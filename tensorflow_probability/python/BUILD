@@ -33,6 +33,11 @@ py_library(
         "monte_carlo.py",
     ],
     srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # six dep,
+        # tensorflow dep,
+    ],
 )
 
 py_test(
@@ -41,5 +46,7 @@ py_test(
     srcs = ["tests/monte_carlo_test.py"],
     deps = [
         ":monte_carlo",
+        # numpy dep,
+        # tensorflow dep,
     ],
 )
