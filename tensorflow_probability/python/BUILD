@@ -23,7 +23,7 @@ exports_files(["LICENSE"])
 
 package(
     default_visibility = [
-        "//tensorflow_probability:__subpackages__",
+        "//third_party/tensorflow_probability:__subpackages__",
     ],
 )
 
@@ -35,7 +35,6 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         # numpy dep,
-        # six dep,
         # tensorflow dep,
     ],
 )
@@ -46,6 +45,29 @@ py_test(
     srcs = ["tests/monte_carlo_test.py"],
     deps = [
         ":monte_carlo",
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "trainable_distributions",
+    srcs = [
+        "trainable_distributions.py",
+    ],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "trainable_distributions_test",
+    size = "small",
+    srcs = ["tests/trainable_distributions_test.py"],
+    deps = [
+        ":trainable_distributions",
         # numpy dep,
         # tensorflow dep,
     ],
