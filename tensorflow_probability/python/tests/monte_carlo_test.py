@@ -12,20 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Copyright 2016 The TensorFlow Authors. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==============================================================================
 """Tests for Monte Carlo Ops."""
 
 from __future__ import absolute_import
@@ -35,6 +21,8 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
+from tensorflow_probability.python import monte_carlo as monte_carlo_lib
+from tensorflow_probability.python.monte_carlo import _get_samples
 from tensorflow.contrib import layers as layers_lib
 from tensorflow.python.framework import constant_op
 from tensorflow.python.ops import gradients_impl
@@ -43,8 +31,6 @@ from tensorflow.python.ops.distributions import gamma as gamma_lib
 from tensorflow.python.ops.distributions import kullback_leibler
 from tensorflow.python.ops.distributions import normal as normal_lib
 from tensorflow.python.platform import test
-from tensorflow_probability.python import monte_carlo as monte_carlo_lib
-from tensorflow_probability.python.monte_carlo import _get_samples
 
 layers = layers_lib
 mc = monte_carlo_lib

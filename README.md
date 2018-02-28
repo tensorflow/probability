@@ -56,7 +56,7 @@ be run directly from the command line, e.g.,
 `python -m tensorflow_probability.examples.weight_uncertainty.mnist_deep_nn`
 
 to train a Bayesian deep network to classify MNIST digits. See the
-[examples](https://github.com/tensorflow/probability/tree/master/examples/)
+[examples](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/)
 directory for the list of example implementations.
 
 ## Usage

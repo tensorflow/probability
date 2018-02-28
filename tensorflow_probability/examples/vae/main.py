@@ -41,8 +41,8 @@ import time
 import numpy as np
 import tensorflow as tf
 
-from tensorflow.contrib.learn.python.learn.datasets import mnist
 from tensorflow_probability.examples.vae import vae_model
+from tensorflow.contrib.learn.python.learn.datasets import mnist
 
 try:
   from matplotlib import cm  # pylint: disable=g-import-not-at-top
