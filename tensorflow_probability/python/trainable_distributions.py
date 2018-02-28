@@ -30,6 +30,7 @@ tfd = tf.contrib.distributions
 
 
 __all__ = [
+    'bernoulli',
     'multivariate_normal_tril',
     'positive_tril_with_diag_shift',
 ]
@@ -95,39 +96,43 @@ def multivariate_normal_tril(
   #### Examples
 
   ```python
+  # This example fits a multilinear regression loss.
   import tensorflow as tf
   import tensorflow_probability as tfp
 
   # Create fictitious training data.
-  n = 3000   # number of samples
-  x_size = 4   # size of single x
-  y_size = 2    # size of single y
-  x = np.random.randn(n, x_size)
-  w = np.random.randn(y_size, x_size)
-  b = np.random.randn(y_size, 1)
-  y = np.tensordot(x, w, axes=[[-1], [-1]]) + b
+  dtype = np.float32
+  n = 3000    # number of samples
+  x_size = 4  # size of single x
+  y_size = 2  # size of single y
+  np.random.seed(142)
+  x = np.random.randn(n, x_size).astype(dtype)
+  w = np.random.randn(x_size, y_size).astype(dtype)
+  b = np.random.randn(1, y_size).astype(dtype)
+  y = np.tensordot(x, w, axes=[[-1], [0]]) + b
 
   # Build TF graph for fitting MVN.
   mvn = tfp.trainable_distribution.multivariate_normal_tril(x, dims=y_size)
   loss = -tf.reduce_mean(mvn.log_prob(y))
   train_op = tf.train.AdamOptimizer(learning_rate=2.**-5).minimize(loss)
-  mse = tf.reduce_mean(tf.squared_difference(y, mvn.loc))  # Monitor convergence
-  tf.global_variables_initializer().run()
+  mse = tf.reduce_mean(tf.squared_difference(y, mvn.mean()))
+  init_op = tf.global_variables_initializer()
 
   # Run graph 1000 times.
   loss_ = np.zeros(1000)
   mse_ = np.zeros(1000)
+  init_op.run()
   for it in xrange(loss_.size):
-    [_, loss_[it], mse_[it]] = sess.run([train_op, loss, mse])
+    _, loss_[it], mse_[it] = sess.run([train_op, loss, mse])
     if it % 200 == 0 or it == loss_.size - 1:
       print("iteration:{}  loss:{}  mse:{}".format(it, loss_[it], mse_[it]))
 
-  # ==> iteration:0    loss:956.214439873  mse:2.36651925571
-  #     iteration:200  loss:2.79611814404  mse:0.784222219306
-  #     iteration:400  loss:2.14970138114  mse:0.504379955415
-  #     iteration:600  loss:1.7965903912   mse:0.311770522879
-  #     iteration:800  loss:1.52653481953  mse:0.178522642874
-  #     iteration:999  loss:1.27916316673  mse:0.0912386968493
+  # ==> iteration:0    loss:670.471557617  mse:3.88558006287
+  #     iteration:200  loss:3.4884390831   mse:1.78182530403
+  #     iteration:400  loss:2.4829223156   mse:1.04152262211
+  #     iteration:600  loss:1.9646422863   mse:0.571185767651
+  #     iteration:800  loss:1.59305691719  mse:0.276959866285
+  #     iteration:999  loss:1.26750314236  mse:0.112104855478
   ```
 
   Args:
@@ -136,8 +141,8 @@ def multivariate_normal_tril(
     dims: Scalar, `int`, `Tensor` indicated the MVN event size, i.e., the
       created MVN will be distribution over length-`dims` vectors.
     layer_fn: Python `callable` which takes input `x` and `int` scalar `d` and
-      returns a transformation of `x` with size `tf.concat([tf.shape(x)[:-1],
-      [d]], axis=0)`.
+      returns a transformation of `x` with size
+      `tf.concat([tf.shape(x)[:-1], [d]], axis=0)`.
       Default value: `tf.layers.dense`.
     loc_fn: Python `callable` which transforms the `loc` parameter. Takes a
       (batch of) length-`dims` vectors and returns a `Tensor` of same shape and
@@ -160,3 +165,80 @@ def multivariate_normal_tril(
     return tfd.MultivariateNormalTriL(
         loc=loc_fn(x[..., :dims]),
         scale_tril=scale_fn(x[..., dims:]))
+
+
+def bernoulli(x, layer_fn=tf.layers.dense, name=None):
+  """Constructs a trainable `tfd.Bernoulli` distribution.
+
+  This function creates a distribution suitable for [logistic regression](
+  https://en.wikipedia.org/wiki/Logistic_regression).
+
+  This function creates a Bernoulli distribution parameterized by logits.
+  Using default args, this function is mathematically equivalent to:
+
+  ```none
+  Y = Bernoulli(logits=matmul(W, x) + b)
+
+  where,
+    W in R^[d, n]
+    b in R^d
+  ```
+
+  #### Examples
+
+  ```python
+  # This example fits a logistic regression loss.
+  import tensorflow as tf
+  import tensorflow_probability as tfp
+
+  # Create fictitious training data.
+  dtype = np.float32
+  n = 3000    # number of samples
+  x_size = 4  # size of single x
+  np.random.seed(142)
+  x = np.random.randn(n, x_size).astype(dtype)
+  w = np.random.randn(x_size).astype(dtype)
+  b = np.random.randn(1).astype(dtype)
+  y = dtype(np.tensordot(x, w, axes=[[-1], [-1]]) + b > 0.)
+
+  # Build TF graph for fitting Bernoulli.
+  bernoulli = tfp.trainable_distribution.bernoulli(x)
+  loss = -tf.reduce_mean(bernoulli.log_prob(y))
+  train_op = tf.train.AdamOptimizer(learning_rate=2.**-5).minimize(loss)
+  mse = tf.reduce_mean(tf.squared_difference(y, bernoulli.mean()))
+  init_op = tf.global_variables_initializer()
+
+  # Run graph 1000 times.
+  loss_ = np.zeros(1000)
+  mse_ = np.zeros(1000)
+  init_op.run()
+  for it in xrange(loss_.size):
+    _, loss_[it], mse_[it] = sess.run([train_op, loss, mse])
+    if it % 200 == 0 or it == loss_.size - 1:
+      print("iteration:{}  loss:{}  mse:{}".format(it, loss_[it], mse_[it]))
+
+  # ==> iteration:0    loss:1.17989099026    mse:0.4212923944
+  #     iteration:200  loss:0.213382124901   mse:0.0547544509172
+  #     iteration:400  loss:0.14739997685    mse:0.0365632660687
+  #     iteration:600  loss:0.118733644485   mse:0.0290872063488
+  #     iteration:800  loss:0.101618662477   mse:0.0247089788318
+  #     iteration:999  loss:0.0898892953992  mse:0.0217369645834
+  ```
+
+  Args:
+    x: `Tensor` with floating type. Must have statically defined rank and
+      statically known right-most dimension.
+    layer_fn: Python `callable` which takes input `x` and `int` scalar `d` and
+      returns a transformation of `x` with size
+      `tf.concat([tf.shape(x)[:-1], [1]], axis=0)`.
+      Default value: `tf.layers.dense`.
+    name: A `name_scope` name for operations created by this function.
+      Default value: `None` (i.e., "bernoulli").
+
+  Returns:
+    bernoulli: An instance of `tfd.Bernoulli`.
+  """
+  with tf.name_scope(name, 'bernoulli', [x]):
+    x = tf.convert_to_tensor(x, name='x')
+    logits = tf.squeeze(layer_fn(x, 1), axis=-1)
+    return tfd.Bernoulli(logits=logits)
