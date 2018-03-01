@@ -18,9 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from tensorflow.python.framework import ops
-from tensorflow.python.ops import array_ops
-from tensorflow.python.ops import math_ops
+import tensorflow as tf
+
 
 __all__ = [
     'expectation',
@@ -157,15 +156,15 @@ def expectation(f, samples, log_prob=None, use_reparametrization=True,
       `callable`.
   """
 
-  with ops.name_scope(name, 'expectation', [samples]):
+  with tf.name_scope(name, 'expectation', [samples]):
     if not callable(f):
       raise ValueError('`f` must be a callable function.')
     if use_reparametrization:
-      return math_ops.reduce_mean(f(samples), axis=axis, keep_dims=keep_dims)
+      return tf.reduce_mean(f(samples), axis=axis, keep_dims=keep_dims)
     else:
       if not callable(log_prob):
         raise ValueError('`log_prob` must be a callable function.')
-      stop = array_ops.stop_gradient  # For readability.
+      stop = tf.stop_gradient  # For readability.
       x = stop(samples)
       logpx = log_prob(x)
       fx = f(x)  # Call `f` once in case it has side-effects.
@@ -181,22 +180,22 @@ def expectation(f, samples, log_prob=None, use_reparametrization=True,
       # "Is there a floating point value of x, for which x-x == 0 is false?"
       # http://stackoverflow.com/q/2686644
       fx += stop(fx) * (logpx - stop(logpx))  # Add zeros_like(logpx).
-      return math_ops.reduce_mean(fx, axis=axis, keep_dims=keep_dims)
+      return tf.reduce_mean(fx, axis=axis, keep_dims=keep_dims)
 
 
 def _sample_mean(values):
   """Mean over sample indices.  In this module this is always [0]."""
-  return math_ops.reduce_mean(values, reduction_indices=[0])
+  return tf.reduce_mean(values, reduction_indices=[0])
 
 
 def _sample_max(values):
   """Max over sample indices.  In this module this is always [0]."""
-  return math_ops.reduce_max(values, reduction_indices=[0])
+  return tf.reduce_max(values, reduction_indices=[0])
 
 
 def _get_samples(dist, z, n, seed):
   """Check args and return samples."""
-  with ops.name_scope('get_samples', values=[z, n]):
+  with tf.name_scope('get_samples', values=[z, n]):
     if (n is None) == (z is None):
       raise ValueError(
           'Must specify exactly one of arguments "n" and "z".  Found: '
@@ -204,4 +203,4 @@ def _get_samples(dist, z, n, seed):
     if n is not None:
       return dist.sample(n, seed=seed)
     else:
-      return ops.convert_to_tensor(z, name='z')
+      return tf.convert_to_tensor(z, name='z')

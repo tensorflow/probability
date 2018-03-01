@@ -22,9 +22,8 @@ from __future__ import print_function
 import numpy as np
 
 import tensorflow as tf
-from tensorflow_probability.python import trainable_distributions as tfp_td
+import tensorflow_probability as tfp
 from tensorflow.python.framework import test_util
-
 
 tfd = tf.contrib.distributions
 
@@ -42,7 +41,7 @@ class TestMVNTriL(tf.test.TestCase):
     x_ = np.random.randn(*np.concatenate([batch_shape, [x_size]]))
 
     x = tf.constant(x_)
-    mvn = tfp_td.multivariate_normal_tril(x, dims=mvn_size)
+    mvn = tfp.trainable_distributions.multivariate_normal_tril(x, dims=mvn_size)
     scale = mvn.scale.to_dense()
     scale_upper = tf.matrix_set_diag(
         tf.matrix_band_part(scale, num_lower=0, num_upper=-1),
@@ -80,7 +79,7 @@ class TestMVNTriL(tf.test.TestCase):
     x_ = np.random.randn(*np.concatenate([batch_shape, [x_size]]))
 
     x = tf.constant(x_)
-    mvn = tfp_td.multivariate_normal_tril(
+    mvn = tfp.trainable_distributions.multivariate_normal_tril(
         x,
         dims=mvn_size,
         loc_fn=tf.zeros_like,
@@ -129,7 +128,7 @@ class TestBernoulli(tf.test.TestCase):
     x_ = np.random.randn(*np.concatenate([batch_shape, [x_size]]))
 
     x = tf.constant(x_)
-    bernoulli = tfp_td.bernoulli(x)
+    bernoulli = tfp.trainable_distributions.bernoulli(x)
 
     self.evaluate(tf.global_variables_initializer())
     [
@@ -153,7 +152,7 @@ class TestBernoulli(tf.test.TestCase):
     x_ = np.random.randn(*np.concatenate([batch_shape, [x_size]]))
 
     x = tf.constant(x_)
-    bernoulli = tfp_td.bernoulli(
+    bernoulli = tfp.trainable_distributions.bernoulli(
         x,
         layer_fn=lambda x, _: tf.reduce_sum(x, axis=-1, keepdims=True))
 

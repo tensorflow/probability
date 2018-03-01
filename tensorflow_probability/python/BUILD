@@ -21,17 +21,29 @@ licenses(["notice"])  # Apache 2.0
 
 exports_files(["LICENSE"])
 
-package(
-    default_visibility = [
-        "//third_party/tensorflow_probability:__subpackages__",
+# Submodules need to grant visibility to ":python-visible-package" and be in
+# the `deps` of ":python".
+package_group(
+    name = "python-visible-package",
+    packages = [
+        "//tensorflow_probability/python",
+    ],
+)
+
+py_library(
+    name = "python",
+    srcs = ["__init__.py"],
+    srcs_version = "PY2AND3",
+    visibility = ["//tensorflow_probability:__pkg__"],
+    deps = [
+        ":monte_carlo",
+        ":trainable_distributions",
     ],
 )
 
 py_library(
     name = "monte_carlo",
-    srcs = [
-        "monte_carlo.py",
-    ],
+    srcs = ["monte_carlo.py"],
     srcs_version = "PY2AND3",
     deps = [
         # numpy dep,
@@ -42,19 +54,17 @@ py_library(
 py_test(
     name = "monte_carlo_test",
     size = "small",
-    srcs = ["tests/monte_carlo_test.py"],
+    srcs = ["monte_carlo_test.py"],
     deps = [
-        ":monte_carlo",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability",
     ],
 )
 
 py_library(
     name = "trainable_distributions",
-    srcs = [
-        "trainable_distributions.py",
-    ],
+    srcs = ["trainable_distributions.py"],
     srcs_version = "PY2AND3",
     deps = [
         # numpy dep,
@@ -65,10 +75,10 @@ py_library(
 py_test(
     name = "trainable_distributions_test",
     size = "small",
-    srcs = ["tests/trainable_distributions_test.py"],
+    srcs = ["trainable_distributions_test.py"],
     deps = [
-        ":trainable_distributions",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability",
     ],
 )

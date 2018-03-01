@@ -18,12 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+# Contributors to the `python/` dir should not alter this file; instead update
+# `python/__init__.py` as necessary.
 
-from tensorflow_probability.python import monte_carlo
-from tensorflow_probability.python import trainable_distributions
-
-
-__all__ = [
-    "monte_carlo",
-    "trainable_distributions",
-]
+from tensorflow_probability.python import *  # pylint: disable=wildcard-import

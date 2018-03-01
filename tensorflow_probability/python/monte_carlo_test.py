@@ -21,27 +21,20 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-from tensorflow_probability.python import monte_carlo as monte_carlo_lib
+import tensorflow as tf
+import tensorflow_probability as tfp
+
 from tensorflow_probability.python.monte_carlo import _get_samples
-from tensorflow.contrib import layers as layers_lib
-from tensorflow.python.framework import constant_op
-from tensorflow.python.ops import gradients_impl
-from tensorflow.python.ops.distributions import distribution as distribution_lib
-from tensorflow.python.ops.distributions import gamma as gamma_lib
-from tensorflow.python.ops.distributions import kullback_leibler
-from tensorflow.python.ops.distributions import normal as normal_lib
-from tensorflow.python.platform import test
 
-layers = layers_lib
-mc = monte_carlo_lib
+tfd = tf.contrib.distributions
 
 
-class GetSamplesTest(test.TestCase):
+class GetSamplesTest(tf.test.TestCase):
   """Test the private method 'get_samples'."""
 
   def test_raises_if_both_z_and_n_are_none(self):
     with self.test_session():
-      dist = normal_lib.Normal(loc=0., scale=1.)
+      dist = tfd.Normal(loc=0., scale=1.)
       z = None
       n = None
       seed = None
@@ -50,7 +43,7 @@ class GetSamplesTest(test.TestCase):
 
   def test_raises_if_both_z_and_n_are_not_none(self):
     with self.test_session():
-      dist = normal_lib.Normal(loc=0., scale=1.)
+      dist = tfd.Normal(loc=0., scale=1.)
       z = dist.sample(seed=42)
       n = 1
       seed = None
@@ -59,7 +52,7 @@ class GetSamplesTest(test.TestCase):
 
   def test_returns_n_samples_if_n_provided(self):
     with self.test_session():
-      dist = normal_lib.Normal(loc=0., scale=1.)
+      dist = tfd.Normal(loc=0., scale=1.)
       z = None
       n = 10
       seed = None
@@ -68,7 +61,7 @@ class GetSamplesTest(test.TestCase):
 
   def test_returns_z_if_z_provided(self):
     with self.test_session():
-      dist = normal_lib.Normal(loc=0., scale=1.)
+      dist = tfd.Normal(loc=0., scale=1.)
       z = dist.sample(10, seed=42)
       n = None
       seed = None
@@ -76,20 +69,20 @@ class GetSamplesTest(test.TestCase):
       self.assertEqual((10,), z.get_shape())
 
 
-class ExpectationTest(test.TestCase):
+class ExpectationTest(tf.test.TestCase):
 
   def test_works_correctly(self):
     with self.test_session() as sess:
-      x = constant_op.constant([-1e6, -100, -10, -1, 1, 10, 100, 1e6])
-      p = normal_lib.Normal(loc=x, scale=1.)
+      x = tf.constant([-1e6, -100, -10, -1, 1, 10, 100, 1e6])
+      p = tfd.Normal(loc=x, scale=1.)
 
       # We use the prefex "efx" to mean "E_p[f(X)]".
       f = lambda u: u
       efx_true = x
       samples = p.sample(int(1e5), seed=1)
-      efx_reparam = mc.expectation(f, samples, p.log_prob)
-      efx_score = mc.expectation(f, samples, p.log_prob,
-                                 use_reparametrization=False)
+      efx_reparam = tfp.monte_carlo.expectation(f, samples, p.log_prob)
+      efx_score = tfp.monte_carlo.expectation(f, samples, p.log_prob,
+                                              use_reparametrization=False)
 
       [
           efx_true_,
@@ -102,9 +95,9 @@ class ExpectationTest(test.TestCase):
           efx_true,
           efx_reparam,
           efx_score,
-          gradients_impl.gradients(efx_true, x)[0],
-          gradients_impl.gradients(efx_reparam, x)[0],
-          gradients_impl.gradients(efx_score, x)[0],
+          tf.gradients(efx_true, x)[0],
+          tf.gradients(efx_reparam, x)[0],
+          tf.gradients(efx_score, x)[0],
       ])
 
       self.assertAllEqual(np.ones_like(efx_true_grad_), efx_true_grad_)
@@ -128,28 +121,28 @@ class ExpectationTest(test.TestCase):
   def test_docstring_example_normal(self):
     with self.test_session() as sess:
       num_draws = int(1e5)
-      mu_p = constant_op.constant(0.)
-      mu_q = constant_op.constant(1.)
-      p = normal_lib.Normal(loc=mu_p, scale=1.)
-      q = normal_lib.Normal(loc=mu_q, scale=2.)
-      exact_kl_normal_normal = kullback_leibler.kl_divergence(p, q)
-      approx_kl_normal_normal = monte_carlo_lib.expectation(
+      mu_p = tf.constant(0.)
+      mu_q = tf.constant(1.)
+      p = tfd.Normal(loc=mu_p, scale=1.)
+      q = tfd.Normal(loc=mu_q, scale=2.)
+      exact_kl_normal_normal = tfd.kl_divergence(p, q)
+      approx_kl_normal_normal = tfp.monte_carlo.expectation(
           f=lambda x: p.log_prob(x) - q.log_prob(x),
           samples=p.sample(num_draws, seed=42),
           log_prob=p.log_prob,
-          use_reparametrization=(p.reparameterization_type
-                                 == distribution_lib.FULLY_REPARAMETERIZED))
+          use_reparametrization=(p.reparameterization_type ==
+                                 tfd.FULLY_REPARAMETERIZED))
       [exact_kl_normal_normal_, approx_kl_normal_normal_] = sess.run([
           exact_kl_normal_normal, approx_kl_normal_normal])
       self.assertEqual(
           True,
-          p.reparameterization_type == distribution_lib.FULLY_REPARAMETERIZED)
+          p.reparameterization_type == tfd.FULLY_REPARAMETERIZED)
       self.assertAllClose(exact_kl_normal_normal_, approx_kl_normal_normal_,
                           rtol=0.01, atol=0.)
 
       # Compare gradients. (Not present in `docstring`.)
-      gradp = lambda fp: gradients_impl.gradients(fp, mu_p)[0]
-      gradq = lambda fq: gradients_impl.gradients(fq, mu_q)[0]
+      gradp = lambda fp: tf.gradients(fp, mu_p)[0]
+      gradq = lambda fq: tf.gradients(fq, mu_q)[0]
       [
           gradp_exact_kl_normal_normal_,
           gradq_exact_kl_normal_normal_,
@@ -171,28 +164,28 @@ class ExpectationTest(test.TestCase):
   def test_docstring_example_gamma(self):
     with self.test_session() as sess:
       num_draws = int(1e5)
-      concentration_p = constant_op.constant(1.)
-      concentration_q = constant_op.constant(2.)
-      p = gamma_lib.Gamma(concentration=concentration_p, rate=1.)
-      q = gamma_lib.Gamma(concentration=concentration_q, rate=3.)
-      approx_kl_gamma_gamma = monte_carlo_lib.expectation(
+      concentration_p = tf.constant(1.)
+      concentration_q = tf.constant(2.)
+      p = tfd.Gamma(concentration=concentration_p, rate=1.)
+      q = tfd.Gamma(concentration=concentration_q, rate=3.)
+      approx_kl_gamma_gamma = tfp.monte_carlo.expectation(
           f=lambda x: p.log_prob(x) - q.log_prob(x),
           samples=p.sample(num_draws, seed=42),
           log_prob=p.log_prob,
-          use_reparametrization=(p.reparameterization_type
-                                 == distribution_lib.FULLY_REPARAMETERIZED))
-      exact_kl_gamma_gamma = kullback_leibler.kl_divergence(p, q)
+          use_reparametrization=(p.reparameterization_type ==
+                                 tfd.FULLY_REPARAMETERIZED))
+      exact_kl_gamma_gamma = tfd.kl_divergence(p, q)
       [exact_kl_gamma_gamma_, approx_kl_gamma_gamma_] = sess.run([
           exact_kl_gamma_gamma, approx_kl_gamma_gamma])
       self.assertEqual(
           False,
-          p.reparameterization_type == distribution_lib.FULLY_REPARAMETERIZED)
+          p.reparameterization_type == tfd.FULLY_REPARAMETERIZED)
       self.assertAllClose(exact_kl_gamma_gamma_, approx_kl_gamma_gamma_,
                           rtol=0.01, atol=0.)
 
       # Compare gradients. (Not present in `docstring`.)
-      gradp = lambda fp: gradients_impl.gradients(fp, concentration_p)[0]
-      gradq = lambda fq: gradients_impl.gradients(fq, concentration_q)[0]
+      gradp = lambda fp: tf.gradients(fp, concentration_p)[0]
+      gradq = lambda fq: tf.gradients(fq, concentration_q)[0]
       [
           gradp_exact_kl_gamma_gamma_,
           gradq_exact_kl_gamma_gamma_,
@@ -214,4 +207,4 @@ class ExpectationTest(test.TestCase):
 
 
 if __name__ == '__main__':
-  test.main()
+  tf.test.main()
