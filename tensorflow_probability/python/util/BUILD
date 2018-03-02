@@ -13,29 +13,32 @@
 # limitations under the License.
 # ============================================================================
 # Description:
-#   TensorFlow Probability implements probabilistic and statistical
-#   methods, including modeling and Bayesian inference. APIs here are
-#   meant to evolve over time.
+#   TensorFlow Probability utility functions.
+
+package(
+    default_visibility = [
+        "//tensorflow_probability:__subpackages__",
+    ],
+)
 
 licenses(["notice"])  # Apache 2.0
 
 exports_files(["LICENSE"])
 
 py_library(
-    name = "python",
+    name = "util",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
-    visibility = ["//tensorflow_probability:__pkg__"],
     deps = [
-        ":monte_carlo",
-        ":trainable_distributions",
-        "//tensorflow_probability/python/util",
+        ":variables",
     ],
 )
 
 py_library(
-    name = "monte_carlo",
-    srcs = ["monte_carlo.py"],
+    name = "variables",
+    srcs = [
+        "variables.py",
+    ],
     srcs_version = "PY2AND3",
     deps = [
         # numpy dep,
@@ -44,30 +47,9 @@ py_library(
 )
 
 py_test(
-    name = "monte_carlo_test",
+    name = "variables_test",
     size = "small",
-    srcs = ["monte_carlo_test.py"],
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-    ],
-)
-
-py_library(
-    name = "trainable_distributions",
-    srcs = ["trainable_distributions.py"],
-    srcs_version = "PY2AND3",
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-    ],
-)
-
-py_test(
-    name = "trainable_distributions_test",
-    size = "small",
-    srcs = ["trainable_distributions_test.py"],
+    srcs = ["variables_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,

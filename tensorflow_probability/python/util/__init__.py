@@ -12,11 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Tools for probabilistic reasoning in TensorFlow."""
+"""TensorFlow Probability python utilities."""
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from tensorflow_probability.python import monte_carlo
-from tensorflow_probability.python import trainable_distributions
-from tensorflow_probability.python import util
+from tensorflow_probability.python.util.variables import externalize_variables_as_args
