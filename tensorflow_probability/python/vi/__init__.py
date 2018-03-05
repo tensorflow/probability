@@ -12,12 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Tools for probabilistic reasoning in TensorFlow."""
+"""Methods and objectives for variational inference."""
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from tensorflow_probability.python import monte_carlo
-from tensorflow_probability.python import trainable_distributions
-from tensorflow_probability.python import util
-from tensorflow_probability.python import vi
+from tensorflow_probability.python.vi import csiszar_divergence

@@ -13,9 +13,7 @@
 # limitations under the License.
 # ============================================================================
 # Description:
-#   TensorFlow Probability implements probabilistic and statistical
-#   methods, including modeling and Bayesian inference. APIs here are
-#   meant to evolve over time.
+#   Methods and objectives for variational inference.
 
 licenses(["notice"])  # Apache 2.0
 
@@ -28,53 +26,29 @@ package(
 exports_files(["LICENSE"])
 
 py_library(
-    name = "python",
+    name = "vi",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
-    visibility = ["//tensorflow_probability:__pkg__"],
     deps = [
-        ":monte_carlo",
-        ":trainable_distributions",
-        "//tensorflow_probability/python/util",
-        "//tensorflow_probability/python/vi",
+        ":csiszar_divergence",
     ],
 )
 
 py_library(
-    name = "monte_carlo",
-    srcs = ["monte_carlo.py"],
+    name = "csiszar_divergence",
+    srcs = ["csiszar_divergence.py"],
     srcs_version = "PY2AND3",
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python:monte_carlo",
     ],
 )
 
 py_test(
-    name = "monte_carlo_test",
-    size = "small",
-    srcs = ["monte_carlo_test.py"],
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-    ],
-)
-
-py_library(
-    name = "trainable_distributions",
-    srcs = ["trainable_distributions.py"],
-    srcs_version = "PY2AND3",
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-    ],
-)
-
-py_test(
-    name = "trainable_distributions_test",
-    size = "small",
-    srcs = ["trainable_distributions_test.py"],
+    name = "csiszar_divergence_test",
+    size = "medium",
+    srcs = ["csiszar_divergence_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
