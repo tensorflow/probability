@@ -2,16 +2,16 @@
 
 This package collects tools for probabilistic reasoning in TensorFlow. It is
 intended to serve as a hub for development of modeling tools, inference
-algorithms, useful models, and general statistical computation. Taking advantage
-of the TensorFlow ecosystem allows straightforward combination of probabilistic
-methods with deep networks, gradient-based inference via automatic
-differentiation, and scalability to large datasets and models via hardware
-acceleration (e.g., GPUs) and distributed computation.
+algorithms, useful models, and general statistical computation. Taking
+advantage of the TensorFlow ecosystem allows straightforward combination of
+probabilistic methods with deep networks, gradient-based inference via
+automatic differentiation, and scalability to large datasets and models via
+hardware acceleration (e.g., GPUs) and distributed computation.
 
 Contents of this package currently include:
 
-* *Sampling algorithms* E.g., `tfp.metropolis_hastings`, `tfp.hmc`,
-  `tfp.monte_carlo`.
+* *Sampling algorithms* E.g., `tfp.mcmc.sample_chain`,
+  `tfp.mcmc.HamiltonianMonteCarlo`, `tfp.monte_carlo.expectation`.
 * *Example models* (`tfp.examples`): implementations of common probability
   models in TensorFlow using tools from this package and from
   `tf.contrib.distributions`.

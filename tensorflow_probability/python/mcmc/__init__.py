@@ -12,13 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Tools for probabilistic reasoning in TensorFlow."""
+"""TensorFlow Probability MCMC python package."""
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from tensorflow_probability.python import mcmc
-from tensorflow_probability.python import monte_carlo
-from tensorflow_probability.python import trainable_distributions
-from tensorflow_probability.python import util
-from tensorflow_probability.python import vi
+from tensorflow_probability.python.mcmc.hmc import HamiltonianMonteCarlo
+from tensorflow_probability.python.mcmc.kernel import TransitionKernel
+from tensorflow_probability.python.mcmc.sample import sample_chain
