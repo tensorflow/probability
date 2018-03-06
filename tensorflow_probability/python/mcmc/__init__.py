@@ -17,6 +17,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from tensorflow_probability.python.mcmc.diagnostic import effective_sample_size
+from tensorflow_probability.python.mcmc.diagnostic import potential_scale_reduction
 from tensorflow_probability.python.mcmc.hmc import HamiltonianMonteCarlo
 from tensorflow_probability.python.mcmc.kernel import TransitionKernel
 from tensorflow_probability.python.mcmc.sample import sample_chain

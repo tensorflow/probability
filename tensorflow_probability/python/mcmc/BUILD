@@ -30,9 +30,31 @@ py_library(
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":diagnostic",
         ":hmc",
         ":kernel",
         ":sample",
+    ],
+)
+
+py_library(
+    name = "diagnostic",
+    srcs = ["diagnostic.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "diagnostic_test",
+    size = "small",
+    srcs = ["diagnostic_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
     ],
 )
 
