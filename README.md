@@ -43,7 +43,7 @@ git clone https://github.com/tensorflow/probability.git
 cd probability
 bazel build --config=opt --copt=-O3 --copt=-march=native :pip_pkg
 ./bazel-bin/pip_pkg /tmp/tensorflow_probability_pkg
-pip install /tmp/tensorflow_probability_pkg/*.whl
+pip install /tmp/tensorflow_probability_pkg/*.whl --user --upgrade
 ```
 
 ## Examples
