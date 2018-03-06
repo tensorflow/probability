@@ -71,8 +71,10 @@ function main() {
     echo $(date) : "=== Building wheel"
   fi
 
-  # Arguments to setup.py may be passed as a quoted string, e.g.,
-  # ./pip_pkg /tmp/tensorflow_probability_pkg "--gpu --release"
+  # Pass through remaining arguments (following the first argument, which
+  # specifies the output dir) to setup.py, e.g.,
+  #  ./pip_pkg /tmp/tensorflow_probability_pkg --gpu --release
+  # passes `--gpu --release` to setup.py.
   python setup.py sdist ${@:2} > /dev/null
   python setup.py bdist_wheel ${@:2} >/dev/null
 
