@@ -22,28 +22,26 @@ interfaces may change at any time. We welcome external contributions! See
 
 ## Installation
 
-The easiest way to install TensorFlow Probability is using `pip`:
+As simple as:
 
 ```shell
-pip install --upgrade tensorflow-probability       # for Python 2.7
-pip3 install --upgrade tensorflow-probability      # for Python 3.n
-pip install --upgrade tensorflow-probability-gpu   # for Python 2.7 and GPU
-pip3 install --upgrade tensorflow-probability-gpu  # for Python 3.n and GPU
+pip install tfp-nightly --user --upgrade     # depends on tensorflow (CPU-only)
+```
+
+We also provide a GPU-enabled flavor:
+
+```shell
+pip install tfp-nightly-gpu --user --upgrade # depends on tensorflow-gpu (GPU enabled)
 ```
 
 TensorFlow Probability does not currently contain any GPU-specific code; the
 primary difference between these packages is that `tensorflow-probability-gpu`
 depends on a GPU-enabled version of TensorFlow.
 
-For more up-to-date (but possibly less stable) functionality, you may prefer to
-install the nightly release:
-
-```shell
-pip install --upgrade tfp-nightly       # for Python 2.7
-pip3 install --upgrade tfp-nightly      # for Python 3.n
-pip install --upgrade tfp-nightly-gpu   # for Python 2.7
-pip3 install --upgrade tfp-nightly-gpu  # for Python 3.n
-```
+To force a Python 3-specific install, replace `pip` with `pip3` in the above
+commands. For additional installation help, guidance installing prerequisites,
+and (optionally) setting up virtual environments, see the [TensorFlow
+installation guide](https://www.tensorflow.org/install).
 
 You can also install from source. This requires the [Bazel](
 https://bazel.build/) build system.
