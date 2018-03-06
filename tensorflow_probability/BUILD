@@ -13,7 +13,7 @@
 # limitations under the License.
 # ============================================================================
 # Description:
-#   Tensorflow Probability implements probabilistic and statistical
+#   TensorFlow Probability implements probabilistic and statistical
 #   methods, including modeling and Bayesian inference. APIs here are
 #   meant to evolve over time.
 
