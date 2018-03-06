@@ -30,13 +30,15 @@ changes you propose do not break existing unit tests. You can run tests (on CPU)
 using the command,
 
 ```shell
-bazel test --config=opt //tensorflow_probability/...
+bazel test --config=opt --copt=-O3 --copt=-march=native \
+  //tensorflow_probability/...
 ```
 
 or on GPU,
 
 ```shell
-bazel test --config=opt --config=cuda //tensorflow_probability/...
+bazel test --config=opt --copt=-O3 --copt=-march=native --config=cuda \
+  //tensorflow_probability/...
 ```
 
 from the root of the `tensorflow_probability` repository.

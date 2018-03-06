@@ -41,7 +41,7 @@ https://bazel.build/) build system.
 ```shell
 git clone https://github.com/tensorflow/probability.git
 cd probability
-bazel build :pip_pkg
+bazel build --config=opt --copt=-O3 --copt=-march=native :pip_pkg
 ./bazel-bin/pip_pkg /tmp/tensorflow_probability_pkg
 pip install /tmp/tensorflow_probability_pkg/*.whl
 ```
