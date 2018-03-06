@@ -13,6 +13,7 @@
 # limitations under the License.
 # ============================================================================
 """Install tensorflow_probability."""
+import datetime
 import sys
 
 from setuptools import find_packages
@@ -20,7 +21,7 @@ from setuptools import setup
 from setuptools.command.install import install as InstallCommandBase
 from setuptools.dist import Distribution
 
-__version__ = '0.1'
+__version__ = '0.0.1'
 
 REQUIRED_PACKAGES = [
     'six >= 1.10.0',
@@ -33,12 +34,29 @@ if '--gpu' in sys.argv:
 else:
   use_gpu = False
 
-if use_gpu:
-  project_name = 'tensorflow-probability-gpu'
-  REQUIRED_PACKAGES.append('tensorflow-gpu>=1.5.0')
+if '--release' in sys.argv:
+  release = True
+  sys.argv.remove('--release')
 else:
+  # Build a nightly package by default.
+  release = False
+
+if release:
   project_name = 'tensorflow-probability'
-  REQUIRED_PACKAGES.append('tensorflow>=1.5.0')
+  tensorflow_package_name = 'tensorflow'
+else:
+  # Nightly releases use date-based versioning of the form
+  # '0.1.dev20180305', and depend on nightly TensorFlow.
+  project_name = 'tfp-nightly'
+  datestring = datetime.datetime.now().strftime('%Y%m%d')
+  __version__ = '{}.dev{}'.format(__version__, datestring)
+  tensorflow_package_name = 'tf-nightly'
+
+if use_gpu:
+  project_name = '{}-gpu'.format(project_name)
+  REQUIRED_PACKAGES.append('{}-gpu>=1.5.0'.format(tensorflow_package_name))
+else:
+  REQUIRED_PACKAGES.append('{}>=1.5.0'.format(tensorflow_package_name))
 
 
 class BinaryDistribution(Distribution):

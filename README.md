@@ -32,8 +32,18 @@ pip3 install --upgrade tensorflow-probability-gpu  # for Python 3.n and GPU
 ```
 
 TensorFlow Probability does not currently contain any GPU-specific code; the
-primary difference between these packages is that  `tensorflow-probability-gpu`
+primary difference between these packages is that `tensorflow-probability-gpu`
 depends on a GPU-enabled version of TensorFlow.
+
+For more up-to-date (but possibly less stable) functionality, you may prefer to
+install the nightly release:
+
+```shell
+pip install --upgrade tfp-nightly       # for Python 2.7
+pip3 install --upgrade tfp-nightly      # for Python 3.n
+pip install --upgrade tfp-nightly-gpu   # for Python 2.7
+pip3 install --upgrade tfp-nightly-gpu  # for Python 3.n
+```
 
 You can also install from source. This requires the [Bazel](
 https://bazel.build/) build system.
