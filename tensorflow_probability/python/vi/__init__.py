@@ -13,8 +13,4 @@
 # limitations under the License.
 # ============================================================================
 """Methods and objectives for variational inference."""
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from tensorflow_probability.python.vi import csiszar_divergence

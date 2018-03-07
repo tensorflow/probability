@@ -13,8 +13,4 @@
 # limitations under the License.
 # ============================================================================
 """TensorFlow Probability python utilities."""
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from tensorflow_probability.python.util.variables import externalize_variables_as_args

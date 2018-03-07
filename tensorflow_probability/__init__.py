@@ -14,10 +14,6 @@
 # ============================================================================
 """Tools for probabilistic reasoning in TensorFlow."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 # Contributors to the `python/` dir should not alter this file; instead update
 # `python/__init__.py` as necessary.
 
