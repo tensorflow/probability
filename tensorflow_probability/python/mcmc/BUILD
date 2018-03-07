@@ -34,6 +34,7 @@ py_library(
         ":hmc",
         ":kernel",
         ":sample",
+        ":sample_annealed_importance",
         ":sample_halton_sequence",
     ],
 )
@@ -107,6 +108,28 @@ py_test(
     name = "sample_test",
     size = "small",
     srcs = ["sample_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "sample_annealed_importance",
+    srcs = ["sample_annealed_importance.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":util",
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "sample_annealed_importance_test",
+    size = "medium",
+    srcs = ["sample_annealed_importance_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,

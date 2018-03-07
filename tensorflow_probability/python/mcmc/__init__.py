@@ -22,4 +22,5 @@ from tensorflow_probability.python.mcmc.diagnostic import potential_scale_reduct
 from tensorflow_probability.python.mcmc.hmc import HamiltonianMonteCarlo
 from tensorflow_probability.python.mcmc.kernel import TransitionKernel
 from tensorflow_probability.python.mcmc.sample import sample_chain
+from tensorflow_probability.python.mcmc.sample_annealed_importance import sample_annealed_importance_chain
 from tensorflow_probability.python.mcmc.sample_halton_sequence import sample_halton_sequence
