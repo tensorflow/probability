@@ -34,6 +34,7 @@ py_library(
         ":hmc",
         ":kernel",
         ":sample",
+        ":sample_halton_sequence",
     ],
 )
 
@@ -106,6 +107,27 @@ py_test(
     name = "sample_test",
     size = "small",
     srcs = ["sample_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "sample_halton_sequence",
+    srcs = ["sample_halton_sequence.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "sample_halton_sequence_test",
+    size = "medium",
+    srcs = ["sample_halton_sequence_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
