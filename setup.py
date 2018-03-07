@@ -42,19 +42,19 @@ else:
   # Build a nightly package by default.
   release = False
 
-gpu_suffix = '-gpu' if use_gpu else ''
+maybe_gpu_suffix = '-gpu' if use_gpu else ''
 
 if release:
-  project_name = 'tensorflow-probability{}'.format(gpu_suffix)
+  project_name = 'tensorflow-probability' + maybe_gpu_suffix
   tensorflow_package_name = 'tensorflow{}>={}'.format(
-      gpu_suffix, REQUIRED_TENSORFLOW_VERSION)
+      maybe_gpu_suffix, REQUIRED_TENSORFLOW_VERSION)
 else:
   # Nightly releases use date-based versioning of the form
   # '0.1.dev20180305', and depend on nightly TensorFlow.
-  project_name = 'tfp-nightly{}'.format(gpu_suffix)
+  project_name = 'tfp-nightly' + maybe_gpu_suffix
   datestring = datetime.datetime.now().strftime('%Y%m%d')
-  __version__ = '{}.dev{}'.format(__version__, datestring)
-  tensorflow_package_name = 'tf-nightly{}'.format(gpu_suffix)
+  __version__ += 'dev' + datestring
+  tensorflow_package_name = 'tf-nightly' + maybe_gpu_suffix
 
 REQUIRED_PACKAGES.append(tensorflow_package_name)
 
