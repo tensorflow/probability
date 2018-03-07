@@ -27,6 +27,7 @@ REQUIRED_PACKAGES = [
     'six >= 1.10.0',
     'numpy >= 1.11.1',
 ]
+REQUIRED_TENSORFLOW_VERSION = '1.5.0'
 
 if '--gpu' in sys.argv:
   use_gpu = True
@@ -41,22 +42,21 @@ else:
   # Build a nightly package by default.
   release = False
 
+gpu_suffix = '-gpu' if use_gpu else ''
+
 if release:
-  project_name = 'tensorflow-probability'
-  tensorflow_package_name = 'tensorflow'
+  project_name = 'tensorflow-probability{}'.format(gpu_suffix)
+  tensorflow_package_name = 'tensorflow{}>={}'.format(
+      gpu_suffix, REQUIRED_TENSORFLOW_VERSION)
 else:
   # Nightly releases use date-based versioning of the form
   # '0.1.dev20180305', and depend on nightly TensorFlow.
-  project_name = 'tfp-nightly'
+  project_name = 'tfp-nightly{}'.format(gpu_suffix)
   datestring = datetime.datetime.now().strftime('%Y%m%d')
   __version__ = '{}.dev{}'.format(__version__, datestring)
-  tensorflow_package_name = 'tf-nightly'
+  tensorflow_package_name = 'tf-nightly{}'.format(gpu_suffix)
 
-if use_gpu:
-  project_name = '{}-gpu'.format(project_name)
-  REQUIRED_PACKAGES.append('{}-gpu>=1.5.0'.format(tensorflow_package_name))
-else:
-  REQUIRED_PACKAGES.append('{}>=1.5.0'.format(tensorflow_package_name))
+REQUIRED_PACKAGES.append(tensorflow_package_name)
 
 
 class BinaryDistribution(Distribution):
