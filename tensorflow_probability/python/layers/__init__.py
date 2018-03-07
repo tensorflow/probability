@@ -12,14 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Tools for probabilistic reasoning in TensorFlow."""
+"""TensorFlow Probability layers."""
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from tensorflow_probability.python import layers
-from tensorflow_probability.python import mcmc
-from tensorflow_probability.python import monte_carlo
-from tensorflow_probability.python import trainable_distributions
-from tensorflow_probability.python import util
-from tensorflow_probability.python import vi
+# pylint: disable=wildcard-import
+
+from tensorflow_probability.python.layers.conv_variational import *
+from tensorflow_probability.python.layers.dense_variational import *
+from tensorflow_probability.python.layers.util import *
+
+# pylint: enable=wildcard-import

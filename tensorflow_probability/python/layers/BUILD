@@ -13,7 +13,7 @@
 # limitations under the License.
 # ============================================================================
 # Description:
-#   TensorFlow Probability utility functions.
+#   TensorFlow Probability layers.
 
 package(
     default_visibility = [
@@ -26,19 +26,20 @@ licenses(["notice"])  # Apache 2.0
 exports_files(["LICENSE"])
 
 py_library(
-    name = "util",
+    name = "layers",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
     deps = [
-        ":docstring",
-        ":variables",
+        ":conv_variational",
+        ":dense_variational",
+        ":util",
     ],
 )
 
 py_library(
-    name = "docstring",
+    name = "conv_variational",
     srcs = [
-        "docstring.py",
+        "conv_variational.py",
     ],
     srcs_version = "PY2AND3",
     deps = [
@@ -48,9 +49,9 @@ py_library(
 )
 
 py_test(
-    name = "docstring_test",
+    name = "conv_variational_test",
     size = "small",
-    srcs = ["docstring_test.py"],
+    srcs = ["conv_variational_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -59,9 +60,9 @@ py_test(
 )
 
 py_library(
-    name = "variables",
+    name = "dense_variational",
     srcs = [
-        "variables.py",
+        "dense_variational.py",
     ],
     srcs_version = "PY2AND3",
     deps = [
@@ -71,12 +72,24 @@ py_library(
 )
 
 py_test(
-    name = "variables_test",
+    name = "dense_variational_test",
     size = "small",
-    srcs = ["variables_test.py"],
+    srcs = ["dense_variational_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "util",
+    srcs = [
+        "util.py",
+    ],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
     ],
 )

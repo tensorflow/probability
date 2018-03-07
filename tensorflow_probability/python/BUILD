@@ -35,6 +35,7 @@ py_library(
     deps = [
         ":monte_carlo",
         ":trainable_distributions",
+        "//tensorflow_probability/python/layers",
         "//tensorflow_probability/python/mcmc",
         "//tensorflow_probability/python/util",
         "//tensorflow_probability/python/vi",
