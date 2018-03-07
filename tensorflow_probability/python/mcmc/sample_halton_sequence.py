@@ -23,6 +23,9 @@ import numpy as np
 
 import tensorflow as tf
 
+from tensorflow.python.ops.distributions import util as distributions_util
+
+
 __all__ = [
     'sample_halton_sequence',
 ]
@@ -36,7 +39,7 @@ _MAX_DIMENSION = 1000
 def sample_halton_sequence(dim,
                            num_results=None,
                            sequence_indices=None,
-                           dtype=None,
+                           dtype=tf.float32,
                            randomized=True,
                            seed=None,
                            name=None):
@@ -125,6 +128,7 @@ def sample_halton_sequence(dim,
       generate. Either this parameter or sequence_indices must be specified but
       not both. If this parameter is None, then the behaviour is determined by
       the `sequence_indices`.
+      Default value: `None`.
     sequence_indices: (Optional) `Tensor` of dtype int32 and rank 1. The
       elements of the sequence to compute specified by their position in the
       sequence. The entries index into the Halton sequence starting with 0 and
@@ -132,26 +136,31 @@ def sample_halton_sequence(dim,
       produce the first, sixth and seventh elements of the sequence. If this
       parameter is None, then the `num_results` parameter must be specified
       which gives the number of desired samples starting from the first sample.
-    dtype: (Optional) The dtype of the sample. One of `float32` or `float64`.
-      Default is `float32`.
+      Default value: `None`.
+    dtype: (Optional) The dtype of the sample. One of: `float16`, `float32` or
+      `float64`.
+      Default value: `tf.float32`.
     randomized: (Optional) bool indicating whether to produce a randomized
       Halton sequence. If True, applies the randomization described in
       Owen (2017) [arXiv:1706.02808].
+      Default value: `True`.
     seed: (Optional) Python integer to seed the random number generator. Only
       used if `randomized` is True. If not supplied and `randomized` is True,
       no seed is set.
+      Default value: `None`.
     name:  (Optional) Python `str` describing ops managed by this function. If
-    not supplied the name of this function is used.
+      not supplied the name of this function is used.
+      Default value: "sample_halton_sequence".
 
   Returns:
     halton_elements: Elements of the Halton sequence. `Tensor` of supplied dtype
-    and `shape` `[num_results, dim]` if `num_results` was specified or shape
-    `[s, dim]` where s is the size of `sequence_indices` if `sequence_indices`
-    were specified.
+      and `shape` `[num_results, dim]` if `num_results` was specified or shape
+      `[s, dim]` where s is the size of `sequence_indices` if `sequence_indices`
+      were specified.
 
   Raises:
     ValueError: if both `sequence_indices` and `num_results` were specified or
-    if dimension `dim` is less than 1 or greater than 1000.
+      if dimension `dim` is less than 1 or greater than 1000.
   """
   if dim < 1 or dim > _MAX_DIMENSION:
     raise ValueError(
@@ -161,7 +170,6 @@ def sample_halton_sequence(dim,
     raise ValueError('Either `num_results` or `sequence_indices` must be'
                      ' specified but not both.')
 
-  dtype = dtype or tf.float32
   if not dtype.is_floating:
     raise ValueError('dtype must be of `float`-type')
 
@@ -211,6 +219,8 @@ def sample_halton_sequence(dim,
     if not randomized:
       coeffs /= radixes
       return tf.reduce_sum(coeffs / weights, axis=-1)
+    seed = distributions_util.gen_new_seed(
+        seed, salt='mcmc_sample_halton_sequence_1')
     coeffs = _randomize(coeffs, radixes, seed=seed)
     # Remove the contribution from randomizing the trailing zero for the
     # axes where max_size_by_axes < max_size. This will be accounted
@@ -225,6 +235,8 @@ def sample_halton_sequence(dim,
     # this is equivalent to adding a uniform random value scaled so the first
     # `max_size_by_axes` coefficients are zero. The following statements perform
     # this correction.
+    seed = distributions_util.gen_new_seed(
+        seed, salt='mcmc_sample_halton_sequence_2')
     zero_correction = tf.random_uniform([dim, 1], seed=seed, dtype=dtype)
     zero_correction /= radixes ** max_sizes_by_axes
     return base_values + tf.reshape(zero_correction, [-1])
@@ -236,6 +248,8 @@ def _randomize(coeffs, radixes, seed=None):
   coeffs = tf.to_int32(coeffs)
   num_coeffs = tf.shape(coeffs)[-1]
   radixes = tf.reshape(tf.to_int32(radixes), shape=[-1])
+  seed = distributions_util.gen_new_seed(
+      seed, salt='mcmc_sample_halton_sequence_3')
   perms = _get_permutations(num_coeffs, radixes, seed=seed)
   perms = tf.reshape(perms, shape=[-1])
   radix_sum = tf.reduce_sum(radixes)
@@ -269,9 +283,15 @@ def _get_permutations(num_results, dims, seed=None):
     dtype as `dims`.
   """
   sample_range = tf.range(num_results)
+  seed = [seed]  # Trick so we access by reference.
   def generate_one(d):
-    fn = lambda _: tf.random_shuffle(tf.range(d), seed=seed)
-    return tf.map_fn(fn, sample_range)
+    seed[0] = distributions_util.gen_new_seed(
+        seed[0], salt='mcmc_sample_halton_sequence_4')
+    fn = lambda _: tf.random_shuffle(tf.range(d), seed=seed[0])
+    return tf.map_fn(
+        fn,
+        sample_range,
+        parallel_iterations=1 if seed[0] is not None else seed[0])
   return tf.concat([generate_one(d) for d in tf.unstack(dims)],
                    axis=-1)
 

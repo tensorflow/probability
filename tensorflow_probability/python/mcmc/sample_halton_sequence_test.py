@@ -196,6 +196,17 @@ class HaltonSequenceTest(tf.test.TestCase):
       log_rel_err = np.log(100 * var_hi / var_lo)
       self.assertAllClose(log_rel_err, 0., atol=1.2)
 
+  def test_seed_implies_deterministic_results(self):
+    dim = 20
+    num_results = 100
+    with self.test_session() as sess:
+      sample1 = tfp.mcmc.sample_halton_sequence(
+          dim, num_results=num_results, seed=1925)
+      sample2 = tfp.mcmc.sample_halton_sequence(
+          dim, num_results=num_results, seed=1925)
+      [sample1_, sample2_] = sess.run([sample1, sample2])
+      self.assertAllClose(sample1_, sample2_, atol=0., rtol=1e-6)
+
 
 if __name__ == '__main__':
   tf.test.main()
