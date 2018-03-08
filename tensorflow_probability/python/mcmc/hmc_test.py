@@ -25,7 +25,7 @@ from scipy import stats
 
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow_probability.python.mcmc.hmc import _compute_energy_change
+from tensorflow_probability.python.mcmc.hmc import _compute_log_acceptance_correction
 from tensorflow_probability.python.mcmc.hmc import _leapfrog_integrator
 from tensorflow.python.framework import random_seed
 
@@ -90,8 +90,7 @@ class HMCTest(tf.test.TestCase):
         current_grads_target_log_prob=grad_0)
     new_m = new_m[0]
 
-    new_energy = -log_prob_1 + 0.5 * tf.reduce_sum(
-        new_m * new_m, axis=event_dims)
+    new_energy = -log_prob_1 + 0.5 * tf.reduce_sum(new_m**2., axis=event_dims)
 
     x_shape = sess.run(x, feed_dict).shape
     event_size = np.prod(x_shape[independent_chain_ndims:])
@@ -176,8 +175,8 @@ class HMCTest(tf.test.TestCase):
       ] = sess.run([
           samples0,
           samples1,
-          kernel_results0.current_target_log_prob,
-          kernel_results1.current_target_log_prob,
+          kernel_results0.accepted_results.target_log_prob,
+          kernel_results1.accepted_results.target_log_prob,
       ])
       self.assertAllClose(samples0_[::2], samples1_,
                           atol=1e-5, rtol=1e-5)
@@ -298,7 +297,8 @@ class HMCTest(tf.test.TestCase):
       states_, kernel_results_ = sess.run([states, kernel_results])
       pstates_ = kernel_results_.proposed_state
 
-      neg_inf_mask = np.isneginf(kernel_results_.proposed_target_log_prob)
+      neg_inf_mask = np.isneginf(
+          kernel_results_.proposed_results.target_log_prob)
 
       # First:  Test that the mathematical properties of the above log prob
       # function in conjunction with HMC show up as expected in kernel_results_.
@@ -313,16 +313,20 @@ class HMCTest(tf.test.TestCase):
       # We better not have any NaNs in states or log_prob.
       # We may have some NaN in grads, which involve multiplication/addition due
       # to gradient rules.  This is the known "NaN grad issue with tf.where."
-      self.assertAllEqual(np.zeros_like(states_),
-                          np.isnan(kernel_results_.proposed_target_log_prob))
-      self.assertAllEqual(np.zeros_like(states_),
-                          np.isnan(states_))
-      # We better not have any +inf in states, grads, or log_prob.
-      self.assertAllEqual(np.zeros_like(states_),
-                          np.isposinf(kernel_results_.proposed_target_log_prob))
       self.assertAllEqual(
           np.zeros_like(states_),
-          np.isposinf(kernel_results_.proposed_grads_target_log_prob[0]))
+          np.isnan(kernel_results_.proposed_results.target_log_prob))
+      self.assertAllEqual(
+          np.zeros_like(states_),
+          np.isnan(states_))
+      # We better not have any +inf in states, grads, or log_prob.
+      self.assertAllEqual(
+          np.zeros_like(states_),
+          np.isposinf(kernel_results_.proposed_results.target_log_prob))
+      self.assertAllEqual(
+          np.zeros_like(states_),
+          np.isposinf(
+              kernel_results_.proposed_results.grads_target_log_prob[0]))
       self.assertAllEqual(np.zeros_like(states_),
                           np.isposinf(states_))
 
@@ -533,10 +537,13 @@ class HMCTest(tf.test.TestCase):
 
       self.assertAllFinite(
           tf.gradients(updated_x, initial_x)[0].eval())
-      self.assertAllEqual([True], [g is None for g in tf.gradients(
-          kernel_results.proposed_grads_target_log_prob, initial_x)])
+      self.assertAllEqual(
+          [True],
+          [g is None for g in tf.gradients(
+              kernel_results.proposed_results.grads_target_log_prob,
+              initial_x)])
       self.assertAllEqual([False], [g is None for g in tf.gradients(
-          kernel_results.proposed_grads_target_log_prob,
+          kernel_results.proposed_results.grads_target_log_prob,
           kernel_results.proposed_state)])
 
       # Gradients of the acceptance probs and new log prob are not finite.
@@ -606,46 +613,87 @@ class HMCTest(tf.test.TestCase):
       [sample_mean_, sample_cov_] = sess.run([
           sample_mean, sample_cov])
       self.assertAllClose(true_mean, sample_mean_,
-                          atol=0.05, rtol=0.)
+                          atol=0.06, rtol=0.)
       self.assertAllClose(true_cov, sample_cov_,
                           atol=0., rtol=0.1)
 
+  def testUncalibratedHMCPreservesStaticShape(self):
+    with self.test_session(graph=tf.Graph()):
+      uncal_hmc = tfp.mcmc.UncalibratedHamiltonianMonteCarlo(
+          target_log_prob_fn=lambda x: tf.reduce_sum(-x**2., axis=-1),
+          step_size=0.5,
+          num_leapfrog_steps=2,
+          seed=1042)
+      x0 = tf.constant([[-1., 0.5],
+                        [0., 0.],
+                        [1., 1.25]])
+      r0 = uncal_hmc.bootstrap_results(x0)
+      x1, r1 = uncal_hmc.one_step(x0, r0)
+      self.assertAllEqual([3, 2], x0.shape)
+      self.assertAllEqual([3], r0.target_log_prob.shape)
+      self.assertAllEqual([3, 2], x1.shape)
+      self.assertAllEqual([3], r1.target_log_prob.shape)
 
-class _EnergyComputationTest(object):
+  def testHMCPreservesStaticShape(self):
+    with self.test_session(graph=tf.Graph()):
+      hmc = tfp.mcmc.HamiltonianMonteCarlo(
+          target_log_prob_fn=lambda x: tf.reduce_sum(-x**2., axis=-1),
+          step_size=0.5,
+          num_leapfrog_steps=2,
+          seed=1042)
+      x0 = tf.constant([[-1., 0.5],
+                        [0., 0.],
+                        [1., 1.25]])
+      r0 = hmc.bootstrap_results(x0)
+      x1, r1 = hmc.one_step(x0, r0)
+      self.assertAllEqual([3, 2], x0.shape)
+      self.assertAllEqual([3], r0.accepted_results.target_log_prob.shape)
+      self.assertAllEqual([3, 2], x1.shape)
+      self.assertAllEqual([3], r1.accepted_results.target_log_prob.shape)
+
+
+class _LogCorrectionTest(object):
 
   def testHandlesNanFromPotential(self):
     with self.test_session(graph=tf.Graph()) as sess:
-      x = [1, np.inf, -np.inf, np.nan]
+      tlp = [1, np.inf, -np.inf, np.nan]
       target_log_prob, proposed_target_log_prob = [
-          self.dtype(x.flatten()) for x in np.meshgrid(x, x)]
+          self.dtype(x.flatten()) for x in np.meshgrid(tlp, tlp)]
       num_chains = len(target_log_prob)
-      dummy_momentums = [-1, 1]
-      momentums = [self.dtype([dummy_momentums] * num_chains)]
-      proposed_momentums = [self.dtype([dummy_momentums] * num_chains)]
+      x0 = np.zeros(num_chains, dtype=self.dtype)
 
-      target_log_prob = tf.convert_to_tensor(target_log_prob)
-      momentums = [tf.convert_to_tensor(momentums[0])]
-      proposed_target_log_prob = tf.convert_to_tensor(proposed_target_log_prob)
-      proposed_momentums = [tf.convert_to_tensor(proposed_momentums[0])]
+      def make_trick_fun(f):
+        f_x = tf.convert_to_tensor(f)
+        def _fn(x):
+          # We'll make the gradient be `1` regardless of input.
+          return f_x + (x - tf.stop_gradient(x))
+        return _fn
 
-      energy = _compute_energy_change(
-          target_log_prob,
-          momentums,
-          proposed_target_log_prob,
-          proposed_momentums,
-          independent_chain_ndims=1)
-      grads = tf.gradients(energy, momentums)
+      # Use trick fun to get "current" results.
+      pkr = tfp.mcmc.HamiltonianMonteCarlo(
+          target_log_prob_fn=make_trick_fun(target_log_prob),
+          step_size=1.,
+          num_leapfrog_steps=1).bootstrap_results(x0)
 
-      [actual_energy, grads_] = sess.run([energy, grads])
+      # Use trick fun to inject "proposed" results.
+      _, results = tfp.mcmc.HamiltonianMonteCarlo(
+          target_log_prob_fn=make_trick_fun(proposed_target_log_prob),
+          step_size=1.,
+          num_leapfrog_steps=1).one_step(x0, pkr)
 
-      # Ensure energy is `inf` (note: that's positive inf) in weird cases and
-      # finite otherwise.
-      expected_energy = self.dtype([0] + [np.inf]*(num_chains - 1))
-      self.assertAllEqual(expected_energy, actual_energy)
+      [actual_log_accept_ratio_, actual_grads_target_log_prob_] = sess.run([
+          results.log_accept_ratio,
+          results.accepted_results.grads_target_log_prob])
+
+      # First log(accept_ratio) is finite, rest are weird so reject them.
+      self.assertTrue(np.isfinite(actual_log_accept_ratio_[0]))
+      self.assertAllEqual(self.dtype([-np.inf]*(num_chains - 1)),
+                          actual_log_accept_ratio_[1:])
 
       # Ensure gradient is finite.
-      self.assertAllEqual(np.ones_like(grads_).astype(np.bool),
-                          np.isfinite(grads_))
+      self.assertAllEqual(
+          np.ones_like(actual_grads_target_log_prob_).astype(np.bool),
+          np.isfinite(actual_grads_target_log_prob_))
 
   def testHandlesNanFromKinetic(self):
     with self.test_session(graph=tf.Graph()) as sess:
@@ -654,28 +702,25 @@ class _EnergyComputationTest(object):
           [np.reshape(self.dtype(x), [-1, 1])]
           for x in np.meshgrid(x, x)]
       num_chains = len(momentums[0])
-      target_log_prob = np.ones(num_chains, self.dtype)
-      proposed_target_log_prob = np.ones(num_chains, self.dtype)
 
-      target_log_prob = tf.convert_to_tensor(target_log_prob)
       momentums = [tf.convert_to_tensor(momentums[0])]
-      proposed_target_log_prob = tf.convert_to_tensor(proposed_target_log_prob)
       proposed_momentums = [tf.convert_to_tensor(proposed_momentums[0])]
 
-      energy = _compute_energy_change(
-          target_log_prob,
+      log_acceptance_correction = _compute_log_acceptance_correction(
           momentums,
-          proposed_target_log_prob,
           proposed_momentums,
           independent_chain_ndims=1)
-      grads = tf.gradients(energy, momentums)
+      grads = tf.gradients(log_acceptance_correction, momentums)
 
-      [actual_energy, grads_] = sess.run([energy, grads])
+      [actual_log_acceptance_correction, grads_] = sess.run([
+          log_acceptance_correction, grads])
 
-      # Ensure energy is `inf` (note: that's positive inf) in weird cases and
-      # finite otherwise.
-      expected_energy = self.dtype([0] + [np.inf]*(num_chains - 1))
-      self.assertAllEqual(expected_energy, actual_energy)
+      # Ensure log_acceptance_correction is `inf` (note: that's positive inf) in
+      # weird cases and finite otherwise.
+      expected_log_acceptance_correction = -(
+          self.dtype([0] + [np.inf]*(num_chains - 1)))
+      self.assertAllEqual(expected_log_acceptance_correction,
+                          actual_log_acceptance_correction)
 
       # Ensure gradient is finite.
       g = grads_[0].reshape([len(x), len(x)])[:, 0]
@@ -687,15 +732,15 @@ class _EnergyComputationTest(object):
       self.assertAllEqual(np.ones_like(g).astype(np.bool), np.isnan(g))
 
 
-class EnergyComputationTest16(tf.test.TestCase, _EnergyComputationTest):
+class LogCorrectionTest16(tf.test.TestCase, _LogCorrectionTest):
   dtype = np.float16
 
 
-class EnergyComputationTest32(tf.test.TestCase, _EnergyComputationTest):
+class LogCorrectionTest32(tf.test.TestCase, _LogCorrectionTest):
   dtype = np.float32
 
 
-class EnergyComputationTest64(tf.test.TestCase, _EnergyComputationTest):
+class LogCorrectionTest64(tf.test.TestCase, _LogCorrectionTest):
   dtype = np.float64
 
 

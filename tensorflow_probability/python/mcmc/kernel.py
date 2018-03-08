@@ -63,6 +63,15 @@ class TransitionKernel(object):
     """
     raise NotImplementedError()
 
+  @abc.abstractproperty
+  def is_calibrated(self):
+    """Returns `True` if Markov chain converges to specified distribution.
+
+    `TransitionKernel`s which are "uncalibrated" are often calibrated by
+    composing them with the `tfp.mcmc.MetropolisHastings` `TransitionKernel`.
+    """
+    raise NotImplementedError()
+
   def bootstrap_results(self, init_state):  # pylint: disable=unused-argument
     """Returns an object with the same type as returned by `one_step(...)[1]`.
 

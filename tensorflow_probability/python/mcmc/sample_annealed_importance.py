@@ -235,7 +235,7 @@ def sample_annealed_importance_chain(
       kernel = make_kernel_fn(_make_convex_combined_log_prob_fn(iter_=0))
       inner_results = kernel.bootstrap_results(init_state)
 
-      convex_combined_log_prob = inner_results.current_target_log_prob
+      convex_combined_log_prob = inner_results.accepted_results.target_log_prob
       dtype = convex_combined_log_prob.dtype.as_numpy_dtype
       shape = tf.shape(convex_combined_log_prob)
       proposal_log_prob = tf.fill(shape, dtype(np.nan),
@@ -254,9 +254,9 @@ def sample_annealed_importance_chain(
 
     ais_weights = tf.zeros(
         shape=tf.broadcast_dynamic_shape(
-            tf.shape(inner_results.proposed_target_log_prob),
-            tf.shape(inner_results.current_target_log_prob)),
-        dtype=inner_results.proposed_target_log_prob.dtype.base_dtype)
+            tf.shape(inner_results.proposed_results.target_log_prob),
+            tf.shape(inner_results.accepted_results.target_log_prob)),
+        dtype=inner_results.proposed_results.target_log_prob.dtype.base_dtype)
 
     [_, ais_weights, current_state, kernel_results] = tf.while_loop(
         cond=lambda iter_, *args: iter_ < num_steps,

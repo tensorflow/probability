@@ -26,6 +26,7 @@ import tensorflow as tf
 __all__ = [
     'is_list_like',
     'choose',
+    'set_doc',
     'safe_sum',
 ]
 
@@ -54,14 +55,17 @@ def choose(is_accepted,
       ], axis=0)
       m = tf.tile(tf.reshape(is_accepted, expand_shape),
                   multiples)
-      m.set_shape(x.shape)
+      m.set_shape(m.shape.merge_with(x.shape))
       return m
+  def _where(accepted, rejected):
+    r = tf.where(_expand_is_accepted_like(accepted), accepted, rejected)
+    r.set_shape(r.shape.merge_with(accepted.shape.merge_with(rejected.shape)))
+    return r
   with tf.name_scope(name, 'choose', values=[
       is_accepted, accepted, rejected, independent_chain_ndims]):
     if not is_list_like(accepted):
-      return tf.where(_expand_is_accepted_like(accepted), accepted, rejected)
-    return [tf.where(_expand_is_accepted_like(a), a, r)
-            for a, r in zip(accepted, rejected)]
+      return _where(accepted, rejected)
+    return [_where(a, r) for a, r in zip(accepted, rejected)]
 
 
 def safe_sum(x, alt_value=-np.inf, name=None):
@@ -111,3 +115,11 @@ def safe_sum(x, alt_value=-np.inf, name=None):
     x = tf.reduce_sum(x, axis=-1)
     x.set_shape(x.shape.merge_with(in_shape))
     return x
+
+
+def set_doc(value):
+  """Decorator to programmatically set a function docstring."""
+  def _doc(func):
+    func.__doc__ = value
+    return func
+  return _doc

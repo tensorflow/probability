@@ -36,7 +36,7 @@ class SampleChainTest(tf.test.TestCase):
     random_seed.set_random_seed(10003)
     np.random.seed(10003)
 
-  # TODO(jvdillon): Create Fake TransitionKernel and not rely on HMC tests.
+  # TODO(b/74154679): Create Fake TransitionKernel and not rely on HMC tests.
 
   def testChainWorksCorrelatedMultivariate(self):
     dtype = np.float32

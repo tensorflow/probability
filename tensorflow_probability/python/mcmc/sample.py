@@ -21,6 +21,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import warnings
 # Dependency imports
 import numpy as np
 
@@ -31,6 +32,11 @@ from tensorflow_probability.python.mcmc import util as mcmc_util
 __all__ = [
     "sample_chain",
 ]
+
+
+# Cause all warnings to always be triggered.
+# Not having this means subsequent calls wont trigger the warning.
+warnings.simplefilter("always")
 
 
 def sample_chain(
@@ -195,6 +201,9 @@ def sample_chain(
     kernel_results: A (possibly nested) `tuple`, `namedtuple` or `list` of
       `Tensor`s representing internal calculations made within this function.
   """
+  if not kernel.is_calibrated:
+    warnings.warn("Supplied `TransitionKernel` is not calibrated. Markov "
+                  "chain may not converge to intended target distribution.")
   with tf.name_scope(
       name, "mcmc_sample_chain",
       [num_results, num_burnin_steps, num_steps_between_results]):

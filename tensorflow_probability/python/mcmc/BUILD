@@ -33,6 +33,7 @@ py_library(
         ":diagnostic",
         ":hmc",
         ":kernel",
+        ":metropolis_hastings",
         ":sample",
         ":sample_annealed_importance",
         ":sample_halton_sequence",
@@ -66,6 +67,7 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         ":kernel",
+        ":metropolis_hastings",
         ":util",
         # numpy dep,
         # tensorflow dep,
@@ -94,6 +96,29 @@ py_library(
 )
 
 py_library(
+    name = "metropolis_hastings",
+    srcs = ["metropolis_hastings.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":kernel",
+        ":util",
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "metropolis_hastings_test",
+    size = "small",
+    srcs = ["metropolis_hastings_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
     name = "sample",
     srcs = ["sample.py"],
     srcs_version = "PY2AND3",
@@ -106,7 +131,7 @@ py_library(
 
 py_test(
     name = "sample_test",
-    size = "small",
+    size = "medium",
     srcs = ["sample_test.py"],
     deps = [
         # numpy dep,

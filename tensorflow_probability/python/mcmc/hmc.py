@@ -25,30 +25,28 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.mcmc import kernel as kernel_base
+from tensorflow_probability.python.mcmc import metropolis_hastings
 from tensorflow_probability.python.mcmc import util as mcmc_util
 from tensorflow.python.ops.distributions import util as distributions_util
 
 
 __all__ = [
     'HamiltonianMonteCarlo',
+    'UncalibratedHamiltonianMonteCarlo',
 ]
 
 
-KernelResults = collections.namedtuple(
-    'KernelResults',
+UncalibratedHamiltonianMonteCarloKernelResults = collections.namedtuple(
+    'UncalibratedHamiltonianMonteCarloKernelResults',
     [
-        'current_grads_target_log_prob',  # "Current result" means "accepted".
-        'current_target_log_prob',  # "Current result" means "accepted".
-        'is_accepted',
-        'log_accept_ratio',
-        'proposed_grads_target_log_prob',
-        'proposed_state',
-        'proposed_target_log_prob',
+        'log_acceptance_correction',
+        'target_log_prob',        # For "next_state".
+        'grads_target_log_prob',  # For "next_state".
     ])
 
 
 class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
-  """Runs one iteration of Hamiltonian Monte Carlo.
+  """Runs one step of Hamiltonian Monte Carlo.
 
   Hamiltonian Monte Carlo (HMC) is a Markov chain Monte Carlo (MCMC)
   algorithm that takes a series of gradient-informed steps to produce
@@ -90,8 +88,9 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
       step_size=step_size,
       num_leapfrog_steps=3)
 
-  next_x, other_results = hmc(current_state=x,
-                              previous_kernel_results=hmc.bootsrap_results(x))
+  next_x, other_results = hmc(
+      current_state=x,
+      previous_kernel_results=hmc.bootstrap_results(x))
 
   x_update = x.assign(next_x)
 
@@ -126,7 +125,14 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
 
   ##### Sample from more complicated posterior.
 
-  I.e.,
+  In this example, we'll use Monte-Carlo EM to find best-fit parameters. More
+  precisely, we use HMC to form a chain conditioned on parameter `sigma` and
+  training data `{ (x[i], y[i]) : i=1...n }`. Then we use one gradient step of
+  maximum-likelihood to improve the `sigma` estimate. Then repeat the process
+  until convergence. (This procedure is a [Robbins--Monro algorithm](
+  https://en.wikipedia.org/wiki/Stochastic_approximation).)
+
+  The generative assumptions are:
 
   ```none
     W ~ MVN(loc=0, scale=sigma * eye(dims))
@@ -135,6 +141,8 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
       eps[i] ~ Normal(loc=0, scale=1)
         Y[i] = X[i].T * W + eps[i]
   ```
+
+  We now implement MCEM using `tensorflow_probability` intrinsics.
 
   ```python
   import tensorflow as tf
@@ -186,17 +194,18 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
 
   prior = make_prior(sigma, dims)
 
-  def joint_log_prob_fn(w):
+  def joint_log_prob(w):
     # f(w) = log p(w, y | x)
     return prior.log_prob(w) + make_likelihood(x, w).log_prob(y)
 
+  # Initialize the HMC sampler.
   hmc = tfp.mcmc.HamiltonianMonteCarlo(
       target_log_prob_fn=joint_log_prob,
       step_size=0.1,
       num_leapfrog_steps=5)
 
   weights_update = weights.assign(
-      hmc(weights, hmc.bootstrap_results(weights))[0])
+      hmc.one_step(weights, hmc.bootstrap_results(weights))[0])
 
   with tf.control_dependencies([weights_update]):
     loss = -prior.log_prob(weights)
@@ -268,6 +277,14 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
     self._num_leapfrog_steps = num_leapfrog_steps
     self._seed = seed
     self._name = name
+    self._hmc_impl = metropolis_hastings.MetropolisHastings(
+        inner_kernel=UncalibratedHamiltonianMonteCarlo(
+            target_log_prob_fn=target_log_prob_fn,
+            step_size=step_size,
+            num_leapfrog_steps=num_leapfrog_steps,
+            seed=seed,
+            name=name),
+        seed=seed)
 
   @property
   def target_log_prob_fn(self):
@@ -289,6 +306,10 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
   def name(self):
     return self._name
 
+  @property
+  def is_calibrated(self):
+    return True
+
   def one_step(self, current_state, previous_kernel_results):
     """Runs one iteration of Hamiltonian Monte Carlo.
 
@@ -302,8 +323,8 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
 
     Returns:
       next_state: Tensor or Python list of `Tensor`s representing the state(s)
-        of the Markov chain(s) at each result step. Has same shape as
-        `current_state`.
+        of the Markov chain(s) after taking exactly one step. Has same type and
+        shape as `current_state`.
       kernel_results: `collections.namedtuple` of internal calculations used to
         advance the chain.
 
@@ -311,12 +332,69 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
       ValueError: if there isn't one `step_size` or a list with same length as
         `current_state`.
     """
+    return self._hmc_impl.one_step(current_state, previous_kernel_results)
+
+  def bootstrap_results(self, init_state):
+    """Creates initial `previous_kernel_results` using a supplied `state`."""
+    return self._hmc_impl.bootstrap_results(init_state)
+
+
+class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
+  """Runs one step of Uncalibrated Hamiltonian Monte Carlo.
+
+  Warning: this kernel will not result in a chain which converges to the
+  `target_log_prob`. To get a convergent MCMC, use `HamiltonianMonteCarlo(...)`
+  or `MetropolisHastings(UncalibratedHamiltonianMonteCarlo(...))`.
+
+  For more details on `UncalibratedHamiltonianMonteCarlo`, see
+  `HamiltonianMonteCarlo`.
+  """
+
+  @mcmc_util.set_doc(HamiltonianMonteCarlo.__init__.__doc__)
+  def __init__(self,
+               target_log_prob_fn,
+               step_size,
+               num_leapfrog_steps,
+               seed=None,
+               name=None):
+    self._target_log_prob_fn = target_log_prob_fn
+    self._step_size = step_size
+    self._num_leapfrog_steps = num_leapfrog_steps
+    self._seed = seed
+    self._name = name
+
+  @property
+  def target_log_prob_fn(self):
+    return self._target_log_prob_fn
+
+  @property
+  def step_size(self):
+    return self._step_size
+
+  @property
+  def num_leapfrog_steps(self):
+    return self._num_leapfrog_steps
+
+  @property
+  def seed(self):
+    return self._seed
+
+  @property
+  def name(self):
+    return self._name
+
+  @property
+  def is_calibrated(self):
+    return False
+
+  @mcmc_util.set_doc(HamiltonianMonteCarlo.one_step.__doc__)
+  def one_step(self, current_state, previous_kernel_results):
     with tf.name_scope(
         self.name, 'hmc_kernel',
         [self.step_size, self.num_leapfrog_steps, self.seed,
          current_state,
-         previous_kernel_results.current_target_log_prob,
-         previous_kernel_results.current_grads_target_log_prob]):
+         previous_kernel_results.target_log_prob,
+         previous_kernel_results.grads_target_log_prob]):
       with tf.name_scope('initialize'):
         [
             current_state_parts,
@@ -327,12 +405,16 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
             self.target_log_prob_fn,
             current_state,
             self.step_size,
-            previous_kernel_results.current_target_log_prob,
-            previous_kernel_results.current_grads_target_log_prob,
+            previous_kernel_results.target_log_prob,
+            previous_kernel_results.grads_target_log_prob,
             maybe_expand=True)
 
         current_momentums = []
         for s in current_state_parts:
+          # Note:
+          # - We mutate seed state so subsequent calls are not correlated.
+          # - We mutate seed BEFORE using it just in case users supplied the
+          #   same seed to an outer kernel, e.g., `MetropolisHastings`.
           self._seed = distributions_util.gen_new_seed(
               self.seed, salt='hmc_kernel_momentums')
           current_momentums.append(tf.random_normal(
@@ -345,14 +427,14 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
             dtype=tf.int32,
             name='num_leapfrog_steps')
 
-        independent_chain_ndims = distributions_util.prefer_static_rank(
-            current_target_log_prob)
+      independent_chain_ndims = distributions_util.prefer_static_rank(
+          current_target_log_prob)
 
       [
-          proposed_momentums,
-          proposed_state_parts,
-          proposed_target_log_prob,
-          proposed_grads_target_log_prob,
+          next_momentums,
+          next_state_parts,
+          next_target_log_prob,
+          next_grads_target_log_prob,
       ] = _leapfrog_integrator(current_momentums,
                                self.target_log_prob_fn,
                                current_state_parts,
@@ -361,70 +443,35 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
                                current_target_log_prob,
                                current_grads_target_log_prob)
 
-      log_accept_ratio = -_compute_energy_change(current_target_log_prob,
-                                                 current_momentums,
-                                                 proposed_target_log_prob,
-                                                 proposed_momentums,
-                                                 independent_chain_ndims)
-
-      # If proposed state reduces likelihood: randomly accept.
-      # If proposed state increases likelihood: always accept.
-      # I.e., u < min(1, accept_ratio),  where u ~ Uniform[0,1)
-      #       ==> log(u) < log_accept_ratio
-      self._seed = distributions_util.gen_new_seed(
-          self.seed, salt='metropolis_hastings_one_step')
-      log_uniform = tf.log(tf.random_uniform(
-          shape=tf.shape(proposed_target_log_prob),
-          dtype=proposed_target_log_prob.dtype,
-          seed=self.seed))
-      is_accepted = log_uniform < log_accept_ratio
-
-      accepted_target_log_prob = tf.where(
-          is_accepted,
-          proposed_target_log_prob,
-          current_target_log_prob)
-
-      next_state_parts = mcmc_util.choose(
-          is_accepted,
-          proposed_state_parts,
-          current_state_parts,
-          independent_chain_ndims)
-
-      accepted_grads_target_log_prob = mcmc_util.choose(
-          is_accepted,
-          proposed_grads_target_log_prob,
-          current_grads_target_log_prob,
-          independent_chain_ndims)
-
       def maybe_flatten(x):
         return x if mcmc_util.is_list_like(current_state) else x[0]
 
       return [
           maybe_flatten(next_state_parts),
-          KernelResults(
-              log_accept_ratio=log_accept_ratio,
-              current_grads_target_log_prob=accepted_grads_target_log_prob,
-              current_target_log_prob=accepted_target_log_prob,
-              is_accepted=is_accepted,
-              proposed_grads_target_log_prob=proposed_grads_target_log_prob,
-              proposed_state=maybe_flatten(proposed_state_parts),
-              proposed_target_log_prob=proposed_target_log_prob,
+          UncalibratedHamiltonianMonteCarloKernelResults(
+              log_acceptance_correction=_compute_log_acceptance_correction(
+                  current_momentums,
+                  next_momentums,
+                  independent_chain_ndims),
+              target_log_prob=next_target_log_prob,
+              grads_target_log_prob=next_grads_target_log_prob,
           ),
       ]
 
+  @mcmc_util.set_doc(HamiltonianMonteCarlo.bootstrap_results.__doc__)
   def bootstrap_results(self, init_state):
-    init_target_log_prob = self.target_log_prob_fn(*(
-        init_state if mcmc_util.is_list_like(init_state) else [init_state]))
-    init_grads_target_log_prob = tf.gradients(init_target_log_prob, init_state)
-    return KernelResults(
-        log_accept_ratio=init_target_log_prob,
-        current_grads_target_log_prob=init_grads_target_log_prob,
-        current_target_log_prob=init_target_log_prob,
-        is_accepted=tf.ones_like(init_target_log_prob, tf.bool),
-        proposed_grads_target_log_prob=init_grads_target_log_prob,
-        proposed_state=init_state,
-        proposed_target_log_prob=init_target_log_prob,
-    )
+    with tf.name_scope(self.name, 'hmc_bootstrap_results', [init_state]):
+      if not mcmc_util.is_list_like(init_state):
+        init_state = [init_state]
+      init_state = [tf.convert_to_tensor(x) for x in init_state]
+      init_target_log_prob = self.target_log_prob_fn(*init_state)
+      init_grads_target_log_prob = tf.gradients(
+          init_target_log_prob, init_state)
+      return UncalibratedHamiltonianMonteCarloKernelResults(
+          log_acceptance_correction=tf.zeros_like(init_target_log_prob),
+          target_log_prob=init_target_log_prob,
+          grads_target_log_prob=init_grads_target_log_prob,
+      )
 
 
 def _leapfrog_integrator(current_momentums,
@@ -563,7 +610,7 @@ def _leapfrog_integrator(current_momentums,
             current_target_log_prob,
             current_grads_target_log_prob,
         ],
-        back_prop=False)[1:]  # Lop-off 'iter_'.
+        back_prop=False)[1:]  # Lop-off "iter_".
 
 
 def _leapfrog_step(current_momentums,
@@ -613,17 +660,87 @@ def _leapfrog_step(current_momentums,
     ]
 
 
-def _compute_energy_change(current_target_log_prob,
-                           current_momentums,
-                           proposed_target_log_prob,
-                           proposed_momentums,
-                           independent_chain_ndims,
-                           name=None):
-  """Helper to `kernel` which computes the energy change."""
+def _compute_log_acceptance_correction(current_momentums,
+                                       proposed_momentums,
+                                       independent_chain_ndims,
+                                       name=None):
+  """Helper to `kernel` which computes the log acceptance-correction.
+
+  A sufficient but not necessary condition for the existence of a stationary
+  distribution, `p(x)`, is "detailed balance", i.e.:
+
+  ```none
+  p(x'|x) p(x) = p(x|x') p(x')
+  ```
+
+  In the Metropolis-Hastings algorithm, a state is proposed according to
+  `g(x'|x)` and accepted according to `a(x'|x)`, hence
+  `p(x'|x) = g(x'|x) a(x'|x)`.
+
+  Inserting this into the detailed balance equation implies:
+
+  ```none
+      g(x'|x) a(x'|x) p(x) = g(x|x') a(x|x') p(x')
+  ==> a(x'|x) / a(x|x') = p(x') / p(x) [g(x|x') / g(x'|x)]    (*)
+  ```
+
+  One definition of `a(x'|x)` which satisfies (*) is:
+
+  ```none
+  a(x'|x) = min(1, p(x') / p(x) [g(x|x') / g(x'|x)])
+  ```
+
+  (To see that this satisfies (*), notice that under this definition only at
+  most one `a(x'|x)` and `a(x|x') can be other than one.)
+
+  We call the bracketed term the "acceptance correction".
+
+  In the case of UncalibratedHMC, the log acceptance-correction is not the log
+  proposal-ratio. UncalibratedHMC augments the state-space with momentum, z.
+  Assuming a standard Gaussian distribution for momentums, the chain eventually
+  converges to:
+
+  ```none
+  p([x, z]) propto= target_prob(x) exp(-0.5 z**2)
+  ```
+
+  Relating this back to Metropolis-Hastings parlance, for HMC we have:
+
+  ```none
+  p([x, z]) propto= target_prob(x) exp(-0.5 z**2)
+  g([x, z] | [x', z']) = g([x', z'] | [x, z])
+  ```
+
+  In other words, the MH bracketed term is `1`. However, because we desire to
+  use a general MH framework, we can place the momentum probability ratio inside
+  the metropolis-correction factor thus getting an acceptance probability:
+
+  ```none
+                       target_prob(x')
+  accept_prob(x'|x) = -----------------  [exp(-0.5 z**2) / exp(-0.5 z'**2)]
+                       target_prob(x)
+  ```
+
+  (Note: we actually need to handle the kinetic energy change at each leapfrog
+  step, but this is the idea.)
+
+  Args:
+    current_momentums: `Tensor` representing the value(s) of the current
+      momentum(s) of the state (parts).
+    proposed_momentums: `Tensor` representing the value(s) of the proposed
+      momentum(s) of the state (parts).
+    independent_chain_ndims: Scalar `int` `Tensor` representing the number of
+      leftmost `Tensor` dimensions which index independent chains.
+    name: Python `str` name prefixed to Ops created by this function.
+      Default value: `None` (i.e., 'compute_log_acceptance_correction').
+
+  Returns:
+    log_acceptance_correction: `Tensor` representing the `log`
+      acceptance-correction.  (See docstring for mathematical definition.)
+  """
   with tf.name_scope(
-      name, 'compute_energy_change',
-      [current_target_log_prob, proposed_target_log_prob,
-       independent_chain_ndims, current_momentums, proposed_momentums]):
+      name, 'compute_log_acceptance_correction',
+      [independent_chain_ndims, current_momentums, proposed_momentums]):
     log_current_kinetic, log_proposed_kinetic = [], []
     for current_momentum, proposed_momentum in zip(
         current_momentums, proposed_momentums):
@@ -634,10 +751,7 @@ def _compute_energy_change(current_target_log_prob,
         tf.reduce_logsumexp(tf.stack(log_current_kinetic, axis=-1), axis=-1))
     proposed_kinetic = 0.5 * tf.exp(
         tf.reduce_logsumexp(tf.stack(log_proposed_kinetic, axis=-1), axis=-1))
-    return mcmc_util.safe_sum([
-        -proposed_target_log_prob, proposed_kinetic,
-        current_target_log_prob, -current_kinetic,
-    ], alt_value=np.inf)
+    return mcmc_util.safe_sum([current_kinetic, -proposed_kinetic])
 
 
 def _maybe_call_fn_and_grads(fn,
