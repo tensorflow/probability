@@ -46,16 +46,15 @@ maybe_gpu_suffix = '-gpu' if use_gpu else ''
 
 if release:
   project_name = 'tensorflow-probability' + maybe_gpu_suffix
-  tensorflow_package_name = 'tensorflow{}>={}'.format(
-      maybe_gpu_suffix, REQUIRED_TENSORFLOW_VERSION)
 else:
   # Nightly releases use date-based versioning of the form
-  # '0.1.dev20180305', and depend on nightly TensorFlow.
+  # '0.0.1.dev20180305'
   project_name = 'tfp-nightly' + maybe_gpu_suffix
   datestring = datetime.datetime.now().strftime('%Y%m%d')
-  __version__ += 'dev' + datestring
-  tensorflow_package_name = 'tf-nightly' + maybe_gpu_suffix
+  __version__ += '.dev' + datestring
 
+tensorflow_package_name = 'tensorflow{}>={}'.format(
+    maybe_gpu_suffix, REQUIRED_TENSORFLOW_VERSION)
 REQUIRED_PACKAGES.append(tensorflow_package_name)
 
 
@@ -70,7 +69,7 @@ setup(
     version=__version__,
     description='Probabilistic modeling and statistical '
                 'inference in TensorFlow',
-    author='Google Inc.',
+    author='Google LLC',
     author_email='no-reply@google.com',
     url='http://github.com/tensorflow/probability',
     license='Apache 2.0',
