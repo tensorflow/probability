@@ -67,44 +67,65 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
 
   ##### Simple chain with warm-up.
 
+  In this example we sample from a standard univariate normal
+  distribution using HMC with adaptive step size.
+
   ```python
   import tensorflow as tf
   import tensorflow_probability as tfp
+  import numpy as np
+
   tfd = tf.contrib.distributions
 
   # Tuning acceptance rates:
   dtype = np.float32
-  target_accept_rate = 0.631
   num_warmup_iter = 500
   num_chain_iter = 500
+  # Set the target average acceptance ratio for the HMC as suggested by
+  # Beskos et al. (2013):
+  # https://projecteuclid.org/download/pdfview_1/euclid.bj/1383661192
+
+  target_accept_rate = 0.651
 
   x = tf.get_variable(name='x', initializer=dtype(1))
   step_size = tf.get_variable(name='step_size', initializer=dtype(1))
 
+  # Target distribution is standard univariate Normal.
   target = tfd.Normal(loc=dtype(0), scale=dtype(1))
 
+  # Initialize the HMC sampler.
   hmc = tfp.mcmc.HamiltonianMonteCarlo(
       target_log_prob_fn=target.log_prob,
       step_size=step_size,
       num_leapfrog_steps=3)
 
-  next_x, other_results = hmc(
+  # One iteration of the HMC
+  next_x, other_results = hmc.one_step(
       current_state=x,
       previous_kernel_results=hmc.bootstrap_results(x))
 
   x_update = x.assign(next_x)
 
+  # Adapt the step size using standard adaptive MCMC procedure. See Section 4.2
+  # of Andrieu and Thoms (2008):
+  # http://www4.ncsu.edu/~rsmith/MA797V_S12/Andrieu08_AdaptiveMCMC_Tutorial.pdf
+
   step_size_update = step_size.assign_add(
       step_size * tf.where(
-          tf.exp(tf.minimum(other_results.log_accept_ratio), 0.) >
+          tf.exp(tf.minimum(other_results.log_accept_ratio, 0.)) >
               target_accept_rate,
           0.01, -0.01))
 
+  # Note, the adaptations are performed during warmup only.
   warmup = tf.group([x_update, step_size_update])
 
-  tf.global_variables_initializer().run()
+  init = tf.global_variables_initializer()
+
+  sess = tf.Session()
 
   sess.graph.finalize()  # No more graph building.
+
+  sess.run(init)
 
   # Warm up the sampler and adapt the step size
   for _ in xrange(num_warmup_iter):
@@ -113,24 +134,27 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
   # Collect samples without adapting step size
   samples = np.zeros([num_chain_iter])
   for i in xrange(num_chain_iter):
-    _, x_, target_log_prob_, grad_ = sess.run([
-        x_update,
-        x,
-        other_results.target_log_prob,
-        other_results.grads_target_log_prob])
+    _, x_,= sess.run([x_update, x])
     samples[i] = x_
+
+  sess.close()
 
   print(samples.mean(), samples.std())
   ```
 
-  ##### Sample from more complicated posterior.
+  ##### Estimate parametrs of a more complicated posterior.
 
-  In this example, we'll use Monte-Carlo EM to find best-fit parameters. More
-  precisely, we use HMC to form a chain conditioned on parameter `sigma` and
-  training data `{ (x[i], y[i]) : i=1...n }`. Then we use one gradient step of
-  maximum-likelihood to improve the `sigma` estimate. Then repeat the process
+  In this example, we'll use Monte-Carlo EM to find best-fit parameters. See
+  ["Implementations of the Monte Carlo EM algorithm " by Levine and Casella](
+  https://ecommons.cornell.edu/bitstream/handle/1813/32030/BU-1431-M.pdf?sequence=1).
+
+  More precisely, we use HMC to form a chain conditioned on parameter `sigma`
+  and training data `{ (x[i], y[i]) : i=1...n }`. Then we use one gradient step
+  of maximum-likelihood to improve the `sigma` estimate. Then repeat the process
   until convergence. (This procedure is a [Robbins--Monro algorithm](
   https://en.wikipedia.org/wiki/Stochastic_approximation).)
+
+
 
   The generative assumptions are:
 
@@ -147,6 +171,8 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
   ```python
   import tensorflow as tf
   import tensorflow_probability as tfp
+  import numpy as np
+
   tfd = tf.contrib.distributions
 
   def make_training_data(num_samples, dims, sigma):
@@ -158,8 +184,8 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
         loc=zeros,
         scale_identity_multiplier=sigma).sample(seed=2)
     noise = tfd.Normal(
-        loc=dt(0),
-        scale=dt(1)).sample(num_samples, seed=3)
+        loc=dt.type(0),
+        scale=dt.type(1)).sample(num_samples, seed=3)
     y = tf.tensordot(x, w, axes=[[1], [0]]) + noise
     return y, x, w
 
@@ -180,7 +206,7 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
   dims = 10
   num_iters = int(5e3)
 
-  true_sigma = dtype(0.5)
+  true_sigma = dtype(0.3)
   y, x, true_weights = make_training_data(num_samples, dims, true_sigma)
 
   # Estimate of `log(true_sigma)`.
@@ -207,31 +233,44 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
   weights_update = weights.assign(
       hmc.one_step(weights, hmc.bootstrap_results(weights))[0])
 
+  # We do an optimization step to propagate `log_sigma` after one HMC step to
+  # propagate `weights`. The loss function for the optimization algorithm is
+  # exacltly the prior distribution since the likelihood does not depend on
+  # `log_sigma`.
   with tf.control_dependencies([weights_update]):
     loss = -prior.log_prob(weights)
 
   optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.01)
   log_sigma_update = optimizer.minimize(loss, var_list=[log_sigma])
 
+  init = tf.global_variables_initializer()
+
+  sess = tf.Session()
+
   sess.graph.finalize()  # No more graph building.
 
-  tf.global_variables_initializer().run()
+  sess.run(init)
 
   sigma_history = np.zeros(num_iters, dtype)
   weights_history = np.zeros([num_iters, dims], dtype)
 
   for i in xrange(num_iters):
-    _, sigma_, weights_, _ = sess.run([log_sigma_update, sigma, weights])
+    _, sigma_, weights_ = sess.run([log_sigma_update, sigma, weights])
     weights_history[i, :] = weights_
     sigma_history[i] = sigma_
 
   true_weights_ = sess.run(true_weights)
 
-  # Should converge to something close to true_sigma.
-  import matplotlib.plot as plt
-  plt.plot(sigma_history);
-  plt.ylabel('sigma');
-  plt.xlabel('iteration');
+  sess.close()
+
+  # Should oscillate around true_sigma.
+  import matplotlib.pyplot as plt
+  plt.plot(sigma_history)
+  plt.ylabel('sigma')
+  plt.xlabel('iteration')
+
+  # Mean error should be close to zero
+  print 'mean error:', abs(np.mean(sigma_history) - true_sigma)
   ```
 
   """
