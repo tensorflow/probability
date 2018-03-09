@@ -518,8 +518,8 @@ def _leapfrog_integrator(current_momentums,
                          current_state_parts,
                          step_sizes,
                          num_leapfrog_steps,
-                         current_target_log_prob=None,
-                         current_grads_target_log_prob=None,
+                         current_target_log_prob,
+                         current_grads_target_log_prob,
                          name=None):
   """Applies `num_leapfrog_steps` of the leapfrog integrator.
 
@@ -530,6 +530,11 @@ def _leapfrog_integrator(current_momentums,
   ##### Simple quadratic potential.
 
   ```python
+  import matplotlib.pyplot as plt
+  %matplotlib inline
+  import numpy as np
+  import tensorflow as tf
+  from tensorflow_probability.python.mcmc.hmc import _leapfrog_integrator
   tfd = tf.contrib.distributions
 
   dims = 10
@@ -539,16 +544,26 @@ def _leapfrog_integrator(current_momentums,
   position = tf.placeholder(np.float32)
   momentum = tf.placeholder(np.float32)
 
+  target_log_prob_fn = tfd.MultivariateNormalDiag(
+      loc=tf.zeros(dims, dtype)).log_prob
+  current_target_log_prob = target_log_prob_fn(position)
+  current_grads_target_log_prob = tf.gradients(
+      current_target_log_prob, position)
+
   [
       next_momentums,
       next_positions,
-  ] = hmc._leapfrog_integrator(
+  ] = _leapfrog_integrator(
       current_momentums=[momentum],
       target_log_prob_fn=tfd.MultivariateNormalDiag(
           loc=tf.zeros(dims, dtype)).log_prob,
       current_state_parts=[position],
       step_sizes=0.1,
-      num_leapfrog_steps=3)[:2]
+      num_leapfrog_steps=3,
+      current_target_log_prob=current_target_log_prob,
+      current_grads_target_log_prob=current_grads_target_log_prob)[:2]
+
+  sess = tf.Session()
 
   sess.graph.finalize()  # No more graph building.
 
@@ -563,6 +578,7 @@ def _leapfrog_integrator(current_momentums,
     positions[i] = position_
 
   plt.plot(positions[:, 0]);  # Sinusoidal.
+  sess.close()
   ```
 
   Args:
@@ -583,15 +599,13 @@ def _leapfrog_integrator(current_momentums,
     num_leapfrog_steps: Integer number of steps to run the leapfrog integrator
       for. Total progress per HMC step is roughly proportional to `step_size *
       num_leapfrog_steps`.
-    current_target_log_prob: (Optional) `Tensor` representing the value of
+    current_target_log_prob: `Tensor` representing the value of
       `target_log_prob_fn(*current_state_parts)`. The only reason to specify
       this argument is to reduce TF graph size.
-      Default value: `None` (i.e., compute as needed).
-    current_grads_target_log_prob: (Optional) Python list of `Tensor`s
-      representing gradient of `target_log_prob_fn(*current_state_parts`) wrt
+    current_grads_target_log_prob: Python list of `Tensor`s representing
+      gradient of `target_log_prob_fn(*current_state_parts`) wrt
       `current_state_parts`. Must have same shape as `current_state_parts`. The
       only reason to specify this argument is to reduce TF graph size.
-      Default value: `None` (i.e., compute as needed).
     name: Python `str` name prefixed to Ops created by this function.
       Default value: `None` (i.e., 'hmc_leapfrog_integrator').
 
