@@ -12,11 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Tools for probabilistic reasoning in TensorFlow."""
-from tensorflow_probability.python import layers
-from tensorflow_probability.python import mcmc
-from tensorflow_probability.python import monte_carlo
-from tensorflow_probability.python import optimizer
-from tensorflow_probability.python import trainable_distributions
-from tensorflow_probability.python import util
-from tensorflow_probability.python import vi
+"""TensorFlow Probability Optimizer python package."""
+from tensorflow_probability.python.optimizer.sgld import StochasticGradientLangevinDynamics
+from tensorflow_probability.python.optimizer.variational_sgd import VariationalSGD

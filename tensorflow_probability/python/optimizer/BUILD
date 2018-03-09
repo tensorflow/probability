@@ -13,11 +13,7 @@
 # limitations under the License.
 # ============================================================================
 # Description:
-#   TensorFlow Probability implements probabilistic and statistical
-#   methods, including modeling and Bayesian inference. APIs here are
-#   meant to evolve over time.
-
-licenses(["notice"])  # Apache 2.0
+#   Optimizers.
 
 package(
     default_visibility = [
@@ -25,38 +21,33 @@ package(
     ],
 )
 
+licenses(["notice"])  # Apache 2.0
+
 exports_files(["LICENSE"])
 
 py_library(
-    name = "python",
+    name = "optimizer",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
-    visibility = ["//tensorflow_probability:__pkg__"],
     deps = [
-        ":monte_carlo",
-        ":trainable_distributions",
-        "//tensorflow_probability/python/layers",
-        "//tensorflow_probability/python/mcmc",
-        "//tensorflow_probability/python/optimizer",
-        "//tensorflow_probability/python/util",
-        "//tensorflow_probability/python/vi",
+        ":sgld",
+        ":variational_sgd",
     ],
 )
 
 py_library(
-    name = "monte_carlo",
-    srcs = ["monte_carlo.py"],
+    name = "sgld",
+    srcs = ["sgld.py"],
     srcs_version = "PY2AND3",
     deps = [
-        # numpy dep,
         # tensorflow dep,
     ],
 )
 
 py_test(
-    name = "monte_carlo_test",
+    name = "sgld_test",
     size = "small",
-    srcs = ["monte_carlo_test.py"],
+    srcs = ["sgld_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -65,21 +56,19 @@ py_test(
 )
 
 py_library(
-    name = "trainable_distributions",
-    srcs = ["trainable_distributions.py"],
+    name = "variational_sgd",
+    srcs = ["variational_sgd.py"],
     srcs_version = "PY2AND3",
     deps = [
-        # numpy dep,
         # tensorflow dep,
     ],
 )
 
 py_test(
-    name = "trainable_distributions_test",
-    size = "small",
-    srcs = ["trainable_distributions_test.py"],
+    name = "variational_sgd_test",
+    size = "medium",
+    srcs = ["variational_sgd_test.py"],
     deps = [
-        # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],
