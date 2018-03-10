@@ -179,9 +179,6 @@ class MetropolisHastings(kernel_base.TransitionKernel):
         current_state,
         previous_kernel_results.accepted_results)
 
-    def has_target_log_prob(kr):
-      return getattr(kr, 'target_log_prob', None) is not None
-
     if (not has_target_log_prob(proposed_results) or
         not has_target_log_prob(previous_kernel_results.accepted_results)):
       raise ValueError('"target_log_prob" must be a member of '
@@ -257,8 +254,8 @@ class MetropolisHastings(kernel_base.TransitionKernel):
       ValueError: if `inner_kernel` results doesn't contain the member
         "target_log_prob".
     """
-    pkr = self._inner_kernel.bootstrap_results(init_state)
-    if 'target_log_prob' not in pkr._fields:
+    pkr = self.inner_kernel.bootstrap_results(init_state)
+    if not has_target_log_prob(pkr):
       raise ValueError(
           '"target_log_prob" must be a member of `inner_kernel` results.')
     x = pkr.target_log_prob
@@ -269,3 +266,8 @@ class MetropolisHastings(kernel_base.TransitionKernel):
         proposed_state=init_state,
         proposed_results=pkr,
     )
+
+
+def has_target_log_prob(kernel_results):
+  """Returns `True` if `target_log_prob` is a member of input."""
+  return getattr(kernel_results, 'target_log_prob', None) is not None

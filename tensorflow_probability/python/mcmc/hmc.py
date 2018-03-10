@@ -48,20 +48,20 @@ UncalibratedHamiltonianMonteCarloKernelResults = collections.namedtuple(
 class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
   """Runs one step of Hamiltonian Monte Carlo.
 
-  Hamiltonian Monte Carlo (HMC) is a Markov chain Monte Carlo (MCMC)
-  algorithm that takes a series of gradient-informed steps to produce
-  a Metropolis proposal. This function takes one random HMC step from
-  a given `current_state`.
+  Hamiltonian Monte Carlo (HMC) is a Markov chain Monte Carlo (MCMC) algorithm
+  that takes a series of gradient-informed steps to produce a Metropolis
+  proposal. This class implements one random HMC step from a given
+  `current_state`.
 
-  This function can update multiple chains in parallel. It assumes that all
-  leftmost dimensions of `current_state` index independent chain states (and
-  are therefore updated independently). The output of
+  The `one_step` function can update multiple chains in parallel. It assumes
+  that all leftmost dimensions of `current_state` index independent chain states
+  (and are therefore updated independently). The output of
   `target_log_prob_fn(*current_state)` should sum log-probabilities across all
   event dimensions. Slices along the rightmost dimensions may have different
   target distributions; for example, `current_state[0, :]` could have a
-  different target distribution from `current_state[1, :]`. These semantics
-  are governed by `target_log_prob_fn(*current_state)`. (The number of
-  independent chains is `tf.size(target_log_prob_fn(*current_state))`.)
+  different target distribution from `current_state[1, :]`. These semantics are
+  governed by `target_log_prob_fn(*current_state)`. (The number of independent
+  chains is `tf.size(target_log_prob_fn(*current_state))`.)
 
   #### Examples:
 
@@ -121,23 +121,16 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
 
   init = tf.global_variables_initializer()
 
-  sess = tf.Session()
-
-  sess.graph.finalize()  # No more graph building.
-
-  sess.run(init)
-
-  # Warm up the sampler and adapt the step size
-  for _ in xrange(num_warmup_iter):
-    sess.run(warmup)
-
-  # Collect samples without adapting step size
-  samples = np.zeros([num_chain_iter])
-  for i in xrange(num_chain_iter):
-    _, x_,= sess.run([x_update, x])
-    samples[i] = x_
-
-  sess.close()
+  with tf.Session() as sess:
+    sess.run(init)
+    # Warm up the sampler and adapt the step size
+    for _ in xrange(num_warmup_iter):
+      sess.run(warmup)
+    # Collect samples without adapting step size
+    samples = np.zeros([num_chain_iter])
+    for i in xrange(num_chain_iter):
+      _, x_,= sess.run([x_update, x])
+      samples[i] = x_
 
   print(samples.mean(), samples.std())
   ```
@@ -245,23 +238,16 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
 
   init = tf.global_variables_initializer()
 
-  sess = tf.Session()
-
-  sess.graph.finalize()  # No more graph building.
-
-  sess.run(init)
-
   sigma_history = np.zeros(num_iters, dtype)
   weights_history = np.zeros([num_iters, dims], dtype)
 
-  for i in xrange(num_iters):
-    _, sigma_, weights_ = sess.run([log_sigma_update, sigma, weights])
-    weights_history[i, :] = weights_
-    sigma_history[i] = sigma_
-
-  true_weights_ = sess.run(true_weights)
-
-  sess.close()
+  with tf.Session() as sess:
+    sess.run(init)
+    for i in xrange(num_iters):
+      _, sigma_, weights_ = sess.run([log_sigma_update, sigma, weights])
+      weights_history[i, :] = weights_
+      sigma_history[i] = sigma_
+    true_weights_ = sess.run(true_weights)
 
   # Should oscillate around true_sigma.
   import matplotlib.pyplot as plt
@@ -558,27 +544,23 @@ def _leapfrog_integrator(current_momentums,
       target_log_prob_fn=tfd.MultivariateNormalDiag(
           loc=tf.zeros(dims, dtype)).log_prob,
       current_state_parts=[position],
-      step_sizes=0.1,
+      step_sizes=[0.1],
       num_leapfrog_steps=3,
       current_target_log_prob=current_target_log_prob,
       current_grads_target_log_prob=current_grads_target_log_prob)[:2]
 
-  sess = tf.Session()
-
-  sess.graph.finalize()  # No more graph building.
-
   momentum_ = np.random.randn(dims).astype(dtype)
   position_ = np.random.randn(dims).astype(dtype)
-
   positions = np.zeros([num_iter, dims], dtype)
-  for i in xrange(num_iter):
-    position_, momentum_ = sess.run(
-        [next_momentums[0], next_position[0]],
-        feed_dict={position: position_, momentum: momentum_})
-    positions[i] = position_
+
+  with tf.Session() as sess:
+    for i in xrange(num_iter):
+      position_, momentum_ = sess.run(
+          [next_momentums[0], next_positions[0]],
+          feed_dict={position: position_, momentum: momentum_})
+      positions[i] = position_
 
   plt.plot(positions[:, 0]);  # Sinusoidal.
-  sess.close()
   ```
 
   Args:

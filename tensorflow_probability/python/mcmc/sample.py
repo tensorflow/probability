@@ -48,22 +48,17 @@ def sample_chain(
     num_steps_between_results=0,
     parallel_iterations=10,
     name=None):
-  """Runs multiple iterations of one or more Hamiltonian Monte Carlo chains.
+  """Implements Markov chain Monte Carlo via repeated `TransitionKernel` steps.
 
   This function samples from an Markov chain at `current_state` and whose
-  stationary distribution is governed by the supplied transition `kernel`.
+  stationary distribution is governed by the supplied `TransitionKernel`
+  instance (`kernel`).
 
-  This function samples from multiple chains in parallel. It assumes that the
-  the leftmost dimensions of (each) `current_state` (part) index an independent
-  chain.  The function `target_log_prob_fn()` sums log-probabilities across
-  event dimensions (i.e., current state (part) rightmost dimensions). Each
-  element of the output of `target_log_prob_fn()` represents the (possibly
-  unnormalized) log-probability of the joint distribution over (all) the current
-  state (parts).
+  This function can sample from multiple chains, in parallel. (Whether or not
+  there are multiple chains is dictated by the `kernel`.)
 
   The `current_state` can be represented as a single `Tensor` or a `list` of
-  `Tensors` which collectively represent the current state. When specifying a
-  `list`, one must also specify a list of `step_size`s.
+  `Tensors` which collectively represent the current state.
 
   Since MCMC states are correlated, it is sometimes desirable to produce
   additional intermediate states, and then discard them, ending up with a set of
@@ -73,7 +68,7 @@ def sample_chain(
   the results.  The extra steps are never materialized (in calls to `sess.run`),
   and thus do not increase memory requirements.
 
-  Warning: when setting a `seed` in `kernel`, ensure that
+  Warning: when setting a `seed` in the `kernel`, ensure that `sample_chain`'s
   `parallel_iterations=1`, otherwise results will not be reproducible.
 
   [1]: "Statistically efficient thinning of a Markov chain sampler."
