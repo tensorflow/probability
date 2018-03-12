@@ -36,6 +36,7 @@ py_library(
         ":monte_carlo",
         ":trainable_distributions",
         "//tensorflow_probability/python/layers",
+        "//tensorflow_probability/python/math",
         "//tensorflow_probability/python/mcmc",
         "//tensorflow_probability/python/optimizer",
         "//tensorflow_probability/python/util",
