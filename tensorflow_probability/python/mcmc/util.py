@@ -39,7 +39,6 @@ def is_list_like(x):
 def choose(is_accepted,
            accepted,
            rejected,
-           independent_chain_ndims,
            name=None):
   """Helper to `kernel` which expand_dims `is_accepted` to apply tf.where."""
   def _expand_is_accepted_like(x):
@@ -51,18 +50,20 @@ def choose(is_accepted,
       ], axis=0)
       multiples = tf.concat([
           tf.ones([tf.rank(is_accepted)], dtype=tf.int32),
-          tf.shape(x)[independent_chain_ndims:],
+          tf.shape(x)[tf.rank(is_accepted):],
       ], axis=0)
       m = tf.tile(tf.reshape(is_accepted, expand_shape),
                   multiples)
       m.set_shape(m.shape.merge_with(x.shape))
       return m
   def _where(accepted, rejected):
+    accepted = tf.convert_to_tensor(accepted, name='accepted')
+    rejected = tf.convert_to_tensor(rejected, name='rejected')
     r = tf.where(_expand_is_accepted_like(accepted), accepted, rejected)
     r.set_shape(r.shape.merge_with(accepted.shape.merge_with(rejected.shape)))
     return r
   with tf.name_scope(name, 'choose', values=[
-      is_accepted, accepted, rejected, independent_chain_ndims]):
+      is_accepted, accepted, rejected]):
     if not is_list_like(accepted):
       return _where(accepted, rejected)
     return [_where(a, r) for a, r in zip(accepted, rejected)]

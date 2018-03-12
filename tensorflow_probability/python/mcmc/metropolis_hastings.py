@@ -58,10 +58,11 @@ class MetropolisHastings(kernel_base.TransitionKernel):
   to eventually sample from a target distribution.
 
   Note: `inner_kernel.one_step` must return `kernel_results` as a
-  `collections.namedtuple` and must itself have the following members:
+  `collections.namedtuple` which must:
 
-  - `target_log_prob`
-  - `log_acceptance_correction` [Optional]
+  - have a `target_log_prob` field,
+  - optionally have a `log_acceptance_correction` field, and,
+  - have only fields which are `Tensor`-valued.
 
   The Metropolis-Hastings log acceptance-probability is computed as:
 
@@ -171,73 +172,72 @@ class MetropolisHastings(kernel_base.TransitionKernel):
       ValueError: if `inner_kernel` results doesn't contain the member
         "target_log_prob".
     """
-    # Take one inner step.
-    [
-        proposed_state,
-        proposed_results,
-    ] = self.inner_kernel.one_step(
-        current_state,
-        previous_kernel_results.accepted_results)
+    name = ('mh_one_step' if self.name is None
+            else (self.name + '_one_step'))
+    with tf.name_scope(name=name,
+                       values=[current_state, previous_kernel_results]):
+      # Take one inner step.
+      [
+          proposed_state,
+          proposed_results,
+      ] = self.inner_kernel.one_step(
+          current_state,
+          previous_kernel_results.accepted_results)
 
-    if (not has_target_log_prob(proposed_results) or
-        not has_target_log_prob(previous_kernel_results.accepted_results)):
-      raise ValueError('"target_log_prob" must be a member of '
-                       '`inner_kernel` results.')
+      if (not has_target_log_prob(proposed_results) or
+          not has_target_log_prob(previous_kernel_results.accepted_results)):
+        raise ValueError('"target_log_prob" must be a member of '
+                         '`inner_kernel` results.')
 
-    # Compute log(acceptance_ratio).
-    to_sum = [proposed_results.target_log_prob,
-              -previous_kernel_results.accepted_results.target_log_prob]
-    try:
-      to_sum.append(proposed_results.log_acceptance_correction)
-    except AttributeError:
-      warnings.warn('Supplied inner `TransitionKernel` does not have a '
-                    '`log_acceptance_correction`. Assuming its value is `0.`')
-    log_accept_ratio = mcmc_util.safe_sum(
-        to_sum, name='compute_log_accept_ratio')
+      # Compute log(acceptance_ratio).
+      to_sum = [proposed_results.target_log_prob,
+                -previous_kernel_results.accepted_results.target_log_prob]
+      try:
+        to_sum.append(proposed_results.log_acceptance_correction)
+      except AttributeError:
+        warnings.warn('Supplied inner `TransitionKernel` does not have a '
+                      '`log_acceptance_correction`. Assuming its value is `0.`')
+      log_accept_ratio = mcmc_util.safe_sum(
+          to_sum, name='compute_log_accept_ratio')
 
-    # If proposed state reduces likelihood: randomly accept.
-    # If proposed state increases likelihood: always accept.
-    # I.e., u < min(1, accept_ratio),  where u ~ Uniform[0,1)
-    #       ==> log(u) < log_accept_ratio
-    # Note:
-    # - We mutate seed state so subsequent calls are not correlated.
-    # - We mutate seed BEFORE using it just in case users supplied the
-    #   same seed to the inner kernel.
-    self._seed = distributions_util.gen_new_seed(
-        self.seed, salt='metropolis_hastings_one_step')
-    log_uniform = tf.log(tf.random_uniform(
-        shape=tf.shape(proposed_results.target_log_prob),
-        dtype=proposed_results.target_log_prob.dtype.base_dtype,
-        seed=self.seed))
-    is_accepted = log_uniform < log_accept_ratio
+      # If proposed state reduces likelihood: randomly accept.
+      # If proposed state increases likelihood: always accept.
+      # I.e., u < min(1, accept_ratio),  where u ~ Uniform[0,1)
+      #       ==> log(u) < log_accept_ratio
+      # Note:
+      # - We mutate seed state so subsequent calls are not correlated.
+      # - We mutate seed BEFORE using it just in case users supplied the
+      #   same seed to the inner kernel.
+      self._seed = distributions_util.gen_new_seed(
+          self.seed, salt='metropolis_hastings_one_step')
+      log_uniform = tf.log(tf.random_uniform(
+          shape=tf.shape(proposed_results.target_log_prob),
+          dtype=proposed_results.target_log_prob.dtype.base_dtype,
+          seed=self.seed))
+      is_accepted = log_uniform < log_accept_ratio
 
-    independent_chain_ndims = distributions_util.prefer_static_rank(
-        proposed_results.target_log_prob)
+      next_state = mcmc_util.choose(
+          is_accepted,
+          proposed_state,
+          current_state)
 
-    next_state = mcmc_util.choose(
-        is_accepted,
-        proposed_state,
-        current_state,
-        independent_chain_ndims)
+      accepted_results = type(proposed_results)(**dict(
+          [(fn,
+            mcmc_util.choose(
+                is_accepted,
+                getattr(proposed_results, fn),
+                getattr(previous_kernel_results.accepted_results, fn)))
+           for fn in proposed_results._fields]))
 
-    accepted_results = type(proposed_results)(**dict(
-        [(fn,
-          mcmc_util.choose(
-              is_accepted,
-              getattr(proposed_results, fn),
-              getattr(previous_kernel_results.accepted_results, fn),
-              independent_chain_ndims))
-         for fn in proposed_results._fields]))
-
-    return [
-        next_state,
-        MetropolisHastingsKernelResults(
-            accepted_results=accepted_results,
-            is_accepted=is_accepted,
-            log_accept_ratio=log_accept_ratio,
-            proposed_state=proposed_state,
-            proposed_results=proposed_results,
-        )]
+      return [
+          next_state,
+          MetropolisHastingsKernelResults(
+              accepted_results=accepted_results,
+              is_accepted=is_accepted,
+              log_accept_ratio=log_accept_ratio,
+              proposed_state=proposed_state,
+              proposed_results=proposed_results,
+          )]
 
   def bootstrap_results(self, init_state):
     """Returns an object with the same type as returned by `one_step`.
@@ -254,18 +254,21 @@ class MetropolisHastings(kernel_base.TransitionKernel):
       ValueError: if `inner_kernel` results doesn't contain the member
         "target_log_prob".
     """
-    pkr = self.inner_kernel.bootstrap_results(init_state)
-    if not has_target_log_prob(pkr):
-      raise ValueError(
-          '"target_log_prob" must be a member of `inner_kernel` results.')
-    x = pkr.target_log_prob
-    return MetropolisHastingsKernelResults(
-        accepted_results=pkr,
-        is_accepted=tf.ones_like(x, dtype=tf.bool),
-        log_accept_ratio=tf.zeros_like(x),
-        proposed_state=init_state,
-        proposed_results=pkr,
-    )
+    name = ('mh_bootstrap_results' if self.name is None
+            else (self.name + '_bootstrap_results'))
+    with tf.name_scope(name=name, values=[init_state]):
+      pkr = self.inner_kernel.bootstrap_results(init_state)
+      if not has_target_log_prob(pkr):
+        raise ValueError(
+            '"target_log_prob" must be a member of `inner_kernel` results.')
+      x = pkr.target_log_prob
+      return MetropolisHastingsKernelResults(
+          accepted_results=pkr,
+          is_accepted=tf.ones_like(x, dtype=tf.bool),
+          log_accept_ratio=tf.zeros_like(x),
+          proposed_state=init_state,
+          proposed_results=pkr,
+      )
 
 
 def has_target_log_prob(kernel_results):
