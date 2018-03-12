@@ -593,12 +593,12 @@ class HMCTest(tf.test.TestCase):
                 z[..., tf.newaxis]),
             axis=-1)
         return -0.5 * tf.reduce_sum(z**2., axis=-1)
-      states, _ = tfp.mcmc.sample_chain(
+      states, kernel_results = tfp.mcmc.sample_chain(
           num_results=num_results,
           current_state=[dtype(-2), dtype(2)],
           kernel=tfp.mcmc.HamiltonianMonteCarlo(
               target_log_prob_fn=target_log_prob,
-              step_size=[0.5, 0.5],
+              step_size=[1.23, 1.23],
               num_leapfrog_steps=2,
               seed=54),
           num_burnin_steps=200,
@@ -610,8 +610,9 @@ class HMCTest(tf.test.TestCase):
       sample_mean = tf.reduce_mean(states, axis=0)
       x = states - sample_mean
       sample_cov = tf.matmul(x, x, transpose_a=True) / dtype(num_results)
-      [sample_mean_, sample_cov_] = sess.run([
-          sample_mean, sample_cov])
+      [sample_mean_, sample_cov_, is_accepted_] = sess.run([
+          sample_mean, sample_cov, kernel_results.is_accepted])
+      self.assertNear(0.6, is_accepted_.mean(), err=0.05)
       self.assertAllClose(true_mean, sample_mean_,
                           atol=0.06, rtol=0.)
       self.assertAllClose(true_cov, sample_cov_,
