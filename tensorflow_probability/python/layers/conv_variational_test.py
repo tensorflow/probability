@@ -105,14 +105,14 @@ class ConvVariational(tf.test.TestCase):
   def _testKLPenaltyKernel(self, layer_class):
     with self.test_session():
       layer = layer_class(filters=2, kernel_size=3)
-      if layer_class in (tfp.layers.Conv1DReparameterization,
-                         tfp.layers.Conv1DFlipout):
+      if layer_class in (tfp.layers.Convolution1DReparameterization,
+                         tfp.layers.Convolution1DFlipout):
         inputs = tf.random_uniform([2, 3, 1], seed=1)
-      elif layer_class in (tfp.layers.Conv2DReparameterization,
-                           tfp.layers.Conv2DFlipout):
+      elif layer_class in (tfp.layers.Convolution2DReparameterization,
+                           tfp.layers.Convolution2DFlipout):
         inputs = tf.random_uniform([2, 3, 3, 1], seed=1)
-      elif layer_class in (tfp.layers.Conv3DReparameterization,
-                           tfp.layers.Conv3DFlipout):
+      elif layer_class in (tfp.layers.Convolution3DReparameterization,
+                           tfp.layers.Convolution3DFlipout):
         inputs = tf.random_uniform([2, 3, 3, 3, 1], seed=1)
 
       # No keys.
@@ -137,14 +137,14 @@ class ConvVariational(tf.test.TestCase):
           kernel_size=3,
           bias_posterior_fn=tfp.layers.default_mean_field_normal_fn(),
           bias_prior_fn=_make_normal)
-      if layer_class in (tfp.layers.Conv1DReparameterization,
-                         tfp.layers.Conv1DFlipout):
+      if layer_class in (tfp.layers.Convolution1DReparameterization,
+                         tfp.layers.Convolution1DFlipout):
         inputs = tf.random_uniform([2, 3, 1], seed=1)
-      elif layer_class in (tfp.layers.Conv2DReparameterization,
-                           tfp.layers.Conv2DFlipout):
+      elif layer_class in (tfp.layers.Convolution2DReparameterization,
+                           tfp.layers.Convolution2DFlipout):
         inputs = tf.random_uniform([2, 3, 3, 1], seed=1)
-      elif layer_class in (tfp.layers.Conv3DReparameterization,
-                           tfp.layers.Conv3DFlipout):
+      elif layer_class in (tfp.layers.Convolution3DReparameterization,
+                           tfp.layers.Convolution3DFlipout):
         inputs = tf.random_uniform([2, 3, 3, 3, 1], seed=1)
 
       # No keys.
@@ -163,18 +163,18 @@ class ConvVariational(tf.test.TestCase):
                      height=None, width=None, channels=None, filters=None,
                      **kwargs):
     seed = Counter()
-    if layer_class in (tfp.layers.Conv1DReparameterization,
-                       tfp.layers.Conv1DFlipout):
+    if layer_class in (tfp.layers.Convolution1DReparameterization,
+                       tfp.layers.Convolution1DFlipout):
       inputs = tf.random_uniform(
           [batch_size, width, channels], seed=seed())
       kernel_size = (2,)
-    elif layer_class in (tfp.layers.Conv2DReparameterization,
-                         tfp.layers.Conv2DFlipout):
+    elif layer_class in (tfp.layers.Convolution2DReparameterization,
+                         tfp.layers.Convolution2DFlipout):
       inputs = tf.random_uniform(
           [batch_size, height, width, channels], seed=seed())
       kernel_size = (2, 2)
-    elif layer_class in (tfp.layers.Conv3DReparameterization,
-                         tfp.layers.Conv3DFlipout):
+    elif layer_class in (tfp.layers.Convolution3DReparameterization,
+                         tfp.layers.Convolution3DFlipout):
       inputs = tf.random_uniform(
           [batch_size, depth, height, width, channels], seed=seed())
       kernel_size = (2, 2, 2)
@@ -389,18 +389,18 @@ class ConvVariational(tf.test.TestCase):
     batch_size, depth, height, width, channels, filters = 2, 4, 4, 4, 3, 5
     with self.test_session() as sess:
       seed = Counter()
-      if layer_class in (tfp.layers.Conv1DReparameterization,
-                         tfp.layers.Conv1DFlipout):
+      if layer_class in (tfp.layers.Convolution1DReparameterization,
+                         tfp.layers.Convolution1DFlipout):
         inputs = tf.random_uniform(
             [batch_size, width, channels], seed=seed())
         kernel_size = (2,)
-      elif layer_class in (tfp.layers.Conv2DReparameterization,
-                           tfp.layers.Conv2DFlipout):
+      elif layer_class in (tfp.layers.Convolution2DReparameterization,
+                           tfp.layers.Convolution2DFlipout):
         inputs = tf.random_uniform(
             [batch_size, height, width, channels], seed=seed())
         kernel_size = (2, 2)
-      elif layer_class in (tfp.layers.Conv3DReparameterization,
-                           tfp.layers.Conv3DFlipout):
+      elif layer_class in (tfp.layers.Convolution3DReparameterization,
+                           tfp.layers.Convolution3DFlipout):
         inputs = tf.random_uniform(
             [batch_size, depth, height, width, channels], seed=seed())
         kernel_size = (2, 2, 2)
@@ -454,62 +454,62 @@ class ConvVariational(tf.test.TestCase):
       self.assertLess(np.sum(np.isclose(outputs_one_, outputs_two_)),
                       np.prod(outputs_one_.shape))
 
-  def testKLPenaltyKernelConv1DReparameterization(self):
-    self._testKLPenaltyKernel(tfp.layers.Conv1DReparameterization)
+  def testKLPenaltyKernelConvolution1DReparameterization(self):
+    self._testKLPenaltyKernel(tfp.layers.Convolution1DReparameterization)
 
-  def testKLPenaltyKernelConv2DReparameterization(self):
-    self._testKLPenaltyKernel(tfp.layers.Conv2DReparameterization)
+  def testKLPenaltyKernelConvolution2DReparameterization(self):
+    self._testKLPenaltyKernel(tfp.layers.Convolution2DReparameterization)
 
-  def testKLPenaltyKernelConv3DReparameterization(self):
-    self._testKLPenaltyKernel(tfp.layers.Conv3DReparameterization)
+  def testKLPenaltyKernelConvolution3DReparameterization(self):
+    self._testKLPenaltyKernel(tfp.layers.Convolution3DReparameterization)
 
-  def testKLPenaltyKernelConv1DFlipout(self):
-    self._testKLPenaltyKernel(tfp.layers.Conv1DFlipout)
+  def testKLPenaltyKernelConvolution1DFlipout(self):
+    self._testKLPenaltyKernel(tfp.layers.Convolution1DFlipout)
 
-  def testKLPenaltyKernelConv2DFlipout(self):
-    self._testKLPenaltyKernel(tfp.layers.Conv2DFlipout)
+  def testKLPenaltyKernelConvolution2DFlipout(self):
+    self._testKLPenaltyKernel(tfp.layers.Convolution2DFlipout)
 
-  def testKLPenaltyKernelConv3DFlipout(self):
-    self._testKLPenaltyKernel(tfp.layers.Conv3DFlipout)
+  def testKLPenaltyKernelConvolution3DFlipout(self):
+    self._testKLPenaltyKernel(tfp.layers.Convolution3DFlipout)
 
-  def testKLPenaltyBothConv1DReparameterization(self):
-    self._testKLPenaltyBoth(tfp.layers.Conv1DReparameterization)
+  def testKLPenaltyBothConvolution1DReparameterization(self):
+    self._testKLPenaltyBoth(tfp.layers.Convolution1DReparameterization)
 
-  def testKLPenaltyBothConv2DReparameterization(self):
-    self._testKLPenaltyBoth(tfp.layers.Conv2DReparameterization)
+  def testKLPenaltyBothConvolution2DReparameterization(self):
+    self._testKLPenaltyBoth(tfp.layers.Convolution2DReparameterization)
 
-  def testKLPenaltyBothConv3DReparameterization(self):
-    self._testKLPenaltyBoth(tfp.layers.Conv3DReparameterization)
+  def testKLPenaltyBothConvolution3DReparameterization(self):
+    self._testKLPenaltyBoth(tfp.layers.Convolution3DReparameterization)
 
-  def testKLPenaltyBothConv1DFlipout(self):
-    self._testKLPenaltyBoth(tfp.layers.Conv1DFlipout)
+  def testKLPenaltyBothConvolution1DFlipout(self):
+    self._testKLPenaltyBoth(tfp.layers.Convolution1DFlipout)
 
-  def testKLPenaltyBothConv2DFlipout(self):
-    self._testKLPenaltyBoth(tfp.layers.Conv2DFlipout)
+  def testKLPenaltyBothConvolution2DFlipout(self):
+    self._testKLPenaltyBoth(tfp.layers.Convolution2DFlipout)
 
-  def testKLPenaltyBothConv3DFlipout(self):
-    self._testKLPenaltyBoth(tfp.layers.Conv3DFlipout)
+  def testKLPenaltyBothConvolution3DFlipout(self):
+    self._testKLPenaltyBoth(tfp.layers.Convolution3DFlipout)
 
-  def testConv1DReparameterization(self):
-    self._testConvReparameterization(tfp.layers.Conv1DReparameterization)
+  def testConvolution1DReparameterization(self):
+    self._testConvReparameterization(tfp.layers.Convolution1DReparameterization)
 
-  def testConv2DReparameterization(self):
-    self._testConvReparameterization(tfp.layers.Conv2DReparameterization)
+  def testConvolution2DReparameterization(self):
+    self._testConvReparameterization(tfp.layers.Convolution2DReparameterization)
 
-  def testConv3DReparameterization(self):
-    self._testConvReparameterization(tfp.layers.Conv3DReparameterization)
+  def testConvolution3DReparameterization(self):
+    self._testConvReparameterization(tfp.layers.Convolution3DReparameterization)
 
-  def testConv1DFlipout(self):
-    self._testConvFlipout(tfp.layers.Conv1DFlipout)
+  def testConvolution1DFlipout(self):
+    self._testConvFlipout(tfp.layers.Convolution1DFlipout)
 
-  def testConv2DFlipout(self):
-    self._testConvFlipout(tfp.layers.Conv2DFlipout)
+  def testConvolution2DFlipout(self):
+    self._testConvFlipout(tfp.layers.Convolution2DFlipout)
 
-  def testConv3DFlipout(self):
-    self._testConvFlipout(tfp.layers.Conv3DFlipout)
+  def testConvolution3DFlipout(self):
+    self._testConvFlipout(tfp.layers.Convolution3DFlipout)
 
-  def testRandomConv1DFlipout(self):
-    self._testRandomConvFlipout(tfp.layers.Conv1DFlipout)
+  def testRandomConvolution1DFlipout(self):
+    self._testRandomConvFlipout(tfp.layers.Convolution1DFlipout)
 
 
 if __name__ == '__main__':

@@ -13,5 +13,16 @@
 # limitations under the License.
 # ============================================================================
 """TensorFlow Probability Optimizer python package."""
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 from tensorflow_probability.python.optimizer.sgld import StochasticGradientLangevinDynamics
 from tensorflow_probability.python.optimizer.variational_sgd import VariationalSGD
+
+
+__all__ = [
+    'StochasticGradientLangevinDynamics',
+    'VariationalSGD',
+]

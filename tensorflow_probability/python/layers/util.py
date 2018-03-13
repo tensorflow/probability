@@ -21,21 +21,22 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-from tensorflow.contrib.distributions.python.ops import deterministic as deterministic_lib
-from tensorflow.contrib.distributions.python.ops import independent as independent_lib
-from tensorflow.python.framework import dtypes
-from tensorflow.python.ops import array_ops
-from tensorflow.python.ops import init_ops
-from tensorflow.python.ops import math_ops
-from tensorflow.python.ops import nn_ops
-from tensorflow.python.ops import random_ops
-from tensorflow.python.ops.distributions import normal as normal_lib
+import tensorflow as tf
+
+tfd = tf.contrib.distributions
+
+
+__all__ = [
+    'default_loc_scale_fn',
+    'default_mean_field_normal_fn',
+    'random_sign',
+]
 
 
 def default_loc_scale_fn(
     is_singular=False,
-    loc_initializer=init_ops.random_normal_initializer(stddev=0.1),
-    untransformed_scale_initializer=init_ops.random_normal_initializer(
+    loc_initializer=tf.random_normal_initializer(stddev=0.1),
+    untransformed_scale_initializer=tf.random_normal_initializer(
         mean=-3., stddev=0.1),
     loc_regularizer=None,
     untransformed_scale_regularizer=None,
@@ -88,7 +89,7 @@ def default_loc_scale_fn(
   def _fn(dtype, shape, name, trainable, add_variable_fn):
     """Creates `loc`, `scale` parameters."""
     loc = add_variable_fn(
-        name=name + "_loc",
+        name=name + '_loc',
         shape=shape,
         initializer=loc_initializer,
         regularizer=loc_regularizer,
@@ -98,7 +99,7 @@ def default_loc_scale_fn(
     if is_singular:
       return loc, None
     untransformed_scale = add_variable_fn(
-        name=name + "_untransformed_scale",
+        name=name + '_untransformed_scale',
         shape=shape,
         initializer=untransformed_scale_initializer,
         regularizer=untransformed_scale_regularizer,
@@ -106,7 +107,7 @@ def default_loc_scale_fn(
         dtype=dtype,
         trainable=trainable)
     scale = (np.finfo(dtype.as_numpy_dtype).eps +
-             nn_ops.softplus(untransformed_scale))
+             tf.nn.softplus(untransformed_scale))
     return loc, scale
   return _fn
 
@@ -174,18 +175,21 @@ def default_mean_field_normal_fn(
     """Creates multivariate `Deterministic` or `Normal` distribution."""
     loc, scale = loc_scale_fn_(dtype, shape, name, trainable, add_variable_fn)
     if scale is None:
-      dist = deterministic_lib.Deterministic(loc=loc)
+      dist = tfd.Deterministic(loc=loc)
     else:
-      dist = normal_lib.Normal(loc=loc, scale=scale)
-    reinterpreted_batch_ndims = array_ops.shape(dist.batch_shape_tensor())[0]
-    return independent_lib.Independent(
+      dist = tfd.Normal(loc=loc, scale=scale)
+    reinterpreted_batch_ndims = tf.shape(dist.batch_shape_tensor())[0]
+    return tfd.Independent(
         dist, reinterpreted_batch_ndims=reinterpreted_batch_ndims)
   return _fn
 
 
-def random_sign(shape, dtype=dtypes.float32, seed=None):
+def random_sign(shape, dtype=tf.float32, seed=None):
   """Draw values from {-1, 1} uniformly, i.e., Rademacher distribution."""
-  random_bernoulli = random_ops.random_uniform(shape, minval=0, maxval=2,
-                                               dtype=dtypes.int32,
-                                               seed=seed)
-  return math_ops.cast(2 * random_bernoulli - 1, dtype)
+  random_bernoulli = tf.random_uniform(
+      shape,
+      minval=0,
+      maxval=2,
+      dtype=tf.int32,
+      seed=seed)
+  return tf.cast(2 * random_bernoulli - 1, dtype)

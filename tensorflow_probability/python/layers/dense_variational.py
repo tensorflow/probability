@@ -24,8 +24,17 @@ from tensorflow_probability.python.layers import util as tfp_layers_util
 from tensorflow_probability.python.util import docstring as docstring_util
 from tensorflow.python.ops.distributions import util as distribution_util
 
-
 tfd = tf.contrib.distributions
+
+
+__all__ = [
+    'DenseFlipout',
+    'DenseLocalReparameterization',
+    'DenseReparameterization',
+    'dense_flipout',
+    'dense_local_reparameterization',
+    'dense_reparameterization',
+]
 
 
 doc_args = """units: Integer or Long, dimensionality of the output space.

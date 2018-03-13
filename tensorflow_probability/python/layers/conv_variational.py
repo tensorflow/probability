@@ -26,8 +26,23 @@ from tensorflow.python.layers import utils as tf_layers_util
 from tensorflow.python.ops import nn_ops
 from tensorflow.python.ops.distributions import util as distribution_util
 
-
 tfd = tf.contrib.distributions
+
+
+__all__ = [
+    'Convolution1DFlipout',
+    'Convolution1DReparameterization',
+    'Convolution2DFlipout',
+    'Convolution2DReparameterization',
+    'Convolution3DFlipout',
+    'Convolution3DReparameterization',
+    'convolution1d_flipout',
+    'convolution1d_reparameterization',
+    'convolution2d_flipout',
+    'convolution2d_reparameterization',
+    'convolution3d_flipout',
+    'convolution3d_reparameterization',
+]
 
 
 doc_args = """activation: Activation function. Set it to None to maintain a
