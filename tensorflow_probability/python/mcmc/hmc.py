@@ -51,7 +51,8 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
   Hamiltonian Monte Carlo (HMC) is a Markov chain Monte Carlo (MCMC) algorithm
   that takes a series of gradient-informed steps to produce a Metropolis
   proposal. This class implements one random HMC step from a given
-  `current_state`.
+  `current_state`. Mathematical details and derivations can be found in Neal's
+  "MCMC Using Hamiltonian Dynamics" (2011; https://arxiv.org/abs/1206.1901).
 
   The `one_step` function can update multiple chains in parallel. It assumes
   that all leftmost dimensions of `current_state` index independent chain states
@@ -607,6 +608,48 @@ def _leapfrog_integrator(current_momentums,
     ValueError: if `len(state_parts) != len(grads_target_log_prob)`.
     TypeError: if `not target_log_prob.dtype.is_floating`.
   """
+  # Note on per-variable step sizes:
+  #
+  # Using per-variable step sizes is equivalent to using the same step
+  # size for all variables and adding a diagonal mass matrix in the
+  # kinetic energy term of the Hamiltonian being integrated. This is
+  # hinted at by Neal (2011) but not derived in detail there.
+  #
+  # Let x and v be position and momentum variables respectively.
+  # Let g(x) be the gradient of `target_log_prob_fn(x)`.
+  # Let S be a diagonal matrix of per-variable step sizes.
+  # Let the Hamiltonian H(x, v) = -target_log_prob_fn(x) + 0.5 * ||v||**2.
+  #
+  # Using per-variable step sizes gives the updates
+  # v'  = v  + 0.5 * matmul(S, g(x))
+  # x'' = x  + matmul(S, v')
+  # v'' = v' + 0.5 * matmul(S, g(x''))
+  #
+  # Let u = matmul(inv(S), v).
+  # Multiplying v by inv(S) in the updates above gives the transformed dynamics
+  # u'  = matmul(inv(S), v')  = matmul(inv(S), v) + 0.5 * g(x)
+  #                           = u + 0.5 * g(x)
+  # x'' = x + matmul(S, v') = x + matmul(S**2, u')
+  # u'' = matmul(inv(S), v'') = matmul(inv(S), v') + 0.5 * g(x'')
+  #                           = u' + 0.5 * g(x'')
+  #
+  # These are exactly the leapfrog updates for the Hamiltonian
+  # H'(x, u) = -target_log_prob_fn(x) + 0.5 * u^T S**2 u
+  #          = -target_log_prob_fn(x) + 0.5 * ||v||**2 = H(x, v).
+  #
+  # To summarize:
+  #
+  # * Using per-variable step sizes implicitly simulates the dynamics
+  #   of the Hamiltonian H' (which are energy-conserving in H'). We
+  #   keep track of v instead of u, but the underlying dynamics are
+  #   the same if we transform back.
+  # * The value of the Hamiltonian H'(x, u) is the same as the value
+  #   of the original Hamiltonian H(x, v) after we transform back from
+  #   u to v.
+  # * Sampling v ~ N(0, I) is equivalent to sampling u ~ N(0, S**-2).
+  #
+  # So using per-variable step sizes in HMC will give results that are
+  # exactly identical to explicitly using a diagonal mass matrix.
   def _loop_body(step,
                  current_momentums,
                  current_state_parts,
