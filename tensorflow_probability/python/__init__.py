@@ -25,9 +25,11 @@ from tensorflow_probability.python import optimizer
 from tensorflow_probability.python import trainable_distributions
 from tensorflow_probability.python import util
 from tensorflow_probability.python import vi
+from tensorflow.contrib import distributions
 
 
 __all__ = [
+    'distributions',
     'layers',
     'mcmc',
     'monte_carlo',
