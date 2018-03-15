@@ -175,5 +175,155 @@ class TestBernoulli(tf.test.TestCase):
     self.assertAllClose(np.sum(x_, axis=-1), logits_, atol=0, rtol=1e-3)
 
 
+class TestNormal(tf.test.TestCase):
+
+  def setUp(self):
+    np.random.seed(142)
+
+  @test_util.run_in_graph_and_eager_modes()
+  def testDefaultsYieldCorrectShape(self):
+    batch_shape = [4, 3]
+    x_size = 3
+    x_ = np.random.randn(*np.concatenate([batch_shape, [x_size]]))
+
+    x = tf.constant(x_)
+    normal = tfp.trainable_distributions.normal(x)
+
+    self.evaluate(tf.global_variables_initializer())
+    [
+        batch_shape_,
+        event_shape_,
+    ] = self.evaluate([
+        normal.batch_shape_tensor(),
+        normal.event_shape_tensor(),
+    ])
+
+    self.assertAllEqual(batch_shape, normal.batch_shape)
+    self.assertAllEqual(batch_shape, batch_shape_)
+
+    self.assertAllEqual([], normal.event_shape)
+    self.assertAllEqual([], event_shape_)
+
+  @test_util.run_in_graph_and_eager_modes()
+  def testNonDefaultsYieldCorrectShapeAndValues(self):
+    batch_shape = [4, 3]
+    x_size = 3
+    x_ = np.random.randn(*np.concatenate([batch_shape, [x_size]]))
+
+    x = tf.constant(x_)
+    normal = tfp.trainable_distributions.normal(
+        x,
+        layer_fn=lambda x, _: tf.reduce_sum(x, axis=-1, keepdims=True))
+
+    [
+        batch_shape_,
+        event_shape_,
+        loc_,
+    ] = self.evaluate([
+        normal.batch_shape_tensor(),
+        normal.event_shape_tensor(),
+        normal.loc,
+    ])
+
+    self.assertAllEqual(batch_shape, normal.batch_shape)
+    self.assertAllEqual(batch_shape, batch_shape_)
+
+    self.assertAllEqual([], normal.event_shape)
+    self.assertAllEqual([], event_shape_)
+
+    self.assertAllClose(np.sum(x_, axis=-1), loc_, atol=0, rtol=1e-3)
+
+
+class TestPoisson(tf.test.TestCase):
+
+  def setUp(self):
+    np.random.seed(142)
+
+  @test_util.run_in_graph_and_eager_modes()
+  def testDefaultsYieldCorrectShape(self):
+    batch_shape = [4, 3]
+    x_size = 3
+    x_ = np.random.randn(*np.concatenate([batch_shape, [x_size]]))
+
+    x = tf.constant(x_)
+    poisson = tfp.trainable_distributions.poisson(x)
+
+    self.evaluate(tf.global_variables_initializer())
+    [
+        batch_shape_,
+        event_shape_,
+    ] = self.evaluate([
+        poisson.batch_shape_tensor(),
+        poisson.event_shape_tensor(),
+    ])
+
+    self.assertAllEqual(batch_shape, poisson.batch_shape)
+    self.assertAllEqual(batch_shape, batch_shape_)
+
+    self.assertAllEqual([], poisson.event_shape)
+    self.assertAllEqual([], event_shape_)
+
+  @test_util.run_in_graph_and_eager_modes()
+  def testNonDefaultsYieldCorrectShapeAndValues(self):
+    batch_shape = [4, 3]
+    x_size = 3
+    x_ = np.random.randn(*np.concatenate([batch_shape, [x_size]]))
+
+    x = tf.constant(x_)
+    poisson = tfp.trainable_distributions.poisson(
+        x,
+        layer_fn=lambda x, _: tf.reduce_sum(x, axis=-1, keepdims=True))
+
+    [
+        batch_shape_,
+        event_shape_,
+        log_rate_,
+    ] = self.evaluate([
+        poisson.batch_shape_tensor(),
+        poisson.event_shape_tensor(),
+        poisson.log_rate,
+    ])
+
+    self.assertAllEqual(batch_shape, poisson.batch_shape)
+    self.assertAllEqual(batch_shape, batch_shape_)
+
+    self.assertAllEqual([], poisson.event_shape)
+    self.assertAllEqual([], event_shape_)
+
+    self.assertAllClose(np.sum(x_, axis=-1), log_rate_, atol=0, rtol=1e-3)
+
+
+class TestMakePositiveFunctions(tf.test.TestCase):
+
+  def softplus(self, x):
+    return np.log1p(np.exp(x))
+
+  @test_util.run_in_graph_and_eager_modes()
+  def testPositiveTriLWorks(self):
+    x_ = np.float32(np.arange(6) - 3)
+    y = tfp.trainable_distributions.tril_with_diag_softplus_and_shift(
+        x_, diag_shift=1.)
+    y_ = self.evaluate(y)
+    # Recall that:
+    # tfd.fill_triangular(np.arange(6) - 3).eval()
+    # ==> array([[ 0,  0,  0],
+    #            [ 2,  1,  0],
+    #            [-1, -2, -3]])
+    # I.e., fill_triangular fills in a counter-clockwise spiral, starting from
+    # the last row. Hence,
+    expected_y = np.float32([
+        [self.softplus(0) + 1, 0, 0],
+        [1 + 1, self.softplus(1) + 1, 0],
+        [-2 + 1, -3 + 1, self.softplus(-3) + 1]])
+    self.assertAllClose(expected_y, y_, atol=1e-5, rtol=1e-5)
+
+  @test_util.run_in_graph_and_eager_modes()
+  def testPositiveWorks(self):
+    x_ = np.float32(np.arange(6) - 3)
+    y = tfp.trainable_distributions.softplus_and_shift(x_, shift=1.)
+    y_ = self.evaluate(y)
+    self.assertAllClose(self.softplus(x_) + 1, y_, atol=1e-5, rtol=1e-5)
+
+
 if __name__ == '__main__':
   tf.test.main()
