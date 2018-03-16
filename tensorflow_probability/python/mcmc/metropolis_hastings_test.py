@@ -26,7 +26,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.mcmc import util as mcmc_util
+from tensorflow_probability.python.mcmc.util import is_list_like
 
 
 InnerKernelResultsWithoutCorrection = collections.namedtuple(
@@ -82,7 +82,7 @@ class FakeTransitionKernel(tfp.mcmc.TransitionKernel):
 def make_one_step_fn(dtype):
   def one_step(current_state, previous_kernel_results):
     # Make next_state.
-    if mcmc_util.is_list_like(current_state):
+    if is_list_like(current_state):
       next_state = []
       for i, s in enumerate(current_state):
         next_state.append(tf.identity(s * dtype(i + 2),
