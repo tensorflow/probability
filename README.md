@@ -1,40 +1,43 @@
 # TensorFlow Probability
 
-This package collects tools for probabilistic reasoning in TensorFlow. It is
-intended to serve as a hub for development of modeling tools, inference
-algorithms, useful models, and general statistical computation. Taking
-advantage of the TensorFlow ecosystem allows straightforward combination of
-probabilistic methods with deep networks, gradient-based inference via
-automatic differentiation, and scalability to large datasets and models via
-hardware acceleration (e.g., GPUs) and distributed computation.
+TensorFlow Probability is a library for probabilistic reasoning and statistical
+analysis in TensorFlow. As part of the TensorFlow ecosystem, TensorFlow
+Probability provides integration of probabilistic methods with deep networks,
+gradient-based inference via automatic differentiation, and scalability to
+large datasets and models via hardware acceleration (e.g., GPUs) and distributed
+computation.
 
-Contents of this package currently include:
+The library consists of the following modules:
 
-* *Sampling algorithms* E.g., `tfp.mcmc.sample_chain`,
-  `tfp.mcmc.HamiltonianMonteCarlo`, `tfp.monte_carlo.expectation`.
-* *Example models* (`tfp.examples`): implementations of common probability
-  models in TensorFlow using tools from this package and from
-  `tf.contrib.distributions`.
+* *Distributions* (`tfp.distributions`, `tfp.trainable_distributions`):
+  Probability distributions with efficient, composable manipulations.
+* *Layers* (`tfp.layers`): Neural network layers with uncertainty
+  over the functions they represent, extending TensorFlow Layers.
+* *Monte Carlo* (`tfp.mcmc`, `tfp.optimizers`, `tfp.monte_carlo`): Algorithms
+  for approximate Bayesian inference via sampling.
+* *Variational Inference* (`tfp.vi`): Algorithms for approximate Bayesian
+  inference via optimization.
+* *Examples* (`tfp.examples`): End-to-end implementations of probabilistic
+  reasoning using TensorFlow Probability.
 
-Contents of this repository should be considered under active development;
-interfaces may change at any time. We welcome external contributions! See
-[Contributing](#contributing) for details.
+TensorFlow Probability is under active development. Interfaces may change at any
+time.
 
 ## Installation
 
-As simple as:
+To install the latest version, run the following:
 
 ```shell
 pip install tfp-nightly --user --upgrade     # depends on tensorflow (CPU-only)
 ```
 
-We also provide a GPU-enabled flavor:
+We also provide a GPU-enabled version.
 
 ```shell
 pip install tfp-nightly-gpu --user --upgrade # depends on tensorflow-gpu (GPU enabled)
 ```
 
-TensorFlow Probability does not currently contain any GPU-specific code; the
+Currently, TensorFlow Probability does not contain any GPU-specific code. The
 primary difference between these packages is that `tensorflow-probability-gpu`
 depends on a GPU-enabled version of TensorFlow.
 
@@ -54,29 +57,27 @@ bazel build --config=opt --copt=-O3 --copt=-march=native :pip_pkg
 pip install /tmp/tensorflow_probability_pkg/*.whl --user --upgrade
 ```
 
-## Examples
-
-It is often easiest to learn by example. The `examples/` directory contains
-reference implementations of common probabilistic models and demonstrates
-idiomatic styles for building probability models in TensorFlow. Example code may
-be run directly from the command line, e.g.,
-
-`python -m tensorflow_probability.examples.weight_uncertainty.mnist_deep_nn`
-
-to train a Bayesian deep network to classify MNIST digits. See the
-[examples](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/)
-directory for the list of example implementations.
-
 ## Usage
 
-After you've installed `tensorflow_probability`, functions can be accessed as:
+Access the library using
 
 ```python
 import tensorflow_probability as tfp
 ```
 
+## Examples
+
+See the `tfp.examples` module for examples of end-to-end implementations. They
+can also be run under command line: for example, run
+
+`python -m tensorflow_probability.examples.vae`
+
+to train a variational auto-encoder to generate MNIST digits. See the
+[`examples/`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/)
+directory for more details.
+
 ## Contributing
 
 We're eager to collaborate with you! Feel free to [open an issue on
 GitHub](https://github.com/tensorflow/probability/issues) and/or send us your
-pull requests. See [our contribution doc](CONTRIBUTING.md) for more details.
+pull requests. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for more details.
