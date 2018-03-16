@@ -12,31 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Tools for probabilistic reasoning in TensorFlow."""
+"""Edward2 probabilistic programming language."""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from tensorflow_probability.python import edward2
-from tensorflow_probability.python import layers
-from tensorflow_probability.python import mcmc
-from tensorflow_probability.python import monte_carlo
-from tensorflow_probability.python import optimizer
-from tensorflow_probability.python import trainable_distributions
-from tensorflow_probability.python import util
-from tensorflow_probability.python import vi
-from tensorflow.contrib import distributions
+# pylint: disable=wildcard-import
+from tensorflow_probability.python.edward2.generated_random_variables import *
+from tensorflow_probability.python.edward2.generated_random_variables import __all__ as rv_all
+from tensorflow_probability.python.edward2.interceptor import get_interceptor
+from tensorflow_probability.python.edward2.interceptor import interception
+from tensorflow_probability.python.edward2.random_variable import RandomVariable
+# pylint: enable=wildcard-import
 
-
-__all__ = [
-    'distributions',
-    'edward2',
-    'layers',
-    'mcmc',
-    'monte_carlo',
-    'optimizer',
-    'trainable_distributions',
-    'util',
-    'vi',
+__all__ = rv_all + [
+    "RandomVariable",
+    "get_interceptor",
+    "interception",
 ]
