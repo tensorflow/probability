@@ -21,7 +21,7 @@ from setuptools import setup
 from setuptools.command.install import install as InstallCommandBase
 from setuptools.dist import Distribution
 
-__version__ = '0.0.1'
+VERSION = '0.0.0'
 
 REQUIRED_PACKAGES = [
     'six >= 1.10.0',
@@ -51,7 +51,7 @@ else:
   # '0.0.1.dev20180305'
   project_name = 'tfp-nightly' + maybe_gpu_suffix
   datestring = datetime.datetime.now().strftime('%Y%m%d')
-  __version__ += '.dev' + datestring
+  VERSION += '.dev' + datestring
 
 tensorflow_package_name = 'tensorflow{}>={}'.format(
     maybe_gpu_suffix, REQUIRED_TENSORFLOW_VERSION)
@@ -66,7 +66,7 @@ class BinaryDistribution(Distribution):
 
 setup(
     name=project_name,
-    version=__version__,
+    version=VERSION,
     description='Probabilistic modeling and statistical '
                 'inference in TensorFlow',
     author='Google LLC',
