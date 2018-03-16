@@ -11,6 +11,9 @@ The library consists of the following modules:
 
 * *Distributions* (`tfp.distributions`, `tfp.trainable_distributions`):
   Probability distributions with efficient, composable manipulations.
+* *Edward2* (`tfp.edward2`): A probabilistic programming language, which enables
+  flexible probabilistic models and flexible computation for their training and
+  testing.
 * *Layers* (`tfp.layers`): Neural network layers with uncertainty
   over the functions they represent, extending TensorFlow Layers.
 * *Monte Carlo* (`tfp.mcmc`, `tfp.optimizers`, `tfp.monte_carlo`): Algorithms
