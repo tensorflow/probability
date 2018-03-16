@@ -12,5 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-trandustin
-mhoffman
+# Please send reviews to jvdillon; he will reassign as needed.
+jvdillon  # primary
+
+cgs       # secondary
+davmre    # secondary
+
+saxeas    # metropolis_hastings
+
+# MDB used by Copybara-as-a-service
+mdb-group:copybara-piper
