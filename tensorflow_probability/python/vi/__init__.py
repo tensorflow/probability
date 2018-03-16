@@ -20,7 +20,10 @@ from __future__ import print_function
 
 from tensorflow_probability.python.vi import csiszar_divergence
 
+from tensorflow.python.util.all_util import remove_undocumented
 
-__all__ = [
+_allowed_symbols = [
     'csiszar_divergence',
 ]
+
+remove_undocumented(__name__, _allowed_symbols)

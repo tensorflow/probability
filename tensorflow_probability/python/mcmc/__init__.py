@@ -28,8 +28,9 @@ from tensorflow_probability.python.mcmc.sample import sample_chain
 from tensorflow_probability.python.mcmc.sample_annealed_importance import sample_annealed_importance_chain
 from tensorflow_probability.python.mcmc.sample_halton_sequence import sample_halton_sequence
 
+from tensorflow.python.util.all_util import remove_undocumented
 
-__all__ = [
+_allowed_symbols = [
     'HamiltonianMonteCarlo',
     'MetropolisHastings',
     'TransitionKernel',
@@ -40,3 +41,5 @@ __all__ = [
     'sample_chain',
     'sample_halton_sequence',
 ]
+
+remove_undocumented(__name__, _allowed_symbols)

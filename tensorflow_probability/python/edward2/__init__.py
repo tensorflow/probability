@@ -26,8 +26,12 @@ from tensorflow_probability.python.edward2.interceptor import interception
 from tensorflow_probability.python.edward2.random_variable import RandomVariable
 # pylint: enable=wildcard-import
 
-__all__ = rv_all + [
+from tensorflow.python.util.all_util import remove_undocumented
+
+_allowed_symbols = rv_all + [
     "RandomVariable",
     "get_interceptor",
     "interception",
 ]
+
+remove_undocumented(__name__, _allowed_symbols)

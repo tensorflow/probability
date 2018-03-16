@@ -39,8 +39,9 @@ from tensorflow_probability.python.layers.dense_variational import DenseReparame
 from tensorflow_probability.python.layers.util import default_loc_scale_fn
 from tensorflow_probability.python.layers.util import default_mean_field_normal_fn
 
+from tensorflow.python.util.all_util import remove_undocumented
 
-__all__ = [
+_allowed_symbols = [
     'Convolution1DFlipout',
     'Convolution1DReparameterization',
     'Convolution2DFlipout',
@@ -62,3 +63,5 @@ __all__ = [
     'dense_local_reparameterization',
     'dense_reparameterization',
 ]
+
+remove_undocumented(__name__, _allowed_symbols)

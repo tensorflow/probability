@@ -20,7 +20,10 @@ from __future__ import print_function
 
 from tensorflow_probability.python.util.variables import externalize_variables_as_args
 
+from tensorflow.python.util.all_util import remove_undocumented
 
-__all__ = [
+_allowed_symbols = [
     'externalize_variables_as_args',
 ]
+
+remove_undocumented(__name__, _allowed_symbols)

@@ -28,8 +28,9 @@ from tensorflow_probability.python import util
 from tensorflow_probability.python import vi
 from tensorflow.contrib import distributions
 
+from tensorflow.python.util.all_util import remove_undocumented
 
-__all__ = [
+_allowed_symbols = [
     'distributions',
     'edward2',
     'layers',
@@ -40,3 +41,5 @@ __all__ = [
     'util',
     'vi',
 ]
+
+remove_undocumented(__name__, _allowed_symbols)

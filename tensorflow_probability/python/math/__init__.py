@@ -18,4 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-__all__ = []
+from tensorflow.python.util.all_util import remove_undocumented
+
+_allowed_symbols = []
+
+remove_undocumented(__name__, _allowed_symbols)
