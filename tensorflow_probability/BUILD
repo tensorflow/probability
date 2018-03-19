@@ -27,6 +27,7 @@ py_library(
     srcs_version = "PY2AND3",
     visibility = ["//visibility:public"],
     deps = [
+#         "//tensorflow_probability/google/staging",  # DisableOnExport
         "//tensorflow_probability/python",
     ],
 )

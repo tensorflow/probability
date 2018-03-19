@@ -17,4 +17,5 @@
 # Contributors to the `python/` dir should not alter this file; instead update
 # `python/__init__.py` as necessary.
 
+# from tensorflow_probability.google import staging  # DisableOnExport
 from tensorflow_probability.python import *  # pylint: disable=wildcard-import
