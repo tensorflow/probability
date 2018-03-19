@@ -128,25 +128,32 @@ class MetropolisHastings(kernel_base.TransitionKernel):
       metropolis_hastings_kernel: Instance of `TransitionKernel` which wraps the
         input transtion kernel with the Metropolis-Hastings algorithm.
     """
-    self._inner_kernel = inner_kernel
-    self._seed = seed
-    self._name = name
     if inner_kernel.is_calibrated:
       warnings.warn('Supplied `TransitionKernel` is already calibrated. '
-                    'Composing with `MetropolisHastings` `TransitionKernel` '
+                    'Composing `MetropolisHastings` `TransitionKernel` '
                     'may not be required.')
+    self._seed_stream = seed  # This will be mutated with use.
+    self._parameters = dict(
+        inner_kernel=inner_kernel,
+        seed=seed,
+        name=name)
 
   @property
   def inner_kernel(self):
-    return self._inner_kernel
+    return self._parameters['inner_kernel']
 
   @property
   def seed(self):
-    return self._seed
+    return self._parameters['seed']
 
   @property
   def name(self):
-    return self._name
+    return self._parameters['name']
+
+  @property
+  def parameters(self):
+    """Return `dict` of ``__init__`` arguments and their values."""
+    return self._parameters
 
   @property
   def is_calibrated(self):
@@ -172,10 +179,9 @@ class MetropolisHastings(kernel_base.TransitionKernel):
       ValueError: if `inner_kernel` results doesn't contain the member
         "target_log_prob".
     """
-    name = ('mh_one_step' if self.name is None
-            else (self.name + '_one_step'))
-    with tf.name_scope(name=name,
-                       values=[current_state, previous_kernel_results]):
+    with tf.name_scope(
+        name=mcmc_util.make_name(self.name, 'mh', 'one_step'),
+        values=[current_state, previous_kernel_results]):
       # Take one inner step.
       [
           proposed_state,
@@ -208,36 +214,33 @@ class MetropolisHastings(kernel_base.TransitionKernel):
       # - We mutate seed state so subsequent calls are not correlated.
       # - We mutate seed BEFORE using it just in case users supplied the
       #   same seed to the inner kernel.
-      self._seed = distributions_util.gen_new_seed(
-          self.seed, salt='metropolis_hastings_one_step')
+      self._seed_stream = distributions_util.gen_new_seed(
+          self._seed_stream, salt='metropolis_hastings_one_step')
       log_uniform = tf.log(tf.random_uniform(
           shape=tf.shape(proposed_results.target_log_prob),
           dtype=proposed_results.target_log_prob.dtype.base_dtype,
-          seed=self.seed))
+          seed=self._seed_stream))
       is_accepted = log_uniform < log_accept_ratio
 
       next_state = mcmc_util.choose(
           is_accepted,
           proposed_state,
-          current_state)
+          current_state,
+          name='choose_next_state')
 
-      accepted_results = type(proposed_results)(**dict(
-          [(fn,
-            mcmc_util.choose(
-                is_accepted,
-                getattr(proposed_results, fn),
-                getattr(previous_kernel_results.accepted_results, fn)))
-           for fn in proposed_results._fields]))
+      kernel_results = MetropolisHastingsKernelResults(
+          accepted_results=mcmc_util.choose(
+              is_accepted,
+              proposed_results,
+              previous_kernel_results.accepted_results,
+              name='choose_inner_results'),
+          is_accepted=is_accepted,
+          log_accept_ratio=log_accept_ratio,
+          proposed_state=proposed_state,
+          proposed_results=proposed_results,
+      )
 
-      return [
-          next_state,
-          MetropolisHastingsKernelResults(
-              accepted_results=accepted_results,
-              is_accepted=is_accepted,
-              log_accept_ratio=log_accept_ratio,
-              proposed_state=proposed_state,
-              proposed_results=proposed_results,
-          )]
+      return next_state, kernel_results
 
   def bootstrap_results(self, init_state):
     """Returns an object with the same type as returned by `one_step`.
@@ -254,9 +257,9 @@ class MetropolisHastings(kernel_base.TransitionKernel):
       ValueError: if `inner_kernel` results doesn't contain the member
         "target_log_prob".
     """
-    name = ('mh_bootstrap_results' if self.name is None
-            else (self.name + '_bootstrap_results'))
-    with tf.name_scope(name=name, values=[init_state]):
+    with tf.name_scope(
+        name=mcmc_util.make_name(self.name, 'mh', 'bootstrap_results'),
+        values=[init_state]):
       pkr = self.inner_kernel.bootstrap_results(init_state)
       if not has_target_log_prob(pkr):
         raise ValueError(

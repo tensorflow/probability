@@ -148,8 +148,6 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
   until convergence. (This procedure is a [Robbins--Monro algorithm](
   https://en.wikipedia.org/wiki/Stochastic_approximation).)
 
-
-
   The generative assumptions are:
 
   ```none
@@ -298,12 +296,7 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
       ValueError: if there isn't one `step_size` or a list with same length as
         `current_state`.
     """
-    self._target_log_prob_fn = target_log_prob_fn
-    self._step_size = step_size
-    self._num_leapfrog_steps = num_leapfrog_steps
-    self._seed = seed
-    self._name = name
-    self._hmc_impl = metropolis_hastings.MetropolisHastings(
+    self._impl = metropolis_hastings.MetropolisHastings(
         inner_kernel=UncalibratedHamiltonianMonteCarlo(
             target_log_prob_fn=target_log_prob_fn,
             step_size=step_size,
@@ -314,23 +307,28 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
 
   @property
   def target_log_prob_fn(self):
-    return self._target_log_prob_fn
+    return self._impl.inner_kernel.target_log_prob_fn
 
   @property
   def step_size(self):
-    return self._step_size
+    return self._impl.inner_kernel.step_size
 
   @property
   def num_leapfrog_steps(self):
-    return self._num_leapfrog_steps
+    return self._impl.inner_kernel.num_leapfrog_steps
 
   @property
   def seed(self):
-    return self._seed
+    return self._impl.inner_kernel.seed
 
   @property
   def name(self):
-    return self._name
+    return self._impl.inner_kernel.name
+
+  @property
+  def parameters(self):
+    """Return `dict` of ``__init__`` arguments and their values."""
+    return self._impl.inner_kernel.parameters
 
   @property
   def is_calibrated(self):
@@ -358,11 +356,11 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
       ValueError: if there isn't one `step_size` or a list with same length as
         `current_state`.
     """
-    return self._hmc_impl.one_step(current_state, previous_kernel_results)
+    return self._impl.one_step(current_state, previous_kernel_results)
 
   def bootstrap_results(self, init_state):
     """Creates initial `previous_kernel_results` using a supplied `state`."""
-    return self._hmc_impl.bootstrap_results(init_state)
+    return self._impl.bootstrap_results(init_state)
 
 
 class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
@@ -383,31 +381,38 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
                num_leapfrog_steps,
                seed=None,
                name=None):
-    self._target_log_prob_fn = target_log_prob_fn
-    self._step_size = step_size
-    self._num_leapfrog_steps = num_leapfrog_steps
-    self._seed = seed
-    self._name = name
+    self._seed_stream = seed  # This will be mutated with use.
+    self._parameters = dict(
+        target_log_prob_fn=target_log_prob_fn,
+        step_size=step_size,
+        num_leapfrog_steps=num_leapfrog_steps,
+        seed=seed,
+        name=name)
 
   @property
   def target_log_prob_fn(self):
-    return self._target_log_prob_fn
+    return self._parameters['target_log_prob_fn']
 
   @property
   def step_size(self):
-    return self._step_size
+    return self._parameters['step_size']
 
   @property
   def num_leapfrog_steps(self):
-    return self._num_leapfrog_steps
+    return self._parameters['num_leapfrog_steps']
 
   @property
   def seed(self):
-    return self._seed
+    return self._parameters['seed']
 
   @property
   def name(self):
-    return self._name
+    return self._parameters['name']
+
+  @property
+  def parameters(self):
+    """Return `dict` of ``__init__`` arguments and their values."""
+    return self._parameters
 
   @property
   def is_calibrated(self):
@@ -416,11 +421,11 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
   @mcmc_util.set_doc(HamiltonianMonteCarlo.one_step.__doc__)
   def one_step(self, current_state, previous_kernel_results):
     with tf.name_scope(
-        self.name, 'hmc_kernel',
-        [self.step_size, self.num_leapfrog_steps, self.seed,
-         current_state,
-         previous_kernel_results.target_log_prob,
-         previous_kernel_results.grads_target_log_prob]):
+        name=mcmc_util.make_name(self.name, 'hmc', 'one_step'),
+        values=[self.step_size, self.num_leapfrog_steps, self._seed_stream,
+                current_state,
+                previous_kernel_results.target_log_prob,
+                previous_kernel_results.grads_target_log_prob]):
       with tf.name_scope('initialize'):
         [
             current_state_parts,
@@ -441,12 +446,12 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
           # - We mutate seed state so subsequent calls are not correlated.
           # - We mutate seed BEFORE using it just in case users supplied the
           #   same seed to an outer kernel, e.g., `MetropolisHastings`.
-          self._seed = distributions_util.gen_new_seed(
-              self.seed, salt='hmc_kernel_momentums')
+          self._seed_stream = distributions_util.gen_new_seed(
+              self._seed_stream, salt='hmc_kernel_momentums')
           current_momentums.append(tf.random_normal(
               shape=tf.shape(s),
               dtype=s.dtype.base_dtype,
-              seed=self.seed))
+              seed=self._seed_stream))
 
         num_leapfrog_steps = tf.convert_to_tensor(
             self.num_leapfrog_steps,
@@ -486,7 +491,9 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
 
   @mcmc_util.set_doc(HamiltonianMonteCarlo.bootstrap_results.__doc__)
   def bootstrap_results(self, init_state):
-    with tf.name_scope(self.name, 'hmc_bootstrap_results', [init_state]):
+    with tf.name_scope(
+        name=mcmc_util.make_name(self.name, 'hmc', 'bootstrap_results'),
+        values=[init_state]):
       if not mcmc_util.is_list_like(init_state):
         init_state = [init_state]
       init_state = [tf.convert_to_tensor(x) for x in init_state]

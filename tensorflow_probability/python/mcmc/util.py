@@ -18,16 +18,20 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import collections
+
 # Dependency imports
 import numpy as np
 import tensorflow as tf
 
 
 __all__ = [
-    'is_list_like',
     'choose',
-    'set_doc',
+    'is_list_like',
+    'is_namedtuple_like',
+    'make_name',
     'safe_sum',
+    'set_doc',
 ]
 
 
@@ -36,11 +40,26 @@ def is_list_like(x):
   return isinstance(x, (tuple, list))
 
 
-def choose(is_accepted,
-           accepted,
-           rejected,
-           name=None):
-  """Helper to `kernel` which expand_dims `is_accepted` to apply tf.where."""
+def is_namedtuple_like(x):
+  """Helper which returns `True` if input is `collections.namedtuple`-like."""
+  return (isinstance(x, tuple) and
+          isinstance(getattr(x, '__dict__', None), collections.Mapping) and
+          getattr(x, '_fields', None) is not None)
+
+
+def make_name(super_name, default_super_name, sub_name):
+  """Helper which makes a `str` name; useful for tf.name_scope."""
+  name = super_name if super_name is not None else default_super_name
+  if sub_name is not None:
+    name += '_' + sub_name
+  return name
+
+
+def _choose_base_case(is_accepted,
+                      accepted,
+                      rejected,
+                      name=None):
+  """Helper to `choose` which expand_dims `is_accepted` and applies tf.where."""
   def _expand_is_accepted_like(x):
     with tf.name_scope('expand_is_accepted_like'):
       expand_shape = tf.concat([
@@ -66,7 +85,27 @@ def choose(is_accepted,
       is_accepted, accepted, rejected]):
     if not is_list_like(accepted):
       return _where(accepted, rejected)
-    return [_where(a, r) for a, r in zip(accepted, rejected)]
+    return [(choose(is_accepted, a, r, name=name) if is_namedtuple_like(a)
+             else _where(a, r))
+            for a, r in zip(accepted, rejected)]
+
+
+def choose(is_accepted, accepted, rejected, name=None):
+  """Helper which expand_dims `is_accepted` then applies tf.where."""
+  if not is_namedtuple_like(accepted):
+    return _choose_base_case(is_accepted, accepted, rejected, name=name)
+  if not isinstance(accepted, type(rejected)):
+    raise TypeError('Type of `accepted` ({}) must be identical to '
+                    'type of `rejected` ({})'.format(
+                        type(accepted).__name__,
+                        type(rejected).__name__))
+  return type(accepted)(**dict(
+      [(fn,
+        choose(is_accepted,
+               getattr(accepted, fn),
+               getattr(rejected, fn),
+               name=name))
+       for fn in accepted._fields]))
 
 
 def safe_sum(x, alt_value=-np.inf, name=None):

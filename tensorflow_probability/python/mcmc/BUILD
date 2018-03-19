@@ -192,3 +192,13 @@ py_library(
         # tensorflow dep,
     ],
 )
+
+py_test(
+    name = "util_test",
+    size = "small",
+    srcs = ["util_test.py"],
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
