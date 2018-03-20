@@ -31,13 +31,13 @@ time.
 To install the latest version, run the following:
 
 ```shell
-pip install tfp-nightly --user --upgrade     # depends on tensorflow (CPU-only)
+pip install --user --upgrade tfp-nightly    # depends on tensorflow (CPU-only)
 ```
 
 We also provide a GPU-enabled version.
 
 ```shell
-pip install tfp-nightly-gpu --user --upgrade # depends on tensorflow-gpu (GPU enabled)
+pip install --user --upgrade tfp-nightly-gpu  # depends on tensorflow-gpu (GPU enabled)
 ```
 
 Currently, TensorFlow Probability does not contain any GPU-specific code. The
@@ -53,11 +53,14 @@ You can also install from source. This requires the [Bazel](
 https://bazel.build/) build system.
 
 ```shell
+# sudo apt-get install bazel git python-pip  # Ubuntu; others, see above links.
+pip install --user --upgrade tf-nightly
 git clone https://github.com/tensorflow/probability.git
 cd probability
 bazel build --config=opt --copt=-O3 --copt=-march=native :pip_pkg
-./bazel-bin/pip_pkg /tmp/tensorflow_probability_pkg
-pip install /tmp/tensorflow_probability_pkg/*.whl --user --upgrade
+PKGDIR=$(mktemp -d)
+./bazel-bin/pip_pkg $PKGDIR
+pip install --user --upgrade $PKGDIR/*.whl
 ```
 
 ## Usage
