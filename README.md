@@ -54,7 +54,6 @@ https://bazel.build/) build system.
 
 ```shell
 # sudo apt-get install bazel git python-pip  # Ubuntu; others, see above links.
-pip install --user --upgrade tf-nightly
 git clone https://github.com/tensorflow/probability.git
 cd probability
 bazel build --config=opt --copt=-O3 --copt=-march=native :pip_pkg

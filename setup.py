@@ -46,15 +46,17 @@ maybe_gpu_suffix = '-gpu' if use_gpu else ''
 
 if release:
   project_name = 'tensorflow-probability' + maybe_gpu_suffix
+  tensorflow_package_name = 'tensorflow{}>={}'.format(
+      maybe_gpu_suffix, REQUIRED_TENSORFLOW_VERSION)
 else:
   # Nightly releases use date-based versioning of the form
   # '0.0.1.dev20180305'
   project_name = 'tfp-nightly' + maybe_gpu_suffix
   datestring = datetime.datetime.now().strftime('%Y%m%d')
   VERSION += '.dev' + datestring
+  tensorflow_package_name = 'tf-nightly{}'.format(
+      maybe_gpu_suffix)
 
-tensorflow_package_name = 'tensorflow{}>={}'.format(
-    maybe_gpu_suffix, REQUIRED_TENSORFLOW_VERSION)
 REQUIRED_PACKAGES.append(tensorflow_package_name)
 
 
