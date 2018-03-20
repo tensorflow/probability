@@ -891,8 +891,8 @@ def csiszar_vimco(f,
                   name=None):
   """Use VIMCO to lower the variance of gradient[csiszar_function(Avg(logu))].
 
-  This function generalizes "Variational Inference for Monte Carlo Objectives"
-  (VIMCO), i.e., https://arxiv.org/abs/1602.06725, to Csiszar f-Divergences.
+  This function generalizes VIMCO [(Mnih and Rezende, 2016)][1] to Csiszar
+  f-Divergences.
 
   Note: if `q.reparameterization_type = tfd.FULLY_REPARAMETERIZED`,
   consider using `monte_carlo_csiszar_f_divergence`.
@@ -948,6 +948,12 @@ def csiszar_vimco(f,
 
   Raises:
     ValueError: if `num_draws < 2`.
+
+  #### References
+
+  [1]: Andriy Mnih and Danilo Rezende. Variational Inference for Monte Carlo
+       objectives. In _International Conference on Machine Learning_, 2016.
+       https://arxiv.org/abs/1602.06725
   """
   with tf.name_scope(name, "csiszar_vimco", [num_draws, num_batch_draws]):
     if num_draws < 2:

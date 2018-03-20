@@ -59,15 +59,15 @@ def sample_halton_sequence(dim,
   prime base for the k-th axes is the k-th prime starting from 2. For example,
   if `dim` = 3, then the bases will be [2, 3, 5] respectively and the first
   element of the non-randomized sequence will be: [0.5, 0.333, 0.2]. For a more
-  complete description of the Halton sequences see:
-  https://en.wikipedia.org/wiki/Halton_sequence. For low discrepancy sequences
-  and their applications see:
-  https://en.wikipedia.org/wiki/Low-discrepancy_sequence.
+  complete description of the Halton sequences see
+  [here](https://en.wikipedia.org/wiki/Halton_sequence). For low discrepancy
+  sequences and their applications see
+  [here](https://en.wikipedia.org/wiki/Low-discrepancy_sequence).
 
   If `randomized` is true, this function produces a scrambled version of the
-  Halton sequence introduced by Owen in arXiv:1706.02808. For the advantages of
-  randomization of low discrepancy sequences see:
-  https://en.wikipedia.org/wiki/Quasi-Monte_Carlo_method#Randomization_of_quasi-Monte_Carlo
+  Halton sequence introduced by [Owen (2017)][1]. For the advantages of
+  randomization of low discrepancy sequences see [here](
+  https://en.wikipedia.org/wiki/Quasi-Monte_Carlo_method#Randomization_of_quasi-Monte_Carlo).
 
   The number of samples produced is controlled by the `num_results` and
   `sequence_indices` parameters. The user must supply either `num_results` or
@@ -142,7 +142,7 @@ def sample_halton_sequence(dim,
       Default value: `tf.float32`.
     randomized: (Optional) bool indicating whether to produce a randomized
       Halton sequence. If True, applies the randomization described in
-      Owen (2017) [arXiv:1706.02808].
+      [Owen (2017)][1].
       Default value: `True`.
     seed: (Optional) Python integer to seed the random number generator. Only
       used if `randomized` is True. If not supplied and `randomized` is True,
@@ -161,6 +161,11 @@ def sample_halton_sequence(dim,
   Raises:
     ValueError: if both `sequence_indices` and `num_results` were specified or
       if dimension `dim` is less than 1 or greater than 1000.
+
+  #### References
+
+  [1]: Art B. Owen. A randomized Halton algorithm in R. _arXiv preprint
+       arXiv:1706.02808_, 2017. https://arxiv.org/abs/1706.02808
   """
   if dim < 1 or dim > _MAX_DIMENSION:
     raise ValueError(
@@ -243,7 +248,7 @@ def sample_halton_sequence(dim,
 
 
 def _randomize(coeffs, radixes, seed=None):
-  """Applies the Owen randomization to the coefficients."""
+  """Applies the Owen (2017) randomization to the coefficients."""
   given_dtype = coeffs.dtype
   coeffs = tf.to_int32(coeffs)
   num_coeffs = tf.shape(coeffs)[-1]

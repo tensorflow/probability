@@ -51,8 +51,8 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
   Hamiltonian Monte Carlo (HMC) is a Markov chain Monte Carlo (MCMC) algorithm
   that takes a series of gradient-informed steps to produce a Metropolis
   proposal. This class implements one random HMC step from a given
-  `current_state`. Mathematical details and derivations can be found in Neal's
-  "MCMC Using Hamiltonian Dynamics" (2011; https://arxiv.org/abs/1206.1901).
+  `current_state`. Mathematical details and derivations can be found in
+  [Neal (2011)][1].
 
   The `one_step` function can update multiple chains in parallel. It assumes
   that all leftmost dimensions of `current_state` index independent chain states
@@ -258,6 +258,10 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
   print 'mean error:', abs(np.mean(sigma_history) - true_sigma)
   ```
 
+  #### References
+
+  [1]: Radford Neal. MCMC Using Hamiltonian Dynamics. _Handbook of Markov Chain
+       Monte Carlo_, 2011. https://arxiv.org/abs/1206.1901
   """
 
   def __init__(self,

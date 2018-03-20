@@ -33,27 +33,23 @@ class StochasticGradientLangevinDynamics(tf.train.Optimizer):
   """An optimizer module for stochastic gradient Langevin dynamics.
 
   This implements the preconditioned Stochastic Gradient Langevin Dynamics
-  optimizer [1]. The optimization variable is regarded as a sample from the
-  posterior under Stochastic Gradient Langevin Dynamics with noise rescaled in
-  each dimension according to RMSProp [2].
+  optimizer [(Li et al., 2016)][1]. The optimization variable is regarded as a
+  sample from the posterior under Stochastic Gradient Langevin Dynamics with
+  noise rescaled in each dimension according to [RMSProp](
+  http://www.cs.toronto.edu/~tijmen/csc321/slides/lecture_slides_lec6.pdf).
 
   Note: If a prior is included in the loss, it should be scaled by
   `1/num_pseudo_batches`, where num_pseudo_batches is the number of minibatches
   in the data.  I.e., it should be divided by the `num_pseudo_batches` term
   described below.
 
-  [1]: "Preconditioned Stochastic Gradient Langevin Dynamics for Deep Neural
-       Networks." Chunyuan Li, Changyou Chen, David Carlson, Lawrence Carin.
-       ArXiv:1512.07666, 2015. https://arxiv.org/abs/1512.07666
-  [2]: http://www.cs.toronto.edu/~tijmen/csc321/slides/lecture_slides_lec6.pdf
-
   Args:
     learning_rate: Scalar `float`-like `Tensor`. The base learning rate for the
       optimizer. Must be tuned to the specific function being minimized.
     preconditioner_decay_rate: Scalar `float`-like `Tensor`. The exponential
       decay rate of the rescaling of the preconditioner (RMSprop). (This is
-      "alpha" in [1]). Should be smaller than but nearly `1` to approximate
-      sampling from the posterior. (Default: `0.95`)
+      "alpha" in Li et al. (2016)). Should be smaller than but nearly `1` to
+      approximate sampling from the posterior. (Default: `0.95`)
     num_pseudo_batches: Scalar `int`-like `Tensor`. The effective number of
       minibatches in the data set.  Trades off noise and prior with the SGD
       likelihood term. Note: Assumes the loss is taken as the mean over a
@@ -74,6 +70,13 @@ class StochasticGradientLangevinDynamics(tf.train.Optimizer):
   Raises:
     InvalidArgumentError: If preconditioner_decay_rate is a `Tensor` not in
       `(0,1]`.
+
+  #### References
+
+  [1]: Chunyuan Li, Changyou Chen, David Carlson, and Lawrence Carin.
+       Preconditioned Stochastic Gradient Langevin Dynamics for Deep Neural
+       Networks. In _Association for the Advancement of Artificial
+       Intelligence_, 2016. https://arxiv.org/abs/1512.07666
   """
 
   def __init__(self,

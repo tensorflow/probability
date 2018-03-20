@@ -53,7 +53,31 @@ def effective_sample_size(states,
   If the sequence is uncorrelated, `ESS = N`.  In general, one should expect
   `ESS <= N`, with more highly correlated sequences having smaller `ESS`.
 
-  #### Example of using ESS to estimate standard error.
+  Args:
+    states:  `Tensor` or list of `Tensor` objects.  Dimension zero should index
+      identically distributed states.
+    filter_threshold:  `Tensor` or list of `Tensor` objects.
+      Must broadcast with `state`.  The auto-correlation sequence is truncated
+      after the first appearance of a term less than `filter_threshold`.
+      Setting to `None` means we use no threshold filter.  Since `|R_k| <= 1`,
+      setting to any number less than `-1` has the same effect.
+    filter_beyond_lag:  `Tensor` or list of `Tensor` objects.  Must be
+      `int`-like and scalar valued.  The auto-correlation sequence is truncated
+      to this length.  Setting to `None` means we do not filter based on number
+      of lags.
+    name:  `String` name to prepend to created ops.
+
+  Returns:
+    ess:  `Tensor` or list of `Tensor` objects.  The effective sample size of
+      each component of `states`.  Shape will be `states.shape[1:]`.
+
+  Raises:
+    ValueError:  If `states` and `filter_threshold` or `states` and
+      `filter_beyond_lag` are both lists with different lengths.
+
+  #### Examples
+
+  We use ESS to estimate standard error.
 
   ```
   import tensorflow as tf
@@ -98,28 +122,6 @@ def effective_sample_size(states,
   remove noisy tail terms from `R_k`.  They combine in an "OR" manner meaning
   terms are removed if they were to be filtered under the `filter_beyond_lag` OR
   `filter_threshold` criteria.
-
-  Args:
-    states:  `Tensor` or list of `Tensor` objects.  Dimension zero should index
-      identically distributed states.
-    filter_threshold:  `Tensor` or list of `Tensor` objects.
-      Must broadcast with `state`.  The auto-correlation sequence is truncated
-      after the first appearance of a term less than `filter_threshold`.
-      Setting to `None` means we use no threshold filter.  Since `|R_k| <= 1`,
-      setting to any number less than `-1` has the same effect.
-    filter_beyond_lag:  `Tensor` or list of `Tensor` objects.  Must be
-      `int`-like and scalar valued.  The auto-correlation sequence is truncated
-      to this length.  Setting to `None` means we do not filter based on number
-      of lags.
-    name:  `String` name to prepend to created ops.
-
-  Returns:
-    ess:  `Tensor` or list of `Tensor` objects.  The effective sample size of
-      each component of `states`.  Shape will be `states.shape[1:]`.
-
-  Raises:
-    ValueError:  If `states` and `filter_threshold` or `states` and
-      `filter_beyond_lag` are both lists with different lengths.
   """
   states_was_list = _is_list_like(states)
 
@@ -203,14 +205,14 @@ def _effective_sample_size_single_state(states, filter_beyond_lag,
 def potential_scale_reduction(chains_states,
                               independent_chain_ndims=1,
                               name=None):
-  """Gelman and Rubin's potential scale reduction factor for chain convergence.
+  """Gelman and Rubin (1992)'s potential scale reduction for chain convergence.
 
   Given `N > 1` states from each of `C > 1` independent chains, the potential
   scale reduction factor, commonly referred to as R-hat, measures convergence of
   the chains (to the same target) by testing for equality of means.
   Specifically, R-hat measures the degree to which variance (of the means)
   between chains exceeds what one would expect if the chains were identically
-  distributed.  See [1], [2].
+  distributed. See [Gelman and Rubin (1992)][1]; [Brooks and Gelman (1998)][2].
 
   Some guidelines:
 
@@ -222,9 +224,32 @@ def potential_scale_reduction(chains_states,
   * The above holds for any number of chains `C > 1`.  Increasing `C` does
     improves effectiveness of the diagnostic.
   * Sometimes, R-hat < 1.2 is used to indicate approximate convergence, but of
-    course this is problem depedendent.  See [2].
-  * R-hat only measures non-convergence of the mean. If higher moments, or other
-    statistics are desired, a different diagnostic should be used.  See [2].
+    course this is problem depedendent. See [Brooks and Gelman (1998)][2].
+  * R-hat only measures non-convergence of the mean. If higher moments, or
+    other statistics are desired, a different diagnostic should be used. See
+    [Brooks and Gelman (1998)][2].
+
+  Args:
+    chains_states:  `Tensor` or Python `list` of `Tensor`s representing the
+      state(s) of a Markov Chain at each result step.  The `ith` state is
+      assumed to have shape `[Ni, Ci1, Ci2,...,CiD] + A`.
+      Dimension `0` indexes the `Ni > 1` result steps of the Markov Chain.
+      Dimensions `1` through `D` index the `Ci1 x ... x CiD` independent
+      chains to be tested for convergence to the same target.
+      The remaining dimensions, `A`, can have any shape (even empty).
+    independent_chain_ndims: Integer type `Tensor` with value `>= 1` giving the
+      number of giving the number of dimensions, from `dim = 1` to `dim = D`,
+      holding independent chain results to be tested for convergence.
+    name: `String` name to prepend to created tf.  Default:
+      `potential_scale_reduction`.
+
+  Returns:
+    `Tensor` or Python `list` of `Tensor`s representing the R-hat statistic for
+    the state(s).  Same `dtype` as `state`, and shape equal to
+    `state.shape[1 + independent_chain_ndims:]`.
+
+  Raises:
+    ValueError:  If `independent_chain_ndims < 1`.
 
   #### Examples
 
@@ -273,34 +298,14 @@ def potential_scale_reduction(chains_states,
   the individual chain means.  If the chains are all drawing from the same
   distribution, they will have the same mean, and thus the ratio should be one.
 
-  [1] "Inference from Iterative Simulation Using Multiple Sequences"
-      Andrew Gelman and Donald B. Rubin
-      Statist. Sci. Volume 7, Number 4 (1992), 457-472.
-  [2] "General Methods for Monitoring Convergence of Iterative Simulations"
-      Stephen P. Brooks and Andrew Gelman
-      Journal of Computational and Graphical Statistics, 1998. Vol 7, No. 4.
+  #### References
 
-  Args:
-    chains_states:  `Tensor` or Python `list` of `Tensor`s representing the
-      state(s) of a Markov Chain at each result step.  The `ith` state is
-      assumed to have shape `[Ni, Ci1, Ci2,...,CiD] + A`.
-      Dimension `0` indexes the `Ni > 1` result steps of the Markov Chain.
-      Dimensions `1` through `D` index the `Ci1 x ... x CiD` independent
-      chains to be tested for convergence to the same target.
-      The remaining dimensions, `A`, can have any shape (even empty).
-    independent_chain_ndims: Integer type `Tensor` with value `>= 1` giving the
-      number of giving the number of dimensions, from `dim = 1` to `dim = D`,
-      holding independent chain results to be tested for convergence.
-    name: `String` name to prepend to created tf.  Default:
-      `potential_scale_reduction`.
+  [1]: Stephen P. Brooks and Andrew Gelman. General Methods for Monitoring
+       Convergence of Iterative Simulations. _Journal of Computational and
+       Graphical Statistics_, 7(4), 1998.
 
-  Returns:
-    `Tensor` or Python `list` of `Tensor`s representing the R-hat statistic for
-    the state(s).  Same `dtype` as `state`, and shape equal to
-    `state.shape[1 + independent_chain_ndims:]`.
-
-  Raises:
-    ValueError:  If `independent_chain_ndims < 1`.
+  [2]: Andrew Gelman and Donald B. Rubin. Inference from Iterative Simulation
+       Using Multiple Sequences. _Statistical Science_, 7(4):457-472, 1992.
   """
   chains_states_was_list = _is_list_like(chains_states)
   if not chains_states_was_list:
@@ -348,7 +353,7 @@ def _potential_scale_reduction_single_state(state, independent_chain_ndims):
     n = _axis_size(state, sample_axis)
     m = _axis_size(state, chain_axis)
 
-    # In the language of [2],
+    # In the language of Brooks and Gelman (1998),
     # B / n is the between chain variance, the variance of the chain means.
     # W is the within sequence variance, the mean of the chain variances.
     b_div_n = _reduce_variance(

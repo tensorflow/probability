@@ -47,7 +47,7 @@ def externalize_variables_as_args(fn,
   By default `possible_ancestor_vars` is `tf.trainable_variables() +
   tf.get_collection(tf.GraphKeys.TRAINABLE_RESOURCE_VARIABLES)`.
 
-  #### Examples:
+  #### Examples
 
   ```python
   num_samples = 2

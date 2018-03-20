@@ -382,8 +382,8 @@ class _ConvReparameterization(_ConvVariational):
   outputs = f(inputs; kernel, bias), kernel, bias ~ posterior
   ```
   where f denotes the layer's calculation. It uses the reparameterization
-  estimator [1], which performs a Monte Carlo approximation of the
-  distribution integrating over the `kernel` and `bias`.
+  estimator [(Kingma and Welling, 2014)][1], which performs a Monte Carlo
+  approximation of the distribution integrating over the `kernel` and `bias`.
 
   The arguments permit separate specification of the surrogate posterior
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
@@ -408,9 +408,11 @@ class _ConvReparameterization(_ConvVariational):
     bias_prior_fn: `callable` returning prior.
     bias_divergence_fn: `callable` returning divergence.
 
-  [1]: "Auto-Encoding Variational Bayes."
-        Diederik P. Kingma, Max Welling.
-        International Conference on Learning Representations, 2014.
+  #### References
+
+  [1]: Diederik Kingma and Max Welling. Auto-Encoding Variational Bayes. In
+       _International Conference on Learning Representations_, 2014.
+       https://arxiv.org/abs/1312.6114
   """
 
   @docstring_util.expand_docstring(args=doc_args)
@@ -509,8 +511,8 @@ class Conv1DReparameterization(_ConvReparameterization):
   outputs = f(inputs; kernel, bias), kernel, bias ~ posterior
   ```
   where f denotes the layer's calculation. It uses the reparameterization
-  estimator [1], which performs a Monte Carlo approximation of the
-  distribution integrating over the `kernel` and `bias`.
+  estimator [(Kingma and Welling, 2014)][1], which performs a Monte Carlo
+  approximation of the distribution integrating over the `kernel` and `bias`.
 
   The arguments permit separate specification of the surrogate posterior
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
@@ -565,9 +567,11 @@ class Conv1DReparameterization(_ConvReparameterization):
   Monte Carlo; and the KL divergence, which is added via regularizer
   terms which are arguments to the layer.
 
-  [1]: "Auto-Encoding Variational Bayes."
-        Diederik P. Kingma, Max Welling.
-        International Conference on Learning Representations, 2014.
+  #### References
+
+  [1]: Diederik Kingma and Max Welling. Auto-Encoding Variational Bayes. In
+       _International Conference on Learning Representations_, 2014.
+       https://arxiv.org/abs/1312.6114
   """
 
   @docstring_util.expand_docstring(args=doc_args)
@@ -678,8 +682,8 @@ def conv1d_reparameterization(
   outputs = f(inputs; kernel, bias), kernel, bias ~ posterior
   ```
   where f denotes the layer's calculation. It uses the reparameterization
-  estimator [1], which performs a Monte Carlo approximation of the
-  distribution integrating over the `kernel` and `bias`.
+  estimator [(Kingma and Welling, 2014)][1], which performs a Monte Carlo
+  approximation of the distribution integrating over the `kernel` and `bias`.
 
   The arguments permit separate specification of the surrogate posterior
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
@@ -747,9 +751,11 @@ def conv1d_reparameterization(
   Monte Carlo; and the KL divergence, which is added via regularizer
   terms which are arguments to the layer.
 
-  [1]: "Auto-Encoding Variational Bayes."
-        Diederik P. Kingma, Max Welling.
-        International Conference on Learning Representations, 2014.
+  #### References
+
+  [1]: Diederik Kingma and Max Welling. Auto-Encoding Variational Bayes. In
+       _International Conference on Learning Representations_, 2014.
+       https://arxiv.org/abs/1312.6114
   """
   # pylint: enable=g-doc-args
   layer = Conv1DReparameterization(
@@ -792,8 +798,8 @@ class Conv2DReparameterization(_ConvReparameterization):
   outputs = f(inputs; kernel, bias), kernel, bias ~ posterior
   ```
   where f denotes the layer's calculation. It uses the reparameterization
-  estimator [1], which performs a Monte Carlo approximation of the
-  distribution integrating over the `kernel` and `bias`.
+  estimator [(Kingma and Welling, 2014)][1], which performs a Monte Carlo
+  approximation of the distribution integrating over the `kernel` and `bias`.
 
   The arguments permit separate specification of the surrogate posterior
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
@@ -851,9 +857,11 @@ class Conv2DReparameterization(_ConvReparameterization):
   Monte Carlo; and the KL divergence, which is added via regularizer
   terms which are arguments to the layer.
 
-  [1]: "Auto-Encoding Variational Bayes."
-        Diederik P. Kingma, Max Welling.
-        International Conference on Learning Representations, 2014.
+  #### References
+
+  [1]: Diederik Kingma and Max Welling. Auto-Encoding Variational Bayes. In
+       _International Conference on Learning Representations_, 2014.
+       https://arxiv.org/abs/1312.6114
   """
 
   @docstring_util.expand_docstring(args=doc_args)
@@ -970,8 +978,8 @@ def conv2d_reparameterization(
   outputs = f(inputs; kernel, bias), kernel, bias ~ posterior
   ```
   where f denotes the layer's calculation. It uses the reparameterization
-  estimator [1], which performs a Monte Carlo approximation of the
-  distribution integrating over the `kernel` and `bias`.
+  estimator [(Kingma and Welling, 2014)][1], which performs a Monte Carlo
+  approximation of the distribution integrating over the `kernel` and `bias`.
 
   The arguments permit separate specification of the surrogate posterior
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
@@ -1049,9 +1057,11 @@ def conv2d_reparameterization(
   Monte Carlo; and the KL divergence, which is added via regularizer
   terms which are arguments to the layer.
 
-  [1]: "Auto-Encoding Variational Bayes."
-        Diederik P. Kingma, Max Welling.
-        International Conference on Learning Representations, 2014.
+  #### References
+
+  [1]: Diederik Kingma and Max Welling. Auto-Encoding Variational Bayes. In
+       _International Conference on Learning Representations_, 2014.
+       https://arxiv.org/abs/1312.6114
   """
   # pylint: enable=g-doc-args
   layer = Conv2DReparameterization(
@@ -1094,8 +1104,8 @@ class Conv3DReparameterization(_ConvReparameterization):
   outputs = f(inputs; kernel, bias), kernel, bias ~ posterior
   ```
   where f denotes the layer's calculation. It uses the reparameterization
-  estimator [1], which performs a Monte Carlo approximation of the
-  distribution integrating over the `kernel` and `bias`.
+  estimator [(Kingma and Welling, 2014)][1], which performs a Monte Carlo
+  approximation of the distribution integrating over the `kernel` and `bias`.
 
   The arguments permit separate specification of the surrogate posterior
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
@@ -1153,9 +1163,11 @@ class Conv3DReparameterization(_ConvReparameterization):
   Monte Carlo; and the KL divergence, which is added via regularizer
   terms which are arguments to the layer.
 
-  [1]: "Auto-Encoding Variational Bayes."
-        Diederik P. Kingma, Max Welling.
-        International Conference on Learning Representations, 2014.
+  #### References
+
+  [1]: Diederik Kingma and Max Welling. Auto-Encoding Variational Bayes. In
+       _International Conference on Learning Representations_, 2014.
+       https://arxiv.org/abs/1312.6114
   """
 
   @docstring_util.expand_docstring(args=doc_args)
@@ -1273,8 +1285,8 @@ def conv3d_reparameterization(
   outputs = f(inputs; kernel, bias), kernel, bias ~ posterior
   ```
   where f denotes the layer's calculation. It uses the reparameterization
-  estimator [1], which performs a Monte Carlo approximation of the
-  distribution integrating over the `kernel` and `bias`.
+  estimator [(Kingma and Welling, 2014)][1], which performs a Monte Carlo
+  approximation of the distribution integrating over the `kernel` and `bias`.
 
   The arguments permit separate specification of the surrogate posterior
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
@@ -1354,9 +1366,11 @@ def conv3d_reparameterization(
   Monte Carlo; and the KL divergence, which is added via regularizer
   terms which are arguments to the layer.
 
-  [1]: "Auto-Encoding Variational Bayes."
-        Diederik P. Kingma, Max Welling.
-        International Conference on Learning Representations, 2014.
+  #### References
+
+  [1]: Diederik Kingma and Max Welling. Auto-Encoding Variational Bayes. In
+       _International Conference on Learning Representations_, 2014.
+       https://arxiv.org/abs/1312.6114
   """
   # pylint: enable=g-doc-args
   layer = Conv3DReparameterization(
@@ -1399,11 +1413,10 @@ class _ConvFlipout(_ConvVariational):
   outputs = f(inputs; kernel, bias), kernel, bias ~ posterior
   ```
   where f denotes the layer's calculation. It uses the Flipout
-  estimator [1], which performs a Monte Carlo approximation of the
-  distribution integrating over the `kernel` and `bias`. Flipout uses
-  roughly twice as many floating point operations as the
-  reparameterization estimator but has the advantage of significantly
-  lower variance.
+  estimator [(Wen et al., 2018)][1], which performs a Monte Carlo approximation
+  of the distribution integrating over the `kernel` and `bias`. Flipout uses
+  roughly twice as many floating point operations as the reparameterization
+  estimator but has the advantage of significantly lower variance.
 
   The arguments permit separate specification of the surrogate posterior
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
@@ -1429,10 +1442,12 @@ class _ConvFlipout(_ConvVariational):
     bias_divergence_fn: `callable` returning divergence.
     seed: Python integer, used to create random seeds.
 
-  [1]: "Flipout: Efficient Pseudo-Independent Weight Perturbations on
-        Mini-Batches."
-        Yeming Wen, Paul Vicol, Jimmy Ba, Dustin Tran, Roger Grosse.
-        International Conference on Learning Representations, 2018.
+  #### References
+
+  [1]: Yeming Wen, Paul Vicol, Jimmy Ba, Dustin Tran, and Roger Grosse. Flipout:
+       Efficient Pseudo-Independent Weight Perturbations on Mini-Batches. In
+       _International Conference on Learning Representations_, 2018.
+       https://arxiv.org/abs/1803.04386
   """
 
   @docstring_util.expand_docstring(args=doc_args)
@@ -1577,11 +1592,10 @@ class Conv1DFlipout(_ConvFlipout):
   outputs = f(inputs; kernel, bias), kernel, bias ~ posterior
   ```
   where f denotes the layer's calculation. It uses the Flipout
-  estimator [1], which performs a Monte Carlo approximation of the
-  distribution integrating over the `kernel` and `bias`. Flipout uses
-  roughly twice as many floating point operations as the
-  reparameterization estimator but has the advantage of significantly
-  lower variance.
+  estimator [(Wen et al., 2018)][1], which performs a Monte Carlo approximation
+  of the distribution integrating over the `kernel` and `bias`. Flipout uses
+  roughly twice as many floating point operations as the reparameterization
+  estimator but has the advantage of significantly lower variance.
 
   The arguments permit separate specification of the surrogate posterior
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
@@ -1637,10 +1651,12 @@ class Conv1DFlipout(_ConvFlipout):
   Monte Carlo; and the KL divergence, which is added via regularizer
   terms which are arguments to the layer.
 
-  [1]: "Flipout: Efficient Pseudo-Independent Weight Perturbations on
-        Mini-Batches."
-        Yeming Wen, Paul Vicol, Jimmy Ba, Dustin Tran, Roger Grosse.
-        International Conference on Learning Representations, 2018.
+  #### References
+
+  [1]: Yeming Wen, Paul Vicol, Jimmy Ba, Dustin Tran, and Roger Grosse. Flipout:
+       Efficient Pseudo-Independent Weight Perturbations on Mini-Batches. In
+       _International Conference on Learning Representations_, 2018.
+       https://arxiv.org/abs/1803.04386
   """
 
   @docstring_util.expand_docstring(args=doc_args)
@@ -1754,11 +1770,10 @@ def conv1d_flipout(
   outputs = f(inputs; kernel, bias), kernel, bias ~ posterior
   ```
   where f denotes the layer's calculation. It uses the Flipout
-  estimator [1], which performs a Monte Carlo approximation of the
-  distribution integrating over the `kernel` and `bias`. Flipout uses
-  roughly twice as many floating point operations as the
-  reparameterization estimator but has the advantage of significantly
-  lower variance.
+  estimator [(Wen et al., 2018)][1], which performs a Monte Carlo approximation
+  of the distribution integrating over the `kernel` and `bias`. Flipout uses
+  roughly twice as many floating point operations as the reparameterization
+  estimator but has the advantage of significantly lower variance.
 
   The arguments permit separate specification of the surrogate posterior
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
@@ -1826,10 +1841,12 @@ def conv1d_flipout(
   Monte Carlo; and the KL divergence, which is added via regularizer
   terms which are arguments to the layer.
 
-  [1]: "Flipout: Efficient Pseudo-Independent Weight Perturbations on
-        Mini-Batches."
-        Yeming Wen, Paul Vicol, Jimmy Ba, Dustin Tran, Roger Grosse.
-        International Conference on Learning Representations, 2018.
+  #### References
+
+  [1]: Yeming Wen, Paul Vicol, Jimmy Ba, Dustin Tran, and Roger Grosse. Flipout:
+       Efficient Pseudo-Independent Weight Perturbations on Mini-Batches. In
+       _International Conference on Learning Representations_, 2018.
+       https://arxiv.org/abs/1803.04386
   """
   # pylint: enable=g-doc-args
   layer = Conv1DFlipout(
@@ -1873,11 +1890,10 @@ class Conv2DFlipout(_ConvFlipout):
   outputs = f(inputs; kernel, bias), kernel, bias ~ posterior
   ```
   where f denotes the layer's calculation. It uses the Flipout
-  estimator [1], which performs a Monte Carlo approximation of the
-  distribution integrating over the `kernel` and `bias`. Flipout uses
-  roughly twice as many floating point operations as the
-  reparameterization estimator but has the advantage of significantly
-  lower variance.
+  estimator [(Wen et al., 2018)][1], which performs a Monte Carlo approximation
+  of the distribution integrating over the `kernel` and `bias`. Flipout uses
+  roughly twice as many floating point operations as the reparameterization
+  estimator but has the advantage of significantly lower variance.
 
   The arguments permit separate specification of the surrogate posterior
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
@@ -1936,10 +1952,12 @@ class Conv2DFlipout(_ConvFlipout):
   Monte Carlo; and the KL divergence, which is added via regularizer
   terms which are arguments to the layer.
 
-  [1]: "Flipout: Efficient Pseudo-Independent Weight Perturbations on
-        Mini-Batches."
-        Yeming Wen, Paul Vicol, Jimmy Ba, Dustin Tran, Roger Grosse.
-        International Conference on Learning Representations, 2018.
+  #### References
+
+  [1]: Yeming Wen, Paul Vicol, Jimmy Ba, Dustin Tran, and Roger Grosse. Flipout:
+       Efficient Pseudo-Independent Weight Perturbations on Mini-Batches. In
+       _International Conference on Learning Representations_, 2018.
+       https://arxiv.org/abs/1803.04386
   """
 
   @docstring_util.expand_docstring(args=doc_args)
@@ -2059,11 +2077,10 @@ def conv2d_flipout(
   outputs = f(inputs; kernel, bias), kernel, bias ~ posterior
   ```
   where f denotes the layer's calculation. It uses the Flipout
-  estimator [1], which performs a Monte Carlo approximation of the
-  distribution integrating over the `kernel` and `bias`. Flipout uses
-  roughly twice as many floating point operations as the
-  reparameterization estimator but has the advantage of significantly
-  lower variance.
+  estimator [(Wen et al., 2018)][1], which performs a Monte Carlo approximation
+  of the distribution integrating over the `kernel` and `bias`. Flipout uses
+  roughly twice as many floating point operations as the reparameterization
+  estimator but has the advantage of significantly lower variance.
 
   The arguments permit separate specification of the surrogate posterior
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
@@ -2141,10 +2158,12 @@ def conv2d_flipout(
   Monte Carlo; and the KL divergence, which is added via regularizer
   terms which are arguments to the layer.
 
-  [1]: "Flipout: Efficient Pseudo-Independent Weight Perturbations on
-        Mini-Batches."
-        Yeming Wen, Paul Vicol, Jimmy Ba, Dustin Tran, Roger Grosse.
-        International Conference on Learning Representations, 2018.
+  #### References
+
+  [1]: Yeming Wen, Paul Vicol, Jimmy Ba, Dustin Tran, and Roger Grosse. Flipout:
+       Efficient Pseudo-Independent Weight Perturbations on Mini-Batches. In
+       _International Conference on Learning Representations_, 2018.
+       https://arxiv.org/abs/1803.04386
   """
   # pylint: enable=g-doc-args
   layer = Conv2DFlipout(
@@ -2188,11 +2207,10 @@ class Conv3DFlipout(_ConvFlipout):
   outputs = f(inputs; kernel, bias), kernel, bias ~ posterior
   ```
   where f denotes the layer's calculation. It uses the Flipout
-  estimator [1], which performs a Monte Carlo approximation of the
-  distribution integrating over the `kernel` and `bias`. Flipout uses
-  roughly twice as many floating point operations as the
-  reparameterization estimator but has the advantage of significantly
-  lower variance.
+  estimator [(Wen et al., 2018)][1], which performs a Monte Carlo approximation
+  of the distribution integrating over the `kernel` and `bias`. Flipout uses
+  roughly twice as many floating point operations as the reparameterization
+  estimator but has the advantage of significantly lower variance.
 
   The arguments permit separate specification of the surrogate posterior
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
@@ -2251,10 +2269,12 @@ class Conv3DFlipout(_ConvFlipout):
   Monte Carlo; and the KL divergence, which is added via regularizer
   terms which are arguments to the layer.
 
-  [1]: "Flipout: Efficient Pseudo-Independent Weight Perturbations on
-        Mini-Batches."
-        Yeming Wen, Paul Vicol, Jimmy Ba, Dustin Tran, Roger Grosse.
-        International Conference on Learning Representations, 2018.
+  #### References
+
+  [1]: Yeming Wen, Paul Vicol, Jimmy Ba, Dustin Tran, and Roger Grosse. Flipout:
+       Efficient Pseudo-Independent Weight Perturbations on Mini-Batches. In
+       _International Conference on Learning Representations_, 2018.
+       https://arxiv.org/abs/1803.04386
   """
 
   @docstring_util.expand_docstring(args=doc_args)
@@ -2375,11 +2395,10 @@ def conv3d_flipout(
   outputs = f(inputs; kernel, bias), kernel, bias ~ posterior
   ```
   where f denotes the layer's calculation. It uses the Flipout
-  estimator [1], which performs a Monte Carlo approximation of the
-  distribution integrating over the `kernel` and `bias`. Flipout uses
-  roughly twice as many floating point operations as the
-  reparameterization estimator but has the advantage of significantly
-  lower variance.
+  estimator [(Wen et al., 2018)][1], which performs a Monte Carlo approximation
+  of the distribution integrating over the `kernel` and `bias`. Flipout uses
+  roughly twice as many floating point operations as the reparameterization
+  estimator but has the advantage of significantly lower variance.
 
   The arguments permit separate specification of the surrogate posterior
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
@@ -2459,10 +2478,12 @@ def conv3d_flipout(
   Monte Carlo; and the KL divergence, which is added via regularizer
   terms which are arguments to the layer.
 
-  [1]: "Flipout: Efficient Pseudo-Independent Weight Perturbations on
-        Mini-Batches."
-        Yeming Wen, Paul Vicol, Jimmy Ba, Dustin Tran, Roger Grosse.
-        International Conference on Learning Representations, 2018.
+  #### References
+
+  [1]: Yeming Wen, Paul Vicol, Jimmy Ba, Dustin Tran, and Roger Grosse. Flipout:
+       Efficient Pseudo-Independent Weight Perturbations on Mini-Batches. In
+       _International Conference on Learning Representations_, 2018.
+       https://arxiv.org/abs/1803.04386
   """
   # pylint: enable=g-doc-args
   layer = Conv3DFlipout(

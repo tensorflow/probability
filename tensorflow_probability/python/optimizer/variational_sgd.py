@@ -33,17 +33,13 @@ class VariationalSGD(tf.train.Optimizer):
   """An optimizer module for constant stochastic gradient descent.
 
   This implements an optimizer module for the constant stochastic gradient
-  descent algorithm [1].  The optimization variable is regarded as an
-  approximate sample from the posterior .
+  descent algorithm [(Mandt et al., 2017)][1]. The optimization variable is
+  regarded as an approximate sample from the posterior .
 
   Note: If a prior is included in the loss, it should be scaled by
   `1/num_pseudo_batches`, where num_pseudo_batches is the number of minibatches
   in the data.  I.e., it should be divided by the `num_pseudo_batches` term
   described below.
-
-  [1]: "Stochastic Gradient Descent as Approximate Bayesian Inference
-       Stephan Mandt, Matthew D. Hoffman, David M. Blei.
-       ArXiv:1704.04289, 2017. https://arxiv.org/abs/1704.04289
 
   Args:
     batch_size: Scalar `int`-like `Tensor`. The number of examples in a
@@ -57,8 +53,8 @@ class VariationalSGD(tf.train.Optimizer):
       this. (Default: `1`)
     preconditioner_decay_rate: Scalar `float`-like `Tensor`. The exponential
       decay rate of the rescaling of the preconditioner (RMSprop). (This is
-      "alpha" in [1]). Should be smaller than but nearly `1` to approximate
-      sampling from the posterior. (Default: `0.95`)
+      "alpha" in Mandt et al. (2017)). Should be smaller than but nearly `1` to
+      approximate sampling from the posterior. (Default: `0.95`)
     burnin: Scalar `int`-like `Tensor`. The number of iterations to collect
       gradient statistics to update the preconditioner before starting to draw
       noisy samples. (Default: `25`)
@@ -77,6 +73,12 @@ class VariationalSGD(tf.train.Optimizer):
   Raises:
     InvalidArgumentError: If preconditioner_decay_rate is a `Tensor` not in
       `(0,1]`.
+
+  #### References
+
+  [1]: Stephan Mandt, Matthew D. Hoffman, and David M. Blei. Stochastic
+       Gradient Descent as Approximate Bayesian Inference. _arXiv preprint
+       arXiv:1704.04289_, 2017. https://arxiv.org/abs/1704.04289
   """
 
   def __init__(self,

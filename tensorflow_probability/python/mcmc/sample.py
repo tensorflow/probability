@@ -62,20 +62,46 @@ def sample_chain(
 
   Since MCMC states are correlated, it is sometimes desirable to produce
   additional intermediate states, and then discard them, ending up with a set of
-  states with decreased autocorrelation.  See [1].  Such "thinning" is made
-  possible by setting `num_steps_between_results > 0`.  The chain then takes
-  `num_steps_between_results` extra steps between the steps that make it into
-  the results.  The extra steps are never materialized (in calls to `sess.run`),
-  and thus do not increase memory requirements.
+  states with decreased autocorrelation.  See [Owen (2017)][1]. Such "thinning"
+  is made possible by setting `num_steps_between_results > 0`. The chain then
+  takes `num_steps_between_results` extra steps between the steps that make it
+  into the results. The extra steps are never materialized (in calls to
+  `sess.run`), and thus do not increase memory requirements.
 
   Warning: when setting a `seed` in the `kernel`, ensure that `sample_chain`'s
   `parallel_iterations=1`, otherwise results will not be reproducible.
 
-  [1]: "Statistically efficient thinning of a Markov chain sampler."
-       Art B. Owen. April 2017.
-       http://statweb.stanford.edu/~owen/reports/bestthinning.pdf
+  Args:
+    num_results: Integer number of Markov chain draws.
+    current_state: `Tensor` or Python `list` of `Tensor`s representing the
+      current state(s) of the Markov chain(s).
+    previous_kernel_results: A (possibly nested) `tuple`, `namedtuple` or
+      `list` of `Tensor`s representing internal calculations made within the
+      previous call to this function (or as returned by `bootstrap_results`).
+    kernel: An instance of `tfp.mcmc.TransitionKernel` which implements one step
+      of the Markov chain.
+    num_burnin_steps: Integer number of chain steps to take before starting to
+      collect results.
+      Default value: 0 (i.e., no burn-in).
+    num_steps_between_results: Integer number of chain steps between collecting
+      a result. Only one out of every `num_steps_between_samples + 1` steps is
+      included in the returned results.  The number of returned chain states is
+      still equal to `num_results`.  Default value: 0 (i.e., no thinning).
+    parallel_iterations: The number of iterations allowed to run in parallel.
+        It must be a positive integer. See `tf.while_loop` for more details.
+    name: Python `str` name prefixed to Ops created by this function.
+      Default value: `None` (i.e., "mcmc_sample_chain").
 
-  #### Examples:
+  Returns:
+    next_states: Tensor or Python list of `Tensor`s representing the
+      state(s) of the Markov chain(s) at each result step. Has same shape as
+      input `current_state` but with a prepended `num_results`-size dimension.
+    kernel_results: `collections.namedtuple` of internal calculations used to
+      advance the chain.
+    kernel_results: A (possibly nested) `tuple`, `namedtuple` or `list` of
+      `Tensor`s representing internal calculations made within this function.
+
+  #### Examples
 
   ##### Sample from a diagonal-variance Gaussian.
 
@@ -166,35 +192,11 @@ def sample_chain(
       axis=[0, 1])
   ```
 
-  Args:
-    num_results: Integer number of Markov chain draws.
-    current_state: `Tensor` or Python `list` of `Tensor`s representing the
-      current state(s) of the Markov chain(s).
-    previous_kernel_results: A (possibly nested) `tuple`, `namedtuple` or
-      `list` of `Tensor`s representing internal calculations made within the
-      previous call to this function (or as returned by `bootstrap_results`).
-    kernel: An instance of `tfp.mcmc.TransitionKernel` which implements one step
-      of the Markov chain.
-    num_burnin_steps: Integer number of chain steps to take before starting to
-      collect results.
-      Default value: 0 (i.e., no burn-in).
-    num_steps_between_results: Integer number of chain steps between collecting
-      a result. Only one out of every `num_steps_between_samples + 1` steps is
-      included in the returned results.  The number of returned chain states is
-      still equal to `num_results`.  Default value: 0 (i.e., no thinning).
-    parallel_iterations: The number of iterations allowed to run in parallel.
-        It must be a positive integer. See `tf.while_loop` for more details.
-    name: Python `str` name prefixed to Ops created by this function.
-      Default value: `None` (i.e., "mcmc_sample_chain").
+  #### References
 
-  Returns:
-    next_states: Tensor or Python list of `Tensor`s representing the
-      state(s) of the Markov chain(s) at each result step. Has same shape as
-      input `current_state` but with a prepended `num_results`-size dimension.
-    kernel_results: `collections.namedtuple` of internal calculations used to
-      advance the chain.
-    kernel_results: A (possibly nested) `tuple`, `namedtuple` or `list` of
-      `Tensor`s representing internal calculations made within this function.
+  [1]: Art B. Owen. Statistically efficient thinning of a Markov chain sampler.
+       _Technical Report_, 2017.
+       http://statweb.stanford.edu/~owen/reports/bestthinning.pdf
   """
   if not kernel.is_calibrated:
     warnings.warn("Supplied `TransitionKernel` is not calibrated. Markov "

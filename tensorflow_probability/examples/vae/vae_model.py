@@ -179,9 +179,7 @@ def make_vae(images,
      <= log p(X)
   ```
   which also provides a lower bound on the marginal likelihood `p(X)`. See
-  `Kingma, Diederik and Welling, Max. Auto-Encoding Variational Bayes. 2013.
-   https://arxiv.org/abs/1312.6114`
-  for further information.
+  [Kingma and Welling (2014)][1] for further information.
 
   ### Example Usage
 
@@ -226,6 +224,12 @@ def make_vae(images,
   Returns:
     elbo_loss: A scalar `Tensor` computing the negation of the variational
       evidence bound (i.e., `elbo_loss >= -log p(X)`).
+
+  #### References
+
+  [1]: Diederik Kingma and Max Welling. Auto-Encoding Variational Bayes. In
+       _International Conference on Learning Representations_, 2014.
+       https://arxiv.org/abs/1312.6114
   """
 
   # Create the three components of a VAE: encoder, prior, and decoder

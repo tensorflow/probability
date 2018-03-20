@@ -280,9 +280,9 @@ class DenseReparameterization(_DenseVariational):
   outputs = activation(matmul(inputs, kernel) + bias)
   ```
 
-  It uses the reparameterization estimator [1], which performs a Monte Carlo
-  approximation of the distribution integrating over the `kernel` and
-  `bias`.
+  It uses the reparameterization estimator [(Kingma and Welling, 2014)][1],
+  which performs a Monte Carlo approximation of the distribution integrating
+  over the `kernel` and `bias`.
 
   The arguments permit separate specification of the surrogate posterior
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
@@ -327,9 +327,11 @@ class DenseReparameterization(_DenseVariational):
   Monte Carlo; and the KL divergence, which is added via regularizer
   terms which are arguments to the layer.
 
-  [1]: "Auto-Encoding Variational Bayes."
-        Diederik P. Kingma, Max Welling.
-        International Conference on Learning Representations, 2014.
+  #### References
+
+  [1]: Diederik Kingma and Max Welling. Auto-Encoding Variational Bayes. In
+       _International Conference on Learning Representations_, 2014.
+       https://arxiv.org/abs/1312.6114
   """
 
   @docstring_util.expand_docstring(args=doc_args)
@@ -413,9 +415,9 @@ def dense_reparameterization(
   outputs = activation(matmul(inputs, kernel) + bias)
   ```
 
-  It uses the reparameterization estimator [1], which performs a Monte Carlo
-  approximation of the distribution integrating over the `kernel` and
-  `bias`.
+  It uses the reparameterization estimator [(Kingma and Welling, 2014)][1],
+  which performs a Monte Carlo approximation of the distribution integrating
+  over the `kernel` and `bias`.
 
   The arguments permit separate specification of the surrogate posterior
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
@@ -455,9 +457,11 @@ def dense_reparameterization(
   Monte Carlo; and the KL divergence, which is added via regularizer
   terms which are arguments to the layer.
 
-  [1]: "Auto-Encoding Variational Bayes."
-        Diederik P. Kingma, Max Welling.
-        International Conference on Learning Representations, 2014.
+  #### References
+
+  [1]: Diederik Kingma and Max Welling. Auto-Encoding Variational Bayes. In
+       _International Conference on Learning Representations_, 2014.
+       https://arxiv.org/abs/1312.6114
   """
   # pylint: enable=g-doc-args
   layer = DenseReparameterization(
@@ -493,9 +497,9 @@ class DenseLocalReparameterization(_DenseVariational):
   outputs = activation(matmul(inputs, kernel) + bias)
   ```
 
-  It uses the local reparameterization estimator [1], which performs a
-  Monte Carlo approximation of the distribution on the hidden units
-  induced by the `kernel` and `bias`.
+  It uses the local reparameterization estimator [(Kingma et al., 2015)][1],
+  which performs a Monte Carlo approximation of the distribution on the hidden
+  units induced by the `kernel` and `bias`.
 
   The arguments permit separate specification of the surrogate posterior
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
@@ -540,9 +544,11 @@ class DenseLocalReparameterization(_DenseVariational):
   Monte Carlo; and the KL divergence, which is added via regularizer
   terms which are arguments to the layer.
 
-  [1]: "Variational Dropout and the Local Reparameterization Trick."
-        Diederik P. Kingma, Tim Salimans, Max Welling.
-        Neural Information Processing Systems, 2015.
+  #### References
+
+  [1]: Diederik Kingma, Tim Salimans, and Max Welling. Variational Dropout and
+       the Local Reparameterization Trick. In _Neural Information Processing
+       Systems_, 2015. https://arxiv.org/abs/1506.02557
   """
 
   @docstring_util.expand_docstring(args=doc_args)
@@ -638,9 +644,9 @@ def dense_local_reparameterization(
   outputs = activation(matmul(inputs, kernel) + bias)
   ```
 
-  It uses the local reparameterization estimator [1], which performs a
-  Monte Carlo approximation of the distribution on the hidden units
-  induced by the `kernel` and `bias`.
+  It uses the local reparameterization estimator [(Kingma et al., 2015)][1],
+  which performs a Monte Carlo approximation of the distribution on the hidden
+  units induced by the `kernel` and `bias`.
 
   The arguments permit separate specification of the surrogate posterior
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
@@ -680,9 +686,11 @@ def dense_local_reparameterization(
   Monte Carlo; and the KL divergence, which is added via regularizer
   terms which are arguments to the layer.
 
-  [1]: "Variational Dropout and the Local Reparameterization Trick."
-        Diederik P. Kingma, Tim Salimans, Max Welling.
-        Neural Information Processing Systems, 2015.
+  #### References
+
+  [1]: Diederik Kingma, Tim Salimans, and Max Welling. Variational Dropout and
+       the Local Reparameterization Trick. In _Neural Information Processing
+       Systems_, 2015. https://arxiv.org/abs/1506.02557
   """
   # pylint: enable=g-doc-args
   layer = DenseLocalReparameterization(
@@ -718,11 +726,11 @@ class DenseFlipout(_DenseVariational):
   outputs = activation(matmul(inputs, kernel) + bias)
   ```
 
-  It uses the Flipout estimator [1], which performs a Monte Carlo
-  approximation of the distribution integrating over the `kernel` and
-  `bias`. Flipout uses roughly twice as many floating point operations
-  as the reparameterization estimator but has the advantage of
-  significantly lower variance.
+  It uses the Flipout estimator [(Wen et al., 2018)][1], which performs a Monte
+  Carlo approximation of the distribution integrating over the `kernel` and
+  `bias`. Flipout uses roughly twice as many floating point operations as the
+  reparameterization estimator but has the advantage of significantly lower
+  variance.
 
   The arguments permit separate specification of the surrogate posterior
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
@@ -768,10 +776,12 @@ class DenseFlipout(_DenseVariational):
   Monte Carlo; and the KL divergence, which is added via regularizer
   terms which are arguments to the layer.
 
-  [1]: "Flipout: Efficient Pseudo-Independent Weight Perturbations on
-        Mini-Batches."
-        Anonymous. OpenReview, 2017.
-        https://openreview.net/forum?id=rJnpifWAb
+  #### References
+
+  [1]: Yeming Wen, Paul Vicol, Jimmy Ba, Dustin Tran, and Roger Grosse. Flipout:
+       Efficient Pseudo-Independent Weight Perturbations on Mini-Batches. In
+       _International Conference on Learning Representations_, 2018.
+       https://arxiv.org/abs/1803.04386
   """
 
   @docstring_util.expand_docstring(args=doc_args)
@@ -887,11 +897,11 @@ def dense_flipout(
   outputs = activation(matmul(inputs, kernel) + bias)
   ```
 
-  It uses the Flipout estimator [1], which performs a Monte Carlo
-  approximation of the distribution integrating over the `kernel` and
-  `bias`. Flipout uses roughly twice as many floating point operations
-  as the reparameterization estimator but has the advantage of
-  significantly lower variance.
+  It uses the Flipout estimator [(Wen et al., 2018)][1], which performs a Monte
+  Carlo approximation of the distribution integrating over the `kernel` and
+  `bias`. Flipout uses roughly twice as many floating point operations as the
+  reparameterization estimator but has the advantage of significantly lower
+  variance.
 
   The arguments permit separate specification of the surrogate posterior
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
@@ -931,10 +941,12 @@ def dense_flipout(
   Monte Carlo; and the KL divergence, which is added via regularizer
   terms which are arguments to the layer.
 
-  [1]: "Flipout: Efficient Pseudo-Independent Weight Perturbations on
-        Mini-Batches."
-        Anonymous. OpenReview, 2017.
-        https://openreview.net/forum?id=rJnpifWAb
+  #### References
+
+  [1]: Yeming Wen, Paul Vicol, Jimmy Ba, Dustin Tran, and Roger Grosse. Flipout:
+       Efficient Pseudo-Independent Weight Perturbations on Mini-Batches. In
+       _International Conference on Learning Representations_, 2018.
+       https://arxiv.org/abs/1803.04386
   """
   # pylint: enable=g-doc-args
   layer = DenseFlipout(
