@@ -21,7 +21,7 @@ from setuptools import setup
 from setuptools.command.install import install as InstallCommandBase
 from setuptools.dist import Distribution
 
-VERSION = '0.0.0'
+VERSION = '0.0.1'
 
 REQUIRED_PACKAGES = [
     'six >= 1.10.0',
