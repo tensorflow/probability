@@ -27,7 +27,8 @@ REQUIRED_PACKAGES = [
     'six >= 1.10.0',
     'numpy >= 1.11.1',
 ]
-REQUIRED_TENSORFLOW_VERSION = '1.6.0'
+# TODO(b/76094057): Once we support releases, enable the following:
+# REQUIRED_TENSORFLOW_VERSION = '1.6.0'
 
 if '--gpu' in sys.argv:
   use_gpu = True
@@ -45,9 +46,11 @@ else:
 maybe_gpu_suffix = '-gpu' if use_gpu else ''
 
 if release:
-  project_name = 'tensorflow-probability' + maybe_gpu_suffix
-  tensorflow_package_name = 'tensorflow{}>={}'.format(
-      maybe_gpu_suffix, REQUIRED_TENSORFLOW_VERSION)
+  raise NotImplementedError('Tensorflow Probability team does not yet '
+                            'support releases.')
+  # TODO(b/76094057): Once we support releases, enable the following:
+  # tensorflow_package_name = 'tensorflow{}>={}'.format(
+  #     maybe_gpu_suffix, REQUIRED_TENSORFLOW_VERSION)
 else:
   # Nightly releases use date-based versioning of the form
   # '0.0.1.dev20180305'
