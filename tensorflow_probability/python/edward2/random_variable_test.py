@@ -48,10 +48,10 @@ class RandomVariableTest(tf.test.TestCase):
     x_sample, x_value = self.evaluate([tf.convert_to_tensor(x), x.value])
     self.assertAllEqual(x_sample, x_value)
     with self.assertRaises(ValueError):
-      ed.RandomVariable(tfd.Bernoulli(probs=0.5),
-                        value=tf.zeros([2, 5], dtype=tf.int32))  # pylint: disable=pointless-statement
+      _ = ed.RandomVariable(tfd.Bernoulli(probs=0.5),
+                            value=tf.zeros([2, 5], dtype=tf.int32))
     with self.assertRaises(NotImplementedError):
-      ed.RandomVariable(FakeDistribution())  # pylint: disable=pointless-statement
+      _ = ed.RandomVariable(FakeDistribution())
 
   @tfe.run_test_in_graph_and_eager_modes()
   def testGradientsFirstOrder(self):
@@ -106,7 +106,7 @@ class RandomVariableTest(tf.test.TestCase):
       self.assertEqual(x.numpy(), tf.constant(1.23).numpy())
     else:
       with self.assertRaises(NotImplementedError):
-        x.numpy()  # pylint: disable=pointless-statement
+        _ = x.numpy()
 
   @tfe.run_test_in_graph_and_eager_modes()
   def testOperatorsAdd(self):
@@ -316,7 +316,7 @@ class RandomVariableTest(tf.test.TestCase):
   def testOperatorsBoolNonzero(self):
     x = ed.RandomVariable(tfd.Normal(0.0, 1.0))
     with self.assertRaises(TypeError):
-      not x  # pylint: disable=pointless-statement
+      _ = not x
 
   @tfe.run_test_in_graph_and_eager_modes()
   def testArrayPriority(self):
@@ -331,7 +331,7 @@ class RandomVariableTest(tf.test.TestCase):
   def testConvertToTensor(self):
     x = ed.RandomVariable(tfd.Normal(0.0, 0.1))
     with self.assertRaises(ValueError):
-      tf.convert_to_tensor(x, dtype=tf.int32)  # pylint: disable=pointless-statement
+      _ = tf.convert_to_tensor(x, dtype=tf.int32)
 
   def testSessionEval(self):
     with self.test_session() as sess:
