@@ -23,6 +23,7 @@ from tensorflow_probability.python.edward2.generated_random_variables import *
 from tensorflow_probability.python.edward2.generated_random_variables import __all__ as rv_all
 from tensorflow_probability.python.edward2.interceptor import get_interceptor
 from tensorflow_probability.python.edward2.interceptor import interception
+from tensorflow_probability.python.edward2.program_transformations import make_log_joint_fn
 from tensorflow_probability.python.edward2.random_variable import RandomVariable
 # pylint: enable=wildcard-import
 
@@ -32,6 +33,7 @@ _allowed_symbols = rv_all + [
     "RandomVariable",
     "get_interceptor",
     "interception",
+    "make_log_joint_fn",
 ]
 
 remove_undocumented(__name__, _allowed_symbols)

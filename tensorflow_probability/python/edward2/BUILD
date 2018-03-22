@@ -32,6 +32,7 @@ py_library(
     deps = [
         ":generated_random_variables",
         ":interceptor",
+        ":program_transformations",
         ":random_variable",
     ],
 )
@@ -68,6 +69,26 @@ py_test(
     name = "interceptor_test",
     size = "small",
     srcs = ["interceptor_test.py"],
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "program_transformations",
+    srcs = ["program_transformations.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":interceptor",
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "program_transformations_test",
+    size = "small",
+    srcs = ["program_transformations_test.py"],
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",
