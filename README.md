@@ -86,3 +86,5 @@ directory for more details.
 We're eager to collaborate with you! Feel free to [open an issue on
 GitHub](https://github.com/tensorflow/probability/issues) and/or send us your
 pull requests. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for more details.
+This project adheres to TensorFlow's [code of conduct](CODE_OF_CONDUCT.md). By
+participating, you are expected to uphold this code.
