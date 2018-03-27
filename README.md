@@ -34,7 +34,11 @@ To install the latest version, run the following:
 pip install --user --upgrade tfp-nightly    # depends on tensorflow (CPU-only)
 ```
 
-We also provide a GPU-enabled version.
+TensorFlow Probability depends on a current nightly release of TensorFlow
+(`tf-nightly`); the `--upgrade` flag ensures you'll automatically get the latest
+version.
+
+We also provide a GPU-enabled package:
 
 ```shell
 pip install --user --upgrade tfp-nightly-gpu  # depends on tensorflow-gpu (GPU enabled)
