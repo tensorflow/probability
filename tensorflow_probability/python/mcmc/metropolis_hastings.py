@@ -73,7 +73,7 @@ class MetropolisHastings(kernel_base.TransitionKernel):
   ```
 
   If `current_kernel_results.log_acceptance_correction` does not exist, it is
-  presumed `0.` (i.e., that the proposal distribution is symmetric)."
+  presumed `0.` (i.e., that the proposal distribution is symmetric).
 
   The most common use-case for `log_acceptance_correction` is in the
   Metropolis-Hastings algorithm, i.e.,
@@ -122,7 +122,7 @@ class MetropolisHastings(kernel_base.TransitionKernel):
         member.
       seed: Python integer to seed the random number generator.
       name: Python `str` name prefixed to Ops created by this function.
-        Default value: `None` (i.e., "hmc_kernel").
+        Default value: `None` (i.e., "mh_kernel").
 
     Returns:
       metropolis_hastings_kernel: Instance of `TransitionKernel` which wraps the
@@ -199,7 +199,10 @@ class MetropolisHastings(kernel_base.TransitionKernel):
       to_sum = [proposed_results.target_log_prob,
                 -previous_kernel_results.accepted_results.target_log_prob]
       try:
-        to_sum.append(proposed_results.log_acceptance_correction)
+        if (not mcmc_util.is_list_like(
+            proposed_results.log_acceptance_correction)
+            or proposed_results.log_acceptance_correction):
+          to_sum.append(proposed_results.log_acceptance_correction)
       except AttributeError:
         warnings.warn('Supplied inner `TransitionKernel` does not have a '
                       '`log_acceptance_correction`. Assuming its value is `0.`')
