@@ -75,7 +75,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
   [Replica Exchange Monte Carlo](
   https://en.wikipedia.org/wiki/Parallel_tempering) is a Markov chain
   Monte Carlo (MCMC) algorithm that is also known as Parallel Tempering. This
-  algorithm perform multiple sampling with different temperatures in parallel,
+  algorithm performs multiple sampling with different temperatures in parallel,
   and exchange those samplings according to the Metropolis-Hastings criterion.
   By using the sampling result of high temperature, sampling with less influence
   of the local solution becomes possible.
