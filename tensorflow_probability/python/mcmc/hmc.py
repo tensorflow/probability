@@ -206,9 +206,11 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
   sigma = tf.exp(log_sigma)
 
   # State of the Markov chain.
+  # We set `trainable=False` so it is unaffected by the M-step.
   weights = tf.get_variable(
       name='weights',
-      initializer=np.random.randn(dims).astype(dtype))
+      initializer=np.random.randn(dims).astype(dtype),
+      trainable=False)
 
   prior = make_prior(sigma, dims)
 
@@ -233,7 +235,7 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
     loss = -prior.log_prob(weights)
 
   optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.01)
-  log_sigma_update = optimizer.minimize(loss, var_list=[log_sigma])
+  log_sigma_update = optimizer.minimize(loss)
 
   init = tf.global_variables_initializer()
 
@@ -255,7 +257,7 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
   plt.xlabel('iteration')
 
   # Mean error should be close to zero
-  print 'mean error:', abs(np.mean(sigma_history) - true_sigma)
+  print('mean error:', np.abs(np.mean(sigma_history) - true_sigma))
   ```
 
   #### References
