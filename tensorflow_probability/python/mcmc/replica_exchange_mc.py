@@ -49,22 +49,42 @@ def default_exchange_proposed_fn(freq):
   Depending on the probability of `freq`, decide whether to propose combinations
   of replica for exchange.
   When exchanging, create combinations of adjacent replicas from 0 or 1 index.
+
+  Args:
+    freq: `float`.
+
+  Returns:
+    default_exchange_proposed_fn_: Python callable which take a number of
+      replicas, and return combinations of replicas for exchange and a number of
+      combinations.
   """
-  def default_exchange_proposed_fn_(n_replica, seed=None):
-    seed = distributions_util.gen_new_seed(seed, "default_exchange_proposed_fn")
-    u = tf.random_uniform([], seed=seed)
-    exist = u > freq
+  def default_exchange_proposed_fn_(num_replica, seed=None):
+    num_replica = tf.to_int32(num_replica)
 
     seed = distributions_util.gen_new_seed(seed, "default_exchange_proposed_fn")
-    i = tf.random_uniform([], minval=0, maxval=2, dtype=tf.int32, seed=seed)
-    a = tf.range(i, n_replica - 1, 2)
-    exchange_proposed = tf.transpose(tf.concat(([a], [a + 1]), axis=0))
-    exchange_proposed_n = tf.to_int32(tf.floor(
-        (tf.to_int32(n_replica) - i) / 2))
+    random_uniform = tf.random_uniform([], seed=seed)
+    exist = random_uniform > freq
 
-    exchange_proposed = tf.cond(
-        exist, lambda: tf.to_int32([]), lambda: exchange_proposed)
-    exchange_proposed_n = tf.cond(exist, lambda: 0, lambda: exchange_proposed_n)
+    seed = distributions_util.gen_new_seed(seed, "default_exchange_proposed_fn")
+    zero_start = tf.random_uniform([], seed=seed) > 0.5
+    if num_replica % 2 == 0:
+      exchange_proposed = tf.where(
+          zero_start, tf.range(num_replica),
+          tf.sparse_to_dense(tf.range(num_replica - 2), (num_replica,),
+                             tf.range(1, num_replica - 1)))
+      exchange_proposed_n = tf.where(zero_start, tf.to_int32(num_replica / 2),
+                                     tf.to_int32(num_replica / 2) - 1)
+    else:
+      exchange_proposed = tf.where(
+          zero_start, tf.range(num_replica - 1), tf.range(1, num_replica))
+      exchange_proposed_n = tf.to_int32(num_replica / 2)
+
+    exchange_proposed = tf.reshape(exchange_proposed,
+                                   (tf.to_int32(num_replica / 2), 2))
+    exchange_proposed = tf.where(exist, tf.zeros_like(exchange_proposed),
+                                 exchange_proposed)
+    exchange_proposed_n = tf.where(exist, tf.zeros_like(exchange_proposed_n),
+                                   exchange_proposed_n)
     return exchange_proposed, exchange_proposed_n
   return default_exchange_proposed_fn_
 
@@ -107,7 +127,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
   # Initialize the ReplicaExchangeMC sampler.
   remc = tfp.mcmc.ReplicaExchangeMC(
       target_log_prob_fn=target.log_prob,
-      inverse_temperatures=tf.pow(10., tf.linspace(0., -2., 5)),
+      inverse_temperatures=10.**tf.linspace(0., -2., 5),
       replica_kernel_class=tfp.mcmc.HamiltonianMonteCarlo,
       step_size=0.5,
       num_leapfrog_steps=3)
@@ -120,7 +140,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
 
   x_update = x.assign(next_x)
   replica_update = [init_results.replica_states[i].assign(
-      other_results.replica_states[i]) for i in range(remc.n_replica)]
+      other_results.replica_states[i]) for i in range(remc.num_replica)]
 
   warmup = tf.group([x_update, replica_update])
 
@@ -158,24 +178,35 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
         `current_state` (or `*current_state` if it's a list) and returns its
         (possibly unnormalized) log-density under the target distribution.
       inverse_temperatures: sequence of inverse temperatures to perform
-        samplings with each replica.
+        samplings with each replica. Must have statically known rank and
+        statically known leading shape.
       replica_kernel_class: mcmc kernel class for multiple sampling with
         different temperatures in parallel
       exchange_proposed_fn: Python callable which take a number of replicas, and
-        return combinations of replicas for exchange.
+        return combinations of replicas for exchange and a number of
+        combinations.
       seed: Python integer to seed the random number generator.
+        Default value: `None` (i.e., no seed).
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., "remc_kernel").
       **kwargs: Arguments for `replica_kernel_class`.
+
+    Raises:
+      ValueError: if `inverse_temperatures` doesn't have statically known rank
+        and statically known leading shape
     """
+    if inverse_temperatures.shape.ndims is None or \
+       inverse_temperatures.shape[0].value is None:
+      raise ValueError('"inverse_temperatures" must have statically known rank '
+                       'and statically known leading shape')
     self._seed_stream = seed  # This will be mutated with use.
     self._parameters = dict(target_log_prob_fn=target_log_prob_fn,
                             inverse_temperatures=inverse_temperatures,
-                            n_replica=inverse_temperatures.shape[0],
+                            num_replica=inverse_temperatures.shape[0],
                             exchange_proposed_fn=exchange_proposed_fn,
                             seed=seed, name=name)
     self.replica_kernels = []
-    for i in range(self.n_replica):
+    for i in range(self.num_replica):
       self._seed_stream = distributions_util.gen_new_seed(
           self._seed_stream, salt='replica_kernels')
       self.replica_kernels.append(replica_kernel_class(
@@ -192,8 +223,8 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
     return self._parameters['inverse_temperatures']
 
   @property
-  def n_replica(self):
-    return self._parameters['n_replica']
+  def num_replica(self):
+    return self._parameters['num_replica']
 
   @property
   def exchange_proposed_fn(self):
@@ -239,7 +270,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
       sampled_replica_states = []
       sampled_replica_results = []
       sampled_replica_ratios = []
-      for i in range(self.n_replica):
+      for i in range(self.num_replica):
         [
             sampled_state,
             sampled_results,
@@ -251,11 +282,11 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
         sampled_replica_ratios.append(self.target_log_prob_fn(sampled_state))
       sampled_replica_ratios = tf.stack(sampled_replica_ratios, axis=0)
 
-      next_replica_idx = tf.range(self.n_replica)
+      next_replica_idx = tf.range(self.num_replica)
       self._seed_stream = distributions_util.gen_new_seed(
           self._seed_stream, salt='replica_exchange_one_step')
       exchange_proposed, exchange_proposed_n = \
-          self.exchange_proposed_fn(self.n_replica, seed=self._seed_stream)
+          self.exchange_proposed_fn(self.num_replica, seed=self._seed_stream)
       i = tf.constant(0)
 
       def cond(i, next_replica_idx):
@@ -276,7 +307,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
         exchange = log_uniform < ratio
         exchange_op = tf.sparse_to_dense(
             [exchange_proposed[i, 0], exchange_proposed[i, 1]],
-            [self.n_replica],
+            [self.num_replica],
             [next_replica_idx[exchange_proposed[i, 1]] -
              next_replica_idx[exchange_proposed[i, 0]],
              next_replica_idx[exchange_proposed[i, 0]] -
@@ -291,15 +322,15 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
 
       next_replica_states = []
       next_replica_results = []
-      for i in range(self.n_replica):
+      for i in range(self.num_replica):
         next_replica_states.append(
             tf.case({tf.equal(next_replica_idx[i], j):
                     _stateful_lambda(sampled_replica_states[j])
-                    for j in range(self.n_replica)}, exclusive=True))
+                    for j in range(self.num_replica)}, exclusive=True))
         next_replica_results.append(
             tf.case({tf.equal(next_replica_idx[i], j):
                      _stateful_lambda(sampled_replica_results[j])
-                     for j in range(self.n_replica)}, exclusive=True))
+                     for j in range(self.num_replica)}, exclusive=True))
 
       next_state = tf.identity(next_replica_states[0])
       kernel_results = ReplicaExchangeMCKernelResults(
@@ -328,11 +359,13 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
         name=mcmc_util.make_name(self.name, 'remc', 'bootstrap_results'),
         values=[init_state]):
       replica_results = [self.replica_kernels[i].bootstrap_results(init_state)
-                         for i in range(self.n_replica)]
-      replica_states = [tf.Variable(init_state) for i in range(self.n_replica)]
-      next_replica_idx = tf.range(self.n_replica)
-      exchange_proposed = tf.to_int32([])
-      exchange_proposed_n = 0
+                         for i in range(self.num_replica)]
+      replica_states = [tf.Variable(init_state) for i in range(self.num_replica)]
+      next_replica_idx = tf.range(self.num_replica)
+      exchange_proposed, exchange_proposed_n = \
+          self.exchange_proposed_fn(self.num_replica, seed=self._seed_stream)
+      exchange_proposed = tf.zeros_like(exchange_proposed)
+      exchange_proposed_n = tf.zeros_like(exchange_proposed_n)
       return ReplicaExchangeMCKernelResults(
           replica_results=replica_results,
           replica_states=replica_states,
