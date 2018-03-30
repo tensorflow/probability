@@ -102,67 +102,83 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
 
   #### Examples
 
+  ##### Sampling from the Standard Normal Distribution.
+
   ```python
+  import numpy as np
   import tensorflow as tf
   import tensorflow_probability as tfp
-  import numpy as np
-  import matplotlib.pyplot as plt
+  tfd = tfp.distributions
 
-  tfd = tf.contrib.distributions
-
-  # Tuning acceptance rates:
   dtype = np.float32
-  num_warmup_iter = 1000
-  num_chain_iter = 1000
 
-  x = tf.get_variable(name='x', initializer=np.zeros(2, dtype=dtype))
+  target = tfd.Normal(loc=dtype(0), scale=dtype(1))
 
-  # Target distribution is Mixture Normal.
-  target = tfd.MixtureSameFamily(
-      mixture_distribution=tfd.Categorical(probs=[0.5, 0.5]),
-      components_distribution=tfd.MultivariateNormalDiag(
-          loc=[[-5., -5], [5., 5.]],
-          scale_identity_multiplier=[1., 1.]))
-
-  # Initialize the ReplicaExchangeMC sampler.
   remc = tfp.mcmc.ReplicaExchangeMC(
       target_log_prob_fn=target.log_prob,
       inverse_temperatures=10.**tf.linspace(0., -2., 5),
       replica_kernel_class=tfp.mcmc.HamiltonianMonteCarlo,
-      step_size=0.5,
-      num_leapfrog_steps=3)
+      step_size=1.0,
+      num_leapfrog_steps=3,
+      seed=42)
 
-  # One iteration of the ReplicaExchangeMC
-  init_results = remc.bootstrap_results(x)
-  next_x, other_results = remc.one_step(
-      current_state=x,
-      previous_kernel_results=init_results)
+  samples, _ = tfp.mcmc.sample_chain(
+      num_results=1000,
+      current_state=dtype(1),
+      kernel=remc,
+      num_burnin_steps=500,
+      parallel_iterations=1)  # For determinism.
 
-  x_update = x.assign(next_x)
-  replica_update = [init_results.replica_states[i].assign(
-      other_results.replica_states[i]) for i in range(remc.num_replica)]
+  sample_mean = tf.reduce_mean(samples, axis=0)
+  sample_std = tf.sqrt(
+      tf.reduce_mean(tf.squared_difference(samples, sample_mean),
+                     axis=0))
+  with tf.Session() as sess:
+    [sample_mean_, sample_std_] = sess.run([sample_mean, sample_std])
 
-  warmup = tf.group([x_update, replica_update])
+  print('Estimated mean: '.format(sample_mean_))
+  print('Estimated standard deviation: {}'.format(sample_std_))
+  ```
 
-  init = tf.global_variables_initializer()
+  ##### Sampling from a 2-D Mixture Normal Distribution.
+
+  ```python
+  import numpy as np
+  import tensorflow as tf
+  import tensorflow_probability as tfp
+  import matplotlib.pyplot as plt
+  tfd = tfp.distributions
+
+  dtype = np.float32
+
+  target = tfd.MixtureSameFamily(
+      mixture_distribution=tfd.Categorical(probs=[0.5, 0.5]),
+      components_distribution=tfd.MultivariateNormalDiag(
+          loc=[[-1., -1], [1., 1.]],
+          scale_identity_multiplier=[0.1, 0.1]))
+
+  remc = tfp.mcmc.ReplicaExchangeMC(
+      target_log_prob_fn=target.log_prob,
+      inverse_temperatures=10.**tf.linspace(0., -2., 5),
+      replica_kernel_class=tfp.mcmc.HamiltonianMonteCarlo,
+      step_size=0.3,
+      num_leapfrog_steps=3,
+      seed=42)
+
+  samples, _ = tfp.mcmc.sample_chain(
+      num_results=1000,
+      current_state=np.zeros(2, dtype=dtype),
+      kernel=remc,
+      num_burnin_steps=500,
+      parallel_iterations=1)  # For determinism.
 
   with tf.Session() as sess:
-    sess.run(init)
-    # Warm up the sampler
-    for _ in range(num_warmup_iter):
-      sess.run(warmup)
-    # Collect samples
-    samples = np.zeros([num_chain_iter, 2])
-    replica_samples = np.zeros([num_chain_iter, 5, 2])
-    for i in range(num_chain_iter):
-      _, x_, replica_x_ = sess.run([x_update, x, replica_update])
-      samples[i] = x_
-      replica_samples[i] = replica_x_
+    samples_ = sess.run(samples)
 
   plt.figure(figsize=(8, 8))
-  plt.xlim(-10, 10)
-  plt.ylim(-10, 10)
-  plt.plot(samples[:, 0], samples[:, 1], '.')
+  plt.xlim(-2, 2)
+  plt.ylim(-2, 2)
+  plt.plot(samples_[:, 0], samples_[:, 1], '.')
   plt.show()
   ```
 
@@ -279,7 +295,9 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
             previous_kernel_results.replica_results[i])
         sampled_replica_states.append(sampled_state)
         sampled_replica_results.append(sampled_results)
-        sampled_replica_ratios.append(self.target_log_prob_fn(sampled_state))
+        if not mcmc_util.is_list_like(sampled_state):
+          sampled_state = [sampled_state]
+        sampled_replica_ratios.append(self.target_log_prob_fn(*sampled_state))
       sampled_replica_ratios = tf.stack(sampled_replica_ratios, axis=0)
 
       next_replica_idx = tf.range(self.num_replica)
@@ -360,7 +378,16 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
         values=[init_state]):
       replica_results = [self.replica_kernels[i].bootstrap_results(init_state)
                          for i in range(self.num_replica)]
-      replica_states = [tf.Variable(init_state) for i in range(self.num_replica)]
+
+      init_state_parts = (list(init_state)
+                          if mcmc_util.is_list_like(init_state)
+                          else [init_state])
+      replica_states = [[tf.Variable(s) if isinstance(s, tf.Variable)
+                         else tf.identity(s) for s in init_state_parts]
+                        for i in range(self.num_replica)]
+      def maybe_flatten(x):
+        return x if mcmc_util.is_list_like(init_state) else x[0]
+      replica_states = [maybe_flatten(s) for s in replica_states]
       next_replica_idx = tf.range(self.num_replica)
       exchange_proposed, exchange_proposed_n = \
           self.exchange_proposed_fn(self.num_replica, seed=self._seed_stream)

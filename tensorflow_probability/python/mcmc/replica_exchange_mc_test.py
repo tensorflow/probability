@@ -27,57 +27,73 @@ import tensorflow_probability as tfp
 tfd = tf.contrib.distributions
 
 
-class ReplicaExchangeMCTest(tf.test.TestCase):
-  def testDocstringExample(self):
-    """Tests the simplified docstring example."""
-    # Tuning acceptance rates:
+class REMCTest(tf.test.TestCase):
+
+  def testRWM1DNNormal(self):
+    """Sampling from the Standard Normal Distribution."""
     dtype = np.float32
-    num_warmup_iter = 1000
-    num_chain_iter = 1000
 
-    x = tf.get_variable(name='x', initializer=np.zeros(2, dtype=dtype))
+    with self.test_session(graph=tf.Graph()) as sess:
+      target = tfd.Normal(loc=dtype(0), scale=dtype(1))
 
-    # Target distribution is Mixture Normal.
-    target = tfd.MixtureSameFamily(
-        mixture_distribution=tfd.Categorical(probs=[0.5, 0.5]),
-        components_distribution=tfd.MultivariateNormalDiag(
-            loc=[[-5., -5], [5., 5.]],
-            scale_identity_multiplier=[1., 1.]))
+      remc = tfp.mcmc.ReplicaExchangeMC(
+          target_log_prob_fn=target.log_prob,
+          inverse_temperatures=10.**tf.linspace(0., -2., 5),
+          replica_kernel_class=tfp.mcmc.HamiltonianMonteCarlo,
+          step_size=1.0,
+          num_leapfrog_steps=3,
+          seed=42)
 
-    # Initialize the ReplicaExchangeMC sampler.
-    remc = tfp.mcmc.ReplicaExchangeMC(
-        target_log_prob_fn=target.log_prob,
-        inverse_temperatures=tf.pow(10., tf.linspace(0., -2., 5)),
-        replica_kernel_class=tfp.mcmc.HamiltonianMonteCarlo,
-        step_size=0.5,
-        num_leapfrog_steps=3)
+      samples, _ = tfp.mcmc.sample_chain(
+          num_results=1000,
+          current_state=dtype(1),
+          kernel=remc,
+          num_burnin_steps=500,
+          parallel_iterations=1)  # For determinism.
 
-    # One iteration of the ReplicaExchangeMC
-    init_results = remc.bootstrap_results(x)
-    next_x, other_results = remc.one_step(
-        current_state=x,
-        previous_kernel_results=init_results)
+      sample_mean = tf.reduce_mean(samples, axis=0)
+      sample_std = tf.sqrt(
+          tf.reduce_mean(tf.squared_difference(samples, sample_mean),
+                         axis=0))
+      [sample_mean_, sample_std_] = sess.run([sample_mean, sample_std])
 
-    x_update = x.assign(next_x)
-    replica_update = [init_results.replica_states[i].assign(
-        other_results.replica_states[i]) for i in range(remc.n_replica)]
+    self.assertAllClose(sample_mean_, 0., atol=0.1, rtol=0.1)
+    self.assertAllClose(sample_std_, 1., atol=0.1, rtol=0.1)
 
-    warmup = tf.group([x_update, replica_update])
+  def testRWM2DMixNormal(self):
+    """Sampling from a 2-D Mixture Normal Distribution."""
+    dtype = np.float32
 
-    init = tf.global_variables_initializer()
+    with self.test_session(graph=tf.Graph()) as sess:
+      target = tfd.MixtureSameFamily(
+          mixture_distribution=tfd.Categorical(probs=[0.5, 0.5]),
+          components_distribution=tfd.MultivariateNormalDiag(
+              loc=[[-1., -1], [1., 1.]],
+              scale_identity_multiplier=[0.1, 0.1]))
 
-    with tf.Session() as sess:
-      sess.run(init)
-      # Warm up the sampler
-      for _ in range(num_warmup_iter):
-        sess.run(warmup)
-      # Collect samples
-      samples = np.zeros([num_chain_iter, 2])
-      replica_samples = np.zeros([num_chain_iter, 5, 2])
-      for i in range(num_chain_iter):
-        _, x_, replica_x_ = sess.run([x_update, x, replica_update])
-        samples[i] = x_
-        replica_samples[i] = replica_x_
+      remc = tfp.mcmc.ReplicaExchangeMC(
+          target_log_prob_fn=target.log_prob,
+          inverse_temperatures=10.**tf.linspace(0., -2., 5),
+          replica_kernel_class=tfp.mcmc.HamiltonianMonteCarlo,
+          step_size=0.3,
+          num_leapfrog_steps=3,
+          seed=42)
+
+      samples, _ = tfp.mcmc.sample_chain(
+          num_results=5000,
+          current_state=np.zeros(2, dtype=dtype),
+          kernel=remc,
+          num_burnin_steps=2000,
+          parallel_iterations=1)  # For determinism.
+
+      sample_mean = tf.reduce_mean(samples, axis=0)
+      sample_std = tf.sqrt(
+          tf.reduce_mean(tf.squared_difference(samples, sample_mean),
+                         axis=0))
+      [sample_mean_, sample_std_] = sess.run([sample_mean, sample_std])
+
+    self.assertAllClose(sample_mean_, [0., 0.], atol=0.3, rtol=0.3)
+    self.assertAllClose(sample_std_, [1., 1.], atol=0.1, rtol=0.1)
 
 
 if __name__ == '__main__':
