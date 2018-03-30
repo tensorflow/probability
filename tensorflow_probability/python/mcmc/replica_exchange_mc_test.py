@@ -95,6 +95,26 @@ class REMCTest(tf.test.TestCase):
     self.assertAllClose(sample_mean_, [0., 0.], atol=0.3, rtol=0.3)
     self.assertAllClose(sample_std_, [1., 1.], atol=0.1, rtol=0.1)
 
+  def testInverseTemperaturesValueError(self):
+    """Using invalid `inverse_temperatures`."""
+    dtype = np.float32
+
+    with self.assertRaises(ValueError) as cm:
+      target = tfd.Normal(loc=dtype(0), scale=dtype(1))
+
+      tfp.mcmc.ReplicaExchangeMC(
+          target_log_prob_fn=target.log_prob,
+          inverse_temperatures=10.**tf.linspace(
+              0., -2., tf.random_uniform([], maxval=10, dtype=tf.int32)),
+          replica_kernel_class=tfp.mcmc.HamiltonianMonteCarlo,
+          step_size=1.0,
+          num_leapfrog_steps=3,
+          seed=42)
+    the_exception = cm.exception
+    tf.equal(the_exception.args[0],
+             '"inverse_temperatures" must have statically known rank '
+             'and statically known leading shape')
+
 
 if __name__ == '__main__':
   tf.test.main()
