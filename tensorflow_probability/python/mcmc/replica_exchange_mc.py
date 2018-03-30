@@ -194,8 +194,9 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
         `current_state` (or `*current_state` if it's a list) and returns its
         (possibly unnormalized) log-density under the target distribution.
       inverse_temperatures: sequence of inverse temperatures to perform
-        samplings with each replica. Must have statically known rank and
-        statically known leading shape.
+        samplings with each replica. Must have statically known `rank` and
+        statically known leading shape, i.e.,
+        `inverse_temperatures.shape[0].value is not None`
       replica_kernel_class: mcmc kernel class for multiple sampling with
         different temperatures in parallel
       exchange_proposed_fn: Python callable which take a number of replicas, and
