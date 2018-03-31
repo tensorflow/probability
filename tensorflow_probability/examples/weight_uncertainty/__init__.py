@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Example implementation of a simple variational auto-encoder (VAE)."""
+"""Examples of model uncertainty in predictive classifiers."""
 
 from __future__ import absolute_import
 from __future__ import division

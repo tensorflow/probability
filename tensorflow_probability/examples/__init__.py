@@ -12,8 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Example implementation of a simple variational auto-encoder (VAE)."""
+"""Example implementations of common models."""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+
+from tensorflow_probability.examples import vae
+from tensorflow_probability.examples import weight_uncertainty
+
+from tensorflow.python.util.all_util import remove_undocumented
+
+_allowed_symbols = [
+    "vae",
+    "weight_uncertainty"
+]
+
+remove_undocumented(__name__, _allowed_symbols)

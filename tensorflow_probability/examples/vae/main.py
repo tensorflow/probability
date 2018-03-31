@@ -38,22 +38,14 @@ import sys
 import time
 
 # Dependency imports
+from matplotlib import cm
+from matplotlib import figure
+from matplotlib.backends import backend_agg
 import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.examples.vae import vae_model
 from tensorflow.contrib.learn.python.learn.datasets import mnist
-
-try:
-  from matplotlib import cm  # pylint: disable=g-import-not-at-top
-  from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas  # pylint: disable=g-import-not-at-top
-  from matplotlib.figure import Figure  # pylint: disable=g-import-not-at-top
-  HAS_MATPLOTLIB = True
-except ImportError:
-  # Tensorflow doesn't depend on matplotlib, so fail gracefully if
-  # it's not present.
-  tf.logging.warn("Could not import matplotlib.")
-  HAS_MATPLOTLIB = False
 
 # Hardcode the image shape. Change this if using non-MNIST datasets.
 IMAGE_SHAPE = [28, 28]
@@ -70,12 +62,9 @@ def save_imgs(x, fname):
     ImportError: if matplotlib is not available.
   """
 
-  if not HAS_MATPLOTLIB:
-    raise ImportError("Could not import matplotlib.")
-
   n = x.shape[0]
-  fig = Figure(figsize=(n, 1), frameon=False)
-  canvas = FigureCanvas(fig)
+  fig = figure.Figure(figsize=(n, 1), frameon=False)
+  canvas = backend_agg.FigureCanvasAgg(fig)
   for i in range(n):
     ax = fig.add_subplot(1, n, i+1)
     ax.imshow(x[i].squeeze(),
@@ -227,38 +216,37 @@ def run_training():
 
     init = tf.global_variables_initializer()
     saver = tf.train.Saver()
-    sess = tf.Session()
 
-    summary_writer = tf.summary.FileWriter(FLAGS.log_dir, sess.graph)
-    sess.run(init)
+    with tf.Session() as sess:
+      summary_writer = tf.summary.FileWriter(FLAGS.log_dir, sess.graph)
+      sess.run(init)
 
-    # Run the training loop.
-    train_handle = sess.run(training_iterator.string_handle())
-    heldout_handle = sess.run(heldout_iterator.string_handle())
-    for step in range(FLAGS.max_steps):
-      start_time = time.time()
+      # Run the training loop.
+      train_handle = sess.run(training_iterator.string_handle())
+      heldout_handle = sess.run(heldout_iterator.string_handle())
+      for step in range(FLAGS.max_steps):
+        start_time = time.time()
 
-      _, loss_value = sess.run([train_op, elbo_loss],
-                               feed_dict={handle: train_handle})
+        _, loss_value = sess.run([train_op, elbo_loss],
+                                 feed_dict={handle: train_handle})
 
-      duration = time.time() - start_time
+        duration = time.time() - start_time
 
-      if step % 100 == 0:
-        print("Step {}: loss = {:.2f} ({:.3f} sec)".format
-              (step, loss_value, duration))
+        if step % 100 == 0:
+          print("Step {}: loss = {:.2f} ({:.3f} sec)".format
+                (step, loss_value, duration))
 
-        # Update the events file.
-        summary_str = sess.run(summary, feed_dict={handle: train_handle})
-        summary_writer.add_summary(summary_str, step)
-        summary_writer.flush()
+          # Update the events file.
+          summary_str = sess.run(summary, feed_dict={handle: train_handle})
+          summary_writer.add_summary(summary_str, step)
+          summary_writer.flush()
 
-      # Periodically save a checkpoint and visualize model progress.
-      if (step+1) % 500 == 0 or (step + 1) == FLAGS.max_steps:
+        # Periodically save a checkpoint and visualize model progress.
+        if (step+1) % 500 == 0 or (step + 1) == FLAGS.max_steps:
 
-        checkpoint_file = os.path.join(FLAGS.log_dir, "model.ckpt")
-        saver.save(sess, checkpoint_file, global_step=step)
+          checkpoint_file = os.path.join(FLAGS.log_dir, "model.ckpt")
+          saver.save(sess, checkpoint_file, global_step=step)
 
-        if HAS_MATPLOTLIB:
           # Visualize inputs and model reconstructions from the
           # training set...
           images_val, reconstructions_val, random_images_val = sess.run(
