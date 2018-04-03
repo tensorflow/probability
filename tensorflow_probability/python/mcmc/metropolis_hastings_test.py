@@ -136,7 +136,10 @@ class MetropolisHastingsTest(tf.test.TestCase):
                       self.dtype([3, 4])]
     current_state = [tf.convert_to_tensor(s) for s in current_state_]
     expected_inner_init_kernel_results = InnerKernelResultsWithoutCorrection(
-        target_log_prob=self.dtype([+100., -100.]),
+        target_log_prob=self.dtype([
+            +100.,
+            -100.,
+        ]),
         grads_target_log_prob=[self.dtype([1.25, 1.5]),
                                self.dtype([2.25, 2.5])],
         extraneous=self.dtype([1.75, 2.]))
