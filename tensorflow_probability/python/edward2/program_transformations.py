@@ -56,7 +56,7 @@ def make_log_joint_fn(model):
   function.
 
   ```python
-  import tensorflow_probability.edward2 as ed
+  from tensorflow_probability import edward2 as ed
 
   def model(X):
     w = ed.Normal(loc=0., scale=1., sample_shape=X.shape[1], name="w")

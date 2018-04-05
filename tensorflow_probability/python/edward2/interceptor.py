@@ -61,7 +61,7 @@ def interception(interceptor):
   how to set the value of a specific random variable within a program.
 
   ```python
-  import tensorflow_probability.edward2 as ed
+  from tensorflow_probability import edward2 as ed
 
   def model():
     return ed.Poisson(rate=1.5, name="y")
