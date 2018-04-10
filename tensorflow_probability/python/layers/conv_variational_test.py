@@ -152,14 +152,14 @@ class ConvVariational(tf.test.TestCase):
         inputs = tf.random_uniform([2, 3, 3, 3, 1], seed=1)
 
       # No keys.
-      losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
+      losses = layer.get_losses_for(inputs=None)
       self.assertEqual(len(losses), 0)
       self.assertListEqual(layer.losses, losses)
 
       _ = layer(inputs)
 
       # Yes keys.
-      losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
+      losses = layer.get_losses_for(inputs=None)
       self.assertEqual(len(losses), 1)
       self.assertListEqual(layer.losses, losses)
 
@@ -184,14 +184,14 @@ class ConvVariational(tf.test.TestCase):
         inputs = tf.random_uniform([2, 3, 3, 3, 1], seed=1)
 
       # No keys.
-      losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
+      losses = layer.get_losses_for(inputs=None)
       self.assertEqual(len(losses), 0)
       self.assertListEqual(layer.losses, losses)
 
       _ = layer(inputs)
 
       # Yes keys.
-      losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
+      losses = layer.get_losses_for(inputs=None)
       self.assertEqual(len(losses), 2)
       self.assertListEqual(layer.losses, losses)
 
@@ -253,7 +253,7 @@ class ConvVariational(tf.test.TestCase):
 
     outputs = layer(inputs)
 
-    kl_penalty = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
+    kl_penalty = layer.get_losses_for(inputs=None)
     return (kernel_posterior, kernel_prior, kernel_divergence,
             bias_posterior, bias_prior, bias_divergence,
             layer, inputs, outputs, kl_penalty, kernel_shape)
