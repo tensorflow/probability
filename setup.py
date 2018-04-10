@@ -46,7 +46,7 @@ else:
 maybe_gpu_suffix = '-gpu' if use_gpu else ''
 
 if release:
-  raise NotImplementedError('Tensorflow Probability team does not yet '
+  raise NotImplementedError('TensorFlow Probability team does not yet '
                             'support releases.')
   # TODO(b/76094057): Once we support releases, enable the following:
   # tensorflow_package_name = 'tensorflow{}>={}'.format(
