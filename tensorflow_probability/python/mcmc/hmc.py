@@ -136,7 +136,7 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
   print(samples.mean(), samples.std())
   ```
 
-  ##### Estimate parametrs of a more complicated posterior.
+  ##### Estimate parameters of a more complicated posterior.
 
   In this example, we'll use Monte-Carlo EM to find best-fit parameters. See
   ["Implementations of the Monte Carlo EM algorithm " by Levine and Casella](
@@ -229,7 +229,7 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
 
   # We do an optimization step to propagate `log_sigma` after one HMC step to
   # propagate `weights`. The loss function for the optimization algorithm is
-  # exacltly the prior distribution since the likelihood does not depend on
+  # exactly the prior distribution since the likelihood does not depend on
   # `log_sigma`.
   with tf.control_dependencies([weights_update]):
     loss = -prior.log_prob(weights)
