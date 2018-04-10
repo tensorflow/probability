@@ -45,7 +45,7 @@ def make_encoder_net(images,
       indicating the number of units in each hidden layer. E.g., `[128, 32]`
       implies the network has two hidden layers with `128` and `32` outputs,
       respectively.
-    activation: The activation function as a Tensorflow op (e.g., tf.nn.elu).
+    activation: The activation function as a TensorFlow op (e.g., tf.nn.elu).
     name: An optional name scope for the network parameters.
 
   Returns:
@@ -101,7 +101,7 @@ def make_decoder_net(encoding_draw,
       indicating the number of units in each hidden layer. E.g., `[128, 32]`
       implies the network has two hidden layers with `128` and `32` outputs,
       respectively.
-    activation: The activation function as a Tensorflow op (e.g., tf.nn.elu).
+    activation: The activation function as a TensorFlow op (e.g., tf.nn.elu).
     name: An optional name scope for network parameters.
 
   Returns:
@@ -147,7 +147,7 @@ def make_prior_mvndiag(latent_size, dtype=tf.float32, name=None):
 
   Args:
     latent_size: The number of elements in the latent random variable.
-    dtype: The Tensorflow datatype of the latent code.
+    dtype: The TensorFlow datatype of the latent code.
     name: An optional name scope.
 
   Returns:
