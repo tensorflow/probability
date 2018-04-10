@@ -83,10 +83,10 @@ class RandomVariableTest(tf.test.TestCase):
   def testStr(self):
     x = ed.RandomVariable(tfd.Normal(0.0, 1.0), value=1.234)
     if tfe.in_eager_mode():
-      pattern = "RandomVariable(\"1.234\", shape=(), dtype=float32, device=..."
+      pattern = "RandomVariable(\"1.234\", shape=(), dtype=float32"
     else:
-      pattern = "RandomVariable(\"Normal\", shape=(), dtype=float32, device=..."
-    regexp = re.escape(pattern).replace(re.escape("..."), ".*")
+      pattern = "RandomVariable(\"Normal\", shape=(), dtype=float32"
+    regexp = re.escape(pattern)
     self.assertRegexpMatches(str(x), regexp)
 
   @tfe.run_test_in_graph_and_eager_modes()
