@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Tests for convolutional Bayesian layers."""
+"""Tests for convolutional variational layers."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -24,6 +24,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow.python.keras._impl.keras import testing_utils
 from tensorflow.python.ops import nn_ops
 from tensorflow.python.ops.distributions import util as distribution_util
 
@@ -101,6 +102,41 @@ class MockKLDivergence(object):
 
 
 class ConvVariational(tf.test.TestCase):
+
+  def _testKerasLayer(self, layer_class):
+    def kernel_posterior_fn(dtype, shape, name, trainable, add_variable_fn):
+      """Set trivially. The function is required to instantiate layer."""
+      del name, trainable, add_variable_fn  # unused
+      # Deserialized Keras objects do not perform lexical scoping. Any modules
+      # that the function requires must be imported within the function.
+      import tensorflow as tf  # pylint: disable=g-import-not-at-top,redefined-outer-name
+      tfd = tf.contrib.distributions  # pylint: disable=redefined-outer-name
+
+      loc = tf.zeros(shape, dtype=dtype)
+      scale = tf.ones(shape, dtype=dtype)
+      return tfd.Independent(tfd.Normal(loc=loc, scale=scale))
+
+    if layer_class in (tfp.layers.Convolution1DReparameterization,
+                       tfp.layers.Convolution1DFlipout):
+      input_shape = (2, 3, 1)
+    elif layer_class in (tfp.layers.Convolution2DReparameterization,
+                         tfp.layers.Convolution2DFlipout):
+      input_shape = (2, 3, 3, 1)
+    elif layer_class in (tfp.layers.Convolution3DReparameterization,
+                         tfp.layers.Convolution3DFlipout):
+      input_shape = (2, 3, 3, 3, 1)
+
+    with tf.keras.utils.CustomObjectScope({layer_class.__name__: layer_class}):
+      with self.test_session():
+        testing_utils.layer_test(
+            layer_class,
+            kwargs={'filters': 2,
+                    'kernel_size': 3,
+                    'kernel_posterior_fn': kernel_posterior_fn,
+                    'kernel_prior_fn': None,
+                    'bias_posterior_fn': None,
+                    'bias_prior_fn': None},
+            input_shape=input_shape)
 
   def _testKLPenaltyKernel(self, layer_class):
     with self.test_session():
@@ -453,6 +489,24 @@ class ConvVariational(tf.test.TestCase):
 
       self.assertLess(np.sum(np.isclose(outputs_one_, outputs_two_)),
                       np.prod(outputs_one_.shape))
+
+  def testKerasLayerConvolution1DReparameterization(self):
+    self._testKerasLayer(tfp.layers.Convolution1DReparameterization)
+
+  def testKerasLayerConvolution2DReparameterization(self):
+    self._testKerasLayer(tfp.layers.Convolution2DReparameterization)
+
+  def testKerasLayerConvolution3DReparameterization(self):
+    self._testKerasLayer(tfp.layers.Convolution3DReparameterization)
+
+  def testKerasLayerConvolution1DFlipout(self):
+    self._testKerasLayer(tfp.layers.Convolution1DFlipout)
+
+  def testKerasLayerConvolution2DFlipout(self):
+    self._testKerasLayer(tfp.layers.Convolution2DFlipout)
+
+  def testKerasLayerConvolution3DFlipout(self):
+    self._testKerasLayer(tfp.layers.Convolution3DFlipout)
 
   def testKLPenaltyKernelConvolution1DReparameterization(self):
     self._testKLPenaltyKernel(tfp.layers.Convolution1DReparameterization)

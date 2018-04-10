@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Tests for dense Bayesian layers."""
+"""Tests for dense variational layers."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -24,6 +24,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow.python.keras._impl.keras import testing_utils
 from tensorflow.python.ops.distributions import util as distribution_util
 
 tfd = tf.contrib.distributions
@@ -99,6 +100,35 @@ class MockKLDivergence(object):
 
 
 class DenseVariational(tf.test.TestCase):
+
+  def _testKerasLayer(self, layer_class):
+    def kernel_posterior_fn(dtype, shape, name, trainable, add_variable_fn):
+      """Set trivially. The function is required to instantiate layer."""
+      del name, trainable, add_variable_fn  # unused
+      # Deserialized Keras objects do not perform lexical scoping. Any modules
+      # that the function requires must be imported within the function.
+      import tensorflow as tf  # pylint: disable=g-import-not-at-top,redefined-outer-name
+      tfd = tf.contrib.distributions  # pylint: disable=redefined-outer-name
+
+      loc = tf.zeros(shape, dtype=dtype)
+      scale = tf.ones(shape, dtype=dtype)
+      return tfd.Independent(tfd.Normal(loc=loc, scale=scale))
+
+    kwargs = {'units': 3,
+              'kernel_posterior_fn': kernel_posterior_fn,
+              'kernel_prior_fn': None,
+              'bias_posterior_fn': None,
+              'bias_prior_fn': None}
+    with tf.keras.utils.CustomObjectScope({layer_class.__name__: layer_class}):
+      with self.test_session():
+        testing_utils.layer_test(
+            layer_class,
+            kwargs=kwargs,
+            input_shape=(3, 2))
+        testing_utils.layer_test(
+            layer_class,
+            kwargs=kwargs,
+            input_shape=(None, None, 2))
 
   def _testKLPenaltyKernel(self, layer_class):
     with self.test_session():
@@ -185,6 +215,15 @@ class DenseVariational(tf.test.TestCase):
     return (kernel_posterior, kernel_prior, kernel_divergence,
             bias_posterior, bias_prior, bias_divergence,
             layer, inputs, outputs, kl_penalty)
+
+  def testKerasLayerReparameterization(self):
+    self._testKerasLayer(tfp.layers.DenseReparameterization)
+
+  def testKerasLayerLocalReparameterization(self):
+    self._testKerasLayer(tfp.layers.DenseLocalReparameterization)
+
+  def testKerasLayerFlipout(self):
+    self._testKerasLayer(tfp.layers.DenseFlipout)
 
   def testKLPenaltyKernelReparameterization(self):
     self._testKLPenaltyKernel(tfp.layers.DenseReparameterization)

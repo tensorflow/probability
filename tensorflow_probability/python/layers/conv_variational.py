@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Convolutional variational layer classes and their functional aliases."""
+"""Convolutional variational layers."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -36,20 +36,12 @@ __all__ = [
     'Convolution2DReparameterization',
     'Convolution3DFlipout',
     'Convolution3DReparameterization',
-    'convolution1d_flipout',
-    'convolution1d_reparameterization',
-    'convolution2d_flipout',
-    'convolution2d_reparameterization',
-    'convolution3d_flipout',
-    'convolution3d_reparameterization',
 ]
 
 
 doc_args = """activation: Activation function. Set it to None to maintain a
       linear activation.
-  activity_regularizer: Optional regularizer function for the output.
-  trainable: Boolean, if `True` also add variables to the graph collection
-    `GraphKeys.TRAINABLE_VARIABLES` (see `tf.Variable`).
+  activity_regularizer: Regularizer function for the output.
   kernel_posterior_fn: Python `callable` which creates
     `tf.distributions.Distribution` instance representing the surrogate
     posterior of the `kernel` parameter. Default value:
@@ -81,11 +73,10 @@ doc_args = """activation: Activation function. Set it to None to maintain a
     distribution, prior distribution and random variate sample(s) from the
     surrogate posterior and computes or approximates the KL divergence. The
     distributions are `tf.distributions.Distribution`-like instances and the
-    sample is a `Tensor`.
-  name: A string, the name of the layer."""
+    sample is a `Tensor`."""
 
 
-class _ConvVariational(tf.layers.Layer):
+class _ConvVariational(tf.keras.layers.Layer):
   """Abstract nD convolution layer (private, used as implementation base).
 
   This layer creates a convolution kernel that is convolved
@@ -137,7 +128,6 @@ class _ConvVariational(tf.layers.Layer):
       dilation_rate=1,
       activation=None,
       activity_regularizer=None,
-      trainable=True,
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
       kernel_prior_fn=lambda dtype, *args: tfd.Normal(  # pylint: disable=g-long-lambda
@@ -147,7 +137,6 @@ class _ConvVariational(tf.layers.Layer):
       bias_posterior_tensor_fn=lambda d: d.sample(),
       bias_prior_fn=None,
       bias_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
-      name=None,
       **kwargs):
     # pylint: disable=g-doc-args
     """Construct layer.
@@ -177,8 +166,6 @@ class _ConvVariational(tf.layers.Layer):
     """
     # pylint: enable=g-doc-args
     super(_ConvVariational, self).__init__(
-        trainable=trainable,
-        name=name,
         activity_regularizer=activity_regularizer,
         **kwargs)
     self.rank = rank
@@ -290,6 +277,122 @@ class _ConvVariational(tf.layers.Layer):
       self._built_bias_divergence = True
     return outputs
 
+  def compute_output_shape(self, input_shape):
+    """Computes the output shape of the layer.
+
+    Args:
+      input_shape: Shape tuple (tuple of integers) or list of shape tuples
+        (one per output tensor of the layer). Shape tuples can include None for
+        free dimensions, instead of an integer.
+
+    Returns:
+      output_shape: A tuple representing the output shape.
+    """
+    input_shape = tf.TensorShape(input_shape).as_list()
+    if self.data_format == 'channels_last':
+      space = input_shape[1:-1]
+      new_space = []
+      for i in range(len(space)):
+        new_dim = tf_layers_util.conv_output_length(
+            space[i],
+            self.kernel_size[i],
+            padding=self.padding,
+            stride=self.strides[i],
+            dilation=self.dilation_rate[i])
+        new_space.append(new_dim)
+      return tf.TensorShape([input_shape[0]] + new_space + [self.filters])
+    else:
+      space = input_shape[2:]
+      new_space = []
+      for i in range(len(space)):
+        new_dim = tf_layers_util.conv_output_length(
+            space[i],
+            self.kernel_size[i],
+            padding=self.padding,
+            stride=self.strides[i],
+            dilation=self.dilation_rate[i])
+        new_space.append(new_dim)
+      return tf.TensorShape([input_shape[0], self.filters] + new_space)
+
+  def get_config(self):
+    """Returns the config of the layer.
+
+    A layer config is a Python dictionary (serializable) containing the
+    configuration of a layer. The same layer can be reinstantiated later
+    (without its trained weights) from this configuration.
+
+    Returns:
+      config: A Python dictionary of class keyword arguments and their
+        serialized values.
+    """
+    config = {
+        'filters': self.filters,
+        'kernel_size': self.kernel_size,
+        'strides': self.strides,
+        'padding': self.padding,
+        'data_format': self.data_format,
+        'dilation_rate': self.dilation_rate,
+        'activation': (tf.keras.activations.serialize(self.activation)
+                       if self.activation else None),
+        'activity_regularizer':
+            tf.keras.initializers.serialize(self.activity_regularizer),
+    }
+    function_keys = [
+        'kernel_posterior_fn',
+        'kernel_posterior_tensor_fn',
+        'kernel_prior_fn',
+        'kernel_divergence_fn',
+        'bias_posterior_fn',
+        'bias_posterior_tensor_fn',
+        'bias_prior_fn',
+        'bias_divergence_fn',
+    ]
+    for function_key in function_keys:
+      function = getattr(self, function_key)
+      if function is None:
+        function_name = None
+        function_type = None
+      else:
+        function_name, function_type = tfp_layers_util.serialize_function(
+            function)
+      config[function_key] = function_name
+      config[function_key + '_type'] = function_type
+    base_config = super(_ConvVariational, self).get_config()
+    return dict(list(base_config.items()) + list(config.items()))
+
+  @classmethod
+  def from_config(cls, config):
+    """Creates a layer from its config.
+
+    This method is the reverse of `get_config`, capable of instantiating the
+    same layer from the config dictionary.
+
+    Args:
+      config: A Python dictionary, typically the output of `get_config`.
+
+    Returns:
+      layer: A layer instance.
+    """
+    config = config.copy()
+    function_keys = [
+        'kernel_posterior_fn',
+        'kernel_posterior_tensor_fn',
+        'kernel_prior_fn',
+        'kernel_divergence_fn',
+        'bias_posterior_fn',
+        'bias_posterior_tensor_fn',
+        'bias_prior_fn',
+        'bias_divergence_fn',
+    ]
+    for function_key in function_keys:
+      serial = config[function_key]
+      function_type = config.pop(function_key + '_type')
+      if serial is not None:
+        config[function_key] = tfp_layers_util.deserialize_function(
+            serial,
+            function_type=function_type)
+    return cls(**config)
+
   def _apply_variational_bias(self, inputs):
     if self.bias_posterior is None:
       self.bias_posterior_tensor = None
@@ -337,34 +440,6 @@ class _ConvVariational(tf.layers.Layer):
         divergence_fn(posterior, prior, posterior_tensor),
         name=name)
     self.add_loss(divergence)
-
-  def _compute_output_shape(self, input_shape):
-    input_shape = tf.TensorShape(input_shape).as_list()
-    if self.data_format == 'channels_last':
-      space = input_shape[1:-1]
-      new_space = []
-      for i in range(len(space)):
-        new_dim = tf_layers_util.conv_output_length(
-            space[i],
-            self.kernel_size[i],
-            padding=self.padding,
-            stride=self.strides[i],
-            dilation=self.dilation_rate[i])
-        new_space.append(new_dim)
-      return tf.TensorShape([input_shape[0]] + new_space +
-                            [self.filters])
-    else:
-      space = input_shape[2:]
-      new_space = []
-      for i in range(len(space)):
-        new_dim = tf_layers_util.conv_output_length(
-            space[i],
-            self.kernel_size[i],
-            padding=self.padding,
-            stride=self.strides[i],
-            dilation=self.dilation_rate[i])
-        new_space.append(new_dim)
-      return tf.TensorShape([input_shape[0], self.filters] + new_space)
 
 
 class _ConvReparameterization(_ConvVariational):
@@ -427,7 +502,6 @@ class _ConvReparameterization(_ConvVariational):
       dilation_rate=1,
       activation=None,
       activity_regularizer=None,
-      trainable=True,
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
       kernel_prior_fn=lambda dtype, *args: tfd.Normal(  # pylint: disable=g-long-lambda
@@ -437,7 +511,6 @@ class _ConvReparameterization(_ConvVariational):
       bias_posterior_tensor_fn=lambda d: d.sample(),
       bias_prior_fn=None,
       bias_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
-      name=None,
       **kwargs):
     # pylint: disable=g-doc-args
     """Construct layer.
@@ -476,7 +549,6 @@ class _ConvReparameterization(_ConvVariational):
         dilation_rate=dilation_rate,
         activation=activation,
         activity_regularizer=activity_regularizer,
-        trainable=trainable,
         kernel_posterior_fn=kernel_posterior_fn,
         kernel_posterior_tensor_fn=kernel_posterior_tensor_fn,
         kernel_prior_fn=kernel_prior_fn,
@@ -485,7 +557,7 @@ class _ConvReparameterization(_ConvVariational):
         bias_posterior_tensor_fn=bias_posterior_tensor_fn,
         bias_prior_fn=bias_prior_fn,
         bias_divergence_fn=bias_divergence_fn,
-        name=name, **kwargs)
+        **kwargs)
 
   def _apply_variational_kernel(self, inputs):
     self.kernel_posterior_tensor = self.kernel_posterior_tensor_fn(
@@ -585,7 +657,6 @@ class Conv1DReparameterization(_ConvReparameterization):
       dilation_rate=1,
       activation=None,
       activity_regularizer=None,
-      trainable=True,
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
       kernel_prior_fn=lambda dtype, *args: tfd.Normal(  # pylint: disable=g-long-lambda
@@ -595,7 +666,6 @@ class Conv1DReparameterization(_ConvReparameterization):
       bias_posterior_tensor_fn=lambda d: d.sample(),
       bias_prior_fn=None,
       bias_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
-      name=None,
       **kwargs):
     # pylint: disable=g-doc-args
     """Construct layer.
@@ -632,7 +702,6 @@ class Conv1DReparameterization(_ConvReparameterization):
         dilation_rate=dilation_rate,
         activation=activation,
         activity_regularizer=activity_regularizer,
-        trainable=trainable,
         kernel_posterior_fn=kernel_posterior_fn,
         kernel_posterior_tensor_fn=kernel_posterior_tensor_fn,
         kernel_prior_fn=kernel_prior_fn,
@@ -641,146 +710,7 @@ class Conv1DReparameterization(_ConvReparameterization):
         bias_posterior_tensor_fn=bias_posterior_tensor_fn,
         bias_prior_fn=bias_prior_fn,
         bias_divergence_fn=bias_divergence_fn,
-        name=name, **kwargs)
-
-
-@docstring_util.expand_docstring(args=doc_args)
-def conv1d_reparameterization(
-    inputs,
-    filters,
-    kernel_size,
-    strides=1,
-    padding='valid',
-    data_format='channels_last',
-    dilation_rate=1,
-    activation=None,
-    activity_regularizer=None,
-    trainable=True,
-    kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
-    kernel_posterior_tensor_fn=lambda d: d.sample(),
-    kernel_prior_fn=lambda dtype, *args: tfd.Normal(  # pylint: disable=g-long-lambda
-        loc=dtype.as_numpy_dtype(0.), scale=dtype.as_numpy_dtype(1.)),
-    kernel_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
-    bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(is_singular=True),  # pylint: disable=line-too-long
-    bias_posterior_tensor_fn=lambda d: d.sample(),
-    bias_prior_fn=None,
-    bias_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
-    name=None,
-    reuse=None):
-  # pylint: disable=g-doc-args
-  """Functional interface for 1D convolution layer (e.g. temporal convolution).
-
-  This layer creates a convolution kernel that is convolved
-  (actually cross-correlated) with the layer input to produce a tensor of
-  outputs. It may also include a bias addition and activation function
-  on the outputs. It assumes the `kernel` and/or `bias` are drawn from
-  distributions.
-
-  By default, the layer implements a stochastic forward pass via
-  sampling from the kernel and bias posteriors,
-  ```none
-  outputs = f(inputs; kernel, bias), kernel, bias ~ posterior
-  ```
-  where f denotes the layer's calculation. It uses the reparameterization
-  estimator [(Kingma and Welling, 2014)][1], which performs a Monte Carlo
-  approximation of the distribution integrating over the `kernel` and `bias`.
-
-  The arguments permit separate specification of the surrogate posterior
-  (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
-  distributions.
-
-  Args:
-    inputs: Tensor input.
-    filters: Integer, the dimensionality of the output space (i.e. the number
-      of filters in the convolution).
-    kernel_size: An integer or tuple/list of a single integer, specifying the
-      length of the 1D convolution window.
-    strides: An integer or tuple/list of a single integer,
-      specifying the stride length of the convolution.
-      Specifying any stride value != 1 is incompatible with specifying
-      any `dilation_rate` value != 1.
-    padding: One of `"valid"` or `"same"` (case-insensitive).
-    data_format: A string, one of `channels_last` (default) or `channels_first`.
-      The ordering of the dimensions in the inputs.
-      `channels_last` corresponds to inputs with shape
-      `(batch, length, channels)` while `channels_first` corresponds to
-      inputs with shape `(batch, channels, length)`.
-    dilation_rate: An integer or tuple/list of a single integer, specifying
-      the dilation rate to use for dilated convolution.
-      Currently, specifying any `dilation_rate` value != 1 is
-      incompatible with specifying any `strides` value != 1.
-    @{args}
-    reuse: Boolean, whether to reuse the weights of a previous layer
-      by the same name.
-
-  Returns:
-    Output tensor.
-
-  Raises:
-    ValueError: if eager execution is enabled.
-
-  #### Examples
-
-  We illustrate a Bayesian neural network with [variational inference](
-  https://en.wikipedia.org/wiki/Variational_Bayesian_methods),
-  assuming a dataset of `features` and `labels`.
-
-  ```python
-  import tensorflow as tf
-  import tensorflow_probability as tfp
-
-  net = tf.reshape(features, [-1, 128, 1])
-  net = tfp.layers.conv1d_reparameterization(net,
-                                             filters=64,
-                                             kernel_size=5,
-                                             padding='SAME',
-                                             activation=tf.nn.relu)
-  net = tf.reshape(net, [-1, 128 * 64])
-  logits = tfp.layers.dense_reparameterization(net, 10)
-  neg_log_likelihood = tf.nn.softmax_cross_entropy_with_logits(
-      labels=labels, logits=logits)
-  kl = sum(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
-  loss = neg_log_likelihood + kl
-  train_op = tf.train.AdamOptimizer().minimize(loss)
-  ```
-
-  It uses reparameterization gradients to minimize the
-  Kullback-Leibler divergence up to a constant, also known as the
-  negative Evidence Lower Bound. It consists of the sum of two terms:
-  the expected negative log-likelihood, which we approximate via
-  Monte Carlo; and the KL divergence, which is added via regularizer
-  terms which are arguments to the layer.
-
-  #### References
-
-  [1]: Diederik Kingma and Max Welling. Auto-Encoding Variational Bayes. In
-       _International Conference on Learning Representations_, 2014.
-       https://arxiv.org/abs/1312.6114
-  """
-  # pylint: enable=g-doc-args
-  layer = Conv1DReparameterization(
-      filters=filters,
-      kernel_size=kernel_size,
-      strides=strides,
-      padding=padding,
-      data_format=data_format,
-      dilation_rate=dilation_rate,
-      activation=activation,
-      activity_regularizer=activity_regularizer,
-      trainable=trainable,
-      kernel_posterior_fn=kernel_posterior_fn,
-      kernel_posterior_tensor_fn=kernel_posterior_tensor_fn,
-      kernel_prior_fn=kernel_prior_fn,
-      kernel_divergence_fn=kernel_divergence_fn,
-      bias_posterior_fn=bias_posterior_fn,
-      bias_posterior_tensor_fn=bias_posterior_tensor_fn,
-      bias_prior_fn=bias_prior_fn,
-      bias_divergence_fn=bias_divergence_fn,
-      name=name,
-      dtype=inputs.dtype.base_dtype,
-      _scope=name,
-      _reuse=reuse)
-  return layer.apply(inputs)
+        **kwargs)
 
 
 class Conv2DReparameterization(_ConvReparameterization):
@@ -875,7 +805,6 @@ class Conv2DReparameterization(_ConvReparameterization):
       dilation_rate=(1, 1),
       activation=None,
       activity_regularizer=None,
-      trainable=True,
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
       kernel_prior_fn=lambda dtype, *args: tfd.Normal(  # pylint: disable=g-long-lambda
@@ -885,7 +814,6 @@ class Conv2DReparameterization(_ConvReparameterization):
       bias_posterior_tensor_fn=lambda d: d.sample(),
       bias_prior_fn=None,
       bias_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
-      name=None,
       **kwargs):
     # pylint: disable=g-doc-args
     """Construct layer.
@@ -928,7 +856,6 @@ class Conv2DReparameterization(_ConvReparameterization):
         dilation_rate=dilation_rate,
         activation=activation,
         activity_regularizer=activity_regularizer,
-        trainable=trainable,
         kernel_posterior_fn=kernel_posterior_fn,
         kernel_posterior_tensor_fn=kernel_posterior_tensor_fn,
         kernel_prior_fn=kernel_prior_fn,
@@ -937,156 +864,7 @@ class Conv2DReparameterization(_ConvReparameterization):
         bias_posterior_tensor_fn=bias_posterior_tensor_fn,
         bias_prior_fn=bias_prior_fn,
         bias_divergence_fn=bias_divergence_fn,
-        name=name, **kwargs)
-
-
-@docstring_util.expand_docstring(args=doc_args)
-def conv2d_reparameterization(
-    inputs,
-    filters,
-    kernel_size,
-    strides=(1, 1),
-    padding='valid',
-    data_format='channels_last',
-    dilation_rate=(1, 1),
-    activation=None,
-    activity_regularizer=None,
-    trainable=True,
-    kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
-    kernel_posterior_tensor_fn=lambda d: d.sample(),
-    kernel_prior_fn=lambda dtype, *args: tfd.Normal(  # pylint: disable=g-long-lambda
-        loc=dtype.as_numpy_dtype(0.), scale=dtype.as_numpy_dtype(1.)),
-    kernel_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
-    bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(is_singular=True),  # pylint: disable=line-too-long
-    bias_posterior_tensor_fn=lambda d: d.sample(),
-    bias_prior_fn=None,
-    bias_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
-    name=None,
-    reuse=None):
-  # pylint: disable=g-doc-args
-  """Functional interface for the 2D convolution layer.
-
-  This layer creates a convolution kernel that is convolved
-  (actually cross-correlated) with the layer input to produce a tensor of
-  outputs. It may also include a bias addition and activation function
-  on the outputs. It assumes the `kernel` and/or `bias` are drawn from
-  distributions.
-
-  By default, the layer implements a stochastic forward pass via
-  sampling from the kernel and bias posteriors,
-  ```none
-  outputs = f(inputs; kernel, bias), kernel, bias ~ posterior
-  ```
-  where f denotes the layer's calculation. It uses the reparameterization
-  estimator [(Kingma and Welling, 2014)][1], which performs a Monte Carlo
-  approximation of the distribution integrating over the `kernel` and `bias`.
-
-  The arguments permit separate specification of the surrogate posterior
-  (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
-  distributions.
-
-  Args:
-    inputs: Tensor input.
-    filters: Integer, the dimensionality of the output space (i.e. the number
-      of filters in the convolution).
-    kernel_size: An integer or tuple/list of 2 integers, specifying the
-      height and width of the 2D convolution window.
-      Can be a single integer to specify the same value for
-      all spatial dimensions.
-    strides: An integer or tuple/list of 2 integers,
-      specifying the strides of the convolution along the height and width.
-      Can be a single integer to specify the same value for
-      all spatial dimensions.
-      Specifying any stride value != 1 is incompatible with specifying
-      any `dilation_rate` value != 1.
-    padding: One of `"valid"` or `"same"` (case-insensitive).
-    data_format: A string, one of `channels_last` (default) or `channels_first`.
-      The ordering of the dimensions in the inputs.
-      `channels_last` corresponds to inputs with shape
-      `(batch, height, width, channels)` while `channels_first` corresponds to
-      inputs with shape `(batch, channels, height, width)`.
-    dilation_rate: An integer or tuple/list of 2 integers, specifying
-      the dilation rate to use for dilated convolution.
-      Can be a single integer to specify the same value for
-      all spatial dimensions.
-      Currently, specifying any `dilation_rate` value != 1 is
-      incompatible with specifying any stride value != 1.
-    @{args}
-    reuse: Boolean, whether to reuse the weights of a previous layer
-      by the same name.
-
-  Returns:
-    Output tensor.
-
-  Raises:
-    ValueError: if eager execution is enabled.
-
-  #### Examples
-
-  We illustrate a Bayesian neural network with [variational inference](
-  https://en.wikipedia.org/wiki/Variational_Bayesian_methods),
-  assuming a dataset of `features` and `labels`.
-
-  ```python
-  import tensorflow as tf
-  import tensorflow_probability as tfp
-
-  net = tf.reshape(features, [-1, 32, 32, 3])
-  net = tfp.layers.conv2d_reparameterization(net,
-                                             filters=64,
-                                             kernel_size=5,
-                                             padding='SAME',
-                                             activation=tf.nn.relu)
-  net = tf.layers.max_pooling2d(net,
-                                pool_size=2,
-                                strides=2,
-                                padding='SAME')
-  net = tf.reshape(net, [-1, 8 * 8 * 64])
-  logits = tfp.layers.dense_reparameterization(net, 10)
-  neg_log_likelihood = tf.nn.softmax_cross_entropy_with_logits(
-      labels=labels, logits=logits)
-  kl = sum(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
-  loss = neg_log_likelihood + kl
-  train_op = tf.train.AdamOptimizer().minimize(loss)
-  ```
-
-  It uses reparameterization gradients to minimize the
-  Kullback-Leibler divergence up to a constant, also known as the
-  negative Evidence Lower Bound. It consists of the sum of two terms:
-  the expected negative log-likelihood, which we approximate via
-  Monte Carlo; and the KL divergence, which is added via regularizer
-  terms which are arguments to the layer.
-
-  #### References
-
-  [1]: Diederik Kingma and Max Welling. Auto-Encoding Variational Bayes. In
-       _International Conference on Learning Representations_, 2014.
-       https://arxiv.org/abs/1312.6114
-  """
-  # pylint: enable=g-doc-args
-  layer = Conv2DReparameterization(
-      filters=filters,
-      kernel_size=kernel_size,
-      strides=strides,
-      padding=padding,
-      data_format=data_format,
-      dilation_rate=dilation_rate,
-      activation=activation,
-      activity_regularizer=activity_regularizer,
-      trainable=trainable,
-      kernel_posterior_fn=kernel_posterior_fn,
-      kernel_posterior_tensor_fn=kernel_posterior_tensor_fn,
-      kernel_prior_fn=kernel_prior_fn,
-      kernel_divergence_fn=kernel_divergence_fn,
-      bias_posterior_fn=bias_posterior_fn,
-      bias_posterior_tensor_fn=bias_posterior_tensor_fn,
-      bias_prior_fn=bias_prior_fn,
-      bias_divergence_fn=bias_divergence_fn,
-      name=name,
-      dtype=inputs.dtype.base_dtype,
-      _scope=name,
-      _reuse=reuse)
-  return layer.apply(inputs)
+        **kwargs)
 
 
 class Conv3DReparameterization(_ConvReparameterization):
@@ -1181,7 +959,6 @@ class Conv3DReparameterization(_ConvReparameterization):
       dilation_rate=(1, 1, 1),
       activation=None,
       activity_regularizer=None,
-      trainable=True,
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
       kernel_prior_fn=lambda dtype, *args: tfd.Normal(  # pylint: disable=g-long-lambda
@@ -1191,7 +968,6 @@ class Conv3DReparameterization(_ConvReparameterization):
       bias_posterior_tensor_fn=lambda d: d.sample(),
       bias_prior_fn=None,
       bias_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
-      name=None,
       **kwargs):
     # pylint: disable=g-doc-args
     """Construct layer.
@@ -1235,7 +1011,6 @@ class Conv3DReparameterization(_ConvReparameterization):
         dilation_rate=dilation_rate,
         activation=activation,
         activity_regularizer=activity_regularizer,
-        trainable=trainable,
         kernel_posterior_fn=kernel_posterior_fn,
         kernel_posterior_tensor_fn=kernel_posterior_tensor_fn,
         kernel_prior_fn=kernel_prior_fn,
@@ -1244,158 +1019,7 @@ class Conv3DReparameterization(_ConvReparameterization):
         bias_posterior_tensor_fn=bias_posterior_tensor_fn,
         bias_prior_fn=bias_prior_fn,
         bias_divergence_fn=bias_divergence_fn,
-        name=name, **kwargs)
-
-
-@docstring_util.expand_docstring(args=doc_args)
-def conv3d_reparameterization(
-    inputs,
-    filters,
-    kernel_size,
-    strides=(1, 1, 1),
-    padding='valid',
-    data_format='channels_last',
-    dilation_rate=(1, 1, 1),
-    activation=None,
-    activity_regularizer=None,
-    trainable=True,
-    kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
-    kernel_posterior_tensor_fn=lambda d: d.sample(),
-    kernel_prior_fn=lambda dtype, *args: tfd.Normal(  # pylint: disable=g-long-lambda
-        loc=dtype.as_numpy_dtype(0.), scale=dtype.as_numpy_dtype(1.)),
-    kernel_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
-    bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(is_singular=True),  # pylint: disable=line-too-long
-    bias_posterior_tensor_fn=lambda d: d.sample(),
-    bias_prior_fn=None,
-    bias_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
-    name=None,
-    reuse=None):
-  # pylint: disable=g-doc-args
-  """Functional interface for the 3D convolution layer.
-
-  This layer creates a convolution kernel that is convolved
-  (actually cross-correlated) with the layer input to produce a tensor of
-  outputs. It may also include a bias addition and activation function
-  on the outputs. It assumes the `kernel` and/or `bias` are drawn from
-  distributions.
-
-  By default, the layer implements a stochastic forward pass via
-  sampling from the kernel and bias posteriors,
-  ```none
-  outputs = f(inputs; kernel, bias), kernel, bias ~ posterior
-  ```
-  where f denotes the layer's calculation. It uses the reparameterization
-  estimator [(Kingma and Welling, 2014)][1], which performs a Monte Carlo
-  approximation of the distribution integrating over the `kernel` and `bias`.
-
-  The arguments permit separate specification of the surrogate posterior
-  (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
-  distributions.
-
-  Args:
-    inputs: Tensor input.
-    filters: Integer, the dimensionality of the output space (i.e. the number
-      of filters in the convolution).
-    kernel_size: An integer or tuple/list of 3 integers, specifying the
-      depth, height and width of the 3D convolution window.
-      Can be a single integer to specify the same value for
-      all spatial dimensions.
-    strides: An integer or tuple/list of 3 integers,
-      specifying the strides of the convolution along the depth,
-      height and width.
-      Can be a single integer to specify the same value for
-      all spatial dimensions.
-      Specifying any stride value != 1 is incompatible with specifying
-      any `dilation_rate` value != 1.
-    padding: One of `"valid"` or `"same"` (case-insensitive).
-    data_format: A string, one of `channels_last` (default) or `channels_first`.
-      The ordering of the dimensions in the inputs.
-      `channels_last` corresponds to inputs with shape
-      `(batch, depth, height, width, channels)` while `channels_first`
-      corresponds to inputs with shape
-      `(batch, channels, depth, height, width)`.
-    dilation_rate: An integer or tuple/list of 3 integers, specifying
-      the dilation rate to use for dilated convolution.
-      Can be a single integer to specify the same value for
-      all spatial dimensions.
-      Currently, specifying any `dilation_rate` value != 1 is
-      incompatible with specifying any stride value != 1.
-    @{args}
-    reuse: Boolean, whether to reuse the weights of a previous layer
-      by the same name.
-
-  Returns:
-    Output tensor.
-
-  Raises:
-    ValueError: if eager execution is enabled.
-
-  #### Examples
-
-  We illustrate a Bayesian neural network with [variational inference](
-  https://en.wikipedia.org/wiki/Variational_Bayesian_methods),
-  assuming a dataset of `features` and `labels`.
-
-  ```python
-  import tensorflow as tf
-  import tensorflow_probability as tfp
-
-  net = tf.reshape(features, [-1, 256, 32, 32, 3])
-  net = tfp.layers.conv3d_reparameterization(net,
-                                             filters=64,
-                                             kernel_size=5,
-                                             padding='SAME',
-                                             activation=tf.nn.relu)
-  net = tf.layers.max_pooling2d(net,
-                                pool_size=2,
-                                strides=2,
-                                padding='SAME')
-  net = tf.reshape(net, [-1, 256 * 8 * 8 * 64])
-  logits = tfp.layers.dense_reparameterization(net, 10)
-  neg_log_likelihood = tf.nn.softmax_cross_entropy_with_logits(
-      labels=labels, logits=logits)
-  kl = sum(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
-  loss = neg_log_likelihood + kl
-  train_op = tf.train.AdamOptimizer().minimize(loss)
-  ```
-
-  It uses reparameterization gradients to minimize the
-  Kullback-Leibler divergence up to a constant, also known as the
-  negative Evidence Lower Bound. It consists of the sum of two terms:
-  the expected negative log-likelihood, which we approximate via
-  Monte Carlo; and the KL divergence, which is added via regularizer
-  terms which are arguments to the layer.
-
-  #### References
-
-  [1]: Diederik Kingma and Max Welling. Auto-Encoding Variational Bayes. In
-       _International Conference on Learning Representations_, 2014.
-       https://arxiv.org/abs/1312.6114
-  """
-  # pylint: enable=g-doc-args
-  layer = Conv3DReparameterization(
-      filters=filters,
-      kernel_size=kernel_size,
-      strides=strides,
-      padding=padding,
-      data_format=data_format,
-      dilation_rate=dilation_rate,
-      activation=activation,
-      activity_regularizer=activity_regularizer,
-      trainable=trainable,
-      kernel_posterior_fn=kernel_posterior_fn,
-      kernel_posterior_tensor_fn=kernel_posterior_tensor_fn,
-      kernel_prior_fn=kernel_prior_fn,
-      kernel_divergence_fn=kernel_divergence_fn,
-      bias_posterior_fn=bias_posterior_fn,
-      bias_posterior_tensor_fn=bias_posterior_tensor_fn,
-      bias_prior_fn=bias_prior_fn,
-      bias_divergence_fn=bias_divergence_fn,
-      name=name,
-      dtype=inputs.dtype.base_dtype,
-      _scope=name,
-      _reuse=reuse)
-  return layer.apply(inputs)
+        **kwargs)
 
 
 class _ConvFlipout(_ConvVariational):
@@ -1462,7 +1086,6 @@ class _ConvFlipout(_ConvVariational):
       dilation_rate=1,
       activation=None,
       activity_regularizer=None,
-      trainable=True,
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
       kernel_prior_fn=lambda dtype, *args: tfd.Normal(  # pylint: disable=g-long-lambda
@@ -1473,7 +1096,6 @@ class _ConvFlipout(_ConvVariational):
       bias_prior_fn=None,
       bias_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
       seed=None,
-      name=None,
       **kwargs):
     # pylint: disable=g-doc-args
     """Construct layer.
@@ -1500,6 +1122,8 @@ class _ConvFlipout(_ConvVariational):
         Currently, specifying any `dilation_rate` value != 1 is
         incompatible with specifying any `strides` value != 1.
       @{args}
+      seed: Python scalar `int` which initializes the random number
+        generator. Default value: `None` (i.e., use global seed).
     """
     # pylint: enable=g-doc-args
     super(_ConvFlipout, self).__init__(
@@ -1512,7 +1136,6 @@ class _ConvFlipout(_ConvVariational):
         dilation_rate=dilation_rate,
         activation=activation,
         activity_regularizer=activity_regularizer,
-        trainable=trainable,
         kernel_posterior_fn=kernel_posterior_fn,
         kernel_posterior_tensor_fn=kernel_posterior_tensor_fn,
         kernel_prior_fn=kernel_prior_fn,
@@ -1521,7 +1144,8 @@ class _ConvFlipout(_ConvVariational):
         bias_posterior_tensor_fn=bias_posterior_tensor_fn,
         bias_prior_fn=bias_prior_fn,
         bias_divergence_fn=bias_divergence_fn,
-        name=name, **kwargs)
+        **kwargs)
+    # Set additional attributes which do not exist in the parent class.
     self.seed = seed
 
   def _apply_variational_kernel(self, inputs):
@@ -1575,6 +1199,23 @@ class _ConvFlipout(_ConvVariational):
 
     outputs += perturbed_inputs
     return outputs
+
+  def get_config(self):
+    """Returns the config of the layer.
+
+    A layer config is a Python dictionary (serializable) containing the
+    configuration of a layer. The same layer can be reinstantiated later
+    (without its trained weights) from this configuration.
+
+    Returns:
+      config: A Python dictionary of class keyword arguments and their
+        serialized values.
+    """
+    config = {
+        'seed': self.seed,
+    }
+    base_config = super(_ConvFlipout, self).get_config()
+    return dict(list(base_config.items()) + list(config.items()))
 
 
 class Conv1DFlipout(_ConvFlipout):
@@ -1670,7 +1311,6 @@ class Conv1DFlipout(_ConvFlipout):
       dilation_rate=1,
       activation=None,
       activity_regularizer=None,
-      trainable=True,
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
       kernel_prior_fn=lambda dtype, *args: tfd.Normal(  # pylint: disable=g-long-lambda
@@ -1681,7 +1321,6 @@ class Conv1DFlipout(_ConvFlipout):
       bias_prior_fn=None,
       bias_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
       seed=None,
-      name=None,
       **kwargs):
     # pylint: disable=g-doc-args
     """Construct layer.
@@ -1706,6 +1345,8 @@ class Conv1DFlipout(_ConvFlipout):
         Currently, specifying any `dilation_rate` value != 1 is
         incompatible with specifying any `strides` value != 1.
       @{args}
+      seed: Python scalar `int` which initializes the random number
+        generator. Default value: `None` (i.e., use global seed).
     """
     # pylint: enable=g-doc-args
     super(Conv1DFlipout, self).__init__(
@@ -1718,7 +1359,6 @@ class Conv1DFlipout(_ConvFlipout):
         dilation_rate=dilation_rate,
         activation=activation,
         activity_regularizer=activity_regularizer,
-        trainable=trainable,
         kernel_posterior_fn=kernel_posterior_fn,
         kernel_posterior_tensor_fn=kernel_posterior_tensor_fn,
         kernel_prior_fn=kernel_prior_fn,
@@ -1728,151 +1368,7 @@ class Conv1DFlipout(_ConvFlipout):
         bias_prior_fn=bias_prior_fn,
         bias_divergence_fn=bias_divergence_fn,
         seed=seed,
-        name=name, **kwargs)
-
-
-@docstring_util.expand_docstring(args=doc_args)
-def conv1d_flipout(
-    inputs,
-    filters,
-    kernel_size,
-    strides=1,
-    padding='valid',
-    data_format='channels_last',
-    dilation_rate=1,
-    activation=None,
-    activity_regularizer=None,
-    trainable=True,
-    kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
-    kernel_posterior_tensor_fn=lambda d: d.sample(),
-    kernel_prior_fn=lambda dtype, *args: tfd.Normal(  # pylint: disable=g-long-lambda
-        loc=dtype.as_numpy_dtype(0.), scale=dtype.as_numpy_dtype(1.)),
-    kernel_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
-    bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(is_singular=True),  # pylint: disable=line-too-long
-    bias_posterior_tensor_fn=lambda d: d.sample(),
-    bias_prior_fn=None,
-    bias_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
-    seed=None,
-    name=None,
-    reuse=None):
-  # pylint: disable=g-doc-args
-  """Functional interface for 1D convolution layer (e.g. temporal convolution).
-
-  This layer creates a convolution kernel that is convolved
-  (actually cross-correlated) with the layer input to produce a tensor of
-  outputs. It may also include a bias addition and activation function
-  on the outputs. It assumes the `kernel` and/or `bias` are drawn from
-  distributions.
-
-  By default, the layer implements a stochastic forward pass via
-  sampling from the kernel and bias posteriors,
-  ```none
-  outputs = f(inputs; kernel, bias), kernel, bias ~ posterior
-  ```
-  where f denotes the layer's calculation. It uses the Flipout
-  estimator [(Wen et al., 2018)][1], which performs a Monte Carlo approximation
-  of the distribution integrating over the `kernel` and `bias`. Flipout uses
-  roughly twice as many floating point operations as the reparameterization
-  estimator but has the advantage of significantly lower variance.
-
-  The arguments permit separate specification of the surrogate posterior
-  (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
-  distributions.
-
-  Args:
-    inputs: Tensor input.
-    filters: Integer, the dimensionality of the output space (i.e. the number
-      of filters in the convolution).
-    kernel_size: An integer or tuple/list of a single integer, specifying the
-      length of the 1D convolution window.
-    strides: An integer or tuple/list of a single integer,
-      specifying the stride length of the convolution.
-      Specifying any stride value != 1 is incompatible with specifying
-      any `dilation_rate` value != 1.
-    padding: One of `"valid"` or `"same"` (case-insensitive).
-    data_format: A string, one of `channels_last` (default) or `channels_first`.
-      The ordering of the dimensions in the inputs.
-      `channels_last` corresponds to inputs with shape
-      `(batch, length, channels)` while `channels_first` corresponds to
-      inputs with shape `(batch, channels, length)`.
-    dilation_rate: An integer or tuple/list of a single integer, specifying
-      the dilation rate to use for dilated convolution.
-      Currently, specifying any `dilation_rate` value != 1 is
-      incompatible with specifying any `strides` value != 1.
-    @{args}
-    reuse: Boolean, whether to reuse the weights of a previous layer
-      by the same name.
-
-  Returns:
-    Output tensor.
-
-  Raises:
-    ValueError: if eager execution is enabled.
-
-  #### Examples
-
-  We illustrate a Bayesian neural network with [variational inference](
-  https://en.wikipedia.org/wiki/Variational_Bayesian_methods),
-  assuming a dataset of `features` and `labels`.
-
-  ```python
-  import tensorflow as tf
-  import tensorflow_probability as tfp
-
-  net = tf.reshape(features, [-1, 128, 1])
-  net = tfp.layers.conv1d_flipout(net,
-                                  filters=64,
-                                  kernel_size=5,
-                                  padding='SAME',
-                                  activation=tf.nn.relu)
-  net = tf.reshape(net, [-1, 128 * 64])
-  logits = tfp.layers.dense_flipout(net, 10)
-  neg_log_likelihood = tf.nn.softmax_cross_entropy_with_logits(
-      labels=labels, logits=logits)
-  kl = sum(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
-  loss = neg_log_likelihood + kl
-  train_op = tf.train.AdamOptimizer().minimize(loss)
-  ```
-
-  It uses the Flipout gradient estimator to minimize the
-  Kullback-Leibler divergence up to a constant, also known as the
-  negative Evidence Lower Bound. It consists of the sum of two terms:
-  the expected negative log-likelihood, which we approximate via
-  Monte Carlo; and the KL divergence, which is added via regularizer
-  terms which are arguments to the layer.
-
-  #### References
-
-  [1]: Yeming Wen, Paul Vicol, Jimmy Ba, Dustin Tran, and Roger Grosse. Flipout:
-       Efficient Pseudo-Independent Weight Perturbations on Mini-Batches. In
-       _International Conference on Learning Representations_, 2018.
-       https://arxiv.org/abs/1803.04386
-  """
-  # pylint: enable=g-doc-args
-  layer = Conv1DFlipout(
-      filters=filters,
-      kernel_size=kernel_size,
-      strides=strides,
-      padding=padding,
-      data_format=data_format,
-      dilation_rate=dilation_rate,
-      activation=activation,
-      activity_regularizer=activity_regularizer,
-      trainable=trainable,
-      kernel_posterior_fn=kernel_posterior_fn,
-      kernel_posterior_tensor_fn=kernel_posterior_tensor_fn,
-      kernel_prior_fn=kernel_prior_fn,
-      kernel_divergence_fn=kernel_divergence_fn,
-      bias_posterior_fn=bias_posterior_fn,
-      bias_posterior_tensor_fn=bias_posterior_tensor_fn,
-      bias_prior_fn=bias_prior_fn,
-      bias_divergence_fn=bias_divergence_fn,
-      seed=seed,
-      name=name,
-      dtype=inputs.dtype.base_dtype,
-      _scope=name,
-      _reuse=reuse)
-  return layer.apply(inputs)
+        **kwargs)
 
 
 class Conv2DFlipout(_ConvFlipout):
@@ -1971,7 +1467,6 @@ class Conv2DFlipout(_ConvFlipout):
       dilation_rate=(1, 1),
       activation=None,
       activity_regularizer=None,
-      trainable=True,
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
       kernel_prior_fn=lambda dtype, *args: tfd.Normal(  # pylint: disable=g-long-lambda
@@ -1982,7 +1477,6 @@ class Conv2DFlipout(_ConvFlipout):
       bias_prior_fn=None,
       bias_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
       seed=None,
-      name=None,
       **kwargs):
     # pylint: disable=g-doc-args
     """Construct layer.
@@ -2013,6 +1507,8 @@ class Conv2DFlipout(_ConvFlipout):
         Currently, specifying any `dilation_rate` value != 1 is
         incompatible with specifying any stride value != 1.
       @{args}
+      seed: Python scalar `int` which initializes the random number
+        generator. Default value: `None` (i.e., use global seed).
     """
     # pylint: enable=g-doc-args
     super(Conv2DFlipout, self).__init__(
@@ -2025,7 +1521,6 @@ class Conv2DFlipout(_ConvFlipout):
         dilation_rate=dilation_rate,
         activation=activation,
         activity_regularizer=activity_regularizer,
-        trainable=trainable,
         kernel_posterior_fn=kernel_posterior_fn,
         kernel_posterior_tensor_fn=kernel_posterior_tensor_fn,
         kernel_prior_fn=kernel_prior_fn,
@@ -2035,161 +1530,7 @@ class Conv2DFlipout(_ConvFlipout):
         bias_prior_fn=bias_prior_fn,
         bias_divergence_fn=bias_divergence_fn,
         seed=seed,
-        name=name, **kwargs)
-
-
-@docstring_util.expand_docstring(args=doc_args)
-def conv2d_flipout(
-    inputs,
-    filters,
-    kernel_size,
-    strides=(1, 1),
-    padding='valid',
-    data_format='channels_last',
-    dilation_rate=(1, 1),
-    activation=None,
-    activity_regularizer=None,
-    trainable=True,
-    kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
-    kernel_posterior_tensor_fn=lambda d: d.sample(),
-    kernel_prior_fn=lambda dtype, *args: tfd.Normal(  # pylint: disable=g-long-lambda
-        loc=dtype.as_numpy_dtype(0.), scale=dtype.as_numpy_dtype(1.)),
-    kernel_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
-    bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(is_singular=True),  # pylint: disable=line-too-long
-    bias_posterior_tensor_fn=lambda d: d.sample(),
-    bias_prior_fn=None,
-    bias_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
-    seed=None,
-    name=None,
-    reuse=None):
-  # pylint: disable=g-doc-args
-  """Functional interface for the 2D convolution layer.
-
-  This layer creates a convolution kernel that is convolved
-  (actually cross-correlated) with the layer input to produce a tensor of
-  outputs. It may also include a bias addition and activation function
-  on the outputs. It assumes the `kernel` and/or `bias` are drawn from
-  distributions.
-
-  By default, the layer implements a stochastic forward pass via
-  sampling from the kernel and bias posteriors,
-  ```none
-  outputs = f(inputs; kernel, bias), kernel, bias ~ posterior
-  ```
-  where f denotes the layer's calculation. It uses the Flipout
-  estimator [(Wen et al., 2018)][1], which performs a Monte Carlo approximation
-  of the distribution integrating over the `kernel` and `bias`. Flipout uses
-  roughly twice as many floating point operations as the reparameterization
-  estimator but has the advantage of significantly lower variance.
-
-  The arguments permit separate specification of the surrogate posterior
-  (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
-  distributions.
-
-  Args:
-    inputs: Tensor input.
-    filters: Integer, the dimensionality of the output space (i.e. the number
-      of filters in the convolution).
-    kernel_size: An integer or tuple/list of 2 integers, specifying the
-      height and width of the 2D convolution window.
-      Can be a single integer to specify the same value for
-      all spatial dimensions.
-    strides: An integer or tuple/list of 2 integers,
-      specifying the strides of the convolution along the height and width.
-      Can be a single integer to specify the same value for
-      all spatial dimensions.
-      Specifying any stride value != 1 is incompatible with specifying
-      any `dilation_rate` value != 1.
-    padding: One of `"valid"` or `"same"` (case-insensitive).
-    data_format: A string, one of `channels_last` (default) or `channels_first`.
-      The ordering of the dimensions in the inputs.
-      `channels_last` corresponds to inputs with shape
-      `(batch, height, width, channels)` while `channels_first` corresponds to
-      inputs with shape `(batch, channels, height, width)`.
-    dilation_rate: An integer or tuple/list of 2 integers, specifying
-      the dilation rate to use for dilated convolution.
-      Can be a single integer to specify the same value for
-      all spatial dimensions.
-      Currently, specifying any `dilation_rate` value != 1 is
-      incompatible with specifying any stride value != 1.
-    @{args}
-    reuse: Boolean, whether to reuse the weights of a previous layer
-      by the same name.
-
-  Returns:
-    Output tensor.
-
-  Raises:
-    ValueError: if eager execution is enabled.
-
-  #### Examples
-
-  We illustrate a Bayesian neural network with [variational inference](
-  https://en.wikipedia.org/wiki/Variational_Bayesian_methods),
-  assuming a dataset of `features` and `labels`.
-
-  ```python
-  import tensorflow as tf
-  import tensorflow_probability as tfp
-
-  net = tf.reshape(features, [-1, 32, 32, 3])
-  net = tfp.layers.conv2d_flipout(net,
-                                  filters=64,
-                                  kernel_size=5,
-                                  padding='SAME',
-                                  activation=tf.nn.relu)
-  net = tf.layers.max_pooling2d(net,
-                                pool_size=2,
-                                strides=2,
-                                padding='SAME')
-  net = tf.reshape(net, [-1, 8 * 8 * 64])
-  logits = tfp.layers.dense_flipout(net, 10)
-  neg_log_likelihood = tf.nn.softmax_cross_entropy_with_logits(
-      labels=labels, logits=logits)
-  kl = sum(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
-  loss = neg_log_likelihood + kl
-  train_op = tf.train.AdamOptimizer().minimize(loss)
-  ```
-
-  It uses the Flipout gradient estimator to minimize the
-  Kullback-Leibler divergence up to a constant, also known as the
-  negative Evidence Lower Bound. It consists of the sum of two terms:
-  the expected negative log-likelihood, which we approximate via
-  Monte Carlo; and the KL divergence, which is added via regularizer
-  terms which are arguments to the layer.
-
-  #### References
-
-  [1]: Yeming Wen, Paul Vicol, Jimmy Ba, Dustin Tran, and Roger Grosse. Flipout:
-       Efficient Pseudo-Independent Weight Perturbations on Mini-Batches. In
-       _International Conference on Learning Representations_, 2018.
-       https://arxiv.org/abs/1803.04386
-  """
-  # pylint: enable=g-doc-args
-  layer = Conv2DFlipout(
-      filters=filters,
-      kernel_size=kernel_size,
-      strides=strides,
-      padding=padding,
-      data_format=data_format,
-      dilation_rate=dilation_rate,
-      activation=activation,
-      activity_regularizer=activity_regularizer,
-      trainable=trainable,
-      kernel_posterior_fn=kernel_posterior_fn,
-      kernel_posterior_tensor_fn=kernel_posterior_tensor_fn,
-      kernel_prior_fn=kernel_prior_fn,
-      kernel_divergence_fn=kernel_divergence_fn,
-      bias_posterior_fn=bias_posterior_fn,
-      bias_posterior_tensor_fn=bias_posterior_tensor_fn,
-      bias_prior_fn=bias_prior_fn,
-      bias_divergence_fn=bias_divergence_fn,
-      seed=seed,
-      name=name,
-      dtype=inputs.dtype.base_dtype,
-      _scope=name,
-      _reuse=reuse)
-  return layer.apply(inputs)
+        **kwargs)
 
 
 class Conv3DFlipout(_ConvFlipout):
@@ -2288,7 +1629,6 @@ class Conv3DFlipout(_ConvFlipout):
       dilation_rate=(1, 1, 1),
       activation=None,
       activity_regularizer=None,
-      trainable=True,
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
       kernel_prior_fn=lambda dtype, *args: tfd.Normal(  # pylint: disable=g-long-lambda
@@ -2299,7 +1639,6 @@ class Conv3DFlipout(_ConvFlipout):
       bias_prior_fn=None,
       bias_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
       seed=None,
-      name=None,
       **kwargs):
     # pylint: disable=g-doc-args
     """Construct layer.
@@ -2331,6 +1670,8 @@ class Conv3DFlipout(_ConvFlipout):
         Currently, specifying any `dilation_rate` value != 1 is
         incompatible with specifying any stride value != 1.
       @{args}
+      seed: Python scalar `int` which initializes the random number
+        generator. Default value: `None` (i.e., use global seed).
     """
     # pylint: enable=g-doc-args
     super(Conv3DFlipout, self).__init__(
@@ -2343,7 +1684,6 @@ class Conv3DFlipout(_ConvFlipout):
         dilation_rate=dilation_rate,
         activation=activation,
         activity_regularizer=activity_regularizer,
-        trainable=trainable,
         kernel_posterior_fn=kernel_posterior_fn,
         kernel_posterior_tensor_fn=kernel_posterior_tensor_fn,
         kernel_prior_fn=kernel_prior_fn,
@@ -2353,163 +1693,7 @@ class Conv3DFlipout(_ConvFlipout):
         bias_prior_fn=bias_prior_fn,
         bias_divergence_fn=bias_divergence_fn,
         seed=seed,
-        name=name, **kwargs)
-
-
-@docstring_util.expand_docstring(args=doc_args)
-def conv3d_flipout(
-    inputs,
-    filters,
-    kernel_size,
-    strides=(1, 1, 1),
-    padding='valid',
-    data_format='channels_last',
-    dilation_rate=(1, 1, 1),
-    activation=None,
-    activity_regularizer=None,
-    trainable=True,
-    kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
-    kernel_posterior_tensor_fn=lambda d: d.sample(),
-    kernel_prior_fn=lambda dtype, *args: tfd.Normal(  # pylint: disable=g-long-lambda
-        loc=dtype.as_numpy_dtype(0.), scale=dtype.as_numpy_dtype(1.)),
-    kernel_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
-    bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(is_singular=True),  # pylint: disable=line-too-long
-    bias_posterior_tensor_fn=lambda d: d.sample(),
-    bias_prior_fn=None,
-    bias_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
-    seed=None,
-    name=None,
-    reuse=None):
-  # pylint: disable=g-doc-args
-  """Functional interface for the 3D convolution layer.
-
-  This layer creates a convolution kernel that is convolved
-  (actually cross-correlated) with the layer input to produce a tensor of
-  outputs. It may also include a bias addition and activation function
-  on the outputs. It assumes the `kernel` and/or `bias` are drawn from
-  distributions.
-
-  By default, the layer implements a stochastic forward pass via
-  sampling from the kernel and bias posteriors,
-  ```none
-  outputs = f(inputs; kernel, bias), kernel, bias ~ posterior
-  ```
-  where f denotes the layer's calculation. It uses the Flipout
-  estimator [(Wen et al., 2018)][1], which performs a Monte Carlo approximation
-  of the distribution integrating over the `kernel` and `bias`. Flipout uses
-  roughly twice as many floating point operations as the reparameterization
-  estimator but has the advantage of significantly lower variance.
-
-  The arguments permit separate specification of the surrogate posterior
-  (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
-  distributions.
-
-  Args:
-    inputs: Tensor input.
-    filters: Integer, the dimensionality of the output space (i.e. the number
-      of filters in the convolution).
-    kernel_size: An integer or tuple/list of 3 integers, specifying the
-      depth, height and width of the 3D convolution window.
-      Can be a single integer to specify the same value for
-      all spatial dimensions.
-    strides: An integer or tuple/list of 3 integers,
-      specifying the strides of the convolution along the depth,
-      height and width.
-      Can be a single integer to specify the same value for
-      all spatial dimensions.
-      Specifying any stride value != 1 is incompatible with specifying
-      any `dilation_rate` value != 1.
-    padding: One of `"valid"` or `"same"` (case-insensitive).
-    data_format: A string, one of `channels_last` (default) or `channels_first`.
-      The ordering of the dimensions in the inputs.
-      `channels_last` corresponds to inputs with shape
-      `(batch, depth, height, width, channels)` while `channels_first`
-      corresponds to inputs with shape
-      `(batch, channels, depth, height, width)`.
-    dilation_rate: An integer or tuple/list of 3 integers, specifying
-      the dilation rate to use for dilated convolution.
-      Can be a single integer to specify the same value for
-      all spatial dimensions.
-      Currently, specifying any `dilation_rate` value != 1 is
-      incompatible with specifying any stride value != 1.
-    @{args}
-    reuse: Boolean, whether to reuse the weights of a previous layer
-      by the same name.
-
-  Returns:
-    Output tensor.
-
-  Raises:
-    ValueError: if eager execution is enabled.
-
-  #### Examples
-
-  We illustrate a Bayesian neural network with [variational inference](
-  https://en.wikipedia.org/wiki/Variational_Bayesian_methods),
-  assuming a dataset of `features` and `labels`.
-
-  ```python
-  import tensorflow as tf
-  import tensorflow_probability as tfp
-
-  net = tf.reshape(features, [-1, 256, 32, 32, 3])
-  net = tfp.layers.conv3d_flipout(net,
-                                  filters=64,
-                                  kernel_size=5,
-                                  padding='SAME',
-                                  activation=tf.nn.relu)
-  net = tf.layers.max_pooling2d(net,
-                                pool_size=2,
-                                strides=2,
-                                padding='SAME')
-  net = tf.reshape(net, [-1, 256 * 8 * 8 * 64])
-  logits = tfp.layers.dense_flipout(net, 10)
-  neg_log_likelihood = tf.nn.softmax_cross_entropy_with_logits(
-      labels=labels, logits=logits)
-  kl = sum(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
-  loss = neg_log_likelihood + kl
-  train_op = tf.train.AdamOptimizer().minimize(loss)
-  ```
-
-  It uses the Flipout gradient estimator to minimize the
-  Kullback-Leibler divergence up to a constant, also known as the
-  negative Evidence Lower Bound. It consists of the sum of two terms:
-  the expected negative log-likelihood, which we approximate via
-  Monte Carlo; and the KL divergence, which is added via regularizer
-  terms which are arguments to the layer.
-
-  #### References
-
-  [1]: Yeming Wen, Paul Vicol, Jimmy Ba, Dustin Tran, and Roger Grosse. Flipout:
-       Efficient Pseudo-Independent Weight Perturbations on Mini-Batches. In
-       _International Conference on Learning Representations_, 2018.
-       https://arxiv.org/abs/1803.04386
-  """
-  # pylint: enable=g-doc-args
-  layer = Conv3DFlipout(
-      filters=filters,
-      kernel_size=kernel_size,
-      strides=strides,
-      padding=padding,
-      data_format=data_format,
-      dilation_rate=dilation_rate,
-      activation=activation,
-      activity_regularizer=activity_regularizer,
-      trainable=trainable,
-      kernel_posterior_fn=kernel_posterior_fn,
-      kernel_posterior_tensor_fn=kernel_posterior_tensor_fn,
-      kernel_prior_fn=kernel_prior_fn,
-      kernel_divergence_fn=kernel_divergence_fn,
-      bias_posterior_fn=bias_posterior_fn,
-      bias_posterior_tensor_fn=bias_posterior_tensor_fn,
-      bias_prior_fn=bias_prior_fn,
-      bias_divergence_fn=bias_divergence_fn,
-      seed=seed,
-      name=name,
-      dtype=inputs.dtype.base_dtype,
-      _scope=name,
-      _reuse=reuse)
-  return layer.apply(inputs)
+        **kwargs)
 
 
 # Aliases
@@ -2517,12 +1701,6 @@ def conv3d_flipout(
 Convolution1DReparameterization = Conv1DReparameterization
 Convolution2DReparameterization = Conv2DReparameterization
 Convolution3DReparameterization = Conv3DReparameterization
-convolution1d_reparameterization = conv1d_reparameterization
-convolution2d_reparameterization = conv2d_reparameterization
-convolution3d_reparameterization = conv3d_reparameterization
 Convolution1DFlipout = Conv1DFlipout
 Convolution2DFlipout = Conv2DFlipout
 Convolution3DFlipout = Conv3DFlipout
-convolution1d_flipout = conv1d_flipout
-convolution2d_flipout = conv2d_flipout
-convolution3d_flipout = conv3d_flipout

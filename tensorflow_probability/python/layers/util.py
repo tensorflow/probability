@@ -18,10 +18,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import types
 # Dependency imports
 import numpy as np
-
 import tensorflow as tf
+
+from tensorflow.python.keras._impl.keras.utils import generic_utils
 
 tfd = tf.contrib.distributions
 
@@ -29,7 +31,9 @@ tfd = tf.contrib.distributions
 __all__ = [
     'default_loc_scale_fn',
     'default_mean_field_normal_fn',
+    'deserialize_function',
     'random_sign',
+    'serialize_function',
 ]
 
 
@@ -184,6 +188,47 @@ def default_mean_field_normal_fn(
   return _fn
 
 
+def deserialize_function(serial, function_type):
+  """Deserializes the Keras-serialized function.
+
+  (De)serializing Python functions from/to bytecode is unsafe. Therefore we
+  also use the function's type as an anonymous function ('lambda') or named
+  function in the Python environment ('function'). In the latter case, this lets
+  us use the Python scope to obtain the function rather than reload it from
+  bytecode. (Note that both cases are brittle!)
+
+  Keras-deserialized functions do not perform lexical scoping. Any modules that
+  the function requires must be imported within the function itself.
+
+  This serialization mimicks the implementation in `tf.keras.layers.Lambda`.
+
+  Args:
+    serial: Serialized Keras object: typically a dict, string, or bytecode.
+    function_type: Python string denoting 'function' or 'lambda'.
+
+  Returns:
+    function: Function the serialized Keras object represents.
+
+  #### Examples
+
+  ```python
+  serial, function_type = serialize_function(lambda x: x)
+  function = deserialize_function(serial, function_type)
+  assert function(2.3) == 2.3  # function is identity
+  ```
+
+  """
+  if function_type == 'function':
+    # Simple lookup in custom objects
+    function = tf.keras.utils.deserialize_keras_object(serial)
+  elif function_type == 'lambda':
+    # Unsafe deserialization from bytecode
+    function = generic_utils.func_load(serial)
+  else:
+    raise TypeError('Unknown function type:', function_type)
+  return function
+
+
 def random_sign(shape, dtype=tf.float32, seed=None):
   """Draw values from {-1, 1} uniformly, i.e., Rademacher distribution."""
   random_bernoulli = tf.random_uniform(
@@ -193,3 +238,27 @@ def random_sign(shape, dtype=tf.float32, seed=None):
       dtype=tf.int32,
       seed=seed)
   return tf.cast(2 * random_bernoulli - 1, dtype)
+
+
+def serialize_function(func):
+  """Serializes function for Keras.
+
+  (De)serializing Python functions from/to bytecode is unsafe. Therefore we
+  return the function's type as an anonymous function ('lambda') or named
+  function in the Python environment ('function'). In the latter case, this lets
+  us use the Python scope to obtain the function rather than reload it from
+  bytecode. (Note that both cases are brittle!)
+
+  This serialization mimicks the implementation in `tf.keras.layers.Lambda`.
+
+  Args:
+    func: Python function to serialize.
+
+  Returns:
+    (serial, function_type): Serialized object, which is a tuple of its
+    bytecode (if function is anonymous) or name (if function is named), and its
+    function type.
+  """
+  if isinstance(func, types.LambdaType):
+    return generic_utils.func_dump(func), 'lambda'
+  return func.__name__, 'function'
