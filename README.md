@@ -7,21 +7,57 @@ gradient-based inference via automatic differentiation, and scalability to
 large datasets and models via hardware acceleration (e.g., GPUs) and distributed
 computation.
 
-The library consists of the following modules:
+Our probabilistic machine learning tools are structured as follows.
 
-* *Distributions* (`tfp.distributions`, `tfp.trainable_distributions`):
-  Probability distributions with efficient, composable manipulations.
-* *Edward2* (`tfp.edward2`): A probabilistic programming language, which enables
-  flexible probabilistic models and flexible computation for their training and
-  testing.
-* *Layers* (`tfp.layers`): Neural network layers with uncertainty
-  over the functions they represent, extending TensorFlow Layers.
-* *Monte Carlo* (`tfp.mcmc`, `tfp.optimizers`, `tfp.monte_carlo`): Algorithms
-  for approximate Bayesian inference via sampling.
-* *Variational Inference* (`tfp.vi`): Algorithms for approximate Bayesian
-  inference via optimization.
-* *Examples* (`tfp.examples`): End-to-end implementations of probabilistic
-  reasoning using TensorFlow Probability.
+__Layer 0: TensorFlow.__ Numerical operations. In particular, the LinearOperator
+class enables matrix-free implementations that can exploit special structure
+(diagonal, low-rank, etc.) for efficient computation. It is built and maintained
+by the TensorFlow Probability team and is now part of
+[`tf.linalg`](https://github.com/tensorflow/tensorflow/tree/master/tensorflow/python/ops/linalg)
+in core TF.
+
+__Layer 1: Statistical Building Blocks__
+
+* Distributions ([`tf.contrib.distributions`](https://github.com/tensorflow/tensorflow/tree/master/tensorflow/contrib/distributions/python/ops),
+  [`tf.distributions`](https://github.com/tensorflow/tensorflow/tree/master/tensorflow/python/ops/distributions)):
+  A large collection of probability
+  distributions and related statistics with batch and
+  [broadcasting](https://docs.scipy.org/doc/numpy-1.14.0/user/basics.broadcasting.html)
+  semantics.
+* Bijectors ([`tf.contrib.distributions.bijectors`](https://github.com/tensorflow/tensorflow/tree/master/tensorflow/contrib/distributions/python/ops/bijectors)):
+  Reversible and composable transformations of random variables. Bijectors
+  provide a rich class of transformed distributions, from classical examples
+  like the
+  [log-normal distribution](https://en.wikipedia.org/wiki/Log-normal_distribution)
+  to sophisticated deep learning models such as
+  [masked autoregressive flows](https://arxiv.org/abs/1705.07057).
+
+__Layer 2: Model Building__
+
+* Edward2 ([`tfp.edward2`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2)):
+  A probabilistic programming language for specifying flexible probabilistic
+  models as programs.
+* Probabilistic Layers ([`tfp.layers`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/layers)):
+  Neural network layers with uncertainty over the functions they represent,
+  extending TensorFlow Layers.
+* Trainable Distributions ([`tfp.trainable_distributions`](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/trainable_distributions.py)):
+  Probability distributions parameterized by a single Tensor, making it easy to
+  build neural nets that output probability distributions.
+
+__Layer 3: Probabilistic Inference__
+
+* Markov chain Monte Carlo ([`tfp.mcmc`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc)):
+  Algorithms for approximating integrals via sampling. Includes
+  [Hamiltonian Monte Carlo](https://en.wikipedia.org/wiki/Hamiltonian_Monte_Carlo),
+  random-walk Metropolis-Hastings, and the ability to build custom transition
+  kernels.
+* Variational Inference ([`tfp.vi`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/vi)):
+  Algorithms for approximating integrals via optimization.
+* Optimizers ([`tfp.optimizer`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/optimizer)):
+  Stochastic optimization methods, extending TensorFlow Optimizers. Includes
+  [Stochastic Gradient Langevin Dynamics](http://www.icml-2011.org/papers/398_icmlpaper.pdf).
+* Monte Carlo ([`tfp.monte_carlo`](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/monte_carlo.py)):
+  Tools for computing Monte Carlo expectations.
 
 TensorFlow Probability is under active development. Interfaces may change at any
 time.
@@ -92,3 +128,10 @@ GitHub](https://github.com/tensorflow/probability/issues) and/or send us your
 pull requests. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for more details.
 This project adheres to TensorFlow's [code of conduct](CODE_OF_CONDUCT.md). By
 participating, you are expected to uphold this code.
+
+## References
+
++ _TensorFlow Distributions._ Joshua V. Dillon, Ian Langmore, Dustin Tran,
+Eugene Brevdo, Srinivas Vasudevan, Dave Moore, Brian Patton, Alex Alemi, Matt
+Hoffman, Rif A. Saurous.
+[arXiv preprint arXiv:1711.10604, 2017](https://arxiv.org/abs/1711.10604).
