@@ -22,8 +22,9 @@ from __future__ import print_function
 import numpy as np
 
 import tensorflow as tf
+import tensorflow_probability as tfp
 
-tfd = tf.contrib.distributions
+tfd = tfp.distributions
 
 
 def make_encoder_net(images,
@@ -240,7 +241,35 @@ def make_vae(images,
   with tf.variable_scope("prior"):
     prior = make_prior()
 
-  with tf.variable_scope("decoder"):
+  def reverse_kl(z):
+    """Helper to compute the ELBO loss, i.e., `KL[q(Z|x), p(x, Z)]`."""
+    with tf.variable_scope("decoder"):
+      decoder = make_decoder(z)
+    return decoder.log_prob(images) - (encoder.log_prob(z) - prior.log_prob(z))
+
+  elbo_loss = tfp.monte_carlo.expectation(
+      f=reverse_kl,
+      samples=encoding_draw,
+      log_prob=encoder.log_prob,  # Only used if use_reparametrization=False.
+      use_reparametrization=(encoder.reparameterization_type
+                             == tfd.FULLY_REPARAMETERIZED),
+      axis=None)
+
+  # We could have done:
+  #
+  #   joint_log_prob = lambda z: (make_decoder_fn(z).log_prob(images)
+  #                               + prior.log_prob(z))
+  #   elbo_loss = tfp.vi.monte_carlo_csiszar_f_divergence(
+  #     f=tfp.vi.kl_reverse,
+  #     p_log_prob=joint_log_prob,
+  #     q=encoder,
+  #     num_draws=1)
+  #
+  # However, we want to record extra stats so we've used
+  # tfp.monte_carlo.expectation, i.e., a slightly lower-level utility.
+
+  # We'll also rebuild (and reuse!) the decoder so we can compute stats from it.
+  with tf.variable_scope("decoder", reuse=True):
     decoder = make_decoder(encoding_draw)
 
   # Combine terms from each component to form the (negative) ELBO

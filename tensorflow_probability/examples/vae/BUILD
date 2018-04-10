@@ -35,6 +35,7 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability",
     ],
 )
 
