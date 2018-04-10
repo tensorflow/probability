@@ -126,7 +126,7 @@ class MetropolisHastings(kernel_base.TransitionKernel):
 
     Returns:
       metropolis_hastings_kernel: Instance of `TransitionKernel` which wraps the
-        input transtion kernel with the Metropolis-Hastings algorithm.
+        input transition kernel with the Metropolis-Hastings algorithm.
     """
     if inner_kernel.is_calibrated:
       warnings.warn('Supplied `TransitionKernel` is already calibrated. '

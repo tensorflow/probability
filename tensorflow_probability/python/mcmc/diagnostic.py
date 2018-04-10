@@ -114,7 +114,7 @@ def effective_sample_size(states,
   Since `R_k` must be estimated using only `N - k` samples, it becomes
   progressively noisier for larger `k`.  For this reason, the summation over
   `R_k` should be truncated at some number `filter_beyond_lag < N`.  Since many
-  MCMC methods generate chains where `R_k > 0`, a reasonable critera is to
+  MCMC methods generate chains where `R_k > 0`, a reasonable criteria is to
   truncate at the first index where the estimated auto-correlation becomes
   negative.
 
@@ -224,7 +224,7 @@ def potential_scale_reduction(chains_states,
   * The above holds for any number of chains `C > 1`.  Increasing `C` does
     improves effectiveness of the diagnostic.
   * Sometimes, R-hat < 1.2 is used to indicate approximate convergence, but of
-    course this is problem depedendent. See [Brooks and Gelman (1998)][2].
+    course this is problem dependent. See [Brooks and Gelman (1998)][2].
   * R-hat only measures non-convergence of the mean. If higher moments, or
     other statistics are desired, a different diagnostic should be used. See
     [Brooks and Gelman (1998)][2].
