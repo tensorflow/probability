@@ -236,54 +236,28 @@ def make_vae(images,
   # Create the three components of a VAE: encoder, prior, and decoder
   with tf.variable_scope("encoder"):
     encoder = make_encoder(images)
-  encoding_draw = encoder.sample()
 
   with tf.variable_scope("prior"):
     prior = make_prior()
 
-  def reverse_kl(z):
-    """Helper to compute the ELBO loss, i.e., `KL[q(Z|x), p(x, Z)]`."""
+  def joint_log_prob(z):
     with tf.variable_scope("decoder"):
       decoder = make_decoder(z)
-    return decoder.log_prob(images) - (encoder.log_prob(z) - prior.log_prob(z))
+    return decoder.log_prob(images) + prior.log_prob(z)
 
-  elbo_loss = tfp.monte_carlo.expectation(
-      f=reverse_kl,
-      samples=encoding_draw,
-      log_prob=encoder.log_prob,  # Only used if use_reparametrization=False.
-      use_reparametrization=(encoder.reparameterization_type
-                             == tfd.FULLY_REPARAMETERIZED),
-      axis=None)
-
-  # We could have done:
-  #
-  #   joint_log_prob = lambda z: (make_decoder_fn(z).log_prob(images)
-  #                               + prior.log_prob(z))
-  #   elbo_loss = tfp.vi.monte_carlo_csiszar_f_divergence(
-  #     f=tfp.vi.kl_reverse,
-  #     p_log_prob=joint_log_prob,
-  #     q=encoder,
-  #     num_draws=1)
-  #
-  # However, we want to record extra stats so we've used
-  # tfp.monte_carlo.expectation, i.e., a slightly lower-level utility.
-
-  # We'll also rebuild (and reuse!) the decoder so we can compute stats from it.
-  with tf.variable_scope("decoder", reuse=True):
-    decoder = make_decoder(encoding_draw)
-
-  # Combine terms from each component to form the (negative) ELBO
-  avg_logq = tf.reduce_mean(encoder.log_prob(encoding_draw))
-  avg_logp_z = tf.reduce_mean(prior.log_prob(encoding_draw))
-  avg_logp_x_given_z = tf.reduce_mean(decoder.log_prob(images))
-  elbo_loss = avg_logq - (avg_logp_z + avg_logp_x_given_z)
-
-  tf.summary.scalar("prior", avg_logp_z)
-  tf.summary.scalar("likelihood", avg_logp_x_given_z)
-  tf.summary.scalar("entropy", -avg_logq)
+  elbo_loss = tf.reduce_sum(
+      tfp.vi.csiszar_divergence.monte_carlo_csiszar_f_divergence(
+          f=tfp.vi.csiszar_divergence.kl_reverse,
+          p_log_prob=joint_log_prob,
+          q=encoder,
+          num_draws=1))
   tf.summary.scalar("elbo", elbo_loss)
 
   if return_full:
+    # Rebuild (and reuse!) the decoder so we can compute stats from it.
+    encoding_draw = encoder.sample()
+    with tf.variable_scope("decoder", reuse=True):
+      decoder = make_decoder(encoding_draw)
     return elbo_loss, encoder, decoder, prior, encoding_draw
 
   return elbo_loss
