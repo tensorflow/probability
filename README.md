@@ -62,6 +62,28 @@ __Layer 3: Probabilistic Inference__
 TensorFlow Probability is under active development. Interfaces may change at any
 time.
 
+## Examples
+
+See [`tfp.examples`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/)
+for end-to-end examples. It includes tutorial notebooks such as:
+
+* [Linear Mixed Effects Models](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Linear_Mixed_Effects_Models.ipynb).
+  A hierarchical linear model for sharing statistical strength across examples.
+* [Gaussian Copulas](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Gaussian_Copula.ipynb).
+  Probability distributions for capturing dependence across random variables.
+* [Understanding TensorFlow Distributions Shapes](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Understanding%20TensorFlow%20Distributions%20Shapes.ipynb).
+  How to distinguish between samples, batches, and events for arbitrarily shaped
+  probabilistic computations.
+
+Example scripts can also be run under command line. For example,
+`python -m tensorflow_probability.examples.vae`
+trains a variational auto-encoder to generate MNIST digits. This includes:
+
+* [Variational Autoencoders](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/vae).
+  Representation learning with a latent code and variational inference.
+* [Bayesian Neural Networks](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/weight_uncertainty).
+  Neural networks with uncertainty over their weights.
+
 ## Installation
 
 To install the latest version, run the following:
@@ -101,27 +123,6 @@ PKGDIR=$(mktemp -d)
 ./bazel-bin/pip_pkg $PKGDIR
 pip install --user --upgrade $PKGDIR/*.whl
 ```
-
-## Usage
-
-Access the library using
-
-```python
-import tensorflow_probability as tfp
-```
-
-## Examples
-
-See [`tfp.examples`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/)
-for end-to-end examples. It includes tutorial notebooks such as:
-
-* [Linear Mixed Effects Models](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Linear_Mixed_Effects_Models.ipynb)
-* [Gaussian Copulas](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Gaussian_Copula.ipynb)
-* [Understanding TensorFlow Distributions Shapes](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Understanding%20TensorFlow%20Distributions%20Shapes.ipynb)
-
-Example scripts can also be run under command line. For example,
-`python -m tensorflow_probability.examples.vae`
-trains a variational auto-encoder to generate MNIST digits.
 
 ## Contributing
 
