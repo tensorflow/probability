@@ -112,14 +112,16 @@ import tensorflow_probability as tfp
 
 ## Examples
 
-See the `tfp.examples` module for examples of end-to-end implementations. They
-can also be run under command line: for example, run
+See [`tfp.examples`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/)
+for end-to-end examples. It includes tutorial notebooks such as:
 
+* [Linear Mixed Effects Models](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Linear_Mixed_Effects_Models.ipynb)
+* [Gaussian Copulas](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Gaussian_Copula.ipynb)
+* [Understanding TensorFlow Distributions Shapes](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Understanding%20TensorFlow%20Distributions%20Shapes.ipynb)
+
+Example scripts can also be run under command line. For example,
 `python -m tensorflow_probability.examples.vae`
-
-to train a variational auto-encoder to generate MNIST digits. See the
-[`examples/`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/)
-directory for more details.
+trains a variational auto-encoder to generate MNIST digits.
 
 ## Contributing
 
