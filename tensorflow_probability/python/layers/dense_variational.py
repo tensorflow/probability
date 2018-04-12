@@ -111,8 +111,9 @@ class _DenseVariational(tf.keras.layers.Layer):
       activity_regularizer=None,
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
-      kernel_prior_fn=lambda dtype, *args: tfd.Normal(  # pylint: disable=g-long-lambda
-          loc=dtype.as_numpy_dtype(0.), scale=dtype.as_numpy_dtype(1.)),
+      kernel_prior_fn=lambda dtype, shape, *dummy_args: tfd.Independent(  # pylint: disable=g-long-lambda
+          tfd.Normal(loc=tf.zeros(shape, dtype),
+                     scale=dtype.as_numpy_dtype(1.))),
       kernel_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
       bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(is_singular=True),  # pylint: disable=line-too-long
       bias_posterior_tensor_fn=lambda d: d.sample(),
@@ -380,14 +381,18 @@ class DenseReparameterization(_DenseVariational):
   assuming a dataset of `features` and `labels`.
 
   ```python
+  import tensorflow as tf
   import tensorflow_probability as tfp
 
-  net = tfp.layers.DenseReparameterization(
-      512, activation=tf.nn.relu)(features)
-  logits = tfp.layers.DenseReparameterization(10)(net)
+  model = tf.keras.Sequential([
+      tfp.layers.DenseReparameterization(512, activation=tf.nn.relu),
+      tfp.layers.DenseReparameterization(10)
+  ])
+
+  logits = model(features)
   neg_log_likelihood = tf.nn.softmax_cross_entropy_with_logits(
       labels=labels, logits=logits)
-  kl = sum(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
+  kl = sum(model.get_losses_for(inputs=None))
   loss = neg_log_likelihood + kl
   train_op = tf.train.AdamOptimizer().minimize(loss)
   ```
@@ -415,8 +420,9 @@ class DenseReparameterization(_DenseVariational):
       trainable=True,
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
-      kernel_prior_fn=lambda dtype, *args: tfd.Normal(  # pylint: disable=g-long-lambda
-          loc=dtype.as_numpy_dtype(0.), scale=dtype.as_numpy_dtype(1.)),
+      kernel_prior_fn=lambda dtype, shape, *dummy_args: tfd.Independent(  # pylint: disable=g-long-lambda
+          tfd.Normal(loc=tf.zeros(shape, dtype),
+                     scale=dtype.as_numpy_dtype(1.))),
       kernel_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
       bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(
           is_singular=True),
@@ -497,12 +503,15 @@ class DenseLocalReparameterization(_DenseVariational):
   ```python
   import tensorflow_probability as tfp
 
-  net = tfp.layers.DenseLocalReparameterization(
-      512, activation=tf.nn.relu)(features)
-  logits = tfp.layers.DenseLocalReparameterization(10)(net)
+  model = tf.keras.Sequential([
+      tfp.layers.DenseReparameterization(512, activation=tf.nn.relu),
+      tfp.layers.DenseReparameterization(10)
+  ])
+
+  logits = model(features)
   neg_log_likelihood = tf.nn.softmax_cross_entropy_with_logits(
       labels=labels, logits=logits)
-  kl = sum(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
+  kl = sum(model.get_losses_for(inputs=None))
   loss = neg_log_likelihood + kl
   train_op = tf.train.AdamOptimizer().minimize(loss)
   ```
@@ -530,8 +539,9 @@ class DenseLocalReparameterization(_DenseVariational):
       trainable=True,
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
-      kernel_prior_fn=lambda dtype, *args: tfd.Normal(  # pylint: disable=g-long-lambda
-          loc=dtype.as_numpy_dtype(0.), scale=dtype.as_numpy_dtype(1.)),
+      kernel_prior_fn=lambda dtype, shape, *dummy_args: tfd.Independent(  # pylint: disable=g-long-lambda
+          tfd.Normal(loc=tf.zeros(shape, dtype),
+                     scale=dtype.as_numpy_dtype(1.))),
       kernel_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
       bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(
           is_singular=True),
@@ -626,12 +636,15 @@ class DenseFlipout(_DenseVariational):
   ```python
   import tensorflow_probability as tfp
 
-  net = tfp.layers.DenseFlipout(
-      512, activation=tf.nn.relu)(features)
-  logits = tfp.layers.DenseFlipout(10)(net)
+  model = tf.keras.Sequential([
+      tfp.layers.DenseFlipout(512, activation=tf.nn.relu),
+      tfp.layers.DenseFlipout(10)
+  ])
+
+  logits = model(features)
   neg_log_likelihood = tf.nn.softmax_cross_entropy_with_logits(
       labels=labels, logits=logits)
-  kl = sum(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
+  kl = sum(model.get_losses_for(inputs=None))
   loss = neg_log_likelihood + kl
   train_op = tf.train.AdamOptimizer().minimize(loss)
   ```
@@ -660,8 +673,9 @@ class DenseFlipout(_DenseVariational):
       trainable=True,
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
-      kernel_prior_fn=lambda dtype, *args: tfd.Normal(  # pylint: disable=g-long-lambda
-          loc=dtype.as_numpy_dtype(0.), scale=dtype.as_numpy_dtype(1.)),
+      kernel_prior_fn=lambda dtype, shape, *dummy_args: tfd.Independent(  # pylint: disable=g-long-lambda
+          tfd.Normal(loc=tf.zeros(shape, dtype),
+                     scale=dtype.as_numpy_dtype(1.))),
       kernel_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
       bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(
           is_singular=True),

@@ -164,9 +164,9 @@ class ConvVariational(tf.test.TestCase):
       self.assertListEqual(layer.losses, losses)
 
   def _testKLPenaltyBoth(self, layer_class):
-    def _make_normal(dtype, *args):  # pylint: disable=unused-argument
-      return tfd.Normal(
-          loc=dtype.as_numpy_dtype(0.), scale=dtype.as_numpy_dtype(1.))
+    def _make_normal(dtype, shape, *dummy_args):
+      return tfd.Independent(tfd.Normal(
+          loc=tf.zeros(shape, dtype), scale=dtype.as_numpy_dtype(1.)))
     with self.test_session():
       layer = layer_class(
           filters=2,
