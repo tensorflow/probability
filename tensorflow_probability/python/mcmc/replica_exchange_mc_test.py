@@ -39,7 +39,7 @@ class REMCTest(tf.test.TestCase):
       remc = tfp.mcmc.ReplicaExchangeMC(
           target_log_prob_fn=target.log_prob,
           inverse_temperatures=10.**tf.linspace(0., -2., 5),
-          replica_kernel_class=tfp.mcmc.HamiltonianMonteCarlo,
+          make_kernel_fn=tfp.mcmc.HamiltonianMonteCarlo,
           step_size=1.0,
           num_leapfrog_steps=3,
           seed=42)
@@ -74,7 +74,7 @@ class REMCTest(tf.test.TestCase):
       remc = tfp.mcmc.ReplicaExchangeMC(
           target_log_prob_fn=target.log_prob,
           inverse_temperatures=10.**tf.linspace(0., -2., 5),
-          replica_kernel_class=tfp.mcmc.HamiltonianMonteCarlo,
+          make_kernel_fn=tfp.mcmc.HamiltonianMonteCarlo,
           step_size=0.3,
           num_leapfrog_steps=3,
           seed=42)
@@ -106,7 +106,7 @@ class REMCTest(tf.test.TestCase):
           target_log_prob_fn=target.log_prob,
           inverse_temperatures=10.**tf.linspace(
               0., -2., tf.random_uniform([], maxval=10, dtype=tf.int32)),
-          replica_kernel_class=tfp.mcmc.HamiltonianMonteCarlo,
+          make_kernel_fn=tfp.mcmc.HamiltonianMonteCarlo,
           step_size=1.0,
           num_leapfrog_steps=3,
           seed=42)
