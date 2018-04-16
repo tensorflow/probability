@@ -31,6 +31,7 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         ":custom_gradient",
+        ":linalg",
     ],
 )
 
@@ -50,6 +51,29 @@ py_test(
     name = "custom_gradient_test",
     size = "small",
     srcs = ["custom_gradient_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "linalg",
+    srcs = [
+        "linalg.py",
+    ],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "linalg_test",
+    size = "small",
+    srcs = ["linalg_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
