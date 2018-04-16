@@ -107,9 +107,10 @@ def pinv(a, rcond=None, validate_args=False, name=None):
     if not a.dtype.is_floating:
       raise TypeError('Input `a` must have `float`-like `dtype` '
                       '(saw {}).'.format(a.dtype.name))
-    if a.shape.ndims is not None and a.shape.ndims < 2:
-      raise ValueError('Input `a` must have at least 2 dimensions '
-                       '(saw: {}).'.format(a.shape.ndims))
+    if a.shape.ndims is not None:
+      if a.shape.ndims < 2:
+        raise ValueError('Input `a` must have at least 2 dimensions '
+                         '(saw: {}).'.format(a.shape.ndims))
     elif validate_args:
       assert_rank_at_least_2 = tf.assert_rank_at_least(
           a, rank=2,
@@ -145,10 +146,11 @@ def pinv(a, rcond=None, validate_args=False, name=None):
 
     # Saturate small singular values to inf. This has the effect of make
     # `1. / s = 0.` while not resulting in `NaN` gradients.
-    max_singular_value = tf.reduce_max(singular_values, axis=-1, keepdims=True)
-    cutoff = rcond[..., tf.newaxis] * max_singular_value
-    inf = tf.fill(tf.shape(singular_values), np.array(np.inf, dtype))
-    singular_values = tf.where(singular_values > cutoff, singular_values, inf)
+    cutoff = rcond * tf.reduce_max(singular_values, axis=-1)
+    singular_values = tf.where(
+        singular_values > cutoff[..., tf.newaxis],
+        singular_values,
+        tf.fill(tf.shape(singular_values), np.array(np.inf, dtype)))
 
     # Although `a == tf.matmul(u, s * v, transpose_b=True)` we swap
     # `u` and `v` here so that `tf.matmul(pinv(A), A) = tf.eye()`, i.e.,
