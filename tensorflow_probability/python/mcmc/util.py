@@ -18,8 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import collections
-
 # Dependency imports
 import numpy as np
 import tensorflow as tf
@@ -42,9 +40,12 @@ def is_list_like(x):
 
 def is_namedtuple_like(x):
   """Helper which returns `True` if input is `collections.namedtuple`-like."""
-  return (isinstance(x, tuple) and
-          isinstance(getattr(x, '__dict__', None), collections.Mapping) and
-          getattr(x, '_fields', None) is not None)
+  try:
+    for fn in x._fields:
+      _ = getattr(x, fn)
+    return True
+  except AttributeError:
+    return False
 
 
 def make_name(super_name, default_super_name, sub_name):
