@@ -138,3 +138,11 @@ participating, you are expected to uphold this code.
 Eugene Brevdo, Srinivas Vasudevan, Dave Moore, Brian Patton, Alex Alemi, Matt
 Hoffman, Rif A. Saurous.
 [arXiv preprint arXiv:1711.10604, 2017](https://arxiv.org/abs/1711.10604).
+
+
+## Publicity
+
++ [Coffee with a Googler: Probabilistic Machine Learning in TensorFlow](
+  https://www.youtube.com/watch?v=BjUkL8DFH5Q)
++ [Introducing TensorFlow Probability](
+  https://medium.com/tensorflow/introducing-tensorflow-probability-dca4c304e245)
