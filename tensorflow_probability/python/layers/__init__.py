@@ -29,6 +29,7 @@ from tensorflow_probability.python.layers.dense_variational import DenseLocalRep
 from tensorflow_probability.python.layers.dense_variational import DenseReparameterization
 from tensorflow_probability.python.layers.util import default_loc_scale_fn
 from tensorflow_probability.python.layers.util import default_mean_field_normal_fn
+from tensorflow_probability.python.layers.util import default_multivariate_normal_fn
 
 from tensorflow.python.util.all_util import remove_undocumented
 
@@ -44,6 +45,7 @@ _allowed_symbols = [
     'DenseReparameterization',
     'default_loc_scale_fn',
     'default_mean_field_normal_fn',
+    'default_multivariate_normal_fn',
 ]
 
 remove_undocumented(__name__, _allowed_symbols)

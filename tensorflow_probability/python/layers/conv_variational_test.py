@@ -112,9 +112,10 @@ class ConvVariational(tf.test.TestCase):
       import tensorflow as tf  # pylint: disable=g-import-not-at-top,redefined-outer-name
       tfd = tf.contrib.distributions  # pylint: disable=redefined-outer-name
 
-      loc = tf.zeros(shape, dtype=dtype)
-      scale = tf.ones(shape, dtype=dtype)
-      return tfd.Independent(tfd.Normal(loc=loc, scale=scale))
+      dist = tfd.Normal(loc=tf.zeros(shape, dtype),
+                        scale=dtype.as_numpy_dtype(1))
+      batch_ndims = tf.size(dist.batch_shape_tensor())
+      return tfd.Independent(dist, reinterpreted_batch_ndims=batch_ndims)
 
     if layer_class in (tfp.layers.Convolution1DReparameterization,
                        tfp.layers.Convolution1DFlipout):
@@ -152,27 +153,25 @@ class ConvVariational(tf.test.TestCase):
         inputs = tf.random_uniform([2, 3, 3, 3, 1], seed=1)
 
       # No keys.
-      losses = layer.get_losses_for(inputs=None)
-      self.assertEqual(len(losses), 0)
-      self.assertListEqual(layer.losses, losses)
+      input_dependent_losses = layer.get_losses_for(inputs=None)
+      self.assertEqual(len(layer.losses), 0)
+      self.assertListEqual(layer.losses, input_dependent_losses)
 
       _ = layer(inputs)
 
       # Yes keys.
-      losses = layer.get_losses_for(inputs=None)
-      self.assertEqual(len(losses), 1)
-      self.assertListEqual(layer.losses, losses)
+      input_dependent_losses = layer.get_losses_for(inputs=None)
+      self.assertEqual(len(layer.losses), 1)
+      self.assertEqual(layer.losses[0].shape, ())
+      self.assertListEqual(layer.losses, input_dependent_losses)
 
   def _testKLPenaltyBoth(self, layer_class):
-    def _make_normal(dtype, shape, *dummy_args):
-      return tfd.Independent(tfd.Normal(
-          loc=tf.zeros(shape, dtype), scale=dtype.as_numpy_dtype(1.)))
     with self.test_session():
       layer = layer_class(
           filters=2,
           kernel_size=3,
           bias_posterior_fn=tfp.layers.default_mean_field_normal_fn(),
-          bias_prior_fn=_make_normal)
+          bias_prior_fn=tfp.layers.default_multivariate_normal_fn)
       if layer_class in (tfp.layers.Convolution1DReparameterization,
                          tfp.layers.Convolution1DFlipout):
         inputs = tf.random_uniform([2, 3, 1], seed=1)
@@ -184,16 +183,18 @@ class ConvVariational(tf.test.TestCase):
         inputs = tf.random_uniform([2, 3, 3, 3, 1], seed=1)
 
       # No keys.
-      losses = layer.get_losses_for(inputs=None)
-      self.assertEqual(len(losses), 0)
-      self.assertListEqual(layer.losses, losses)
+      input_dependent_losses = layer.get_losses_for(inputs=None)
+      self.assertEqual(len(layer.losses), 0)
+      self.assertListEqual(layer.losses, input_dependent_losses)
 
       _ = layer(inputs)
 
       # Yes keys.
-      losses = layer.get_losses_for(inputs=None)
-      self.assertEqual(len(losses), 2)
-      self.assertListEqual(layer.losses, losses)
+      input_dependent_losses = layer.get_losses_for(inputs=None)
+      self.assertEqual(len(layer.losses), 2)
+      self.assertEqual(layer.losses[0].shape, ())
+      self.assertEqual(layer.losses[1].shape, ())
+      self.assertListEqual(layer.losses, input_dependent_losses)
 
   def _testConvSetUp(self, layer_class, batch_size, depth=None,
                      height=None, width=None, channels=None, filters=None,
@@ -225,7 +226,7 @@ class ConvVariational(tf.test.TestCase):
         result_log_prob=tf.random_uniform(kernel_shape, seed=seed()),
         result_sample=tf.random_uniform(kernel_shape, seed=seed()))
     kernel_divergence = MockKLDivergence(
-        result=tf.random_uniform(kernel_shape, seed=seed()))
+        result=tf.random_uniform([], seed=seed()))
 
     bias_size = (filters,)
     bias_posterior = MockDistribution(
@@ -235,7 +236,7 @@ class ConvVariational(tf.test.TestCase):
         result_log_prob=tf.random_uniform(bias_size, seed=seed()),
         result_sample=tf.random_uniform(bias_size, seed=seed()))
     bias_divergence = MockKLDivergence(
-        result=tf.random_uniform(bias_size, seed=seed()))
+        result=tf.random_uniform([], seed=seed()))
 
     layer = layer_class(
         filters=filters,
@@ -308,15 +309,11 @@ class ConvVariational(tf.test.TestCase):
           rtol=1e-6, atol=0.)
 
       self.assertAllEqual(
-          [[kernel_posterior.distribution,
-            kernel_prior.distribution,
-            kernel_posterior.result_sample]],
+          [[kernel_posterior, kernel_prior, kernel_posterior.result_sample]],
           kernel_divergence.args)
 
       self.assertAllEqual(
-          [[bias_posterior.distribution,
-            bias_prior.distribution,
-            bias_posterior.result_sample]],
+          [[bias_posterior, bias_prior, bias_posterior.result_sample]],
           bias_divergence.args)
 
   def _testConvFlipout(self, layer_class):
@@ -412,13 +409,11 @@ class ConvVariational(tf.test.TestCase):
           rtol=1e-6, atol=0.)
 
       self.assertAllEqual(
-          [[kernel_posterior.distribution, kernel_prior.distribution, None]],
+          [[kernel_posterior, kernel_prior, None]],
           kernel_divergence.args)
 
       self.assertAllEqual(
-          [[bias_posterior.distribution,
-            bias_prior.distribution,
-            bias_posterior.result_sample]],
+          [[bias_posterior, bias_prior, bias_posterior.result_sample]],
           bias_divergence.args)
 
   def _testRandomConvFlipout(self, layer_class):
@@ -468,8 +463,10 @@ class ConvVariational(tf.test.TestCase):
           padding='SAME',
           kernel_posterior_fn=lambda *args: kernel_posterior,
           kernel_posterior_tensor_fn=lambda d: d.sample(seed=42),
+          kernel_divergence_fn=None,
           bias_posterior_fn=lambda *args: bias_posterior,
           bias_posterior_tensor_fn=lambda d: d.sample(seed=43),
+          bias_divergence_fn=None,
           seed=44)
       layer_two = layer_class(
           filters=filters,
@@ -477,8 +474,10 @@ class ConvVariational(tf.test.TestCase):
           padding='SAME',
           kernel_posterior_fn=lambda *args: kernel_posterior,
           kernel_posterior_tensor_fn=lambda d: d.sample(seed=42),
+          kernel_divergence_fn=None,
           bias_posterior_fn=lambda *args: bias_posterior,
           bias_posterior_tensor_fn=lambda d: d.sample(seed=43),
+          bias_divergence_fn=None,
           seed=45)
 
       outputs_one = layer_one(inputs)

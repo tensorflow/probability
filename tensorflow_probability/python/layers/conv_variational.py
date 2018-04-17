@@ -130,9 +130,7 @@ class _ConvVariational(tf.keras.layers.Layer):
       activity_regularizer=None,
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
-      kernel_prior_fn=lambda dtype, shape, *dummy_args: tfd.Independent(  # pylint: disable=g-long-lambda
-          tfd.Normal(loc=tf.zeros(shape, dtype),
-                     scale=dtype.as_numpy_dtype(1.))),
+      kernel_prior_fn=tfp_layers_util.default_multivariate_normal_fn,
       kernel_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
       bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(is_singular=True),  # pylint: disable=line-too-long
       bias_posterior_tensor_fn=lambda d: d.sample(),
@@ -251,28 +249,16 @@ class _ConvVariational(tf.keras.layers.Layer):
     if self.activation is not None:
       outputs = self.activation(outputs)
     if not self._built_kernel_divergence:
-      kernel_posterior = self.kernel_posterior
-      kernel_prior = self.kernel_prior
-      if isinstance(self.kernel_posterior, tfd.Independent):
-        kernel_posterior = kernel_posterior.distribution
-      if isinstance(self.kernel_prior, tfd.Independent):
-        kernel_prior = kernel_prior.distribution
       self._apply_divergence(self.kernel_divergence_fn,
-                             kernel_posterior,
-                             kernel_prior,
+                             self.kernel_posterior,
+                             self.kernel_prior,
                              self.kernel_posterior_tensor,
                              name='divergence_kernel')
       self._built_kernel_divergence = True
     if not self._built_bias_divergence:
-      bias_posterior = self.bias_posterior
-      bias_prior = self.bias_prior
-      if isinstance(self.bias_posterior, tfd.Independent):
-        bias_posterior = bias_posterior.distribution
-      if isinstance(self.bias_prior, tfd.Independent):
-        bias_prior = bias_prior.distribution
       self._apply_divergence(self.bias_divergence_fn,
-                             bias_posterior,
-                             bias_prior,
+                             self.bias_posterior,
+                             self.bias_prior,
                              self.bias_posterior_tensor,
                              name='divergence_bias')
       self._built_bias_divergence = True
@@ -505,9 +491,7 @@ class _ConvReparameterization(_ConvVariational):
       activity_regularizer=None,
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
-      kernel_prior_fn=lambda dtype, shape, *dummy_args: tfd.Independent(  # pylint: disable=g-long-lambda
-          tfd.Normal(loc=tf.zeros(shape, dtype),
-                     scale=dtype.as_numpy_dtype(1.))),
+      kernel_prior_fn=tfp_layers_util.default_multivariate_normal_fn,
       kernel_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
       bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(is_singular=True),  # pylint: disable=line-too-long
       bias_posterior_tensor_fn=lambda d: d.sample(),
@@ -624,14 +608,14 @@ class Conv1DReparameterization(_ConvReparameterization):
       tf.keras.layers.Reshape([128, 1]),
       tfp.layers.Convolution1DReparameterization(
           64, kernel_size=5, padding='SAME', activation=tf.nn.relu),
-      tf.keras.layers.Reshape([128 * 64]),
-      tfp.layers.DenseReparameterization(10)
+      tf.keras.layers.Flatten(),
+      tfp.layers.DenseReparameterization(10),
   ])
 
   logits = model(features)
   neg_log_likelihood = tf.nn.softmax_cross_entropy_with_logits(
       labels=labels, logits=logits)
-  kl = sum(model.get_losses_for(inputs=None))
+  kl = sum(model.losses)
   loss = neg_log_likelihood + kl
   train_op = tf.train.AdamOptimizer().minimize(loss)
   ```
@@ -663,9 +647,7 @@ class Conv1DReparameterization(_ConvReparameterization):
       activity_regularizer=None,
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
-      kernel_prior_fn=lambda dtype, shape, *dummy_args: tfd.Independent(  # pylint: disable=g-long-lambda
-          tfd.Normal(loc=tf.zeros(shape, dtype),
-                     scale=dtype.as_numpy_dtype(1.))),
+      kernel_prior_fn=tfp_layers_util.default_multivariate_normal_fn,
       kernel_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
       bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(is_singular=True),  # pylint: disable=line-too-long
       bias_posterior_tensor_fn=lambda d: d.sample(),
@@ -775,14 +757,14 @@ class Conv2DReparameterization(_ConvReparameterization):
       tf.keras.layers.MaxPooling2D(pool_size=[2, 2],
                                    strides=[2, 2],
                                    padding='SAME'),
-      tf.keras.layers.Reshape([16 * 16 * 64]),
-      tfp.layers.DenseReparameterization(10)
+      tf.keras.layers.Flatten(),
+      tfp.layers.DenseReparameterization(10),
   ])
 
   logits = model(features)
   neg_log_likelihood = tf.nn.softmax_cross_entropy_with_logits(
       labels=labels, logits=logits)
-  kl = sum(model.get_losses_for(inputs=None))
+  kl = sum(model.losses)
   loss = neg_log_likelihood + kl
   train_op = tf.train.AdamOptimizer().minimize(loss)
   ```
@@ -814,9 +796,7 @@ class Conv2DReparameterization(_ConvReparameterization):
       activity_regularizer=None,
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
-      kernel_prior_fn=lambda dtype, shape, *dummy_args: tfd.Independent(  # pylint: disable=g-long-lambda
-          tfd.Normal(loc=tf.zeros(shape, dtype),
-                     scale=dtype.as_numpy_dtype(1.))),
+      kernel_prior_fn=tfp_layers_util.default_multivariate_normal_fn,
       kernel_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
       bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(is_singular=True),  # pylint: disable=line-too-long
       bias_posterior_tensor_fn=lambda d: d.sample(),
@@ -932,14 +912,14 @@ class Conv3DReparameterization(_ConvReparameterization):
       tf.keras.layers.MaxPooling3D(pool_size=[2, 2, 2],
                                    strides=[2, 2, 2],
                                    padding='SAME'),
-      tf.keras.layers.Reshape([128 * 16 * 16 * 64]),
-      tfp.layers.DenseReparameterization(10)
+      tf.keras.layers.Flatten(),
+      tfp.layers.DenseReparameterization(10),
   ])
 
   logits = model(features)
   neg_log_likelihood = tf.nn.softmax_cross_entropy_with_logits(
       labels=labels, logits=logits)
-  kl = sum(model.get_losses_for(inputs=None))
+  kl = sum(model.losses)
   loss = neg_log_likelihood + kl
   train_op = tf.train.AdamOptimizer().minimize(loss)
   ```
@@ -971,9 +951,7 @@ class Conv3DReparameterization(_ConvReparameterization):
       activity_regularizer=None,
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
-      kernel_prior_fn=lambda dtype, shape, *dummy_args: tfd.Independent(  # pylint: disable=g-long-lambda
-          tfd.Normal(loc=tf.zeros(shape, dtype),
-                     scale=dtype.as_numpy_dtype(1.))),
+      kernel_prior_fn=tfp_layers_util.default_multivariate_normal_fn,
       kernel_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
       bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(is_singular=True),  # pylint: disable=line-too-long
       bias_posterior_tensor_fn=lambda d: d.sample(),
@@ -1099,9 +1077,7 @@ class _ConvFlipout(_ConvVariational):
       activity_regularizer=None,
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
-      kernel_prior_fn=lambda dtype, shape, *dummy_args: tfd.Independent(  # pylint: disable=g-long-lambda
-          tfd.Normal(loc=tf.zeros(shape, dtype),
-                     scale=dtype.as_numpy_dtype(1.))),
+      kernel_prior_fn=tfp_layers_util.default_multivariate_normal_fn,
       kernel_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
       bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(is_singular=True),  # pylint: disable=line-too-long
       bias_posterior_tensor_fn=lambda d: d.sample(),
@@ -1287,14 +1263,14 @@ class Conv1DFlipout(_ConvFlipout):
       tf.keras.layers.Reshape([128, 1]),
       tfp.layers.Convolution1DFlipout(
           64, kernel_size=5, padding='SAME', activation=tf.nn.relu),
-      tf.keras.layers.Reshape([128 * 64]),
-      tfp.layers.DenseFlipout(10)
+      tf.keras.layers.Flatten(),
+      tfp.layers.DenseFlipout(10),
   ])
 
   logits = model(features)
   neg_log_likelihood = tf.nn.softmax_cross_entropy_with_logits(
       labels=labels, logits=logits)
-  kl = sum(model.get_losses_for(inputs=None))
+  kl = sum(model.losses)
   loss = neg_log_likelihood + kl
   train_op = tf.train.AdamOptimizer().minimize(loss)
   ```
@@ -1327,9 +1303,7 @@ class Conv1DFlipout(_ConvFlipout):
       activity_regularizer=None,
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
-      kernel_prior_fn=lambda dtype, shape, *dummy_args: tfd.Independent(  # pylint: disable=g-long-lambda
-          tfd.Normal(loc=tf.zeros(shape, dtype),
-                     scale=dtype.as_numpy_dtype(1.))),
+      kernel_prior_fn=tfp_layers_util.default_multivariate_normal_fn,
       kernel_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
       bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(is_singular=True),  # pylint: disable=line-too-long
       bias_posterior_tensor_fn=lambda d: d.sample(),
@@ -1446,14 +1420,14 @@ class Conv2DFlipout(_ConvFlipout):
       tf.keras.layers.MaxPooling2D(pool_size=[2, 2],
                                    strides=[2, 2],
                                    padding='SAME'),
-      tf.keras.layers.Reshape([16 * 16 * 64]),
-      tfp.layers.DenseFlipout(10)
+      tf.keras.layers.Flatten(),
+      tfp.layers.DenseFlipout(10),
   ])
 
   logits = model(features)
   neg_log_likelihood = tf.nn.softmax_cross_entropy_with_logits(
       labels=labels, logits=logits)
-  kl = sum(model.get_losses_for(inputs=None))
+  kl = sum(model.losses)
   loss = neg_log_likelihood + kl
   train_op = tf.train.AdamOptimizer().minimize(loss)
   ```
@@ -1486,9 +1460,7 @@ class Conv2DFlipout(_ConvFlipout):
       activity_regularizer=None,
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
-      kernel_prior_fn=lambda dtype, shape, *dummy_args: tfd.Independent(  # pylint: disable=g-long-lambda
-          tfd.Normal(loc=tf.zeros(shape, dtype),
-                     scale=dtype.as_numpy_dtype(1.))),
+      kernel_prior_fn=tfp_layers_util.default_multivariate_normal_fn,
       kernel_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
       bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(is_singular=True),  # pylint: disable=line-too-long
       bias_posterior_tensor_fn=lambda d: d.sample(),
@@ -1611,14 +1583,14 @@ class Conv3DFlipout(_ConvFlipout):
       tf.keras.layers.MaxPooling3D(pool_size=[2, 2, 2],
                                    strides=[2, 2, 2],
                                    padding='SAME'),
-      tf.keras.layers.Reshape([128 * 16 * 16 * 64]),
-      tfp.layers.DenseFlipout(10)
+      tf.keras.layers.Flatten(),
+      tfp.layers.DenseFlipout(10),
   ])
 
   logits = model(features)
   neg_log_likelihood = tf.nn.softmax_cross_entropy_with_logits(
       labels=labels, logits=logits)
-  kl = sum(model.get_losses_for(inputs=None))
+  kl = sum(model.losses)
   loss = neg_log_likelihood + kl
   train_op = tf.train.AdamOptimizer().minimize(loss)
   ```
@@ -1651,9 +1623,7 @@ class Conv3DFlipout(_ConvFlipout):
       activity_regularizer=None,
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
-      kernel_prior_fn=lambda dtype, shape, *dummy_args: tfd.Independent(  # pylint: disable=g-long-lambda
-          tfd.Normal(loc=tf.zeros(shape, dtype),
-                     scale=dtype.as_numpy_dtype(1.))),
+      kernel_prior_fn=tfp_layers_util.default_multivariate_normal_fn,
       kernel_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
       bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(is_singular=True),  # pylint: disable=line-too-long
       bias_posterior_tensor_fn=lambda d: d.sample(),

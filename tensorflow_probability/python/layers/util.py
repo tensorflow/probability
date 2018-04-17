@@ -31,6 +31,7 @@ tfd = tf.contrib.distributions
 __all__ = [
     'default_loc_scale_fn',
     'default_mean_field_normal_fn',
+    'default_multivariate_normal_fn',
     'deserialize_function',
     'random_sign',
     'serialize_function',
@@ -129,17 +130,7 @@ def default_mean_field_normal_fn(
   """Creates a function to build Normal distributions with trainable params.
 
   This function produces a closure which produces `tf.distributions.Normal`
-  parameterized by a loc` and `scale` each created using `tf.get_variable`. The
-  produced closure accepts the following arguments:
-
-    name: Python `str` name prepended to any created (or existing)
-      `tf.Variable`s.
-    shape: Python `list`-like representing the parameter's event shape.
-    dtype: Type of parameter's event.
-    trainable: Python `bool` indicating all created `tf.Variable`s should be
-      added to the graph collection `GraphKeys.TRAINABLE_VARIABLES`.
-    add_variable_fn: `tf.get_variable`-like `callable` used to create (or
-      access existing) `tf.Variable`s.
+  parameterized by a loc` and `scale` each created using `tf.get_variable`.
 
   Args:
     is_singular: Python `bool` if `True`, forces the special case limit of
@@ -170,7 +161,7 @@ def default_mean_field_normal_fn(
     make_normal_fn: Python `callable` which creates a `tf.distributions.Normal`
       using from args: `dtype, shape, name, trainable, add_variable_fn`.
   """
-  loc_scale_fn_ = default_loc_scale_fn(
+  loc_scale_fn = default_loc_scale_fn(
       is_singular=is_singular,
       loc_initializer=loc_initializer,
       untransformed_scale_initializer=untransformed_scale_initializer,
@@ -179,16 +170,52 @@ def default_mean_field_normal_fn(
       loc_constraint=loc_constraint,
       untransformed_scale_constraint=untransformed_scale_constraint)
   def _fn(dtype, shape, name, trainable, add_variable_fn):
-    """Creates multivariate `Deterministic` or `Normal` distribution."""
-    loc, scale = loc_scale_fn_(dtype, shape, name, trainable, add_variable_fn)
+    """Creates multivariate `Deterministic` or `Normal` distribution.
+
+    Args:
+      dtype: Type of parameter's event.
+      shape: Python `list`-like representing the parameter's event shape.
+      name: Python `str` name prepended to any created (or existing)
+        `tf.Variable`s.
+      trainable: Python `bool` indicating all created `tf.Variable`s should be
+        added to the graph collection `GraphKeys.TRAINABLE_VARIABLES`.
+      add_variable_fn: `tf.get_variable`-like `callable` used to create (or
+        access existing) `tf.Variable`s.
+
+    Returns:
+      Multivariate `Deterministic` or `Normal` distribution.
+    """
+    loc, scale = loc_scale_fn(dtype, shape, name, trainable, add_variable_fn)
     if scale is None:
       dist = tfd.Deterministic(loc=loc)
     else:
       dist = tfd.Normal(loc=loc, scale=scale)
-    reinterpreted_batch_ndims = tf.shape(dist.batch_shape_tensor())[0]
-    return tfd.Independent(
-        dist, reinterpreted_batch_ndims=reinterpreted_batch_ndims)
+    batch_ndims = tf.size(dist.batch_shape_tensor())
+    return tfd.Independent(dist, reinterpreted_batch_ndims=batch_ndims)
   return _fn
+
+
+def default_multivariate_normal_fn(dtype, shape, name, trainable,
+                                   add_variable_fn):
+  """Creates multivariate standard `Normal` distribution.
+
+  Args:
+    dtype: Type of parameter's event.
+    shape: Python `list`-like representing the parameter's event shape.
+    name: Python `str` name prepended to any created (or existing)
+      `tf.Variable`s.
+    trainable: Python `bool` indicating all created `tf.Variable`s should be
+      added to the graph collection `GraphKeys.TRAINABLE_VARIABLES`.
+    add_variable_fn: `tf.get_variable`-like `callable` used to create (or
+      access existing) `tf.Variable`s.
+
+  Returns:
+    Multivariate standard `Normal` distribution.
+  """
+  del name, trainable, add_variable_fn   # unused
+  dist = tfd.Normal(loc=tf.zeros(shape, dtype), scale=dtype.as_numpy_dtype(1))
+  batch_ndims = tf.size(dist.batch_shape_tensor())
+  return tfd.Independent(dist, reinterpreted_batch_ndims=batch_ndims)
 
 
 def deserialize_function(serial, function_type):

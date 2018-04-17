@@ -111,9 +111,7 @@ class _DenseVariational(tf.keras.layers.Layer):
       activity_regularizer=None,
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
-      kernel_prior_fn=lambda dtype, shape, *dummy_args: tfd.Independent(  # pylint: disable=g-long-lambda
-          tfd.Normal(loc=tf.zeros(shape, dtype),
-                     scale=dtype.as_numpy_dtype(1.))),
+      kernel_prior_fn=tfp_layers_util.default_multivariate_normal_fn,
       kernel_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
       bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(is_singular=True),  # pylint: disable=line-too-long
       bias_posterior_tensor_fn=lambda d: d.sample(),
@@ -189,28 +187,16 @@ class _DenseVariational(tf.keras.layers.Layer):
     if self.activation is not None:
       outputs = self.activation(outputs)  # pylint: disable=not-callable
     if not self._built_kernel_divergence:
-      kernel_posterior = self.kernel_posterior
-      kernel_prior = self.kernel_prior
-      if isinstance(self.kernel_posterior, tfd.Independent):
-        kernel_posterior = kernel_posterior.distribution
-      if isinstance(self.kernel_prior, tfd.Independent):
-        kernel_prior = kernel_prior.distribution
       self._apply_divergence(self.kernel_divergence_fn,
-                             kernel_posterior,
-                             kernel_prior,
+                             self.kernel_posterior,
+                             self.kernel_prior,
                              self.kernel_posterior_tensor,
                              name='divergence_kernel')
       self._built_kernel_divergence = True
     if not self._built_bias_divergence:
-      bias_posterior = self.bias_posterior
-      bias_prior = self.bias_prior
-      if isinstance(self.bias_posterior, tfd.Independent):
-        bias_posterior = bias_posterior.distribution
-      if isinstance(self.bias_prior, tfd.Independent):
-        bias_prior = bias_prior.distribution
       self._apply_divergence(self.bias_divergence_fn,
-                             bias_posterior,
-                             bias_prior,
+                             self.bias_posterior,
+                             self.bias_prior,
                              self.bias_posterior_tensor,
                              name='divergence_bias')
       self._built_bias_divergence = True
@@ -386,13 +372,13 @@ class DenseReparameterization(_DenseVariational):
 
   model = tf.keras.Sequential([
       tfp.layers.DenseReparameterization(512, activation=tf.nn.relu),
-      tfp.layers.DenseReparameterization(10)
+      tfp.layers.DenseReparameterization(10),
   ])
 
   logits = model(features)
   neg_log_likelihood = tf.nn.softmax_cross_entropy_with_logits(
       labels=labels, logits=logits)
-  kl = sum(model.get_losses_for(inputs=None))
+  kl = sum(model.losses)
   loss = neg_log_likelihood + kl
   train_op = tf.train.AdamOptimizer().minimize(loss)
   ```
@@ -420,9 +406,7 @@ class DenseReparameterization(_DenseVariational):
       trainable=True,
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
-      kernel_prior_fn=lambda dtype, shape, *dummy_args: tfd.Independent(  # pylint: disable=g-long-lambda
-          tfd.Normal(loc=tf.zeros(shape, dtype),
-                     scale=dtype.as_numpy_dtype(1.))),
+      kernel_prior_fn=tfp_layers_util.default_multivariate_normal_fn,
       kernel_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
       bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(
           is_singular=True),
@@ -505,13 +489,13 @@ class DenseLocalReparameterization(_DenseVariational):
 
   model = tf.keras.Sequential([
       tfp.layers.DenseReparameterization(512, activation=tf.nn.relu),
-      tfp.layers.DenseReparameterization(10)
+      tfp.layers.DenseReparameterization(10),
   ])
 
   logits = model(features)
   neg_log_likelihood = tf.nn.softmax_cross_entropy_with_logits(
       labels=labels, logits=logits)
-  kl = sum(model.get_losses_for(inputs=None))
+  kl = sum(model.losses)
   loss = neg_log_likelihood + kl
   train_op = tf.train.AdamOptimizer().minimize(loss)
   ```
@@ -539,9 +523,7 @@ class DenseLocalReparameterization(_DenseVariational):
       trainable=True,
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
-      kernel_prior_fn=lambda dtype, shape, *dummy_args: tfd.Independent(  # pylint: disable=g-long-lambda
-          tfd.Normal(loc=tf.zeros(shape, dtype),
-                     scale=dtype.as_numpy_dtype(1.))),
+      kernel_prior_fn=tfp_layers_util.default_multivariate_normal_fn,
       kernel_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
       bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(
           is_singular=True),
@@ -638,13 +620,13 @@ class DenseFlipout(_DenseVariational):
 
   model = tf.keras.Sequential([
       tfp.layers.DenseFlipout(512, activation=tf.nn.relu),
-      tfp.layers.DenseFlipout(10)
+      tfp.layers.DenseFlipout(10),
   ])
 
   logits = model(features)
   neg_log_likelihood = tf.nn.softmax_cross_entropy_with_logits(
       labels=labels, logits=logits)
-  kl = sum(model.get_losses_for(inputs=None))
+  kl = sum(model.losses)
   loss = neg_log_likelihood + kl
   train_op = tf.train.AdamOptimizer().minimize(loss)
   ```
@@ -673,9 +655,7 @@ class DenseFlipout(_DenseVariational):
       trainable=True,
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
-      kernel_prior_fn=lambda dtype, shape, *dummy_args: tfd.Independent(  # pylint: disable=g-long-lambda
-          tfd.Normal(loc=tf.zeros(shape, dtype),
-                     scale=dtype.as_numpy_dtype(1.))),
+      kernel_prior_fn=tfp_layers_util.default_multivariate_normal_fn,
       kernel_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
       bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(
           is_singular=True),
