@@ -86,19 +86,21 @@ py_test(
     ],
 )
 
-py_test(
-    name = "mnist_deep_nn_test",
-    size = "small",
-    srcs = [
-        "mnist_deep_nn.py",
-    ],
-    args = [
-        "--fake_data",
-        "--max_steps=5",
-    ],
-    main = "mnist_deep_nn.py",
-    srcs_version = "PY2AND3",
-    deps = [
-        ":mnist_deep_nn",
-    ],
-)
+# TODO(b/78137893): Clean this up. For now, we disable tests until
+# seaborn/python3.4 dependency issues resolved.
+#py_test(
+#    name = "mnist_deep_nn_test",
+#    size = "small",
+#    srcs = [
+#        "mnist_deep_nn.py",
+#    ],
+#    args = [
+#        "--fake_data",
+#        "--max_steps=5",
+#    ],
+#    main = "mnist_deep_nn.py",
+#    srcs_version = "PY2AND3",
+#    deps = [
+#        ":mnist_deep_nn",
+#    ],
+#)
