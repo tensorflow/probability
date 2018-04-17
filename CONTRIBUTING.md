@@ -22,9 +22,9 @@ Help](https://help.github.com/articles/about-pull-requests/) for more
 information on using pull requests.
 
 After a pull request is approved, we merge it. Note our merging process differs
-from GitHub. Namely, we pull and submit the change into an internal version
-control system; it automatically pushes a git commit to the GitHub repository
-(with credit to the original author). We then manually close the pull request.
+from GitHub in that we pull and submit the change into an internal version
+control system. This system automatically pushes a git commit to the GitHub
+repository (with credit to the original author) and closes the pull request.
 
 ## Unit tests
 
