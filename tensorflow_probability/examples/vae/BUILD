@@ -13,7 +13,7 @@
 # limitations under the License.
 # ============================================================================
 # Description:
-# Example implementation of a simple variational auto-encoder (VAE).
+# Example of a variational auto-encoder.
 
 licenses(["notice"])  # Apache 2.0
 
@@ -25,48 +25,31 @@ package(
 
 exports_files(["LICENSE"])
 
-py_library(
-    name = "vae_model",
-    srcs = [
-        "vae_model.py",
-    ],
+py_binary(
+    name = "vae",
+    srcs = ["vae.py"],
+    main = "vae.py",
     srcs_version = "PY2AND3",
-    visibility = ["//visibility:public"],
     deps = [
+        # absl/flags dep,
+        # matplotlib dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],
 )
 
-py_binary(
-    name = "vae_main",
-    srcs = [
-        "main.py",
-    ],
-    main = "main.py",
-    srcs_version = "PY2AND3",
-    deps = [
-        ":vae_model",
-        # matplotlib dep,
-        # numpy dep,
-        # tensorflow dep,
-    ],
-)
-
 py_test(
     name = "vae_test",
     size = "small",
-    srcs = [
-        "main.py",
-    ],
+    srcs = ["vae.py"],
     args = [
         "--fake_data",
         "--max_steps=5",
     ],
-    main = "main.py",
+    main = "vae.py",
     srcs_version = "PY2AND3",
     deps = [
-        ":vae_main",
+        ":vae",
     ],
 )

@@ -31,7 +31,7 @@ py_library(
     name = "examples",
     srcs = ["__init__.py"],
     data = [
-        "//tensorflow_probability/examples/vae:vae_main",
+        "//tensorflow_probability/examples/vae",
         "//tensorflow_probability/examples/weight_uncertainty:logistic_regression",
         "//tensorflow_probability/examples/weight_uncertainty:mnist_deep_nn",
     ],
