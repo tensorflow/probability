@@ -71,7 +71,7 @@ for end-to-end examples. It includes tutorial notebooks such as:
   A hierarchical linear model for sharing statistical strength across examples.
 * [Gaussian Copulas](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Gaussian_Copula.ipynb).
   Probability distributions for capturing dependence across random variables.
-* [Understanding TensorFlow Distributions Shapes](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Understanding%20TensorFlow%20Distributions%20Shapes.ipynb).
+* [Understanding TensorFlow Distributions Shapes](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Understanding_TensorFlow_Distributions_Shapes.ipynb).
   How to distinguish between samples, batches, and events for arbitrarily shaped
   probabilistic computations.
 
