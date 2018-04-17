@@ -18,21 +18,41 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import argparse  # TODO(b/74538173): Use absl.flags rather than argparse.
 import os
-import sys
 
 # Dependency imports
+from absl import flags
 from matplotlib import cm
 from matplotlib import figure
 from matplotlib.backends import backend_agg
 import numpy as np
 import tensorflow as tf
-
-from tensorflow_probability.examples.weight_uncertainty import weight_uncertainty
-
+import tensorflow_probability as tfp
 
 tfd = tf.contrib.distributions
+
+flags.DEFINE_float("learning_rate",
+                   default=0.01,
+                   help="Initial learning rate.")
+flags.DEFINE_integer("max_steps",
+                     default=1500,
+                     help="Number of training steps to run.")
+flags.DEFINE_integer("batch_size",
+                     default=32,
+                     help="Batch size. Must divide evenly into dataset sizes.")
+flags.DEFINE_string(
+    "model_dir",
+    default=os.path.join(os.getenv("TEST_TMPDIR", "/tmp"),
+                         "logistic_regression/"),
+    help="Directory to put the model's fit.")
+flags.DEFINE_integer("num_examples",
+                     default=256,
+                     help="Number of datapoints to generate.")
+flags.DEFINE_integer("num_monte_carlo",
+                     default=50,
+                     help="Monte Carlo samples to visualize weight posterior.")
+
+FLAGS = flags.FLAGS
 
 
 def toy_logistic_data(num_examples, input_size=2, weights_prior_stddev=5.0):
@@ -79,11 +99,7 @@ def visualize_decision(inputs, labels, true_w_b, candidate_w_bs, fname):
     candidate_w_bs: Python `iterable` containing tuples of the same form as
        true_w_b.
     fname: The filename to save the plot as a PNG image (Python `str`).
-
-  Raises:
-    ImportError: if matplotlib is not available.
   """
-
   fig = figure.Figure(figsize=(6, 6))
   canvas = backend_agg.FigureCanvasAgg(fig)
   ax = fig.add_subplot(1, 1, 1)
@@ -128,7 +144,6 @@ def build_input_pipeline(x, y, batch_size):
     batch_labels: `Tensor` feed of labels, of shape
       `[batch_size] + y.shape[1:]`.
   """
-
   training_dataset = tf.data.Dataset.from_tensor_slices((x, y))
   training_batches = training_dataset.repeat().batch(batch_size)
   training_iterator = training_batches.make_one_shot_iterator()
@@ -136,107 +151,71 @@ def build_input_pipeline(x, y, batch_size):
   return batch_data, batch_labels
 
 
-def run_training():
-  """Generate data and run the training loop."""
+def main(argv):
+  del argv  # unused
+  if tf.gfile.Exists(FLAGS.model_dir):
+    tf.logging.warning(
+        "Warning: deleting old log directory at {}".format(FLAGS.model_dir))
+    tf.gfile.DeleteRecursively(FLAGS.model_dir)
+  tf.gfile.MakeDirs(FLAGS.model_dir)
 
   # Generate (and visualize) a toy classification dataset.
   w_true, b_true, x, y = toy_logistic_data(FLAGS.num_examples, 2)
 
-  # Define a logistic regression model as a Bernoulli distribution
-  # parameterized by logits from a single linear layer.
-  def build_logistic_model(inputs):
-    logits = tf.layers.dense(inputs, 1, activation=None)
-    model = tfd.Bernoulli(logits=logits)
-    return model
-
   with tf.Graph().as_default():
     inputs, labels = build_input_pipeline(x, y, FLAGS.batch_size)
 
-    # Build a variational Bayesian logistic regression model
-    elbo_loss, _ = weight_uncertainty.bayesianify(
-        build_logistic_model,
-        inputs,
-        labels,
-        FLAGS.num_examples)
+    # Define a logistic regression model as a Bernoulli distribution
+    # parameterized by logits from a single linear layer. We use the Flipout
+    # Monte Carlo estimator for the layer: this enables lower variance
+    # stochastic gradients than naive reparameterization.
+    with tf.name_scope("logistic_regression", values=[inputs]):
+      layer = tfp.layers.DenseFlipout(
+          units=1,
+          activation=None,
+          kernel_posterior_fn=tfp.layers.default_mean_field_normal_fn(),
+          bias_posterior_fn=tfp.layers.default_mean_field_normal_fn())
+      logits = layer(inputs)
+      labels_distribution = tfd.Bernoulli(logits=logits)
+
+    # Compute the -ELBO as the loss, averaged over the batch size.
+    neg_log_likelihood = -tf.reduce_mean(labels_distribution.log_prob(labels))
+    kl = sum(layer.losses) / FLAGS.num_examples
+    elbo_loss = neg_log_likelihood + kl
+
+    # Build metrics for evaluation. Predictions are formed from a single forward
+    # pass of the probabilistic layers. They are cheap but noisy predictions.
+    predictions = tf.cast(logits > 0, dtype=tf.int32)
+    accuracy, accuracy_update_op = tf.metrics.accuracy(
+        labels=labels, predictions=predictions)
 
     with tf.name_scope("train"):
-      opt = tf.train.AdamOptimizer(
-          learning_rate=FLAGS.learning_rate)
+      opt = tf.train.AdamOptimizer(learning_rate=FLAGS.learning_rate)
 
       train_op = opt.minimize(elbo_loss)
-      init = tf.global_variables_initializer()
       with tf.Session() as sess:
-        sess.run(init)
+        sess.run(tf.global_variables_initializer())
+        sess.run(tf.local_variables_initializer())
 
         # Fit the model to data.
         for step in range(FLAGS.max_steps):
-          _, loss_value = sess.run([train_op, elbo_loss])
-          if step % 400 == 0:
-            print("step {:d}: loss {:.2f}".format(step, loss_value))
+          _ = sess.run([train_op, accuracy_update_op])
+          if step % 100 == 0:
+            loss_value, accuracy_value = sess.run([elbo_loss, accuracy])
+            print("Step: {:>3d} Loss: {:.3f} Accuracy: {:.3f}".format(
+                step, loss_value, accuracy_value))
 
         # Visualize some draws from the weights posterior.
-        qw, qb = tf.get_collection(weight_uncertainty.VI_QDISTS)
-        w_draw, b_draw = qw.sample(), qb.sample()
+        w_draw = layer.kernel_posterior.sample()
+        b_draw = layer.bias_posterior.sample()
         candidate_w_bs = []
-        for _ in range(FLAGS.n_monte_carlo):
+        for _ in range(FLAGS.num_monte_carlo):
           w, b = sess.run((w_draw, b_draw))
           candidate_w_bs.append((w, b))
         visualize_decision(x, y, (w_true, b_true),
                            candidate_w_bs,
-                           fname=os.path.join(FLAGS.log_dir,
+                           fname=os.path.join(FLAGS.model_dir,
                                               "weights_inferred.png"))
 
-
-def main(_):
-  if tf.gfile.Exists(FLAGS.log_dir):
-    tf.logging.warn(
-        "Warning: deleting old log directory at {}".format(
-            FLAGS.log_dir))
-    tf.gfile.DeleteRecursively(FLAGS.log_dir)
-  tf.gfile.MakeDirs(FLAGS.log_dir)
-
-  run_training()
-
 if __name__ == "__main__":
-  parser = argparse.ArgumentParser()
-  parser.add_argument(
-      "--learning_rate",
-      type=float,
-      default=0.01,
-      help="Initial learning rate."
-  )
-  parser.add_argument(
-      "--max_steps",
-      type=int,
-      default=1500,
-      help="Number of training steps to run."
-  )
-  parser.add_argument(
-      "--batch_size",
-      type=int,
-      default=32,
-      help="Batch size.  Must divide evenly into the dataset sizes."
-  )
-  parser.add_argument(
-      "--log_dir",
-      type=str,
-      default=os.path.join(os.getenv("TEST_TMPDIR", "/tmp"),
-                           "logistic_regression/logs/"),
-      help="Directory to put the log data."
-  )
-  parser.add_argument(
-      "--num_examples",
-      type=int,
-      default=256,
-      help="Number of datapoints to generate."
-  )
-  parser.add_argument(
-      "--n_monte_carlo",
-      type=int,
-      default=25,
-      help="Monte Carlo samples used to visualize the weight posterior"
-  )
-
-  FLAGS, unparsed = parser.parse_known_args()
-
-  tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)
+  tf.app.run()

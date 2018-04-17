@@ -13,7 +13,7 @@
 # limitations under the License.
 # ============================================================================
 # Description:
-# Examples of model uncertainty in predictive classifiers.
+# Example of logistic regression.
 
 licenses(["notice"])  # Apache 2.0
 
@@ -25,46 +25,16 @@ package(
 
 exports_files(["LICENSE"])
 
-py_library(
-    name = "weight_uncertainty",
-    srcs = [
-        "weight_uncertainty.py",
-    ],
-    srcs_version = "PY2AND3",
-    visibility = ["//visibility:public"],
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-    ],
-)
-
 py_binary(
     name = "logistic_regression",
-    srcs = [
-        "logistic_regression.py",
-    ],
+    srcs = ["logistic_regression.py"],
     srcs_version = "PY2AND3",
     deps = [
-        ":weight_uncertainty",
+        # absl/flags dep,
         # matplotlib dep,
         # numpy dep,
-        # seaborn dep,
         # tensorflow dep,
-    ],
-)
-
-py_binary(
-    name = "mnist_deep_nn",
-    srcs = [
-        "mnist_deep_nn.py",
-    ],
-    srcs_version = "PY2AND3",
-    deps = [
-        ":weight_uncertainty",
-        # matplotlib dep,
-        # numpy dep,
-        # seaborn dep,
-        # tensorflow dep,
+        "//tensorflow_probability",
     ],
 )
 
@@ -85,22 +55,3 @@ py_test(
         ":logistic_regression",
     ],
 )
-
-# TODO(b/78137893): Clean this up. For now, we disable tests until
-# seaborn/python3.4 dependency issues resolved.
-#py_test(
-#    name = "mnist_deep_nn_test",
-#    size = "small",
-#    srcs = [
-#        "mnist_deep_nn.py",
-#    ],
-#    args = [
-#        "--fake_data",
-#        "--max_steps=5",
-#    ],
-#    main = "mnist_deep_nn.py",
-#    srcs_version = "PY2AND3",
-#    deps = [
-#        ":mnist_deep_nn",
-#    ],
-#)

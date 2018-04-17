@@ -18,25 +18,66 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import argparse  # TODO(b/74538173): Use absl.flags rather than argparse.
 import os
-import sys
 
 # Dependency imports
+from absl import flags
 import matplotlib
 matplotlib.use("Agg")
 from matplotlib import figure  # pylint: disable=g-import-not-at-top
 from matplotlib.backends import backend_agg
 import numpy as np
-import seaborn as sns
 import tensorflow as tf
+import tensorflow_probability as tfp
 
-from tensorflow_probability.examples.weight_uncertainty import weight_uncertainty
 from tensorflow.contrib.learn.python.learn.datasets import mnist
+
+# TODO(b/78137893): Integration tests currently fail with seaborn imports.
+try:
+  import seaborn as sns  # pylint: disable=g-import-not-at-top
+  HAS_SEABORN = True
+except ImportError:
+  HAS_SEABORN = False
 
 tfd = tf.contrib.distributions
 
-IMAGE_SHAPE = (28, 28)
+IMAGE_SHAPE = [28, 28]
+
+flags.DEFINE_float("learning_rate",
+                   default=0.01,
+                   help="Initial learning rate.")
+flags.DEFINE_integer("max_steps",
+                     default=6000,
+                     help="Number of training steps to run.")
+flags.DEFINE_list("layer_sizes",
+                  default=["128", "128"],
+                  help="Comma-separated list denoting hidden units per layer.")
+flags.DEFINE_string("activation",
+                    default="relu",
+                    help="Activation function for all hidden layers.")
+flags.DEFINE_integer("batch_size",
+                     default=128,
+                     help="Batch size. Must divide evenly into dataset sizes.")
+flags.DEFINE_string("data_dir",
+                    default=os.path.join(os.getenv("TEST_TMPDIR", "/tmp"),
+                                         "bayesian_neural_network/data"),
+                    help="Directory where data is stored (if using real data).")
+flags.DEFINE_string(
+    "model_dir",
+    default=os.path.join(os.getenv("TEST_TMPDIR", "/tmp"),
+                         "bayesian_neural_network/"),
+    help="Directory to put the model's fit.")
+flags.DEFINE_integer("viz_steps",
+                     default=400,
+                     help="Frequency at which save visualizations.")
+flags.DEFINE_integer("num_monte_carlo",
+                     default=50,
+                     help="Network draws to compute predictive probabilities.")
+flags.DEFINE_bool("fake_data",
+                  default=None,
+                  help="If true, uses fake data. Defaults to real data.")
+
+FLAGS = flags.FLAGS
 
 
 def plot_weight_posteriors(names, qm_vals, qs_vals, fname):
@@ -51,11 +92,7 @@ def plot_weight_posteriors(names, qm_vals, qs_vals, fname):
       whose elements are Numpy `array`s, of any shape, containing
       posterior standard deviations of weight varibles.
     fname: Python `str` filename to save the plot to.
-
-  Raises:
-    ImportError: if matplotlib is not available.
   """
-
   fig = figure.Figure(figsize=(6, 3))
   canvas = backend_agg.FigureCanvasAgg(fig)
 
@@ -85,18 +122,14 @@ def plot_heldout_prediction(input_vals, probs,
 
   Args:
     input_vals: A `float`-like Numpy `array` of shape
-      `(n_heldout,) + IMAGE_SHAPE`, containing heldout input images.
-    probs: A `float`-like Numpy array of shape `(n_monte_carlo,
-      n_heldout, n_classes)` containing Monte Carlo samples of
+      `[num_heldout] + IMAGE_SHAPE`, containing heldout input images.
+    probs: A `float`-like Numpy array of shape `[num_monte_carlo,
+      num_heldout, num_classes]` containing Monte Carlo samples of
       class probabilities for each heldout sample.
     fname: Python `str` filename to save the plot to.
     n: Python `int` number of datapoints to vizualize.
     title: Python `str` title for the plot.
-
-  Raises:
-    ImportError: if matplotlib is not available.
   """
-
   fig = figure.Figure(figsize=(9, 3*n))
   canvas = backend_agg.FigureCanvasAgg(fig)
   for i in range(n):
@@ -122,7 +155,6 @@ def plot_heldout_prediction(input_vals, probs,
 
 def build_input_pipeline(mnist_data, batch_size, heldout_size):
   """Build an Iterator switching between train and heldout data."""
-
   # Build an iterator over training batches.
   training_dataset = tf.data.Dataset.from_tensor_slices(
       (mnist_data.train.images, np.int32(mnist_data.train.labels)))
@@ -171,166 +203,112 @@ def build_fake_data(num_examples=10):
   return mnist_data
 
 
-def run_training():
-  """Run the main training loop."""
+def main(argv):
+  del argv  # unused
+  FLAGS.layer_sizes = [int(units) for units in FLAGS.layer_sizes]
+  FLAGS.activation = getattr(tf.nn, FLAGS.activation)
+  if tf.gfile.Exists(FLAGS.model_dir):
+    tf.logging.warning(
+        "Warning: deleting old log directory at {}".format(FLAGS.model_dir))
+    tf.gfile.DeleteRecursively(FLAGS.model_dir)
+  tf.gfile.MakeDirs(FLAGS.model_dir)
 
   if FLAGS.fake_data:
-    # Generate dummy images and labels for fast unit testing
     mnist_data = build_fake_data()
   else:
-    mnist_data = mnist.read_data_sets(FLAGS.input_data_dir)
-
-  def build_deep_classifier(images, name=None):
-    with tf.name_scope(name, "build_deep_classifier", [images]):
-      net = images
-      for layer_size in FLAGS.encoder_layers:
-        net = tf.layers.dense(net, layer_size, activation=FLAGS.activation)
-      logits = tf.layers.dense(net, 10, activation=None)
-      model = tfd.Categorical(logits=logits)
-      return model
+    mnist_data = mnist.read_data_sets(FLAGS.data_dir)
 
   with tf.Graph().as_default():
-
     (images, labels, handle,
      training_iterator, heldout_iterator) = build_input_pipeline(
          mnist_data, FLAGS.batch_size, mnist_data.validation.num_examples)
 
-    # Build a Bayesian neural net.
-    elbo_loss, model = weight_uncertainty.bayesianify(
-        build_deep_classifier, images, labels, mnist_data.train.num_examples)
+    # Build a Bayesian neural net. We use the Flipout Monte Carlo estimator for
+    # each layer: this enables lower variance stochastic gradients than naive
+    # reparameterization.
+    with tf.name_scope("bayesian_neural_net", values=[images]):
+      neural_net = tf.keras.Sequential()
+      for units in FLAGS.layer_sizes:
+        layer = tfp.layers.DenseFlipout(
+            units,
+            activation=FLAGS.activation)
+        neural_net.add(layer)
+      neural_net.add(tfp.layers.DenseFlipout(10))
+      logits = neural_net(images)
+      labels_distribution = tfd.Categorical(logits=logits)
+
+    # Compute the -ELBO as the loss, averaged over the batch size.
+    neg_log_likelihood = -tf.reduce_mean(labels_distribution.log_prob(labels))
+    kl = sum(neural_net.losses) / mnist_data.train.num_examples
+    elbo_loss = neg_log_likelihood + kl
+
+    # Build metrics for evaluation. Predictions are formed from a single forward
+    # pass of the probabilistic layers. They are cheap but noisy predictions.
+    predictions = tf.argmax(logits, axis=1)
+    accuracy, accuracy_update_op = tf.metrics.accuracy(
+        labels=labels, predictions=predictions)
 
     # Extract weight posterior statistics for later visualization.
-    qs = tf.get_collection(weight_uncertainty.VI_QDISTS)
-    names, qmeans, qstds = zip(*[
-        (q.name[6:-10], q.mean(), q.stddev()) for q in qs])
+    names = []
+    qmeans = []
+    qstds = []
+    for i, layer in enumerate(neural_net.layers):
+      q = layer.kernel_posterior
+      names.append("Layer {}".format(i))
+      qmeans.append(q.mean())
+      qstds.append(q.stddev())
 
     with tf.name_scope("train"):
-      opt = tf.train.AdamOptimizer(
-          learning_rate=FLAGS.learning_rate)
+      opt = tf.train.AdamOptimizer(learning_rate=FLAGS.learning_rate)
 
       train_op = opt.minimize(elbo_loss)
-      init = tf.global_variables_initializer()
       sess = tf.Session()
-      sess.run(init)
+      sess.run(tf.global_variables_initializer())
+      sess.run(tf.local_variables_initializer())
 
-      # Run the training loop
+      # Run the training loop.
       train_handle = sess.run(training_iterator.string_handle())
       heldout_handle = sess.run(heldout_iterator.string_handle())
       for step in range(FLAGS.max_steps):
-        _, loss_value = sess.run([train_op, elbo_loss],
-                                 feed_dict={handle: train_handle})
+        _ = sess.run([train_op, accuracy_update_op],
+                     feed_dict={handle: train_handle})
 
-        if step % 10 == 0:
-          print("step {:d} loss {:.2f}".format(step, loss_value))
+        if step % 100 == 0:
+          loss_value, accuracy_value = sess.run(
+              [elbo_loss, accuracy], feed_dict={handle: train_handle})
+          print("Step: {:>3d} Loss: {:.3f} Accuracy: {:.3f}".format(
+              step, loss_value, accuracy_value))
 
         if (step+1) % FLAGS.viz_steps == 0:
-
           # Compute log prob of heldout set by averaging draws from the model:
           # p(heldout | train) = int_model p(heldout|model) p(model|train)
           #                   ~= 1/n * sum_{i=1}^n p(heldout | model_i)
-          # where model_i is a draw from the posterior p(model|train)
-          probs = np.asarray([sess.run((model.probs),
+          # where model_i is a draw from the posterior p(model|train).
+          probs = np.asarray([sess.run((labels_distribution.probs),
                                        feed_dict={handle: heldout_handle})
-                              for _ in range(FLAGS.n_monte_carlo)])
+                              for _ in range(FLAGS.num_monte_carlo)])
           mean_probs = np.mean(probs, axis=0)
 
           image_vals, label_vals = sess.run((images, labels),
                                             feed_dict={handle: heldout_handle})
           heldout_lp = np.mean(np.log(mean_probs[np.arange(mean_probs.shape[0]),
                                                  label_vals.flatten()]))
-          print(" ... heldout lp {:.2f}".format(heldout_lp))
+          print(" ... Held-out nats: {:.3f}".format(heldout_lp))
 
           qm_vals, qs_vals = sess.run((qmeans, qstds))
-          plot_weight_posteriors(names, qm_vals, qs_vals,
-                                 fname=os.path.join(
-                                     FLAGS.log_dir,
-                                     "step{:05d}_weights.png".format(step)))
 
-          plot_heldout_prediction(image_vals, probs,
-                                  fname=os.path.join(
-                                      FLAGS.log_dir,
-                                      "step{:05d}_pred.png".format(step)),
-                                  title="mean heldout logprob {:.2f}"
-                                  .format(heldout_lp))
+          if HAS_SEABORN:
+            plot_weight_posteriors(names, qm_vals, qs_vals,
+                                   fname=os.path.join(
+                                       FLAGS.model_dir,
+                                       "step{:05d}_weights.png".format(step)))
 
-
-def main(_):
-  if tf.gfile.Exists(FLAGS.log_dir):
-    print("Warning: deleting old log directory at {}".format(FLAGS.log_dir))
-    tf.gfile.DeleteRecursively(FLAGS.log_dir)
-  tf.gfile.MakeDirs(FLAGS.log_dir)
-
-  run_training()
+            plot_heldout_prediction(image_vals, probs,
+                                    fname=os.path.join(
+                                        FLAGS.model_dir,
+                                        "step{:05d}_pred.png".format(step)),
+                                    title="mean heldout logprob {:.2f}"
+                                    .format(heldout_lp))
 
 if __name__ == "__main__":
-  parser = argparse.ArgumentParser()
-  parser.add_argument(
-      "--learning_rate",
-      type=float,
-      default=0.01,
-      help="Initial learning rate."
-  )
-  parser.add_argument(
-      "--max_steps",
-      type=int,
-      default=6000,
-      help="Number of training steps to run."
-  )
-  parser.add_argument(
-      "--encoder_layers",
-      type=str,
-      default="128,32",
-      help="Comma-separated list of layer sizes for the encoder."
-  )
-  parser.add_argument(
-      "--activation",
-      type=str,
-      default="elu",
-      help="Activation function for the encoder and decoder networks."
-      )
-  parser.add_argument(
-      "--batch_size",
-      type=int,
-      default=128,
-      help="Batch size.  Must divide evenly into the dataset sizes."
-  )
-  parser.add_argument(
-      "--input_data_dir",
-      type=str,
-      default=os.path.join(os.getenv("TEST_TMPDIR", "/tmp"),
-                           "mnist_deep_nn/input_data"),
-      help="Directory to put the input data."
-  )
-  parser.add_argument(
-      "--log_dir",
-      type=str,
-      default=os.path.join(os.getenv("TEST_TMPDIR", "/tmp"),
-                           "mnist_deep_nn/logs/"),
-      help="Directory to put the log data."
-  )
-  parser.add_argument(
-      "--viz_steps",
-      type=int,
-      default=400,
-      help="Frequency at which save visualizations."
-  )
-  parser.add_argument(
-      "--n_monte_carlo",
-      type=int,
-      default=50,
-      help="Network draws used to compute predictive probabilities"
-  )
-  parser.add_argument(
-      "--fake_data",
-      default=False,
-      action="store_true",
-      help="If true, uses fake data for unit testing.",
-  )
-
-  FLAGS, unparsed = parser.parse_known_args()
-
-  FLAGS.encoder_layers = [int(units) for units
-                          in FLAGS.encoder_layers.split(",")]
-  FLAGS.activation = tf.nn.__getattribute__(FLAGS.activation)
-
-  tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)
+  tf.app.run()

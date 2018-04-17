@@ -12,22 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Example implementations of common models."""
+"""Example of a Bayesian neural network."""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
-
-from tensorflow_probability.examples import bayesian_neural_network
-from tensorflow_probability.examples import logistic_regression
-from tensorflow_probability.examples import vae
-
-from tensorflow.python.util.all_util import remove_undocumented
-
-_allowed_symbols = [
-    "bayesian_neural_network",
-    "logistic_regression",
-    "vae",
-]
-
-remove_undocumented(__name__, _allowed_symbols)

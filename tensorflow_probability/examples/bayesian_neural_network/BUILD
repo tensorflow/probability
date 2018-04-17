@@ -13,9 +13,7 @@
 # limitations under the License.
 # ============================================================================
 # Description:
-#   TensorFlow Probability implements probabilistic and statistical
-#   methods, including modeling and Bayesian inference. APIs here are
-#   meant to evolve over time.
+# Example of a Bayesian neural network.
 
 licenses(["notice"])  # Apache 2.0
 
@@ -27,14 +25,31 @@ package(
 
 exports_files(["LICENSE"])
 
-py_library(
-    name = "examples",
-    srcs = ["__init__.py"],
-    data = [
-        "//tensorflow_probability/examples/bayesian_neural_network",
-        "//tensorflow_probability/examples/logistic_regression",
-        "//tensorflow_probability/examples/vae",
-    ],
+py_binary(
+    name = "bayesian_neural_network",
+    srcs = ["bayesian_neural_network.py"],
     srcs_version = "PY2AND3",
-    visibility = ["//tensorflow_probability:__pkg__"],
+    deps = [
+        # absl/flags dep,
+        # matplotlib dep,
+        # numpy dep,
+        # seaborn dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_test(
+    name = "bayesian_neural_network_test",
+    size = "small",
+    srcs = ["bayesian_neural_network.py"],
+    args = [
+        "--fake_data",
+        "--max_steps=5",
+    ],
+    main = "bayesian_neural_network.py",
+    srcs_version = "PY2AND3",
+    deps = [
+        ":bayesian_neural_network",
+    ],
 )

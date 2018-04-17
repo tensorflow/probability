@@ -81,8 +81,10 @@ trains a variational auto-encoder to generate MNIST digits. This includes:
 
 * [Variational Autoencoders](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/vae).
   Representation learning with a latent code and variational inference.
-* [Bayesian Neural Networks](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/weight_uncertainty).
+* [Bayesian Neural Networks](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/bayesian_neural_network).
   Neural networks with uncertainty over their weights.
+* [Bayesian Logistic Regression](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/logistic_regression).
+  Bayesian inference for binary classification.
 
 ## Installation
 
