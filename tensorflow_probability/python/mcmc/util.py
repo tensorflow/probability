@@ -149,10 +149,8 @@ def safe_sum(x, alt_value=-np.inf, name=None):
         is_sum_determinate[..., tf.newaxis],
         multiples=tf.concat([tf.ones(tf.rank(x) - 1, dtype=tf.int32), [n]],
                             axis=0))
-    x = tf.where(
-        is_sum_determinate,
-        x,
-        tf.fill(tf.shape(x), value=x.dtype.as_numpy_dtype(alt_value)))
+    alt_value = np.array(alt_value, x.dtype.as_numpy_dtype)
+    x = tf.where(is_sum_determinate, x, tf.fill(tf.shape(x), value=alt_value))
     x = tf.reduce_sum(x, axis=-1)
     x.set_shape(x.shape.merge_with(in_shape))
     return x

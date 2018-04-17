@@ -23,47 +23,49 @@ import collections
 import numpy as np
 
 import tensorflow as tf
+
 from tensorflow_probability.python.mcmc.util import choose
 from tensorflow_probability.python.mcmc.util import is_namedtuple_like
+from tensorflow.python.framework import test_util
 
 
 class ChooseTest(tf.test.TestCase):
 
+  @test_util.run_in_graph_and_eager_modes()
   def test_works_for_nested_namedtuple(self):
     Results = collections.namedtuple('Results', ['field1', 'inner'])  # pylint: disable=invalid-name
     InnerResults = collections.namedtuple('InnerResults', ['fieldA', 'fieldB'])  # pylint: disable=invalid-name
-    with self.test_session() as sess:
-      accepted = Results(
-          field1=np.int32([1, 3]),
-          inner=InnerResults(
-              fieldA=np.float32([5, 7]),
-              fieldB=[
-                  np.float32([9, 11]),
-                  np.float32([13, 15]),
-              ]))
-      rejected = Results(
-          field1=np.int32([0, 2]),
-          inner=InnerResults(
-              fieldA=np.float32([4, 6]),
-              fieldB=[
-                  np.float32([8, 10]),
-                  np.float32([12, 14]),
-              ]))
-      chosen = choose(
-          tf.constant([False, True]),
-          accepted,
-          rejected)
-      chosen_ = sess.run(chosen)
-      # Lhs should be 0,4,8,12 and rhs=lhs+3.
-      expected = Results(
-          field1=np.int32([0, 3]),
-          inner=InnerResults(
-              fieldA=np.float32([4, 7]),
-              fieldB=[
-                  np.float32([8, 11]),
-                  np.float32([12, 15]),
-              ]))
-      self.assertAllClose(expected, chosen_, atol=0., rtol=1e-5)
+    accepted = Results(
+        field1=np.int32([1, 3]),
+        inner=InnerResults(
+            fieldA=np.float32([5, 7]),
+            fieldB=[
+                np.float32([9, 11]),
+                np.float64([13, 15]),
+            ]))
+    rejected = Results(
+        field1=np.int32([0, 2]),
+        inner=InnerResults(
+            fieldA=np.float32([4, 6]),
+            fieldB=[
+                np.float32([8, 10]),
+                np.float64([12, 14]),
+            ]))
+    chosen = choose(
+        tf.constant([False, True]),
+        accepted,
+        rejected)
+    chosen_ = self.evaluate(chosen)
+    # Lhs should be 0,4,8,12 and rhs=lhs+3.
+    expected = Results(
+        field1=np.int32([0, 3]),
+        inner=InnerResults(
+            fieldA=np.float32([4, 7]),
+            fieldB=[
+                np.float32([8, 11]),
+                np.float64([12, 15]),
+            ]))
+    self.assertAllClose(expected, chosen_, atol=0., rtol=1e-5)
 
 
 class IsNamedTupleLikeTest(tf.test.TestCase):
