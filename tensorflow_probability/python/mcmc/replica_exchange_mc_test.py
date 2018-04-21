@@ -36,12 +36,15 @@ class REMCTest(tf.test.TestCase):
     with self.test_session(graph=tf.Graph()) as sess:
       target = tfd.Normal(loc=dtype(0), scale=dtype(1))
 
+      def make_kernel_fn(target_log_prob_fn, seed):
+        return tfp.mcmc.HamiltonianMonteCarlo(
+            target_log_prob_fn=target_log_prob_fn,
+            seed=seed, step_size=1.0, num_leapfrog_steps=3)
+
       remc = tfp.mcmc.ReplicaExchangeMC(
           target_log_prob_fn=target.log_prob,
           inverse_temperatures=10.**tf.linspace(0., -2., 5),
-          make_kernel_fn=tfp.mcmc.HamiltonianMonteCarlo,
-          step_size=1.0,
-          num_leapfrog_steps=3,
+          make_kernel_fn=make_kernel_fn,
           seed=42)
 
       samples, _ = tfp.mcmc.sample_chain(
@@ -71,12 +74,15 @@ class REMCTest(tf.test.TestCase):
               loc=[[-1., -1], [1., 1.]],
               scale_identity_multiplier=[0.1, 0.1]))
 
+      def make_kernel_fn(target_log_prob_fn, seed):
+        return tfp.mcmc.HamiltonianMonteCarlo(
+            target_log_prob_fn=target_log_prob_fn,
+            seed=seed, step_size=0.3, num_leapfrog_steps=3)
+
       remc = tfp.mcmc.ReplicaExchangeMC(
           target_log_prob_fn=target.log_prob,
           inverse_temperatures=10.**tf.linspace(0., -2., 5),
-          make_kernel_fn=tfp.mcmc.HamiltonianMonteCarlo,
-          step_size=0.3,
-          num_leapfrog_steps=3,
+          make_kernel_fn=make_kernel_fn,
           seed=42)
 
       samples, _ = tfp.mcmc.sample_chain(
@@ -102,14 +108,18 @@ class REMCTest(tf.test.TestCase):
     with self.assertRaises(ValueError) as cm:
       target = tfd.Normal(loc=dtype(0), scale=dtype(1))
 
+      def make_kernel_fn(target_log_prob_fn, seed):
+        return tfp.mcmc.HamiltonianMonteCarlo(
+            target_log_prob_fn=target_log_prob_fn,
+            seed=seed, step_size=1.0, num_leapfrog_steps=3)
+
       tfp.mcmc.ReplicaExchangeMC(
           target_log_prob_fn=target.log_prob,
           inverse_temperatures=10.**tf.linspace(
               0., -2., tf.random_uniform([], maxval=10, dtype=tf.int32)),
-          make_kernel_fn=tfp.mcmc.HamiltonianMonteCarlo,
-          step_size=1.0,
-          num_leapfrog_steps=3,
+          make_kernel_fn=make_kernel_fn,
           seed=42)
+
     the_exception = cm.exception
     tf.equal(the_exception.args[0],
              '"inverse_temperatures" must have statically known rank '

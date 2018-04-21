@@ -117,12 +117,15 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
 
   target = tfd.Normal(loc=dtype(0), scale=dtype(1))
 
+  def make_kernel_fn(target_log_prob_fn, seed):
+    return tfp.mcmc.HamiltonianMonteCarlo(
+        target_log_prob_fn=target_log_prob_fn,
+        seed=seed, step_size=1.0, num_leapfrog_steps=3)
+
   remc = tfp.mcmc.ReplicaExchangeMC(
       target_log_prob_fn=target.log_prob,
       inverse_temperatures=10.**tf.linspace(0., -2., 5),
-      make_kernel_fn=tfp.mcmc.HamiltonianMonteCarlo,
-      step_size=1.0,
-      num_leapfrog_steps=3,
+      make_kernel_fn=make_kernel_fn,
       seed=42)
 
   samples, _ = tfp.mcmc.sample_chain(
@@ -160,12 +163,15 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
           loc=[[-1., -1], [1., 1.]],
           scale_identity_multiplier=[0.1, 0.1]))
 
+  def make_kernel_fn(target_log_prob_fn, seed):
+    return tfp.mcmc.HamiltonianMonteCarlo(
+        target_log_prob_fn=target_log_prob_fn,
+        seed=seed, step_size=0.3, num_leapfrog_steps=3)
+
   remc = tfp.mcmc.ReplicaExchangeMC(
       target_log_prob_fn=target.log_prob,
       inverse_temperatures=10.**tf.linspace(0., -2., 5),
-      make_kernel_fn=tfp.mcmc.HamiltonianMonteCarlo,
-      step_size=0.3,
-      num_leapfrog_steps=3,
+      make_kernel_fn=make_kernel_fn,
       seed=42)
 
   samples, _ = tfp.mcmc.sample_chain(
@@ -232,7 +238,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
       self.replica_kernels.append(make_kernel_fn(
           target_log_prob_fn=_replica_log_prob_fn(
               inverse_temperatures[i], target_log_prob_fn),
-          seed=self._seed_stream, name=name, **kwargs))
+          seed=self._seed_stream))
 
   @property
   def target_log_prob_fn(self):
@@ -422,11 +428,6 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
           sampled_replica_states=replica_states,
           sampled_replica_results=replica_results,
       )
-
-
-def has_target_log_prob(kernel_results):
-  """Returns `True` if `target_log_prob` is a member of input."""
-  return getattr(kernel_results, 'target_log_prob', None) is not None
 
 
 def _stateful_lambda(x):
