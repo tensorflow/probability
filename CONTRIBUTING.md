@@ -26,6 +26,10 @@ from GitHub in that we pull and submit the change into an internal version
 control system. This system automatically pushes a git commit to the GitHub
 repository (with credit to the original author) and closes the pull request.
 
+## Style
+
+See the [TensorFlow Probability style guide](STYLE_GUIDE.md).
+
 ## Unit tests
 
 Please include unit tests when contributing new features, as they help to a)

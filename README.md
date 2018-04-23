@@ -124,13 +124,34 @@ PKGDIR=$(mktemp -d)
 pip install --user --upgrade $PKGDIR/*.whl
 ```
 
+## Community
+
+As part of TensorFlow, we're committed to fostering an open and welcoming
+environment.
+
+* [Stack Overflow](https://stackoverflow.com/questions/tagged/tensorflow): Ask
+  or answer technical questions.
+* [GitHub](https://github.com/tensorflow/probability/issues): Report bugs or
+  make feature requests.
+* [TensorFlow Blog](https://medium.com/tensorflow): Stay up to date on content
+  from the TensorFlow team and best articles from the community.
+* [Youtube Channel](http://youtube.com/tensorflow/): Follow TensorFlow shows.
+* Mailing list: Stay tuned!
+
+See the [TensorFlow Community](https://www.tensorflow.org/community/) page for
+more details. Check out our latest publicity here:
+
++ [Coffee with a Googler: Probabilistic Machine Learning in TensorFlow](
+  https://www.youtube.com/watch?v=BjUkL8DFH5Q)
++ [Introducing TensorFlow Probability](
+  https://medium.com/tensorflow/introducing-tensorflow-probability-dca4c304e245)
+
 ## Contributing
 
-We're eager to collaborate with you! Feel free to [open an issue on
-GitHub](https://github.com/tensorflow/probability/issues) and/or send us your
-pull requests. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for more details.
-This project adheres to TensorFlow's [code of conduct](CODE_OF_CONDUCT.md). By
-participating, you are expected to uphold this code.
+We're eager to collaborate with you! See [`CONTRIBUTING.md`](CONTRIBUTING.md)
+for more details. This project adheres to TensorFlow's
+[code of conduct](CODE_OF_CONDUCT.md). By participating, you are expected to
+uphold this code.
 
 ## References
 
@@ -138,11 +159,3 @@ participating, you are expected to uphold this code.
 Eugene Brevdo, Srinivas Vasudevan, Dave Moore, Brian Patton, Alex Alemi, Matt
 Hoffman, Rif A. Saurous.
 [arXiv preprint arXiv:1711.10604, 2017](https://arxiv.org/abs/1711.10604).
-
-
-## Publicity
-
-+ [Coffee with a Googler: Probabilistic Machine Learning in TensorFlow](
-  https://www.youtube.com/watch?v=BjUkL8DFH5Q)
-+ [Introducing TensorFlow Probability](
-  https://medium.com/tensorflow/introducing-tensorflow-probability-dca4c304e245)
