@@ -64,7 +64,7 @@ time.
 
 ## Examples
 
-See [`tfp.examples`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/)
+See [`tensorflow_probability/examples/`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/)
 for end-to-end examples. It includes tutorial notebooks such as:
 
 * [Linear Mixed Effects Models](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Linear_Mixed_Effects_Models.ipynb).
@@ -75,15 +75,13 @@ for end-to-end examples. It includes tutorial notebooks such as:
   How to distinguish between samples, batches, and events for arbitrarily shaped
   probabilistic computations.
 
-Example scripts can also be run under command line. For example,
-`python -m tensorflow_probability.examples.vae`
-trains a variational auto-encoder to generate MNIST digits. This includes:
+It also includes example scripts such as:
 
-* [Variational Autoencoders](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/vae).
+* [Variational Autoencoders](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/vae.py).
   Representation learning with a latent code and variational inference.
-* [Bayesian Neural Networks](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/bayesian_neural_network).
+* [Bayesian Neural Networks](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/bayesian_neural_network.py).
   Neural networks with uncertainty over their weights.
-* [Bayesian Logistic Regression](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/logistic_regression).
+* [Bayesian Logistic Regression](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/logistic_regression.py).
   Bayesian inference for binary classification.
 
 ## Installation

@@ -13,9 +13,7 @@
 # limitations under the License.
 # ============================================================================
 # Description:
-#   TensorFlow Probability implements probabilistic and statistical
-#   methods, including modeling and Bayesian inference. APIs here are
-#   meant to evolve over time.
+#   TensorFlow Probability examples.
 
 licenses(["notice"])  # Apache 2.0
 
@@ -27,14 +25,91 @@ package(
 
 exports_files(["LICENSE"])
 
-py_library(
-    name = "examples",
-    srcs = ["__init__.py"],
-    data = [
-        "//tensorflow_probability/examples/bayesian_neural_network",
-        "//tensorflow_probability/examples/logistic_regression",
-        "//tensorflow_probability/examples/vae",
-    ],
+py_binary(
+    name = "bayesian_neural_network",
+    srcs = ["bayesian_neural_network.py"],
     srcs_version = "PY2AND3",
-    visibility = ["//tensorflow_probability:__pkg__"],
+    deps = [
+        # absl/flags dep,
+        # matplotlib dep,
+        # numpy dep,
+        # seaborn dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_test(
+    name = "bayesian_neural_network_test",
+    size = "small",
+    srcs = ["bayesian_neural_network.py"],
+    args = [
+        "--fake_data",
+        "--max_steps=5",
+    ],
+    main = "bayesian_neural_network.py",
+    srcs_version = "PY2AND3",
+    deps = [
+        ":bayesian_neural_network",
+    ],
+)
+
+py_binary(
+    name = "logistic_regression",
+    srcs = ["logistic_regression.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # absl/flags dep,
+        # matplotlib dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_test(
+    name = "logistic_regression_test",
+    size = "small",
+    srcs = [
+        "logistic_regression.py",
+    ],
+    args = [
+        "--num_examples=32",
+        "--batch_size=8",
+        "--max_steps=50",
+    ],
+    main = "logistic_regression.py",
+    srcs_version = "PY2AND3",
+    deps = [
+        ":logistic_regression",
+    ],
+)
+
+py_binary(
+    name = "vae",
+    srcs = ["vae.py"],
+    main = "vae.py",
+    srcs_version = "PY2AND3",
+    deps = [
+        # absl/flags dep,
+        # matplotlib dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_test(
+    name = "vae_test",
+    size = "small",
+    srcs = ["vae.py"],
+    args = [
+        "--fake_data",
+        "--max_steps=5",
+    ],
+    main = "vae.py",
+    srcs_version = "PY2AND3",
+    deps = [
+        ":vae",
+    ],
 )
