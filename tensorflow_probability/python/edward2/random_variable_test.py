@@ -55,15 +55,15 @@ class RandomVariableTest(tf.test.TestCase):
 
   @tfe.run_test_in_graph_and_eager_modes()
   def testGradientsFirstOrder(self):
-    f = lambda x: 2 * x
-    x = ed.RandomVariable(tfd.Bernoulli(probs=0.5))
+    f = lambda x: 2. * x
+    x = ed.RandomVariable(tfd.Normal(0., 1.))
     y = f(x)
     if tfe.in_eager_mode():
       df = tfe.gradients_function(f)
       (z,) = df(x)
     else:
       (z,) = tf.gradients(y, x)
-    self.assertEqual(self.evaluate(z), 2)
+    self.assertEqual(self.evaluate(z), 2.)
 
   @tfe.run_test_in_graph_and_eager_modes()
   def testGradientsSecondOrder(self):

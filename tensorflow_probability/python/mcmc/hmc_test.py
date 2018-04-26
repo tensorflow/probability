@@ -534,9 +534,6 @@ class HMCTest(tf.test.TestCase):
         [g is None for g in tf.gradients(
             kernel_results.proposed_results.grads_target_log_prob,
             initial_x)])
-    self.assertAllEqual([False], [g is None for g in tf.gradients(
-        kernel_results.proposed_results.grads_target_log_prob,
-        kernel_results.proposed_state)])
 
     # Gradients of the acceptance probs and new log prob are not finite.
     # self.assertAllFinite(
