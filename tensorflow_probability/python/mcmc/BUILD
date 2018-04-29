@@ -35,6 +35,7 @@ py_library(
         ":kernel",
         ":metropolis_hastings",
         ":random_walk_metropolis",
+        ":replica_exchange_mc",
         ":sample",
         ":sample_annealed_importance",
         ":sample_halton_sequence",
@@ -99,6 +100,18 @@ py_library(
 py_library(
     name = "metropolis_hastings",
     srcs = ["metropolis_hastings.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":kernel",
+        ":util",
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "replica_exchange_mc",
+    srcs = ["replica_exchange_mc.py"],
     srcs_version = "PY2AND3",
     deps = [
         ":kernel",
