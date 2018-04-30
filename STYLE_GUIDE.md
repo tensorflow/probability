@@ -65,10 +65,10 @@ it supercedes all previous conventions.
     of annoying scrolling ...unless Examples follow Args/Returns/Raises.
 
 3.  __Citations in Docstrings.__ Write a `#### References` subsection at the
-    bottom of any docstring with citations. Enumerate all references in
-    alphabetical order. Individual bib entries use ICLR’s bibliography style,
-    which borrows from icml2010.bst and which itself borrows from plainnl.bst.
-    Add a link to the paper if the publication is open source (ideally, arXiv).
+    bottom of any docstring with citations. Use ICLR’s bibliography style to
+    write references; for example, order entries by the first author's last
+    name. Add a link to the paper if the publication is open source (ideally,
+    arXiv).
 
     Write in-paragraph citations in general, e.g., [(Tran and Blei, 2018)][1].
     Write in-text citations when the citation is a noun, e.g., [Tran and Blei
@@ -81,20 +81,27 @@ it supercedes all previous conventions.
     ```none
     #### References
 
-    [1]: Andrew Gelman and Donald B. Rubin. Inference from Iterative Simulation
-    Using Multiple Sequences. _Statistical Science_, 7(4):457-472, 1992.
+    # technical report
+    [1]: Tony Finch. Incremental calculation of weighted mean and variance.
+         _Technical Report_, 2009.
+         http://people.ds.cam.ac.uk/fanf2/hermes/doc/antiforgery/stats.pdf
 
-    [2]: Tony Finch. Incremental calculation of weighted mean and variance.
-    _Technical Report_, 2009.
-    http://people.ds.cam.ac.uk/fanf2/hermes/doc/antiforgery/stats.pdf
+    # journal
+    [2]: Andrew Gelman and Donald B. Rubin. Inference from Iterative Simulation
+         Using Multiple Sequences. _Statistical Science_, 7(4):457-472, 1992.
 
-    [3]: Art B. Owen. A randomized Halton algorithm in R. _arXiv preprint
-    arXiv:1706.02808_, 2017. https://arxiv.org/abs/1706.02808
+    # arXiv preprint
+    # use "et al." for papers with too many authors to maintain
+    [3]: Aaron van den Oord et al. Parallel WaveNet: Fast High-Fidelity Speech
+         Synthesis. _arXiv preprint arXiv:1711.10433_, 2017.
+         https://arxiv.org/abs/1711.10433
 
+    # conference
     [4]: Yeming Wen, Paul Vicol, Jimmy Ba, Dustin Tran, and Roger Grosse.
-    Flipout: Efficient Pseudo-Independent Weight Perturbations on Mini-Batches.
-    In _International Conference on Learning Representations_, 2018.
-    https://arxiv.org/abs/1803.04386
+         Flipout: Efficient Pseudo-Independent Weight Perturbations on
+         Mini-Batches. In _International Conference on Learning
+         Representations_, 2018.
+         https://arxiv.org/abs/1803.04386
     ```
 
 4.  When doing float math over literals eg use `1.` instead of `1` or `1.0`.
