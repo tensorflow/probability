@@ -23,6 +23,8 @@ from tensorflow_probability.python.mcmc.diagnostic import potential_scale_reduct
 from tensorflow_probability.python.mcmc.hmc import HamiltonianMonteCarlo
 from tensorflow_probability.python.mcmc.hmc import UncalibratedHamiltonianMonteCarlo
 from tensorflow_probability.python.mcmc.kernel import TransitionKernel
+from tensorflow_probability.python.mcmc.langevin import MetropolisAdjustedLangevinAlgorithm
+from tensorflow_probability.python.mcmc.langevin import UncalibratedLangevin
 from tensorflow_probability.python.mcmc.metropolis_hastings import MetropolisHastings
 from tensorflow_probability.python.mcmc.random_walk_metropolis import random_walk_normal_fn
 from tensorflow_probability.python.mcmc.random_walk_metropolis import random_walk_uniform_fn
@@ -37,6 +39,8 @@ from tensorflow_probability.python.mcmc.sample_halton_sequence import sample_hal
 from tensorflow.python.util.all_util import remove_undocumented
 
 _allowed_symbols = [
+    'MetropolisAdjustedLangevinAlgorithm',
+    'UncalibratedLangevin',
     'HamiltonianMonteCarlo',
     'MetropolisHastings',
     'ReplicaExchangeMC',

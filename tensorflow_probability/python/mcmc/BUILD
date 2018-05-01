@@ -33,6 +33,7 @@ py_library(
         ":diagnostic",
         ":hmc",
         ":kernel",
+        ":langevin",
         ":metropolis_hastings",
         ":random_walk_metropolis",
         ":replica_exchange_mc",
@@ -83,6 +84,29 @@ py_test(
     deps = [
         # numpy dep,
         # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "langevin",
+    srcs = ["langevin.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":kernel",
+        ":metropolis_hastings",
+        ":util",
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "langevin_test",
+    size = "medium",
+    srcs = ["langevin_test.py"],
+    deps = [
+        # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],
@@ -140,7 +164,6 @@ py_library(
         ":kernel",
         ":metropolis_hastings",
         ":util",
-        # numpy dep,
         # tensorflow dep,
     ],
 )

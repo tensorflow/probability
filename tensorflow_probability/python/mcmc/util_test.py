@@ -25,6 +25,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.mcmc.util import choose
+from tensorflow_probability.python.mcmc.util import gradients
 from tensorflow_probability.python.mcmc.util import is_namedtuple_like
 from tensorflow.python.framework import test_util
 
@@ -86,6 +87,24 @@ class IsNamedTupleLikeTest(tf.test.TestCase):
     self.assertFalse(is_namedtuple_like(dict(a=5, b=6)))
     self.assertFalse(is_namedtuple_like(tf.constant(1.)))
     self.assertFalse(is_namedtuple_like(np.int32()))
+
+
+class GradientTest(tf.test.TestCase):
+
+  @test_util.run_in_graph_and_eager_modes()
+  def testGradientComputesCorrectly(self):
+    dtype = np.float32
+    def fn(x, y):
+      return x**2 + y ** 2
+
+    fn_args = [dtype(3), dtype(3)]
+    # Convert function input to a list of tensors
+    fn_args = [tf.convert_to_tensor(arg) for arg in fn_args]
+    fn_res = fn(*fn_args)
+    grads = gradients(fn, fn_res, *fn_args)
+    print('grads: ', grads)
+    for grad in grads:
+      self.assertAllClose(self.evaluate(grad), dtype(6), atol=0., rtol=1e-5)
 
 
 if __name__ == '__main__':

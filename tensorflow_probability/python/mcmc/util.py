@@ -22,9 +22,12 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
+from tensorflow.contrib import eager as tfe
+
 
 __all__ = [
     'choose',
+    'gradients',
     'is_list_like',
     'is_namedtuple_like',
     'make_name',
@@ -162,3 +165,14 @@ def set_doc(value):
     func.__doc__ = value
     return func
   return _doc
+
+
+def gradients(fn, fn_res, *fn_args):
+  """Maybe calls `fn` and computes the gradient of `fn_res` wrt `fn_args`."""
+  if tfe.executing_eagerly():
+    # Gradient in eager mode needs to recompute `fn_res = fn(*fn_args)`
+    grads = tfe.gradients_function(fn)(*fn_args)
+  else:
+    # Gradient in graph mode
+    grads = tf.gradients(fn_res, fn_args)
+  return grads
