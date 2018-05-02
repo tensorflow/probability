@@ -447,8 +447,7 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
             previous_kernel_results.target_log_prob,
             previous_kernel_results.grads_target_log_prob,
             previous_kernel_results.volatility,
-            previous_kernel_results.grads_volatility,
-            previous_kernel_results.diffusion_drift)
+            previous_kernel_results.grads_volatility)
 
         random_draw_parts = []
         for s in current_state_parts:
@@ -508,8 +507,8 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
           ),
       ]
 
-  @mcmc_util.set_doc(MetropolisAdjustedLangevinAlgorithm.bootstrap_results.
-                     __doc__)
+  @mcmc_util.set_doc(
+      MetropolisAdjustedLangevinAlgorithm.bootstrap_results.__doc__)
   def bootstrap_results(self, init_state):
     with tf.name_scope(
         name=mcmc_util.make_name(self.name, 'mala', 'bootstrap_results'),
@@ -795,25 +794,22 @@ def _compute_log_acceptance_correction(current_state_parts,
                                -proposed_log_density_reduce])
 
 
-def _maybe_call_fn_and_grads_and_volatility(fn,
-                                            volatility_fn,
-                                            fn_arg_list,
-                                            fn_result=None,
-                                            grads_fn_result=None,
-                                            volatility_fn_results=None,
-                                            grads_volatility_fn=None,
-                                            description='target_log_prob'):
-  """Helper which computes `fn_result`, `grads` and `volatility` if needed."""
-  fn_arg_list = (list(fn_arg_list) if mcmc_util.is_list_like(fn_arg_list)
-                 else [fn_arg_list])
-  if fn_result is None:
-    fn_result = fn(*fn_arg_list)
-  if not fn_result.dtype.is_floating:
-    raise TypeError('`{}` must be a `Tensor` with `float` `dtype`.'.format(
-        description))
-
-  if volatility_fn_results is None:
-    volatility_fn_results = volatility_fn(*fn_arg_list)
+def _maybe_call_volatility_fn_and_grads(volatility_fn,
+                                        state,
+                                        volatility_fn_results=None,
+                                        grads_volatility_fn=None):
+  """Helper which computes `volatility_fn` results and grads, if needed."""
+  state_parts = list(state) if mcmc_util.is_list_like(state) else [state]
+  needs_volatility_fn_gradients = grads_volatility_fn is None
+  [
+      volatility_fn_results,
+      grads_volatility_fn,
+  ] = mcmc_util.maybe_call_fn_and_grads(
+      volatility_fn,
+      state_parts,
+      volatility_fn_results,
+      grads_volatility_fn,
+      check_non_none_grads=False)
 
   # Convert `volatility_fn_results` to a list
   volatility_parts = (
@@ -822,69 +818,59 @@ def _maybe_call_fn_and_grads_and_volatility(fn,
       else [volatility_fn_results])
 
   if len(volatility_parts) == 1:
-    volatility_parts *= len(fn_arg_list)
+    volatility_parts *= len(state_parts)
 
-  if len(volatility_parts) != len(fn_arg_list):
+  if len(volatility_parts) != len(state_parts):
     raise ValueError('There should be exactly one `volatility_parts` or it'
                      'should have same length as `current_state`.')
 
   # Compute gradient of `volatility_parts ** 2`
-  if grads_volatility_fn is None:
-    # Auxiliary gradient
-    grads_volatility_fn_aux = mcmc_util.gradients(volatility_fn,
-                                                  volatility_fn_results,
-                                                  *fn_arg_list)
-    grads_volatility_fn = []
-    for g, volatility, fn_arg in zip(grads_volatility_fn_aux, volatility_parts,
-                                     fn_arg_list):
-      grad_volatility = 2 * g * volatility if g is not None else tf.zeros_like(
-          fn_arg, dtype=fn_arg.dtype.base_dtype)
-      grads_volatility_fn.append(grad_volatility)
+  if needs_volatility_fn_gradients:
+    grads_volatility_fn = [
+        2. * g * volatility if g is not None else tf.zeros_like(
+            fn_arg, dtype=fn_arg.dtype.base_dtype)
+        for g, volatility, fn_arg in zip(
+            grads_volatility_fn, volatility_parts, state_parts)
+    ]
 
-  # Compute gradient of `fn(*fn_arg_list)`
-  if grads_fn_result is None:
-    grads_fn_result = mcmc_util.gradients(fn, fn_result, *fn_arg_list)
-
-  if len(fn_arg_list) != len(grads_fn_result):
-    raise ValueError('`{}` must be in one-to-one correspondence with '
-                     '`grads_{}`'.format(*[description]*2))
-  if any(g is None for g in grads_fn_result):
-    raise ValueError('Encountered `None` gradient.')
-  return fn_result, grads_fn_result, volatility_parts, grads_volatility_fn
+  return volatility_parts, grads_volatility_fn
 
 
 def _maybe_broadcast_volatility(volatility_parts,
                                 state_parts):
   """Helper to broadcast `volatility_parts` to the shape of `state_parts`."""
-  volatility_parts_broadcasted = [
-      v + tf.zeros_like(sp, dtype=sp.dtype.base_dtype)
-      for v, sp in zip(volatility_parts, state_parts)]
-
-  return volatility_parts_broadcasted
+  return [v + tf.zeros_like(sp, dtype=sp.dtype.base_dtype)
+          for v, sp in zip(volatility_parts, state_parts)]
 
 
-def _prepare_args(target_log_prob_fn, volatility_fn, state, step_size,
+def _prepare_args(target_log_prob_fn,
+                  volatility_fn,
+                  state,
+                  step_size,
                   target_log_prob=None,
                   grads_target_log_prob=None,
                   volatility=None,
-                  grads_volatility_fn=None,
-                  description='target_log_prob'):
+                  grads_volatility_fn=None):
   """Helper which processes input args to meet list-like assumptions."""
   state_parts = list(state) if mcmc_util.is_list_like(state) else [state]
   state_parts = [tf.convert_to_tensor(s, name='current_state')
                  for s in state_parts]
-  (target_log_prob,
-   grads_target_log_prob,
-   volatility_parts,
-   grads_volatility) = _maybe_call_fn_and_grads_and_volatility(
-       target_log_prob_fn,
-       volatility_fn,
-       state_parts,
-       target_log_prob,
-       grads_target_log_prob,
-       volatility,
-       grads_volatility_fn,
-       description)
+  [
+      target_log_prob,
+      grads_target_log_prob,
+  ] = mcmc_util.maybe_call_fn_and_grads(
+      target_log_prob_fn,
+      state_parts,
+      target_log_prob,
+      grads_target_log_prob)
+  [
+      volatility_parts,
+      grads_volatility,
+  ] = _maybe_call_volatility_fn_and_grads(
+      volatility_fn,
+      state_parts,
+      volatility,
+      grads_volatility_fn)
 
   step_sizes = (list(step_size) if mcmc_util.is_list_like(step_size)
                 else [step_size])

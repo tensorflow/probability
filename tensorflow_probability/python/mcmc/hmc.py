@@ -27,7 +27,6 @@ import tensorflow as tf
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import metropolis_hastings
 from tensorflow_probability.python.mcmc import util as mcmc_util
-from tensorflow.contrib import eager as tfe
 from tensorflow.python.ops.distributions import util as distributions_util
 
 
@@ -507,7 +506,7 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
       [
           init_target_log_prob,
           init_grads_target_log_prob,
-      ] = _value_and_gradients(self.target_log_prob_fn, *init_state)
+      ] = mcmc_util.maybe_call_fn_and_grads(self.target_log_prob_fn, init_state)
       return UncalibratedHamiltonianMonteCarloKernelResults(
           log_acceptance_correction=tf.zeros_like(init_target_log_prob),
           target_log_prob=init_target_log_prob,
@@ -688,7 +687,7 @@ def _leapfrog_integrator(current_momentums,
     [
         current_target_log_prob,
         current_grads_target_log_prob,
-    ] = _maybe_call_fn_and_grads(
+    ] = mcmc_util.maybe_call_fn_and_grads(
         target_log_prob_fn,
         current_state_parts,
         current_target_log_prob,
@@ -729,7 +728,9 @@ def _leapfrog_step(current_momentums,
     [
         proposed_target_log_prob,
         proposed_grads_target_log_prob,
-    ] = _value_and_gradients(target_log_prob_fn, *proposed_state_parts)
+    ] = mcmc_util.maybe_call_fn_and_grads(
+        target_log_prob_fn,
+        proposed_state_parts)
 
     if not proposed_target_log_prob.dtype.is_floating:
       raise TypeError('`target_log_prob_fn` must produce a `Tensor` '
@@ -851,42 +852,21 @@ def _compute_log_acceptance_correction(current_momentums,
     return mcmc_util.safe_sum([current_kinetic, -proposed_kinetic])
 
 
-def _maybe_call_fn_and_grads(fn,
-                             fn_arg_list,
-                             fn_result=None,
-                             grads_fn_result=None,
-                             description='target_log_prob'):
-  """Helper which computes `fn_result` and `grads` if needed."""
-  fn_arg_list = (list(fn_arg_list) if mcmc_util.is_list_like(fn_arg_list)
-                 else [fn_arg_list])
-  if fn_result is None:
-    fn_result = fn(*fn_arg_list)
-  if not fn_result.dtype.is_floating:
-    raise TypeError('`{}` must be a `Tensor` with `float` `dtype`.'.format(
-        description))
-  if grads_fn_result is None:
-    grads_fn_result = tf.gradients(fn_result, fn_arg_list)
-  if len(fn_arg_list) != len(grads_fn_result):
-    raise ValueError('`{}` must be in one-to-one correspondence with '
-                     '`grads_{}`'.format(*[description]*2))
-  if any(g is None for g in grads_fn_result):
-    raise ValueError('Encountered `None` gradient.')
-  return fn_result, grads_fn_result
-
-
-def _prepare_args(target_log_prob_fn, state, step_size,
-                  target_log_prob=None, grads_target_log_prob=None,
-                  maybe_expand=False, description='target_log_prob'):
+def _prepare_args(target_log_prob_fn,
+                  state,
+                  step_size,
+                  target_log_prob=None,
+                  grads_target_log_prob=None,
+                  maybe_expand=False):
   """Helper which processes input args to meet list-like assumptions."""
   state_parts = list(state) if mcmc_util.is_list_like(state) else [state]
   state_parts = [tf.convert_to_tensor(s, name='current_state')
                  for s in state_parts]
-  target_log_prob, grads_target_log_prob = _maybe_call_fn_and_grads(
+  target_log_prob, grads_target_log_prob = mcmc_util.maybe_call_fn_and_grads(
       target_log_prob_fn,
       state_parts,
       target_log_prob,
-      grads_target_log_prob,
-      description)
+      grads_target_log_prob)
   step_sizes = (list(step_size) if mcmc_util.is_list_like(step_size)
                 else [step_size])
   step_sizes = [
@@ -911,12 +891,3 @@ def _prepare_args(target_log_prob_fn, state, step_size,
 def _log_sum_sq(x, axis=None):
   """Computes log(sum(x**2))."""
   return tf.reduce_logsumexp(2. * tf.log(tf.abs(x)), axis)
-
-
-def _value_and_gradients(fn, *args):
-  """Calls `fn` and computes the gradient of the result wrt `args_list`."""
-  if tfe.executing_eagerly():
-    return tfe.value_and_gradients_function(fn)(*args)
-  result = fn(*args)
-  grads = tf.gradients(result, args)
-  return result, grads

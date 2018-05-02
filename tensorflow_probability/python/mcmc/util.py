@@ -27,10 +27,10 @@ from tensorflow.contrib import eager as tfe
 
 __all__ = [
     'choose',
-    'gradients',
     'is_list_like',
     'is_namedtuple_like',
     'make_name',
+    'maybe_call_fn_and_grads',
     'safe_sum',
     'set_doc',
 ]
@@ -65,6 +65,7 @@ def _choose_base_case(is_accepted,
                       name=None):
   """Helper to `choose` which expand_dims `is_accepted` and applies tf.where."""
   def _expand_is_accepted_like(x):
+    """Helper to expand `is_accepted` like the shape of some input arg."""
     with tf.name_scope('expand_is_accepted_like'):
       expand_shape = tf.concat([
           tf.shape(is_accepted),
@@ -167,12 +168,71 @@ def set_doc(value):
   return _doc
 
 
-def gradients(fn, fn_res, *fn_args):
-  """Maybe calls `fn` and computes the gradient of `fn_res` wrt `fn_args`."""
-  if tfe.executing_eagerly():
-    # Gradient in eager mode needs to recompute `fn_res = fn(*fn_args)`
-    grads = tfe.gradients_function(fn)(*fn_args)
-  else:
-    # Gradient in graph mode
-    grads = tf.gradients(fn_res, fn_args)
-  return grads
+def _value_and_gradients(fn, fn_arg_list, result=None, grads=None, name=None):
+  """Helper to `maybe_call_fn_and_grads`."""
+  with tf.name_scope(name, 'value_and_gradients', [fn_arg_list, result, grads]):
+    def _convert_to_tensor(x, name):
+      ctt = lambda x_: x_ if x_ is None else tf.convert_to_tensor(x_, name=name)
+      return [ctt(x_) for x_ in x] if is_list_like(x) else ctt(x)
+
+    fn_arg_list = (list(fn_arg_list) if is_list_like(fn_arg_list)
+                   else [fn_arg_list])
+    fn_arg_list = _convert_to_tensor(fn_arg_list, 'fn_arg')
+
+    if result is None:
+      result = fn(*fn_arg_list)
+    result = _convert_to_tensor(result, 'fn_result')
+
+    if grads is not None:
+      grads = _convert_to_tensor(grads, 'fn_grad')
+      return result, grads
+
+    if tfe.executing_eagerly():
+      if is_list_like(result) and len(result) == len(fn_arg_list):
+        # Compute the block diagonal of Jacobian.
+        # TODO(b/79158574): Guard this calculation by an arg which explicitly
+        # requests block diagonal Jacobian calculation.
+        def make_fn_slice(i):
+          """Needed to prevent `cell-var-from-loop` pylint warning."""
+          return lambda *args: fn(*args)[i]
+        grads = [
+            tfe.gradients_function(make_fn_slice(i))(*fn_arg_list)[i]
+            for i in range(len(result))
+        ]
+      else:
+        grads = tfe.gradients_function(fn)(*fn_arg_list)
+    else:
+      if is_list_like(result) and len(result) == len(fn_arg_list):
+        # Compute the block diagonal of Jacobian.
+        # TODO(b/79158574): Guard this calculation by an arg which explicitly
+        # requests block diagonal Jacobian calculation.
+        grads = [tf.gradients(result[i], fn_arg_list[i])[0]
+                 for i in range(len(result))]
+      else:
+        grads = tf.gradients(result, fn_arg_list)
+
+    return result, grads
+
+
+def maybe_call_fn_and_grads(fn,
+                            fn_arg_list,
+                            result=None,
+                            grads=None,
+                            check_non_none_grads=True,
+                            name=None):
+  """Calls `fn` and computes the gradient of the result wrt `args_list`."""
+  with tf.name_scope(name, 'maybe_call_fn_and_grads',
+                     [fn_arg_list, result, grads]):
+    fn_arg_list = (list(fn_arg_list) if is_list_like(fn_arg_list)
+                   else [fn_arg_list])
+    result, grads = _value_and_gradients(fn, fn_arg_list, result, grads)
+    if not all(r.dtype.is_floating
+               for r in (result if is_list_like(result) else [result])):  # pylint: disable=superfluous-parens
+      raise TypeError('Function result must be a `Tensor` with `float` '
+                      '`dtype`.')
+    if len(fn_arg_list) != len(grads):
+      raise ValueError('Function args must be in one-to-one correspondence '
+                       'with grads.')
+    if check_non_none_grads and any(g is None for g in grads):
+      raise ValueError('Encountered `None` gradient.')
+    return result, grads

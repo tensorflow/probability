@@ -129,8 +129,8 @@ class LangevinTest(tf.test.TestCase):
       # Here we define the volatility function to be non-caonstant
       def volatility_fn(x, y):
         # Stack the input tensors together
-        return [1. / (0.5 + 0.1 * tf.sqrt(x * x)),
-                1. / (0.5 + 0.1 *tf.sqrt(y * y))]
+        return [1. / (0.5 + 0.1 * tf.abs(x + y)),
+                1. / (0.5 + 0.1 * tf.abs(y))]
 
       # Initial state of the chain
       init_state = [np.ones([num_chains, 2], dtype=dtype),
@@ -181,8 +181,8 @@ class LangevinTest(tf.test.TestCase):
 
     def volatility_fn(x, y):
       # Stack the input tensors together
-      return [1. / (0.5 + 0.1 * tf.sqrt(x * x)),
-              1. / (0.5 + 0.1 *tf.sqrt(y * y))]
+      return [1. / (0.5 + 0.1 * tf.abs(x + y)),
+              1. / (0.5 + 0.1 * tf.abs(y))]
 
     # Initial state of the chain
     init_state = [np.ones([num_chains, 2], dtype=dtype),
@@ -205,15 +205,23 @@ class LangevinTest(tf.test.TestCase):
     kernel_general = langevin_general.bootstrap_results(init_state)
 
     # For `langevin_general` volatility gradient should be zero.
-    for grad in kernel_unit_volatility.accepted_results.grads_volatility:
-      self.assertAllEqual(self.evaluate(grad),
-                          np.zeros(shape=grad.shape, dtype=dtype))
+    grad_1, grad_2 = kernel_unit_volatility.accepted_results.grads_volatility
+    self.assertAllEqual(self.evaluate(grad_1),
+                        np.zeros(shape=init_state[0].shape, dtype=dtype))
+    self.assertAllEqual(self.evaluate(grad_2),
+                        np.zeros(shape=init_state[1].shape, dtype=dtype))
+
     # For `langevin_unit` volatility gradient should be around -0.926 for
     # each direction.
-    for grad in kernel_general.accepted_results.grads_volatility:
-      self.assertAllClose(self.evaluate(grad),
-                          -0.926 * np.ones(shape=grad.shape, dtype=dtype),
-                          atol=0.01, rtol=0.01)
+    grad_1, grad_2 = kernel_general.accepted_results.grads_volatility
+    self.assertAllClose(self.evaluate(grad_1),
+                        -0.583 * np.ones(shape=init_state[0].shape,
+                                         dtype=dtype),
+                        atol=0.01, rtol=0.01)
+    self.assertAllClose(self.evaluate(grad_2),
+                        -0.926 * np.ones(shape=init_state[1].shape,
+                                         dtype=dtype),
+                        atol=0.01, rtol=0.01)
 
 
 if __name__ == '__main__':

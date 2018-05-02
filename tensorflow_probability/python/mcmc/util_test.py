@@ -25,8 +25,8 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.mcmc.util import choose
-from tensorflow_probability.python.mcmc.util import gradients
 from tensorflow_probability.python.mcmc.util import is_namedtuple_like
+from tensorflow_probability.python.mcmc.util import maybe_call_fn_and_grads
 from tensorflow.python.framework import test_util
 
 
@@ -95,16 +95,16 @@ class GradientTest(tf.test.TestCase):
   def testGradientComputesCorrectly(self):
     dtype = np.float32
     def fn(x, y):
-      return x**2 + y ** 2
+      return x**2 + y**2
 
     fn_args = [dtype(3), dtype(3)]
     # Convert function input to a list of tensors
     fn_args = [tf.convert_to_tensor(arg) for arg in fn_args]
-    fn_res = fn(*fn_args)
-    grads = gradients(fn, fn_res, *fn_args)
-    print('grads: ', grads)
-    for grad in grads:
-      self.assertAllClose(self.evaluate(grad), dtype(6), atol=0., rtol=1e-5)
+    fn_result, grads = maybe_call_fn_and_grads(fn, fn_args)
+    fn_result_, grads_ = self.evaluate([fn_result, grads])
+    self.assertNear(18., fn_result_, err=1e-5)
+    for grad in grads_:
+      self.assertAllClose(grad, dtype(6), atol=0., rtol=1e-5)
 
 
 if __name__ == '__main__':
