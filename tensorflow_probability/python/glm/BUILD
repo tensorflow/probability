@@ -13,11 +13,7 @@
 # limitations under the License.
 # ============================================================================
 # Description:
-#   TensorFlow Probability implements probabilistic and statistical
-#   methods, including modeling and Bayesian inference. APIs here are
-#   meant to evolve over time.
-
-licenses(["notice"])  # Apache 2.0
+#   Generalized Linear Model specification, fitting, and related utilities.
 
 package(
     default_visibility = [
@@ -25,41 +21,35 @@ package(
     ],
 )
 
+licenses(["notice"])  # Apache 2.0
+
 exports_files(["LICENSE"])
 
 py_library(
-    name = "python",
+    name = "glm",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
-    visibility = ["//tensorflow_probability:__pkg__"],
     deps = [
-        ":monte_carlo",
-        ":trainable_distributions",
-        "//tensorflow_probability/python/edward2",
-        "//tensorflow_probability/python/glm",
-        "//tensorflow_probability/python/layers",
-        "//tensorflow_probability/python/math",
-        "//tensorflow_probability/python/mcmc",
-        "//tensorflow_probability/python/optimizer",
-        "//tensorflow_probability/python/util",
-        "//tensorflow_probability/python/vi",
+        ":family",
+        ":fisher_scoring",
     ],
 )
 
 py_library(
-    name = "monte_carlo",
-    srcs = ["monte_carlo.py"],
+    name = "fisher_scoring",
+    srcs = ["fisher_scoring.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":util",
         # numpy dep,
         # tensorflow dep,
     ],
 )
 
 py_test(
-    name = "monte_carlo_test",
+    name = "fisher_scoring_test",
     size = "small",
-    srcs = ["monte_carlo_test.py"],
+    srcs = ["fisher_scoring_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -68,22 +58,33 @@ py_test(
 )
 
 py_library(
-    name = "trainable_distributions",
-    srcs = ["trainable_distributions.py"],
+    name = "family",
+    srcs = ["family.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":util",
         # numpy dep,
         # tensorflow dep,
     ],
 )
 
 py_test(
-    name = "trainable_distributions_test",
+    name = "family_test",
     size = "small",
-    srcs = ["trainable_distributions_test.py"],
+    srcs = ["family_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "util",
+    srcs = ["util.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
     ],
 )
