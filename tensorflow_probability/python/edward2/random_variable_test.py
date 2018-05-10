@@ -321,7 +321,7 @@ class RandomVariableTest(tf.test.TestCase):
   @tfe.run_test_in_graph_and_eager_modes()
   def testArrayPriority(self):
     x = ed.RandomVariable(tfd.Normal(0.0, 1.0))
-    y = np.array(5.0)
+    y = np.array(5.0, dtype=np.float32)
     z = y / x
     z_value = y / x.value
     z_eval, z_value_eval = self.evaluate([z, z_value])
