@@ -22,6 +22,7 @@ import numpy as np
 
 import tensorflow as tf
 from tensorflow_probability.python.glm.util import common_dtype
+from tensorflow.python.ops.distributions import util as distributions_util
 
 
 __all__ = [
@@ -37,6 +38,7 @@ def fit(
     model,
     model_coefficients_start=None,
     predicted_linear_response_start=None,
+    l2_regularizer=None,
     dispersion=None,
     offset=None,
     convergence_criteria_fn=None,
@@ -64,6 +66,10 @@ def fit(
       predictions based on `model_coefficients_start`.
       Default value: `offset` if `model_coefficients is None`, and
       `tf.matmul(model_matrix, model_coefficients_start) + offset` otherwise.
+    l2_regularizer: Optional scalar `Tensor` representing L2 regularization
+      penalty, i.e.,
+      `loss(w) = sum{-log p(y[i]|x[i],w) : i=1..n} + l2_regularizer ||w||_2^2`.
+      Default value: `None` (i.e., no L2 regularization).
     dispersion: Optional `Tensor` representing `response` dispersion, i.e., as
       in, `p(y|theta) := exp((y theta - A(theta)) / dispersion)`. Must broadcast
       with rows of `model_matrix`.
@@ -198,6 +204,7 @@ def fit(
           response,
           model,
           predicted_linear_response_previous,
+          l2_regularizer,
           dispersion,
           offset,
           learning_rate,
@@ -254,6 +261,7 @@ def fit_one_step(
     response,
     model,
     predicted_linear_response_start,
+    l2_regularizer=None,
     dispersion=None,
     offset=None,
     learning_rate=None,
@@ -275,6 +283,10 @@ def fit_one_step(
       predictions based on `model_coefficients_start`.
       Default value: `offset` if `model_coefficients is None`, and
       `tf.matmul(model_matrix, model_coefficients_start) + offset` otherwise.
+    l2_regularizer: Optional scalar `Tensor` representing L2 regularization
+      penalty, i.e.,
+      `loss(w) = sum{-log p(y[i]|x[i],w) : i=1..n} + l2_regularizer ||w||_2^2`.
+      Default value: `None` (i.e., no L2 regularization).
     dispersion: Optional `Tensor` representing `response` dispersion, i.e., as
       in, `p(y|theta) := exp((y theta - A(theta)) / dispersion)`. Must broadcast
       with rows of `model_matrix`.
@@ -345,8 +357,45 @@ def fit_one_step(
     b = z * w
     # Solve `min{ || A @ model_coefficients - b ||_2**2 : model_coefficients }`
     # where `@` denotes `matmul`.
+
+    if l2_regularizer is None:
+      l2_regularizer = np.array(0, a.dtype.as_numpy_dtype)
+    else:
+      l2_regularizer_ = distributions_util.maybe_get_static_value(
+          l2_regularizer, a.dtype.as_numpy_dtype)
+      if l2_regularizer_ is not None:
+        l2_regularizer = l2_regularizer_
+
+    def _embed_l2_regularization():
+      """Adds synthetic observations to implement L2 regularization."""
+      # `tf.matrix_solve_ls` does not respect the `l2_regularization` argument
+      # when `fast_unsafe_numerics` is `False`. This function  adds synthetic
+      # observations to the data to implement the regularization instead.
+      # Adding observations `sqrt(l2_regularizer) * I` is mathematically
+      # equivalent to adding the term
+      # `-l2_regularizer ||coefficients||_2**2` to the log-likelihood.
+      num_model_coefficients = num_cols(model_matrix)
+      batch_shape = tf.shape(model_matrix)[:-2]
+      eye = tf.eye(
+          num_model_coefficients, batch_shape=batch_shape, dtype=a.dtype)
+      a_ = tf.concat([a, tf.sqrt(l2_regularizer) * eye], axis=-2)
+      b_ = distributions_util.pad(
+          b, count=num_model_coefficients, axis=-2, back=True)
+      # Return l2_regularizer=0 since its now embedded.
+      l2_regularizer_ = np.array(0, a.dtype.as_numpy_dtype)
+      return a_, b_, l2_regularizer_
+
+    a, b, l2_regularizer = prefer_static_cond(
+        prefer_static_reduce_all([not(fast_unsafe_numerics),
+                                  l2_regularizer > 0.]),
+        _embed_l2_regularization,
+        lambda: (a, b, l2_regularizer))
+
     model_coefficients_next = tf.matrix_solve_ls(
-        a, b, fast=fast_unsafe_numerics, name='model_coefficients_next')
+        a, b,
+        fast=fast_unsafe_numerics,
+        l2_regularizer=l2_regularizer,
+        name='model_coefficients_next')
 
     # TODO(b/79122261): The approach used in `matrix_solve_ls` could be made
     # faster by avoiding explicitly forming Q and instead keeping the
@@ -536,3 +585,24 @@ def num_cols(x):
   if x.shape.ndims is not None and x.shape[-1].value is not None:
     return x.shape[-1].value
   return tf.shape(x)[-1]
+
+
+def prefer_static_cond(predicate, true_fn, false_fn, name=None):
+  """Identical to `tf.cond` but operates statically if possible."""
+  with tf.name_scope(name, 'prefer_static_cond', [predicate]):
+    predicate_ = distributions_util.maybe_get_static_value(predicate)
+    if predicate_ is None:
+      return tf.cond(predicate, true_fn, false_fn)
+    return true_fn() if predicate_ else false_fn()
+
+
+def prefer_static_reduce_all(preds, name=None):
+  """Identical to `tf.reduce_all` but operates statically if possible."""
+  with tf.name_scope(name, 'prefer_static_reduce_all', [preds]):
+    preds_ = [distributions_util.maybe_get_static_value(p, np.bool)
+              for p in preds]
+    if any(p is False for p in preds_):
+      return False
+    if any(p is None for p in preds_):
+      return tf.reduce_all(preds)
+    return all(preds_)

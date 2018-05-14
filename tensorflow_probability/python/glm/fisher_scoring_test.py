@@ -99,8 +99,8 @@ class FitTestFast(tf.test.TestCase):
     avg_response_diff = np.mean(linear_response_ - linear_response_true_)
 
     self.assertTrue(num_iter_ < 10)
-    self.assertNear(0., avg_response_diff, err=2e-3)
-    self.assertAllClose(0.8, accuracy, atol=0., rtol=0.02)
+    self.assertNear(0., avg_response_diff, err=4e-3)
+    self.assertAllClose(0.8, accuracy, atol=0., rtol=0.03)
     self.assertAllClose(model_coefficients_true_, model_coefficients_,
                         atol=0.03, rtol=0.15)
     self.assertTrue(is_converged_)
@@ -152,6 +152,84 @@ class FitTestFast(tf.test.TestCase):
 class FitTestSlow(FitTestFast):
 
   fast = False
+
+  # Only need to run this test once since it compares fast to slow.
+  # We use `fast` as a baseline since core TF implements the L2 regularization
+  # in this case.
+  def _testL2RegularizationWorksCorrectly(self, static_l2):
+    n = int(1e3)
+    [
+        model_matrix,
+        response,
+        _,  # model_coefficients_true
+        _,  # linear_response_true
+    ] = self.make_dataset(n=n, d=3, link='probit')
+    l2_regularizer = np.array(0.07 * n, model_matrix.dtype.as_numpy_dtype)
+    if not static_l2:
+      l2_regularizer = tf.placeholder_with_default(l2_regularizer, shape=[])
+    [
+        expected_model_coefficients,
+        expected_linear_response,
+        expected_is_converged,
+        expected_num_iter,
+    ] = tfp.glm.fit(
+        model_matrix,
+        response,
+        tfp.glm.BernoulliNormalCDF(),
+        l2_regularizer=l2_regularizer,
+        fast_unsafe_numerics=True,
+        maximum_iterations=10)
+    [
+        actual_model_coefficients,
+        actual_linear_response,
+        actual_is_converged,
+        actual_num_iter,
+    ] = tfp.glm.fit(
+        model_matrix,
+        response,
+        tfp.glm.BernoulliNormalCDF(),
+        l2_regularizer=l2_regularizer,
+        fast_unsafe_numerics=False,
+        maximum_iterations=10)
+
+    [
+        expected_model_coefficients_,
+        expected_linear_response_,
+        expected_is_converged_,
+        expected_num_iter_,
+        actual_model_coefficients_,
+        actual_linear_response_,
+        actual_is_converged_,
+        actual_num_iter_,
+    ] = self.evaluate([
+        expected_model_coefficients,
+        expected_linear_response,
+        expected_is_converged,
+        expected_num_iter,
+        actual_model_coefficients,
+        actual_linear_response,
+        actual_is_converged,
+        actual_num_iter,
+    ])
+
+    self.assertAllClose(
+        expected_model_coefficients_, actual_model_coefficients_,
+        atol=1e-6, rtol=1e-6)
+    self.assertAllClose(
+        expected_linear_response_, actual_linear_response_,
+        atol=1e-5, rtol=1e-5)
+    self.assertEqual(expected_is_converged_, actual_is_converged_)
+    self.assertEqual(expected_num_iter_, actual_num_iter_)
+
+  @test_util.run_in_graph_and_eager_modes()
+  def testStaticL2RegularizationWorksCorrectly(self):
+    self._testL2RegularizationWorksCorrectly(static_l2=True)
+
+# TODO(jvdillon): Re-enable once matrix_solve_ls correctly casts
+# l2_regularization.
+# @test_util.run_in_graph_and_eager_modes()
+# def testDynamicL2RegularizationWorksCorrectly(self):
+#   self._testL2RegularizationWorksCorrectly(static_l2=False)
 
 
 # TODO(b/79377499): Add additional unit-tests, esp, those to cover cases when
