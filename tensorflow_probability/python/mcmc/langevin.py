@@ -27,7 +27,6 @@ from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import metropolis_hastings
 from tensorflow_probability.python.mcmc import util as mcmc_util
 
-from tensorflow.contrib.distributions.python.ops import seed_stream
 from tensorflow.python.ops.distributions import util as distributions_util
 
 
@@ -375,7 +374,7 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
                volatility_fn=None,
                seed=None,
                name=None):
-    self._seed_stream = seed_stream.SeedStream(
+    self._seed_stream = tf.contrib.distributions.SeedStream(
         seed, salt='UncalibratedLangevin')
     # Default value of `volatility_fn` is the identity function.
     if volatility_fn is None:
