@@ -23,7 +23,7 @@ import types
 import numpy as np
 import tensorflow as tf
 
-from tensorflow.python.keras._impl.keras.utils import generic_utils
+from tensorflow.python.keras.utils import generic_utils
 
 tfd = tf.contrib.distributions
 

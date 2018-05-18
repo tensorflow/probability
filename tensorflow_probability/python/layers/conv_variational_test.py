@@ -24,7 +24,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from tensorflow.python.keras._impl.keras import testing_utils
+from tensorflow.python.keras import testing_utils
 from tensorflow.python.ops import nn_ops
 from tensorflow.python.ops.distributions import util as distribution_util
 
