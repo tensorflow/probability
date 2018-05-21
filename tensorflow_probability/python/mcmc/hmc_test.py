@@ -27,7 +27,9 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.mcmc.hmc import _compute_log_acceptance_correction
-from tensorflow_probability.python.mcmc.hmc import _leapfrog_integrator
+from tensorflow_probability.python.mcmc.hmc import _leapfrog_integrator_one_step
+from tensorflow_probability.python.mcmc.util import maybe_call_fn_and_grads
+from tensorflow.contrib import eager as tfe
 from tensorflow.python.eager import context
 from tensorflow.python.framework import random_seed
 from tensorflow.python.framework import test_util
@@ -50,10 +52,13 @@ def run_in_graph_mode_only(__unused__=None, config=None, use_gpu=True):  # pylin
   return decorator
 
 
-# Monkey patch for consistency. Ideally `run_in_graph_mode_only` would be in
-# `test_util` so this makes it look like it is. If we end up needing
-# `run_in_graph_mode_only` in more tests, we can modify `test_util` directly.
-test_util.run_in_graph_mode_only = run_in_graph_mode_only
+def _set_seed(seed):
+  """Helper which uses graph seed if using TFE."""
+  # TODO(b/68017812): Deprecate once TFE supports seed.
+  if tfe.executing_eagerly():
+    tf.set_random_seed(seed)
+    return None
+  return seed
 
 
 def _reduce_variance(x, axis=None, keepdims=False):
@@ -92,8 +97,9 @@ class HMCTest(tf.test.TestCase):
     event_dims = tf.range(independent_chain_ndims, tf.rank(x))
 
     m = tf.random_normal(tf.shape(x))
-    log_prob_0 = self._log_gamma_log_prob(x, event_dims)
-    grad_0 = tf.gradients(log_prob_0, x)
+    log_prob_0, grad_0 = maybe_call_fn_and_grads(
+        lambda x: self._log_gamma_log_prob(x, event_dims),
+        x)
     old_energy = -log_prob_0 + 0.5 * tf.reduce_sum(m**2., event_dims)
 
     x_shape = self.evaluate(x).shape
@@ -101,15 +107,23 @@ class HMCTest(tf.test.TestCase):
     step_size = tf.constant(0.1 / event_size, x.dtype)
     hmc_lf_steps = tf.constant(1000, np.int32)
 
-    new_m, _, log_prob_1, _ = _leapfrog_integrator(
-        current_momentums=[m],
-        target_log_prob_fn=lambda x: self._log_gamma_log_prob(x, event_dims),
-        current_state_parts=[x],
-        step_sizes=[step_size],
-        num_leapfrog_steps=hmc_lf_steps,
-        current_target_log_prob=log_prob_0,
-        current_grads_target_log_prob=grad_0)
-    new_m = new_m[0]
+    def leapfrog_one_step(*args):
+      return _leapfrog_integrator_one_step(
+          lambda x: self._log_gamma_log_prob(x, event_dims),
+          independent_chain_ndims,
+          [step_size],
+          *args)
+
+    [[new_m], _, log_prob_1, _] = tf.while_loop(
+        cond=lambda *args: True,
+        body=leapfrog_one_step,
+        loop_vars=[
+            [m],         # current_momentum_parts
+            [x],         # current_state_parts,
+            log_prob_0,  # current_target_log_prob
+            grad_0,      # current_target_log_prob_grad_parts
+        ],
+        maximum_iterations=hmc_lf_steps)
 
     new_energy = -log_prob_1 + 0.5 * tf.reduce_sum(new_m**2., axis=event_dims)
 
@@ -132,23 +146,23 @@ class HMCTest(tf.test.TestCase):
     x = tf.constant(np.random.rand(50, 10, 2), np.float32)
     self._integrator_conserves_energy(x, independent_chain_ndims)
 
-  @test_util.run_in_graph_mode_only()
+  @test_util.run_in_graph_and_eager_modes()
   def testIntegratorEnergyConservationNullShape(self):
     self._integrator_conserves_energy_wrapper(0)
 
-  @test_util.run_in_graph_mode_only()
+  @test_util.run_in_graph_and_eager_modes()
   def testIntegratorEnergyConservation1(self):
     self._integrator_conserves_energy_wrapper(1)
 
-  @test_util.run_in_graph_mode_only()
+  @test_util.run_in_graph_and_eager_modes()
   def testIntegratorEnergyConservation2(self):
     self._integrator_conserves_energy_wrapper(2)
 
-  @test_util.run_in_graph_mode_only()
+  @test_util.run_in_graph_and_eager_modes()
   def testIntegratorEnergyConservation3(self):
     self._integrator_conserves_energy_wrapper(3)
 
-  @test_util.run_in_graph_mode_only()
+  @test_util.run_in_graph_and_eager_modes()
   def testSampleChainSeedReproducibleWorksCorrectly(self):
     num_results = 10
     independent_chain_ndims = 1
@@ -168,7 +182,7 @@ class HMCTest(tf.test.TestCase):
             target_log_prob_fn=log_gamma_log_prob,
             step_size=0.1,
             num_leapfrog_steps=2,
-            seed=52),
+            seed=_set_seed(52)),
         num_burnin_steps=150,
         parallel_iterations=1)
 
@@ -181,7 +195,7 @@ class HMCTest(tf.test.TestCase):
             target_log_prob_fn=log_gamma_log_prob,
             step_size=0.1,
             num_leapfrog_steps=2,
-            seed=52),
+            seed=_set_seed(52)),
         num_burnin_steps=150,
         parallel_iterations=1)
 
@@ -215,11 +229,17 @@ class HMCTest(tf.test.TestCase):
             target_log_prob_fn=log_gamma_log_prob,
             step_size=0.05,
             num_leapfrog_steps=2,
-            seed=42),
+            seed=_set_seed(42)),
         num_burnin_steps=150,
         parallel_iterations=1)
 
-    self.assertAllEqual(dict(target_calls=2), counter)
+    if tfe.executing_eagerly():
+      # TODO(b/79991421): Figure out why this is approx twice as many as it
+      # should be. I.e., `expected_calls = (150 + 150) * 2 + 1`.
+      expected_calls = 1202
+    else:
+      expected_calls = 2
+    self.assertAllEqual(dict(target_calls=expected_calls), counter)
 
     expected_x = (tf.digamma(self._shape_param)
                   - np.log(self._rate_param))
@@ -248,19 +268,19 @@ class HMCTest(tf.test.TestCase):
     x = tf.constant(np.random.rand(50, 10, 2), np.float32, name='x')
     self._chain_gets_correct_expectations(x, independent_chain_ndims)
 
-  @test_util.run_in_graph_mode_only()
+  @test_util.run_in_graph_and_eager_modes()
   def testHMCChainExpectationsNullShape(self):
     self._chain_gets_correct_expectations_wrapper(0)
 
-  @test_util.run_in_graph_mode_only()
+  @test_util.run_in_graph_and_eager_modes()
   def testHMCChainExpectations1(self):
     self._chain_gets_correct_expectations_wrapper(1)
 
-  @test_util.run_in_graph_mode_only()
+  @test_util.run_in_graph_and_eager_modes()
   def testHMCChainExpectations2(self):
     self._chain_gets_correct_expectations_wrapper(2)
 
-  @test_util.run_in_graph_mode_only()
+  @test_util.run_in_graph_and_eager_modes()
   def testKernelResultsUsingTruncatedDistribution(self):
     def log_prob(x):
       return tf.where(
@@ -279,7 +299,7 @@ class HMCTest(tf.test.TestCase):
     num_results = 1000
     # Large step size, will give rejections due to integration error in addition
     # to rejection due to going into a region of log_prob = -inf.
-    step_size = 0.1
+    step_size = 0.2
     num_leapfrog_steps = 5
     num_chains = 2
 
@@ -293,7 +313,7 @@ class HMCTest(tf.test.TestCase):
             target_log_prob_fn=log_prob,
             step_size=step_size,
             num_leapfrog_steps=num_leapfrog_steps,
-            seed=42),
+            seed=_set_seed(42)),
         parallel_iterations=1)
 
     states_, kernel_results_ = self.evaluate([states, kernel_results])
@@ -373,7 +393,7 @@ class HMCTest(tf.test.TestCase):
         target_log_prob_fn=log_gamma_log_prob,
         step_size=0.4,
         num_leapfrog_steps=5,
-        seed=43)
+        seed=_set_seed(43))
     sample, kernel_results = hmc.one_step(
         current_state=initial_draws,
         previous_kernel_results=hmc.bootstrap_results(initial_draws))
@@ -382,7 +402,7 @@ class HMCTest(tf.test.TestCase):
         target_log_prob_fn=fake_log_prob,
         step_size=0.4,
         num_leapfrog_steps=5,
-        seed=44)
+        seed=_set_seed(44))
     bad_sample, bad_kernel_results = bad_hmc.one_step(
         current_state=initial_draws,
         previous_kernel_results=bad_hmc.bootstrap_results(initial_draws))
@@ -486,7 +506,7 @@ class HMCTest(tf.test.TestCase):
         target_log_prob_fn=_unbounded_exponential_log_prob,
         step_size=2.,
         num_leapfrog_steps=5,
-        seed=46)
+        seed=_set_seed(46))
     updated_x, kernel_results = hmc.one_step(
         current_state=initial_x,
         previous_kernel_results=hmc.bootstrap_results(initial_x))
@@ -501,7 +521,7 @@ class HMCTest(tf.test.TestCase):
     self.assertAllEqual(initial_x_, updated_x_)
     self.assertEqual(acceptance_probs, 0.)
 
-  @test_util.run_in_graph_mode_only()
+  @run_in_graph_mode_only()
   def testNanFromGradsDontPropagate(self):
     """Test that update with NaN gradients does not cause NaN in results."""
     def _nan_log_prob_with_nan_gradient(x):
@@ -512,7 +532,7 @@ class HMCTest(tf.test.TestCase):
         target_log_prob_fn=_nan_log_prob_with_nan_gradient,
         step_size=2.,
         num_leapfrog_steps=5,
-        seed=47)
+        seed=_set_seed(47))
     updated_x, kernel_results = hmc.one_step(
         current_state=initial_x,
         previous_kernel_results=hmc.bootstrap_results(initial_x))
@@ -549,28 +569,28 @@ class HMCTest(tf.test.TestCase):
             target_log_prob_fn=lambda x: -tf.reduce_sum(x**2., axis=-1),
             step_size=0.01,
             num_leapfrog_steps=10,
-            seed=48),
+            seed=_set_seed(48)),
         parallel_iterations=1)
     states_, log_accept_ratio_ = self.evaluate(
         [states, kernel_results.log_accept_ratio])
     self.assertEqual(dtype, states_.dtype)
     self.assertEqual(dtype, log_accept_ratio_.dtype)
 
-  @test_util.run_in_graph_mode_only()
+  @test_util.run_in_graph_and_eager_modes()
   def testChainWorksIn64Bit(self):
     self._testChainWorksDtype(np.float64)
 
-  @test_util.run_in_graph_mode_only()
+  @test_util.run_in_graph_and_eager_modes()
   def testChainWorksIn16Bit(self):
     self._testChainWorksDtype(np.float16)
 
-  @test_util.run_in_graph_mode_only()
+  @test_util.run_in_graph_and_eager_modes()
   def testChainWorksCorrelatedMultivariate(self):
     dtype = np.float32
     true_mean = dtype([0, 0])
     true_cov = dtype([[1, 0.5],
                       [0.5, 1]])
-    num_results = 2000
+    num_results = 1500
     counter = collections.Counter()
     def target_log_prob(x, y):
       counter['target_calls'] += 1
@@ -590,11 +610,18 @@ class HMCTest(tf.test.TestCase):
             target_log_prob_fn=target_log_prob,
             step_size=[1.23, 1.23],
             num_leapfrog_steps=2,
-            seed=54),
+            seed=_set_seed(54)),
         num_burnin_steps=200,
-        num_steps_between_results=1,
         parallel_iterations=1)
-    self.assertAllEqual(dict(target_calls=2), counter)
+
+    if tfe.executing_eagerly():
+      # TODO(b/79991421): Figure out why this is approx twice as many as it
+      # should be. I.e., `expected_calls = (num_results + 200) * 2 * 2 + 1`.
+      expected_calls = 6802
+    else:
+      expected_calls = 2
+    self.assertAllEqual(dict(target_calls=expected_calls), counter)
+
     states = tf.stack(states, axis=-1)
     self.assertEqual(num_results, states.shape[0].value)
     sample_mean = tf.reduce_mean(states, axis=0)
@@ -606,15 +633,15 @@ class HMCTest(tf.test.TestCase):
     self.assertAllClose(true_mean, sample_mean_,
                         atol=0.06, rtol=0.)
     self.assertAllClose(true_cov, sample_cov_,
-                        atol=0., rtol=0.1)
+                        atol=0., rtol=0.2)
 
-  @test_util.run_in_graph_mode_only()
+  @test_util.run_in_graph_and_eager_modes()
   def testUncalibratedHMCPreservesStaticShape(self):
     uncal_hmc = tfp.mcmc.UncalibratedHamiltonianMonteCarlo(
         target_log_prob_fn=lambda x: tf.reduce_sum(-x**2., axis=-1),
         step_size=0.5,
         num_leapfrog_steps=2,
-        seed=1042)
+        seed=_set_seed(1042))
     x0 = tf.constant([[-1., 0.5],
                       [0., 0.],
                       [1., 1.25]])
@@ -625,13 +652,13 @@ class HMCTest(tf.test.TestCase):
     self.assertAllEqual([3, 2], x1.shape)
     self.assertAllEqual([3], r1.target_log_prob.shape)
 
-  @test_util.run_in_graph_mode_only()
+  @test_util.run_in_graph_and_eager_modes()
   def testHMCPreservesStaticShape(self):
     hmc = tfp.mcmc.HamiltonianMonteCarlo(
         target_log_prob_fn=lambda x: tf.reduce_sum(-x**2., axis=-1),
         step_size=0.5,
         num_leapfrog_steps=2,
-        seed=1042)
+        seed=_set_seed(1042))
     x0 = tf.constant([[-1., 0.5],
                       [0., 0.],
                       [1., 1.25]])
@@ -686,7 +713,7 @@ class _LogCorrectionTest(object):
         np.ones_like(actual_grads_target_log_prob_).astype(np.bool),
         np.isfinite(actual_grads_target_log_prob_))
 
-  @test_util.run_in_graph_mode_only()
+  @run_in_graph_mode_only()
   def testHandlesNanFromKinetic(self):
     x = [1, np.inf, -np.inf, np.nan]
     momentums, proposed_momentums = [
@@ -737,25 +764,26 @@ class LogCorrectionTest64(tf.test.TestCase, _LogCorrectionTest):
 
 class _HMCHandlesLists(object):
 
-  @test_util.run_in_graph_mode_only()
+  @test_util.run_in_graph_and_eager_modes()
   def testStateParts(self):
-    dist_x = tfd.Normal(loc=self.dtype(0), scale=self.dtype(1))
+    cast = lambda x: np.array(x, self.dtype)
+    dist_x = tfd.Normal(loc=cast(0), scale=cast(1))
     dist_y = tfd.Independent(
-        tfd.Gamma(concentration=self.dtype([1, 2]),
-                  rate=self.dtype([0.5, 0.75])),
+        tfd.Gamma(concentration=cast([1, 2]),
+                  rate=cast([0.5, 0.75])),
         reinterpreted_batch_ndims=1)
     def target_log_prob(x, y):
       return dist_x.log_prob(x) + dist_y.log_prob(y)
-    x0 = [dist_x.sample(seed=1), dist_y.sample(seed=2)]
-    samples, _ = tfp.mcmc.sample_chain(
-        num_results=int(2e3),
+    x0 = [dist_x.sample(seed=_set_seed(61)), dist_y.sample(seed=_set_seed(62))]
+    samples, kernel_results = tfp.mcmc.sample_chain(
+        num_results=1500,
         current_state=x0,
         kernel=tfp.mcmc.HamiltonianMonteCarlo(
             target_log_prob_fn=target_log_prob,
-            step_size=0.85,
+            step_size=0.5,
             num_leapfrog_steps=3,
-            seed=49),
-        num_burnin_steps=250,
+            seed=_set_seed(49)),
+        num_burnin_steps=500,
         parallel_iterations=1)
     actual_means = [tf.reduce_mean(s, axis=0) for s in samples]
     actual_vars = [_reduce_variance(s, axis=0) for s in samples]
@@ -766,14 +794,18 @@ class _HMCHandlesLists(object):
         actual_vars_,
         expected_means_,
         expected_vars_,
+        is_accepted_,
     ] = self.evaluate([
         actual_means,
         actual_vars,
         expected_means,
         expected_vars,
+        kernel_results.is_accepted,
     ])
-    self.assertAllClose(expected_means_, actual_means_, atol=0.05, rtol=0.16)
-    self.assertAllClose(expected_vars_, actual_vars_, atol=0., rtol=0.25)
+    # Assert acceptance rate is asymptotically optimal.
+    self.assertNear(0.651, np.mean(is_accepted_), err=0.05)
+    self.assertAllClose(expected_means_, actual_means_, atol=0.07, rtol=0.16)
+    self.assertAllClose(expected_vars_, actual_vars_, atol=0., rtol=0.5)
 
 
 class HMCHandlesLists32(_HMCHandlesLists, tf.test.TestCase):

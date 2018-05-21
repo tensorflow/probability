@@ -20,13 +20,13 @@ from __future__ import print_function
 
 import collections
 # Dependency imports
-import numpy as np
 
 import tensorflow as tf
 
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import metropolis_hastings
 from tensorflow_probability.python.mcmc import util as mcmc_util
+from tensorflow.contrib import eager as tfe
 from tensorflow.python.ops.distributions import util as distributions_util
 
 
@@ -285,8 +285,8 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
         possible, it's often helpful to match per-variable step sizes to the
         standard deviations of the target distribution in each variable.
       num_leapfrog_steps: Integer number of steps to run the leapfrog integrator
-        for. Total progress per HMC step is roughly proportional to `step_size *
-        num_leapfrog_steps`.
+        for. Total progress per HMC step is roughly proportional to
+        `step_size * num_leapfrog_steps`.
       seed: Python integer to seed the random number generator.
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., 'hmc_kernel').
@@ -308,7 +308,7 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
             step_size=step_size,
             num_leapfrog_steps=num_leapfrog_steps,
             seed=seed,
-            name=name),
+            name='hmc_kernel' if name is None else name),
         seed=seed)
 
   @property
@@ -387,7 +387,13 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
                num_leapfrog_steps,
                seed=None,
                name=None):
-    self._seed_stream = seed  # This will be mutated with use.
+    if seed is not None and tfe.executing_eagerly():
+      # TODO(b/68017812): Re-enable once TFE supports `tf.random_shuffle` seed.
+      raise NotImplementedError('Specifying a `seed` when running eagerly is '
+                                'not currently supported. To run in Eager '
+                                'mode with a seed, use `tf.set_random_seed`.')
+    self._seed_stream = tf.contrib.distributions.SeedStream(
+        seed, 'hmc_one_step')
     self._parameters = dict(
         target_log_prob_fn=target_log_prob_fn,
         step_size=step_size,
@@ -428,57 +434,61 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
   def one_step(self, current_state, previous_kernel_results):
     with tf.name_scope(
         name=mcmc_util.make_name(self.name, 'hmc', 'one_step'),
-        values=[self.step_size, self.num_leapfrog_steps, self._seed_stream,
+        values=[self.step_size,
+                self.num_leapfrog_steps,
                 current_state,
                 previous_kernel_results.target_log_prob,
                 previous_kernel_results.grads_target_log_prob]):
-      with tf.name_scope('initialize'):
-        [
-            current_state_parts,
-            step_sizes,
-            current_target_log_prob,
-            current_grads_target_log_prob,
-        ] = _prepare_args(
-            self.target_log_prob_fn,
-            current_state,
-            self.step_size,
-            previous_kernel_results.target_log_prob,
-            previous_kernel_results.grads_target_log_prob,
-            maybe_expand=True)
-
-        current_momentums = []
-        for s in current_state_parts:
-          # Note:
-          # - We mutate seed state so subsequent calls are not correlated.
-          # - We mutate seed BEFORE using it just in case users supplied the
-          #   same seed to an outer kernel, e.g., `MetropolisHastings`.
-          self._seed_stream = distributions_util.gen_new_seed(
-              self._seed_stream, salt='hmc_kernel_momentums')
-          current_momentums.append(tf.random_normal(
-              shape=tf.shape(s),
-              dtype=s.dtype.base_dtype,
-              seed=self._seed_stream))
-
-        num_leapfrog_steps = tf.convert_to_tensor(
-            self.num_leapfrog_steps,
-            dtype=tf.int32,
-            name='num_leapfrog_steps')
+      [
+          current_state_parts,
+          step_sizes,
+          current_target_log_prob,
+          current_target_log_prob_grad_parts,
+      ] = _prepare_args(
+          self.target_log_prob_fn,
+          current_state,
+          self.step_size,
+          previous_kernel_results.target_log_prob,
+          previous_kernel_results.grads_target_log_prob,
+          maybe_expand=True)
 
       independent_chain_ndims = distributions_util.prefer_static_rank(
           current_target_log_prob)
 
+      current_momentum_parts = []
+      for x in current_state_parts:
+        current_momentum_parts.append(tf.random_normal(
+            shape=tf.shape(x),
+            dtype=x.dtype.base_dtype,
+            seed=self._seed_stream()))
+
+      def _leapfrog_one_step(*args):
+        """Closure representing computation done during each leapfrog step."""
+        return _leapfrog_integrator_one_step(
+            target_log_prob_fn=self.target_log_prob_fn,
+            independent_chain_ndims=independent_chain_ndims,
+            step_sizes=step_sizes,
+            current_momentum_parts=args[0],
+            current_state_parts=args[1],
+            current_target_log_prob=args[2],
+            current_target_log_prob_grad_parts=args[3])
+
+      # Do leapfrog integration.
       [
-          next_momentums,
+          next_momentum_parts,
           next_state_parts,
           next_target_log_prob,
-          next_grads_target_log_prob,
-      ] = _leapfrog_integrator(current_momentums,
-                               self.target_log_prob_fn,
-                               current_state_parts,
-                               step_sizes,
-                               num_leapfrog_steps,
-                               current_target_log_prob,
-                               current_grads_target_log_prob)
+          next_target_log_prob_grad_parts,
+      ] = tf.while_loop(
+          cond=lambda i, *args: i < self.num_leapfrog_steps,
+          body=lambda i, *args: [i + 1] + list(_leapfrog_one_step(*args)),
+          loop_vars=[
+              tf.zeros([], tf.int32, name='iter'),
+              current_momentum_parts,
+              current_state_parts,
+              current_target_log_prob,
+              current_target_log_prob_grad_parts,
+          ])[1:]
 
       def maybe_flatten(x):
         return x if mcmc_util.is_list_like(current_state) else x[0]
@@ -487,11 +497,11 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
           maybe_flatten(next_state_parts),
           UncalibratedHamiltonianMonteCarloKernelResults(
               log_acceptance_correction=_compute_log_acceptance_correction(
-                  current_momentums,
-                  next_momentums,
+                  current_momentum_parts,
+                  next_momentum_parts,
                   independent_chain_ndims),
               target_log_prob=next_target_log_prob,
-              grads_target_log_prob=next_grads_target_log_prob,
+              grads_target_log_prob=next_target_log_prob_grad_parts,
           ),
       ]
 
@@ -514,14 +524,15 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
       )
 
 
-def _leapfrog_integrator(current_momentums,
-                         target_log_prob_fn,
-                         current_state_parts,
-                         step_sizes,
-                         num_leapfrog_steps,
-                         current_target_log_prob,
-                         current_grads_target_log_prob,
-                         name=None):
+def _leapfrog_integrator_one_step(
+    target_log_prob_fn,
+    independent_chain_ndims,
+    step_sizes,
+    current_momentum_parts,
+    current_state_parts,
+    current_target_log_prob,
+    current_target_log_prob_grad_parts,
+    name=None):
   """Applies `num_leapfrog_steps` of the leapfrog integrator.
 
   Assumes a simple quadratic kinetic energy function: `0.5 ||momentum||**2`.
@@ -547,22 +558,34 @@ def _leapfrog_integrator(current_momentums,
 
   target_log_prob_fn = tfd.MultivariateNormalDiag(
       loc=tf.zeros(dims, dtype)).log_prob
-  current_target_log_prob = target_log_prob_fn(position)
-  current_grads_target_log_prob = tf.gradients(
-      current_target_log_prob, position)
 
+  def _leapfrog_one_step(*args):
+    # Closure representing computation done during each leapfrog step.
+    return _leapfrog_integrator_one_step(
+        target_log_prob_fn=target_log_prob_fn,
+        independent_chain_ndims=0,
+        step_sizes=[0.1],
+        current_momentum_parts=args[0],
+        current_state_parts=args[1],
+        current_target_log_prob=args[2],
+        current_target_log_prob_grad_parts=args[3])
+
+  # Do leapfrog integration.
   [
-      next_momentums,
-      next_positions,
-  ] = _leapfrog_integrator(
-      current_momentums=[momentum],
-      target_log_prob_fn=tfd.MultivariateNormalDiag(
-          loc=tf.zeros(dims, dtype)).log_prob,
-      current_state_parts=[position],
-      step_sizes=[0.1],
-      num_leapfrog_steps=3,
-      current_target_log_prob=current_target_log_prob,
-      current_grads_target_log_prob=current_grads_target_log_prob)[:2]
+      [next_momentum],
+      [next_position],
+      next_target_log_prob,
+      next_target_log_prob_grad_parts,
+  ] = tf.while_loop(
+      cond=lambda *args: True,
+      body=_leapfrog_one_step,
+      loop_vars=[
+        [momentum],
+        [position],
+        target_log_prob_fn(position),
+        tf.gradients(target_log_prob_fn(position), position),
+      ],
+      maximum_iterations=3)
 
   momentum_ = np.random.randn(dims).astype(dtype)
   position_ = np.random.randn(dims).astype(dtype)
@@ -571,7 +594,7 @@ def _leapfrog_integrator(current_momentums,
   with tf.Session() as sess:
     for i in xrange(num_iter):
       position_, momentum_ = sess.run(
-          [next_momentums[0], next_positions[0]],
+          [next_momentum, next_position],
           feed_dict={position: position_, momentum: momentum_})
       positions[i] = position_
 
@@ -579,27 +602,26 @@ def _leapfrog_integrator(current_momentums,
   ```
 
   Args:
-    current_momentums: Tensor containing the value(s) of the momentum
-      variable(s) to update.
     target_log_prob_fn: Python callable which takes an argument like
       `*current_state_parts` and returns its (possibly unnormalized) log-density
       under the target distribution.
-    current_state_parts: Python `list` of `Tensor`s representing the current
-      state(s) of the Markov chain(s). The first `independent_chain_ndims` of
-      the `Tensor`(s) index different chains.
+    independent_chain_ndims: Scalar `int` `Tensor` representing the number of
+      leftmost `Tensor` dimensions which index independent chains.
     step_sizes: Python `list` of `Tensor`s representing the step size for the
       leapfrog integrator. Must broadcast with the shape of
       `current_state_parts`.  Larger step sizes lead to faster progress, but
       too-large step sizes make rejection exponentially more likely. When
       possible, it's often helpful to match per-variable step sizes to the
       standard deviations of the target distribution in each variable.
-    num_leapfrog_steps: Integer number of steps to run the leapfrog integrator
-      for. Total progress per HMC step is roughly proportional to `step_size *
-      num_leapfrog_steps`.
+    current_momentum_parts: Tensor containing the value(s) of the momentum
+      variable(s) to update.
+    current_state_parts: Python `list` of `Tensor`s representing the current
+      state(s) of the Markov chain(s). The first `independent_chain_ndims` of
+      the `Tensor`(s) index different chains.
     current_target_log_prob: `Tensor` representing the value of
       `target_log_prob_fn(*current_state_parts)`. The only reason to specify
       this argument is to reduce TF graph size.
-    current_grads_target_log_prob: Python list of `Tensor`s representing
+    current_target_log_prob_grad_parts: Python list of `Tensor`s representing
       gradient of `target_log_prob_fn(*current_state_parts`) wrt
       `current_state_parts`. Must have same shape as `current_state_parts`. The
       only reason to specify this argument is to reduce TF graph size.
@@ -607,17 +629,17 @@ def _leapfrog_integrator(current_momentums,
       Default value: `None` (i.e., 'hmc_leapfrog_integrator').
 
   Returns:
-    proposed_momentums: Updated value of the momentum.
+    proposed_momentum_parts: Updated value of the momentum.
     proposed_state_parts: Tensor or Python list of `Tensor`s representing the
       state(s) of the Markov chain(s) at each result step. Has same shape as
       input `current_state_parts`.
     proposed_target_log_prob: `Tensor` representing the value of
       `target_log_prob_fn` at `next_state`.
-    proposed_grads_target_log_prob: Gradient of `proposed_target_log_prob` wrt
-      `next_state`.
+    proposed_target_log_prob_grad_parts: Gradient of `proposed_target_log_prob`
+      wrt `next_state`.
 
   Raises:
-    ValueError: if `len(momentums) != len(state_parts)`.
+    ValueError: if `len(momentum_parts) != len(state_parts)`.
     ValueError: if `len(state_parts) != len(step_sizes)`.
     ValueError: if `len(state_parts) != len(grads_target_log_prob)`.
     TypeError: if `not target_log_prob.dtype.is_floating`.
@@ -664,70 +686,33 @@ def _leapfrog_integrator(current_momentums,
   #
   # So using per-variable step sizes in HMC will give results that are
   # exactly identical to explicitly using a diagonal mass matrix.
-  def _loop_body(step,
-                 current_momentums,
-                 current_state_parts,
-                 ignore_current_target_log_prob,  # pylint: disable=unused-argument
-                 current_grads_target_log_prob):
-    return [step + 1] + list(_leapfrog_step(current_momentums,
-                                            target_log_prob_fn,
-                                            current_state_parts,
-                                            step_sizes,
-                                            current_grads_target_log_prob))
 
   with tf.name_scope(
-      name, 'hmc_leapfrog_integrator',
-      [current_momentums, current_state_parts, step_sizes, num_leapfrog_steps,
-       current_target_log_prob, current_grads_target_log_prob]):
-    if len(current_momentums) != len(current_state_parts):
-      raise ValueError('`momentums` must be in one-to-one correspondence '
-                       'with `state_parts`')
-    num_leapfrog_steps = tf.convert_to_tensor(num_leapfrog_steps,
-                                              name='num_leapfrog_steps')
-    [
-        current_target_log_prob,
-        current_grads_target_log_prob,
-    ] = mcmc_util.maybe_call_fn_and_grads(
-        target_log_prob_fn,
-        current_state_parts,
-        current_target_log_prob,
-        current_grads_target_log_prob)
-    return tf.while_loop(
-        cond=lambda iter_, *args: iter_ < num_leapfrog_steps,
-        body=_loop_body,
-        loop_vars=[
-            np.int32(0),  # iter_
-            current_momentums,
-            current_state_parts,
-            current_target_log_prob,
-            current_grads_target_log_prob,
-        ],
-        back_prop=False)[1:]  # Lop-off "iter_".
+      name, 'hmc_leapfrog_integrator_one_step',
+      [independent_chain_ndims, step_sizes,
+       current_momentum_parts, current_state_parts,
+       current_target_log_prob, current_target_log_prob_grad_parts]):
 
+    # Step 1: Update momentum.
+    proposed_momentum_parts = [
+        v + 0.5 * eps * g
+        for v, eps, g
+        in zip(current_momentum_parts,
+               step_sizes,
+               current_target_log_prob_grad_parts)]
 
-def _leapfrog_step(current_momentums,
-                   target_log_prob_fn,
-                   current_state_parts,
-                   step_sizes,
-                   current_grads_target_log_prob,
-                   name=None):
-  """Applies one step of the leapfrog integrator."""
-  with tf.name_scope(
-      name, '_leapfrog_step',
-      [current_momentums, current_state_parts, step_sizes,
-       current_grads_target_log_prob]):
-    proposed_momentums = [m + 0.5 * ss * g for m, ss, g
-                          in zip(current_momentums,
-                                 step_sizes,
-                                 current_grads_target_log_prob)]
-    proposed_state_parts = [x + ss * m for x, ss, m
-                            in zip(current_state_parts,
-                                   step_sizes,
-                                   proposed_momentums)]
+    # Step 2: Update state.
+    proposed_state_parts = [
+        x + eps * v
+        for x, eps, v
+        in zip(current_state_parts,
+               step_sizes,
+               proposed_momentum_parts)]
 
+    # Step 3a: Re-evaluate target-log-prob (and grad) at proposed state.
     [
         proposed_target_log_prob,
-        proposed_grads_target_log_prob,
+        proposed_target_log_prob_grad_parts,
     ] = mcmc_util.maybe_call_fn_and_grads(
         target_log_prob_fn,
         proposed_state_parts)
@@ -736,25 +721,30 @@ def _leapfrog_step(current_momentums,
       raise TypeError('`target_log_prob_fn` must produce a `Tensor` '
                       'with `float` `dtype`.')
 
-    if any(g is None for g in proposed_grads_target_log_prob):
+    if any(g is None for g in proposed_target_log_prob_grad_parts):
       raise ValueError(
           'Encountered `None` gradient. Does your target `target_log_prob_fn` '
           'access all `tf.Variable`s via `tf.get_variable`?\n'
           '  current_state_parts: {}\n'
           '  proposed_state_parts: {}\n'
-          '  proposed_grads_target_log_prob: {}'.format(
+          '  proposed_target_log_prob_grad_parts: {}'.format(
               current_state_parts,
               proposed_state_parts,
-              proposed_grads_target_log_prob))
-    proposed_momentums = [m + 0.5 * ss * g for m, ss, g
-                          in zip(proposed_momentums,
-                                 step_sizes,
-                                 proposed_grads_target_log_prob)]
+              proposed_target_log_prob_grad_parts))
+
+    # Step 3b: Update momentum (again).
+    proposed_momentum_parts = [
+        v + 0.5 * eps * g
+        for v, eps, g
+        in zip(proposed_momentum_parts,
+               step_sizes,
+               proposed_target_log_prob_grad_parts)]
+
     return [
-        proposed_momentums,
+        proposed_momentum_parts,
         proposed_state_parts,
         proposed_target_log_prob,
-        proposed_grads_target_log_prob,
+        proposed_target_log_prob_grad_parts,
     ]
 
 

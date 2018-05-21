@@ -25,7 +25,6 @@ import tensorflow as tf
 
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import util as mcmc_util
-from tensorflow.python.ops.distributions import util as distributions_util
 
 
 __all__ = [
@@ -132,7 +131,8 @@ class MetropolisHastings(kernel_base.TransitionKernel):
       warnings.warn('Supplied `TransitionKernel` is already calibrated. '
                     'Composing `MetropolisHastings` `TransitionKernel` '
                     'may not be required.')
-    self._seed_stream = seed  # This will be mutated with use.
+    self._seed_stream = tf.contrib.distributions.SeedStream(
+        seed, 'metropolis_hastings_one_step')
     self._parameters = dict(
         inner_kernel=inner_kernel,
         seed=seed,
@@ -213,16 +213,10 @@ class MetropolisHastings(kernel_base.TransitionKernel):
       # If proposed state increases likelihood: always accept.
       # I.e., u < min(1, accept_ratio),  where u ~ Uniform[0,1)
       #       ==> log(u) < log_accept_ratio
-      # Note:
-      # - We mutate seed state so subsequent calls are not correlated.
-      # - We mutate seed BEFORE using it just in case users supplied the
-      #   same seed to the inner kernel.
-      self._seed_stream = distributions_util.gen_new_seed(
-          self._seed_stream, salt='metropolis_hastings_one_step')
       log_uniform = tf.log(tf.random_uniform(
           shape=tf.shape(proposed_results.target_log_prob),
           dtype=proposed_results.target_log_prob.dtype.base_dtype,
-          seed=self._seed_stream))
+          seed=self._seed_stream()))
       is_accepted = log_uniform < log_accept_ratio
 
       next_state = mcmc_util.choose(

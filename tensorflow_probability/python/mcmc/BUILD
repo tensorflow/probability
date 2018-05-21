@@ -79,8 +79,9 @@ py_library(
 
 py_test(
     name = "hmc_test",
-    size = "large",
+    size = "medium",
     srcs = ["hmc_test.py"],
+    shard_count = 6,
     deps = [
         # numpy dep,
         # scipy dep,
