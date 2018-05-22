@@ -19,11 +19,13 @@ from __future__ import division
 from __future__ import print_function
 
 from tensorflow_probability.python.math.linalg import pinv
+from tensorflow_probability.python.math.random_ops import random_rademacher
 
 from tensorflow.python.util.all_util import remove_undocumented
 
 _allowed_symbols = [
     'pinv',
+    'random_rademacher',
 ]
 
 remove_undocumented(__name__, _allowed_symbols)

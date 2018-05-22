@@ -33,7 +33,6 @@ __all__ = [
     'default_mean_field_normal_fn',
     'default_multivariate_normal_fn',
     'deserialize_function',
-    'random_sign',
     'serialize_function',
 ]
 
@@ -257,17 +256,6 @@ def deserialize_function(serial, function_type):
   else:
     raise TypeError('Unknown function type:', function_type)
   return function
-
-
-def random_sign(shape, dtype=tf.float32, seed=None):
-  """Draw values from {-1, 1} uniformly, i.e., Rademacher distribution."""
-  random_bernoulli = tf.random_uniform(
-      shape,
-      minval=0,
-      maxval=2,
-      dtype=tf.int32,
-      seed=seed)
-  return tf.cast(2 * random_bernoulli - 1, dtype)
 
 
 def serialize_function(func):

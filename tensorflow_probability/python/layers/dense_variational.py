@@ -21,6 +21,7 @@ from __future__ import print_function
 import tensorflow as tf
 
 from tensorflow_probability.python.layers import util as tfp_layers_util
+from tensorflow_probability.python.math import random_rademacher
 from tensorflow_probability.python.util import docstring as docstring_util
 from tensorflow.python.ops.distributions import util as distribution_util
 
@@ -708,11 +709,11 @@ class DenseFlipout(_DenseVariational):
     input_shape = tf.shape(inputs)
     batch_shape = input_shape[:-1]
 
-    sign_input = tfp_layers_util.random_sign(
+    sign_input = random_rademacher(
         input_shape,
         dtype=inputs.dtype,
         seed=self.seed)
-    sign_output = tfp_layers_util.random_sign(
+    sign_output = random_rademacher(
         tf.concat([batch_shape,
                    tf.expand_dims(self.units, 0)], 0),
         dtype=inputs.dtype,

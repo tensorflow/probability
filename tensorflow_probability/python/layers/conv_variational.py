@@ -21,6 +21,7 @@ from __future__ import print_function
 import tensorflow as tf
 
 from tensorflow_probability.python.layers import util as tfp_layers_util
+from tensorflow_probability.python.math import random_rademacher
 from tensorflow_probability.python.util import docstring as docstring_util
 from tensorflow.python.layers import utils as tf_layers_util
 from tensorflow.python.ops import nn_ops
@@ -1160,12 +1161,12 @@ class _ConvFlipout(_ConvVariational):
     batch_shape = tf.expand_dims(input_shape[0], 0)
     channels = input_shape[-1]
 
-    sign_input = tfp_layers_util.random_sign(
+    sign_input = random_rademacher(
         tf.concat([batch_shape,
                    tf.expand_dims(channels, 0)], 0),
         dtype=inputs.dtype,
         seed=self.seed)
-    sign_output = tfp_layers_util.random_sign(
+    sign_output = random_rademacher(
         tf.concat([batch_shape,
                    tf.expand_dims(self.filters, 0)], 0),
         dtype=inputs.dtype,
