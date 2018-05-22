@@ -23,8 +23,117 @@ import numpy as np
 
 import tensorflow as tf
 
+from tensorflow_probability.python.math import matvecmul as matvecmul
 from tensorflow_probability.python.math import pinv as pinv
 from tensorflow.python.framework import test_util
+
+
+class _MatvecmulTest(object):
+
+  @test_util.run_in_graph_and_eager_modes()
+  def testMultiplicationWorks(self):
+    a = self.dtype([[1., .4, .5],
+                    [.4, .2, .25]])
+    b = self.dtype([0.3, 0.7, 0.5])
+    expected_result = np.matmul(a, b)
+
+    a = make_tensor_hiding_attributes(a, hide_shape=self.use_dynamic_shape)
+    b = make_tensor_hiding_attributes(b, hide_shape=self.use_dynamic_shape)
+    result = matvecmul(a, b)
+    result = self.evaluate(result)
+
+    self.assertAllClose(expected_result, result)
+
+  @test_util.run_in_graph_and_eager_modes()
+  def testTransposedMultiplicationWorks(self):
+    a = self.dtype([[1., .4, .5],
+                    [.4, .2, .25]])
+    b = self.dtype([0.3, 0.7])
+    expected_result = np.matmul(np.transpose(a), b)
+
+    a = make_tensor_hiding_attributes(a, hide_shape=self.use_dynamic_shape)
+    b = make_tensor_hiding_attributes(b, hide_shape=self.use_dynamic_shape)
+    result = matvecmul(a, b, transpose_a=True)
+    result = self.evaluate(result)
+
+    self.assertAllClose(expected_result, result)
+
+  @test_util.run_in_graph_and_eager_modes()
+  def testBatchedMultiplicationWorks(self):
+    a = self.dtype([[[1., .4, .5],
+                     [.4, .2, .25]],
+                    [[2, .3, .4],
+                     [.5, .6, .7]]])
+    b = self.dtype([[0.3, 0.7, 0.5],
+                    [1.0, 2.1, 3.2]])
+    expected_result = np.stack([np.matmul(a[0, ...], b[0, ...]),
+                                np.matmul(a[1, ...], b[1, ...])])
+
+    a = make_tensor_hiding_attributes(a, hide_shape=self.use_dynamic_shape)
+    b = make_tensor_hiding_attributes(b, hide_shape=self.use_dynamic_shape)
+    result = matvecmul(a, b)
+    result = self.evaluate(result)
+
+    self.assertAllClose(expected_result, result)
+
+  @test_util.run_in_graph_and_eager_modes()
+  def testLiteralsWithMismatchedDtypes(self):
+    a = np.array([[1, 2], [3, 4]], np.float64)
+    b = [1., 1.]
+    expected_result = np.matmul(a, b)
+
+    result = matvecmul(a, b)
+    result = self.evaluate(result)
+
+    self.assertAllClose(expected_result, result)
+
+  @test_util.run_in_graph_and_eager_modes()
+  def testMismatchedRanksFails(self):
+    data_1d = self.dtype([0.3, 0.7])
+    data_2d = self.dtype([[1., .4],
+                          [.4, .2]])
+    data_3d = self.dtype([[[1., .4],
+                           [.2, .5]]])
+
+    data_1d = make_tensor_hiding_attributes(data_1d,
+                                            hide_shape=self.use_dynamic_shape)
+    data_2d = make_tensor_hiding_attributes(data_2d,
+                                            hide_shape=self.use_dynamic_shape)
+    data_3d = make_tensor_hiding_attributes(data_3d,
+                                            hide_shape=self.use_dynamic_shape)
+
+    with self.assertRaisesRegexp(Exception, 'similarly batched'):
+      self.evaluate(matvecmul(data_2d, data_3d,
+                              validate_args=self.use_dynamic_shape))
+    with self.assertRaisesRegexp(Exception, 'similarly batched'):
+      self.evaluate(matvecmul(data_2d, data_2d,
+                              validate_args=self.use_dynamic_shape))
+    with self.assertRaisesRegexp(Exception, 'similarly batched'):
+      self.evaluate(matvecmul(data_3d, data_3d,
+                              validate_args=self.use_dynamic_shape))
+    with self.assertRaisesRegexp(Exception, 'similarly batched'):
+      self.evaluate(matvecmul(data_3d, data_1d,
+                              validate_args=self.use_dynamic_shape))
+
+
+class MatvecmulTestStatic32(tf.test.TestCase, _MatvecmulTest):
+  dtype = np.float32
+  use_dynamic_shape = False
+
+
+class MatvecmulTestDynamic32(tf.test.TestCase, _MatvecmulTest):
+  dtype = np.float32
+  use_dynamic_shape = True
+
+
+class MatvecmulTestStatic64(tf.test.TestCase, _MatvecmulTest):
+  dtype = np.float64
+  use_dynamic_shape = False
+
+
+class MatvecmulTestDynamic64(tf.test.TestCase, _MatvecmulTest):
+  dtype = np.float64
+  use_dynamic_shape = True
 
 
 class _PinvTest(object):
@@ -111,6 +220,14 @@ class PinvTestStatic64CustomRcond(tf.test.TestCase, _PinvTest):
   dtype = np.float64
   use_static_shape = True
   use_default_rcond = False
+
+
+def make_tensor_hiding_attributes(value, hide_shape, hide_value=True):
+  if not hide_value:
+    return tf.convert_to_tensor(value)
+
+  shape = None if hide_shape else getattr(value, 'shape', None)
+  return tf.placeholder_with_default(input=value, shape=shape)
 
 
 if __name__ == '__main__':

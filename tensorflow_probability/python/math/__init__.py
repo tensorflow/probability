@@ -18,12 +18,14 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from tensorflow_probability.python.math.linalg import matvecmul
 from tensorflow_probability.python.math.linalg import pinv
 from tensorflow_probability.python.math.random_ops import random_rademacher
 
 from tensorflow.python.util.all_util import remove_undocumented
 
 _allowed_symbols = [
+    'matvecmul',
     'pinv',
     'random_rademacher',
 ]
