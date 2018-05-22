@@ -50,7 +50,7 @@ py_library(
 
 py_test(
     name = "conv_variational_test",
-    size = "small",
+    size = "medium",
     srcs = ["conv_variational_test.py"],
     deps = [
         # numpy dep,
