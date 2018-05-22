@@ -27,7 +27,6 @@ import tensorflow_probability as tfp
 from tensorflow.python.platform import test
 
 tfd = tf.contrib.distributions
-cd = tfp.vi.csiszar_divergence
 
 
 def tridiag(d, diag_value, offdiag_value):
@@ -49,43 +48,43 @@ class AmariAlphaTest(test.TestCase):
       for normalized in [True, False]:
         with self.test_session(graph=tf.Graph()):
           self.assertAllClose(
-              cd.amari_alpha(0., alpha=alpha,
-                             self_normalized=normalized).eval(),
+              tfp.vi.amari_alpha(0., alpha=alpha,
+                                 self_normalized=normalized).eval(),
               0.)
 
   def test_correct_when_alpha0(self):
     with self.test_session():
       self.assertAllClose(
-          cd.amari_alpha(self._logu, alpha=0.).eval(),
+          tfp.vi.amari_alpha(self._logu, alpha=0.).eval(),
           -self._logu)
 
       self.assertAllClose(
-          cd.amari_alpha(self._logu, alpha=0., self_normalized=True).eval(),
+          tfp.vi.amari_alpha(self._logu, alpha=0., self_normalized=True).eval(),
           -self._logu + (self._u - 1.))
 
   def test_correct_when_alpha1(self):
     with self.test_session():
       self.assertAllClose(
-          cd.amari_alpha(self._logu, alpha=1.).eval(),
+          tfp.vi.amari_alpha(self._logu, alpha=1.).eval(),
           self._u * self._logu)
 
       self.assertAllClose(
-          cd.amari_alpha(self._logu, alpha=1., self_normalized=True).eval(),
+          tfp.vi.amari_alpha(self._logu, alpha=1., self_normalized=True).eval(),
           self._u * self._logu - (self._u - 1.))
 
   def test_correct_when_alpha_not_01(self):
     for alpha in [-2, -1., -0.5, 0.5, 2.]:
       with self.test_session(graph=tf.Graph()):
         self.assertAllClose(
-            cd.amari_alpha(self._logu,
-                           alpha=alpha,
-                           self_normalized=False).eval(),
+            tfp.vi.amari_alpha(self._logu,
+                               alpha=alpha,
+                               self_normalized=False).eval(),
             ((self._u**alpha - 1)) / (alpha * (alpha - 1.)))
 
         self.assertAllClose(
-            cd.amari_alpha(self._logu,
-                           alpha=alpha,
-                           self_normalized=True).eval(),
+            tfp.vi.amari_alpha(self._logu,
+                               alpha=alpha,
+                               self_normalized=True).eval(),
             ((self._u**alpha - 1.)
              - alpha * (self._u - 1)) / (alpha * (alpha - 1.)))
 
@@ -100,17 +99,17 @@ class KLReverseTest(test.TestCase):
     for normalized in [True, False]:
       with self.test_session(graph=tf.Graph()):
         self.assertAllClose(
-            cd.kl_reverse(0., self_normalized=normalized).eval(),
+            tfp.vi.kl_reverse(0., self_normalized=normalized).eval(),
             0.)
 
   def test_correct(self):
     with self.test_session():
       self.assertAllClose(
-          cd.kl_reverse(self._logu).eval(),
+          tfp.vi.kl_reverse(self._logu).eval(),
           -self._logu)
 
       self.assertAllClose(
-          cd.kl_reverse(self._logu, self_normalized=True).eval(),
+          tfp.vi.kl_reverse(self._logu, self_normalized=True).eval(),
           -self._logu + (self._u - 1.))
 
 
@@ -124,17 +123,17 @@ class KLForwardTest(test.TestCase):
     for normalized in [True, False]:
       with self.test_session(graph=tf.Graph()):
         self.assertAllClose(
-            cd.kl_forward(0., self_normalized=normalized).eval(),
+            tfp.vi.kl_forward(0., self_normalized=normalized).eval(),
             0.)
 
   def test_correct(self):
     with self.test_session():
       self.assertAllClose(
-          cd.kl_forward(self._logu).eval(),
+          tfp.vi.kl_forward(self._logu).eval(),
           self._u * self._logu)
 
       self.assertAllClose(
-          cd.kl_forward(self._logu, self_normalized=True).eval(),
+          tfp.vi.kl_forward(self._logu, self_normalized=True).eval(),
           self._u * self._logu - (self._u - 1.))
 
 
@@ -146,30 +145,30 @@ class JensenShannonTest(test.TestCase):
 
   def test_at_zero(self):
     with self.test_session():
-      self.assertAllClose(cd.jensen_shannon(0.).eval(), np.log(0.25))
+      self.assertAllClose(tfp.vi.jensen_shannon(0.).eval(), np.log(0.25))
 
   def test_symmetric(self):
     with self.test_session():
       self.assertAllClose(
-          cd.jensen_shannon(self._logu).eval(),
-          cd.symmetrized_csiszar_function(
-              self._logu, cd.jensen_shannon).eval())
+          tfp.vi.jensen_shannon(self._logu).eval(),
+          tfp.vi.symmetrized_csiszar_function(
+              self._logu, tfp.vi.jensen_shannon).eval())
 
       self.assertAllClose(
-          cd.jensen_shannon(self._logu, self_normalized=True).eval(),
-          cd.symmetrized_csiszar_function(
+          tfp.vi.jensen_shannon(self._logu, self_normalized=True).eval(),
+          tfp.vi.symmetrized_csiszar_function(
               self._logu,
-              lambda x: cd.jensen_shannon(x, self_normalized=True)).eval())
+              lambda x: tfp.vi.jensen_shannon(x, self_normalized=True)).eval())
 
   def test_correct(self):
     with self.test_session():
       self.assertAllClose(
-          cd.jensen_shannon(self._logu).eval(),
+          tfp.vi.jensen_shannon(self._logu).eval(),
           (self._u * self._logu
            - (1 + self._u) * np.log1p(self._u)))
 
       self.assertAllClose(
-          cd.jensen_shannon(self._logu, self_normalized=True).eval(),
+          tfp.vi.jensen_shannon(self._logu, self_normalized=True).eval(),
           (self._u * self._logu
            - (1 + self._u) * np.log((1 + self._u) / 2)))
 
@@ -182,25 +181,25 @@ class ArithmeticGeometricMeanTest(test.TestCase):
 
   def test_at_zero(self):
     with self.test_session():
-      self.assertAllClose(cd.arithmetic_geometric(0.).eval(), np.log(4))
+      self.assertAllClose(tfp.vi.arithmetic_geometric(0.).eval(), np.log(4))
       self.assertAllClose(
-          cd.arithmetic_geometric(0., self_normalized=True).eval(), 0.)
+          tfp.vi.arithmetic_geometric(0., self_normalized=True).eval(), 0.)
 
   def test_symmetric(self):
     with self.test_session():
       self.assertAllClose(
-          cd.arithmetic_geometric(self._logu).eval(),
-          cd.symmetrized_csiszar_function(
-              self._logu, cd.arithmetic_geometric).eval())
+          tfp.vi.arithmetic_geometric(self._logu).eval(),
+          tfp.vi.symmetrized_csiszar_function(
+              self._logu, tfp.vi.arithmetic_geometric).eval())
 
   def test_correct(self):
     with self.test_session():
       self.assertAllClose(
-          cd.arithmetic_geometric(self._logu).eval(),
+          tfp.vi.arithmetic_geometric(self._logu).eval(),
           (1. + self._u) * np.log((1. + self._u) / np.sqrt(self._u)))
 
       self.assertAllClose(
-          cd.arithmetic_geometric(self._logu, self_normalized=True).eval(),
+          tfp.vi.arithmetic_geometric(self._logu, self_normalized=True).eval(),
           (1. + self._u) * np.log(0.5 * (1. + self._u) / np.sqrt(self._u)))
 
 
@@ -212,12 +211,12 @@ class TotalVariationTest(test.TestCase):
 
   def test_at_zero(self):
     with self.test_session():
-      self.assertAllClose(cd.total_variation(0.).eval(), 0.)
+      self.assertAllClose(tfp.vi.total_variation(0.).eval(), 0.)
 
   def test_correct(self):
     with self.test_session():
       self.assertAllClose(
-          cd.total_variation(self._logu).eval(),
+          tfp.vi.total_variation(self._logu).eval(),
           0.5 * np.abs(self._u - 1))
 
 
@@ -229,12 +228,12 @@ class PearsonTest(test.TestCase):
 
   def test_at_zero(self):
     with self.test_session():
-      self.assertAllClose(cd.pearson(0.).eval(), 0.)
+      self.assertAllClose(tfp.vi.pearson(0.).eval(), 0.)
 
   def test_correct(self):
     with self.test_session():
       self.assertAllClose(
-          cd.pearson(self._logu).eval(),
+          tfp.vi.pearson(self._logu).eval(),
           np.square(self._u - 1))
 
 
@@ -246,19 +245,19 @@ class SquaredHellingerTest(test.TestCase):
 
   def test_at_zero(self):
     with self.test_session():
-      self.assertAllClose(cd.squared_hellinger(0.).eval(), 0.)
+      self.assertAllClose(tfp.vi.squared_hellinger(0.).eval(), 0.)
 
   def test_symmetric(self):
     with self.test_session():
       self.assertAllClose(
-          cd.squared_hellinger(self._logu).eval(),
-          cd.symmetrized_csiszar_function(
-              self._logu, cd.squared_hellinger).eval())
+          tfp.vi.squared_hellinger(self._logu).eval(),
+          tfp.vi.symmetrized_csiszar_function(
+              self._logu, tfp.vi.squared_hellinger).eval())
 
   def test_correct(self):
     with self.test_session():
       self.assertAllClose(
-          cd.squared_hellinger(self._logu).eval(),
+          tfp.vi.squared_hellinger(self._logu).eval(),
           np.square(np.sqrt(self._u) - 1))
 
 
@@ -270,19 +269,19 @@ class TriangularTest(test.TestCase):
 
   def test_at_zero(self):
     with self.test_session():
-      self.assertAllClose(cd.triangular(0.).eval(), 0.)
+      self.assertAllClose(tfp.vi.triangular(0.).eval(), 0.)
 
   def test_symmetric(self):
     with self.test_session():
       self.assertAllClose(
-          cd.triangular(self._logu).eval(),
-          cd.symmetrized_csiszar_function(
-              self._logu, cd.triangular).eval())
+          tfp.vi.triangular(self._logu).eval(),
+          tfp.vi.symmetrized_csiszar_function(
+              self._logu, tfp.vi.triangular).eval())
 
   def test_correct(self):
     with self.test_session():
       self.assertAllClose(
-          cd.triangular(self._logu).eval(),
+          tfp.vi.triangular(self._logu).eval(),
           np.square(self._u - 1) / (1 + self._u))
 
 
@@ -294,41 +293,41 @@ class TPowerTest(test.TestCase):
 
   def test_at_zero(self):
     with self.test_session():
-      self.assertAllClose(cd.t_power(0., t=-0.1).eval(), 0.)
-      self.assertAllClose(cd.t_power(0., t=0.5).eval(), 0.)
-      self.assertAllClose(cd.t_power(0., t=1.1).eval(), 0.)
+      self.assertAllClose(tfp.vi.t_power(0., t=-0.1).eval(), 0.)
+      self.assertAllClose(tfp.vi.t_power(0., t=0.5).eval(), 0.)
+      self.assertAllClose(tfp.vi.t_power(0., t=1.1).eval(), 0.)
       self.assertAllClose(
-          cd.t_power(0., t=-0.1, self_normalized=True).eval(), 0.)
+          tfp.vi.t_power(0., t=-0.1, self_normalized=True).eval(), 0.)
       self.assertAllClose(
-          cd.t_power(0., t=0.5, self_normalized=True).eval(), 0.)
+          tfp.vi.t_power(0., t=0.5, self_normalized=True).eval(), 0.)
       self.assertAllClose(
-          cd.t_power(0., t=1.1, self_normalized=True).eval(), 0.)
+          tfp.vi.t_power(0., t=1.1, self_normalized=True).eval(), 0.)
 
   def test_correct(self):
     with self.test_session():
       self.assertAllClose(
-          cd.t_power(self._logu, t=np.float64(-0.1)).eval(),
+          tfp.vi.t_power(self._logu, t=np.float64(-0.1)).eval(),
           self._u ** -0.1 - 1.)
       self.assertAllClose(
-          cd.t_power(self._logu, t=np.float64(0.5)).eval(),
+          tfp.vi.t_power(self._logu, t=np.float64(0.5)).eval(),
           -self._u ** 0.5 + 1.)
       self.assertAllClose(
-          cd.t_power(self._logu, t=np.float64(1.1)).eval(),
+          tfp.vi.t_power(self._logu, t=np.float64(1.1)).eval(),
           self._u ** 1.1 - 1.)
 
   def test_correct_self_normalized(self):
     with self.test_session():
       self.assertAllClose(
-          cd.t_power(self._logu, t=np.float64(-0.1),
-                     self_normalized=True).eval(),
+          tfp.vi.t_power(self._logu, t=np.float64(-0.1),
+                         self_normalized=True).eval(),
           self._u ** -0.1 - 1. + 0.1 * (self._u - 1.))
       self.assertAllClose(
-          cd.t_power(self._logu, t=np.float64(0.5),
-                     self_normalized=True).eval(),
+          tfp.vi.t_power(self._logu, t=np.float64(0.5),
+                         self_normalized=True).eval(),
           -self._u ** 0.5 + 1. + 0.5 * (self._u - 1.))
       self.assertAllClose(
-          cd.t_power(self._logu, t=np.float64(1.1),
-                     self_normalized=True).eval(),
+          tfp.vi.t_power(self._logu, t=np.float64(1.1),
+                         self_normalized=True).eval(),
           self._u ** 1.1 - 1. - 1.1 * (self._u - 1.))
 
 
@@ -340,12 +339,12 @@ class Log1pAbsTest(test.TestCase):
 
   def test_at_zero(self):
     with self.test_session():
-      self.assertAllClose(cd.log1p_abs(0.).eval(), 0.)
+      self.assertAllClose(tfp.vi.log1p_abs(0.).eval(), 0.)
 
   def test_correct(self):
     with self.test_session():
       self.assertAllClose(
-          cd.log1p_abs(self._logu).eval(),
+          tfp.vi.log1p_abs(self._logu).eval(),
           self._u**(np.sign(self._u - 1)) - 1)
 
 
@@ -357,19 +356,19 @@ class JeffreysTest(test.TestCase):
 
   def test_at_zero(self):
     with self.test_session():
-      self.assertAllClose(cd.jeffreys(0.).eval(), 0.)
+      self.assertAllClose(tfp.vi.jeffreys(0.).eval(), 0.)
 
   def test_symmetric(self):
     with self.test_session():
       self.assertAllClose(
-          cd.jeffreys(self._logu).eval(),
-          cd.symmetrized_csiszar_function(
-              self._logu, cd.jeffreys).eval())
+          tfp.vi.jeffreys(self._logu).eval(),
+          tfp.vi.symmetrized_csiszar_function(
+              self._logu, tfp.vi.jeffreys).eval())
 
   def test_correct(self):
     with self.test_session():
       self.assertAllClose(
-          cd.jeffreys(self._logu).eval(),
+          tfp.vi.jeffreys(self._logu).eval(),
           0.5 * (self._u * self._logu - self._logu))
 
 
@@ -381,12 +380,12 @@ class ChiSquareTest(test.TestCase):
 
   def test_at_zero(self):
     with self.test_session():
-      self.assertAllClose(cd.chi_square(0.).eval(), 0.)
+      self.assertAllClose(tfp.vi.chi_square(0.).eval(), 0.)
 
   def test_correct(self):
     with self.test_session():
       self.assertAllClose(
-          cd.chi_square(self._logu).eval(),
+          tfp.vi.chi_square(self._logu).eval(),
           self._u**2 - 1)
 
 
@@ -399,18 +398,18 @@ class ModifiedGanTest(test.TestCase):
   def test_at_zero(self):
     with self.test_session():
       self.assertAllClose(
-          cd.modified_gan(0.).eval(), np.log(2))
+          tfp.vi.modified_gan(0.).eval(), np.log(2))
       self.assertAllClose(
-          cd.modified_gan(0., self_normalized=True).eval(), np.log(2))
+          tfp.vi.modified_gan(0., self_normalized=True).eval(), np.log(2))
 
   def test_correct(self):
     with self.test_session():
       self.assertAllClose(
-          cd.modified_gan(self._logu).eval(),
+          tfp.vi.modified_gan(self._logu).eval(),
           np.log1p(self._u) - self._logu)
 
       self.assertAllClose(
-          cd.modified_gan(self._logu, self_normalized=True).eval(),
+          tfp.vi.modified_gan(self._logu, self_normalized=True).eval(),
           np.log1p(self._u) - self._logu + 0.5 * (self._u - 1))
 
 
@@ -435,22 +434,24 @@ class SymmetrizedCsiszarFunctionTest(test.TestCase):
             logu - tf.nn.softplus(logu)))
 
       self.assertAllClose(
-          cd.symmetrized_csiszar_function(self._logu, js1).eval(),
-          cd.jensen_shannon(self._logu).eval())
+          tfp.vi.symmetrized_csiszar_function(self._logu, js1).eval(),
+          tfp.vi.jensen_shannon(self._logu).eval())
 
       self.assertAllClose(
-          cd.symmetrized_csiszar_function(self._logu, js2).eval(),
-          cd.jensen_shannon(self._logu).eval())
+          tfp.vi.symmetrized_csiszar_function(self._logu, js2).eval(),
+          tfp.vi.jensen_shannon(self._logu).eval())
 
   def test_jeffreys(self):
     with self.test_session():
       self.assertAllClose(
-          cd.symmetrized_csiszar_function(self._logu, cd.kl_reverse).eval(),
-          cd.jeffreys(self._logu).eval())
+          tfp.vi.symmetrized_csiszar_function(
+              self._logu, tfp.vi.kl_reverse).eval(),
+          tfp.vi.jeffreys(self._logu).eval())
 
       self.assertAllClose(
-          cd.symmetrized_csiszar_function(self._logu, cd.kl_forward).eval(),
-          cd.jeffreys(self._logu).eval())
+          tfp.vi.symmetrized_csiszar_function(
+              self._logu, tfp.vi.kl_forward).eval(),
+          tfp.vi.jeffreys(self._logu).eval())
 
 
 class DualCsiszarFunctionTest(test.TestCase):
@@ -462,14 +463,14 @@ class DualCsiszarFunctionTest(test.TestCase):
   def test_kl_forward(self):
     with self.test_session():
       self.assertAllClose(
-          cd.dual_csiszar_function(self._logu, cd.kl_forward).eval(),
-          cd.kl_reverse(self._logu).eval())
+          tfp.vi.dual_csiszar_function(self._logu, tfp.vi.kl_forward).eval(),
+          tfp.vi.kl_reverse(self._logu).eval())
 
   def test_kl_reverse(self):
     with self.test_session():
       self.assertAllClose(
-          cd.dual_csiszar_function(self._logu, cd.kl_reverse).eval(),
-          cd.kl_forward(self._logu).eval())
+          tfp.vi.dual_csiszar_function(self._logu, tfp.vi.kl_reverse).eval(),
+          tfp.vi.kl_forward(self._logu).eval())
 
 
 class MonteCarloCsiszarFDivergenceTest(test.TestCase):
@@ -482,15 +483,15 @@ class MonteCarloCsiszarFDivergenceTest(test.TestCase):
 
       p = tfd.Normal(loc=q.loc + 0.1, scale=q.scale - 0.2)
 
-      approx_kl = cd.monte_carlo_csiszar_f_divergence(
-          f=cd.kl_forward,
+      approx_kl = tfp.vi.monte_carlo_csiszar_f_divergence(
+          f=tfp.vi.kl_forward,
           p_log_prob=p.log_prob,
           q=q,
           num_draws=int(1e5),
           seed=1)
 
-      approx_kl_self_normalized = cd.monte_carlo_csiszar_f_divergence(
-          f=lambda logu: cd.kl_forward(logu, self_normalized=True),
+      approx_kl_self_normalized = tfp.vi.monte_carlo_csiszar_f_divergence(
+          f=lambda logu: tfp.vi.kl_forward(logu, self_normalized=True),
           p_log_prob=p.log_prob,
           q=q,
           num_draws=int(1e5),
@@ -516,15 +517,15 @@ class MonteCarloCsiszarFDivergenceTest(test.TestCase):
 
       p = tfd.Normal(loc=q.loc + 0.1, scale=q.scale - 0.2)
 
-      approx_kl = cd.monte_carlo_csiszar_f_divergence(
-          f=cd.kl_reverse,
+      approx_kl = tfp.vi.monte_carlo_csiszar_f_divergence(
+          f=tfp.vi.kl_reverse,
           p_log_prob=p.log_prob,
           q=q,
           num_draws=int(1e5),
           seed=1)
 
-      approx_kl_self_normalized = cd.monte_carlo_csiszar_f_divergence(
-          f=lambda logu: cd.kl_reverse(logu, self_normalized=True),
+      approx_kl_self_normalized = tfp.vi.monte_carlo_csiszar_f_divergence(
+          f=lambda logu: tfp.vi.kl_reverse(logu, self_normalized=True),
           p_log_prob=p.log_prob,
           q=q,
           num_draws=int(1e5),
@@ -551,15 +552,15 @@ class MonteCarloCsiszarFDivergenceTest(test.TestCase):
 
       q = tfd.MultivariateNormalDiag(scale_diag=[0.5]*d)
 
-      approx_kl = cd.monte_carlo_csiszar_f_divergence(
-          f=cd.kl_reverse,
+      approx_kl = tfp.vi.monte_carlo_csiszar_f_divergence(
+          f=tfp.vi.kl_reverse,
           p_log_prob=p.log_prob,
           q=q,
           num_draws=int(1e5),
           seed=1)
 
-      approx_kl_self_normalized = cd.monte_carlo_csiszar_f_divergence(
-          f=lambda logu: cd.kl_reverse(logu, self_normalized=True),
+      approx_kl_self_normalized = tfp.vi.monte_carlo_csiszar_f_divergence(
+          f=lambda logu: tfp.vi.kl_reverse(logu, self_normalized=True),
           p_log_prob=p.log_prob,
           q=q,
           num_draws=int(1e5),
@@ -589,15 +590,15 @@ class MonteCarloCsiszarFDivergenceTest(test.TestCase):
       # "covers" p and thus Var_q[p/q] is smaller.
       q = tfd.MultivariateNormalDiag(scale_diag=[1.]*d)
 
-      approx_kl = cd.monte_carlo_csiszar_f_divergence(
-          f=cd.kl_forward,
+      approx_kl = tfp.vi.monte_carlo_csiszar_f_divergence(
+          f=tfp.vi.kl_forward,
           p_log_prob=p.log_prob,
           q=q,
           num_draws=int(1e5),
           seed=1)
 
-      approx_kl_self_normalized = cd.monte_carlo_csiszar_f_divergence(
-          f=lambda logu: cd.kl_forward(logu, self_normalized=True),
+      approx_kl_self_normalized = tfp.vi.monte_carlo_csiszar_f_divergence(
+          f=lambda logu: tfp.vi.kl_forward(logu, self_normalized=True),
           p_log_prob=p.log_prob,
           q=q,
           num_draws=int(1e5),
@@ -631,22 +632,22 @@ class MonteCarloCsiszarFDivergenceTest(test.TestCase):
       q = tfd.MultivariateNormalDiag(
           scale_diag=tf.tile([s], [d]))
 
-      approx_kl = cd.monte_carlo_csiszar_f_divergence(
-          f=cd.kl_reverse,
+      approx_kl = tfp.vi.monte_carlo_csiszar_f_divergence(
+          f=tfp.vi.kl_reverse,
           p_log_prob=p.log_prob,
           q=q,
           num_draws=num_draws,
           seed=seed)
 
-      approx_kl_self_normalized = cd.monte_carlo_csiszar_f_divergence(
-          f=lambda logu: cd.kl_reverse(logu, self_normalized=True),
+      approx_kl_self_normalized = tfp.vi.monte_carlo_csiszar_f_divergence(
+          f=lambda logu: tfp.vi.kl_reverse(logu, self_normalized=True),
           p_log_prob=p.log_prob,
           q=q,
           num_draws=num_draws,
           seed=seed)
 
-      approx_kl_score_trick = cd.monte_carlo_csiszar_f_divergence(
-          f=cd.kl_reverse,
+      approx_kl_score_trick = tfp.vi.monte_carlo_csiszar_f_divergence(
+          f=tfp.vi.kl_reverse,
           p_log_prob=p.log_prob,
           q=q,
           num_draws=num_draws,
@@ -654,8 +655,8 @@ class MonteCarloCsiszarFDivergenceTest(test.TestCase):
           seed=seed)
 
       approx_kl_self_normalized_score_trick = (
-          cd.monte_carlo_csiszar_f_divergence(
-              f=lambda logu: cd.kl_reverse(logu, self_normalized=True),
+          tfp.vi.monte_carlo_csiszar_f_divergence(
+              f=lambda logu: tfp.vi.kl_reverse(logu, self_normalized=True),
               p_log_prob=p.log_prob,
               q=q,
               num_draws=num_draws,
@@ -769,7 +770,7 @@ class CsiszarVIMCOTest(test.TestCase):
     logu = np.linspace(-100., 100., 100).reshape([10, 2, 5])
     with self.test_session() as sess:
       np_log_avg_u, np_log_sooavg_u = self._csiszar_vimco_helper(logu)
-      [log_avg_u, log_sooavg_u] = sess.run(cd.csiszar_vimco_helper(logu))
+      [log_avg_u, log_sooavg_u] = sess.run(tfp.vi.csiszar_vimco_helper(logu))
       self.assertAllClose(np_log_avg_u, log_avg_u,
                           rtol=1e-8, atol=0.)
       self.assertAllClose(np_log_sooavg_u, log_sooavg_u,
@@ -782,7 +783,7 @@ class CsiszarVIMCOTest(test.TestCase):
     logu = np.float32([0., 700, -1, 1])
     with self.test_session() as sess:
       np_log_avg_u, np_log_sooavg_u = self._csiszar_vimco_helper(logu)
-      [log_avg_u, log_sooavg_u] = sess.run(cd.csiszar_vimco_helper(logu))
+      [log_avg_u, log_sooavg_u] = sess.run(tfp.vi.csiszar_vimco_helper(logu))
       self.assertAllClose(np_log_avg_u, log_avg_u,
                           rtol=1e-6, atol=0.)
       self.assertAllClose(np_log_sooavg_u, log_sooavg_u,
@@ -794,7 +795,7 @@ class CsiszarVIMCOTest(test.TestCase):
     logu = np.float32([0., -1000, -1, 1])
     with self.test_session() as sess:
       np_log_avg_u, np_log_sooavg_u = self._csiszar_vimco_helper(logu)
-      [log_avg_u, log_sooavg_u] = sess.run(cd.csiszar_vimco_helper(logu))
+      [log_avg_u, log_sooavg_u] = sess.run(tfp.vi.csiszar_vimco_helper(logu))
       self.assertAllClose(np_log_avg_u, log_avg_u,
                           rtol=1e-5, atol=0.)
       self.assertAllClose(np_log_sooavg_u, log_sooavg_u,
@@ -808,7 +809,7 @@ class CsiszarVIMCOTest(test.TestCase):
       logu = tf.constant(logu_)
 
       grad = lambda flogu: tf.gradients(flogu, logu)[0]
-      log_avg_u, log_sooavg_u = cd.csiszar_vimco_helper(logu)
+      log_avg_u, log_sooavg_u = tfp.vi.csiszar_vimco_helper(logu)
 
       [
           grad_log_avg_u,
@@ -840,7 +841,7 @@ class CsiszarVIMCOTest(test.TestCase):
       ] = self._csiszar_vimco_helper_grad(logu_, delta)
 
       grad = lambda flogu: tf.gradients(flogu, logu)[0]
-      log_avg_u, log_sooavg_u = cd.csiszar_vimco_helper(logu)
+      log_avg_u, log_sooavg_u = tfp.vi.csiszar_vimco_helper(logu)
 
       [
           grad_log_avg_u,
@@ -873,7 +874,7 @@ class CsiszarVIMCOTest(test.TestCase):
       ] = self._csiszar_vimco_helper_grad(logu_, delta)
 
       grad = lambda flogu: tf.gradients(flogu, logu)[0]
-      log_avg_u, log_sooavg_u = cd.csiszar_vimco_helper(logu)
+      log_avg_u, log_sooavg_u = tfp.vi.csiszar_vimco_helper(logu)
 
       [
           grad_log_avg_u,
@@ -900,7 +901,7 @@ class CsiszarVIMCOTest(test.TestCase):
       num_batch_draws = int(3)
       seed = 1
 
-      f = lambda logu: cd.kl_reverse(logu, self_normalized=False)
+      f = lambda logu: tfp.vi.kl_reverse(logu, self_normalized=False)
       np_f = lambda logu: -logu
 
       p = tfd.MultivariateNormalFullCovariance(
@@ -913,7 +914,7 @@ class CsiszarVIMCOTest(test.TestCase):
       q = tfd.MultivariateNormalDiag(
           scale_diag=tf.tile([s], [dims]))
 
-      vimco = cd.csiszar_vimco(
+      vimco = tfp.vi.csiszar_vimco(
           f=f,
           p_log_prob=p.log_prob,
           q=q,
@@ -925,7 +926,7 @@ class CsiszarVIMCOTest(test.TestCase):
                    seed=seed)
       x = tf.stop_gradient(x)
       logu = p.log_prob(x) - q.log_prob(x)
-      f_log_sum_u = f(cd.csiszar_vimco_helper(logu)[0])
+      f_log_sum_u = f(tfp.vi.csiszar_vimco_helper(logu)[0])
 
       grad_sum = lambda fs: tf.gradients(fs, s)[0]
 
@@ -971,8 +972,8 @@ class CsiszarVIMCOTest(test.TestCase):
       #
       # Regarding `grad_mean_f_log_sum_u_`, note that we validate the
       # correctness of the zero-th order derivative (for each batch member).
-      # Since `cd.csiszar_vimco_helper` itself does not manipulate any gradient
-      # information, we can safely rely on TF.
+      # Since `tfp.vi.csiszar_vimco_helper` itself does not manipulate any
+      # gradient information, we can safely rely on TF.
       self.assertAllClose(np_f(np_log_avg_u), f_log_sum_u_, rtol=1e-4, atol=0.)
       #
       # Regarding `jacobian_logqx_`, note that testing the gradient of

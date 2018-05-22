@@ -193,8 +193,8 @@ def make_vae(images, encoder_fn, decoder_fn, prior_fn, return_full=False):
     return decoder.log_prob(images) + prior.log_prob(z)
 
   elbo_loss = tf.reduce_sum(
-      tfp.vi.csiszar_divergence.monte_carlo_csiszar_f_divergence(
-          f=tfp.vi.csiszar_divergence.kl_reverse,
+      tfp.vi.monte_carlo_csiszar_f_divergence(
+          f=tfp.vi.kl_reverse,
           p_log_prob=joint_log_prob,
           q=encoder,
           num_draws=1))

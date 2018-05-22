@@ -26,6 +26,28 @@ from tensorflow_probability.python import monte_carlo
 
 tfd = tf.contrib.distributions
 
+__all__ = [
+    "amari_alpha",
+    "arithmetic_geometric",
+    "chi_square",
+    "csiszar_vimco",
+    "csiszar_vimco_helper",
+    "dual_csiszar_function",
+    "jeffreys",
+    "jensen_shannon",
+    "kl_forward",
+    "kl_reverse",
+    "log1p_abs",
+    "modified_gan",
+    "monte_carlo_csiszar_f_divergence",
+    "pearson",
+    "squared_hellinger",
+    "symmetrized_csiszar_function",
+    "t_power",
+    "total_variation",
+    "triangular",
+]
+
 
 def amari_alpha(logu, alpha=1., self_normalized=False, name=None):
   """The Amari-alpha Csiszar-function in log-space.
