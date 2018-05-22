@@ -12,9 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Disable load checks.
-common --incompatible_load_argument_is_label=false
-
 # Coloring for error messages.
 common --color=yes
 
