@@ -175,8 +175,18 @@ it supercedes all previous conventions.
 
 17. Preserve static shape hints.
 
-18. The `__init__.py` file for modules should use TensorFlow's
-    `remove_undocumented` feature, which seals the module's methods.
+18. __Name management.__  Follow these conventions for indicating which
+    names are internal vs external:
+
+    *   Start names of private methods and private module functions with an
+        underscore.
+    *   List top-level classes and functions that are meant to be visible
+        outside a module in its `__all__` constant.
+    *   Import any names that are meant to be visible to clients of a package
+        into that package's `__init__.py` file.  (A name that is public in a
+        module but not imported into `__init__.py` is "package private".)
+    *   Use TensorFlow's `remove_undocumented` feature in each `__init__.py`
+        file to seal the package's methods.
 
 19. Submodule names should be singular, except where they overlap to TF.
 
