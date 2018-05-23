@@ -22,6 +22,8 @@ import numpy as np
 
 import tensorflow as tf
 from tensorflow_probability.python.glm.util import common_dtype
+from tensorflow_probability.python.math import matvecmul
+from tensorflow.python.framework import smart_cond
 from tensorflow.python.ops.distributions import util as distributions_util
 
 
@@ -65,7 +67,8 @@ def fit(
       matching `response`; represents `offset` shifted initial linear
       predictions based on `model_coefficients_start`.
       Default value: `offset` if `model_coefficients is None`, and
-      `tf.matmul(model_matrix, model_coefficients_start) + offset` otherwise.
+      `tfp.math.matvecmul(model_matrix, model_coefficients_start) + offset`
+      otherwise.
     l2_regularizer: Optional scalar `Tensor` representing L2 regularization
       penalty, i.e.,
       `loss(w) = sum{-log p(y[i]|x[i],w) : i=1..n} + l2_regularizer ||w||_2^2`.
@@ -105,7 +108,7 @@ def fit(
       fitted model coefficients, one for each column in `model_matrix`.
     predicted_linear_response: `response`-shaped `Tensor` representing linear
       predictions based on new `model_coefficients`, i.e.,
-      `tf.matmul(model_matrix, model_coefficients) + offset`.
+      `tfp.math.matvecmul(model_matrix, model_coefficients) + offset`.
     is_converged: `bool` `Tensor` indicating that the returned
       `model_coefficients` met the `convergence_criteria_fn` criteria within the
       `maximum_iterations` limit.
@@ -183,6 +186,7 @@ def fit(
         response,
         model_coefficients_start,
         predicted_linear_response_start,
+        offset,
     ] = prepare_args(
         model_matrix,
         response,
@@ -203,6 +207,7 @@ def fit(
           model_matrix,
           response,
           model,
+          model_coefficients_previous,
           predicted_linear_response_previous,
           l2_regularizer,
           dispersion,
@@ -244,10 +249,6 @@ def fit(
         ],
         maximum_iterations=maximum_iterations)
 
-    # Drop extra dim and set shape hints.
-    model_coefficients = model_coefficients[..., 0]
-    predicted_linear_response = predicted_linear_response[..., 0]
-
     return [
         model_coefficients,
         predicted_linear_response,
@@ -260,7 +261,8 @@ def fit_one_step(
     model_matrix,
     response,
     model,
-    predicted_linear_response_start,
+    model_coefficients_start=None,
+    predicted_linear_response_start=None,
     l2_regularizer=None,
     dispersion=None,
     offset=None,
@@ -278,11 +280,16 @@ def fit_one_step(
     model: `tfp.glm.ExponentialFamily`-like instance used to construct the
       negative log-likelihood loss, gradient, and expected Hessian (i.e., the
       Fisher information matrix).
+    model_coefficients_start: Optional (batch of) vector-shaped `Tensor`
+      representing the initial model coefficients, one for each column in
+      `model_matrix`. Must have same `dtype` as `model_matrix`.
+      Default value: `tf.zeros(tf.shape(model_matrix)[-1], model_matrix.dtype)`.
     predicted_linear_response_start: Optional `Tensor` with `shape`, `dtype`
       matching `response`; represents `offset` shifted initial linear
       predictions based on `model_coefficients_start`.
       Default value: `offset` if `model_coefficients is None`, and
-      `tf.matmul(model_matrix, model_coefficients_start) + offset` otherwise.
+      `tfp.math.matvecmul(model_matrix, model_coefficients_start) + offset`
+      otherwise.
     l2_regularizer: Optional scalar `Tensor` representing L2 regularization
       penalty, i.e.,
       `loss(w) = sum{-log p(y[i]|x[i],w) : i=1..n} + l2_regularizer ||w||_2^2`.
@@ -306,22 +313,29 @@ def fit_one_step(
 
   Returns:
     model_coefficients: (Batch of) vector-shaped `Tensor`; represents the
-      fitted model coefficients, one for each column in `model_matrix`.
+      next estimate of the model coefficients, one for each column in
+      `model_matrix`.
     predicted_linear_response: `response`-shaped `Tensor` representing linear
       predictions based on new `model_coefficients`, i.e.,
-      `tf.matmul(model_matrix, model_coefficients_next) + offset`.
+      `tfp.math.matvecmul(model_matrix, model_coefficients_next) + offset`.
   """
-  graph_deps = [model_matrix, response, predicted_linear_response_start,
-                dispersion, learning_rate]
+  graph_deps = [model_matrix, response, model_coefficients_start,
+                predicted_linear_response_start, dispersion, learning_rate]
   with tf.name_scope(name, 'fit_one_step', graph_deps):
-    dtype = common_dtype(graph_deps, np.float32)
-    model_matrix = tf.convert_to_tensor(
-        model_matrix, dtype=dtype, name='model_matrix')
-    response = tf.convert_to_tensor(response, dtype=dtype, name='response')
-    predicted_linear_response_start = tf.convert_to_tensor(
+
+    [
+        model_matrix,
+        response,
+        model_coefficients_start,
         predicted_linear_response_start,
-        dtype=dtype,
-        name='predicted_linear_response_start')
+        offset,
+    ] = prepare_args(
+        model_matrix,
+        response,
+        model_coefficients_start,
+        predicted_linear_response_start,
+        offset)
+
     # Compute: mean, grad(mean, predicted_linear_response_start), and variance.
     mean, variance, grad_mean = model(predicted_linear_response_start)
 
@@ -353,7 +367,7 @@ def fit_one_step(
     w = (mask_if_invalid(grad_mean, 0.) *
          tf.rsqrt(mask_if_invalid(variance, np.inf)))
 
-    a = model_matrix * w
+    a = model_matrix * w[..., tf.newaxis]
     b = z * w
     # Solve `min{ || A @ model_coefficients - b ||_2**2 : model_coefficients }`
     # where `@` denotes `matmul`.
@@ -380,22 +394,23 @@ def fit_one_step(
           num_model_coefficients, batch_shape=batch_shape, dtype=a.dtype)
       a_ = tf.concat([a, tf.sqrt(l2_regularizer) * eye], axis=-2)
       b_ = distributions_util.pad(
-          b, count=num_model_coefficients, axis=-2, back=True)
+          b, count=num_model_coefficients, axis=-1, back=True)
       # Return l2_regularizer=0 since its now embedded.
       l2_regularizer_ = np.array(0, a.dtype.as_numpy_dtype)
       return a_, b_, l2_regularizer_
 
-    a, b, l2_regularizer = prefer_static_cond(
-        prefer_static_reduce_all([not(fast_unsafe_numerics),
-                                  l2_regularizer > 0.]),
+    a, b, l2_regularizer = smart_cond.smart_cond(
+        smart_reduce_all([not(fast_unsafe_numerics),
+                          l2_regularizer > 0.]),
         _embed_l2_regularization,
         lambda: (a, b, l2_regularizer))
 
     model_coefficients_next = tf.matrix_solve_ls(
-        a, b,
+        a, b[..., tf.newaxis],
         fast=fast_unsafe_numerics,
         l2_regularizer=l2_regularizer,
         name='model_coefficients_next')
+    model_coefficients_next = model_coefficients_next[..., 0]
 
     # TODO(b/79122261): The approach used in `matrix_solve_ls` could be made
     # faster by avoiding explicitly forming Q and instead keeping the
@@ -408,13 +423,12 @@ def fit_one_step(
     #   c = tf.matmul(q, b, adjoint_a=True)
     #   model_coefficients_next = tf.matrix_triangular_solve(
     #       r, c, lower=False, name='model_coefficients_next')
-    predicted_linear_response_next = tf.matmul(
+
+    predicted_linear_response_next = calculate_linear_predictor(
         model_matrix,
         model_coefficients_next,
+        offset,
         name='predicted_linear_response_next')
-
-    if offset is not None:
-      predicted_linear_response_next += offset
 
     return model_coefficients_next, predicted_linear_response_next
 
@@ -511,19 +525,29 @@ def prepare_args(model_matrix,
       `response`; represents `offset` shifted initial linear predictions based
       on current `model_coefficients`.
       Default value: `offset` if `model_coefficients is None`, and
-      `tf.matmul(model_matrix, model_coefficients_start) + offset` otherwise.
+      `tfp.math.matvecmul(model_matrix, model_coefficients_start) + offset`
+      otherwise.
     offset: Optional `Tensor` with `shape`, `dtype` matching `response`;
       represents constant shift applied to `predicted_linear_response`.
       Default value: `None` (i.e., `tf.zeros_like(response)`).
     name: Python `str` used as name prefix to ops created by this function.
-      Default value: `"prepar_args"`.
+      Default value: `"prepare_args"`.
 
   Returns:
-    model_coefficients: (Batch of) vector-shaped `Tensor`; represents the
-      fitted model coefficients, one for each column in `model_matrix`.
-    predicted_linear_response: `response`-shaped `Tensor` representing linear
-      predictions based on `model_coefficients`, i.e.,
-      `tf.matmul(model_matrix, model_coefficients) + offset`.
+    model_matrix: A `Tensor` with `shape`, `dtype` and values of the
+      `model_matrix` argument.
+    response: A `Tensor` with `shape`, `dtype` and values of the
+      `response` argument.
+    model_coefficients_start: A `Tensor` with `shape`, `dtype` and
+      values of the `model_coefficients_start` argument if specified.
+      A (batch of) vector-shaped `Tensors` with `dtype` matching `model_matrix`
+      containing the default starting point otherwise.
+    predicted_linear_response:  A `Tensor` with `shape`, `dtype` and
+      values of the `predicted_linear_response` argument if specified.
+      A `Tensor` with `shape`, `dtype` matching `response` containing the
+      default value otherwise.
+    offset: A `Tensor` with `shape`, `dtype` and values of the `offset` argument
+      if specified or `None` otherwise.
   """
   graph_deps = [model_matrix, response, model_coefficients,
                 predicted_linear_response, offset]
@@ -533,8 +557,10 @@ def prepare_args(model_matrix,
     model_matrix = tf.convert_to_tensor(
         model_matrix, dtype=dtype, name='model_matrix')
 
+    if offset is not None:
+      offset = tf.convert_to_tensor(offset, dtype=dtype, name='offset')
+
     response = tf.convert_to_tensor(response, dtype=dtype, name='response')
-    response = response[..., tf.newaxis]  # [B, 1]
 
     use_default_model_coefficients = model_coefficients is None
     if use_default_model_coefficients:
@@ -547,37 +573,44 @@ def prepare_args(model_matrix,
       model_coefficients = tf.convert_to_tensor(
           model_coefficients, dtype=dtype, name='model_coefficients')
 
-    model_coefficients = model_coefficients[..., tf.newaxis]  # [B, d, 1]
-
-    if use_default_model_coefficients:
-      # Since we're using zeros for model_coefficients, we know the predicted
-      # linear response will also be all zeros.
-      if (model_matrix.shape.ndims is not None and
-          model_matrix.shape[:-1].is_fully_defined()):
-        # Obtain shape statically.
-        shape = np.int32(model_matrix.shape[:-1].concatenate([1]).as_list())
+    if predicted_linear_response is None:
+      if use_default_model_coefficients:
+        # Since we're using zeros for model_coefficients, we know the predicted
+        # linear response will also be all zeros.
+        if offset is None:
+          predicted_linear_response = tf.zeros_like(
+              response, dtype, name='predicted_linear_response')
+        else:
+          predicted_linear_response = tf.broadcast_to(
+              offset, tf.shape(response), name='predicted_linear_response')
       else:
-        # Obtain shape dynamically.
-        shape = tf.concat([tf.shape(model_matrix)[:-1], [1]], axis=0)
-      predicted_linear_response = tf.zeros(
-          shape, dtype, name='predicted_linear_response')
-      if offset is not None:
-        predicted_linear_response += offset
-    elif predicted_linear_response is None:
-      # We were given model_coefficiencts but not the predicted linear response,
-      # hence compute it (as a matmul).
-      predicted_linear_response = tf.matmul(
-          model_matrix, model_coefficients, name='predicted_linear_response')
-      if offset is not None:
-        predicted_linear_response += offset
+        # We were given model_coefficients but not the predicted linear
+        # response.
+        predicted_linear_response = calculate_linear_predictor(
+            model_matrix, model_coefficients, offset)
     else:
-      # We were given the predicted linear response. However, we assume the user
-      # supplies a vector not a `n x 1` matrix. For their convenience we expand
-      # the `[n]`-shaped Tensor to `[n, 1]`.
-      predicted_linear_response = tf.expand_dims(
-          predicted_linear_response, axis=-1, name='predicted_linear_response')
+      predicted_linear_response = tf.convert_to_tensor(
+          predicted_linear_response, dtype=dtype,
+          name='predicted_linear_response')
 
-    return model_matrix, response, model_coefficients, predicted_linear_response
+  return [
+      model_matrix,
+      response,
+      model_coefficients,
+      predicted_linear_response,
+      offset,
+  ]
+
+
+def calculate_linear_predictor(model_matrix, model_coefficients, offset=None,
+                               name=None):
+  """Computes `model_matrix @ model_coefficients + offset`."""
+  with tf.name_scope(name, 'calculate_linear_predictor',
+                     [model_matrix, model_coefficients, offset]):
+    predicted_linear_response = matvecmul(model_matrix, model_coefficients)
+    if offset is not None:
+      predicted_linear_response += offset
+    return predicted_linear_response
 
 
 def num_cols(x):
@@ -587,22 +620,12 @@ def num_cols(x):
   return tf.shape(x)[-1]
 
 
-def prefer_static_cond(predicate, true_fn, false_fn, name=None):
-  """Identical to `tf.cond` but operates statically if possible."""
-  with tf.name_scope(name, 'prefer_static_cond', [predicate]):
-    predicate_ = distributions_util.maybe_get_static_value(predicate)
-    if predicate_ is None:
-      return tf.cond(predicate, true_fn, false_fn)
-    return true_fn() if predicate_ else false_fn()
-
-
-def prefer_static_reduce_all(preds, name=None):
+def smart_reduce_all(preds, name=None):
   """Identical to `tf.reduce_all` but operates statically if possible."""
-  with tf.name_scope(name, 'prefer_static_reduce_all', [preds]):
-    preds_ = [distributions_util.maybe_get_static_value(p, np.bool)
-              for p in preds]
-    if any(p is False for p in preds_):
+  with tf.name_scope(name, 'smart_reduce_all', [preds]):
+    pred_values = [smart_cond.smart_constant_value(p) for p in preds]
+    if any(p is False for p in pred_values):
       return False
-    if any(p is None for p in preds_):
+    if any(p is None for p in pred_values):
       return tf.reduce_all(preds)
-    return all(preds_)
+    return all(pred_values)
