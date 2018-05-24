@@ -175,7 +175,7 @@ def expectation(f, samples, log_prob=None, use_reparametrization=True,
       # https://arxiv.org/abs/1802.05098
       # DiCE ensures that any order gradients of the objective 
       # are unbiased gradient estimators
-      l_dice = fx * tf.exp(logpx - stop(logpx))  # Add zeros_like(logpx).
+      l_dice = fx * tf.exp(logpx - stop(logpx))
       return tf.reduce_mean(l_dice, axis=axis, keep_dims=keep_dims)
 
 
