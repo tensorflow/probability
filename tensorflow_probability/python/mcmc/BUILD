@@ -82,6 +82,7 @@ py_test(
     size = "medium",
     srcs = ["hmc_test.py"],
     shard_count = 6,
+    tags = ["notap"],
     deps = [
         # numpy dep,
         # scipy dep,
