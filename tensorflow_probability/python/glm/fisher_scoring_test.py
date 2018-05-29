@@ -67,7 +67,7 @@ class FitTestFast(tf.test.TestCase):
         response,
         model_coefficients_true,
         linear_response_true,
-    ] = self.make_dataset(n=int(1e3), d=3, link='probit')
+    ] = self.make_dataset(n=int(1e4), d=3, link='probit')
     model_coefficients, linear_response, is_converged, num_iter = tfp.glm.fit(
         model_matrix,
         response,
@@ -112,7 +112,7 @@ class FitTestFast(tf.test.TestCase):
         response,
         model_coefficients_true,
         linear_response_true,
-    ] = self.make_dataset(n=int(1e3), d=3, link='linear')
+    ] = self.make_dataset(n=int(1e4), d=3, link='linear')
     model_coefficients, linear_response, is_converged, num_iter = tfp.glm.fit(
         model_matrix,
         response,
@@ -138,7 +138,7 @@ class FitTestFast(tf.test.TestCase):
     # diff between true and predicted linear responses should be zero, on
     # average.
     avg_response_diff = np.mean(linear_response_ - linear_response_true_)
-    self.assertNear(0., avg_response_diff, err=2e-3)
+    self.assertNear(0., avg_response_diff, err=3e-3)
     self.assertAllClose(model_coefficients_true_, model_coefficients_,
                         atol=0.03, rtol=0.15)
     self.assertTrue(is_converged_)
@@ -147,6 +147,22 @@ class FitTestFast(tf.test.TestCase):
     # solution in one step. It takes two because the way we structure the while
     # loop means that the procedure can only terminate on the second iteration.
     self.assertTrue(num_iter_ < 3)
+
+  @test_util.run_in_graph_and_eager_modes()
+  def testBatchedOperationConverges(self):
+    model_1 = self.make_dataset(n=10, d=3, link='linear')
+    model_2 = self.make_dataset(n=10, d=3, link='probit')
+    model_matrices = [model_1[0], model_2[0]]
+    responses = [model_1[1], model_2[1]]
+
+    _, _, is_converged, _ = self.evaluate(
+        tfp.glm.fit(
+            model_matrices,
+            responses,
+            tfp.glm.Normal(),
+            fast_unsafe_numerics=self.fast,
+            maximum_iterations=10))
+    self.assertTrue(is_converged)
 
 
 class FitTestSlow(FitTestFast):

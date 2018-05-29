@@ -62,7 +62,7 @@ def fit(
     model_coefficients_start: Optional (batch of) vector-shaped `Tensor`
       representing the initial model coefficients, one for each column in
       `model_matrix`. Must have same `dtype` as `model_matrix`.
-      Default value: `tf.zeros(tf.shape(model_matrix)[-1], model_matrix.dtype)`.
+      Default value: Zeros.
     predicted_linear_response_start: Optional `Tensor` with `shape`, `dtype`
       matching `response`; represents `offset` shifted initial linear
       predictions based on `model_coefficients_start`.
@@ -73,12 +73,12 @@ def fit(
       penalty, i.e.,
       `loss(w) = sum{-log p(y[i]|x[i],w) : i=1..n} + l2_regularizer ||w||_2^2`.
       Default value: `None` (i.e., no L2 regularization).
-    dispersion: Optional `Tensor` representing `response` dispersion, i.e., as
-      in, `p(y|theta) := exp((y theta - A(theta)) / dispersion)`. Must broadcast
-      with rows of `model_matrix`.
+    dispersion: Optional (batch of) `Tensor` representing `response` dispersion,
+      i.e., as in, `p(y|theta) := exp((y theta - A(theta)) / dispersion)`.
+      Must broadcast with rows of `model_matrix`.
       Default value: `None` (i.e., "no dispersion").
-    offset: Optional `Tensor` with `shape`, `dtype` matching `response`;
-      represents constant shift applied to `predicted_linear_response`.
+    offset: Optional `Tensor` representing constant shift applied to
+      `predicted_linear_response`.  Must broadcast to `response`.
       Default value: `None` (i.e., `tf.zeros_like(response)`).
     convergence_criteria_fn: Python `callable` taking:
       `is_converged_previous`, `iter_`, `model_coefficients_previous`,
@@ -89,9 +89,9 @@ def fit(
       example function.
       Default value: `None` (i.e.,
       `convergence_criteria_small_relative_norm_weights_change`).
-    learning_rate: Optional scalar `Tensor` used to dampen iterative progress.
-      Typically only needed if optimization diverges, should be no larger than
-      `1` and typically very close to `1`.
+    learning_rate: Optional (batch of) scalar `Tensor` used to dampen iterative
+      progress. Typically only needed if optimization diverges, should be no
+      larger than `1` and typically very close to `1`.
       Default value: `None` (i.e., `1`).
     fast_unsafe_numerics: Optional Python `bool` indicating if faster, less
       numerically accurate methods can be employed for computing the weighted
@@ -283,7 +283,7 @@ def fit_one_step(
     model_coefficients_start: Optional (batch of) vector-shaped `Tensor`
       representing the initial model coefficients, one for each column in
       `model_matrix`. Must have same `dtype` as `model_matrix`.
-      Default value: `tf.zeros(tf.shape(model_matrix)[-1], model_matrix.dtype)`.
+      Default value: Zeros.
     predicted_linear_response_start: Optional `Tensor` with `shape`, `dtype`
       matching `response`; represents `offset` shifted initial linear
       predictions based on `model_coefficients_start`.
@@ -294,16 +294,16 @@ def fit_one_step(
       penalty, i.e.,
       `loss(w) = sum{-log p(y[i]|x[i],w) : i=1..n} + l2_regularizer ||w||_2^2`.
       Default value: `None` (i.e., no L2 regularization).
-    dispersion: Optional `Tensor` representing `response` dispersion, i.e., as
-      in, `p(y|theta) := exp((y theta - A(theta)) / dispersion)`. Must broadcast
-      with rows of `model_matrix`.
+    dispersion: Optional (batch of) `Tensor` representing `response` dispersion,
+      i.e., as in, `p(y|theta) := exp((y theta - A(theta)) / dispersion)`.
+      Must broadcast with rows of `model_matrix`.
       Default value: `None` (i.e., "no dispersion").
-    offset: Optional `Tensor` with `shape`, `dtype` matching `response`;
-      represents constant shift applied to `predicted_linear_response`.
+    offset: Optional `Tensor` representing constant shift applied to
+      `predicted_linear_response`.  Must broadcast to `response`.
       Default value: `None` (i.e., `tf.zeros_like(response)`).
-    learning_rate: Optional scalar `Tensor` used to dampen iterative progress.
-      Typically only needed if optimization diverges, should be no larger than
-      `1` and typically very close to `1`.
+    learning_rate: Optional (batch of) scalar `Tensor` used to dampen iterative
+      progress. Typically only needed if optimization diverges, should be no
+      larger than `1` and typically very close to `1`.
       Default value: `None` (i.e., `1`).
     fast_unsafe_numerics: Optional Python `bool` indicating if solve should be
       based on Cholesky or QR decomposition.
@@ -357,7 +357,7 @@ def fit_one_step(
     # TODO(jvdillon): Rather than use learning rate, we should consider using
     # backtracking line search.
     if learning_rate is not None:
-      z *= learning_rate
+      z *= learning_rate[..., tf.newaxis]
     z += predicted_linear_response_start
 
     # Compute "`w`", the per-sample weight.
@@ -565,8 +565,11 @@ def prepare_args(model_matrix,
     use_default_model_coefficients = model_coefficients is None
     if use_default_model_coefficients:
       # User did not supply model coefficients; assume they're all zero.
+      batch_shape = tf.shape(model_matrix)[:-2]
+      num_columns = tf.shape(model_matrix)[-1]
       model_coefficients = tf.zeros(
-          [num_cols(model_matrix)], dtype=dtype, name='model_coefficients')
+          shape=tf.concat([batch_shape, [num_columns]], axis=0),
+          dtype=dtype, name='model_coefficients')
     else:
       # User did supply model coefficients; convert to Tensor in case it's
       # numpy or literal.
