@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Trains a variational auto-encoder (VAE) on dynamically binarized MNIST.
+"""Trains a variational auto-encoder (VAE) on binarized MNIST.
 
 The VAE defines a generative model in which a latent code `Z` is
 sampled from a prior `p(Z)`, then used to generate an observation `X`
@@ -109,15 +109,12 @@ def make_encoder(images):
   Returns:
     encoder: A multivariate `Normal` distribution.
   """
-  encoder_net = tf.keras.Sequential()
-  encoder_net.add(tf.keras.layers.Flatten())
-  for units in FLAGS.encoder_layers:
-    encoder_net.add(tf.keras.layers.Dense(units,
-                                          activation=FLAGS.activation))
-  encoder_net.add(tf.keras.layers.Dense(FLAGS.latent_size * 2,
-                                        activation=None))
   images = tf.cast(images, dtype=tf.float32)
-  net = encoder_net(images)
+  net = 2 * tf.layers.flatten(images) - 1
+  for units in FLAGS.encoder_layers:
+    net = tf.layers.dense(net, units, activation=FLAGS.activation)
+  net = tf.layers.dense(net, FLAGS.latent_size*2, activation=None)
+
   loc = net[..., :FLAGS.latent_size]
   scale_diag = tf.nn.softplus(net[..., FLAGS.latent_size:] + 0.5)
   return tfd.MultivariateNormalDiag(loc=loc,
@@ -136,13 +133,13 @@ def make_decoder(codes):
   Returns:
     decoder: A multivariate `Bernoulli` distribution.
   """
-  decoder_net = tf.keras.Sequential()
+  net = codes
   for units in FLAGS.decoder_layers:
-    decoder_net.add(tf.keras.layers.Dense(units,
-                                          activation=FLAGS.activation))
-  decoder_net.add(tf.keras.layers.Dense(np.prod(IMAGE_SHAPE),
-                                        activation=None))
-  net = decoder_net(codes)
+    net = tf.layers.dense(net, units,
+                          activation=FLAGS.activation)
+  net = tf.layers.dense(net, np.prod(IMAGE_SHAPE),
+                        activation=None)
+
   new_shape = tf.concat([tf.shape(net)[:-1], IMAGE_SHAPE], axis=0)
   logits = tf.reshape(net, shape=new_shape)
   return tfd.Independent(tfd.Bernoulli(logits=logits),
@@ -331,7 +328,7 @@ def main(argv):
      training_iterator, heldout_iterator) = build_input_pipeline(
          mnist_data, FLAGS.batch_size, mnist_data.validation.num_examples)
 
-    # Reshape as a pixel image and dynamically binarize pixels.
+    # Reshape as a pixel image and binarize pixels.
     images = tf.reshape(images, shape=[-1] + IMAGE_SHAPE)
     images = tf.cast(images > 0.5, dtype=tf.int32)
 
