@@ -130,7 +130,7 @@ class _DenseVariational(tf.keras.layers.Layer):
         activity_regularizer=activity_regularizer,
         **kwargs)
     self.units = units
-    self.activation = activation
+    self.activation = tf.keras.activations.get(activation)
     self.input_spec = tf.layers.InputSpec(min_ndim=2)
     self.kernel_posterior_fn = kernel_posterior_fn
     self.kernel_posterior_tensor_fn = kernel_posterior_tensor_fn
