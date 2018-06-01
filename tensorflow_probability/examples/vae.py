@@ -98,66 +98,84 @@ flags.DEFINE_bool("fake_data",
 FLAGS = flags.FLAGS
 
 
-def make_encoder(images):
-  """Build encoder which takes a batch of images and returns a latent code.
+class Encoder(object):
+  """Defines a functor for creating the encoder distribution."""
 
-  Args:
-    images: A `int`-like `Tensor` representing the inputs to be encoded.
-      The first dimension (axis 0) indexes batch elements; all other
-      dimensions index event elements.
+  def __init__(self, layers, activation, output_size):
+    self.output_size = output_size
+    self.encoder_net = tf.keras.Sequential(
+        [tf.keras.layers.Flatten()] +
+        [tf.keras.layers.Dense(units, activation=activation)
+         for units in layers] +
+        [tf.keras.layers.Dense(2 * output_size, activation=None)])
 
-  Returns:
-    encoder: A multivariate `Normal` distribution.
-  """
-  images = tf.cast(images, dtype=tf.float32)
-  net = 2 * tf.layers.flatten(images) - 1
-  for units in FLAGS.encoder_layers:
-    net = tf.layers.dense(net, units, activation=FLAGS.activation)
-  net = tf.layers.dense(net, FLAGS.latent_size*2, activation=None)
+  def __call__(self, images):
+    """Build encoder which takes a batch of images and returns a latent code.
 
-  loc = net[..., :FLAGS.latent_size]
-  scale_diag = tf.nn.softplus(net[..., FLAGS.latent_size:] + 0.5)
-  return tfd.MultivariateNormalDiag(loc=loc,
-                                    scale_diag=scale_diag,
-                                    name="encoder_distribution")
+    Args:
+      images: A `int`-like `Tensor` representing the inputs to be encoded.
+        The first dimension (axis 0) indexes batch elements; all other
+        dimensions index event elements.
 
-
-def make_decoder(codes):
-  """Build decoder which takes a batch of codes and returns generated images.
-
-  Args:
-    codes: A `float`-like `Tensor` containing the latent
-      vectors to be decoded. These are assumed to be rank-1, so
-      the encoding `Tensor` is rank-2 with shape `[batch_size, latent_size]`.
-
-  Returns:
-    decoder: A multivariate `Bernoulli` distribution.
-  """
-  net = codes
-  for units in FLAGS.decoder_layers:
-    net = tf.layers.dense(net, units,
-                          activation=FLAGS.activation)
-  net = tf.layers.dense(net, np.prod(IMAGE_SHAPE),
-                        activation=None)
-
-  new_shape = tf.concat([tf.shape(net)[:-1], IMAGE_SHAPE], axis=0)
-  logits = tf.reshape(net, shape=new_shape)
-  return tfd.Independent(tfd.Bernoulli(logits=logits),
-                         reinterpreted_batch_ndims=len(IMAGE_SHAPE),
-                         name="decoder_distribution")
+    Returns:
+      encoder: A multivariate `Normal` distribution.
+    """
+    images = tf.cast(images, dtype=tf.float32)
+    net = self.encoder_net(images)
+    loc = net[..., :self.output_size]
+    scale_diag = tf.nn.softplus(net[..., self.output_size:] + 0.5)
+    return tfd.MultivariateNormalDiag(loc=loc,
+                                      scale_diag=scale_diag,
+                                      name="encoder_distribution")
 
 
-def make_prior():
-  """Build prior distribution over latent codes.
+class Decoder(object):
+  """Defines a functor for creating the decoder distribution."""
 
-  Returns:
-    prior: A multivariate standard `Normal` distribution.
-  """
-  return tfd.MultivariateNormalDiag(scale_diag=tf.ones(FLAGS.latent_size),
-                                    name="prior_distribution")
+  def __init__(self, layers, activation, output_shape):
+    self.output_shape = output_shape
+    self.decoder_net = tf.keras.Sequential(
+        [tf.keras.layers.Dense(units, activation=activation)
+         for units in layers] +
+        [tf.keras.layers.Dense(np.prod(output_shape), activation=None)])
+
+  def __call__(self, codes):
+    """Build decoder which takes a batch of codes and returns generated images.
+
+    Args:
+      codes: A `float`-like `Tensor` containing the latent
+        vectors to be decoded. These are assumed to be rank-1, so
+        the encoding `Tensor` is rank-2 with shape `[batch_size, latent_size]`.
+
+    Returns:
+      decoder: A multivariate `Bernoulli` distribution.
+    """
+    net = self.decoder_net(codes)
+    new_shape = tf.concat([tf.shape(net)[:-1], self.output_shape], axis=0)
+    logits = tf.reshape(net, shape=new_shape)
+    return tfd.Independent(tfd.Bernoulli(logits=logits),
+                           reinterpreted_batch_ndims=len(self.output_shape),
+                           name="decoder_distribution")
 
 
-def make_vae(images, encoder_fn, decoder_fn, prior_fn, return_full=False):
+class Prior(object):
+  """Defines a functor for creating the prior distribution."""
+
+  def __init__(self, latent_size):
+    self.prior = tfd.MultivariateNormalDiag(
+        scale_diag=tf.ones(latent_size),
+        name="prior_distribution")
+
+  def __call__(self):
+    """Build prior distribution over latent codes.
+
+    Returns:
+      prior: A multivariate standard `Normal` distribution.
+    """
+    return self.prior
+
+
+def make_vae(images, encoder_fn, decoder_fn, prior_fn):
   """Builds the variational auto-encoder and its loss function.
 
   Args:
@@ -172,22 +190,17 @@ def make_vae(images, encoder_fn, decoder_fn, prior_fn, return_full=False):
       `Z`, and returns a Distribution over the batch of observations `X`.
     prior_fn: A callable to build the prior `p(Z)`. This takes no arguments and
       returns a Distribution over a single latent code (
-    return_full: If True, also return the model components and the encoding.
 
   Returns:
     elbo_loss: A scalar `Tensor` computing the negation of the variational
       evidence bound (i.e., `elbo_loss >= -log p(X)`).
   """
-  with tf.variable_scope("encoder"):
-    encoder = encoder_fn(images)
+  encoder = encoder_fn(images)
 
-  with tf.variable_scope("prior"):
-    prior = prior_fn()
+  prior = prior_fn()
 
   def joint_log_prob(z):
-    with tf.variable_scope("decoder"):
-      decoder = decoder_fn(z)
-    return decoder.log_prob(images) + prior.log_prob(z)
+    return decoder_fn(z).log_prob(images) + prior.log_prob(z)
 
   elbo_loss = tf.reduce_sum(
       tfp.vi.monte_carlo_csiszar_f_divergence(
@@ -195,16 +208,14 @@ def make_vae(images, encoder_fn, decoder_fn, prior_fn, return_full=False):
           p_log_prob=joint_log_prob,
           q=encoder,
           num_draws=1))
+
   tf.summary.scalar("elbo", elbo_loss)
 
-  if return_full:
-    # Rebuild (and reuse!) the decoder so we can compute stats from it.
-    encoding_draw = encoder.sample()
-    with tf.variable_scope("decoder", reuse=True):
-      decoder = decoder_fn(encoding_draw)
-    return elbo_loss, encoder, decoder, prior, encoding_draw
+  # Rebuild (and reuse!) the decoder so we can compute stats from it.
+  encoding_draw = encoder.sample()
+  decoder = decoder_fn(encoding_draw)
 
-  return elbo_loss
+  return elbo_loss, encoder, decoder, encoding_draw
 
 
 def save_imgs(x, fname):
@@ -332,19 +343,19 @@ def main(argv):
     images = tf.reshape(images, shape=[-1] + IMAGE_SHAPE)
     images = tf.cast(images > 0.5, dtype=tf.int32)
 
+    encoder = Encoder(FLAGS.encoder_layers, FLAGS.activation, FLAGS.latent_size)
+    decoder = Decoder(FLAGS.decoder_layers, FLAGS.activation, IMAGE_SHAPE)
+    prior = Prior(FLAGS.latent_size)
+
     # Build the model and ELBO loss function.
-    elbo_loss, _, decoder, prior, _ = make_vae(images,
-                                               make_encoder,
-                                               make_decoder,
-                                               make_prior,
-                                               return_full=True)
-    reconstructed_images = decoder.mean()
+    elbo_loss, _, decoder_distribution, _ = make_vae(
+        images, encoder, decoder, prior)
+    reconstructed_images = decoder_distribution.mean()
 
     # Decode samples from the prior for visualization.
-    prior_samples = prior.sample(10)
-    with tf.variable_scope("decoder", reuse=True):
-      decoded = make_decoder(prior_samples)
-      random_images = decoded.mean()
+    prior_samples = prior().sample(10)
+    decoded_distribution_given_random_prior = decoder(prior_samples)
+    random_images = decoded_distribution_given_random_prior.mean()
 
     # Perform variational inference by minimizing the -ELBO.
     optimizer = tf.train.AdamOptimizer(FLAGS.learning_rate)
