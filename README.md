@@ -71,6 +71,8 @@ for end-to-end examples. It includes tutorial notebooks such as:
   A hierarchical linear model for sharing statistical strength across examples.
 * [Eight Schools](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Eight_Schools.ipynb).
   A hierarchical normal model for exchangeable treatment effects.
+* [Bayesian Gaussian Mixture Models](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Bayesian_Gaussian_Mixture_Model.ipynb).
+  Clustering with a probabilistic generative model.
 * [Gaussian Copulas](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Gaussian_Copula.ipynb).
   Probability distributions for capturing dependence across random variables.
 * [Understanding TensorFlow Distributions Shapes](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Understanding_TensorFlow_Distributions_Shapes.ipynb).
