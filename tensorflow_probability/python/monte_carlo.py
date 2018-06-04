@@ -174,7 +174,16 @@ def expectation(f, samples, log_prob=None, use_reparametrization=True,
       # "DiCE: The Infinitely Differentiable Monte-Carlo Estimator"
       # https://arxiv.org/abs/1802.05098
       # DiCE ensures that any order gradients of the objective 
-      # are unbiased gradient estimators
+      # are unbiased gradient estimators.
+      # We exploit that
+      #   `h(x) - stop(h(x)) == zeros_like(h(x))`
+      # but its gradient is grad[h(x)].
+      # Note that IEEE754 specifies that `x - x == 0.` and `x + 0. == x`, hence
+      # this trick loses no precision. For more discussion regarding the
+      # relevant portions of the IEEE754 standard, see the StackOverflow
+      # question,
+      # "Is there a floating point value of x, for which x-x == 0 is false?"
+      # http://stackoverflow.com/q/2686644
       l_dice = fx * tf.exp(logpx - stop(logpx))
       return tf.reduce_mean(l_dice, axis=axis, keep_dims=keep_dims)
 
