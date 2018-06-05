@@ -153,7 +153,7 @@ more details. Check out our latest publicity here:
 ## Contributing
 
 We're eager to collaborate with you! See [`CONTRIBUTING.md`](CONTRIBUTING.md)
-for more details. This project adheres to TensorFlow's
+for a guide on how to contribute. This project adheres to TensorFlow's
 [code of conduct](CODE_OF_CONDUCT.md). By participating, you are expected to
 uphold this code.
 
