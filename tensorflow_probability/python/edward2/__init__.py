@@ -20,7 +20,8 @@ from __future__ import print_function
 
 # pylint: disable=wildcard-import
 from tensorflow_probability.python.edward2.generated_random_variables import *
-from tensorflow_probability.python.edward2.generated_random_variables import __all__ as rv_all
+from tensorflow_probability.python.edward2.generated_random_variables import as_random_variable
+from tensorflow_probability.python.edward2.generated_random_variables import rv_all
 from tensorflow_probability.python.edward2.interceptor import get_interceptor
 from tensorflow_probability.python.edward2.interceptor import interception
 from tensorflow_probability.python.edward2.program_transformations import make_log_joint_fn
@@ -31,6 +32,7 @@ from tensorflow.python.util.all_util import remove_undocumented
 
 _allowed_symbols = rv_all + [
     "RandomVariable",
+    "as_random_variable",
     "get_interceptor",
     "interception",
     "make_log_joint_fn",
