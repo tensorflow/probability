@@ -389,7 +389,8 @@ class RandomVariableTest(tf.test.TestCase):
   @tfe.run_test_in_graph_and_eager_modes()
   def testRandomTensorSample(self):
     num_samples = tf.cast(tfd.Poisson(rate=5.).sample(), tf.int32)
-    _ = tfd.Normal(loc=0.0, scale=1.0).sample(num_samples)
+    _ = ed.RandomVariable(tfd.Normal(loc=0.0, scale=1.0),
+                          sample_shape=num_samples)
 
 
 if __name__ == "__main__":

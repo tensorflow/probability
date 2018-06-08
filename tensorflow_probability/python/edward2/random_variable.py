@@ -153,7 +153,7 @@ class RandomVariable(object):
       name: name to give to the op
 
     Returns:
-      batch_shape: `Tensor`.
+      sample_shape: `Tensor`.
     """
     with tf.name_scope(name):
       if isinstance(self._sample_shape, tf.Tensor):
