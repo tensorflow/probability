@@ -23,6 +23,7 @@ import tensorflow as tf
 
 from tensorflow.python.client import session as tf_session
 from tensorflow.python.framework import ops
+from tensorflow.python.framework import tensor_util
 
 __all__ = [
     "RandomVariable",
@@ -106,12 +107,11 @@ class RandomVariable(object):
       NotImplementedError: `distribution` does not have a `sample` method.
     """
     self._distribution = distribution
-
-    self._sample_shape = tf.TensorShape(sample_shape)
+    self._sample_shape = sample_shape
     if value is not None:
       t_value = tf.convert_to_tensor(value, self.distribution.dtype)
       value_shape = t_value.shape
-      expected_shape = self._sample_shape.concatenate(
+      expected_shape = self.sample_shape.concatenate(
           self.distribution.batch_shape).concatenate(
               self.distribution.event_shape)
       if not value_shape.is_compatible_with(expected_shape):
@@ -122,7 +122,7 @@ class RandomVariable(object):
         self._value = t_value
     else:
       try:
-        self._value = self.distribution.sample(self._sample_shape)
+        self._value = self.distribution.sample(self.sample_shape_tensor())
       except NotImplementedError:
         raise NotImplementedError(
             "sample is not implemented for {0}. You must either pass in the "
@@ -141,8 +141,24 @@ class RandomVariable(object):
 
   @property
   def sample_shape(self):
-    """Sample shape of random variable."""
-    return self._sample_shape
+    """Sample shape of random variable as a `TensorShape`."""
+    if isinstance(self._sample_shape, tf.Tensor):
+      return tf.TensorShape(tensor_util.constant_value(self._sample_shape))
+    return tf.TensorShape(self._sample_shape)
+
+  def sample_shape_tensor(self, name="sample_shape_tensor"):
+    """Sample shape of random variable as a 1-D `Tensor`.
+
+    Args:
+      name: name to give to the op
+
+    Returns:
+      batch_shape: `Tensor`.
+    """
+    with tf.name_scope(name):
+      if isinstance(self._sample_shape, tf.Tensor):
+        return self._sample_shape
+      return tf.convert_to_tensor(self.sample_shape.as_list(), dtype=tf.int32)
 
   @property
   def shape(self):

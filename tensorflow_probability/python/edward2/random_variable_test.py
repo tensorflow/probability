@@ -377,6 +377,19 @@ class RandomVariableTest(tf.test.TestCase):
     self._testShape(
         ed.RandomVariable(tfd.Bernoulli(probs=0.5), sample_shape=[2, 1]),
         [2, 1], [], [])
+    self._testShape(
+        ed.RandomVariable(tfd.Bernoulli(probs=0.5),
+                          sample_shape=tf.constant([2])),
+        [2], [], [])
+    self._testShape(
+        ed.RandomVariable(tfd.Bernoulli(probs=0.5),
+                          sample_shape=tf.constant([2, 4])),
+        [2, 4], [], [])
+
+  @tfe.run_test_in_graph_and_eager_modes()
+  def testRandomTensorSample(self):
+    num_samples = tf.cast(tfd.Poisson(rate=5.).sample(), tf.int32)
+    _ = tfd.Normal(loc=0.0, scale=1.0).sample(num_samples)
 
 
 if __name__ == "__main__":
