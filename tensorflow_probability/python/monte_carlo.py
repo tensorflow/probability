@@ -168,9 +168,14 @@ def expectation(f, samples, log_prob=None, use_reparametrization=True,
       x = stop(samples)
       logpx = log_prob(x)
       fx = f(x)  # Call `f` once in case it has side-effects.
-      # We now rewrite f(x) so that:
-      #   `grad[f(x)] := grad[f(x)] + f(x) * grad[logqx]`.
-      # To achieve this, we use a trick that
+      # We now introduce the DiCE objective:
+      # Jakob Foerster, Greg Farquhar, Maruan Al-Shedivat, Tim Rocktaeschel,
+      # Eric P. Xing, Shimon Whiteson (ICML 2018)
+      # "DiCE: The Infinitely Differentiable Monte-Carlo Estimator"
+      # https://arxiv.org/abs/1802.05098
+      # DiCE ensures that any order gradients of the objective 
+      # are unbiased gradient estimators.
+      # We exploit that
       #   `h(x) - stop(h(x)) == zeros_like(h(x))`
       # but its gradient is grad[h(x)].
       # Note that IEEE754 specifies that `x - x == 0.` and `x + 0. == x`, hence
@@ -179,8 +184,8 @@ def expectation(f, samples, log_prob=None, use_reparametrization=True,
       # question,
       # "Is there a floating point value of x, for which x-x == 0 is false?"
       # http://stackoverflow.com/q/2686644
-      fx += stop(fx) * (logpx - stop(logpx))  # Add zeros_like(logpx).
-      return tf.reduce_mean(fx, axis=axis, keep_dims=keep_dims)
+      l_dice = fx * tf.exp(logpx - stop(logpx))
+      return tf.reduce_mean(l_dice, axis=axis, keep_dims=keep_dims)
 
 
 def _sample_mean(values):
