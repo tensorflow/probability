@@ -40,6 +40,7 @@ py_library(
         ":sample",
         ":sample_annealed_importance",
         ":sample_halton_sequence",
+        ":transformed_kernel",
     ],
 )
 
@@ -239,6 +240,29 @@ py_test(
     name = "sample_halton_sequence_test",
     size = "medium",
     srcs = ["sample_halton_sequence_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "transformed_kernel",
+    srcs = ["transformed_kernel.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/mcmc:kernel",
+        "//tensorflow_probability/python/mcmc:util",
+    ],
+)
+
+py_test(
+    name = "transformed_kernel_test",
+    size = "medium",
+    srcs = ["transformed_kernel_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,

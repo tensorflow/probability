@@ -35,6 +35,7 @@ from tensorflow_probability.python.mcmc.replica_exchange_mc import ReplicaExchan
 from tensorflow_probability.python.mcmc.sample import sample_chain
 from tensorflow_probability.python.mcmc.sample_annealed_importance import sample_annealed_importance_chain
 from tensorflow_probability.python.mcmc.sample_halton_sequence import sample_halton_sequence
+from tensorflow_probability.python.mcmc.transformed_kernel import TransformedTransitionKernel
 
 from tensorflow.python.util.all_util import remove_undocumented
 
@@ -47,6 +48,7 @@ _allowed_symbols = [
     'TransitionKernel',
     'UncalibratedHamiltonianMonteCarlo',
     'RandomWalkMetropolis',
+    'TransformedTransitionKernel',
     'UncalibratedRandomWalk',
     'default_exchange_proposed_fn',
     'effective_sample_size',
