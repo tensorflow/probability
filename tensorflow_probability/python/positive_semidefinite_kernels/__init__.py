@@ -12,41 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Tools for probabilistic reasoning in TensorFlow."""
+"""Positive-semidefinite kernels package."""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from tensorflow_probability.python import edward2
-from tensorflow_probability.python import glm
-from tensorflow_probability.python import layers
-from tensorflow_probability.python import mcmc
-from tensorflow_probability.python import monte_carlo
-from tensorflow_probability.python import optimizer
-from tensorflow_probability.python import positive_semidefinite_kernels
-from tensorflow_probability.python import trainable_distributions
-from tensorflow_probability.python import util
-from tensorflow_probability.python import vi
-from tensorflow.contrib import distributions
+from tensorflow_probability.python.positive_semidefinite_kernels.positive_semidefinite_kernel import PositiveSemidefiniteKernel
+import tensorflow_probability.python.positive_semidefinite_kernels.util
 
 from tensorflow.python.util.all_util import remove_undocumented
 
 _allowed_symbols = [
-    '__version__',
-    'distributions',
-    'edward2',
-    'glm',
-    'layers',
-    'mcmc',
-    'monte_carlo',
-    'optimizer',
-    'positive_semidefinite_kernels',
-    'trainable_distributions',
+    'PositiveSemidefiniteKernel',
     'util',
-    'vi',
 ]
-
-__version__ = '0.0.1'
 
 remove_undocumented(__name__, _allowed_symbols)

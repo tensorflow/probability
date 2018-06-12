@@ -41,6 +41,7 @@ py_library(
         "//tensorflow_probability/python/math",
         "//tensorflow_probability/python/mcmc",
         "//tensorflow_probability/python/optimizer",
+        "//tensorflow_probability/python/positive_semidefinite_kernels",
         "//tensorflow_probability/python/util",
         "//tensorflow_probability/python/vi",
     ],
