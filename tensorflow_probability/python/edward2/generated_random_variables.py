@@ -196,16 +196,16 @@ def _make_random_variable(distribution_cls):
       doc=inspect.cleandoc(distribution_cls.__init__.__doc__))
   def func(*args, **kwargs):
     # pylint: disable=g-doc-args
-    """Create a random variable for @{cls}.
+    """Create a random variable for ${cls}.
 
-    See @{cls} for more details.
+    See ${cls} for more details.
 
     Returns:
       RandomVariable.
 
     #### Original Docstring for Distribution
 
-    @{doc}
+    ${doc}
     """
     # pylint: enable=g-doc-args
     sample_shape = kwargs.pop("sample_shape", ())

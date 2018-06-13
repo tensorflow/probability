@@ -162,7 +162,7 @@ class _ConvVariational(tf.keras.layers.Layer):
         the dilation rate to use for dilated convolution.
         Currently, specifying any `dilation_rate` value != 1 is
         incompatible with specifying any `strides` value != 1.
-      @{args}
+      ${args}
     """
     # pylint: enable=g-doc-args
     super(_ConvVariational, self).__init__(
@@ -523,7 +523,7 @@ class _ConvReparameterization(_ConvVariational):
         the dilation rate to use for dilated convolution.
         Currently, specifying any `dilation_rate` value != 1 is
         incompatible with specifying any `strides` value != 1.
-      @{args}
+      ${args}
     """
     # pylint: enable=g-doc-args
     super(_ConvReparameterization, self).__init__(
@@ -677,7 +677,7 @@ class Conv1DReparameterization(_ConvReparameterization):
         the dilation rate to use for dilated convolution.
         Currently, specifying any `dilation_rate` value != 1 is
         incompatible with specifying any `strides` value != 1.
-      @{args}
+      ${args}
     """
     # pylint: enable=g-doc-args
     super(Conv1DReparameterization, self).__init__(
@@ -832,7 +832,7 @@ class Conv2DReparameterization(_ConvReparameterization):
         all spatial dimensions.
         Currently, specifying any `dilation_rate` value != 1 is
         incompatible with specifying any stride value != 1.
-      @{args}
+      ${args}
     """
     # pylint: enable=g-doc-args
     super(Conv2DReparameterization, self).__init__(
@@ -988,7 +988,7 @@ class Conv3DReparameterization(_ConvReparameterization):
         all spatial dimensions.
         Currently, specifying any `dilation_rate` value != 1 is
         incompatible with specifying any stride value != 1.
-      @{args}
+      ${args}
     """
     # pylint: enable=g-doc-args
     super(Conv3DReparameterization, self).__init__(
@@ -1110,7 +1110,7 @@ class _ConvFlipout(_ConvVariational):
         the dilation rate to use for dilated convolution.
         Currently, specifying any `dilation_rate` value != 1 is
         incompatible with specifying any `strides` value != 1.
-      @{args}
+      ${args}
       seed: Python scalar `int` which initializes the random number
         generator. Default value: `None` (i.e., use global seed).
     """
@@ -1334,7 +1334,7 @@ class Conv1DFlipout(_ConvFlipout):
         the dilation rate to use for dilated convolution.
         Currently, specifying any `dilation_rate` value != 1 is
         incompatible with specifying any `strides` value != 1.
-      @{args}
+      ${args}
       seed: Python scalar `int` which initializes the random number
         generator. Default value: `None` (i.e., use global seed).
     """
@@ -1497,7 +1497,7 @@ class Conv2DFlipout(_ConvFlipout):
         all spatial dimensions.
         Currently, specifying any `dilation_rate` value != 1 is
         incompatible with specifying any stride value != 1.
-      @{args}
+      ${args}
       seed: Python scalar `int` which initializes the random number
         generator. Default value: `None` (i.e., use global seed).
     """
@@ -1661,7 +1661,7 @@ class Conv3DFlipout(_ConvFlipout):
         all spatial dimensions.
         Currently, specifying any `dilation_rate` value != 1 is
         incompatible with specifying any stride value != 1.
-      @{args}
+      ${args}
       seed: Python scalar `int` which initializes the random number
         generator. Default value: `None` (i.e., use global seed).
     """

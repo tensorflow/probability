@@ -123,7 +123,7 @@ class _DenseVariational(tf.keras.layers.Layer):
     """Construct layer.
 
     Args:
-      @{args}
+      ${args}
     """
     # pylint: enable=g-doc-args
     super(_DenseVariational, self).__init__(
@@ -419,7 +419,7 @@ class DenseReparameterization(_DenseVariational):
     """Construct layer.
 
     Args:
-      @{args}
+      ${args}
     """
     # pylint: enable=g-doc-args
     super(DenseReparameterization, self).__init__(
@@ -536,7 +536,7 @@ class DenseLocalReparameterization(_DenseVariational):
     """Construct layer.
 
     Args:
-      @{args}
+      ${args}
     """
     # pylint: enable=g-doc-args
     super(DenseLocalReparameterization, self).__init__(
@@ -669,7 +669,7 @@ class DenseFlipout(_DenseVariational):
     """Construct layer.
 
     Args:
-      @{args}
+      ${args}
       seed: Python scalar `int` which initializes the random number
         generator. Default value: `None` (i.e., use global seed).
     """

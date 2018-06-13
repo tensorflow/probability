@@ -32,7 +32,7 @@ def expand_docstring(**kwargs):
 
   Args:
     **kwargs: Keyword arguments to set. For each key-value pair `k` and `v`,
-      the key is found as `@{k}` in the docstring and replaced with `v`.
+      the key is found as `${k}` in the docstring and replaced with `v`.
 
   Returns:
     Decorated function.
@@ -41,10 +41,10 @@ def expand_docstring(**kwargs):
     """Original function with modified `__doc__` attribute."""
     doc = inspect.cleandoc(fn.__doc__)
     for k, v in six.iteritems(kwargs):
-      # Capture each @{k} reference to replace with v.
+      # Capture each ${k} reference to replace with v.
       # We wrap the replacement in a function so no backslash escapes
       # are processed.
-      pattern = r'@\{' + str(k) + r'\}'
+      pattern = r'\$\{' + str(k) + r'\}'
       doc = re.sub(pattern, lambda match: v, doc)  # pylint: disable=cell-var-from-loop
     fn.__doc__ = doc
     return fn

@@ -34,7 +34,7 @@ class DocstringUtil(tf.test.TestCase):
       """Hello world.
 
       Args:
-        @{args}
+        ${args}
 
       Returns:
         x.
@@ -65,7 +65,7 @@ class DocstringUtil(tf.test.TestCase):
         """Hello world.
 
         Args:
-          @{args}
+          ${args}
 
         Bar.
         """
