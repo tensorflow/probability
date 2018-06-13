@@ -20,13 +20,12 @@ from __future__ import print_function
 
 import functools
 import inspect
-import tensorflow as tf
 
+from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.edward2.interceptor import interceptable
 from tensorflow_probability.python.edward2.random_variable import RandomVariable
-from tensorflow_probability.python.util import docstring as docstring_util
 
-tfd = tf.contrib.distributions
+from tensorflow_probability.python.util import docstring as docstring_util
 
 rv_all = [
     "Autoregressive",

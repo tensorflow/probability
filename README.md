@@ -18,13 +18,13 @@ in core TF.
 
 __Layer 1: Statistical Building Blocks__
 
-* Distributions ([`tf.contrib.distributions`](https://github.com/tensorflow/tensorflow/tree/master/tensorflow/contrib/distributions/python/ops),
+* Distributions ([`tfp.distributions`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions),
   [`tf.distributions`](https://github.com/tensorflow/tensorflow/tree/master/tensorflow/python/ops/distributions)):
   A large collection of probability
   distributions and related statistics with batch and
   [broadcasting](https://docs.scipy.org/doc/numpy-1.14.0/user/basics.broadcasting.html)
   semantics.
-* Bijectors ([`tf.contrib.distributions.bijectors`](https://github.com/tensorflow/tensorflow/tree/master/tensorflow/contrib/distributions/python/ops/bijectors)):
+* Bijectors ([`tfp.distributions.bijectors`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/bijectors)):
   Reversible and composable transformations of random variables. Bijectors
   provide a rich class of transformed distributions, from classical examples
   like the

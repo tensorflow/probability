@@ -22,9 +22,9 @@ import inspect
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability import distributions as tfd
 from tensorflow_probability import edward2 as ed
 
-tfd = tf.contrib.distributions
 tfe = tf.contrib.eager
 
 

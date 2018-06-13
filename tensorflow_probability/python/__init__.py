@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from tensorflow_probability.python import distributions
 from tensorflow_probability.python import edward2
 from tensorflow_probability.python import glm
 from tensorflow_probability.python import layers
@@ -28,7 +29,6 @@ from tensorflow_probability.python import positive_semidefinite_kernels
 from tensorflow_probability.python import trainable_distributions
 from tensorflow_probability.python import util
 from tensorflow_probability.python import vi
-from tensorflow.contrib import distributions
 
 from tensorflow.python.util.all_util import remove_undocumented
 
