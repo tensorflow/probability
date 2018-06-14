@@ -28,14 +28,14 @@ util = tfp.positive_semidefinite_kernels.util
 
 class UtilTest(tf.test.TestCase):
 
-  def testMaybeExpandDims(self):
+  def testPadShapeRightWithOnes(self):
     # Test nominal behavior.
     x = np.ones([3], np.float32)
     self.assertAllEqual(
         self.evaluate(util.pad_shape_right_with_ones(x, 3)).shape,
         [3, 1, 1, 1])
 
-  def testMaybeExpandDimsDynamicShape(self):
+  def testPadShapeRightWithOnesDynamicShape(self):
     # Test partially unknown shape
     x = tf.placeholder_with_default(np.ones([3], np.float32), [None])
     expanded = util.pad_shape_right_with_ones(x, 3)
@@ -48,7 +48,7 @@ class UtilTest(tf.test.TestCase):
     self.assertIsNone(expanded.shape.ndims)
     self.assertAllEqual(self.evaluate(expanded).shape, [3, 1, 1, 1])
 
-  def testMaybeExpandDimsCanBeGraphNoop(self):
+  def testPadShapeRightWithOnesCanBeGraphNoop(self):
     # First ensure graph actually *is* changed when we use non-trivial ndims.
     # Use an explicitly created graph, to make sure no whacky test fixture graph
     # reuse is going on in the background.
