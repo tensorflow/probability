@@ -46,6 +46,7 @@ from tensorflow_probability.python.distributions.internal.moving_stats import mo
 from tensorflow_probability.python.distributions.inverse_gamma import InverseGamma
 from tensorflow_probability.python.distributions.inverse_gamma import InverseGammaWithSoftplusConcentrationRate
 from tensorflow_probability.python.distributions.kumaraswamy import Kumaraswamy
+from tensorflow_probability.python.distributions.linear_gaussian_ssm import LinearGaussianStateSpaceModel
 from tensorflow_probability.python.distributions.logistic import Logistic
 from tensorflow_probability.python.distributions.mixture import Mixture
 from tensorflow_probability.python.distributions.mixture_same_family import MixtureSameFamily
@@ -141,6 +142,7 @@ __all__ = [
     'InverseGamma',
     'InverseGammaWithSoftplusConcentrationRate',
     'Kumaraswamy',
+    'LinearGaussianStateSpaceModel',
     'Laplace',
     'LaplaceWithSoftplusScale',
     'Logistic',

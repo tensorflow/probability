@@ -192,6 +192,17 @@ py_test(
 )
 
 py_test(
+    name = "linear_gaussian_ssm_test",
+    size = "medium",
+    srcs = ["linear_gaussian_ssm_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_test(
     name = "moving_stats_test",
     size = "small",
     srcs = ["internal/moving_stats_test.py"],
