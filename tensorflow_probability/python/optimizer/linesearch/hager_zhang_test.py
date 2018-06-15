@@ -45,7 +45,7 @@ class HagerZhangTest(tf.test.TestCase):
     # Case 1: The starting value is close to 0 and doesn't bracket the min.
     with self.test_session() as session:
       close_start, far_start = tf.constant(0.1), tf.constant(7.0)
-      results_close = session.run(tfp.optimizer.hz_line_search(
+      results_close = session.run(tfp.optimizer.linesearch.hager_zhang(
           fdf, initial_step_size=close_start))
       self.assertTrue(results_close.converged)
       self.assertAlmostEqual(results_close.left_pt, results_close.right_pt)
@@ -57,7 +57,7 @@ class HagerZhangTest(tf.test.TestCase):
                                       df0,
                                       0.1,
                                       0.9))
-      results_far = session.run(tfp.optimizer.hz_line_search(
+      results_far = session.run(tfp.optimizer.linesearch.hager_zhang(
           fdf, initial_step_size=far_start))
       self.assertTrue(results_far.converged)
       self.assertAlmostEqual(results_far.left_pt, results_far.right_pt)
@@ -81,7 +81,7 @@ class HagerZhangTest(tf.test.TestCase):
       starts = (tf.constant(0.1), tf.constant(1.5), tf.constant(2.0),
                 tf.constant(4.0))
       for start in starts:
-        results = session.run(tfp.optimizer.hz_line_search(
+        results = session.run(tfp.optimizer.linesearch.hager_zhang(
             fdf, initial_step_size=start))
         self.assertTrue(results.converged)
         self.assertAlmostEqual(results.left_pt, results.right_pt)
@@ -130,8 +130,8 @@ class HagerZhangTest(tf.test.TestCase):
         coord = x0 + t * dirn
         ft, df = rosenbrock(coord)
         return ft, tf.reduce_sum(df * dirn)
-      results = session.run(tfp.optimizer.hz_line_search(fdf,
-                                                         initial_step_size=1.0))
+      results = session.run(tfp.optimizer.linesearch.hager_zhang(
+          fdf, initial_step_size=1.0))
       self.assertTrue(results.converged)
 
   def test_eval_count(self):
@@ -152,7 +152,7 @@ class HagerZhangTest(tf.test.TestCase):
 
     for start in starts:
       fdf, counter = get_fn()
-      results = tfp.optimizer.hz_line_search(
+      results = tfp.optimizer.linesearch.hager_zhang(
           fdf, initial_step_size=tf.constant(start))
       init = tf.global_variables_initializer()
       with self.test_session() as session:
@@ -178,7 +178,7 @@ class HagerZhangTest(tf.test.TestCase):
     with self.test_session() as session:
       start = tf.constant(dtype(1e-8))
       results = session.run(
-          tfp.optimizer.hz_line_search(
+          tfp.optimizer.linesearch.hager_zhang(
               fdf,
               initial_step_size=start,
               sufficient_decrease_param=0.1,
@@ -209,7 +209,7 @@ class HagerZhangTest(tf.test.TestCase):
     def get_results():
       with self.test_session() as session:
         start = tf.constant(0.9)
-        results = tfp.optimizer.hz_line_search(
+        results = tfp.optimizer.linesearch.hager_zhang(
             fdf,
             initial_step_size=start,
             sufficient_decrease_param=0.1,
@@ -235,7 +235,7 @@ class HagerZhangTest(tf.test.TestCase):
     with self.test_session() as session:
       start = tf.constant(0.1, dtype=tf.float64)
       results = session.run(
-          tfp.optimizer.hz_line_search(
+          tfp.optimizer.linesearch.hager_zhang(
               rastrigin,
               initial_step_size=start,
               sufficient_decrease_param=0.1,

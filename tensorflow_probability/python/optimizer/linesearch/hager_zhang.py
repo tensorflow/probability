@@ -36,6 +36,9 @@ import tensorflow as tf
 
 from tensorflow.python.framework import smart_cond
 
+__all__ = [
+    'hager_zhang',
+]
 
 # Container to hold the function value and the derivative at a given point.
 # Each entry is a scalar tensor of real dtype. Used for internal data passing.
@@ -76,7 +79,7 @@ HagerZhangLineSearchResult = collections.namedtuple(
     ])
 
 
-def line_search(value_and_gradients_function,
+def hager_zhang(value_and_gradients_function,
                 initial_step_size=None,
                 objective_at_zero=None,
                 grad_objective_at_zero=None,
@@ -137,8 +140,8 @@ def line_search(value_and_gradients_function,
     value_and_gradients_function = lambda x: ((x - 1.3) ** 2, 2 * (x-1.3))
     # Set initial step size.
     step_size = tf.constant(0.1)
-    ls_result = tfp.optimizer.hz_line_search(value_and_gradients_function,
-                                             initial_step_size=step_size)
+    ls_result = tfp.optimizer.linesearch.hager_zhang(
+        value_and_gradients_function, initial_step_size=step_size)
     # Evaluate the results.
     with tf.Session() as session:
       results = session.run(ls_result)
@@ -209,7 +212,7 @@ def line_search(value_and_gradients_function,
       by `1.`. Corresponds to 'sigma' in the terminology of
       [Hager and Zhang (2006)][2].
     name: (Optional) Python str. The name prefixed to the ops created by this
-      function. If not supplied, the default name 'line_search' is used.
+      function. If not supplied, the default name 'hager_zhang' is used.
 
   Returns:
     results: A namedtuple containing the following attributes.
@@ -244,7 +247,7 @@ def line_search(value_and_gradients_function,
         If converged is True, it is equal to the dfn_step.
         Otherwise it corresponds to the last interval computed.
   """
-  with tf.name_scope(name, 'line_search',
+  with tf.name_scope(name, 'hager_zhang',
                      [initial_step_size,
                       objective_at_zero,
                       grad_objective_at_zero,

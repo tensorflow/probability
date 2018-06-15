@@ -12,18 +12,42 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Line-search optimizers package."""
+# Line search optimization methods
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+package(
+    default_visibility = [
+        "//tensorflow_probability:__subpackages__",
+    ],
+)
 
-from tensorflow_probability.python.optimizer.linesearch.hager_zhang import hager_zhang
+licenses(["notice"])  # Apache 2.0
 
-from tensorflow.python.util.all_util import remove_undocumented
+exports_files(["LICENSE"])
 
-_allowed_symbols = [
-    'hager_zhang',
-]
+py_library(
+    name = "linesearch",
+    srcs = ["__init__.py"],
+    deps = [
+        ":hager_zhang",
+    ],
+)
 
-remove_undocumented(__name__, _allowed_symbols)
+py_library(
+    name = "hager_zhang",
+    srcs = ["hager_zhang.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "hager_zhang_test",
+    size = "medium",
+    srcs = ["hager_zhang_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
