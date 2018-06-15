@@ -117,3 +117,32 @@ py_test(
         ":vae",
     ],
 )
+
+py_binary(
+    name = "vq_vae",
+    srcs = ["vq_vae.py"],
+    main = "vq_vae.py",
+    srcs_version = "PY2AND3",
+    deps = [
+        # absl/flags dep,
+        # matplotlib dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_test(
+    name = "vq_vae_test",
+    size = "small",
+    srcs = ["vq_vae.py"],
+    args = [
+        "--fake_data",
+        "--max_steps=5",
+    ],
+    main = "vq_vae.py",
+    srcs_version = "PY2AND3",
+    deps = [
+        ":vq_vae",
+    ],
+)
