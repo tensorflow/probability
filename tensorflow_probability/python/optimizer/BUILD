@@ -30,9 +30,9 @@ py_library(
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
     deps = [
-        ":hager_zhang",
         ":sgld",
         ":variational_sgd",
+        "//tensorflow_probability/python/optimizer/linesearch",
     ],
 )
 
@@ -42,26 +42,6 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         # tensorflow dep,
-    ],
-)
-
-py_library(
-    name = "hager_zhang",
-    srcs = ["linesearch/hager_zhang.py"],
-    srcs_version = "PY2AND3",
-    deps = [
-        # tensorflow dep,
-    ],
-)
-
-py_test(
-    name = "hager_zhang_test",
-    size = "medium",
-    srcs = ["linesearch/hager_zhang_test.py"],
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
     ],
 )
 
