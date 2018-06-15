@@ -102,7 +102,7 @@ py_binary(
 
 py_test(
     name = "vae_test",
-    size = "small",
+    size = "medium",
     srcs = ["vae.py"],
     args = [
         "--fake_data",
