@@ -20,6 +20,8 @@ from __future__ import print_function
 
 import abc
 import contextlib
+import functools
+import operator
 import six
 import tensorflow as tf
 
@@ -30,12 +32,12 @@ __all__ = [
 
 @six.add_metaclass(abc.ABCMeta)
 class PositiveSemidefiniteKernel(object):
-  """Abstract base class for positive-semidefinite kernel functions.
+  """Abstract base class for positive semi-definite kernel functions.
 
   #### Background
 
   For any set `S`, a real- (or complex-valued) function `k` on the Cartesian
-  product `S x S` is called positive-semidefinite if we have
+  product `S x S` is called positive semi-definite if we have
 
   ```none
   sum_i sum_j (c[i]*) c[j] k(x[i], x[j]) >= 0
@@ -248,7 +250,7 @@ class PositiveSemidefiniteKernel(object):
 
     Given an index set `S`, a kernel function is mathematically defined as a
     real- or complex-valued function on `S` satisfying the
-    positive-semidefiniteness constraint:
+    positive semi-definiteness constraint:
 
     ```none
     sum_i sum_j (c[i]*) c[j] k(x[i], x[j]) >= 0
@@ -541,3 +543,202 @@ class PositiveSemidefiniteKernel(object):
   def _batch_shape_tensor(self):
     raise NotImplementedError(
         'Subclasses must provide batch_shape_tensor implementation')
+
+  def __add__(self, k):
+    if not isinstance(k, PositiveSemidefiniteKernel):
+      raise ValueError(
+          "Can't add non-kernel (of type '%s') to kernel" % type(k))
+    return _SumKernel([self, k])
+
+  def __iadd__(self, k):
+    return self.__add__(k)
+
+  def __mul__(self, k):
+    if not isinstance(k, PositiveSemidefiniteKernel):
+      raise ValueError(
+          "Can't multiply by non-kernel (of type '%s') to kernel" % type(k))
+    return _ProductKernel([self, k])
+
+  def __imul__(self, k):
+    return self.__mul__(k)
+
+
+def _flatten_summand_list(kernels):
+  """Flatten a list of kernels which may contain _SumKernel instances.
+
+  Args:
+    kernels: Python list of `PositiveSemidefiniteKernel` instances
+
+  Returns:
+    Python list containing the elements of kernels, with any _SumKernel
+    instances replaced by their `kernels` property contents.
+  """
+  flattened = []
+  for k in kernels:
+    if isinstance(k, _SumKernel):
+      flattened += k.kernels
+    else:
+      flattened.append(k)
+  return flattened
+
+
+def _flatten_multiplicand_list(kernels):
+  """Flatten a list of kernels which may contain _ProductKernel instances.
+
+  Args:
+    kernels: Python list of `PositiveSemidefiniteKernel` instances
+
+  Returns:
+    Python list containing the elements of kernels, with any _ProductKernel
+    instances replaced by their `kernels` property contents.
+  """
+  flattened = []
+  for k in kernels:
+    if isinstance(k, _ProductKernel):
+      flattened += k.kernels
+    else:
+      flattened.append(k)
+  return flattened
+
+
+class _SumKernel(PositiveSemidefiniteKernel):
+  """Kernel class representing summation over a list of kernels.
+
+  Mathematically this class represents the pointwise sum of several kernels.
+  Given two kernels, `k1` and `k2`, and `kp = _SumKernel([k1, k2])`, we have
+
+    ```none
+    kp.apply(x, y) = k1(x, y) + k2(x, y)
+    ```
+
+  for any `x`, `y` in the feature space (this presumes that the constituent
+  kernels all act on the same feature space).
+
+  That the sum is positive semi-definite follows simply from the definition of
+  positive semi-definiteness of functions. If we have
+
+    ```none
+    sum_i sum_j (c[i]*) c[j] k1(x[i], x[j]) >= 0
+    ```
+  and
+
+    ```none
+    sum_i sum_j (c[i]*) c[j] k2(x[i], x[j]) >= 0
+    ```
+
+  for any finite collections `{x[1], ..., x[N]}` in S and `{c[1], ..., c[N]}` in
+  the reals (or the complex plane), then we clearly also have the same for the
+  sum of `k1` and `k2`.
+  """
+
+  def __init__(self, kernels, name=None):
+    """Create a kernel which is the sum of `kernels`.
+
+    The input list is 'flattened' in the sense that any entries which are also
+    of type `_SumKernel` will have their list of kernels appended to this
+    instance's list of kernels. This will reduce the stack depth when actually
+    evaluating the sum over kernel applications.
+
+    Args:
+      kernels: Python `list` of `PositiveSemidefiniteKernel` instances.
+      name: Python `str` name prefixed to Ops created by this class.
+    Raises:
+      ValueError: `kernels` is an empty list, or `kernels` don't all have the
+      same `feature_ndims`.
+    """
+    if not kernels:
+      raise ValueError("Can't create _SumKernel over empty list.")
+    if len(set([k.feature_ndims for k in kernels])) > 1:
+      raise ValueError(
+          "Can't sum kernels with different feature_ndims. Got:\n%s" %
+          str([k.feature_ndims for k in kernels]))
+    self._kernels = _flatten_summand_list(kernels)
+    if name is None:
+      name = 'SumKernel'
+    # We have ensured the list is non-empty and all feature_ndims are the same.
+    super(_SumKernel, self).__init__(feature_ndims=kernels[0].feature_ndims,
+                                     name=name)
+
+  @property
+  def kernels(self):
+    """The list of kernels this _SumKernel sums over."""
+    return self._kernels
+
+  def _apply(self, x1, x2, param_expansion_ndims=0):
+    return sum([k._apply(x1, x2, param_expansion_ndims) for k in self.kernels])  # pylint: disable=protected-access
+
+  def _batch_shape(self):
+    return functools.reduce(tf.broadcast_static_shape,
+                            [k.batch_shape for k in self.kernels])
+
+  def _batch_shape_tensor(self):
+    return functools.reduce(tf.broadcast_dynamic_shape,
+                            [k.batch_shape_tensor() for k in self.kernels])
+
+
+class _ProductKernel(PositiveSemidefiniteKernel):
+  """Kernel class representing the product over a list of kernels.
+
+  Mathematically this class represents the pointwise product of several kernels.
+  Given two kernels, `k1` and `k2`, and `kp = _ProductKernel([k1, k2])`, we have
+
+    ```none
+    kp.apply(x, y) = k1(x, y) * k2(x, y)
+    ```
+
+  for any x, y in the feature space (this presumes that the constituent kernels
+  all act on the same feature space).
+
+  The fact that this product is still positive semi-definite can be shown in a
+  variety of ways, many deep and all fascinating, but follows readily from the
+  [Schur product theorem](https://en.wikipedia.org/wiki/Schur_product_theorem),
+  which states that the Hadamard (element-wise) product of two PSD matrices is
+  also PSD.
+  """
+
+  def __init__(self, kernels, name=None):
+    """Create a kernel which is the product of `kernels`.
+
+    The input list is 'flattened' in the sense that any entries which are also
+    of type `_ProductKernel` will have their list of kernels appended to this
+    instance's list of kernels. This will reduce the stack depth when actually
+    evaluating the product over kernel applications.
+
+    Args:
+      kernels: Python `list` of `PositiveSemidefiniteKernel` instances.
+      name: Python `str` name prefixed to Ops created by this class.
+    Raises:
+      ValueError: `kernels` is an empty list, or `kernels` don't all have the
+      same `feature_ndims`.
+    """
+    if not kernels:
+      raise ValueError("Can't create _ProductKernel over empty list.")
+    if len(set([k.feature_ndims for k in kernels])) > 1:
+      raise ValueError(
+          "Can't multiply kernels with different feature_ndims. Got:\n%s" %
+          str([k.feature_ndims for k in kernels]))
+    self._kernels = _flatten_multiplicand_list(kernels)
+    if name is None:
+      name = 'ProductKernel'
+    # We have ensured the list is non-empty and all feature_ndims are the same.
+    super(_ProductKernel, self).__init__(feature_ndims=kernels[0].feature_ndims,
+                                         name=name)
+
+  @property
+  def kernels(self):
+    """The list of kernels this _ProductKernel multiplies over."""
+    return self._kernels
+
+  def _apply(self, x1, x2, param_expansion_ndims=0):
+    return functools.reduce(
+        operator.mul,
+        [k._apply(x1, x2, param_expansion_ndims) for k in self.kernels])  # pylint: disable=protected-access
+
+  def _batch_shape(self):
+    return functools.reduce(tf.broadcast_static_shape,
+                            [k.batch_shape for k in self.kernels])
+
+  def _batch_shape_tensor(self):
+    return functools.reduce(tf.broadcast_dynamic_shape,
+                            [k.batch_shape_tensor() for k in self.kernels])
+

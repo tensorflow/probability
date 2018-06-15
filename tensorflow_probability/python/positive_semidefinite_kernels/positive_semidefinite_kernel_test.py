@@ -18,8 +18,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from absl.testing import parameterized
 
+import functools
+import operator
+from absl.testing import parameterized
 import tensorflow as tf
 import tensorflow_probability as tfp
 
@@ -38,7 +40,8 @@ class TestKernel(kernels_lib.PositiveSemidefiniteKernel):
 
   k(x, y) = m * sum(x + y)
 
-  Not at all positive semidefinite, but we don't care about this here."""
+  Not at all positive semidefinite, but we don't care about this here.
+  """
 
   def __init__(self, multiplier):
     self._multiplier = tf.convert_to_tensor(multiplier)
@@ -206,5 +209,73 @@ class PositiveSemidefiniteKernelTest(tf.test.TestCase, parameterized.TestCase):
     self.assertEqual(apply_op.shape.ndims, None)
     self.assertAllEqual(self.evaluate(apply_op).shape, [2, 5, 3, 4])
 
+  def testOperatorOverloads(self):
+    k0 = TestKernel(self.params_0)
+    sum_kernel = k0 + k0 + k0
+    self.assertEqual(len(sum_kernel.kernels), 3)
+    sum_kernel += k0 + k0
+    self.assertEqual(len(sum_kernel.kernels), 5)
+
+    product_kernel = k0 * k0 * k0
+    self.assertEqual(len(product_kernel.kernels), 3)
+    product_kernel *= k0 * k0
+    self.assertEqual(len(product_kernel.kernels), 5)
+
+  def testStaticShapesAndValuesOfSum(self):
+    k0 = TestKernel(self.params_0)
+    k1 = TestKernel(self.params_1)
+    k2 = TestKernel(self.params_2)
+    k21 = TestKernel(self.params_21)
+
+    sum_kernel = k0 + k1 + k2 + k21
+    self.assertAllEqual(sum_kernel.batch_shape, [2, 2])
+    self.assertAllEqual(
+        self.evaluate(sum_kernel.matrix(self.x, self.y)),
+        sum([self.evaluate(k.matrix(self.x, self.y))
+             for k in sum_kernel.kernels]))
+
+  def testDynamicShapesAndValuesOfSum(self):
+    k2 = TestKernel(self.params_2_dynamic)
+    k21 = TestKernel(self.params_21_dynamic)
+
+    sum_kernel = k2 + k21
+    self.assertIsNone(sum_kernel.batch_shape.ndims)
+    self.assertAllEqual(self.evaluate(sum_kernel.batch_shape_tensor()), [2, 2])
+    self.assertAllEqual(
+        self.evaluate(sum_kernel.matrix(self.x, self.y)),
+        sum([self.evaluate(k.matrix(self.x, self.y))
+             for k in sum_kernel.kernels]))
+
+  def testStaticShapesAndValuesOfProduct(self):
+    k0 = TestKernel(self.params_0)
+    k1 = TestKernel(self.params_1)
+    k2 = TestKernel(self.params_2)
+    k21 = TestKernel(self.params_21)
+
+    product_kernel = k0 * k1 * k2 * k21
+    self.assertAllEqual(product_kernel.batch_shape, [2, 2])
+    self.assertAllEqual(
+        self.evaluate(product_kernel.matrix(self.x, self.y)),
+        functools.reduce(
+            operator.mul,
+            [self.evaluate(k.matrix(self.x, self.y))
+             for k in product_kernel.kernels]))
+
+  def testDynamicShapesAndValuesOfProduct(self):
+    k2 = TestKernel(self.params_2_dynamic)
+    k21 = TestKernel(self.params_21_dynamic)
+
+    product_kernel = k2 * k21
+    self.assertIsNone(product_kernel.batch_shape.ndims)
+    self.assertAllEqual(
+        self.evaluate(product_kernel.batch_shape_tensor()), [2, 2])
+    self.assertAllEqual(
+        self.evaluate(product_kernel.matrix(self.x, self.y)),
+        functools.reduce(
+            operator.mul,
+            [self.evaluate(k.matrix(self.x, self.y))
+             for k in product_kernel.kernels]))
+
 if __name__ == '__main__':
   tf.test.main()
+
