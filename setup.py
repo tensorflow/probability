@@ -46,6 +46,7 @@ else:
 maybe_gpu_suffix = '-gpu' if use_gpu else ''
 
 if release:
+  project_name = 'tensorflow-probability' + maybe_gpu_suffix
   tensorflow_package_name = 'tensorflow{}>={}'.format(
       maybe_gpu_suffix, REQUIRED_TENSORFLOW_VERSION)
 else:
