@@ -24,6 +24,7 @@ from tensorflow.python.ops.distributions import util as distribution_util
 
 __all__ = [
     'pad_shape_right_with_ones',
+    'sum_rightmost_ndims_preserving_shape',
 ]
 
 
@@ -59,3 +60,24 @@ def pad_shape_right_with_ones(x, ndims):
   x = tf.reshape(x, new_shape)
   x.set_shape(original_shape.concatenate([1]*ndims))
   return x
+
+
+def sum_rightmost_ndims_preserving_shape(x, ndims):
+  """Return `Tensor` with right-most ndims summed.
+
+  Args:
+    x: the `Tensor` whose right-most `ndims` dimensions to sum
+    ndims: number of right-most dimensions to sum.
+
+  Returns:
+    A `Tensor` resulting from calling `reduce_sum` on the `ndims` right-most
+    dimensions. If the shape of `x` is statically known, the result will also
+    have statically known shape. Otherwise, the resulting shape will only be
+    known at runtime.
+  """
+  x = tf.convert_to_tensor(x)
+  if x.shape.ndims is not None:
+    axes = tf.range(x.shape.ndims - ndims, x.shape.ndims)
+  else:
+    axes = tf.range(tf.rank(x) - ndims, tf.rank(x))
+  return tf.reduce_sum(x, axis=axes)

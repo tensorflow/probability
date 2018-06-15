@@ -26,6 +26,7 @@ py_library(
     name = "positive_semidefinite_kernels",
     srcs = ["__init__.py"],
     deps = [
+        ":exponentiated_quadratic",
         ":positive_semidefinite_kernel",
         ":util",
     ],
@@ -44,6 +45,26 @@ py_test(
     name = "positive_semidefinite_kernel_test",
     size = "small",
     srcs = ["positive_semidefinite_kernel_test.py"],
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "exponentiated_quadratic",
+    srcs = ["exponentiated_quadratic.py"],
+    deps = [
+        # six dep,
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "exponentiated_quadratic_test",
+    srcs = ["exponentiated_quadratic_test.py"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,

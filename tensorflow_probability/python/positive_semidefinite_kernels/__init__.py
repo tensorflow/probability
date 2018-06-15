@@ -18,12 +18,14 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from tensorflow_probability.python.positive_semidefinite_kernels.exponentiated_quadratic import ExponentiatedQuadratic
 from tensorflow_probability.python.positive_semidefinite_kernels.positive_semidefinite_kernel import PositiveSemidefiniteKernel
 import tensorflow_probability.python.positive_semidefinite_kernels.util
 
 from tensorflow.python.util.all_util import remove_undocumented
 
 _allowed_symbols = [
+    'ExponentiatedQuadratic',
     'PositiveSemidefiniteKernel',
     'util',
 ]

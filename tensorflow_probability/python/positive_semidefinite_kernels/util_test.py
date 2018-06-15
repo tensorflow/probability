@@ -67,6 +67,28 @@ class UtilTest(tf.test.TestCase):
       x = util.pad_shape_right_with_ones(x, 0)
       self.assertEqual(graph_def, g.as_graph_def())
 
+  def testSumRightmostNdimsPreservingShapeStaticRank(self):
+    x = np.ones((5, 4, 3, 2))
+    self.assertAllEqual(
+        util.sum_rightmost_ndims_preserving_shape(x, ndims=2).shape,
+        [5, 4])
+
+    x = tf.placeholder_with_default(np.ones((5, 4, 3, 2)),
+                                    shape=[5, 4, None, None])
+    self.assertAllEqual(
+        util.sum_rightmost_ndims_preserving_shape(x, ndims=1).shape.as_list(),
+        [5, 4, None])
+
+  def testSumRightmostNdimsPreservingShapeDynamicRank(self):
+    x = tf.placeholder_with_default(np.ones((5, 4, 3, 2)), shape=None)
+    self.assertIsNone(
+        util.sum_rightmost_ndims_preserving_shape(x, ndims=2).shape.ndims,
+        None)
+    self.assertAllEqual(
+        self.evaluate(
+            util.sum_rightmost_ndims_preserving_shape(x, ndims=2)).shape,
+        [5, 4])
+
 
 if __name__ == '__main__':
   tf.test.main()
