@@ -30,385 +30,389 @@ lower bound (ELBO)
 which also provides a lower bound on the marginal likelihood `p(X)`. See
 [Kingma and Welling (2014)][1] for more details.
 
+Here we also compute tighter bounds, the IWAE [Burda et. al. (2015)][2].
+
+These as well as image summaries can be seen in Tensorboard. For help using
+Tensorboard see
+https://www.tensorflow.org/programmers_guide/summaries_and_tensorboard
+which can be run with
+  `python -m tensorboard.main --logdir=MODEL_DIR`
+
 #### References
 
 [1]: Diederik Kingma and Max Welling. Auto-Encoding Variational Bayes. In
      _International Conference on Learning Representations_, 2014.
      https://arxiv.org/abs/1312.6114
+[2]: Yuri Burda, Roger Grosse, Ruslan Salakhutdinov. Importance Weighted
+     Autoencoders. In _International Conference on Learning Representations_,
+     2015.
+     https://arxiv.org/abs/1509.00519
 """
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
 import os
-import time
 
 # Dependency imports
 from absl import flags
-from matplotlib import cm
-from matplotlib import figure
-from matplotlib.backends import backend_agg
 import numpy as np
+from six.moves import urllib
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from tensorflow.contrib.learn.python.learn.datasets import mnist
+tfd = tfp.distributions
 
-tfd = tf.contrib.distributions
+IMAGE_SHAPE = (28, 28, 1)
 
-IMAGE_SHAPE = [28, 28]
-
-flags.DEFINE_float("learning_rate",
-                   default=0.01,
-                   help="Initial learning rate.")
-flags.DEFINE_integer("max_steps",
-                     default=10000,
-                     help="Number of training steps to run.")
-flags.DEFINE_integer("latent_size",
-                     default=16,
-                     help="Number of dimensions in the latent code (z).")
-flags.DEFINE_string("encoder_layers",
-                    default="256,128",
-                    help="Comma-separated list of layer sizes for the encoder.")
-flags.DEFINE_string("decoder_layers",
-                    default="128,256",
-                    help="Comma-separated list of layer sizes for the decoder.")
-flags.DEFINE_string("activation",
-                    default="elu",
-                    help="Activation function for all hidden layers.")
-flags.DEFINE_integer("batch_size",
-                     default=128,
-                     help="Batch size. Must divide evenly into dataset sizes.")
-flags.DEFINE_string("data_dir",
-                    default=os.path.join(os.getenv("TEST_TMPDIR", "/tmp"),
-                                         "vae/data"),
-                    help="Directory where data is stored (if using real data).")
+flags.DEFINE_float(
+    "learning_rate", default=0.001, help="Initial learning rate.")
+flags.DEFINE_integer(
+    "max_steps", default=5001, help="Number of training steps to run.")
+flags.DEFINE_integer(
+    "latent_size",
+    default=16,
+    help="Number of dimensions in the latent code (z).")
+flags.DEFINE_integer("base_depth", default=32, help="Base depth for layers.")
+flags.DEFINE_string(
+    "activation",
+    default="leaky_relu",
+    help="Activation function for all hidden layers.")
+flags.DEFINE_integer(
+    "batch_size",
+    default=32,
+    help="Batch size. Must divide evenly into dataset sizes.")
+flags.DEFINE_integer(
+    "n_samples", default=16, help="Number of samples to use in encoding.")
+flags.DEFINE_integer(
+    "mixture_components", default=100, help="Number of mixture components.")
+flags.DEFINE_string(
+    "data_dir",
+    default=os.path.join(os.getenv("TEST_TMPDIR", "/tmp"), "vae/data"),
+    help="Directory where data is stored (if using real data).")
 flags.DEFINE_string(
     "model_dir",
     default=os.path.join(os.getenv("TEST_TMPDIR", "/tmp"), "vae/"),
     help="Directory to put the model's fit.")
-flags.DEFINE_integer("viz_steps",
-                     default=500,
-                     help="Frequency at which save visualizations.")
-flags.DEFINE_bool("fake_data",
-                  default=False,
-                  help="If true, uses fake data.")
+flags.DEFINE_integer(
+    "viz_steps", default=500, help="Frequency at which save visualizations.")
+flags.DEFINE_bool("fake_data", default=False, help="If true, uses fake data.")
+flags.DEFINE_bool(
+    "delete_existing",
+    default=False,
+    help="If true, deletes existing directory.")
 
 FLAGS = flags.FLAGS
 
 
-class Encoder(object):
-  """Defines a functor for creating the encoder distribution."""
-
-  def __init__(self, layers, activation, output_size):
-    self.output_size = output_size
-    self.encoder_net = tf.keras.Sequential(
-        [tf.keras.layers.Flatten()] +
-        [tf.keras.layers.Dense(units, activation=activation)
-         for units in layers] +
-        [tf.keras.layers.Dense(2 * output_size, activation=None)])
-
-  def __call__(self, images):
-    """Build encoder which takes a batch of images and returns a latent code.
-
-    Args:
-      images: A `int`-like `Tensor` representing the inputs to be encoded.
-        The first dimension (axis 0) indexes batch elements; all other
-        dimensions index event elements.
-
-    Returns:
-      encoder: A multivariate `Normal` distribution.
-    """
-    images = tf.cast(images, dtype=tf.float32)
-    net = self.encoder_net(images)
-    loc = net[..., :self.output_size]
-    scale_diag = tf.nn.softplus(net[..., self.output_size:] + 0.5)
-    return tfd.MultivariateNormalDiag(loc=loc,
-                                      scale_diag=scale_diag,
-                                      name="encoder_distribution")
+def _softplus_inverse(x):
+  """Helper which computes the function inverse of `tf.nn.softplus`."""
+  return tf.log(tf.expm1(x))
 
 
-class Decoder(object):
-  """Defines a functor for creating the decoder distribution."""
-
-  def __init__(self, layers, activation, output_shape):
-    self.output_shape = output_shape
-    self.decoder_net = tf.keras.Sequential(
-        [tf.keras.layers.Dense(units, activation=activation)
-         for units in layers] +
-        [tf.keras.layers.Dense(np.prod(output_shape), activation=None)])
-
-  def __call__(self, codes):
-    """Build decoder which takes a batch of codes and returns generated images.
-
-    Args:
-      codes: A `float`-like `Tensor` containing the latent
-        vectors to be decoded. These are assumed to be rank-1, so
-        the encoding `Tensor` is rank-2 with shape `[batch_size, latent_size]`.
-
-    Returns:
-      decoder: A multivariate `Bernoulli` distribution.
-    """
-    net = self.decoder_net(codes)
-    new_shape = tf.concat([tf.shape(net)[:-1], self.output_shape], axis=0)
-    logits = tf.reshape(net, shape=new_shape)
-    return tfd.Independent(tfd.Bernoulli(logits=logits),
-                           reinterpreted_batch_ndims=len(self.output_shape),
-                           name="decoder_distribution")
-
-
-class Prior(object):
-  """Defines a functor for creating the prior distribution."""
-
-  def __init__(self, latent_size):
-    self.prior = tfd.MultivariateNormalDiag(
-        scale_diag=tf.ones(latent_size),
-        name="prior_distribution")
-
-  def __call__(self):
-    """Build prior distribution over latent codes.
-
-    Returns:
-      prior: A multivariate standard `Normal` distribution.
-    """
-    return self.prior
-
-
-def make_vae(images, encoder_fn, decoder_fn, prior_fn):
-  """Builds the variational auto-encoder and its loss function.
+def make_encoder(activation, latent_dim, base_depth):
+  """Create the encoder function.
 
   Args:
-    images: A `int`-like `Tensor` containing observed inputs X. The first
-      dimension (axis 0) indexes batch elements; all other dimensions index
-      event elements.
-    encoder_fn: A callable to build the encoder `q(Z|X)`. This takes a single
-      argument, a `int`-like `Tensor` representing a batch of inputs `X`, and
-      returns a Distribution over the batch of latent codes `Z`.
-    decoder_fn: A callable to build the decoder `p(X|Z)`. This takes a single
-      argument, a `float`-like `Tensor` representing a batch of latent codes
-      `Z`, and returns a Distribution over the batch of observations `X`.
-    prior_fn: A callable to build the prior `p(Z)`. This takes no arguments and
-      returns a Distribution over a single latent code (
+    activation: Activation function to use.
+    latent_dim: The dimensionality of the encoding.
+    base_depth: The lowest depth for a layer.
 
   Returns:
-    elbo_loss: A scalar `Tensor` computing the negation of the variational
-      evidence bound (i.e., `elbo_loss >= -log p(X)`).
+    encoder: A `callable` mapping a `Tensor` of images to a
+      `tf.distributions.Distribution` instance over encodings.
   """
-  encoder = encoder_fn(images)
+  conv = functools.partial(
+      tf.keras.layers.Conv2D, padding="SAME", activation=activation)
 
-  prior = prior_fn()
+  encoder_net = tf.keras.Sequential([
+      conv(base_depth, 5, 1),
+      conv(base_depth, 5, 2),
+      conv(2 * base_depth, 5, 1),
+      conv(2 * base_depth, 5, 2),
+      conv(4 * latent_dim, 7, padding="VALID"),
+      tf.keras.layers.Flatten(),
+      tf.keras.layers.Dense(2 * latent_dim, activation=None),
+  ])
 
-  def joint_log_prob(z):
-    return decoder_fn(z).log_prob(images) + prior.log_prob(z)
+  def encoder(images):
+    images = 2 * tf.cast(images, dtype=tf.float32) - 1
+    net = encoder_net(images)
+    return tfd.MultivariateNormalDiag(
+        loc=net[..., :latent_dim],
+        scale_diag=tf.nn.softplus(net[..., latent_dim:] +
+                                  _softplus_inverse(1.0)),
+        name="code")
 
-  elbo_loss = tf.reduce_sum(
-      tfp.vi.monte_carlo_csiszar_f_divergence(
-          f=tfp.vi.kl_reverse,
-          p_log_prob=joint_log_prob,
-          q=encoder,
-          num_draws=1))
-
-  tf.summary.scalar("elbo", elbo_loss)
-
-  # Rebuild (and reuse!) the decoder so we can compute stats from it.
-  encoding_draw = encoder.sample()
-  decoder = decoder_fn(encoding_draw)
-
-  return elbo_loss, encoder, decoder, encoding_draw
+  return encoder
 
 
-def save_imgs(x, fname):
-  """Helper method to save a grid of images to a PNG file.
+def make_decoder(activation, latent_dim, output_shape, base_depth):
+  """Create the decoder function.
 
   Args:
-    x: A numpy array of shape [n_images, height, width].
-    fname: The filename to write to (including extension).
+    activation: Activation function to use.
+    latent_dim: Dimensionality of the encoding.
+    output_shape: The output image shape.
+    base_depth: Smallest depth for a layer.
+
+  Returns:
+    decoder: A `callable` mapping a `Tensor` of encodings to a
+      `tf.distributions.Distribution` instance over images.
   """
-  n = x.shape[0]
-  fig = figure.Figure(figsize=(n, 1), frameon=False)
-  canvas = backend_agg.FigureCanvasAgg(fig)
-  for i in range(n):
-    ax = fig.add_subplot(1, n, i+1)
-    ax.imshow(x[i].squeeze(),
-              interpolation="none",
-              cmap=cm.get_cmap("binary"))
-    ax.axis("off")
-  canvas.print_figure(fname, format="png")
-  print("saved %s" % fname)
+  deconv = functools.partial(
+      tf.keras.layers.Conv2DTranspose, padding="SAME", activation=activation)
+  conv = functools.partial(
+      tf.keras.layers.Conv2D, padding="SAME", activation=activation)
+
+  decoder_net = tf.keras.Sequential([
+      deconv(2 * base_depth, 7, padding="VALID"),
+      deconv(2 * base_depth, 5),
+      deconv(2 * base_depth, 5, 2),
+      deconv(base_depth, 5),
+      deconv(base_depth, 5, 2),
+      deconv(base_depth, 5),
+      conv(output_shape[-1], 5, activation=None),
+  ])
+
+  def decoder(codes):
+    original_shape = tf.shape(codes)
+    # Collapse the sample and batch dimension
+    # and convert to rank-4 tensor for use with
+    # a convolutional decoder network.
+    codes = tf.reshape(codes, (-1, 1, 1, latent_dim))
+    logits = decoder_net(codes)
+    logits = tf.reshape(
+        logits, shape=tf.concat([original_shape[:-1], output_shape], axis=0))
+    return tfd.Independent(
+        tfd.Bernoulli(logits=logits),
+        reinterpreted_batch_ndims=len(output_shape),
+        name="image")
+
+  return decoder
 
 
-def visualize_training(images_val,
-                       reconstructed_images_val,
-                       random_images_val,
-                       log_dir, prefix, viz_n=10):
-  """Helper method to save images visualizing model reconstructions.
+def make_random_prior(latent_size, mixture_components):
+  """Create the prior distribution.
 
   Args:
-    images_val: Numpy array containing a batch of input images.
-    reconstructed_images_val: Numpy array giving the expected output
-      (mean) of the decoder.
-    random_images_val: Optionally, a Numpy array giving the expected output
-      (mean) of decoding samples from the prior, or `None`.
-    log_dir: The directory to write images (Python `str`).
-    prefix: A specific label for the saved visualizations, which
-      determines their filenames (Python `str`).
-    viz_n: The number of images from each batch to visualize (Python `int`).
+    latent_size: The dimensionality of the latent representation.
+    mixture_components: Number of elements of the mixture.
+
+  Returns:
+    random_prior: A `tf.distributions.Distribution` instance
+      representing the distribution over encodings in the absence of any
+      evidence.
   """
-  save_imgs(images_val[:viz_n],
-            os.path.join(log_dir, "{}_inputs.png".format(prefix)))
-  save_imgs(reconstructed_images_val[:viz_n],
-            os.path.join(log_dir,
-                         "{}_reconstructions.png".format(prefix)))
+  loc = tf.get_variable(name="loc", shape=[mixture_components, latent_size])
+  raw_scale_diag = tf.get_variable(
+      name="raw_scale_diag", shape=[mixture_components, latent_size])
+  mixture_logits = tf.get_variable(
+      name="mixture_logits", shape=[mixture_components])
 
-  if random_images_val is not None:
-    save_imgs(random_images_val[:viz_n],
-              os.path.join(log_dir,
-                           "{}_prior_samples.png".format(prefix)))
+  return tfd.MixtureSameFamily(
+      components_distribution=tfd.MultivariateNormalDiag(
+          loc=loc,
+          scale_diag=tf.nn.softplus(raw_scale_diag + _softplus_inverse(1.))),
+      mixture_distribution=tfd.Categorical(logits=mixture_logits),
+      name="prior")
 
 
-def build_fake_data(num_examples=10):
+def pack_images(images, rows, cols):
+  """Helper utility to make a field of images."""
+  shape = tf.shape(images)
+  width = shape[-3]
+  height = shape[-2]
+  depth = shape[-1]
+  images = tf.reshape(images, (-1, width, height, depth))
+  batch = tf.shape(images)[0]
+  rows = tf.minimum(rows, batch)
+  cols = tf.minimum(batch // rows, cols)
+  images = images[:rows * cols]
+  images = tf.reshape(images, (rows, cols, width, height, depth))
+  images = tf.transpose(images, [0, 2, 1, 3, 4])
+  images = tf.reshape(images, [1, rows * width, cols * height, depth])
+  return images
+
+
+def image_tile_summary(name, tensor, rows=8, cols=8):
+  tf.summary.image(name, pack_images(tensor, rows, cols), max_outputs=1)
+
+
+def model_fn(features, labels, mode, params, config):
+  """Build the model function for use in an estimator.
+
+  Arguments:
+    features: The input features for the estimator.
+    labels: The labels, unused here.
+    mode: Signifies whether it is train or test or predict.
+    params: Some hyperparameters as a dictionary.
+    config: The RunConfig, unused here.
+  Returns:
+    EstimatorSpec: A tf.estimator.EstimatorSpec instance.
+  """
+  del labels, config
+  encoder = make_encoder(params["activation"],
+                         params["latent_size"],
+                         params["base_depth"])
+  decoder = make_decoder(params["activation"],
+                         params["latent_size"],
+                         IMAGE_SHAPE,
+                         params["base_depth"])
+  random_prior = make_random_prior(params["latent_size"],
+                                   params["mixture_components"])
+
+  image_tile_summary("input", tf.to_float(features), rows=1, cols=16)
+
+  random_encoding = encoder(features)
+  encoding = random_encoding.sample(params["n_samples"])
+  random_reconstruction = decoder(encoding)
+  image_tile_summary(
+      "recon/sample",
+      tf.to_float(random_reconstruction.sample()[:3, :16]),
+      rows=3,
+      cols=16)
+  image_tile_summary(
+      "recon/mean",
+      random_reconstruction.mean()[:3, :16],
+      rows=3,
+      cols=16)
+
+  distortion = -random_reconstruction.log_prob(features)
+  avg_distortion = tf.reduce_mean(distortion)
+  tf.summary.scalar("distortion", avg_distortion)
+  rate = random_encoding.log_prob(encoding) - random_prior.log_prob(encoding)
+  avg_rate = tf.reduce_mean(rate)
+  tf.summary.scalar("rate", avg_rate)
+
+  elbo_local = rate + distortion
+
+  elbo = tf.reduce_mean(elbo_local)
+  tf.summary.scalar("elbo", elbo)
+  importance_weighted_elbo = -tf.reduce_mean(
+      tf.reduce_logsumexp(-elbo_local, axis=0) -
+      tf.log(tf.to_float(params["n_samples"])))
+  tf.summary.scalar("elbo/importance_weighted", importance_weighted_elbo)
+
+  # Decode samples from the prior for visualization.
+  prior = random_prior.sample(16)
+  random_image = decoder(prior)
+  image_tile_summary(
+      "random/sample", tf.to_float(random_image.sample()), rows=4, cols=4)
+  image_tile_summary("random/mean", random_image.mean(), rows=4, cols=4)
+
+  # Perform variational inference by minimizing the -ELBO.
+  global_step = tf.train.get_or_create_global_step()
+  learning_rate = tf.train.cosine_decay(params["learning_rate"], global_step,
+                                        params["max_steps"])
+  tf.summary.scalar("learning_rate", learning_rate)
+  optimizer = tf.train.AdamOptimizer(learning_rate)
+  train_op = optimizer.minimize(elbo, global_step=global_step)
+
+  return tf.estimator.EstimatorSpec(
+      mode=mode,
+      loss=elbo,
+      train_op=train_op,
+      eval_metric_ops={
+          "elbo": tf.metrics.mean(elbo),
+          "elbo/importance_weighted": tf.metrics.mean(importance_weighted_elbo),
+          "rate": tf.metrics.mean(avg_rate),
+          "distortion": tf.metrics.mean(avg_distortion),
+      },
+  )
+
+
+ROOT_PATH = "http://www.cs.toronto.edu/~larocheh/public/datasets/binarized_mnist/"
+FILE_TEMPLATE = "binarized_mnist_{split}.amat"
+
+
+def download(directory, filename):
+  """Download a file."""
+  filepath = os.path.join(directory, filename)
+  if tf.gfile.Exists(filepath):
+    return filepath
+  if not tf.gfile.Exists(directory):
+    tf.gfile.MakeDirs(directory)
+  url = os.path.join(ROOT_PATH, filename)
+  print("Downloading %s to %s" % (url, filepath))
+  urllib.request.urlretrieve(url, filepath)
+  return filepath
+
+
+def static_mnist_dataset(directory, split_name):
+  """Return binary static MNIST tf.data.Dataset."""
+  amat_file = download(directory, FILE_TEMPLATE.format(split=split_name))
+  dataset = tf.data.TextLineDataset(amat_file)
+  str_to_arr = lambda string: np.array([char == "1" for char in string.split()])
+
+  def _parser(s):
+    booltensor = tf.py_func(str_to_arr, [s], tf.bool)
+    reshaped = tf.reshape(booltensor, [28, 28, 1])
+    return tf.to_float(reshaped), tf.constant(0, tf.int32)
+
+  return dataset.map(_parser)
+
+
+def build_fake_input_fns(batch_size):
   """Build fake MNIST-style data for unit testing."""
+  dataset = tf.data.Dataset.from_tensor_slices(
+      np.random.rand(batch_size, *IMAGE_SHAPE).astype("float32")).map(
+          lambda row: (row, 0)).batch(batch_size)
 
-  class Dummy(object):
-    pass
-
-  num_examples = 10
-  mnist_data = Dummy()
-  mnist_data.train = Dummy()
-  mnist_data.train.images = np.float32(np.random.randn(
-      num_examples, np.prod(IMAGE_SHAPE)))
-  mnist_data.train.labels = np.int32(np.random.permutation(
-      np.arange(num_examples)))
-  mnist_data.train.num_examples = num_examples
-  mnist_data.validation = Dummy()
-  mnist_data.validation.images = np.float32(np.random.randn(
-      num_examples, np.prod(IMAGE_SHAPE)))
-  mnist_data.validation.labels = np.int32(np.random.permutation(
-      np.arange(num_examples)))
-  mnist_data.validation.num_examples = num_examples
-  return mnist_data
+  train_input_fn = lambda: dataset.repeat().make_one_shot_iterator().get_next()
+  eval_input_fn = lambda: dataset.make_one_shot_iterator().get_next()
+  return train_input_fn, eval_input_fn
 
 
-def build_input_pipeline(mnist_data, batch_size, heldout_size):
+def build_input_fns(data_dir, batch_size):
   """Build an Iterator switching between train and heldout data."""
+
   # Build an iterator over training batches.
-  training_dataset = tf.data.Dataset.from_tensor_slices(
-      (mnist_data.train.images, np.int32(mnist_data.train.labels)))
-  training_batches = training_dataset.repeat().batch(batch_size)
-  training_iterator = training_batches.make_one_shot_iterator()
+  training_dataset = static_mnist_dataset(data_dir, "train")
+  training_dataset = training_dataset.shuffle(50000).repeat().batch(batch_size)
+  train_input_fn = lambda: training_dataset.make_one_shot_iterator().get_next()
 
   # Build a iterator over the heldout set with batch_size=heldout_size,
   # i.e., return the entire heldout set as a constant.
-  heldout_dataset = tf.data.Dataset.from_tensor_slices(
-      (mnist_data.validation.images,
-       np.int32(mnist_data.validation.labels)))
-  heldout_frozen = (heldout_dataset.take(heldout_size).
-                    repeat().batch(heldout_size))
-  heldout_iterator = heldout_frozen.make_one_shot_iterator()
+  eval_dataset = static_mnist_dataset(data_dir, "valid")
+  eval_dataset = eval_dataset.batch(batch_size)
+  eval_input_fn = lambda: eval_dataset.make_one_shot_iterator().get_next()
 
-  # Combine these into a feedable iterator that can switch between training
-  # and validation inputs.
-  handle = tf.placeholder(tf.string, shape=[])
-  feedable_iterator = tf.data.Iterator.from_string_handle(
-      handle, training_batches.output_types, training_batches.output_shapes)
-  images, labels = feedable_iterator.get_next()
-
-  return images, labels, handle, training_iterator, heldout_iterator
+  return train_input_fn, eval_input_fn
 
 
 def main(argv):
   del argv  # unused
-  FLAGS.encoder_layers = [int(units) for units
-                          in FLAGS.encoder_layers.split(",")]
-  FLAGS.decoder_layers = [int(units) for units
-                          in FLAGS.decoder_layers.split(",")]
-  FLAGS.activation = getattr(tf.nn, FLAGS.activation)
-  if tf.gfile.Exists(FLAGS.model_dir):
+
+  params = FLAGS.flag_values_dict()
+  params["activation"] = getattr(tf.nn, params["activation"])
+  if FLAGS.delete_existing and tf.gfile.Exists(FLAGS.model_dir):
     tf.logging.warn("Deleting old log directory at {}".format(FLAGS.model_dir))
     tf.gfile.DeleteRecursively(FLAGS.model_dir)
   tf.gfile.MakeDirs(FLAGS.model_dir)
 
   if FLAGS.fake_data:
-    mnist_data = build_fake_data()
+    train_input_fn, eval_input_fn = build_fake_input_fns(FLAGS.batch_size)
   else:
-    mnist_data = mnist.read_data_sets(FLAGS.data_dir)
+    train_input_fn, eval_input_fn = build_input_fns(FLAGS.data_dir,
+                                                    FLAGS.batch_size)
 
-  with tf.Graph().as_default():
-    (images, _, handle,
-     training_iterator, heldout_iterator) = build_input_pipeline(
-         mnist_data, FLAGS.batch_size, mnist_data.validation.num_examples)
+  estimator = tf.estimator.Estimator(
+      model_fn,
+      params=params,
+      config=tf.estimator.RunConfig(
+          model_dir=FLAGS.model_dir,
+          save_checkpoints_steps=FLAGS.viz_steps,
+      ),
+  )
 
-    # Reshape as a pixel image and binarize pixels.
-    images = tf.reshape(images, shape=[-1] + IMAGE_SHAPE)
-    images = tf.cast(images > 0.5, dtype=tf.int32)
+  for _ in range(FLAGS.max_steps // FLAGS.viz_steps):
+    estimator.train(train_input_fn, steps=FLAGS.viz_steps)
+    eval_results = estimator.evaluate(eval_input_fn)
+    print("Evaluation_results:\n\t%s\n" % eval_results)
 
-    encoder = Encoder(FLAGS.encoder_layers, FLAGS.activation, FLAGS.latent_size)
-    decoder = Decoder(FLAGS.decoder_layers, FLAGS.activation, IMAGE_SHAPE)
-    prior = Prior(FLAGS.latent_size)
-
-    # Build the model and ELBO loss function.
-    elbo_loss, _, decoder_distribution, _ = make_vae(
-        images, encoder, decoder, prior)
-    reconstructed_images = decoder_distribution.mean()
-
-    # Decode samples from the prior for visualization.
-    prior_samples = prior().sample(10)
-    decoded_distribution_given_random_prior = decoder(prior_samples)
-    random_images = decoded_distribution_given_random_prior.mean()
-
-    # Perform variational inference by minimizing the -ELBO.
-    optimizer = tf.train.AdamOptimizer(FLAGS.learning_rate)
-    train_op = optimizer.minimize(elbo_loss)
-
-    summary = tf.summary.merge_all()
-    init = tf.global_variables_initializer()
-    saver = tf.train.Saver()
-    with tf.Session() as sess:
-      summary_writer = tf.summary.FileWriter(FLAGS.model_dir, sess.graph)
-      sess.run(init)
-
-      # Run the training loop.
-      train_handle = sess.run(training_iterator.string_handle())
-      heldout_handle = sess.run(heldout_iterator.string_handle())
-      for step in range(FLAGS.max_steps):
-        start_time = time.time()
-        _, loss_value = sess.run([train_op, elbo_loss],
-                                 feed_dict={handle: train_handle})
-        duration = time.time() - start_time
-        if step % 100 == 0:
-          print("Step: {:>3d} Loss: {:.3f} ({:.3f} sec)".format(
-              step, loss_value, duration))
-
-          # Update the events file.
-          summary_str = sess.run(summary, feed_dict={handle: train_handle})
-          summary_writer.add_summary(summary_str, step)
-          summary_writer.flush()
-
-        # Periodically save a checkpoint and visualize model progress.
-        if (step + 1) % FLAGS.viz_steps == 0 or (step + 1) == FLAGS.max_steps:
-          checkpoint_file = os.path.join(FLAGS.model_dir, "model.ckpt")
-          saver.save(sess, checkpoint_file, global_step=step)
-
-          # Visualize inputs and model reconstructions from the training set.
-          images_val, reconstructions_val, random_images_val = sess.run(
-              (images, reconstructed_images, random_images),
-              feed_dict={handle: train_handle})
-          visualize_training(images_val,
-                             reconstructions_val,
-                             random_images_val,
-                             log_dir=FLAGS.model_dir,
-                             prefix="step{:05d}_train".format(step))
-
-          # Visualize inputs and model reconstructions from the validation set.
-          heldout_images_val, heldout_reconstructions_val = sess.run(
-              (images, reconstructed_images),
-              feed_dict={handle: heldout_handle})
-          visualize_training(heldout_images_val,
-                             heldout_reconstructions_val,
-                             None,
-                             log_dir=FLAGS.model_dir,
-                             prefix="step{:05d}_validation".format(step))
 
 if __name__ == "__main__":
   tf.app.run()

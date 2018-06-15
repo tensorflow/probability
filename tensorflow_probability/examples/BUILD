@@ -92,10 +92,11 @@ py_binary(
     srcs_version = "PY2AND3",
     deps = [
         # absl/flags dep,
-        # matplotlib dep,
         # numpy dep,
+        # six dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions",
     ],
 )
 
@@ -106,6 +107,9 @@ py_test(
     args = [
         "--fake_data",
         "--max_steps=5",
+        "--delete_existing",
+        "--viz_steps=5",
+        "--learning_rate=1e-7",
     ],
     main = "vae.py",
     srcs_version = "PY2AND3",
