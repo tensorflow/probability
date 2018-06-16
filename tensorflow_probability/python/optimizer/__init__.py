@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 from tensorflow_probability.python.optimizer import linesearch
+from tensorflow_probability.python.optimizer.bfgs import minimize as bfgs_minimize
 from tensorflow_probability.python.optimizer.sgld import StochasticGradientLangevinDynamics
 from tensorflow_probability.python.optimizer.variational_sgd import VariationalSGD
 
@@ -26,6 +27,7 @@ from tensorflow_probability.python.optimizer.variational_sgd import VariationalS
 from tensorflow.python.util.all_util import remove_undocumented
 
 _allowed_symbols = [
+    'bfgs_minimize',
     'linesearch',
     'StochasticGradientLangevinDynamics',
     'VariationalSGD',

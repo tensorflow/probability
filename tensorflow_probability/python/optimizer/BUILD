@@ -30,6 +30,7 @@ py_library(
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":bfgs",
         ":sgld",
         ":variational_sgd",
         "//tensorflow_probability/python/optimizer/linesearch",
@@ -70,6 +71,26 @@ py_test(
     size = "medium",
     srcs = ["variational_sgd_test.py"],
     deps = [
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "bfgs",
+    srcs = ["bfgs.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "bfgs_test",
+    size = "medium",
+    srcs = ["bfgs_test.py"],
+    deps = [
+        # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],
