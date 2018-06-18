@@ -213,7 +213,7 @@ class OneHotCategorical(tf.distributions.Distribution):
       return x
     return control_flow_ops.with_dependencies([
         tf.assert_non_positive(x),
-        distribution_util.assert_close(
+        tf.assert_near(
             tf.zeros([], dtype=self.dtype), tf.reduce_logsumexp(x, axis=[-1])),
     ], x)
 
