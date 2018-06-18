@@ -100,7 +100,7 @@ py_library(
         ":kernel",
         ":metropolis_hastings",
         ":util",
-        # tensorflow dep,
+        "//tensorflow_probability/python/math:diag_jacobian",
     ],
 )
 

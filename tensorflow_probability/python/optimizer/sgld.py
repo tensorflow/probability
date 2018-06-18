@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 
+from tensorflow_probability.python.math import diag_jacobian
 from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.training import training_ops
 
@@ -39,10 +40,74 @@ class StochasticGradientLangevinDynamics(tf.train.Optimizer):
   http://www.cs.toronto.edu/~tijmen/csc321/slides/lecture_slides_lec6.pdf).
 
   Note: If a prior is included in the loss, it should be scaled by
-  `1/num_pseudo_batches`, where num_pseudo_batches is the number of minibatches
-  in the data.  I.e., it should be divided by the `num_pseudo_batches` term
-  described below.
+  `1/data_size`, where `data_size` is the number of points in the data set.
+  I.e., it should be divided by the `data_size` term described below.
 
+  #### Examples
+
+  ##### Optimizing energy of a 3D-Gaussian distribution
+
+  This example demonstrates that for a fixed step size SGLD works as an
+  approximate version of MALA (tfp.mcmc.MetropolisAdjustedLangevinAlgorithm).
+
+  ```python
+  import tensorflow as tf
+  import tensorflow_probability as tfp
+  import numpy as np
+
+  tfd = tfp.distributions
+  dtype = np.float32
+
+  with tf.Session(graph=tf.Graph()) as sess:
+    # Set up random seed for the optimizer
+    tf.set_random_seed(42)
+    true_mean = dtype([0, 0, 0])
+    true_cov = dtype([[1, 0.25, 0.25], [0.25, 1, 0.25], [0.25, 0.25, 1]])
+    # Loss is defined through the Cholesky decomposition
+    chol = tf.linalg.cholesky(true_cov)
+    var_1 = tf.get_variable(
+        'var_1', initializer=[1., 1.])
+    var_2 = tf.get_variable(
+        'var_2', initializer=[1.])
+
+    var = tf.concat([var_1, var_2], axis=-1)
+    # Partially defined loss function
+    loss_part = tf.cholesky_solve(chol, tf.expand_dims(var, -1))
+    # Loss function
+    loss = 0.5 * tf.squeeze(tf.matmul(loss_part, tf.expand_dims(var, -1),
+                                      transpose_a=True))
+
+    # Set up the learning rate with a polynomial decay
+    global_step = tf.Variable(0, trainable=False)
+    starter_learning_rate = .3
+    end_learning_rate = 1e-4
+    decay_steps = 1e4
+    learning_rate = tf.train.polynomial_decay(starter_learning_rate,
+                                              global_step, decay_steps,
+                                              end_learning_rate, power=1.)
+
+    # Set up the optimizer
+    optimizer_kernel = tfp.optimizer.StochasticGradientLangevinDynamics(
+        learning_rate=learning_rate, preconditioner_decay_rate=0.99)
+
+    optimizer = optimizer_kernel.minimize(loss)
+
+    init = tf.global_variables_initializer()
+    # Number of training steps
+    training_steps = 5000
+    # Record the steps as and treat them as samples
+    samples = [np.zeros([training_steps, 2]), np.zeros([training_steps, 1])]
+    sess.run(init)
+    for step in range(training_steps):
+      sess.run([optimizer, loss])
+      sample = [sess.run(var_1), sess.run(var_2)]
+      samples[0][step, :] = sample[0]
+      samples[1][step, :] = sample[1]
+
+    samples_ = np.concatenate(samples, axis=-1)
+    sample_mean = np.mean(samples_, 0)
+    print('sample mean', sample_mean)
+  ```
   Args:
     learning_rate: Scalar `float`-like `Tensor`. The base learning rate for the
       optimizer. Must be tuned to the specific function being minimized.
@@ -50,11 +115,11 @@ class StochasticGradientLangevinDynamics(tf.train.Optimizer):
       decay rate of the rescaling of the preconditioner (RMSprop). (This is
       "alpha" in Li et al. (2016)). Should be smaller than but nearly `1` to
       approximate sampling from the posterior. (Default: `0.95`)
-    num_pseudo_batches: Scalar `int`-like `Tensor`. The effective number of
-      minibatches in the data set.  Trades off noise and prior with the SGD
-      likelihood term. Note: Assumes the loss is taken as the mean over a
+    data_size: Scalar `int`-like `Tensor`. The effective number of
+      points in the data set. Assumes that the loss is taken as the mean over a
       minibatch. Otherwise if the sum was taken, divide this number by the
-      batch size.  (Default: `1`)
+      batch size. If a prior is included in the loss function, it should be
+      normalized by `data_size`. Default value: `1`.
     burnin: Scalar `int`-like `Tensor`. The number of iterations to collect
       gradient statistics to update the preconditioner before starting to draw
       noisy samples. (Default: `25`)
@@ -63,6 +128,9 @@ class StochasticGradientLangevinDynamics(tf.train.Optimizer):
       (Default: `1e-8`)
     name: Python `str` describing ops managed by this function.
       (Default: `"StochasticGradientLangevinDynamics"`)
+    parallel_iterations: the number of coordinates for which the gradients of
+        the preconditioning matrix can be computed in parallel. Must be a
+        positive integer.
     variable_scope: Variable scope used for calls to `tf.get_variable`.
       If `None`, a new variable scope is created using name
       `tf.get_default_graph().unique_name(name or default_name)`.
@@ -70,6 +138,7 @@ class StochasticGradientLangevinDynamics(tf.train.Optimizer):
   Raises:
     InvalidArgumentError: If preconditioner_decay_rate is a `Tensor` not in
       `(0,1]`.
+    NotImplementedError: If eager execution is enabled.
 
   #### References
 
@@ -82,16 +151,20 @@ class StochasticGradientLangevinDynamics(tf.train.Optimizer):
   def __init__(self,
                learning_rate,
                preconditioner_decay_rate=0.95,
-               num_pseudo_batches=1,
+               data_size=1,
                burnin=25,
                diagonal_bias=1e-8,
                name=None,
+               parallel_iterations=10,
                variable_scope=None):
     default_name = 'StochasticGradientLangevinDynamics'
     with tf.name_scope(name, default_name, [
-        learning_rate, preconditioner_decay_rate, num_pseudo_batches, burnin,
+        learning_rate, preconditioner_decay_rate, data_size, burnin,
         diagonal_bias
     ]):
+      if tf.executing_eagerly():
+        raise NotImplementedError('Eager execution currently not supported for '
+                                  ' SGLD optimizer.')
       if variable_scope is None:
         var_scope_name = tf.get_default_graph().unique_name(
             name or default_name)
@@ -102,13 +175,14 @@ class StochasticGradientLangevinDynamics(tf.train.Optimizer):
 
       self._preconditioner_decay_rate = tf.convert_to_tensor(
           preconditioner_decay_rate, name='preconditioner_decay_rate')
-      self._num_pseudo_batches = tf.convert_to_tensor(
-          num_pseudo_batches, name='num_pseudo_batches')
+      self._data_size = tf.convert_to_tensor(
+          data_size, name='data_size')
       self._burnin = tf.convert_to_tensor(burnin, name='burnin')
       self._diagonal_bias = tf.convert_to_tensor(
           diagonal_bias, name='diagonal_bias')
       self._learning_rate = tf.convert_to_tensor(
           learning_rate, name='learning_rate')
+      self._parallel_iterations = parallel_iterations
 
       with tf.variable_scope(self._variable_scope):
         self._counter = tf.get_variable(
@@ -124,12 +198,12 @@ class StochasticGradientLangevinDynamics(tf.train.Optimizer):
               message='`preconditioner_decay_rate` must be at most 1.'),
       ], self._preconditioner_decay_rate)
 
-      self._num_pseudo_batches = control_flow_ops.with_dependencies([
+      self._data_size = control_flow_ops.with_dependencies([
           tf.assert_greater(
-              self._num_pseudo_batches,
+              self._data_size,
               0,
-              message='`num_pseudo_batches` must be greater than zero')
-      ], self._num_pseudo_batches)
+              message='`data_size` must be greater than zero')
+      ], self._data_size)
 
       self._burnin = control_flow_ops.with_dependencies([
           tf.assert_non_negative(
@@ -167,12 +241,7 @@ class StochasticGradientLangevinDynamics(tf.train.Optimizer):
 
   def _apply_dense(self, grad, var):
     rms = self.get_slot(var, 'rms')
-
-    with tf.control_dependencies([
-        self._update_momentum(rms, grad, tf.cast(
-            self._decay_tensor, var.dtype.base_dtype))]):
-      new_grad = self._apply_noisy_update(rms, grad)
-
+    new_grad = self._apply_noisy_update(rms, grad, var)
     return training_ops.apply_gradient_descent(
         var,
         tf.cast(self._learning_rate_tensor, var.dtype.base_dtype),
@@ -181,12 +250,7 @@ class StochasticGradientLangevinDynamics(tf.train.Optimizer):
 
   def _apply_sparse(self, grad, var):
     rms = self.get_slot(var, 'rms')
-
-    with tf.control_dependencies([
-        self._update_momentum(rms, grad, tf.cast(
-            self._decay_tensor, var.dtype.base_dtype))]):
-      new_grad = self._apply_noisy_update(rms, grad)
-
+    new_grad = self._apply_noisy_update(rms, grad, var)
     return training_ops.apply_gradient_descent(
         var,
         tf.cast(self._learning_rate_tensor, var.dtype.base_dtype),
@@ -202,23 +266,34 @@ class StochasticGradientLangevinDynamics(tf.train.Optimizer):
     """Variable scope of all calls to `tf.get_variable`."""
     return self._variable_scope
 
-  def _apply_noisy_update(self, mom, grad):
+  def _apply_noisy_update(self, mom, grad, var):
     # Compute and apply the gradient update following
     # preconditioned Langevin dynamics
     stddev = tf.where(
         tf.squeeze(self._counter > self._burnin),
         tf.cast(tf.rsqrt(self._learning_rate), grad.dtype),
         tf.zeros([], grad.dtype))
-
-    preconditioner = tf.rsqrt(
-        mom + tf.cast(self._diagonal_bias, grad.dtype))
-    return (
-        0.5 * preconditioner * grad * tf.cast(
-            self._num_pseudo_batches, grad.dtype) +
-        tf.random_normal(tf.shape(grad), 1., dtype=grad.dtype) *
-        stddev * tf.sqrt(preconditioner))
-
-  def _update_momentum(self, mom, grad, decay):
     # Keep an exponentially weighted moving average of squared gradients.
     # Not thread safe
-    return mom.assign_add((1.0 - decay) * (tf.square(grad) - mom))
+    decay_tensor = tf.cast(self._decay_tensor, grad.dtype)
+    new_mom = decay_tensor * mom + (1. - decay_tensor) * tf.square(grad)
+    preconditioner = tf.rsqrt(
+        new_mom + tf.cast(self._diagonal_bias, grad.dtype))
+
+    # Compute gradients of the preconsitionaer
+    _, preconditioner_grads = diag_jacobian(
+        xs=var,
+        ys=preconditioner,
+        parallel_iterations=self._parallel_iterations)
+
+    mean = 0.5 * (preconditioner * grad *
+                  tf.cast(self._data_size, grad.dtype)
+                  - preconditioner_grads[0])
+    stddev *= tf.sqrt(preconditioner)
+    result_shape = tf.broadcast_dynamic_shape(tf.shape(mean),
+                                              tf.shape(stddev))
+    with tf.control_dependencies([tf.assign(mom, new_mom)]):
+      return tf.random_normal(shape=result_shape,
+                              mean=mean,
+                              stddev=stddev,
+                              dtype=grad.dtype)

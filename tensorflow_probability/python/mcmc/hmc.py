@@ -94,9 +94,10 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
   # Target distribution is standard univariate Normal.
   target = tfd.Normal(loc=dtype(0), scale=dtype(1))
 
-  # Initialize the HMC sampler.
+  # Initialize the HMC sampler. In order to retain `tfe` compatibility,
+  # `target_log_prob_fn` is passed as `lambda x: target.log_prob(x)`.
   hmc = tfp.mcmc.HamiltonianMonteCarlo(
-      target_log_prob_fn=target.log_prob,
+      target_log_prob_fn=lambda x: target.log_prob(x),
       step_size=step_size,
       num_leapfrog_steps=3)
 

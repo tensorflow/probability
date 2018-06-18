@@ -31,6 +31,7 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         ":custom_gradient",
+        ":diag_jacobian",
         ":linalg",
         ":random_ops",
     ],
@@ -98,6 +99,29 @@ py_test(
     name = "random_ops_test",
     size = "small",
     srcs = ["random_ops_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "diag_jacobian",
+    srcs = [
+        "diag_jacobian.py",
+    ],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "diag_jacobian_test",
+    size = "small",
+    srcs = ["diag_jacobian_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,

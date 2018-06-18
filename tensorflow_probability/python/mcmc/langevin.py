@@ -23,6 +23,7 @@ import collections
 
 import tensorflow as tf
 
+from tensorflow_probability.python.math import diag_jacobian
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import metropolis_hastings
 from tensorflow_probability.python.mcmc import util as mcmc_util
@@ -96,7 +97,7 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
     samples, _ = tfp.mcmc.sample_chain(
         num_results=1000,
         current_state=dtype(1),
-        kernel=tfp.mcmcm.MetropolisAdjustedLangevinAlgorithm(
+        kernel=tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
             target_log_prob_fn=target.log_prob,
             step_size=0.75,
             seed=42),
@@ -140,7 +141,7 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
   samples, _ = tfp.mcmc.sample_chain(
       num_results=1000,
       current_state=dtype(1),
-      kernel=tfp.mcmcm.MetropolisAdjustedLangevinAlgorithm(
+      kernel=tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
           target_log_prob_fn=target_log_prob,
           step_size=0.75,
           seed=42),
@@ -191,7 +192,7 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
       z = tf.concat([x, y], axis=-1) - true_mean
       return target.log_prob(z)
 
-    # Here we define the volatility function to be non-caonstant
+    # Here we define the volatility function to be non-constant
     def volatility_fn(x, y):
       # Stack the input tensors together
       return [1. / (0.5 + 0.1 * tf.sqrt(x * x)),
@@ -245,6 +246,7 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
                step_size,
                volatility_fn=None,
                seed=None,
+               parallel_iterations=10,
                name=None):
     """Initializes MALA transition kernel.
 
@@ -264,6 +266,8 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
         `list` of `Tensor`s that must broadcast with the shape of
         `current_state` Defaults to the identity function.
       seed: Python integer to seed the random number generator.
+      parallel_iterations: the number of coordinates for which the gradients of
+        the volatility matrix `volatility_fn` can be computed in parallel.
         Default value: `None` (i.e., no seed).
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., 'mala_kernel').
@@ -286,6 +290,7 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
             step_size=step_size,
             volatility_fn=volatility_fn,
             seed=seed,
+            parallel_iterations=parallel_iterations,
             name=name),
         seed=seed)
 
@@ -302,12 +307,12 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
     return self._impl.inner_kernel.step_size
 
   @property
-  def volatility(self):
-    return self._impl.inner_kernel.volatility
-
-  @property
   def seed(self):
     return self._impl.inner_kernel.seed
+
+  @property
+  def parallel_iterations(self):
+    return self._impl.inner_kernel.parallel_iterations
 
   @property
   def name(self):
@@ -342,7 +347,7 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
 
     Raises:
       ValueError: if there isn't one `step_size` or a list with same length as
-        `current_state`.
+        `current_state` or `diffusion_drift`.
     """
     return self._impl.one_step(current_state, previous_kernel_results)
 
@@ -367,13 +372,53 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
   `MetropolisAdjustedLangevinAlgorithm`.
   """
 
-  @mcmc_util.set_doc(MetropolisAdjustedLangevinAlgorithm.__init__.__doc__)
   def __init__(self,
                target_log_prob_fn,
                step_size,
                volatility_fn=None,
+               parallel_iterations=10,
+               compute_acceptance=True,
                seed=None,
                name=None):
+    """Initializes Langevin diffusion transition kernel.
+
+    Args:
+      target_log_prob_fn: Python callable which takes an argument like
+        `current_state` (or `*current_state` if it's a list) and returns its
+        (possibly unnormalized) log-density under the target distribution.
+      step_size: `Tensor` or Python `list` of `Tensor`s representing the step
+        size for the leapfrog integrator. Must broadcast with the shape of
+        `current_state`. Larger step sizes lead to faster progress, but
+        too-large step sizes make rejection exponentially more likely. When
+        possible, it's often helpful to match per-variable step sizes to the
+        standard deviations of the target distribution in each variable.
+      volatility_fn: Python callable which takes an argument like
+        `current_state` (or `*current_state` if it's a list) and returns
+        volatility value at `current_state`. Should return a `Tensor` or Python
+        `list` of `Tensor`s that must broadcast with the shape of
+        `current_state` Defaults to the identity function.
+      parallel_iterations: the number of coordinates for which the gradients of
+        the volatility matrix `volatility_fn` can be computed in parallel.
+      compute_acceptance: Python 'bool' indicating whether to compute the
+        Metropolis log-acceptance ratio used to construct
+        `MetropolisAdjustedLangevinAlgorithm` kernel.
+      seed: Python integer to seed the random number generator.
+        Default value: `None` (i.e., no seed).
+      name: Python `str` name prefixed to Ops created by this function.
+        Default value: `None` (i.e., 'mala_kernel').
+
+    Returns:
+      next_state: Tensor or Python list of `Tensor`s representing the state(s)
+        of the Markov chain(s) at each result step. Has same shape as
+        `current_state`.
+      kernel_results: `collections.namedtuple` of internal calculations used to
+        advance the chain.
+
+    Raises:
+      ValueError: if there isn't one `step_size` or a list with same length as
+        `current_state`.
+      TypeError: if `volatility_fn` is not callable.
+    """
     self._seed_stream = tf.contrib.distributions.SeedStream(
         seed, salt='UncalibratedLangevin')
     # Default value of `volatility_fn` is the identity function.
@@ -386,7 +431,9 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
         target_log_prob_fn=target_log_prob_fn,
         step_size=step_size,
         volatility_fn=volatility_fn,
+        compute_acceptance=tf.convert_to_tensor(compute_acceptance),
         seed=seed,
+        parallel_iterations=parallel_iterations,
         name=name)
 
   @property
@@ -402,8 +449,16 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
     return self._parameters['volatility_fn']
 
   @property
+  def compute_acceptance(self):
+    return self._parameters['compute_acceptance']
+
+  @property
   def seed(self):
     return self._parameters['seed']
+
+  @property
+  def parallel_iterations(self):
+    return self._parameters['parallel_iterations']
 
   @property
   def name(self):
@@ -446,7 +501,9 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
             previous_kernel_results.target_log_prob,
             previous_kernel_results.grads_target_log_prob,
             previous_kernel_results.volatility,
-            previous_kernel_results.grads_volatility)
+            previous_kernel_results.grads_volatility,
+            previous_kernel_results.diffusion_drift,
+            self.parallel_iterations)
 
         random_draw_parts = []
         for s in current_state_parts:
@@ -481,23 +538,33 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
           self.target_log_prob_fn,
           self.volatility_fn,
           next_state_parts,
-          step_size_parts)
+          step_size_parts,
+          parallel_iterations=self.parallel_iterations)
 
       def maybe_flatten(x):
         return x if mcmc_util.is_list_like(current_state) else x[0]
 
+      # Decide whether to compute the acceptance ratio
+      log_acceptance_correction_compute = _compute_log_acceptance_correction(
+          current_state_parts,
+          next_state_parts,
+          current_volatility_parts,
+          next_volatility_parts,
+          current_drift_parts,
+          next_drift_parts,
+          step_size_parts,
+          independent_chain_ndims)
+      log_acceptance_correction_skip = tf.zeros_like(next_target_log_prob)
+
+      log_acceptance_correction = tf.cond(
+          self.compute_acceptance,
+          lambda: log_acceptance_correction_compute,
+          lambda: log_acceptance_correction_skip)
+
       return [
           maybe_flatten(next_state_parts),
           UncalibratedLangevinKernelResults(
-              log_acceptance_correction=_compute_log_acceptance_correction(
-                  current_state_parts,
-                  next_state_parts,
-                  current_volatility_parts,
-                  next_volatility_parts,
-                  current_drift_parts,
-                  next_drift_parts,
-                  step_size_parts,
-                  independent_chain_ndims),
+              log_acceptance_correction=log_acceptance_correction,
               target_log_prob=next_target_log_prob,
               grads_target_log_prob=next_grads_target_log_prob,
               volatility=maybe_flatten(next_volatility_parts),
@@ -532,7 +599,8 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
           self.volatility_fn,
           state=init_state_parts,
           step_size=self.step_size,
-          volatility=init_volatility)
+          volatility=init_volatility,
+          parallel_iterations=self.parallel_iterations)
 
       def maybe_flatten(x):
         return x if mcmc_util.is_list_like(init_state) else x[0]
@@ -620,7 +688,7 @@ def _get_drift(step_size_parts, volatility_parts, grads_volatility,
   + `step_size` * `grads_volatility`
   ```
 
-  where `volatility_parts` = `volatility_fn(current_state) ** 2` and
+  where `volatility_parts` = `volatility_fn(current_state)**2` and
   `grads_volatility` is a gradient of `volatility_parts` at the `current_state`.
 
   Args:
@@ -633,7 +701,7 @@ def _get_drift(step_size_parts, volatility_parts, grads_volatility,
     volatility_parts: Python `list` of `Tensor`s representing the value of
       `volatility_fn(*state_parts)`.
     grads_volatility: Python list of `Tensor`s representing the value of the
-      gradient of `volatility_parts ** 2` wrt the state of the chain.
+      gradient of `volatility_parts**2` wrt the state of the chain.
     grads_target_log_prob: Python list of `Tensor`s representing
       gradient of `target_log_prob_fn(*state_parts`) wrt `state_parts`. Must
       have same shape as `volatility_parts`.
@@ -682,10 +750,10 @@ def _compute_log_acceptance_correction(current_state_parts,
 
    ```none
   q(proposed_state | current_state) \sim N(current_state + current_drift,
-  step_size * current_volatility ** 2)
+  step_size * current_volatility**2)
 
   q(current_state | proposed_state) \sim N(proposed_state + proposed_drift,
-  step_size * proposed_volatility ** 2)
+  step_size * proposed_volatility**2)
   ```
 
   The `log_acceptance_correction` is then
@@ -769,7 +837,7 @@ def _compute_log_acceptance_correction(current_state_parts,
       # Compute part of `q(proposed_state | current_state)`
       proposed_energy = (
           tf.reduce_sum(mcmc_util.safe_sum(
-              [tf.log(current_volatility), 0.5 * (proposed_energy ** 2)]),
+              [tf.log(current_volatility), 0.5 * (proposed_energy**2)]),
                         axis=axis))
       proposed_log_density_parts.append(-proposed_energy)
 
@@ -778,7 +846,7 @@ def _compute_log_acceptance_correction(current_state_parts,
       dual_energy = (
           tf.reduce_sum(
               mcmc_util.safe_sum(
-                  [tf.log(proposed_volatility), 0.5 * (dual_energy ** 2)]),
+                  [tf.log(proposed_volatility), 0.5 * (dual_energy**2)]),
               axis=axis))
       dual_log_density_parts.append(-dual_energy)
 
@@ -796,43 +864,54 @@ def _compute_log_acceptance_correction(current_state_parts,
 def _maybe_call_volatility_fn_and_grads(volatility_fn,
                                         state,
                                         volatility_fn_results=None,
-                                        grads_volatility_fn=None):
+                                        grads_volatility_fn=None,
+                                        sample_shape=None,
+                                        parallel_iterations=10):
   """Helper which computes `volatility_fn` results and grads, if needed."""
   state_parts = list(state) if mcmc_util.is_list_like(state) else [state]
   needs_volatility_fn_gradients = grads_volatility_fn is None
-  [
-      volatility_fn_results,
-      grads_volatility_fn,
-  ] = mcmc_util.maybe_call_fn_and_grads(
-      volatility_fn,
-      state_parts,
-      volatility_fn_results,
-      grads_volatility_fn,
-      check_non_none_grads=False)
 
   # Convert `volatility_fn_results` to a list
-  volatility_parts = (
-      list(volatility_fn_results)
-      if mcmc_util.is_list_like(volatility_fn_results)
-      else [volatility_fn_results])
+  if volatility_fn_results is None:
+    volatility_fn_results = volatility_fn(*state_parts)
 
-  if len(volatility_parts) == 1:
-    volatility_parts *= len(state_parts)
+  volatility_fn_results = (list(volatility_fn_results)
+                           if mcmc_util.is_list_like(volatility_fn_results)
+                           else [volatility_fn_results])
+  if len(volatility_fn_results) == 1:
+    volatility_fn_results *= len(state_parts)
+  if len(state_parts) != len(volatility_fn_results):
+    raise ValueError('`volatility_fn` should return a tensor or a list '
+                     'of the same length as `current_state`.')
 
-  if len(volatility_parts) != len(state_parts):
-    raise ValueError('There should be exactly one `volatility_parts` or it'
-                     'should have same length as `current_state`.')
+  # The shape of 'volatility_parts' needs to have the number of chains as a
+  # leading dimension. For determinism we broadcast 'volatility_parts' to the
+  # shape of `state_parts` since each dimension of `state_parts` could have a
+  # different volatility value.
 
-  # Compute gradient of `volatility_parts ** 2`
+  volatility_fn_results = _maybe_broadcast_volatility(volatility_fn_results,
+                                                      state_parts)
+  if grads_volatility_fn is None:
+    [
+        _,
+        grads_volatility_fn,
+    ] = diag_jacobian(
+        xs=state_parts,
+        ys=volatility_fn_results,
+        sample_shape=sample_shape,
+        parallel_iterations=parallel_iterations,
+        fn=volatility_fn)
+
+  # Compute gradient of `volatility_parts**2`
   if needs_volatility_fn_gradients:
     grads_volatility_fn = [
         2. * g * volatility if g is not None else tf.zeros_like(
             fn_arg, dtype=fn_arg.dtype.base_dtype)
         for g, volatility, fn_arg in zip(
-            grads_volatility_fn, volatility_parts, state_parts)
+            grads_volatility_fn, volatility_fn_results, state_parts)
     ]
 
-  return volatility_parts, grads_volatility_fn
+  return volatility_fn_results, grads_volatility_fn
 
 
 def _maybe_broadcast_volatility(volatility_parts,
@@ -849,11 +928,12 @@ def _prepare_args(target_log_prob_fn,
                   target_log_prob=None,
                   grads_target_log_prob=None,
                   volatility=None,
-                  grads_volatility_fn=None):
+                  grads_volatility_fn=None,
+                  diffusion_drift=None,
+                  parallel_iterations=10):
   """Helper which processes input args to meet list-like assumptions."""
   state_parts = list(state) if mcmc_util.is_list_like(state) else [state]
-  state_parts = [tf.convert_to_tensor(s, name='current_state')
-                 for s in state_parts]
+
   [
       target_log_prob,
       grads_target_log_prob,
@@ -869,7 +949,9 @@ def _prepare_args(target_log_prob_fn,
       volatility_fn,
       state_parts,
       volatility,
-      grads_volatility_fn)
+      grads_volatility_fn,
+      distributions_util.prefer_static_shape(target_log_prob),
+      parallel_iterations)
 
   step_sizes = (list(step_size) if mcmc_util.is_list_like(step_size)
                 else [step_size])
@@ -883,16 +965,17 @@ def _prepare_args(target_log_prob_fn,
     raise ValueError('There should be exactly one `step_size` or it should '
                      'have same length as `current_state`.')
 
-  # The shape of 'volatility_parts' needs to have the number of chains as a
-  # leading dimension. For determinism we broadcast 'volatility_parts' to the
-  # shape of `state_parts` since each dimension of `state_parts` could have a
-  # different volatility value.
-  volatility_parts = _maybe_broadcast_volatility(volatility_parts,
-                                                 state_parts)
-
-  diffusion_drift_parts = _get_drift(step_sizes, volatility_parts,
-                                     grads_volatility,
-                                     grads_target_log_prob)
+  if diffusion_drift is None:
+    diffusion_drift_parts = _get_drift(step_sizes, volatility_parts,
+                                       grads_volatility,
+                                       grads_target_log_prob)
+  else:
+    diffusion_drift_parts = (list(diffusion_drift)
+                             if mcmc_util.is_list_like(diffusion_drift)
+                             else [diffusion_drift])
+    if len(state_parts) != len(diffusion_drift):
+      raise ValueError('There should be exactly one `diffusion_drift` or it '
+                       'should have same length as list-like `current_state`.')
 
   return [
       state_parts,
