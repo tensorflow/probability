@@ -54,6 +54,7 @@ from tensorflow_probability.python.distributions.mvn_diag import MultivariateNor
 from tensorflow_probability.python.distributions.mvn_diag import MultivariateNormalDiagWithSoftplusScale
 from tensorflow_probability.python.distributions.mvn_diag_plus_low_rank import MultivariateNormalDiagPlusLowRank
 from tensorflow_probability.python.distributions.mvn_full_covariance import MultivariateNormalFullCovariance
+from tensorflow_probability.python.distributions.mvn_linear_operator import MultivariateNormalLinearOperator
 from tensorflow_probability.python.distributions.mvn_tril import MultivariateNormalTriL
 from tensorflow_probability.python.distributions.negative_binomial import NegativeBinomial
 from tensorflow_probability.python.distributions.normal_conjugate_posteriors import normal_conjugates_known_scale_posterior
@@ -158,6 +159,7 @@ __all__ = [
     'Uniform',
     'MultivariateNormalDiag',
     'MultivariateNormalFullCovariance',
+    'MultivariateNormalLinearOperator',
     'MultivariateNormalTriL',
     'MultivariateNormalDiagPlusLowRank',
     'MultivariateNormalDiagWithSoftplusScale',

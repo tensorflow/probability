@@ -265,6 +265,18 @@ py_test(
 )
 
 py_test(
+    name = "mvn_linear_operator_test",
+    size = "small",
+    srcs = ["mvn_linear_operator_test.py"],
+    deps = [
+        ":distributions",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_test(
     name = "mixture_test",
     size = "medium",
     srcs = ["mixture_test.py"],

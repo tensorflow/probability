@@ -46,7 +46,6 @@ or
 """
 
 
-# TODO(b/35290280): Import in `../../__init__.py` after adding unit-tests.
 class MultivariateNormalLinearOperator(
     transformed_distribution.TransformedDistribution):
   """The multivariate normal distribution on `R^k`.
