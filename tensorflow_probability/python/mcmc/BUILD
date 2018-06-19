@@ -40,6 +40,7 @@ py_library(
         ":sample",
         ":sample_annealed_importance",
         ":sample_halton_sequence",
+        ":slice_sampler_kernel",
         ":transformed_kernel",
     ],
 )
@@ -241,6 +242,40 @@ py_test(
     size = "medium",
     srcs = ["sample_halton_sequence_test.py"],
     deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "slice_sampler_kernel",
+    srcs = ["slice_sampler_kernel.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":kernel",
+        ":slice_sampler_utils",
+        ":util",
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "slice_sampler_utils",
+    srcs = ["slice_sampler_utils.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "slice_sampler_test",
+    size = "medium",
+    timeout = "long",
+    srcs = ["slice_sampler_test.py"],
+    deps = [
+        ":slice_sampler_utils",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
