@@ -315,6 +315,8 @@ class PositiveSemidefiniteKernel(object):
 
     """
     with self._name_scope(self._name, values=[x1, x2]):
+      x1 = tf.convert_to_tensor(x1, name='x1')
+      x2 = tf.convert_to_tensor(x2, name='x2')
       return self._apply(x1, x2)
 
   def _apply(self, x1, x2, param_expansion_ndims=0):
