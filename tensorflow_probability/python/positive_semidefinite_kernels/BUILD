@@ -27,6 +27,7 @@ py_library(
     srcs = ["__init__.py"],
     deps = [
         ":exponentiated_quadratic",
+        ":matern",
         ":positive_semidefinite_kernel",
         ":util",
     ],
@@ -65,6 +66,26 @@ py_library(
 py_test(
     name = "exponentiated_quadratic_test",
     srcs = ["exponentiated_quadratic_test.py"],
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "matern",
+    srcs = ["matern.py"],
+    deps = [
+        ":positive_semidefinite_kernel",
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "matern_test",
+    srcs = ["matern_test.py"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
