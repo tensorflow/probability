@@ -26,6 +26,7 @@ py_library(
     name = "positive_semidefinite_kernels",
     srcs = ["__init__.py"],
     deps = [
+        ":exp_sin_squared",
         ":exponentiated_quadratic",
         ":matern",
         ":positive_semidefinite_kernel",
@@ -58,7 +59,7 @@ py_library(
     name = "exponentiated_quadratic",
     srcs = ["exponentiated_quadratic.py"],
     deps = [
-        # six dep,
+        ":positive_semidefinite_kernel",
         # tensorflow dep,
     ],
 )
@@ -66,6 +67,26 @@ py_library(
 py_test(
     name = "exponentiated_quadratic_test",
     srcs = ["exponentiated_quadratic_test.py"],
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "exp_sin_squared",
+    srcs = ["exp_sin_squared.py"],
+    deps = [
+        ":positive_semidefinite_kernel",
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "exp_sin_squared_test",
+    srcs = ["exp_sin_squared_test.py"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,

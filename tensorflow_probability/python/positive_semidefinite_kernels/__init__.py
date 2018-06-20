@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from tensorflow_probability.python.positive_semidefinite_kernels.exp_sin_squared import ExpSinSquared
 from tensorflow_probability.python.positive_semidefinite_kernels.exponentiated_quadratic import ExponentiatedQuadratic
 from tensorflow_probability.python.positive_semidefinite_kernels.matern import MaternFiveHalves
 from tensorflow_probability.python.positive_semidefinite_kernels.matern import MaternOneHalf
@@ -29,6 +30,7 @@ from tensorflow.python.util.all_util import remove_undocumented
 
 _allowed_symbols = [
     'ExponentiatedQuadratic',
+    'ExpSinSquared',
     'MaternFiveHalves',
     'MaternOneHalf',
     'MaternThreeHalves',
