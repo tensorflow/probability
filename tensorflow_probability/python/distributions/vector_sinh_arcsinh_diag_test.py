@@ -22,7 +22,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow_probability.python.distributions.internal import test_util
+from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions
 rng = np.random.RandomState(123)

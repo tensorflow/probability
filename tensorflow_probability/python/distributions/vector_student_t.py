@@ -20,7 +20,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python.distributions import bijectors
-from tensorflow_probability.python.distributions.internal import distribution_util
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow.python.ops.distributions import student_t
 from tensorflow.python.ops.distributions import transformed_distribution
 

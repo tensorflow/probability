@@ -23,13 +23,16 @@ import itertools
 # Dependency imports
 import numpy as np
 import tensorflow as tf
-import tensorflow_probability as tfp
 
-from tensorflow_probability.python.distributions.internal import distribution_util
+
+from tensorflow_probability.python.distributions import Mixture
+from tensorflow_probability.python.distributions import MixtureSameFamily
+from tensorflow_probability.python.distributions import MultivariateNormalDiag
+
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow.python.framework import test_util
-# Dependency imports.third_party.tensorflow.python.ops.nn_grad  # pylint: disable=unused-import
 
-tfd = tfp.distributions
+# Dependency imports.third_party.tensorflow.python.ops.nn_grad  # pylint: disable=unused-import
 
 
 def _powerset(x):
@@ -399,7 +402,7 @@ class PadMixtureDimensionsTest(tf.test.TestCase):
 
   def test_pad_mixture_dimensions_mixture(self):
     with self.test_session() as sess:
-      gm = tfd.Mixture(
+      gm = Mixture(
           cat=tf.distributions.Categorical(probs=[[0.3, 0.7]]),
           components=[
               tf.distributions.Normal(loc=[-1.0], scale=[1.0]),
@@ -416,9 +419,9 @@ class PadMixtureDimensionsTest(tf.test.TestCase):
 
   def test_pad_mixture_dimensions_mixture_same_family(self):
     with self.test_session() as sess:
-      gm = tfd.MixtureSameFamily(
+      gm = MixtureSameFamily(
           mixture_distribution=tf.distributions.Categorical(probs=[0.3, 0.7]),
-          components_distribution=tfd.MultivariateNormalDiag(
+          components_distribution=MultivariateNormalDiag(
               loc=[[-1., 1], [1, -1]], scale_identity_multiplier=[1.0, 0.5]))
 
       x = tf.constant([[1.0, 2.0], [3.0, 4.0]])

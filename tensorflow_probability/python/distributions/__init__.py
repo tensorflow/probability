@@ -34,12 +34,6 @@ from tensorflow_probability.python.distributions.deterministic import VectorDete
 from tensorflow_probability.python.distributions.geometric import Geometric
 from tensorflow_probability.python.distributions.half_normal import HalfNormal
 from tensorflow_probability.python.distributions.independent import Independent
-from tensorflow_probability.python.distributions.internal.distribution_util import fill_triangular
-from tensorflow_probability.python.distributions.internal.distribution_util import fill_triangular_inverse
-from tensorflow_probability.python.distributions.internal.distribution_util import matrix_diag_transform
-from tensorflow_probability.python.distributions.internal.distribution_util import reduce_weighted_logsumexp
-from tensorflow_probability.python.distributions.internal.distribution_util import softplus_inverse
-from tensorflow_probability.python.distributions.internal.distribution_util import tridiag
 from tensorflow_probability.python.distributions.internal.moving_stats import assign_log_moving_mean_exp
 from tensorflow_probability.python.distributions.internal.moving_stats import assign_moving_mean_variance
 from tensorflow_probability.python.distributions.internal.moving_stats import moving_mean_variance
@@ -80,6 +74,13 @@ from tensorflow_probability.python.distributions.vector_laplace_diag import Vect
 from tensorflow_probability.python.distributions.vector_sinh_arcsinh_diag import VectorSinhArcsinhDiag
 from tensorflow_probability.python.distributions.wishart import WishartCholesky
 from tensorflow_probability.python.distributions.wishart import WishartFull
+
+from tensorflow_probability.python.internal.distribution_util import fill_triangular
+from tensorflow_probability.python.internal.distribution_util import fill_triangular_inverse
+from tensorflow_probability.python.internal.distribution_util import matrix_diag_transform
+from tensorflow_probability.python.internal.distribution_util import reduce_weighted_logsumexp
+from tensorflow_probability.python.internal.distribution_util import softplus_inverse
+from tensorflow_probability.python.internal.distribution_util import tridiag
 
 from tensorflow.python.ops.distributions.bernoulli import Bernoulli
 from tensorflow.python.ops.distributions.beta import Beta

@@ -23,7 +23,7 @@ import math
 import numpy as np
 import tensorflow as tf
 
-from tensorflow_probability.python.distributions.internal import distribution_util
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow.contrib.framework.python.framework import tensor_util as contrib_tensor_util
 from tensorflow.python.framework import tensor_util
 from tensorflow.python.ops import control_flow_ops

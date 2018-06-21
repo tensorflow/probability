@@ -24,7 +24,7 @@ import tensorflow as tf
 
 from tensorflow_probability.python.distributions.bijectors.affine_linear_operator import AffineLinearOperator
 from tensorflow_probability.python.distributions.bijectors.softmax_centered import SoftmaxCentered
-from tensorflow_probability.python.distributions.internal import distribution_util
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow.contrib.linalg.python.ops import linear_operator_addition as linop_add_lib
 from tensorflow.python.framework import tensor_util
 from tensorflow.python.ops import control_flow_ops

@@ -23,8 +23,8 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.distributions.bijectors.exp import Exp
-from tensorflow_probability.python.distributions.internal import distribution_util
 from tensorflow_probability.python.distributions.poisson import Poisson
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.ops.distributions import categorical as categorical_lib
 from tensorflow.python.ops.distributions import transformed_distribution as transformed_lib

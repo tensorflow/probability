@@ -24,9 +24,9 @@ import collections
 import tensorflow as tf
 
 
-from tensorflow_probability.python.distributions.internal import distribution_util as util
 from tensorflow_probability.python.distributions.mvn_tril import MultivariateNormalTriL
 from tensorflow_probability.python.distributions.seed_stream import SeedStream
+from tensorflow_probability.python.internal import distribution_util as util
 
 from tensorflow.python.framework import tensor_util
 from tensorflow.python.ops.linalg import linear_operator_util

@@ -24,7 +24,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python import distributions
-from tensorflow_probability.python.distributions.internal import test_util
+from tensorflow_probability.python.internal import test_util
 from tensorflow.python.layers import normalization
 from tensorflow.python.ops.distributions import transformed_distribution as transformed_distribution_lib
 from tensorflow.python.training import adam
