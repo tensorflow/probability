@@ -512,6 +512,17 @@ py_test(
 )
 
 py_test(
+    name = "lognormal_test",
+    size = "small",
+    srcs = ["lognormal_test.py"],
+    deps = [
+        ":distributions",
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_test(
     name = "relaxed_bernoulli_test",
     size = "small",
     srcs = ["relaxed_bernoulli_test.py"],
