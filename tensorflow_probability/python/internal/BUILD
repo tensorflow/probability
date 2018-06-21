@@ -26,6 +26,16 @@ package(
 exports_files(["LICENSE"])
 
 py_library(
+    name = "internal",
+    srcs = ["__init__.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":distribution_util",
+        ":test_util",
+    ],
+)
+
+py_library(
     name = "distribution_util",
     srcs = ["distribution_util.py"],
     srcs_version = "PY2AND3",

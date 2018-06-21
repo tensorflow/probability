@@ -38,6 +38,7 @@ py_library(
         "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/edward2",
         "//tensorflow_probability/python/glm",
+        "//tensorflow_probability/python/internal",
         "//tensorflow_probability/python/layers",
         "//tensorflow_probability/python/math",
         "//tensorflow_probability/python/mcmc",
