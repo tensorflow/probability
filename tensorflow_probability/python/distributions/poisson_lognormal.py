@@ -22,7 +22,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
-from tensorflow_probability.python.distributions.bijectors.exp import Exp
+from tensorflow_probability.python.bijectors.exp import Exp
 from tensorflow_probability.python.distributions.poisson import Poisson
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow.python.framework import tensor_shape

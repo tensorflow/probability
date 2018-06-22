@@ -56,7 +56,7 @@ class VectorLaplaceDiagTest(tf.test.TestCase):
     with self.test_session():
       base_dist = tfd.VectorLaplaceDiag(mu, diag, validate_args=True)
       dist = tfd.TransformedDistribution(
-          base_dist, validate_args=True, bijector=tfd.bijectors.Softplus())
+          base_dist, validate_args=True, bijector=tfp.bijectors.Softplus())
       samps = dist.sample(5)  # Shape [5, 1, 3].
       self.assertAllEqual([5, 1], dist.log_prob(samps).get_shape())
 

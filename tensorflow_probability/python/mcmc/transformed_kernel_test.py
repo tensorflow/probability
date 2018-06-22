@@ -27,7 +27,7 @@ import tensorflow_probability as tfp
 
 
 tfd = tfp.distributions
-tfb = tfd.bijectors
+tfb = tfp.bijectors
 
 
 FakeInnerKernelResults = collections.namedtuple(

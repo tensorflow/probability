@@ -21,7 +21,7 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 import tensorflow as tf
-from tensorflow_probability.python.distributions import bijectors
+from tensorflow_probability.python import bijectors
 from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.ops.distributions import transformed_distribution
 from tensorflow.python.ops.distributions import util as distribution_util

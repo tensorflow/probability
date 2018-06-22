@@ -19,7 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from tensorflow_probability.python.distributions.bijectors.sigmoid import Sigmoid
+from tensorflow_probability.python.bijectors.sigmoid import Sigmoid
 # Bijectors must be directly imported because `remove_undocumented` prevents
 # individual file imports.
 from tensorflow_probability.python.distributions.logistic import Logistic

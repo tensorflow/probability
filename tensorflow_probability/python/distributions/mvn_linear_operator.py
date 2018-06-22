@@ -19,7 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from tensorflow_probability.python.distributions.bijectors import AffineLinearOperator
+from tensorflow_probability.python.bijectors import AffineLinearOperator
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow.python.ops.distributions import transformed_distribution
 

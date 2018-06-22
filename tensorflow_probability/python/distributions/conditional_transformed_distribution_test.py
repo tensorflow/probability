@@ -23,8 +23,8 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.bijectors.conditional_bijector import ConditionalBijector
 from tensorflow_probability.python.distributions import transformed_distribution_test
-from tensorflow_probability.python.distributions.bijectors.conditional_bijector import ConditionalBijector
 
 tfd = tfp.distributions
 

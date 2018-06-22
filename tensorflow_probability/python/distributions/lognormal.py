@@ -20,7 +20,7 @@ from __future__ import print_function
 
 import numpy as np
 import tensorflow as tf
-from tensorflow_probability.python.distributions.bijectors import Exp
+from tensorflow_probability.python.bijectors import Exp
 from tensorflow.python.ops.distributions import transformed_distribution
 
 

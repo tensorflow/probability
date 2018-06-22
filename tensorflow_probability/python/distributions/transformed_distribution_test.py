@@ -24,10 +24,8 @@ from scipy import stats
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-
 tfd = tfp.distributions
-
-tfb = tfp.distributions.bijectors
+tfb = tfp.bijectors
 
 
 class DummyMatrixTransform(tfb.Bijector):
@@ -269,7 +267,7 @@ class TransformedDistributionTest(tf.test.TestCase):
     with self.test_session() as sess:
       exp2 = self._cls()(
           tfd.Exponential(rate=0.25),
-          bijector=tfd.bijectors.AffineScalar(scale=2.))
+          bijector=tfb.AffineScalar(scale=2.))
       log_prob = exp2.log_prob(1.)
       log_prob_ = sess.run(log_prob)
       base_log_prob = -0.5 * 0.25 + np.log(0.25)

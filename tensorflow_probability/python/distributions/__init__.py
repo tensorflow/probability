@@ -19,8 +19,6 @@ from __future__ import print_function
 
 # pylint: disable=unused-import,line-too-long,g-importing-member
 
-from tensorflow_probability.python.distributions import bijectors
-
 from tensorflow_probability.python.distributions.autoregressive import Autoregressive
 from tensorflow_probability.python.distributions.batch_reshape import BatchReshape
 from tensorflow_probability.python.distributions.binomial import Binomial
@@ -115,7 +113,6 @@ from tensorflow.python.util.all_util import remove_undocumented
 
 __all__ = [
     'auto_correlation',
-    'bijectors',
     'Cauchy',
     'ConditionalDistribution',
     'ConditionalTransformedDistribution',

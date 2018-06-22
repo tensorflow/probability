@@ -26,7 +26,7 @@ from tensorflow.python.ops.distributions import transformed_distribution as tran
 from tensorflow.python.ops.distributions import util as distribution_util
 
 tfd = tfp.distributions
-tfb = tfd.bijectors
+tfb = tfp.bijectors
 
 
 class AutogressiveTest(test_util.VectorDistributionTestHelpers,
