@@ -214,6 +214,15 @@ class InverseGammaTest(tf.test.TestCase):
           atol=.15)
       self.assertTrue(self._kstest(alpha_v, beta_v, sample_values))
 
+  def testInverseGammaFullyReparameterized(self):
+    alpha = tf.constant(4.0)
+    beta = tf.constant(3.0)
+    inv_gamma = tfd.InverseGamma(concentration=alpha, rate=beta)
+    samples = inv_gamma.sample(100)
+    grad_alpha, grad_beta = tf.gradients(samples, [alpha, beta])
+    self.assertIsNotNone(grad_alpha)
+    self.assertIsNotNone(grad_beta)
+
   def testInverseGammaSampleMultiDimensional(self):
     with tf.Session():
       alpha_v = np.array([np.arange(3, 103, dtype=np.float32)])  # 1 x 100

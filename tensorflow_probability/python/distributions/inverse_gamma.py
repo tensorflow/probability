@@ -75,8 +75,11 @@ class InverseGamma(tf.distributions.Distribution):
   Distribution parameters are automatically broadcast in all functions; see
   examples for details.
 
-  WARNING: This distribution may draw 0-valued samples for small concentration
-  values. See note in `tf.random_gamma` docstring.
+  Samples of this distribution are reparameterized (pathwise differentiable).
+  The derivatives are computed using the approach described in the paper
+
+  [Michael Figurnov, Shakir Mohamed, Andriy Mnih.
+  Implicit Reparameterization Gradients, 2018](https://arxiv.org/abs/1805.08498)
 
   #### Examples
 
@@ -84,6 +87,19 @@ class InverseGamma(tf.distributions.Distribution):
   tfd = tfp.distributions
   dist = tfd.InverseGamma(concentration=3.0, rate=2.0)
   dist2 = tfd.InverseGamma(concentration=[3.0, 4.0], rate=[2.0, 3.0])
+  ```
+
+  Compute the gradients of samples w.r.t. the parameters:
+
+  ```python
+  tfd = tfp.distributions
+  concentration = tf.constant(3.0)
+  rate = tf.constant(2.0)
+  dist = tfd.InverseGamma(concentration, rate)
+  samples = dist.sample(5)  # Shape [5]
+  loss = tf.reduce_mean(tf.square(samples))  # Arbitrary loss function
+  # Unbiased stochastic gradients of the loss function
+  grads = tf.gradients(loss, [concentration, rate])
   ```
 
   """
@@ -131,7 +147,7 @@ class InverseGamma(tf.distributions.Distribution):
         dtype=self._concentration.dtype,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
-        reparameterization_type=tf.distributions.NOT_REPARAMETERIZED,
+        reparameterization_type=tf.distributions.FULLY_REPARAMETERIZED,
         parameters=parameters,
         graph_parents=[self._concentration, self._rate],
         name=name)

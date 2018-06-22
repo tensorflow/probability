@@ -59,7 +59,7 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
   The Kumaraswamy distribution is defined over the `(0, 1)` interval using
   parameters
   `concentration1` (aka "alpha") and `concentration0` (aka "beta").  It has a
-  shape similar to the Beta distribution, but is reparameterizeable.
+  shape similar to the Beta distribution, but is easier to reparameterize.
 
   #### Mathematical Details
 

@@ -161,49 +161,61 @@ class ExpectationTest(tf.test.TestCase):
                           gradq_approx_kl_normal_normal_,
                           rtol=0.01, atol=0.)
 
-  def test_docstring_example_gamma(self):
+  def test_docstring_example_bernoulli(self):
     with self.test_session() as sess:
       num_draws = int(1e5)
-      concentration_p = tf.constant(1.)
-      concentration_q = tf.constant(2.)
-      p = tfd.Gamma(concentration=concentration_p, rate=1.)
-      q = tfd.Gamma(concentration=concentration_q, rate=3.)
-      approx_kl_gamma_gamma = tfp.monte_carlo.expectation(
+      probs_p = tf.constant(0.4)
+      probs_q = tf.constant(0.7)
+      p = tfd.Bernoulli(probs=probs_p)
+      q = tfd.Bernoulli(probs=probs_q)
+      exact_kl_bernoulli_bernoulli = tfp.monte_carlo.expectation(
           f=lambda x: p.log_prob(x) - q.log_prob(x),
           samples=p.sample(num_draws, seed=42),
           log_prob=p.log_prob,
-          use_reparametrization=(p.reparameterization_type ==
-                                 tfd.FULLY_REPARAMETERIZED))
-      exact_kl_gamma_gamma = tfd.kl_divergence(p, q)
-      [exact_kl_gamma_gamma_, approx_kl_gamma_gamma_] = sess.run([
-          exact_kl_gamma_gamma, approx_kl_gamma_gamma])
-      self.assertEqual(
-          False,
-          p.reparameterization_type == tfd.FULLY_REPARAMETERIZED)
-      self.assertAllClose(exact_kl_gamma_gamma_, approx_kl_gamma_gamma_,
-                          rtol=0.01, atol=0.)
+          use_reparametrization=(
+              p.reparameterization_type == tfd.FULLY_REPARAMETERIZED))
+      approx_kl_bernoulli_bernoulli = tfd.kl_divergence(p, q)
+      [
+          exact_kl_bernoulli_bernoulli_,
+          approx_kl_bernoulli_bernoulli_,
+      ] = sess.run([
+          exact_kl_bernoulli_bernoulli,
+          approx_kl_bernoulli_bernoulli,
+      ])
+      self.assertEqual(False,
+                       p.reparameterization_type == tfd.FULLY_REPARAMETERIZED)
+      self.assertAllClose(
+          exact_kl_bernoulli_bernoulli_,
+          approx_kl_bernoulli_bernoulli_,
+          rtol=0.01,
+          atol=0.)
+      print(exact_kl_bernoulli_bernoulli_, approx_kl_bernoulli_bernoulli_)
 
       # Compare gradients. (Not present in `docstring`.)
-      gradp = lambda fp: tf.gradients(fp, concentration_p)[0]
-      gradq = lambda fq: tf.gradients(fq, concentration_q)[0]
+      gradp = lambda fp: tf.gradients(fp, probs_p)[0]
+      gradq = lambda fq: tf.gradients(fq, probs_q)[0]
       [
-          gradp_exact_kl_gamma_gamma_,
-          gradq_exact_kl_gamma_gamma_,
-          gradp_approx_kl_gamma_gamma_,
-          gradq_approx_kl_gamma_gamma_,
+          gradp_exact_kl_bernoulli_bernoulli_,
+          gradq_exact_kl_bernoulli_bernoulli_,
+          gradp_approx_kl_bernoulli_bernoulli_,
+          gradq_approx_kl_bernoulli_bernoulli_,
       ] = sess.run([
-          gradp(exact_kl_gamma_gamma),
-          gradq(exact_kl_gamma_gamma),
-          gradp(approx_kl_gamma_gamma),
-          gradq(approx_kl_gamma_gamma),
+          gradp(exact_kl_bernoulli_bernoulli),
+          gradq(exact_kl_bernoulli_bernoulli),
+          gradp(approx_kl_bernoulli_bernoulli),
+          gradq(approx_kl_bernoulli_bernoulli),
       ])
       # Notice that variance (i.e., `rtol`) is higher when using score-trick.
-      self.assertAllClose(gradp_exact_kl_gamma_gamma_,
-                          gradp_approx_kl_gamma_gamma_,
-                          rtol=0.05, atol=0.)
-      self.assertAllClose(gradq_exact_kl_gamma_gamma_,
-                          gradq_approx_kl_gamma_gamma_,
-                          rtol=0.03, atol=0.)
+      self.assertAllClose(
+          gradp_exact_kl_bernoulli_bernoulli_,
+          gradp_approx_kl_bernoulli_bernoulli_,
+          rtol=0.05,
+          atol=0.)
+      self.assertAllClose(
+          gradq_exact_kl_bernoulli_bernoulli_,
+          gradq_approx_kl_bernoulli_bernoulli_,
+          rtol=0.03,
+          atol=0.)
 
 
 if __name__ == '__main__':
