@@ -112,12 +112,12 @@ def _softplus_inverse(x):
   return tf.log(tf.expm1(x))
 
 
-def make_encoder(activation, latent_dim, base_depth):
+def make_encoder(activation, latent_size, base_depth):
   """Create the encoder function.
 
   Args:
     activation: Activation function to use.
-    latent_dim: The dimensionality of the encoding.
+    latent_size: The dimensionality of the encoding.
     base_depth: The lowest depth for a layer.
 
   Returns:
@@ -132,29 +132,29 @@ def make_encoder(activation, latent_dim, base_depth):
       conv(base_depth, 5, 2),
       conv(2 * base_depth, 5, 1),
       conv(2 * base_depth, 5, 2),
-      conv(4 * latent_dim, 7, padding="VALID"),
+      conv(4 * latent_size, 7, padding="VALID"),
       tf.keras.layers.Flatten(),
-      tf.keras.layers.Dense(2 * latent_dim, activation=None),
+      tf.keras.layers.Dense(2 * latent_size, activation=None),
   ])
 
   def encoder(images):
     images = 2 * tf.cast(images, dtype=tf.float32) - 1
     net = encoder_net(images)
     return tfd.MultivariateNormalDiag(
-        loc=net[..., :latent_dim],
-        scale_diag=tf.nn.softplus(net[..., latent_dim:] +
+        loc=net[..., :latent_size],
+        scale_diag=tf.nn.softplus(net[..., latent_size:] +
                                   _softplus_inverse(1.0)),
         name="code")
 
   return encoder
 
 
-def make_decoder(activation, latent_dim, output_shape, base_depth):
+def make_decoder(activation, latent_size, output_shape, base_depth):
   """Create the decoder function.
 
   Args:
     activation: Activation function to use.
-    latent_dim: Dimensionality of the encoding.
+    latent_size: Dimensionality of the encoding.
     output_shape: The output image shape.
     base_depth: Smallest depth for a layer.
 
@@ -182,7 +182,7 @@ def make_decoder(activation, latent_dim, output_shape, base_depth):
     # Collapse the sample and batch dimension
     # and convert to rank-4 tensor for use with
     # a convolutional decoder network.
-    codes = tf.reshape(codes, (-1, 1, 1, latent_dim))
+    codes = tf.reshape(codes, (-1, 1, 1, latent_size))
     logits = decoder_net(codes)
     logits = tf.reshape(
         logits, shape=tf.concat([original_shape[:-1], output_shape], axis=0))
@@ -287,12 +287,13 @@ def model_fn(features, labels, mode, params, config):
   avg_rate = tf.reduce_mean(rate)
   tf.summary.scalar("rate", avg_rate)
 
-  elbo_local = rate + distortion
+  elbo_local = -(rate + distortion)
 
   elbo = tf.reduce_mean(elbo_local)
+  loss = -elbo
   tf.summary.scalar("elbo", elbo)
-  importance_weighted_elbo = -tf.reduce_mean(
-      tf.reduce_logsumexp(-elbo_local, axis=0) -
+  importance_weighted_elbo = tf.reduce_mean(
+      tf.reduce_logsumexp(elbo_local, axis=0) -
       tf.log(tf.to_float(params["n_samples"])))
   tf.summary.scalar("elbo/importance_weighted", importance_weighted_elbo)
 
@@ -309,11 +310,11 @@ def model_fn(features, labels, mode, params, config):
                                         params["max_steps"])
   tf.summary.scalar("learning_rate", learning_rate)
   optimizer = tf.train.AdamOptimizer(learning_rate)
-  train_op = optimizer.minimize(elbo, global_step=global_step)
+  train_op = optimizer.minimize(loss, global_step=global_step)
 
   return tf.estimator.EstimatorSpec(
       mode=mode,
-      loss=elbo,
+      loss=loss,
       train_op=train_op,
       eval_metric_ops={
           "elbo": tf.metrics.mean(elbo),
@@ -374,8 +375,7 @@ def build_input_fns(data_dir, batch_size):
   training_dataset = training_dataset.shuffle(50000).repeat().batch(batch_size)
   train_input_fn = lambda: training_dataset.make_one_shot_iterator().get_next()
 
-  # Build a iterator over the heldout set with batch_size=heldout_size,
-  # i.e., return the entire heldout set as a constant.
+  # Build an iterator over the heldout set.
   eval_dataset = static_mnist_dataset(data_dir, "valid")
   eval_dataset = eval_dataset.batch(batch_size)
   eval_input_fn = lambda: eval_dataset.make_one_shot_iterator().get_next()
