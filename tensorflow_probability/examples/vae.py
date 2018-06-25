@@ -34,7 +34,7 @@ Here we also compute tighter bounds, the IWAE [Burda et. al. (2015)][2].
 
 These as well as image summaries can be seen in Tensorboard. For help using
 Tensorboard see
-https://www.tensorflow.org/programmers_guide/summaries_and_tensorboard
+https://www.tensorflow.org/guide/summaries_and_tensorboard
 which can be run with
   `python -m tensorboard.main --logdir=MODEL_DIR`
 
