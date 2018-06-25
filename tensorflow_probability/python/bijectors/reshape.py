@@ -146,9 +146,12 @@ class Reshape(bijector.Bijector):
           tf.assert_less_equal(
               ndims, 1, message="`{}` rank should be <= 1.".format(shape)))
 
-    shape_ = tensor_util.constant_value_as_shape(shape)
-    if shape_.is_fully_defined():
-      es = np.int32(shape_.as_list())
+    # Note, we might be inclined to use tensor_util.constant_value_as_shape
+    # here, but that method coerces negative values into `None`s, rendering the
+    # checks we do below impossible.
+    shape_tensor_ = tensor_util.constant_value(shape)
+    if shape_tensor_ is not None:
+      es = np.int32(shape_tensor_)
       if sum(es == -1) > 1:
         raise ValueError(
             "`{}` must have at most one `-1` (given {})"

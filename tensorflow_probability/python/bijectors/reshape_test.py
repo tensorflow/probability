@@ -119,34 +119,6 @@ class _ReshapeBijectorTest(object):
       self.assertAllClose(expected_y_scalar, y_scalar_, rtol=1e-6, atol=0)
       self.assertAllClose(expected_x_scalar, x_scalar_, rtol=1e-6, atol=0)
 
-  def testMultipleUnspecifiedDimensionsOpError(self):
-
-    with self.test_session() as sess:
-      shape_in, shape_out = self.build_shapes([2, 3], [4, -1, -1,])
-      bijector = tfb.Reshape(
-          event_shape_out=shape_out,
-          event_shape_in=shape_in,
-          validate_args=True)
-
-      with self.assertRaisesError(
-          "elements must have at most one `-1`."):
-        sess.run(bijector.forward_event_shape_tensor(shape_in))
-
-  # pylint: disable=invalid-name
-  def _testInvalidDimensionsOpError(self, expected_error_message):
-
-    with self.test_session() as sess:
-
-      shape_in, shape_out = self.build_shapes([2, 3], [1, 2, -2,])
-      bijector = tfb.Reshape(
-          event_shape_out=shape_out,
-          event_shape_in=shape_in,
-          validate_args=True)
-
-      with self.assertRaisesError(expected_error_message):
-        sess.run(bijector.forward_event_shape_tensor(shape_in))
-  # pylint: enable=invalid-name
-
   def testValidButNonMatchingInputOpError(self):
     x = np.random.randn(4, 3, 2)
 
@@ -289,9 +261,21 @@ class ReshapeBijectorTestStatic(tf.test.TestCase, _ReshapeBijectorTest):
       assert_bijective_and_finite(
           bijector, x, y, event_ndims=2, rtol=1e-6, atol=0)
 
+  def testMultipleUnspecifiedDimensionsOpError(self):
+    shape_in, shape_out = self.build_shapes([2, 3], [4, -1, -1,])
+
+    with self.assertRaises(ValueError):
+      tfb.Reshape(event_shape_out=shape_out,
+                  event_shape_in=shape_in,
+                  validate_args=True)
+
   def testInvalidDimensionsOpError(self):
-    self._testInvalidDimensionsOpError(
-        "Invalid value in tensor used for shape: -2")
+    shape_in, shape_out = self.build_shapes([2, 3], [1, 2, -2,])
+
+    with self.assertRaises(ValueError):
+      tfb.Reshape(event_shape_out=shape_out,
+                  event_shape_in=shape_in,
+                  validate_args=True)
 
   def testInputOutputMismatchOpError(self):
     self._testInputOutputMismatchOpError("Cannot reshape a tensor with")
@@ -308,12 +292,32 @@ class ReshapeBijectorTestDynamic(tf.test.TestCase, _ReshapeBijectorTest):
   def assertRaisesError(self, msg):
     return self.assertRaisesOpError(msg)
 
-  def testInvalidDimensionsOpError(self):
-    self._testInvalidDimensionsOpError(
-        "elements must be either positive integers or `-1`.")
-
   def testInputOutputMismatchOpError(self):
     self._testInputOutputMismatchOpError("Input to reshape is a tensor with")
+
+  def testMultipleUnspecifiedDimensionsOpError(self):
+    shape_in, shape_out = self.build_shapes([2, 3], [4, -1, -1,])
+    bijector = tfb.Reshape(
+        event_shape_out=shape_out,
+        event_shape_in=shape_in,
+        validate_args=True)
+
+    with self.test_session() as sess:
+      with self.assertRaisesError(
+          "elements must have at most one `-1`."):
+        sess.run(bijector.forward_event_shape_tensor(shape_in))
+
+  def testInvalidDimensionsOpError(self):
+    shape_in, shape_out = self.build_shapes([2, 3], [1, 2, -2,])
+    bijector = tfb.Reshape(
+        event_shape_out=shape_out,
+        event_shape_in=shape_in,
+        validate_args=True)
+
+    with self.test_session() as sess:
+      with self.assertRaisesError(
+          "elements must be either positive integers or `-1`."):
+        sess.run(bijector.forward_event_shape_tensor(shape_in))
 
 
 class ReshapeBijectorTestDynamicNdims(tf.test.TestCase, _ReshapeBijectorTest):
@@ -327,13 +331,32 @@ class ReshapeBijectorTestDynamicNdims(tf.test.TestCase, _ReshapeBijectorTest):
   def assertRaisesError(self, msg):
     return self.assertRaisesOpError(msg)
 
-  def testInvalidDimensionsOpError(self):
-    self._testInvalidDimensionsOpError(
-        "elements must be either positive integers or `-1`.")
-
   def testInputOutputMismatchOpError(self):
     self._testInputOutputMismatchOpError("Input to reshape is a tensor with")
 
+  def testMultipleUnspecifiedDimensionsOpError(self):
+    shape_in, shape_out = self.build_shapes([2, 3], [4, -1, -1,])
+    bijector = tfb.Reshape(
+        event_shape_out=shape_out,
+        event_shape_in=shape_in,
+        validate_args=True)
+
+    with self.test_session() as sess:
+      with self.assertRaisesError(
+          "elements must have at most one `-1`."):
+        sess.run(bijector.forward_event_shape_tensor(shape_in))
+
+  def testInvalidDimensionsOpError(self):
+    shape_in, shape_out = self.build_shapes([2, 3], [1, 2, -2,])
+    bijector = tfb.Reshape(
+        event_shape_out=shape_out,
+        event_shape_in=shape_in,
+        validate_args=True)
+
+    with self.test_session() as sess:
+      with self.assertRaisesError(
+          "elements must be either positive integers or `-1`."):
+        sess.run(bijector.forward_event_shape_tensor(shape_in))
 
 if __name__ == "__main__":
   tf.test.main()
