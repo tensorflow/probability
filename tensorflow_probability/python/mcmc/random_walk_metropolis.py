@@ -224,7 +224,7 @@ class RandomWalkMetropolis(kernel_base.TransitionKernel):
   with tf.Session() as sess:
     [sample_mean_, sample_std_] = sess.run([sample_mean, sample_std])
 
-  print('Estimated mean: '.format(sample_mean_))
+  print('Estimated mean: {}'.format(sample_mean_))
   print('Estimated standard deviation: {}'.format(sample_std_))
   ```
 
