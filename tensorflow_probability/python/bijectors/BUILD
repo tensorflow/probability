@@ -443,6 +443,18 @@ py_test(
 )
 
 py_test(
+    name = "transpose_test",
+    size = "small",
+    srcs = ["transpose_test.py"],
+    deps = [
+        ":bijectors",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_test(
     name = "weibull_test",
     size = "small",
     srcs = ["weibull_test.py"],

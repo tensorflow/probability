@@ -52,6 +52,7 @@ from tensorflow_probability.python.bijectors.softsign import Softsign
 from tensorflow_probability.python.bijectors.square import Square
 from tensorflow_probability.python.bijectors.tanh import Tanh
 from tensorflow_probability.python.bijectors.transform_diagonal import TransformDiagonal
+from tensorflow_probability.python.bijectors.transpose import Transpose
 from tensorflow_probability.python.bijectors.weibull import Weibull
 from tensorflow.python.ops.distributions.bijector import Bijector
 from tensorflow.python.ops.distributions.identity_bijector import Identity
@@ -61,14 +62,41 @@ from tensorflow.python.ops.distributions.identity_bijector import Identity
 from tensorflow.python.util.all_util import remove_undocumented
 
 __all__ = [
-    "AbsoluteValue", "Affine", "AffineLinearOperator", "AffineScalar",
-    "Bijector", "BatchNormalization", "Chain", "CholeskyOuterProduct",
-    "ConditionalBijector", "Exp", "FillTriangular", "Gumbel", "Identity",
-    "Inline", "Invert", "Kumaraswamy", "MaskedAutoregressiveFlow",
-    "MatrixInverseTriL", "Permute", "PowerTransform", "RealNVP", "Reshape",
-    "ScaleTriL", "Sigmoid", "SinhArcsinh", "SoftmaxCentered", "Softplus",
-    "Softsign", "Square", "Tanh", "TransformDiagonal", "Weibull",
-    "masked_autoregressive_default_template", "masked_dense",
+    "AbsoluteValue",
+    "Affine",
+    "AffineLinearOperator",
+    "AffineScalar",
+    "BatchNormalization",
+    "Bijector",
+    "Chain",
+    "CholeskyOuterProduct",
+    "ConditionalBijector",
+    "Exp",
+    "FillTriangular",
+    "Gumbel",
+    "Identity",
+    "Inline",
+    "Invert",
+    "Kumaraswamy",
+    "MaskedAutoregressiveFlow",
+    "MatrixInverseTriL",
+    "Permute",
+    "PowerTransform",
+    "RealNVP",
+    "Reshape",
+    "ScaleTriL",
+    "Sigmoid",
+    "SinhArcsinh",
+    "SoftmaxCentered",
+    "Softplus",
+    "Softsign",
+    "Square",
+    "Tanh",
+    "TransformDiagonal",
+    "Transpose",
+    "Weibull",
+    "masked_autoregressive_default_template",
+    "masked_dense",
     "real_nvp_default_template"
 ]
 
