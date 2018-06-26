@@ -201,11 +201,11 @@ def _maybe_validate_rightmost_transposed_ndims(
     if not rightmost_transposed_ndims.dtype.is_integer:
       raise TypeError('`rightmost_transposed_ndims` must be integer type.')
 
-    msg = '`rightmost_transposed_ndims` must be a scalar.'
     if rightmost_transposed_ndims.shape.ndims is not None:
       if rightmost_transposed_ndims.shape.ndims != 0:
-        raise ValueError(msg[:-1] + ', saw rank: {}.'.format(
-            rightmost_transposed_ndims.shape.ndims))
+        raise ValueError('`rightmost_transposed_ndims` must be a scalar, '
+                         'saw rank: {}.'.format(
+                             rightmost_transposed_ndims.shape.ndims))
     elif validate_args:
       assertions += [tf.assert_rank(rightmost_transposed_ndims, 0)]
 
