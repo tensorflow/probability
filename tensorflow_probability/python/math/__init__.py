@@ -22,6 +22,7 @@ from tensorflow_probability.python.math.diag_jacobian import diag_jacobian
 from tensorflow_probability.python.math.linalg import matvecmul
 from tensorflow_probability.python.math.linalg import pinv
 from tensorflow_probability.python.math.random_ops import random_rademacher
+from tensorflow_probability.python.math.random_ops import random_rayleigh
 
 from tensorflow.python.util.all_util import remove_undocumented
 
@@ -29,6 +30,7 @@ _allowed_symbols = [
     'matvecmul',
     'pinv',
     'random_rademacher',
+    'random_rayleigh',
     'diag_jacobian',
 ]
 

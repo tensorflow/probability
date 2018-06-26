@@ -24,6 +24,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.math import random_rademacher
+from tensorflow_probability.python.math import random_rayleigh
 from tensorflow.python.framework import test_util
 
 
@@ -53,6 +54,48 @@ class RandomRademacherDynamic32(tf.test.TestCase, _RandomRademacher):
 
 
 class RandomRademacherDynamic64(tf.test.TestCase, _RandomRademacher):
+  dtype = np.float64
+  use_static_shape = True
+
+
+class _RandomRayleigh(object):
+
+  @test_util.run_in_graph_and_eager_modes()
+  def test_expected_value(self):
+    shape_ = np.array([2, int(1e3)], np.int32)
+    shape = (tf.constant(shape_) if self.use_static_shape
+             else tf.placeholder_with_default(shape_, shape=None))
+    # This shape will require broadcasting before sampling.
+    scale_ = np.linspace(0.1, 0.5, 3 * 2).astype(self.dtype).reshape(3, 2)
+    scale = (tf.constant(scale_) if self.use_static_shape
+             else tf.placeholder_with_default(scale_, shape=None))
+    x = random_rayleigh(shape,
+                        scale=scale[..., tf.newaxis],
+                        dtype=self.dtype,
+                        seed=42)
+    self.assertEqual(self.dtype, x.dtype.as_numpy_dtype)
+    final_shape_ = [3, 2, int(1e3)]
+    if self.use_static_shape:
+      self.assertAllEqual(final_shape_, x.shape)
+    sample_mean = tf.reduce_mean(x, axis=-1, keepdims=True)
+    sample_var = tf.reduce_mean(tf.squared_difference(
+        x, sample_mean), axis=-1)
+    [x_, sample_mean_, sample_var_] = self.evaluate([
+        x, sample_mean[..., 0], sample_var])
+    self.assertAllEqual(final_shape_, x_.shape)
+    self.assertAllEqual(np.ones_like(x_, dtype=np.bool), x_ > 0.)
+    self.assertAllClose(np.sqrt(np.pi / 2.) * scale_, sample_mean_,
+                        atol=0.05, rtol=0.)
+    self.assertAllClose(0.5 * (4. - np.pi) * scale_**2., sample_var_,
+                        atol=0.05, rtol=0.)
+
+
+class RandomRayleighDynamic32(tf.test.TestCase, _RandomRayleigh):
+  dtype = np.float32
+  use_static_shape = False
+
+
+class RandomRayleighDynamic64(tf.test.TestCase, _RandomRayleigh):
   dtype = np.float64
   use_static_shape = True
 
