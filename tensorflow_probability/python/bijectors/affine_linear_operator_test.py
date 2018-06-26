@@ -100,6 +100,43 @@ class AffineLinearOperatorTest(tf.test.TestCase):
           -affine.inverse_log_det_jacobian(y, event_ndims=2).eval(),
           affine.forward_log_det_jacobian(x, event_ndims=2).eval())
 
+  def testTriLAdjoint(self):
+    with self.test_session():
+      shift = np.array([-1, 0, 1], dtype=np.float32)
+      tril = np.array([[[3, 0, 0],
+                        [2, -1, 0],
+                        [3, 2, 1]],
+                       [[2, 0, 0],
+                        [3, -2, 0],
+                        [4, 3, 2]]],
+                      dtype=np.float32)
+      scale = tf.linalg.LinearOperatorLowerTriangular(
+          tril, is_non_singular=True)
+      affine = tfb.AffineLinearOperator(
+          shift=shift, scale=scale, adjoint=True, validate_args=True)
+
+      x = np.array([[[1, 0, -1],
+                     [2, 3, 4]],
+                    [[4, 1, -7],
+                     [6, 9, 8]]],
+                   dtype=np.float32)
+      # If we made the bijector do x*A+b then this would be simplified to:
+      # y = np.matmul(x, tril) + shift.
+      triu = tril.transpose([0, 2, 1])
+      y = np.matmul(triu, x[..., np.newaxis])[..., 0] + shift
+      ildj = -np.sum(np.log(np.abs(np.diagonal(
+          tril, axis1=-2, axis2=-1))))
+
+      self.assertEqual(affine.name, "affine_linear_operator")
+      self.assertAllClose(y, affine.forward(x).eval())
+      self.assertAllClose(x, affine.inverse(y).eval())
+      self.assertAllClose(
+          ildj, affine.inverse_log_det_jacobian(
+              y, event_ndims=2).eval())
+      self.assertAllClose(
+          -affine.inverse_log_det_jacobian(y, event_ndims=2).eval(),
+          affine.forward_log_det_jacobian(x, event_ndims=2).eval())
+
 
 if __name__ == "__main__":
   tf.test.main()

@@ -99,6 +99,7 @@ class Affine(bijector.Bijector):
                scale_tril=None,
                scale_perturb_factor=None,
                scale_perturb_diag=None,
+               adjoint=False,
                validate_args=False,
                name="affine"):
     """Instantiates the `Affine` bijector.
@@ -151,6 +152,9 @@ class Affine(bijector.Bijector):
         matrix. `scale_perturb_diag` has shape [N1, N2, ...  r], which
         represents an `r x r` diagonal matrix. When `None` low rank updates will
         take the form `scale_perturb_factor * scale_perturb_factor.T`.
+      adjoint: Python `bool` indicating whether to use the `scale` matrix as
+        specified or its adjoint.
+        Default value: `False`.
       validate_args: Python `bool` indicating whether arguments should be
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
@@ -229,6 +233,7 @@ class Affine(bijector.Bijector):
           batch_ndims=batch_ndims,
           event_ndims=1,
           validate_args=validate_args)
+      self._adjoint = adjoint
       super(Affine, self).__init__(
           forward_min_event_ndims=1,
           graph_parents=(
@@ -322,10 +327,18 @@ class Affine(bijector.Bijector):
     """The `scale` `LinearOperator` in `Y = scale @ X + shift`."""
     return self._scale
 
+  @property
+  def adjoint(self):
+    """`bool` indicating `scale` should be used as conjugate transpose."""
+    return self._adjoint
+
   def _forward(self, x):
     y = x
     if self._is_only_identity_multiplier:
-      y *= self._scale
+      s = (tf.conj(self._scale)
+           if self.adjoint and self._scale.dtype.is_complex
+           else self._scale)
+      y *= s
       if self.shift is not None:
         return y + self.shift
       return y
@@ -333,7 +346,7 @@ class Affine(bijector.Bijector):
         y, expand_batch_dim=False)
     with tf.control_dependencies(self._maybe_check_scale()
                                  if self.validate_args else []):
-      y = self.scale.matmul(y)
+      y = self.scale.matmul(y, adjoint=self.adjoint)
     y = self._shaper.undo_make_batch_of_event_sample_matrices(
         y, sample_shape, expand_batch_dim=False)
     if self.shift is not None:
@@ -345,12 +358,14 @@ class Affine(bijector.Bijector):
     if self.shift is not None:
       x -= self.shift
     if self._is_only_identity_multiplier:
-      return x / self._scale
-
+      s = (tf.conj(self._scale)
+           if self.adjoint and self._scale.dtype.is_complex
+           else self._scale)
+      return x / s
     x, sample_shape = self._shaper.make_batch_of_event_sample_matrices(
         x, expand_batch_dim=False)
     # Solve fails if the op is singular so we may safely skip this assertion.
-    x = self.scale.solve(x)
+    x = self.scale.solve(x, adjoint=self.adjoint)
     x = self._shaper.undo_make_batch_of_event_sample_matrices(
         x, sample_shape, expand_batch_dim=False)
     return x
@@ -362,10 +377,10 @@ class Affine(bijector.Bijector):
     if self._is_only_identity_multiplier:
       # We don't pad in this case and instead let the fldj be applied
       # via broadcast.
+      log_abs_diag = tf.log(tf.abs(self._scale))
       event_size = tf.shape(x)[-1]
-      event_size = tf.cast(event_size, dtype=self._scale.dtype)
-      return tf.log(tf.abs(self._scale)) * event_size
-
+      event_size = tf.cast(event_size, dtype=log_abs_diag.dtype)
+      return log_abs_diag * event_size
     return self.scale.log_abs_determinant()
 
   def _maybe_check_scale(self):

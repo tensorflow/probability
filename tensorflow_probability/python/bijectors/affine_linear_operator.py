@@ -89,6 +89,7 @@ class AffineLinearOperator(bijector.Bijector):
   def __init__(self,
                shift=None,
                scale=None,
+               adjoint=False,
                validate_args=False,
                name="affine_linear_operator"):
     """Instantiates the `AffineLinearOperator` bijector.
@@ -97,6 +98,9 @@ class AffineLinearOperator(bijector.Bijector):
       shift: Floating-point `Tensor`.
       scale:  Subclass of `LinearOperator`. Represents the (batch) positive
         definite matrix `M` in `R^{k x k}`.
+      adjoint: Python `bool` indicating whether to use the `scale` matrix as
+        specified or its adjoint.
+        Default value: `False`.
       validate_args: Python `bool` indicating whether arguments should be
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
@@ -145,6 +149,7 @@ class AffineLinearOperator(bijector.Bijector):
           batch_ndims=batch_ndims,
           event_ndims=1,
           validate_args=validate_args)
+      self._adjoint = adjoint
       super(AffineLinearOperator, self).__init__(
           forward_min_event_ndims=1,
           graph_parents=graph_parents,
@@ -163,6 +168,11 @@ class AffineLinearOperator(bijector.Bijector):
     """The `scale` `LinearOperator` in `Y = scale @ X + shift`."""
     return self._scale
 
+  @property
+  def adjoint(self):
+    """`bool` indicating `scale` should be used as conjugate transpose."""
+    return self._adjoint
+
   def _forward(self, x):
     y = x
     if self.scale is not None:
@@ -170,7 +180,7 @@ class AffineLinearOperator(bijector.Bijector):
           y, expand_batch_dim=False)
       with tf.control_dependencies(self._maybe_collect_assertions()
                                    if self.validate_args else []):
-        y = self.scale.matmul(y)
+        y = self.scale.matmul(y, adjoint=self.adjoint)
       y = self._shaper.undo_make_batch_of_event_sample_matrices(
           y, sample_shape, expand_batch_dim=False)
     if self.shift is not None:
@@ -185,7 +195,7 @@ class AffineLinearOperator(bijector.Bijector):
       x, sample_shape = self._shaper.make_batch_of_event_sample_matrices(
           x, expand_batch_dim=False)
       # Solve fails if the op is singular so we may safely skip this assertion.
-      x = self.scale.solve(x)
+      x = self.scale.solve(x, adjoint=self.adjoint)
       x = self._shaper.undo_make_batch_of_event_sample_matrices(
           x, sample_shape, expand_batch_dim=False)
     return x

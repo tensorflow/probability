@@ -25,6 +25,8 @@ import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
+from tensorflow.python.framework import test_util
+
 
 class AffineBijectorTest(tf.test.TestCase):
   """Tests correctness of the Y = scale @ x + shift transformation."""
@@ -614,6 +616,83 @@ class AffineBijectorTest(tf.test.TestCase):
         },
         x=np.array(
             [1., 2], dtype=np.float32))
+
+  def testTriLWithVDVTUpdateAdjoint(self):
+    with self.test_session() as sess:
+      placeholder = tf.placeholder(tf.float32, name="x")
+
+      def static_run(fun, x, **kwargs):
+        return fun(x, **kwargs).eval()
+
+      def dynamic_run(fun, x_value, **kwargs):
+        x_value = np.array(x_value)
+        return sess.run(
+            fun(placeholder, **kwargs), feed_dict={placeholder: x_value})
+
+      for run in (static_run, dynamic_run):
+        mu = -1.
+        # Corresponds to scale = [[10, 0, 0], [1, 3, 0], [2, 3, 5]]
+        bijector = tfb.Affine(
+            shift=mu,
+            scale_tril=[[2., 0, 0], [1, 3, 0], [2, 3, 4]],
+            scale_perturb_diag=[2., 1],
+            scale_perturb_factor=[[2., 0], [0., 0], [0, 1]],
+            adjoint=True,
+            validate_args=True)
+        scale_ref = np.array([[10., 0, 0],
+                              [1, 3, 0],
+                              [2, 3, 5]], dtype=np.float32)
+        x = np.array([1., 2, 3], dtype=np.float32)
+        expected_forward = np.matmul(scale_ref.T, x) + mu
+        self.assertAllClose(expected_forward,
+                            run(bijector.forward, x))
+        expected_inverse = np.linalg.solve(scale_ref.T, x - mu)
+        self.assertAllClose(expected_inverse,
+                            run(bijector.inverse, x))
+        self.assertAllClose(x,
+                            run(bijector.inverse, expected_forward))
+        expected_fldj = np.log(np.prod(np.diagonal(scale_ref)))
+        self.assertAllClose(
+            -expected_fldj,
+            run(bijector.inverse_log_det_jacobian, x, event_ndims=1))
+        self.assertAllClose(
+            expected_fldj,
+            run(bijector.forward_log_det_jacobian, x, event_ndims=1))
+
+  def _testScaledIdentityComplexAdjoint(self, is_dynamic):
+    shift_ = np.array(-0.5, dtype=np.complex)
+    scale_ = np.array(4 + 2j, dtype=np.complex)
+    shift = tf.placeholder_with_default(
+        shift_, shape=None if is_dynamic else [])
+    scale = tf.placeholder_with_default(
+        scale_, shape=None if is_dynamic else [])
+    bijector = tfb.Affine(
+        shift=shift,
+        scale_identity_multiplier=scale,
+        adjoint=True,
+        validate_args=True)
+    z = np.array([1., 2, 3], dtype=np.complex)
+    y = bijector.forward(z)
+    x = bijector.inverse(z)
+    inv_fwd_z = bijector.inverse(tf.identity(y))
+    ildj = bijector.inverse_log_det_jacobian(z, event_ndims=1)
+    fldj = bijector.forward_log_det_jacobian(z, event_ndims=1)
+    [x_, y_, inv_fwd_z_, ildj_, fldj_] = self.evaluate([
+        x, y, inv_fwd_z, ildj, fldj])
+    self.assertAllClose(np.conj(scale_) * z + shift_, y_)
+    self.assertAllClose((z - shift_) / np.conj(scale_), x_)
+    self.assertAllClose(z, inv_fwd_z_)
+    self.assertAllClose(z.shape[-1] * np.log(np.abs(scale_)), fldj_)
+    self.assertAllClose(-z.shape[-1] * np.log(np.abs(scale_)), ildj_)
+
+  @test_util.run_in_graph_and_eager_modes
+  def testScaledIdentityComplexAdjointDynamic(self):
+    return self._testScaledIdentityComplexAdjoint(is_dynamic=True)
+
+  @test_util.run_in_graph_and_eager_modes
+  def testScaledIdentityComplexAdjointStatic(self):
+    return self._testScaledIdentityComplexAdjoint(is_dynamic=False)
+
 
 if __name__ == "__main__":
   tf.test.main()
