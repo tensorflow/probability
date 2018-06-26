@@ -417,6 +417,19 @@ py_test(
 )
 
 py_test(
+    name = "tanh_test",
+    size = "small",
+    srcs = ["tanh_test.py"],
+    deps = [
+        ":bijectors",
+        # numpy dep,
+        # six dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_test(
     name = "transform_diagonal_test",
     size = "small",
     srcs = ["transform_diagonal_test.py"],

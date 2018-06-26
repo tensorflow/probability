@@ -50,6 +50,7 @@ from tensorflow_probability.python.bijectors.softmax_centered import SoftmaxCent
 from tensorflow_probability.python.bijectors.softplus import Softplus
 from tensorflow_probability.python.bijectors.softsign import Softsign
 from tensorflow_probability.python.bijectors.square import Square
+from tensorflow_probability.python.bijectors.tanh import Tanh
 from tensorflow_probability.python.bijectors.transform_diagonal import TransformDiagonal
 from tensorflow_probability.python.bijectors.weibull import Weibull
 from tensorflow.python.ops.distributions.bijector import Bijector
@@ -66,7 +67,7 @@ __all__ = [
     "Inline", "Invert", "Kumaraswamy", "MaskedAutoregressiveFlow",
     "MatrixInverseTriL", "Permute", "PowerTransform", "RealNVP", "Reshape",
     "ScaleTriL", "Sigmoid", "SinhArcsinh", "SoftmaxCentered", "Softplus",
-    "Softsign", "Square", "TransformDiagonal", "Weibull",
+    "Softsign", "Square", "Tanh", "TransformDiagonal", "Weibull",
     "masked_autoregressive_default_template", "masked_dense",
     "real_nvp_default_template"
 ]
