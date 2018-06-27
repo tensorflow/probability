@@ -39,7 +39,7 @@ flags.DEFINE_integer("max_steps",
                      help="Number of training steps to run.")
 flags.DEFINE_integer("batch_size",
                      default=32,
-                     help="Batch size. Must divide evenly into dataset sizes.")
+                     help="Batch size.")
 flags.DEFINE_string(
     "model_dir",
     default=os.path.join(os.getenv("TEST_TMPDIR", "/tmp"),

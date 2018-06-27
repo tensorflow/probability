@@ -82,7 +82,7 @@ flags.DEFINE_float("decay",
                    help="Decay for exponential moving average.")
 flags.DEFINE_integer("batch_size",
                      default=128,
-                     help="Batch size. Must divide evenly into dataset sizes.")
+                     help="Batch size.")
 flags.DEFINE_string("data_dir",
                     default=os.path.join(os.getenv("TEST_TMPDIR", "/tmp"),
                                          "vq_vae/data"),

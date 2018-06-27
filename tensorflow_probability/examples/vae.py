@@ -83,7 +83,7 @@ flags.DEFINE_string(
 flags.DEFINE_integer(
     "batch_size",
     default=32,
-    help="Batch size. Must divide evenly into dataset sizes.")
+    help="Batch size.")
 flags.DEFINE_integer(
     "n_samples", default=16, help="Number of samples to use in encoding.")
 flags.DEFINE_integer(
