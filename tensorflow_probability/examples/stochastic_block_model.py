@@ -1,77 +1,97 @@
 import time
-
+import functools as ft
 from matplotlib import pylab as plt
 import numpy as np
 from observations import karate
+
+from sklearn.metrics.cluster import adjusted_rand_score
 import tensorflow as tf
-from tensorflow_probability import edward2 as ed
+import tensorflow_probability as tfp
+from tensorflow_probability import distributions as tfd
 
 
 # Data & parameters
 # -----------------------------------------------------------------------------
-x_data, z = karate('~/data')
-V = x_data.shape[1]
+x_data, z_true = karate('~/data')
+V = x_data.shape[0]
 K = 2
-learning_rate = 1e-4
-max_steps = 10000
-epsilon= 0.001
+starter_learning_rate = 1e-2
+max_steps = 1000000
+epsilon= 1e-5
+tf.set_random_seed(42)
 
+def joint_log_prob(data, priors, qgamma, qpi, qz):
+    """ Compute the joint log-likelihood of the model.
 
-def compute_loss(latent_vars, data):
-    """ Compute the loss associated with MAP calculations.
+    Parameters
+    ----------
+    data: np.array, shape (V, V)
+        The adjacency matrix of the graph.
+    priors: dict of tf.distribution
+        The prior distributions of the model.
+    qgamma: tensorflow variable
+        Values that the gamma variable takes.
+    qpi: tensorflow variable
+        Values taken by the pi variable.
+    qz: tensorflow variable
+        Values taken by the z variable.
     """
-    dict_vals = {var: latent.value for var, latent in latent_vars.items()}
-    for x, datum in data.items(): # assuming we have the values as input
-        dict_vals[x] = datum
-    
-    log_prob = 0.0
-    for z in latent_vars.keys():
-        z_copy = z.distribution.copy()
-        log_prob += tf.reduce_sum(z_copy.log_prob(dict_vals[z]))
+    pi = priors['pi']
+    gamma = priors['gamma']
+    z = tfd.Multinomial(total_count=tf.ones(data.shape[0]),
+                        probs=qgamma)
+    x = tfd.Bernoulli(probs=tf.matmul(qz, tf.matmul(qpi, tf.transpose(qz))))
 
-    for x in data.keys():
-        x_copy = x.distribution.copy()
-        log_prob += tf.reduce_sum(x_copy.log_prob(dict_vals[x]))
+    log_prob_parts = [
+            gamma.log_prob(qgamma),
+            pi.log_prob(qpi),
+            z.log_prob(qz),
+            x.log_prob(data)
+            ]
 
-    reg_penalty = tf.reduce_sum(tf.losses.get_regularization_losses())
-    loss = -log_prob + reg_penalty
-    
-    return loss
+    log_prob = 0.
+    for prob in log_prob_parts:
+        log_prob += tf.reduce_sum(prob)
+
+    return -log_prob
 
 
 # Model
 # -----------------------------------------------------------------------------
-gamma = ed.Dirichlet(tf.ones([K]))
-pi = ed.Beta(tf.ones([K,K]), tf.ones([K,K]))
-z = ed.Multinomial(tf.ones([V]), gamma)
-x = ed.Bernoulli(tf.matmul(z, tf.matmul(pi, tf.transpose(z))))
+gamma = tfd.Dirichlet(concentration=tf.ones([K]))
+pi = tfd.Beta(concentration0=tf.ones([K,K]),
+              concentration1=tf.ones([K,K]))
 
+priors = {'gamma': gamma,
+          'pi': pi}
 
-# Define the MAP loss
-# -----------------------------------------------------------------------------
-qgamma = ed.VectorDeterministic(tf.nn.softmax(tf.get_variable('qgamma/params', [K]))) # Gamma must sum to one
-qpi = ed.VectorDeterministic(tf.nn.sigmoid(tf.get_variable('qpi/params', [K, K]))) # Each pi must be between 0 and 1
-qz = ed.VectorDeterministic(tf.nn.softmax(tf.get_variable('qz/params', [V,K]), axis=1)) # the Z_i must sum to one row-wise (axis 0)
+qgamma = tf.nn.softmax(tf.get_variable('qgamma/params', [K])) # must sum to one
+qpi = tf.nn.sigmoid(tf.get_variable('qpi/params', [K, K])) # must be between 0 and 1
+qz = tf.nn.softmax(tf.get_variable('qz/param', [V, K]))
 
-latent_vars = {gamma: qgamma, pi: qpi, z: qz}
-data = {x: x_data}
-MAP_loss = compute_loss(latent_vars, data)
+log_prob = ft.partial(joint_log_prob, data=x_data, priors=priors)
+loss = log_prob(qgamma=qgamma, qpi=qpi, qz=qz)
 
 
 # Inference
 # -----------------------------------------------------------------------------
+global_step = tf.Variable(0, trainable=False, name='global_step')
+learning_rate = tf.train.exponential_decay(starter_learning_rate,
+                                          global_step,
+                                          100, 0.9, staircase=True)
 optimizer = tf.train.AdagradOptimizer(learning_rate)
-train_op = optimizer.minimize(MAP_loss)
+train_op = optimizer.minimize(loss)
 
 loss_vals = []
 with tf.Session() as session:
     start = time.time()
     session.run(tf.global_variables_initializer())
 
+
     for step in range(max_steps):
-        _, loss_value = session.run([train_op, MAP_loss])
+        _, loss_value = session.run([train_op, loss])
         duration = time.time() - start
-        if step % 100 == 0:
+        if step % 1000 == 0:
             print("Step: {:>3d} Loss: {:.3f} ({:.3f} sec)".format(step, 
                                                                   loss_value,
                                                                   duration))
@@ -79,6 +99,13 @@ with tf.Session() as session:
             if abs(loss_vals[-1]-loss_value) <  epsilon:
                 break
         loss_vals.append(loss_value)
+
+    # Criticism
+    z_pred = session.run(qz).argmax(axis=1)
+    print("Adjusted Rand Index=", adjusted_rand_score(z_pred, z_true))
+
+    print(z_pred)
+    print(z_true)
 
 
 fig = plt.figure()
