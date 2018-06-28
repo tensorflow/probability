@@ -57,17 +57,24 @@ class _ReshapeBijectorTest(object):
       (x_,
        y_,
        fldj_,
-       ildj_) = sess.run((
+       ildj_,
+       fest_,
+       iest_) = sess.run((
            bijector.inverse(expected_y),
            bijector.forward(expected_x),
            bijector.forward_log_det_jacobian(expected_x, event_ndims=2),
            bijector.inverse_log_det_jacobian(expected_y, event_ndims=2),
+           bijector.forward_event_shape_tensor(expected_x.shape),
+           bijector.inverse_event_shape_tensor(expected_y.shape),
        ))
       self.assertEqual("reshape", bijector.name)
       self.assertAllClose(expected_y, y_, rtol=1e-6, atol=0)
       self.assertAllClose(expected_x, x_, rtol=1e-6, atol=0)
       self.assertAllClose(0., fldj_, rtol=1e-6, atol=0)
       self.assertAllClose(0., ildj_, rtol=1e-6, atol=0)
+      # Test that event_shape_tensors match fwd/inv result shapes.
+      self.assertAllEqual(y_.shape, fest_)
+      self.assertAllEqual(x_.shape, iest_)
 
   def testEventShapeTensor(self):
     """Test event_shape_tensor methods when even ndims may be dynamic."""
@@ -132,8 +139,7 @@ class _ReshapeBijectorTest(object):
       # Here we pass in a tensor (x) whose shape is compatible with
       # the output shape, so tf.reshape will throw no error, but
       # doesn't match the expected input shape.
-      with self.assertRaisesError(
-          "Input `event_shape` does not match `event_shape_in`."):
+      with self.assertRaisesError("Input `event_shape` does not match"):
         sess.run(bijector.forward(x))
 
   def testValidButNonMatchingInputPartiallySpecifiedOpError(self):
@@ -146,8 +152,7 @@ class _ReshapeBijectorTest(object):
           event_shape_in=shape_in,
           validate_args=True)
 
-      with self.assertRaisesError(
-          "Input `event_shape` does not match `event_shape_in`."):
+      with self.assertRaisesError("Input `event_shape` does not match"):
         sess.run(bijector.forward(x))
 
   # pylint: disable=invalid-name
@@ -235,22 +240,30 @@ class ReshapeBijectorTestStatic(tf.test.TestCase, _ReshapeBijectorTest):
 
   def testEventShape(self):
     shape_in_static = tf.TensorShape([2, 3])
-    shape_out_static = tf.TensorShape([
-        6,
-    ])
+    shape_out_static = tf.TensorShape([6])
     bijector = tfb.Reshape(
         event_shape_out=shape_out_static,
         event_shape_in=shape_in_static,
         validate_args=True)
 
-    # test that forward_ and inverse_event_shape do sensible things
-    # when shapes are statically known.
+    # Test that forward_ and inverse_event_shape are correct when
+    # event_shape_in/_out are statically known, even when the input shapes
+    # are only partially specified.
     self.assertEqual(
-        bijector.forward_event_shape(shape_in_static),
-        shape_out_static)
+        bijector.forward_event_shape(tf.TensorShape([4, 2, 3])).as_list(),
+        [4, 6])
     self.assertEqual(
-        bijector.inverse_event_shape(shape_out_static),
-        shape_in_static)
+        bijector.forward_event_shape(tf.TensorShape([None, 2, 3])).as_list(),
+        [None, 6])
+    self.assertEqual(
+        bijector.inverse_event_shape(tf.TensorShape([4, 6])).as_list(),
+        [4, 2, 3])
+    self.assertEqual(
+        bijector.inverse_event_shape(tf.TensorShape([None, 6])).as_list(),
+        [None, 2, 3])
+    # If the input shape is totally unknown, there's nothing we can do!
+    self.assertIsNone(
+        bijector.forward_event_shape(tf.TensorShape(None)).ndims)
 
   def testBijectiveAndFinite(self):
     x = np.random.randn(4, 2, 3)
@@ -292,6 +305,29 @@ class ReshapeBijectorTestDynamic(tf.test.TestCase, _ReshapeBijectorTest):
   def assertRaisesError(self, msg):
     return self.assertRaisesOpError(msg)
 
+  def testEventShape(self):
+    event_shape_in, event_shape_out = self.build_shapes([2, 3], [6])
+    bijector = tfb.Reshape(
+        event_shape_out=event_shape_out,
+        event_shape_in=event_shape_in,
+        validate_args=True)
+
+    self.assertEqual(
+        bijector.forward_event_shape(tf.TensorShape([4, 2, 3])).as_list(),
+        [4, None])
+    self.assertEqual(
+        bijector.forward_event_shape(tf.TensorShape([None, 2, 3])).as_list(),
+        [None, None])
+    self.assertEqual(
+        bijector.inverse_event_shape(tf.TensorShape([4, 6])).as_list(),
+        [4, None, None])
+    self.assertEqual(
+        bijector.inverse_event_shape(tf.TensorShape([None, 6])).as_list(),
+        [None, None, None])
+    # If the input shape is totally unknown, there's nothing we can do!
+    self.assertIsNone(
+        bijector.forward_event_shape(tf.TensorShape(None)).ndims)
+
   def testInputOutputMismatchOpError(self):
     self._testInputOutputMismatchOpError("Input to reshape is a tensor with")
 
@@ -330,6 +366,25 @@ class ReshapeBijectorTestDynamicNdims(tf.test.TestCase, _ReshapeBijectorTest):
 
   def assertRaisesError(self, msg):
     return self.assertRaisesOpError(msg)
+
+  def testEventShape(self):
+    event_shape_in, event_shape_out = self.build_shapes([2, 3], [6])
+    bijector = tfb.Reshape(
+        event_shape_out=event_shape_out,
+        event_shape_in=event_shape_in,
+        validate_args=True)
+
+    # forward_ and inverse_event_shape can only be totally unknown in this case.
+    self.assertIsNone(
+        bijector.forward_event_shape(tf.TensorShape([4, 2, 3])).ndims)
+    self.assertIsNone(
+        bijector.forward_event_shape(tf.TensorShape([None, 2, 3])).ndims)
+    self.assertIsNone(
+        bijector.inverse_event_shape(tf.TensorShape([4, 6])).ndims)
+    self.assertIsNone(
+        bijector.inverse_event_shape(tf.TensorShape([None, 6])).ndims)
+    self.assertIsNone(
+        bijector.forward_event_shape(tf.TensorShape(None)).ndims)
 
   def testInputOutputMismatchOpError(self):
     self._testInputOutputMismatchOpError("Input to reshape is a tensor with")
