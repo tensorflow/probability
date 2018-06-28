@@ -40,6 +40,7 @@ _allowed_symbols = [
     'edward2',
     'glm',
     'layers',
+    'math',
     'mcmc',
     'monte_carlo',
     'optimizer',
