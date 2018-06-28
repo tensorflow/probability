@@ -444,7 +444,7 @@ class PositiveSemidefiniteKernel(object):
 
       ```none
       | k(x[0], y[0])    k(x[0], y[1])  ...  k(x[0], y[3]) |
-      | k(x[1], y[0])    k(x[1], y[1])  ...  k(x[0], y[3]) |
+      | k(x[1], y[0])    k(x[1], y[1])  ...  k(x[1], y[3]) |
       |      ...              ...                 ...      |
       | k(x[4], y[0])    k(x[4], y[1])  ...  k(x[4], y[3]) |
       ```
