@@ -296,7 +296,7 @@ def _get_permutations(num_results, dims, seed=None):
     return tf.map_fn(
         fn,
         sample_range,
-        parallel_iterations=1 if seed[0] is not None else seed[0])
+        parallel_iterations=1 if seed[0] is not None else 10)
   return tf.concat([generate_one(d) for d in tf.unstack(dims)],
                    axis=-1)
 
