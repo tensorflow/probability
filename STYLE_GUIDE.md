@@ -18,7 +18,7 @@ conventions may be moved upstream.)
     Justification: it’s easier to debug TF graphs when they align with Python
     code.
 
-3.  Run all Tensor args through tf.convert_to_tensor immediately after
+3.  Run all Tensor args through `tf.convert_to_tensor` immediately after
     name_scope.
 
     Justification: not doing so can lead to surprising results when computing
