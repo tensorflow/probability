@@ -87,7 +87,7 @@ def make_tril_scale(
     validate_args=False,
     assert_positive=False,
     name=None):
-  """Creates a LinOp representing a lower triangular matrix.
+  """Creates a LinearOperator representing a lower triangular matrix.
 
   Args:
     loc: Floating-point `Tensor`. This is used for inferring shape in the case
@@ -95,12 +95,12 @@ def make_tril_scale(
     scale_tril: Floating-point `Tensor` representing the diagonal matrix.
       `scale_diag` has shape [N1, N2, ...  k, k], which represents a k x k
       lower triangular matrix.
-      When `None` no `scale_tril` term is added to the LinOp.
+      When `None` no `scale_tril` term is added to the LinearOperator.
       The upper triangular elements above the diagonal are ignored.
     scale_diag: Floating-point `Tensor` representing the diagonal matrix.
       `scale_diag` has shape [N1, N2, ...  k], which represents a k x k
       diagonal matrix.
-      When `None` no diagonal term is added to the LinOp.
+      When `None` no diagonal term is added to the LinearOperator.
     scale_identity_multiplier: floating point rank 0 `Tensor` representing a
       scaling done to the identity matrix.
       When `scale_identity_multiplier = scale_diag = scale_tril = None` then
@@ -110,8 +110,8 @@ def make_tril_scale(
       the identity matrix when only `scale_identity_multiplier` is set.
     validate_args: Python `bool` indicating whether arguments should be
       checked for correctness.
-    assert_positive: Python `bool` indicating whether LinOp should be checked
-      for being positive definite.
+    assert_positive: Python `bool` indicating whether LinearOperator should be
+      checked for being positive definite.
     name: Python `str` name given to ops managed by this object.
 
   Returns:
@@ -183,7 +183,7 @@ def make_diag_scale(
     validate_args=False,
     assert_positive=False,
     name=None):
-  """Creates a LinOp representing a diagonal matrix.
+  """Creates a LinearOperator representing a diagonal matrix.
 
   Args:
     loc: Floating-point `Tensor`. This is used for inferring shape in the case
@@ -191,7 +191,7 @@ def make_diag_scale(
     scale_diag: Floating-point `Tensor` representing the diagonal matrix.
       `scale_diag` has shape [N1, N2, ...  k], which represents a k x k
       diagonal matrix.
-      When `None` no diagonal term is added to the LinOp.
+      When `None` no diagonal term is added to the LinearOperator.
     scale_identity_multiplier: floating point rank 0 `Tensor` representing a
       scaling done to the identity matrix.
       When `scale_identity_multiplier = scale_diag = scale_tril = None` then
@@ -201,8 +201,8 @@ def make_diag_scale(
       the identity matrix when only `scale_identity_multiplier` is set.
     validate_args: Python `bool` indicating whether arguments should be
       checked for correctness.
-    assert_positive: Python `bool` indicating whether LinOp should be checked
-      for being positive definite.
+    assert_positive: Python `bool` indicating whether LinearOperator should be
+      checked for being positive definite.
     name: Python `str` name given to ops managed by this object.
 
   Returns:
