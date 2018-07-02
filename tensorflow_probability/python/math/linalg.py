@@ -14,7 +14,7 @@
 # ============================================================================
 """Functions for common linear algebra operations.
 
-Note: Many of these functions will eventually be migrated to core Tensorflow.
+Note: Many of these functions will eventually be migrated to core TensorFlow.
 """
 
 from __future__ import absolute_import
