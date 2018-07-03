@@ -44,7 +44,7 @@ class _BatchReshapeTest(object):
                        old_batch_shape + [dims, dims])
     scale_ph = tf.placeholder_with_default(
         scale, shape=scale.shape if self.is_static_shape else None)
-    wishart = tfd.WishartFull(df=5, scale=scale_ph)
+    wishart = tfd.Wishart(df=5, scale=scale_ph)
     reshape_wishart = tfd.BatchReshape(
         distribution=wishart,
         batch_shape=new_batch_shape_ph,

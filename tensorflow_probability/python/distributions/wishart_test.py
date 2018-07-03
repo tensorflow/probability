@@ -46,17 +46,17 @@ def wishart_var(df, x):
   return x**2 + np.dot(d, d.T)
 
 
-class WishartCholeskyTest(tf.test.TestCase):
+class WishartTest(tf.test.TestCase):
 
   def testEntropy(self):
     with self.test_session():
       scale = make_pd(1., 2)
       df = 4
-      w = tfd.WishartCholesky(df, chol(scale))
+      w = tfd.Wishart(df, scale_tril=chol(scale))
       # sp.stats.wishart(df=4, scale=make_pd(1., 2)).entropy()
       self.assertAllClose(6.301387092430769, w.entropy().eval())
 
-      w = tfd.WishartCholesky(df=1, scale=[[1.]])
+      w = tfd.Wishart(df=1, scale_tril=[[1.]])
       # sp.stats.wishart(df=1,scale=1).entropy()
       self.assertAllClose(0.78375711047393404, w.entropy().eval())
 
@@ -69,38 +69,38 @@ class WishartCholeskyTest(tf.test.TestCase):
             - 0.5 * (w.df - w.dimension - 1.) * w.mean_log_det()
             + 0.5 * w.df * w.dimension).eval()
 
-      w = tfd.WishartCholesky(df=4, scale=chol(make_pd(1., 2)))
+      w = tfd.Wishart(df=4, scale_tril=chol(make_pd(1., 2)))
       self.assertAllClose(w.entropy().eval(), entropy_alt(w))
 
-      w = tfd.WishartCholesky(df=5, scale=[[1.]])
+      w = tfd.Wishart(df=5, scale_tril=[[1.]])
       self.assertAllClose(w.entropy().eval(), entropy_alt(w))
 
   def testMean(self):
     with self.test_session():
       scale = make_pd(1., 2)
       df = 4
-      w = tfd.WishartCholesky(df, chol(scale))
+      w = tfd.Wishart(df, scale_tril=chol(scale))
       self.assertAllEqual(df * scale, w.mean().eval())
 
   def testMode(self):
     with self.test_session():
       scale = make_pd(1., 2)
       df = 4
-      w = tfd.WishartCholesky(df, chol(scale))
+      w = tfd.Wishart(df, scale_tril=chol(scale))
       self.assertAllEqual((df - 2. - 1.) * scale, w.mode().eval())
 
   def testStd(self):
     with self.test_session():
       scale = make_pd(1., 2)
       df = 4
-      w = tfd.WishartCholesky(df, chol(scale))
+      w = tfd.Wishart(df, scale_tril=chol(scale))
       self.assertAllEqual(chol(wishart_var(df, scale)), w.stddev().eval())
 
   def testVariance(self):
     with self.test_session():
       scale = make_pd(1., 2)
       df = 4
-      w = tfd.WishartCholesky(df, chol(scale))
+      w = tfd.Wishart(df, scale_tril=chol(scale))
       self.assertAllEqual(wishart_var(df, scale), w.variance().eval())
 
   def testSample(self):
@@ -108,32 +108,32 @@ class WishartCholeskyTest(tf.test.TestCase):
       scale = make_pd(1., 2)
       df = 4
 
-      chol_w = tfd.WishartCholesky(
-          df, chol(scale), cholesky_input_output_matrices=False)
+      chol_w = tfd.Wishart(
+          df, scale_tril=chol(scale), cholesky_input_output_matrices=False)
 
       x = chol_w.sample(1, seed=42).eval()
       chol_x = [chol(x[0])]
 
-      full_w = tfd.WishartFull(df, scale, cholesky_input_output_matrices=False)
+      full_w = tfd.Wishart(df, scale, cholesky_input_output_matrices=False)
       self.assertAllClose(x, full_w.sample(1, seed=42).eval())
 
-      chol_w_chol = tfd.WishartCholesky(
-          df, chol(scale), cholesky_input_output_matrices=True)
+      chol_w_chol = tfd.Wishart(
+          df, scale_tril=chol(scale), cholesky_input_output_matrices=True)
       self.assertAllClose(chol_x, chol_w_chol.sample(1, seed=42).eval())
       eigen_values = tf.matrix_diag_part(chol_w_chol.sample(1000, seed=42))
       np.testing.assert_array_less(0., eigen_values.eval())
 
-      full_w_chol = tfd.WishartFull(
-          df, scale, cholesky_input_output_matrices=True)
+      full_w_chol = tfd.Wishart(
+          df, scale=scale, cholesky_input_output_matrices=True)
       self.assertAllClose(chol_x, full_w_chol.sample(1, seed=42).eval())
       eigen_values = tf.matrix_diag_part(full_w_chol.sample(1000, seed=42))
       np.testing.assert_array_less(0., eigen_values.eval())
 
       # Check first and second moments.
       df = 4.
-      chol_w = tfd.WishartCholesky(
+      chol_w = tfd.Wishart(
           df=df,
-          scale=chol(make_pd(1., 3)),
+          scale_tril=chol(make_pd(1., 3)),
           cholesky_input_output_matrices=False)
       x = chol_w.sample(10000, seed=42)
       self.assertAllEqual((10000, 3, 3), x.get_shape())
@@ -156,17 +156,17 @@ class WishartCholeskyTest(tf.test.TestCase):
       n_val = 100
 
       tf.set_random_seed(654321)
-      chol_w1 = tfd.WishartCholesky(
+      chol_w1 = tfd.Wishart(
           df=df,
-          scale=chol(make_pd(1., 3)),
+          scale_tril=chol(make_pd(1., 3)),
           cholesky_input_output_matrices=False,
           name="wishart1")
       samples1 = chol_w1.sample(n_val, seed=123456).eval()
 
       tf.set_random_seed(654321)
-      chol_w2 = tfd.WishartCholesky(
+      chol_w2 = tfd.Wishart(
           df=df,
-          scale=chol(make_pd(1., 3)),
+          scale_tril=chol(make_pd(1., 3)),
           cholesky_input_output_matrices=False,
           name="wishart2")
       samples2 = chol_w2.sample(n_val, seed=123456).eval()
@@ -196,8 +196,10 @@ class WishartCholeskyTest(tf.test.TestCase):
       ])
 
       # This test checks that batches don't interfere with correctness.
-      w = tfd.WishartCholesky(
-          df=[2, 3, 4, 5], scale=chol_x, cholesky_input_output_matrices=True)
+      w = tfd.Wishart(
+          df=[2, 3, 4, 5],
+          scale_tril=chol_x,
+          cholesky_input_output_matrices=True)
       self.assertAllClose(log_prob_df_seq, w.log_prob(chol_x).eval())
 
       # Now we test various constructions of Wishart with different sample
@@ -214,10 +216,13 @@ class WishartCholeskyTest(tf.test.TestCase):
           -20.951582705289454,
       ])
 
-      for w in (tfd.WishartCholesky(
-          df=4, scale=chol_x[0], cholesky_input_output_matrices=False),
-                tfd.WishartFull(
-                    df=4, scale=x[0], cholesky_input_output_matrices=False)):
+      for w in (
+          tfd.Wishart(
+              df=4,
+              scale_tril=chol_x[0],
+              cholesky_input_output_matrices=False),
+          tfd.Wishart(
+              df=4, scale=x[0], cholesky_input_output_matrices=False)):
         self.assertAllEqual((2, 2), w.event_shape_tensor().eval())
         self.assertEqual(2, w.dimension.eval())
         self.assertAllClose(log_prob[0], w.log_prob(x[0]).eval())
@@ -231,10 +236,11 @@ class WishartCholeskyTest(tf.test.TestCase):
         self.assertAllEqual((2, 2),
                             w.log_prob(np.reshape(x, (2, 2, 2, 2))).get_shape())
 
-      for w in (tfd.WishartCholesky(
-          df=4, scale=chol_x[0], cholesky_input_output_matrices=True),
-                tfd.WishartFull(
-                    df=4, scale=x[0], cholesky_input_output_matrices=True)):
+      for w in (
+          tfd.Wishart(df=4,
+                      scale_tril=chol_x[0],
+                      cholesky_input_output_matrices=True),
+          tfd.Wishart(df=4, scale=x[0], cholesky_input_output_matrices=True)):
         self.assertAllEqual((2, 2), w.event_shape_tensor().eval())
         self.assertEqual(2, w.dimension.eval())
         self.assertAllClose(log_prob[0], w.log_prob(chol_x[0]).eval())
@@ -253,17 +259,17 @@ class WishartCholeskyTest(tf.test.TestCase):
       scale = make_pd(1., 2)
       chol_scale = chol(scale)
 
-      w = tfd.WishartCholesky(df=4, scale=chol_scale)
+      w = tfd.Wishart(df=4, scale_tril=chol_scale)
       self.assertAllEqual([], w.batch_shape)
       self.assertAllEqual([], w.batch_shape_tensor().eval())
 
-      w = tfd.WishartCholesky(
-          df=[4., 4], scale=np.array([chol_scale, chol_scale]))
+      w = tfd.Wishart(
+          df=[4., 4], scale_tril=np.array([chol_scale, chol_scale]))
       self.assertAllEqual([2], w.batch_shape)
       self.assertAllEqual([2], w.batch_shape_tensor().eval())
 
       scale_deferred = tf.placeholder(tf.float32)
-      w = tfd.WishartCholesky(df=4, scale=scale_deferred)
+      w = tfd.Wishart(df=4, scale_tril=scale_deferred)
       self.assertAllEqual(
           [], sess.run(w.batch_shape_tensor(),
                        feed_dict={scale_deferred: chol_scale}))
@@ -277,17 +283,17 @@ class WishartCholeskyTest(tf.test.TestCase):
       scale = make_pd(1., 2)
       chol_scale = chol(scale)
 
-      w = tfd.WishartCholesky(df=4, scale=chol_scale)
+      w = tfd.Wishart(df=4, scale_tril=chol_scale)
       self.assertAllEqual([2, 2], w.event_shape)
       self.assertAllEqual([2, 2], w.event_shape_tensor().eval())
 
-      w = tfd.WishartCholesky(
-          df=[4., 4], scale=np.array([chol_scale, chol_scale]))
+      w = tfd.Wishart(
+          df=[4., 4], scale_tril=np.array([chol_scale, chol_scale]))
       self.assertAllEqual([2, 2], w.event_shape)
       self.assertAllEqual([2, 2], w.event_shape_tensor().eval())
 
       scale_deferred = tf.placeholder(tf.float32)
-      w = tfd.WishartCholesky(df=4, scale=scale_deferred)
+      w = tfd.Wishart(df=4, scale_tril=scale_deferred)
       self.assertAllEqual(
           [2, 2],
           sess.run(w.event_shape_tensor(),
@@ -307,8 +313,10 @@ class WishartCholeskyTest(tf.test.TestCase):
       # Check expensive, deferred assertions.
       with self.assertRaisesRegexp(errors_impl.InvalidArgumentError,
                                    "cannot be less than"):
-        chol_w = tfd.WishartCholesky(
-            df=df_deferred, scale=chol_scale_deferred, validate_args=True)
+        chol_w = tfd.Wishart(
+            df=df_deferred,
+            scale_tril=chol_scale_deferred,
+            validate_args=True)
         sess.run(chol_w.log_prob(np.asarray(
             x, dtype=np.float32)),
                  feed_dict={df_deferred: 2.,
@@ -316,7 +324,7 @@ class WishartCholeskyTest(tf.test.TestCase):
 
       with self.assertRaisesRegexp(errors_impl.InvalidArgumentError,
                                    "Cholesky decomposition was not successful"):
-        chol_w = tfd.WishartFull(df=df_deferred, scale=chol_scale_deferred)
+        chol_w = tfd.Wishart(df=df_deferred, scale=chol_scale_deferred)
         # np.ones((3, 3)) is not positive, definite.
         sess.run(chol_w.log_prob(np.asarray(
             x, dtype=np.float32)),
@@ -326,16 +334,18 @@ class WishartCholeskyTest(tf.test.TestCase):
                          (3, 3), dtype=np.float32)
                  })
 
-      with self.assertRaisesOpError("scale must be square"):
-        chol_w = tfd.WishartCholesky(
+      with self.assertRaisesOpError("scale_tril must be square"):
+        chol_w = tfd.Wishart(
             df=4.,
-            scale=np.array([[2., 3., 4.], [1., 2., 3.]], dtype=np.float32),
+            scale_tril=np.array([[2., 3., 4.], [1., 2., 3.]],
+                                dtype=np.float32),
             validate_args=True)
         sess.run(chol_w.scale().eval())
 
       # Ensure no assertions.
-      chol_w = tfd.WishartCholesky(
-          df=df_deferred, scale=chol_scale_deferred, validate_args=False)
+      chol_w = tfd.Wishart(
+          df=df_deferred, scale_tril=chol_scale_deferred,
+          validate_args=False)
       sess.run(chol_w.log_prob(np.asarray(
           x, dtype=np.float32)),
                feed_dict={df_deferred: 4,
@@ -354,11 +364,11 @@ class WishartCholeskyTest(tf.test.TestCase):
       # Still has these assertions because they're resolveable at graph
       # construction
       with self.assertRaisesRegexp(ValueError, "cannot be less than"):
-        tfd.WishartCholesky(df=2, scale=chol_scale, validate_args=False)
+        tfd.Wishart(df=2, scale_tril=chol_scale, validate_args=False)
       with self.assertRaisesRegexp(TypeError, "Argument tril must have dtype"):
-        tfd.WishartCholesky(
+        tfd.Wishart(
             df=4.,
-            scale=np.asarray(chol_scale, dtype=np.int32),
+            scale_tril=np.asarray(chol_scale, dtype=np.int32),
             validate_args=False)
 
   def testSampleBroadcasts(self):
@@ -373,7 +383,7 @@ class WishartCholeskyTest(tf.test.TestCase):
     ])
     scale = np.reshape(np.concatenate([scale, scale, scale], axis=0),
                        batch_shape + [dims, dims])
-    wishart = tfd.WishartFull(df=5, scale=scale)
+    wishart = tfd.Wishart(df=5, scale=scale)
     x = wishart.sample(sample_shape, seed=42)
     with self.test_session() as sess:
       x_ = sess.run(x)

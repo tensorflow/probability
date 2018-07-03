@@ -61,8 +61,7 @@ class DistributionTest(tf.test.TestCase):
       # different initialization arguments. We therefore spot test a few.
       normal = tfd.Normal(loc=1., scale=2., validate_args=True)
       self.assertEqual(normal.parameters, normal.copy().parameters)
-      wishart = tfd.WishartFull(df=2, scale=[[1., 2], [2, 5]],
-                                validate_args=True)
+      wishart = tfd.Wishart(df=2, scale=[[1., 2], [2, 5]], validate_args=True)
       self.assertEqual(wishart.parameters, wishart.copy().parameters)
 
   def testCopyOverride(self):

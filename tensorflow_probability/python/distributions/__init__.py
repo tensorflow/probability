@@ -71,8 +71,7 @@ from tensorflow_probability.python.distributions.vector_diffeomixture import Vec
 from tensorflow_probability.python.distributions.vector_exponential_diag import VectorExponentialDiag
 from tensorflow_probability.python.distributions.vector_laplace_diag import VectorLaplaceDiag
 from tensorflow_probability.python.distributions.vector_sinh_arcsinh_diag import VectorSinhArcsinhDiag
-from tensorflow_probability.python.distributions.wishart import WishartCholesky
-from tensorflow_probability.python.distributions.wishart import WishartFull
+from tensorflow_probability.python.distributions.wishart import Wishart
 
 from tensorflow_probability.python.internal.distribution_util import fill_triangular
 from tensorflow_probability.python.internal.distribution_util import fill_triangular_inverse
@@ -169,8 +168,7 @@ __all__ = [
     'VectorDiffeomixture',
     'VectorLaplaceDiag',
     'VectorSinhArcsinhDiag',
-    'WishartCholesky',
-    'WishartFull',
+    'Wishart',
     'TransformedDistribution',
     'QuantizedDistribution',
     'Mixture',

@@ -72,8 +72,7 @@ rv_all = [
     "VectorExponentialDiag",
     "VectorLaplaceDiag",
     "VectorSinhArcsinhDiag",
-    "WishartCholesky",
-    "WishartFull",
+    "Wishart",
 ]
 
 __all__ = rv_all + [
@@ -264,6 +263,5 @@ VectorDiffeomixture = _make_random_variable(tfd.VectorDiffeomixture)
 VectorExponentialDiag = _make_random_variable(tfd.VectorExponentialDiag)
 VectorLaplaceDiag = _make_random_variable(tfd.VectorLaplaceDiag)
 VectorSinhArcsinhDiag = _make_random_variable(tfd.VectorSinhArcsinhDiag)
-WishartCholesky = _make_random_variable(tfd.WishartCholesky)
-WishartFull = _make_random_variable(tfd.WishartFull)
+Wishart = _make_random_variable(tfd.Wishart)
 # pylint: enable=invalid-name
