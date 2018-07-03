@@ -124,7 +124,7 @@ https://bazel.build/) build system.
 # sudo apt-get install bazel git python-pip  # Ubuntu; others, see above links.
 git clone https://github.com/tensorflow/probability.git
 cd probability
-bazel build --config=opt --copt=-O3 --copt=-march=native :pip_pkg
+bazel build --copt=-O3 --copt=-march=native :pip_pkg
 PKGDIR=$(mktemp -d)
 ./bazel-bin/pip_pkg $PKGDIR
 pip install --user --upgrade $PKGDIR/*.whl
