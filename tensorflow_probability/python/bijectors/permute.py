@@ -70,13 +70,17 @@ class Permute(bijector.Bijector):
 
   """
 
-  def __init__(self, permutation, validate_args=False, name=None):
+  def __init__(self, permutation, axis=-1, validate_args=False, name=None):
     """Creates the `Permute` bijector.
 
     Args:
       permutation: An `int`-like vector-shaped `Tensor` representing the
-        permutation to apply to the rightmost dimension of the transformed
+        permutation to apply to the `axis` dimension of the transformed
         `Tensor`.
+      axis: Scalar `int` `Tensor` representing the dimension over which to
+        `tf.gather`. `axis` must be relative to the end (reading left to right)
+        thus must be negative.
+        Default value: `-1` (i.e., right-most).
       validate_args: Python `bool` indicating whether arguments should be
         checked for correctness.
       name: Python `str`, name given to ops managed by this object.
@@ -85,8 +89,14 @@ class Permute(bijector.Bijector):
       TypeError: if `not permutation.dtype.is_integer`.
       ValueError: if `permutation` does not contain exactly one of each of
         `{0, 1, ..., d}`.
+      NotImplementedError: if `axis` is not known prior to graph execution.
+      NotImplementedError: if `axis` is not negative.
     """
-    with tf.name_scope(name, "permute", values=[permutation]):
+    with tf.name_scope(name, "permute", values=[permutation, axis]):
+      axis = tf.convert_to_tensor(axis, name="axis")
+      if not axis.dtype.is_integer:
+        raise TypeError("axis.dtype ({}) should be `int`-like.".format(
+            axis.dtype.name))
       permutation = tf.convert_to_tensor(permutation, name="permutation")
       if not permutation.dtype.is_integer:
         raise TypeError("permutation.dtype ({}) should be `int`-like.".format(
@@ -106,9 +116,19 @@ class Permute(bijector.Bijector):
                 message=("Permutation over `d` must contain exactly one of "
                          "each of `{0, 1, ..., d}`.")),
         ], permutation)
+      axis_ = tensor_util.constant_value(axis)
+      if axis_ is None:
+        raise NotImplementedError("`axis` must be known prior to graph "
+                                  "execution.")
+      elif axis_ >= 0:
+        raise NotImplementedError("`axis` must be relative the rightmost "
+                                  "dimension, i.e., negative.")
+      else:
+        forward_min_event_ndims = int(np.abs(axis_))
       self._permutation = permutation
+      self._axis = axis
       super(Permute, self).__init__(
-          forward_min_event_ndims=1,
+          forward_min_event_ndims=forward_min_event_ndims,
           is_constant_jacobian=True,
           validate_args=validate_args,
           name=name or "permute")
@@ -117,11 +137,15 @@ class Permute(bijector.Bijector):
   def permutation(self):
     return self._permutation
 
+  @property
+  def axis(self):
+    return self._axis
+
   def _forward(self, x):
-    return tf.gather(x, self.permutation, axis=-1)
+    return tf.gather(x, self.permutation, axis=self.axis)
 
   def _inverse(self, y):
-    return tf.gather(y, tf.invert_permutation(self.permutation), axis=-1)
+    return tf.gather(y, tf.invert_permutation(self.permutation), axis=self.axis)
 
   def _inverse_log_det_jacobian(self, y):
     # is_constant_jacobian = True for this bijector, hence the

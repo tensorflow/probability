@@ -114,14 +114,16 @@ class Transpose(bijector.Bijector):
       name: Python `str` name given to ops managed by this object.
 
     Raises:
-      ValueError: if `rightmost_transposed_ndims` is not known prior to graph
-        execution.
+      ValueError: if both or neither `perm` and `rightmost_transposed_ndims` are
+        specified.
+      NotImplementedError: if `rightmost_transposed_ndims` is not known prior to
+        graph execution.
     """
     with tf.name_scope(name, values=[perm, rightmost_transposed_ndims]):
       if (rightmost_transposed_ndims is None) == (perm is None):
         raise ValueError('Must specify exactly one of '
                          '`rightmost_transposed_ndims` and `perm`.')
-      elif rightmost_transposed_ndims is not None:
+      if rightmost_transposed_ndims is not None:
         rightmost_transposed_ndims = tf.convert_to_tensor(
             rightmost_transposed_ndims,
             dtype=np.int32,
@@ -136,7 +138,7 @@ class Transpose(bijector.Bijector):
             limit=-1,
             delta=-1,
             name='perm')
-      elif perm is not None:
+      else:  # perm is not None:
         perm = tf.convert_to_tensor(perm, dtype=np.int32, name='perm')
         rightmost_transposed_ndims = tf.size(
             perm, name='rightmost_transposed_ndims')
@@ -149,8 +151,8 @@ class Transpose(bijector.Bijector):
       # `min_event_ndims`, then this class already works dynamically and the
       # following five lines can be removed.
       if rightmost_transposed_ndims_ is None:
-        raise ValueError('`rightmost_transposed_ndims` must be '
-                         'known prior to graph execution.')
+        raise NotImplementedError('`rightmost_transposed_ndims` must be '
+                                  'known prior to graph execution.')
       else:
         rightmost_transposed_ndims_ = int(rightmost_transposed_ndims_)
 

@@ -77,5 +77,18 @@ class PermuteBijectorTest(tf.test.TestCase):
       assert_bijective_and_finite(
           bijector, x, y, event_ndims=1, rtol=1e-6, atol=0)
 
+  def testBijectiveAndFiniteAxis(self):
+    permutation = np.int32([1, 0])
+    x = np.random.randn(4, 2, 3)
+    y = x[..., permutation, :]
+    with self.test_session():
+      bijector = tfb.Permute(
+          permutation=permutation,
+          axis=-2,
+          validate_args=True)
+      assert_bijective_and_finite(
+          bijector, x, y, event_ndims=2, rtol=1e-6, atol=0)
+
+
 if __name__ == "__main__":
   tf.test.main()
