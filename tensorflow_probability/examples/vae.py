@@ -14,21 +14,80 @@
 # ============================================================================
 """Trains a variational auto-encoder (VAE) on binarized MNIST.
 
-The VAE defines a generative model in which a latent code `Z` is
-sampled from a prior `p(Z)`, then used to generate an observation `X`
-by way of a decoder `p(X|Z)`. To fit the model, we assume an approximate
-representation of the posterior in the form of an encoder
-`q(Z|X)`. We minimize the KL divergence between `q(Z|X)` and the
-true posterior `p(Z|X)`: this is equivalent to maximizing the evidence
-lower bound (ELBO)
+The VAE defines a generative model in which a latent code `Z` is sampled from a
+prior `p(Z)`, then used to generate an observation `X` by way of a decoder
+`p(X|Z)`. The full reconstruction follows
 
 ```none
- L =  E_{Z~q(Z|X)}[log p(Z)p(X|Z) - log q(Z)]
-   <= log p(X)
+   X ~ p(X)              # A random image from some dataset.
+   Z ~ q(Z | X)          # A random encoding of the original image ("encoder").
+Xhat ~ p(Xhat | Z)       # A random reconstruction of the original image
+                         #   ("decoder").
 ```
 
-which also provides a lower bound on the marginal likelihood `p(X)`. See
+To fit the VAE, we assume an approximate representation of the posterior in the
+form of an encoder `q(Z|X)`. We minimize the KL divergence between `q(Z|X)` and
+the true posterior `p(Z|X)`: this is equivalent to maximizing the evidence lower
+bound (ELBO),
+
+```none
+-log p(x)
+= -log int dz p(x|z) p(z)
+= -log int dz q(z|x) p(x|z) p(z) / q(z|x)
+<= int dz q(z|x) (-log[ p(x|z) p(z) / q(z|x) ])   # Jensen's Inequality
+=: KL[q(Z|x) || p(x|Z)p(Z)]
+= -E_{Z~q(Z|x)}[log p(x|Z)] - KL[q(Z|x) || p(Z)]
+```
+
+-or-
+
+```none
+-log p(x)
+= KL[q(Z|x) || p(x|Z)p(Z)] - KL[q(Z|x) || p(Z|x)]
+<= KL[q(Z|x) || p(x|Z)p(Z)                        # Positivity of KL
+= -E_{Z~q(Z|x)}[log p(x|Z)] - KL[q(Z|x) || p(Z)]
+```
+
+The `-E_{Z~q(Z|x)}[log p(x|Z)]` term is an expected reconstruction loss and
+`KL[q(Z|x) || p(Z)]` is a kind of distributional regularizer. See
 [Kingma and Welling (2014)][1] for more details.
+
+This script supports both a (learned) mixture of Gaussians prior as well as a
+fixed standard normal prior. You can enable the fixed standard normal prior by
+setting `mixture_components` to 1. Note that fixing the parameters of the prior
+(as opposed to fitting them with the rest of the model) incurs no loss in
+generality when using only a single Gaussian. The reasoning for this is
+two-fold:
+
+  * On the generative side, the parameters from the prior can simply be absorbed
+    into the first linear layer of the generative net. If `z ~ N(mu, Sigma)` and
+    the first layer of the generative net is given by `x = Wz + b`, this can be
+    rewritten,
+
+      s ~ N(0, I)
+      x = Wz + b
+        = W (As + mu) + b
+        = (WA) s + (W mu + b)
+
+    where Sigma has been decomposed into A A^T = Sigma. In other words, the log
+    likelihood of the model (E_{Z~q(Z|x)}[log p(x|Z)]) is independent of whether
+    or not we learn mu and Sigma.
+
+  * On the inference side, we can adjust any posterior approximation
+    q(z | x) ~ N(mu[q], Sigma[q]), with
+
+    new_mu[p] := 0
+    new_Sigma[p] := eye(d)
+    new_mu[q] := inv(chol(Sigma[p])) @ (mu[p] - mu[q])
+    new_Sigma[q] := inv(Sigma[q]) @ Sigma[p]
+
+    A bit of algebra on the KL divergence term `KL[q(Z|x) || p(Z)]` reveals that
+    it is also invariant to the prior parameters as long as Sigma[p] and
+    Sigma[q] are invertible.
+
+This script also supports using the analytic KL (KL[q(Z|x) || p(Z)]) with the
+`analytic_kl` flag. Using the analytic KL is only supported when
+`mixture_components` is set to 1 since otherwise no analytic form is known.
 
 Here we also compute tighter bounds, the IWAE [Burda et. al. (2015)][2].
 
@@ -87,7 +146,21 @@ flags.DEFINE_integer(
 flags.DEFINE_integer(
     "n_samples", default=16, help="Number of samples to use in encoding.")
 flags.DEFINE_integer(
-    "mixture_components", default=100, help="Number of mixture components.")
+    "mixture_components",
+    default=100,
+    help="Number of mixture components to use in the prior. Each component is "
+         "a diagonal normal distribution. The parameters of the components are "
+         "intialized randomly, and then learned along with the rest of the "
+         "parameters. If `analytic_kl` is True, `mixture_components` must be "
+         "set to `1`.")
+flags.DEFINE_bool(
+    "analytic_kl",
+    default=False,
+    help="Whether or not to use the analytic version of the KL. When set to "
+         "False the E_{Z~q(Z|X)}[log p(Z)p(X|Z) - log q(Z|X)] form of the ELBO "
+         "will be used. Otherwise the -KL(q(Z|X) || p(Z)) + "
+         "E_{Z~q(Z|X)}[log p(X|Z)] form will be used. If analytic_kl is True, "
+         "then you must also specify `mixture_components=1`.")
 flags.DEFINE_string(
     "data_dir",
     default=os.path.join(os.getenv("TEST_TMPDIR", "/tmp"), "vae/data"),
@@ -97,12 +170,15 @@ flags.DEFINE_string(
     default=os.path.join(os.getenv("TEST_TMPDIR", "/tmp"), "vae/"),
     help="Directory to put the model's fit.")
 flags.DEFINE_integer(
-    "viz_steps", default=500, help="Frequency at which save visualizations.")
-flags.DEFINE_bool("fake_data", default=False, help="If true, uses fake data.")
+    "viz_steps", default=500, help="Frequency at which to save visualizations.")
+flags.DEFINE_bool(
+    "fake_data",
+    default=False,
+    help="If true, uses fake data instead of MNIST.")
 flags.DEFINE_bool(
     "delete_existing",
     default=False,
-    help="If true, deletes existing directory.")
+    help="If true, deletes existing `model_dir` directory.")
 
 FLAGS = flags.FLAGS
 
@@ -179,9 +255,8 @@ def make_decoder(activation, latent_size, output_shape, base_depth):
 
   def decoder(codes):
     original_shape = tf.shape(codes)
-    # Collapse the sample and batch dimension
-    # and convert to rank-4 tensor for use with
-    # a convolutional decoder network.
+    # Collapse the sample and batch dimension and convert to rank-4 tensor for
+    # use with a convolutional decoder network.
     codes = tf.reshape(codes, (-1, 1, 1, latent_size))
     logits = decoder_net(codes)
     logits = tf.reshape(
@@ -194,8 +269,8 @@ def make_decoder(activation, latent_size, output_shape, base_depth):
   return decoder
 
 
-def make_random_prior(latent_size, mixture_components):
-  """Create the prior distribution.
+def make_mixture_prior(latent_size, mixture_components):
+  """Create the mixture of Gaussians prior distribution.
 
   Args:
     latent_size: The dimensionality of the latent representation.
@@ -206,18 +281,24 @@ def make_random_prior(latent_size, mixture_components):
       representing the distribution over encodings in the absence of any
       evidence.
   """
-  loc = tf.get_variable(name="loc", shape=[mixture_components, latent_size])
-  raw_scale_diag = tf.get_variable(
-      name="raw_scale_diag", shape=[mixture_components, latent_size])
-  mixture_logits = tf.get_variable(
-      name="mixture_logits", shape=[mixture_components])
+  if mixture_components == 1:
+    # See the module docstring for why we don't learn the parameters here.
+    return tfd.MultivariateNormalDiag(
+        loc=tf.zeros([latent_size]),
+        scale_identity_multiplier=1.0)
+  else:
+    loc = tf.get_variable(name="loc", shape=[mixture_components, latent_size])
+    raw_scale_diag = tf.get_variable(
+        name="raw_scale_diag", shape=[mixture_components, latent_size])
+    mixture_logits = tf.get_variable(
+        name="mixture_logits", shape=[mixture_components])
 
-  return tfd.MixtureSameFamily(
-      components_distribution=tfd.MultivariateNormalDiag(
-          loc=loc,
-          scale_diag=tf.nn.softplus(raw_scale_diag + _softplus_inverse(1.))),
-      mixture_distribution=tfd.Categorical(logits=mixture_logits),
-      name="prior")
+    return tfd.MixtureSameFamily(
+        components_distribution=tfd.MultivariateNormalDiag(
+            loc=loc,
+            scale_diag=tf.nn.softplus(raw_scale_diag)),
+        mixture_distribution=tfd.Categorical(logits=mixture_logits),
+        name="prior")
 
 
 def pack_images(images, rows, cols):
@@ -254,6 +335,12 @@ def model_fn(features, labels, mode, params, config):
     EstimatorSpec: A tf.estimator.EstimatorSpec instance.
   """
   del labels, config
+
+  if params["analytic_kl"] and params["latent_size"] != 1:
+    raise NotImplementedError(
+        "Using `analytic_kl` is only supported when `mixture_components = 1` "
+        "since there's no closed form otherwise.")
+
   encoder = make_encoder(params["activation"],
                          params["latent_size"],
                          params["base_depth"])
@@ -261,29 +348,35 @@ def model_fn(features, labels, mode, params, config):
                          params["latent_size"],
                          IMAGE_SHAPE,
                          params["base_depth"])
-  random_prior = make_random_prior(params["latent_size"],
-                                   params["mixture_components"])
+  latent_prior = make_mixture_prior(params["latent_size"],
+                                    params["mixture_components"])
 
   image_tile_summary("input", tf.to_float(features), rows=1, cols=16)
 
-  random_encoding = encoder(features)
-  encoding = random_encoding.sample(params["n_samples"])
-  random_reconstruction = decoder(encoding)
+  approx_posterior = encoder(features)
+  approx_posterior_sample = approx_posterior.sample(params["n_samples"])
+  decoder_likelihood = decoder(approx_posterior_sample)
   image_tile_summary(
       "recon/sample",
-      tf.to_float(random_reconstruction.sample()[:3, :16]),
+      tf.to_float(decoder_likelihood.sample()[:3, :16]),
       rows=3,
       cols=16)
   image_tile_summary(
       "recon/mean",
-      random_reconstruction.mean()[:3, :16],
+      decoder_likelihood.mean()[:3, :16],
       rows=3,
       cols=16)
 
-  distortion = -random_reconstruction.log_prob(features)
+  # `distortion` is just the negative log likelihood.
+  distortion = -decoder_likelihood.log_prob(features)
   avg_distortion = tf.reduce_mean(distortion)
   tf.summary.scalar("distortion", avg_distortion)
-  rate = random_encoding.log_prob(encoding) - random_prior.log_prob(encoding)
+
+  if params["analytic_kl"]:
+    rate = tfd.kl_divergence(approx_posterior, latent_prior)
+  else:
+    rate = (approx_posterior.log_prob(approx_posterior_sample)
+            - latent_prior.log_prob(approx_posterior_sample))
   avg_rate = tf.reduce_mean(rate)
   tf.summary.scalar("rate", avg_rate)
 
@@ -292,14 +385,14 @@ def model_fn(features, labels, mode, params, config):
   elbo = tf.reduce_mean(elbo_local)
   loss = -elbo
   tf.summary.scalar("elbo", elbo)
+
   importance_weighted_elbo = tf.reduce_mean(
       tf.reduce_logsumexp(elbo_local, axis=0) -
       tf.log(tf.to_float(params["n_samples"])))
   tf.summary.scalar("elbo/importance_weighted", importance_weighted_elbo)
 
   # Decode samples from the prior for visualization.
-  prior = random_prior.sample(16)
-  random_image = decoder(prior)
+  random_image = decoder(latent_prior.sample(16))
   image_tile_summary(
       "random/sample", tf.to_float(random_image.sample()), rows=4, cols=4)
   image_tile_summary("random/mean", random_image.mean(), rows=4, cols=4)
