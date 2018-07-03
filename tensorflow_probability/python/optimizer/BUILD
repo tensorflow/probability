@@ -31,6 +31,7 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         ":bfgs",
+        ":nelder_mead",
         ":sgld",
         ":variational_sgd",
         "//tensorflow_probability/python/optimizer/linesearch",
@@ -89,6 +90,26 @@ py_test(
     name = "bfgs_test",
     size = "medium",
     srcs = ["bfgs_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "nelder_mead",
+    srcs = ["nelder_mead.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "nelder_mead_test",
+    size = "medium",
+    srcs = ["nelder_mead_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
