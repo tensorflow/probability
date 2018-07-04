@@ -66,6 +66,7 @@ from tensorflow_probability.python.distributions.sample_stats import auto_correl
 from tensorflow_probability.python.distributions.sample_stats import percentile
 from tensorflow_probability.python.distributions.seed_stream import SeedStream
 from tensorflow_probability.python.distributions.sinh_arcsinh import SinhArcsinh
+from tensorflow_probability.python.distributions.truncated_normal import TruncatedNormal
 from tensorflow_probability.python.distributions.vector_diffeomixture import quadrature_scheme_softmaxnormal_gauss_hermite
 from tensorflow_probability.python.distributions.vector_diffeomixture import quadrature_scheme_softmaxnormal_quantiles
 from tensorflow_probability.python.distributions.vector_diffeomixture import VectorDiffeomixture
@@ -157,6 +158,7 @@ __all__ = [
     'SinhArcsinh',
     'StudentT',
     'StudentTWithAbsDfSoftplusScale',
+    'TruncatedNormal',
     'Uniform',
     'MultivariateNormalDiag',
     'MultivariateNormalFullCovariance',

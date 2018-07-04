@@ -339,6 +339,19 @@ py_test(
 )
 
 py_test(
+    name = "truncated_normal_test",
+    size = "medium",
+    srcs = ["truncated_normal_test.py"],
+    deps = [
+        ":distributions",
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_test(
     name = "independent_test",
     size = "small",
     srcs = ["independent_test.py"],
