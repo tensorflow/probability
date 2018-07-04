@@ -581,3 +581,15 @@ py_test(
         "//tensorflow_probability",
     ],
 )
+
+py_test(
+    name = "gaussian_process_test",
+    size = "small",
+    srcs = ["gaussian_process_test.py"],
+    deps = [
+        ":distributions",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
