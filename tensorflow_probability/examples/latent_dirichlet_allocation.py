@@ -357,7 +357,7 @@ def get_topics_strings(topics_words, alpha, vocabulary,
     topics_words: KxV tensor with topics as rows and words as columns.
     alpha: 1xK tensor of prior Dirichlet concentrations for the
         topics.
-    vocabulary: A mapping word_idx -> word.
+    vocabulary: A mapping of word's integer index to the corresponding string.
     topics_to_print: The number of topics with highest prior weight to
         summarize.
     words_per_topic: Number of wodrs per topic to return.
@@ -450,7 +450,18 @@ def build_fake_input_fns(batch_size):
 
 
 def build_input_fns(data_dir, batch_size):
-  """Build an Iterator switching between train and heldout data."""
+  """Builds iterators for train and evaluation data.
+
+  Each object is represented as a bag-of-words vector.
+
+  Arguments:
+    data_dir: Folder in which to store the data.
+    batch_size: Batch size for both train and evaluation.
+  Returns:
+    train_input_fn: A function that returns an iterator over the training data.
+    eval_input_fn: A function that returns an iterator over the evaluation data.
+    vocabulary: A mapping of word's integer index to the corresponding string.
+  """
 
   with open(download(data_dir, "vocab.pkl"), "r") as f:
     words_to_idx = pickle.load(f)
@@ -467,8 +478,7 @@ def build_input_fns(data_dir, batch_size):
   training_dataset = training_dataset.batch(batch_size).prefetch(32)
   train_input_fn = lambda: training_dataset.make_one_shot_iterator().get_next()
 
-  # Build a iterator over the heldout set with batch_size=heldout_size,
-  # i.e., return the entire heldout set as a constant.
+  # Build an iterator over the heldout set.
   eval_dataset = newsgroups_dataset(data_dir, "test", num_words,
                                     shuffle_and_repeat=False)
   eval_dataset = eval_dataset.batch(batch_size)
