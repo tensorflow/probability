@@ -129,8 +129,11 @@ def _get_function_inputs(f, **kwargs):
     Dict of key-value pairs in `kwargs` which exist in `f`'s signature.
   """
   if hasattr(f, "_func"):  # functions returned by tf.make_template
-    argspec = inspect.getargspec(f._func)  # pylint: disable=protected-access
-  else:
+    f = f._func  # pylint: disable=protected-access
+
+  try:  # getargspec was deprecated in Python 3.6
+    argspec = inspect.getfullargspec(f)
+  except AttributeError:
     argspec = inspect.getargspec(f)
 
   fkwargs = {k: v for k, v in six.iteritems(kwargs) if k in argspec.args}
