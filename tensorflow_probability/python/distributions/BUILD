@@ -340,7 +340,7 @@ py_test(
 
 py_test(
     name = "truncated_normal_test",
-    size = "medium",
+    size = "large",
     srcs = ["truncated_normal_test.py"],
     deps = [
         ":distributions",

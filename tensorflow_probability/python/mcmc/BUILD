@@ -324,3 +324,37 @@ py_test(
         "//tensorflow_probability",
     ],
 )
+
+py_library(
+    name = "eight_schools_hmc",
+    srcs = ["eight_schools_hmc.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+# bazel run -c opt :eight_schools_hmc_eager_test -- --benchmarks=.
+py_test(
+    name = "eight_schools_hmc_eager_test",
+    size = "medium",  # Might run > 1 minute.
+    srcs = ["eight_schools_hmc_eager_test.py"],
+    deps = [
+        ":eight_schools_hmc",
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+# bazel run -c opt :eight_schools_hmc_graph_test -- --benchmarks=.
+py_test(
+    name = "eight_schools_hmc_graph_test",
+    size = "medium",  # Might run > 1 minute.
+    srcs = ["eight_schools_hmc_graph_test.py"],
+    deps = [
+        ":eight_schools_hmc",
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
