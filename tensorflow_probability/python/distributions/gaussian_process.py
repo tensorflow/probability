@@ -206,6 +206,7 @@ class GaussianProcess(mvn_linear_operator.MultivariateNormalLinearOperator):
     Raises:
       ValueError: if `mean_fn` is not `None` and is not callable.
     """
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       self._kernel = kernel
       self._index_points = tf.convert_to_tensor(
@@ -237,6 +238,8 @@ class GaussianProcess(mvn_linear_operator.MultivariateNormalLinearOperator):
             validate_args=validate_args,
             allow_nan_stats=allow_nan_stats,
             name=name)
+        self._parameters = parameters
+        self._graph_parents = [self._index_points, self._jitter]
 
   @property
   def mean_fn(self):
