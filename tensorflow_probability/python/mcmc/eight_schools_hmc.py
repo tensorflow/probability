@@ -85,35 +85,40 @@ def benchmark_eight_schools_hmc(
         treatment_effects, treatment_stddevs,
         avg_effect, avg_stddev, school_effects_standard)
 
+  sample_chain = tfe.defun(tfp.mcmc.sample_chain)
+  executing_eagerly = tf.executing_eagerly()
+
+  def computation():
+    """The benchmark computation."""
+    _, kernel_results = sample_chain(
+        num_results=num_results,
+        num_burnin_steps=num_burnin_steps,
+        current_state=(
+            tf.zeros([], name='init_avg_effect'),
+            tf.zeros([], name='init_avg_stddev'),
+            tf.ones([num_schools], name='init_school_effects_standard'),
+        ),
+        kernel=tfp.mcmc.HamiltonianMonteCarlo(
+            target_log_prob_fn=unnormalized_posterior_log_prob,
+            step_size=step_size,
+            num_leapfrog_steps=num_leapfrog_steps))
+
+    return kernel_results.is_accepted
+
+  # warm-up
+  is_accepted_tensor = computation()
+  if not executing_eagerly:
+    session = tf.Session()
+    session.run(is_accepted_tensor)
+
   start_time = time.time()
-
-  if tfe.executing_eagerly():
-    sample_chain = tfe.defun(tfp.mcmc.sample_chain)
+  if executing_eagerly:
+    is_accepted = computation()
   else:
-    sample_chain = tfp.mcmc.sample_chain
-
-  _, kernel_results = sample_chain(
-      num_results=num_results,
-      num_burnin_steps=num_burnin_steps,
-      current_state=(
-          tf.zeros([], name='init_avg_effect'),
-          tf.zeros([], name='init_avg_stddev'),
-          tf.ones([num_schools], name='init_school_effects_standard'),
-      ),
-      kernel=tfp.mcmc.HamiltonianMonteCarlo(
-          target_log_prob_fn=unnormalized_posterior_log_prob,
-          step_size=step_size,
-          num_leapfrog_steps=num_leapfrog_steps))
-
-  if tfe.executing_eagerly():
-    is_accepted_ = kernel_results.is_accepted
-  else:
-    with tf.Session() as sess:
-      is_accepted_ = sess.run(kernel_results.is_accepted)
-
+    is_accepted = session.run(is_accepted_tensor)
   wall_time = time.time() - start_time
 
-  num_accepted = np.sum(is_accepted_)
+  num_accepted = np.sum(is_accepted)
   acceptance_rate = np.float32(num_accepted) / np.float32(num_results)
 
   return dict(
