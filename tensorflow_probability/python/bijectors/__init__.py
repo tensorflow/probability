@@ -27,6 +27,7 @@ from tensorflow_probability.python.bijectors.affine_scalar import AffineScalar
 from tensorflow_probability.python.bijectors.batch_normalization import BatchNormalization
 from tensorflow_probability.python.bijectors.chain import Chain
 from tensorflow_probability.python.bijectors.cholesky_outer_product import CholeskyOuterProduct
+from tensorflow_probability.python.bijectors.cholesky_to_inv_cholesky import CholeskyToInvCholesky
 from tensorflow_probability.python.bijectors.conditional_bijector import ConditionalBijector
 from tensorflow_probability.python.bijectors.exp import Exp
 from tensorflow_probability.python.bijectors.fill_triangular import FillTriangular
@@ -70,6 +71,7 @@ __all__ = [
     "Bijector",
     "Chain",
     "CholeskyOuterProduct",
+    "CholeskyToInvCholesky",
     "ConditionalBijector",
     "Exp",
     "FillTriangular",

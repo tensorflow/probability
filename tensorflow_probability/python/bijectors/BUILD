@@ -32,10 +32,14 @@ py_library(
         ["*.py"],
         exclude = glob([
             "*_test.py",
-        ]) + ["shape.py"],
+        ]) + [
+            "cholesky_outer_product.py",
+            "shape.py",
+        ],
     ),
     srcs_version = "PY2AND3",
     deps = [
+        ":cholesky_outer_product",
         ":shape",
         # numpy dep,
         # tensorflow dep,
@@ -49,6 +53,17 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "cholesky_outer_product",
+    srcs = ["cholesky_outer_product.py"],
+    deps = [
+        ":shape",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
 
@@ -161,6 +176,19 @@ py_test(
     name = "cholesky_outer_product_test",
     size = "small",
     srcs = ["cholesky_outer_product_test.py"],
+    deps = [
+        ":bijectors",
+        # numpy dep,
+        # six dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_test(
+    name = "cholesky_to_inv_cholesky_test",
+    size = "small",
+    srcs = ["cholesky_to_inv_cholesky_test.py"],
     deps = [
         ":bijectors",
         # numpy dep,
