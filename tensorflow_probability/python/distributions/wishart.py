@@ -369,7 +369,7 @@ class _WishartLinearOperator(tf.distributions.Distribution):
       raise ValueError(
           "Computing std. dev. when is cholesky_input_output_matrices=True "
           "does not make sense.")
-    return tf.cholesky(self.variance())
+    return tf.sqrt(self.variance())
 
   def _mode(self):
     s = self.df - self.dimension - 1.

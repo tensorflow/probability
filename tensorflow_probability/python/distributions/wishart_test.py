@@ -94,7 +94,7 @@ class WishartTest(tf.test.TestCase):
       scale = make_pd(1., 2)
       df = 4
       w = tfd.Wishart(df, scale_tril=chol(scale))
-      self.assertAllEqual(chol(wishart_var(df, scale)), w.stddev().eval())
+      self.assertAllEqual(tf.sqrt(wishart_var(df, scale)), w.stddev().eval())
 
   def testVariance(self):
     with self.test_session():
