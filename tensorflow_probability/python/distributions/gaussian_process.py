@@ -208,21 +208,24 @@ class GaussianProcess(mvn_linear_operator.MultivariateNormalLinearOperator):
     """
     parameters = dict(locals())
     with tf.name_scope(name) as name:
-      self._kernel = kernel
-      self._index_points = tf.convert_to_tensor(
+      index_points = tf.convert_to_tensor(
           index_points, name='index_points')
-      dtype = self._index_points.dtype.as_numpy_dtype
+      dtype = index_points.dtype.as_numpy_dtype
+      jitter = tf.convert_to_tensor(jitter, dtype=dtype, name='jitter')
+
+      self._kernel = kernel
+      self._index_points = index_points
       # Default to a constant zero function, borrowing the dtype from
       # index_points to ensure consistency.
       if mean_fn is None:
-        self._mean_fn = lambda x: np.array([0.], dtype)
+        mean_fn = lambda x: np.array([0.], dtype)
       else:
         if not callable(mean_fn):
           raise ValueError('`mean_fn` must be a Python callable')
-        self._mean_fn = mean_fn
-      self._jitter = tf.convert_to_tensor(jitter, dtype=dtype, name='jitter')
+      self._mean_fn = mean_fn
+      self._jitter = jitter
 
-      with tf.name_scope('init', values=[self.index_points, self.jitter]):
+      with tf.name_scope('init', values=[index_points, jitter]):
         kernel_matrix = _add_diagonal_shift(
             kernel.matrix(self.index_points, self.index_points),
             self.jitter)
@@ -233,13 +236,13 @@ class GaussianProcess(mvn_linear_operator.MultivariateNormalLinearOperator):
             name='GaussianProcessScaleLinearOperator')
 
         super(GaussianProcess, self).__init__(
-            loc=self._mean_fn(self.index_points),
+            loc=mean_fn(index_points),
             scale=scale,
             validate_args=validate_args,
             allow_nan_stats=allow_nan_stats,
             name=name)
         self._parameters = parameters
-        self._graph_parents = [self._index_points, self._jitter]
+        self._graph_parents = [index_points, jitter]
 
   @property
   def mean_fn(self):
