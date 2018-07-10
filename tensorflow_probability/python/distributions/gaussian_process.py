@@ -71,6 +71,24 @@ class GaussianProcess(mvn_linear_operator.MultivariateNormalLinearOperator):
   definite; hence the requirement that `k` be a positive definite function
   (which, by definition, says that the above procedure will yield PD matrices).
 
+  We also support the inclusion of zero-mean Gaussian noise in the model, via
+  the `observation_noise_variance` parameter. This augments the generative model
+  to
+
+  ```none
+  f ~ GP(m, k)
+  (y[i] | f, x[i]) ~ Normal(f(x[i]), s)
+  ```
+
+  where
+
+    * `m` is the mean function
+    * `k` is the covariance kernel function
+    * `f` is the function drawn from the GP
+    * `x[i]` are the index points at which the function is observed
+    * `y[i]` are the observed values at the index points
+    * `s` is the scale of the observation noise.
+
   Note that this class represents an *unconditional* Gaussian process; it does
   not implement posterior inference conditional on observed function
   evaluations. This class is useful, for example, if one wishes to combine a GP
@@ -83,7 +101,8 @@ class GaussianProcess(mvn_linear_operator.MultivariateNormalLinearOperator):
 
   ```none
   pdf(x; index_points, mean_fn, kernel) = exp(-0.5 * y) / Z
-  K = kernel.matrix(index_points, index_points) + jitter * I
+  K = (kernel.matrix(index_points, index_points) +
+       (observation_noise_variance + jitter) * eye(N))
   y = (x - mean_fn(index_points))^T @ K @ (x - mean_fn(index_points))
   Z = (2 * pi)**(.5 * N) |det(K)|**(.5)
   ```
@@ -94,9 +113,10 @@ class GaussianProcess(mvn_linear_operator.MultivariateNormalLinearOperator):
   * `mean_fn` is a callable mapping the index set to the GP's mean values,
   * `kernel` is `PositiveSemidefiniteKernel`-like and represents the covariance
     function of the GP,
+  * `observation_noise_variance` represents (optional) observation noise.
   * `jitter` is added to the diagonal to ensure positive definiteness up to
      machine precision (otherwise Cholesky-decomposition is prone to failure),
-  * `I` is an N-by-N identity matrix.
+  * `eye(N)` is an N-by-N identity matrix.
 
   #### Examples
 
@@ -123,6 +143,13 @@ class GaussianProcess(mvn_linear_operator.MultivariateNormalLinearOperator):
 
   samples = gp.sample(10)
   # ==> 10 independently drawn, joint samples at `index_points`
+
+  noisy_gp = tfd.GaussianProcess(
+      kernel=kernel,
+      index_points=index_points,
+      observation_noise_variance=.05)
+  noisy_samples = noise_gp.sample(10)
+  # ==> 10 independently drawn, noisy joint samples at `index_points`
   ```
 
   ##### Optimize kernel parameters via maximum marginal likelihood.
@@ -163,6 +190,7 @@ class GaussianProcess(mvn_linear_operator.MultivariateNormalLinearOperator):
                kernel,
                index_points,
                mean_fn=None,
+               observation_noise_variance=0.,
                jitter=1e-6,
                validate_args=False,
                allow_nan_stats=False,
@@ -185,10 +213,14 @@ class GaussianProcess(mvn_linear_operator.MultivariateNormalLinearOperator):
         shape `[b1, ..., bB, f1, ..., fF]` and returns a `Tensor` whose shape is
         broadcastable with `[b1, ..., bB]`. Default value: `None` implies
         constant zero function.
+      observation_noise_variance: `float` `Tensor` representing the variance
+        of the noise in the Normal likelihood distribution of the model. May be
+        batched, in which case the batch shape must be broadcastable with the
+        shapes of all other batched parameters (`kernel.batch_shape`,
+        `index_points`, etc.).
+        Default value: `0.`
       jitter: `float` scalar `Tensor` added to the diagonal of the covariance
-        matrix to ensure positive definiteness of the covariance matrix. This
-        parameter can also be interpreted as adding zero-mean Gaussian noise to
-        the distribution's samples.
+        matrix to ensure positive definiteness of the covariance matrix.
         Default value: `1e-6`.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
@@ -212,6 +244,10 @@ class GaussianProcess(mvn_linear_operator.MultivariateNormalLinearOperator):
           index_points, name='index_points')
       dtype = index_points.dtype.as_numpy_dtype
       jitter = tf.convert_to_tensor(jitter, dtype=dtype, name='jitter')
+      observation_noise_variance = tf.convert_to_tensor(
+          observation_noise_variance,
+          dtype=dtype,
+          name='observation_noise_variance')
 
       self._kernel = kernel
       self._index_points = index_points
@@ -223,12 +259,13 @@ class GaussianProcess(mvn_linear_operator.MultivariateNormalLinearOperator):
         if not callable(mean_fn):
           raise ValueError('`mean_fn` must be a Python callable')
       self._mean_fn = mean_fn
+      self._observation_noise_variance = observation_noise_variance
       self._jitter = jitter
 
       with tf.name_scope('init', values=[index_points, jitter]):
         kernel_matrix = _add_diagonal_shift(
             kernel.matrix(self.index_points, self.index_points),
-            self.jitter)
+            jitter + observation_noise_variance)
 
         scale = tf.linalg.LinearOperatorLowerTriangular(
             tf.linalg.cholesky(kernel_matrix),
@@ -255,6 +292,10 @@ class GaussianProcess(mvn_linear_operator.MultivariateNormalLinearOperator):
   @property
   def index_points(self):
     return self._index_points
+
+  @property
+  def observation_noise_variance(self):
+    return self._observation_noise_variance
 
   @property
   def jitter(self):

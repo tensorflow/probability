@@ -84,6 +84,7 @@ class _GaussianProcessTest(object):
     amp = np.float64(.5)
     len_scale = np.float64(.2)
     jitter = np.float64(1e-4)
+    observation_noise_variance = np.float64(3e-3)
 
     kernel = psd_kernels.ExponentiatedQuadratic(amp, len_scale)
 
@@ -92,6 +93,7 @@ class _GaussianProcessTest(object):
     gp = tfd.GaussianProcess(
         kernel,
         index_points,
+        observation_noise_variance=observation_noise_variance,
         jitter=jitter)
 
     def _kernel_fn(x, y):
@@ -100,7 +102,7 @@ class _GaussianProcessTest(object):
     expected_covariance = (
         _kernel_fn(np.expand_dims(index_points, 0),
                    np.expand_dims(index_points, 1)) +
-        jitter * np.eye(10))
+        (observation_noise_variance + jitter) * np.eye(10))
 
     self.assertAllClose(expected_covariance,
                         self.evaluate(gp.covariance()))
