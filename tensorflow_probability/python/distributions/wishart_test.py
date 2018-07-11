@@ -109,22 +109,22 @@ class WishartTest(tf.test.TestCase):
       df = 4
 
       chol_w = tfd.Wishart(
-          df, scale_tril=chol(scale), cholesky_input_output_matrices=False)
+          df, scale_tril=chol(scale), input_output_cholesky=False)
 
       x = chol_w.sample(1, seed=42).eval()
       chol_x = [chol(x[0])]
 
-      full_w = tfd.Wishart(df, scale, cholesky_input_output_matrices=False)
+      full_w = tfd.Wishart(df, scale, input_output_cholesky=False)
       self.assertAllClose(x, full_w.sample(1, seed=42).eval())
 
       chol_w_chol = tfd.Wishart(
-          df, scale_tril=chol(scale), cholesky_input_output_matrices=True)
+          df, scale_tril=chol(scale), input_output_cholesky=True)
       self.assertAllClose(chol_x, chol_w_chol.sample(1, seed=42).eval())
       eigen_values = tf.matrix_diag_part(chol_w_chol.sample(1000, seed=42))
       np.testing.assert_array_less(0., eigen_values.eval())
 
       full_w_chol = tfd.Wishart(
-          df, scale=scale, cholesky_input_output_matrices=True)
+          df, scale=scale, input_output_cholesky=True)
       self.assertAllClose(chol_x, full_w_chol.sample(1, seed=42).eval())
       eigen_values = tf.matrix_diag_part(full_w_chol.sample(1000, seed=42))
       np.testing.assert_array_less(0., eigen_values.eval())
@@ -134,7 +134,7 @@ class WishartTest(tf.test.TestCase):
       chol_w = tfd.Wishart(
           df=df,
           scale_tril=chol(make_pd(1., 3)),
-          cholesky_input_output_matrices=False)
+          input_output_cholesky=False)
       x = chol_w.sample(10000, seed=42)
       self.assertAllEqual((10000, 3, 3), x.get_shape())
 
@@ -159,7 +159,7 @@ class WishartTest(tf.test.TestCase):
       chol_w1 = tfd.Wishart(
           df=df,
           scale_tril=chol(make_pd(1., 3)),
-          cholesky_input_output_matrices=False,
+          input_output_cholesky=False,
           name="wishart1")
       samples1 = chol_w1.sample(n_val, seed=123456).eval()
 
@@ -167,7 +167,7 @@ class WishartTest(tf.test.TestCase):
       chol_w2 = tfd.Wishart(
           df=df,
           scale_tril=chol(make_pd(1., 3)),
-          cholesky_input_output_matrices=False,
+          input_output_cholesky=False,
           name="wishart2")
       samples2 = chol_w2.sample(n_val, seed=123456).eval()
 
@@ -199,7 +199,7 @@ class WishartTest(tf.test.TestCase):
       w = tfd.Wishart(
           df=[2, 3, 4, 5],
           scale_tril=chol_x,
-          cholesky_input_output_matrices=True)
+          input_output_cholesky=True)
       self.assertAllClose(log_prob_df_seq, w.log_prob(chol_x).eval())
 
       # Now we test various constructions of Wishart with different sample
@@ -220,9 +220,9 @@ class WishartTest(tf.test.TestCase):
           tfd.Wishart(
               df=4,
               scale_tril=chol_x[0],
-              cholesky_input_output_matrices=False),
+              input_output_cholesky=False),
           tfd.Wishart(
-              df=4, scale=x[0], cholesky_input_output_matrices=False)):
+              df=4, scale=x[0], input_output_cholesky=False)):
         self.assertAllEqual((2, 2), w.event_shape_tensor().eval())
         self.assertEqual(2, w.dimension.eval())
         self.assertAllClose(log_prob[0], w.log_prob(x[0]).eval())
@@ -239,8 +239,8 @@ class WishartTest(tf.test.TestCase):
       for w in (
           tfd.Wishart(df=4,
                       scale_tril=chol_x[0],
-                      cholesky_input_output_matrices=True),
-          tfd.Wishart(df=4, scale=x[0], cholesky_input_output_matrices=True)):
+                      input_output_cholesky=True),
+          tfd.Wishart(df=4, scale=x[0], input_output_cholesky=True)):
         self.assertAllEqual((2, 2), w.event_shape_tensor().eval())
         self.assertEqual(2, w.dimension.eval())
         self.assertAllClose(log_prob[0], w.log_prob(chol_x[0]).eval())

@@ -59,14 +59,13 @@ class _WishartLinearOperator(tf.distributions.Distribution):
 
   #### Examples
 
-  See `WishartFull`, `WishartCholesky` for examples of initializing and using
-  this class.
+  See the `Wishart` class for examples of initializing and using this class.
   """
 
   def __init__(self,
                df,
                scale_operator,
-               cholesky_input_output_matrices=False,
+               input_output_cholesky=False,
                validate_args=False,
                allow_nan_stats=True,
                name=None):
@@ -76,11 +75,17 @@ class _WishartLinearOperator(tf.distributions.Distribution):
       df: `float` or `double` tensor, the degrees of freedom of the
         distribution(s). `df` must be greater than or equal to `k`.
       scale_operator: `float` or `double` instance of `LinearOperator`.
-      cholesky_input_output_matrices: Python `bool`. Any function which whose
-        input or output is a matrix assumes the input is Cholesky and returns a
-        Cholesky factored matrix. Example `log_prob` input takes a Cholesky and
-        `sample_n` returns a Cholesky when
-        `cholesky_input_output_matrices=True`.
+      input_output_cholesky: Python `bool`. If `True`, functions whose input or
+        output have the semantics of samples assume inputs are in Cholesky form
+        and return outputs in Cholesky form. In particular, if this flag is
+        `True`, input to `log_prob` is presumed of Cholesky form and output from
+        `sample`, `mean`, and `mode` are of Cholesky form.  Setting this
+        argument to `True` is purely a computational optimization and does not
+        change the underlying distribution; for instance, `mean` returns the
+        Cholesky of the mean, not the mean of Cholesky factors. The `variance`
+        and `stddev` methods are unaffected by this flag.
+        Default value: `False` (i.e., input/output does not have Cholesky
+        semantics).
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -98,7 +103,7 @@ class _WishartLinearOperator(tf.distributions.Distribution):
         `(k, k)`
     """
     parameters = dict(locals())
-    self._cholesky_input_output_matrices = cholesky_input_output_matrices
+    self._input_output_cholesky = input_output_cholesky
     with tf.name_scope(name) as name:
       with tf.name_scope("init", values=[df, scale_operator]):
         if not scale_operator.dtype.is_floating:
@@ -166,7 +171,7 @@ class _WishartLinearOperator(tf.distributions.Distribution):
 
   def scale(self):
     """Wishart distribution scale matrix."""
-    if self._cholesky_input_output_matrices:
+    if self._input_output_cholesky:
       return self.scale_operator.to_dense()
     else:
       return self._square_scale_operator()
@@ -177,9 +182,9 @@ class _WishartLinearOperator(tf.distributions.Distribution):
     return self._scale_operator
 
   @property
-  def cholesky_input_output_matrices(self):
+  def input_output_cholesky(self):
     """Boolean indicating if `Tensor` input/outputs are Cholesky factorized."""
-    return self._cholesky_input_output_matrices
+    return self._input_output_cholesky
 
   @property
   def dimension(self):
@@ -239,9 +244,8 @@ class _WishartLinearOperator(tf.distributions.Distribution):
     x = tf.reshape(x, shape)
 
     # Complexity: O(nbM) where M is the complexity of the operator solving a
-    # vector system. E.g., for LinearOperatorDiag, each matmul is O(k**2), so
-    # this complexity is O(nbk**2). For LinearOperatorLowerTriangular,
-    # each matmul is O(k^3) so this step has complexity O(nbk^3).
+    # vector system. For LinearOperatorLowerTriangular, each matmul is O(k^3) so
+    # this step has complexity O(nbk^3).
     x = self.scale_operator.matmul(x)
 
     # Undo make batch-op ready.
@@ -251,14 +255,14 @@ class _WishartLinearOperator(tf.distributions.Distribution):
     perm = tf.concat([[ndims - 1], tf.range(0, ndims - 1)], 0)
     x = tf.transpose(x, perm)
 
-    if not self.cholesky_input_output_matrices:
+    if not self.input_output_cholesky:
       # Complexity: O(nbk**3)
       x = tf.matmul(x, x, adjoint_b=True)
 
     return x
 
   def _log_prob(self, x):
-    if self.cholesky_input_output_matrices:
+    if self.input_output_cholesky:
       x_sqrt = x
     else:
       # Complexity: O(nbk**3)
@@ -291,10 +295,9 @@ class _WishartLinearOperator(tf.distributions.Distribution):
                        (tf.cast(self.dimension, dtype=tf.int32), -1)), 0)
     scale_sqrt_inv_x_sqrt = tf.reshape(scale_sqrt_inv_x_sqrt, shape)
 
-    # Complexity: O(nbM*k) where M is the complexity of the operator solving
-    # a vector system. E.g., for LinearOperatorDiag, each solve is O(k), so
-    # this complexity is O(nbk**2). For LinearOperatorLowerTriangular,
-    # each solve is O(k**2) so this step has complexity O(nbk^3).
+    # Complexity: O(nbM*k) where M is the complexity of the operator solving a
+    # vector system. For LinearOperatorLowerTriangular, each solve is O(k**2) so
+    # this step has complexity O(nbk^3).
     scale_sqrt_inv_x_sqrt = self.scale_operator.solve(
         scale_sqrt_inv_x_sqrt)
 
@@ -352,7 +355,7 @@ class _WishartLinearOperator(tf.distributions.Distribution):
             (half_dp1 - half_df) * self._multi_digamma(half_df, self.dimension))
 
   def _mean(self):
-    if self.cholesky_input_output_matrices:
+    if self.input_output_cholesky:
       return tf.sqrt(self.df) * self.scale_operator.to_dense()
     return self.df * self._square_scale_operator()
 
@@ -360,15 +363,9 @@ class _WishartLinearOperator(tf.distributions.Distribution):
     x = tf.sqrt(self.df) * self._square_scale_operator()
     d = tf.expand_dims(tf.matrix_diag_part(x), -1)
     v = tf.square(x) + tf.matmul(d, d, adjoint_b=True)
-    if self.cholesky_input_output_matrices:
-      return tf.cholesky(v)
     return v
 
   def _stddev(self):
-    if self.cholesky_input_output_matrices:
-      raise ValueError(
-          "Computing std. dev. when is cholesky_input_output_matrices=True "
-          "does not make sense.")
     return tf.sqrt(self.variance())
 
   def _mode(self):
@@ -376,7 +373,7 @@ class _WishartLinearOperator(tf.distributions.Distribution):
     s = tf.where(
         tf.less(s, 0.), tf.constant(float("NaN"), dtype=self.dtype, name="nan"),
         s)
-    if self.cholesky_input_output_matrices:
+    if self.input_output_cholesky:
       return tf.sqrt(s) * self.scale_operator.to_dense()
     return s * self._square_scale_operator()
 
@@ -477,10 +474,10 @@ class Wishart(_WishartLinearOperator):
                df,
                scale=None,
                scale_tril=None,
-               cholesky_input_output_matrices=False,
+               input_output_cholesky=False,
                validate_args=False,
                allow_nan_stats=True,
-               name="WishartCholesky"):
+               name="Wishart"):
     """Construct Wishart distributions.
 
     Args:
@@ -492,11 +489,17 @@ class Wishart(_WishartLinearOperator):
       scale_tril: `float` or `double` `Tensor`. The Cholesky factorization
         of the symmetric positive definite scale matrix of the distribution.
         Exactly one of `scale` and 'scale_tril` must be passed.
-      cholesky_input_output_matrices: Python `bool`. Any function which whose
-        input or output is a matrix assumes the input is Cholesky and returns a
-        Cholesky factored matrix. Example `log_prob` input takes a Cholesky and
-        `sample_n` returns a Cholesky when
-        `cholesky_input_output_matrices=True`.
+      input_output_cholesky: Python `bool`. If `True`, functions whose input or
+        output have the semantics of samples assume inputs are in Cholesky form
+        and return outputs in Cholesky form. In particular, if this flag is
+        `True`, input to `log_prob` is presumed of Cholesky form and output from
+        `sample`, `mean`, and `mode` are of Cholesky form.  Setting this
+        argument to `True` is purely a computational optimization and does not
+        change the underlying distribution; for instance, `mean` returns the
+        Cholesky of the mean, not the mean of Cholesky factors. The `variance`
+        and `stddev` methods are unaffected by this flag.
+        Default value: `False` (i.e., input/output does not have Cholesky
+        semantics).
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -541,7 +544,7 @@ class Wishart(_WishartLinearOperator):
               is_non_singular=True,
               is_positive_definite=True,
               is_square=True),
-          cholesky_input_output_matrices=cholesky_input_output_matrices,
+          input_output_cholesky=input_output_cholesky,
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
           name=name)
