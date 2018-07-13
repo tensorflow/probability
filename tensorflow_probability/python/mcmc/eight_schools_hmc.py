@@ -23,7 +23,8 @@ import time
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-# Dependency imports.third_party.tensorflow.contrib.eager as tfe
+
+from tensorflow.contrib import eager as tfe
 
 tfd = tfp.distributions
 

@@ -32,8 +32,6 @@ from tensorflow_probability.python.distributions import MultivariateNormalDiag
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow.python.framework import test_util
 
-# Dependency imports.third_party.tensorflow.python.ops.nn_grad  # pylint: disable=unused-import
-
 
 def _powerset(x):
   s = list(x)
