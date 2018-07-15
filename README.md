@@ -24,7 +24,7 @@ __Layer 1: Statistical Building Blocks__
   distributions and related statistics with batch and
   [broadcasting](https://docs.scipy.org/doc/numpy-1.14.0/user/basics.broadcasting.html)
   semantics.
-* Bijectors ([`tfp.bijectors`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/bijectors)):
+* Bijectors ([`tfp.bijectors`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/bijectors)):
   Reversible and composable transformations of random variables. Bijectors
   provide a rich class of transformed distributions, from classical examples
   like the
