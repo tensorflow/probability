@@ -30,6 +30,7 @@ from tensorflow_probability.python.distributions.conditional_transformed_distrib
 from tensorflow_probability.python.distributions.deterministic import Deterministic
 from tensorflow_probability.python.distributions.deterministic import VectorDeterministic
 from tensorflow_probability.python.distributions.gaussian_process import GaussianProcess
+from tensorflow_probability.python.distributions.gaussian_process_regression_model import GaussianProcessRegressionModel
 from tensorflow_probability.python.distributions.geometric import Geometric
 from tensorflow_probability.python.distributions.half_normal import HalfNormal
 from tensorflow_probability.python.distributions.independent import Independent
@@ -139,6 +140,7 @@ __all__ = [
     'GammaWithSoftplusConcentrationRate',
     'Geometric',
     'GaussianProcess',
+    'GaussianProcessRegressionModel',
     'HalfNormal',
     'Independent',
     'InverseGamma',
