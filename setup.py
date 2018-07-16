@@ -21,14 +21,14 @@ from setuptools import setup
 from setuptools.command.install import install as InstallCommandBase
 from setuptools.dist import Distribution
 
-VERSION = '0.1.0rc1'
+VERSION = '0.2.0rc0'
 
 REQUIRED_PACKAGES = [
     'six >= 1.10.0',
     'numpy >= 1.11.1',
 ]
 
-REQUIRED_TENSORFLOW_VERSION = '1.9.0rc1'
+REQUIRED_TENSORFLOW_VERSION = '1.9.0'
 
 if '--gpu' in sys.argv:
   use_gpu = True
