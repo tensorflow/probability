@@ -264,9 +264,9 @@ py_test(
 )
 
 py_test(
-    name = "kumaraswamy_bijector_test",
+    name = "kumaraswamy_test",
     size = "small",
-    srcs = ["kumaraswamy_bijector_test.py"],
+    srcs = ["kumaraswamy_test.py"],
     deps = [
         ":bijectors",
         # numpy dep,
