@@ -28,29 +28,89 @@ exports_files(["LICENSE"])
 
 py_library(
     name = "bijectors",
-    srcs = glob(
-        ["*.py"],
-        exclude = glob([
-            "*_test.py",
-        ]) + [
-            "cholesky_outer_product.py",
-            "shape.py",
-        ],
-    ),
-    srcs_version = "PY2AND3",
+    srcs = ["__init__.py"],
     deps = [
+        ":absolute_value",
+        ":affine",
+        ":affine_linear_operator",
+        ":affine_scalar",
+        ":batch_normalization",
+        ":chain",
         ":cholesky_outer_product",
+        ":cholesky_to_inv_cholesky",
+        ":conditional_bijector",
+        ":exp",
+        ":fill_triangular",
+        ":gumbel",
+        ":inline",
+        ":invert",
+        ":kumaraswamy",
+        ":masked_autoregressive",
+        ":matrix_inverse_tril",
+        ":permute",
+        ":power_transform",
+        ":real_nvp",
+        ":reshape",
+        ":scale_tril",
         ":shape",
-        # numpy dep,
+        ":sigmoid",
+        ":sinh_arcsinh",
+        ":softmax_centered",
+        ":softplus",
+        ":softsign",
+        ":square",
+        ":tanh",
+        ":transform_diagonal",
+        ":transpose",
+        ":weibull",
+    ],
+)
+
+py_library(
+    name = "absolute_value",
+    srcs = ["absolute_value.py"],
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "affine_linear_operator",
+    srcs = ["affine_linear_operator.py"],
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "affine_scalar",
+    srcs = ["affine_scalar.py"],
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "affine",
+    srcs = ["affine.py"],
+    deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
 
 py_library(
-    name = "shape",
-    srcs = ["shape.py"],
-    srcs_version = "PY2AND3",
+    name = "batch_normalization",
+    srcs = ["batch_normalization.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "chain",
+    srcs = ["chain.py"],
     deps = [
         # tensorflow dep,
     ],
@@ -60,10 +120,224 @@ py_library(
     name = "cholesky_outer_product",
     srcs = ["cholesky_outer_product.py"],
     deps = [
-        ":shape",
         # numpy dep,
         # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "cholesky_to_inv_cholesky",
+    srcs = ["cholesky_to_inv_cholesky.py"],
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "conditional_bijector",
+    srcs = ["conditional_bijector.py"],
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "exp",
+    srcs = ["exp.py"],
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "fill_triangular",
+    srcs = ["fill_triangular.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "gumbel",
+    srcs = ["gumbel.py"],
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "inline",
+    srcs = ["inline.py"],
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "invert",
+    srcs = ["invert.py"],
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "kumaraswamy",
+    srcs = ["kumaraswamy.py"],
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "masked_autoregressive",
+    srcs = ["masked_autoregressive.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "matrix_inverse_tril",
+    srcs = ["matrix_inverse_tril.py"],
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "permute",
+    srcs = ["permute.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "power_transform",
+    srcs = ["power_transform.py"],
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "real_nvp",
+    srcs = ["real_nvp.py"],
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "reshape",
+    srcs = ["reshape.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "scale_tril",
+    srcs = ["scale_tril.py"],
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "shape",
+    srcs = ["shape.py"],
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "sigmoid",
+    srcs = ["sigmoid.py"],
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "sinh_arcsinh",
+    srcs = ["sinh_arcsinh.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "softmax_centered",
+    srcs = ["softmax_centered.py"],
+    deps = [
+        # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
+    ],
+)
+
+py_library(
+    name = "softplus",
+    srcs = ["softplus.py"],
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "softsign",
+    srcs = ["softsign.py"],
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "square",
+    srcs = ["square.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "tanh",
+    srcs = ["tanh.py"],
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "transform_diagonal",
+    srcs = ["transform_diagonal.py"],
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "transpose",
+    srcs = ["transpose.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "weibull",
+    srcs = ["weibull.py"],
+    deps = [
+        # tensorflow dep,
     ],
 )
 
