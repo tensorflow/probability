@@ -31,11 +31,9 @@ py_library(
     srcs = glob(
         [
             "*.py",
-            "internal/*.py",
         ],
         exclude = glob([
             "*_test.py",
-            "internal/*_test.py",
         ]),
     ),
     srcs_version = "PY2AND3",
@@ -44,6 +42,8 @@ py_library(
         # six dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/distributions/internal:moving_stats",
+        "//tensorflow_probability/python/distributions/internal:statistical_testing",
         "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
@@ -185,19 +185,6 @@ py_test(
     size = "medium",
     srcs = ["linear_gaussian_ssm_test.py"],
     deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-    ],
-)
-
-py_test(
-    name = "moving_stats_test",
-    size = "small",
-    srcs = ["internal/moving_stats_test.py"],
-    tags = ["nomsan"],  # disable to avoid false positives from scipy.
-    deps = [
-        ":distributions",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
@@ -395,21 +382,6 @@ py_test(
     srcs = ["seed_stream_test.py"],
     deps = [
         ":distributions",
-        # tensorflow dep,
-        "//tensorflow_probability",
-    ],
-)
-
-py_test(
-    name = "statistical_testing_test",
-    size = "medium",
-    srcs = [
-        "internal/statistical_testing_test.py",
-    ],
-    shard_count = 4,
-    deps = [
-        ":distributions",
-        # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],
