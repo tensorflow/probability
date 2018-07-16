@@ -463,11 +463,8 @@ def masked_autoregressive_default_template(hidden_layers,
        Masked Autoencoder for Distribution Estimation. In _International
        Conference on Machine Learning_, 2015. https://arxiv.org/abs/1502.03509
   """
-
-  with tf.name_scope(
-      name,
-      "masked_autoregressive_default_template",
-      values=[log_scale_min_clip, log_scale_max_clip]):
+  name = name or "masked_autoregressive_default_template"
+  with tf.name_scope(name, values=[log_scale_min_clip, log_scale_max_clip]):
     def _fn(x):
       """MADE parameterized via `masked_autoregressive_default_template`."""
       # TODO(b/67594795): Better support of dynamic shape.
@@ -504,8 +501,7 @@ def masked_autoregressive_default_template(hidden_layers,
           if log_scale_clip_gradient else _clip_by_value_preserve_grad)
       log_scale = which_clip(log_scale, log_scale_min_clip, log_scale_max_clip)
       return shift, log_scale
-
-    return tf.make_template("masked_autoregressive_default_template", _fn)
+    return tf.make_template(name, _fn)
 
 
 def _clip_by_value_preserve_grad(x, clip_value_min, clip_value_max, name=None):
