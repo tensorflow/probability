@@ -376,13 +376,11 @@ py_test(
     ],
 )
 
-# Tests for SinhArcSinh bijector.  The file name has the extra "_bijector" to
-# avoid BUILD rule name conflicts with the distribution by the same name.
 py_test(
-    name = "sinh_arcsinh_bijector_test",
+    name = "sinh_arcsinh_test",
     size = "small",
-    srcs = ["sinh_arcsinh_bijector_test.py"],
-    tags = ["no_windows"],  # TODO: needs investigation on Windows
+    srcs = ["sinh_arcsinh_test.py"],
+    tags = ["no_windows"],  # TODO: needs investigation on Windows.
     deps = [
         ":bijectors",
         # numpy dep,
