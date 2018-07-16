@@ -342,38 +342,12 @@ py_library(
 )
 
 py_test(
-    name = "shape_test",
-    size = "medium",
-    srcs = ["shape_test.py"],
-    deps = [
-        ":shape",
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-    ],
-)
-
-py_test(
-    name = "conditional_bijector_test",
-    size = "small",
-    srcs = ["conditional_bijector_test.py"],
-    deps = [
-        ":bijectors",
-        # numpy dep,
-        # six dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-    ],
-)
-
-py_test(
     name = "absolute_value_test",
     size = "small",
     srcs = ["absolute_value_test.py"],
     deps = [
         ":bijectors",
         # numpy dep,
-        # six dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],
@@ -388,20 +362,6 @@ py_test(
     deps = [
         ":bijectors",
         # numpy dep,
-        # six dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-    ],
-)
-
-py_test(
-    name = "affine_scalar_test",
-    size = "small",
-    srcs = ["affine_scalar_test.py"],
-    deps = [
-        ":bijectors",
-        # numpy dep,
-        # six dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],
@@ -414,7 +374,18 @@ py_test(
     deps = [
         ":bijectors",
         # numpy dep,
-        # six dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_test(
+    name = "affine_scalar_test",
+    size = "small",
+    srcs = ["affine_scalar_test.py"],
+    deps = [
+        ":bijectors",
+        # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],
@@ -440,7 +411,6 @@ py_test(
     deps = [
         ":bijectors",
         # numpy dep,
-        # six dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],
@@ -453,7 +423,6 @@ py_test(
     deps = [
         ":bijectors",
         # numpy dep,
-        # six dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],
@@ -466,7 +435,18 @@ py_test(
     deps = [
         ":bijectors",
         # numpy dep,
-        # six dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_test(
+    name = "conditional_bijector_test",
+    size = "small",
+    srcs = ["conditional_bijector_test.py"],
+    deps = [
+        ":bijectors",
+        # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],
@@ -479,7 +459,6 @@ py_test(
     deps = [
         ":bijectors",
         # numpy dep,
-        # six dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],
@@ -492,7 +471,6 @@ py_test(
     deps = [
         ":bijectors",
         # numpy dep,
-        # six dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],
@@ -505,7 +483,6 @@ py_test(
     deps = [
         ":bijectors",
         # numpy dep,
-        # six dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],
@@ -518,7 +495,6 @@ py_test(
     deps = [
         ":bijectors",
         # numpy dep,
-        # six dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],
@@ -531,7 +507,6 @@ py_test(
     deps = [
         ":bijectors",
         # numpy dep,
-        # six dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],
@@ -544,7 +519,6 @@ py_test(
     deps = [
         ":bijectors",
         # numpy dep,
-        # six dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],
@@ -576,19 +550,6 @@ py_test(
 )
 
 py_test(
-    name = "real_nvp_test",
-    size = "small",
-    srcs = ["real_nvp_test.py"],
-    deps = [
-        ":bijectors",
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
-py_test(
     name = "permute_test",
     size = "small",
     srcs = ["permute_test.py"],
@@ -607,9 +568,21 @@ py_test(
     deps = [
         ":bijectors",
         # numpy dep,
-        # six dep,
         # tensorflow dep,
         "//tensorflow_probability",
+    ],
+)
+
+py_test(
+    name = "real_nvp_test",
+    size = "small",
+    srcs = ["real_nvp_test.py"],
+    deps = [
+        ":bijectors",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -638,13 +611,24 @@ py_test(
 )
 
 py_test(
+    name = "shape_test",
+    size = "medium",
+    srcs = ["shape_test.py"],
+    deps = [
+        ":shape",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_test(
     name = "sigmoid_test",
     size = "small",
     srcs = ["sigmoid_test.py"],
     deps = [
         ":bijectors",
         # numpy dep,
-        # six dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],
@@ -658,7 +642,6 @@ py_test(
     deps = [
         ":bijectors",
         # numpy dep,
-        # six dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],
@@ -671,7 +654,6 @@ py_test(
     deps = [
         ":bijectors",
         # numpy dep,
-        # six dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],
@@ -684,7 +666,6 @@ py_test(
     deps = [
         ":bijectors",
         # numpy dep,
-        # six dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],
@@ -697,7 +678,6 @@ py_test(
     deps = [
         ":bijectors",
         # numpy dep,
-        # six dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],
@@ -710,7 +690,6 @@ py_test(
     deps = [
         ":bijectors",
         # numpy dep,
-        # six dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],
@@ -723,7 +702,6 @@ py_test(
     deps = [
         ":bijectors",
         # numpy dep,
-        # six dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],
@@ -736,7 +714,6 @@ py_test(
     deps = [
         ":bijectors",
         # numpy dep,
-        # six dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],
@@ -761,7 +738,6 @@ py_test(
     deps = [
         ":bijectors",
         # numpy dep,
-        # six dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],
