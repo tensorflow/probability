@@ -172,6 +172,8 @@ def minimize(value_and_gradients_function,
   with tf.name_scope(name, 'minimize', [initial_position,
                                         tolerance,
                                         initial_inverse_hessian_estimate]):
+    initial_position = tf.convert_to_tensor(initial_position,
+                                            name='initial_position')
     dtype = initial_position.dtype.base_dtype
     domain_shape = initial_position.shape
     if initial_inverse_hessian_estimate is None:
@@ -217,7 +219,9 @@ def minimize(value_and_gradients_function,
           objective_value=objective_value,
           objective_gradient=objective_gradient,
           inverse_hessian_estimate=inv_hessian_estimate)
-      ls_failed_case = (~ls_result.converged, lambda: failed_retval)
+      # Fail if the objective value is not finite or the line search failed.
+      ls_failed_case = (~(tf.is_finite(objective_value) & ls_result.converged),
+                        lambda: failed_retval)
 
       # If the line search didn't fail, then either we need to continue
       # searching or need to stop because we have converged.
