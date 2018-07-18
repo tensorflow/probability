@@ -79,8 +79,7 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors",
-        "//tensorflow_probability/python/distributions/internal:moving_stats",
-        "//tensorflow_probability/python/distributions/internal:statistical_testing",
+        "//tensorflow_probability/python/distributions/internal",
         "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
