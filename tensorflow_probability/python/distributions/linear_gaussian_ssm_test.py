@@ -518,7 +518,8 @@ class _AugmentSampleShapeTest(object):
 
     full_batch_shape, dist = self.build_inputs([5, 4, 2, 3], [6, 5, 4, 2, 3])
 
-    with self.assertRaisesError("Cannot broadcast"):
+    with self.assertRaisesError(
+        "(Broadcasting is not supported|Cannot broadcast)"):
       self.maybe_evaluate(
           _augment_sample_shape(dist, full_batch_shape,
                                 validate_args=True))

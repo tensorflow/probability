@@ -55,7 +55,7 @@ class LogNormalTest(tf.test.TestCase):
   def testLogNormalSample(self):
     loc, scale = 1.5, 0.4
     dist = tfd.LogNormal(loc=loc, scale=scale)
-    samples = self.evaluate(dist.sample(5000))
+    samples = self.evaluate(dist.sample(6000, seed=1234))
     self.assertAllClose(np.mean(samples),
                         self.evaluate(dist.mean()),
                         atol=0.1)
