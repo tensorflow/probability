@@ -92,20 +92,24 @@ It also includes example scripts such as:
 
 ## Installation
 
+### Stable Builds
+
 To install the latest version, run the following:
 
 ```shell
-pip install --user --upgrade tfp-nightly    # depends on tensorflow (CPU-only)
+# Installing with the `--upgrade` flag ensures you'll get the latest version.
+pip install --user --upgrade tensorflow-probability  # depends on tensorflow (CPU-only)
 ```
 
-TensorFlow Probability depends on a current nightly release of TensorFlow
-(`tf-nightly`); the `--upgrade` flag ensures you'll automatically get the latest
-version.
+TensorFlow Probability depends on a recent stable release of TensorFlow
+(pip package `tensorflow`); see [TF release notes](
+https://github.com/tensorflow/probability/releases) for details on the latest
+version of TensorFlow Probability, and the version of TensorFlow it depends on.
 
 We also provide a GPU-enabled package:
 
 ```shell
-pip install --user --upgrade tfp-nightly-gpu  # depends on tensorflow-gpu (GPU enabled)
+pip install --user --upgrade tensorflow-probability-gpu  # depends on tensorflow-gpu
 ```
 
 Currently, TensorFlow Probability does not contain any GPU-specific code. The
@@ -116,6 +120,15 @@ To force a Python 3-specific install, replace `pip` with `pip3` in the above
 commands. For additional installation help, guidance installing prerequisites,
 and (optionally) setting up virtual environments, see the [TensorFlow
 installation guide](https://www.tensorflow.org/install).
+
+### Nightly Builds
+
+We also release nightly builds, under the pip packages `tfp-nightly` and
+`tfp-nightly-gpu`; these depend on `tf-nightly` and `tf-nightly-gpu`,
+respectively. These builds include newer features, but may be less stable than
+our versioned releases.
+
+### Installing from Source
 
 You can also install from source. This requires the [Bazel](
 https://bazel.build/) build system.
