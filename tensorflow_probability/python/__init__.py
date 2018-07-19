@@ -49,6 +49,6 @@ _allowed_symbols = [
     'vi',
 ]
 
-__version__ = '0.2.0-rc0'
+__version__ = '0.2.0'
 
 remove_undocumented(__name__, _allowed_symbols)
