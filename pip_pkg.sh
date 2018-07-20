@@ -61,13 +61,12 @@ function main() {
   cp LICENSE ${TMPDIR}
 
   pushd ${TMPDIR}
-  echo $(date) : "=== Building source distribution and wheel"
+  echo $(date) : "=== Building wheel"
 
   # Pass through remaining arguments (following the first argument, which
   # specifies the output dir) to setup.py, e.g.,
   #  ./pip_pkg /tmp/tensorflow_probability_pkg --gpu --release
   # passes `--gpu --release` to setup.py.
-  python setup.py sdist ${@:2} > /dev/null
   python setup.py bdist_wheel --universal ${@:2} >/dev/null
 
   cp dist/* "${DEST}"
