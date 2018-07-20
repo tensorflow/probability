@@ -97,6 +97,46 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
       self.assertAllClose(x_, inverse_y_, rtol=1e-4, atol=0.)
       self.assertAllClose(ildj_, -fldj_, rtol=1e-6, atol=0.)
 
+  def testBijectorConditionKwargs(self):
+    N = 3
+    x_ = np.arange(N * 4 * 2).astype(np.float32).reshape(N, 4 * 2)
+    conditions = {
+        'a': tf.reshape(tf.range(N * 4, dtype=tf.float32), (N, 4)),
+        'b': tf.reshape(tf.range(N * 2, dtype=tf.float32), (N, 2)),
+    }
+
+    with self.test_session() as sess:
+      nvp = tfb.RealNVP(
+          num_masked=4, validate_args=True, **self._real_nvp_kwargs)
+      x = tf.constant(x_)
+
+      forward_x = nvp.forward(x, **conditions)
+      # Use identity to invalidate cache.
+      inverse_y = nvp.inverse(tf.identity(forward_x), **conditions)
+      forward_inverse_y = nvp.forward(inverse_y, **conditions)
+      fldj = nvp.forward_log_det_jacobian(x, event_ndims=1, **conditions)
+      # Use identity to invalidate cache.
+      ildj = nvp.inverse_log_det_jacobian(
+          tf.identity(forward_x), event_ndims=1, **conditions)
+      tf.global_variables_initializer().run()
+      [
+          forward_x_,
+          inverse_y_,
+          forward_inverse_y_,
+          ildj_,
+          fldj_,
+      ] = sess.run([
+          forward_x,
+          inverse_y,
+          forward_inverse_y,
+          ildj,
+          fldj,
+      ])
+      self.assertEqual("real_nvp", nvp.name)
+      self.assertAllClose(forward_x_, forward_inverse_y_, rtol=1e-1, atol=0.)
+      self.assertAllClose(x_, inverse_y_, rtol=1e-1, atol=0.)
+      self.assertAllClose(ildj_, -fldj_, rtol=1e-6, atol=0.)
+
   def testMutuallyConsistent(self):
     dims = 4
     with self.test_session() as sess:
@@ -152,8 +192,8 @@ class RealNVPConstantShiftScaleTest(RealNVPTest):
   @property
   def _real_nvp_kwargs(self):
 
-    def constant_shift_log_scale_fn(x0, output_units):
-      del x0, output_units
+    def constant_shift_log_scale_fn(x0, output_units, **condition_kwargs):
+      del x0, output_units, condition_kwargs
       shift = tf.constant([0.1])
       log_scale = tf.constant([0.5])
       return shift, log_scale
