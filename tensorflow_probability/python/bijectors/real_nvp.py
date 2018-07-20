@@ -19,8 +19,9 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from tensorflow_probability.python.bijectors import bijector
 from tensorflow.python.layers import core as layers
+from tensorflow_probability.python.bijectors.conditional_bijector import ConditionalBijector
+
 
 
 __all__ = [
@@ -29,7 +30,7 @@ __all__ = [
 ]
 
 
-class RealNVP(bijector.Bijector):
+class RealNVP(ConditionalBijector):
   """RealNVP "affine coupling layer" for vector-valued events.
 
   Real NVP models a normalizing flow on a `D`-dimensional distribution via a
@@ -176,12 +177,12 @@ class RealNVP(bijector.Bijector):
         raise ValueError(
             "Number of masked units must be smaller than the event size.")
 
-  def _forward(self, x):
+  def _forward(self, x, **condition_kwargs):
     self._cache_input_depth(x)
     # Performs scale and shift.
     x0, x1 = x[..., :self._num_masked], x[..., self._num_masked:]
     shift, log_scale = self._shift_and_log_scale_fn(
-        x0, self._input_depth - self._num_masked)
+        x0, self._input_depth - self._num_masked, **condition_kwargs)
     y1 = x1
     if log_scale is not None:
       y1 *= tf.exp(log_scale)
@@ -190,12 +191,12 @@ class RealNVP(bijector.Bijector):
     y = tf.concat([x0, y1], axis=-1)
     return y
 
-  def _inverse(self, y):
+  def _inverse(self, y, **condition_kwargs):
     self._cache_input_depth(y)
     # Performs un-shift and un-scale.
     y0, y1 = y[..., :self._num_masked], y[..., self._num_masked:]
     shift, log_scale = self._shift_and_log_scale_fn(
-        y0, self._input_depth - self._num_masked)
+        y0, self._input_depth - self._num_masked, **condition_kwargs)
     x1 = y1
     if shift is not None:
       x1 -= shift
@@ -204,20 +205,20 @@ class RealNVP(bijector.Bijector):
     x = tf.concat([y0, x1], axis=-1)
     return x
 
-  def _inverse_log_det_jacobian(self, y):
+  def _inverse_log_det_jacobian(self, y, **condition_kwargs):
     self._cache_input_depth(y)
     y0 = y[..., :self._num_masked]
     _, log_scale = self._shift_and_log_scale_fn(
-        y0, self._input_depth - self._num_masked)
+        y0, self._input_depth - self._num_masked, **condition_kwargs)
     if log_scale is None:
       return tf.constant(0., dtype=y.dtype, name="ildj")
     return -tf.reduce_sum(log_scale, axis=-1)
 
-  def _forward_log_det_jacobian(self, x):
+  def _forward_log_det_jacobian(self, x, **condition_kwargs):
     self._cache_input_depth(x)
     x0 = x[..., :self._num_masked]
     _, log_scale = self._shift_and_log_scale_fn(
-        x0, self._input_depth - self._num_masked)
+        x0, self._input_depth - self._num_masked, **condition_kwargs)
     if log_scale is None:
       return tf.constant(0., dtype=x.dtype, name="fldj")
     return tf.reduce_sum(log_scale, axis=-1)
@@ -266,8 +267,11 @@ def real_nvp_default_template(hidden_layers,
 
   with tf.name_scope(name, "real_nvp_default_template"):
 
-    def _fn(x, output_units):
+    def _fn(x, output_units, **condition_kwargs):
       """Fully connected MLP parameterized via `real_nvp_template`."""
+      x = tf.concat(
+        [x] + [condition_kwargs[k] for k in sorted(condition_kwargs)], axis=-1)
+
       for units in hidden_layers:
         x = layers.dense(
             inputs=x,
