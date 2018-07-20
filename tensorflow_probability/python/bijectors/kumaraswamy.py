@@ -30,8 +30,8 @@ __all__ = [
 class Kumaraswamy(bijector.Bijector):
   """Compute `Y = g(X) = (1 - (1 - X)**(1 / b))**(1 / a), X in [0, 1]`.
 
-  This bijector maps inputs from `[0, 1]` to [0, 1]`. The inverse of the
-  bijector applied to a uniform random variable `X ~ U(0, 1) gives back a
+  This bijector maps inputs from `[0, 1]` to `[0, 1]`. The inverse of the
+  bijector applied to a uniform random variable `X ~ U(0, 1)` gives back a
   random variable with the [Kumaraswamy distribution](
   https://en.wikipedia.org/wiki/Kumaraswamy_distribution):
 
