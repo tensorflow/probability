@@ -12,6 +12,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-include README.md LICENSE BUILD
-recursive-include tensorflow_probability BUILD
-
+include README.md LICENSE
+recursive-include tensorflow_probability
