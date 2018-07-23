@@ -189,10 +189,10 @@ def _softplus_inverse(x):
 
 
 def make_encoder(activation, latent_size, base_depth):
-  """Create the encoder function.
+  """Creates the encoder function.
 
   Args:
-    activation: Activation function to use.
+    activation: Activation function in hidden layers.
     latent_size: The dimensionality of the encoding.
     base_depth: The lowest depth for a layer.
 
@@ -226,10 +226,10 @@ def make_encoder(activation, latent_size, base_depth):
 
 
 def make_decoder(activation, latent_size, output_shape, base_depth):
-  """Create the decoder function.
+  """Creates the decoder function.
 
   Args:
-    activation: Activation function to use.
+    activation: Activation function in hidden layers.
     latent_size: Dimensionality of the encoding.
     output_shape: The output image shape.
     base_depth: Smallest depth for a layer.
@@ -270,7 +270,7 @@ def make_decoder(activation, latent_size, output_shape, base_depth):
 
 
 def make_mixture_prior(latent_size, mixture_components):
-  """Create the mixture of Gaussians prior distribution.
+  """Creates the mixture of Gaussians prior distribution.
 
   Args:
     latent_size: The dimensionality of the latent representation.
@@ -286,19 +286,19 @@ def make_mixture_prior(latent_size, mixture_components):
     return tfd.MultivariateNormalDiag(
         loc=tf.zeros([latent_size]),
         scale_identity_multiplier=1.0)
-  else:
-    loc = tf.get_variable(name="loc", shape=[mixture_components, latent_size])
-    raw_scale_diag = tf.get_variable(
-        name="raw_scale_diag", shape=[mixture_components, latent_size])
-    mixture_logits = tf.get_variable(
-        name="mixture_logits", shape=[mixture_components])
 
-    return tfd.MixtureSameFamily(
-        components_distribution=tfd.MultivariateNormalDiag(
-            loc=loc,
-            scale_diag=tf.nn.softplus(raw_scale_diag)),
-        mixture_distribution=tfd.Categorical(logits=mixture_logits),
-        name="prior")
+  loc = tf.get_variable(name="loc", shape=[mixture_components, latent_size])
+  raw_scale_diag = tf.get_variable(
+      name="raw_scale_diag", shape=[mixture_components, latent_size])
+  mixture_logits = tf.get_variable(
+      name="mixture_logits", shape=[mixture_components])
+
+  return tfd.MixtureSameFamily(
+      components_distribution=tfd.MultivariateNormalDiag(
+          loc=loc,
+          scale_diag=tf.nn.softplus(raw_scale_diag)),
+      mixture_distribution=tfd.Categorical(logits=mixture_logits),
+      name="prior")
 
 
 def pack_images(images, rows, cols):
@@ -323,7 +323,7 @@ def image_tile_summary(name, tensor, rows=8, cols=8):
 
 
 def model_fn(features, labels, mode, params, config):
-  """Build the model function for use in an estimator.
+  """Builds the model function for use in an estimator.
 
   Arguments:
     features: The input features for the estimator.
@@ -331,6 +331,7 @@ def model_fn(features, labels, mode, params, config):
     mode: Signifies whether it is train or test or predict.
     params: Some hyperparameters as a dictionary.
     config: The RunConfig, unused here.
+
   Returns:
     EstimatorSpec: A tf.estimator.EstimatorSpec instance.
   """
@@ -423,7 +424,7 @@ FILE_TEMPLATE = "binarized_mnist_{split}.amat"
 
 
 def download(directory, filename):
-  """Download a file."""
+  """Downloads a file."""
   filepath = os.path.join(directory, filename)
   if tf.gfile.Exists(filepath):
     return filepath
@@ -436,7 +437,7 @@ def download(directory, filename):
 
 
 def static_mnist_dataset(directory, split_name):
-  """Return binary static MNIST tf.data.Dataset."""
+  """Returns binary static MNIST tf.data.Dataset."""
   amat_file = download(directory, FILE_TEMPLATE.format(split=split_name))
   dataset = tf.data.TextLineDataset(amat_file)
   str_to_arr = lambda string: np.array([char == "1" for char in string.split()])
@@ -450,7 +451,7 @@ def static_mnist_dataset(directory, split_name):
 
 
 def build_fake_input_fns(batch_size):
-  """Build fake MNIST-style data for unit testing."""
+  """Builds fake MNIST-style data for unit testing."""
   dataset = tf.data.Dataset.from_tensor_slices(
       np.random.rand(batch_size, *IMAGE_SHAPE).astype("float32")).map(
           lambda row: (row, 0)).batch(batch_size)
@@ -461,7 +462,7 @@ def build_fake_input_fns(batch_size):
 
 
 def build_input_fns(data_dir, batch_size):
-  """Build an Iterator switching between train and heldout data."""
+  """Builds an Iterator switching between train and heldout data."""
 
   # Build an iterator over training batches.
   training_dataset = static_mnist_dataset(data_dir, "train")

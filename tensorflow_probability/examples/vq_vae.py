@@ -18,7 +18,7 @@ The VQ-VAE is similar to a variational autoencoder (VAE), but the latent
 code Z goes through a discrete bottleneck before being passed to the encoder.
 The bottleneck uses vector quantization to match the latent code to its nearest
 neighbor in a codebook. To train, we minimize the weighted sum of the
-reconstruction loss and a commitment loss  that ensures the encoder commits to
+reconstruction loss and a commitment loss that ensures the encoder commits to
 entries in the codebook. In addition, we use exponential moving averaging (EMA)
 to update the codebook for each minibatch.
 
@@ -102,9 +102,12 @@ FLAGS = flags.FLAGS
 
 
 class VectorQuantizer(object):
-  """Creates a vector-quantizer, which quantizes a continuous vector under a
-  codebook. The codebook is also known as "embeddings" or "memory", and it is
-  learned using an exponential moving average."""
+  """Creates a vector-quantizer.
+
+  It quantizes a continuous vector under a codebook. The codebook is also known
+  as "embeddings" or "memory", and it is learned using an exponential moving
+  average.
+  """
 
   def __init__(self, num_codes, code_size):
     self.num_codes = num_codes
@@ -119,7 +122,7 @@ class VectorQuantizer(object):
         trainable=False)
 
   def __call__(self, codes):
-    """Use codebook to find nearest neighbor for each code.
+    """Uses codebook to find nearest neighbor for each code.
 
     Args:
       codes: A `float`-like `Tensor` containing the latent
@@ -145,65 +148,80 @@ class VectorQuantizer(object):
     return nearest_codebook_entries, one_hot_assignments
 
 
-class Encoder(object):
-  """Creates the encoder."""
+def make_encoder(layers, activation, latent_size, code_size):
+  """Creates the encoder function.
 
-  def __init__(self, layers, activation, latent_size, code_size):
-    self.latent_size = latent_size
-    self.code_size = code_size
-    self.encoder_net = tf.keras.Sequential(
-        [tf.keras.layers.Flatten()] +
-        [tf.keras.layers.Dense(units, activation=activation)
-         for units in layers] +
-        [tf.keras.layers.Dense(latent_size * code_size, activation=None)] +
-        [tf.keras.layers.Reshape([latent_size, code_size])])
+  Args:
+    layers: List of integers denoting number of units in hidden layers.
+    activation: Activation function in hidden layers.
+    latent_size: The number of latent variables in the code.
+    code_size: The dimensionality of each latent variable.
 
-  def __call__(self, images):
-    """Build encoder which takes a batch of images and returns a latent code.
+  Returns:
+    encoder: A `callable` mapping a `Tensor` of images to a `Tensor` of shape
+      `[..., latent_size, code_size]`.
+  """
+  encoder_net = tf.keras.Sequential(
+      [tf.keras.layers.Flatten()] +
+      [tf.keras.layers.Dense(units, activation=activation)
+       for units in layers] +
+      [tf.keras.layers.Dense(latent_size * code_size, activation=None)] +
+      [tf.keras.layers.Reshape([latent_size, code_size])])
+
+  def encoder(images):
+    """Encodes a batch of images.
 
     Args:
-      images: A `int`-like `Tensor` representing the inputs to be encoded.
-        The first dimension (axis 0) indexes batch elements; all other
-        dimensions index event elements.
+      images: A `Tensor` representing the inputs to be encoded, of shape `[...,
+        channels]`.
 
     Returns:
-      codes: The output of the encoder, a `float`-like `Tensor` containing the
-        latent vectors to be matched with the codebook. These are rank-3 with
-        shape `[batch_size, latent_size, code_size]`.
+      codes: A `float`-like `Tensor` of shape `[..., latent_size, code_size]`.
+        It represents latent vectors to be matched with the codebook.
     """
     images = tf.cast(images, dtype=tf.float32)
-    codes = self.encoder_net(images)
+    codes = encoder_net(images)
     return codes
 
+  return encoder
 
-class Decoder(object):
-  """Defines a functor for creating the decoder distribution."""
 
-  def __init__(self, layers, activation, output_shape):
-    self.output_shape = output_shape
-    self.decoder_net = tf.keras.Sequential(
-        [tf.keras.layers.Flatten()] +
-        [tf.keras.layers.Dense(units, activation=activation)
-         for units in layers] +
-        [tf.keras.layers.Dense(np.prod(output_shape), activation=None)])
+def make_decoder(layers, activation, output_shape):
+  """Creates the decoder function.
 
-  def __call__(self, codes):
-    """Build decoder which takes a code and returns a distribution over images.
+  Args:
+    layers: List of integers denoting number of units in hidden layers.
+    activation: Activation function in hidden layers.
+    output_shape: The output image shape.
+
+  Returns:
+    decoder: A `callable` mapping a `Tensor` of encodings to a
+      `tf.distributions.Distribution` instance over images.
+  """
+  decoder_net = tf.keras.Sequential(
+      [tf.keras.layers.Flatten()] +
+      [tf.keras.layers.Dense(units, activation=activation)
+       for units in layers] +
+      [tf.keras.layers.Dense(np.prod(output_shape), activation=None)])
+
+  def decoder(codes):
+    """Builds a distribution over images given codes.
 
     Args:
-      codes: A `float`-like `Tensor` representing the inputs to be decoded.
-        The first dimension (axis 0) indexes batch elements; all other
-        dimensions index event elements.
+      codes: A `Tensor` representing the inputs to be decoded, of shape `[...,
+        code_size]`.
 
     Returns:
-      decoder: A multivariate `Bernoulli` distribution.
+      decoder_distribution: A multivariate `Bernoulli` distribution.
     """
-    net = self.decoder_net(codes)
-    new_shape = tf.concat([tf.shape(net)[:-1], self.output_shape], axis=0)
+    net = decoder_net(codes)
+    new_shape = tf.concat([tf.shape(net)[:-1], output_shape], axis=0)
     logits = tf.reshape(net, shape=new_shape)
     return tfd.Independent(tfd.Bernoulli(logits=logits),
-                           reinterpreted_batch_ndims=len(self.output_shape),
+                           reinterpreted_batch_ndims=len(output_shape),
                            name="decoder_distribution")
+
+  return decoder
 
 
 def make_vq_vae(images,
@@ -233,6 +251,8 @@ def make_vq_vae(images,
 
   Returns:
     loss: A scalar `Tensor` computing the loss function.
+    decoder_distribution: A `tf.distributions.Distribution` instance conditional
+      on a draw from the encoder.
   """
   codes = encoder_fn(images)
   nearest_codebook_entries, one_hot_assignments = vector_quantizer(codes)
@@ -241,10 +261,13 @@ def make_vq_vae(images,
   # reconstruction loss.
   codes_straight_through = codes + tf.stop_gradient(
       nearest_codebook_entries - codes)
-  reconstruction_loss = tf.reduce_mean(
-      -1 * decoder_fn(codes_straight_through).log_prob(images))
+  decoder_distribution = decoder_fn(codes_straight_through)
+  reconstruction_loss = -tf.reduce_mean(decoder_distribution.log_prob(images))
   commitment_loss = tf.reduce_mean(
       tf.square(codes - tf.stop_gradient(nearest_codebook_entries)))
+
+  tf.summary.scalar("reconstruction_loss", reconstruction_loss)
+  tf.summary.scalar("commitment_loss", commitment_loss)
 
   # Use an exponential moving average to update the codebook.
   updated_ema_count = moving_averages.assign_moving_average(
@@ -266,12 +289,7 @@ def make_vq_vae(images,
   loss += reconstruction_loss
 
   tf.summary.scalar("loss", loss)
-
-  # Rebuild (and reuse!) the decoder so we can compute stats from it.
-  encoding_draw = nearest_codebook_entries
-  decoder = decoder_fn(encoding_draw)
-
-  return loss, codes, decoder, encoding_draw
+  return loss, decoder_distribution
 
 
 def save_imgs(x, fname):
@@ -324,7 +342,7 @@ def visualize_training(images_val,
 
 
 def build_fake_data(num_examples=10):
-  """Build fake MNIST-style data for unit testing."""
+  """Builds fake MNIST-style data for unit testing."""
 
   class Dummy(object):
     pass
@@ -347,7 +365,7 @@ def build_fake_data(num_examples=10):
 
 
 def build_input_pipeline(mnist_data, batch_size, heldout_size):
-  """Build an Iterator switching between train and heldout data."""
+  """Builds an Iterator switching between train and heldout data."""
   # Build an iterator over training batches.
   training_dataset = tf.data.Dataset.from_tensor_slices(
       (mnist_data.train.images, np.int32(mnist_data.train.labels)))
@@ -399,13 +417,17 @@ def main(argv):
     images = tf.reshape(images, shape=[-1] + IMAGE_SHAPE)
     images = tf.cast(images > 0.5, dtype=tf.int32)
 
-    encoder = Encoder(FLAGS.encoder_layers, FLAGS.activation, FLAGS.latent_size,
-                      FLAGS.code_size)
-    decoder = Decoder(FLAGS.decoder_layers, FLAGS.activation, IMAGE_SHAPE)
+    encoder = make_encoder(FLAGS.encoder_layers,
+                           FLAGS.activation,
+                           FLAGS.latent_size,
+                           FLAGS.code_size)
+    decoder = make_decoder(FLAGS.decoder_layers,
+                           FLAGS.activation,
+                           IMAGE_SHAPE)
     vector_quantizer = VectorQuantizer(FLAGS.num_codes, FLAGS.code_size)
 
     # Build the model and loss function.
-    loss, _, decoder_distribution, _ = make_vq_vae(
+    loss, decoder_distribution = make_vq_vae(
         images, encoder, decoder, vector_quantizer, FLAGS.beta, FLAGS.decay)
     reconstructed_images = decoder_distribution.mean()
 
