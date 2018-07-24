@@ -75,6 +75,7 @@ py_library(
         ":vector_laplace_linear_operator",
         ":vector_sinh_arcsinh_diag",
         ":vector_student_t",
+        ":von_mises_fisher",
         ":wishart",
         # numpy dep,
         # tensorflow dep,
@@ -494,6 +495,15 @@ py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors",
         "//tensorflow_probability/python/internal:distribution_util",
+    ],
+)
+
+py_library(
+    name = "von_mises_fisher",
+    srcs = ["von_mises_fisher.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
     ],
 )
 
@@ -1017,6 +1027,19 @@ py_test(
     name = "vector_sinh_arcsinh_diag_test",
     size = "medium",
     srcs = ["vector_sinh_arcsinh_diag_test.py"],
+    deps = [
+        ":distributions",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_test(
+    name = "von_mises_fisher_test",
+    size = "medium",
+    srcs = ["von_mises_fisher_test.py"],
     deps = [
         ":distributions",
         # numpy dep,
