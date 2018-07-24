@@ -25,11 +25,13 @@ if [[ $# -lt 1 ]] ; then
 fi
 
 # Create the destination directory, then do dirname on a non-existent file
-# inside it to give us an absolute paths with tilde characters resolved to the
-# destination directory. Readlink -f is a cleaner way of doing this but is not
-# available on a fresh macOS install.
+# inside it to give us a path with tilde characters resolved (readlink -f is
+# another way of doing this but is not available on a fresh macOS install).
+# Finally, use cd and pwd to get an absolute path, in case a relative one was
+# given.
 mkdir -p "$1"
-DEST="$(dirname "${1}/does_not_exist")"
+DEST=$(dirname "${1}/does_not_exist")
+DEST=$(cd "$DEST" && pwd)
 
 cd bazel-bin/pip_pkg.runfiles/tensorflow_probability
 # Pass through remaining arguments (following the first argument, which
