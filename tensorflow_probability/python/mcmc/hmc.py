@@ -133,67 +133,42 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
   ```python
   import tensorflow as tf
   import tensorflow_probability as tfp
-  import numpy as np
 
-  tfd = tfp.distributions
+  # Target distribution is proportional to: `exp(-x (1 + x))`.
+  def unnormalized_log_prob(x):
+    return -x - x**2.
 
-  # Tuning acceptance rates:
-  dtype = np.float32
-  num_warmup_iter = 500
-  num_chain_iter = 500
-  # Set the target average acceptance ratio for the HMC as suggested by
-  # Beskos et al. (2013):
-  # https://projecteuclid.org/download/pdfview_1/euclid.bj/1383661192
+  # Create state to hold updated `step_size`.
+  step_size = tf.get_variable(
+      name='step_size',
+      initializer=1.,
+      use_resource=True,  # For TFE compatibility.
+      trainable=False)
 
-  target_accept_rate = 0.651
-
-  x = tf.get_variable(name='x', initializer=dtype(1))
-  step_size = tf.get_variable(name='step_size', initializer=dtype(1))
-
-  # Target distribution is standard univariate Normal.
-  target = tfd.Normal(loc=dtype(0), scale=dtype(1))
-
-  # Initialize the HMC sampler. In order to retain `tfe` compatibility,
-  # `target_log_prob_fn` is passed as `lambda x: target.log_prob(x)`.
+  # Initialize the HMC transition kernel.
   hmc = tfp.mcmc.HamiltonianMonteCarlo(
-      target_log_prob_fn=lambda x: target.log_prob(x),
+      target_log_prob_fn=unnormalized_log_prob,
+      num_leapfrog_steps=3,
       step_size=step_size,
-      num_leapfrog_steps=3)
+      step_size_update_fn=tfp.mcmc.step_size_simple_update)
 
-  # One iteration of the HMC
-  next_x, other_results = hmc.one_step(
-      current_state=x,
-      previous_kernel_results=hmc.bootstrap_results(x))
+  # Run the chain (with burn-in).
+  samples, kernel_results = tfp.mcmc.sample_chain(
+      num_results=int(10e3),
+      num_burnin_steps=int(1e3),
+      current_state=1.,
+      kernel=hmc)
 
-  x_update = x.assign(next_x)
-
-  # Adapt the step size using standard adaptive MCMC procedure. See Section 4.2
-  # of Andrieu and Thoms (2008):
-  # http://www4.ncsu.edu/~rsmith/MA797V_S12/Andrieu08_AdaptiveMCMC_Tutorial.pdf
-
-  step_size_update = step_size.assign_add(
-      step_size * tf.where(
-          tf.exp(tf.minimum(other_results.log_accept_ratio, 0.)) >
-              target_accept_rate,
-          0.01, -0.01))
-
-  # Note, the adaptations are performed during warmup only.
-  warmup = tf.group([x_update, step_size_update])
-
-  init = tf.global_variables_initializer()
+  # Initialize all constructed variables.
+  init_op = tf.global_variables_initializer()
 
   with tf.Session() as sess:
-    sess.run(init)
-    # Warm up the sampler and adapt the step size
-    for _ in xrange(num_warmup_iter):
-      sess.run(warmup)
-    # Collect samples without adapting step size
-    samples = np.zeros([num_chain_iter])
-    for i in xrange(num_chain_iter):
-      _, x_,= sess.run([x_update, x])
-      samples[i] = x_
+    init_op.run()
+    samples_, kernel_results_ = sess.run([samples, kernel_results])
 
-  print(samples.mean(), samples.std())
+  print('mean:{:.4f}  stddev:{:.4f}  acceptance:{:.4f}'.format(
+      samples_.mean(), samples_.std(), kernel_results_.is_accepted.mean()))
+  # mean:-0.5003  stddev:0.7711  acceptance:0.6240
   ```
 
   ##### Estimate parameters of a more complicated posterior.
