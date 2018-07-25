@@ -35,7 +35,7 @@ from tensorflow.python.framework import random_seed
 from tensorflow.python.framework import test_util
 
 
-tfd = tf.contrib.distributions
+tfd = tfp.distributions
 
 
 # Arguments kept to match counterpart,
@@ -814,6 +814,188 @@ class HMCHandlesLists32(_HMCHandlesLists, tf.test.TestCase):
 
 class HMCHandlesLists64(_HMCHandlesLists, tf.test.TestCase):
   dtype = np.float64
+
+
+class HMCEMAdaptiveStepSize(tf.test.TestCase):
+  """This test verifies that the docstring example works as advertised."""
+
+  def setUp(self):
+    random_seed.set_random_seed(10014)
+    np.random.seed(10014)
+
+  def make_training_data(self, num_samples, dims, sigma):
+    dt = np.asarray(sigma).dtype
+    zeros = tf.zeros(dims, dtype=dt)
+    x = tf.transpose(tfd.MultivariateNormalDiag(loc=zeros).sample(
+        num_samples, seed=1))  # [d, n]
+    w = tfd.MultivariateNormalDiag(
+        loc=zeros,
+        scale_identity_multiplier=sigma).sample([1], seed=2)  # [1, d]
+    noise = tfd.Normal(loc=np.array(0, dt), scale=np.array(1, dt)).sample(
+        num_samples, seed=3)  # [n]
+    y = tf.matmul(w, x) + noise  # [1, n]
+    return y[0], x, w[0]
+
+  def make_weights_prior(self, dims, dtype):
+    return tfd.MultivariateNormalDiag(
+        loc=tf.zeros([dims], dtype=dtype),
+        scale_identity_multiplier=tf.exp(tf.get_variable(
+            name='log_sigma',
+            initializer=np.array(0, dtype),
+            use_resource=True)))
+
+  def make_response_likelihood(self, w, x):
+    w_shape = tf.pad(
+        tf.shape(w),
+        paddings=[[tf.where(tf.rank(w) > 1, 0, 1), 0]],
+        constant_values=1)
+    y_shape = tf.concat([tf.shape(w)[:-1], [tf.shape(x)[-1]]], axis=0)
+    w_expand = tf.reshape(w, w_shape)
+    return tfd.Normal(
+        loc=tf.reshape(tf.matmul(w_expand, x), y_shape),
+        scale=np.array(1, w.dtype.as_numpy_dtype))  # [n]
+
+  def test_mcem_converges(self):
+    # Setup assumptions.
+    dtype = np.float32
+    num_samples = 500
+    dims = 10
+
+    weights_prior_true_scale = np.array(0.3, dtype)
+    with tf.Session() as sess:
+      y, x, _ = sess.run(
+          self.make_training_data(num_samples, dims, weights_prior_true_scale))
+
+    prior = self.make_weights_prior(dims, dtype)
+    def unnormalized_posterior_log_prob(w):
+      likelihood = self.make_response_likelihood(w, x)
+      return (prior.log_prob(w)
+              + tf.reduce_sum(likelihood.log_prob(y), axis=-1))  # [m]
+
+    weights_chain_start = tf.placeholder(dtype, shape=[dims])
+
+    step_size = tf.get_variable(
+        name='step_size',
+        initializer=np.array(0.05, dtype),
+        use_resource=True,
+        trainable=False)
+
+    num_results = 2
+    weights, kernel_results = tfp.mcmc.sample_chain(
+        num_results=num_results,
+        num_burnin_steps=0,
+        current_state=weights_chain_start,
+        kernel=tfp.mcmc.HamiltonianMonteCarlo(
+            target_log_prob_fn=unnormalized_posterior_log_prob,
+            num_leapfrog_steps=2,
+            step_size=step_size,
+            step_size_update_fn=tfp.mcmc.step_size_simple_update,
+            state_gradients_are_stopped=True,
+            seed=_set_seed(252)),
+        parallel_iterations=1)
+
+    avg_acceptance_ratio = tf.reduce_mean(
+        tf.exp(tf.minimum(kernel_results.log_accept_ratio, 0.)))
+
+    # We do an optimization step to propagate `log_sigma` after two HMC steps to
+    # propagate `weights`.
+    loss = -tf.reduce_mean(kernel_results.accepted_results.target_log_prob)
+    optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.01)
+    train_op = optimizer.minimize(loss)
+
+    with tf.variable_scope(tf.get_variable_scope(), reuse=True):
+      weights_prior_estimated_scale = tf.exp(
+          tf.get_variable(name='log_sigma', dtype=dtype))
+
+    init_op = tf.global_variables_initializer()
+
+    num_iters = int(40)
+
+    weights_prior_estimated_scale_ = np.zeros(num_iters, dtype)
+    weights_ = np.zeros([num_iters + 1, dims], dtype)
+    loss_ = np.zeros([num_iters], dtype)
+    weights_[0] = np.random.randn(dims).astype(dtype)
+
+    with tf.Session() as sess:
+      init_op.run()
+      for iter_ in range(num_iters):
+        [
+            _,
+            weights_prior_estimated_scale_[iter_],
+            weights_[iter_ + 1],
+            loss_[iter_],
+            step_size_,
+            avg_acceptance_ratio_,
+        ] = sess.run([
+            train_op,
+            weights_prior_estimated_scale,
+            weights[-1],
+            loss,
+            step_size,
+            avg_acceptance_ratio,
+        ], feed_dict={weights_chain_start: weights_[iter_]})
+        # Enable using bazel flags:
+        # `--test_arg="--logtostderr" --test_arg="--vmodule=hmc_test=2"`,
+        # E.g.,
+        # bazel test --test_output=streamed -c opt :hmc_test \
+        # --test_filter=HMCEMAdaptiveStepSize \
+        # --test_arg="--logtostderr" --test_arg="--vmodule=hmc_test=2"
+        tf.logging.vlog(
+            1, ('iter:{:>2}  loss:{: 9.3f}  scale:{:.3f}  '
+                'step_size:{:.4f}  avg_acceptance_ratio:{:.4f}').format(
+                    iter_, loss_[iter_], weights_prior_estimated_scale_[iter_],
+                    step_size_, avg_acceptance_ratio_))
+
+    # Loss had better decrease....
+    self.assertGreater(loss_[:10].mean(), loss_[-10:].mean())
+    self.assertNear(0.24,  # Actually smaller than weights_prior_true_scale,
+                    weights_prior_estimated_scale_[-5:].mean(),
+                    err=0.005)
+
+  @test_util.run_in_graph_and_eager_modes
+  def test_step_size_adapts(self):
+    dtype = np.float32
+
+    def unnormalized_log_prob(x):
+      return -x - x**2
+
+    # TODO(b/111765211): Switch to the following once
+    # `get_variable(use_resource=True)` has the same semantics as
+    # `tf.contrib.eager.Variable`.
+    #   step_size = tf.get_variable(
+    #       name='step_size',
+    #       initializer=np.array(0.05, dtype),
+    #       use_resource=True,
+    #       trainable=False)
+    step_size = tf.contrib.eager.Variable(
+        initial_value=np.array(0.05, dtype),
+        name='step_size',
+        trainable=False)
+
+    _, kernel_results = tfp.mcmc.sample_chain(
+        num_results=int(1e3),
+        num_burnin_steps=100,
+        current_state=tf.zeros([], dtype),
+        kernel=tfp.mcmc.HamiltonianMonteCarlo(
+            target_log_prob_fn=unnormalized_log_prob,
+            num_leapfrog_steps=2,
+            step_size=step_size,
+            step_size_update_fn=tfp.mcmc.step_size_simple_update,
+            seed=_set_seed(252)),
+        parallel_iterations=1)
+
+    init_op = tf.global_variables_initializer()
+    self.evaluate(init_op)
+    [kernel_results_, step_size_] = self.evaluate([
+        kernel_results, kernel_results.extra.step_size_assign])
+
+    # The important thing is that the new step_size does not equal the original,
+    # 0.05. However, we're not using `self.assertNotEqual` because testing for
+    # `1.25` reveals just how much the step_size has changed.
+    self.assertNear(1.25, step_size_[-100:].mean(), err=0.03)
+    self.assertNear(0., step_size_[-100:].std(), err=0.04)
+    # Anything in [0.6, 0.9] is sufficient. https://arxiv.org/abs/1411.6669
+    self.assertNear(0.75, kernel_results_.is_accepted.mean(), err=0.05)
 
 
 if __name__ == '__main__':

@@ -45,6 +45,7 @@ MetropolisHastingsKernelResults = collections.namedtuple(
         'log_accept_ratio',
         'proposed_state',
         'proposed_results',
+        'extra',
     ])
 
 
@@ -235,6 +236,7 @@ class MetropolisHastings(kernel_base.TransitionKernel):
           log_accept_ratio=log_accept_ratio,
           proposed_state=proposed_state,
           proposed_results=proposed_results,
+          extra=[],
       )
 
       return next_state, kernel_results
@@ -268,6 +270,7 @@ class MetropolisHastings(kernel_base.TransitionKernel):
           log_accept_ratio=tf.zeros_like(x),
           proposed_state=init_state,
           proposed_results=pkr,
+          extra=[],
       )
 
 

@@ -21,6 +21,7 @@ from __future__ import print_function
 from tensorflow_probability.python.mcmc.diagnostic import effective_sample_size
 from tensorflow_probability.python.mcmc.diagnostic import potential_scale_reduction
 from tensorflow_probability.python.mcmc.hmc import HamiltonianMonteCarlo
+from tensorflow_probability.python.mcmc.hmc import step_size_simple_update
 from tensorflow_probability.python.mcmc.hmc import UncalibratedHamiltonianMonteCarlo
 from tensorflow_probability.python.mcmc.kernel import TransitionKernel
 from tensorflow_probability.python.mcmc.langevin import MetropolisAdjustedLangevinAlgorithm
@@ -55,11 +56,12 @@ _allowed_symbols = [
     'default_exchange_proposed_fn',
     'effective_sample_size',
     'potential_scale_reduction',
+    'random_walk_normal_fn',
+    'random_walk_uniform_fn',
     'sample_annealed_importance_chain',
     'sample_chain',
     'sample_halton_sequence',
-    'random_walk_normal_fn',
-    'random_walk_uniform_fn',
+    'step_size_simple_update',
 ]
 
 remove_undocumented(__name__, _allowed_symbols)
