@@ -29,6 +29,7 @@ from tensorflow_probability.python.distributions.conditional_distribution import
 from tensorflow_probability.python.distributions.conditional_transformed_distribution import ConditionalTransformedDistribution
 from tensorflow_probability.python.distributions.deterministic import Deterministic
 from tensorflow_probability.python.distributions.deterministic import VectorDeterministic
+from tensorflow_probability.python.distributions.gamma_gamma import GammaGamma
 from tensorflow_probability.python.distributions.gaussian_process import GaussianProcess
 from tensorflow_probability.python.distributions.gaussian_process_regression_model import GaussianProcessRegressionModel
 from tensorflow_probability.python.distributions.geometric import Geometric
@@ -138,6 +139,7 @@ __all__ = [
     'ExponentialWithSoftplusRate',
     'VectorExponentialDiag',
     'Gamma',
+    'GammaGamma',
     'GammaWithSoftplusConcentrationRate',
     'Geometric',
     'GaussianProcess',

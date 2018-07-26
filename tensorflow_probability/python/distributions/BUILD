@@ -38,6 +38,7 @@ py_library(
         ":conditional_distribution",
         ":conditional_transformed_distribution",
         ":deterministic",
+        ":gamma_gamma",
         ":gaussian_process",
         ":gaussian_process_regression_model",
         ":geometric",
@@ -149,6 +150,15 @@ py_library(
     name = "deterministic",
     srcs = ["deterministic.py"],
     deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "gamma_gamma",
+    srcs = ["gamma_gamma.py"],
+    deps = [
+        # numpy dep,
         # tensorflow dep,
     ],
 )
@@ -626,6 +636,18 @@ py_test(
     srcs = ["distribution_test.py"],
     deps = [
         ":distributions",
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_test(
+    name = "gamma_gamma_test",
+    size = "small",
+    srcs = ["gamma_gamma_test.py"],
+    deps = [
+        ":distributions",
+        # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],
