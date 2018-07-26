@@ -49,6 +49,7 @@ BfgsOptimizerResults = collections.namedtuple(
                    # a constraint and the search stopped due to available
                    # evaluations being exhausted, both `failed` and `converged`
                    # will be simultaneously False.
+        'num_iterations',  # The number of iterations of the BFGS update.
         'num_objective_evaluations',  # The total number of objective
                                       # evaluations performed.
         'position',  # A tensor containing the last argument value found
@@ -188,10 +189,11 @@ def minimize(value_and_gradients_function,
               failed,
               *ignored_args):  # pylint: disable=unused-argument
       """Stopping condition for the algorithm."""
-      return ~converged & ~failed
+      return tf.logical_not(converged | failed)
 
     def _body(_,
               failed,    # pylint: disable=unused-argument
+              num_iterations,
               total_evals,
               position,
               objective_value,
@@ -214,6 +216,7 @@ def minimize(value_and_gradients_function,
       failed_retval = BfgsOptimizerResults(
           converged=False,
           failed=True,
+          num_iterations=num_iterations + 1,
           num_objective_evaluations=total_evals + ls_result.func_evals,
           position=position,
           objective_value=objective_value,
@@ -237,17 +240,23 @@ def minimize(value_and_gradients_function,
                                                      inv_hessian_estimate)
       updated_inv_hessian.set_shape(inv_hessian_estimate.shape)
       converged_retval = BfgsOptimizerResults(
-          converged=True,
-          failed=False,
-          num_objective_evaluations=total_evals + ls_result.func_evals + 1,
+          converged=tf.constant(True, name='converged'),
+          failed=tf.constant(False, name='failed'),
+          num_iterations=tf.convert_to_tensor(num_iterations+1,
+                                              name='num_iterations'),
+          num_objective_evaluations=tf.convert_to_tensor(
+              total_evals + ls_result.func_evals + 1,
+              name='num_objective_evaluations'),
           position=next_position,
           objective_value=next_objective,
           objective_gradient=next_objective_gradient,
           inverse_hessian_estimate=updated_inv_hessian)
       converged_case = (has_converged, lambda: converged_retval)
       default_retval = BfgsOptimizerResults(
-          converged=False,
-          failed=False,
+          converged=tf.constant(False, name='converged'),
+          failed=tf.constant(False, name='failed'),
+          num_iterations=tf.convert_to_tensor(num_iterations+1,
+                                              name='num_iterations'),
           num_objective_evaluations=total_evals + ls_result.func_evals + 1,
           position=next_position,
           objective_value=next_objective,
@@ -260,6 +269,7 @@ def minimize(value_and_gradients_function,
     initial_values = BfgsOptimizerResults(
         converged=converged,
         failed=False,
+        num_iterations=0,
         num_objective_evaluations=0,
         position=initial_position,
         objective_value=f0,

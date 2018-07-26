@@ -48,6 +48,9 @@ _FnDFn = collections.namedtuple('_FnDFn', ['x', 'f', 'df'])
 HagerZhangLineSearchResult = collections.namedtuple(
     'HagerZhangLineSearchResults', [
         'converged',  # Whether a pt satisfying Wolfe/Approx wolfe was found.
+        'failed',  # Whether the line search failed. It can fail if the
+                   # objective function or the gradient are not finite at
+                   # an evaluation point.
         'func_evals',  # Number of function evaluations made.
         'left_pt',  # The left end point of the final bracketing interval.
                     # If converged is True, it is equal to 'right_pt'.
@@ -268,69 +271,86 @@ def hager_zhang(value_and_gradients_function,
         grad_objective_at_zero,
         threshold_use_approximate_wolfe_condition)
 
+    # Checks if the evaluation of the function at the supplied points failed.
+    # If it did, then we quit.
+    eval_failed = ~_is_finite(val_0, val_c)
+
     # Check if the initial step size already satisfies the Wolfe conditions.
     # If it does, there is no further work.
     already_converged = _satisfies_wolfe(val_0, val_c, f_lim,
                                          sufficient_decrease_param,
                                          curvature_param)
 
-    def _cond(converged, *ignored_args):  # pylint:disable=unused-argument
+    def _cond(converged, failed, *ignored_args):  # pylint:disable=unused-argument
       """Loops until convergence is reached."""
-      return ~converged
+      return tf.logical_not(converged | failed)
 
     def _update_with_mid(current_evals, left, right):
       """Corresponds to step L3 in [Hager and Zhang (2006)][2]."""
       mid_pt = (left.x + right.x) / 2
       f_mid, df_mid = value_and_gradients_function(mid_pt)
       mid = _FnDFn(x=mid_pt, f=f_mid, df=df_mid)
-      update_evals, next_left, next_right = _update(
-          value_and_gradients_function,
-          left,
-          right,
-          mid,
-          f_lim)
+      mid_failed = ~_is_finite(mid)
+      updated = _update(value_and_gradients_function,
+                        left,
+                        right,
+                        mid,
+                        f_lim)
+      failed, update_evals, next_left, next_right = smart_cond.smart_cond(
+          mid_failed,
+          true_fn=lambda: (True, 0, mid, mid),
+          false_fn=lambda: updated)
       return (False,
+              failed,
               current_evals + update_evals + 1,
               next_left,
               next_right)
 
-    def _body(converged, evals, left, right):
-      converged, secant2_evals, next_left, next_right = _secant2(
+    def _body(converged, failed, evals, left, right):  # pylint:disable=unused-argument
+      """Line search loop body."""
+      converged, failed, secant2_evals, next_left, next_right = _secant2(
           value_and_gradients_function, val_0, left, right, f_lim,
           sufficient_decrease_param=sufficient_decrease_param,
           curvature_param=curvature_param)
 
       evals += secant2_evals
-      # If converged, then do no further processing.
+
       return smart_cond.smart_case(
-          [(converged,
-            lambda: (True, evals, next_left, next_right)),
+          # If converged or failed, then do no further processing.
+          [(converged | failed,
+            lambda: (converged, failed, evals, next_left, next_right)),
            (next_right.x - next_left.x > shrinkage_param * (right.x - left.x),
             lambda: _update_with_mid(evals, next_left, next_right))],
-          default=lambda: (False, evals, next_left, next_right))
+          default=lambda: (False, False, evals, next_left, next_right))
 
     def do_line_search():
-      _, bracket_evals, left, right = _bracket(
+      bracketed, failed, bracket_evals, left, right = _bracket(
           value_and_gradients_function,
           val_0,
           val_c,
           f_lim,
           expansion_param=expansion_param)
+      failed = failed & tf.logical_not(bracketed)
       return tf.while_loop(_cond,
                            _body,
                            (False,
+                            failed,
                             bracket_evals + prepare_evals,
                             left,
                             right),
                            parallel_iterations=1)
 
-    converged, func_evals, left, right = smart_cond.smart_cond(
-        already_converged,
-        lambda: (already_converged, prepare_evals, val_c, val_c),
-        do_line_search)
+    converged, failed, func_evals, left, right = smart_cond.smart_case(
+        [
+            (already_converged,
+             lambda: (already_converged, False, prepare_evals, val_c, val_c)),
+            (eval_failed, lambda: (False, True, prepare_evals, val_0, val_c))
+        ],
+        default=do_line_search)
 
     return HagerZhangLineSearchResult(
-        converged=converged,
+        converged=tf.convert_to_tensor(converged, name='converged'),
+        failed=tf.convert_to_tensor(failed, name='failed'),
         func_evals=func_evals,
         left_pt=left.x,
         objective_at_left_pt=left.f,
@@ -417,9 +437,8 @@ def _bisection_update(value_and_gradients_function,
 
   Args:
     value_and_gradients_function: A Python callable that accepts a real scalar
-      tensor and returns a
-      tuple of scalar tensors of real dtype containing the value of the
-      function and its derivative at that point.
+      tensor and returns a tuple of scalar tensors of real dtype containing
+      the value of the function and its derivative at that point.
       In usual optimization application, this function would be generated by
       projecting the multivariate objective function along some specific
       direction. The direction is determined by some other procedure but should
@@ -434,8 +453,8 @@ def _bisection_update(value_and_gradients_function,
 
   Returns:
     A tuple containing
-      found: A scalar boolean tensor. Indicates whether the opposite slope
-        condition was satisfied by the returned endpoints.
+      failed: A scalar boolean tensor. Indicates whether the objective function
+        failed to produce a finite value.
       evals: A scalar int32 tensor. The number of value and gradients function
         evaluations.
       final_left: Instance of _FnDFn. The value and derivative of the function
@@ -444,37 +463,42 @@ def _bisection_update(value_and_gradients_function,
         evaluated at the right end point of the bracketing interval found.
   """
 
-  loop_cond = lambda found, *ignored_args: ~found
+  loop_cond = lambda found, failed, *ignored: tf.logical_not(found | failed)
 
   # The case where the proposed point has negative slope but the value is
   # too high. It is not a valid left end point but along with the current left
   # end point, it encloses another minima. The following loop tries to narrow
   # the interval so that it satisfies the opposite slope conditions.
-  def loop_body(_, eval_count, val_left, val_right):
+  def loop_body(_, failed, eval_count, val_left, val_right):  # pylint:disable=unused-argument
     """Updates the right end point to satisfy the opposite slope conditions."""
     # Captured by closure: value_and_gradients_function and f_lim
     mid_pt = (val_left.x + val_right.x) / 2
     f_mid, df_mid = value_and_gradients_function(mid_pt)
     # The case conditions.
+    val_mid = _FnDFn(x=mid_pt, f=f_mid, df=df_mid)
+    failed_case = (~_is_finite(val_mid),
+                   lambda: (False, True, eval_count + 1, val_left, val_right))
     valid_right = df_mid >= 0  # The new point can be a valid right end point.
     valid_left = (df_mid < 0) & (f_mid <= f_lim)  # It is a valid left end pt.
-    val_mid = _FnDFn(x=mid_pt, f=f_mid, df=df_mid)
+
     # The case actions.
-    valid_right_fn = lambda: (True, eval_count + 1, val_left, val_mid)
+    valid_right_fn = lambda: (True, False, eval_count + 1, val_left, val_mid)
     # Note that we must return found = False in this case because our target
     # is to find a good right end point and improvements to the left end point
     # are coincidental. Hence the loop must continue until we exit via
     # the valid_right case.
-    valid_left_fn = lambda: (False, eval_count + 1, val_mid, val_right)
+    valid_left_fn = lambda: (False, False, eval_count + 1, val_mid, val_right)
     # To be explicit, this action applies when the new point has a positive
     # slope but the function value at that point is too high. This is the
     # same situation with which we started the loop in the first place. Hence
     # we should just replace the old right end point and continue to loop.
-    default_fn = lambda: (False, eval_count + 1, val_left, val_mid)
-    cases = ((valid_right, valid_right_fn), (valid_left, valid_left_fn))
+    default_fn = lambda: (False, False, eval_count + 1, val_left, val_mid)
+    cases = (failed_case,
+             (valid_right, valid_right_fn),
+             (valid_left, valid_left_fn))
     return smart_cond.smart_case(cases, default=default_fn, exclusive=False)
 
-  initial_args = (False, tf.constant(0), initial_left,
+  initial_args = (False, False, tf.constant(0), initial_left,
                   initial_right)
   return tf.while_loop(loop_cond, loop_body,
                        initial_args, parallel_iterations=1)[1:]
@@ -541,6 +565,8 @@ def _update(value_and_gradients_function,
       the approximate Wolfe conditions to be checked.
 
   Returns:
+    update_failed: A boolean scalar `Tensor` indicating whether the objective
+      function failed to yield a finite value at the trial points.
     evals: A scalar int32 `Tensor`. The total number of function evaluations
       made.
     val_left_bar: Instance of _FnDFn. The position and the associated value and
@@ -554,16 +580,16 @@ def _update(value_and_gradients_function,
   # If the intermediate point is not in the interval, do nothing.
   inside_case = (
       ((trial < left) | (trial > right)),
-      lambda: (tf.constant(0), val_left, val_right))
+      lambda: (False, tf.constant(0), val_left, val_right))
 
   # The new point is a valid right end point (has positive derivative).
   can_update_right = (df_trial >= 0,
-                      lambda: (tf.constant(0), val_left, val_trial))
+                      lambda: (False, tf.constant(0), val_left, val_trial))
 
   # The new point is a valid left end point because it has negative slope
   # and the value at the point is not too large.
   can_update_left = (((df_trial < 0) & (f_trial <= f_lim)),
-                     lambda: (tf.constant(0), val_trial, val_right))
+                     lambda: (False, tf.constant(0), val_trial, val_right))
 
   def _default_fn():
     return _bisection_update(value_and_gradients_function,
@@ -672,19 +698,30 @@ def _secant2(value_and_gradients_function,
     c = _secant(a, b, dfa, dfb)  # This will always be s.t. a <= c <= b
     fc, dfc = value_and_gradients_function(c)
     val_c = _FnDFn(x=c, f=fc, df=dfc)
+    secant_failed = ~_is_finite(val_c)
     good_c = _satisfies_wolfe(
         val_0, val_c, f_lim,
         sufficient_decrease_param=sufficient_decrease_param,
         curvature_param=curvature_param)
 
+    secant_failed_case = (
+        secant_failed,
+        lambda: (False, True, tf.constant(1), val_c, val_c)
+    )
     # If we have found a point satisfying the Wolfe conditions,
     # we have converged.
-    case1 = good_c, (lambda: (True, tf.constant(1), val_c, val_c))
+    converged_case = (
+        good_c,
+        lambda: (True, False, tf.constant(1), val_c, val_c)
+    )
     # The temp_right and temp_left are the values referred to as A and B in
     # Hager Zhang (2006).
-    evals, val_temp_left, val_temp_right = _update(
+    update_failed, evals, val_temp_left, val_temp_right = _update(
         value_and_gradients_function, val_left, val_right, val_c, f_lim)
-
+    update_failed_case = (
+        update_failed,
+        lambda: (False, True, evals + 1, val_temp_left, val_temp_right)
+    )
     def _common_update(curr_left, curr_right):
       """Performs secant division to update the interval."""
       # Note that curr_left and curr_right may not satisfy opposite slope so
@@ -692,6 +729,7 @@ def _secant2(value_and_gradients_function,
       c_bar = _secant(curr_left.x, curr_right.x, curr_left.df, curr_right.df)
       fc_bar, dfc_bar = value_and_gradients_function(c_bar)
       val_c_bar = _FnDFn(x=c_bar, f=fc_bar, df=dfc_bar)
+      common_update_failed = ~_is_finite(val_c_bar)
       outside_range = (c_bar < val_temp_left.x) | (val_temp_right.x < c_bar)
       good_c_bar = _satisfies_wolfe(
           val_0, val_c_bar, f_lim,
@@ -699,33 +737,51 @@ def _secant2(value_and_gradients_function,
           curvature_param=curvature_param)
       def _default_fn():
         # Perform yet another update on [temp_left, temp_right] using c_bar.
-        inner_evals, val_left_bar, val_right_bar = _update(
+        failed, inner_evals, val_left_bar, val_right_bar = _update(
             value_and_gradients_function,
             val_temp_left,
             val_temp_right,
             val_c_bar,
             f_lim)
-        return (False, evals + inner_evals + 2, val_left_bar, val_right_bar)
+        return (
+            False,
+            failed,
+            evals + inner_evals + 2,
+            val_left_bar,
+            val_right_bar)
+
       return smart_cond.smart_case(
           [
+              (common_update_failed,
+               lambda: (False, True, evals+2, val_c_bar, val_c_bar)),
               (outside_range,
-               lambda: (False, evals + 2, val_temp_left, val_temp_right)),
+               lambda: (False, False, evals+2, val_temp_left, val_temp_right)),
               (good_c_bar,
-               lambda: (True, evals + 2, val_c_bar, val_c_bar))
+               lambda: (True, False, evals+2, val_c_bar, val_c_bar))
           ],
           default=_default_fn,
           exclusive=False)
     # This case checks if the value c has become the right end point
     # (i.e. c==temp_right).
-    case2 = (tf.equal(c, val_temp_right.x),
-             lambda: _common_update(val_right, val_temp_right))
+    replace_right_case = (
+        tf.equal(c, val_temp_right.x),
+        lambda: _common_update(val_right, val_temp_right)
+    )
     # This case checks if the value c has become the left end point
     # (i.e. c==temp_left).
-    case3 = (tf.equal(c, val_temp_left.x),
-             lambda: _common_update(val_left, val_temp_left))
-    default_fn = lambda: (False, evals + 1, val_temp_left, val_temp_right)
-    return smart_cond.smart_case([case1, case2, case3],
-                                 default=default_fn, exclusive=False)
+    replace_left_case = (
+        tf.equal(c, val_temp_left.x),
+        lambda: _common_update(val_left, val_temp_left)
+    )
+    default_fn = (
+        lambda: (False, False, evals + 1, val_temp_left, val_temp_right))
+    return smart_cond.smart_case([
+        secant_failed_case,
+        converged_case,
+        update_failed_case,
+        replace_right_case,
+        replace_left_case
+    ], default=default_fn, exclusive=False)
 
 
 def _bracket(value_and_gradients_function,
@@ -757,6 +813,8 @@ def _bracket(value_and_gradients_function,
   Returns:
     bracketed: A boolean scalar `Tensor`. True if the minimum has been
       bracketed by the returned interval.
+    failed: A boolean scalar `Tensor`. True if an objective evaluation failed
+      to produce a finite value.
     evals: An int32 scalar `Tensor`. The number of times the function to be
       minimized was evaluated.
     val_left: Instance of _FnDFn. The position and the associated value and
@@ -765,31 +823,37 @@ def _bracket(value_and_gradients_function,
       derivative at the updated right end point of the interval found.
   """
 
-  def _cond(bracketed, *ignored_args):  # pylint:disable=unused-argument
-    return ~bracketed
+  def _cond(bracketed, failed, *ignored_args):  # pylint:disable=unused-argument
+    return tf.logical_not(bracketed | failed)
 
-  def _body(_, evals, val_left, val_right):
+  def _body(_, failed, evals, val_left, val_right):  # pylint:disable=unused-argument
     """Loop body to find the bracketing interval."""
+    # Check that the function or gradient are finite and quit if they aren't.
+    case0 = (~_is_finite(val_left, val_right),
+             lambda: (False, True, evals, val_left, val_right))
     # If the right point has an increasing derivative, then [left, right]
     # encloses a minimum and we are done.
-    case1 = (val_right.df >= 0), lambda: (True, evals, val_left, val_right)
+    case1 = ((val_right.df >= 0),
+             lambda: (True, False, evals, val_left, val_right))
     # This case applies if the point has negative derivative (i.e. it is almost
     # suitable as a left endpoint.
     def _case2_fn():
-      inner_evals, left, right = _bisection_update(
+      failed, inner_evals, left, right = _bisection_update(
           value_and_gradients_function,
           val_0,
           val_right,
           f_lim)
-      return (True, inner_evals + evals, left, right)
+      return (True, failed, inner_evals + evals, left, right)
     case2 = (val_right.f > f_lim, _case2_fn)
     def _default_fn():
       next_right = expansion_param * val_right.x
       f_next_right, df_next_right = value_and_gradients_function(next_right)
       val_next_right = _FnDFn(x=next_right, f=f_next_right, df=df_next_right)
-      return False, evals + 1, val_right, val_next_right
+      failed = ~_is_finite(val_next_right)
+      return False, failed, evals + 1, val_right, val_next_right
     return smart_cond.smart_case(
         [
+            case0,
             case1,
             case2
         ],
@@ -799,8 +863,25 @@ def _bracket(value_and_gradients_function,
   return tf.while_loop(
       _cond,
       _body,
-      (False, 0, val_0, val_c),
+      (False, False, 0, val_0, val_c),
       parallel_iterations=1)
+
+
+def _is_finite(val_1, val_2=None):
+  """Checks if the supplied values are finite.
+
+  Args:
+    val_1: Instance of _FnDFn. The function and derivative value.
+    val_2: (Optional) Instance of _FnDFn. The function and derivative value.
+
+  Returns:
+    is_finite: Scalar boolean `Tensor` indicating whether the function value
+      and the gradient in `val_1` (and optionally) in `val_2` are all finite.
+  """
+  val_1_finite = tf.is_finite(val_1.f) & tf.is_finite(val_1.df)
+  if val_2 is not None:
+    return val_1_finite & tf.is_finite(val_2.f) & tf.is_finite(val_2.df)
+  return val_1_finite
 
 
 def _prepare_args(value_and_gradients_function,
