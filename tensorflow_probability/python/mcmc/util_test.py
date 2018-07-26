@@ -68,6 +68,28 @@ class ChooseTest(tf.test.TestCase):
             ]))
     self.assertAllClose(expected, chosen_, atol=0., rtol=1e-5)
 
+  @test_util.run_in_graph_and_eager_modes()
+  def test_selects_batch_members_from_list_of_arrays(self):
+    # Shape of each array: [2, 3] = [batch_size, event_size]
+    # This test verifies that is_accepted selects batch members, despite the
+    # "usual" broadcasting being applied on the right first (event first).
+    zeros_states = [np.zeros((2, 3))]
+    ones_states = [np.ones((2, 3))]
+    chosen = choose(
+        tf.constant([True, False]),
+        zeros_states,
+        ones_states)
+    chosen_ = self.evaluate(chosen)
+
+    # Make sure outer list wasn't interpreted as a dimenion of an array.
+    self.assertIsInstance(chosen_, list)
+    expected_array = np.array([
+        [0., 0., 0.],  # zeros_states selected for first batch
+        [1., 1., 1.],  # ones_states selected for second
+    ])
+    expected = [expected_array]
+    self.assertAllEqual(expected, chosen_)
+
 
 class IsNamedTupleLikeTest(tf.test.TestCase):
 

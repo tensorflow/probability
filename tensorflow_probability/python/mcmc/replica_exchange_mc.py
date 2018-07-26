@@ -22,76 +22,89 @@ import collections
 
 import tensorflow as tf
 
+from tensorflow_probability.python.distributions.seed_stream import SeedStream
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import util as mcmc_util
-from tensorflow.python.ops.distributions import util as distributions_util
-
 
 __all__ = [
     'ReplicaExchangeMC',
     'default_exchange_proposed_fn',
 ]
 
-
 ReplicaExchangeMCKernelResults = collections.namedtuple(
     'ReplicaExchangeMCKernelResults',
     [
+        # List of states for each replica.  Each state may itself be a list of
+        # state parts.
         'replica_states',
+        # List of KernelResults for each replica, post exchange.
         'replica_results',
-        'next_replica_idx',
-        'exchange_proposed',
-        'exchange_proposed_n',
+        # List of state/state-parts with pre-exchange samples from each replica.
         'sampled_replica_states',
+        # List of kernel-results with pre-exchange samples from each replica.
         'sampled_replica_results',
     ])
 
 
-def default_exchange_proposed_fn(probs):
-  """Default function for `exchange_proposed_fn` of `kernel`.
+def default_exchange_proposed_fn(prob_exchange):
+  """Default exchange proposal function, for replica exchange MC.
 
-  Depending on the probability of `probs`, decide whether to propose
-  combinations of replica for exchange.
-  When exchanging, create combinations of adjacent replicas from 0 or 1 index.
+  With probability `prob_exchange` propose combinations of replica for exchange.
+  When exchanging, create combinations of adjacent replicas in
+  [Replica Exchange Monte Carlo](
+  https://en.wikipedia.org/wiki/Parallel_tempering)
+
+  ```
+  exchange_fn = default_exchange_proposed_fn(prob_exchange=0.5)
+  exchange_proposed = exchange_fn(num_replica=3)
+
+  exchange_proposed.eval()
+  ==> [[0, 1]]  # 1 exchange, 0 <--> 1
+
+  exchange_proposed.eval()
+  ==> []  # 0 exchanges
+  ```
 
   Args:
-    probs: A float-like Tensor which represents the probability of proposing
-      combinations of replicas for exchange.
+    prob_exchange: Scalar `Tensor` giving probability that any exchanges will
+      be generated.
 
   Returns:
     default_exchange_proposed_fn_: Python callable which take a number of
-      replicas, and return combinations of replicas for exchange and a number of
-      combinations.
+      replicas (a Python integer), and return combinations of replicas for
+      exchange as an [n, 2] integer `Tensor`, `0 <= n <= num_replica // 2`,
+      with *unique* values in the set `{0, ..., num_replica}`.
   """
 
   def default_exchange_proposed_fn_(num_replica, seed=None):
     """Default function for `exchange_proposed_fn` of `kernel`."""
-    num_replica = tf.to_int32(num_replica)
+    seed_stream = SeedStream(seed, 'default_exchange_proposed_fn')
 
-    seed = distributions_util.gen_new_seed(seed, 'default_exchange_proposed_fn')
-    random_uniform = tf.random_uniform([], seed=seed)
-    accept_proposed_exchange = random_uniform < probs
-
-    seed = distributions_util.gen_new_seed(seed, 'default_exchange_proposed_fn')
-    zero_start = tf.random_uniform([], seed=seed) > 0.5
+    zero_start = tf.random_uniform([], seed=seed_stream()) > 0.5
     if num_replica % 2 == 0:
-      exchange_proposed = tf.where(
-          zero_start, tf.range(num_replica),
-          tf.sparse_to_dense(tf.range(num_replica - 2), (num_replica,),
-                             tf.range(1, num_replica - 1)))
-      exchange_proposed_n = tf.where(zero_start, num_replica // 2,
-                                     num_replica // 2 - 1)
-    else:
-      exchange_proposed = tf.where(
-          zero_start, tf.range(num_replica - 1), tf.range(1, num_replica))
-      exchange_proposed_n = num_replica // 2
 
-    exchange_proposed = tf.reshape(exchange_proposed, (num_replica // 2, 2))
-    exchange_proposed = tf.where(accept_proposed_exchange, exchange_proposed,
-                                 tf.zeros_like(exchange_proposed))
-    exchange_proposed_n = tf.where(accept_proposed_exchange,
-                                   exchange_proposed_n,
-                                   tf.zeros_like(exchange_proposed_n))
-    return exchange_proposed, exchange_proposed_n
+      def _exchange():
+        flat_exchange = tf.range(num_replica)
+        if num_replica > 2:
+          start = tf.to_int32(~zero_start)
+          end = num_replica - start
+          flat_exchange = flat_exchange[start:end]
+        return tf.reshape(flat_exchange, [tf.size(flat_exchange) // 2, 2])
+    else:
+
+      def _exchange():
+        start = tf.to_int32(zero_start)
+        end = num_replica - tf.to_int32(~zero_start)
+        flat_exchange = tf.range(num_replica)[start:end]
+        return tf.reshape(flat_exchange, [tf.size(flat_exchange) // 2, 2])
+
+    def _null_exchange():
+      return tf.reshape(tf.to_int32([]), shape=[0, 2])
+
+    return tf.cond(
+        tf.random_uniform([], seed=seed_stream()) < prob_exchange, _exchange,
+        _null_exchange)
+
   return default_exchange_proposed_fn_
 
 
@@ -102,9 +115,25 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
   https://en.wikipedia.org/wiki/Parallel_tempering) is a Markov chain
   Monte Carlo (MCMC) algorithm that is also known as Parallel Tempering. This
   algorithm performs multiple sampling with different temperatures in parallel,
-  and exchange those samplings according to the Metropolis-Hastings criterion.
-  By using the sampling result of high temperature, sampling with less influence
-  of the local solution becomes possible.
+  and exchanges those samplings according to the Metropolis-Hastings criterion.
+
+  The `K` replicas are parameterized in terms of `inverse_temperature`'s,
+  `(beta[0], beta[1], ..., beta[K-1])`.  If the target distribution has
+  probability density `p(x)`, the `kth` replica has density `p(x)**beta_k`.
+
+  Typically `beta[0] = 1.0`, and `1.0 > beta[1] > beta[2] > ... > 0.0`.
+
+  * `beta[0] == 1` ==> First replicas samples from the target density, `p`.
+  * `beta[k] < 1`, for `k = 1, ..., K-1` ==> Other replicas sample from
+    "flattened" versions of `p` (peak is less high, valley less low).  These
+    distributions are somewhat closer to a uniform on the support of `p`.
+
+  Samples from adjacent replicas `i`, `i + 1` are used as proposals for each
+  other in a Metropolis step.  This allows the lower `beta` samples, which
+  explore less dense areas of `p`, to occasionally be used to help the
+  `beta == 1` chain explore new regions of the support.
+
+  Samples from replica 0 are returned, and the others are discarded.
 
   #### Examples
 
@@ -127,7 +156,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
 
   remc = tfp.mcmc.ReplicaExchangeMC(
       target_log_prob_fn=target.log_prob,
-      inverse_temperatures=10.**tf.linspace(0., -2., 5),
+      inverse_temperatures=[1., 0.3, 0.1, 0.03],
       make_kernel_fn=make_kernel_fn,
       seed=42)
 
@@ -173,13 +202,14 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
 
   remc = tfp.mcmc.ReplicaExchangeMC(
       target_log_prob_fn=target.log_prob,
-      inverse_temperatures=10.**tf.linspace(0., -2., 5),
+      inverse_temperatures=[1., 0.3, 0.1, 0.03, 0.01],
       make_kernel_fn=make_kernel_fn,
       seed=42)
 
   samples, _ = tfp.mcmc.sample_chain(
       num_results=1000,
-      current_state=np.zeros(2, dtype=dtype),
+      # Start near the [1, 1] mode.  Standard HMC would get stuck there.
+      current_state=np.ones(2, dtype=dtype),
       kernel=remc,
       num_burnin_steps=500,
       parallel_iterations=1)  # For determinism.
@@ -196,25 +226,28 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
 
   """
 
-  def __init__(self, target_log_prob_fn, inverse_temperatures,
+  def __init__(self,
+               target_log_prob_fn,
+               inverse_temperatures,
                make_kernel_fn,
                exchange_proposed_fn=default_exchange_proposed_fn(1.),
-               seed=None, name=None, **kwargs):
+               seed=None,
+               name=None,
+               **kwargs):
     """Instantiates this object.
 
     Args:
       target_log_prob_fn: Python callable which takes an argument like
         `current_state` (or `*current_state` if it's a list) and returns its
         (possibly unnormalized) log-density under the target distribution.
-      inverse_temperatures: sequence of inverse temperatures to perform
-        samplings with each replica. Must have statically known `rank` and
-        statically known leading shape, i.e.,
-        `inverse_temperatures.shape[0].value is not None`
+      inverse_temperatures: `1D` `Tensor of inverse temperatures to perform
+        samplings with each replica. Must have statically known `shape`.
+        `inverse_temperatures[0]` produces the states returned by samplers,
+        and is typically == 1.
       make_kernel_fn: Python callable which takes target_log_prob_fn and seed
         args and returns a TransitionKernel instance.
       exchange_proposed_fn: Python callable which take a number of replicas, and
-        return combinations of replicas for exchange and a number of
-        combinations.
+        return combinations of replicas for exchange.
       seed: Python integer to seed the random number generator.
         Default value: `None` (i.e., no seed).
       name: Python `str` name prefixed to Ops created by this function.
@@ -222,27 +255,31 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
       **kwargs: Arguments for `make_kernel_fn`.
 
     Raises:
-      ValueError: if `inverse_temperatures` doesn't have statically known rank
-        and statically known leading shape
+      ValueError: `inverse_temperatures` doesn't have statically known 1D shape.
     """
-    if inverse_temperatures.shape.ndims is None or \
-       inverse_temperatures.shape[0].value is None:
-      raise ValueError('"inverse_temperatures" must have statically known rank '
-                       'and statically known leading shape')
-    self._seed_stream = seed  # This will be mutated with use.
-    self._parameters = dict(target_log_prob_fn=target_log_prob_fn,
-                            inverse_temperatures=inverse_temperatures,
-                            num_replica=inverse_temperatures.shape[0],
-                            exchange_proposed_fn=exchange_proposed_fn,
-                            seed=seed, name=name)
+    inverse_temperatures = tf.convert_to_tensor(
+        inverse_temperatures, name='inverse_temperatures')
+
+    # Note these are static checks, and don't need to be embedded in the graph.
+    inverse_temperatures.shape.assert_is_fully_defined()
+    inverse_temperatures.shape.assert_has_rank(1)
+
+    self._seed_stream = SeedStream(seed, salt=name)
+    self._seeded_mcmc = seed is not None
+    self._parameters = dict(
+        target_log_prob_fn=target_log_prob_fn,
+        inverse_temperatures=inverse_temperatures,
+        num_replica=inverse_temperatures.shape[0].value,
+        exchange_proposed_fn=exchange_proposed_fn,
+        seed=seed,
+        name=name)
     self.replica_kernels = []
     for i in range(self.num_replica):
-      self._seed_stream = distributions_util.gen_new_seed(
-          self._seed_stream, salt='replica_kernels')
-      self.replica_kernels.append(make_kernel_fn(
-          target_log_prob_fn=_replica_log_prob_fn(
-              inverse_temperatures[i], target_log_prob_fn),
-          seed=self._seed_stream))
+      self.replica_kernels.append(
+          make_kernel_fn(
+              target_log_prob_fn=_replica_log_prob_fn(inverse_temperatures[i],
+                                                      target_log_prob_fn),
+              seed=self._seed_stream()))
 
   @property
   def target_log_prob_fn(self):
@@ -294,103 +331,199 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
         `Tensor`s representing internal calculations made within this function.
         This inculdes replica states.
     """
+    # Key difficulty:  The type of exchanges differs from one call to the
+    # next...even the number of exchanges can differ.
+    # As a result, exchanges must happen dynamically, in while loops.
     with tf.name_scope(
         name=mcmc_util.make_name(self.name, 'remc', 'one_step'),
         values=[current_state, previous_kernel_results]):
+
+      # Each replica does `one_step` to get pre-exchange states/KernelResults.
       sampled_replica_states, sampled_replica_results = zip(*[
           rk.one_step(previous_kernel_results.replica_states[i],
                       previous_kernel_results.replica_results[i])
-          for i, rk in enumerate(self.replica_kernels)])
+          for i, rk in enumerate(self.replica_kernels)
+      ])
       sampled_replica_states = list(sampled_replica_states)
       sampled_replica_results = list(sampled_replica_results)
 
-      sampled_replica_results_modified = [
-          srr._replace(target_log_prob=srr.target_log_prob /
-                       self.inverse_temperatures[i])
-          if 'target_log_prob' in srr._fields
-          else srr._replace(accepted_results=srr.accepted_results._replace(
-              target_log_prob=srr.accepted_results.target_log_prob /
-              self.inverse_temperatures[i]))
-          for i, srr in enumerate(sampled_replica_results)
+      states_are_lists = mcmc_util.is_list_like(sampled_replica_states[0])
+
+      if not states_are_lists:
+        sampled_replica_states = [[s] for s in sampled_replica_states]
+      num_state_parts = len(sampled_replica_states[0])
+
+      dtype = sampled_replica_states[0][0].dtype
+
+      # Must put states into TensorArrays.  Why?  We will read/write states
+      # dynamically with Tensor index `i`, and you cannot do this with lists.
+      # old_states[k][i] is Tensor of (old) state part k, for replica i.
+      # The `k` will be known statically, and `i` is a Tensor.
+      old_states = [
+          tf.TensorArray(
+              dtype,
+              size=self.num_replica,
+              dynamic_size=False,
+              clear_after_read=False,
+              tensor_array_name='old_states',
+              # State part k has same shape, regardless of replica.  So use 0.
+              element_shape=sampled_replica_states[0][k].shape)
+          for k in range(num_state_parts)
       ]
+      for k in range(num_state_parts):
+        for i in range(self.num_replica):
+          old_states[k] = old_states[k].write(i, sampled_replica_states[i][k])
 
-      sampled_replica_ratios = [
-          srr.target_log_prob if 'target_log_prob' in srr._fields
-          else srr.accepted_results.target_log_prob
-          for i, srr in enumerate(sampled_replica_results_modified)]
-      sampled_replica_ratios = tf.stack(sampled_replica_ratios, axis=-1)
+      exchange_proposed = self.exchange_proposed_fn(
+          self.num_replica, seed=self._seed_stream())
+      exchange_proposed_n = tf.shape(exchange_proposed)[0]
 
-      next_replica_idx = tf.range(self.num_replica)
-      self._seed_stream = distributions_util.gen_new_seed(
-          self._seed_stream, salt='replica_exchange_one_step')
-      exchange_proposed, exchange_proposed_n = self.exchange_proposed_fn(
-          self.num_replica, seed=self._seed_stream)
-      i = tf.constant(0)
+      exchanged_states = self._get_exchanged_states(
+          old_states, exchange_proposed, exchange_proposed_n,
+          sampled_replica_states, sampled_replica_results)
 
-      def cond(i, next_replica_idx):  # pylint: disable=unused-argument
-        return tf.less(i, exchange_proposed_n)
+      no_exchange_proposed, _ = tf.setdiff1d(
+          tf.range(self.num_replica), tf.reshape(exchange_proposed, [-1]))
 
-      def body(i, next_replica_idx):
-        """`tf.while_loop` body."""
-        ratio = (
-            sampled_replica_ratios[next_replica_idx[exchange_proposed[i, 0]]]
-            - sampled_replica_ratios[next_replica_idx[exchange_proposed[i, 1]]])
-        ratio *= (
-            self.inverse_temperatures[exchange_proposed[i, 1]]
-            - self.inverse_temperatures[exchange_proposed[i, 0]])
-        self._seed_stream = distributions_util.gen_new_seed(
-            self._seed_stream, salt='replica_exchange_one_step')
-        log_uniform = tf.log(tf.random_uniform(
-            shape=tf.shape(ratio),
-            dtype=ratio.dtype.base_dtype,
-            seed=self._seed_stream))
-        exchange = log_uniform < ratio
-        exchange_op = tf.sparse_to_dense(
-            [exchange_proposed[i, 0], exchange_proposed[i, 1]],
-            [self.num_replica],
-            [next_replica_idx[exchange_proposed[i, 1]] -
-             next_replica_idx[exchange_proposed[i, 0]],
-             next_replica_idx[exchange_proposed[i, 0]] -
-             next_replica_idx[exchange_proposed[i, 1]]])
-        next_replica_idx = tf.cond(exchange,
-                                   lambda: next_replica_idx + exchange_op,
-                                   lambda: next_replica_idx)
-        return [i + 1, next_replica_idx]
+      exchanged_states = self._insert_old_states_where_no_exchange_was_proposed(
+          no_exchange_proposed, old_states, exchanged_states)
 
-      next_replica_idx = tf.while_loop(
-          cond, body, loop_vars=[i, next_replica_idx])[1]
+      next_replica_states = []
+      for i in range(self.num_replica):
+        next_replica_states_i = []
+        for k in range(num_state_parts):
+          next_replica_states_i.append(exchanged_states[k].read(i))
+        next_replica_states.append(next_replica_states_i)
 
-      def _prep(list_):
-        return list(
-            tf.case({tf.equal(next_replica_idx[i], j):
-                     _stateful_lambda(list_[j])
-                     for j in range(self.num_replica)}, exclusive=True)
-            for i in range(self.num_replica))
-      next_replica_states = _prep(sampled_replica_states)
-      next_replica_results = _prep(sampled_replica_results_modified)
+      if not states_are_lists:
+        next_replica_states = [s[0] for s in next_replica_states]
+        sampled_replica_states = [s[0] for s in sampled_replica_states]
 
+      # Now that states are/aren't exchanged, bootstrap next kernel_results.
+      # The viewpoint is that after each exchange, we are starting anew.
       next_replica_results = [
-          nrr._replace(target_log_prob=nrr.target_log_prob *
-                       self.inverse_temperatures[i])
-          if 'target_log_prob' in nrr._fields
-          else nrr._replace(accepted_results=nrr.accepted_results._replace(
-              target_log_prob=nrr.accepted_results.target_log_prob *
-              self.inverse_temperatures[i]))
-          for i, nrr in enumerate(next_replica_results)
+          rk.bootstrap_results(state)
+          for rk, state in zip(self.replica_kernels, next_replica_states)
       ]
 
-      next_state = tf.identity(next_replica_states[0])
+      next_state = next_replica_states[0]  # Replica 0 is the returned state(s).
+
       kernel_results = ReplicaExchangeMCKernelResults(
           replica_states=next_replica_states,
           replica_results=next_replica_results,
-          next_replica_idx=next_replica_idx,
-          exchange_proposed=exchange_proposed,
-          exchange_proposed_n=exchange_proposed_n,
           sampled_replica_states=sampled_replica_states,
           sampled_replica_results=sampled_replica_results,
       )
 
       return next_state, kernel_results
+
+  def _get_exchanged_states(self, old_states, exchange_proposed,
+                            exchange_proposed_n, sampled_replica_states,
+                            sampled_replica_results):
+    """Get list of TensorArrays holding exchanged states, and zeros."""
+    with tf.name_scope('get_exchanged_states'):
+
+      target_log_probs = []
+      for replica in range(self.num_replica):
+        replica_log_prob = _get_field(sampled_replica_results[replica],
+                                      'target_log_prob')
+        inverse_temp = self.inverse_temperatures[replica]
+        target_log_probs.append(replica_log_prob / inverse_temp)
+      target_log_probs = tf.stack(target_log_probs, axis=0)
+
+      dtype = target_log_probs.dtype
+      num_state_parts = len(sampled_replica_states[0])
+      # exchanged_states[k][i] is Tensor of (new) state part k, for replica i.
+      # The `k` will be known statically, and `i` is a Tensor.
+      # We will insert values into indices `i` for every replica with a proposed
+      # exchange.
+      exchanged_states = [
+          tf.TensorArray(
+              dtype,
+              size=self.num_replica,
+              dynamic_size=False,
+              tensor_array_name='exchanged_states',
+              # State part k has same shape, regardless of replica.  So use 0.
+              element_shape=sampled_replica_states[0][k].shape)
+          for k in range(num_state_parts)
+      ]
+
+      # Draw random variables here, to avoid sampling in the loop (and losing
+      # reproducibility).  This may mean we sample too many, but we will always
+      # have enough.
+      sample_shape = tf.concat(
+          ([self.num_replica // 2], tf.shape(target_log_probs)[1:]), axis=0)
+      log_uniforms = tf.log(
+          tf.random_uniform(
+              shape=sample_shape, dtype=dtype, seed=self._seed_stream()))
+
+      def _swap(is_exchange_accepted, x, y):
+        """Swap batches of x, y where accepted."""
+        with tf.name_scope('swap_where_exchange_accepted'):
+          new_x = mcmc_util.choose(is_exchange_accepted, y, x)
+          new_y = mcmc_util.choose(is_exchange_accepted, x, y)
+        return new_x, new_y
+
+      def cond(i, unused_exchanged_states):
+        return i < exchange_proposed_n
+
+      def body(i, exchanged_states):
+        """Body of while loop for exchanging states."""
+        # Propose exchange between replicas indexed by m and n.
+        m, n = tf.unstack(exchange_proposed[i])
+
+        # Construct log_accept_ratio:  -temp_diff * target_log_prob_diff.
+        # Note target_log_prob_diff = -EnergyDiff (common definition is in terms
+        # of energy).
+        temp_diff = self.inverse_temperatures[m] - self.inverse_temperatures[n]
+        # Difference of target log probs may be +- Inf or NaN.  We want the
+        # product of this with the temperature difference to have "alt value" of
+        # -Inf.
+        log_accept_ratio = mcmc_util.safe_sum(
+            [-temp_diff * target_log_probs[m], temp_diff * target_log_probs[n]])
+
+        is_exchange_accepted = log_uniforms[i] < log_accept_ratio
+
+        is_exchange_accepted = tf.Print(
+            is_exchange_accepted, [
+                'is_exchange_accepted: ',
+                is_exchange_accepted,
+                'temp_diff: ',
+                temp_diff,
+                'log_accept_ratio: ',
+                log_accept_ratio,
+            ],
+            summarize=2,
+            first_n=0)
+
+        for k in range(num_state_parts):
+          new_m, new_n = _swap(is_exchange_accepted, old_states[k].read(m),
+                               old_states[k].read(n))
+          exchanged_states[k] = exchanged_states[k].write(m, new_m)
+          exchanged_states[k] = exchanged_states[k].write(n, new_n)
+
+        return i + 1, exchanged_states
+
+      # At this point, exchanged_states[k] is a length num_replicas TensorArray.
+      return tf.while_loop(cond, body,
+                           [tf.constant(0), exchanged_states])[1]  # Remove `i`
+
+  def _insert_old_states_where_no_exchange_was_proposed(
+      self, no_exchange_proposed, old_states, exchanged_states):
+    with tf.name_scope('insert_old_states_where_no_exchange_was_proposed'):
+
+      def cond(j, unused_exchanged_states):
+        return j < tf.size(no_exchange_proposed)
+
+      def body(j, exchanged_states):
+        replica = no_exchange_proposed[j]
+        for k in range(len(old_states)):  # k indexes state part
+          exchanged_states[k] = exchanged_states[k].write(
+              replica, old_states[k].read(replica))
+        return j + 1, exchanged_states
+
+      return tf.while_loop(cond, body,
+                           [tf.constant(0), exchanged_states])[1]  # Remove `j`
 
   def bootstrap_results(self, init_state):
     """Returns an object with the same type as returned by `one_step`.
@@ -407,47 +540,45 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
     with tf.name_scope(
         name=mcmc_util.make_name(self.name, 'remc', 'bootstrap_results'),
         values=[init_state]):
-      replica_results = [self.replica_kernels[i].bootstrap_results(init_state)
-                         for i in range(self.num_replica)]
+      replica_results = [
+          self.replica_kernels[i].bootstrap_results(init_state)
+          for i in range(self.num_replica)
+      ]
 
-      init_state_parts = (list(init_state)
-                          if mcmc_util.is_list_like(init_state)
-                          else [init_state])
-      replica_states = [[tf.identity(s) for s in init_state_parts]
+      init_state_parts = (
+          list(init_state)
+          if mcmc_util.is_list_like(init_state) else [init_state])
+
+      # Convert all states parts to tensor...
+      replica_states = [[tf.convert_to_tensor(s)
+                         for s in init_state_parts]
                         for i in range(self.num_replica)]
 
-      def maybe_flatten(x):
-        return x if mcmc_util.is_list_like(init_state) else x[0]
-      replica_states = [maybe_flatten(s) for s in replica_states]
-      next_replica_idx = tf.range(self.num_replica)
-      [
-          exchange_proposed,
-          exchange_proposed_n,
-      ] = self.exchange_proposed_fn(self.num_replica, seed=self._seed_stream)
-      exchange_proposed = tf.zeros_like(exchange_proposed)
-      exchange_proposed_n = tf.zeros_like(exchange_proposed_n)
+      if not mcmc_util.is_list_like(init_state):
+        replica_states = [s[0] for s in replica_states]
+
       return ReplicaExchangeMCKernelResults(
           replica_states=replica_states,
           replica_results=replica_results,
-          next_replica_idx=next_replica_idx,
-          exchange_proposed=exchange_proposed,
-          exchange_proposed_n=exchange_proposed_n,
           sampled_replica_states=replica_states,
           sampled_replica_results=replica_results,
       )
 
 
-def _stateful_lambda(x):
-  """Function to use instead of lambda."""
-  # `lambda` is affected by the change of `x`,
-  # so `_stateful_lambda(x)()`` output `x` at the time of definition.
-  def _stateful_lambda_():
-    return x
-  return _stateful_lambda_
-
-
 def _replica_log_prob_fn(inverse_temperature, target_log_prob_fn):
   """Return a log probability function made considering temperature."""
+
   def _replica_log_prob_fn_(*x):
     return inverse_temperature * target_log_prob_fn(*x)
+
   return _replica_log_prob_fn_
+
+
+# TODO(b/111801087) Use a more standardized API when available.
+def _get_field(kernel_results, field_name):
+  """field_name from kernel_results or kernel_results.accepted_results."""
+  if hasattr(kernel_results, field_name):
+    return getattr(kernel_results, field_name)
+  if hasattr(kernel_results, 'accepted_results'):
+    return getattr(kernel_results.accepted_results, field_name)
+  raise TypeError('Cannot extract %s from %s' % (field_name, kernel_results))
