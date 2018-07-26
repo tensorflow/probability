@@ -71,13 +71,19 @@ for end-to-end examples. It includes tutorial notebooks such as:
   A hierarchical linear model for sharing statistical strength across examples.
 * [Eight Schools](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Eight_Schools.ipynb).
   A hierarchical normal model for exchangeable treatment effects.
+* [Hierarchical Linear Models](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/HLM_TFP_R_Stan.ipynb).
+  Hierarchical linear models compared among TensorFlow Probability, R, and Stan.
 * [Bayesian Gaussian Mixture Models](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Bayesian_Gaussian_Mixture_Model.ipynb).
   Clustering with a probabilistic generative model.
+* [Probabilistic Principal Components Analysis](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Probabilistic_PCA.ipynb).
+  Dimensionality reduction with latent variables.
 * [Gaussian Copulas](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Gaussian_Copula.ipynb).
   Probability distributions for capturing dependence across random variables.
 * [Understanding TensorFlow Distributions Shapes](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Understanding_TensorFlow_Distributions_Shapes.ipynb).
   How to distinguish between samples, batches, and events for arbitrarily shaped
   probabilistic computations.
+* [TensorFlow Probability Case Study: Covariance Estimation](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/TensorFlow_Probability_Case_Study_Covariance_Estimation.ipynb).
+  A user's case study in applying TensorFlow Probability to estimate covariances.
 
 It also includes example scripts such as:
 
@@ -85,6 +91,8 @@ It also includes example scripts such as:
   Representation learning with a latent code and variational inference.
 * [Vector-Quantized Autoencoder](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/vq_vae.py).
   Discrete representation learning with vector quantization.
+* [Latent Dirichlet Allocation](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/latent_dirichlet_allocation.py).
+  Mixed membership modeling for capturing topics in a document.
 * [Bayesian Neural Networks](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/bayesian_neural_network.py).
   Neural networks with uncertainty over their weights.
 * [Bayesian Logistic Regression](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/logistic_regression.py).
