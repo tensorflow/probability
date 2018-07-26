@@ -487,8 +487,20 @@ def build_input_fns(data_dir, batch_size):
   return train_input_fn, eval_input_fn, vocabulary
 
 
+def assert_random_gamma_has_gradients():
+  """Check that TensorFlow supports tf.random_gamma gradients."""
+  a = tf.constant(1.0)
+  gradient = tf.gradients(tf.random_gamma([], a), a)[0]
+  message = ("This example requires tf.random_gamma gradients, introduced in"
+             " TensorFlow 1.10 RC0, to work correctly."
+             " Please upgrade TensorFlow to a newer version, e.g. tf-nightly.")
+  assert gradient is not None, message
+
+
 def main(argv):
   del argv  # unused
+
+  assert_random_gamma_has_gradients()
 
   params = FLAGS.flag_values_dict()
   params["layer_sizes"] = [int(units) for units in params["layer_sizes"]]
