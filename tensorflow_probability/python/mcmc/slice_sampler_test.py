@@ -103,6 +103,112 @@ class SliceSamplerTest(tf.test.TestCase):
                         atol=0.1, rtol=0.1)
     self.assertAllClose(true_cov, b=np.squeeze(sample_cov), atol=0.1, rtol=0.1)
 
+  def testTwoDimNormalDynamicShape(self):
+    """Checks that dynamic batch shapes for the initial state are supported."""
+    dtype = np.float32
+    true_mean = dtype([0, 0])
+    true_cov = dtype([[1, 0.5], [0.5, 1]])
+    num_results = 200
+    num_chains = 75
+    with self.test_session() as sess:
+      # Target distribution is defined through the Cholesky decomposition.
+      chol = tf.linalg.cholesky(true_cov)
+      target = tfd.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
+
+      # Assume that the state is passed as a list of 1-d tensors `x` and `y`.
+      # Then the target log-density is defined as follows:
+      def target_log_prob(x, y):
+        # Stack the input tensors together
+        z = tf.stack([x, y], axis=-1) - true_mean
+        return target.log_prob(z)
+
+      # Initial state of the chain
+      init_state = [np.ones([num_chains, 1], dtype=dtype),
+                    np.ones([num_chains, 1], dtype=dtype)]
+      placeholder_init_state = [
+          tf.placeholder(dtype, shape=[None, 1]),
+          tf.placeholder(dtype, shape=[None, 1])
+      ]
+      # Run Slice Samper for `num_results` iterations for `num_chains`
+      # independent chains:
+      [x, y], _ = tfp.mcmc.sample_chain(
+          num_results=num_results,
+          current_state=placeholder_init_state,
+          kernel=tfp.mcmc.SliceSampler(
+              target_log_prob_fn=target_log_prob,
+              step_size=1.0,
+              max_doublings=5,
+              seed=47),
+          num_burnin_steps=200,
+          num_steps_between_results=1,
+          parallel_iterations=1)
+
+      states = tf.stack([x, y], axis=-1)
+      sample_mean = tf.reduce_mean(states, axis=[0, 1])
+      z = states - sample_mean
+      sample_cov = tf.reduce_mean(tf.matmul(z, z, transpose_a=True),
+                                  axis=[0, 1])
+      [sample_mean, sample_cov] = sess.run(
+          [sample_mean, sample_cov],
+          {k: v for k, v in zip(placeholder_init_state, init_state)})
+
+    self.assertAllClose(true_mean, b=np.squeeze(sample_mean),
+                        atol=0.1, rtol=0.1)
+    self.assertAllClose(true_cov, b=np.squeeze(sample_cov), atol=0.1, rtol=0.1)
+
+  def testTwoDimNormalDynamicRank(self):
+    """Checks that fully dynamic shape for the initial state is supported."""
+    dtype = np.float32
+    true_mean = dtype([0, 0])
+    true_cov = dtype([[1, 0.5], [0.5, 1]])
+    num_results = 200
+    num_chains = 75
+    with self.test_session() as sess:
+      # Target distribution is defined through the Cholesky decomposition.
+      chol = tf.linalg.cholesky(true_cov)
+      target = tfd.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
+
+      # Assume that the state is passed as a list of 1-d tensors `x` and `y`.
+      # Then the target log-density is defined as follows:
+      def target_log_prob(x, y):
+        # Stack the input tensors together
+        z = tf.stack([x, y], axis=-1) - true_mean
+        return target.log_prob(z)
+
+      # Initial state of the chain
+      init_state = [np.ones([num_chains, 1], dtype=dtype),
+                    np.ones([num_chains, 1], dtype=dtype)]
+      placeholder_init_state = [
+          tf.placeholder(dtype, shape=None),
+          tf.placeholder(dtype, shape=None)
+      ]
+      # Run Slice Samper for `num_results` iterations for `num_chains`
+      # independent chains:
+      [x, y], _ = tfp.mcmc.sample_chain(
+          num_results=num_results,
+          current_state=placeholder_init_state,
+          kernel=tfp.mcmc.SliceSampler(
+              target_log_prob_fn=target_log_prob,
+              step_size=1.0,
+              max_doublings=5,
+              seed=47),
+          num_burnin_steps=200,
+          num_steps_between_results=1,
+          parallel_iterations=1)
+
+      states = tf.stack([x, y], axis=-1)
+      sample_mean = tf.reduce_mean(states, axis=[0, 1])
+      z = states - sample_mean
+      sample_cov = tf.reduce_mean(tf.matmul(z, z, transpose_a=True),
+                                  axis=[0, 1])
+      [sample_mean, sample_cov] = sess.run(
+          [sample_mean, sample_cov],
+          {k: v for k, v in zip(placeholder_init_state, init_state)})
+
+    self.assertAllClose(true_mean, b=np.squeeze(sample_mean),
+                        atol=0.1, rtol=0.1)
+    self.assertAllClose(true_cov, b=np.squeeze(sample_cov), atol=0.1, rtol=0.1)
+
   def testFourDimNormal(self):
     """Sampling from a 4-D Multivariate Normal distribution."""
 

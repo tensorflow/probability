@@ -21,7 +21,6 @@ from __future__ import print_function
 import collections
 # Dependency imports
 
-import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.mcmc import kernel as kernel_base
@@ -248,9 +247,9 @@ class SliceSampler(kernel_base.TransitionKernel):
     """Runs one iteration of Slice Sampler.
 
     Args:
-      current_state: `Tensor` or Python `list` of `Tensor`s of fully defined
-        static shape representing the current state(s) of the Markov chain(s).
-        The first `r` dimensions index independent chains,
+      current_state: `Tensor` or Python `list` of `Tensor`s representing the
+        current state(s) of the Markov chain(s). The first `r` dimensions
+        index independent chains,
         `r = tf.rank(target_log_prob_fn(*current_state))`.
       previous_kernel_results: `collections.namedtuple` containing `Tensor`s
         representing values from previous calls to this function (or from the
@@ -266,7 +265,6 @@ class SliceSampler(kernel_base.TransitionKernel):
     Raises:
       ValueError: if there isn't one `step_size` or a list with same length as
         `current_state`.
-      ValueError: if `current_state` does not have a fully defined static shape.
       TypeError: if `not target_log_prob.dtype.is_floating`.
     """
     with tf.name_scope(
@@ -348,7 +346,7 @@ def _choose_random_direction(current_state_parts, batch_rank, seed=None):
   """Chooses a random direction in the event space."""
   seed_gen = seed_stream.SeedStream(seed, salt='_choose_random_direction')
   # Chooses the random directions across each of the input components.
-  rnd_direction_parts = [tf.random_normal(current_state_part.shape.as_list(),
+  rnd_direction_parts = [tf.random_normal(tf.shape(current_state_part),
                                           dtype=tf.float32, seed=seed_gen())
                          for current_state_part in current_state_parts]
 
@@ -388,11 +386,10 @@ def _sample_next(target_log_prob_fn,
       under the target distribution.
     current_state_parts: Python `list` of `Tensor`s representing the current
       state(s) of the Markov chain(s). The first `independent_chain_ndims` of
-      the `Tensor`(s) index different chains. Must have fully defined static
-      shape.
-    step_sizes: Python `list` of `Tensor`s representing the step size for the
-      leapfrog integrator. Must broadcast with the shape of
-      `current_state_parts`.
+      the `Tensor`(s) index different chains.
+    step_sizes: Python `list` of `Tensor`s. Provides a measure of the width
+      of the density. Used to find the slice bounds. Must broadcast with the
+      shape of `current_state_parts`.
     max_doublings: Integer number of doublings to allow while locating the slice
       boundaries.
     current_target_log_prob: `Tensor` representing the value of
@@ -461,6 +458,11 @@ def _sample_next(target_log_prob_fn,
                   for i, (step_size, dirn_part)
                   in enumerate(zip(step_sizes, direction))]
     step_size = tf.rsqrt(tf.add_n(components))
+    # Computes the rank of a tensor. Uses the static rank if possible.
+    def _get_rank(x):
+      return (len(x.shape.as_list()) if x.shape.dims is not None
+              else tf.rank(x))
+    state_part_ranks = [_get_rank(part) for part in current_state_parts]
 
     def _step_along_direction(alpha):
       """Converts the scalar alpha into an n-dim vector with full state info.
@@ -477,9 +479,8 @@ def _sample_next(target_log_prob_fn,
           state(s) of the Markov chain(s) for a given alpha and a given chosen
           direction. Has the same shape as `current_state_parts`.
       """
-      padded_alphas = [_right_pad_with_static_shape(
-          alpha, final_rank=len(current_state_part.shape))
-                       for current_state_part in current_state_parts]
+      padded_alphas = [_right_pad(alpha, final_rank=part_rank)
+                       for part_rank in state_part_ranks]
 
       state_parts = [state_part + padded_alpha
                      * direction_part for state_part, direction_part,
@@ -538,7 +539,7 @@ def _maybe_call_fn(fn,
   return fn_result
 
 
-def _right_pad_with_static_shape(x, final_rank):
+def _right_pad(x, final_rank):
   """Pads the shape of x to the right to be of rank final_rank.
 
   Expands the dims of `x` to the right such that its rank is equal to
@@ -547,15 +548,24 @@ def _right_pad_with_static_shape(x, final_rank):
 
   Args:
     x: The tensor whose shape is to be padded.
-    final_rank: Integer. The desired rank of x, must be >= rank(x).
+    final_rank: Scalar int32 `Tensor` or Python `int`. The desired rank of x.
 
   Returns:
     padded_x: A tensor of rank final_rank.
   """
-  x_shape = x.shape.as_list()
-  x_rank = len(x_shape)
-  x_final_shape = x_shape + [1] * (final_rank - x_rank)
-  padded_x = tf.reshape(x, x_final_shape)
+  padded_shape = tf.concat(
+      [
+          tf.shape(x),
+          tf.ones(final_rank - tf.rank(x), dtype=tf.int32)
+      ],
+      axis=0)
+  static_padded_shape = None
+  if x.shape.is_fully_defined() and isinstance(final_rank, int):
+    static_padded_shape = x.shape.as_list()
+    extra_dims = final_rank - len(static_padded_shape)
+    static_padded_shape.extend([1] * extra_dims)
+
+  padded_x = tf.reshape(x, static_padded_shape or padded_shape)
   return padded_x
 
 
@@ -566,10 +576,7 @@ def _prepare_args(target_log_prob_fn, state, step_size,
   state_parts = list(state) if mcmc_util.is_list_like(state) else [state]
   state_parts = [tf.convert_to_tensor(s, name='current_state')
                  for s in state_parts]
-  # Verifies that the input static shape is fully defined.
-  state_shapes_defined = [s.shape.is_fully_defined() for s in state_parts]
-  if not np.all(state_shapes_defined):
-    raise ValueError('All static shapes must be fully defined.')
+
   target_log_prob = _maybe_call_fn(
       target_log_prob_fn,
       state_parts,
