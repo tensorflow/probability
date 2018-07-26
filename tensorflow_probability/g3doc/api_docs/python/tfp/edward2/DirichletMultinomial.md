@@ -1,0 +1,49 @@
+Project: /probability/_project.yaml
+Book: /probability/_book.yaml
+page_type: reference
+<div itemscope itemtype="http://developers.google.com/ReferenceObject">
+<meta itemprop="name" content="tfp.edward2.DirichletMultinomial" />
+</div>
+
+# tfp.edward2.DirichletMultinomial
+
+``` python
+tfp.edward2.DirichletMultinomial(
+    *args,
+    **kwargs
+)
+```
+
+Create a random variable for DirichletMultinomial.
+
+See DirichletMultinomial for more details.
+
+#### Returns:
+
+  RandomVariable.
+
+#### Original Docstring for Distribution
+
+Initialize a batch of DirichletMultinomial distributions.
+
+
+#### Args:
+
+* <b>`total_count`</b>:  Non-negative floating point tensor, whose dtype is the same
+    as `concentration`. The shape is broadcastable to `[N1,..., Nm]` with
+    `m >= 0`. Defines this as a batch of `N1 x ... x Nm` different
+    Dirichlet multinomial distributions. Its components should be equal to
+    integer values.
+* <b>`concentration`</b>: Positive floating point tensor, whose dtype is the
+    same as `n` with shape broadcastable to `[N1,..., Nm, K]` `m >= 0`.
+    Defines this as a batch of `N1 x ... x Nm` different `K` class Dirichlet
+    multinomial distributions.
+* <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
+    parameters are checked for validity despite possibly degrading runtime
+    performance. When `False` invalid inputs may silently render incorrect
+    outputs.
+* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
+    (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
+    result is undefined. When `False`, an exception is raised if one or
+    more of the statistic's batch members are undefined.
+* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
