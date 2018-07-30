@@ -163,8 +163,7 @@ class GammaGamma(tf.distributions.Distribution):
 
   def _batch_shape_tensor(self):
     return _dynamic_broadcast_shape_from_tensors(
-        self.frequency, self.concentration, self.mixing_concentration,
-        self.mixing_rate)
+        self.concentration, self.mixing_concentration, self.mixing_rate)
 
   def _batch_shape(self):
     return _static_broadcast_shape_from_tensors(
