@@ -35,7 +35,6 @@ from tensorflow.contrib.learn.python.learn.datasets import mnist
 import warnings
 warnings.simplefilter(action='ignore')
 
-# TODO(b/78137893): Integration tests currently fail with seaborn imports.
 try:
   import seaborn as sns  # pylint: disable=g-import-not-at-top
   HAS_SEABORN = True
@@ -214,9 +213,9 @@ def main(argv):
      training_iterator, heldout_iterator) = build_input_pipeline(
          mnist_data, FLAGS.batch_size, mnist_data.validation.num_examples)
 
-    # Build a Bayesian neural net. We use the Flipout Monte Carlo estimator for
-    # each layer: this enables lower variance stochastic gradients than naive
-    # reparameterization.
+    # Build a Bayesian LeNet5 network. We use the Flipout Monte Carlo estimator for
+    # the convolution and fully-connected layers: this enables lower variance stochastic
+    # gradients than naive reparameterization.
     with tf.name_scope("bayesian_neural_net", values=[images]):
         neural_net = tf.keras.Sequential([
                 tfp.layers.Convolution2DFlipout(
@@ -250,7 +249,8 @@ def main(argv):
     accuracy, accuracy_update_op = tf.metrics.accuracy(
         labels=labels, predictions=predictions)
 
-    # Extract weight posterior statistics for later visualization.
+    # Extract weight posterior statistics for layers with weight distributions for
+    # later visualization.
     names = []
     qmeans = []
     qstds = []
