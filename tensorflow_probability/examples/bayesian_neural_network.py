@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Trains a deep Bayesian neural net to classify MNIST digits."""
+"""Trains a deep Bayesian convolution neural net to classify MNIST digits."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -32,6 +32,9 @@ import tensorflow_probability as tfp
 
 from tensorflow.contrib.learn.python.learn.datasets import mnist
 
+import warnings
+warnings.simplefilter(action='ignore')
+
 # TODO(b/78137893): Integration tests currently fail with seaborn imports.
 try:
   import seaborn as sns  # pylint: disable=g-import-not-at-top
@@ -41,20 +44,14 @@ except ImportError:
 
 tfd = tf.contrib.distributions
 
-IMAGE_SHAPE = [28, 28]
+IMAGE_SHAPE = (28, 28, 1)
 
 flags.DEFINE_float("learning_rate",
-                   default=0.01,
+                   default=0.001,
                    help="Initial learning rate.")
 flags.DEFINE_integer("max_steps",
                      default=6000,
                      help="Number of training steps to run.")
-flags.DEFINE_list("layer_sizes",
-                  default=["128", "128"],
-                  help="Comma-separated list denoting hidden units per layer.")
-flags.DEFINE_string("activation",
-                    default="relu",
-                    help="Activation function for all hidden layers.")
 flags.DEFINE_integer("batch_size",
                      default=128,
                      help="Batch size.")
@@ -74,7 +71,7 @@ flags.DEFINE_integer("num_monte_carlo",
                      default=50,
                      help="Network draws to compute predictive probabilities.")
 flags.DEFINE_bool("fake_data",
-                  default=None,
+                  default=False,
                   help="If true, uses fake data. Defaults to real data.")
 
 FLAGS = flags.FLAGS
@@ -82,7 +79,6 @@ FLAGS = flags.FLAGS
 
 def plot_weight_posteriors(names, qm_vals, qs_vals, fname):
   """Save a PNG plot with histograms of weight means and stddevs.
-
   Args:
     names: A Python `iterable` of `str` variable names.
     qm_vals: A Python `iterable`, the same length as `names`,
@@ -101,7 +97,6 @@ def plot_weight_posteriors(names, qm_vals, qs_vals, fname):
     sns.distplot(qm.flatten(), ax=ax, label=n)
   ax.set_title("weight means")
   ax.set_xlim([-1.5, 1.5])
-  ax.set_ylim([0, 4.])
   ax.legend()
 
   ax = fig.add_subplot(1, 2, 2)
@@ -109,7 +104,6 @@ def plot_weight_posteriors(names, qm_vals, qs_vals, fname):
     sns.distplot(qs.flatten(), ax=ax)
   ax.set_title("weight stddevs")
   ax.set_xlim([0, 1.])
-  ax.set_ylim([0, 25.])
 
   fig.tight_layout()
   canvas.print_figure(fname, format="png")
@@ -119,7 +113,6 @@ def plot_weight_posteriors(names, qm_vals, qs_vals, fname):
 def plot_heldout_prediction(input_vals, probs,
                             fname, n=10, title=""):
   """Save a PNG plot visualizing posterior uncertainty on heldout data.
-
   Args:
     input_vals: A `float`-like Numpy `array` of shape
       `[num_heldout] + IMAGE_SHAPE`, containing heldout input images.
@@ -134,7 +127,7 @@ def plot_heldout_prediction(input_vals, probs,
   canvas = backend_agg.FigureCanvasAgg(fig)
   for i in range(n):
     ax = fig.add_subplot(n, 3, 3*i + 1)
-    ax.imshow(input_vals[i, :].reshape(IMAGE_SHAPE), interpolation="None")
+    ax.imshow(input_vals[i, :].reshape([28, 28]), interpolation="None")
 
     ax = fig.add_subplot(n, 3, 3*i + 2)
     for prob_sample in probs:
@@ -158,7 +151,8 @@ def build_input_pipeline(mnist_data, batch_size, heldout_size):
   # Build an iterator over training batches.
   training_dataset = tf.data.Dataset.from_tensor_slices(
       (mnist_data.train.images, np.int32(mnist_data.train.labels)))
-  training_batches = training_dataset.repeat().batch(batch_size)
+  training_batches = training_dataset.shuffle(50000, 
+                                              reshuffle_each_iteration=True).repeat().batch(batch_size)
   training_iterator = training_batches.make_one_shot_iterator()
 
   # Build a iterator over the heldout set with batch_size=heldout_size,
@@ -190,23 +184,20 @@ def build_fake_data(num_examples=10):
   mnist_data = Dummy()
   mnist_data.train = Dummy()
   mnist_data.train.images = np.float32(np.random.randn(
-      num_examples, np.prod(IMAGE_SHAPE)))
+      num_examples, *IMAGE_SHAPE))
   mnist_data.train.labels = np.int32(np.random.permutation(
       np.arange(num_examples)))
   mnist_data.train.num_examples = num_examples
   mnist_data.validation = Dummy()
   mnist_data.validation.images = np.float32(np.random.randn(
-      num_examples, np.prod(IMAGE_SHAPE)))
+      num_examples, *IMAGE_SHAPE))
   mnist_data.validation.labels = np.int32(np.random.permutation(
       np.arange(num_examples)))
   mnist_data.validation.num_examples = num_examples
   return mnist_data
 
-
 def main(argv):
   del argv  # unused
-  FLAGS.layer_sizes = [int(units) for units in FLAGS.layer_sizes]
-  FLAGS.activation = getattr(tf.nn, FLAGS.activation)
   if tf.gfile.Exists(FLAGS.model_dir):
     tf.logging.warning(
         "Warning: deleting old log directory at {}".format(FLAGS.model_dir))
@@ -216,7 +207,7 @@ def main(argv):
   if FLAGS.fake_data:
     mnist_data = build_fake_data()
   else:
-    mnist_data = mnist.read_data_sets(FLAGS.data_dir)
+    mnist_data = mnist.read_data_sets(FLAGS.data_dir, reshape=False)
 
   with tf.Graph().as_default():
     (images, labels, handle,
@@ -227,16 +218,27 @@ def main(argv):
     # each layer: this enables lower variance stochastic gradients than naive
     # reparameterization.
     with tf.name_scope("bayesian_neural_net", values=[images]):
-      neural_net = tf.keras.Sequential()
-      for units in FLAGS.layer_sizes:
-        layer = tfp.layers.DenseFlipout(
-            units,
-            activation=FLAGS.activation)
-        neural_net.add(layer)
-      neural_net.add(tfp.layers.DenseFlipout(10))
-      logits = neural_net(images)
-      labels_distribution = tfd.Categorical(logits=logits)
-
+        neural_net = tf.keras.Sequential([
+                tfp.layers.Convolution2DFlipout(
+                        6, kernel_size=5, padding='SAME', activation=tf.nn.relu),
+                tf.keras.layers.MaxPooling2D(pool_size=[2, 2],
+                                   strides=[2, 2],
+                                   padding='SAME'),
+                tfp.layers.Convolution2DFlipout(
+                        16, kernel_size=5, padding='SAME', activation=tf.nn.relu),
+                tf.keras.layers.MaxPooling2D(pool_size=[2, 2],
+                                   strides=[2, 2],
+                                   padding='SAME'),
+                tfp.layers.Convolution2DFlipout(
+                        120, kernel_size=5, padding='SAME', activation=tf.nn.relu),
+                tf.keras.layers.Flatten(),
+                tfp.layers.DenseFlipout(84, activation=tf.nn.relu),
+                tfp.layers.DenseFlipout(10)
+                ])
+        
+        logits = neural_net(images)
+        labels_distribution = tfd.Categorical(logits=logits)
+      
     # Compute the -ELBO as the loss, averaged over the batch size.
     neg_log_likelihood = -tf.reduce_mean(labels_distribution.log_prob(labels))
     kl = sum(neural_net.losses) / mnist_data.train.num_examples
@@ -252,7 +254,9 @@ def main(argv):
     names = []
     qmeans = []
     qstds = []
-    for i, layer in enumerate(neural_net.layers):
+    probLayers = [0, 2, 4, 6, 7]
+    for i in probLayers:
+      layer = neural_net.layers[i]
       q = layer.kernel_posterior
       names.append("Layer {}".format(i))
       qmeans.append(q.mean())
@@ -294,7 +298,7 @@ def main(argv):
           heldout_lp = np.mean(np.log(mean_probs[np.arange(mean_probs.shape[0]),
                                                  label_vals.flatten()]))
           print(" ... Held-out nats: {:.3f}".format(heldout_lp))
-
+          
           qm_vals, qs_vals = sess.run((qmeans, qstds))
 
           if HAS_SEABORN:
