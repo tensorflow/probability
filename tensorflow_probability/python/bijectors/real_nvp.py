@@ -90,7 +90,7 @@ class RealNVP(bijector.Bijector):
   # A common choice for a normalizing flow is to use a Gaussian for the base
   # distribution. (However, any continuous distribution would work.) E.g.,
   nvp = tfd.TransformedDistribution(
-      distribution=tfd.MultivariateNormalDiag(loc=[0., 0., 0.])),
+      distribution=tfd.MultivariateNormalDiag(loc=[0., 0., 0.]),
       bijector=tfb.RealNVP(
           num_masked=2,
           shift_and_log_scale_fn=tfb.real_nvp_default_template(
@@ -179,7 +179,7 @@ class RealNVP(bijector.Bijector):
   def _forward(self, x):
     self._cache_input_depth(x)
     # Performs scale and shift.
-    x0, x1 = x[:, :self._num_masked], x[:, self._num_masked:]
+    x0, x1 = x[..., :self._num_masked], x[..., self._num_masked:]
     shift, log_scale = self._shift_and_log_scale_fn(
         x0, self._input_depth - self._num_masked)
     y1 = x1
@@ -193,7 +193,7 @@ class RealNVP(bijector.Bijector):
   def _inverse(self, y):
     self._cache_input_depth(y)
     # Performs un-shift and un-scale.
-    y0, y1 = y[:, :self._num_masked], y[:, self._num_masked:]
+    y0, y1 = y[..., :self._num_masked], y[..., self._num_masked:]
     shift, log_scale = self._shift_and_log_scale_fn(
         y0, self._input_depth - self._num_masked)
     x1 = y1
@@ -206,7 +206,7 @@ class RealNVP(bijector.Bijector):
 
   def _inverse_log_det_jacobian(self, y):
     self._cache_input_depth(y)
-    y0 = y[:, :self._num_masked]
+    y0 = y[..., :self._num_masked]
     _, log_scale = self._shift_and_log_scale_fn(
         y0, self._input_depth - self._num_masked)
     if log_scale is None:
@@ -215,7 +215,7 @@ class RealNVP(bijector.Bijector):
 
   def _forward_log_det_jacobian(self, x):
     self._cache_input_depth(x)
-    x0 = x[:, :self._num_masked]
+    x0 = x[..., :self._num_masked]
     _, log_scale = self._shift_and_log_scale_fn(
         x0, self._input_depth - self._num_masked)
     if log_scale is None:

@@ -37,7 +37,35 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
             False,
     }
 
-  def testBijector(self):
+  def testBijectorWithTrivialTransform(self):
+    flat_x_ = np.arange(8).astype(np.float32).reshape(8)
+    batched_x_ = np.arange(3 * 8).astype(np.float32).reshape(3, 8)
+    for x_ in [flat_x_, batched_x_]:
+      nvp = tfb.RealNVP(
+          num_masked=4,
+          validate_args=True,
+          shift_and_log_scale_fn=lambda x, _: (x, x),
+          is_constant_jacobian=False)
+      x = tf.constant(x_)
+      forward_x = nvp.forward(x)
+      # Use identity to invalidate cache.
+      inverse_y = nvp.inverse(tf.identity(forward_x))
+      forward_inverse_y = nvp.forward(inverse_y)
+      fldj = nvp.forward_log_det_jacobian(x, event_ndims=1)
+      # Use identity to invalidate cache.
+      ildj = nvp.inverse_log_det_jacobian(tf.identity(forward_x), event_ndims=1)
+      forward_x_ = self.evaluate(forward_x)
+      inverse_y_ = self.evaluate(inverse_y)
+      forward_inverse_y_ = self.evaluate(forward_inverse_y)
+      ildj_ = self.evaluate(ildj)
+      fldj_ = self.evaluate(fldj)
+
+      self.assertEqual("real_nvp", nvp.name)
+      self.assertAllClose(forward_x_, forward_inverse_y_, rtol=1e-1, atol=0.)
+      self.assertAllClose(x_, inverse_y_, rtol=1e-1, atol=0.)
+      self.assertAllClose(ildj_, -fldj_, rtol=1e-6, atol=0.)
+
+  def testBatchedBijectorWithMLPTransform(self):
     x_ = np.arange(3 * 4 * 2).astype(np.float32).reshape(3, 4 * 2)
     with self.test_session() as sess:
       nvp = tfb.RealNVP(
