@@ -42,6 +42,32 @@ conventions may be moved upstream.)
     any Python objects, types, or code. E.g., write \`Tensor\` instead of
     Tensor.
 
+7.  Append `_` to literals, not Tensors. 
+
+	For example, the typical use of this pattern would be:
+	`[foo_, bar_] = sess.run([foo, bar])`.
+
+8.  Ideally you dont create Tensors after you've evaluated some Tensors. When 
+    possible, avoid making many for each time you want to see a tensor output. 
+
+	Although there's no harm in doing so, it can be confusing to the reader 
+	because now you have a hodgepodge of tensors (ie, data "futures") and 
+	actual materialized results. If you are debugging intermediate results, try
+	adding `print()` and `.eval()` statements within, and then commenting them
+	out afterwards.
+    
+    For example, if you are evaluating the following code,
+    ```python
+    halo_pos_ = tf.stack([x[0] for x in halo_pos_], axis=0) 
+    ```
+
+    either evaluate it in your sess.run, or better yet, just do it in numpy as:
+    ```python
+    halo_pos_ = np.stack([x[0] for x in halo_pos_], axis=0)
+    ```
+
+
+
 ## TensorFlow Probability Style
 
 Below are TensorFlow Probability-specific conventions. In the event of conflict,
@@ -164,6 +190,8 @@ it supercedes all previous conventions.
 
     *   Use `tf.squared_difference(x,y)` over `(x-y)**2`.
     *   Use `tf.rsqrt` over `1./tf.sqrt(x)`.
+    *	Use `tf.norm(x - y, ord=2)` over `tf.sqrt(tf.reduce_sum((tf.square(x - y)), axis=1))`
+    *	Use `tf.ones([80])` over `tf.fill([1], 80.)`.
 
 14. Worry about gradients! (It's often not automatic for API builders!)
 
@@ -205,3 +233,37 @@ it supercedes all previous conventions.
     tutorials](https://docs.python.org/3.2/tutorial/inputoutput.html#old-string-formatting):
     "...this old style of formatting will eventually be removed from the
     language, str.format() should generally be used."
+
+22. Instead of unpacking states after the fact, do it inline.
+
+    ```python
+    [halo_pos, mass_large], kernel_results = tfp.mcmc.sample_chain(
+    	num_results=num_results, 
+    	num_burnin_steps=num_burnin_steps, 
+    	current_state=[ 
+    			tf.fill([1], 80.), 
+    			tf.fill([1, 2], 2100.)
+    			], 
+    	kernel=tfp.mcmc.RandomWalkMetropolis(
+    		target_log_prob_fn=posterior_log_prob, 
+    		seed=54)
+    	)
+    ```
+
+    instead of 
+
+    ```python
+    states, kernel_results = tfp.mcmc.sample_chain(
+    	num_results=num_results, 
+    	num_burnin_steps=num_burnin_steps, 
+    	current_state=[ 
+    			tf.fill([1], 80.), 
+    			tf.fill([1, 2], 2100.)
+    			], 
+    	kernel=tfp.mcmc.RandomWalkMetropolis(
+    		target_log_prob_fn=posterior_log_prob, 
+    		seed=54)
+    	)
+
+    [halo_pos, mass_large] = states
+    ```
