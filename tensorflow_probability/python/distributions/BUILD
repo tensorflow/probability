@@ -48,6 +48,7 @@ py_library(
         ":inverse_gamma",
         ":kumaraswamy",
         ":linear_gaussian_ssm",
+        ":lkj",
         ":logistic",
         ":lognormal",
         ":mixture",
@@ -243,6 +244,15 @@ py_library(
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
+    ],
+)
+
+py_library(
+    name = "lkj",
+    srcs = ["lkj.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
     ],
 )
 
@@ -952,6 +962,20 @@ py_test(
     size = "medium",
     srcs = ["sample_stats_test.py"],
     tags = ["nomsan"],  # disable to avoid false positives from scipy.
+    deps = [
+        ":distributions",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_test(
+    name = "lkj_test",
+    size = "medium",
+    srcs = [
+        "lkj_test.py",
+    ],
     deps = [
         ":distributions",
         # numpy dep,

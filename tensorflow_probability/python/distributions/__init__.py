@@ -42,6 +42,7 @@ from tensorflow_probability.python.distributions.inverse_gamma import InverseGam
 from tensorflow_probability.python.distributions.inverse_gamma import InverseGammaWithSoftplusConcentrationRate
 from tensorflow_probability.python.distributions.kumaraswamy import Kumaraswamy
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import LinearGaussianStateSpaceModel
+from tensorflow_probability.python.distributions.lkj import LKJ
 from tensorflow_probability.python.distributions.logistic import Logistic
 from tensorflow_probability.python.distributions.lognormal import LogNormal
 from tensorflow_probability.python.distributions.mixture import Mixture
@@ -152,6 +153,7 @@ __all__ = [
     'LinearGaussianStateSpaceModel',
     'Laplace',
     'LaplaceWithSoftplusScale',
+    'LKJ',
     'Logistic',
     'LogNormal',
     'NegativeBinomial',
