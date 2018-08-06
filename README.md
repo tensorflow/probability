@@ -110,7 +110,7 @@ pip install --user --upgrade tensorflow-probability  # depends on tensorflow (CP
 ```
 
 TensorFlow Probability depends on a recent stable release of TensorFlow
-(pip package `tensorflow`); see [TF release notes](
+(pip package `tensorflow`); see [TFP release notes](
 https://github.com/tensorflow/probability/releases) for details on the latest
 version of TensorFlow Probability, and the version of TensorFlow it depends on.
 
