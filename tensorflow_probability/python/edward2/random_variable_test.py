@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import re
+from absl.testing import parameterized
 import numpy as np
 import tensorflow as tf
 
@@ -39,7 +40,7 @@ class FakeDistribution(tfd.Distribution):
         allow_nan_stats=True)
 
 
-class RandomVariableTest(tf.test.TestCase):
+class RandomVariableTest(parameterized.TestCase, tf.test.TestCase):
 
   @tfe.run_test_in_graph_and_eager_modes()
   def testConstructor(self):
@@ -356,35 +357,41 @@ class RandomVariableTest(tf.test.TestCase):
       self.assertGreater(sess.run(y, feed_dict={x_ph: 100.0}), 5.0)
       self.assertRaises(tf.errors.InvalidArgumentError, sess.run, y)
 
-  def _testShape(self, rv, sample_shape, batch_shape, event_shape):
+  @parameterized.parameters(
+      {"rv": ed.RandomVariable(tfd.Bernoulli(probs=0.5)),
+       "sample_shape": [],
+       "batch_shape": [],
+       "event_shape": []},
+      {"rv": ed.RandomVariable(tfd.Bernoulli(tf.zeros([2, 3]))),
+       "sample_shape": [],
+       "batch_shape": [2, 3],
+       "event_shape": []},
+      {"rv": ed.RandomVariable(tfd.Bernoulli(probs=0.5), sample_shape=2),
+       "sample_shape": [2],
+       "batch_shape": [],
+       "event_shape": []},
+      {"rv": ed.RandomVariable(tfd.Bernoulli(probs=0.5), sample_shape=[2, 1]),
+       "sample_shape": [2, 1],
+       "batch_shape": [],
+       "event_shape": []},
+      {"rv": ed.RandomVariable(tfd.Bernoulli(probs=0.5),
+                               sample_shape=tf.constant([2])),
+       "sample_shape": [2],
+       "batch_shape": [],
+       "event_shape": []},
+      {"rv": ed.RandomVariable(tfd.Bernoulli(probs=0.5),
+                               sample_shape=tf.constant([2, 4])),
+       "sample_shape": [2, 4],
+       "batch_shape": [],
+       "event_shape": []},
+  )
+  @tfe.run_test_in_graph_and_eager_modes()
+  def testShape(self, rv, sample_shape, batch_shape, event_shape):
     self.assertEqual(rv.shape, sample_shape + batch_shape + event_shape)
     self.assertEqual(rv.shape, rv.get_shape())
     self.assertEqual(rv.sample_shape, sample_shape)
     self.assertEqual(rv.distribution.batch_shape, batch_shape)
     self.assertEqual(rv.distribution.event_shape, event_shape)
-
-  @tfe.run_test_in_graph_and_eager_modes()
-  def testShapeRandomVariable(self):
-    self._testShape(
-        ed.RandomVariable(tfd.Bernoulli(probs=0.5)),
-        [], [], [])
-    self._testShape(
-        ed.RandomVariable(tfd.Bernoulli(tf.zeros([2, 3]))),
-        [], [2, 3], [])
-    self._testShape(
-        ed.RandomVariable(tfd.Bernoulli(probs=0.5), sample_shape=2),
-        [2], [], [])
-    self._testShape(
-        ed.RandomVariable(tfd.Bernoulli(probs=0.5), sample_shape=[2, 1]),
-        [2, 1], [], [])
-    self._testShape(
-        ed.RandomVariable(tfd.Bernoulli(probs=0.5),
-                          sample_shape=tf.constant([2])),
-        [2], [], [])
-    self._testShape(
-        ed.RandomVariable(tfd.Bernoulli(probs=0.5),
-                          sample_shape=tf.constant([2, 4])),
-        [2, 4], [], [])
 
   @tfe.run_test_in_graph_and_eager_modes()
   def testRandomTensorSample(self):

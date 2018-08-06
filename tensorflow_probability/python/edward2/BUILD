@@ -53,6 +53,7 @@ py_test(
     size = "small",
     srcs = ["generated_random_variables_test.py"],
     deps = [
+        # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
@@ -70,6 +71,7 @@ py_test(
     size = "small",
     srcs = ["interceptor_test.py"],
     deps = [
+        # absl/testing:parameterized dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],
@@ -109,6 +111,7 @@ py_test(
     size = "small",
     srcs = ["random_variable_test.py"],
     deps = [
+        # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
