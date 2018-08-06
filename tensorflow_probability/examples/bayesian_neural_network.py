@@ -12,7 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Trains a deep Bayesian convolution neural net to classify MNIST digits."""
+"""Trains a Bayesian neural network to classify MNIST digits.
+
+The architecture is LeNet-5 [1].
+
+#### References
+
+[1]: Yann LeCun, Leon Bottou, Yoshua Bengio, and Patrick Haffner.
+     Gradient-based learning applied to document recognition.
+     _Proceedings of the IEEE_, 1998.
+     http://yann.lecun.com/exdb/publis/pdf/lecun-01a.pdf
+"""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -32,6 +42,7 @@ import tensorflow_probability as tfp
 
 from tensorflow.contrib.learn.python.learn.datasets import mnist
 
+# TODO(b/78137893): Integration tests currently fail with seaborn imports.
 import warnings
 warnings.simplefilter(action='ignore')
 
@@ -78,6 +89,7 @@ FLAGS = flags.FLAGS
 
 def plot_weight_posteriors(names, qm_vals, qs_vals, fname):
   """Save a PNG plot with histograms of weight means and stddevs.
+  
   Args:
     names: A Python `iterable` of `str` variable names.
     qm_vals: A Python `iterable`, the same length as `names`,
@@ -112,6 +124,7 @@ def plot_weight_posteriors(names, qm_vals, qs_vals, fname):
 def plot_heldout_prediction(input_vals, probs,
                             fname, n=10, title=""):
   """Save a PNG plot visualizing posterior uncertainty on heldout data.
+  
   Args:
     input_vals: A `float`-like Numpy `array` of shape
       `[num_heldout] + IMAGE_SHAPE`, containing heldout input images.
@@ -195,6 +208,7 @@ def build_fake_data(num_examples=10):
   mnist_data.validation.num_examples = num_examples
   return mnist_data
 
+
 def main(argv):
   del argv  # unused
   if tf.gfile.Exists(FLAGS.model_dir):
@@ -202,7 +216,7 @@ def main(argv):
         "Warning: deleting old log directory at {}".format(FLAGS.model_dir))
     tf.gfile.DeleteRecursively(FLAGS.model_dir)
   tf.gfile.MakeDirs(FLAGS.model_dir)
-
+  
   if FLAGS.fake_data:
     mnist_data = build_fake_data()
   else:
@@ -218,18 +232,24 @@ def main(argv):
     # gradients than naive reparameterization.
     with tf.name_scope("bayesian_neural_net", values=[images]):
         neural_net = tf.keras.Sequential([
-                tfp.layers.Convolution2DFlipout(
-                        6, kernel_size=5, padding='SAME', activation=tf.nn.relu),
+                tfp.layers.Convolution2DFlipout(6, 
+                                                kernel_size=5, 
+                                                padding='SAME', 
+                                                activation=tf.nn.relu),
                 tf.keras.layers.MaxPooling2D(pool_size=[2, 2],
-                                   strides=[2, 2],
-                                   padding='SAME'),
-                tfp.layers.Convolution2DFlipout(
-                        16, kernel_size=5, padding='SAME', activation=tf.nn.relu),
+                                             strides=[2, 2],
+                                             padding='SAME'),
+                tfp.layers.Convolution2DFlipout(16, 
+                                                kernel_size=5, 
+                                                padding='SAME', 
+                                                activation=tf.nn.relu),
                 tf.keras.layers.MaxPooling2D(pool_size=[2, 2],
-                                   strides=[2, 2],
-                                   padding='SAME'),
-                tfp.layers.Convolution2DFlipout(
-                        120, kernel_size=5, padding='SAME', activation=tf.nn.relu),
+                                             strides=[2, 2],
+                                             padding='SAME'),
+                tfp.layers.Convolution2DFlipout(120, 
+                                                kernel_size=5, 
+                                                padding='SAME', 
+                                                activation=tf.nn.relu),
                 tf.keras.layers.Flatten(),
                 tfp.layers.DenseFlipout(84, activation=tf.nn.relu),
                 tfp.layers.DenseFlipout(10)
@@ -254,8 +274,8 @@ def main(argv):
     names = []
     qmeans = []
     qstds = []
-    probLayers = [0, 2, 4, 6, 7]
-    for i in probLayers:
+    prob_layers = [0, 2, 4, 6, 7]
+    for i in prob_layers:
       layer = neural_net.layers[i]
       q = layer.kernel_posterior
       names.append("Layer {}".format(i))
@@ -316,3 +336,4 @@ def main(argv):
 
 if __name__ == "__main__":
   tf.app.run()
+
