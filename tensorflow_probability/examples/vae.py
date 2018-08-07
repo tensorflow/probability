@@ -337,7 +337,7 @@ def model_fn(features, labels, mode, params, config):
   """
   del labels, config
 
-  if params["analytic_kl"] and params["latent_size"] != 1:
+  if params["analytic_kl"] and params["mixture_components"] != 1:
     raise NotImplementedError(
         "Using `analytic_kl` is only supported when `mixture_components = 1` "
         "since there's no closed form otherwise.")
