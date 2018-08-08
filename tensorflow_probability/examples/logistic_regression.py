@@ -29,7 +29,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-tfd = tf.contrib.distributions
+tfd = tfp.distributions
 
 flags.DEFINE_float("learning_rate",
                    default=0.01,

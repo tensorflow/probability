@@ -70,8 +70,9 @@ class RandomVariable(object):
   #### Examples
 
   ```python
+  import tensorflow_probability as tfp
   from tensorflow_probability import edward2 as ed
-  tfd = tf.contrib.distributions
+  tfd = tfp.distributions
 
   z1 = tf.constant([[1.0, -0.8], [0.3, -1.0]])
   z2 = tf.constant([[0.9, 0.2], [2.0, -0.1]])

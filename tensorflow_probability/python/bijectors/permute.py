@@ -36,9 +36,7 @@ class Permute(bijector.Bijector):
   """Permutes the rightmost dimension of a `Tensor`.
 
   ```python
-  tfd = tfp.distributions
-
-  reverse = tfd.bijectors.Permute(permutation=[2, 1, 0])
+  reverse = tfp.bijectors.Permute(permutation=[2, 1, 0])
 
   reverse.forward([-1., 0., 1.])
   # ==> [1., 0., -1]

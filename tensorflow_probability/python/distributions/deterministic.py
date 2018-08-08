@@ -182,7 +182,7 @@ class Deterministic(_BaseDeterministic):
 
   ```python
   # Initialize a single Deterministic supported at zero.
-  constant = tf.contrib.distributions.Deterministic(0.)
+  constant = tfp.distributions.Deterministic(0.)
   constant.prob(0.)
   ==> 1.
   constant.prob(2.)
@@ -191,7 +191,7 @@ class Deterministic(_BaseDeterministic):
   # Initialize a [2, 2] batch of scalar constants.
   loc = [[0., 1.], [2., 3.]]
   x = [[0., 1.1], [1.99, 3.]]
-  constant = tf.contrib.distributions.Deterministic(loc)
+  constant = tfp.distributions.Deterministic(loc)
   constant.prob(x)
   ==> [[1., 0.], [0., 1.]]
   ```

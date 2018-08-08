@@ -186,7 +186,7 @@ class QuantizedDistribution(distributions.Distribution):
 
   ```python
   tfd = tfp.distributions
-  tfb = tfd.bijectors
+  tfb = tfp.bijectors
 
   net = wavenet(inputs)
   loc, unconstrained_scale, logits = tf.split(net,

@@ -41,10 +41,10 @@ class MatrixInverseTriL(bijector.Bijector):
   #### Examples
 
   ```python
-  tfd.bijectors.MatrixInverseTriL().forward(x=[[1., 0], [2, 1]])
+  tfp.bijectors.MatrixInverseTriL().forward(x=[[1., 0], [2, 1]])
   # Result: [[1., 0], [-2, 1]], i.e., inv(x)
 
-  tfd.bijectors.MatrixInverseTriL().inverse(y=[[1., 0], [-2, 1]])
+  tfp.bijectors.MatrixInverseTriL().inverse(y=[[1., 0], [-2, 1]])
   # Result: [[1., 0], [2, 1]], i.e., inv(y).
   ```
 

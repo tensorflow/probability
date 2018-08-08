@@ -59,14 +59,14 @@ class HalfNormal(tf.distributions.Distribution):
 
   ```python
   # Define a single scalar HalfNormal distribution.
-  dist = tf.contrib.distributions.HalfNormal(scale=3.0)
+  dist = tfp.distributions.HalfNormal(scale=3.0)
 
   # Evaluate the cdf at 1, returning a scalar.
   dist.cdf(1.)
 
   # Define a batch of two scalar valued HalfNormals.
   # The first has scale 11.0, the second 22.0
-  dist = tf.contrib.distributions.HalfNormal(scale=[11.0, 22.0])
+  dist = tfp.distributions.HalfNormal(scale=[11.0, 22.0])
 
   # Evaluate the pdf of the first distribution on 1.0, and the second on 1.5,
   # returning a length two tensor.

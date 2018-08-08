@@ -108,7 +108,7 @@ def sample_chain(
   ```python
   import tensorflow tf
   import tensorflow_probability as tfp
-  tfd = tf.contrib.distributions
+  tfd = tfp.distributions
 
   def make_likelihood(true_variances):
     return tfd.MultivariateNormalDiag(
@@ -150,7 +150,7 @@ def sample_chain(
   ```python
   import tensorflow tf
   import tensorflow_probability as tfp
-  tfd = tf.contrib.distributions
+  tfd = tfp.distributions
 
   def make_prior(dims, dtype):
     return tfd.MultivariateNormalDiag(

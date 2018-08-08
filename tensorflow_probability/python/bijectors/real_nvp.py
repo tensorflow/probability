@@ -85,7 +85,7 @@ class RealNVP(bijector.Bijector):
 
   ```python
   tfd = tfp.distributions
-  tfb = tfd.bijectors
+  tfb = tfp.bijectors
 
   # A common choice for a normalizing flow is to use a Gaussian for the base
   # distribution. (However, any continuous distribution would work.) E.g.,

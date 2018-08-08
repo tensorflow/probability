@@ -27,7 +27,7 @@ from tensorflow.python.framework import test_util
 from tensorflow.python.ops.distributions.bijector_test_util import assert_bijective_and_finite
 
 tfd = tfp.distributions
-tfb = tfd.bijectors
+tfb = tfp.bijectors
 
 
 class OrderedBijectorTest(tf.test.TestCase):

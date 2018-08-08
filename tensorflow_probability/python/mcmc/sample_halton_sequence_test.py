@@ -25,7 +25,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 tfb = tf.contrib.bayesflow
-tfd = tf.contrib.distributions
+tfd = tfp.distributions
 
 
 class HaltonSequenceTest(tf.test.TestCase):

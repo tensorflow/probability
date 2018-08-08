@@ -20,14 +20,13 @@ from __future__ import print_function
 
 import tensorflow as tf
 
+from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.layers import util as tfp_layers_util
 from tensorflow_probability.python.math import random_rademacher
 from tensorflow_probability.python.util import docstring as docstring_util
 from tensorflow.python.layers import utils as tf_layers_util
 from tensorflow.python.ops import nn_ops
 from tensorflow.python.ops.distributions import util as distribution_util
-
-tfd = tf.contrib.distributions
 
 
 __all__ = [

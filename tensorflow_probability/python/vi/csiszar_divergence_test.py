@@ -26,7 +26,7 @@ import tensorflow_probability as tfp
 
 from tensorflow.python.platform import test
 
-tfd = tf.contrib.distributions
+tfd = tfp.distributions
 
 
 def tridiag(d, diag_value, offdiag_value):

@@ -22,10 +22,11 @@ import re
 from absl.testing import parameterized
 import numpy as np
 import tensorflow as tf
+import tensorflow_probability as tfp
 
 from tensorflow_probability import edward2 as ed
 
-tfd = tf.contrib.distributions
+tfd = tfp.distributions
 tfe = tf.contrib.eager
 
 
