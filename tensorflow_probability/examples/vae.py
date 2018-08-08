@@ -440,7 +440,7 @@ def static_mnist_dataset(directory, split_name):
   """Returns binary static MNIST tf.data.Dataset."""
   amat_file = download(directory, FILE_TEMPLATE.format(split=split_name))
   dataset = tf.data.TextLineDataset(amat_file)
-  str_to_arr = lambda string: np.array([char == "1" for char in string.split()])
+  str_to_arr = lambda string: np.array([char == b"1" for char in string.split()])
 
   def _parser(s):
     booltensor = tf.py_func(str_to_arr, [s], tf.bool)
