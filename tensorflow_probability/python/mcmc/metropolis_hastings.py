@@ -246,7 +246,7 @@ class MetropolisHastings(kernel_base.TransitionKernel):
 
     Args:
       init_state: `Tensor` or Python `list` of `Tensor`s representing the
-        a state(s) of the Markov chain(s).
+        initial state(s) of the Markov chain(s).
 
     Returns:
       kernel_results: A (possibly nested) `tuple`, `namedtuple` or `list` of
