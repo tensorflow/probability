@@ -111,7 +111,7 @@ def sample_annealed_importance_chain(
   ##### Estimate the normalizing constant of a log-gamma distribution.
 
   ```python
-  tfd = tf.contrib.distributions
+  tfd = tfp.distributions
 
   # Run 100 AIS chains in parallel
   num_chains = 100
@@ -124,7 +124,7 @@ def sample_annealed_importance_chain(
   target = tfd.TransformedDistribution(
     distribution=tfd.Gamma(concentration=dtype(2),
                            rate=dtype(3)),
-    bijector=tfd.bijectors.Invert(tfd.bijectors.Exp()),
+    bijector=tfp.bijectors.Invert(tfp.bijectors.Exp()),
     event_shape=[dims])
 
   chains_state, ais_weights, kernels_results = (
@@ -146,7 +146,7 @@ def sample_annealed_importance_chain(
   ##### Estimate marginal likelihood of a Bayesian regression model.
 
   ```python
-  tfd = tf.contrib.distributions
+  tfd = tfp.distributions
 
   def make_prior(dims, dtype):
     return tfd.MultivariateNormalDiag(

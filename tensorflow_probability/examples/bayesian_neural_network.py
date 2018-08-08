@@ -39,7 +39,7 @@ try:
 except ImportError:
   HAS_SEABORN = False
 
-tfd = tf.contrib.distributions
+tfd = tfp.distributions
 
 IMAGE_SHAPE = [28, 28]
 

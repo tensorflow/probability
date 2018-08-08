@@ -26,7 +26,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 
-tfd = tf.contrib.distributions
+from tensorflow_probability.python import distributions as tfd
 
 
 __all__ = [

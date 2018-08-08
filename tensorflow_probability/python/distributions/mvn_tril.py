@@ -74,8 +74,8 @@ class MultivariateNormalTriL(MultivariateNormalLinearOperator):
   ```
 
   Trainable (batch) lower-triangular matrices can be created with
-  `tf.contrib.distributions.matrix_diag_transform()` and/or
-  `tf.contrib.distributions.fill_triangular()`
+  `tfp.distributions.matrix_diag_transform()` and/or
+  `tfp.distributions.fill_triangular()`
 
   #### Examples
 

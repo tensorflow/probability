@@ -114,7 +114,7 @@ class TransformedTransitionKernel(TransitionKernel):
   import tensorflow as tf
   import tensorflow_probability as tfp
   tfd = tfp.distributions
-  tfb = tfd.bijectors
+  tfb = tfp.bijectors
 
   def make_likelihood(true_variances):
     return tfd.MultivariateNormalDiag(

@@ -25,7 +25,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow.python.framework import test_util
 
-tfd = tf.contrib.distributions
+tfd = tfp.distributions
 
 
 class TestMVNTriL(tf.test.TestCase):

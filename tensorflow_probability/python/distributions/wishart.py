@@ -466,7 +466,7 @@ class Wishart(_WishartLinearOperator):
   dist.prob(x)  # Shape is [2, 2].
 
   # (*) - To efficiently create a trainable covariance matrix, see the example
-  #   in tf.contrib.distributions.matrix_diag_transform.
+  #   in tfp.distributions.matrix_diag_transform.
   ```
   """
 

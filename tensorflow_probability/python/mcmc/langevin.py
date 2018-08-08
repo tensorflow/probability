@@ -172,7 +172,7 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
   import tensorflow_probability as tfp
   import numpy as np
 
-  tfd = tf.contrib.distributions
+  tfd = tfp.distributions
 
   dtype = np.float32
   true_mean = dtype([0, 0, 0])

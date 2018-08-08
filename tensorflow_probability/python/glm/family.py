@@ -22,9 +22,10 @@ import contextlib
 import numpy as np
 
 import tensorflow as tf
+from tensorflow_probability.python import bijectors
+from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.glm.util import common_dtype
 
-tfd = tf.contrib.distributions
 tfe = tf.contrib.eager
 
 
@@ -208,7 +209,7 @@ class CustomExponentialFamily(
     self._distribution_fn = distribution_fn
     self._inverse_link_fn = (
         linear_model_to_mean_fn.forward
-        if isinstance(linear_model_to_mean_fn, tfd.bijectors.Bijector)
+        if isinstance(linear_model_to_mean_fn, bijectors.Bijector)
         else linear_model_to_mean_fn)
     self._is_canonical = is_canonical
 

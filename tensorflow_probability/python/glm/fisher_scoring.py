@@ -121,7 +121,7 @@ def fit(
   import numpy as np
   import tensorflow as tf
   import tensorflow_probability as tfp
-  tfd = tf.contrib.distributions
+  tfd = tfp.distributions
 
   def make_dataset(n, d, link, scale=1., dtype=np.float32):
     model_coefficients = tfd.Uniform(
