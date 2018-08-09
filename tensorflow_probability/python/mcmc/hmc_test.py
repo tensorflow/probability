@@ -816,6 +816,118 @@ class HMCHandlesLists64(_HMCHandlesLists, tf.test.TestCase):
   dtype = np.float64
 
 
+class HMCAdaptiveStepSize(tf.test.TestCase):
+
+  def setUp(self):
+    random_seed.set_random_seed(10014)
+    np.random.seed(10014)
+
+  # TODO(b/112427830): Reenable eager tests for TF 1.11 release.
+  @run_in_graph_mode_only()
+  def test_multiple_step_sizes(self):
+    num_results = 5
+    initial_step_sizes = [1e-5, 1e-4]
+    initial_state = [0., 0.]
+    dtype = np.float32
+
+    # TODO(b/111765211): Switch to the following once
+    # `get_variable(use_resource=True)` has the same semantics as
+    # `tf.contrib.eager.Variable`.
+    #   step_size = tf.get_variable(
+    #       name='step_size',
+    #       initializer=np.array(1e-3, dtype),
+    #       use_resource=True,
+    #       trainable=False)
+    step_size = [tf.contrib.eager.Variable(
+        initial_value=np.array(initial_step_size, dtype),
+        name='step_size',
+        trainable=False) for initial_step_size in initial_step_sizes]
+
+    def target_log_prob_fn(x1, x2):
+      return tf.reduce_sum(tfd.Normal(0., 1.).log_prob([x1, x2]))
+
+    _, kernel_results = tfp.mcmc.sample_chain(
+        num_results=num_results,
+        num_burnin_steps=0,
+        current_state=initial_state,
+        kernel=tfp.mcmc.HamiltonianMonteCarlo(
+            target_log_prob_fn=target_log_prob_fn,
+            num_leapfrog_steps=2,
+            step_size=step_size,
+            step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy(),
+            state_gradients_are_stopped=True,
+            seed=_set_seed(252)),
+        parallel_iterations=1)
+
+    init_op = tf.global_variables_initializer()
+    self.evaluate(init_op)
+
+    step_size_ = self.evaluate(kernel_results.extra.step_size_assign)
+
+    # We apply the same adjustment to each step size in the list, so
+    # the starting ratio of step sizes should match the final ratio.
+    self.assertNear(step_size_[0][0]/step_size_[1][0],
+                    step_size_[0][-1]/step_size_[1][-1], err=1e-4)
+
+  # TODO(b/112427830): Reenable eager tests for TF 1.11 release.
+  @run_in_graph_mode_only()
+  def test_finite_adaptation(self):
+
+    # Test that the adaptation runs for the specified number of steps.
+    # We set up a chain with a tiny initial step size, so every step accepts,
+    # and test that the final step size is incremented exactly
+    # `num_adaptation_steps` times.
+    num_results = 10
+    num_adaptation_steps = 3
+    initial_step_size = 1e-5
+    dtype = np.float32
+
+    # TODO(b/111765211): Switch to the following once
+    # `get_variable(use_resource=True)` has the same semantics as
+    # `tf.contrib.eager.Variable`.
+    #   step_size = tf.get_variable(
+    #       name='step_size',
+    #       initializer=np.array(1e-3, dtype),
+    #       use_resource=True,
+    #       trainable=False)
+    step_size = tf.contrib.eager.Variable(
+        initial_value=np.array(initial_step_size, dtype),
+        name='step_size',
+        trainable=False)
+
+    _, kernel_results = tfp.mcmc.sample_chain(
+        num_results=num_results,
+        num_burnin_steps=0,
+        current_state=0.,
+        kernel=tfp.mcmc.HamiltonianMonteCarlo(
+            target_log_prob_fn=tfd.Normal(0., 1.).log_prob,
+            num_leapfrog_steps=2,
+            step_size=step_size,
+            step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy(
+                num_adaptation_steps=num_adaptation_steps,
+                increment_multiplier=1.,  # double step_size on every accept
+                decrement_multiplier=1.),  # halve step_size on every reject
+            state_gradients_are_stopped=True,
+            seed=_set_seed(252)),
+        parallel_iterations=1)
+
+    init_op = tf.global_variables_initializer()
+    self.evaluate(init_op)
+
+    [_, step_size_] = self.evaluate([
+        kernel_results, kernel_results.extra.step_size_assign])
+
+    # Test that we've incremented the step size every time. This verifies
+    # that adaptation ran on each of the first `num_adaptation_steps` steps.
+    self.assertNear(initial_step_size * 2**num_adaptation_steps,
+                    step_size_[num_adaptation_steps], err=1e-6)
+
+    # Test that the step size does not change after the first
+    # `num_adaptation_steps` steps.
+    self.assertEqual(step_size_[num_adaptation_steps:].min(),
+                     step_size_[num_adaptation_steps:].max())
+
+
 class HMCEMAdaptiveStepSize(tf.test.TestCase):
   """This test verifies that the docstring example works as advertised."""
 
@@ -889,7 +1001,7 @@ class HMCEMAdaptiveStepSize(tf.test.TestCase):
             target_log_prob_fn=unnormalized_posterior_log_prob,
             num_leapfrog_steps=2,
             step_size=step_size,
-            step_size_update_fn=tfp.mcmc.step_size_simple_update,
+            step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy(),
             state_gradients_are_stopped=True,
             seed=_set_seed(252)),
         parallel_iterations=1)
@@ -980,7 +1092,7 @@ class HMCEMAdaptiveStepSize(tf.test.TestCase):
             target_log_prob_fn=unnormalized_log_prob,
             num_leapfrog_steps=2,
             step_size=step_size,
-            step_size_update_fn=tfp.mcmc.step_size_simple_update,
+            step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy(),
             seed=_set_seed(252)),
         parallel_iterations=1)
 

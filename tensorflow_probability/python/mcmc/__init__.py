@@ -21,7 +21,7 @@ from __future__ import print_function
 from tensorflow_probability.python.mcmc.diagnostic import effective_sample_size
 from tensorflow_probability.python.mcmc.diagnostic import potential_scale_reduction
 from tensorflow_probability.python.mcmc.hmc import HamiltonianMonteCarlo
-from tensorflow_probability.python.mcmc.hmc import step_size_simple_update
+from tensorflow_probability.python.mcmc.hmc import make_simple_step_size_update_policy
 from tensorflow_probability.python.mcmc.hmc import UncalibratedHamiltonianMonteCarlo
 from tensorflow_probability.python.mcmc.kernel import TransitionKernel
 from tensorflow_probability.python.mcmc.langevin import MetropolisAdjustedLangevinAlgorithm
@@ -61,7 +61,7 @@ _allowed_symbols = [
     'sample_annealed_importance_chain',
     'sample_chain',
     'sample_halton_sequence',
-    'step_size_simple_update',
+    'make_simple_step_size_update_policy',
 ]
 
 remove_undocumented(__name__, _allowed_symbols)
