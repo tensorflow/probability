@@ -12,10 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 2b3b983... updated new file
 """Trains a Bayesian neural network to classify MNIST digits.
 
 The architecture is LeNet-5 [1].
@@ -27,12 +23,6 @@ The architecture is LeNet-5 [1].
      _Proceedings of the IEEE_, 1998.
      http://yann.lecun.com/exdb/publis/pdf/lecun-01a.pdf
 """
-<<<<<<< HEAD
-=======
-"""Trains a deep Bayesian convolution neural net to classify MNIST digits."""
->>>>>>> c178e38... Updated as bayesian_neural_network with LeNet5
-=======
->>>>>>> 2b3b983... updated new file
 
 from __future__ import absolute_import
 from __future__ import division
@@ -56,13 +46,6 @@ from tensorflow.contrib.learn.python.learn.datasets import mnist
 import warnings
 warnings.simplefilter(action='ignore')
 
-<<<<<<< HEAD
-# TODO(b/78137893): Integration tests currently fail with seaborn imports.
-import warnings
-warnings.simplefilter(action='ignore')
-
-=======
->>>>>>> 74056fa... Added comments
 try:
   import seaborn as sns  # pylint: disable=g-import-not-at-top
   HAS_SEABORN = True
@@ -177,6 +160,7 @@ def plot_heldout_prediction(input_vals, probs,
 
 def build_input_pipeline(mnist_data, batch_size, heldout_size):
   """Build an Iterator switching between train and heldout data."""
+  
   # Build an iterator over training batches.
   training_dataset = tf.data.Dataset.from_tensor_slices(
       (mnist_data.train.images, np.int32(mnist_data.train.labels)))
@@ -233,7 +217,7 @@ def main(argv):
         "Warning: deleting old log directory at {}".format(FLAGS.model_dir))
     tf.gfile.DeleteRecursively(FLAGS.model_dir)
   tf.gfile.MakeDirs(FLAGS.model_dir)
-
+  
   if FLAGS.fake_data:
     mnist_data = build_fake_data()
   else:
@@ -249,15 +233,10 @@ def main(argv):
     # gradients than naive reparameterization.
     with tf.name_scope("bayesian_neural_net", values=[images]):
         neural_net = tf.keras.Sequential([
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 2b3b983... updated new file
                 tfp.layers.Convolution2DFlipout(6, 
                                                 kernel_size=5, 
                                                 padding='SAME', 
                                                 activation=tf.nn.relu),
-<<<<<<< HEAD
                 tf.keras.layers.MaxPooling2D(pool_size=[2, 2],
                                              strides=[2, 2],
                                              padding='SAME'),
@@ -272,41 +251,14 @@ def main(argv):
                                                 kernel_size=5, 
                                                 padding='SAME', 
                                                 activation=tf.nn.relu),
-=======
-                tfp.layers.Convolution2DFlipout(
-                        6, kernel_size=5, padding='SAME', activation=tf.nn.relu),
-=======
->>>>>>> 2b3b983... updated new file
-                tf.keras.layers.MaxPooling2D(pool_size=[2, 2],
-                                             strides=[2, 2],
-                                             padding='SAME'),
-                tfp.layers.Convolution2DFlipout(16, 
-                                                kernel_size=5, 
-                                                padding='SAME', 
-                                                activation=tf.nn.relu),
-                tf.keras.layers.MaxPooling2D(pool_size=[2, 2],
-<<<<<<< HEAD
-                                   strides=[2, 2],
-                                   padding='SAME'),
-                tfp.layers.Convolution2DFlipout(
-                        120, kernel_size=5, padding='SAME', activation=tf.nn.relu),
->>>>>>> c178e38... Updated as bayesian_neural_network with LeNet5
-=======
-                                             strides=[2, 2],
-                                             padding='SAME'),
-                tfp.layers.Convolution2DFlipout(120, 
-                                                kernel_size=5, 
-                                                padding='SAME', 
-                                                activation=tf.nn.relu),
->>>>>>> 2b3b983... updated new file
                 tf.keras.layers.Flatten(),
                 tfp.layers.DenseFlipout(84, activation=tf.nn.relu),
                 tfp.layers.DenseFlipout(10)
                 ])
-
+        
         logits = neural_net(images)
         labels_distribution = tfd.Categorical(logits=logits)
-
+      
     # Compute the -ELBO as the loss, averaged over the batch size.
     neg_log_likelihood = -tf.reduce_mean(labels_distribution.log_prob(labels))
     kl = sum(neural_net.losses) / mnist_data.train.num_examples
@@ -323,18 +275,8 @@ def main(argv):
     names = []
     qmeans = []
     qstds = []
-<<<<<<< HEAD
-<<<<<<< HEAD
     prob_layers = [0, 2, 4, 6, 7]
     for i in prob_layers:
-=======
-    probLayers = [0, 2, 4, 6, 7]
-    for i in probLayers:
->>>>>>> c178e38... Updated as bayesian_neural_network with LeNet5
-=======
-    prob_layers = [0, 2, 4, 6, 7]
-    for i in prob_layers:
->>>>>>> 2b3b983... updated new file
       layer = neural_net.layers[i]
       q = layer.kernel_posterior
       names.append("Layer {}".format(i))
@@ -394,17 +336,5 @@ def main(argv):
                                     .format(heldout_lp))
 
 if __name__ == "__main__":
-<<<<<<< HEAD
-<<<<<<< HEAD
   tf.app.run()
 
-=======
-  tf.app.run()
->>>>>>> c178e38... Updated as bayesian_neural_network with LeNet5
-=======
-  tf.app.run()
-<<<<<<< HEAD
->>>>>>> 74056fa... Added comments
-=======
-
->>>>>>> 2b3b983... updated new file
