@@ -177,7 +177,6 @@ def plot_heldout_prediction(input_vals, probs,
 
 def build_input_pipeline(mnist_data, batch_size, heldout_size):
   """Build an Iterator switching between train and heldout data."""
-  
   # Build an iterator over training batches.
   training_dataset = tf.data.Dataset.from_tensor_slices(
       (mnist_data.train.images, np.int32(mnist_data.train.labels)))
@@ -234,7 +233,7 @@ def main(argv):
         "Warning: deleting old log directory at {}".format(FLAGS.model_dir))
     tf.gfile.DeleteRecursively(FLAGS.model_dir)
   tf.gfile.MakeDirs(FLAGS.model_dir)
-  
+
   if FLAGS.fake_data:
     mnist_data = build_fake_data()
   else:
@@ -304,10 +303,10 @@ def main(argv):
                 tfp.layers.DenseFlipout(84, activation=tf.nn.relu),
                 tfp.layers.DenseFlipout(10)
                 ])
-        
+
         logits = neural_net(images)
         labels_distribution = tfd.Categorical(logits=logits)
-      
+
     # Compute the -ELBO as the loss, averaged over the batch size.
     neg_log_likelihood = -tf.reduce_mean(labels_distribution.log_prob(labels))
     kl = sum(neural_net.losses) / mnist_data.train.num_examples
