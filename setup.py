@@ -32,7 +32,7 @@ REQUIRED_PACKAGES = [
     'numpy <=1.14.5, >=1.13.3',
 ]
 
-REQUIRED_TENSORFLOW_VERSION = '1.9.0'
+REQUIRED_TENSORFLOW_VERSION = '1.10.0'
 
 if '--gpu' in sys.argv:
   use_gpu = True
