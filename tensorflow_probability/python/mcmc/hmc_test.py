@@ -1064,7 +1064,8 @@ class HMCEMAdaptiveStepSize(tf.test.TestCase):
                     weights_prior_estimated_scale_[-5:].mean(),
                     err=0.005)
 
-  @test_util.run_in_graph_and_eager_modes
+  # TODO(b/112427830): Reenable eager tests for TF 1.11 release.
+  @run_in_graph_mode_only()
   def test_step_size_adapts(self):
     dtype = np.float32
 
