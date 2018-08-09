@@ -25,7 +25,11 @@ VERSION = '0.3.0'
 
 REQUIRED_PACKAGES = [
     'six >= 1.10.0',
-    'numpy >= 1.11.1',
+    # Currently numpy>=1.15.0 causes test failures in TensorFlow so they've
+    # constrained to these slightly older versions. Fix is planned for 1.11
+    # release.
+    # TODO(b/112417381): revert this once TF issues are fixed.
+    'numpy <=1.14.5, >=1.13.3',
 ]
 
 REQUIRED_TENSORFLOW_VERSION = '1.9.0'
