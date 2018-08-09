@@ -49,10 +49,13 @@ from tensorflow.contrib.learn.python.learn.datasets import mnist
 import warnings
 warnings.simplefilter(action='ignore')
 
+<<<<<<< HEAD
 # TODO(b/78137893): Integration tests currently fail with seaborn imports.
 import warnings
 warnings.simplefilter(action='ignore')
 
+=======
+>>>>>>> 74056fa... Added comments
 try:
   import seaborn as sns  # pylint: disable=g-import-not-at-top
   HAS_SEABORN = True
@@ -361,8 +364,12 @@ def main(argv):
 
 if __name__ == "__main__":
 <<<<<<< HEAD
+<<<<<<< HEAD
   tf.app.run()
 
 =======
   tf.app.run()
 >>>>>>> c178e38... Updated as bayesian_neural_network with LeNet5
+=======
+  tf.app.run()
+>>>>>>> 74056fa... Added comments
