@@ -822,8 +822,7 @@ class HMCAdaptiveStepSize(tf.test.TestCase):
     random_seed.set_random_seed(10014)
     np.random.seed(10014)
 
-  # TODO(b/112427830): Reenable eager tests for TF 1.11 release.
-  @run_in_graph_mode_only()
+  @test_util.run_in_graph_and_eager_modes()
   def test_multiple_step_sizes(self):
     num_results = 5
     initial_step_sizes = [1e-5, 1e-4]
@@ -842,6 +841,10 @@ class HMCAdaptiveStepSize(tf.test.TestCase):
         initial_value=np.array(initial_step_size, dtype),
         name='step_size',
         trainable=False) for initial_step_size in initial_step_sizes]
+    step_counter = tf.contrib.eager.Variable(
+        name='step_size_adaptation_step_counter1',
+        initial_value=np.array(-1, dtype=np.int32),
+        trainable=False)
 
     def target_log_prob_fn(x1, x2):
       return tf.reduce_sum(tfd.Normal(0., 1.).log_prob([x1, x2]))
@@ -854,7 +857,8 @@ class HMCAdaptiveStepSize(tf.test.TestCase):
             target_log_prob_fn=target_log_prob_fn,
             num_leapfrog_steps=2,
             step_size=step_size,
-            step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy(),
+            step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy(
+                step_counter=step_counter),
             state_gradients_are_stopped=True,
             seed=_set_seed(252)),
         parallel_iterations=1)
@@ -869,8 +873,7 @@ class HMCAdaptiveStepSize(tf.test.TestCase):
     self.assertNear(step_size_[0][0]/step_size_[1][0],
                     step_size_[0][-1]/step_size_[1][-1], err=1e-4)
 
-  # TODO(b/112427830): Reenable eager tests for TF 1.11 release.
-  @run_in_graph_mode_only()
+  @test_util.run_in_graph_and_eager_modes()
   def test_finite_adaptation(self):
 
     # Test that the adaptation runs for the specified number of steps.
@@ -894,19 +897,24 @@ class HMCAdaptiveStepSize(tf.test.TestCase):
         initial_value=np.array(initial_step_size, dtype),
         name='step_size',
         trainable=False)
+    step_counter = tf.contrib.eager.Variable(
+        name='step_size_adaptation_step_counter2',
+        initial_value=np.array(-1, dtype=np.int32),
+        trainable=False)
 
     _, kernel_results = tfp.mcmc.sample_chain(
         num_results=num_results,
         num_burnin_steps=0,
-        current_state=0.,
+        current_state=tf.constant(0.),
         kernel=tfp.mcmc.HamiltonianMonteCarlo(
-            target_log_prob_fn=tfd.Normal(0., 1.).log_prob,
+            target_log_prob_fn=lambda x: tfd.Normal(0., 1.).log_prob(x),
             num_leapfrog_steps=2,
             step_size=step_size,
             step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy(
                 num_adaptation_steps=num_adaptation_steps,
                 increment_multiplier=1.,  # double step_size on every accept
-                decrement_multiplier=1.),  # halve step_size on every reject
+                decrement_multiplier=1.,  # halve step_size on every reject
+                step_counter=step_counter),
             state_gradients_are_stopped=True,
             seed=_set_seed(252)),
         parallel_iterations=1)
@@ -1064,8 +1072,7 @@ class HMCEMAdaptiveStepSize(tf.test.TestCase):
                     weights_prior_estimated_scale_[-5:].mean(),
                     err=0.005)
 
-  # TODO(b/112427830): Reenable eager tests for TF 1.11 release.
-  @run_in_graph_mode_only()
+  @test_util.run_in_graph_and_eager_modes()
   def test_step_size_adapts(self):
     dtype = np.float32
 
