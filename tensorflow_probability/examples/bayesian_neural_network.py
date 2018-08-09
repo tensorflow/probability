@@ -89,7 +89,7 @@ FLAGS = flags.FLAGS
 
 def plot_weight_posteriors(names, qm_vals, qs_vals, fname):
   """Save a PNG plot with histograms of weight means and stddevs.
-  
+
   Args:
     names: A Python `iterable` of `str` variable names.
     qm_vals: A Python `iterable`, the same length as `names`,
@@ -124,7 +124,7 @@ def plot_weight_posteriors(names, qm_vals, qs_vals, fname):
 def plot_heldout_prediction(input_vals, probs,
                             fname, n=10, title=""):
   """Save a PNG plot visualizing posterior uncertainty on heldout data.
-  
+
   Args:
     input_vals: A `float`-like Numpy `array` of shape
       `[num_heldout] + IMAGE_SHAPE`, containing heldout input images.
@@ -160,6 +160,7 @@ def plot_heldout_prediction(input_vals, probs,
 
 def build_input_pipeline(mnist_data, batch_size, heldout_size):
   """Build an Iterator switching between train and heldout data."""
+  
   # Build an iterator over training batches.
   training_dataset = tf.data.Dataset.from_tensor_slices(
       (mnist_data.train.images, np.int32(mnist_data.train.labels)))
@@ -318,7 +319,7 @@ def main(argv):
           heldout_lp = np.mean(np.log(mean_probs[np.arange(mean_probs.shape[0]),
                                                  label_vals.flatten()]))
           print(" ... Held-out nats: {:.3f}".format(heldout_lp))
-          
+
           qm_vals, qs_vals = sess.run((qmeans, qstds))
 
           if HAS_SEABORN:
