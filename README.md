@@ -163,7 +163,7 @@ environment.
 * [TensorFlow Blog](https://medium.com/tensorflow): Stay up to date on content
   from the TensorFlow team and best articles from the community.
 * [Youtube Channel](http://youtube.com/tensorflow/): Follow TensorFlow shows.
-* Mailing list: Stay tuned!
+* [tfprobability@tensorflow.org](https://groups.google.com/a/tensorflow.org/forum/#!forum/tfprobability) Open mailing list for discussion and questions.
 
 See the [TensorFlow Community](https://www.tensorflow.org/community/) page for
 more details. Check out our latest publicity here:
