@@ -47,16 +47,91 @@ class InterceptorTest(parameterized.TestCase, tf.test.TestCase):
     self.assertEqual(rv2_value, value)
 
   @tfe.run_test_in_graph_and_eager_modes()
+  def testTrivialInterceptorPreservesLogJoint(self):
+    def trivial_interceptor(fn, *args, **kwargs):
+      # An interceptor that does nothing.
+      return ed.interceptable(fn)(*args, **kwargs)
+
+    def model():
+      return ed.Normal(0., 1., name="x")
+
+    def transformed_model():
+      with ed.interception(trivial_interceptor):
+        model()
+
+    log_joint = ed.make_log_joint_fn(model)
+    log_joint_transformed = ed.make_log_joint_fn(transformed_model)
+    self.assertEqual(self.evaluate(log_joint(x=5.)),
+                     self.evaluate(log_joint_transformed(x=5.)))
+
+  @tfe.run_test_in_graph_and_eager_modes()
+  def testInterceptionForwarding(self):
+    def double(f, *args, **kwargs):
+      return 2. * ed.interceptable(f)(*args, **kwargs)
+
+    def set_xy(f, *args, **kwargs):
+      if kwargs.get("name") == "x":
+        kwargs["value"] = 1.
+      if kwargs.get("name") == "y":
+        kwargs["value"] = 0.42
+      return ed.interceptable(f)(*args, **kwargs)
+
+    def model():
+      x = ed.Normal(loc=0., scale=1., name="x")
+      y = ed.Normal(loc=x, scale=1., name="y")
+      return x + y
+
+    with ed.interception(set_xy):
+      with ed.interception(double):
+        z = model()
+
+    value = 2. * 1. + 2. * 0.42
+    z_value = self.evaluate(z)
+    self.assertAlmostEqual(z_value, value, places=5)
+
+  @tfe.run_test_in_graph_and_eager_modes()
+  def testInterceptionNonForwarding(self):
+    def double(f, *args, **kwargs):
+      self.assertEqual("yes", "no")
+      return 2. * f(*args, **kwargs)
+
+    def set_xy(f, *args, **kwargs):
+      if kwargs.get("name") == "x":
+        kwargs["value"] = 1.
+      if kwargs.get("name") == "y":
+        kwargs["value"] = 0.42
+      return f(*args, **kwargs)
+
+    def model():
+      x = ed.Normal(loc=0., scale=1., name="x")
+      y = ed.Normal(loc=x, scale=1., name="y")
+      return x + y
+
+    with ed.interception(double):
+      with ed.interception(set_xy):
+        z = model()
+
+    value = 1. + 0.42
+    z_value = self.evaluate(z)
+    self.assertAlmostEqual(z_value, value, places=5)
+
+  @tfe.run_test_in_graph_and_eager_modes()
   def testInterceptionException(self):
     def f():
       raise NotImplementedError()
     def interceptor(f, *fargs, **fkwargs):
       return f(*fargs, **fkwargs)
-    old_interceptor = ed.get_interceptor()
+
+    with ed.get_next_interceptor() as top_interceptor:
+      old_interceptor = top_interceptor
+
     with self.assertRaises(NotImplementedError):
       with ed.interception(interceptor):
         f()
-    new_interceptor = ed.get_interceptor()
+
+    with ed.get_next_interceptor() as top_interceptor:
+      new_interceptor = top_interceptor
+
     self.assertEqual(old_interceptor, new_interceptor)
 
 
