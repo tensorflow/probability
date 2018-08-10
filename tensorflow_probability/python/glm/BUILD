@@ -32,6 +32,7 @@ py_library(
     deps = [
         ":family",
         ":fisher_scoring",
+        ":proximal_hessian",
     ],
 )
 
@@ -50,6 +51,28 @@ py_test(
     name = "fisher_scoring_test",
     size = "small",
     srcs = ["fisher_scoring_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "proximal_hessian",
+    srcs = ["proximal_hessian.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":util",
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "proximal_hessian_test",
+    size = "large",
+    srcs = ["proximal_hessian_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
