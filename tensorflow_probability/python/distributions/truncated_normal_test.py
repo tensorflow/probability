@@ -281,9 +281,19 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase,
           scale, scale.shape, empirical_abs_mean, [1],
           x_init_value=scale.eval(),
           init_targets=[tf.global_variables_initializer()], delta=0.1)
+      low_err = tf.test.compute_gradient_error(
+          low, low.shape, empirical_abs_mean, [1],
+          x_init_value=low.eval(),
+          init_targets=[tf.global_variables_initializer()], delta=0.1)
+      high_err = tf.test.compute_gradient_error(
+          high, high.shape, empirical_abs_mean, [1],
+          x_init_value=high.eval(),
+          init_targets=[tf.global_variables_initializer()], delta=0.1)
       # These gradients are noisy due to sampling.
       self.assertLess(loc_err, 0.05)
       self.assertLess(scale_err, 0.05)
+      self.assertLess(low_err, 0.05)
+      self.assertLess(high_err, 0.05)
 
   @parameterized.parameters(
       itertools.product((np.float32, np.float64),

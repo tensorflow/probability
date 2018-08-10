@@ -42,9 +42,9 @@ class TruncatedNormal(tf.distributions.Distribution):
   The truncated normal is a normal distribution bounded between `low`
   and `high` (the pdf is 0 outside these bounds and renormalized).
 
-  Samples from this distribution are differentiable with respect to
-  `loc` and `scale` but not `low` and `high`, i.e., this distribution is
-  partially reparameterizeable.
+  Samples from this distribution are differentiable with respect to `loc`,
+  `scale` as well as the bounds, `low` and `high`, i.e., this
+  implementation is fully reparameterizeable.
 
   For more details, see [here](
   https://en.wikipedia.org/wiki/Truncated_normal_distribution).
@@ -54,7 +54,7 @@ class TruncatedNormal(tf.distributions.Distribution):
   The probability density function (pdf) of this distribution is:
   ```none
     pdf(x; loc, scale, low, high) =
-        { (2 pi)**(-0.5) exp(-0.5 y) / (scale z) for low <= x <= high
+        { (2 pi)**(-0.5) exp(-0.5 y**2) / (scale * z) for low <= x <= high
         { 0                                    otherwise
     y = (x - loc)/scale
     z = NormalCDF((high - loc) / scale) - NormalCDF((lower - loc) / scale)
@@ -63,7 +63,7 @@ class TruncatedNormal(tf.distributions.Distribution):
   where:
 
   * `NormalCDF` is the cumulative density function of the Normal distribution
-    with 0. mean and unit variance.
+    with 0 mean and unit variance.
 
   This is a scalar distribution so the event shape is always scalar and the
   dimensions of the parameters defined the batch_shape.
@@ -143,12 +143,14 @@ class TruncatedNormal(tf.distributions.Distribution):
 
     super(TruncatedNormal, self).__init__(
         dtype=dtype,
-        # This distribution is partial reparameterized. loc, scale have straight
-        # through gradients but not the bounds.
-        # TODO(mfigurnov): This could be extended to use implicit gradients to
-        # compute derivatives for the bounds.
-        # https://arxiv.org/pdf/1806.01851.pdf
-        reparameterization_type=tf.distributions.NOT_REPARAMETERIZED,
+        # This distribution is fully reparameterized. loc, scale have straight
+        # through gradients. The gradients for the bounds are implemented using
+        # custom derived expressions based on implicit gradients.
+        # For the special case of lower bound zero and a positive upper bound
+        # an equivalent expression can also be found in Sec 9.1.1.
+        # of https://arxiv.org/pdf/1806.01851.pdf. The implementation here
+        # handles arbitrary bounds.
+        reparameterization_type=tf.distributions.FULLY_REPARAMETERIZED,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
         parameters=parameters,
@@ -234,14 +236,57 @@ class TruncatedNormal(tf.distributions.Distribution):
     # unit variance and mean and scale (but with the standardized
     # truncation bounds).
 
-    std_samples = random_ops.parameterized_truncated_normal(
-        shape=flat_batch_and_sample_shape,
-        means=0.0,
-        stddevs=1.0,
-        minvals=tf.reshape(self._standardized_low, [-1]),
-        maxvals=tf.reshape(self._standardized_high, [-1]),
-        dtype=self.dtype,
-        seed=seed)
+    @tf.custom_gradient
+    def _std_samples_with_gradients(lower, upper):
+      """Standard truncated Normal with gradient support for low, high."""
+      std_samples = random_ops.parameterized_truncated_normal(
+          shape=flat_batch_and_sample_shape,
+          means=0.0,
+          stddevs=1.0,
+          minvals=lower,
+          maxvals=upper,
+          dtype=self.dtype,
+          seed=seed)
+
+      def grad(dy):
+        """Computes a derivative for the min and max parameters.
+
+        This function implements the derivative wrt the truncation bounds, which
+        get blocked by the sampler. We use a custom expression for numerical
+        stability instead of automatic differentiation on CDF for implicit
+        gradients.
+
+        Args:
+          dy: output gradients
+
+        Returns:
+           The standard normal samples and the gradients wrt the upper
+           bound and lower bound.
+        """
+        cdf_samples = ((special_math.ndtr(std_samples) -
+                        special_math.ndtr(lower)) /
+                       (special_math.ndtr(upper) - special_math.ndtr(lower)))
+
+        # tiny, eps are tolerance parameters to ensure we stay away from giving
+        # a zero arg to the log CDF expression.
+
+        tiny = np.finfo(self.dtype.as_numpy_dtype).tiny
+        eps = np.finfo(self.dtype.as_numpy_dtype).eps
+        cdf_samples = tf.clip_by_value(cdf_samples, tiny, 1 - eps)
+
+        du = tf.exp(0.5 * (std_samples**2 - upper**2) + tf.log(cdf_samples))
+        dl = tf.exp(0.5 * (std_samples**2 - lower**2) + tf.log(1 - cdf_samples))
+
+        # Reduce the gradient across the samples
+        grad_u = tf.reduce_sum(dy * du, axis=-1)
+        grad_l = tf.reduce_sum(dy * dl, axis=-1)
+        return [grad_l, grad_u]
+
+      return std_samples, grad
+
+    std_samples = _std_samples_with_gradients(
+        tf.reshape(self._standardized_low, [-1]),
+        tf.reshape(self._standardized_high, [-1]))
 
     # The returned shape is [flat_batch x n]
     std_samples = tf.transpose(std_samples, [1, 0])
