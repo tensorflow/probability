@@ -32,7 +32,7 @@ class ProgramTransformationsTest(tf.test.TestCase):
   @tfe.run_test_in_graph_and_eager_modes()
   def testMakeLogJointFnUnconditional(self):
     """Test `make_log_joint_fn` on unconditional Edward program."""
-    def model():
+    def normal_with_unknown_mean():
       loc = ed.Normal(loc=0., scale=1., name="loc")
       x = ed.Normal(loc=loc, scale=0.5, sample_shape=5, name="x")
       return x
@@ -45,7 +45,7 @@ class ProgramTransformationsTest(tf.test.TestCase):
     loc_value = 0.3
     x_value = tf.random_normal([5])
 
-    log_joint = ed.make_log_joint_fn(model)
+    log_joint = ed.make_log_joint_fn(normal_with_unknown_mean)
     actual_log_prob = true_log_joint(loc_value, x_value)
     expected_log_prob = log_joint(loc=loc_value, x=x_value)
 
@@ -59,7 +59,7 @@ class ProgramTransformationsTest(tf.test.TestCase):
   @tfe.run_test_in_graph_and_eager_modes()
   def testMakeLogJointFnConditional(self):
     """Test `make_log_joint_fn` on conditional Edward program."""
-    def model(features, prior_precision):
+    def linear_regression(features, prior_precision):
       w = ed.Normal(loc=0.,
                     scale=tf.rsqrt(prior_precision),
                     sample_shape=features.shape[1],
@@ -83,7 +83,7 @@ class ProgramTransformationsTest(tf.test.TestCase):
           scale=1.).log_prob(y))
       return log_prob
 
-    log_joint = ed.make_log_joint_fn(model)
+    log_joint = ed.make_log_joint_fn(linear_regression)
     actual_log_prob = true_log_joint(
         features, prior_precision, w_value, y_value)
     expected_log_prob = log_joint(
@@ -109,7 +109,7 @@ class ProgramTransformationsTest(tf.test.TestCase):
       # Don't run test in graph mode.
       return
 
-    def model():
+    def mixture_of_real_and_int():
       loc = ed.Normal(loc=0., scale=1., name="loc")
       flip = ed.Bernoulli(probs=0.5, name="flip")
       if tf.equal(flip, 1):
@@ -132,7 +132,7 @@ class ProgramTransformationsTest(tf.test.TestCase):
     flip_value = tf.constant(1)
     x_value = tf.random_normal([5])
 
-    log_joint = ed.make_log_joint_fn(model)
+    log_joint = ed.make_log_joint_fn(mixture_of_real_and_int)
     actual_log_prob = true_log_joint(loc_value, flip_value, x_value)
     expected_log_prob = log_joint(loc=loc_value, flip=flip_value, x=x_value)
 
@@ -179,7 +179,7 @@ class ProgramTransformationsTest(tf.test.TestCase):
   @tfe.run_test_in_graph_and_eager_modes()
   def testMakeLogJointFnError(self):
     """Test `make_log_joint_fn` raises errors when `name`(s) not supplied."""
-    def model():
+    def normal_with_unknown_mean():
       loc = ed.Normal(loc=0., scale=1., name="loc")
       x = ed.Normal(loc=loc, scale=0.5, sample_shape=5)
       return x
@@ -187,7 +187,7 @@ class ProgramTransformationsTest(tf.test.TestCase):
     loc_value = 0.3
     x_value = tf.random_normal([5])
 
-    log_joint = ed.make_log_joint_fn(model)
+    log_joint = ed.make_log_joint_fn(normal_with_unknown_mean)
 
     with self.assertRaises(KeyError):
       _ = log_joint(loc=loc_value, x=x_value)
