@@ -5,6 +5,9 @@ extends the TensorFlow ecosystem so that one can declare models as
 probabilistic programs and manipulate a model's computation for flexible
 training, latent variable inference, and predictions.
 
+Are you upgrading from Edward? Check out the guide
+[`Upgrading_from_Edward_to_Edward2.md`]((https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/edward2/Upgrading_from_Edward_to_Edward2.md)).
+
 ## 1. Models as Probabilistic Programs
 
 ### Random Variables
