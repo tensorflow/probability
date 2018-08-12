@@ -6,7 +6,7 @@ probabilistic programs and manipulate a model's computation for flexible
 training, latent variable inference, and predictions.
 
 Are you upgrading from Edward? Check out the guide
-[`Upgrading_from_Edward_to_Edward2.md`]((https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/edward2/Upgrading_from_Edward_to_Edward2.md)).
+["Upgrading_from_Edward_to_Edward2"](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/edward2/Upgrading_From_Edward_To_Edward2.md).
 
 ## 1. Models as Probabilistic Programs
 
@@ -15,8 +15,8 @@ Are you upgrading from Edward? Check out the guide
 In Edward2, we use
 [`RandomVariables`](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/edward2/random_variable.py)
 to specify a probabilistic model's structure.
-A random variable `rv` carries a probability distribution (`rv.distribution`).
-It is a TensorFlow Distribution instance governing the random variable's methods
+A random variable `rv` carries a probability distribution (`rv.distribution`),
+which is a TensorFlow Distribution instance governing the random variable's methods
 such as `log_prob` and `sample`.
 
 Random variables are formed like TensorFlow Distributions.
@@ -35,9 +35,9 @@ dirichlet_rv = ed.Dirichlet(concentration=tf.ones([2, 10]))
 
 By default, instantiating a random variable `rv` creates a sampling op to form
 the tensor `rv.value ~ rv.distribution.sample()`. The default number of samples
-(`sample_shape`) is one, and if the optional `value` argument is provided, no
-sampling op is created. Random variables can also operate with TensorFlow ops:
-they operate on the sample.
+(controllable via the `sample_shape` argument to `rv`) is one, and if the
+optional `value` argument is provided, no sampling op is created. Random
+variables can interoperate with TensorFlow ops: the TF ops operate on the sample.
 
 ```python
 x = ed.Normal(loc=tf.zeros(10), scale=tf.ones(10))
@@ -60,7 +60,10 @@ function can be thought of as values the model conditions on.
 
 Below we write Bayesian logistic regression, where binary outcomes are generated
 given features, coefficients, and an intercept. There is a prior over the
-coefficients and intercept.
+coefficients and intercept. Executing the function adds operations to the
+TensorFlow graph, and asking for the result node in a TensorFlow session will
+sample coefficients and intercept from the prior, and use these samples to
+compute the outcomes.
 
 ```python
 def logistic_regression(features):
@@ -72,12 +75,13 @@ def logistic_regression(features):
       name="outcomes")
   return outcomes
 
-features = tf.random_normal([100, 55])
+num_features = 10
+features = tf.random_normal([100, num_features])
 outcomes = logistic_regression(features)
 
 # Execute the model program, returning a sample np.ndarray of shape (100,).
 with tf.Session() as sess:
-  sess.run(outcomes)
+  outcomes_ = sess.run(outcomes)
 ```
 
 Edward2 programs can also represent distributions beyond those which directly
@@ -89,29 +93,31 @@ import tensorflow_probability as tfp
 
 def logistic_regression_posterior(num_features):
   """Posterior of Bayesian logistic regression p(w, b | {x, y})."""
-  coeffs = ed.MultivariateNormalTriL(
+  posterior_coeffs = ed.MultivariateNormalTriL(
       loc=tf.get_variable("coeffs_loc", [num_features]),
       scale_tril=tfp.trainable_distributions.tril_with_diag_softplus_and_shift(
           tf.get_variable("coeffs_scale", [num_features*(num_features+1) / 2])),
       name="coeffs_posterior")
-  intercept = ed.Normal(
+  posterior_intercept = ed.Normal(
       loc=tf.get_variable("intercept_loc", []),
       scale=tfp.trainable_distributions.softplus_and_shift(
           tf.get_variable("intercept_scale", [])),
       name="intercept_posterior")
   return coeffs, intercept
 
-num_features = features.shape[-1]
 coeffs, intercept = logistic_regression_posterior(num_features)
 
-# Execute the variational program, returning a sample
+# Execute the program, returning a sample
 # (np.ndarray of shape (55,), np.ndarray of shape ()).
 with tf.Session() as sess:
   sess.run(tf.global_variables_initializer())
-  sess.run([coeffs, intercept])
+  posterior_coeffs_, posterior_intercept_ = sess.run(
+      [posterior_coeffs, posterior_intercept])
 ```
 
-For an example using a variational program, see the
+Note the use of [`tfp.trainable_distributions`](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/trainable_distributions.py) in the above example. These are convenience wrappers around distributions where the parameters need to live in the constrained space (like the scale of a multivariate normal), which take unconstrained TensorFlow variables as input and handle constraint maintenance automatically.
+
+For a full example of the technique as a variational program, see the
 [probabilistic PCA tutorial](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Probabilistic_PCA.ipynb).
 
 ## 2. Manipulating Model Computation
@@ -119,9 +125,7 @@ For an example using a variational program, see the
 ### Interceptors
 
 Training and testing probabilistic models typically require more than just
-samples from the generative process. To enable flexible training and testing, we
-manipulate the model's computation using
-[`interceptors`](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/edward2/interceptor.py).
+samples from the generative process. To enable flexible training and testing, we manipulate the model's computation using [`interceptors`](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/edward2/interceptor.py).
 
 An interceptor is a function that acts on another function `f` and its arguments
 `*args`, `**kwargs`. It performs various computations before returning an output
@@ -139,16 +143,18 @@ def set_prior_to_posterior_mean(f, *args, **kwargs):
   """Forms posterior predictions, setting each prior to its posterior mean."""
   name = kwargs.get("name")
   if name == "coeffs":
-    return coeffs.distribution.mean()  # posterior mean; requires `coeffs` above
+    return posterior_coeffs.distribution.mean()
   elif name == "intercept":
-    return intercept.distribution.mean()  # posterior mean; requires `intercept` above
+    return posterior_intercept.distribution.mean()
   return f(*args, **kwargs)
 
 with ed.interception(set_prior_to_posterior_mean):
   predictions = logistic_regression(features)
 
-training_accuracy, _ = tf.metrics.accuracy(predictions.distribution.mode(),
-                                           outcomes)
+
+training_accuracy = (
+    tf.reduce_sum(tf.cast(tf.equal(predictions, outcomes), tf.float32)) /
+    tf.cast(tf.shape(outcomes), tf.float32))
 ```
 
 ### Program Transformations
@@ -161,6 +167,20 @@ For example, Markov chain Monte Carlo algorithms often require a model's
 log-joint probability function as input. Below we take the Bayesian logistic
 regression program which specifies a generative process, and apply the built-in
 `ed.make_log_joint` transformation to obtain its log-joint probability function.
+In this example, `ed.make_log_joint` takes as argument the generative program
+`logistic_regression` and returns a new function which takes as argument the 
+union of the arguments to the generative program and the random variables created
+by the generative program. In our example, `make_log_joint_fn` returns a function
+taking `features`, `coeffs`, `intercept` and `outcomes` as arguments. The returned 
+function computes the log joint probability of the model with the given values
+of the inputs and random variables (any random variable not passed
+in as an argument is sampled from the model.)
+
+In our example, `features` and `outcomes` are fixed, and we want to use
+Hamiltonian Monte Carlo to draw samples from the posterior distribution for
+`coeffs` and `intercept`. To this use, we create `target_log_prob_fn`, which
+takes just `coeffs` and `intercept` as arguments and pins the input `features`
+and output rv `outcomes` to its known values.
 
 ```python
 import tensorflow_probability as tfp
@@ -183,12 +203,17 @@ hmc_kernel = tfp.mcmc.HamiltonianMonteCarlo(
     target_log_prob_fn=target_log_prob_fn,
     step_size=0.1,
     num_leapfrog_steps=5)
-states, kernels_results = tfp.mcmc.sample_chain(
+states, kernel_results = tfp.mcmc.sample_chain(
     num_results=1000,
     current_state=[tf.random_normal([55]), tf.random_normal([])],
     kernel=hmc_kernel,
     num_burnin_steps=500)
+
+with tf.Session() as sess:
+  states_, results_ = sess.run([states, kernels_results])
 ```
+The returned `states_[0]` and `states[1]` contain 1,000 samples from the posterior distribution for `coeffs` and `intercept` respectively. They may be used, for example, or to evaluate the model's posterior predictive on new data.
+
 
 ## Examples
 
