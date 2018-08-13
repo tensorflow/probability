@@ -81,6 +81,11 @@ class GammaGamma(tf.distributions.Distribution):
   See:
     http://www.brucehardie.com/notes/025/gamma_gamma.pdf
 
+  Samples of this distribution are reparameterized as samples of the Gamma
+  distribution are reparameterized using the technique described in the paper
+
+  [Michael Figurnov, Shakir Mohamed, Andriy Mnih.
+  Implicit Reparameterization Gradients, 2018](https://arxiv.org/abs/1805.08498)
   """
 
   def __init__(self,
@@ -139,7 +144,7 @@ class GammaGamma(tf.distributions.Distribution):
         dtype=self._concentration.dtype,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
-        reparameterization_type=tf.distributions.NOT_REPARAMETERIZED,
+        reparameterization_type=tf.distributions.FULLY_REPARAMETERIZED,
         parameters=parameters,
         graph_parents=[
             self._concentration, self._mixing_concentration, self._mixing_rate
