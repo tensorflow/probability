@@ -34,7 +34,7 @@ from tensorflow.python.eager import context
 from tensorflow.python.framework import random_seed
 from tensorflow.python.framework import test_util
 
-
+tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
@@ -775,14 +775,24 @@ class _HMCHandlesLists(object):
     def target_log_prob(x, y):
       return dist_x.log_prob(x) + dist_y.log_prob(y)
     x0 = [dist_x.sample(seed=_set_seed(61)), dist_y.sample(seed=_set_seed(62))]
-    samples, kernel_results = tfp.mcmc.sample_chain(
-        num_results=1500,
+    kernel = tfp.mcmc.HamiltonianMonteCarlo(
+        target_log_prob_fn=target_log_prob,
+        step_size=1.,
+        num_leapfrog_steps=1,
+        seed=_set_seed(49))
+    # We are using bijectors to sample from a transformed density defined on
+    # an unbounded domain. The samples returned are from the original bounded
+    # domain.
+    unconstraining_bijectors = [
+        tfb.Identity(),      # Maps R to R.
+        tfb.Exp(),           # Maps R to a positive real.
+    ]
+    transformed_kernel = tfp.mcmc.TransformedTransitionKernel(
+        inner_kernel=kernel, bijector=unconstraining_bijectors)
+    samples, _ = tfp.mcmc.sample_chain(
+        num_results=2000,
         current_state=x0,
-        kernel=tfp.mcmc.HamiltonianMonteCarlo(
-            target_log_prob_fn=target_log_prob,
-            step_size=0.5,
-            num_leapfrog_steps=3,
-            seed=_set_seed(49)),
+        kernel=transformed_kernel,
         num_burnin_steps=500,
         parallel_iterations=1)
     actual_means = [tf.reduce_mean(s, axis=0) for s in samples]
@@ -794,16 +804,12 @@ class _HMCHandlesLists(object):
         actual_vars_,
         expected_means_,
         expected_vars_,
-        is_accepted_,
     ] = self.evaluate([
         actual_means,
         actual_vars,
         expected_means,
         expected_vars,
-        kernel_results.is_accepted,
     ])
-    # Assert acceptance rate is asymptotically optimal.
-    self.assertNear(0.651, np.mean(is_accepted_), err=0.05)
     self.assertAllClose(expected_means_, actual_means_, atol=0.07, rtol=0.16)
     self.assertAllClose(expected_vars_, actual_vars_, atol=0., rtol=0.5)
 

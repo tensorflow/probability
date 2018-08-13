@@ -170,7 +170,7 @@ class TransformedTransitionKernel(TransitionKernel):
         `inner_kernel` state space to the state expected by
         `inner_kernel.target_log_prob_fn`.
       name: Python `str` name prefixed to Ops created by this function.
-        Default value: `None` (i.e., "hmc_kernel").
+        Default value: `None` (i.e., "transformed_kernel").
 
     Returns:
       transformed_kernel: Instance of `TransitionKernel` which copies the input
@@ -180,7 +180,7 @@ class TransformedTransitionKernel(TransitionKernel):
     self._parameters = dict(
         inner_kernel=inner_kernel,
         bijector=bijector,
-        name=name)
+        name=name or 'transformed_kernel')
     inner_kernel_kwargs = inner_kernel.parameters
     target_log_prob_fn = inner_kernel_kwargs['target_log_prob_fn']
     self._forward_transform = forward_transform_fn(bijector)

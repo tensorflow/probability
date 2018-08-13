@@ -62,7 +62,7 @@ class LangevinTest(tf.test.TestCase):
   def testLangevin3DNormal(self):
     """Sampling from a 3-D Multivariate Normal distribution."""
     dtype = np.float32
-    true_mean = dtype([0, 0, 0])
+    true_mean = dtype([1, 2, 7])
     true_cov = dtype([[1, 0.25, 0.25], [0.25, 1, 0.25], [0.25, 0.25, 1]])
     num_results = 500
     num_chains = 500
@@ -75,7 +75,7 @@ class LangevinTest(tf.test.TestCase):
       # Then the target log-density is defined as follows:
       def target_log_prob(x, y):
         # Stack the input tensors together
-        z = tf.concat([x, y], axis=-1) - true_mean
+        z = tf.concat([x, y], axis=-1)
         return target.log_prob(z)
 
       # Initial state of the chain
@@ -110,7 +110,7 @@ class LangevinTest(tf.test.TestCase):
   def testLangevin3DNormalDynamicVolatility(self):
     """Sampling from a 3-D Multivariate Normal distribution."""
     dtype = np.float32
-    true_mean = dtype([0, 0, 0])
+    true_mean = dtype([1, 2, 7])
     true_cov = dtype([[1, 0.25, 0.25], [0.25, 1, 0.25], [0.25, 0.25, 1]])
     num_results = 500
     num_chains = 500
@@ -123,7 +123,7 @@ class LangevinTest(tf.test.TestCase):
       # Then the target log-density is defined as follows:
       def target_log_prob(x, y):
         # Stack the input tensors together
-        z = tf.concat([x, y], axis=-1) - true_mean
+        z = tf.concat([x, y], axis=-1)
         return target.log_prob(z)
 
       # Here we define the volatility function to be non-caonstant
@@ -167,7 +167,7 @@ class LangevinTest(tf.test.TestCase):
     """Check that the gradient of the volatility is computed correctly."""
     # Consider the example target distribution as in `testLangevin3DNormal`
     dtype = np.float32
-    true_mean = dtype([0, 0, 0])
+    true_mean = dtype([1, 2, 7])
     true_cov = dtype([[1, 0.25, 0.25], [0.25, 1, 0.25], [0.25, 0.25, 1]])
     num_chains = 100
 
@@ -176,7 +176,7 @@ class LangevinTest(tf.test.TestCase):
 
     def target_log_prob(x, y):
       # Stack the input tensors together
-      z = tf.concat([x, y], axis=-1) - true_mean
+      z = tf.concat([x, y], axis=-1)
       return target.log_prob(z)
 
     def volatility_fn(x, y):
