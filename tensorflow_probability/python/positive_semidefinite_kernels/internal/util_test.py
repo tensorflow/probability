@@ -21,9 +21,8 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 import tensorflow as tf
-import tensorflow_probability as tfp
 
-util = tfp.positive_semidefinite_kernels.util
+from tensorflow_probability.python.positive_semidefinite_kernels.internal import util
 
 
 class UtilTest(tf.test.TestCase):

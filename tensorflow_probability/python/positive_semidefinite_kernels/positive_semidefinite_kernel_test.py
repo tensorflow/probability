@@ -25,8 +25,9 @@ from absl.testing import parameterized
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.positive_semidefinite_kernels.internal import util as kernels_util
+
 kernels_lib = tfp.positive_semidefinite_kernels
-kernels_util = tfp.positive_semidefinite_kernels.util
 
 
 class IncompletelyDefinedKernel(kernels_lib.PositiveSemidefiniteKernel):

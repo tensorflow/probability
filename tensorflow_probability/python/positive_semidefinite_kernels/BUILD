@@ -30,7 +30,7 @@ py_library(
         ":exponentiated_quadratic",
         ":matern",
         ":positive_semidefinite_kernel",
-        ":util",
+        "//tensorflow_probability/python/positive_semidefinite_kernels/internal",
     ],
 )
 
@@ -109,24 +109,6 @@ py_test(
     srcs = ["matern_test.py"],
     deps = [
         # absl/testing:parameterized dep,
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-    ],
-)
-
-py_library(
-    name = "util",
-    srcs = ["util.py"],
-    deps = [
-        # tensorflow dep,
-    ],
-)
-
-py_test(
-    name = "util_test",
-    srcs = ["util_test.py"],
-    deps = [
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",

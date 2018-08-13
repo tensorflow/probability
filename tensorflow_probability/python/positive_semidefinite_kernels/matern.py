@@ -21,7 +21,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python.positive_semidefinite_kernels import positive_semidefinite_kernel as psd_kernel
-from tensorflow_probability.python.positive_semidefinite_kernels import util
+from tensorflow_probability.python.positive_semidefinite_kernels.internal import util
 
 __all__ = [
     "MaternOneHalf",
