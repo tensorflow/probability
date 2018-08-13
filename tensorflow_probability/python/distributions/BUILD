@@ -61,6 +61,7 @@ py_library(
         ":negative_binomial",
         ":normal_conjugate_posteriors",
         ":onehot_categorical",
+        ":pareto",
         ":poisson",
         ":poisson_lognormal",
         ":quantized_distribution",
@@ -371,6 +372,15 @@ py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors",
         "//tensorflow_probability/python/internal:distribution_util",
+    ],
+)
+
+py_library(
+    name = "pareto",
+    srcs = ["pareto.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
     ],
 )
 
@@ -894,6 +904,18 @@ py_test(
     srcs = ["onehot_categorical_test.py"],
     deps = [
         ":distributions",
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_test(
+    name = "pareto_test",
+    size = "small",
+    srcs = ["pareto_test.py"],
+    deps = [
+        ":distributions",
+        # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],

@@ -57,6 +57,7 @@ from tensorflow_probability.python.distributions.negative_binomial import Negati
 from tensorflow_probability.python.distributions.normal_conjugate_posteriors import normal_conjugates_known_scale_posterior
 from tensorflow_probability.python.distributions.normal_conjugate_posteriors import normal_conjugates_known_scale_predictive
 from tensorflow_probability.python.distributions.onehot_categorical import OneHotCategorical
+from tensorflow_probability.python.distributions.pareto import Pareto
 from tensorflow_probability.python.distributions.poisson import Poisson
 from tensorflow_probability.python.distributions.poisson_lognormal import PoissonLogNormalQuadratureCompound
 from tensorflow_probability.python.distributions.poisson_lognormal import quadrature_scheme_lognormal_gauss_hermite
@@ -187,6 +188,7 @@ __all__ = [
     'MixtureSameFamily',
     'ExpRelaxedOneHotCategorical',
     'OneHotCategorical',
+    'Pareto',
     'RelaxedBernoulli',
     'RelaxedOneHotCategorical',
     'kl_divergence',
