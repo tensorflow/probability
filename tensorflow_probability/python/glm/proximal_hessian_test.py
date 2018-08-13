@@ -81,7 +81,7 @@ class _ProximalHessianTest(object):
   # @test_util.run_in_graph_and_eager_modes
   def testFindingSparseSolution(self):
     # Test that Proximal Hessian descent prefers sparse solutions when
-    # l1_regularization_weight is large enough.
+    # l1_regularizer is large enough.
     #
     # Define
     #
@@ -89,9 +89,9 @@ class _ProximalHessianTest(object):
     #                    (x[i] - a[i])**2 for i in range(1, n))
     #
     # where `a` is a constant and epsilon is small.  Set
-    # l2_regularization_weight = 0 and set l1_regularization_weight such that
+    # l2_regularizer = 0 and set l1_regularizer such that
     #
-    #     epsilon << l1_regularization_weight << 1.
+    #     epsilon << l1_regularizer << 1.
     #
     # L1 regularization should cause the computed optimum to have zeros in all
     # but the 0th coordinate: optimal_x ~= [a[0], 0, ..., 0].
@@ -117,8 +117,8 @@ class _ProximalHessianTest(object):
     w, is_converged, num_iter = minimize_sparse(
         _grad_and_hessian_unregularized_loss_fn,
         x_start=tf.zeros([n], dtype=self.dtype),
-        l1_regularization_weight=1e-2,
-        l2_regularization_weight=None,
+        l1_regularizer=1e-2,
+        l2_regularizer=None,
         maximum_iterations=10,
         maximum_full_sweeps_per_iteration=10,
         tolerance=1e-5,
@@ -137,7 +137,7 @@ class _ProximalHessianTest(object):
   @test_util.run_in_graph_and_eager_modes
   def testL2Regularization(self):
     # Define Loss(x) := ||x - a||_2**2, where a is a constant.
-    # Set l1_regularization_weight = 0 and l2_regularization_weight = 1.
+    # Set l1_regularizer = 0 and l2_regularizer = 1.
     # Then the regularized loss is
     #
     #     ||x - a||_2**2 + ||x||_2**2
@@ -157,8 +157,8 @@ class _ProximalHessianTest(object):
     w, is_converged, num_iter = minimize_sparse(
         _grad_and_hessian_unregularized_loss_fn,
         x_start=tf.zeros_like(a_, dtype=self.dtype),
-        l1_regularization_weight=0.,
-        l2_regularization_weight=1.,
+        l1_regularizer=0.,
+        l2_regularizer=1.,
         maximum_iterations=4,
         maximum_full_sweeps_per_iteration=4,
         tolerance=1e-5,
@@ -179,17 +179,16 @@ class _ProximalHessianTest(object):
     # is equals what we expect it to (usually we don't know the exact number,
     # but in this simple case we do -- explanation below).
     #
-    # Since l1_regularization_weight = 0, the soft threshold operator is
-    # actually the identity operator, hence the `minimize_sparse` algorithm
-    # becomes literally coordinatewise Newton's method being used to find the
-    # zeros of grad Loss(x), which in this case is a linear function of x.
-    # Hence Newton's method should find the exact correct answer in 1 sweep.
-    # At the end of the first sweep the algorithm does not yet know it has
-    # converged; it takes a second sweep, when the algorithm notices that its
-    # answer hasn't changed at all, to become aware that convergence has
-    # happened.  Hence we expect two sweeps.  So with
-    # max_full_sweeps_per_iteration = 1, that means we expect 2 iterations of
-    # the outer loop.
+    # Since l1_regularizer = 0, the soft threshold operator is actually the
+    # identity operator, hence the `minimize_sparse` algorithm becomes literally
+    # coordinatewise Newton's method being used to find the zeros of grad
+    # Loss(x), which in this case is a linear function of x.  Hence Newton's
+    # method should find the exact correct answer in 1 sweep.  At the end of the
+    # first sweep the algorithm does not yet know it has converged; it takes a
+    # second sweep, when the algorithm notices that its answer hasn't changed at
+    # all, to become aware that convergence has happened.  Hence we expect two
+    # sweeps.  So with maximum_full_sweeps_per_iteration = 1, that means we
+    # expect 2 iterations of the outer loop.
     n = 100
     np.random.seed(42)
     a_ = np.random.random(size=(n,))
@@ -204,8 +203,8 @@ class _ProximalHessianTest(object):
     w, is_converged, num_iter = minimize_sparse(
         _grad_and_hessian_unregularized_loss_fn,
         x_start=tf.zeros_like(a_, dtype=self.dtype),
-        l1_regularization_weight=0.,
-        l2_regularization_weight=1.,
+        l1_regularizer=0.,
+        l2_regularizer=1.,
         maximum_iterations=4,
         maximum_full_sweeps_per_iteration=1,
         tolerance=1e-5,

@@ -293,8 +293,8 @@ def minimize_sparse_one_step(gradient_unregularized_loss,
                              hessian_unregularized_loss_middle,
                              x_start,
                              tolerance,
-                             l1_regularization_weight,
-                             l2_regularization_weight=None,
+                             l1_regularizer,
+                             l2_regularizer=None,
                              maximum_full_sweeps=1,
                              learning_rate=None,
                              x_update_var=None,
@@ -312,8 +312,8 @@ def minimize_sparse_one_step(gradient_unregularized_loss,
   ```none
   x_update_fix = argmin{
       Loss(x_start + x_update')
-        + l1_regularization_weight * ||x_start + x_update'||_1
-        + l2_regularization_weight * ||x_start + x_update'||_2**2
+        + l1_regularizer * ||x_start + x_update'||_1
+        + l2_regularizer * ||x_start + x_update'||_2**2
       : x_update' }
   ```
 
@@ -325,8 +325,7 @@ def minimize_sparse_one_step(gradient_unregularized_loss,
   curvature (Hessian), which significantly speeds up convergence.
 
   This algorithm assumes that `Loss` is convex, at least in a region surrounding
-  the optimum.  (If `l2_regularization_weight > 0`, then only weak convexity is
-  needed.)
+  the optimum.  (If `l2_regularizer > 0`, then only weak convexity is needed.)
 
   Note that this function does not support batched inputs.
 
@@ -360,11 +359,11 @@ def minimize_sparse_one_step(gradient_unregularized_loss,
       where `x_update_end` is the value of `x_update` at the end of a sweep and
       `x_update_start` is the value of `x_update` at the beginning of that
       sweep.
-    l1_regularization_weight: scalar, `float` `Tensor` representing the weight
-      of the L1 regularization term (see equation above).  If L1 regularization
-      is not required, then `tfp.glm.fit_one_step` is preferable.
-    l2_regularization_weight: scalar, `float` `Tensor` representing the weight
-      of the L2 regularization term (see equation above).
+    l1_regularizer: scalar, `float` `Tensor` representing the weight of the L1
+      regularization term (see equation above).  If L1 regularization is not
+      required, then `tfp.glm.fit_one_step` is preferable.
+    l2_regularizer: scalar, `float` `Tensor` representing the weight of the L2
+      regularization term (see equation above).
       Default value: `None` (i.e., no L2 regularization).
     maximum_full_sweeps: Python integer specifying maximum number of sweeps to
       run.  A "sweep" consists of an iteration of coordinate descent on each
@@ -407,8 +406,8 @@ def minimize_sparse_one_step(gradient_unregularized_loss,
       hessian_unregularized_loss_outer,
       hessian_unregularized_loss_middle,
       x_start,
-      l1_regularization_weight,
-      l2_regularization_weight,
+      l1_regularizer,
+      l2_regularizer,
       maximum_full_sweeps,
       tolerance,
       learning_rate,
@@ -437,8 +436,7 @@ def minimize_sparse_one_step(gradient_unregularized_loss,
     def _hessian_diag_elt_with_l2(coord):  # pylint: disable=missing-docstring
       # Returns the (coord, coord) entry of
       #
-      #   Hessian(UnregularizedLoss(x) +
-      #           l2_regularization_weight * ||x||_2**2)
+      #   Hessian(UnregularizedLoss(x) + l2_regularizer * ||x||_2**2)
       #
       # evaluated at x = x_start.
       unregularized_component = (
@@ -446,12 +444,12 @@ def minimize_sparse_one_step(gradient_unregularized_loss,
           _sparse_or_dense_inner_square(
               _sparse_or_dense_matmul_onehot(hessian_unregularized_loss_outer,
                                              coord, num_samples)))
-      l2_component = _mul_or_none(2., l2_regularization_weight)
+      l2_component = _mul_or_none(2., l2_regularizer)
       return _add_ignoring_nones(unregularized_component, l2_component)
 
     grad_loss_with_l2 = _add_ignoring_nones(
         gradient_unregularized_loss,
-        _mul_or_none(2., l2_regularization_weight, x_start))
+        _mul_or_none(2., l2_regularizer, x_start))
 
     # We define `x_update_diff_norm_sq_convergence_threshold` such that the
     # convergence condition
@@ -487,19 +485,19 @@ def minimize_sparse_one_step(gradient_unregularized_loss,
       #
       #   LocalLoss(x_update')
       #     = LocalLossSmoothComponent(x_update')
-      #         + l1_regularization_weight * (||x_start + x_update'||_1 -
-      #                                       ||x_start + x_update||_1)
+      #         + l1_regularizer * (||x_start + x_update'||_1 -
+      #                             ||x_start + x_update||_1)
       #    := (UnregularizedLoss(x_start + x_update') -
       #        UnregularizedLoss(x_start + x_update)
-      #         + l2_regularization_weight * (||x_start + x_update'||_2**2 -
-      #                                       ||x_start + x_update||_2**2)
-      #         + l1_regularization_weight * (||x_start + x_update'||_1 -
-      #                                       ||x_start + x_update||_1)
+      #         + l2_regularizer * (||x_start + x_update'||_2**2 -
+      #                             ||x_start + x_update||_2**2)
+      #         + l1_regularizer * (||x_start + x_update'||_1 -
+      #                             ||x_start + x_update||_1)
       #
       # In this algorithm approximate the above argmin using (univariate)
       # proximal gradient descent:
       #
-      # (*)  x_update[j] = prox_{t * l1_regularization_weight * L1}(
+      # (*)  x_update[j] = prox_{t * l1_regularizer * L1}(
       #                 x_update[j] -
       #                 t * d/dz|z=0 UnivariateLocalLossSmoothComponent(z))
       #
@@ -556,12 +554,12 @@ def minimize_sparse_one_step(gradient_unregularized_loss,
       newton_step.set_shape([])
       # Applying the soft-threshold operator accounts for L1 regularization.
       # In above notation, delta =
-      #     prox_{t*l1_regularization_weight*L1}(w_old + newton_step) - w_old.
+      #     prox_{t*l1_regularizer*L1}(w_old + newton_step) - w_old.
       delta = (
           soft_threshold(
               w_old + newton_step,
-              _mul_ignoring_nones(learning_rate, l1_regularization_weight) /
-              second_deriv) - w_old)
+              _mul_ignoring_nones(learning_rate, l1_regularizer) / second_deriv)
+          - w_old)
 
       def _do_update(x_update_diff_norm_sq, x_update, hess_matmul_x_update):  # pylint: disable=missing-docstring
         del x_update
@@ -572,11 +570,11 @@ def minimize_sparse_one_step(gradient_unregularized_loss,
                 * _sparse_or_dense_matmul_onehot(
                     hessian_unregularized_loss_outer, coord, num_samples),
                 adjoint_a=True), [dims])
-        if l2_regularization_weight is not None:
+        if l2_regularizer is not None:
           hessian_column_with_l2 += _one_hot_like(
               hessian_column_with_l2,
               coord,
-              on_value=2. * l2_regularization_weight)
+              on_value=2. * l2_regularizer)
         changed_x_update_var = tf.scatter_update(x_update_var, [coord],
                                                  [x_update_var[coord] + delta])
         with tf.control_dependencies([changed_x_update_var]):
@@ -647,8 +645,8 @@ def minimize_sparse_one_step(gradient_unregularized_loss,
 def minimize_sparse(grad_and_hessian_loss_fn,
                     x_start,
                     tolerance,
-                    l1_regularization_weight,
-                    l2_regularization_weight=None,
+                    l1_regularizer,
+                    l2_regularizer=None,
                     maximum_iterations=1,
                     maximum_full_sweeps_per_iteration=1,
                     learning_rate=None,
@@ -660,8 +658,8 @@ def minimize_sparse(grad_and_hessian_loss_fn,
 
   ```none
   argmin{ Loss(x)
-            + l1_regularization_weight * ||x||_1
-            + l2_regularization_weight * ||x||_2**2
+            + l1_regularizer * ||x||_1
+            + l2_regularizer * ||x||_2**2
           : x in R^n }
   ```
 
@@ -685,10 +683,10 @@ def minimize_sparse(grad_and_hessian_loss_fn,
     tolerance: scalar, `float` `Tensor` representing the tolerance for each
       optiization step; see the `tolerance` argument of
       `minimize_sparse_one_step`.
-    l1_regularization_weight: scalar, `float` `Tensor` representing the weight
-      of the L1 regularization term (see equation above).
-    l2_regularization_weight: scalar, `float` `Tensor` representing the weight
-      of the L2 regularization term (see equation above).
+    l1_regularizer: scalar, `float` `Tensor` representing the weight of the L1
+      regularization term (see equation above).
+    l2_regularizer: scalar, `float` `Tensor` representing the weight of the L2
+      regularization term (see equation above).
       Default value: `None` (i.e., no L2 regularization).
     maximum_iterations: Python integer specifying the maximum number of
       iterations of the outer loop of GLMNet.  After this many iterations of the
@@ -738,8 +736,8 @@ def minimize_sparse(grad_and_hessian_loss_fn,
   # error they get would be informative enough.
   graph_deps = [
       x_start,
-      l1_regularization_weight,
-      l2_regularization_weight,
+      l1_regularizer,
+      l2_regularizer,
       maximum_iterations,
       maximum_full_sweeps_per_iteration,
       tolerance,
@@ -768,8 +766,8 @@ def minimize_sparse(grad_and_hessian_loss_fn,
           hessian_unregularized_loss_outer=h_outer,
           hessian_unregularized_loss_middle=h_middle,
           x_start=x_start,
-          l1_regularization_weight=l1_regularization_weight,
-          l2_regularization_weight=l2_regularization_weight,
+          l1_regularizer=l1_regularizer,
+          l2_regularizer=l2_regularizer,
           maximum_full_sweeps=maximum_full_sweeps_per_iteration,
           tolerance=tolerance,
           x_update_var=x_update_var,
@@ -910,8 +908,8 @@ def fit_sparse_one_step(model_matrix,
         hessian_unregularized_loss_outer=model_matrix,
         hessian_unregularized_loss_middle=h_middle,
         x_start=model_coefficients_start,
-        l1_regularization_weight=l1_regularizer,
-        l2_regularization_weight=l2_regularizer,
+        l1_regularizer=l1_regularizer,
+        l2_regularizer=l2_regularizer,
         maximum_full_sweeps=maximum_full_sweeps,
         tolerance=tolerance,
         learning_rate=learning_rate,
@@ -1039,8 +1037,8 @@ def fit_sparse(model_matrix,
     return minimize_sparse(
         _grad_neg_log_likelihood_and_fim_fn,
         x_start=model_coefficients_start,
-        l1_regularization_weight=l1_regularizer,
-        l2_regularization_weight=l2_regularizer,
+        l1_regularizer=l1_regularizer,
+        l2_regularizer=l2_regularizer,
         maximum_iterations=maximum_iterations,
         maximum_full_sweeps_per_iteration=maximum_full_sweeps_per_iteration,
         learning_rate=learning_rate,
@@ -1092,8 +1090,8 @@ def _fit_sparse_exact_hessian(model_matrix,  # pylint: disable = missing-docstri
     return minimize_sparse(
         _grad_and_hessian_loss_fn,
         x_start=model_coefficients_start,
-        l1_regularization_weight=l1_regularizer,
-        l2_regularization_weight=l2_regularizer,
+        l1_regularizer=l1_regularizer,
+        l2_regularizer=l2_regularizer,
         maximum_iterations=maximum_iterations,
         maximum_full_sweeps_per_iteration=maximum_full_sweeps_per_iteration,
         learning_rate=learning_rate,
