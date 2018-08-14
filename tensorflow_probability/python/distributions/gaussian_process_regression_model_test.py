@@ -30,7 +30,7 @@ from tensorflow.python.framework import test_util
 def _np_kernel_matrix_fn(amp, len_scale, x, y):
   x = np.expand_dims(x, -2)[..., 0]
   y = np.expand_dims(y, -3)[..., 0]
-  return amp * np.exp(-.5 * ((x - y)**2) / (len_scale**2))
+  return amp ** 2 * np.exp(-.5 * ((x - y)**2) / (len_scale**2))
 
 
 np.random.seed(42)

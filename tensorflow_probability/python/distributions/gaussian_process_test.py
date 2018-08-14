@@ -97,7 +97,7 @@ class _GaussianProcessTest(object):
         jitter=jitter)
 
     def _kernel_fn(x, y):
-      return amp * np.exp(-.5 * (np.squeeze((x - y)**2)) / (len_scale**2))
+      return amp ** 2 * np.exp(-.5 * (np.squeeze((x - y)**2)) / (len_scale**2))
 
     expected_covariance = (
         _kernel_fn(np.expand_dims(index_points, 0),

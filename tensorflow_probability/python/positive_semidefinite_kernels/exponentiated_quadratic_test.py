@@ -52,7 +52,7 @@ class ExponentiatedQuadraticTest(tf.test.TestCase, parameterized.TestCase):
       y = np.random.uniform(-1, 1, size=shape).astype(np.float32)
       self.assertAllClose(
           self.evaluate(k.apply(x, y)),
-          amplitude * np.exp(
+          amplitude ** 2 * np.exp(
               -np.float32(.5) * np.sum((x - y)**2) / length_scale**2))
 
   def testShapesAreCorrect(self):
