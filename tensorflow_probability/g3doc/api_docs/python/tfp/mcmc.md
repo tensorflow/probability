@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.mcmc" />
 </div>
@@ -35,9 +32,11 @@ TensorFlow Probability MCMC python package.
 
 ## Functions
 
-[`default_exchange_proposed_fn(...)`](../tfp/mcmc/default_exchange_proposed_fn.md): Default function for `exchange_proposed_fn` of `kernel`.
+[`default_exchange_proposed_fn(...)`](../tfp/mcmc/default_exchange_proposed_fn.md): Default exchange proposal function, for replica exchange MC.
 
 [`effective_sample_size(...)`](../tfp/mcmc/effective_sample_size.md): Estimate a lower bound on effective sample size for each independent chain.
+
+[`make_simple_step_size_update_policy(...)`](../tfp/mcmc/make_simple_step_size_update_policy.md): Create a function implementing a step-size update policy.
 
 [`potential_scale_reduction(...)`](../tfp/mcmc/potential_scale_reduction.md): Gelman and Rubin (1992)'s potential scale reduction for chain convergence.
 

@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.mcmc.UncalibratedHamiltonianMonteCarlo" />
 <meta itemprop="property" content="is_calibrated"/>
@@ -8,6 +5,7 @@ page_type: reference
 <meta itemprop="property" content="num_leapfrog_steps"/>
 <meta itemprop="property" content="parameters"/>
 <meta itemprop="property" content="seed"/>
+<meta itemprop="property" content="state_gradients_are_stopped"/>
 <meta itemprop="property" content="step_size"/>
 <meta itemprop="property" content="target_log_prob_fn"/>
 <meta itemprop="property" content="__init__"/>
@@ -52,6 +50,10 @@ Return `dict` of ``__init__`` arguments and their values.
 
 
 
+<h3 id="state_gradients_are_stopped"><code>state_gradients_are_stopped</code></h3>
+
+
+
 <h3 id="step_size"><code>step_size</code></h3>
 
 
@@ -71,6 +73,7 @@ __init__(
     target_log_prob_fn,
     step_size,
     num_leapfrog_steps,
+    state_gradients_are_stopped=False,
     seed=None,
     name=None
 )
@@ -92,6 +95,14 @@ Initializes this transition kernel.
 * <b>`num_leapfrog_steps`</b>: Integer number of steps to run the leapfrog integrator
     for. Total progress per HMC step is roughly proportional to
     `step_size * num_leapfrog_steps`.
+* <b>`state_gradients_are_stopped`</b>: Python `bool` indicating that the proposed
+    new state be run through `tf.stop_gradient`. This is particularly useful
+    when combining optimization over samples from the HMC chain.
+    Default value: `False` (i.e., do not apply `stop_gradient`).
+* <b>`step_size_update_fn`</b>: Python `callable` taking current `step_size`
+    (typically a `tf.Variable`) and `kernel_results` (typically
+    `collections.namedtuple`) and returns updated step_size (`Tensor`s).
+    Default value: `None` (i.e., do not update `step_size` automatically).
 * <b>`seed`</b>: Python integer to seed the random number generator.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this function.
     Default value: `None` (i.e., 'hmc_kernel').

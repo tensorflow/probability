@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions.Kumaraswamy" />
 <meta itemprop="property" content="allow_nan_stats"/>
@@ -52,7 +49,7 @@ Kumaraswamy distribution.
 The Kumaraswamy distribution is defined over the `(0, 1)` interval using
 parameters
 `concentration1` (aka "alpha") and `concentration0` (aka "beta").  It has a
-shape similar to the Beta distribution, but is reparameterizeable.
+shape similar to the Beta distribution, but is easier to reparameterize.
 
 #### Mathematical Details
 

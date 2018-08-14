@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.mcmc.sample_chain" />
 </div>
@@ -83,7 +80,7 @@ Warning: when setting a `seed` in the `kernel`, ensure that `sample_chain`'s
 ```python
 import tensorflow tf
 import tensorflow_probability as tfp
-tfd = tf.contrib.distributions
+tfd = tfp.distributions
 
 def make_likelihood(true_variances):
   return tfd.MultivariateNormalDiag(
@@ -125,7 +122,7 @@ where `F` denotes factors.
 ```python
 import tensorflow tf
 import tensorflow_probability as tfp
-tfd = tf.contrib.distributions
+tfd = tfp.distributions
 
 def make_prior(dims, dtype):
   return tfd.MultivariateNormalDiag(

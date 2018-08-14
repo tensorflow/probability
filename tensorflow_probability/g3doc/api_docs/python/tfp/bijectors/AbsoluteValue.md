@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.bijectors.AbsoluteValue" />
 <meta itemprop="property" content="dtype"/>
@@ -43,9 +40,7 @@ with the absolute value function, which maps `(-inf, inf)` to `[0, inf)`.
 
 
 ```python
-tfd = tfp.distributions
-
-abs = tfd.bijectors.AbsoluteValue()
+abs = tfp.bijectors.AbsoluteValue()
 
 abs.forward([-1., 0., 1.])
 ==> [1., 0.,  1.]

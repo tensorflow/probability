@@ -1,15 +1,12 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
-<meta itemprop="name" content="tfp.distributions.WishartCholesky" />
+<meta itemprop="name" content="tfp.distributions.Wishart" />
 <meta itemprop="property" content="allow_nan_stats"/>
 <meta itemprop="property" content="batch_shape"/>
-<meta itemprop="property" content="cholesky_input_output_matrices"/>
 <meta itemprop="property" content="df"/>
 <meta itemprop="property" content="dimension"/>
 <meta itemprop="property" content="dtype"/>
 <meta itemprop="property" content="event_shape"/>
+<meta itemprop="property" content="input_output_cholesky"/>
 <meta itemprop="property" content="name"/>
 <meta itemprop="property" content="parameters"/>
 <meta itemprop="property" content="reparameterization_type"/>
@@ -44,22 +41,17 @@ page_type: reference
 <meta itemprop="property" content="variance"/>
 </div>
 
-# tfp.distributions.WishartCholesky
+# tfp.distributions.Wishart
 
-## Class `WishartCholesky`
+## Class `Wishart`
 
 
 
 The matrix Wishart distribution on positive definite matrices.
 
-This distribution is defined by a scalar degrees of freedom `df` and a
-lower, triangular Cholesky factor which characterizes the scale matrix.
-
-Using WishartCholesky is a constant-time improvement over WishartFull. It
-saves an O(nbk^3) operation, i.e., a matrix-product operation for sampling
-and a Cholesky factorization in log_prob. For most use-cases it often saves
-another O(nbk^3) operation since most uses of Wishart will also use the
-Cholesky factorization.
+This distribution is defined by a scalar degrees of freedom `df` and a scale
+matrix, which can either be a full symmetric matrix or a lower triangular
+Cholesky factor.
 
 #### Mathematical Details
 
@@ -85,7 +77,7 @@ where:
 # degrees-of-freedom.(*)
 df = 5
 chol_scale = tf.cholesky(...)  # Shape is [3, 3].
-dist = tf.contrib.distributions.WishartCholesky(df=df, scale=chol_scale)
+dist = tfd.Wishart(df=df, scale_tril=chol_scale)
 
 # Evaluate this on an observation in R^3, returning a scalar.
 x = ...  # A 3x3 positive definite matrix.
@@ -96,17 +88,17 @@ dist.prob(x)  # Shape is [], a scalar.
 x = [x0, x1]  # Shape is [2, 3, 3].
 dist.prob(x)  # Shape is [2].
 
-# Initialize two 3x3 Wisharts with Cholesky factored scale matrices.
+# Initialize two 3x3 Wisharts with full scale matrices.
 df = [5, 4]
-chol_scale = tf.cholesky(...)  # Shape is [2, 3, 3].
-dist = tf.contrib.distributions.WishartCholesky(df=df, scale=chol_scale)
+scale = ...  # Shape is [2, 3, 3].
+dist = tfd.Wishart(df=df, scale=scale)
 
 # Evaluate this on four observations.
 x = [[x0, x1], [x2, x3]]  # Shape is [2, 2, 3, 3].
 dist.prob(x)  # Shape is [2, 2].
 
 # (*) - To efficiently create a trainable covariance matrix, see the example
-#   in tf.contrib.distributions.matrix_diag_transform.
+#   in tfp.distributions.matrix_diag_transform.
 ```
 
 ## Properties
@@ -140,10 +132,6 @@ parameterizations of this distribution.
 
 * <b>`batch_shape`</b>: `TensorShape`, possibly unknown.
 
-<h3 id="cholesky_input_output_matrices"><code>cholesky_input_output_matrices</code></h3>
-
-Boolean indicating if `Tensor` input/outputs are Cholesky factorized.
-
 <h3 id="df"><code>df</code></h3>
 
 Wishart distribution degree(s) of freedom.
@@ -165,6 +153,10 @@ May be partially defined or unknown.
 #### Returns:
 
 * <b>`event_shape`</b>: `TensorShape`, possibly unknown.
+
+<h3 id="input_output_cholesky"><code>input_output_cholesky</code></h3>
+
+Boolean indicating if `Tensor` input/outputs are Cholesky factorized.
 
 <h3 id="name"><code>name</code></h3>
 
@@ -203,11 +195,12 @@ Python `bool` indicating possibly expensive checks are enabled.
 ``` python
 __init__(
     df,
-    scale,
-    cholesky_input_output_matrices=False,
+    scale=None,
+    scale_tril=None,
+    input_output_cholesky=False,
     validate_args=False,
     allow_nan_stats=True,
-    name='WishartCholesky'
+    name='Wishart'
 )
 ```
 
@@ -217,13 +210,23 @@ Construct Wishart distributions.
 
 * <b>`df`</b>: `float` or `double` `Tensor`. Degrees of freedom, must be greater than
     or equal to dimension of the scale matrix.
-* <b>`scale`</b>: `float` or `double` `Tensor`. The Cholesky factorization of
-    the symmetric positive definite scale matrix of the distribution.
-* <b>`cholesky_input_output_matrices`</b>: Python `bool`. Any function which whose
-    input or output is a matrix assumes the input is Cholesky and returns a
-    Cholesky factored matrix. Example `log_prob` input takes a Cholesky and
-    `sample_n` returns a Cholesky when
-    `cholesky_input_output_matrices=True`.
+* <b>`scale`</b>: `float` or `double` `Tensor`. The symmetric positive definite
+    scale matrix of the distribution. Exactly one of `scale` and
+    'scale_tril` must be passed.
+* <b>`scale_tril`</b>: `float` or `double` `Tensor`. The Cholesky factorization
+    of the symmetric positive definite scale matrix of the distribution.
+    Exactly one of `scale` and 'scale_tril` must be passed.
+* <b>`input_output_cholesky`</b>: Python `bool`. If `True`, functions whose input or
+    output have the semantics of samples assume inputs are in Cholesky form
+    and return outputs in Cholesky form. In particular, if this flag is
+    `True`, input to `log_prob` is presumed of Cholesky form and output from
+    `sample`, `mean`, and `mode` are of Cholesky form.  Setting this
+    argument to `True` is purely a computational optimization and does not
+    change the underlying distribution; for instance, `mean` returns the
+    Cholesky of the mean, not the mean of Cholesky factors. The `variance`
+    and `stddev` methods are unaffected by this flag.
+    Default value: `False` (i.e., input/output does not have Cholesky
+    semantics).
 * <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
     parameters are checked for validity despite possibly degrading runtime
     performance. When `False` invalid inputs may silently render incorrect
@@ -233,6 +236,10 @@ Construct Wishart distributions.
     result is undefined. When `False`, an exception is raised if one or
     more of the statistic's batch members are undefined.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
+
+#### Raises:
+
+* <b>`ValueError`</b>: if zero or both of 'scale' and 'scale_tril' are passed in.
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
 

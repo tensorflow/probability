@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.positive_semidefinite_kernels.ExponentiatedQuadratic" />
 <meta itemprop="property" content="amplitude"/>
@@ -377,7 +374,7 @@ pairwise, across all pairs:
 
   ```none
   | k(x[0], y[0])    k(x[0], y[1])  ...  k(x[0], y[3]) |
-  | k(x[1], y[0])    k(x[1], y[1])  ...  k(x[0], y[3]) |
+  | k(x[1], y[0])    k(x[1], y[1])  ...  k(x[1], y[3]) |
   |      ...              ...                 ...      |
   | k(x[4], y[0])    k(x[4], y[1])  ...  k(x[4], y[3]) |
   ```

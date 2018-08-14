@@ -1,19 +1,14 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
-<meta itemprop="name" content="tfp.distributions.WishartFull" />
+<meta itemprop="name" content="tfp.distributions.VonMisesFisher" />
 <meta itemprop="property" content="allow_nan_stats"/>
 <meta itemprop="property" content="batch_shape"/>
-<meta itemprop="property" content="cholesky_input_output_matrices"/>
-<meta itemprop="property" content="df"/>
-<meta itemprop="property" content="dimension"/>
+<meta itemprop="property" content="concentration"/>
 <meta itemprop="property" content="dtype"/>
 <meta itemprop="property" content="event_shape"/>
+<meta itemprop="property" content="mean_direction"/>
 <meta itemprop="property" content="name"/>
 <meta itemprop="property" content="parameters"/>
 <meta itemprop="property" content="reparameterization_type"/>
-<meta itemprop="property" content="scale_operator"/>
 <meta itemprop="property" content="validate_args"/>
 <meta itemprop="property" content="__init__"/>
 <meta itemprop="property" content="batch_shape_tensor"/>
@@ -27,82 +22,81 @@ page_type: reference
 <meta itemprop="property" content="is_scalar_event"/>
 <meta itemprop="property" content="kl_divergence"/>
 <meta itemprop="property" content="log_cdf"/>
-<meta itemprop="property" content="log_normalization"/>
 <meta itemprop="property" content="log_prob"/>
 <meta itemprop="property" content="log_survival_function"/>
 <meta itemprop="property" content="mean"/>
-<meta itemprop="property" content="mean_log_det"/>
 <meta itemprop="property" content="mode"/>
 <meta itemprop="property" content="param_shapes"/>
 <meta itemprop="property" content="param_static_shapes"/>
 <meta itemprop="property" content="prob"/>
 <meta itemprop="property" content="quantile"/>
 <meta itemprop="property" content="sample"/>
-<meta itemprop="property" content="scale"/>
 <meta itemprop="property" content="stddev"/>
 <meta itemprop="property" content="survival_function"/>
 <meta itemprop="property" content="variance"/>
 </div>
 
-# tfp.distributions.WishartFull
+# tfp.distributions.VonMisesFisher
 
-## Class `WishartFull`
+## Class `VonMisesFisher`
 
+Inherits From: [`Distribution`](../../tfp/distributions/Distribution.md)
 
+The von Mises-Fisher distribution over unit vectors on `S^{n-1}`.
 
-The matrix Wishart distribution on positive definite matrices.
+The von Mises-Fisher distribution is a directional distribution over vectors
+on the unit hypersphere `S^{n-1}` embedded in `n` dimensions (`R^n`).
 
-This distribution is defined by a scalar degrees of freedom `df` and a
-symmetric, positive definite scale matrix.
-
-Evaluation of the pdf, determinant, and sampling are all `O(k^3)` operations
-where `(k, k)` is the event space shape.
-
-#### Mathematical Details
+#### Mathematical details
 
 The probability density function (pdf) is,
 
 ```none
-pdf(X; df, scale) = det(X)**(0.5 (df-k-1)) exp(-0.5 tr[inv(scale) X]) / Z
-Z = 2**(0.5 df k) |det(scale)|**(0.5 df) Gamma_k(0.5 df)
+pdf(x; mu, kappa) = C(kappa) exp(kappa * mu^T x)
+where,
+C(kappa) = (2 pi)^{-n/2} kappa^{n/2-1} / I_{n/2-1}(kappa),
+I_v(z) being the modified Bessel function of the first kind of order v
 ```
 
 where:
-* `df >= k` denotes the degrees of freedom,
-* `scale` is a symmetric, positive definite, `k x k` matrix,
-* `Z` is the normalizing constant, and,
-* `Gamma_k` is the [multivariate Gamma function](
-  https://en.wikipedia.org/wiki/Multivariate_gamma_function).
+* `mean_direction = mu`; a unit vector in `R^k`,
+* `concentration = kappa`; scalar real >= 0, concentration of samples around
+  `mean_direction`, where 0 pertains to the uniform distribution on the
+  hypersphere, and \inf indicates a delta function at `mean_direction`.
+
+
+NOTE: Currently only n in {2, 3, 4, 5} are supported. For n=5 some numerical
+instability can occur for low concentrations (<.01).
 
 #### Examples
 
+A single instance of a vMF distribution is defined by a mean direction (or
+mode) unit vector and a scalar concentration parameter.
+
+Extra leading dimensions, if provided, allow for batches.
+
 ```python
-# Initialize a single 3x3 Wishart with Full factored scale matrix and 5
-# degrees-of-freedom.(*)
-df = 5
-scale = ...  # Shape is [3, 3]; positive definite.
-dist = tf.contrib.distributions.WishartFull(df=df, scale=scale)
+tfd = tfp.distributions
 
-# Evaluate this on an observation in R^3, returning a scalar.
-x = ...  # A 3x3 positive definite matrix.
-dist.prob(x)  # Shape is [], a scalar.
+# Initialize a single 3-dimension vMF distribution.
+mu = [0., 1, 0]
+conc = 1.
+vmf = tfd.VonMisesFisher(mean_direction=mu, concentration=conc)
 
-# Evaluate this on a two observations, each in R^{3x3}, returning a length two
-# Tensor.
-x = [x0, x1]  # Shape is [2, 3, 3].
-dist.prob(x)  # Shape is [2].
+# Evaluate this on an observation in S^2 (in R^3), returning a scalar.
+vmf.prob([1., 0, 0])
 
-# Initialize two 3x3 Wisharts with Full factored scale matrices.
-df = [5, 4]
-scale = ...  # Shape is [2, 3, 3].
-dist = tf.contrib.distributions.WishartFull(df=df, scale=scale)
+# Initialize a batch of two 3-variate vMF distributions.
+mu = [[0., 1, 0],
+      [1., 0, 0]]
+conc = [1., 2]
+vmf = tfd.VonMisesFisher(mean_direction=mu, concentration=conc)
 
-# Evaluate this on four observations.
-x = [[x0, x1], [x2, x3]]  # Shape is [2, 2, 3, 3]; xi is positive definite.
-dist.prob(x)  # Shape is [2, 2].
-
-# (*) - To efficiently create a trainable covariance matrix, see the example
-#   in tf.contrib.distributions.matrix_diag_transform.
+# Evaluate this on two observations, each in S^2, returning a length two
+# tensor.
+x = [[0., 0, 1],
+     [0., 1, 0]]
+vmf.prob(x)
 ```
 
 ## Properties
@@ -136,17 +130,9 @@ parameterizations of this distribution.
 
 * <b>`batch_shape`</b>: `TensorShape`, possibly unknown.
 
-<h3 id="cholesky_input_output_matrices"><code>cholesky_input_output_matrices</code></h3>
+<h3 id="concentration"><code>concentration</code></h3>
 
-Boolean indicating if `Tensor` input/outputs are Cholesky factorized.
-
-<h3 id="df"><code>df</code></h3>
-
-Wishart distribution degree(s) of freedom.
-
-<h3 id="dimension"><code>dimension</code></h3>
-
-Dimension of underlying vector space. The `p` in `R^(p*p)`.
+Concentration parameter.
 
 <h3 id="dtype"><code>dtype</code></h3>
 
@@ -161,6 +147,10 @@ May be partially defined or unknown.
 #### Returns:
 
 * <b>`event_shape`</b>: `TensorShape`, possibly unknown.
+
+<h3 id="mean_direction"><code>mean_direction</code></h3>
+
+Mean direction parameter.
 
 <h3 id="name"><code>name</code></h3>
 
@@ -182,10 +172,6 @@ or `distributions.NOT_REPARAMETERIZED`.
 
 An instance of `ReparameterizationType`.
 
-<h3 id="scale_operator"><code>scale_operator</code></h3>
-
-Wishart distribution scale matrix as an Linear Operator.
-
 <h3 id="validate_args"><code>validate_args</code></h3>
 
 Python `bool` indicating possibly expensive checks are enabled.
@@ -198,37 +184,43 @@ Python `bool` indicating possibly expensive checks are enabled.
 
 ``` python
 __init__(
-    df,
-    scale,
-    cholesky_input_output_matrices=False,
+    mean_direction,
+    concentration,
     validate_args=False,
     allow_nan_stats=True,
-    name='WishartFull'
+    name='VonMisesFisher'
 )
 ```
 
-Construct Wishart distributions.
+Creates a new `VonMisesFisher` instance.
 
 #### Args:
 
-* <b>`df`</b>: `float` or `double` `Tensor`. Degrees of freedom, must be greater than
-    or equal to dimension of the scale matrix.
-* <b>`scale`</b>: `float` or `double` `Tensor`. The symmetric positive definite
-    scale matrix of the distribution.
-* <b>`cholesky_input_output_matrices`</b>: Python `bool`. Any function which whose
-    input or output is a matrix assumes the input is Cholesky and returns a
-    Cholesky factored matrix. Example `log_prob` input takes a Cholesky and
-    `sample_n` returns a Cholesky when
-    `cholesky_input_output_matrices=True`.
+* <b>`mean_direction`</b>: Floating-point `Tensor` with shape [B1, ... Bn, D].
+    A unit vector indicating the mode of the distribution, or the
+    unit-normalized direction of the mean. (This is *not* in general the
+    mean of the distribution; the mean is not generally in the support of
+    the distribution.) NOTE: `D` is currently restricted to <= 5.
+* <b>`concentration`</b>: Floating-point `Tensor` having batch shape [B1, ... Bn]
+    broadcastable with `mean_direction`. The level of concentration of
+    samples around the `mean_direction`. `concentration=0` indicates a
+    uniform distribution over the unit hypersphere, and `concentration=+inf`
+    indicates a `Deterministic` distribution (delta function) at
+    `mean_direction`.
 * <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
     parameters are checked for validity despite possibly degrading runtime
     performance. When `False` invalid inputs may silently render incorrect
     outputs.
-* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
-    (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
-    result is undefined. When `False`, an exception is raised if one or
-    more of the statistic's batch members are undefined.
+* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`,
+    statistics (e.g., mean, mode, variance) use the value "`NaN`" to
+    indicate the result is undefined. When `False`, an exception is raised
+    if one or more of the statistic's batch members are undefined.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
+
+
+#### Raises:
+
+* <b>`ValueError`</b>: For known-bad arguments, i.e. unsupported event dimension.
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
 
@@ -505,14 +497,6 @@ a more accurate answer than simply taking the logarithm of the `cdf` when
 * <b>`logcdf`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
     values of type `self.dtype`.
 
-<h3 id="log_normalization"><code>log_normalization</code></h3>
-
-``` python
-log_normalization(name='log_normalization')
-```
-
-Computes the log normalizing constant, log(Z).
-
 <h3 id="log_prob"><code>log_prob</code></h3>
 
 ``` python
@@ -576,14 +560,6 @@ mean(name='mean')
 
 Mean.
 
-<h3 id="mean_log_det"><code>mean_log_det</code></h3>
-
-``` python
-mean_log_det(name='mean_log_det')
-```
-
-Computes E[log(det(X))] under this Wishart distribution.
-
 <h3 id="mode"><code>mode</code></h3>
 
 ``` python
@@ -591,6 +567,10 @@ mode(name='mode')
 ```
 
 Mode.
+
+Additional documentation from `VonMisesFisher`:
+
+The mode of the von Mises-Fisher distribution is the mean direction.
 
 <h3 id="param_shapes"><code>param_shapes</code></h3>
 
@@ -730,14 +710,6 @@ sample.
 #### Returns:
 
 * <b>`samples`</b>: a `Tensor` with prepended dimensions `sample_shape`.
-
-<h3 id="scale"><code>scale</code></h3>
-
-``` python
-scale()
-```
-
-Wishart distribution scale matrix.
 
 <h3 id="stddev"><code>stddev</code></h3>
 

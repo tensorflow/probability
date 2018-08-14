@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.bijectors.Kumaraswamy" />
 <meta itemprop="property" content="concentration0"/>
@@ -31,8 +28,8 @@ Inherits From: [`Bijector`](../../tfp/bijectors/Bijector.md)
 
 Compute `Y = g(X) = (1 - (1 - X)**(1 / b))**(1 / a), X in [0, 1]`.
 
-This bijector maps inputs from `[0, 1]` to [0, 1]`. The inverse of the
-bijector applied to a uniform random variable `X ~ U(0, 1) gives back a
+This bijector maps inputs from `[0, 1]` to `[0, 1]`. The inverse of the
+bijector applied to a uniform random variable `X ~ U(0, 1)` gives back a
 random variable with the [Kumaraswamy distribution](
 https://en.wikipedia.org/wiki/Kumaraswamy_distribution):
 

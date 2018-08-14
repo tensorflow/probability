@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.bijectors.MaskedAutoregressiveFlow" />
 <meta itemprop="property" content="dtype"/>
@@ -45,7 +42,7 @@ decomposition, `p(x) = prod{ p(x[i] | x[0:i]) : i=0, ..., d }`. The provided
 this property by zeroing out weights in its `masked_dense` layers.
 
 In the `tf.distributions` framework, a "normalizing flow" is implemented as a
-`tf.contrib.distributions.bijectors.Bijector`. The `forward` "autoregression"
+`tfp.distributions.bijectors.Bijector`. The `forward` "autoregression"
 is implemented using a `tf.while_loop` and a deep neural network (DNN) with
 masked weights such that the autoregressive property is automatically met in
 the `inverse`.
@@ -110,7 +107,7 @@ also proves the transform is bijective.)
 
 ```python
 tfd = tfp.distributions
-tfb = tfd.bijectors
+tfb = tfp.bijectors
 
 dims = 5
 

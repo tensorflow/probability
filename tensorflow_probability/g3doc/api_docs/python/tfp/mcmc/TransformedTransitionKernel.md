@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.mcmc.TransformedTransitionKernel" />
 <meta itemprop="property" content="bijector"/>
@@ -57,7 +54,7 @@ density of the masked dimensions
 import tensorflow as tf
 import tensorflow_probability as tfp
 tfd = tfp.distributions
-tfb = tfd.bijectors
+tfb = tfp.bijectors
 
 def make_likelihood(true_variances):
   return tfd.MultivariateNormalDiag(

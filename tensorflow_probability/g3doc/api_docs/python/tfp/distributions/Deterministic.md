@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions.Deterministic" />
 <meta itemprop="property" content="allow_nan_stats"/>
@@ -68,7 +65,7 @@ cdf(x; loc) = 1, if x >= loc, else 0
 
 ```python
 # Initialize a single Deterministic supported at zero.
-constant = tf.contrib.distributions.Deterministic(0.)
+constant = tfp.distributions.Deterministic(0.)
 constant.prob(0.)
 ==> 1.
 constant.prob(2.)
@@ -77,7 +74,7 @@ constant.prob(2.)
 # Initialize a [2, 2] batch of scalar constants.
 loc = [[0., 1.], [2., 3.]]
 x = [[0., 1.1], [1.99, 3.]]
-constant = tf.contrib.distributions.Deterministic(loc)
+constant = tfp.distributions.Deterministic(loc)
 constant.prob(x)
 ==> [[1., 0.], [0., 1.]]
 ```

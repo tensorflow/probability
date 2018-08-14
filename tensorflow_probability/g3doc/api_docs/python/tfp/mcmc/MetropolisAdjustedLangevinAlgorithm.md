@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.mcmc.MetropolisAdjustedLangevinAlgorithm" />
 <meta itemprop="property" content="is_calibrated"/>
@@ -143,7 +140,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 import numpy as np
 
-tfd = tf.contrib.distributions
+tfd = tfp.distributions
 
 dtype = np.float32
 true_mean = dtype([0, 0, 0])

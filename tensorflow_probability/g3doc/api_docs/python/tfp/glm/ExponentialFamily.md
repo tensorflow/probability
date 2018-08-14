@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.glm.ExponentialFamily" />
 <meta itemprop="property" content="is_canonical"/>
@@ -73,6 +70,18 @@ __call__(
 ```
 
 Computes `mean(r), var(mean), d/dr mean(r)` for linear response, `r`.
+
+Here `mean` and `var` are the mean and variance of the sufficient statistic,
+which may not be the same as the mean and variance of the random variable
+itself.  If the distribution's density has the form
+
+```none
+p_Y(y) = h(y) Exp[dot(theta, T(y)) - A]
+```
+
+where `theta` and `A` are constants and `h` and `T` are known functions,
+then `mean` and `var` are the mean and variance of `T(Y)`.  In practice,
+often `T(Y) := Y` and in that case the distinction doesn't matter.
 
 #### Args:
 

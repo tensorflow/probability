@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.mcmc.HamiltonianMonteCarlo" />
 <meta itemprop="property" content="is_calibrated"/>
@@ -8,7 +5,9 @@ page_type: reference
 <meta itemprop="property" content="num_leapfrog_steps"/>
 <meta itemprop="property" content="parameters"/>
 <meta itemprop="property" content="seed"/>
+<meta itemprop="property" content="state_gradients_are_stopped"/>
 <meta itemprop="property" content="step_size"/>
+<meta itemprop="property" content="step_size_update_fn"/>
 <meta itemprop="property" content="target_log_prob_fn"/>
 <meta itemprop="property" content="__init__"/>
 <meta itemprop="property" content="bootstrap_results"/>
@@ -49,74 +48,49 @@ distribution using HMC with adaptive step size.
 ```python
 import tensorflow as tf
 import tensorflow_probability as tfp
-import numpy as np
 
-tfd = tf.contrib.distributions
+# Target distribution is proportional to: `exp(-x (1 + x))`.
+def unnormalized_log_prob(x):
+  return -x - x**2.
 
-# Tuning acceptance rates:
-dtype = np.float32
-num_warmup_iter = 500
-num_chain_iter = 500
-# Set the target average acceptance ratio for the HMC as suggested by
-# Beskos et al. (2013):
-# https://projecteuclid.org/download/pdfview_1/euclid.bj/1383661192
+# Create state to hold updated `step_size`.
+step_size = tf.get_variable(
+    name='step_size',
+    initializer=1.,
+    use_resource=True,  # For TFE compatibility.
+    trainable=False)
 
-target_accept_rate = 0.651
-
-x = tf.get_variable(name='x', initializer=dtype(1))
-step_size = tf.get_variable(name='step_size', initializer=dtype(1))
-
-# Target distribution is standard univariate Normal.
-target = tfd.Normal(loc=dtype(0), scale=dtype(1))
-
-# Initialize the HMC sampler. In order to retain `tfe` compatibility,
-# `target_log_prob_fn` is passed as `lambda x: target.log_prob(x)`.
+# Initialize the HMC transition kernel.
 hmc = tfp.mcmc.HamiltonianMonteCarlo(
-    target_log_prob_fn=lambda x: target.log_prob(x),
+    target_log_prob_fn=unnormalized_log_prob,
+    num_leapfrog_steps=3,
     step_size=step_size,
-    num_leapfrog_steps=3)
+    step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy())
 
-# One iteration of the HMC
-next_x, other_results = hmc.one_step(
-    current_state=x,
-    previous_kernel_results=hmc.bootstrap_results(x))
+# Run the chain (with burn-in).
+samples, kernel_results = tfp.mcmc.sample_chain(
+    num_results=int(10e3),
+    num_burnin_steps=int(1e3),
+    current_state=1.,
+    kernel=hmc)
 
-x_update = x.assign(next_x)
-
-# Adapt the step size using standard adaptive MCMC procedure. See Section 4.2
-# of Andrieu and Thoms (2008):
-# http://www4.ncsu.edu/~rsmith/MA797V_S12/Andrieu08_AdaptiveMCMC_Tutorial.pdf
-
-step_size_update = step_size.assign_add(
-    step_size * tf.where(
-        tf.exp(tf.minimum(other_results.log_accept_ratio, 0.)) >
-            target_accept_rate,
-        0.01, -0.01))
-
-# Note, the adaptations are performed during warmup only.
-warmup = tf.group([x_update, step_size_update])
-
-init = tf.global_variables_initializer()
+# Initialize all constructed variables.
+init_op = tf.global_variables_initializer()
 
 with tf.Session() as sess:
-  sess.run(init)
-  # Warm up the sampler and adapt the step size
-  for _ in xrange(num_warmup_iter):
-    sess.run(warmup)
-  # Collect samples without adapting step size
-  samples = np.zeros([num_chain_iter])
-  for i in xrange(num_chain_iter):
-    _, x_,= sess.run([x_update, x])
-    samples[i] = x_
+  init_op.run()
+  samples_, kernel_results_ = sess.run([samples, kernel_results])
 
-print(samples.mean(), samples.std())
+print('mean:{:.4f}  stddev:{:.4f}  acceptance:{:.4f}'.format(
+    samples_.mean(), samples_.std(), kernel_results_.is_accepted.mean()))
+# mean:-0.5003  stddev:0.7711  acceptance:0.6240
 ```
 
 ##### Estimate parameters of a more complicated posterior.
 
 In this example, we'll use Monte-Carlo EM to find best-fit parameters. See
-["Implementations of the Monte Carlo EM algorithm " by Levine and Casella](
-https://ecommons.cornell.edu/bitstream/handle/1813/32030/BU-1431-M.pdf?sequence=1).
+[_Convergence of a stochastic approximation version of the EM algorithm_][2]
+for more details.
 
 More precisely, we use HMC to form a chain conditioned on parameter `sigma`
 and training data `{ (x[i], y[i]) : i=1...n }`. Then we use one gradient step
@@ -134,112 +108,143 @@ The generative assumptions are:
       Y[i] = X[i].T * W + eps[i]
 ```
 
-We now implement MCEM using `tensorflow_probability` intrinsics.
+We now implement a stochastic approximation of Expectation Maximization (SAEM)
+using `tensorflow_probability` intrinsics. [Bernard (1999)][2]
 
 ```python
 import tensorflow as tf
 import tensorflow_probability as tfp
 import numpy as np
 
-tfd = tf.contrib.distributions
+tfd = tfp.distributions
 
 def make_training_data(num_samples, dims, sigma):
   dt = np.asarray(sigma).dtype
   zeros = tf.zeros(dims, dtype=dt)
-  x = tfd.MultivariateNormalDiag(
-      loc=zeros).sample(num_samples, seed=1)
+  x = tf.transpose(tfd.MultivariateNormalDiag(loc=zeros).sample(
+      num_samples, seed=1))  # [d, n]
   w = tfd.MultivariateNormalDiag(
       loc=zeros,
-      scale_identity_multiplier=sigma).sample(seed=2)
-  noise = tfd.Normal(
-      loc=dt.type(0),
-      scale=dt.type(1)).sample(num_samples, seed=3)
-  y = tf.tensordot(x, w, axes=[[1], [0]]) + noise
-  return y, x, w
+      scale_identity_multiplier=sigma).sample([1], seed=2)  # [1, d]
+  noise = tfd.Normal(loc=np.array(0, dt), scale=np.array(1, dt)).sample(
+      num_samples, seed=3)  # [n]
+  y = tf.matmul(w, x) + noise  # [1, n]
+  return y[0], x, w[0]
 
-def make_prior(sigma, dims):
-  # p(w | sigma)
+def make_weights_prior(dims, dtype):
   return tfd.MultivariateNormalDiag(
-      loc=tf.zeros([dims], dtype=sigma.dtype),
-      scale_identity_multiplier=sigma)
+      loc=tf.zeros([dims], dtype=dtype),
+      scale_identity_multiplier=tf.exp(tf.get_variable(
+          name='log_sigma',
+          initializer=np.array(0, dtype),
+          use_resource=True)))
 
-def make_likelihood(x, w):
-  # p(y | x, w)
-  return tfd.MultivariateNormalDiag(
-      loc=tf.tensordot(x, w, axes=[[1], [0]]))
+def make_response_likelihood(w, x):
+  w_shape = tf.pad(
+      tf.shape(w),
+      paddings=[[tf.where(tf.rank(w) > 1, 0, 1), 0]],
+      constant_values=1)
+  y_shape = tf.concat([tf.shape(w)[:-1], [tf.shape(x)[-1]]], axis=0)
+  w_expand = tf.reshape(w, w_shape)
+  return tfd.Normal(
+      loc=tf.reshape(tf.matmul(w_expand, x), y_shape),
+      scale=np.array(1, w.dtype.as_numpy_dtype))  # [n]
 
 # Setup assumptions.
 dtype = np.float32
-num_samples = 150
+num_samples = 500
 dims = 10
-num_iters = int(5e3)
 
-true_sigma = dtype(0.3)
-y, x, true_weights = make_training_data(num_samples, dims, true_sigma)
+weights_prior_true_scale = np.array(0.3, dtype)
+with tf.Session() as sess:
+  y, x, true_weights = sess.run(
+      make_training_data(num_samples, dims, weights_prior_true_scale))
 
-# Estimate of `log(true_sigma)`.
-log_sigma = tf.get_variable(name='log_sigma', initializer=dtype(0))
-sigma = tf.exp(log_sigma)
+prior = make_weights_prior(dims, dtype)
+def unnormalized_posterior_log_prob(w):
+  likelihood = make_response_likelihood(w, x)
+  return (prior.log_prob(w)
+          + tf.reduce_sum(likelihood.log_prob(y), axis=-1))  # [m]
 
-# State of the Markov chain.
-# We set `trainable=False` so it is unaffected by the M-step.
-weights = tf.get_variable(
-    name='weights',
-    initializer=np.random.randn(dims).astype(dtype),
+weights_chain_start = tf.placeholder(dtype, shape=[dims])
+
+step_size = tf.get_variable(
+    name='step_size',
+    initializer=np.array(0.05, dtype),
+    use_resource=True,
     trainable=False)
 
-prior = make_prior(sigma, dims)
+num_results = 2
+weights, kernel_results = tfp.mcmc.sample_chain(
+    num_results=num_results,
+    num_burnin_steps=0,
+    current_state=weights_chain_start,
+    kernel=tfp.mcmc.HamiltonianMonteCarlo(
+        target_log_prob_fn=unnormalized_posterior_log_prob,
+        num_leapfrog_steps=2,
+        step_size=step_size,
+        step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy(),
+        state_gradients_are_stopped=True))
 
-def joint_log_prob(w):
-  # f(w) = log p(w, y | x)
-  return prior.log_prob(w) + make_likelihood(x, w).log_prob(y)
+avg_acceptance_ratio = tf.reduce_mean(
+    tf.exp(tf.minimum(kernel_results.log_accept_ratio, 0.)))
 
-# Initialize the HMC sampler.
-hmc = tfp.mcmc.HamiltonianMonteCarlo(
-    target_log_prob_fn=joint_log_prob,
-    step_size=0.1,
-    num_leapfrog_steps=5)
-
-weights_update = weights.assign(
-    hmc.one_step(weights, hmc.bootstrap_results(weights))[0])
-
-# We do an optimization step to propagate `log_sigma` after one HMC step to
-# propagate `weights`. The loss function for the optimization algorithm is
-# exactly the prior distribution since the likelihood does not depend on
-# `log_sigma`.
-with tf.control_dependencies([weights_update]):
-  loss = -prior.log_prob(weights)
-
+# We do an optimization step to propagate `log_sigma` after two HMC steps to
+# propagate `weights`.
+loss = -tf.reduce_mean(kernel_results.accepted_results.target_log_prob)
 optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.01)
-log_sigma_update = optimizer.minimize(loss)
+train_op = optimizer.minimize(loss)
 
-init = tf.global_variables_initializer()
+with tf.variable_scope(tf.get_variable_scope(), reuse=True):
+  weights_prior_estimated_scale = tf.exp(
+      tf.get_variable(name='log_sigma', dtype=dtype))
 
-sigma_history = np.zeros(num_iters, dtype)
-weights_history = np.zeros([num_iters, dims], dtype)
+init_op = tf.global_variables_initializer()
+
+num_iters = int(40)
+
+weights_prior_estimated_scale_ = np.zeros(num_iters, dtype)
+weights_ = np.zeros([num_iters + 1, dims], dtype)
+weights_[0] = np.random.randn(dims).astype(dtype)
 
 with tf.Session() as sess:
-  sess.run(init)
-  for i in xrange(num_iters):
-    _, sigma_, weights_ = sess.run([log_sigma_update, sigma, weights])
-    weights_history[i, :] = weights_
-    sigma_history[i] = sigma_
-  true_weights_ = sess.run(true_weights)
+  init_op.run()
+  for iter_ in range(num_iters):
+    [
+        _,
+        weights_prior_estimated_scale_[iter_],
+        weights_[iter_ + 1],
+        loss_,
+        step_size_,
+        avg_acceptance_ratio_,
+    ] = sess.run([
+        train_op,
+        weights_prior_estimated_scale,
+        weights[-1],
+        loss,
+        step_size,
+        avg_acceptance_ratio,
+    ], feed_dict={weights_chain_start: weights_[iter_]})
+    print('iter:{:>2}  loss:{: 9.3f}  scale:{:.3f}  '
+          'step_size:{:.4f}  avg_acceptance_ratio:{:.4f}').format(
+              iter_, loss_, weights_prior_estimated_scale_[iter_],
+              step_size_, avg_acceptance_ratio_))
 
-# Should oscillate around true_sigma.
+# Should converge to ~0.24.
 import matplotlib.pyplot as plt
-plt.plot(sigma_history)
-plt.ylabel('sigma')
+plot.plot(weights_prior_estimated_scale_)
+plt.ylabel('weights_prior_estimated_scale')
 plt.xlabel('iteration')
-
-# Mean error should be close to zero
-print('mean error:', np.abs(np.mean(sigma_history) - true_sigma))
 ```
 
 #### References
 
 [1]: Radford Neal. MCMC Using Hamiltonian Dynamics. _Handbook of Markov Chain
      Monte Carlo_, 2011. https://arxiv.org/abs/1206.1901
+
+[2]: Bernard Delyon, Marc Lavielle, Eric, Moulines. _Convergence of a
+     stochastic approximation version of the EM algorithm_, Ann. Statist. 27
+     (1999), no. 1, 94--128. https://projecteuclid.org/euclid.aos/1018031103
 
 ## Properties
 
@@ -263,7 +268,15 @@ Return `dict` of ``__init__`` arguments and their values.
 
 
 
+<h3 id="state_gradients_are_stopped"><code>state_gradients_are_stopped</code></h3>
+
+
+
 <h3 id="step_size"><code>step_size</code></h3>
+
+
+
+<h3 id="step_size_update_fn"><code>step_size_update_fn</code></h3>
 
 
 
@@ -282,6 +295,8 @@ __init__(
     target_log_prob_fn,
     step_size,
     num_leapfrog_steps,
+    state_gradients_are_stopped=False,
+    step_size_update_fn=None,
     seed=None,
     name=None
 )
@@ -303,6 +318,14 @@ Initializes this transition kernel.
 * <b>`num_leapfrog_steps`</b>: Integer number of steps to run the leapfrog integrator
     for. Total progress per HMC step is roughly proportional to
     `step_size * num_leapfrog_steps`.
+* <b>`state_gradients_are_stopped`</b>: Python `bool` indicating that the proposed
+    new state be run through `tf.stop_gradient`. This is particularly useful
+    when combining optimization over samples from the HMC chain.
+    Default value: `False` (i.e., do not apply `stop_gradient`).
+* <b>`step_size_update_fn`</b>: Python `callable` taking current `step_size`
+    (typically a `tf.Variable`) and `kernel_results` (typically
+    `collections.namedtuple`) and returns updated step_size (`Tensor`s).
+    Default value: `None` (i.e., do not update `step_size` automatically).
 * <b>`seed`</b>: Python integer to seed the random number generator.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this function.
     Default value: `None` (i.e., 'hmc_kernel').

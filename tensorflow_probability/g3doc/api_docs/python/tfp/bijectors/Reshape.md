@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.bijectors.Reshape" />
 <meta itemprop="property" content="dtype"/>
@@ -43,11 +40,9 @@ a few differences:
   `event_shape_in` (`event_ndims_in = len(event_shape_in)`).
 
 Example usage:
+
 ```python
-
-tfd = tfp.distributions
-
-r = tfd.bijectors.Reshape(event_shape_out=[1, -1])
+r = tfp.bijectors.Reshape(event_shape_out=[1, -1])
 
 r.forward([3., 4.])    # shape [2]
 # ==> [[3., 4.]]       # shape [1, 2]
@@ -64,6 +59,54 @@ r.forward_log_det_jacobian(any_value)
 
 r.inverse_log_det_jacobian(any_value)
 # ==> 0.
+```
+
+Note: we had to make a tricky-to-describe policy decision, which we attempt to
+summarize here. At instantiation time and class method invocation time, we
+validate consistency of class-level and method-level arguments. Note that
+since the class-level arguments may be unspecified until graph execution time,
+we had the option of deciding between two validation policies. One was,
+roughly, "the earliest, most statically specified arguments take precedence".
+The other was "method-level arguments must be consistent with class-level
+arguments". The former policy is in a sense more optimistic about user intent,
+and would enable us, in at least one particular case [1], to perform
+additional inference about resulting shapes. We chose the latter policy, as it
+is simpler to implement and a bit easier to articulate.
+
+[1] The case in question is exemplified in the following snippet:
+
+```python
+bijector = tfp.bijectors.Reshape(
+  event_shape_out=tf.placeholder(dtype=tf.int32, shape=[1]),
+  event_shape_in= tf.placeholder(dtype=tf.int32, shape=[3]),
+  validate_args=True)
+
+bijector.forward_event_shape(tf.TensorShape([5, 2, 3, 7]))
+# Chosen policy    ==> (5, None)
+# Alternate policy ==> (5, 42)
+```
+
+In the chosen policy, since we don't know what `event_shape_in/out` are at the
+time of the call to `forward_event_shape`, we simply fill in everything we
+*do* know, which is that the last three dims will be replaced with
+"something".
+
+In the alternate policy, we would assume that the intention must be to reshape
+`[5, 2, 3, 7]` such that the last three dims collapse to one, which is only
+possible if the resulting shape is `[5, 42]`.
+
+Note that the above is the *only* case in which we could do such inference; if
+the output shape has more than 1 dim, we can't infer anything. E.g., we would
+have
+
+```python
+bijector = tfp.bijectors.Reshape(
+  event_shape_out=tf.placeholder(dtype=tf.int32, shape=[2]),
+  event_shape_in= tf.placeholder(dtype=tf.int32, shape=[3]),
+  validate_args=True)
+
+bijector.forward_event_shape(tf.TensorShape([5, 2, 3, 7]))
+# Either policy ==> (5, None, None)
 ```
 
 ## Properties

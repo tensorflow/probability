@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 # All symbols in TensorFlow Probability
 
 *  <a href="./tfp.md"><code>tfp</code></a>
@@ -13,6 +10,7 @@ page_type: reference
 *  <a href="./tfp/bijectors/Bijector.md"><code>tfp.bijectors.Bijector</code></a>
 *  <a href="./tfp/bijectors/Chain.md"><code>tfp.bijectors.Chain</code></a>
 *  <a href="./tfp/bijectors/CholeskyOuterProduct.md"><code>tfp.bijectors.CholeskyOuterProduct</code></a>
+*  <a href="./tfp/bijectors/CholeskyToInvCholesky.md"><code>tfp.bijectors.CholeskyToInvCholesky</code></a>
 *  <a href="./tfp/bijectors/ConditionalBijector.md"><code>tfp.bijectors.ConditionalBijector</code></a>
 *  <a href="./tfp/bijectors/Exp.md"><code>tfp.bijectors.Exp</code></a>
 *  <a href="./tfp/bijectors/FillTriangular.md"><code>tfp.bijectors.FillTriangular</code></a>
@@ -34,7 +32,9 @@ page_type: reference
 *  <a href="./tfp/bijectors/Softplus.md"><code>tfp.bijectors.Softplus</code></a>
 *  <a href="./tfp/bijectors/Softsign.md"><code>tfp.bijectors.Softsign</code></a>
 *  <a href="./tfp/bijectors/Square.md"><code>tfp.bijectors.Square</code></a>
+*  <a href="./tfp/bijectors/Tanh.md"><code>tfp.bijectors.Tanh</code></a>
 *  <a href="./tfp/bijectors/TransformDiagonal.md"><code>tfp.bijectors.TransformDiagonal</code></a>
+*  <a href="./tfp/bijectors/Transpose.md"><code>tfp.bijectors.Transpose</code></a>
 *  <a href="./tfp/bijectors/Weibull.md"><code>tfp.bijectors.Weibull</code></a>
 *  <a href="./tfp/bijectors/masked_autoregressive_default_template.md"><code>tfp.bijectors.masked_autoregressive_default_template</code></a>
 *  <a href="./tfp/bijectors/masked_dense.md"><code>tfp.bijectors.masked_dense</code></a>
@@ -60,13 +60,17 @@ page_type: reference
 *  <a href="./tfp/distributions/Exponential.md"><code>tfp.distributions.Exponential</code></a>
 *  <a href="./tfp/distributions/ExponentialWithSoftplusRate.md"><code>tfp.distributions.ExponentialWithSoftplusRate</code></a>
 *  <a href="./tfp/distributions/Gamma.md"><code>tfp.distributions.Gamma</code></a>
+*  <a href="./tfp/distributions/GammaGamma.md"><code>tfp.distributions.GammaGamma</code></a>
 *  <a href="./tfp/distributions/GammaWithSoftplusConcentrationRate.md"><code>tfp.distributions.GammaWithSoftplusConcentrationRate</code></a>
+*  <a href="./tfp/distributions/GaussianProcess.md"><code>tfp.distributions.GaussianProcess</code></a>
+*  <a href="./tfp/distributions/GaussianProcessRegressionModel.md"><code>tfp.distributions.GaussianProcessRegressionModel</code></a>
 *  <a href="./tfp/distributions/Geometric.md"><code>tfp.distributions.Geometric</code></a>
 *  <a href="./tfp/distributions/HalfNormal.md"><code>tfp.distributions.HalfNormal</code></a>
 *  <a href="./tfp/distributions/Independent.md"><code>tfp.distributions.Independent</code></a>
 *  <a href="./tfp/distributions/InverseGamma.md"><code>tfp.distributions.InverseGamma</code></a>
 *  <a href="./tfp/distributions/InverseGammaWithSoftplusConcentrationRate.md"><code>tfp.distributions.InverseGammaWithSoftplusConcentrationRate</code></a>
 *  <a href="./tfp/distributions/Kumaraswamy.md"><code>tfp.distributions.Kumaraswamy</code></a>
+*  <a href="./tfp/distributions/LKJ.md"><code>tfp.distributions.LKJ</code></a>
 *  <a href="./tfp/distributions/Laplace.md"><code>tfp.distributions.Laplace</code></a>
 *  <a href="./tfp/distributions/LaplaceWithSoftplusScale.md"><code>tfp.distributions.LaplaceWithSoftplusScale</code></a>
 *  <a href="./tfp/distributions/LinearGaussianStateSpaceModel.md"><code>tfp.distributions.LinearGaussianStateSpaceModel</code></a>
@@ -97,14 +101,15 @@ page_type: reference
 *  <a href="./tfp/distributions/StudentT.md"><code>tfp.distributions.StudentT</code></a>
 *  <a href="./tfp/distributions/StudentTWithAbsDfSoftplusScale.md"><code>tfp.distributions.StudentTWithAbsDfSoftplusScale</code></a>
 *  <a href="./tfp/distributions/TransformedDistribution.md"><code>tfp.distributions.TransformedDistribution</code></a>
+*  <a href="./tfp/distributions/TruncatedNormal.md"><code>tfp.distributions.TruncatedNormal</code></a>
 *  <a href="./tfp/distributions/Uniform.md"><code>tfp.distributions.Uniform</code></a>
 *  <a href="./tfp/distributions/VectorDeterministic.md"><code>tfp.distributions.VectorDeterministic</code></a>
 *  <a href="./tfp/distributions/VectorDiffeomixture.md"><code>tfp.distributions.VectorDiffeomixture</code></a>
 *  <a href="./tfp/distributions/VectorExponentialDiag.md"><code>tfp.distributions.VectorExponentialDiag</code></a>
 *  <a href="./tfp/distributions/VectorLaplaceDiag.md"><code>tfp.distributions.VectorLaplaceDiag</code></a>
 *  <a href="./tfp/distributions/VectorSinhArcsinhDiag.md"><code>tfp.distributions.VectorSinhArcsinhDiag</code></a>
-*  <a href="./tfp/distributions/WishartCholesky.md"><code>tfp.distributions.WishartCholesky</code></a>
-*  <a href="./tfp/distributions/WishartFull.md"><code>tfp.distributions.WishartFull</code></a>
+*  <a href="./tfp/distributions/VonMisesFisher.md"><code>tfp.distributions.VonMisesFisher</code></a>
+*  <a href="./tfp/distributions/Wishart.md"><code>tfp.distributions.Wishart</code></a>
 *  <a href="./tfp/distributions/assign_log_moving_mean_exp.md"><code>tfp.distributions.assign_log_moving_mean_exp</code></a>
 *  <a href="./tfp/distributions/assign_moving_mean_variance.md"><code>tfp.distributions.assign_moving_mean_variance</code></a>
 *  <a href="./tfp/distributions/auto_correlation.md"><code>tfp.distributions.auto_correlation</code></a>
@@ -169,8 +174,7 @@ page_type: reference
 *  <a href="./tfp/edward2/VectorExponentialDiag.md"><code>tfp.edward2.VectorExponentialDiag</code></a>
 *  <a href="./tfp/edward2/VectorLaplaceDiag.md"><code>tfp.edward2.VectorLaplaceDiag</code></a>
 *  <a href="./tfp/edward2/VectorSinhArcsinhDiag.md"><code>tfp.edward2.VectorSinhArcsinhDiag</code></a>
-*  <a href="./tfp/edward2/WishartCholesky.md"><code>tfp.edward2.WishartCholesky</code></a>
-*  <a href="./tfp/edward2/WishartFull.md"><code>tfp.edward2.WishartFull</code></a>
+*  <a href="./tfp/edward2/Wishart.md"><code>tfp.edward2.Wishart</code></a>
 *  <a href="./tfp/edward2/as_random_variable.md"><code>tfp.edward2.as_random_variable</code></a>
 *  <a href="./tfp/edward2/get_interceptor.md"><code>tfp.edward2.get_interceptor</code></a>
 *  <a href="./tfp/edward2/interception.md"><code>tfp.edward2.interception</code></a>
@@ -204,6 +208,12 @@ page_type: reference
 *  <a href="./tfp/layers/default_loc_scale_fn.md"><code>tfp.layers.default_loc_scale_fn</code></a>
 *  <a href="./tfp/layers/default_mean_field_normal_fn.md"><code>tfp.layers.default_mean_field_normal_fn</code></a>
 *  <a href="./tfp/layers/default_multivariate_normal_fn.md"><code>tfp.layers.default_multivariate_normal_fn</code></a>
+*  <a href="./tfp/math.md"><code>tfp.math</code></a>
+*  <a href="./tfp/math/diag_jacobian.md"><code>tfp.math.diag_jacobian</code></a>
+*  <a href="./tfp/math/matvecmul.md"><code>tfp.math.matvecmul</code></a>
+*  <a href="./tfp/math/pinv.md"><code>tfp.math.pinv</code></a>
+*  <a href="./tfp/math/random_rademacher.md"><code>tfp.math.random_rademacher</code></a>
+*  <a href="./tfp/math/random_rayleigh.md"><code>tfp.math.random_rayleigh</code></a>
 *  <a href="./tfp/mcmc.md"><code>tfp.mcmc</code></a>
 *  <a href="./tfp/mcmc/HamiltonianMonteCarlo.md"><code>tfp.mcmc.HamiltonianMonteCarlo</code></a>
 *  <a href="./tfp/mcmc/MetropolisAdjustedLangevinAlgorithm.md"><code>tfp.mcmc.MetropolisAdjustedLangevinAlgorithm</code></a>
@@ -218,6 +228,7 @@ page_type: reference
 *  <a href="./tfp/mcmc/UncalibratedRandomWalk.md"><code>tfp.mcmc.UncalibratedRandomWalk</code></a>
 *  <a href="./tfp/mcmc/default_exchange_proposed_fn.md"><code>tfp.mcmc.default_exchange_proposed_fn</code></a>
 *  <a href="./tfp/mcmc/effective_sample_size.md"><code>tfp.mcmc.effective_sample_size</code></a>
+*  <a href="./tfp/mcmc/make_simple_step_size_update_policy.md"><code>tfp.mcmc.make_simple_step_size_update_policy</code></a>
 *  <a href="./tfp/mcmc/potential_scale_reduction.md"><code>tfp.mcmc.potential_scale_reduction</code></a>
 *  <a href="./tfp/mcmc/random_walk_normal_fn.md"><code>tfp.mcmc.random_walk_normal_fn</code></a>
 *  <a href="./tfp/mcmc/random_walk_uniform_fn.md"><code>tfp.mcmc.random_walk_uniform_fn</code></a>
@@ -232,6 +243,8 @@ page_type: reference
 *  <a href="./tfp/optimizer/bfgs_minimize.md"><code>tfp.optimizer.bfgs_minimize</code></a>
 *  <a href="./tfp/optimizer/linesearch.md"><code>tfp.optimizer.linesearch</code></a>
 *  <a href="./tfp/optimizer/linesearch/hager_zhang.md"><code>tfp.optimizer.linesearch.hager_zhang</code></a>
+*  <a href="./tfp/optimizer/nelder_mead_minimize.md"><code>tfp.optimizer.nelder_mead_minimize</code></a>
+*  <a href="./tfp/optimizer/nelder_mead_one_step.md"><code>tfp.optimizer.nelder_mead_one_step</code></a>
 *  <a href="./tfp/positive_semidefinite_kernels.md"><code>tfp.positive_semidefinite_kernels</code></a>
 *  <a href="./tfp/positive_semidefinite_kernels/ExpSinSquared.md"><code>tfp.positive_semidefinite_kernels.ExpSinSquared</code></a>
 *  <a href="./tfp/positive_semidefinite_kernels/ExponentiatedQuadratic.md"><code>tfp.positive_semidefinite_kernels.ExponentiatedQuadratic</code></a>

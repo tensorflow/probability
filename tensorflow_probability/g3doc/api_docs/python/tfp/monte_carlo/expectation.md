@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.monte_carlo.expectation" />
 </div>
@@ -67,39 +64,37 @@ distribution.
 Example Use:
 
 ```python
-bf = tf.contrib.bayesflow
-ds = tf.contrib.distributions
-
 # Monte-Carlo approximation of a reparameterized distribution, e.g., Normal.
 
 num_draws = int(1e5)
-p = ds.Normal(loc=0., scale=1.)
-q = ds.Normal(loc=1., scale=2.)
-exact_kl_normal_normal = ds.kl_divergence(p, q)
+p = tfp.distributions.Normal(loc=0., scale=1.)
+q = tfp.distributions.Normal(loc=1., scale=2.)
+exact_kl_normal_normal = tfp.distributions.kl_divergence(p, q)
 # ==> 0.44314718
-approx_kl_normal_normal = bf.expectation(
+approx_kl_normal_normal = tfp.monte_carlo.expectation(
     f=lambda x: p.log_prob(x) - q.log_prob(x),
     samples=p.sample(num_draws, seed=42),
     log_prob=p.log_prob,
     use_reparametrization=(p.reparameterization_type
-                           == distribution.FULLY_REPARAMETERIZED))
+                           == tfp.distributions.FULLY_REPARAMETERIZED))
 # ==> 0.44632751
 # Relative Error: <1%
 
-# Monte-Carlo approximation of non-reparameterized distribution, e.g., Gamma.
+# Monte-Carlo approximation of non-reparameterized distribution,
+# e.g., Bernoulli.
 
 num_draws = int(1e5)
-p = ds.Gamma(concentration=1., rate=1.)
-q = ds.Gamma(concentration=2., rate=3.)
-exact_kl_gamma_gamma = ds.kl_divergence(p, q)
-# ==> 0.37999129
-approx_kl_gamma_gamma = bf.expectation(
+p = tfp.distributions.Bernoulli(probs=0.4)
+q = tfp.distributions.Bernoulli(probs=0.8)
+exact_kl_bernoulli_bernoulli = tfp.distributions.kl_divergence(p, q)
+# ==> 0.38190854
+approx_kl_bernoulli_bernoulli = tfp.monte_carlo.expectation(
     f=lambda x: p.log_prob(x) - q.log_prob(x),
     samples=p.sample(num_draws, seed=42),
     log_prob=p.log_prob,
     use_reparametrization=(p.reparameterization_type
-                           == distribution.FULLY_REPARAMETERIZED))
-# ==> 0.37696719
+                           == tfp.distributions.FULLY_REPARAMETERIZED))
+# ==> 0.38336259
 # Relative Error: <1%
 
 # For comparing the gradients, see `monte_carlo_test.py`.
