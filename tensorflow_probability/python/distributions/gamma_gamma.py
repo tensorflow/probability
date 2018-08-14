@@ -22,7 +22,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
-from tensorflow_probability.python.distributions.seed_stream import SeedStream
+from tensorflow_probability.python.distributions import seed_stream
 
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.ops import control_flow_ops
@@ -184,7 +184,7 @@ class GammaGamma(tf.distributions.Distribution):
       """Note: See `tf.random_gamma` docstring for sampling details and
       caveats.""")
   def _sample_n(self, n, seed=None):
-    seed = SeedStream(seed, "gamma_gamma")
+    seed = seed_stream.SeedStream(seed, "gamma_gamma")
     rate = tf.random_gamma(
         shape=[n],
         alpha=self.mixing_concentration,

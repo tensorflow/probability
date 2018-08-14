@@ -19,6 +19,8 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
+
+from tensorflow_probability.python.distributions import seed_stream
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.ops.distributions import util as distribution_util
 
@@ -134,17 +136,18 @@ class NegativeBinomial(tf.distributions.Distribution):
     # Here we use the fact that if:
     # lam ~ Gamma(concentration=total_count, rate=(1-probs)/probs)
     # then X ~ Poisson(lam) is Negative Binomially distributed.
+    stream = seed_stream.SeedStream(seed, salt="NegativeBinomial")
     rate = tf.random_gamma(
         shape=[n],
         alpha=self.total_count,
         beta=tf.exp(-self.logits),
         dtype=self.dtype,
-        seed=seed)
+        seed=stream())
     return tf.random_poisson(
         rate,
         shape=[],
         dtype=self.dtype,
-        seed=distribution_util.gen_new_seed(seed, "negative_binom"))
+        seed=stream())
 
   def _cdf(self, x):
     if self.validate_args:

@@ -23,10 +23,10 @@ import collections
 
 import tensorflow as tf
 
+from tensorflow_probability.python import distributions
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import metropolis_hastings
 from tensorflow_probability.python.mcmc import util as mcmc_util
-from tensorflow.python.ops.distributions import util as distributions_util
 
 
 __all__ = [
@@ -94,17 +94,16 @@ def random_walk_normal_fn(scale=1., name=None):
         scales *= len(state_parts)
       if len(state_parts) != len(scales):
         raise ValueError('`scale` must broadcast with `state_parts`.')
-      next_state_parts = []
-      for scale_part, state_part in zip(scales, state_parts):
-        # Mutate seed with each use.
-        seed = distributions_util.gen_new_seed(
-            seed, salt='random_walk_normal_fn')
-        next_state_parts.append(tf.random_normal(
-            mean=state_part,
-            stddev=scale_part,
-            shape=tf.shape(state_part),
-            dtype=state_part.dtype.base_dtype,
-            seed=seed))
+      seed_stream = distributions.SeedStream(seed, salt='RandomWalkNormalFn')
+      next_state_parts = [
+          tf.random_normal(
+              mean=state_part,
+              stddev=scale_part,
+              shape=tf.shape(state_part),
+              dtype=state_part.dtype.base_dtype,
+              seed=seed_stream()
+          ) for scale_part, state_part in zip(scales, state_parts)]
+
       return next_state_parts
   return _fn
 
@@ -156,17 +155,15 @@ def random_walk_uniform_fn(scale=1., name=None):
         scales *= len(state_parts)
       if len(state_parts) != len(scales):
         raise ValueError('`scale` must broadcast with `state_parts`.')
-      next_state_parts = []
-      for scale_part, state_part in zip(scales, state_parts):
-        # Mutate seed with each use.
-        seed = distributions_util.gen_new_seed(
-            seed, salt='random_walk_uniform_fn')
-        next_state_parts.append(tf.random_uniform(
-            minval=state_part - scale_part,
-            maxval=state_part + scale_part,
-            shape=tf.shape(state_part),
-            dtype=state_part.dtype.base_dtype,
-            seed=seed))
+      seed_stream = distributions.SeedStream(seed, salt='RandomWalkUniformFn')
+      next_state_parts = [
+          tf.random_uniform(
+              minval=state_part - scale_part,
+              maxval=state_part + scale_part,
+              shape=tf.shape(state_part),
+              dtype=state_part.dtype.base_dtype,
+              seed=seed_stream()
+          ) for scale_part, state_part in zip(scales, state_parts)]
       return next_state_parts
   return _fn
 
@@ -305,7 +302,6 @@ class RandomWalkMetropolis(kernel_base.TransitionKernel):
   import numpy as np
   import tensorflow as tf
   import tensorflow_probability as tfp
-  from tensorflow.python.ops.distributions import util as distributions_util
 
   tfd = tfp.distributions
 
@@ -317,12 +313,10 @@ class RandomWalkMetropolis(kernel_base.TransitionKernel):
     cauchy = tfd.Cauchy(loc=dtype(0), scale=dtype(scale))
     def _fn(state_parts, seed):
       next_state_parts = []
+      seed_stream  = tfd.SeedStream(seed, salt='RandomCauchy')
       for sp in state_parts:
-        # Mutate seed with each use.
-        seed = distributions_util.gen_new_seed(
-            seed, salt='random_walk_cauchy_new_state_fn')
         next_state_parts.append(sp + cauchy.sample(
-          sample_shape=sp.shape, seed=seed))
+          sample_shape=sp.shape, seed=seed_stream()))
       return next_state_parts
     return _fn
 
@@ -463,7 +457,8 @@ class UncalibratedRandomWalk(kernel_base.TransitionKernel):
                seed=None,
                name=None):
     self._target_log_prob_fn = target_log_prob_fn
-    self._seed_stream = seed  # This will be mutated with use.
+    self._seed_stream = distributions.SeedStream(
+        seed, salt='RandomWalkMetropolis')
     self._name = name
     self._parameters = dict(
         target_log_prob_fn=target_log_prob_fn,
@@ -510,10 +505,8 @@ class UncalibratedRandomWalk(kernel_base.TransitionKernel):
         current_state_parts = [tf.convert_to_tensor(s, name='current_state')
                                for s in current_state_parts]
 
-      self._seed_stream = distributions_util.gen_new_seed(
-          self._seed_stream, salt='rwm_kernel_proposal')
       new_state_fn = self.new_state_fn
-      next_state_parts = new_state_fn(current_state_parts, self._seed_stream)
+      next_state_parts = new_state_fn(current_state_parts, self._seed_stream())
       # Compute `target_log_prob` so its available to MetropolisHastings.
       next_target_log_prob = self.target_log_prob_fn(*next_state_parts)
 

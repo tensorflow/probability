@@ -20,10 +20,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 
-from tensorflow.contrib.distributions.python.ops import seed_stream
-
-
-tfd = tf.distributions
+from tensorflow_probability.python import distributions
 
 
 def _left_doubling_increments(batch_shape, max_doublings, step_size, seed=None,
@@ -71,7 +68,7 @@ def _left_doubling_increments(batch_shape, max_doublings, step_size, seed=None,
     # Output shape of the left increments tensor.
     output_shape = tf.concat(([max_doublings + 1], batch_shape), axis=0)
     # A sample realization of X_k.
-    expand_left = tfd.Bernoulli(0.5, dtype=dtype).sample(
+    expand_left = distributions.Bernoulli(0.5, dtype=dtype).sample(
         sample_shape=output_shape, seed=seed)
 
     # The widths of the successive intervals. Starts with 1.0 and ends with
@@ -179,7 +176,7 @@ def slice_bounds_by_doubling(x_initial,
   """
   with tf.name_scope(name, 'slice_bounds_by_doubling',
                      [x_initial, log_slice_heights, max_doublings, step_size]):
-    seed_gen = seed_stream.SeedStream(seed, salt='slice_bounds_by_doubling')
+    seed_gen = distributions.SeedStream(seed, salt='slice_bounds_by_doubling')
     x_initial = tf.convert_to_tensor(x_initial)
     batch_shape = tf.shape(x_initial)
     dtype = step_size.dtype.base_dtype
@@ -340,7 +337,7 @@ def _sample_with_shrinkage(x_initial, target_log_prob, log_slice_heights,
   with tf.name_scope(name, 'sample_with_shrinkage',
                      [x_initial, log_slice_heights, step_size, lower_bounds,
                       upper_bounds]):
-    seed_gen = seed_stream.SeedStream(seed, salt='_sample_with_shrinkage')
+    seed_gen = distributions.SeedStream(seed, salt='_sample_with_shrinkage')
     # Keeps track of whether an acceptable sample has been found for the chain.
     found = tf.zeros_like(x_initial, dtype=tf.bool)
     cond = lambda found, *ignored_args: ~tf.reduce_all(found)

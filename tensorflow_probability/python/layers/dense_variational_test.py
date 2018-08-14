@@ -25,7 +25,6 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow.python.keras import testing_utils
-from tensorflow.python.ops.distributions import util as distribution_util
 
 tfd = tfp.distributions
 
@@ -361,20 +360,21 @@ class DenseVariational(tf.test.TestCase):
       expected_kernel_posterior_affine_tensor = (
           expected_kernel_posterior_affine.sample(seed=42))
 
+      stream = tfd.SeedStream(layer.seed, salt='DenseFlipout')
+
       sign_input = tf.random_uniform(
           [batch_size, in_size],
           minval=0,
           maxval=2,
           dtype=tf.int32,
-          seed=layer.seed)
+          seed=stream())
       sign_input = tf.cast(2 * sign_input - 1, inputs.dtype)
       sign_output = tf.random_uniform(
           [batch_size, out_size],
           minval=0,
           maxval=2,
           dtype=tf.int32,
-          seed=distribution_util.gen_new_seed(
-              layer.seed, salt='dense_flipout'))
+          seed=stream())
       sign_output = tf.cast(2 * sign_output - 1, inputs.dtype)
       perturbed_inputs = tf.matmul(
           inputs * sign_input, expected_kernel_posterior_affine_tensor)

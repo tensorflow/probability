@@ -58,10 +58,10 @@ class VectorDiffeomixtureTest(test_util.VectorDistributionTestHelpers,
           validate_args=True)
       # Ball centered at component0's mean.
       self.run_test_sample_consistent_log_prob(
-          sess.run, vdm, radius=2., center=0., rtol=0.015)
+          sess.run, vdm, num_samples=int(3e5), radius=2., center=0., rtol=0.015)
       # Larger ball centered at component1's mean.
       self.run_test_sample_consistent_log_prob(
-          sess.run, vdm, radius=4., center=2., rtol=0.015)
+          sess.run, vdm, num_samples=int(3e5), radius=4., center=2., rtol=0.015)
 
   def testSampleProbConsistentBroadcastMixNonStandardBase(self):
     with self.test_session() as sess:
@@ -87,7 +87,7 @@ class VectorDiffeomixtureTest(test_util.VectorDistributionTestHelpers,
           validate_args=True)
       # Ball centered at component0's mean.
       self.run_test_sample_consistent_log_prob(
-          sess.run, vdm, radius=2., center=1., rtol=0.015)
+          sess.run, vdm, num_samples=int(5e5), radius=2., center=1., rtol=0.025)
       # Larger ball centered at component1's mean.
       self.run_test_sample_consistent_log_prob(
           sess.run, vdm, radius=4., center=3., rtol=0.01)
@@ -119,10 +119,10 @@ class VectorDiffeomixtureTest(test_util.VectorDistributionTestHelpers,
           validate_args=True)
       # Ball centered at component0's mean.
       self.run_test_sample_consistent_log_prob(
-          sess.run, vdm, radius=2., center=0., rtol=0.01)
+          sess.run, vdm, num_samples=int(3e5), radius=2., center=0., rtol=0.01)
       # Larger ball centered at component1's mean.
       self.run_test_sample_consistent_log_prob(
-          sess.run, vdm, radius=4., center=2., rtol=0.01)
+          sess.run, vdm, num_samples=int(3e5), radius=4., center=2., rtol=0.01)
 
   def testSampleProbConsistentBroadcastMixTwoBatchDims(self):
     dims = 4
@@ -146,10 +146,11 @@ class VectorDiffeomixtureTest(test_util.VectorDistributionTestHelpers,
           validate_args=True)
       # Ball centered at component0's mean.
       self.run_test_sample_consistent_log_prob(
-          sess.run, vdm, radius=2., center=0., rtol=0.01)
+          sess.run, vdm, num_samples=int(3e5), radius=2., center=0., rtol=0.01)
       # Larger ball centered at component1's mean.
       self.run_test_sample_consistent_log_prob(
-          sess.run, vdm, radius=3., center=loc_1, rtol=0.02)
+          sess.run, vdm, num_samples=int(3e5), radius=3.,
+          center=loc_1, rtol=0.02)
 
   def testMeanCovarianceNoBatch(self):
     with self.test_session() as sess:
@@ -335,10 +336,10 @@ class VectorDiffeomixtureTest(test_util.VectorDistributionTestHelpers,
           validate_args=True)
       # Ball centered at component0's mean.
       self.run_test_sample_consistent_log_prob(
-          sess.run, vdm, radius=2., center=0., rtol=0.015)
+          sess.run, vdm, num_samples=int(3e5), radius=2., center=0., rtol=0.015)
       # Larger ball centered at component1's mean.
       self.run_test_sample_consistent_log_prob(
-          sess.run, vdm, radius=4., center=2., rtol=0.005)
+          sess.run, vdm, num_samples=int(3e5), radius=4., center=2., rtol=0.005)
 
 
 if __name__ == "__main__":

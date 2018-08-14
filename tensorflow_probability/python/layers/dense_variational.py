@@ -24,7 +24,6 @@ from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.layers import util as tfp_layers_util
 from tensorflow_probability.python.math import random_rademacher
 from tensorflow_probability.python.util import docstring as docstring_util
-from tensorflow.python.ops.distributions import util as distribution_util
 
 
 __all__ = [
@@ -708,16 +707,17 @@ class DenseFlipout(_DenseVariational):
     input_shape = tf.shape(inputs)
     batch_shape = input_shape[:-1]
 
+    seed_stream = tfd.SeedStream(self.seed, salt='DenseFlipout')
+
     sign_input = random_rademacher(
         input_shape,
         dtype=inputs.dtype,
-        seed=self.seed)
+        seed=seed_stream())
     sign_output = random_rademacher(
         tf.concat([batch_shape,
                    tf.expand_dims(self.units, 0)], 0),
         dtype=inputs.dtype,
-        seed=distribution_util.gen_new_seed(
-            self.seed, salt='dense_flipout'))
+        seed=seed_stream())
     perturbed_inputs = self._matmul(
         inputs * sign_input, self.kernel_posterior_affine_tensor) * sign_output
 

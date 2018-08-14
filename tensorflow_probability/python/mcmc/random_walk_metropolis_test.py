@@ -23,8 +23,6 @@ import numpy as np
 
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow.python.ops.distributions import util as distributions_util
-
 
 tfd = tfp.distributions
 
@@ -45,12 +43,12 @@ class RWMTest(tf.test.TestCase):
       target = tfd.Normal(loc=dtype(0), scale=dtype(1))
 
       samples, _ = tfp.mcmc.sample_chain(
-          num_results=1000,
+          num_results=2000,
           current_state=dtype(1),
           kernel=tfp.mcmc.RandomWalkMetropolis(
               target.log_prob,
               new_state_fn=tfp.mcmc.random_walk_uniform_fn(scale=dtype(2.)),
-              seed=42),
+              seed=421),
           num_burnin_steps=500,
           parallel_iterations=1)  # For determinism.
 
@@ -102,13 +100,11 @@ class RWMTest(tf.test.TestCase):
       def cauchy_new_state_fn(scale, dtype):
         cauchy = tfd.Cauchy(loc=dtype(0), scale=dtype(scale))
         def _fn(state_parts, seed):
-          next_state_parts = []
-          for state in state_parts:
-            # Mutate seed with each use.
-            seed = distributions_util.gen_new_seed(
-                seed, salt='random_walk_cauchy_increment')
-            next_state_parts.append(state + cauchy.sample(
-                sample_shape=state.shape, seed=seed))
+          seed_stream = tfd.SeedStream(seed, salt='RandomWalkCauchyIncrement')
+          next_state_parts = [
+              state + cauchy.sample(
+                  sample_shape=state.shape, seed=seed_stream())
+              for state in state_parts]
           return next_state_parts
         return _fn
 

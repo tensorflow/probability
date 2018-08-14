@@ -22,8 +22,9 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
-from tensorflow_probability.python.bijectors.exp import Exp
-from tensorflow_probability.python.distributions.poisson import Poisson
+from tensorflow_probability.python import bijectors
+from tensorflow_probability.python.distributions import poisson
+from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.ops.distributions import categorical as categorical_lib
@@ -108,7 +109,7 @@ def quadrature_scheme_lognormal_quantiles(
     # Create a LogNormal distribution.
     dist = transformed_lib.TransformedDistribution(
         distribution=tf.distributions.Normal(loc=loc, scale=scale),
-        bijector=Exp(),
+        bijector=bijectors.Exp(),
         validate_args=validate_args)
     batch_ndims = dist.batch_shape.ndims
     if batch_ndims is None:
@@ -265,7 +266,7 @@ class PoissonLogNormalQuadratureCompound(tf.distributions.Distribution):
                         "probs dtype ({}).".format(
                             dt.name, self._quadrature_probs.dtype.name))
 
-      self._distribution = Poisson(
+      self._distribution = poisson.Poisson(
           log_rate=self._quadrature_grid,
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats)
@@ -335,6 +336,8 @@ class PoissonLogNormalQuadratureCompound(tf.distributions.Distribution):
     # already specify a probs vector for each batch coordinate.
     # We only support this kind of reduced broadcasting, i.e., there is exactly
     # one probs vector for all batch dims or one for each.
+    stream = seed_stream.SeedStream(
+        seed, salt="PoissonLogNormalQuadratureCompound")
     ids = self._mixture_distribution.sample(
         sample_shape=concat_vectors(
             [n],
@@ -342,8 +345,7 @@ class PoissonLogNormalQuadratureCompound(tf.distributions.Distribution):
                 self.mixture_distribution.is_scalar_batch(),
                 [batch_size],
                 np.int32([]))),
-        seed=distribution_util.gen_new_seed(
-            seed, "poisson_lognormal_quadrature_compound"))
+        seed=stream())
     # We need to flatten batch dims in case mixture_distribution has its own
     # batch dims.
     ids = tf.reshape(

@@ -22,9 +22,9 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
-from tensorflow_probability.python.internal import distribution_util as distribution_utils
+from tensorflow_probability.python.distributions import seed_stream
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow.python.framework import tensor_util
-from tensorflow.python.ops.distributions import util as distribution_util
 
 
 class Mixture(tf.distributions.Distribution):
@@ -260,7 +260,7 @@ class Mixture(tf.distributions.Distribution):
       broadcasted_cat_probs = (
           tf.stack(cat_probs, axis=-1) * tf.ones_like(stacked_means))
 
-      batched_dev = distribution_utils.mixture_stddev(
+      batched_dev = distribution_util.mixture_stddev(
           tf.reshape(broadcasted_cat_probs, [-1, len(self.components)]),
           tf.reshape(stacked_means, [-1, len(self.components)]),
           tf.reshape(stacked_devs, [-1, len(self.components)]))
@@ -302,9 +302,10 @@ class Mixture(tf.distributions.Distribution):
       # random seed management that is consistent with the non-static code path.
       samples = []
       cat_samples = self.cat.sample(n, seed=seed)
+      stream = seed_stream.SeedStream(seed, salt="Mixture")
+
       for c in range(self.num_components):
-        seed = distribution_util.gen_new_seed(seed, "mixture")
-        samples.append(self.components[c].sample(n, seed=seed))
+        samples.append(self.components[c].sample(n, seed=stream()))
       x = tf.stack(samples, -self._static_event_shape.ndims - 1)  # [n, B, k, E]
       npdt = x.dtype.as_numpy_dtype
       mask = tf.one_hot(
@@ -312,7 +313,7 @@ class Mixture(tf.distributions.Distribution):
           depth=self._num_components,  # == k
           on_value=np.ones([], dtype=npdt),
           off_value=np.zeros([], dtype=npdt))  # [n, B, k]
-      mask = distribution_utils.pad_mixture_dimensions(
+      mask = distribution_util.pad_mixture_dimensions(
           mask, self, self._cat,
           self._static_event_shape.ndims)                   # [n, B, k, [1]*e]
       return tf.reduce_sum(
@@ -382,10 +383,12 @@ class Mixture(tf.distributions.Distribution):
           num_partitions=self.num_components)
       samples_class = [None for _ in range(self.num_components)]
 
+      stream = seed_stream.SeedStream(seed, salt="Mixture")
+
       for c in range(self.num_components):
         n_class = tf.size(partitioned_samples_indices[c])
-        seed = distribution_util.gen_new_seed(seed, "mixture")
-        samples_class_c = self.components[c].sample(n_class, seed=seed)
+        samples_class_c = self.components[c].sample(
+            n_class, seed=stream())
 
         # Pull out the correct batch entries from each index.
         # To do this, we may have to flatten the batch shape.

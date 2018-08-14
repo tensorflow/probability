@@ -23,7 +23,7 @@ import numpy as np
 
 import tensorflow as tf
 
-from tensorflow.python.ops.distributions import util as distributions_util
+from tensorflow_probability.python import distributions
 
 
 __all__ = [
@@ -224,9 +224,8 @@ def sample_halton_sequence(dim,
     if not randomized:
       coeffs /= radixes
       return tf.reduce_sum(coeffs / weights, axis=-1)
-    seed = distributions_util.gen_new_seed(
-        seed, salt='mcmc_sample_halton_sequence_1')
-    coeffs = _randomize(coeffs, radixes, seed=seed)
+    stream = distributions.SeedStream(seed, salt='MCMCSampleHaltonSequence')
+    coeffs = _randomize(coeffs, radixes, seed=stream())
     # Remove the contribution from randomizing the trailing zero for the
     # axes where max_size_by_axes < max_size. This will be accounted
     # for separately below (using zero_correction).
@@ -240,9 +239,8 @@ def sample_halton_sequence(dim,
     # this is equivalent to adding a uniform random value scaled so the first
     # `max_size_by_axes` coefficients are zero. The following statements perform
     # this correction.
-    seed = distributions_util.gen_new_seed(
-        seed, salt='mcmc_sample_halton_sequence_2')
-    zero_correction = tf.random_uniform([dim, 1], seed=seed, dtype=dtype)
+    zero_correction = tf.random_uniform(
+        [dim, 1], seed=stream(), dtype=dtype)
     zero_correction /= radixes ** max_sizes_by_axes
     return base_values + tf.reshape(zero_correction, [-1])
 
@@ -253,9 +251,8 @@ def _randomize(coeffs, radixes, seed=None):
   coeffs = tf.to_int32(coeffs)
   num_coeffs = tf.shape(coeffs)[-1]
   radixes = tf.reshape(tf.to_int32(radixes), shape=[-1])
-  seed = distributions_util.gen_new_seed(
-      seed, salt='mcmc_sample_halton_sequence_3')
-  perms = _get_permutations(num_coeffs, radixes, seed=seed)
+  stream = distributions.SeedStream(seed, salt='MCMCSampleHaltonSequence2')
+  perms = _get_permutations(num_coeffs, radixes, seed=stream())
   perms = tf.reshape(perms, shape=[-1])
   radix_sum = tf.reduce_sum(radixes)
   radix_offsets = tf.reshape(tf.cumsum(radixes, exclusive=True),
@@ -288,15 +285,14 @@ def _get_permutations(num_results, dims, seed=None):
     dtype as `dims`.
   """
   sample_range = tf.range(num_results)
-  seed = [seed]  # Trick so we access by reference.
+  stream = distributions.SeedStream(seed, salt='MCMCSampleHaltonSequence3')
   def generate_one(d):
-    seed[0] = distributions_util.gen_new_seed(
-        seed[0], salt='mcmc_sample_halton_sequence_4')
-    fn = lambda _: tf.random_shuffle(tf.range(d), seed=seed[0])
+    seed = stream()
+    fn = lambda _: tf.random_shuffle(tf.range(d), seed=seed)
     return tf.map_fn(
         fn,
         sample_range,
-        parallel_iterations=1 if seed[0] is not None else 10)
+        parallel_iterations=1 if seed is not None else 10)
   return tf.concat([generate_one(d) for d in tf.unstack(dims)],
                    axis=-1)
 

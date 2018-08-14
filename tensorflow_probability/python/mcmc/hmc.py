@@ -24,6 +24,7 @@ import collections
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python import distributions
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import metropolis_hastings
 from tensorflow_probability.python.mcmc import util as mcmc_util
@@ -548,8 +549,7 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
       raise NotImplementedError('Specifying a `seed` when running eagerly is '
                                 'not currently supported. To run in Eager '
                                 'mode with a seed, use `tf.set_random_seed`.')
-    self._seed_stream = tf.contrib.distributions.SeedStream(
-        seed, 'hmc_one_step')
+    self._seed_stream = distributions.SeedStream(seed, 'hmc_one_step')
     self._parameters = dict(
         target_log_prob_fn=target_log_prob_fn,
         step_size=step_size,
