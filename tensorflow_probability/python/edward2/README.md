@@ -6,7 +6,7 @@ probabilistic programs and manipulate a model's computation for flexible
 training, latent variable inference, and predictions.
 
 Are you upgrading from Edward? Check out the guide
-["Upgrading_from_Edward_to_Edward2"](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/edward2/Upgrading_From_Edward_To_Edward2.md).
+[`Upgrading_from_Edward_to_Edward2.md`](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/edward2/Upgrading_From_Edward_To_Edward2.md).
 
 ## 1. Models as Probabilistic Programs
 
@@ -115,7 +115,9 @@ with tf.Session() as sess:
       [posterior_coeffs, posterior_intercept])
 ```
 
-Note the use of [`tfp.trainable_distributions`](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/trainable_distributions.py) in the above example. These are convenience wrappers around distributions where the parameters need to live in the constrained space (like the scale of a multivariate normal), which take unconstrained TensorFlow variables as input and handle constraint maintenance automatically.
+Note the use of [`tfp.trainable_distributions`](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/trainable_distributions.py)
+in the above example. It provides utilities for distributions with parameters
+that live in a constrained space (like the scale of a normal).
 
 For a full example of the technique as a variational program, see the
 [probabilistic PCA tutorial](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Probabilistic_PCA.ipynb).
@@ -125,7 +127,9 @@ For a full example of the technique as a variational program, see the
 ### Interceptors
 
 Training and testing probabilistic models typically require more than just
-samples from the generative process. To enable flexible training and testing, we manipulate the model's computation using [`interceptors`](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/edward2/interceptor.py).
+samples from the generative process. To enable flexible training and testing, we
+manipulate the model's computation using
+[`interceptors`](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/edward2/interceptor.py).
 
 An interceptor is a function that acts on another function `f` and its arguments
 `*args`, `**kwargs`. It performs various computations before returning an output
@@ -151,7 +155,6 @@ def set_prior_to_posterior_mean(f, *args, **kwargs):
 with ed.interception(set_prior_to_posterior_mean):
   predictions = logistic_regression(features)
 
-
 training_accuracy = (
     tf.reduce_sum(tf.cast(tf.equal(predictions, outcomes), tf.float32)) /
     tf.cast(tf.shape(outcomes), tf.float32))
@@ -167,17 +170,12 @@ For example, Markov chain Monte Carlo algorithms often require a model's
 log-joint probability function as input. Below we take the Bayesian logistic
 regression program which specifies a generative process, and apply the built-in
 `ed.make_log_joint` transformation to obtain its log-joint probability function.
-In this example, `ed.make_log_joint` takes as argument the generative program
-`logistic_regression` and returns a new function which takes as argument the 
-union of the arguments to the generative program and the random variables created
-by the generative program. In our example, `make_log_joint_fn` returns a function
-taking `features`, `coeffs`, `intercept` and `outcomes` as arguments. The returned 
-function computes the log joint probability of the model with the given values
-of the inputs and random variables (any random variable not passed
-in as an argument is sampled from the model.)
+The log-joint function takes as input the generative program's original inputs
+as well as random variables in the program. It returns a scalar Tensor
+summing over all random variable log-probabilities.
 
 In our example, `features` and `outcomes` are fixed, and we want to use
-Hamiltonian Monte Carlo to draw samples from the posterior distribution for
+Hamiltonian Monte Carlo to draw samples from the posterior distribution of
 `coeffs` and `intercept`. To this use, we create `target_log_prob_fn`, which
 takes just `coeffs` and `intercept` as arguments and pins the input `features`
 and output rv `outcomes` to its known values.
@@ -212,7 +210,10 @@ states, kernel_results = tfp.mcmc.sample_chain(
 with tf.Session() as sess:
   states_, results_ = sess.run([states, kernels_results])
 ```
-The returned `states_[0]` and `states[1]` contain 1,000 samples from the posterior distribution for `coeffs` and `intercept` respectively. They may be used, for example, or to evaluate the model's posterior predictive on new data.
+
+The returned `states_[0]` and `states_[1]` contain 1,000 posterior samples for
+`coeffs` and `intercept` respectively. They may be used, for example, to
+evaluate the model's posterior predictive on new data.
 
 
 ## Examples
