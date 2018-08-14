@@ -20,8 +20,13 @@ from setuptools import find_packages
 from setuptools import setup
 from setuptools.command.install import install as InstallCommandBase
 from setuptools.dist import Distribution
-
-VERSION = '0.4.0'
+# Import __version__ directly from the local source tree. This does not use a
+# local installation of tensorflow_probability, even if one already exists, and
+# will only work when executing the setup.py file from the directory in which
+# setup.py and the source tree live (this is always where we'd run setup.py,
+# either via `bazel run :pip_pkg /path/to/wheel/output` or simply
+# `pip install .`)
+from tensorflow_probability.python.version import __version__
 
 REQUIRED_PACKAGES = [
     'six >= 1.10.0',
@@ -58,7 +63,7 @@ else:
   # '0.0.1.dev20180305'
   project_name = 'tfp-nightly' + maybe_gpu_suffix
   datestring = datetime.datetime.now().strftime('%Y%m%d')
-  VERSION += '.dev' + datestring
+  __version__ += datestring
   tensorflow_package_name = 'tf-nightly{}'.format(
       maybe_gpu_suffix)
 
@@ -73,7 +78,7 @@ class BinaryDistribution(Distribution):
 
 setup(
     name=project_name,
-    version=VERSION,
+    version=__version__,
     description='Probabilistic modeling and statistical '
                 'inference in TensorFlow',
     author='Google LLC',

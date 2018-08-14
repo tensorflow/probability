@@ -34,7 +34,6 @@ from tensorflow_probability.python import vi
 from tensorflow.python.util.all_util import remove_undocumented
 
 _allowed_symbols = [
-    '__version__',
     'bijectors',
     'distributions',
     'edward2',
@@ -49,7 +48,5 @@ _allowed_symbols = [
     'util',
     'vi',
 ]
-
-__version__ = '0.4.0'
 
 remove_undocumented(__name__, _allowed_symbols)

@@ -12,11 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Tools for probabilistic reasoning in TensorFlow."""
+"""Define TensorFlow Probability version information."""
 
-# Contributors to the `python/` dir should not alter this file; instead update
-# `python/__init__.py` as necessary.
+# We follow Semantic Versioning (https://semver.org/)
+_MAJOR_VERSION = '0'
+_MINOR_VERSION = '4'
+_PATCH_VERSION = '0'
 
-# from tensorflow_probability.google import staging  # DisableOnExport
-from tensorflow_probability.python import *  # pylint: disable=wildcard-import
-from tensorflow_probability.python.version import __version__
+# When building releases, we can update this value on the release branch to
+# reflect the current release candidate ('rc0', 'rc1') or, finally, the official
+# stable release (indicated by `_VERSION_SUFFIX = ''`). Outside the context of a
+# release branch, the current version is by default assumed to be a
+# 'development' version, labeled 'dev'.
+_VERSION_SUFFIX = 'dev'
+
+# Example, '0.4.0.dev'
+__version__ = '.'.join([
+    _MAJOR_VERSION,
+    _MINOR_VERSION,
+    _PATCH_VERSION,
+    _VERSION_SUFFIX,
+])
