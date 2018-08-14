@@ -34,7 +34,7 @@ class FitTestFast(tf.test.TestCase):
   fast = True
 
   def make_dataset(self, n, d, link, scale=1.):
-    seed = tf.contrib.distributions.SeedStream(
+    seed = tfd.SeedStream(
         seed=213356351, salt='tfp.glm.fisher_scoring_test')
     model_coefficients = tfd.Uniform(
         low=np.array(-0.5, self.dtype),

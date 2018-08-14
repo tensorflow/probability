@@ -23,13 +23,12 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.bijectors.conditional_bijector import ConditionalBijector
 from tensorflow_probability.python.distributions import transformed_distribution_test
 
 tfd = tfp.distributions
 
 
-class _ChooseLocation(ConditionalBijector):
+class _ChooseLocation(tfp.bijectors.ConditionalBijector):
   """A Bijector which chooses between one of two location parameters."""
 
   def __init__(self, loc, name="ChooseLocation"):

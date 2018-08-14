@@ -30,7 +30,8 @@ import numpy as np
 import tensorflow as tf
 import tensorflow.distributions as tfd
 
-from tensorflow.contrib.distributions import SeedStream
+from tensorflow_probability.python.distributions import seed_stream
+
 
 __all__ = [
     'LKJ',
@@ -175,7 +176,7 @@ class LKJ(tfd.Distribution):
       raise ValueError(
           'Cannot sample negative-dimension correlation matrices.')
     # Notation below: B is the batch shape, i.e., tf.shape(concentration)
-    seed = SeedStream(seed, 'sample_lkj')
+    seed = seed_stream.SeedStream(seed, 'sample_lkj')
     with tf.name_scope('sample_lkj', name, [self.concentration]):
       if not self.concentration.dtype.is_floating:
         raise TypeError('The concentration argument should have floating type,'

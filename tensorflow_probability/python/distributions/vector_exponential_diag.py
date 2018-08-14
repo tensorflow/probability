@@ -19,7 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from tensorflow_probability.python.distributions.vector_exponential_linear_operator import VectorExponentialLinearOperator
+from tensorflow_probability.python.distributions import vector_exponential_linear_operator as velo
 from tensorflow_probability.python.internal import distribution_util
 
 
@@ -28,7 +28,7 @@ __all__ = [
 ]
 
 
-class VectorExponentialDiag(VectorExponentialLinearOperator):
+class VectorExponentialDiag(velo.VectorExponentialLinearOperator):
   """The vectorization of the Exponential distribution on `R^k`.
 
   The vector exponential distribution is defined over a subset of `R^k`, and

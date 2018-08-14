@@ -34,7 +34,7 @@ from tensorflow_probability.python.distributions.linear_gaussian_ssm import line
 from tensorflow.python.framework import test_util
 from tensorflow.python.platform import test
 
-tfl = tf.contrib.linalg
+tfl = tf.linalg
 tfd = tfp.distributions
 
 

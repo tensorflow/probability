@@ -19,11 +19,11 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 import tensorflow as tf
+import tensorflow_probability as tfp
 
-from tensorflow_probability.python import distributions
 from tensorflow.python.framework import tensor_util
 
-tfd = distributions
+tfd = tfp.distributions
 
 
 class DistributionTest(tf.test.TestCase):
@@ -126,7 +126,7 @@ class DistributionTest(tf.test.TestCase):
         self._static_event_shape = tf.TensorShape(event_shape)
         super(FakeDistribution, self).__init__(
             dtype=tf.float32,
-            reparameterization_type=distributions.NOT_REPARAMETERIZED,
+            reparameterization_type=tfd.NOT_REPARAMETERIZED,
             validate_args=True,
             allow_nan_stats=True,
             name="DummyDistribution")

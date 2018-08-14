@@ -31,7 +31,7 @@ from tensorflow_probability.python.internal import distribution_util as util
 from tensorflow.python.framework import tensor_util
 from tensorflow.python.ops.linalg import linear_operator_util
 
-tfl = tf.contrib.linalg
+tfl = tf.linalg
 
 # The built-in tf.matmul doesn't broadcast batch dimensions, so we
 # need to use `matmul_with_broadcast` throughout to ensure we support

@@ -14,7 +14,7 @@
 # ============================================================================
 """Trainable distributions.
 
-"Trainable distributions" are instances of `tf.contrib.distributions` which are
+"Trainable distributions" are instances of `tfp.distributions` which are
 parameterized by a transformation of a single input `Tensor`. The
 transformations are presumed to use TensorFlow variables and typically need to
 be fit, e.g., using `tf.train` optimizers or `tfp.optimizers`.
