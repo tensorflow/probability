@@ -36,6 +36,10 @@ __all__ = [
 ]
 
 
+def _is_sparse(x):
+  return isinstance(x, (tf.SparseTensor, tf.SparseTensorValue))
+
+
 def _reduce_ignoring_nones(fn, args):
   result = None
   for x in args:
@@ -64,7 +68,7 @@ def _mul_or_none(*args):
 
 
 def _sparse_or_dense_matmul(sparse_or_dense_x, dense_y, **kwargs):
-  if isinstance(sparse_or_dense_x, (tf.SparseTensor, tf.SparseTensorValue)):
+  if _is_sparse(sparse_or_dense_x):
     return tf.sparse_tensor_dense_matmul(sparse_or_dense_x, dense_y, **kwargs)
   else:
     return tf.matmul(sparse_or_dense_x, dense_y, **kwargs)
@@ -94,8 +98,7 @@ def _sparse_or_dense_matmul_onehot(sparse_or_dense_matrix, col_index, size):
       `sparse_or_dense_matrix`, representing the `col_index`th column of
       `sparse_or_dense_matrix`.
   """
-  if isinstance(sparse_or_dense_matrix,
-                (tf.SparseTensor, tf.SparseTensorValue)):
+  if _is_sparse(sparse_or_dense_matrix):
     # TODO(b/111924846): Implement better (ideally in a way that allows us to
     # eliminate the `size` arg, if possible).
     return tf.sparse_tensor_to_dense(
@@ -109,8 +112,7 @@ def _sparse_or_dense_matmul_onehot(sparse_or_dense_matrix, col_index, size):
 
 
 def _sparse_or_dense_inner_square(sparse_or_dense_vector):
-  if isinstance(sparse_or_dense_vector,
-                (tf.SparseTensor, tf.SparseTensorValue)):
+  if _is_sparse(sparse_or_dense_vector):
     return tf.reduce_sum(sparse_or_dense_vector.values**2)
   else:
     return tf.reduce_sum(sparse_or_dense_vector**2)
@@ -217,7 +219,6 @@ def soft_threshold(x, threshold, name=None):
   with tf.name_scope(name, 'soft_threshold', [x, threshold]):
     x = tf.convert_to_tensor(x, name='x')
     threshold = tf.convert_to_tensor(threshold, name='threshold')
-    threshold.set_shape([])
     return tf.sign(x) * tf.maximum(tf.abs(x) - threshold, 0.)
 
 
@@ -426,6 +427,17 @@ def minimize_sparse_one_step(gradient_unregularized_loss,
       num_samples = np.array(
           hessian_unregularized_loss_outer.get_shape()[0].value, np.int32)
 
+    # Hint vector shape for dynamically shaped vector arguments
+    if gradient_unregularized_loss.shape.ndims is None:
+      gradient_unregularized_loss.set_shape([None])
+    if hessian_unregularized_loss_middle.shape.ndims is None:
+      hessian_unregularized_loss_middle.set_shape([None])
+
+    # Hint matrix shape for dynamically shaped matrix arguments
+    if (not _is_sparse(hessian_unregularized_loss_outer) and
+        hessian_unregularized_loss_outer.shape.ndims is None):
+      hessian_unregularized_loss_outer.set_shape([None, None])
+
     if x_update_var is None:
       x_update_var = tf.get_variable(
           name='x_update_var',
@@ -549,9 +561,8 @@ def minimize_sparse_one_step(gradient_unregularized_loss,
       # In above notation, newton_step = -t * (approximation of d/dz|z=0 ULLSC).
       second_deriv = _hessian_diag_elt_with_l2(coord)
       newton_step = -_mul_ignoring_nones(  # pylint: disable=invalid-unary-operand-type
-          learning_rate, grad_loss_with_l2[coord] +
-          hess_matmul_x_update[coord]) / second_deriv
-      newton_step.set_shape([])
+          learning_rate,
+          grad_loss_with_l2[coord] + hess_matmul_x_update[coord]) / second_deriv
       # Applying the soft-threshold operator accounts for L1 regularization.
       # In above notation, delta =
       #     prox_{t*l1_regularizer*L1}(w_old + newton_step) - w_old.
@@ -563,13 +574,11 @@ def minimize_sparse_one_step(gradient_unregularized_loss,
 
       def _do_update(x_update_diff_norm_sq, x_update, hess_matmul_x_update):  # pylint: disable=missing-docstring
         del x_update
-        hessian_column_with_l2 = tf.reshape(
-            _sparse_or_dense_matvecmul(
-                hessian_unregularized_loss_outer,
-                hessian_unregularized_loss_middle
-                * _sparse_or_dense_matmul_onehot(
-                    hessian_unregularized_loss_outer, coord, num_samples),
-                adjoint_a=True), [dims])
+        hessian_column_with_l2 = _sparse_or_dense_matvecmul(
+            hessian_unregularized_loss_outer,
+            hessian_unregularized_loss_middle * _sparse_or_dense_matmul_onehot(
+                hessian_unregularized_loss_outer, coord, num_samples),
+            adjoint_a=True)
         if l2_regularizer is not None:
           hessian_column_with_l2 += _one_hot_like(
               hessian_column_with_l2,
