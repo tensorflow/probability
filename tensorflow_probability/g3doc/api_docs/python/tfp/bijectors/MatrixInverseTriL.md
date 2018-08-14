@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.bijectors.MatrixInverseTriL" />
 <meta itemprop="property" content="dtype"/>
@@ -40,10 +37,10 @@ with batch shape `input.shape[:-2]`, where each matrix has dimensions
 #### Examples
 
 ```python
-tfd.bijectors.MatrixInverseTriL().forward(x=[[1., 0], [2, 1]])
+tfp.bijectors.MatrixInverseTriL().forward(x=[[1., 0], [2, 1]])
 # Result: [[1., 0], [-2, 1]], i.e., inv(x)
 
-tfd.bijectors.MatrixInverseTriL().inverse(y=[[1., 0], [-2, 1]])
+tfp.bijectors.MatrixInverseTriL().inverse(y=[[1., 0], [-2, 1]])
 # Result: [[1., 0], [2, 1]], i.e., inv(y).
 ```
 

@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions.Gamma" />
 <meta itemprop="property" content="allow_nan_stats"/>
@@ -92,11 +89,29 @@ to this value, so it appears more often than it should.
 This should only be noticeable when the `concentration` is very small, or the
 `rate` is very large. See note in `tf.random_gamma` docstring.
 
+Samples of this distribution are reparameterized (pathwise differentiable).
+The derivatives are computed using the approach described in the paper
+
+[Michael Figurnov, Shakir Mohamed, Andriy Mnih.
+Implicit Reparameterization Gradients, 2018](https://arxiv.org/abs/1805.08498)
+
 #### Examples
 
 ```python
-dist = Gamma(concentration=3.0, rate=2.0)
-dist2 = Gamma(concentration=[3.0, 4.0], rate=[2.0, 3.0])
+dist = tf.distributions.Gamma(concentration=3.0, rate=2.0)
+dist2 = tf.distributions.Gamma(concentration=[3.0, 4.0], rate=[2.0, 3.0])
+```
+
+Compute the gradients of samples w.r.t. the parameters:
+
+```python
+concentration = tf.constant(3.0)
+rate = tf.constant(2.0)
+dist = tf.distributions.Gamma(concentration, rate)
+samples = dist.sample(5)  # Shape [5]
+loss = tf.reduce_mean(tf.square(samples))  # Arbitrary loss function
+# Unbiased stochastic gradients of the loss function
+grads = tf.gradients(loss, [concentration, rate])
 ```
 
 ## Properties

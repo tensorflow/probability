@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.glm.fit" />
 </div>
@@ -101,7 +98,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-tfd = tf.contrib.distributions
+tfd = tfp.distributions
 
 def make_dataset(n, d, link, scale=1., dtype=np.float32):
   model_coefficients = tfd.Uniform(

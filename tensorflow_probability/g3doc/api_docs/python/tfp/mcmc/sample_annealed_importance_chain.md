@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.mcmc.sample_annealed_importance_chain" />
 </div>
@@ -85,7 +82,7 @@ times (although this may be reduced to two times, in the future).
 ##### Estimate the normalizing constant of a log-gamma distribution.
 
 ```python
-tfd = tf.contrib.distributions
+tfd = tfp.distributions
 
 # Run 100 AIS chains in parallel
 num_chains = 100
@@ -98,7 +95,7 @@ proposal = tfd.MultivatiateNormalDiag(
 target = tfd.TransformedDistribution(
   distribution=tfd.Gamma(concentration=dtype(2),
                          rate=dtype(3)),
-  bijector=tfd.bijectors.Invert(tfd.bijectors.Exp()),
+  bijector=tfp.bijectors.Invert(tfp.bijectors.Exp()),
   event_shape=[dims])
 
 chains_state, ais_weights, kernels_results = (
@@ -120,7 +117,7 @@ log_true_normalizer = tf.lgamma(2.) - 2. * tf.log(3.)
 ##### Estimate marginal likelihood of a Bayesian regression model.
 
 ```python
-tfd = tf.contrib.distributions
+tfd = tfp.distributions
 
 def make_prior(dims, dtype):
   return tfd.MultivariateNormalDiag(

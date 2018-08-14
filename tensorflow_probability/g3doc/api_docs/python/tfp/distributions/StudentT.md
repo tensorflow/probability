@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions.StudentT" />
 <meta itemprop="property" content="allow_nan_stats"/>
@@ -82,6 +79,12 @@ Notice that `scale` has semantics more similar to standard deviation than
 variance. However it is not actually the std. deviation; the Student's
 t-distribution std. dev. is `scale sqrt(df / (df - 2))` when `df > 2`.
 
+Samples of this distribution are reparameterized (pathwise differentiable).
+The derivatives are computed using the approach described in the paper
+
+[Michael Figurnov, Shakir Mohamed, Andriy Mnih.
+Implicit Reparameterization Gradients, 2018](https://arxiv.org/abs/1805.08498)
+
 #### Examples
 
 Examples of initialization of one or a batch of distributions.
@@ -118,6 +121,19 @@ dist = tf.distributions.StudentT(df=2, loc=1, scale=[11, 22.])
 # Evaluate the pdf of both distributions on the same point, 3.0,
 # returning a length 2 tensor.
 dist.prob(3.0)
+```
+
+Compute the gradients of samples w.r.t. the parameters:
+
+```python
+df = tf.constant(2.0)
+loc = tf.constant(2.0)
+scale = tf.constant(11.0)
+dist = tf.distributions.StudentT(df=df, loc=loc, scale=scale)
+samples = dist.sample(5)  # Shape [5]
+loss = tf.reduce_mean(tf.square(samples))  # Arbitrary loss function
+# Unbiased stochastic gradients of the loss function
+grads = tf.gradients(loss, [df, loc, scale])
 ```
 
 ## Properties

@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.bijectors.RealNVP" />
 <meta itemprop="property" content="dtype"/>
@@ -82,12 +79,12 @@ graph execution (which is the case if using tf.layers).
 
 ```python
 tfd = tfp.distributions
-tfb = tfd.bijectors
+tfb = tfp.bijectors
 
 # A common choice for a normalizing flow is to use a Gaussian for the base
 # distribution. (However, any continuous distribution would work.) E.g.,
 nvp = tfd.TransformedDistribution(
-    distribution=tfd.MultivariateNormalDiag(loc=[0., 0., 0.])),
+    distribution=tfd.MultivariateNormalDiag(loc=[0., 0., 0.]),
     bijector=tfb.RealNVP(
         num_masked=2,
         shift_and_log_scale_fn=tfb.real_nvp_default_template(

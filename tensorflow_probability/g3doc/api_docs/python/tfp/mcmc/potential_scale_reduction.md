@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.mcmc.potential_scale_reduction" />
 </div>
@@ -74,7 +71,7 @@ sample from a 2-variate normal.
 ```python
 import tensorflow as tf
 import tensorflow_probability as tfp
-tfd = tf.contrib.distributions
+tfd = tfp.distributions
 
 target = tfd.MultivariateNormalDiag(scale_diag=[1., 2.])
 

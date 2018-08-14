@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions.MultivariateNormalTriL" />
 <meta itemprop="property" content="allow_nan_stats"/>
@@ -92,8 +89,8 @@ Y = scale @ X + loc
 ```
 
 Trainable (batch) lower-triangular matrices can be created with
-`tf.contrib.distributions.matrix_diag_transform()` and/or
-`tf.contrib.distributions.fill_triangular()`
+`tfp.distributions.matrix_diag_transform()` and/or
+`tfp.distributions.fill_triangular()`
 
 #### Examples
 

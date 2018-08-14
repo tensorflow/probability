@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.mcmc.SliceSampler" />
 <meta itemprop="property" content="is_calibrated"/>
@@ -241,9 +238,9 @@ Runs one iteration of Slice Sampler.
 
 #### Args:
 
-* <b>`current_state`</b>: `Tensor` or Python `list` of `Tensor`s of fully defined
-    static shape representing the current state(s) of the Markov chain(s).
-    The first `r` dimensions index independent chains,
+* <b>`current_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
+    current state(s) of the Markov chain(s). The first `r` dimensions
+    index independent chains,
     `r = tf.rank(target_log_prob_fn(*current_state))`.
 * <b>`previous_kernel_results`</b>: `collections.namedtuple` containing `Tensor`s
     representing values from previous calls to this function (or from the
@@ -263,7 +260,6 @@ Runs one iteration of Slice Sampler.
 
 * <b>`ValueError`</b>: if there isn't one `step_size` or a list with same length as
     `current_state`.
-* <b>`ValueError`</b>: if `current_state` does not have a fully defined static shape.
 * <b>`TypeError`</b>: if `not target_log_prob.dtype.is_floating`.
 
 

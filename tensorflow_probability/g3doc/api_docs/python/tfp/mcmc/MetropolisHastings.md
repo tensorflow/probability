@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.mcmc.MetropolisHastings" />
 <meta itemprop="property" content="inner_kernel"/>
@@ -144,7 +141,7 @@ Returns an object with the same type as returned by `one_step`.
 #### Args:
 
 * <b>`init_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
-    a state(s) of the Markov chain(s).
+    initial state(s) of the Markov chain(s).
 
 
 #### Returns:

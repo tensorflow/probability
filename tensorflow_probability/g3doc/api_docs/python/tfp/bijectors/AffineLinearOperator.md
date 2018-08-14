@@ -1,8 +1,6 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.bijectors.AffineLinearOperator" />
+<meta itemprop="property" content="adjoint"/>
 <meta itemprop="property" content="dtype"/>
 <meta itemprop="property" content="forward_min_event_ndims"/>
 <meta itemprop="property" content="graph_parents"/>
@@ -85,6 +83,10 @@ y = affine.forward(x)  # [3., 7, 11]
 
 ## Properties
 
+<h3 id="adjoint"><code>adjoint</code></h3>
+
+`bool` indicating `scale` should be used as conjugate transpose.
+
 <h3 id="dtype"><code>dtype</code></h3>
 
 dtype of `Tensor`s transformable by this distribution.
@@ -138,6 +140,7 @@ Returns True if Tensor arguments will be validated.
 __init__(
     shift=None,
     scale=None,
+    adjoint=False,
     validate_args=False,
     name='affine_linear_operator'
 )
@@ -150,6 +153,9 @@ Instantiates the `AffineLinearOperator` bijector.
 * <b>`shift`</b>: Floating-point `Tensor`.
 * <b>`scale`</b>:  Subclass of `LinearOperator`. Represents the (batch) positive
     definite matrix `M` in `R^{k x k}`.
+* <b>`adjoint`</b>: Python `bool` indicating whether to use the `scale` matrix as
+    specified or its adjoint.
+    Default value: `False`.
 * <b>`validate_args`</b>: Python `bool` indicating whether arguments should be
     checked for correctness.
 * <b>`name`</b>: Python `str` name given to ops managed by this object.

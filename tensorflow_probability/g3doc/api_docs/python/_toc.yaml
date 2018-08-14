@@ -38,6 +38,8 @@ toc:
       path: /probability/api_docs/python/tfp/bijectors/Chain
     - title: CholeskyOuterProduct
       path: /probability/api_docs/python/tfp/bijectors/CholeskyOuterProduct
+    - title: CholeskyToInvCholesky
+      path: /probability/api_docs/python/tfp/bijectors/CholeskyToInvCholesky
     - title: ConditionalBijector
       path: /probability/api_docs/python/tfp/bijectors/ConditionalBijector
     - title: Exp
@@ -86,8 +88,12 @@ toc:
       path: /probability/api_docs/python/tfp/bijectors/Softsign
     - title: Square
       path: /probability/api_docs/python/tfp/bijectors/Square
+    - title: Tanh
+      path: /probability/api_docs/python/tfp/bijectors/Tanh
     - title: TransformDiagonal
       path: /probability/api_docs/python/tfp/bijectors/TransformDiagonal
+    - title: Transpose
+      path: /probability/api_docs/python/tfp/bijectors/Transpose
     - title: Weibull
       path: /probability/api_docs/python/tfp/bijectors/Weibull
   - title: tfp.distributions
@@ -144,8 +150,14 @@ toc:
       path: /probability/api_docs/python/tfp/distributions/fill_triangular_inverse
     - title: Gamma
       path: /probability/api_docs/python/tfp/distributions/Gamma
+    - title: GammaGamma
+      path: /probability/api_docs/python/tfp/distributions/GammaGamma
     - title: GammaWithSoftplusConcentrationRate
       path: /probability/api_docs/python/tfp/distributions/GammaWithSoftplusConcentrationRate
+    - title: GaussianProcess
+      path: /probability/api_docs/python/tfp/distributions/GaussianProcess
+    - title: GaussianProcessRegressionModel
+      path: /probability/api_docs/python/tfp/distributions/GaussianProcessRegressionModel
     - title: Geometric
       path: /probability/api_docs/python/tfp/distributions/Geometric
     - title: HalfNormal
@@ -166,6 +178,8 @@ toc:
       path: /probability/api_docs/python/tfp/distributions/LaplaceWithSoftplusScale
     - title: LinearGaussianStateSpaceModel
       path: /probability/api_docs/python/tfp/distributions/LinearGaussianStateSpaceModel
+    - title: LKJ
+      path: /probability/api_docs/python/tfp/distributions/LKJ
     - title: Logistic
       path: /probability/api_docs/python/tfp/distributions/Logistic
     - title: LogNormal
@@ -244,6 +258,8 @@ toc:
       path: /probability/api_docs/python/tfp/distributions/TransformedDistribution
     - title: tridiag
       path: /probability/api_docs/python/tfp/distributions/tridiag
+    - title: TruncatedNormal
+      path: /probability/api_docs/python/tfp/distributions/TruncatedNormal
     - title: Uniform
       path: /probability/api_docs/python/tfp/distributions/Uniform
     - title: VectorDeterministic
@@ -256,10 +272,10 @@ toc:
       path: /probability/api_docs/python/tfp/distributions/VectorLaplaceDiag
     - title: VectorSinhArcsinhDiag
       path: /probability/api_docs/python/tfp/distributions/VectorSinhArcsinhDiag
-    - title: WishartCholesky
-      path: /probability/api_docs/python/tfp/distributions/WishartCholesky
-    - title: WishartFull
-      path: /probability/api_docs/python/tfp/distributions/WishartFull
+    - title: VonMisesFisher
+      path: /probability/api_docs/python/tfp/distributions/VonMisesFisher
+    - title: Wishart
+      path: /probability/api_docs/python/tfp/distributions/Wishart
   - title: tfp.edward2
     section:
     - title: Overview
@@ -362,10 +378,8 @@ toc:
       path: /probability/api_docs/python/tfp/edward2/VectorLaplaceDiag
     - title: VectorSinhArcsinhDiag
       path: /probability/api_docs/python/tfp/edward2/VectorSinhArcsinhDiag
-    - title: WishartCholesky
-      path: /probability/api_docs/python/tfp/edward2/WishartCholesky
-    - title: WishartFull
-      path: /probability/api_docs/python/tfp/edward2/WishartFull
+    - title: Wishart
+      path: /probability/api_docs/python/tfp/edward2/Wishart
   - title: tfp.glm
     section:
     - title: Overview
@@ -428,6 +442,20 @@ toc:
       path: /probability/api_docs/python/tfp/layers/DenseLocalReparameterization
     - title: DenseReparameterization
       path: /probability/api_docs/python/tfp/layers/DenseReparameterization
+  - title: tfp.math
+    section:
+    - title: Overview
+      path: /probability/api_docs/python/tfp/math
+    - title: diag_jacobian
+      path: /probability/api_docs/python/tfp/math/diag_jacobian
+    - title: matvecmul
+      path: /probability/api_docs/python/tfp/math/matvecmul
+    - title: pinv
+      path: /probability/api_docs/python/tfp/math/pinv
+    - title: random_rademacher
+      path: /probability/api_docs/python/tfp/math/random_rademacher
+    - title: random_rayleigh
+      path: /probability/api_docs/python/tfp/math/random_rayleigh
   - title: tfp.mcmc
     section:
     - title: Overview
@@ -438,6 +466,8 @@ toc:
       path: /probability/api_docs/python/tfp/mcmc/effective_sample_size
     - title: HamiltonianMonteCarlo
       path: /probability/api_docs/python/tfp/mcmc/HamiltonianMonteCarlo
+    - title: make_simple_step_size_update_policy
+      path: /probability/api_docs/python/tfp/mcmc/make_simple_step_size_update_policy
     - title: MetropolisAdjustedLangevinAlgorithm
       path: /probability/api_docs/python/tfp/mcmc/MetropolisAdjustedLangevinAlgorithm
     - title: MetropolisHastings
@@ -482,6 +512,10 @@ toc:
       path: /probability/api_docs/python/tfp/optimizer
     - title: bfgs_minimize
       path: /probability/api_docs/python/tfp/optimizer/bfgs_minimize
+    - title: nelder_mead_minimize
+      path: /probability/api_docs/python/tfp/optimizer/nelder_mead_minimize
+    - title: nelder_mead_one_step
+      path: /probability/api_docs/python/tfp/optimizer/nelder_mead_one_step
     - title: StochasticGradientLangevinDynamics
       path: /probability/api_docs/python/tfp/optimizer/StochasticGradientLangevinDynamics
     - title: VariationalSGD

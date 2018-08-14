@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.mcmc.default_exchange_proposed_fn" />
 </div>
@@ -8,23 +5,36 @@ page_type: reference
 # tfp.mcmc.default_exchange_proposed_fn
 
 ``` python
-tfp.mcmc.default_exchange_proposed_fn(probs)
+tfp.mcmc.default_exchange_proposed_fn(prob_exchange)
 ```
 
-Default function for `exchange_proposed_fn` of `kernel`.
+Default exchange proposal function, for replica exchange MC.
 
-Depending on the probability of `probs`, decide whether to propose
-combinations of replica for exchange.
-When exchanging, create combinations of adjacent replicas from 0 or 1 index.
+With probability `prob_exchange` propose combinations of replica for exchange.
+When exchanging, create combinations of adjacent replicas in
+[Replica Exchange Monte Carlo](
+https://en.wikipedia.org/wiki/Parallel_tempering)
+
+```
+exchange_fn = default_exchange_proposed_fn(prob_exchange=0.5)
+exchange_proposed = exchange_fn(num_replica=3)
+
+exchange_proposed.eval()
+==> [[0, 1]]  # 1 exchange, 0 <--> 1
+
+exchange_proposed.eval()
+==> []  # 0 exchanges
+```
 
 #### Args:
 
-* <b>`probs`</b>: A float-like Tensor which represents the probability of proposing
-    combinations of replicas for exchange.
+* <b>`prob_exchange`</b>: Scalar `Tensor` giving probability that any exchanges will
+    be generated.
 
 
 #### Returns:
 
 * <b>`default_exchange_proposed_fn_`</b>: Python callable which take a number of
-    replicas, and return combinations of replicas for exchange and a number of
-    combinations.
+    replicas (a Python integer), and return combinations of replicas for
+    exchange as an [n, 2] integer `Tensor`, `0 <= n <= num_replica // 2`,
+    with *unique* values in the set `{0, ..., num_replica}`.

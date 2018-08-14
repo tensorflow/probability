@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.mcmc.ReplicaExchangeMC" />
 <meta itemprop="property" content="exchange_proposed_fn"/>
@@ -28,9 +25,25 @@ Runs one step of the Replica Exchange Monte Carlo.
 https://en.wikipedia.org/wiki/Parallel_tempering) is a Markov chain
 Monte Carlo (MCMC) algorithm that is also known as Parallel Tempering. This
 algorithm performs multiple sampling with different temperatures in parallel,
-and exchange those samplings according to the Metropolis-Hastings criterion.
-By using the sampling result of high temperature, sampling with less influence
-of the local solution becomes possible.
+and exchanges those samplings according to the Metropolis-Hastings criterion.
+
+The `K` replicas are parameterized in terms of `inverse_temperature`'s,
+`(beta[0], beta[1], ..., beta[K-1])`.  If the target distribution has
+probability density `p(x)`, the `kth` replica has density `p(x)**beta_k`.
+
+Typically `beta[0] = 1.0`, and `1.0 > beta[1] > beta[2] > ... > 0.0`.
+
+* `beta[0] == 1` ==> First replicas samples from the target density, `p`.
+* `beta[k] < 1`, for `k = 1, ..., K-1` ==> Other replicas sample from
+  "flattened" versions of `p` (peak is less high, valley less low).  These
+  distributions are somewhat closer to a uniform on the support of `p`.
+
+Samples from adjacent replicas `i`, `i + 1` are used as proposals for each
+other in a Metropolis step.  This allows the lower `beta` samples, which
+explore less dense areas of `p`, to occasionally be used to help the
+`beta == 1` chain explore new regions of the support.
+
+Samples from replica 0 are returned, and the others are discarded.
 
 #### Examples
 
@@ -53,7 +66,7 @@ def make_kernel_fn(target_log_prob_fn, seed):
 
 remc = tfp.mcmc.ReplicaExchangeMC(
     target_log_prob_fn=target.log_prob,
-    inverse_temperatures=10.**tf.linspace(0., -2., 5),
+    inverse_temperatures=[1., 0.3, 0.1, 0.03],
     make_kernel_fn=make_kernel_fn,
     seed=42)
 
@@ -99,13 +112,14 @@ def make_kernel_fn(target_log_prob_fn, seed):
 
 remc = tfp.mcmc.ReplicaExchangeMC(
     target_log_prob_fn=target.log_prob,
-    inverse_temperatures=10.**tf.linspace(0., -2., 5),
+    inverse_temperatures=[1., 0.3, 0.1, 0.03, 0.01],
     make_kernel_fn=make_kernel_fn,
     seed=42)
 
 samples, _ = tfp.mcmc.sample_chain(
     num_results=1000,
-    current_state=np.zeros(2, dtype=dtype),
+    # Start near the [1, 1] mode.  Standard HMC would get stuck there.
+    current_state=np.ones(2, dtype=dtype),
     kernel=remc,
     num_burnin_steps=500,
     parallel_iterations=1)  # For determinism.
@@ -179,15 +193,14 @@ Instantiates this object.
 * <b>`target_log_prob_fn`</b>: Python callable which takes an argument like
     `current_state` (or `*current_state` if it's a list) and returns its
     (possibly unnormalized) log-density under the target distribution.
-* <b>`inverse_temperatures`</b>: sequence of inverse temperatures to perform
-    samplings with each replica. Must have statically known `rank` and
-    statically known leading shape, i.e.,
-    `inverse_temperatures.shape[0].value is not None`
+* <b>`inverse_temperatures`</b>: `1D` `Tensor of inverse temperatures to perform
+    samplings with each replica. Must have statically known `shape`.
+    `inverse_temperatures[0]` produces the states returned by samplers,
+    and is typically == 1.
 * <b>`make_kernel_fn`</b>: Python callable which takes target_log_prob_fn and seed
     args and returns a TransitionKernel instance.
 * <b>`exchange_proposed_fn`</b>: Python callable which take a number of replicas, and
-    return combinations of replicas for exchange and a number of
-    combinations.
+    return combinations of replicas for exchange.
 * <b>`seed`</b>: Python integer to seed the random number generator.
     Default value: `None` (i.e., no seed).
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this function.
@@ -197,8 +210,7 @@ Instantiates this object.
 
 #### Raises:
 
-* <b>`ValueError`</b>: if `inverse_temperatures` doesn't have statically known rank
-    and statically known leading shape
+* <b>`ValueError`</b>: `inverse_temperatures` doesn't have statically known 1D shape.
 
 <h3 id="bootstrap_results"><code>bootstrap_results</code></h3>
 
@@ -211,7 +223,7 @@ Returns an object with the same type as returned by `one_step`.
 #### Args:
 
 * <b>`init_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
-    a state(s) of the Markov chain(s).
+    initial state(s) of the Markov chain(s).
 
 
 #### Returns:
