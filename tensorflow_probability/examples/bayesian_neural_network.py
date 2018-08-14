@@ -54,7 +54,7 @@ except ImportError:
 
 tfd = tf.contrib.distributions
 
-IMAGE_SHAPE = (28, 28, 1)
+IMAGE_SHAPE = [28, 28, 1]
 
 flags.DEFINE_float("learning_rate",
                    default=0.001,
@@ -139,7 +139,7 @@ def plot_heldout_prediction(input_vals, probs,
   canvas = backend_agg.FigureCanvasAgg(fig)
   for i in range(n):
     ax = fig.add_subplot(n, 3, 3*i + 1)
-    ax.imshow(input_vals[i, :].reshape([28, 28]), interpolation="None")
+    ax.imshow(input_vals[i, :].reshape(IMAGE_SHAPE[:-1]), interpolation="None")
 
     ax = fig.add_subplot(n, 3, 3*i + 2)
     for prob_sample in probs:
@@ -275,10 +275,11 @@ def main(argv):
     names = []
     qmeans = []
     qstds = []
-    prob_layers = [0, 2, 4, 6, 7]
-    for i in prob_layers:
-      layer = neural_net.layers[i]
-      q = layer.kernel_posterior
+    for i, layer in enumerate(neural_net.layers):
+      try:
+          q = layer.kernel_posterior
+      except AttributeError:
+          continue
       names.append("Layer {}".format(i))
       qmeans.append(q.mean())
       qstds.append(q.stddev())
