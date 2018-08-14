@@ -22,6 +22,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 tfd = tfp.distributions
+tfe = tf.contrib.eager
 
 rng = np.random.RandomState(0)
 
@@ -179,6 +180,34 @@ class DeterministicTest(tf.test.TestCase):
       entropy_ = sess.run(deterministic.entropy())
       self.assertAllEqual(np.zeros(3), entropy_)
 
+  @tfe.run_test_in_graph_and_eager_modes()
+  def testDeterministicDeterministicKL(self):
+    batch_size = 6
+    a_loc = np.array([0.5] * batch_size, dtype=np.float32)
+    b_loc = np.array([0.4] * batch_size, dtype=np.float32)
+
+    a = tfd.Deterministic(loc=a_loc)
+    b = tfd.Deterministic(loc=b_loc)
+
+    kl = tfd.kl_divergence(a, b)
+    kl_ = self.evaluate(kl)
+    self.assertAllEqual(np.zeros(6) + np.inf, kl_)
+
+  @tfe.run_test_in_graph_and_eager_modes()
+  def testDeterministicGammaKL(self):
+    batch_size = 2
+    a_loc = np.array([0.5] * batch_size, dtype=np.float32)
+    b_concentration = np.array([3.2] * batch_size, dtype=np.float32)
+    b_rate = np.array([4.1] * batch_size, dtype=np.float32)
+
+    a = tfd.Deterministic(loc=a_loc)
+    b = tfd.Gamma(concentration=b_concentration, rate=b_rate)
+
+    expected_kl = -b.log_prob(a_loc)
+    actual_kl = tfd.kl_divergence(a, b)
+    expected_kl_, actual_kl_ = self.evaluate([expected_kl, actual_kl])
+    self.assertAllEqual(expected_kl_, actual_kl_)
+
 
 class VectorDeterministicTest(tf.test.TestCase):
 
@@ -298,6 +327,36 @@ class VectorDeterministicTest(tf.test.TestCase):
     with self.test_session() as sess:
       entropy_ = sess.run(deterministic.entropy())
       self.assertAllEqual(np.zeros(2), entropy_)
+
+  @tfe.run_test_in_graph_and_eager_modes()
+  def testVectorDeterministicVectorDeterministicKL(self):
+    batch_size = 6
+    event_size = 3
+    a_loc = np.array([[0.5] * event_size] * batch_size, dtype=np.float32)
+    b_loc = np.array([[0.4] * event_size] * batch_size, dtype=np.float32)
+
+    a = tfd.VectorDeterministic(loc=a_loc)
+    b = tfd.VectorDeterministic(loc=b_loc)
+
+    kl = tfd.kl_divergence(a, b)
+    kl_ = self.evaluate(kl)
+    self.assertAllEqual(np.zeros(6) + np.inf, kl_)
+
+  @tfe.run_test_in_graph_and_eager_modes()
+  def testVectorDeterministicMultivariateNormalDiagKL(self):
+    batch_size = 4
+    event_size = 5
+    a_loc = np.array([[0.5] * event_size] * batch_size, dtype=np.float32)
+    b_loc = np.array([[0.4] * event_size] * batch_size, dtype=np.float32)
+    b_scale_diag = np.array([[3.2] * event_size] * batch_size, dtype=np.float32)
+
+    a = tfd.VectorDeterministic(loc=a_loc)
+    b = tfd.MultivariateNormalDiag(loc=b_loc, scale_diag=b_scale_diag)
+
+    expected_kl = -b.log_prob(a_loc)
+    actual_kl = tfd.kl_divergence(a, b)
+    expected_kl_, actual_kl_ = self.evaluate([expected_kl, actual_kl])
+    self.assertAllEqual(expected_kl_, actual_kl_)
 
 
 if __name__ == "__main__":

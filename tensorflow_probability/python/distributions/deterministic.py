@@ -381,3 +381,20 @@ class VectorDeterministic(_BaseDeterministic):
     return tf.cast(
         tf.reduce_all(tf.abs(x - self.loc) <= self._slack, axis=-1),
         dtype=self.dtype)
+
+
+@tf.distributions.RegisterKL(_BaseDeterministic, tf.distributions.Distribution)
+def _kl_deterministic_distribution(a, b, name=None):
+  """Calculate the batched KL divergence `KL(a || b)` with `a` Deterministic.
+
+  Args:
+    a: instance of a Deterministic distribution object.
+    b: instance of a Distribution distribution object.
+    name: (optional) Name to use for created operations. Default is
+      "kl_deterministic_distribution".
+
+  Returns:
+    Batchwise `KL(a || b)`.
+  """
+  with tf.name_scope(name, "kl_deterministic_distribution", [a.loc]):
+    return -b.log_prob(a.loc)
