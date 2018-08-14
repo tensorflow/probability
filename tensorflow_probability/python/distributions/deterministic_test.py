@@ -172,6 +172,13 @@ class DeterministicTest(tf.test.TestCase):
         self.assertAllClose(
             np.zeros(sample_shape_ + (2,)).astype(np.float32), sample_)
 
+  def testEntropy(self):
+    loc = np.array([-0.1, -3.2, 7.])
+    deterministic = tfd.Deterministic(loc=loc)
+    with self.test_session() as sess:
+      entropy_ = sess.run(deterministic.entropy())
+      self.assertAllEqual(np.zeros(3), entropy_)
+
 
 class VectorDeterministicTest(tf.test.TestCase):
 
@@ -284,6 +291,13 @@ class VectorDeterministicTest(tf.test.TestCase):
                        sample_shape: sample_shape_})
         self.assertAllClose(
             np.zeros(sample_shape_ + (2, 1)).astype(np.float32), sample_)
+
+  def testEntropy(self):
+    loc = np.array([[8.3, 1.2, 3.3], [-0.1, -3.2, 7.]])
+    deterministic = tfd.VectorDeterministic(loc=loc)
+    with self.test_session() as sess:
+      entropy_ = sess.run(deterministic.entropy())
+      self.assertAllEqual(np.zeros(2), entropy_)
 
 
 if __name__ == "__main__":

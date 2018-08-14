@@ -138,6 +138,9 @@ class _BaseDeterministic(tf.distributions.Distribution):
     """Relative tolerance for comparing points to `self.loc`."""
     return self._rtol
 
+  def _entropy(self):
+    return tf.zeros(self.batch_shape_tensor(), dtype=self.dtype)
+
   def _mean(self):
     return tf.identity(self.loc)
 
