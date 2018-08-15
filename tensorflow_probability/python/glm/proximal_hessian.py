@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""GLMNet with Hessian/proximal gradient descent based optimization.
+"""GLM fitter with Hessian/proximal gradient descent based optimization.
 
-This optimizer is a variant of GLMNet which uses proximal gradient descent and a
-step size dependent on the Hessian to efficiently minimize a convex loss
-function with L1 and L2 regularization.  For GLMs, we approximate the Hessian
-with the Fisher information matrix.
+This optimizer uses proximal gradient descent and a step size dependent on the
+Hessian to efficiently minimize a convex loss function with L1 and L2
+regularization.  For GLMs, we approximate the Hessian with the Fisher
+information matrix.
 """
 
 from __future__ import absolute_import
@@ -300,7 +300,7 @@ def minimize_sparse_one_step(gradient_unregularized_loss,
                              learning_rate=None,
                              x_update_var=None,
                              name=None):
-  """One step of (the outer loop of) GLMNet's minimization algorithm.
+  """One step of (the outer loop of) the minimization algorithm.
 
   This function returns a new value of `x`, equal to `x_start + x_update`.  The
   increment `x_update in R^n` is computed by a coordinate descent method, that
@@ -486,7 +486,7 @@ def minimize_sparse_one_step(gradient_unregularized_loss,
 
     def _loop_body(iter_, x_update_diff_norm_sq, x_update,  # pylint: disable=missing-docstring
                    hess_matmul_x_update):
-      # Inner loop of GLMNet's minimizer.
+      # Inner loop of the minimizer.
       #
       # This loop updates a single coordinate of x_update.  Ideally, an
       # iteration of this loop would set
@@ -698,13 +698,13 @@ def minimize_sparse(grad_and_hessian_loss_fn,
       regularization term (see equation above).
       Default value: `None` (i.e., no L2 regularization).
     maximum_iterations: Python integer specifying the maximum number of
-      iterations of the outer loop of GLMNet.  After this many iterations of the
-      outer loop, the algorithm will terminate even if the return value
+      iterations of the outer loop of the optimizer.  After this many iterations
+      of the outer loop, the algorithm will terminate even if the return value
       `optimal_x` has not converged.
       Default value: `1`.
     maximum_full_sweeps_per_iteration: Python integer specifying the Maximum
-      number of sweeps allowed in each iteration of the outer loop of GLMNet.
-      Passed as the `maximum_full_sweeps` argument to
+      number of sweeps allowed in each iteration of the outer loop of the
+      optimizer.  Passed as the `maximum_full_sweeps` argument to
       `minimize_sparse_one_step`.
       Default value: `1`.
     learning_rate: scalar, `float` `Tensor` representing a multiplicative factor
@@ -725,7 +725,7 @@ def minimize_sparse(grad_and_hessian_loss_fn,
       (`minimize_sparse_one_step`) returns `True` for its `is_converged` output
       value.
     iter: scalar, `int` `Tensor` indicating the actual number of iterations of
-      the outer loop of GLMNet completed (i.e., number of calls to
+      the outer loop of the optimizer completed (i.e., number of calls to
       `minimize_sparse_one_step` before achieving convergence).
 
   #### References
@@ -804,7 +804,7 @@ def fit_sparse_one_step(model_matrix,
                         learning_rate=None,
                         model_coefficients_update_var=None,
                         name=None):
-  """One step of (the outer loop of) GLMNet's fitting algorithm.
+  """One step of (the outer loop of) the GLM fitting algorithm.
 
   This function returns a new value of `model_coefficients`, equal to
   `model_coefficients_start + model_coefficients_update`.  The increment
@@ -938,7 +938,7 @@ def fit_sparse(model_matrix,
                learning_rate=None,
                model_coefficients_update_var=None,
                name=None):
-  """Fits a GLM using GLMNet with FIM-informed proximal gradient descent.
+  """Fits a GLM using coordinate-wise FIM-informed proximal gradient descent.
 
   This function uses a L1- and L2-regularized, second-order quasi-Newton method
   to find maximum-likelihood parameters for the given model and observed data.
@@ -976,7 +976,7 @@ def fit_sparse(model_matrix,
       regularization term.
       Default value: `None` (i.e., no L2 regularization).
     maximum_iterations: Python integer specifying maximum number of iterations
-      of the outer loop of GLMNet (i.e., maximum number of calls to
+      of the outer loop of the optimizer (i.e., maximum number of calls to
       `fit_sparse_one_step`).  After this many iterations of the outer loop, the
       algorithm will terminate even if the return value `model_coefficients` has
       not converged.
@@ -1006,7 +1006,7 @@ def fit_sparse(model_matrix,
       (`fit_sparse_one_step`) returns `True` for its `is_converged` output
       value.
     iter: scalar, `int` `Tensor` indicating the actual number of iterations of
-      the outer loop of GLMNet completed (i.e., number of calls to
+      the outer loop of the optimizer completed (i.e., number of calls to
       `fit_sparse_one_step` before achieving convergence).
 
   #### References
