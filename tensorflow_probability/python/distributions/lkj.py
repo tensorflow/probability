@@ -191,12 +191,31 @@ class LKJ(tfd.Distribution):
         return tf.ones(shape=shape, dtype=self.concentration.dtype)
       beta_conc = concentration + (self.dimension - 2.) / 2.
       beta_dist = tfd.Beta(concentration1=beta_conc, concentration0=beta_conc)
-      corner = 2. * beta_dist.sample(seed=seed()) - 1.
-      ones = tf.ones_like(corner)
-      # result is r in reference [1].
-      result = tf.reshape(
-          tf.stack([ones, corner, corner, ones], axis=-1),
-          tf.concat([concentration_shape, [2, 2]], axis=0))  # shape: B + [2, 2]
+
+      # Note that the sampler below deviates from [1], by doing the sampling in
+      # cholesky space. This does not change the fundamental logic of the
+      # sampler, but does speed up the sampling.
+
+      # This is the correlation coefficient between the first two dimensions.
+      # This is also `r` in reference [1].
+      corr12 = 2. * beta_dist.sample(seed=seed()) - 1.
+
+      # Below we construct the Cholesky of the initial 2x2 correlation matrix,
+      # which is of the form:
+      # [[1, 0], [r, sqrt(1 - r**2)]], where r is the correlation between the
+      # first two dimensions.
+      # This is the top-left corner of the cholesky of the final sample.
+      first_row = tf.concat([
+          tf.ones_like(corr12)[..., tf.newaxis],
+          tf.zeros_like(corr12)[..., tf.newaxis]], axis=-1)
+      second_row = tf.concat([
+          corr12[..., tf.newaxis],
+          tf.sqrt(1 - corr12**2)[..., tf.newaxis]], axis=-1)
+
+      chol_result = tf.concat([
+          first_row[..., tf.newaxis, :],
+          second_row[..., tf.newaxis, :]], axis=-2)
+
       for n in range(2, self.dimension):
         # Loop invariant: on entry, result has shape B + [n, n]
         beta_conc -= 0.5
@@ -211,23 +230,42 @@ class LKJ(tfd.Distribution):
             n, concentration_shape, self.concentration.dtype, seed)
         # raw_correlation is w in reference [1].
         raw_correlation = distance * direction  # shape: B + [n]
-        # new_row is z in reference [1].
-        # new_row shape: B + [n]
-        # This should be a batch matrix-vector multiply, I hope
-        # Could use einsum instead
-        new_row = tf.reduce_sum(
-            tf.cholesky(result) * raw_correlation[..., tf.newaxis, :],
-            axis=-1)
-        # r_plus_row shape: B + [n+1, n]
-        result_plus_row = tf.concat(
-            [result, new_row[..., tf.newaxis, :]], axis=-2)
-        ones = tf.ones_like(
-            concentration, dtype=self.concentration.dtype)[..., tf.newaxis]
-        # new_column_right shape: B + [n+1]
-        new_column = tf.concat([new_row, ones], axis=-1)
-        result = tf.concat(
-            [result_plus_row, new_column[..., tf.newaxis]], axis=-1)
-        # TODO(b/111451422): Rewrite this sampler in Cholesky space
+
+        # This is the next row in the cholesky of the result,
+        # which differs from the construction in reference [1].
+        # In the reference, the new row `z` = chol_result @ raw_correlation^T
+        # = C @ raw_correlation^T (where as short hand we use C = chol_result).
+        # We prove that the below equation is the right row to add to the
+        # cholesky, by showing equality with reference [1].
+        # Let S be the sample constructed so far, and let `z` be as in
+        # reference [1]. Then at this iteration, the new sample S' will be
+        # [[S z^T]
+        #  [z 1]]
+        # In our case we have the cholesky decomposition factor C, so
+        # we want our new row x (same size as z) to satisfy:
+        #  [[S z^T]  [[C 0]    [[C^T  x^T]         [[CC^T  Cx^T]
+        #   [z 1]] =  [x k]]    [0     k]]  =       [xC^t   xx^T + k**2]]
+        # Since C @ raw_correlation^T = z = C @ x^T, and C is invertible,
+        # we have that x = raw_correlation. Also 1 = xx^T + k**2, so k
+        # = sqrt(1 - xx^T) = sqrt(1 - |raw_correlation|**2) = sqrt(1 -
+        # distance**2).
+        new_row = tf.concat(
+            [raw_correlation, tf.sqrt(1. - distance**2)], axis=-1)
+
+        # Finally add this new row, by growing the cholesky of the result.
+        chol_result = tf.concat([
+            chol_result,
+            tf.zeros_like(chol_result[..., 0][..., tf.newaxis])], axis=-1)
+
+        chol_result = tf.concat(
+            [chol_result, new_row[..., tf.newaxis, :]], axis=-2)
+
+      result = tf.matmul(chol_result, chol_result, transpose_b=True)
+      # The diagonal for a correlation matrix should always be ones. Due to
+      # numerical instability the matmul might not achieve that, so manually set
+      # these to ones.
+      result = tf.matrix_set_diag(result, tf.ones(
+          shape=tf.shape(result)[:-1], dtype=result.dtype.base_dtype))
       return result
 
   def _validate_dimension(self, x):
