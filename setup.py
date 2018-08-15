@@ -14,19 +14,27 @@
 # ============================================================================
 """Install tensorflow_probability."""
 import datetime
+import os
 import sys
 
 from setuptools import find_packages
 from setuptools import setup
 from setuptools.command.install import install as InstallCommandBase
 from setuptools.dist import Distribution
-# Import __version__ directly from the local source tree. This does not use a
-# local installation of tensorflow_probability, even if one already exists, and
-# will only work when executing the setup.py file from the directory in which
-# setup.py and the source tree live (this is always where we'd run setup.py,
-# either via `bazel run :pip_pkg /path/to/wheel/output` or simply
-# `pip install .`)
-from tensorflow_probability.python.version import __version__
+
+# Read __version__ variable from tensorflow_probability/python/version.py using
+# `exec`. We can't import it because TFP is not actually installed. Note that
+# this is 1) one of the python-recommended ways of doing this (see
+# https://packaging.python.org/guides/single-sourcing-package-version/), and 2)
+# while pylint discourages it by default, it isn't strictly forbidden (although
+# generally a bad idea in real code, which this setup.py is not)
+version_path = os.path.join(
+    os.path.dirname(__file__), 'tensorflow_probability', 'python', 'version.py')
+with open(version_path, 'r') as f:
+  exec(f.read())  # pylint: disable=exec-used
+# Rename `__version__` here, so we only need one pylint disabling macro.
+# `__version__` is defined as a result of exec'ing the version.py file contents.
+VERSION = __version__  # pylint: disable=undefined-variable
 
 REQUIRED_PACKAGES = [
     'six >= 1.10.0',
@@ -63,7 +71,7 @@ else:
   # '0.0.1.dev20180305'
   project_name = 'tfp-nightly' + maybe_gpu_suffix
   datestring = datetime.datetime.now().strftime('%Y%m%d')
-  __version__ += datestring
+  VERSION += datestring
   tensorflow_package_name = 'tf-nightly{}'.format(
       maybe_gpu_suffix)
 
@@ -78,7 +86,7 @@ class BinaryDistribution(Distribution):
 
 setup(
     name=project_name,
-    version=__version__,
+    version=VERSION,
     description='Probabilistic modeling and statistical '
                 'inference in TensorFlow',
     author='Google LLC',
