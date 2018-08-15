@@ -71,8 +71,9 @@ class ConditionalTransformedDistributionTest(
           bijector=_ChooseLocation(loc=[-100., 100.]))
       z = [-1, +1, -1, -1, +1]
       self.assertAllClose(
-          np.sign(conditional_normal.sample(
-              5, bijector_kwargs={"z": z}).eval()), z)
+          np.sign(self.evaluate(
+              conditional_normal.sample(
+                  5, bijector_kwargs={"z": z}))), z)
 
 
 class ConditionalScalarToMultiTest(

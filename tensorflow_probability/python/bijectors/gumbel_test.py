@@ -41,14 +41,14 @@ class GumbelBijectorTest(tf.test.TestCase):
       # Gumbel distribution
       gumbel_dist = stats.gumbel_r(loc=loc, scale=scale)
       y = gumbel_dist.cdf(x).astype(np.float32)
-      self.assertAllClose(y, bijector.forward(x).eval())
-      self.assertAllClose(x, bijector.inverse(y).eval())
+      self.assertAllClose(y, self.evaluate(bijector.forward(x)))
+      self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
       self.assertAllClose(
           np.squeeze(gumbel_dist.logpdf(x), axis=-1),
-          bijector.forward_log_det_jacobian(x, event_ndims=1).eval())
+          self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=1)))
       self.assertAllClose(
-          -bijector.inverse_log_det_jacobian(y, event_ndims=1).eval(),
-          bijector.forward_log_det_jacobian(x, event_ndims=1).eval(),
+          self.evaluate(-bijector.inverse_log_det_jacobian(y, event_ndims=1)),
+          self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=1)),
           rtol=1e-4,
           atol=0.)
 

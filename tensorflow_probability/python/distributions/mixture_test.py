@@ -147,18 +147,21 @@ class MixtureTest(tf.test.TestCase):
         dist = make_univariate_mixture(batch_shape, num_components=10,
                                        use_static_graph=self.use_static_graph)
         self.assertAllEqual(batch_shape, dist.batch_shape)
-        self.assertAllEqual(batch_shape, dist.batch_shape_tensor().eval())
+        self.assertAllEqual(
+            batch_shape, self.evaluate(dist.batch_shape_tensor()))
         self.assertAllEqual([], dist.event_shape)
-        self.assertAllEqual([], dist.event_shape_tensor().eval())
+        self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
 
         for event_shape in ([1], [2]):
           dist = make_multivariate_mixture(
               batch_shape, num_components=10, event_shape=event_shape,
               use_static_graph=self.use_static_graph)
           self.assertAllEqual(batch_shape, dist.batch_shape)
-          self.assertAllEqual(batch_shape, dist.batch_shape_tensor().eval())
+          self.assertAllEqual(
+              batch_shape, self.evaluate(dist.batch_shape_tensor()))
           self.assertAllEqual(event_shape, dist.event_shape)
-          self.assertAllEqual(event_shape, dist.event_shape_tensor().eval())
+          self.assertAllEqual(
+              event_shape, self.evaluate(dist.event_shape_tensor()))
 
   def testBrokenShapesStatic(self):
     with self.assertRaisesWithPredicateMatch(ValueError,
@@ -537,7 +540,7 @@ class MixtureTest(tf.test.TestCase):
           components,
           name="mixture1",
           use_static_graph=self.use_static_graph)
-      samples1 = dist1.sample(n, seed=123456).eval()
+      samples1 = self.evaluate(dist1.sample(n, seed=123456))
 
       tf.set_random_seed(654321)
       components2 = [
@@ -549,7 +552,7 @@ class MixtureTest(tf.test.TestCase):
           components2,
           name="mixture2",
           use_static_graph=self.use_static_graph)
-      samples2 = dist2.sample(n, seed=123456).eval()
+      samples2 = self.evaluate(dist2.sample(n, seed=123456))
 
       self.assertAllClose(samples1, samples2)
 
@@ -800,7 +803,7 @@ class MixtureTest(tf.test.TestCase):
           cat=tfd.Categorical(probs=[.3, .7]),
           components=[tfd.Gamma(1., 2.), tfd.Gamma(2., 1.)],
           use_static_graph=self.use_static_graph)
-      x_ = gm.sample().eval()
+      x_ = self.evaluate(gm.sample())
       self.assertAllEqual([], x_.shape)
 
 

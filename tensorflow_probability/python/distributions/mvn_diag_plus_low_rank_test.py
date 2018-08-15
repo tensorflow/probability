@@ -51,7 +51,7 @@ class MultivariateNormalDiagPlusLowRankTest(tf.test.TestCase):
                      [0, 4 + 5]],
                     [[5 + 5, 0],
                      [0, 6 + 5]]]),
-          dist.scale.to_dense().eval())
+          self.evaluate(dist.scale.to_dense()))
 
   def testDiagBroadcastBothBatchAndEvent2(self):
     # This test differs from `testDiagBroadcastBothBatchAndEvent` in that it
@@ -87,7 +87,7 @@ class MultivariateNormalDiagPlusLowRankTest(tf.test.TestCase):
                      [0, 4 + 4]],
                     [[5 + 3, 0],
                      [0, 6 + 3]]]),   # shape: [3, 2, 2]
-          dist.scale.to_dense().eval())
+          self.evaluate(dist.scale.to_dense()))
 
   def testDiagBroadcastMultiplierAndLoc(self):
     # batch_shape: [], event_shape: [3]
@@ -109,7 +109,7 @@ class MultivariateNormalDiagPlusLowRankTest(tf.test.TestCase):
                     [[3, 0, 0],
                      [0, 3, 0],
                      [0, 0, 3]]]),
-          dist.scale.to_dense().eval())
+          self.evaluate(dist.scale.to_dense()))
 
   def testMean(self):
     mu = [-1.0, 1.0]
@@ -123,7 +123,7 @@ class MultivariateNormalDiagPlusLowRankTest(tf.test.TestCase):
           scale_perturb_factor=v,
           scale_perturb_diag=diag_small,
           validate_args=True)
-      self.assertAllEqual(mu, dist.mean().eval())
+      self.assertAllEqual(mu, self.evaluate(dist.mean()))
 
   def testSample(self):
     # TODO(jvdillon): This test should be the basis of a new test fixture which
@@ -381,7 +381,8 @@ class MultivariateNormalDiagPlusLowRankTest(tf.test.TestCase):
     with self.test_session():
       mvn = tfd.MultivariateNormalDiagPlusLowRank(
           loc=mu, scale_perturb_factor=u, scale_perturb_diag=m)
-      self.assertAllClose(cov, mvn.covariance().eval(), atol=0., rtol=1e-6)
+      self.assertAllClose(
+          cov, self.evaluate(mvn.covariance()), atol=0., rtol=1e-6)
 
 
 if __name__ == "__main__":

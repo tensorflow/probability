@@ -90,10 +90,10 @@ class VectorStudentTTest(tf.test.TestCase):
       x = 2. * self._rng.rand(4, 1).astype(np.float32) - 1.
 
       self.assertAllClose(expected_mst.log_prob(x),
-                          actual_mst.log_prob(x).eval(),
+                          self.evaluate(actual_mst.log_prob(x)),
                           rtol=0., atol=1e-5)
       self.assertAllClose(expected_mst.prob(x),
-                          actual_mst.prob(x).eval(),
+                          self.evaluate(actual_mst.prob(x)),
                           rtol=0., atol=1e-5)
 
   def testProbStatic(self):
@@ -119,10 +119,10 @@ class VectorStudentTTest(tf.test.TestCase):
       actual_mst = _VectorStudentT(df=df, loc=loc, scale_diag=scale_diag,
                                    validate_args=True)
       self.assertAllClose(expected_mst.log_prob(x),
-                          actual_mst.log_prob(x).eval(),
+                          self.evaluate(actual_mst.log_prob(x)),
                           rtol=0., atol=1e-5)
       self.assertAllClose(expected_mst.prob(x),
-                          actual_mst.prob(x).eval(),
+                          self.evaluate(actual_mst.prob(x)),
                           rtol=0., atol=1e-5)
 
   def testProbDynamic(self):
@@ -183,10 +183,10 @@ class VectorStudentTTest(tf.test.TestCase):
       actual_mst = _VectorStudentT(df=df, loc=loc, scale_diag=scale_diag,
                                    validate_args=True)
       self.assertAllClose(expected_mst.log_prob(x),
-                          actual_mst.log_prob(x).eval(),
+                          self.evaluate(actual_mst.log_prob(x)),
                           rtol=0., atol=1e-5)
       self.assertAllClose(expected_mst.prob(x),
-                          actual_mst.prob(x).eval(),
+                          self.evaluate(actual_mst.prob(x)),
                           rtol=0., atol=1e-5)
 
   def testProbScalarBaseDistributionNonScalarTransformDynamic(self):
@@ -242,10 +242,10 @@ class VectorStudentTTest(tf.test.TestCase):
       actual_mst = _VectorStudentT(df=df, loc=loc, scale_diag=scale_diag,
                                    validate_args=True)
       self.assertAllClose(expected_mst.log_prob(x),
-                          actual_mst.log_prob(x).eval(),
+                          self.evaluate(actual_mst.log_prob(x)),
                           rtol=0., atol=1e-5)
       self.assertAllClose(expected_mst.prob(x),
-                          actual_mst.prob(x).eval(),
+                          self.evaluate(actual_mst.prob(x)),
                           rtol=0., atol=1e-5)
 
   def testProbNonScalarBaseDistributionScalarTransformDynamic(self):

@@ -34,9 +34,10 @@ class DeterministicTest(tf.test.TestCase):
       loc = rng.rand(2, 3, 4)
       deterministic = tfd.Deterministic(loc)
 
-      self.assertAllEqual(deterministic.batch_shape_tensor().eval(), (2, 3, 4))
+      self.assertAllEqual(
+          self.evaluate(deterministic.batch_shape_tensor()), (2, 3, 4))
       self.assertAllEqual(deterministic.batch_shape, (2, 3, 4))
-      self.assertAllEqual(deterministic.event_shape_tensor().eval(), [])
+      self.assertAllEqual(self.evaluate(deterministic.event_shape_tensor()), [])
       self.assertEqual(deterministic.event_shape, tf.TensorShape([]))
 
   def testInvalidTolRaises(self):
@@ -44,21 +45,21 @@ class DeterministicTest(tf.test.TestCase):
     deterministic = tfd.Deterministic(loc, atol=-1, validate_args=True)
     with self.test_session():
       with self.assertRaisesOpError("Condition x >= 0"):
-        deterministic.prob(0.).eval()
+        self.evaluate(deterministic.prob(0.))
 
   def testProbWithNoBatchDimsIntegerType(self):
     deterministic = tfd.Deterministic(0)
     with self.test_session():
-      self.assertAllClose(1, deterministic.prob(0).eval())
-      self.assertAllClose(0, deterministic.prob(2).eval())
-      self.assertAllClose([1, 0], deterministic.prob([0, 2]).eval())
+      self.assertAllClose(1, self.evaluate(deterministic.prob(0)))
+      self.assertAllClose(0, self.evaluate(deterministic.prob(2)))
+      self.assertAllClose([1, 0], self.evaluate(deterministic.prob([0, 2])))
 
   def testProbWithNoBatchDims(self):
     deterministic = tfd.Deterministic(0.)
     with self.test_session():
-      self.assertAllClose(1., deterministic.prob(0.).eval())
-      self.assertAllClose(0., deterministic.prob(2.).eval())
-      self.assertAllClose([1., 0.], deterministic.prob([0., 2.]).eval())
+      self.assertAllClose(1., self.evaluate(deterministic.prob(0.)))
+      self.assertAllClose(0., self.evaluate(deterministic.prob(2.)))
+      self.assertAllClose([1., 0.], self.evaluate(deterministic.prob([0., 2.])))
 
   def testProbWithDefaultTol(self):
     loc = [[0., 1.], [2., 3.]]
@@ -68,7 +69,7 @@ class DeterministicTest(tf.test.TestCase):
     with self.test_session():
       prob = deterministic.prob(x)
       self.assertAllEqual((2, 2), prob.get_shape())
-      self.assertAllEqual(expected_prob, prob.eval())
+      self.assertAllEqual(expected_prob, self.evaluate(prob))
 
   def testProbWithNonzeroATol(self):
     loc = [[0., 1.], [2., 3.]]
@@ -78,7 +79,7 @@ class DeterministicTest(tf.test.TestCase):
     with self.test_session():
       prob = deterministic.prob(x)
       self.assertAllEqual((2, 2), prob.get_shape())
-      self.assertAllEqual(expected_prob, prob.eval())
+      self.assertAllEqual(expected_prob, self.evaluate(prob))
 
   def testProbWithNonzeroATolIntegerType(self):
     loc = [[0, 1], [2, 3]]
@@ -88,7 +89,7 @@ class DeterministicTest(tf.test.TestCase):
     with self.test_session():
       prob = deterministic.prob(x)
       self.assertAllEqual((2, 2), prob.get_shape())
-      self.assertAllEqual(expected_prob, prob.eval())
+      self.assertAllEqual(expected_prob, self.evaluate(prob))
 
   def testProbWithNonzeroRTol(self):
     loc = [[0., 1.], [100., 100.]]
@@ -98,7 +99,7 @@ class DeterministicTest(tf.test.TestCase):
     with self.test_session():
       prob = deterministic.prob(x)
       self.assertAllEqual((2, 2), prob.get_shape())
-      self.assertAllEqual(expected_prob, prob.eval())
+      self.assertAllEqual(expected_prob, self.evaluate(prob))
 
   def testProbWithNonzeroRTolIntegerType(self):
     loc = [[10, 10, 10], [10, 10, 10]]
@@ -110,7 +111,7 @@ class DeterministicTest(tf.test.TestCase):
     with self.test_session():
       prob = deterministic.prob(x)
       self.assertAllEqual((2, 3), prob.get_shape())
-      self.assertAllEqual(expected_prob, prob.eval())
+      self.assertAllEqual(expected_prob, self.evaluate(prob))
 
   def testCdfWithDefaultTol(self):
     loc = [[0., 0.], [0., 0.]]
@@ -120,7 +121,7 @@ class DeterministicTest(tf.test.TestCase):
     with self.test_session():
       cdf = deterministic.cdf(x)
       self.assertAllEqual((2, 2), cdf.get_shape())
-      self.assertAllEqual(expected_cdf, cdf.eval())
+      self.assertAllEqual(expected_cdf, self.evaluate(cdf))
 
   def testCdfWithNonzeroATol(self):
     loc = [[0., 0.], [0., 0.]]
@@ -130,7 +131,7 @@ class DeterministicTest(tf.test.TestCase):
     with self.test_session():
       cdf = deterministic.cdf(x)
       self.assertAllEqual((2, 2), cdf.get_shape())
-      self.assertAllEqual(expected_cdf, cdf.eval())
+      self.assertAllEqual(expected_cdf, self.evaluate(cdf))
 
   def testCdfWithNonzeroRTol(self):
     loc = [[1., 1.], [100., 100.]]
@@ -140,7 +141,7 @@ class DeterministicTest(tf.test.TestCase):
     with self.test_session():
       cdf = deterministic.cdf(x)
       self.assertAllEqual((2, 2), cdf.get_shape())
-      self.assertAllEqual(expected_cdf, cdf.eval())
+      self.assertAllEqual(expected_cdf, self.evaluate(cdf))
 
   def testSampleNoBatchDims(self):
     deterministic = tfd.Deterministic(0.)
@@ -149,7 +150,7 @@ class DeterministicTest(tf.test.TestCase):
         sample = deterministic.sample(sample_shape)
         self.assertAllEqual(sample_shape, sample.get_shape())
         self.assertAllClose(
-            np.zeros(sample_shape).astype(np.float32), sample.eval())
+            np.zeros(sample_shape).astype(np.float32), self.evaluate(sample))
 
   def testSampleWithBatchDims(self):
     deterministic = tfd.Deterministic([0., 0.])
@@ -158,7 +159,8 @@ class DeterministicTest(tf.test.TestCase):
         sample = deterministic.sample(sample_shape)
         self.assertAllEqual(sample_shape + (2,), sample.get_shape())
         self.assertAllClose(
-            np.zeros(sample_shape + (2,)).astype(np.float32), sample.eval())
+            np.zeros(sample_shape + (2,)).astype(np.float32),
+            self.evaluate(sample))
 
   def testSampleDynamicWithBatchDims(self):
     loc = tf.placeholder(np.float32)
@@ -216,9 +218,11 @@ class VectorDeterministicTest(tf.test.TestCase):
       loc = rng.rand(2, 3, 4)
       deterministic = tfd.VectorDeterministic(loc)
 
-      self.assertAllEqual(deterministic.batch_shape_tensor().eval(), (2, 3))
+      self.assertAllEqual(
+          self.evaluate(deterministic.batch_shape_tensor()), (2, 3))
       self.assertAllEqual(deterministic.batch_shape, (2, 3))
-      self.assertAllEqual(deterministic.event_shape_tensor().eval(), [4])
+      self.assertAllEqual(
+          self.evaluate(deterministic.event_shape_tensor()), [4])
       self.assertEqual(deterministic.event_shape, tf.TensorShape([4]))
 
   def testInvalidTolRaises(self):
@@ -226,22 +230,23 @@ class VectorDeterministicTest(tf.test.TestCase):
     deterministic = tfd.VectorDeterministic(loc, atol=-1, validate_args=True)
     with self.test_session():
       with self.assertRaisesOpError("Condition x >= 0"):
-        deterministic.prob(loc).eval()
+        self.evaluate(deterministic.prob(loc))
 
   def testInvalidXRaises(self):
     loc = rng.rand(2, 3, 4).astype(np.float32)
     deterministic = tfd.VectorDeterministic(loc, atol=-1, validate_args=True)
     with self.test_session():
       with self.assertRaisesRegexp(ValueError, "must have rank at least 1"):
-        deterministic.prob(0.).eval()
+        self.evaluate(deterministic.prob(0.))
 
   def testProbVectorDeterministicWithNoBatchDims(self):
     # 0 batch of deterministics on R^1.
     deterministic = tfd.VectorDeterministic([0.])
     with self.test_session():
-      self.assertAllClose(1., deterministic.prob([0.]).eval())
-      self.assertAllClose(0., deterministic.prob([2.]).eval())
-      self.assertAllClose([1., 0.], deterministic.prob([[0.], [2.]]).eval())
+      self.assertAllClose(1., self.evaluate(deterministic.prob([0.])))
+      self.assertAllClose(0., self.evaluate(deterministic.prob([2.])))
+      self.assertAllClose(
+          [1., 0.], self.evaluate(deterministic.prob([[0.], [2.]])))
 
   def testProbWithDefaultTol(self):
     # 3 batch of deterministics on R^2.
@@ -252,7 +257,7 @@ class VectorDeterministicTest(tf.test.TestCase):
     with self.test_session():
       prob = deterministic.prob(x)
       self.assertAllEqual((3,), prob.get_shape())
-      self.assertAllEqual(expected_prob, prob.eval())
+      self.assertAllEqual(expected_prob, self.evaluate(prob))
 
   def testProbWithNonzeroATol(self):
     # 3 batch of deterministics on R^2.
@@ -263,7 +268,7 @@ class VectorDeterministicTest(tf.test.TestCase):
     with self.test_session():
       prob = deterministic.prob(x)
       self.assertAllEqual((3,), prob.get_shape())
-      self.assertAllEqual(expected_prob, prob.eval())
+      self.assertAllEqual(expected_prob, self.evaluate(prob))
 
   def testProbWithNonzeroRTol(self):
     # 3 batch of deterministics on R^2.
@@ -274,13 +279,13 @@ class VectorDeterministicTest(tf.test.TestCase):
     with self.test_session():
       prob = deterministic.prob(x)
       self.assertAllEqual((3,), prob.get_shape())
-      self.assertAllEqual(expected_prob, prob.eval())
+      self.assertAllEqual(expected_prob, self.evaluate(prob))
 
   def testProbVectorDeterministicWithNoBatchDimsOnRZero(self):
     # 0 batch of deterministics on R^0.
     deterministic = tfd.VectorDeterministic([], validate_args=True)
     with self.test_session():
-      self.assertAllClose(1., deterministic.prob([]).eval())
+      self.assertAllClose(1., self.evaluate(deterministic.prob([])))
 
   def testProbVectorDeterministicWithNoBatchDimsOnRZeroRaisesIfXNotInSameRk(
       self):
@@ -288,7 +293,7 @@ class VectorDeterministicTest(tf.test.TestCase):
     deterministic = tfd.VectorDeterministic([], validate_args=True)
     with self.test_session():
       with self.assertRaisesOpError("not defined in the same space"):
-        deterministic.prob([1.]).eval()
+        self.evaluate(deterministic.prob([1.]))
 
   def testSampleNoBatchDims(self):
     deterministic = tfd.VectorDeterministic([0.])
@@ -297,7 +302,8 @@ class VectorDeterministicTest(tf.test.TestCase):
         sample = deterministic.sample(sample_shape)
         self.assertAllEqual(sample_shape + (1,), sample.get_shape())
         self.assertAllClose(
-            np.zeros(sample_shape + (1,)).astype(np.float32), sample.eval())
+            np.zeros(sample_shape + (1,)).astype(np.float32),
+            self.evaluate(sample))
 
   def testSampleWithBatchDims(self):
     deterministic = tfd.VectorDeterministic([[0.], [0.]])
@@ -306,7 +312,8 @@ class VectorDeterministicTest(tf.test.TestCase):
         sample = deterministic.sample(sample_shape)
         self.assertAllEqual(sample_shape + (2, 1), sample.get_shape())
         self.assertAllClose(
-            np.zeros(sample_shape + (2, 1)).astype(np.float32), sample.eval())
+            np.zeros(sample_shape + (2, 1)).astype(np.float32),
+            self.evaluate(sample))
 
   def testSampleDynamicWithBatchDims(self):
     loc = tf.placeholder(np.float32)

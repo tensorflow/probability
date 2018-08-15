@@ -133,13 +133,13 @@ class MatrixInverseTriLBijectorTest(tf.test.TestCase):
     rank_error_msg = "must have rank at least 2"
     with self.test_session():
       with self.assertRaisesWithPredicateMatch(ValueError, rank_error_msg):
-        inv.forward(x_).eval()
+        self.evaluate(inv.forward(x_))
       with self.assertRaisesWithPredicateMatch(ValueError, rank_error_msg):
-        inv.inverse(x_).eval()
+        self.evaluate(inv.inverse(x_))
       with self.assertRaisesWithPredicateMatch(ValueError, rank_error_msg):
-        inv.forward_log_det_jacobian(x_, event_ndims=2).eval()
+        self.evaluate(inv.forward_log_det_jacobian(x_, event_ndims=2))
       with self.assertRaisesWithPredicateMatch(ValueError, rank_error_msg):
-        inv.inverse_log_det_jacobian(x_, event_ndims=2).eval()
+        self.evaluate(inv.inverse_log_det_jacobian(x_, event_ndims=2))
 
   # TODO(b/80481923): Figure out why these assertions fail, and fix them.
   ## def testErrorOnInputNonSquare(self):
@@ -150,16 +150,16 @@ class MatrixInverseTriLBijectorTest(tf.test.TestCase):
   ##   with self.test_session():
   ##     with self.assertRaisesWithPredicateMatch(errors.InvalidArgumentError,
   ##                                              square_error_msg):
-  ##       inv.forward(x_).eval()
+  ##       self.evaluate(inv.forward(x_))
   ##     with self.assertRaisesWithPredicateMatch(errors.InvalidArgumentError,
   ##                                              square_error_msg):
-  ##       inv.inverse(x_).eval()
+  ##       self.evaluate(inv.inverse(x_))
   ##     with self.assertRaisesWithPredicateMatch(errors.InvalidArgumentError,
   ##                                              square_error_msg):
-  ##       inv.forward_log_det_jacobian(x_, event_ndims=2).eval()
+  ##       self.evaluate(inv.forward_log_det_jacobian(x_, event_ndims=2))
   ##     with self.assertRaisesWithPredicateMatch(errors.InvalidArgumentError,
   ##                                              square_error_msg):
-  ##       inv.inverse_log_det_jacobian(x_, event_ndims=2).eval()
+  ##       self.evaluate(inv.inverse_log_det_jacobian(x_, event_ndims=2))
 
   @test_util.run_in_graph_and_eager_modes()
   def testErrorOnInputNotLowerTriangular(self):
@@ -170,16 +170,16 @@ class MatrixInverseTriLBijectorTest(tf.test.TestCase):
     with self.test_session():
       with self.assertRaisesWithPredicateMatch(errors.InvalidArgumentError,
                                                triangular_error_msg):
-        inv.forward(x_).eval()
+        self.evaluate(inv.forward(x_))
       with self.assertRaisesWithPredicateMatch(errors.InvalidArgumentError,
                                                triangular_error_msg):
-        inv.inverse(x_).eval()
+        self.evaluate(inv.inverse(x_))
       with self.assertRaisesWithPredicateMatch(errors.InvalidArgumentError,
                                                triangular_error_msg):
-        inv.forward_log_det_jacobian(x_, event_ndims=2).eval()
+        self.evaluate(inv.forward_log_det_jacobian(x_, event_ndims=2))
       with self.assertRaisesWithPredicateMatch(errors.InvalidArgumentError,
                                                triangular_error_msg):
-        inv.inverse_log_det_jacobian(x_, event_ndims=2).eval()
+        self.evaluate(inv.inverse_log_det_jacobian(x_, event_ndims=2))
 
   @test_util.run_in_graph_and_eager_modes()
   def testErrorOnInputSingular(self):
@@ -189,13 +189,13 @@ class MatrixInverseTriLBijectorTest(tf.test.TestCase):
     nonsingular_error_msg = "must have all diagonal entries nonzero"
     with self.test_session():
       with self.assertRaisesOpError(nonsingular_error_msg):
-        inv.forward(x_).eval()
+        self.evaluate(inv.forward(x_))
       with self.assertRaisesOpError(nonsingular_error_msg):
-        inv.inverse(x_).eval()
+        self.evaluate(inv.inverse(x_))
       with self.assertRaisesOpError(nonsingular_error_msg):
-        inv.forward_log_det_jacobian(x_, event_ndims=2).eval()
+        self.evaluate(inv.forward_log_det_jacobian(x_, event_ndims=2))
       with self.assertRaisesOpError(nonsingular_error_msg):
-        inv.inverse_log_det_jacobian(x_, event_ndims=2).eval()
+        self.evaluate(inv.inverse_log_det_jacobian(x_, event_ndims=2))
 
 
 if __name__ == "__main__":

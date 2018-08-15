@@ -40,11 +40,11 @@ class Chi2Test(tf.test.TestCase):
 
       log_pdf = chi2.log_prob(x)
       self.assertEqual(log_pdf.get_shape(), (6,))
-      self.assertAllClose(log_pdf.eval(), expected_log_pdf)
+      self.assertAllClose(self.evaluate(log_pdf), expected_log_pdf)
 
       pdf = chi2.prob(x)
       self.assertEqual(pdf.get_shape(), (6,))
-      self.assertAllClose(pdf.eval(), np.exp(expected_log_pdf))
+      self.assertAllClose(self.evaluate(pdf), np.exp(expected_log_pdf))
 
   def testChi2CDF(self):
     with self.test_session():
@@ -58,7 +58,7 @@ class Chi2Test(tf.test.TestCase):
 
       cdf = chi2.cdf(x)
       self.assertEqual(cdf.get_shape(), (6,))
-      self.assertAllClose(cdf.eval(), expected_cdf)
+      self.assertAllClose(self.evaluate(cdf), expected_cdf)
 
   def testChi2Mean(self):
     with self.test_session():
@@ -66,7 +66,7 @@ class Chi2Test(tf.test.TestCase):
       expected_mean = stats.chi2.mean(df_v)
       chi2 = tfd.Chi2(df=df_v)
       self.assertEqual(chi2.mean().get_shape(), (3,))
-      self.assertAllClose(chi2.mean().eval(), expected_mean)
+      self.assertAllClose(self.evaluate(chi2.mean()), expected_mean)
 
   def testChi2Variance(self):
     with self.test_session():
@@ -74,7 +74,7 @@ class Chi2Test(tf.test.TestCase):
       expected_variances = stats.chi2.var(df_v)
       chi2 = tfd.Chi2(df=df_v)
       self.assertEqual(chi2.variance().get_shape(), (3,))
-      self.assertAllClose(chi2.variance().eval(), expected_variances)
+      self.assertAllClose(self.evaluate(chi2.variance()), expected_variances)
 
   def testChi2Entropy(self):
     with self.test_session():
@@ -82,13 +82,14 @@ class Chi2Test(tf.test.TestCase):
       expected_entropy = stats.chi2.entropy(df_v)
       chi2 = tfd.Chi2(df=df_v)
       self.assertEqual(chi2.entropy().get_shape(), (3,))
-      self.assertAllClose(chi2.entropy().eval(), expected_entropy)
+      self.assertAllClose(self.evaluate(chi2.entropy()), expected_entropy)
 
   def testChi2WithAbsDf(self):
     with self.test_session():
       df_v = np.array([-1.3, -3.2, 5], dtype=np.float64)
       chi2 = tfd.Chi2WithAbsDf(df=df_v)
-      self.assertAllClose(tf.floor(tf.abs(df_v)).eval(), chi2.df.eval())
+      self.assertAllClose(
+          self.evaluate(tf.floor(tf.abs(df_v))), self.evaluate(chi2.df))
 
 
 if __name__ == "__main__":

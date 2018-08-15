@@ -548,7 +548,7 @@ class HMCTest(tf.test.TestCase):
     self.assertEqual(acceptance_probs, 0.)
 
     self.assertAllFinite(
-        tf.gradients(updated_x, initial_x)[0].eval())
+        self.evaluate(tf.gradients(updated_x, initial_x)[0]))
     self.assertAllEqual(
         [True],
         [g is None for g in tf.gradients(
@@ -557,9 +557,9 @@ class HMCTest(tf.test.TestCase):
 
     # Gradients of the acceptance probs and new log prob are not finite.
     # self.assertAllFinite(
-    #     tf.gradients(acceptance_probs, initial_x)[0].eval())
+    #     self.evaluate(tf.gradients(acceptance_probs, initial_x)[0]))
     # self.assertAllFinite(
-    #     tf.gradients(new_log_prob, initial_x)[0].eval())
+    #     self.evaluate(tf.gradients(new_log_prob, initial_x)[0]))
 
   def _testChainWorksDtype(self, dtype):
     states, kernel_results = tfp.mcmc.sample_chain(

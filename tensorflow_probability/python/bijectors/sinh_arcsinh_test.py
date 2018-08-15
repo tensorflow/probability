@@ -42,17 +42,17 @@ class SinhArcsinhBijectorTest(tf.test.TestCase):
       self.assertEqual("SinhArcsinh", bijector.name)
       x = np.array([[[-2.01], [2.], [1e-4]]]).astype(np.float32)
       y = np.sinh((np.arcsinh(x) + skewness) * tailweight)
-      self.assertAllClose(y, bijector.forward(x).eval())
-      self.assertAllClose(x, bijector.inverse(y).eval())
+      self.assertAllClose(y, self.evaluate(bijector.forward(x)))
+      self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
       self.assertAllClose(
           np.sum(
               np.log(np.cosh(np.arcsinh(y) / tailweight - skewness)) -
               np.log(tailweight) - np.log(np.sqrt(y**2 + 1)),
               axis=-1),
-          bijector.inverse_log_det_jacobian(y, event_ndims=1).eval())
+          self.evaluate(bijector.inverse_log_det_jacobian(y, event_ndims=1)))
       self.assertAllClose(
-          -bijector.inverse_log_det_jacobian(y, event_ndims=1).eval(),
-          bijector.forward_log_det_jacobian(x, event_ndims=1).eval(),
+          self.evaluate(-bijector.inverse_log_det_jacobian(y, event_ndims=1)),
+          self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=1)),
           rtol=1e-4,
           atol=0.)
 
@@ -62,7 +62,7 @@ class SinhArcsinhBijectorTest(tf.test.TestCase):
       x = [-1., 1.]
       tailweight = [[0.5], [1.0], [2.0]]
       bijector = tfb.SinhArcsinh(tailweight=tailweight, validate_args=True)
-      y = bijector.forward(x).eval()
+      y = self.evaluate(bijector.forward(x))
 
       # x = -1, 1 should be mapped to points symmetric about 0
       self.assertAllClose(y[:, 0], -1. * y[:, 1])
@@ -79,7 +79,7 @@ class SinhArcsinhBijectorTest(tf.test.TestCase):
       x = [-1., 1.]
       skewness = [[-1.], [0.], [1.]]
       bijector = tfb.SinhArcsinh(skewness=skewness, validate_args=True)
-      y = bijector.forward(x).eval()
+      y = self.evaluate(bijector.forward(x))
 
       # For skew < 0, |forward(-1)| > |forward(1)|
       self.assertGreater(np.abs(y[0, 0]), np.abs(y[0, 1]))
@@ -150,8 +150,10 @@ class SinhArcsinhBijectorTest(tf.test.TestCase):
         bijector = tfb.SinhArcsinh(
             skewness=skewness, tailweight=tailweight, validate_args=True)
 
-        self.assertAllClose(y, bijector.forward(x).eval(), rtol=1e-4, atol=0.)
-        self.assertAllClose(x, bijector.inverse(y).eval(), rtol=1e-4, atol=0.)
+        self.assertAllClose(
+            y, self.evaluate(bijector.forward(x)), rtol=1e-4, atol=0.)
+        self.assertAllClose(
+            x, self.evaluate(bijector.inverse(y)), rtol=1e-4, atol=0.)
 
         # Do the numpy calculation in float128 to avoid inf/nan.
         y_float128 = np.float128(y)
@@ -160,19 +162,20 @@ class SinhArcsinhBijectorTest(tf.test.TestCase):
                 np.arcsinh(y_float128) / tailweight - skewness) / np.sqrt(
                     y_float128**2 + 1)) -
             np.log(tailweight),
-            bijector.inverse_log_det_jacobian(y, event_ndims=0).eval(),
+            self.evaluate(bijector.inverse_log_det_jacobian(y, event_ndims=0)),
             rtol=1e-4,
             atol=0.)
         self.assertAllClose(
-            -bijector.inverse_log_det_jacobian(y, event_ndims=0).eval(),
-            bijector.forward_log_det_jacobian(x, event_ndims=0).eval(),
+            self.evaluate(-bijector.inverse_log_det_jacobian(y, event_ndims=0)),
+            self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=0)),
             rtol=1e-4,
             atol=0.)
 
   def testZeroTailweightRaises(self):
     with self.test_session():
       with self.assertRaisesOpError("not positive"):
-        tfb.SinhArcsinh(tailweight=0., validate_args=True).forward(1.0).eval()
+        self.evaluate(
+            tfb.SinhArcsinh(tailweight=0., validate_args=True).forward(1.0))
 
   def testDefaultDtypeIsFloat32(self):
     with self.test_session():

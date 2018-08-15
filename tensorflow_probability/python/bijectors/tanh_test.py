@@ -37,12 +37,18 @@ class TanhBijectorTest(tf.test.TestCase):
       y = np.tanh(x)
       ildj = -np.log1p(-np.square(np.tanh(x)))
       bijector = tfb.Tanh()
-      self.assertAllClose(y, bijector.forward(x).eval(), atol=0., rtol=1e-2)
-      self.assertAllClose(x, bijector.inverse(y).eval(), atol=0., rtol=1e-4)
-      self.assertAllClose(ildj, bijector.inverse_log_det_jacobian(
-          y, event_ndims=0).eval(), atol=0., rtol=1e-6)
-      self.assertAllClose(-ildj, bijector.forward_log_det_jacobian(
-          x, event_ndims=0).eval(), atol=0., rtol=1e-4)
+      self.assertAllClose(
+          y, self.evaluate(bijector.forward(x)), atol=0., rtol=1e-2)
+      self.assertAllClose(
+          x, self.evaluate(bijector.inverse(y)), atol=0., rtol=1e-4)
+      self.assertAllClose(
+          ildj,
+          self.evaluate(bijector.inverse_log_det_jacobian(
+              y, event_ndims=0)), atol=0., rtol=1e-6)
+      self.assertAllClose(
+          -ildj,
+          self.evaluate(bijector.forward_log_det_jacobian(
+              x, event_ndims=0)), atol=0., rtol=1e-4)
 
   def testScalarCongruency(self):
     with self.test_session():
@@ -66,16 +72,16 @@ class TanhBijectorTest(tf.test.TestCase):
 
       x = np.linspace(-3.0, 3.0, 100)
       y = np.tanh(x)
-      self.assertAllClose(direct_bj.forward(x).eval(),
-                          indirect_bj.forward(x).eval())
-      self.assertAllClose(direct_bj.inverse(y).eval(),
-                          indirect_bj.inverse(y).eval())
+      self.assertAllClose(self.evaluate(direct_bj.forward(x)),
+                          self.evaluate(indirect_bj.forward(x)))
+      self.assertAllClose(self.evaluate(direct_bj.inverse(y)),
+                          self.evaluate(indirect_bj.inverse(y)))
       self.assertAllClose(
-          direct_bj.inverse_log_det_jacobian(y, event_ndims=0).eval(),
-          indirect_bj.inverse_log_det_jacobian(y, event_ndims=0).eval())
+          self.evaluate(direct_bj.inverse_log_det_jacobian(y, event_ndims=0)),
+          self.evaluate(indirect_bj.inverse_log_det_jacobian(y, event_ndims=0)))
       self.assertAllClose(
-          direct_bj.forward_log_det_jacobian(x, event_ndims=0).eval(),
-          indirect_bj.forward_log_det_jacobian(x, event_ndims=0).eval())
+          self.evaluate(direct_bj.forward_log_det_jacobian(x, event_ndims=0)),
+          self.evaluate(indirect_bj.forward_log_det_jacobian(x, event_ndims=0)))
 
 
 if __name__ == "__main__":

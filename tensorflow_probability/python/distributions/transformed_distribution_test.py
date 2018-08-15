@@ -82,9 +82,9 @@ class TransformedDistributionTest(tf.test.TestCase):
       sample = log_normal.sample(100000, seed=235)
       self.assertAllEqual([], log_normal.event_shape)
       with self.test_session(graph=g):
-        self.assertAllEqual([], log_normal.event_shape_tensor().eval())
+        self.assertAllEqual([], self.evaluate(log_normal.event_shape_tensor()))
         self.assertAllClose(
-            sp_dist.mean(), np.mean(sample.eval()), atol=0.0, rtol=0.05)
+            sp_dist.mean(), np.mean(self.evaluate(sample)), atol=0.0, rtol=0.05)
 
       # pdf, log_pdf, cdf, etc...
       # The mean of the lognormal is around 148.
@@ -98,7 +98,8 @@ class TransformedDistributionTest(tf.test.TestCase):
         actual = func[0](test_vals)
         expected = func[1](test_vals)
         with self.test_session(graph=g):
-          self.assertAllClose(expected, actual.eval(), atol=0, rtol=0.01)
+          self.assertAllClose(
+              expected, self.evaluate(actual), atol=0, rtol=0.01)
 
   def testNonInjectiveTransformedDistribution(self):
     g = tf.Graph()
@@ -114,8 +115,8 @@ class TransformedDistributionTest(tf.test.TestCase):
       sample = abs_normal.sample(100000, seed=235)
       self.assertAllEqual([], abs_normal.event_shape)
       with self.test_session(graph=g):
-        sample_ = sample.eval()
-        self.assertAllEqual([], abs_normal.event_shape_tensor().eval())
+        sample_ = self.evaluate(sample)
+        self.assertAllEqual([], self.evaluate(abs_normal.event_shape_tensor()))
 
         # Abs > 0, duh!
         np.testing.assert_array_less(0, sample_)
@@ -129,12 +130,12 @@ class TransformedDistributionTest(tf.test.TestCase):
         # p_Y(y) = p_X(-y) + p_X(y),
         self.assertAllClose(
             sp_normal.pdf(1.13) + sp_normal.pdf(-1.13),
-            abs_normal.prob(1.13).eval())
+            self.evaluate(abs_normal.prob(1.13)))
 
         # Log[p_Y(y)] = Log[p_X(-y) + p_X(y)]
         self.assertAllClose(
             np.log(sp_normal.pdf(2.13) + sp_normal.pdf(-2.13)),
-            abs_normal.log_prob(2.13).eval())
+            self.evaluate(abs_normal.log_prob(2.13)))
 
   def testQuantile(self):
     with self.test_session() as sess:
@@ -210,16 +211,18 @@ class TransformedDistributionTest(tf.test.TestCase):
           event_shape=[1])
       x = [[[-np.log(3.)], [0.]],
            [[np.log(3)], [np.log(5)]]]
-      y = softmax.forward(x).eval()
+      y = self.evaluate(softmax.forward(x))
       expected_log_pdf = (
           np.squeeze(stats.norm(loc=0., scale=1.).logpdf(x)) -
           np.sum(np.log(y), axis=-1))
       self.assertAllClose(expected_log_pdf,
-                          multi_logit_normal.log_prob(y).eval())
+                          self.evaluate(multi_logit_normal.log_prob(y)))
       self.assertAllClose([1, 2, 3, 2],
-                          tf.shape(multi_logit_normal.sample([1, 2, 3])).eval())
+                          self.evaluate(
+                              tf.shape(multi_logit_normal.sample([1, 2, 3]))))
       self.assertAllEqual([2], multi_logit_normal.event_shape)
-      self.assertAllEqual([2], multi_logit_normal.event_shape_tensor().eval())
+      self.assertAllEqual(
+          [2], self.evaluate(multi_logit_normal.event_shape_tensor()))
 
   def testCastLogDetJacobian(self):
     """Test log_prob when Jacobian and log_prob dtypes do not match."""
@@ -239,9 +242,9 @@ class TransformedDistributionTest(tf.test.TestCase):
           validate_args=True)
 
       y = normal.sample()
-      normal.log_prob(y).eval()
-      normal.prob(y).eval()
-      normal.entropy().eval()
+      self.evaluate(normal.log_prob(y))
+      self.evaluate(normal.prob(y))
+      self.evaluate(normal.entropy())
 
   def testEntropy(self):
     with self.test_session():
@@ -261,7 +264,7 @@ class TransformedDistributionTest(tf.test.TestCase):
               validate_args=True),
           validate_args=True)
       self.assertAllClose(actual_mvn_entropy,
-                          fake_mvn.entropy().eval())
+                          self.evaluate(fake_mvn.entropy()))
 
   def testScalarBatchScalarEventIdentityScale(self):
     with self.test_session() as sess:
@@ -341,7 +344,7 @@ class ScalarToMultiTest(tf.test.TestCase):
       self.assertAllEqual(tf.TensorShape(None), fake_mvn_dynamic.event_shape)
       self.assertAllEqual(tf.TensorShape(None), fake_mvn_dynamic.batch_shape)
 
-      x = fake_mvn_static.sample(5, seed=0).eval()
+      x = self.evaluate(fake_mvn_static.sample(5, seed=0))
       for unsupported_fn in (fake_mvn_static.log_cdf,
                              fake_mvn_static.cdf,
                              fake_mvn_static.survival_function,

@@ -44,7 +44,7 @@ class HalfNormalTest(tf.test.TestCase):
     self._rng = np.random.RandomState(123)
 
   def assertAllFinite(self, tensor):
-    is_finite = np.isfinite(tensor.eval())
+    is_finite = np.isfinite(self.evaluate(tensor))
     all_true = np.ones_like(is_finite, dtype=np.bool)
     self.assertAllEqual(all_true, is_finite)
 
@@ -52,10 +52,11 @@ class HalfNormalTest(tf.test.TestCase):
     with self.test_session():
       param_shapes = tfd.HalfNormal.param_shapes(sample_shape)
       scale_shape = param_shapes["scale"]
-      self.assertAllEqual(expected, scale_shape.eval())
+      self.assertAllEqual(expected, self.evaluate(scale_shape))
       scale = tf.ones(scale_shape)
       self.assertAllEqual(expected,
-                          tf.shape(tfd.HalfNormal(scale).sample()).eval())
+                          self.evaluate(
+                              tf.shape(tfd.HalfNormal(scale).sample())))
 
   def _testParamStaticShapes(self, sample_shape, expected):
     param_shapes = tfd.HalfNormal.param_static_shapes(sample_shape)
@@ -63,10 +64,11 @@ class HalfNormalTest(tf.test.TestCase):
     self.assertEqual(expected, scale_shape)
 
   def _testBatchShapes(self, dist, tensor):
-    self.assertAllEqual(dist.batch_shape_tensor().eval(), tensor.shape)
-    self.assertAllEqual(dist.batch_shape_tensor().eval(), tensor.eval().shape)
+    self.assertAllEqual(self.evaluate(dist.batch_shape_tensor()), tensor.shape)
+    self.assertAllEqual(
+        self.evaluate(dist.batch_shape_tensor()), self.evaluate(tensor).shape)
     self.assertAllEqual(dist.batch_shape, tensor.shape)
-    self.assertAllEqual(dist.batch_shape, tensor.eval().shape)
+    self.assertAllEqual(dist.batch_shape, self.evaluate(tensor).shape)
 
   def testParamShapes(self):
     sample_shape = [10, 3, 4]
@@ -93,9 +95,9 @@ class HalfNormalTest(tf.test.TestCase):
 
       if not stats:
         return
-      expected_log_pdf = stats.halfnorm(scale=scale.eval()).logpdf(x)
-      self.assertAllClose(expected_log_pdf, log_pdf.eval())
-      self.assertAllClose(np.exp(expected_log_pdf), pdf.eval())
+      expected_log_pdf = stats.halfnorm(scale=self.evaluate(scale)).logpdf(x)
+      self.assertAllClose(expected_log_pdf, self.evaluate(log_pdf))
+      self.assertAllClose(np.exp(expected_log_pdf), self.evaluate(pdf))
 
   def testHalfNormalLogPDFMultidimensional(self):
     with self.test_session():
@@ -112,9 +114,9 @@ class HalfNormalTest(tf.test.TestCase):
 
       if not stats:
         return
-      expected_log_pdf = stats.halfnorm(scale=scale.eval()).logpdf(x)
-      self.assertAllClose(expected_log_pdf, log_pdf.eval())
-      self.assertAllClose(np.exp(expected_log_pdf), pdf.eval())
+      expected_log_pdf = stats.halfnorm(scale=self.evaluate(scale)).logpdf(x)
+      self.assertAllClose(expected_log_pdf, self.evaluate(log_pdf))
+      self.assertAllClose(np.exp(expected_log_pdf), self.evaluate(pdf))
 
   def testHalfNormalCDF(self):
     with self.test_session():
@@ -132,8 +134,8 @@ class HalfNormalTest(tf.test.TestCase):
       if not stats:
         return
       expected_logcdf = stats.halfnorm(scale=scale).logcdf(x)
-      self.assertAllClose(expected_logcdf, log_cdf.eval(), atol=0)
-      self.assertAllClose(np.exp(expected_logcdf), cdf.eval(), atol=0)
+      self.assertAllClose(expected_logcdf, self.evaluate(log_cdf), atol=0)
+      self.assertAllClose(np.exp(expected_logcdf), self.evaluate(cdf), atol=0)
 
   def testHalfNormalSurvivalFunction(self):
     with self.test_session():
@@ -151,8 +153,8 @@ class HalfNormalTest(tf.test.TestCase):
       if not stats:
         return
       expected_logsf = stats.halfnorm(scale=scale).logsf(x)
-      self.assertAllClose(expected_logsf, log_sf.eval(), atol=0)
-      self.assertAllClose(np.exp(expected_logsf), sf.eval(), atol=0)
+      self.assertAllClose(expected_logsf, self.evaluate(log_sf), atol=0)
+      self.assertAllClose(np.exp(expected_logsf), self.evaluate(sf), atol=0)
 
   def testHalfNormalQuantile(self):
     with self.test_session():
@@ -167,7 +169,7 @@ class HalfNormalTest(tf.test.TestCase):
       if not stats:
         return
       expected_x = stats.halfnorm(scale=scale).ppf(p)
-      self.assertAllClose(expected_x, x.eval(), atol=0)
+      self.assertAllClose(expected_x, self.evaluate(x), atol=0)
 
   def testFiniteGradients(self):
     for dtype in [np.float32, np.float64]:
@@ -199,7 +201,7 @@ class HalfNormalTest(tf.test.TestCase):
 
       entropy = halfnorm.entropy()
       self._testBatchShapes(halfnorm, entropy)
-      self.assertAllClose(expected_entropy, entropy.eval())
+      self.assertAllClose(expected_entropy, self.evaluate(entropy))
 
   def testHalfNormalMeanAndMode(self):
     with self.test_session():
@@ -208,11 +210,11 @@ class HalfNormalTest(tf.test.TestCase):
       halfnorm = tfd.HalfNormal(scale=scale)
       expected_mean = scale * np.sqrt(2.0) / np.sqrt(np.pi)
 
-      self.assertAllEqual((3,), halfnorm.mean().eval().shape)
-      self.assertAllEqual(expected_mean, halfnorm.mean().eval())
+      self.assertAllEqual((3,), self.evaluate(halfnorm.mean()).shape)
+      self.assertAllEqual(expected_mean, self.evaluate(halfnorm.mean()))
 
-      self.assertAllEqual((3,), halfnorm.mode().eval().shape)
-      self.assertAllEqual([0., 0., 0.], halfnorm.mode().eval())
+      self.assertAllEqual((3,), self.evaluate(halfnorm.mode()).shape)
+      self.assertAllEqual([0., 0., 0.], self.evaluate(halfnorm.mode()))
 
   def testHalfNormalVariance(self):
     with self.test_session():
@@ -220,8 +222,8 @@ class HalfNormalTest(tf.test.TestCase):
       halfnorm = tfd.HalfNormal(scale=scale)
       expected_variance = scale ** 2.0 * (1.0 - 2.0 / np.pi)
 
-      self.assertAllEqual((3,), halfnorm.variance().eval().shape)
-      self.assertAllEqual(expected_variance, halfnorm.variance().eval())
+      self.assertAllEqual((3,), self.evaluate(halfnorm.variance()).shape)
+      self.assertAllEqual(expected_variance, self.evaluate(halfnorm.variance()))
 
   def testHalfNormalStandardDeviation(self):
     with self.test_session():
@@ -230,7 +232,8 @@ class HalfNormalTest(tf.test.TestCase):
       expected_variance = scale ** 2.0 * (1.0 - 2.0 / np.pi)
 
       self.assertAllEqual((3,), halfnorm.stddev().shape)
-      self.assertAllEqual(np.sqrt(expected_variance), halfnorm.stddev().eval())
+      self.assertAllEqual(
+          np.sqrt(expected_variance), self.evaluate(halfnorm.stddev()))
 
   def testHalfNormalSample(self):
     with self.test_session():
@@ -240,19 +243,19 @@ class HalfNormalTest(tf.test.TestCase):
 
       sample = halfnorm.sample(n)
 
-      self.assertEqual(sample.eval().shape, (100000,))
-      self.assertAllClose(sample.eval().mean(),
+      self.assertEqual(self.evaluate(sample).shape, (100000,))
+      self.assertAllClose(self.evaluate(sample).mean(),
                           3.0 * np.sqrt(2.0) / np.sqrt(np.pi), atol=1e-1)
 
-      expected_shape = tf.TensorShape([n.eval()]).concatenate(
-          tf.TensorShape(halfnorm.batch_shape_tensor().eval()))
+      expected_shape = tf.TensorShape([self.evaluate(n)]).concatenate(
+          tf.TensorShape(self.evaluate(halfnorm.batch_shape_tensor())))
       self.assertAllEqual(expected_shape, sample.shape)
-      self.assertAllEqual(expected_shape, sample.eval().shape)
+      self.assertAllEqual(expected_shape, self.evaluate(sample).shape)
 
       expected_shape_static = (
-          tf.TensorShape([n.eval()]).concatenate(halfnorm.batch_shape))
+          tf.TensorShape([self.evaluate(n)]).concatenate(halfnorm.batch_shape))
       self.assertAllEqual(expected_shape_static, sample.shape)
-      self.assertAllEqual(expected_shape_static, sample.eval().shape)
+      self.assertAllEqual(expected_shape_static, self.evaluate(sample).shape)
 
   def testHalfNormalSampleMultiDimensional(self):
     with self.test_session():
@@ -263,35 +266,35 @@ class HalfNormalTest(tf.test.TestCase):
 
       sample = halfnorm.sample(n)
       self.assertEqual(sample.shape, (100000, batch_size, 2))
-      self.assertAllClose(sample.eval()[:, 0, 0].mean(),
+      self.assertAllClose(self.evaluate(sample)[:, 0, 0].mean(),
                           2.0 * np.sqrt(2.0) / np.sqrt(np.pi), atol=1e-1)
-      self.assertAllClose(sample.eval()[:, 0, 1].mean(),
+      self.assertAllClose(self.evaluate(sample)[:, 0, 1].mean(),
                           3.0 * np.sqrt(2.0) / np.sqrt(np.pi), atol=1e-1)
 
-      expected_shape = tf.TensorShape([n.eval()]).concatenate(
-          tf.TensorShape(halfnorm.batch_shape_tensor().eval()))
+      expected_shape = tf.TensorShape([self.evaluate(n)]).concatenate(
+          tf.TensorShape(self.evaluate(halfnorm.batch_shape_tensor())))
       self.assertAllEqual(expected_shape, sample.shape)
-      self.assertAllEqual(expected_shape, sample.eval().shape)
+      self.assertAllEqual(expected_shape, self.evaluate(sample).shape)
 
       expected_shape_static = (
-          tf.TensorShape([n.eval()]).concatenate(halfnorm.batch_shape))
+          tf.TensorShape([self.evaluate(n)]).concatenate(halfnorm.batch_shape))
       self.assertAllEqual(expected_shape_static, sample.shape)
-      self.assertAllEqual(expected_shape_static, sample.eval().shape)
+      self.assertAllEqual(expected_shape_static, self.evaluate(sample).shape)
 
   def testNegativeSigmaFails(self):
     with self.test_session():
       halfnorm = tfd.HalfNormal(scale=[-5.], validate_args=True, name="G")
       with self.assertRaisesOpError("Condition x > 0 did not hold"):
-        halfnorm.mean().eval()
+        self.evaluate(halfnorm.mean())
 
   def testHalfNormalShape(self):
     with self.test_session():
       scale = tf.constant([6.0] * 5)
       halfnorm = tfd.HalfNormal(scale=scale)
 
-      self.assertEqual(halfnorm.batch_shape_tensor().eval(), [5])
+      self.assertEqual(self.evaluate(halfnorm.batch_shape_tensor()), [5])
       self.assertEqual(halfnorm.batch_shape, tf.TensorShape([5]))
-      self.assertAllEqual(halfnorm.event_shape_tensor().eval(), [])
+      self.assertAllEqual(self.evaluate(halfnorm.event_shape_tensor()), [])
       self.assertEqual(halfnorm.event_shape, tf.TensorShape([]))
 
   def testHalfNormalShapeWithPlaceholders(self):
@@ -302,7 +305,7 @@ class HalfNormalTest(tf.test.TestCase):
       # get_batch_shape should return an "<unknown>" tensor.
       self.assertEqual(halfnorm.batch_shape, tf.TensorShape(None))
       self.assertEqual(halfnorm.event_shape, ())
-      self.assertAllEqual(halfnorm.event_shape_tensor().eval(), [])
+      self.assertAllEqual(self.evaluate(halfnorm.event_shape_tensor()), [])
       self.assertAllEqual(
           sess.run(halfnorm.batch_shape_tensor(),
                    feed_dict={scale: [1.0, 2.0]}), [2])

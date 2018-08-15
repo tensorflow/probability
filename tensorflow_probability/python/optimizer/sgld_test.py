@@ -44,8 +44,8 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
             zip([grads0, grads1], [var0, var1]))
         tf.global_variables_initializer().run()
         # Fetch params to validate initial values
-        self.assertAllCloseAccordingToType([1.1, 2.1], var0.eval())
-        self.assertAllCloseAccordingToType([3., 4.], var1.eval())
+        self.assertAllCloseAccordingToType([1.1, 2.1], self.evaluate(var0))
+        self.assertAllCloseAccordingToType([3., 4.], self.evaluate(var1))
         # Run 1 step of sgd
         sgd_op.run()
         # Validate updated params
@@ -54,12 +54,15 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
         # Note that `tfp.math.diag_jacobian(xs=var, ys=grad)` returns zero
         # tensor
         self.assertAllCloseAccordingToType(
-            [1.1 - 3. * grads_scaled, 2.1 - 3. * grads_scaled], var0.eval())
+            [1.1 - 3. * grads_scaled, 2.1 - 3. * grads_scaled],
+            self.evaluate(var0))
         grads_scaled = (0.5 * 0.01 / np.sqrt(
             decay_rate + (1. - decay_rate) * 0.01**2 + 1e-8))
         self.assertAllCloseAccordingToType(
-            [3. - 3. * grads_scaled, 4. - 3. * grads_scaled], var1.eval())
-        self.assertAllCloseAccordingToType(1, sgd_optimizer._counter.eval())
+            [3. - 3. * grads_scaled, 4. - 3. * grads_scaled],
+            self.evaluate(var1))
+        self.assertAllCloseAccordingToType(
+            1, self.evaluate(sgd_optimizer._counter))
 
   def testBasicMultiInstance(self):
     for dtype in [tf.half, tf.float32, tf.float64]:
@@ -83,10 +86,10 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
             zip([gradsa, gradsb], [vara, varb]))
         tf.global_variables_initializer().run()
         # Fetch params to validate initial values
-        self.assertAllCloseAccordingToType([1.1, 2.1], var0.eval())
-        self.assertAllCloseAccordingToType([3., 4.], var1.eval())
-        self.assertAllCloseAccordingToType([1.1, 2.1], vara.eval())
-        self.assertAllCloseAccordingToType([3., 4.], varb.eval())
+        self.assertAllCloseAccordingToType([1.1, 2.1], self.evaluate(var0))
+        self.assertAllCloseAccordingToType([3., 4.], self.evaluate(var1))
+        self.assertAllCloseAccordingToType([1.1, 2.1], self.evaluate(vara))
+        self.assertAllCloseAccordingToType([3., 4.], self.evaluate(varb))
 
         # Run 1 step of sgd
         sgd_op.run()
@@ -95,22 +98,28 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
         grads_scaled = (0.5 * 0.1 /
                         np.sqrt(decay_rate + (1. - decay_rate) * 0.1**2 + 1e-8))
         self.assertAllCloseAccordingToType(
-            [1.1 - 3. * grads_scaled, 2.1 - 3. * grads_scaled], var0.eval())
+            [1.1 - 3. * grads_scaled, 2.1 - 3. * grads_scaled],
+            self.evaluate(var0))
         self.assertAllCloseAccordingToType(
-            [1.1 - 3. * grads_scaled, 2.1 - 3. * grads_scaled], vara.eval())
+            [1.1 - 3. * grads_scaled, 2.1 - 3. * grads_scaled],
+            self.evaluate(vara))
 
         grads_scaled = (0.5 * 0.01 / np.sqrt(
             decay_rate + (1 - decay_rate) * 0.01**2 + 1e-8))
         self.assertAllCloseAccordingToType(
-            [3. - 3. * grads_scaled, 4. - 3. * grads_scaled], var1.eval())
+            [3. - 3. * grads_scaled, 4. - 3. * grads_scaled],
+            self.evaluate(var1))
         self.assertAllCloseAccordingToType(
-            [3. - 3. * grads_scaled, 4. - 3. * grads_scaled], varb.eval())
+            [3. - 3. * grads_scaled, 4. - 3. * grads_scaled],
+            self.evaluate(varb))
         self.assertNotEqual(sgd_optimizer.variable_scope,
                             sgd_optimizer2.variable_scope)
         self.assertNotEqual(sgd_optimizer.variable_scope.name,
                             sgd_optimizer2.variable_scope.name)
-        self.assertAllCloseAccordingToType(1, sgd_optimizer._counter.eval())
-        self.assertAllCloseAccordingToType(1, sgd_optimizer2._counter.eval())
+        self.assertAllCloseAccordingToType(
+            1, self.evaluate(sgd_optimizer._counter))
+        self.assertAllCloseAccordingToType(
+            1, self.evaluate(sgd_optimizer2._counter))
 
   def testTensorLearningRate(self):
     for dtype in [tf.half, tf.float32, tf.float64]:
@@ -127,8 +136,8 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
                     zip([grads0, grads1], [var0, var1]))
         tf.global_variables_initializer().run()
         # Fetch params to validate initial values
-        self.assertAllCloseAccordingToType([1.1, 2.1], var0.eval())
-        self.assertAllCloseAccordingToType([3., 4.], var1.eval())
+        self.assertAllCloseAccordingToType([1.1, 2.1], self.evaluate(var0))
+        self.assertAllCloseAccordingToType([3., 4.], self.evaluate(var1))
         # Run 1 step of sgd
         sgd_op.run()
         # Validate updated params
@@ -137,11 +146,13 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
         # Note that `tfp.math.diag_jacobian(xs=var, ys=grad)` returns zero
         # tensor
         self.assertAllCloseAccordingToType(
-            [1.1 - 3. * grads_scaled, 2.1 - 3. * grads_scaled], var0.eval())
+            [1.1 - 3. * grads_scaled, 2.1 - 3. * grads_scaled],
+            self.evaluate(var0))
         grads_scaled = (0.5 * 0.01 / np.sqrt(
             decay_rate + (1. - decay_rate) * 0.01**2 + 1e-8))
         self.assertAllCloseAccordingToType(
-            [3. - 3. * grads_scaled, 4. - 3. * grads_scaled], var1.eval())
+            [3. - 3. * grads_scaled, 4. - 3. * grads_scaled],
+            self.evaluate(var1))
 
   def testGradWrtRef(self):
     for dtype in [tf.half, tf.float32, tf.float64]:
@@ -152,7 +163,7 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
         grads_and_vars = opt.compute_gradients(vars_[0] + vars_[1], vars_)
         tf.global_variables_initializer().run()
         for grad, _ in grads_and_vars:
-          self.assertAllCloseAccordingToType([1.], grad.eval())
+          self.assertAllCloseAccordingToType([1.], self.evaluate(grad))
 
   def testWithGlobalStep(self):
     for dtype in [tf.half, tf.float32, tf.float64]:
@@ -169,8 +180,8 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
                 global_step=global_step)
         tf.global_variables_initializer().run()
         # Fetch params to validate initial values
-        self.assertAllCloseAccordingToType([1.1, 2.1], var0.eval())
-        self.assertAllCloseAccordingToType([3., 4.], var1.eval())
+        self.assertAllCloseAccordingToType([1.1, 2.1], self.evaluate(var0))
+        self.assertAllCloseAccordingToType([3., 4.], self.evaluate(var1))
         # Run 1 step of sgd
         sgd_op.run()
 
@@ -180,12 +191,14 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
         # Note that `tfp.math.diag_jacobian(xs=var, ys=grad)` returns zero
         # tensor
         self.assertAllCloseAccordingToType(
-            [1.1 - 3. * grads_scaled, 2.1 - 3. * grads_scaled], var0.eval())
+            [1.1 - 3. * grads_scaled, 2.1 - 3. * grads_scaled],
+            self.evaluate(var0))
         grads_scaled = (0.5 * 0.01 / np.sqrt(
             decay_rate + (1. - decay_rate) * 0.01**2 + 1e-8))
         self.assertAllCloseAccordingToType(
-            [3. - 3. * grads_scaled, 4. - 3. * grads_scaled], var1.eval())
-        self.assertAllCloseAccordingToType(1, global_step.eval())
+            [3. - 3. * grads_scaled, 4. - 3. * grads_scaled],
+            self.evaluate(var1))
+        self.assertAllCloseAccordingToType(1, self.evaluate(global_step))
 
   def testSparseBasic(self):
     for dtype in [tf.half, tf.float32, tf.float64]:
@@ -204,8 +217,8 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
                 zip([grads0, grads1], [var0, var1]))
         tf.global_variables_initializer().run()
         # Fetch params to validate initial values
-        self.assertAllCloseAccordingToType([[1.1], [2.1]], var0.eval())
-        self.assertAllCloseAccordingToType([[3.], [4.]], var1.eval())
+        self.assertAllCloseAccordingToType([[1.1], [2.1]], self.evaluate(var0))
+        self.assertAllCloseAccordingToType([[3.], [4.]], self.evaluate(var1))
         # Run 1 step of sgd
         sgd_op.run()
         # Validate updated params
@@ -214,11 +227,11 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
         # Note that `tfp.math.diag_jacobian(xs=var, ys=grad)` returns zero
         # tensor
         self.assertAllCloseAccordingToType([[1.1 - 3. * grads_scaled], [2.1]],
-                                           var0.eval())
+                                           self.evaluate(var0))
         grads_scaled = (0.5 * 0.01 / np.sqrt(
             decay_rate + (1. - decay_rate) * 0.01**2 + 1e-8))
         self.assertAllCloseAccordingToType(
-            [[3. - 3. * 0], [4. - 3. * grads_scaled]], var1.eval())
+            [[3. - 3. * 0], [4. - 3. * grads_scaled]], self.evaluate(var1))
 
   def testPreconditionerComputedCorrectly(self):
     """Test that SGLD step is computed correctly for a 3D Gaussian energy."""

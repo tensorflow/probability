@@ -42,7 +42,7 @@ class AffineScalarBijectorTest(tf.test.TestCase):
     with self.test_session() as sess:
 
       def static_run(fun, x, **kwargs):
-        return fun(x, **kwargs).eval()
+        return self.evaluate(fun(x, **kwargs))
 
       def dynamic_run(fun, x_value, **kwargs):
         x_value = np.array(x_value)
@@ -64,7 +64,7 @@ class AffineScalarBijectorTest(tf.test.TestCase):
     with self.test_session() as sess:
 
       def static_run(fun, x, **kwargs):
-        return fun(x, **kwargs).eval()
+        return self.evaluate(fun(x, **kwargs))
 
       def dynamic_run(fun, x_value, **kwargs):
         x_value = np.array(x_value).astype(np.float64)
@@ -87,7 +87,7 @@ class AffineScalarBijectorTest(tf.test.TestCase):
     with self.test_session() as sess:
 
       def static_run(fun, x, **kwargs):
-        return fun(x, **kwargs).eval()
+        return self.evaluate(fun(x, **kwargs))
 
       def dynamic_run(fun, x_value, **kwargs):
         x_value = np.array(x_value).astype(np.float64)
@@ -110,7 +110,7 @@ class AffineScalarBijectorTest(tf.test.TestCase):
     with self.test_session() as sess:
 
       def static_run(fun, x, **kwargs):
-        return fun(x, **kwargs).eval()
+        return self.evaluate(fun(x, **kwargs))
 
       def dynamic_run(fun, x_value, **kwargs):
         x_value = np.array(x_value).astype(np.float32)
@@ -133,7 +133,7 @@ class AffineScalarBijectorTest(tf.test.TestCase):
     with self.test_session() as sess:
 
       def static_run(fun, x, **kwargs):
-        return fun(x, **kwargs).eval()
+        return self.evaluate(fun(x, **kwargs))
 
       def dynamic_run(fun, x_value, **kwargs):
         x_value = np.array(x_value).astype(np.float32)

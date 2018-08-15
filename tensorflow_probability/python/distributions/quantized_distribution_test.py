@@ -141,7 +141,7 @@ class QuantizedDistributionTest(tf.test.TestCase):
       expected_pmf = (1 / 10) * np.ones(batch_shape)
       expected_pmf[x < 1] = 0.
       expected_pmf[x > 10] = 0.
-      self.assertAllClose(expected_pmf, qdist.prob(x).eval())
+      self.assertAllClose(expected_pmf, self.evaluate(qdist.prob(x)))
 
       # cdf
       # qdist.cdf(j)
@@ -151,7 +151,7 @@ class QuantizedDistributionTest(tf.test.TestCase):
       expected_cdf = x.copy() / 10
       expected_cdf[x < 1] = 0.
       expected_cdf[x > 10] = 1.
-      self.assertAllClose(expected_cdf, qdist.cdf(x).eval())
+      self.assertAllClose(expected_cdf, self.evaluate(qdist.cdf(x)))
 
   def testSamplingFromBatchOfNormals(self):
     batch_shape = (2,)
@@ -163,7 +163,7 @@ class QuantizedDistributionTest(tf.test.TestCase):
       qdist = tfd.QuantizedDistribution(distribution=normal, low=0., high=None)
 
       samps = qdist.sample(5000, seed=42)
-      samps_v = samps.eval()
+      samps_v = self.evaluate(samps)
 
       # With low = 0, the interval j=0 is (-infty, 0], which holds 1/2
       # of the mass of the normals.
@@ -196,7 +196,7 @@ class QuantizedDistributionTest(tf.test.TestCase):
       # dist = maximum distance between P[Z <= a] and P[U <= a].
       # We ignore pvalue, since of course this distribution is not exactly, and
       # with so many sample points we would get a false fail.
-      dist, _ = stats.kstest(z.eval(), "uniform")
+      dist, _ = stats.kstest(self.evaluate(z), "uniform")
 
       # Since the distribution take values (approximately) in [0, 100], the
       # cdf should have jumps (approximately) every 1/100 of the way up.
@@ -213,12 +213,12 @@ class QuantizedDistributionTest(tf.test.TestCase):
       # Standard error should be less than 1 / (2 * sqrt(n_samples))
       n_samples = 10000
       stddev_err_bound = 1 / (2 * np.sqrt(n_samples))
-      samps = qdist.sample((n_samples,), seed=42).eval()
+      samps = self.evaluate(qdist.sample((n_samples,), seed=42))
       # The smallest value the samples can take on is 1, which corresponds to
       # the interval (0, 1].  Recall we use ceiling in the sampling definition.
       self.assertLess(0.5, samps.min())
       x_vals = np.arange(1, 11).astype(np.float32)
-      pmf_vals = qdist.prob(x_vals).eval()
+      pmf_vals = self.evaluate(qdist.prob(x_vals))
       for ii in range(10):
         self.assertAllClose(
             pmf_vals[ii], (samps == x_vals[ii]).mean(), atol=stddev_err_bound)
@@ -235,9 +235,10 @@ class QuantizedDistributionTest(tf.test.TestCase):
 
       x = rng.randint(-5, 5, size=batch_shape).astype(np.float64)
 
-      self.assertAllClose(sp_normal.cdf(x), qdist.cdf(x).eval())
+      self.assertAllClose(sp_normal.cdf(x), self.evaluate(qdist.cdf(x)))
 
-      self.assertAllClose(sp_normal.sf(x), qdist.survival_function(x).eval())
+      self.assertAllClose(
+          sp_normal.sf(x), self.evaluate(qdist.survival_function(x)))
 
   def testNormalLogCdfAndLogSurvivalFunction(self):
     # At integer values, the result should be the same as the standard normal.
@@ -251,10 +252,10 @@ class QuantizedDistributionTest(tf.test.TestCase):
 
       x = rng.randint(-10, 10, size=batch_shape).astype(np.float64)
 
-      self.assertAllClose(sp_normal.logcdf(x), qdist.log_cdf(x).eval())
+      self.assertAllClose(sp_normal.logcdf(x), self.evaluate(qdist.log_cdf(x)))
 
       self.assertAllClose(
-          sp_normal.logsf(x), qdist.log_survival_function(x).eval())
+          sp_normal.logsf(x), self.evaluate(qdist.log_survival_function(x)))
 
   def testNormalProbWithCutoffs(self):
     # At integer values, the result should be the same as the standard normal.
@@ -266,15 +267,19 @@ class QuantizedDistributionTest(tf.test.TestCase):
       # (-inf, -2](-2, -1](-1, 0](0, 1](1, inf)
       #        -2      -1      0     1     2
       # Test interval (-inf, -2], <--> index -2.
-      self.assertAllClose(sm_normal.cdf(-2), qdist.prob(-2.).eval(), atol=0)
+      self.assertAllClose(
+          sm_normal.cdf(-2), self.evaluate(qdist.prob(-2.)), atol=0)
       # Test interval (-2, -1], <--> index -1.
       self.assertAllClose(
-          sm_normal.cdf(-1) - sm_normal.cdf(-2), qdist.prob(-1.).eval(), atol=0)
+          sm_normal.cdf(-1) - sm_normal.cdf(-2),
+          self.evaluate(qdist.prob(-1.)), atol=0)
       # Test interval (-1, 0], <--> index 0.
       self.assertAllClose(
-          sm_normal.cdf(0) - sm_normal.cdf(-1), qdist.prob(0.).eval(), atol=0)
+          sm_normal.cdf(0) - sm_normal.cdf(-1),
+          self.evaluate(qdist.prob(0.)), atol=0)
       # Test interval (1, inf), <--> index 2.
-      self.assertAllClose(1. - sm_normal.cdf(1), qdist.prob(2.).eval(), atol=0)
+      self.assertAllClose(
+          1. - sm_normal.cdf(1), self.evaluate(qdist.prob(2.)), atol=0)
 
   def testNormalLogProbWithCutoffs(self):
     # At integer values, the result should be the same as the standard normal.
@@ -287,20 +292,21 @@ class QuantizedDistributionTest(tf.test.TestCase):
       #        -2      -1      0     1     2
       # Test interval (-inf, -2], <--> index -2.
       self.assertAllClose(
-          np.log(sm_normal.cdf(-2)), qdist.log_prob(-2.).eval(), atol=0)
+          np.log(sm_normal.cdf(-2)), self.evaluate(qdist.log_prob(-2.)), atol=0)
       # Test interval (-2, -1], <--> index -1.
       self.assertAllClose(
           np.log(sm_normal.cdf(-1) - sm_normal.cdf(-2)),
-          qdist.log_prob(-1.).eval(),
+          self.evaluate(qdist.log_prob(-1.)),
           atol=0)
       # Test interval (-1, 0], <--> index 0.
       self.assertAllClose(
           np.log(sm_normal.cdf(0) - sm_normal.cdf(-1)),
-          qdist.log_prob(0.).eval(),
+          self.evaluate(qdist.log_prob(0.)),
           atol=0)
       # Test interval (1, inf), <--> index 2.
       self.assertAllClose(
-          np.log(1. - sm_normal.cdf(1)), qdist.log_prob(2.).eval(), atol=0)
+          np.log(1. - sm_normal.cdf(1)),
+          self.evaluate(qdist.log_prob(2.)), atol=0)
 
   def testLogProbAndGradGivesFiniteResults(self):
     for dtype in [np.float32, np.float64]:
@@ -315,9 +321,9 @@ class QuantizedDistributionTest(tf.test.TestCase):
         grads = tf.gradients(proba, [mu, sigma])
         with self.test_session(graph=g):
           tf.global_variables_initializer().run()
-          self._assert_all_finite(proba.eval())
-          self._assert_all_finite(grads[0].eval())
-          self._assert_all_finite(grads[1].eval())
+          self._assert_all_finite(self.evaluate(proba))
+          self._assert_all_finite(self.evaluate(grads[0]))
+          self._assert_all_finite(self.evaluate(grads[1]))
 
   def testProbAndGradGivesFiniteResultsForCommonEvents(self):
     with self.test_session():
@@ -330,11 +336,11 @@ class QuantizedDistributionTest(tf.test.TestCase):
       tf.global_variables_initializer().run()
 
       proba = qdist.prob(x)
-      self._assert_all_finite(proba.eval())
+      self._assert_all_finite(self.evaluate(proba))
 
       grads = tf.gradients(proba, [mu, sigma])
-      self._assert_all_finite(grads[0].eval())
-      self._assert_all_finite(grads[1].eval())
+      self._assert_all_finite(self.evaluate(grads[0]))
+      self._assert_all_finite(self.evaluate(grads[1]))
 
   def testLowerCutoffMustBeBelowUpperCutoffOrWeRaise(self):
     with self.test_session():
@@ -346,7 +352,7 @@ class QuantizedDistributionTest(tf.test.TestCase):
 
       self.assertTrue(qdist.validate_args)  # Default is True.
       with self.assertRaisesOpError("must be strictly less"):
-        qdist.sample().eval()
+        self.evaluate(qdist.sample())
 
   def testCutoffsMustBeIntegerValuedIfValidateArgsTrue(self):
     with self.test_session():
@@ -371,7 +377,7 @@ class QuantizedDistributionTest(tf.test.TestCase):
       self.assertFalse(qdist.validate_args)  # Default is True.
 
       # Should not raise
-      qdist.sample().eval()
+      self.evaluate(qdist.sample())
 
   def testDtypeAndShapeInheritedFromBaseDist(self):
     batch_shape = (2, 3)
@@ -383,13 +389,14 @@ class QuantizedDistributionTest(tf.test.TestCase):
           high=10.0)
 
       self.assertEqual(batch_shape, qdist.batch_shape)
-      self.assertAllEqual(batch_shape, qdist.batch_shape_tensor().eval())
+      self.assertAllEqual(
+          batch_shape, self.evaluate(qdist.batch_shape_tensor()))
       self.assertEqual((), qdist.event_shape)
-      self.assertAllEqual((), qdist.event_shape_tensor().eval())
+      self.assertAllEqual((), self.evaluate(qdist.event_shape_tensor()))
 
       samps = qdist.sample(10, seed=42)
       self.assertEqual((10,) + batch_shape, samps.get_shape())
-      self.assertAllEqual((10,) + batch_shape, samps.eval().shape)
+      self.assertAllEqual((10,) + batch_shape, self.evaluate(samps).shape)
 
       y = rng.randint(0, 5, size=batch_shape).astype(np.float32)
       self.assertEqual(batch_shape, qdist.prob(y).get_shape())

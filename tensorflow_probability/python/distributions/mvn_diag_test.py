@@ -66,14 +66,14 @@ class MultivariateNormalDiagTest(tf.test.TestCase):
     diag = [1., -5]
     with self.test_session():
       dist = tfd.MultivariateNormalDiag(mu, diag, validate_args=True)
-      self.assertAllEqual(mu, dist.mean().eval())
+      self.assertAllEqual(mu, self.evaluate(dist.mean()))
 
   def testMeanWithBroadcastLoc(self):
     mu = [-1.]
     diag = [1., -5]
     with self.test_session():
       dist = tfd.MultivariateNormalDiag(mu, diag, validate_args=True)
-      self.assertAllEqual([-1., -1.], dist.mean().eval())
+      self.assertAllEqual([-1., -1.], self.evaluate(dist.mean()))
 
   def testEntropy(self):
     mu = [-1., 1]
@@ -82,15 +82,16 @@ class MultivariateNormalDiagTest(tf.test.TestCase):
     scipy_mvn = stats.multivariate_normal(mean=mu, cov=diag_mat**2)
     with self.test_session():
       dist = tfd.MultivariateNormalDiag(mu, diag, validate_args=True)
-      self.assertAllClose(scipy_mvn.entropy(), dist.entropy().eval(), atol=1e-4)
+      self.assertAllClose(
+          scipy_mvn.entropy(), self.evaluate(dist.entropy()), atol=1e-4)
 
   def testSample(self):
     mu = [-1., 1]
     diag = [1., -2]
     with self.test_session():
       dist = tfd.MultivariateNormalDiag(mu, diag, validate_args=True)
-      samps = dist.sample(int(1e3), seed=0).eval()
-      cov_mat = tf.matrix_diag(diag).eval()**2
+      samps = self.evaluate(dist.sample(int(1e3), seed=0))
+      cov_mat = self.evaluate(tf.matrix_diag(diag))**2
 
       self.assertAllClose(mu, samps.mean(axis=0),
                           atol=0., rtol=0.05)
@@ -103,7 +104,7 @@ class MultivariateNormalDiagTest(tf.test.TestCase):
     with self.test_session():
       dist = tfd.MultivariateNormalDiag(mu, diag, validate_args=True)
       with self.assertRaisesOpError("Singular"):
-        dist.sample().eval()
+        self.evaluate(dist.sample())
 
   def testSampleWithBroadcastScale(self):
     # mu corresponds to a 2-batch of 3-variate normals
@@ -117,11 +118,11 @@ class MultivariateNormalDiagTest(tf.test.TestCase):
 
       mean = dist.mean()
       self.assertAllEqual([2, 3], mean.get_shape())
-      self.assertAllClose(mu, mean.eval())
+      self.assertAllClose(mu, self.evaluate(mean))
 
       n = int(1e3)
-      samps = dist.sample(n, seed=0).eval()
-      cov_mat = tf.matrix_diag(diag).eval()**2
+      samps = self.evaluate(dist.sample(n, seed=0))
+      cov_mat = self.evaluate(tf.matrix_diag(diag))**2
       sample_cov = np.matmul(samps.transpose([1, 2, 0]),
                              samps.transpose([1, 0, 2])) / n
 
@@ -135,7 +136,7 @@ class MultivariateNormalDiagTest(tf.test.TestCase):
       mvn = tfd.MultivariateNormalDiag(loc=tf.zeros([2, 3], dtype=tf.float32))
       self.assertAllClose(
           np.diag(np.ones([3], dtype=np.float32)),
-          mvn.covariance().eval())
+          self.evaluate(mvn.covariance()))
 
       mvn = tfd.MultivariateNormalDiag(
           loc=tf.zeros([3], dtype=tf.float32),
@@ -149,7 +150,7 @@ class MultivariateNormalDiagTest(tf.test.TestCase):
                     [[2, 0, 0],
                      [0, 2, 0],
                      [0, 0, 2]]])**2.,
-          mvn.covariance().eval())
+          self.evaluate(mvn.covariance()))
 
       mvn = tfd.MultivariateNormalDiag(
           loc=tf.zeros([3], dtype=tf.float32),
@@ -163,14 +164,14 @@ class MultivariateNormalDiagTest(tf.test.TestCase):
                     [[4, 0, 0],
                      [0, 5, 0],
                      [0, 0, 6]]])**2.,
-          mvn.covariance().eval())
+          self.evaluate(mvn.covariance()))
 
   def testVariance(self):
     with self.test_session():
       mvn = tfd.MultivariateNormalDiag(loc=tf.zeros([2, 3], dtype=tf.float32))
       self.assertAllClose(
           np.ones([3], dtype=np.float32),
-          mvn.variance().eval())
+          self.evaluate(mvn.variance()))
 
       mvn = tfd.MultivariateNormalDiag(
           loc=tf.zeros([3], dtype=tf.float32),
@@ -178,7 +179,7 @@ class MultivariateNormalDiagTest(tf.test.TestCase):
       self.assertAllClose(
           np.array([[3., 3, 3],
                     [2, 2, 2]])**2.,
-          mvn.variance().eval())
+          self.evaluate(mvn.variance()))
 
       mvn = tfd.MultivariateNormalDiag(
           loc=tf.zeros([3], dtype=tf.float32),
@@ -186,14 +187,14 @@ class MultivariateNormalDiagTest(tf.test.TestCase):
       self.assertAllClose(
           np.array([[3., 2, 1],
                     [4, 5, 6]])**2.,
-          mvn.variance().eval())
+          self.evaluate(mvn.variance()))
 
   def testStddev(self):
     with self.test_session():
       mvn = tfd.MultivariateNormalDiag(loc=tf.zeros([2, 3], dtype=tf.float32))
       self.assertAllClose(
           np.ones([3], dtype=np.float32),
-          mvn.stddev().eval())
+          self.evaluate(mvn.stddev()))
 
       mvn = tfd.MultivariateNormalDiag(
           loc=tf.zeros([3], dtype=tf.float32),
@@ -201,7 +202,7 @@ class MultivariateNormalDiagTest(tf.test.TestCase):
       self.assertAllClose(
           np.array([[3., 3, 3],
                     [2, 2, 2]]),
-          mvn.stddev().eval())
+          self.evaluate(mvn.stddev()))
 
       mvn = tfd.MultivariateNormalDiag(
           loc=tf.zeros([3], dtype=tf.float32),
@@ -209,7 +210,7 @@ class MultivariateNormalDiagTest(tf.test.TestCase):
       self.assertAllClose(
           np.array([[3., 2, 1],
                     [4, 5, 6]]),
-          mvn.stddev().eval())
+          self.evaluate(mvn.stddev()))
 
   def testMultivariateNormalDiagWithSoftplusScale(self):
     mu = [-1.0, 1.0]
@@ -217,8 +218,8 @@ class MultivariateNormalDiagTest(tf.test.TestCase):
     with self.test_session():
       dist = tfd.MultivariateNormalDiagWithSoftplusScale(
           mu, diag, validate_args=True)
-      samps = dist.sample(1000, seed=0).eval()
-      cov_mat = tf.matrix_diag(tf.nn.softplus(diag)).eval()**2
+      samps = self.evaluate(dist.sample(1000, seed=0))
+      cov_mat = self.evaluate(tf.matrix_diag(tf.nn.softplus(diag))**2)
 
       self.assertAllClose(mu, samps.mean(axis=0), atol=0.1)
       self.assertAllClose(cov_mat, np.cov(samps.T), atol=0.1)

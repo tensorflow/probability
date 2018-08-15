@@ -38,16 +38,16 @@ class SoftmaxCenteredBijectorTest(tf.test.TestCase):
       self.assertEqual("softmax_centered", softmax.name)
       x = np.log([[2., 3, 4], [4., 8, 12]])
       y = [[0.2, 0.3, 0.4, 0.1], [0.16, 0.32, 0.48, 0.04]]
-      self.assertAllClose(y, softmax.forward(x).eval())
-      self.assertAllClose(x, softmax.inverse(y).eval())
+      self.assertAllClose(y, self.evaluate(softmax.forward(x)))
+      self.assertAllClose(x, self.evaluate(softmax.inverse(y)))
       self.assertAllClose(
           -np.sum(np.log(y), axis=1),
-          softmax.inverse_log_det_jacobian(y, event_ndims=1).eval(),
+          self.evaluate(softmax.inverse_log_det_jacobian(y, event_ndims=1)),
           atol=0.,
           rtol=1e-7)
       self.assertAllClose(
-          -softmax.inverse_log_det_jacobian(y, event_ndims=1).eval(),
-          softmax.forward_log_det_jacobian(x, event_ndims=1).eval(),
+          self.evaluate(-softmax.inverse_log_det_jacobian(y, event_ndims=1)),
+          self.evaluate(softmax.forward_log_det_jacobian(x, event_ndims=1)),
           atol=0.,
           rtol=1e-7)
 
@@ -84,12 +84,14 @@ class SoftmaxCenteredBijectorTest(tf.test.TestCase):
       bijector = tfb.SoftmaxCentered(validate_args=True)
       self.assertAllEqual(y, bijector.forward_event_shape(x))
       self.assertAllEqual(y.as_list(),
-                          bijector.forward_event_shape_tensor(
-                              x.as_list()).eval())
+                          self.evaluate(
+                              bijector.forward_event_shape_tensor(
+                                  x.as_list())))
       self.assertAllEqual(x, bijector.inverse_event_shape(y))
       self.assertAllEqual(x.as_list(),
-                          bijector.inverse_event_shape_tensor(
-                              y.as_list()).eval())
+                          self.evaluate(
+                              bijector.inverse_event_shape_tensor(
+                                  y.as_list())))
 
   def testBijectiveAndFinite(self):
     with self.test_session():

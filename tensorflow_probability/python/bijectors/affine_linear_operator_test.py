@@ -34,13 +34,16 @@ class AffineLinearOperatorTest(tf.test.TestCase):
       ildj = 0.
 
       self.assertEqual(affine.name, "affine_linear_operator")
-      self.assertAllClose(y, affine.forward(x).eval())
-      self.assertAllClose(x, affine.inverse(y).eval())
-      self.assertAllClose(ildj, affine.inverse_log_det_jacobian(
-          y, event_ndims=2).eval())
+      self.assertAllClose(y, self.evaluate(affine.forward(x)))
+      self.assertAllClose(x, self.evaluate(affine.inverse(y)))
       self.assertAllClose(
-          -affine.inverse_log_det_jacobian(y, event_ndims=2).eval(),
-          affine.forward_log_det_jacobian(x, event_ndims=2).eval())
+          ildj,
+          self.evaluate(
+              affine.inverse_log_det_jacobian(
+                  y, event_ndims=2)))
+      self.assertAllClose(
+          self.evaluate(-affine.inverse_log_det_jacobian(y, event_ndims=2)),
+          self.evaluate(affine.forward_log_det_jacobian(x, event_ndims=2)))
 
   def testDiag(self):
     with self.test_session():
@@ -56,13 +59,14 @@ class AffineLinearOperatorTest(tf.test.TestCase):
       ildj = -np.sum(np.log(np.abs(diag)), axis=-1)
 
       self.assertEqual(affine.name, "affine_linear_operator")
-      self.assertAllClose(y, affine.forward(x).eval())
-      self.assertAllClose(x, affine.inverse(y).eval())
+      self.assertAllClose(y, self.evaluate(affine.forward(x)))
+      self.assertAllClose(x, self.evaluate(affine.inverse(y)))
       self.assertAllClose(
-          ildj, affine.inverse_log_det_jacobian(y, event_ndims=1).eval())
+          ildj,
+          self.evaluate(affine.inverse_log_det_jacobian(y, event_ndims=1)))
       self.assertAllClose(
-          -affine.inverse_log_det_jacobian(y, event_ndims=1).eval(),
-          affine.forward_log_det_jacobian(x, event_ndims=1).eval())
+          self.evaluate(-affine.inverse_log_det_jacobian(y, event_ndims=1)),
+          self.evaluate(affine.forward_log_det_jacobian(x, event_ndims=1)))
 
   def testTriL(self):
     with self.test_session():
@@ -91,14 +95,16 @@ class AffineLinearOperatorTest(tf.test.TestCase):
           tril, axis1=-2, axis2=-1))))
 
       self.assertEqual(affine.name, "affine_linear_operator")
-      self.assertAllClose(y, affine.forward(x).eval())
-      self.assertAllClose(x, affine.inverse(y).eval())
+      self.assertAllClose(y, self.evaluate(affine.forward(x)))
+      self.assertAllClose(x, self.evaluate(affine.inverse(y)))
       self.assertAllClose(
-          ildj, affine.inverse_log_det_jacobian(
-              y, event_ndims=2).eval())
+          ildj,
+          self.evaluate(
+              affine.inverse_log_det_jacobian(
+                  y, event_ndims=2)))
       self.assertAllClose(
-          -affine.inverse_log_det_jacobian(y, event_ndims=2).eval(),
-          affine.forward_log_det_jacobian(x, event_ndims=2).eval())
+          self.evaluate(-affine.inverse_log_det_jacobian(y, event_ndims=2)),
+          self.evaluate(affine.forward_log_det_jacobian(x, event_ndims=2)))
 
   def testTriLAdjoint(self):
     with self.test_session():
@@ -128,14 +134,16 @@ class AffineLinearOperatorTest(tf.test.TestCase):
           tril, axis1=-2, axis2=-1))))
 
       self.assertEqual(affine.name, "affine_linear_operator")
-      self.assertAllClose(y, affine.forward(x).eval())
-      self.assertAllClose(x, affine.inverse(y).eval())
+      self.assertAllClose(y, self.evaluate(affine.forward(x)))
+      self.assertAllClose(x, self.evaluate(affine.inverse(y)))
       self.assertAllClose(
-          ildj, affine.inverse_log_det_jacobian(
-              y, event_ndims=2).eval())
+          ildj,
+          self.evaluate(
+              affine.inverse_log_det_jacobian(
+                  y, event_ndims=2)))
       self.assertAllClose(
-          -affine.inverse_log_det_jacobian(y, event_ndims=2).eval(),
-          affine.forward_log_det_jacobian(x, event_ndims=2).eval())
+          self.evaluate(-affine.inverse_log_det_jacobian(y, event_ndims=2)),
+          self.evaluate(affine.forward_log_det_jacobian(x, event_ndims=2)))
 
 
 if __name__ == "__main__":

@@ -42,7 +42,7 @@ class OneHotCategoricalTest(tf.test.TestCase):
     p = [0.2, 0.8]
     dist = tfd.OneHotCategorical(probs=p)
     with self.test_session():
-      self.assertAllClose(p, dist.probs.eval())
+      self.assertAllClose(p, self.evaluate(dist.probs))
       self.assertAllEqual([2], dist.logits.get_shape())
 
   def testLogits(self):
@@ -52,17 +52,18 @@ class OneHotCategoricalTest(tf.test.TestCase):
     with self.test_session():
       self.assertAllEqual([2], dist.probs.get_shape())
       self.assertAllEqual([2], dist.logits.get_shape())
-      self.assertAllClose(dist.probs.eval(), p)
-      self.assertAllClose(dist.logits.eval(), logits)
+      self.assertAllClose(self.evaluate(dist.probs), p)
+      self.assertAllClose(self.evaluate(dist.logits), logits)
 
   def testShapes(self):
     with self.test_session():
       for batch_shape in ([], [1], [2, 3, 4]):
         dist = make_onehot_categorical(batch_shape, 10)
         self.assertAllEqual(batch_shape, dist.batch_shape.as_list())
-        self.assertAllEqual(batch_shape, dist.batch_shape_tensor().eval())
+        self.assertAllEqual(
+            batch_shape, self.evaluate(dist.batch_shape_tensor()))
         self.assertAllEqual([10], dist.event_shape.as_list())
-        self.assertAllEqual([10], dist.event_shape_tensor().eval())
+        self.assertAllEqual([10], self.evaluate(dist.event_shape_tensor()))
         # event_shape is available as a constant because the shape is
         # known at graph build time.
         self.assertEqual(10,
@@ -72,9 +73,10 @@ class OneHotCategoricalTest(tf.test.TestCase):
         dist = make_onehot_categorical(batch_shape,
                                        tf.constant(10, dtype=tf.int32))
         self.assertAllEqual(len(batch_shape), dist.batch_shape.ndims)
-        self.assertAllEqual(batch_shape, dist.batch_shape_tensor().eval())
+        self.assertAllEqual(
+            batch_shape, self.evaluate(dist.batch_shape_tensor()))
         self.assertAllEqual([10], dist.event_shape.as_list())
-        self.assertEqual(10, dist.event_shape_tensor().eval())
+        self.assertEqual(10, self.evaluate(dist.event_shape_tensor()))
 
   def testDtype(self):
     dist = make_onehot_categorical([], 5, dtype=tf.int32)
@@ -111,14 +113,14 @@ class OneHotCategoricalTest(tf.test.TestCase):
     dist = tfd.OneHotCategorical(logits)
     with self.test_session():
       self.assertAllClose(
-          dist.entropy().eval(),
+          self.evaluate(dist.entropy()),
           -(0.2 * np.log(0.2) + 0.8 * np.log(0.8)))
 
   def testEntropyWithBatch(self):
     logits = np.log([[0.2, 0.8], [0.6, 0.4]]) - 50.
     dist = tfd.OneHotCategorical(logits)
     with self.test_session():
-      self.assertAllClose(dist.entropy().eval(), [
+      self.assertAllClose(self.evaluate(dist.entropy()), [
           -(0.2 * np.log(0.2) + 0.8 * np.log(0.8)),
           -(0.6 * np.log(0.6) + 0.4 * np.log(0.4))
       ])
@@ -129,8 +131,8 @@ class OneHotCategoricalTest(tf.test.TestCase):
       logits = self._rng.random_sample(size=(8, 2, 10))
       prob = np.exp(logits)/np.sum(np.exp(logits), axis=-1, keepdims=True)
       dist = tfd.OneHotCategorical(logits=logits)
-      np_sample = dist.sample().eval()
-      np_prob = dist.prob(np_sample).eval()
+      np_sample = self.evaluate(dist.sample())
+      np_prob = self.evaluate(dist.prob(np_sample))
       expected_prob = prob[np_sample.astype(np.bool)]
       self.assertAllClose(expected_prob, np_prob.flatten())
 
@@ -141,7 +143,7 @@ class OneHotCategoricalTest(tf.test.TestCase):
       n = 100
       samples = dist.sample(n, seed=123)
       self.assertEqual(samples.dtype, tf.int32)
-      sample_values = samples.eval()
+      sample_values = self.evaluate(samples)
       self.assertAllEqual([n, 1, 2, 2], sample_values.shape)
       self.assertFalse(np.any(sample_values < 0))
       self.assertFalse(np.any(sample_values > 1))
@@ -152,7 +154,7 @@ class OneHotCategoricalTest(tf.test.TestCase):
       dist = tfd.OneHotCategorical(tf.log(probs) - 50.)
       samples = dist.sample((100, 100), seed=123)
       prob = dist.prob(samples)
-      prob_val = prob.eval()
+      prob_val = self.evaluate(prob)
       self.assertAllClose([0.2**2 + 0.8**2], [prob_val[:, :, :, 0].mean()],
                           atol=1e-2)
       self.assertAllClose([0.4**2 + 0.6**2], [prob_val[:, :, :, 1].mean()],

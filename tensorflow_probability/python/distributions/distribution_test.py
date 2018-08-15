@@ -50,9 +50,11 @@ class DistributionTest(tf.test.TestCase):
           params = dict([(name, tf.random_normal(shape))
                          for name, shape in param_shapes.items()])
           dist = cls(**params)
-          self.assertAllEqual(sample_shape, tf.shape(dist.sample()).eval())
+          self.assertAllEqual(
+              sample_shape, self.evaluate(tf.shape(dist.sample())))
           dist_copy = dist.copy()
-          self.assertAllEqual(sample_shape, tf.shape(dist_copy.sample()).eval())
+          self.assertAllEqual(
+              sample_shape, self.evaluate(tf.shape(dist_copy.sample())))
           self.assertEqual(dist.parameters, dist_copy.parameters)
 
   def testCopyExtraArgs(self):

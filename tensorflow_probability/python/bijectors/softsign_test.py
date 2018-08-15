@@ -46,14 +46,14 @@ class SoftsignBijectorTest(tf.test.TestCase):
     bijector = tfb.Softsign(validate_args=True)
     with self.test_session():
       with self.assertRaisesOpError("greater than -1"):
-        bijector.inverse(-3.).eval()
+        self.evaluate(bijector.inverse(-3.))
       with self.assertRaisesOpError("greater than -1"):
-        bijector.inverse_log_det_jacobian(-3., event_ndims=0).eval()
+        self.evaluate(bijector.inverse_log_det_jacobian(-3., event_ndims=0))
 
       with self.assertRaisesOpError("less than 1"):
-        bijector.inverse(3.).eval()
+        self.evaluate(bijector.inverse(3.))
       with self.assertRaisesOpError("less than 1"):
-        bijector.inverse_log_det_jacobian(3., event_ndims=0).eval()
+        self.evaluate(bijector.inverse_log_det_jacobian(3., event_ndims=0))
 
   @test_util.run_in_graph_and_eager_modes()
   def testBijectorForwardInverse(self):

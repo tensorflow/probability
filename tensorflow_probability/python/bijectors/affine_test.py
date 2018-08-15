@@ -43,7 +43,7 @@ class AffineBijectorTest(tf.test.TestCase):
       placeholder = tf.placeholder(tf.float32, name="x")
 
       def static_run(fun, x, **kwargs):
-        return fun(x, **kwargs).eval()
+        return self.evaluate(fun(x, **kwargs))
 
       def dynamic_run(fun, x_value, **kwargs):
         x_value = np.array(x_value)
@@ -75,7 +75,7 @@ class AffineBijectorTest(tf.test.TestCase):
       placeholder = tf.placeholder(tf.float32, name="x")
 
       def static_run(fun, x, **kwargs):
-        return fun(x, **kwargs).eval()
+        return self.evaluate(fun(x, **kwargs))
 
       def dynamic_run(fun, x_value, **kwargs):
         x_value = np.array(x_value)
@@ -141,7 +141,7 @@ class AffineBijectorTest(tf.test.TestCase):
       placeholder = tf.placeholder(tf.float32, name="x")
 
       def static_run(fun, x, **kwargs):
-        return fun(x, **kwargs).eval()
+        return self.evaluate(fun(x, **kwargs))
 
       def dynamic_run(fun, x_value, **kwargs):
         x_value = np.array(x_value)
@@ -165,7 +165,7 @@ class AffineBijectorTest(tf.test.TestCase):
       placeholder = tf.placeholder(tf.float32, name="x")
 
       def static_run(fun, x, **kwargs):
-        return fun(x, **kwargs).eval()
+        return self.evaluate(fun(x, **kwargs))
 
       def dynamic_run(fun, x_value, **kwargs):
         x_value = np.array(x_value)
@@ -213,7 +213,7 @@ class AffineBijectorTest(tf.test.TestCase):
       placeholder = tf.placeholder(tf.float32, name="x")
 
       def static_run(fun, x, **kwargs):
-        return fun(x, **kwargs).eval()
+        return self.evaluate(fun(x, **kwargs))
 
       def dynamic_run(fun, x_value, **kwargs):
         x_value = np.array(x_value)
@@ -237,7 +237,7 @@ class AffineBijectorTest(tf.test.TestCase):
       placeholder = tf.placeholder(tf.float32, name="x")
 
       def static_run(fun, x, **kwargs):
-        return fun(x, **kwargs).eval()
+        return self.evaluate(fun(x, **kwargs))
 
       def dynamic_run(fun, x_value, **kwargs):
         x_value = np.array(x_value)
@@ -263,7 +263,7 @@ class AffineBijectorTest(tf.test.TestCase):
       placeholder = tf.placeholder(tf.float32, name="x")
 
       def static_run(fun, x, **kwargs):
-        return fun(x, **kwargs).eval()
+        return self.evaluate(fun(x, **kwargs))
 
       def dynamic_run(fun, x_value, **kwargs):
         x_value = np.array(x_value)
@@ -287,7 +287,7 @@ class AffineBijectorTest(tf.test.TestCase):
       placeholder = tf.placeholder(tf.float32, name="x")
 
       def static_run(fun, x, **kwargs):
-        return fun(x, **kwargs).eval()
+        return self.evaluate(fun(x, **kwargs))
 
       def dynamic_run(fun, x_value, **kwargs):
         x_value = np.array(x_value)
@@ -314,7 +314,7 @@ class AffineBijectorTest(tf.test.TestCase):
       placeholder = tf.placeholder(tf.float32, name="x")
 
       def static_run(fun, x, **kwargs):
-        return fun(x, **kwargs).eval()
+        return self.evaluate(fun(x, **kwargs))
 
       def dynamic_run(fun, x_value, **kwargs):
         x_value = np.array(x_value)
@@ -351,7 +351,7 @@ class AffineBijectorTest(tf.test.TestCase):
       placeholder = tf.placeholder(tf.float32, name="x")
 
       def static_run(fun, x, **kwargs):
-        return fun(x, **kwargs).eval()
+        return self.evaluate(fun(x, **kwargs))
 
       def dynamic_run(fun, x_value, **kwargs):
         x_value = np.array(x_value)
@@ -387,7 +387,7 @@ class AffineBijectorTest(tf.test.TestCase):
       placeholder = tf.placeholder(tf.float32, name="x")
 
       def static_run(fun, x, **kwargs):
-        return fun(x, **kwargs).eval()
+        return self.evaluate(fun(x, **kwargs))
 
       def dynamic_run(fun, x_value, **kwargs):
         x_value = np.array(x_value)
@@ -424,7 +424,7 @@ class AffineBijectorTest(tf.test.TestCase):
       placeholder = tf.placeholder(tf.float32, name="x")
 
       def static_run(fun, x, **kwargs):
-        return fun(x, **kwargs).eval()
+        return self.evaluate(fun(x, **kwargs))
 
       def dynamic_run(fun, x_value, **kwargs):
         x_value = np.array(x_value)
@@ -465,7 +465,7 @@ class AffineBijectorTest(tf.test.TestCase):
           scale_diag=[0., 1],
           validate_args=True)
       with self.assertRaisesOpError("diagonal part must be non-zero"):
-        bijector.forward([1., 1.]).eval()
+        self.evaluate(bijector.forward([1., 1.]))
 
   def _makeScale(self,
                  x,
@@ -550,12 +550,12 @@ class AffineBijectorTest(tf.test.TestCase):
           forward = np.matmul(scale, np_x) + shift
           if x.ndim == scale.ndim - 1:
             forward = np.squeeze(forward, axis=-1)
-          self.assertAllClose(forward, bijector.forward(x).eval())
+          self.assertAllClose(forward, self.evaluate(bijector.forward(x)))
 
           backward = np.linalg.solve(scale, np_x - shift)
           if x.ndim == scale.ndim - 1:
             backward = np.squeeze(backward, axis=-1)
-          self.assertAllClose(backward, bijector.inverse(x).eval())
+          self.assertAllClose(backward, self.evaluate(bijector.inverse(x)))
 
           scale *= np.ones(shape=x.shape[:-1], dtype=scale.dtype)
           ildj = -np.log(np.abs(np.linalg.det(scale)))
@@ -569,7 +569,9 @@ class AffineBijectorTest(tf.test.TestCase):
           elif ildj.ndim < scale.ndim - 2:
             ildj = np.reshape(ildj, scale.shape[0:-2])
           self.assertAllClose(
-              ildj, bijector.inverse_log_det_jacobian(x, event_ndims=1).eval())
+              ildj,
+              self.evaluate(bijector.inverse_log_det_jacobian(
+                  x, event_ndims=1)))
 
   def testLegalInputs(self):
     self._testLegalInputs(
@@ -622,7 +624,7 @@ class AffineBijectorTest(tf.test.TestCase):
       placeholder = tf.placeholder(tf.float32, name="x")
 
       def static_run(fun, x, **kwargs):
-        return fun(x, **kwargs).eval()
+        return self.evaluate(fun(x, **kwargs))
 
       def dynamic_run(fun, x_value, **kwargs):
         x_value = np.array(x_value)

@@ -46,14 +46,14 @@ class ChainBijectorTest(tf.test.TestCase):
       self.assertEqual("chain_of_exp_of_softplus", chain.name)
       x = np.asarray([[[1., 2.],
                        [2., 3.]]])
-      self.assertAllClose(1. + np.exp(x), chain.forward(x).eval())
-      self.assertAllClose(np.log(x - 1.), chain.inverse(x).eval())
+      self.assertAllClose(1. + np.exp(x), self.evaluate(chain.forward(x)))
+      self.assertAllClose(np.log(x - 1.), self.evaluate(chain.inverse(x)))
       self.assertAllClose(
           -np.sum(np.log(x - 1.), axis=2),
-          chain.inverse_log_det_jacobian(x, event_ndims=1).eval())
+          self.evaluate(chain.inverse_log_det_jacobian(x, event_ndims=1)))
       self.assertAllClose(
           np.sum(x, axis=2),
-          chain.forward_log_det_jacobian(x, event_ndims=1).eval())
+          self.evaluate(chain.forward_log_det_jacobian(x, event_ndims=1)))
 
   def testBijectorIdentity(self):
     with self.test_session():
@@ -61,12 +61,12 @@ class ChainBijectorTest(tf.test.TestCase):
       self.assertEqual("identity", chain.name)
       x = np.asarray([[[1., 2.],
                        [2., 3.]]])
-      self.assertAllClose(x, chain.forward(x).eval())
-      self.assertAllClose(x, chain.inverse(x).eval())
+      self.assertAllClose(x, self.evaluate(chain.forward(x)))
+      self.assertAllClose(x, self.evaluate(chain.inverse(x)))
       self.assertAllClose(
-          0., chain.inverse_log_det_jacobian(x, event_ndims=1).eval())
+          0., self.evaluate(chain.inverse_log_det_jacobian(x, event_ndims=1)))
       self.assertAllClose(
-          0., chain.forward_log_det_jacobian(x, event_ndims=1).eval())
+          0., self.evaluate(chain.forward_log_det_jacobian(x, event_ndims=1)))
 
   def testScalarCongruency(self):
     with self.test_session():
@@ -85,11 +85,11 @@ class ChainBijectorTest(tf.test.TestCase):
       self.assertAllEqual(y, chain.forward_event_shape(x))
       self.assertAllEqual(
           y.as_list(),
-          chain.forward_event_shape_tensor(x.as_list()).eval())
+          self.evaluate(chain.forward_event_shape_tensor(x.as_list())))
       self.assertAllEqual(x, chain.inverse_event_shape(y))
       self.assertAllEqual(
           x.as_list(),
-          chain.inverse_event_shape_tensor(y.as_list()).eval())
+          self.evaluate(chain.inverse_event_shape_tensor(y.as_list())))
 
   def testMinEventNdimsChain(self):
     chain = tfb.Chain([tfb.Exp(), tfb.Exp(), tfb.Exp()])

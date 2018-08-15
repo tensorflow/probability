@@ -64,7 +64,7 @@ class MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers,
           components_distribution=bernoulli_lib.Bernoulli(probs=bern_probs))
       x = bm.sample([4, 5], seed=42)
       log_prob_x = bm.log_prob(x)
-      x_ = x.eval()
+      x_ = self.evaluate(x)
       self.assertEqual([4, 5, 2], x.shape)
       self.assertEqual([4, 5, 2], log_prob_x.shape)
       self.assertAllEqual(

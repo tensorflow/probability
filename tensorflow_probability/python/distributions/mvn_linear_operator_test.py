@@ -66,17 +66,18 @@ class MultivariateNormalLinearOperatorTest(tf.test.TestCase):
       log_pdf = mvn.log_prob(x)
       pdf = mvn.prob(x)
 
-      covariance = tf.matmul(scale.to_dense(),
-                             scale.to_dense(),
-                             adjoint_b=True).eval()
+      covariance = self.evaluate(
+          tf.matmul(scale.to_dense(),
+                    scale.to_dense(),
+                    adjoint_b=True))
       scipy_mvn = stats.multivariate_normal(mean=loc, cov=covariance)
 
       expected_log_pdf = scipy_mvn.logpdf(x)
       expected_pdf = scipy_mvn.pdf(x)
       self.assertEqual((), log_pdf.get_shape())
       self.assertEqual((), pdf.get_shape())
-      self.assertAllClose(expected_log_pdf, log_pdf.eval())
-      self.assertAllClose(expected_pdf, pdf.eval())
+      self.assertAllClose(expected_log_pdf, self.evaluate(log_pdf))
+      self.assertAllClose(expected_pdf, self.evaluate(pdf))
 
   def testRaisesIfScaleNotProvided(self):
     loc = self.rng.rand(2)
@@ -97,8 +98,8 @@ class MultivariateNormalLinearOperatorTest(tf.test.TestCase):
       self.assertEqual((3, 5), tuple(mvn.batch_shape.as_list()))
 
       # Shapes known at runtime.
-      self.assertEqual((2,), tuple(mvn.event_shape_tensor().eval()))
-      self.assertEqual((3, 5), tuple(mvn.batch_shape_tensor().eval()))
+      self.assertEqual((2,), tuple(self.evaluate(mvn.event_shape_tensor())))
+      self.assertEqual((3, 5), tuple(self.evaluate(mvn.batch_shape_tensor())))
 
   def testMeanAndCovariance(self):
     loc, scale = self._random_loc_and_scale(
@@ -106,12 +107,12 @@ class MultivariateNormalLinearOperatorTest(tf.test.TestCase):
     mvn = tfd.MultivariateNormalLinearOperator(loc, scale)
 
     with self.test_session():
-      self.assertAllEqual(mvn.mean().eval(), loc)
+      self.assertAllEqual(self.evaluate(mvn.mean()), loc)
       self.assertAllClose(
-          mvn.covariance().eval(),
+          self.evaluate(mvn.covariance()),
           np.matmul(
-              scale.to_dense().eval(),
-              np.transpose(scale.to_dense().eval(), [0, 1, 3, 2])))
+              self.evaluate(scale.to_dense()),
+              np.transpose(self.evaluate(scale.to_dense()), [0, 1, 3, 2])))
 
   def testKLBatch(self):
     batch_shape = [2]
@@ -127,13 +128,13 @@ class MultivariateNormalLinearOperatorTest(tf.test.TestCase):
       kl = tfd.kl_divergence(mvn_a, mvn_b)
       self.assertEqual(batch_shape, kl.get_shape())
 
-      kl_v = kl.eval()
+      kl_v = self.evaluate(kl)
       expected_kl_0 = self._compute_non_batch_kl(
-          loc_a[0, :], scale_a.to_dense().eval()[0, :, :],
-          loc_b[0, :], scale_b.to_dense().eval()[0, :])
+          loc_a[0, :], self.evaluate(scale_a.to_dense())[0, :, :],
+          loc_b[0, :], self.evaluate(scale_b.to_dense())[0, :])
       expected_kl_1 = self._compute_non_batch_kl(
-          loc_a[1, :], scale_a.to_dense().eval()[1, :, :],
-          loc_b[1, :], scale_b.to_dense().eval()[1, :])
+          loc_a[1, :], self.evaluate(scale_a.to_dense())[1, :, :],
+          loc_b[1, :], self.evaluate(scale_b.to_dense())[1, :])
       self.assertAllClose(expected_kl_0, kl_v[0])
       self.assertAllClose(expected_kl_1, kl_v[1])
 
@@ -152,13 +153,13 @@ class MultivariateNormalLinearOperatorTest(tf.test.TestCase):
       kl = tfd.kl_divergence(mvn_a, mvn_b)
       self.assertEqual(batch_shape, kl.get_shape())
 
-      kl_v = kl.eval()
+      kl_v = self.evaluate(kl)
       expected_kl_0 = self._compute_non_batch_kl(
-          loc_a[0, :], scale_a.to_dense().eval()[0, :, :],
-          loc_b, scale_b.to_dense().eval())
+          loc_a[0, :], self.evaluate(scale_a.to_dense())[0, :, :],
+          loc_b, self.evaluate(scale_b.to_dense()))
       expected_kl_1 = self._compute_non_batch_kl(
-          loc_a[1, :], scale_a.to_dense().eval()[1, :, :],
-          loc_b, scale_b.to_dense().eval())
+          loc_a[1, :], self.evaluate(scale_a.to_dense())[1, :, :],
+          loc_b, self.evaluate(scale_b.to_dense()))
       self.assertAllClose(expected_kl_0, kl_v[0])
       self.assertAllClose(expected_kl_1, kl_v[1])
 

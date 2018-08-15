@@ -295,7 +295,7 @@ class _PotentialScaleReductionTest(object):
         self.assertAllEqual(
             state_.shape[sample_ndims + independent_chain_ndims:], rhat.shape)
 
-      rhat_ = rhat.eval()
+      rhat_ = self.evaluate(rhat)
       if should_pass:
         self.assertAllClose(np.ones_like(rhat_), rhat_, atol=0, rtol=0.02)
       else:
@@ -397,7 +397,7 @@ class _ReduceVarianceTest(object):
       if self.use_static_shape:
         self.assertAllEqual(np_var.shape, var.shape)
 
-      var_ = var.eval()
+      var_ = self.evaluate(var)
       # We will mask below, which changes shape, so check shape explicitly here.
       self.assertAllEqual(np_var.shape, var_.shape)
 

@@ -305,7 +305,7 @@ class TestMakePositiveFunctions(tf.test.TestCase):
         x_, diag_shift=1.)
     y_ = self.evaluate(y)
     # Recall that:
-    # tfd.fill_triangular(np.arange(6) - 3).eval()
+    # self.evaluate(tfd.fill_triangular(np.arange(6) - 3))
     # ==> array([[ 0,  0,  0],
     #            [ 2,  1,  0],
     #            [-1, -2, -3]])

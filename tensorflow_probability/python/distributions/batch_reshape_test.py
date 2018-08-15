@@ -425,10 +425,10 @@ class _BatchReshapeTest(object):
     else:
       with self.test_session():
         with self.assertRaisesOpError(r"Shape sizes do not match."):
-          tfd.BatchReshape(
+          self.evaluate(tfd.BatchReshape(
               distribution=mvn,
               batch_shape=new_batch_shape_ph,
-              validate_args=True).sample().eval()
+              validate_args=True).sample())
 
   def test_non_positive_shape(self):
     dims = 2
@@ -460,10 +460,10 @@ class _BatchReshapeTest(object):
     else:
       with self.test_session():
         with self.assertRaisesOpError(r".*must be >=-1.*"):
-          tfd.BatchReshape(
+          self.evaluate(tfd.BatchReshape(
               distribution=mvn,
               batch_shape=new_batch_shape_ph,
-              validate_args=True).sample().eval()
+              validate_args=True).sample())
 
   def test_non_vector_shape(self):
     dims = 2
@@ -490,10 +490,10 @@ class _BatchReshapeTest(object):
     else:
       with self.test_session():
         with self.assertRaisesOpError(r".*must be a vector.*"):
-          tfd.BatchReshape(
+          self.evaluate(tfd.BatchReshape(
               distribution=mvn,
               batch_shape=new_batch_shape_ph,
-              validate_args=True).sample().eval()
+              validate_args=True).sample())
 
   def test_broadcasting_explicitly_unsupported(self):
     old_batch_shape = [4]
@@ -524,11 +524,11 @@ class _BatchReshapeTest(object):
 
     with self.assertRaisesOpError("too few batch and event dims"):
       with self.test_session():
-        poisson_141_reshaped.log_prob(x_4).eval()
+        self.evaluate(poisson_141_reshaped.log_prob(x_4))
 
     with self.assertRaisesOpError("unexpected batch and event shape"):
       with self.test_session():
-        poisson_141_reshaped.log_prob(x_114).eval()
+        self.evaluate(poisson_141_reshaped.log_prob(x_114))
 
 
 class BatchReshapeStaticTest(_BatchReshapeTest, tf.test.TestCase):

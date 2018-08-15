@@ -42,14 +42,16 @@ class InvertBijectorTest(tf.test.TestCase):
         self.assertEqual("_".join(["invert", fwd.name]), rev.name)
         x = [[[1., 2.],
               [2., 3.]]]
-        self.assertAllClose(fwd.inverse(x).eval(), rev.forward(x).eval())
-        self.assertAllClose(fwd.forward(x).eval(), rev.inverse(x).eval())
         self.assertAllClose(
-            fwd.forward_log_det_jacobian(x, event_ndims=1).eval(),
-            rev.inverse_log_det_jacobian(x, event_ndims=1).eval())
+            self.evaluate(fwd.inverse(x)), self.evaluate(rev.forward(x)))
         self.assertAllClose(
-            fwd.inverse_log_det_jacobian(x, event_ndims=1).eval(),
-            rev.forward_log_det_jacobian(x, event_ndims=1).eval())
+            self.evaluate(fwd.forward(x)), self.evaluate(rev.inverse(x)))
+        self.assertAllClose(
+            self.evaluate(fwd.forward_log_det_jacobian(x, event_ndims=1)),
+            self.evaluate(rev.inverse_log_det_jacobian(x, event_ndims=1)))
+        self.assertAllClose(
+            self.evaluate(fwd.inverse_log_det_jacobian(x, event_ndims=1)),
+            self.evaluate(rev.forward_log_det_jacobian(x, event_ndims=1)))
 
   def testScalarCongruency(self):
     with self.test_session():
@@ -66,11 +68,11 @@ class InvertBijectorTest(tf.test.TestCase):
       self.assertAllEqual(y, bijector.forward_event_shape(x))
       self.assertAllEqual(
           y.as_list(),
-          bijector.forward_event_shape_tensor(x.as_list()).eval())
+          self.evaluate(bijector.forward_event_shape_tensor(x.as_list())))
       self.assertAllEqual(x, bijector.inverse_event_shape(y))
       self.assertAllEqual(
           x.as_list(),
-          bijector.inverse_event_shape_tensor(y.as_list()).eval())
+          self.evaluate(bijector.inverse_event_shape_tensor(y.as_list())))
 
   def testDocstringExample(self):
     with self.test_session():
@@ -78,7 +80,8 @@ class InvertBijectorTest(tf.test.TestCase):
           transformed_distribution_lib.TransformedDistribution(
               distribution=gamma_lib.Gamma(concentration=1., rate=2.),
               bijector=tfb.Invert(tfb.Exp())))
-      self.assertAllEqual([], tf.shape(exp_gamma_distribution.sample()).eval())
+      self.assertAllEqual(
+          [], self.evaluate(tf.shape(exp_gamma_distribution.sample())))
 
 
 if __name__ == "__main__":

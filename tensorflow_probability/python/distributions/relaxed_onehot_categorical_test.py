@@ -42,7 +42,7 @@ class ExpRelaxedOneHotCategoricalTest(tf.test.TestCase):
     dist = tfd.ExpRelaxedOneHotCategorical(temperature, logits)
     expected_p = np.exp(logits)/np.sum(np.exp(logits))
     with self.test_session():
-      self.assertAllClose(expected_p, dist.probs.eval())
+      self.assertAllClose(expected_p, self.evaluate(dist.probs))
       self.assertAllEqual([3], dist.probs.get_shape())
 
   def testPdf(self):
@@ -52,12 +52,12 @@ class ExpRelaxedOneHotCategoricalTest(tf.test.TestCase):
     p = np.exp(logits)/np.sum(np.exp(logits))
     dist = tfd.ExpRelaxedOneHotCategorical(temperature, logits)
     with self.test_session():
-      x = dist.sample().eval()
+      x = self.evaluate(dist.sample())
       # analytical ExpConcrete density presented in Maddison et al. 2016
       prod_term = p*np.exp(-temperature * x)
       expected_pdf = (gamma(k) * np.power(temperature, k-1) *
                       np.prod(prod_term/np.sum(prod_term)))
-      pdf = dist.prob(x).eval()
+      pdf = self.evaluate(dist.prob(x))
       self.assertAllClose(expected_pdf, pdf)
 
 
@@ -69,7 +69,7 @@ class RelaxedOneHotCategoricalTest(tf.test.TestCase):
     dist = tfd.RelaxedOneHotCategorical(temperature, logits)
     with self.test_session():
       # check p for ExpRelaxed base distribution
-      self.assertAllClose(logits, dist._distribution.logits.eval())
+      self.assertAllClose(logits, self.evaluate(dist._distribution.logits))
       self.assertAllEqual([3], dist._distribution.logits.get_shape())
 
   def testSample(self):
@@ -78,18 +78,18 @@ class RelaxedOneHotCategoricalTest(tf.test.TestCase):
       # single logit
       logits = [.3, .1, .4]
       dist = tfd.RelaxedOneHotCategorical(temperature, logits)
-      self.assertAllEqual([3], dist.sample().eval().shape)
-      self.assertAllEqual([5, 3], dist.sample(5).eval().shape)
+      self.assertAllEqual([3], self.evaluate(dist.sample()).shape)
+      self.assertAllEqual([5, 3], self.evaluate(dist.sample(5)).shape)
       # multiple distributions
       logits = [[2.0, 3.0, -4.0], [.3, .1, .4]]
       dist = tfd.RelaxedOneHotCategorical(temperature, logits)
-      self.assertAllEqual([2, 3], dist.sample().eval().shape)
-      self.assertAllEqual([5, 2, 3], dist.sample(5).eval().shape)
+      self.assertAllEqual([2, 3], self.evaluate(dist.sample()).shape)
+      self.assertAllEqual([5, 2, 3], self.evaluate(dist.sample(5)).shape)
       # multiple distributions
       logits = np.random.uniform(size=(4, 1, 3)).astype(np.float32)
       dist = tfd.RelaxedOneHotCategorical(temperature, logits)
-      self.assertAllEqual([4, 1, 3], dist.sample().eval().shape)
-      self.assertAllEqual([5, 4, 1, 3], dist.sample(5).eval().shape)
+      self.assertAllEqual([4, 1, 3], self.evaluate(dist.sample()).shape)
+      self.assertAllEqual([5, 4, 1, 3], self.evaluate(dist.sample(5)).shape)
 
   def testPdf(self):
     def analytical_pdf(x, temperature, logits):
@@ -109,8 +109,8 @@ class RelaxedOneHotCategoricalTest(tf.test.TestCase):
       temperature = .4
       logits = np.array([[.3, .1, .4]]).astype(np.float32)
       dist = tfd.RelaxedOneHotCategorical(temperature, logits)
-      x = dist.sample().eval()
-      pdf = dist.prob(x).eval()
+      x = self.evaluate(dist.sample())
+      pdf = self.evaluate(dist.prob(x))
       expected_pdf = analytical_pdf(x, temperature, logits)
       self.assertAllClose(expected_pdf.flatten(), pdf, rtol=1e-4)
 
@@ -118,8 +118,8 @@ class RelaxedOneHotCategoricalTest(tf.test.TestCase):
       logits = np.array([[.3, .1, .4], [.6, -.1, 2.]]).astype(np.float32)
       temperatures = np.array([0.4, 2.3]).astype(np.float32)
       dist = tfd.RelaxedOneHotCategorical(temperatures, logits)
-      x = dist.sample().eval()
-      pdf = dist.prob(x).eval()
+      x = self.evaluate(dist.sample())
+      pdf = self.evaluate(dist.prob(x))
       expected_pdf = analytical_pdf(x, temperatures, logits)
       self.assertAllClose(expected_pdf.flatten(), pdf, rtol=1e-4)
 
@@ -128,17 +128,19 @@ class RelaxedOneHotCategoricalTest(tf.test.TestCase):
       for batch_shape in ([], [1], [2, 3, 4]):
         dist = make_relaxed_categorical(batch_shape, 10)
         self.assertAllEqual(batch_shape, dist.batch_shape.as_list())
-        self.assertAllEqual(batch_shape, dist.batch_shape_tensor().eval())
-        self.assertAllEqual([10], dist.event_shape_tensor().eval())
-        self.assertAllEqual([10], dist.event_shape_tensor().eval())
+        self.assertAllEqual(
+            batch_shape, self.evaluate(dist.batch_shape_tensor()))
+        self.assertAllEqual([10], self.evaluate(dist.event_shape_tensor()))
+        self.assertAllEqual([10], self.evaluate(dist.event_shape_tensor()))
 
       for batch_shape in ([], [1], [2, 3, 4]):
         dist = make_relaxed_categorical(batch_shape,
                                         tf.constant(10, dtype=tf.int32))
         self.assertAllEqual(len(batch_shape), dist.batch_shape.ndims)
-        self.assertAllEqual(batch_shape, dist.batch_shape_tensor().eval())
-        self.assertAllEqual([10], dist.event_shape_tensor().eval())
-        self.assertAllEqual([10], dist.event_shape_tensor().eval())
+        self.assertAllEqual(
+            batch_shape, self.evaluate(dist.batch_shape_tensor()))
+        self.assertAllEqual([10], self.evaluate(dist.event_shape_tensor()))
+        self.assertAllEqual([10], self.evaluate(dist.event_shape_tensor()))
 
   def testUnknownShape(self):
     with self.test_session():

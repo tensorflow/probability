@@ -37,8 +37,8 @@ class GeometricTest(tf.test.TestCase):
       probs = tf.constant([.1] * 5)
       geom = tfd.Geometric(probs=probs)
 
-      self.assertEqual([5,], geom.batch_shape_tensor().eval())
-      self.assertAllEqual([], geom.event_shape_tensor().eval())
+      self.assertEqual([5,], self.evaluate(geom.batch_shape_tensor()))
+      self.assertAllEqual([], self.evaluate(geom.event_shape_tensor()))
       self.assertEqual(tf.TensorShape([5]), geom.batch_shape)
       self.assertEqual(tf.TensorShape([]), geom.event_shape)
 
@@ -47,13 +47,13 @@ class GeometricTest(tf.test.TestCase):
     with self.test_session():
       with self.assertRaisesOpError("Condition x >= 0"):
         geom = tfd.Geometric(probs=invalid_ps, validate_args=True)
-        geom.probs.eval()
+        self.evaluate(geom.probs)
 
     invalid_ps = [1.1, 3., 5.]
     with self.test_session():
       with self.assertRaisesOpError("Condition x <= y"):
         geom = tfd.Geometric(probs=invalid_ps, validate_args=True)
-        geom.probs.eval()
+        self.evaluate(geom.probs)
 
   def testGeomLogPmf(self):
     with self.test_session():
@@ -65,11 +65,11 @@ class GeometricTest(tf.test.TestCase):
       expected_log_prob = stats.geom.logpmf(x, probs_v, loc=-1)
       log_prob = geom.log_prob(x)
       self.assertEqual([6,], log_prob.get_shape())
-      self.assertAllClose(expected_log_prob, log_prob.eval())
+      self.assertAllClose(expected_log_prob, self.evaluate(log_prob))
 
       pmf = geom.prob(x)
       self.assertEqual([6,], pmf.get_shape())
-      self.assertAllClose(np.exp(expected_log_prob), pmf.eval())
+      self.assertAllClose(np.exp(expected_log_prob), self.evaluate(pmf))
 
   def testGeometricLogPmf_validate_args(self):
     with self.test_session():
@@ -85,7 +85,7 @@ class GeometricTest(tf.test.TestCase):
 
       with self.assertRaisesOpError("Condition x >= 0"):
         log_prob = geom.log_prob(np.array([-1.], dtype=np.float32))
-        log_prob.eval()
+        self.evaluate(log_prob)
 
       geom = tfd.Geometric(probs=probs)
       log_prob = geom.log_prob(x)
@@ -102,12 +102,12 @@ class GeometricTest(tf.test.TestCase):
       geom = tfd.Geometric(probs=probs)
       expected_log_prob = stats.geom.logpmf(x, probs_v, loc=-1)
       log_prob = geom.log_prob(x)
-      log_prob_values = log_prob.eval()
+      log_prob_values = self.evaluate(log_prob)
       self.assertEqual([6, 3], log_prob.get_shape())
       self.assertAllClose(expected_log_prob, log_prob_values)
 
       pmf = geom.prob(x)
-      pmf_values = pmf.eval()
+      pmf_values = self.evaluate(pmf)
       self.assertEqual([6, 3], pmf.get_shape())
       self.assertAllClose(np.exp(expected_log_prob), pmf_values)
 
@@ -123,7 +123,7 @@ class GeometricTest(tf.test.TestCase):
 
       cdf = geom.cdf(x)
       self.assertEqual([6, 3], cdf.get_shape())
-      self.assertAllClose(expected_cdf, cdf.eval())
+      self.assertAllClose(expected_cdf, self.evaluate(cdf))
 
   def testGeometricEntropy(self):
     with self.test_session():
@@ -131,7 +131,7 @@ class GeometricTest(tf.test.TestCase):
       geom = tfd.Geometric(probs=probs_v)
       expected_entropy = stats.geom.entropy(probs_v, loc=-1)
       self.assertEqual([3], geom.entropy().get_shape())
-      self.assertAllClose(expected_entropy, geom.entropy().eval())
+      self.assertAllClose(expected_entropy, self.evaluate(geom.entropy()))
 
   def testGeometricMean(self):
     with self.test_session():
@@ -139,7 +139,7 @@ class GeometricTest(tf.test.TestCase):
       geom = tfd.Geometric(probs=probs_v)
       expected_means = stats.geom.mean(probs_v, loc=-1)
       self.assertEqual([3], geom.mean().get_shape())
-      self.assertAllClose(expected_means, geom.mean().eval())
+      self.assertAllClose(expected_means, self.evaluate(geom.mean()))
 
   def testGeometricVariance(self):
     with self.test_session():
@@ -147,7 +147,7 @@ class GeometricTest(tf.test.TestCase):
       geom = tfd.Geometric(probs=probs_v)
       expected_vars = stats.geom.var(probs_v, loc=-1)
       self.assertEqual([3], geom.variance().get_shape())
-      self.assertAllClose(expected_vars, geom.variance().eval())
+      self.assertAllClose(expected_vars, self.evaluate(geom.variance()))
 
   def testGeometricStddev(self):
     with self.test_session():
@@ -155,14 +155,14 @@ class GeometricTest(tf.test.TestCase):
       geom = tfd.Geometric(probs=probs_v)
       expected_stddevs = stats.geom.std(probs_v, loc=-1)
       self.assertEqual([3], geom.stddev().get_shape())
-      self.assertAllClose(geom.stddev().eval(), expected_stddevs)
+      self.assertAllClose(self.evaluate(geom.stddev()), expected_stddevs)
 
   def testGeometricMode(self):
     with self.test_session():
       probs_v = np.array([.1, .3, .25])
       geom = tfd.Geometric(probs=probs_v)
       self.assertEqual([3,], geom.mode().get_shape())
-      self.assertAllClose([0.] * 3, geom.mode().eval())
+      self.assertAllClose([0.] * 3, self.evaluate(geom.mode()))
 
   def testGeometricSample(self):
     with self.test_session():
@@ -174,7 +174,7 @@ class GeometricTest(tf.test.TestCase):
       samples = geom.sample(n, seed=12345)
       self.assertEqual([100000, 2], samples.get_shape())
 
-      sample_values = samples.eval()
+      sample_values = self.evaluate(samples)
       self.assertFalse(np.any(sample_values < 0.0))
       for i in range(2):
         self.assertAllClose(sample_values[:, i].mean(),
@@ -196,7 +196,7 @@ class GeometricTest(tf.test.TestCase):
       samples = geom.sample(n, seed=12345)
       self.assertEqual([n, batch_size, 2], samples.get_shape())
 
-      sample_values = samples.eval()
+      sample_values = self.evaluate(samples)
 
       self.assertFalse(np.any(sample_values < 0.0))
       for i in range(2):
@@ -224,32 +224,32 @@ class GeometricTest(tf.test.TestCase):
 
       log_prob = geom.log_prob(x)
       self.assertEqual([7,], log_prob.get_shape())
-      self.assertAllClose(expected_log_prob, log_prob.eval())
+      self.assertAllClose(expected_log_prob, self.evaluate(log_prob))
 
       pmf = geom.prob(x)
       self.assertEqual([7,], pmf.get_shape())
-      self.assertAllClose(np.exp(expected_log_prob), pmf.eval())
+      self.assertAllClose(np.exp(expected_log_prob), self.evaluate(pmf))
 
       expected_log_cdf = stats.geom.logcdf(x, 1., loc=-1)
 
       log_cdf = geom.log_cdf(x)
       self.assertEqual([7,], log_cdf.get_shape())
-      self.assertAllClose(expected_log_cdf, log_cdf.eval())
+      self.assertAllClose(expected_log_cdf, self.evaluate(log_cdf))
 
       cdf = geom.cdf(x)
       self.assertEqual([7,], cdf.get_shape())
-      self.assertAllClose(np.exp(expected_log_cdf), cdf.eval())
+      self.assertAllClose(np.exp(expected_log_cdf), self.evaluate(cdf))
 
       expected_mean = stats.geom.mean(1., loc=-1)
       self.assertEqual([], geom.mean().get_shape())
-      self.assertAllClose(expected_mean, geom.mean().eval())
+      self.assertAllClose(expected_mean, self.evaluate(geom.mean()))
 
       expected_variance = stats.geom.var(1., loc=-1)
       self.assertEqual([], geom.variance().get_shape())
-      self.assertAllClose(expected_variance, geom.variance().eval())
+      self.assertAllClose(expected_variance, self.evaluate(geom.variance()))
 
       with self.assertRaisesOpError("Entropy is undefined"):
-        geom.entropy().eval()
+        self.evaluate(geom.entropy())
 
 
 if __name__ == "__main__":

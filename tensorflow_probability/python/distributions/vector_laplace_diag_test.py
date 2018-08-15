@@ -65,22 +65,22 @@ class VectorLaplaceDiagTest(tf.test.TestCase):
     diag = [1., -5]
     with self.test_session():
       dist = tfd.VectorLaplaceDiag(mu, diag, validate_args=True)
-      self.assertAllEqual(mu, dist.mean().eval())
+      self.assertAllEqual(mu, self.evaluate(dist.mean()))
 
   def testMeanWithBroadcastLoc(self):
     mu = [-1.]
     diag = [1., -5]
     with self.test_session():
       dist = tfd.VectorLaplaceDiag(mu, diag, validate_args=True)
-      self.assertAllEqual([-1., -1.], dist.mean().eval())
+      self.assertAllEqual([-1., -1.], self.evaluate(dist.mean()))
 
   def testSample(self):
     mu = [-1., 1]
     diag = [1., -2]
     with self.test_session():
       dist = tfd.VectorLaplaceDiag(mu, diag, validate_args=True)
-      samps = dist.sample(int(1e4), seed=0).eval()
-      cov_mat = 2. * tf.matrix_diag(diag).eval()**2
+      samps = self.evaluate(dist.sample(int(1e4), seed=0))
+      cov_mat = 2. * self.evaluate(tf.matrix_diag(diag))**2
 
       self.assertAllClose(mu, samps.mean(axis=0),
                           atol=0., rtol=0.05)
@@ -93,7 +93,7 @@ class VectorLaplaceDiagTest(tf.test.TestCase):
     with self.test_session():
       dist = tfd.VectorLaplaceDiag(mu, diag, validate_args=True)
       with self.assertRaisesOpError("Singular"):
-        dist.sample().eval()
+        self.evaluate(dist.sample())
 
   def testSampleWithBroadcastScale(self):
     # mu corresponds to a 2-batch of 3-variate normals
@@ -107,11 +107,11 @@ class VectorLaplaceDiagTest(tf.test.TestCase):
 
       mean = dist.mean()
       self.assertAllEqual([2, 3], mean.get_shape())
-      self.assertAllClose(mu, mean.eval())
+      self.assertAllClose(mu, self.evaluate(mean))
 
       n = int(1e4)
-      samps = dist.sample(n, seed=0).eval()
-      cov_mat = 2. * tf.matrix_diag(diag).eval()**2
+      samps = self.evaluate(dist.sample(n, seed=0))
+      cov_mat = 2. * self.evaluate(tf.matrix_diag(diag))**2
       sample_cov = np.matmul(samps.transpose([1, 2, 0]),
                              samps.transpose([1, 0, 2])) / n
 
@@ -125,7 +125,7 @@ class VectorLaplaceDiagTest(tf.test.TestCase):
       vla = tfd.VectorLaplaceDiag(loc=tf.zeros([2, 3], dtype=tf.float32))
       self.assertAllClose(
           2. * np.diag(np.ones([3], dtype=np.float32)),
-          vla.covariance().eval())
+          self.evaluate(vla.covariance()))
 
       vla = tfd.VectorLaplaceDiag(
           loc=tf.zeros([3], dtype=tf.float32),
@@ -139,7 +139,7 @@ class VectorLaplaceDiagTest(tf.test.TestCase):
                          [[2, 0, 0],
                           [0, 2, 0],
                           [0, 0, 2]]])**2.,
-          vla.covariance().eval())
+          self.evaluate(vla.covariance()))
 
       vla = tfd.VectorLaplaceDiag(
           loc=tf.zeros([3], dtype=tf.float32),
@@ -153,14 +153,14 @@ class VectorLaplaceDiagTest(tf.test.TestCase):
                          [[4, 0, 0],
                           [0, 5, 0],
                           [0, 0, 6]]])**2.,
-          vla.covariance().eval())
+          self.evaluate(vla.covariance()))
 
   def testVariance(self):
     with self.test_session():
       vla = tfd.VectorLaplaceDiag(loc=tf.zeros([2, 3], dtype=tf.float32))
       self.assertAllClose(
           2. * np.ones([3], dtype=np.float32),
-          vla.variance().eval())
+          self.evaluate(vla.variance()))
 
       vla = tfd.VectorLaplaceDiag(
           loc=tf.zeros([3], dtype=tf.float32),
@@ -168,7 +168,7 @@ class VectorLaplaceDiagTest(tf.test.TestCase):
       self.assertAllClose(
           2. * np.array([[3., 3, 3],
                          [2, 2, 2]])**2.,
-          vla.variance().eval())
+          self.evaluate(vla.variance()))
 
       vla = tfd.VectorLaplaceDiag(
           loc=tf.zeros([3], dtype=tf.float32),
@@ -176,14 +176,14 @@ class VectorLaplaceDiagTest(tf.test.TestCase):
       self.assertAllClose(
           2. * np.array([[3., 2, 1],
                          [4, 5, 6]])**2.,
-          vla.variance().eval())
+          self.evaluate(vla.variance()))
 
   def testStddev(self):
     with self.test_session():
       vla = tfd.VectorLaplaceDiag(loc=tf.zeros([2, 3], dtype=tf.float32))
       self.assertAllClose(
           np.sqrt(2) * np.ones([3], dtype=np.float32),
-          vla.stddev().eval())
+          self.evaluate(vla.stddev()))
 
       vla = tfd.VectorLaplaceDiag(
           loc=tf.zeros([3], dtype=tf.float32),
@@ -191,7 +191,7 @@ class VectorLaplaceDiagTest(tf.test.TestCase):
       self.assertAllClose(
           np.sqrt(2) * np.array([[3., 3, 3],
                                  [2, 2, 2]]),
-          vla.stddev().eval())
+          self.evaluate(vla.stddev()))
 
       vla = tfd.VectorLaplaceDiag(
           loc=tf.zeros([3], dtype=tf.float32),
@@ -199,7 +199,7 @@ class VectorLaplaceDiagTest(tf.test.TestCase):
       self.assertAllClose(
           np.sqrt(2) * np.array([[3., 2, 1],
                                  [4, 5, 6]]),
-          vla.stddev().eval())
+          self.evaluate(vla.stddev()))
 
 
 if __name__ == "__main__":

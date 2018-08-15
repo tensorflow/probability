@@ -35,9 +35,9 @@ class AbsoluteValueTest(tf.test.TestCase):
       x = tf.constant([[0., 1., -1], [0., -5., 3.]])  # Shape [2, 3]
       y = tf.abs(x)
 
-      y_ = y.eval()
+      y_ = self.evaluate(y)
 
-      self.assertAllClose(y_, bijector.forward(x).eval())
+      self.assertAllClose(y_, self.evaluate(bijector.forward(x)))
       self.assertAllClose((-y_, y_), sess.run(bijector.inverse(y)))
       self.assertAllClose((0., 0.),
                           sess.run(bijector.inverse_log_det_jacobian(
@@ -45,7 +45,7 @@ class AbsoluteValueTest(tf.test.TestCase):
 
       # Run things twice to make sure there are no issues in caching the tuples
       # returned by .inverse*
-      self.assertAllClose(y_, bijector.forward(x).eval())
+      self.assertAllClose(y_, self.evaluate(bijector.forward(x)))
       self.assertAllClose((-y_, y_), sess.run(bijector.inverse(y)))
       self.assertAllClose((0., 0.),
                           sess.run(bijector.inverse_log_det_jacobian(

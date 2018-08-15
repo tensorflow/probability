@@ -36,22 +36,23 @@ class RelaxedBernoulliTest(tf.test.TestCase):
     p = [0.1, 0.4]
     dist = tfd.RelaxedBernoulli(temperature, probs=p)
     with self.test_session():
-      self.assertAllClose(p, dist.probs.eval())
+      self.assertAllClose(p, self.evaluate(dist.probs))
 
   def testLogits(self):
     temperature = 2.0
     logits = [-42., 42.]
     dist = tfd.RelaxedBernoulli(temperature, logits=logits)
     with self.test_session():
-      self.assertAllClose(logits, dist.logits.eval())
+      self.assertAllClose(logits, self.evaluate(dist.logits))
 
     with self.test_session():
-      self.assertAllClose(scipy.special.expit(logits), dist.probs.eval())
+      self.assertAllClose(
+          scipy.special.expit(logits), self.evaluate(dist.probs))
 
     p = [0.01, 0.99, 0.42]
     dist = tfd.RelaxedBernoulli(temperature, probs=p)
     with self.test_session():
-      self.assertAllClose(scipy.special.logit(p), dist.logits.eval())
+      self.assertAllClose(scipy.special.logit(p), self.evaluate(dist.logits))
 
   def testInvalidP(self):
     temperature = 1.0
@@ -60,20 +61,20 @@ class RelaxedBernoulliTest(tf.test.TestCase):
       with self.test_session():
         with self.assertRaisesOpError("probs has components greater than 1"):
           dist = tfd.RelaxedBernoulli(temperature, probs=p, validate_args=True)
-          dist.probs.eval()
+          self.evaluate(dist.probs)
 
     invalid_ps = [-0.01, -3.]
     for p in invalid_ps:
       with self.test_session():
         with self.assertRaisesOpError("Condition x >= 0"):
           dist = tfd.RelaxedBernoulli(temperature, probs=p, validate_args=True)
-          dist.probs.eval()
+          self.evaluate(dist.probs)
 
     valid_ps = [0.0, 0.5, 1.0]
     for p in valid_ps:
       with self.test_session():
         dist = tfd.RelaxedBernoulli(temperature, probs=p)
-        self.assertEqual(p, dist.probs.eval())
+        self.assertEqual(p, self.evaluate(dist.probs))
 
   def testShapes(self):
     with self.test_session():
@@ -82,9 +83,10 @@ class RelaxedBernoulliTest(tf.test.TestCase):
         p = np.random.random(batch_shape).astype(np.float32)
         dist = tfd.RelaxedBernoulli(temperature, probs=p)
         self.assertAllEqual(batch_shape, dist.batch_shape.as_list())
-        self.assertAllEqual(batch_shape, dist.batch_shape_tensor().eval())
+        self.assertAllEqual(
+            batch_shape, self.evaluate(dist.batch_shape_tensor()))
         self.assertAllEqual([], dist.event_shape.as_list())
-        self.assertAllEqual([], dist.event_shape_tensor().eval())
+        self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
 
   def testZeroTemperature(self):
     """If validate_args, raises InvalidArgumentError when temperature is 0."""
@@ -94,7 +96,7 @@ class RelaxedBernoulliTest(tf.test.TestCase):
     with self.test_session():
       sample = dist.sample()
       with self.assertRaises(errors_impl.InvalidArgumentError):
-        sample.eval()
+        self.evaluate(sample)
 
   def testDtype(self):
     temperature = tf.constant(1.0, dtype=tf.float32)
@@ -122,15 +124,15 @@ class RelaxedBernoulliTest(tf.test.TestCase):
       expected_log_pdf = (np.log(t) + np.log(alpha) +
                           (-t-1)*(np.log(xs)+np.log(1-xs)) -
                           2*np.log(alpha*np.power(xs, -t) + np.power(1-xs, -t)))
-      log_pdf = dist.log_prob(xs).eval()
+      log_pdf = self.evaluate(dist.log_prob(xs))
       self.assertAllClose(expected_log_pdf, log_pdf)
 
   def testBoundaryConditions(self):
     with self.test_session():
       temperature = 1e-2
       dist = tfd.RelaxedBernoulli(temperature, probs=1.0)
-      self.assertAllClose(np.nan, dist.log_prob(0.0).eval())
-      self.assertAllClose([np.nan], [dist.log_prob(1.0).eval()])
+      self.assertAllClose(np.nan, self.evaluate(dist.log_prob(0.0)))
+      self.assertAllClose([np.nan], [self.evaluate(dist.log_prob(1.0))])
 
   def testSampleN(self):
     """mean of quantized samples still approximates the Bernoulli mean."""
@@ -141,7 +143,7 @@ class RelaxedBernoulliTest(tf.test.TestCase):
       n = 10000
       samples = dist.sample(n)
       self.assertEqual(samples.dtype, tf.float32)
-      sample_values = samples.eval()
+      sample_values = self.evaluate(samples)
       self.assertTrue(np.all(sample_values >= 0))
       self.assertTrue(np.all(sample_values <= 1))
 

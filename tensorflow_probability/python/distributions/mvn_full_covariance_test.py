@@ -35,7 +35,7 @@ class MultivariateNormalFullCovarianceTest(tf.test.TestCase):
     mat = rng.rand(*shape)
     chol = tfd.matrix_diag_transform(mat, transform=tf.nn.softplus)
     chol = tf.matrix_band_part(chol, -1, 0)
-    return tf.matmul(chol, chol, adjoint_b=True).eval()
+    return self.evaluate(tf.matmul(chol, chol, adjoint_b=True))
 
   def testRaisesIfInitializedWithNonSymmetricMatrix(self):
     with self.test_session():
@@ -43,7 +43,7 @@ class MultivariateNormalFullCovarianceTest(tf.test.TestCase):
       sigma = [[1., 0.], [1., 1.]]  # Nonsingular, but not symmetric
       mvn = tfd.MultivariateNormalFullCovariance(mu, sigma, validate_args=True)
       with self.assertRaisesOpError("not symmetric"):
-        mvn.covariance().eval()
+        self.evaluate(mvn.covariance())
 
   def testNamePropertyIsSetByInitArg(self):
     with self.test_session():
@@ -58,7 +58,7 @@ class MultivariateNormalFullCovarianceTest(tf.test.TestCase):
       sigma = self._random_pd_matrix(10, 10)
       mvn = tfd.MultivariateNormalFullCovariance(mu, sigma, validate_args=True)
       # Should not raise
-      mvn.covariance().eval()
+      self.evaluate(mvn.covariance())
 
   def testLogPDFScalarBatch(self):
     with self.test_session():
@@ -76,8 +76,8 @@ class MultivariateNormalFullCovarianceTest(tf.test.TestCase):
       expected_pdf = scipy_mvn.pdf(x)
       self.assertEqual((), log_pdf.get_shape())
       self.assertEqual((), pdf.get_shape())
-      self.assertAllClose(expected_log_pdf, log_pdf.eval())
-      self.assertAllClose(expected_pdf, pdf.eval())
+      self.assertAllClose(expected_log_pdf, self.evaluate(log_pdf))
+      self.assertAllClose(expected_pdf, self.evaluate(pdf))
 
   def testLogPDFScalarBatchCovarianceNotProvided(self):
     with self.test_session():
@@ -96,8 +96,8 @@ class MultivariateNormalFullCovarianceTest(tf.test.TestCase):
       expected_pdf = scipy_mvn.pdf(x)
       self.assertEqual((), log_pdf.get_shape())
       self.assertEqual((), pdf.get_shape())
-      self.assertAllClose(expected_log_pdf, log_pdf.eval())
-      self.assertAllClose(expected_pdf, pdf.eval())
+      self.assertAllClose(expected_log_pdf, self.evaluate(log_pdf))
+      self.assertAllClose(expected_pdf, self.evaluate(pdf))
 
   def testShapes(self):
     with self.test_session():
@@ -112,8 +112,8 @@ class MultivariateNormalFullCovarianceTest(tf.test.TestCase):
       self.assertEqual((3, 5), tuple(mvn.batch_shape.as_list()))
 
       # Shapes known at runtime.
-      self.assertEqual((2,), tuple(mvn.event_shape_tensor().eval()))
-      self.assertEqual((3, 5), tuple(mvn.batch_shape_tensor().eval()))
+      self.assertEqual((2,), tuple(self.evaluate(mvn.event_shape_tensor())))
+      self.assertEqual((3, 5), tuple(self.evaluate(mvn.batch_shape_tensor())))
 
   def _random_mu_and_sigma(self, batch_shape, event_shape):
     # This ensures sigma is positive def.
@@ -142,7 +142,7 @@ class MultivariateNormalFullCovarianceTest(tf.test.TestCase):
       kl = tfd.kl_divergence(mvn_a, mvn_b)
       self.assertEqual(batch_shape, kl.get_shape())
 
-      kl_v = kl.eval()
+      kl_v = self.evaluate(kl)
       expected_kl_0 = _compute_non_batch_kl(mu_a[0, :], sigma_a[0, :, :],
                                             mu_b[0, :], sigma_b[0, :])
       expected_kl_1 = _compute_non_batch_kl(mu_a[1, :], sigma_a[1, :, :],
@@ -165,7 +165,7 @@ class MultivariateNormalFullCovarianceTest(tf.test.TestCase):
       kl = tfd.kl_divergence(mvn_a, mvn_b)
       self.assertEqual(batch_shape, kl.get_shape())
 
-      kl_v = kl.eval()
+      kl_v = self.evaluate(kl)
       expected_kl_0 = _compute_non_batch_kl(mu_a[0, :], sigma_a[0, :, :],
                                             mu_b, sigma_b)
       expected_kl_1 = _compute_non_batch_kl(mu_a[1, :], sigma_a[1, :, :],

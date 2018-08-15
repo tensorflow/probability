@@ -33,9 +33,9 @@ class GammaGammaTest(tf.test.TestCase):
           mixing_concentration=[1., 2., 3.],
           mixing_rate=0.5)
 
-      self.assertAllEqual(gg.batch_shape_tensor().eval(), [2, 3])
+      self.assertAllEqual(self.evaluate(gg.batch_shape_tensor()), [2, 3])
       self.assertEqual(gg.batch_shape, tf.TensorShape([2, 3]))
-      self.assertAllEqual(gg.event_shape_tensor().eval(), [])
+      self.assertAllEqual(self.evaluate(gg.event_shape_tensor()), [])
       self.assertEqual(gg.event_shape, tf.TensorShape([]))
 
   def testGammaGammaLogPDF(self):
@@ -69,7 +69,7 @@ class GammaGammaTest(tf.test.TestCase):
           concentration=alpha, mixing_concentration=alpha0, mixing_rate=beta0)
       log_pdf = gg.log_prob(x)
       self.assertEqual(log_pdf.get_shape(), (5,))
-      self.assertAllClose(log_pdf.eval(), expected_log_pdf)
+      self.assertAllClose(self.evaluate(log_pdf), expected_log_pdf)
 
   def testGammaGammaLogPDFMultidimensional(self):
     with self.test_session():
@@ -109,7 +109,7 @@ class GammaGammaTest(tf.test.TestCase):
           mixing_concentration=alpha0_v,
           mixing_rate=beta0_v)
       self.assertEqual(gg.mean().get_shape(), (2,))
-      self.assertAllClose(gg.mean().eval(), expected_mean)
+      self.assertAllClose(self.evaluate(gg.mean()), expected_mean)
 
   def testGammaGammaMeanAllowNanStats(self):
     with self.test_session():
@@ -124,7 +124,7 @@ class GammaGammaTest(tf.test.TestCase):
           mixing_rate=beta0_v,
           allow_nan_stats=False)
       with self.assertRaisesOpError('x < y'):
-        gg.mean().eval()
+        self.evaluate(gg.mean())
 
   def testGammaGammaMeanNanStats(self):
     with self.test_session():
@@ -139,7 +139,7 @@ class GammaGammaTest(tf.test.TestCase):
           mixing_concentration=alpha0_v,
           mixing_rate=beta0_v)
       self.assertEqual(gg.mean().get_shape(), (2,))
-      self.assertAllClose(gg.mean().eval(), expected_mean)
+      self.assertAllClose(self.evaluate(gg.mean()), expected_mean)
 
   def testGammaGammaSample(self):
     with tf.Session():
@@ -153,10 +153,11 @@ class GammaGammaTest(tf.test.TestCase):
           mixing_concentration=alpha0_v,
           mixing_rate=beta0_v)
       samples = gg.sample(n, seed=123456)
-      sample_values = samples.eval()
+      sample_values = self.evaluate(samples)
       self.assertEqual(samples.get_shape(), (n,))
       self.assertEqual(sample_values.shape, (n,))
-      self.assertAllClose(sample_values.mean(), gg.mean().eval(), rtol=.01)
+      self.assertAllClose(
+          sample_values.mean(), self.evaluate(gg.mean()), rtol=.01)
 
   def testGammaGammaSampleMultidimensionalMean(self):
     with self.test_session():
@@ -170,11 +171,11 @@ class GammaGammaTest(tf.test.TestCase):
           mixing_concentration=alpha0_v,
           mixing_rate=beta0_v)
       samples = gg.sample(n, seed=123456)
-      sample_values = samples.eval()
+      sample_values = self.evaluate(samples)
       self.assertEqual(samples.get_shape(), (n, 10, 100))
       self.assertEqual(sample_values.shape, (n, 10, 100))
       self.assertAllClose(
-          sample_values.mean(axis=0), gg.mean().eval(), rtol=.08)
+          sample_values.mean(axis=0), self.evaluate(gg.mean()), rtol=.08)
 
 
 if __name__ == '__main__':

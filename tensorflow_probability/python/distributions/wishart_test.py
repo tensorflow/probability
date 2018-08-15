@@ -54,54 +54,55 @@ class WishartTest(tf.test.TestCase):
       df = 4
       w = tfd.Wishart(df, scale_tril=chol(scale))
       # sp.stats.wishart(df=4, scale=make_pd(1., 2)).entropy()
-      self.assertAllClose(6.301387092430769, w.entropy().eval())
+      self.assertAllClose(6.301387092430769, self.evaluate(w.entropy()))
 
       w = tfd.Wishart(df=1, scale_tril=[[1.]])
       # sp.stats.wishart(df=1,scale=1).entropy()
-      self.assertAllClose(0.78375711047393404, w.entropy().eval())
+      self.assertAllClose(0.78375711047393404, self.evaluate(w.entropy()))
 
   def testMeanLogDetAndLogNormalizingConstant(self):
     with self.test_session():
 
       def entropy_alt(w):
-        return (
+        return self.evaluate(
             w.log_normalization()
             - 0.5 * (w.df - w.dimension - 1.) * w.mean_log_det()
-            + 0.5 * w.df * w.dimension).eval()
+            + 0.5 * w.df * w.dimension)
 
       w = tfd.Wishart(df=4, scale_tril=chol(make_pd(1., 2)))
-      self.assertAllClose(w.entropy().eval(), entropy_alt(w))
+      self.assertAllClose(self.evaluate(w.entropy()), entropy_alt(w))
 
       w = tfd.Wishart(df=5, scale_tril=[[1.]])
-      self.assertAllClose(w.entropy().eval(), entropy_alt(w))
+      self.assertAllClose(self.evaluate(w.entropy()), entropy_alt(w))
 
   def testMean(self):
     with self.test_session():
       scale = make_pd(1., 2)
       df = 4
       w = tfd.Wishart(df, scale_tril=chol(scale))
-      self.assertAllEqual(df * scale, w.mean().eval())
+      self.assertAllEqual(df * scale, self.evaluate(w.mean()))
 
   def testMode(self):
     with self.test_session():
       scale = make_pd(1., 2)
       df = 4
       w = tfd.Wishart(df, scale_tril=chol(scale))
-      self.assertAllEqual((df - 2. - 1.) * scale, w.mode().eval())
+      self.assertAllEqual((df - 2. - 1.) * scale, self.evaluate(w.mode()))
 
   def testStd(self):
     with self.test_session():
       scale = make_pd(1., 2)
       df = 4
       w = tfd.Wishart(df, scale_tril=chol(scale))
-      self.assertAllEqual(tf.sqrt(wishart_var(df, scale)), w.stddev().eval())
+      self.assertAllEqual(
+          tf.sqrt(wishart_var(df, scale)), self.evaluate(w.stddev()))
 
   def testVariance(self):
     with self.test_session():
       scale = make_pd(1., 2)
       df = 4
       w = tfd.Wishart(df, scale_tril=chol(scale))
-      self.assertAllEqual(wishart_var(df, scale), w.variance().eval())
+      self.assertAllEqual(wishart_var(df, scale), self.evaluate(w.variance()))
 
   def testSample(self):
     with self.test_session():
@@ -111,23 +112,23 @@ class WishartTest(tf.test.TestCase):
       chol_w = tfd.Wishart(
           df, scale_tril=chol(scale), input_output_cholesky=False)
 
-      x = chol_w.sample(1, seed=42).eval()
+      x = self.evaluate(chol_w.sample(1, seed=42))
       chol_x = [chol(x[0])]
 
       full_w = tfd.Wishart(df, scale, input_output_cholesky=False)
-      self.assertAllClose(x, full_w.sample(1, seed=42).eval())
+      self.assertAllClose(x, self.evaluate(full_w.sample(1, seed=42)))
 
       chol_w_chol = tfd.Wishart(
           df, scale_tril=chol(scale), input_output_cholesky=True)
-      self.assertAllClose(chol_x, chol_w_chol.sample(1, seed=42).eval())
+      self.assertAllClose(chol_x, self.evaluate(chol_w_chol.sample(1, seed=42)))
       eigen_values = tf.matrix_diag_part(chol_w_chol.sample(1000, seed=42))
-      np.testing.assert_array_less(0., eigen_values.eval())
+      np.testing.assert_array_less(0., self.evaluate(eigen_values))
 
       full_w_chol = tfd.Wishart(
           df, scale=scale, input_output_cholesky=True)
-      self.assertAllClose(chol_x, full_w_chol.sample(1, seed=42).eval())
+      self.assertAllClose(chol_x, self.evaluate(full_w_chol.sample(1, seed=42)))
       eigen_values = tf.matrix_diag_part(full_w_chol.sample(1000, seed=42))
-      np.testing.assert_array_less(0., eigen_values.eval())
+      np.testing.assert_array_less(0., self.evaluate(eigen_values))
 
       # Check first and second moments.
       df = 4.
@@ -138,16 +139,18 @@ class WishartTest(tf.test.TestCase):
       x = chol_w.sample(10000, seed=42)
       self.assertAllEqual((10000, 3, 3), x.get_shape())
 
-      moment1_estimate = tf.reduce_mean(x, reduction_indices=[0]).eval()
-      self.assertAllClose(chol_w.mean().eval(), moment1_estimate, rtol=0.05)
+      moment1_estimate = self.evaluate(tf.reduce_mean(x, reduction_indices=[0]))
+      self.assertAllClose(
+          self.evaluate(chol_w.mean()), moment1_estimate, rtol=0.05)
 
       # The Variance estimate uses the squares rather than outer-products
       # because Wishart.Variance is the diagonal of the Wishart covariance
       # matrix.
-      variance_estimate = (tf.reduce_mean(tf.square(x), reduction_indices=[0]) -
-                           tf.square(moment1_estimate)).eval()
+      variance_estimate = self.evaluate(
+          tf.reduce_mean(tf.square(x), reduction_indices=[0]) -
+          tf.square(moment1_estimate))
       self.assertAllClose(
-          chol_w.variance().eval(), variance_estimate, rtol=0.05)
+          self.evaluate(chol_w.variance()), variance_estimate, rtol=0.05)
 
   # Test that sampling with the same seed twice gives the same results.
   def testSampleMultipleTimes(self):
@@ -161,7 +164,7 @@ class WishartTest(tf.test.TestCase):
           scale_tril=chol(make_pd(1., 3)),
           input_output_cholesky=False,
           name="wishart1")
-      samples1 = chol_w1.sample(n_val, seed=123456).eval()
+      samples1 = self.evaluate(chol_w1.sample(n_val, seed=123456))
 
       tf.set_random_seed(654321)
       chol_w2 = tfd.Wishart(
@@ -169,7 +172,7 @@ class WishartTest(tf.test.TestCase):
           scale_tril=chol(make_pd(1., 3)),
           input_output_cholesky=False,
           name="wishart2")
-      samples2 = chol_w2.sample(n_val, seed=123456).eval()
+      samples2 = self.evaluate(chol_w2.sample(n_val, seed=123456))
 
       self.assertAllClose(samples1, samples2)
 
@@ -200,7 +203,7 @@ class WishartTest(tf.test.TestCase):
           df=[2, 3, 4, 5],
           scale_tril=chol_x,
           input_output_cholesky=True)
-      self.assertAllClose(log_prob_df_seq, w.log_prob(chol_x).eval())
+      self.assertAllClose(log_prob_df_seq, self.evaluate(w.log_prob(chol_x)))
 
       # Now we test various constructions of Wishart with different sample
       # shape.
@@ -223,16 +226,16 @@ class WishartTest(tf.test.TestCase):
               input_output_cholesky=False),
           tfd.Wishart(
               df=4, scale=x[0], input_output_cholesky=False)):
-        self.assertAllEqual((2, 2), w.event_shape_tensor().eval())
-        self.assertEqual(2, w.dimension.eval())
-        self.assertAllClose(log_prob[0], w.log_prob(x[0]).eval())
-        self.assertAllClose(log_prob[0:2], w.log_prob(x[0:2]).eval())
+        self.assertAllEqual((2, 2), self.evaluate(w.event_shape_tensor()))
+        self.assertEqual(2, self.evaluate(w.dimension))
+        self.assertAllClose(log_prob[0], self.evaluate(w.log_prob(x[0])))
+        self.assertAllClose(log_prob[0:2], self.evaluate(w.log_prob(x[0:2])))
         self.assertAllClose(
             np.reshape(log_prob, (2, 2)),
-            w.log_prob(np.reshape(x, (2, 2, 2, 2))).eval())
+            self.evaluate(w.log_prob(np.reshape(x, (2, 2, 2, 2)))))
         self.assertAllClose(
             np.reshape(np.exp(log_prob), (2, 2)),
-            w.prob(np.reshape(x, (2, 2, 2, 2))).eval())
+            self.evaluate(w.prob(np.reshape(x, (2, 2, 2, 2)))))
         self.assertAllEqual((2, 2),
                             w.log_prob(np.reshape(x, (2, 2, 2, 2))).get_shape())
 
@@ -241,16 +244,17 @@ class WishartTest(tf.test.TestCase):
                       scale_tril=chol_x[0],
                       input_output_cholesky=True),
           tfd.Wishart(df=4, scale=x[0], input_output_cholesky=True)):
-        self.assertAllEqual((2, 2), w.event_shape_tensor().eval())
-        self.assertEqual(2, w.dimension.eval())
-        self.assertAllClose(log_prob[0], w.log_prob(chol_x[0]).eval())
-        self.assertAllClose(log_prob[0:2], w.log_prob(chol_x[0:2]).eval())
+        self.assertAllEqual((2, 2), self.evaluate(w.event_shape_tensor()))
+        self.assertEqual(2, self.evaluate(w.dimension))
+        self.assertAllClose(log_prob[0], self.evaluate(w.log_prob(chol_x[0])))
+        self.assertAllClose(
+            log_prob[0:2], self.evaluate(w.log_prob(chol_x[0:2])))
         self.assertAllClose(
             np.reshape(log_prob, (2, 2)),
-            w.log_prob(np.reshape(chol_x, (2, 2, 2, 2))).eval())
+            self.evaluate(w.log_prob(np.reshape(chol_x, (2, 2, 2, 2)))))
         self.assertAllClose(
             np.reshape(np.exp(log_prob), (2, 2)),
-            w.prob(np.reshape(chol_x, (2, 2, 2, 2))).eval())
+            self.evaluate(w.prob(np.reshape(chol_x, (2, 2, 2, 2)))))
         self.assertAllEqual((2, 2),
                             w.log_prob(np.reshape(x, (2, 2, 2, 2))).get_shape())
 
@@ -261,12 +265,12 @@ class WishartTest(tf.test.TestCase):
 
       w = tfd.Wishart(df=4, scale_tril=chol_scale)
       self.assertAllEqual([], w.batch_shape)
-      self.assertAllEqual([], w.batch_shape_tensor().eval())
+      self.assertAllEqual([], self.evaluate(w.batch_shape_tensor()))
 
       w = tfd.Wishart(
           df=[4., 4], scale_tril=np.array([chol_scale, chol_scale]))
       self.assertAllEqual([2], w.batch_shape)
-      self.assertAllEqual([2], w.batch_shape_tensor().eval())
+      self.assertAllEqual([2], self.evaluate(w.batch_shape_tensor()))
 
       scale_deferred = tf.placeholder(tf.float32)
       w = tfd.Wishart(df=4, scale_tril=scale_deferred)
@@ -285,12 +289,12 @@ class WishartTest(tf.test.TestCase):
 
       w = tfd.Wishart(df=4, scale_tril=chol_scale)
       self.assertAllEqual([2, 2], w.event_shape)
-      self.assertAllEqual([2, 2], w.event_shape_tensor().eval())
+      self.assertAllEqual([2, 2], self.evaluate(w.event_shape_tensor()))
 
       w = tfd.Wishart(
           df=[4., 4], scale_tril=np.array([chol_scale, chol_scale]))
       self.assertAllEqual([2, 2], w.event_shape)
-      self.assertAllEqual([2, 2], w.event_shape_tensor().eval())
+      self.assertAllEqual([2, 2], self.evaluate(w.event_shape_tensor()))
 
       scale_deferred = tf.placeholder(tf.float32)
       w = tfd.Wishart(df=4, scale_tril=scale_deferred)
@@ -340,7 +344,7 @@ class WishartTest(tf.test.TestCase):
             scale_tril=np.array([[2., 3., 4.], [1., 2., 3.]],
                                 dtype=np.float32),
             validate_args=True)
-        sess.run(chol_w.scale().eval())
+        self.evaluate(chol_w.scale())
 
       # Ensure no assertions.
       chol_w = tfd.Wishart(

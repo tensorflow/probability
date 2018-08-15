@@ -41,7 +41,7 @@ class HaltonSequenceTest(tf.test.TestCase):
                            [5. / 8, 7. / 9]], dtype=np.float32)
       sample = tfp.mcmc.sample_halton_sequence(
           2, num_results=5, randomized=False)
-      self.assertAllClose(expected, sample.eval(), rtol=1e-6)
+      self.assertAllClose(expected, self.evaluate(sample), rtol=1e-6)
 
   def test_sequence_indices(self):
     """Tests access of sequence elements by index."""
@@ -52,8 +52,9 @@ class HaltonSequenceTest(tf.test.TestCase):
           dim, num_results=10, randomized=False)
       sample_from_indices = tfp.mcmc.sample_halton_sequence(
           dim, sequence_indices=indices, randomized=False)
-      self.assertAllClose(sample_direct.eval(), sample_from_indices.eval(),
-                          rtol=1e-6)
+      self.assertAllClose(
+          self.evaluate(sample_direct), self.evaluate(sample_from_indices),
+          rtol=1e-6)
 
   def test_tf_works_correctly(self):
     """Tests that all supported tf work without error."""
@@ -63,8 +64,8 @@ class HaltonSequenceTest(tf.test.TestCase):
           dim, num_results=10, dtype=tf.float32, seed=11)
       sample_float64 = tfp.mcmc.sample_halton_sequence(
           dim, num_results=10, dtype=tf.float64, seed=21)
-      self.assertEqual(sample_float32.eval().dtype, np.float32)
-      self.assertEqual(sample_float64.eval().dtype, np.float64)
+      self.assertEqual(self.evaluate(sample_float32).dtype, np.float32)
+      self.assertEqual(self.evaluate(sample_float64).dtype, np.float64)
 
   def test_normal_integral_mean_and_var_correctly_estimated(self):
     n = int(1000)
@@ -100,8 +101,10 @@ class HaltonSequenceTest(tf.test.TestCase):
       stddev = tf.sqrt(e_x2 - tf.square(e_x))
       # Keep the tolerance levels the same as in monte_carlo_test.py.
       self.assertEqual(p.batch_shape, e_x.get_shape())
-      self.assertAllClose(p.mean().eval(), e_x.eval(), rtol=0.01)
-      self.assertAllClose(p.stddev().eval(), stddev.eval(), rtol=0.02)
+      self.assertAllClose(
+          self.evaluate(p.mean()), self.evaluate(e_x), rtol=0.01)
+      self.assertAllClose(
+          self.evaluate(p.stddev()), self.evaluate(stddev), rtol=0.02)
 
   def test_docstring_example(self):
     # Produce the first 1000 members of the Halton sequence in 3 dimensions.
@@ -119,7 +122,8 @@ class HaltonSequenceTest(tf.test.TestCase):
       true_value = 1. / tf.reduce_prod(powers + 1.)
 
       # Produces a relative absolute error of 1.7%.
-      self.assertAllClose(integral.eval(), true_value.eval(), rtol=0.02)
+      self.assertAllClose(
+          self.evaluate(integral), self.evaluate(true_value), rtol=0.02)
 
       # Now skip the first 1000 samples and recompute the integral with the next
       # thousand samples. The sequence_indices argument can be used to do this.
@@ -131,7 +135,8 @@ class HaltonSequenceTest(tf.test.TestCase):
 
       integral_leaped = tf.reduce_mean(
           tf.reduce_prod(sample_leaped ** powers, axis=-1))
-      self.assertAllClose(integral_leaped.eval(), true_value.eval(), rtol=0.05)
+      self.assertAllClose(
+          self.evaluate(integral_leaped), self.evaluate(true_value), rtol=0.05)
 
   def test_randomized_qmc_basic(self):
     """Tests the randomization of the Halton sequences."""
@@ -145,7 +150,7 @@ class HaltonSequenceTest(tf.test.TestCase):
       sample = tfp.mcmc.sample_halton_sequence(
           dim, num_results=num_results, seed=121117)
       f = tf.reduce_mean(tf.reduce_sum(sample, axis=1) ** 2)
-      values = [f.eval() for _ in range(replica)]
+      values = [self.evaluate(f) for _ in range(replica)]
       self.assertAllClose(np.mean(values), 101.6667, atol=np.std(values) * 2)
 
   def test_partial_sum_func_qmc(self):
@@ -187,7 +192,8 @@ class HaltonSequenceTest(tf.test.TestCase):
           dim, num_results=num_results_hi, seed=898128)
       f_lo, f_hi = func_estimate(sample_lo), func_estimate(sample_hi)
 
-      estimates = np.array([(f_lo.eval(), f_hi.eval()) for _ in range(replica)])
+      estimates = np.array(
+          [(self.evaluate(f_lo), self.evaluate(f_hi)) for _ in range(replica)])
       var_lo, var_hi = np.mean((estimates - true_mean) ** 2, axis=0)
 
       # Expect that the variance scales as N^2 so var_hi / var_lo ~ k / 10^2

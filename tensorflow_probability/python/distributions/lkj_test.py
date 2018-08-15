@@ -285,8 +285,9 @@ class LKJTestGraphOnly(test.TestCase):
       testee_lkj = tfd.LKJ(
           dimension=3, concentration=[1., 4.], validate_args=True)
       with self.assertRaisesOpError('dimension mismatch'):
-        testee_lkj.log_prob(tf.placeholder_with_default(
-            tf.eye(4), shape=None)).eval()
+        self.evaluate(
+            testee_lkj.log_prob(tf.placeholder_with_default(
+                tf.eye(4), shape=None)))
 
 if __name__ == '__main__':
   test.main()

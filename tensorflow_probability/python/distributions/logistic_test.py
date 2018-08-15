@@ -50,11 +50,11 @@ class LogisticTest(tf.test.TestCase):
 
       log_prob = dist.log_prob(x)
       self.assertEqual(log_prob.get_shape(), (6,))
-      self.assertAllClose(log_prob.eval(), expected_log_prob)
+      self.assertAllClose(self.evaluate(log_prob), expected_log_prob)
 
       prob = dist.prob(x)
       self.assertEqual(prob.get_shape(), (6,))
-      self.assertAllClose(prob.eval(), np.exp(expected_log_prob))
+      self.assertAllClose(self.evaluate(prob), np.exp(expected_log_prob))
 
   def testLogisticCDF(self):
     with self.test_session():
@@ -69,7 +69,7 @@ class LogisticTest(tf.test.TestCase):
       expected_cdf = stats.logistic.cdf(x, np_loc, scale)
 
       self.assertEqual(cdf.get_shape(), (6,))
-      self.assertAllClose(cdf.eval(), expected_cdf)
+      self.assertAllClose(self.evaluate(cdf), expected_cdf)
 
   def testLogisticLogCDF(self):
     with self.test_session():
@@ -84,7 +84,7 @@ class LogisticTest(tf.test.TestCase):
       expected_logcdf = stats.logistic.logcdf(x, np_loc, scale)
 
       self.assertEqual(logcdf.get_shape(), (6,))
-      self.assertAllClose(logcdf.eval(), expected_logcdf)
+      self.assertAllClose(self.evaluate(logcdf), expected_logcdf)
 
   def testLogisticSurvivalFunction(self):
     with self.test_session():
@@ -99,7 +99,8 @@ class LogisticTest(tf.test.TestCase):
       expected_survival_function = stats.logistic.sf(x, np_loc, scale)
 
       self.assertEqual(survival_function.get_shape(), (6,))
-      self.assertAllClose(survival_function.eval(), expected_survival_function)
+      self.assertAllClose(
+          self.evaluate(survival_function), expected_survival_function)
 
   def testLogisticLogSurvivalFunction(self):
     with self.test_session():
@@ -114,7 +115,7 @@ class LogisticTest(tf.test.TestCase):
       expected_logsurvival_function = stats.logistic.logsf(x, np_loc, scale)
 
       self.assertEqual(logsurvival_function.get_shape(), (6,))
-      self.assertAllClose(logsurvival_function.eval(),
+      self.assertAllClose(self.evaluate(logsurvival_function),
                           expected_logsurvival_function)
 
   def testLogisticMean(self):
@@ -123,7 +124,7 @@ class LogisticTest(tf.test.TestCase):
       scale = 1.5
       expected_mean = stats.logistic.mean(loc, scale)
       dist = tfd.Logistic(loc, scale)
-      self.assertAllClose(dist.mean().eval(), expected_mean)
+      self.assertAllClose(self.evaluate(dist.mean()), expected_mean)
 
   def testLogisticVariance(self):
     with self.test_session():
@@ -131,7 +132,7 @@ class LogisticTest(tf.test.TestCase):
       scale = 1.5
       expected_variance = stats.logistic.var(loc, scale)
       dist = tfd.Logistic(loc, scale)
-      self.assertAllClose(dist.variance().eval(), expected_variance)
+      self.assertAllClose(self.evaluate(dist.variance()), expected_variance)
 
   def testLogisticEntropy(self):
     with self.test_session():
@@ -141,7 +142,7 @@ class LogisticTest(tf.test.TestCase):
       scale = 1.5
       expected_entropy = stats.logistic.entropy(np_loc, scale)
       dist = tfd.Logistic(loc, scale)
-      self.assertAllClose(dist.entropy().eval(), expected_entropy)
+      self.assertAllClose(self.evaluate(dist.entropy()), expected_entropy)
 
   def testLogisticSample(self):
     with self.test_session():
@@ -150,7 +151,8 @@ class LogisticTest(tf.test.TestCase):
       dist = tfd.Logistic(loc, scale)
       sample = dist.sample(seed=100)
       self.assertEqual(sample.get_shape(), (3,))
-      self.assertAllClose(sample.eval(), [6.22460556, 3.79602098, 2.05084133])
+      self.assertAllClose(
+          self.evaluate(sample), [6.22460556, 3.79602098, 2.05084133])
 
   def testDtype(self):
     loc = tf.constant([0.1, 0.4], dtype=tf.float32)

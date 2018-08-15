@@ -41,14 +41,14 @@ class InlineBijectorTest(tf.test.TestCase):
       self.assertEqual(exp.name, inline.name)
       x = [[[1., 2.], [3., 4.], [5., 6.]]]
       y = np.exp(x)
-      self.assertAllClose(y, inline.forward(x).eval())
-      self.assertAllClose(x, inline.inverse(y).eval())
+      self.assertAllClose(y, self.evaluate(inline.forward(x)))
+      self.assertAllClose(x, self.evaluate(inline.inverse(y)))
       self.assertAllClose(
           -np.sum(np.log(y), axis=-1),
-          inline.inverse_log_det_jacobian(y, event_ndims=1).eval())
+          self.evaluate(inline.inverse_log_det_jacobian(y, event_ndims=1)))
       self.assertAllClose(
-          -inline.inverse_log_det_jacobian(y, event_ndims=1).eval(),
-          inline.forward_log_det_jacobian(x, event_ndims=1).eval())
+          self.evaluate(-inline.inverse_log_det_jacobian(y, event_ndims=1)),
+          self.evaluate(inline.forward_log_det_jacobian(x, event_ndims=1)))
 
   def testShapeGetters(self):
     with self.test_session():
@@ -64,11 +64,11 @@ class InlineBijectorTest(tf.test.TestCase):
       self.assertAllEqual(y, bijector.forward_event_shape(x))
       self.assertAllEqual(
           y.as_list(),
-          bijector.forward_event_shape_tensor(x.as_list()).eval())
+          self.evaluate(bijector.forward_event_shape_tensor(x.as_list())))
       self.assertAllEqual(x, bijector.inverse_event_shape(y))
       self.assertAllEqual(
           x.as_list(),
-          bijector.inverse_event_shape_tensor(y.as_list()).eval())
+          self.evaluate(bijector.inverse_event_shape_tensor(y.as_list())))
 
 
 if __name__ == "__main__":

@@ -37,14 +37,14 @@ class PowerTransformBijectorTest(tf.test.TestCase):
       self.assertEqual("power_transform", bijector.name)
       x = np.array([[[-1.], [2.], [-5. + 1e-4]]])
       y = (1. + x * c)**(1. / c)
-      self.assertAllClose(y, bijector.forward(x).eval())
-      self.assertAllClose(x, bijector.inverse(y).eval())
+      self.assertAllClose(y, self.evaluate(bijector.forward(x)))
+      self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
       self.assertAllClose(
           (c - 1.) * np.sum(np.log(y), axis=-1),
-          bijector.inverse_log_det_jacobian(y, event_ndims=1).eval())
+          self.evaluate(bijector.inverse_log_det_jacobian(y, event_ndims=1)))
       self.assertAllClose(
-          -bijector.inverse_log_det_jacobian(y, event_ndims=1).eval(),
-          bijector.forward_log_det_jacobian(x, event_ndims=1).eval(),
+          self.evaluate(-bijector.inverse_log_det_jacobian(y, event_ndims=1)),
+          self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=1)),
           rtol=1e-4,
           atol=0.)
 

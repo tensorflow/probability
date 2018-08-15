@@ -46,16 +46,18 @@ class CholeskyOuterProductBijectorTest(tf.test.TestCase):
           axis=1)
       self.assertAllEqual((2, 2, 2), bijector.forward(x).get_shape())
       self.assertAllEqual((2, 2, 2), bijector.inverse(y).get_shape())
-      self.assertAllClose(y, bijector.forward(x).eval())
-      self.assertAllClose(x, bijector.inverse(y).eval())
+      self.assertAllClose(y, self.evaluate(bijector.forward(x)))
+      self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
       self.assertAllClose(
-          ildj, bijector.inverse_log_det_jacobian(
-              y, event_ndims=2).eval(), atol=0., rtol=1e-7)
+          ildj,
+          self.evaluate(
+              bijector.inverse_log_det_jacobian(
+                  y, event_ndims=2)), atol=0., rtol=1e-7)
       self.assertAllClose(
-          -bijector.inverse_log_det_jacobian(
-              y, event_ndims=2).eval(),
-          bijector.forward_log_det_jacobian(
-              x, event_ndims=2).eval(),
+          self.evaluate(-bijector.inverse_log_det_jacobian(
+              y, event_ndims=2)),
+          self.evaluate(bijector.forward_log_det_jacobian(
+              x, event_ndims=2)),
           atol=0.,
           rtol=1e-7)
 
