@@ -29,7 +29,7 @@ tfe = tf.contrib.eager
 
 class ProgramTransformationsTest(tf.test.TestCase):
 
-  @tfe.run_test_in_graph_and_eager_modes()
+  @tfe.run_test_in_graph_and_eager_modes
   def testMakeLogJointFnUnconditional(self):
     """Test `make_log_joint_fn` on unconditional Edward program."""
     def normal_with_unknown_mean():
@@ -56,7 +56,7 @@ class ProgramTransformationsTest(tf.test.TestCase):
         [actual_log_prob, expected_log_prob])
     self.assertEqual(actual_log_prob_, expected_log_prob_)
 
-  @tfe.run_test_in_graph_and_eager_modes()
+  @tfe.run_test_in_graph_and_eager_modes
   def testMakeLogJointFnConditional(self):
     """Test `make_log_joint_fn` on conditional Edward program."""
     def linear_regression(features, prior_precision):
@@ -96,7 +96,7 @@ class ProgramTransformationsTest(tf.test.TestCase):
         [actual_log_prob, expected_log_prob])
     self.assertEqual(actual_log_prob_, expected_log_prob_)
 
-  @tfe.run_test_in_graph_and_eager_modes()
+  @tfe.run_test_in_graph_and_eager_modes
   def testMakeLogJointFnDynamic(self):
     """Test `make_log_joint_fn` on Edward program with stochastic control flow.
 
@@ -105,7 +105,7 @@ class ProgramTransformationsTest(tf.test.TestCase):
     the execution is controlled by random variable outcomes, which in turn is
     controlled by the log-joint's inputs.
     """
-    if not tfe.in_eager_mode():
+    if not tf.executing_eagerly():
       # Don't run test in graph mode.
       return
 
@@ -176,7 +176,7 @@ class ProgramTransformationsTest(tf.test.TestCase):
           [actual_log_prob, expected_log_prob])
       self.assertEqual(actual_log_prob_, expected_log_prob_)
 
-  @tfe.run_test_in_graph_and_eager_modes()
+  @tfe.run_test_in_graph_and_eager_modes
   def testMakeLogJointFnError(self):
     """Test `make_log_joint_fn` raises errors when `name`(s) not supplied."""
     def normal_with_unknown_mean():

@@ -26,13 +26,13 @@ from tensorflow_probability import edward2 as ed
 tfe = tf.contrib.eager
 
 
+@tfe.run_all_tests_in_graph_and_eager_modes
 class InterceptorTest(parameterized.TestCase, tf.test.TestCase):
 
   @parameterized.parameters(
       {"cls": ed.Normal, "value": 2., "kwargs": {"loc": 0.5, "scale": 1.}},
       {"cls": ed.Bernoulli, "value": 1, "kwargs": {"logits": 0.}},
   )
-  @tfe.run_test_in_graph_and_eager_modes()
   def testInterception(self, cls, value, kwargs):
     def interceptor(f, *fargs, **fkwargs):
       name = fkwargs.get("name", None)
@@ -46,7 +46,6 @@ class InterceptorTest(parameterized.TestCase, tf.test.TestCase):
     self.assertEqual(rv1_value, value)
     self.assertEqual(rv2_value, value)
 
-  @tfe.run_test_in_graph_and_eager_modes()
   def testTrivialInterceptorPreservesLogJoint(self):
     def trivial_interceptor(fn, *args, **kwargs):
       # An interceptor that does nothing.
@@ -64,7 +63,6 @@ class InterceptorTest(parameterized.TestCase, tf.test.TestCase):
     self.assertEqual(self.evaluate(log_joint(x=5.)),
                      self.evaluate(log_joint_transformed(x=5.)))
 
-  @tfe.run_test_in_graph_and_eager_modes()
   def testInterceptionForwarding(self):
     def double(f, *args, **kwargs):
       return 2. * ed.interceptable(f)(*args, **kwargs)
@@ -89,7 +87,6 @@ class InterceptorTest(parameterized.TestCase, tf.test.TestCase):
     z_value = self.evaluate(z)
     self.assertAlmostEqual(z_value, value, places=5)
 
-  @tfe.run_test_in_graph_and_eager_modes()
   def testInterceptionNonForwarding(self):
     def double(f, *args, **kwargs):
       self.assertEqual("yes", "no")
@@ -115,7 +112,6 @@ class InterceptorTest(parameterized.TestCase, tf.test.TestCase):
     z_value = self.evaluate(z)
     self.assertAlmostEqual(z_value, value, places=5)
 
-  @tfe.run_test_in_graph_and_eager_modes()
   def testInterceptionException(self):
     def f():
       raise NotImplementedError()

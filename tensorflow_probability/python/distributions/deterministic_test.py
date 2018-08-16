@@ -182,7 +182,7 @@ class DeterministicTest(tf.test.TestCase):
       entropy_ = sess.run(deterministic.entropy())
       self.assertAllEqual(np.zeros(3), entropy_)
 
-  @tfe.run_test_in_graph_and_eager_modes()
+  @tfe.run_test_in_graph_and_eager_modes
   def testDeterministicDeterministicKL(self):
     batch_size = 6
     a_loc = np.array([0.5] * batch_size, dtype=np.float32)
@@ -195,7 +195,7 @@ class DeterministicTest(tf.test.TestCase):
     kl_ = self.evaluate(kl)
     self.assertAllEqual(np.zeros(6) + np.inf, kl_)
 
-  @tfe.run_test_in_graph_and_eager_modes()
+  @tfe.run_test_in_graph_and_eager_modes
   def testDeterministicGammaKL(self):
     batch_size = 2
     a_loc = np.array([0.5] * batch_size, dtype=np.float32)
@@ -335,7 +335,7 @@ class VectorDeterministicTest(tf.test.TestCase):
       entropy_ = sess.run(deterministic.entropy())
       self.assertAllEqual(np.zeros(2), entropy_)
 
-  @tfe.run_test_in_graph_and_eager_modes()
+  @tfe.run_test_in_graph_and_eager_modes
   def testVectorDeterministicVectorDeterministicKL(self):
     batch_size = 6
     event_size = 3
@@ -349,7 +349,7 @@ class VectorDeterministicTest(tf.test.TestCase):
     kl_ = self.evaluate(kl)
     self.assertAllEqual(np.zeros(6) + np.inf, kl_)
 
-  @tfe.run_test_in_graph_and_eager_modes()
+  @tfe.run_test_in_graph_and_eager_modes
   def testVectorDeterministicMultivariateNormalDiagKL(self):
     batch_size = 4
     event_size = 5
