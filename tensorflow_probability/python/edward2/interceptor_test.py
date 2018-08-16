@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 from absl.testing import parameterized
+import six
 import tensorflow as tf
 
 from tensorflow_probability import edward2 as ed
@@ -129,6 +130,67 @@ class InterceptorTest(parameterized.TestCase, tf.test.TestCase):
       new_interceptor = top_interceptor
 
     self.assertEqual(old_interceptor, new_interceptor)
+
+  def testTape(self):
+    def model():
+      x = ed.Normal(loc=0., scale=1., name="x")
+      y = ed.Normal(loc=x, scale=1., name="y")
+      return x + y
+
+    with ed.tape() as model_tape:
+      output = model()
+
+    expected_value, actual_value = self.evaluate([
+        model_tape["x"] + model_tape["y"], output])
+    self.assertEqual(list(six.iterkeys(model_tape)), ["x", "y"])
+    self.assertEqual(expected_value, actual_value)
+
+  def testTapeNoName(self):
+    def model():
+      x = ed.Normal(loc=0., scale=1., name="x")
+      y = ed.Normal(loc=x, scale=1.)
+      return x + y
+
+    with ed.tape() as model_tape:
+      _ = model()
+
+    self.assertEqual(list(six.iterkeys(model_tape)), ["x"])
+
+  def testTapeOuterForwarding(self):
+    def double(f, *args, **kwargs):
+      return 2. * ed.interceptable(f)(*args, **kwargs)
+
+    def model():
+      x = ed.Normal(loc=0., scale=1., name="x")
+      y = ed.Normal(loc=x, scale=1., name="y")
+      return x + y
+
+    with ed.tape() as model_tape:
+      with ed.interception(double):
+        output = model()
+
+    expected_value, actual_value = self.evaluate([
+        2. * model_tape["x"] + 2. * model_tape["y"], output])
+    self.assertEqual(list(six.iterkeys(model_tape)), ["x", "y"])
+    self.assertEqual(expected_value, actual_value)
+
+  def testTapeInnerForwarding(self):
+    def double(f, *args, **kwargs):
+      return 2. * ed.interceptable(f)(*args, **kwargs)
+
+    def model():
+      x = ed.Normal(loc=0., scale=1., name="x")
+      y = ed.Normal(loc=x, scale=1., name="y")
+      return x + y
+
+    with ed.interception(double):
+      with ed.tape() as model_tape:
+        output = model()
+
+    expected_value, actual_value = self.evaluate([
+        model_tape["x"] + model_tape["y"], output])
+    self.assertEqual(list(six.iterkeys(model_tape)), ["x", "y"])
+    self.assertEqual(expected_value, actual_value)
 
 
 if __name__ == "__main__":
