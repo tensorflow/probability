@@ -22,19 +22,11 @@ from setuptools import setup
 from setuptools.command.install import install as InstallCommandBase
 from setuptools.dist import Distribution
 
-# Read __version__ variable from tensorflow_probability/python/version.py using
-# `exec`. We can't import it because TFP is not actually installed. Note that
-# this is 1) one of the python-recommended ways of doing this (see
-# https://packaging.python.org/guides/single-sourcing-package-version/), and 2)
-# while pylint discourages it by default, it isn't strictly forbidden (although
-# generally a bad idea in real code, which this setup.py is not)
+# To enable importing version.py directly, we add its path to sys.path.
 version_path = os.path.join(
-    os.path.dirname(__file__), 'tensorflow_probability', 'python', 'version.py')
-with open(version_path, 'r') as f:
-  exec(f.read())  # pylint: disable=exec-used
-# Rename `__version__` here, so we only need one pylint disabling macro.
-# `__version__` is defined as a result of exec'ing the version.py file contents.
-VERSION = __version__  # pylint: disable=undefined-variable
+    os.path.dirname(__file__), 'tensorflow_probability', 'python')
+sys.path.append(version_path)
+from version import __version__  # pylint: disable=g-import-not-at-top
 
 REQUIRED_PACKAGES = [
     'six >= 1.10.0',
@@ -71,7 +63,7 @@ else:
   # '0.0.1.dev20180305'
   project_name = 'tfp-nightly' + maybe_gpu_suffix
   datestring = datetime.datetime.now().strftime('%Y%m%d')
-  VERSION += datestring
+  __version__ += datestring
   tensorflow_package_name = 'tf-nightly{}'.format(
       maybe_gpu_suffix)
 
@@ -86,7 +78,7 @@ class BinaryDistribution(Distribution):
 
 setup(
     name=project_name,
-    version=VERSION,
+    version=__version__,
     description='Probabilistic modeling and statistical '
                 'inference in TensorFlow',
     author='Google LLC',
