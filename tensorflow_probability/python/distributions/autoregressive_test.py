@@ -52,41 +52,38 @@ class AutogressiveTest(test_util.VectorDistributionTestHelpers,
   def testSampleAndLogProbConsistency(self):
     batch_shape = []
     event_size = 2
-    with self.test_session() as sess:
-      batch_event_shape = np.concatenate([batch_shape, [event_size]], axis=0)
-      sample0 = tf.zeros(batch_event_shape)
-      affine = tfb.Affine(scale_tril=self._random_scale_tril(event_size))
-      ar = tfd.Autoregressive(
-          self._normal_fn(affine), sample0, validate_args=True)
-      self.run_test_sample_consistent_log_prob(
-          sess.run, ar, radius=1., center=0., rtol=0.01)
+    batch_event_shape = np.concatenate([batch_shape, [event_size]], axis=0)
+    sample0 = tf.zeros(batch_event_shape)
+    affine = tfb.Affine(scale_tril=self._random_scale_tril(event_size))
+    ar = tfd.Autoregressive(
+        self._normal_fn(affine), sample0, validate_args=True)
+    self.run_test_sample_consistent_log_prob(
+        self.evaluate, ar, radius=1., center=0., rtol=0.01)
 
   def testCompareToBijector(self):
     """Demonstrates equivalence between TD, Bijector approach and AR dist."""
     sample_shape = np.int32([4, 5])
     batch_shape = np.int32([])
     event_size = np.int32(2)
-    with self.test_session() as sess:
-      batch_event_shape = np.concatenate([batch_shape, [event_size]], axis=0)
-      sample0 = tf.zeros(batch_event_shape)
-      affine = tfb.Affine(scale_tril=self._random_scale_tril(event_size))
-      ar = tfd.Autoregressive(
-          self._normal_fn(affine), sample0, validate_args=True)
-      ar_flow = tfb.MaskedAutoregressiveFlow(
-          is_constant_jacobian=True,
-          shift_and_log_scale_fn=lambda x: [None, affine.forward(x)],
-          validate_args=True)
-      td = transformed_distribution_lib.TransformedDistribution(
-          distribution=tf.distributions.Normal(loc=0., scale=1.),
-          bijector=ar_flow,
-          event_shape=[event_size],
-          batch_shape=batch_shape,
-          validate_args=True)
-      x_shape = np.concatenate(
-          [sample_shape, batch_shape, [event_size]], axis=0)
-      x = 2. * self._rng.random_sample(x_shape).astype(np.float32) - 1.
-      td_log_prob_, ar_log_prob_ = sess.run([td.log_prob(x), ar.log_prob(x)])
-      self.assertAllClose(td_log_prob_, ar_log_prob_, atol=0., rtol=1e-6)
+    batch_event_shape = np.concatenate([batch_shape, [event_size]], axis=0)
+    sample0 = tf.zeros(batch_event_shape)
+    affine = tfb.Affine(scale_tril=self._random_scale_tril(event_size))
+    ar = tfd.Autoregressive(
+        self._normal_fn(affine), sample0, validate_args=True)
+    ar_flow = tfb.MaskedAutoregressiveFlow(
+        is_constant_jacobian=True,
+        shift_and_log_scale_fn=lambda x: [None, affine.forward(x)],
+        validate_args=True)
+    td = transformed_distribution_lib.TransformedDistribution(
+        distribution=tf.distributions.Normal(loc=0., scale=1.),
+        bijector=ar_flow,
+        event_shape=[event_size],
+        batch_shape=batch_shape,
+        validate_args=True)
+    x_shape = np.concatenate([sample_shape, batch_shape, [event_size]], axis=0)
+    x = 2. * self._rng.random_sample(x_shape).astype(np.float32) - 1.
+    td_log_prob_, ar_log_prob_ = self.evaluate([td.log_prob(x), ar.log_prob(x)])
+    self.assertAllClose(td_log_prob_, ar_log_prob_, atol=0., rtol=1e-6)
 
 
 if __name__ == "__main__":

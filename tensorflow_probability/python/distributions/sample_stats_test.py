@@ -46,16 +46,13 @@ class _AutoCorrelationTest(object):
     x_ph = tf.placeholder_with_default(
         input=x_, shape=x_.shape if self.use_static_shape else None)
     with spectral_ops_test_util.fft_kernel_label_map():
-      with self.test_session() as sess:
-        # Setting normalize = True means we divide by zero.
-        auto_corr = tfd.auto_correlation(
-            x_ph, axis=1, center=False, normalize=False)
-        if self.use_static_shape:
-          self.assertEqual((2, 3), auto_corr.shape)
-        auto_corr_ = sess.run(auto_corr)
-        self.assertAllClose(
-            [[0., 0., 0.],
-             [1., 1., 1.]], auto_corr_)
+      # Setting normalize = True means we divide by zero.
+      auto_corr = tfd.auto_correlation(
+          x_ph, axis=1, center=False, normalize=False)
+      if self.use_static_shape:
+        self.assertEqual((2, 3), auto_corr.shape)
+      auto_corr_ = self.evaluate(auto_corr)
+      self.assertAllClose([[0., 0., 0.], [1., 1., 1.]], auto_corr_)
 
   def test_constant_sequence_axis_0_max_lags_none_center_true(self):
     x_ = np.array([[0., 0., 0.],
@@ -63,16 +60,13 @@ class _AutoCorrelationTest(object):
     x_ph = tf.placeholder_with_default(
         input=x_, shape=x_.shape if self.use_static_shape else None)
     with spectral_ops_test_util.fft_kernel_label_map():
-      with self.test_session() as sess:
-        # Setting normalize = True means we divide by zero.
-        auto_corr = tfd.auto_correlation(
-            x_ph, axis=1, normalize=False, center=True)
-        if self.use_static_shape:
-          self.assertEqual((2, 3), auto_corr.shape)
-        auto_corr_ = sess.run(auto_corr)
-        self.assertAllClose(
-            [[0., 0., 0.],
-             [0., 0., 0.]], auto_corr_)
+      # Setting normalize = True means we divide by zero.
+      auto_corr = tfd.auto_correlation(
+          x_ph, axis=1, normalize=False, center=True)
+      if self.use_static_shape:
+        self.assertEqual((2, 3), auto_corr.shape)
+      auto_corr_ = self.evaluate(auto_corr)
+      self.assertAllClose([[0., 0., 0.], [0., 0., 0.]], auto_corr_)
 
   def check_results_versus_brute_force(
       self, x, axis, max_lags, center, normalize):
@@ -98,18 +92,17 @@ class _AutoCorrelationTest(object):
     x_ph = tf.placeholder_with_default(
         x, shape=x.shape if self.use_static_shape else None)
     with spectral_ops_test_util.fft_kernel_label_map():
-      with self.test_session():
-        auto_corr = tfd.auto_correlation(
-            x_ph,
-            axis=axis,
-            max_lags=max_lags,
-            center=center,
-            normalize=normalize)
-        if self.use_static_shape:
-          output_shape = list(x.shape)
-          output_shape[axis] = max_lags + 1
-          self.assertAllEqual(output_shape, auto_corr.shape)
-        self.assertAllClose(rxx, self.evaluate(auto_corr), rtol=1e-5, atol=1e-5)
+      auto_corr = tfd.auto_correlation(
+          x_ph,
+          axis=axis,
+          max_lags=max_lags,
+          center=center,
+          normalize=normalize)
+      if self.use_static_shape:
+        output_shape = list(x.shape)
+        output_shape[axis] = max_lags + 1
+        self.assertAllEqual(output_shape, auto_corr.shape)
+      self.assertAllClose(rxx, self.evaluate(auto_corr), rtol=1e-5, atol=1e-5)
 
   def test_axis_n1_center_false_max_lags_none(self):
     x = rng.randn(2, 3, 4).astype(self.dtype)
@@ -168,19 +161,18 @@ class _AutoCorrelationTest(object):
     x_ph = tf.placeholder_with_default(
         x, shape=(l,) if self.use_static_shape else None)
     with spectral_ops_test_util.fft_kernel_label_map():
-      with self.test_session():
-        rxx = tfd.auto_correlation(
-            x_ph, max_lags=l // 2, center=True, normalize=False)
-        if self.use_static_shape:
-          self.assertAllEqual((l // 2 + 1,), rxx.shape)
-        rxx_ = self.evaluate(rxx)
-        # OSS CPU FFT has some accuracy issues is not the most accurate.
-        # So this tolerance is a bit bad.
-        self.assertAllClose(1., rxx_[0], rtol=0.05)
-        # The maximal error in the rest of the sequence is not great.
-        self.assertAllClose(np.zeros(l // 2), rxx_[1:], atol=0.1)
-        # The mean error in the rest is ok, actually 0.008 when I tested it.
-        self.assertLess(np.abs(rxx_[1:]).mean(), 0.02)
+      rxx = tfd.auto_correlation(
+          x_ph, max_lags=l // 2, center=True, normalize=False)
+      if self.use_static_shape:
+        self.assertAllEqual((l // 2 + 1,), rxx.shape)
+      rxx_ = self.evaluate(rxx)
+      # OSS CPU FFT has some accuracy issues is not the most accurate.
+      # So this tolerance is a bit bad.
+      self.assertAllClose(1., rxx_[0], rtol=0.05)
+      # The maximal error in the rest of the sequence is not great.
+      self.assertAllClose(np.zeros(l // 2), rxx_[1:], atol=0.1)
+      # The mean error in the rest is ok, actually 0.008 when I tested it.
+      self.assertLess(np.abs(rxx_[1:]).mean(), 0.02)
 
   def test_step_function_sequence(self):
     # x jumps to new random value every 10 steps.  So correlation length = 10.
@@ -189,20 +181,19 @@ class _AutoCorrelationTest(object):
     x_ph = tf.placeholder_with_default(
         x, shape=(1000 * 10,) if self.use_static_shape else None)
     with spectral_ops_test_util.fft_kernel_label_map():
-      with self.test_session():
-        rxx = tfd.auto_correlation(
-            x_ph, max_lags=1000 * 10 // 2, center=True, normalize=False)
-        if self.use_static_shape:
-          self.assertAllEqual((1000 * 10 // 2 + 1,), rxx.shape)
-        rxx_ = self.evaluate(rxx)
-        rxx_ /= rxx_[0]
-        # Expect positive correlation for the first 10 lags, then significantly
-        # smaller negative.
-        self.assertGreater(rxx_[:10].min(), 0)
-        self.assertGreater(rxx_[9], 5 * rxx_[10:20].mean())
-        # RXX should be decreasing for the first 10 lags.
-        diff = np.diff(rxx_)
-        self.assertLess(diff[:10].max(), 0)
+      rxx = tfd.auto_correlation(
+          x_ph, max_lags=1000 * 10 // 2, center=True, normalize=False)
+      if self.use_static_shape:
+        self.assertAllEqual((1000 * 10 // 2 + 1,), rxx.shape)
+      rxx_ = self.evaluate(rxx)
+      rxx_ /= rxx_[0]
+      # Expect positive correlation for the first 10 lags, then significantly
+      # smaller negative.
+      self.assertGreater(rxx_[:10].min(), 0)
+      self.assertGreater(rxx_[9], 5 * rxx_[10:20].mean())
+      # RXX should be decreasing for the first 10 lags.
+      diff = np.diff(rxx_)
+      self.assertLess(diff[:10].max(), 0)
 
   def test_normalization(self):
     l = 10000
@@ -210,21 +201,20 @@ class _AutoCorrelationTest(object):
     x_ph = tf.placeholder_with_default(
         x, shape=(l,) if self.use_static_shape else None)
     with spectral_ops_test_util.fft_kernel_label_map():
-      with self.test_session():
-        rxx = tfd.auto_correlation(
-            x_ph, max_lags=l // 2, center=True, normalize=True)
-        if self.use_static_shape:
-          self.assertAllEqual((l // 2 + 1,), rxx.shape)
-        rxx_ = self.evaluate(rxx)
-        # Note that RXX[0] = 1, despite the fact that E[X^2] = 9, and this is
-        # due to normalize=True.
-        # OSS CPU FFT has some accuracy issues is not the most accurate.
-        # So this tolerance is a bit bad.
-        self.assertAllClose(1., rxx_[0], rtol=0.05)
-        # The maximal error in the rest of the sequence is not great.
-        self.assertAllClose(np.zeros(l // 2), rxx_[1:], atol=0.1)
-        # The mean error in the rest is ok, actually 0.008 when I tested it.
-        self.assertLess(np.abs(rxx_[1:]).mean(), 0.02)
+      rxx = tfd.auto_correlation(
+          x_ph, max_lags=l // 2, center=True, normalize=True)
+      if self.use_static_shape:
+        self.assertAllEqual((l // 2 + 1,), rxx.shape)
+      rxx_ = self.evaluate(rxx)
+      # Note that RXX[0] = 1, despite the fact that E[X^2] = 9, and this is
+      # due to normalize=True.
+      # OSS CPU FFT has some accuracy issues is not the most accurate.
+      # So this tolerance is a bit bad.
+      self.assertAllClose(1., rxx_[0], rtol=0.05)
+      # The maximal error in the rest of the sequence is not great.
+      self.assertAllClose(np.zeros(l // 2), rxx_[1:], atol=0.1)
+      # The mean error in the rest is ok, actually 0.008 when I tested it.
+      self.assertLess(np.abs(rxx_[1:]).mean(), 0.02)
 
 
 class AutoCorrelationTestStaticShapeFloat32(tf.test.TestCase,
@@ -272,70 +262,62 @@ class PercentileTestWithLowerInterpolation(tf.test.TestCase):
     for q in [0, 10, 25, 49.9, 50, 50.01, 90, 95, 100]:
       expected_percentile = np.percentile(
           x, q=q, interpolation=self._interpolation, axis=0)
-      with self.test_session():
-        pct = tfd.percentile(
-            x, q=q, interpolation=self._interpolation, axis=[0])
-        self.assertAllEqual((), pct.get_shape())
-        self.assertAllClose(expected_percentile, self.evaluate(pct))
+      pct = tfd.percentile(x, q=q, interpolation=self._interpolation, axis=[0])
+      self.assertAllEqual((), pct.get_shape())
+      self.assertAllClose(expected_percentile, self.evaluate(pct))
 
   def test_one_dim_even_input(self):
     x = [1., 5., 3., 2., 4., 5.]
     for q in [0, 10, 25, 49.9, 50, 50.01, 90, 95, 100]:
       expected_percentile = np.percentile(
           x, q=q, interpolation=self._interpolation)
-      with self.test_session():
-        pct = tfd.percentile(x, q=q, interpolation=self._interpolation)
-        self.assertAllEqual((), pct.get_shape())
-        self.assertAllClose(expected_percentile, self.evaluate(pct))
+      pct = tfd.percentile(x, q=q, interpolation=self._interpolation)
+      self.assertAllEqual((), pct.get_shape())
+      self.assertAllClose(expected_percentile, self.evaluate(pct))
 
   def test_two_dim_odd_input_axis_0(self):
     x = np.array([[-1., 50., -3.5, 2., -1], [0., 0., 3., 2., 4.]]).T
     for q in [0, 10, 25, 49.9, 50, 50.01, 90, 95, 100]:
       expected_percentile = np.percentile(
           x, q=q, interpolation=self._interpolation, axis=0)
-      with self.test_session():
-        # Get dim 1 with negative and positive indices.
-        pct_neg_index = tfd.percentile(
-            x, q=q, interpolation=self._interpolation, axis=[0])
-        pct_pos_index = tfd.percentile(
-            x, q=q, interpolation=self._interpolation, axis=[0])
-        self.assertAllEqual((2,), pct_neg_index.get_shape())
-        self.assertAllEqual((2,), pct_pos_index.get_shape())
-        self.assertAllClose(expected_percentile, self.evaluate(pct_neg_index))
-        self.assertAllClose(expected_percentile, self.evaluate(pct_pos_index))
+      # Get dim 1 with negative and positive indices.
+      pct_neg_index = tfd.percentile(
+          x, q=q, interpolation=self._interpolation, axis=[0])
+      pct_pos_index = tfd.percentile(
+          x, q=q, interpolation=self._interpolation, axis=[0])
+      self.assertAllEqual((2,), pct_neg_index.get_shape())
+      self.assertAllEqual((2,), pct_pos_index.get_shape())
+      self.assertAllClose(expected_percentile, self.evaluate(pct_neg_index))
+      self.assertAllClose(expected_percentile, self.evaluate(pct_pos_index))
 
   def test_two_dim_even_axis_0(self):
     x = np.array([[1., 2., 4., 50.], [1., 2., -4., 5.]]).T
     for q in [0, 10, 25, 49.9, 50, 50.01, 90, 95, 100]:
       expected_percentile = np.percentile(
           x, q=q, interpolation=self._interpolation, axis=0)
-      with self.test_session():
-        pct = tfd.percentile(
-            x, q=q, interpolation=self._interpolation, axis=[0])
-        self.assertAllEqual((2,), pct.get_shape())
-        self.assertAllClose(expected_percentile, self.evaluate(pct))
+      pct = tfd.percentile(x, q=q, interpolation=self._interpolation, axis=[0])
+      self.assertAllEqual((2,), pct.get_shape())
+      self.assertAllClose(expected_percentile, self.evaluate(pct))
 
   def test_two_dim_even_input_and_keep_dims_true(self):
     x = np.array([[1., 2., 4., 50.], [1., 2., -4., 5.]]).T
     for q in [0, 10, 25, 49.9, 50, 50.01, 90, 95, 100]:
       expected_percentile = np.percentile(
           x, q=q, interpolation=self._interpolation, keepdims=True, axis=0)
-      with self.test_session():
-        pct = tfd.percentile(
-            x, q=q, interpolation=self._interpolation, keep_dims=True, axis=[0])
-        self.assertAllEqual((1, 2), pct.get_shape())
-        self.assertAllClose(expected_percentile, self.evaluate(pct))
+      pct = tfd.percentile(
+          x, q=q, interpolation=self._interpolation, keep_dims=True, axis=[0])
+      self.assertAllEqual((1, 2), pct.get_shape())
+      self.assertAllClose(expected_percentile, self.evaluate(pct))
 
   def test_four_dimensional_input(self):
     x = rng.rand(2, 3, 4, 5)
     for axis in [None, 0, 1, -2, (0,), (-1,), (-1, 1), (3, 1), (-3, 0)]:
       expected_percentile = np.percentile(
           x, q=0.77, interpolation=self._interpolation, axis=axis)
-      with self.test_session():
-        pct = tfd.percentile(
-            x, q=0.77, interpolation=self._interpolation, axis=axis)
-        self.assertAllEqual(expected_percentile.shape, pct.get_shape())
-        self.assertAllClose(expected_percentile, self.evaluate(pct))
+      pct = tfd.percentile(
+          x, q=0.77, interpolation=self._interpolation, axis=axis)
+      self.assertAllEqual(expected_percentile.shape, pct.get_shape())
+      self.assertAllClose(expected_percentile, self.evaluate(pct))
 
   def test_four_dimensional_input_and_keepdims(self):
     x = rng.rand(2, 3, 4, 5)
@@ -346,30 +328,28 @@ class PercentileTestWithLowerInterpolation(tf.test.TestCase):
           interpolation=self._interpolation,
           axis=axis,
           keepdims=True)
-      with self.test_session():
-        pct = tfd.percentile(
-            x,
-            q=0.77,
-            interpolation=self._interpolation,
-            axis=axis,
-            keep_dims=True)
-        self.assertAllEqual(expected_percentile.shape, pct.get_shape())
-        self.assertAllClose(expected_percentile, self.evaluate(pct))
+      pct = tfd.percentile(
+          x,
+          q=0.77,
+          interpolation=self._interpolation,
+          axis=axis,
+          keep_dims=True)
+      self.assertAllEqual(expected_percentile.shape, pct.get_shape())
+      self.assertAllClose(expected_percentile, self.evaluate(pct))
 
   def test_four_dimensional_input_x_static_ndims_but_dynamic_sizes(self):
     x = rng.rand(2, 3, 4, 5)
-    x_ph = tf.placeholder(tf.float64, shape=[None, None, None, None])
+    x_ph = tf.placeholder_with_default(input=x, shape=[None, None, None, None])
     for axis in [None, 0, 1, -2, (0,), (-1,), (-1, 1), (3, 1), (-3, 0)]:
       expected_percentile = np.percentile(
           x, q=0.77, interpolation=self._interpolation, axis=axis)
-      with self.test_session():
-        pct = tfd.percentile(
-            x_ph, q=0.77, interpolation=self._interpolation, axis=axis)
-        self.assertAllClose(expected_percentile, pct.eval(feed_dict={x_ph: x}))
+      pct = tfd.percentile(
+          x_ph, q=0.77, interpolation=self._interpolation, axis=axis)
+      self.assertAllClose(expected_percentile, self.evaluate(pct))
 
   def test_four_dimensional_input_and_keepdims_x_static_ndims_dynamic_sz(self):
     x = rng.rand(2, 3, 4, 5)
-    x_ph = tf.placeholder(tf.float64, shape=[None, None, None, None])
+    x_ph = tf.placeholder_with_default(input=x, shape=[None, None, None, None])
     for axis in [None, 0, 1, -2, (0,), (-1,), (-1, 1), (3, 1), (-3, 0)]:
       expected_percentile = np.percentile(
           x,
@@ -377,25 +357,23 @@ class PercentileTestWithLowerInterpolation(tf.test.TestCase):
           interpolation=self._interpolation,
           axis=axis,
           keepdims=True)
-      with self.test_session():
-        pct = tfd.percentile(
-            x_ph,
-            q=0.77,
-            interpolation=self._interpolation,
-            axis=axis,
-            keep_dims=True)
-        self.assertAllClose(expected_percentile, pct.eval(feed_dict={x_ph: x}))
+      pct = tfd.percentile(
+          x_ph,
+          q=0.77,
+          interpolation=self._interpolation,
+          axis=axis,
+          keep_dims=True)
+      self.assertAllClose(expected_percentile, self.evaluate(pct))
 
   def test_with_integer_dtype(self):
     x = [1, 5, 3, 2, 4]
     for q in [0, 10, 25, 49.9, 50, 50.01, 90, 95, 100]:
       expected_percentile = np.percentile(
           x, q=q, interpolation=self._interpolation)
-      with self.test_session():
-        pct = tfd.percentile(x, q=q, interpolation=self._interpolation)
-        self.assertEqual(tf.int32, pct.dtype)
-        self.assertAllEqual((), pct.get_shape())
-        self.assertAllClose(expected_percentile, self.evaluate(pct))
+      pct = tfd.percentile(x, q=q, interpolation=self._interpolation)
+      self.assertEqual(tf.int32, pct.dtype)
+      self.assertAllEqual((), pct.get_shape())
+      self.assertAllClose(expected_percentile, self.evaluate(pct))
 
 
 class PercentileTestWithHigherInterpolation(
@@ -414,20 +392,18 @@ class PercentileTestWithNearestInterpolation(tf.test.TestCase):
     for q in [0, 10.1, 25.1, 49.9, 50.1, 50.01, 89, 100]:
       expected_percentile = np.percentile(
           x, q=q, interpolation=self._interpolation)
-      with self.test_session():
-        pct = tfd.percentile(x, q=q, interpolation=self._interpolation)
-        self.assertAllEqual((), pct.get_shape())
-        self.assertAllClose(expected_percentile, self.evaluate(pct))
+      pct = tfd.percentile(x, q=q, interpolation=self._interpolation)
+      self.assertAllEqual((), pct.get_shape())
+      self.assertAllClose(expected_percentile, self.evaluate(pct))
 
   def test_one_dim_even_input(self):
     x = [1., 5., 3., 2., 4., 5.]
     for q in [0, 10.1, 25.1, 49.9, 50.1, 50.01, 89, 100]:
       expected_percentile = np.percentile(
           x, q=q, interpolation=self._interpolation)
-      with self.test_session():
-        pct = tfd.percentile(x, q=q, interpolation=self._interpolation)
-        self.assertAllEqual((), pct.get_shape())
-        self.assertAllClose(expected_percentile, self.evaluate(pct))
+      pct = tfd.percentile(x, q=q, interpolation=self._interpolation)
+      self.assertAllEqual((), pct.get_shape())
+      self.assertAllClose(expected_percentile, self.evaluate(pct))
 
   def test_invalid_interpolation_raises(self):
     x = [1., 5., 3., 2., 4.]
@@ -441,11 +417,10 @@ class PercentileTestWithNearestInterpolation(tf.test.TestCase):
 
   def test_vector_q_raises_dynamic(self):
     x = [1., 5., 3., 2., 4.]
-    q_ph = tf.placeholder(tf.float32)
+    q_ph = tf.placeholder_with_default(input=[0.5], shape=None)
     pct = tfd.percentile(x, q=q_ph, validate_args=True)
-    with self.test_session():
-      with self.assertRaisesOpError("rank"):
-        pct.eval(feed_dict={q_ph: [0.5]})
+    with self.assertRaisesOpError("rank"):
+      self.evaluate(pct)
 
   def test_finds_max_of_long_array(self):
     # d - 1 == d in float32 and d = 3e7.
@@ -453,9 +428,8 @@ class PercentileTestWithNearestInterpolation(tf.test.TestCase):
     # If float is used, it fails with InvalidArgumentError about an index out of
     # bounds.
     x = tf.linspace(0., 3e7, num=int(3e7))
-    with self.test_session():
-      minval = tfd.percentile(x, q=0, validate_args=True)
-      self.assertAllEqual(0, self.evaluate(minval))
+    minval = tfd.percentile(x, q=0, validate_args=True)
+    self.assertAllEqual(0, self.evaluate(minval))
 
 
 if __name__ == "__main__":

@@ -98,21 +98,22 @@ class ParetoTest(tf.test.TestCase):
     batch_size = 3
     scale = tf.constant([2., 3., 4.])
     concentration = tf.constant([2.] * batch_size)
-    x = tf.placeholder(tf.float32, shape=[3])
     pareto = tfd.Pareto(concentration, scale, validate_args=True)
 
-    with self.test_session():
-      with self.assertRaisesOpError("not in the support"):
-        log_prob = pareto.log_prob(x)
-        log_prob.eval(feed_dict={x: [2., 3., 3.]})
+    with self.assertRaisesOpError("not in the support"):
+      x = tf.placeholder_with_default(input=[2., 3., 3.], shape=[3])
+      log_prob = pareto.log_prob(x)
+      self.evaluate(log_prob)
 
-      with self.assertRaisesOpError("not in the support"):
-        log_prob = pareto.log_prob(x)
-        log_prob.eval(feed_dict={x: [2., 2., 4.]})
+    with self.assertRaisesOpError("not in the support"):
+      x = tf.placeholder_with_default(input=[2., 2., 5.], shape=[3])
+      log_prob = pareto.log_prob(x)
+      self.evaluate(log_prob)
 
-      with self.assertRaisesOpError("not in the support"):
-        log_prob = pareto.log_prob(x)
-        log_prob.eval(feed_dict={x: [1., 3., 4.]})
+    with self.assertRaisesOpError("not in the support"):
+      x = tf.placeholder_with_default(input=[1., 3., 5.], shape=[3])
+      log_prob = pareto.log_prob(x)
+      self.evaluate(log_prob)
 
   @test_util.run_in_graph_and_eager_modes()
   def testParetoLogPdfMultidimensional(self):
@@ -252,13 +253,11 @@ class ParetoTest(tf.test.TestCase):
 
   @test_util.run_in_graph_and_eager_modes()
   def testParetoMode(self):
-    with self.test_session():
-      scale = [0.4, 1.4, 2., 2.5]
-      concentration = [1., 2., 3., 2.5]
-      pareto = tfd.Pareto(concentration, scale)
-      self.assertEqual(pareto.mode().shape, (4,))
-      self.assertAllClose(
-          self.evaluate(pareto.mode()), scale)
+    scale = [0.4, 1.4, 2., 2.5]
+    concentration = [1., 2., 3., 2.5]
+    pareto = tfd.Pareto(concentration, scale)
+    self.assertEqual(pareto.mode().shape, (4,))
+    self.assertAllClose(self.evaluate(pareto.mode()), scale)
 
   @test_util.run_in_graph_and_eager_modes()
   def testParetoSampleMean(self):

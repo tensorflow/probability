@@ -71,18 +71,21 @@ class _BatchReshapeTest(object):
     expected_log_prob = tf.reshape(wishart.log_prob(x), expected_log_prob_shape)
     actual_log_prob = reshape_wishart.log_prob(expected_sample)
 
-    with self.test_session() as sess:
-      [
-          batch_shape_,
-          event_shape_,
-          expected_sample_, actual_sample_,
-          expected_log_prob_, actual_log_prob_,
-      ] = sess.run([
-          batch_shape,
-          event_shape,
-          expected_sample, actual_sample,
-          expected_log_prob, actual_log_prob,
-      ])
+    [
+        batch_shape_,
+        event_shape_,
+        expected_sample_,
+        actual_sample_,
+        expected_log_prob_,
+        actual_log_prob_,
+    ] = self.evaluate([
+        batch_shape,
+        event_shape,
+        expected_sample,
+        actual_sample,
+        expected_log_prob,
+        actual_log_prob,
+    ])
 
     self.assertAllEqual(new_batch_shape, batch_shape_)
     self.assertAllEqual([dims, dims], event_shape_)
@@ -123,20 +126,29 @@ class _BatchReshapeTest(object):
                                    expected_matrix_stat_shape)
     actual_variance = reshape_wishart.variance()
 
-    with self.test_session() as sess:
-      [
-          expected_entropy_, actual_entropy_,
-          expected_mean_, actual_mean_,
-          expected_mode_, actual_mode_,
-          expected_stddev_, actual_stddev_,
-          expected_variance_, actual_variance_,
-      ] = sess.run([
-          expected_entropy, actual_entropy,
-          expected_mean, actual_mean,
-          expected_mode, actual_mode,
-          expected_stddev, actual_stddev,
-          expected_variance, actual_variance,
-      ])
+    [
+        expected_entropy_,
+        actual_entropy_,
+        expected_mean_,
+        actual_mean_,
+        expected_mode_,
+        actual_mode_,
+        expected_stddev_,
+        actual_stddev_,
+        expected_variance_,
+        actual_variance_,
+    ] = self.evaluate([
+        expected_entropy,
+        actual_entropy,
+        expected_mean,
+        actual_mean,
+        expected_mode,
+        actual_mode,
+        expected_stddev,
+        actual_stddev,
+        expected_variance,
+        actual_variance,
+    ])
 
     self.assertAllClose(expected_entropy_, actual_entropy_,
                         atol=0., rtol=1e-6)
@@ -190,18 +202,21 @@ class _BatchReshapeTest(object):
     expected_log_prob = tf.reshape(normal.log_prob(x), expected_log_prob_shape)
     actual_log_prob = reshape_normal.log_prob(expected_sample)
 
-    with self.test_session() as sess:
-      [
-          batch_shape_,
-          event_shape_,
-          expected_sample_, actual_sample_,
-          expected_log_prob_, actual_log_prob_,
-      ] = sess.run([
-          batch_shape,
-          event_shape,
-          expected_sample, actual_sample,
-          expected_log_prob, actual_log_prob,
-      ])
+    [
+        batch_shape_,
+        event_shape_,
+        expected_sample_,
+        actual_sample_,
+        expected_log_prob_,
+        actual_log_prob_,
+    ] = self.evaluate([
+        batch_shape,
+        event_shape,
+        expected_sample,
+        actual_sample,
+        expected_log_prob,
+        actual_log_prob,
+    ])
     self.assertAllEqual(new_batch_shape, batch_shape_)
     self.assertAllEqual([], event_shape_)
     self.assertAllClose(expected_sample_, actual_sample_,
@@ -239,20 +254,29 @@ class _BatchReshapeTest(object):
                                    expected_scalar_stat_shape)
     actual_variance = reshape_normal.variance()
 
-    with self.test_session() as sess:
-      [
-          expected_entropy_, actual_entropy_,
-          expected_mean_, actual_mean_,
-          expected_mode_, actual_mode_,
-          expected_stddev_, actual_stddev_,
-          expected_variance_, actual_variance_,
-      ] = sess.run([
-          expected_entropy, actual_entropy,
-          expected_mean, actual_mean,
-          expected_mode, actual_mode,
-          expected_stddev, actual_stddev,
-          expected_variance, actual_variance,
-      ])
+    [
+        expected_entropy_,
+        actual_entropy_,
+        expected_mean_,
+        actual_mean_,
+        expected_mode_,
+        actual_mode_,
+        expected_stddev_,
+        actual_stddev_,
+        expected_variance_,
+        actual_variance_,
+    ] = self.evaluate([
+        expected_entropy,
+        actual_entropy,
+        expected_mean,
+        actual_mean,
+        expected_mode,
+        actual_mode,
+        expected_stddev,
+        actual_stddev,
+        expected_variance,
+        actual_variance,
+    ])
     self.assertAllClose(expected_entropy_, actual_entropy_,
                         atol=0., rtol=1e-6)
     self.assertAllClose(expected_mean_, actual_mean_,
@@ -304,18 +328,21 @@ class _BatchReshapeTest(object):
     expected_log_prob = tf.reshape(mvn.log_prob(x), expected_log_prob_shape)
     actual_log_prob = reshape_mvn.log_prob(expected_sample)
 
-    with self.test_session() as sess:
-      [
-          batch_shape_,
-          event_shape_,
-          expected_sample_, actual_sample_,
-          expected_log_prob_, actual_log_prob_,
-      ] = sess.run([
-          batch_shape,
-          event_shape,
-          expected_sample, actual_sample,
-          expected_log_prob, actual_log_prob,
-      ])
+    [
+        batch_shape_,
+        event_shape_,
+        expected_sample_,
+        actual_sample_,
+        expected_log_prob_,
+        actual_log_prob_,
+    ] = self.evaluate([
+        batch_shape,
+        event_shape,
+        expected_sample,
+        actual_sample,
+        expected_log_prob,
+        actual_log_prob,
+    ])
     self.assertAllEqual(new_batch_shape, batch_shape_)
     self.assertAllEqual([dims], event_shape_)
     self.assertAllClose(expected_sample_, actual_sample_,
@@ -361,22 +388,33 @@ class _BatchReshapeTest(object):
                                      expected_matrix_stat_shape)
     actual_covariance = reshape_mvn.covariance()
 
-    with self.test_session() as sess:
-      [
-          expected_entropy_, actual_entropy_,
-          expected_mean_, actual_mean_,
-          expected_mode_, actual_mode_,
-          expected_stddev_, actual_stddev_,
-          expected_variance_, actual_variance_,
-          expected_covariance_, actual_covariance_,
-      ] = sess.run([
-          expected_entropy, actual_entropy,
-          expected_mean, actual_mean,
-          expected_mode, actual_mode,
-          expected_stddev, actual_stddev,
-          expected_variance, actual_variance,
-          expected_covariance, actual_covariance,
-      ])
+    [
+        expected_entropy_,
+        actual_entropy_,
+        expected_mean_,
+        actual_mean_,
+        expected_mode_,
+        actual_mode_,
+        expected_stddev_,
+        actual_stddev_,
+        expected_variance_,
+        actual_variance_,
+        expected_covariance_,
+        actual_covariance_,
+    ] = self.evaluate([
+        expected_entropy,
+        actual_entropy,
+        expected_mean,
+        actual_mean,
+        expected_mode,
+        actual_mode,
+        expected_stddev,
+        actual_stddev,
+        expected_variance,
+        actual_variance,
+        expected_covariance,
+        actual_covariance,
+    ])
     self.assertAllClose(expected_entropy_, actual_entropy_,
                         atol=0., rtol=1e-6)
     self.assertAllClose(expected_mean_, actual_mean_,
@@ -423,12 +461,12 @@ class _BatchReshapeTest(object):
             validate_args=True)
 
     else:
-      with self.test_session():
-        with self.assertRaisesOpError(r"Shape sizes do not match."):
-          self.evaluate(tfd.BatchReshape(
-              distribution=mvn,
-              batch_shape=new_batch_shape_ph,
-              validate_args=True).sample())
+      with self.assertRaisesOpError(r"Shape sizes do not match."):
+        self.evaluate(
+            tfd.BatchReshape(
+                distribution=mvn,
+                batch_shape=new_batch_shape_ph,
+                validate_args=True).sample())
 
   def test_non_positive_shape(self):
     dims = 2
@@ -458,12 +496,12 @@ class _BatchReshapeTest(object):
             validate_args=True)
 
     else:
-      with self.test_session():
-        with self.assertRaisesOpError(r".*must be >=-1.*"):
-          self.evaluate(tfd.BatchReshape(
-              distribution=mvn,
-              batch_shape=new_batch_shape_ph,
-              validate_args=True).sample())
+      with self.assertRaisesOpError(r".*must be >=-1.*"):
+        self.evaluate(
+            tfd.BatchReshape(
+                distribution=mvn,
+                batch_shape=new_batch_shape_ph,
+                validate_args=True).sample())
 
   def test_non_vector_shape(self):
     dims = 2
@@ -488,12 +526,12 @@ class _BatchReshapeTest(object):
             validate_args=True)
 
     else:
-      with self.test_session():
-        with self.assertRaisesOpError(r".*must be a vector.*"):
-          self.evaluate(tfd.BatchReshape(
-              distribution=mvn,
-              batch_shape=new_batch_shape_ph,
-              validate_args=True).sample())
+      with self.assertRaisesOpError(r".*must be a vector.*"):
+        self.evaluate(
+            tfd.BatchReshape(
+                distribution=mvn,
+                batch_shape=new_batch_shape_ph,
+                validate_args=True).sample())
 
   def test_broadcasting_explicitly_unsupported(self):
     old_batch_shape = [4]
@@ -523,12 +561,10 @@ class _BatchReshapeTest(object):
       return
 
     with self.assertRaisesOpError("too few batch and event dims"):
-      with self.test_session():
-        self.evaluate(poisson_141_reshaped.log_prob(x_4))
+      self.evaluate(poisson_141_reshaped.log_prob(x_4))
 
     with self.assertRaisesOpError("unexpected batch and event shape"):
-      with self.test_session():
-        self.evaluate(poisson_141_reshaped.log_prob(x_114))
+      self.evaluate(poisson_141_reshaped.log_prob(x_114))
 
 
 class BatchReshapeStaticTest(_BatchReshapeTest, tf.test.TestCase):

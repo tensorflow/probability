@@ -43,81 +43,80 @@ class DistributionTest(tf.test.TestCase):
     ]
 
     sample_shapes = [(), (10,), (10, 20, 30)]
-    with self.test_session():
-      for cls in classes:
-        for sample_shape in sample_shapes:
-          param_shapes = cls.param_shapes(sample_shape)
-          params = dict([(name, tf.random_normal(shape))
-                         for name, shape in param_shapes.items()])
-          dist = cls(**params)
-          self.assertAllEqual(
-              sample_shape, self.evaluate(tf.shape(dist.sample())))
-          dist_copy = dist.copy()
-          self.assertAllEqual(
-              sample_shape, self.evaluate(tf.shape(dist_copy.sample())))
-          self.assertEqual(dist.parameters, dist_copy.parameters)
+    for cls in classes:
+      for sample_shape in sample_shapes:
+        param_shapes = cls.param_shapes(sample_shape)
+        params = dict([(name, tf.random_normal(shape))
+                       for name, shape in param_shapes.items()])
+        dist = cls(**params)
+        self.assertAllEqual(sample_shape, self.evaluate(
+            tf.shape(dist.sample())))
+        dist_copy = dist.copy()
+        self.assertAllEqual(sample_shape,
+                            self.evaluate(tf.shape(dist_copy.sample())))
+        self.assertEqual(dist.parameters, dist_copy.parameters)
 
   def testCopyExtraArgs(self):
-    with self.test_session():
-      # Note: we cannot easily test all distributions since each requires
-      # different initialization arguments. We therefore spot test a few.
-      normal = tfd.Normal(loc=1., scale=2., validate_args=True)
-      self.assertEqual(normal.parameters, normal.copy().parameters)
-      wishart = tfd.Wishart(df=2, scale=[[1., 2], [2, 5]], validate_args=True)
-      self.assertEqual(wishart.parameters, wishart.copy().parameters)
+    # Note: we cannot easily test all distributions since each requires
+    # different initialization arguments. We therefore spot test a few.
+    normal = tfd.Normal(loc=1., scale=2., validate_args=True)
+    self.assertEqual(normal.parameters, normal.copy().parameters)
+    wishart = tfd.Wishart(df=2, scale=[[1., 2], [2, 5]], validate_args=True)
+    self.assertEqual(wishart.parameters, wishart.copy().parameters)
 
   def testCopyOverride(self):
-    with self.test_session():
-      normal = tfd.Normal(loc=1., scale=2., validate_args=True)
-      unused_normal_copy = normal.copy(validate_args=False)
-      base_params = normal.parameters.copy()
-      copy_params = normal.copy(validate_args=False).parameters.copy()
-      self.assertNotEqual(
-          base_params.pop("validate_args"), copy_params.pop("validate_args"))
-      self.assertEqual(base_params, copy_params)
+    normal = tfd.Normal(loc=1., scale=2., validate_args=True)
+    unused_normal_copy = normal.copy(validate_args=False)
+    base_params = normal.parameters.copy()
+    copy_params = normal.copy(validate_args=False).parameters.copy()
+    self.assertNotEqual(
+        base_params.pop("validate_args"), copy_params.pop("validate_args"))
+    self.assertEqual(base_params, copy_params)
 
   def testIsScalar(self):
-    with self.test_session():
-      mu = 1.
-      sigma = 2.
+    mu = 1.
+    sigma = 2.
 
-      normal = tfd.Normal(mu, sigma, validate_args=True)
-      self.assertTrue(tensor_util.constant_value(normal.is_scalar_event()))
-      self.assertTrue(tensor_util.constant_value(normal.is_scalar_batch()))
+    normal = tfd.Normal(mu, sigma, validate_args=True)
+    self.assertTrue(tensor_util.constant_value(normal.is_scalar_event()))
+    self.assertTrue(tensor_util.constant_value(normal.is_scalar_batch()))
 
-      normal = tfd.Normal([mu], [sigma], validate_args=True)
-      self.assertTrue(tensor_util.constant_value(normal.is_scalar_event()))
-      self.assertFalse(tensor_util.constant_value(normal.is_scalar_batch()))
+    normal = tfd.Normal([mu], [sigma], validate_args=True)
+    self.assertTrue(tensor_util.constant_value(normal.is_scalar_event()))
+    self.assertFalse(tensor_util.constant_value(normal.is_scalar_batch()))
 
-      mvn = tfd.MultivariateNormalDiag([mu], [sigma], validate_args=True)
-      self.assertFalse(tensor_util.constant_value(mvn.is_scalar_event()))
-      self.assertTrue(tensor_util.constant_value(mvn.is_scalar_batch()))
+    mvn = tfd.MultivariateNormalDiag([mu], [sigma], validate_args=True)
+    self.assertFalse(tensor_util.constant_value(mvn.is_scalar_event()))
+    self.assertTrue(tensor_util.constant_value(mvn.is_scalar_batch()))
 
-      mvn = tfd.MultivariateNormalDiag([[mu]], [[sigma]], validate_args=True)
-      self.assertFalse(tensor_util.constant_value(mvn.is_scalar_event()))
-      self.assertFalse(tensor_util.constant_value(mvn.is_scalar_batch()))
+    mvn = tfd.MultivariateNormalDiag([[mu]], [[sigma]], validate_args=True)
+    self.assertFalse(tensor_util.constant_value(mvn.is_scalar_event()))
+    self.assertFalse(tensor_util.constant_value(mvn.is_scalar_batch()))
 
-      # We now test every codepath within the underlying is_scalar_helper
-      # function.
+    # We now test every codepath within the underlying is_scalar_helper
+    # function.
 
-      # Test case 1, 2.
-      x = tf.placeholder(dtype=tf.int32, shape=[])
-      # None would fire an exception were it actually executed.
-      self.assertTrue(normal._is_scalar_helper(x.get_shape(), lambda: None))
-      self.assertTrue(
-          normal._is_scalar_helper(tf.TensorShape(None), lambda: tf.shape(x)))
+    # Test case 1, 2.
+    x = tf.placeholder(dtype=tf.int32, shape=[])
+    # None would fire an exception were it actually executed.
+    self.assertTrue(normal._is_scalar_helper(x.get_shape(), lambda: None))
+    self.assertTrue(
+        normal._is_scalar_helper(tf.TensorShape(None), lambda: tf.shape(x)))
 
-      x = tf.placeholder(dtype=tf.int32, shape=[1])
-      # None would fire an exception were it actually executed.
-      self.assertFalse(normal._is_scalar_helper(x.get_shape(), lambda: None))
-      self.assertFalse(
-          normal._is_scalar_helper(tf.TensorShape(None), lambda: tf.shape(x)))
+    x = tf.placeholder(dtype=tf.int32, shape=[1])
+    # None would fire an exception were it actually executed.
+    self.assertFalse(normal._is_scalar_helper(x.get_shape(), lambda: None))
+    self.assertFalse(
+        normal._is_scalar_helper(tf.TensorShape(None), lambda: tf.shape(x)))
 
-      # Test case 3.
-      x = tf.placeholder(dtype=tf.int32)
-      is_scalar = normal._is_scalar_helper(x.get_shape(), lambda: tf.shape(x))
-      self.assertTrue(is_scalar.eval(feed_dict={x: 1}))
-      self.assertFalse(is_scalar.eval(feed_dict={x: [1]}))
+    # Test case 3.
+    x = tf.placeholder_with_default(input=1, shape=None)
+    is_scalar = normal._is_scalar_helper(x.get_shape(), lambda: tf.shape(x))
+    self.assertTrue(self.evaluate(is_scalar))
+
+    x = tf.placeholder_with_default(input=[1], shape=None)
+    is_scalar = normal._is_scalar_helper(x.get_shape(), lambda: tf.shape(x))
+    self.assertFalse(self.evaluate(is_scalar))
 
   def _GetFakeDistribution(self):
     class FakeDistribution(tfd.Distribution):
@@ -144,43 +143,38 @@ class DistributionTest(tf.test.TestCase):
   def testSampleShapeHints(self):
     fake_distribution = self._GetFakeDistribution()
 
-    with self.test_session():
-      # Make a new session since we're playing with static shapes. [And below.]
-      x = tf.placeholder(dtype=tf.float32)
-      dist = fake_distribution(batch_shape=[2, 3], event_shape=[5])
-      sample_shape = tf.convert_to_tensor([6, 7], dtype=tf.int32)
-      y = dist._set_sample_static_shape(x, sample_shape)
-      # We use as_list since TensorShape comparison does not work correctly for
-      # unknown values, ie, Dimension(None).
-      self.assertAllEqual([6, 7, 2, 3, 5], y.get_shape().as_list())
+    # Make a new session since we're playing with static shapes. [And below.]
+    x = tf.placeholder(dtype=tf.float32)
+    dist = fake_distribution(batch_shape=[2, 3], event_shape=[5])
+    sample_shape = tf.convert_to_tensor([6, 7], dtype=tf.int32)
+    y = dist._set_sample_static_shape(x, sample_shape)
+    # We use as_list since TensorShape comparison does not work correctly for
+    # unknown values, ie, Dimension(None).
+    self.assertAllEqual([6, 7, 2, 3, 5], y.get_shape().as_list())
 
-    with self.test_session():
-      x = tf.placeholder(dtype=tf.float32)
-      dist = fake_distribution(batch_shape=[None, 3], event_shape=[5])
-      sample_shape = tf.convert_to_tensor([6, 7], dtype=tf.int32)
-      y = dist._set_sample_static_shape(x, sample_shape)
-      self.assertAllEqual([6, 7, None, 3, 5], y.get_shape().as_list())
+    x = tf.placeholder(dtype=tf.float32)
+    dist = fake_distribution(batch_shape=[None, 3], event_shape=[5])
+    sample_shape = tf.convert_to_tensor([6, 7], dtype=tf.int32)
+    y = dist._set_sample_static_shape(x, sample_shape)
+    self.assertAllEqual([6, 7, None, 3, 5], y.get_shape().as_list())
 
-    with self.test_session():
-      x = tf.placeholder(dtype=tf.float32)
-      dist = fake_distribution(batch_shape=[None, 3], event_shape=[None])
-      sample_shape = tf.convert_to_tensor([6, 7], dtype=tf.int32)
-      y = dist._set_sample_static_shape(x, sample_shape)
-      self.assertAllEqual([6, 7, None, 3, None], y.get_shape().as_list())
+    x = tf.placeholder(dtype=tf.float32)
+    dist = fake_distribution(batch_shape=[None, 3], event_shape=[None])
+    sample_shape = tf.convert_to_tensor([6, 7], dtype=tf.int32)
+    y = dist._set_sample_static_shape(x, sample_shape)
+    self.assertAllEqual([6, 7, None, 3, None], y.get_shape().as_list())
 
-    with self.test_session():
-      x = tf.placeholder(dtype=tf.float32)
-      dist = fake_distribution(batch_shape=None, event_shape=None)
-      sample_shape = tf.convert_to_tensor([6, 7], dtype=tf.int32)
-      y = dist._set_sample_static_shape(x, sample_shape)
-      self.assertTrue(y.get_shape().ndims is None)
+    x = tf.placeholder(dtype=tf.float32)
+    dist = fake_distribution(batch_shape=None, event_shape=None)
+    sample_shape = tf.convert_to_tensor([6, 7], dtype=tf.int32)
+    y = dist._set_sample_static_shape(x, sample_shape)
+    self.assertTrue(y.get_shape().ndims is None)
 
-    with self.test_session():
-      x = tf.placeholder(dtype=tf.float32)
-      dist = fake_distribution(batch_shape=[None, 3], event_shape=None)
-      sample_shape = tf.convert_to_tensor([6, 7], dtype=tf.int32)
-      y = dist._set_sample_static_shape(x, sample_shape)
-      self.assertTrue(y.get_shape().ndims is None)
+    x = tf.placeholder(dtype=tf.float32)
+    dist = fake_distribution(batch_shape=[None, 3], event_shape=None)
+    sample_shape = tf.convert_to_tensor([6, 7], dtype=tf.int32)
+    y = dist._set_sample_static_shape(x, sample_shape)
+    self.assertTrue(y.get_shape().ndims is None)
 
   def testNameScopeWorksCorrectly(self):
     x = tfd.Normal(loc=0., scale=1., name="x")

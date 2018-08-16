@@ -48,77 +48,87 @@ class ProductDistributionTest(tf.test.TestCase):
   def testSampleAndLogProbUnivariate(self):
     loc = np.float32([-1., 1])
     scale = np.float32([0.1, 0.5])
-    with self.test_session() as sess:
-      ind = tfd.Independent(
-          distribution=tf.distributions.Normal(loc=loc, scale=scale),
-          reinterpreted_batch_ndims=1)
+    ind = tfd.Independent(
+        distribution=tf.distributions.Normal(loc=loc, scale=scale),
+        reinterpreted_batch_ndims=1)
 
-      x = ind.sample([4, 5], seed=42)
-      log_prob_x = ind.log_prob(x)
-      x_, actual_log_prob_x = sess.run([x, log_prob_x])
+    x = ind.sample([4, 5], seed=42)
+    log_prob_x = ind.log_prob(x)
+    x_, actual_log_prob_x = self.evaluate([x, log_prob_x])
 
-      self.assertEqual([], ind.batch_shape)
-      self.assertEqual([2], ind.event_shape)
-      self.assertEqual([4, 5, 2], x.shape)
-      self.assertEqual([4, 5], log_prob_x.shape)
+    self.assertEqual([], ind.batch_shape)
+    self.assertEqual([2], ind.event_shape)
+    self.assertEqual([4, 5, 2], x.shape)
+    self.assertEqual([4, 5], log_prob_x.shape)
 
-      expected_log_prob_x = stats.norm(loc, scale).logpdf(x_).sum(-1)
-      self.assertAllClose(expected_log_prob_x, actual_log_prob_x,
-                          rtol=1e-5, atol=0.)
+    expected_log_prob_x = stats.norm(loc, scale).logpdf(x_).sum(-1)
+    self.assertAllClose(
+        expected_log_prob_x, actual_log_prob_x, rtol=1e-5, atol=0.)
 
   def testSampleAndLogProbMultivariate(self):
     loc = np.float32([[-1., 1], [1, -1]])
     scale = np.float32([1., 0.5])
-    with self.test_session() as sess:
-      ind = tfd.Independent(
-          distribution=tfd.MultivariateNormalDiag(
-              loc=loc, scale_identity_multiplier=scale),
-          reinterpreted_batch_ndims=1)
+    ind = tfd.Independent(
+        distribution=tfd.MultivariateNormalDiag(
+            loc=loc, scale_identity_multiplier=scale),
+        reinterpreted_batch_ndims=1)
 
-      x = ind.sample([4, 5], seed=42)
-      log_prob_x = ind.log_prob(x)
-      x_, actual_log_prob_x = sess.run([x, log_prob_x])
+    x = ind.sample([4, 5], seed=42)
+    log_prob_x = ind.log_prob(x)
+    x_, actual_log_prob_x = self.evaluate([x, log_prob_x])
 
-      self.assertEqual([], ind.batch_shape)
-      self.assertEqual([2, 2], ind.event_shape)
-      self.assertEqual([4, 5, 2, 2], x.shape)
-      self.assertEqual([4, 5], log_prob_x.shape)
+    self.assertEqual([], ind.batch_shape)
+    self.assertEqual([2, 2], ind.event_shape)
+    self.assertEqual([4, 5, 2, 2], x.shape)
+    self.assertEqual([4, 5], log_prob_x.shape)
 
-      expected_log_prob_x = stats.norm(loc, scale[:, None]).logpdf(
-          x_).sum(-1).sum(-1)
-      self.assertAllClose(expected_log_prob_x, actual_log_prob_x,
-                          rtol=1e-6, atol=0.)
+    expected_log_prob_x = stats.norm(loc,
+                                     scale[:, None]).logpdf(x_).sum(-1).sum(-1)
+    self.assertAllClose(
+        expected_log_prob_x, actual_log_prob_x, rtol=1e-6, atol=0.)
 
   def testSampleConsistentStats(self):
     loc = np.float32([[-1., 1], [1, -1]])
     scale = np.float32([1., 0.5])
     n_samp = 1e4
-    with self.test_session() as sess:
-      ind = tfd.Independent(
-          distribution=tfd.MultivariateNormalDiag(
-              loc=loc, scale_identity_multiplier=scale),
-          reinterpreted_batch_ndims=1)
+    ind = tfd.Independent(
+        distribution=tfd.MultivariateNormalDiag(
+            loc=loc, scale_identity_multiplier=scale),
+        reinterpreted_batch_ndims=1)
 
-      x = ind.sample(int(n_samp), seed=42)
-      sample_mean = tf.reduce_mean(x, axis=0)
-      sample_var = tf.reduce_mean(tf.squared_difference(x, sample_mean), axis=0)
-      sample_std = tf.sqrt(sample_var)
-      sample_entropy = -tf.reduce_mean(ind.log_prob(x), axis=0)
+    x = ind.sample(int(n_samp), seed=42)
+    sample_mean = tf.reduce_mean(x, axis=0)
+    sample_var = tf.reduce_mean(tf.squared_difference(x, sample_mean), axis=0)
+    sample_std = tf.sqrt(sample_var)
+    sample_entropy = -tf.reduce_mean(ind.log_prob(x), axis=0)
 
-      [
-          sample_mean_, sample_var_, sample_std_, sample_entropy_,
-          actual_mean_, actual_var_, actual_std_, actual_entropy_,
-          actual_mode_,
-      ] = sess.run([
-          sample_mean, sample_var, sample_std, sample_entropy,
-          ind.mean(), ind.variance(), ind.stddev(), ind.entropy(), ind.mode(),
-      ])
+    [
+        sample_mean_,
+        sample_var_,
+        sample_std_,
+        sample_entropy_,
+        actual_mean_,
+        actual_var_,
+        actual_std_,
+        actual_entropy_,
+        actual_mode_,
+    ] = self.evaluate([
+        sample_mean,
+        sample_var,
+        sample_std,
+        sample_entropy,
+        ind.mean(),
+        ind.variance(),
+        ind.stddev(),
+        ind.entropy(),
+        ind.mode(),
+    ])
 
-      self.assertAllClose(sample_mean_, actual_mean_, rtol=0.02, atol=0.)
-      self.assertAllClose(sample_var_, actual_var_, rtol=0.04, atol=0.)
-      self.assertAllClose(sample_std_, actual_std_, rtol=0.02, atol=0.)
-      self.assertAllClose(sample_entropy_, actual_entropy_, rtol=0.01, atol=0.)
-      self.assertAllClose(loc, actual_mode_, rtol=1e-6, atol=0.)
+    self.assertAllClose(sample_mean_, actual_mean_, rtol=0.02, atol=0.)
+    self.assertAllClose(sample_var_, actual_var_, rtol=0.04, atol=0.)
+    self.assertAllClose(sample_std_, actual_std_, rtol=0.02, atol=0.)
+    self.assertAllClose(sample_entropy_, actual_entropy_, rtol=0.01, atol=0.)
+    self.assertAllClose(loc, actual_mode_, rtol=1e-6, atol=0.)
 
   def testKLRaises(self):
     ind1 = tfd.Independent(
@@ -209,44 +219,40 @@ class ProductDistributionTest(tf.test.TestCase):
     def expected_log_prob(x, logits):
       return (x * logits - np.log1p(np.exp(logits))).sum(-1).sum(-1).sum(-1)
 
-    with self.test_session() as sess:
-      logits_ph = tf.placeholder(
-          tf.float32, shape=logits.shape if static_shape else None)
-      ind = tfd.Independent(
-          distribution=bernoulli_lib.Bernoulli(logits=logits_ph))
-      x = ind.sample(sample_shape, seed=42)
-      log_prob_x = ind.log_prob(x)
-      [
-          x_,
-          actual_log_prob_x,
-          ind_batch_shape,
-          ind_event_shape,
-          x_shape,
-          log_prob_x_shape,
-      ] = sess.run(
-          [
-              x,
-              log_prob_x,
-              ind.batch_shape_tensor(),
-              ind.event_shape_tensor(),
-              tf.shape(x),
-              tf.shape(log_prob_x),
-          ],
-          feed_dict={logits_ph: logits})
+    logits_ph = tf.placeholder_with_default(
+        input=logits, shape=logits.shape if static_shape else None)
+    ind = tfd.Independent(
+        distribution=bernoulli_lib.Bernoulli(logits=logits_ph))
+    x = ind.sample(sample_shape, seed=42)
+    log_prob_x = ind.log_prob(x)
+    [
+        x_,
+        actual_log_prob_x,
+        ind_batch_shape,
+        ind_event_shape,
+        x_shape,
+        log_prob_x_shape,
+    ] = self.evaluate([
+        x,
+        log_prob_x,
+        ind.batch_shape_tensor(),
+        ind.event_shape_tensor(),
+        tf.shape(x),
+        tf.shape(log_prob_x),
+    ])
 
-      if static_shape:
-        ind_batch_shape = ind.batch_shape
-        ind_event_shape = ind.event_shape
-        x_shape = x.shape
-        log_prob_x_shape = log_prob_x.shape
+    if static_shape:
+      ind_batch_shape = ind.batch_shape
+      ind_event_shape = ind.event_shape
+      x_shape = x.shape
+      log_prob_x_shape = log_prob_x.shape
 
-      self.assertAllEqual(batch_shape, ind_batch_shape)
-      self.assertAllEqual(image_shape, ind_event_shape)
-      self.assertAllEqual(sample_shape + batch_shape + image_shape, x_shape)
-      self.assertAllEqual(sample_shape + batch_shape, log_prob_x_shape)
-      self.assertAllClose(expected_log_prob(x_, logits),
-                          actual_log_prob_x,
-                          rtol=1e-6, atol=0.)
+    self.assertAllEqual(batch_shape, ind_batch_shape)
+    self.assertAllEqual(image_shape, ind_event_shape)
+    self.assertAllEqual(sample_shape + batch_shape + image_shape, x_shape)
+    self.assertAllEqual(sample_shape + batch_shape, log_prob_x_shape)
+    self.assertAllClose(
+        expected_log_prob(x_, logits), actual_log_prob_x, rtol=1e-6, atol=0.)
 
   def testMnistLikeStaticShape(self):
     self._testMnistLike(static_shape=True)

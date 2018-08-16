@@ -38,82 +38,76 @@ class MultivariateNormalFullCovarianceTest(tf.test.TestCase):
     return self.evaluate(tf.matmul(chol, chol, adjoint_b=True))
 
   def testRaisesIfInitializedWithNonSymmetricMatrix(self):
-    with self.test_session():
-      mu = [1., 2.]
-      sigma = [[1., 0.], [1., 1.]]  # Nonsingular, but not symmetric
-      mvn = tfd.MultivariateNormalFullCovariance(mu, sigma, validate_args=True)
-      with self.assertRaisesOpError("not symmetric"):
-        self.evaluate(mvn.covariance())
-
-  def testNamePropertyIsSetByInitArg(self):
-    with self.test_session():
-      mu = [1., 2.]
-      sigma = [[1., 0.], [0., 1.]]
-      mvn = tfd.MultivariateNormalFullCovariance(mu, sigma, name="Billy")
-      self.assertEqual(mvn.name, "Billy/")
-
-  def testDoesNotRaiseIfInitializedWithSymmetricMatrix(self):
-    with self.test_session():
-      mu = rng.rand(10)
-      sigma = self._random_pd_matrix(10, 10)
-      mvn = tfd.MultivariateNormalFullCovariance(mu, sigma, validate_args=True)
-      # Should not raise
+    mu = [1., 2.]
+    sigma = [[1., 0.], [1., 1.]]  # Nonsingular, but not symmetric
+    mvn = tfd.MultivariateNormalFullCovariance(mu, sigma, validate_args=True)
+    with self.assertRaisesOpError("not symmetric"):
       self.evaluate(mvn.covariance())
 
+  def testNamePropertyIsSetByInitArg(self):
+    mu = [1., 2.]
+    sigma = [[1., 0.], [0., 1.]]
+    mvn = tfd.MultivariateNormalFullCovariance(mu, sigma, name="Billy")
+    self.assertEqual(mvn.name, "Billy/")
+
+  def testDoesNotRaiseIfInitializedWithSymmetricMatrix(self):
+    mu = rng.rand(10)
+    sigma = self._random_pd_matrix(10, 10)
+    mvn = tfd.MultivariateNormalFullCovariance(mu, sigma, validate_args=True)
+    # Should not raise
+    self.evaluate(mvn.covariance())
+
   def testLogPDFScalarBatch(self):
-    with self.test_session():
-      mu = rng.rand(2)
-      sigma = self._random_pd_matrix(2, 2)
-      mvn = tfd.MultivariateNormalFullCovariance(mu, sigma, validate_args=True)
-      x = rng.rand(2)
+    mu = rng.rand(2)
+    sigma = self._random_pd_matrix(2, 2)
+    mvn = tfd.MultivariateNormalFullCovariance(mu, sigma, validate_args=True)
+    x = rng.rand(2)
 
-      log_pdf = mvn.log_prob(x)
-      pdf = mvn.prob(x)
+    log_pdf = mvn.log_prob(x)
+    pdf = mvn.prob(x)
 
-      scipy_mvn = stats.multivariate_normal(mean=mu, cov=sigma)
+    scipy_mvn = stats.multivariate_normal(mean=mu, cov=sigma)
 
-      expected_log_pdf = scipy_mvn.logpdf(x)
-      expected_pdf = scipy_mvn.pdf(x)
-      self.assertEqual((), log_pdf.get_shape())
-      self.assertEqual((), pdf.get_shape())
-      self.assertAllClose(expected_log_pdf, self.evaluate(log_pdf))
-      self.assertAllClose(expected_pdf, self.evaluate(pdf))
+    expected_log_pdf = scipy_mvn.logpdf(x)
+    expected_pdf = scipy_mvn.pdf(x)
+    self.assertEqual((), log_pdf.get_shape())
+    self.assertEqual((), pdf.get_shape())
+    self.assertAllClose(expected_log_pdf, self.evaluate(log_pdf))
+    self.assertAllClose(expected_pdf, self.evaluate(pdf))
 
   def testLogPDFScalarBatchCovarianceNotProvided(self):
-    with self.test_session():
-      mu = rng.rand(2)
-      mvn = tfd.MultivariateNormalFullCovariance(
-          mu, covariance_matrix=None, validate_args=True)
-      x = rng.rand(2)
+    mu = rng.rand(2)
+    mvn = tfd.MultivariateNormalFullCovariance(
+        mu, covariance_matrix=None, validate_args=True)
+    x = rng.rand(2)
 
-      log_pdf = mvn.log_prob(x)
-      pdf = mvn.prob(x)
+    log_pdf = mvn.log_prob(x)
+    pdf = mvn.prob(x)
 
-      # Initialize a scipy_mvn with the default covariance.
-      scipy_mvn = stats.multivariate_normal(mean=mu, cov=np.eye(2))
+    # Initialize a scipy_mvn with the default covariance.
+    scipy_mvn = stats.multivariate_normal(mean=mu, cov=np.eye(2))
 
-      expected_log_pdf = scipy_mvn.logpdf(x)
-      expected_pdf = scipy_mvn.pdf(x)
-      self.assertEqual((), log_pdf.get_shape())
-      self.assertEqual((), pdf.get_shape())
-      self.assertAllClose(expected_log_pdf, self.evaluate(log_pdf))
-      self.assertAllClose(expected_pdf, self.evaluate(pdf))
+    expected_log_pdf = scipy_mvn.logpdf(x)
+    expected_pdf = scipy_mvn.pdf(x)
+    self.assertEqual((), log_pdf.get_shape())
+    self.assertEqual((), pdf.get_shape())
+    self.assertAllClose(expected_log_pdf, self.evaluate(log_pdf))
+    self.assertAllClose(expected_pdf, self.evaluate(pdf))
 
   def testShapes(self):
-    with self.test_session():
-      mu = rng.rand(3, 5, 2)
-      covariance = self._random_pd_matrix(3, 5, 2, 2)
+    mu = rng.rand(3, 5, 2)
+    covariance = self._random_pd_matrix(3, 5, 2, 2)
 
-      mvn = tfd.MultivariateNormalFullCovariance(
-          mu, covariance, validate_args=True)
+    mvn = tfd.MultivariateNormalFullCovariance(
+        mu, covariance, validate_args=True)
 
-      # Shapes known at graph construction time.
-      self.assertEqual((2,), tuple(mvn.event_shape.as_list()))
-      self.assertEqual((3, 5), tuple(mvn.batch_shape.as_list()))
+    # Shapes known at graph construction time.
+    self.assertEqual((2,), tuple(mvn.event_shape.as_list()))
+    self.assertEqual((3, 5), tuple(mvn.batch_shape.as_list()))
 
-      # Shapes known at runtime.
-      self.assertEqual((2,), tuple(self.evaluate(mvn.event_shape_tensor())))
-      self.assertEqual((3, 5), tuple(self.evaluate(mvn.batch_shape_tensor())))
+    # Shapes known at runtime.
+    self.assertEqual((2,), tuple(self.evaluate(mvn.event_shape_tensor())))
+    self.assertEqual((3, 5), tuple(self.evaluate(mvn.batch_shape_tensor())))
 
   def _random_mu_and_sigma(self, batch_shape, event_shape):
     # This ensures sigma is positive def.
@@ -131,47 +125,45 @@ class MultivariateNormalFullCovarianceTest(tf.test.TestCase):
   def testKLBatch(self):
     batch_shape = [2]
     event_shape = [3]
-    with self.test_session():
-      mu_a, sigma_a = self._random_mu_and_sigma(batch_shape, event_shape)
-      mu_b, sigma_b = self._random_mu_and_sigma(batch_shape, event_shape)
-      mvn_a = tfd.MultivariateNormalFullCovariance(
-          loc=mu_a, covariance_matrix=sigma_a, validate_args=True)
-      mvn_b = tfd.MultivariateNormalFullCovariance(
-          loc=mu_b, covariance_matrix=sigma_b, validate_args=True)
+    mu_a, sigma_a = self._random_mu_and_sigma(batch_shape, event_shape)
+    mu_b, sigma_b = self._random_mu_and_sigma(batch_shape, event_shape)
+    mvn_a = tfd.MultivariateNormalFullCovariance(
+        loc=mu_a, covariance_matrix=sigma_a, validate_args=True)
+    mvn_b = tfd.MultivariateNormalFullCovariance(
+        loc=mu_b, covariance_matrix=sigma_b, validate_args=True)
 
-      kl = tfd.kl_divergence(mvn_a, mvn_b)
-      self.assertEqual(batch_shape, kl.get_shape())
+    kl = tfd.kl_divergence(mvn_a, mvn_b)
+    self.assertEqual(batch_shape, kl.get_shape())
 
-      kl_v = self.evaluate(kl)
-      expected_kl_0 = _compute_non_batch_kl(mu_a[0, :], sigma_a[0, :, :],
-                                            mu_b[0, :], sigma_b[0, :])
-      expected_kl_1 = _compute_non_batch_kl(mu_a[1, :], sigma_a[1, :, :],
-                                            mu_b[1, :], sigma_b[1, :])
-      self.assertAllClose(expected_kl_0, kl_v[0])
-      self.assertAllClose(expected_kl_1, kl_v[1])
+    kl_v = self.evaluate(kl)
+    expected_kl_0 = _compute_non_batch_kl(mu_a[0, :], sigma_a[0, :, :],
+                                          mu_b[0, :], sigma_b[0, :])
+    expected_kl_1 = _compute_non_batch_kl(mu_a[1, :], sigma_a[1, :, :],
+                                          mu_b[1, :], sigma_b[1, :])
+    self.assertAllClose(expected_kl_0, kl_v[0])
+    self.assertAllClose(expected_kl_1, kl_v[1])
 
   def testKLBatchBroadcast(self):
     batch_shape = [2]
     event_shape = [3]
-    with self.test_session():
-      mu_a, sigma_a = self._random_mu_and_sigma(batch_shape, event_shape)
-      # No batch shape.
-      mu_b, sigma_b = self._random_mu_and_sigma([], event_shape)
-      mvn_a = tfd.MultivariateNormalFullCovariance(
-          loc=mu_a, covariance_matrix=sigma_a, validate_args=True)
-      mvn_b = tfd.MultivariateNormalFullCovariance(
-          loc=mu_b, covariance_matrix=sigma_b, validate_args=True)
+    mu_a, sigma_a = self._random_mu_and_sigma(batch_shape, event_shape)
+    # No batch shape.
+    mu_b, sigma_b = self._random_mu_and_sigma([], event_shape)
+    mvn_a = tfd.MultivariateNormalFullCovariance(
+        loc=mu_a, covariance_matrix=sigma_a, validate_args=True)
+    mvn_b = tfd.MultivariateNormalFullCovariance(
+        loc=mu_b, covariance_matrix=sigma_b, validate_args=True)
 
-      kl = tfd.kl_divergence(mvn_a, mvn_b)
-      self.assertEqual(batch_shape, kl.get_shape())
+    kl = tfd.kl_divergence(mvn_a, mvn_b)
+    self.assertEqual(batch_shape, kl.get_shape())
 
-      kl_v = self.evaluate(kl)
-      expected_kl_0 = _compute_non_batch_kl(mu_a[0, :], sigma_a[0, :, :],
-                                            mu_b, sigma_b)
-      expected_kl_1 = _compute_non_batch_kl(mu_a[1, :], sigma_a[1, :, :],
-                                            mu_b, sigma_b)
-      self.assertAllClose(expected_kl_0, kl_v[0])
-      self.assertAllClose(expected_kl_1, kl_v[1])
+    kl_v = self.evaluate(kl)
+    expected_kl_0 = _compute_non_batch_kl(mu_a[0, :], sigma_a[0, :, :], mu_b,
+                                          sigma_b)
+    expected_kl_1 = _compute_non_batch_kl(mu_a[1, :], sigma_a[1, :, :], mu_b,
+                                          sigma_b)
+    self.assertAllClose(expected_kl_0, kl_v[0])
+    self.assertAllClose(expected_kl_1, kl_v[1])
 
 
 def _compute_non_batch_kl(mu_a, sigma_a, mu_b, sigma_b):

@@ -39,19 +39,14 @@ class MultivariateNormalDiagPlusLowRankTest(tf.test.TestCase):
     diag = np.array([[1., 2], [3, 4], [5, 6]])
     # batch_shape: [1], event_shape: []
     identity_multiplier = np.array([5.])
-    with self.test_session():
-      dist = tfd.MultivariateNormalDiagPlusLowRank(
-          scale_diag=diag,
-          scale_identity_multiplier=identity_multiplier,
-          validate_args=True)
-      self.assertAllClose(
-          np.array([[[1. + 5, 0],
-                     [0, 2 + 5]],
-                    [[3 + 5, 0],
-                     [0, 4 + 5]],
-                    [[5 + 5, 0],
-                     [0, 6 + 5]]]),
-          self.evaluate(dist.scale.to_dense()))
+    dist = tfd.MultivariateNormalDiagPlusLowRank(
+        scale_diag=diag,
+        scale_identity_multiplier=identity_multiplier,
+        validate_args=True)
+    self.assertAllClose(
+        np.array([[[1. + 5, 0], [0, 2 + 5]], [[3 + 5, 0], [0, 4 + 5]],
+                  [[5 + 5, 0], [0, 6 + 5]]]),
+        self.evaluate(dist.scale.to_dense()))
 
   def testDiagBroadcastBothBatchAndEvent2(self):
     # This test differs from `testDiagBroadcastBothBatchAndEvent` in that it
@@ -61,69 +56,53 @@ class MultivariateNormalDiagPlusLowRankTest(tf.test.TestCase):
     diag = np.array([[1., 2], [3, 4], [5, 6]])
     # batch_shape: [3, 1], event_shape: []
     identity_multiplier = np.array([[5.], [4], [3]])
-    with self.test_session():
-      dist = tfd.MultivariateNormalDiagPlusLowRank(
-          scale_diag=diag,
-          scale_identity_multiplier=identity_multiplier,
-          validate_args=True)
-      self.assertAllEqual(
-          [3, 3, 2, 2],
-          dist.scale.to_dense().get_shape())
+    dist = tfd.MultivariateNormalDiagPlusLowRank(
+        scale_diag=diag,
+        scale_identity_multiplier=identity_multiplier,
+        validate_args=True)
+    self.assertAllEqual([3, 3, 2, 2], dist.scale.to_dense().get_shape())
 
   def testDiagBroadcastOnlyEvent(self):
     # batch_shape: [3], event_shape: [2]
     diag = np.array([[1., 2], [3, 4], [5, 6]])
     # batch_shape: [3], event_shape: []
     identity_multiplier = np.array([5., 4, 3])
-    with self.test_session():
-      dist = tfd.MultivariateNormalDiagPlusLowRank(
-          scale_diag=diag,
-          scale_identity_multiplier=identity_multiplier,
-          validate_args=True)
-      self.assertAllClose(
-          np.array([[[1. + 5, 0],
-                     [0, 2 + 5]],
-                    [[3 + 4, 0],
-                     [0, 4 + 4]],
-                    [[5 + 3, 0],
-                     [0, 6 + 3]]]),   # shape: [3, 2, 2]
-          self.evaluate(dist.scale.to_dense()))
+    dist = tfd.MultivariateNormalDiagPlusLowRank(
+        scale_diag=diag,
+        scale_identity_multiplier=identity_multiplier,
+        validate_args=True)
+    self.assertAllClose(
+        np.array([[[1. + 5, 0], [0, 2 + 5]], [[3 + 4, 0], [0, 4 + 4]],
+                  [[5 + 3, 0], [0, 6 + 3]]]),  # shape: [3, 2, 2]
+        self.evaluate(dist.scale.to_dense()))
 
   def testDiagBroadcastMultiplierAndLoc(self):
     # batch_shape: [], event_shape: [3]
     loc = np.array([1., 0, -1])
     # batch_shape: [3], event_shape: []
     identity_multiplier = np.array([5., 4, 3])
-    with self.test_session():
-      dist = tfd.MultivariateNormalDiagPlusLowRank(
-          loc=loc,
-          scale_identity_multiplier=identity_multiplier,
-          validate_args=True)
-      self.assertAllClose(
-          np.array([[[5, 0, 0],
-                     [0, 5, 0],
-                     [0, 0, 5]],
-                    [[4, 0, 0],
-                     [0, 4, 0],
-                     [0, 0, 4]],
-                    [[3, 0, 0],
-                     [0, 3, 0],
-                     [0, 0, 3]]]),
-          self.evaluate(dist.scale.to_dense()))
+    dist = tfd.MultivariateNormalDiagPlusLowRank(
+        loc=loc,
+        scale_identity_multiplier=identity_multiplier,
+        validate_args=True)
+    self.assertAllClose(
+        np.array([[[5, 0, 0], [0, 5, 0], [0, 0, 5]],
+                  [[4, 0, 0], [0, 4, 0], [0, 0, 4]], [[3, 0, 0], [0, 3, 0],
+                                                      [0, 0, 3]]]),
+        self.evaluate(dist.scale.to_dense()))
 
   def testMean(self):
     mu = [-1.0, 1.0]
     diag_large = [1.0, 5.0]
     v = [[2.0], [3.0]]
     diag_small = [3.0]
-    with self.test_session():
-      dist = tfd.MultivariateNormalDiagPlusLowRank(
-          loc=mu,
-          scale_diag=diag_large,
-          scale_perturb_factor=v,
-          scale_perturb_diag=diag_small,
-          validate_args=True)
-      self.assertAllEqual(mu, self.evaluate(dist.mean()))
+    dist = tfd.MultivariateNormalDiagPlusLowRank(
+        loc=mu,
+        scale_diag=diag_large,
+        scale_perturb_factor=v,
+        scale_perturb_diag=diag_small,
+        validate_args=True)
+    self.assertAllEqual(mu, self.evaluate(dist.mean()))
 
   def testSample(self):
     # TODO(jvdillon): This test should be the basis of a new test fixture which
@@ -146,217 +125,226 @@ class MultivariateNormalDiagPlusLowRankTest(tf.test.TestCase):
     true_variance = np.diag(true_covariance)
     true_stddev = np.sqrt(true_variance)
 
-    with self.test_session() as sess:
-      dist = tfd.MultivariateNormalDiagPlusLowRank(
-          loc=mu,
-          scale_diag=diag_large,
-          scale_perturb_factor=v,
-          scale_perturb_diag=diag_small,
-          validate_args=True)
+    dist = tfd.MultivariateNormalDiagPlusLowRank(
+        loc=mu,
+        scale_diag=diag_large,
+        scale_perturb_factor=v,
+        scale_perturb_diag=diag_small,
+        validate_args=True)
 
-      # The following distributions will test the KL divergence calculation.
-      mvn_identity = tfd.MultivariateNormalDiag(
-          loc=np.array([1., 2, 0.25], dtype=np.float32), validate_args=True)
-      mvn_scaled = tfd.MultivariateNormalDiag(
-          loc=mvn_identity.loc,
-          scale_identity_multiplier=2.2,
-          validate_args=True)
-      mvn_diag = tfd.MultivariateNormalDiag(
-          loc=mvn_identity.loc,
-          scale_diag=np.array([0.5, 1.5, 1.], dtype=np.float32),
-          validate_args=True)
-      mvn_chol = tfd.MultivariateNormalTriL(
-          loc=np.array([1., 2, -1], dtype=np.float32),
-          scale_tril=np.array(
-              [[6., 0, 0], [2, 5, 0], [1, 3, 4]], dtype=np.float32) / 10.,
-          validate_args=True)
+    # The following distributions will test the KL divergence calculation.
+    mvn_identity = tfd.MultivariateNormalDiag(
+        loc=np.array([1., 2, 0.25], dtype=np.float32), validate_args=True)
+    mvn_scaled = tfd.MultivariateNormalDiag(
+        loc=mvn_identity.loc, scale_identity_multiplier=2.2, validate_args=True)
+    mvn_diag = tfd.MultivariateNormalDiag(
+        loc=mvn_identity.loc,
+        scale_diag=np.array([0.5, 1.5, 1.], dtype=np.float32),
+        validate_args=True)
+    mvn_chol = tfd.MultivariateNormalTriL(
+        loc=np.array([1., 2, -1], dtype=np.float32),
+        scale_tril=np.array(
+            [[6., 0, 0], [2, 5, 0], [1, 3, 4]], dtype=np.float32) / 10.,
+        validate_args=True)
 
-      scale = dist.scale.to_dense()
+    scale = dist.scale.to_dense()
 
-      n = int(30e3)
-      samps = dist.sample(n, seed=0)
-      sample_mean = tf.reduce_mean(samps, 0)
-      x = samps - sample_mean
-      sample_covariance = tf.matmul(x, x, transpose_a=True) / n
+    n = int(30e3)
+    samps = dist.sample(n, seed=0)
+    sample_mean = tf.reduce_mean(samps, 0)
+    x = samps - sample_mean
+    sample_covariance = tf.matmul(x, x, transpose_a=True) / n
 
-      sample_kl_identity = tf.reduce_mean(
-          dist.log_prob(samps) - mvn_identity.log_prob(samps), 0)
-      analytical_kl_identity = tfd.kl_divergence(dist, mvn_identity)
+    sample_kl_identity = tf.reduce_mean(
+        dist.log_prob(samps) - mvn_identity.log_prob(samps), 0)
+    analytical_kl_identity = tfd.kl_divergence(dist, mvn_identity)
 
-      sample_kl_scaled = tf.reduce_mean(
-          dist.log_prob(samps) - mvn_scaled.log_prob(samps), 0)
-      analytical_kl_scaled = tfd.kl_divergence(dist, mvn_scaled)
+    sample_kl_scaled = tf.reduce_mean(
+        dist.log_prob(samps) - mvn_scaled.log_prob(samps), 0)
+    analytical_kl_scaled = tfd.kl_divergence(dist, mvn_scaled)
 
-      sample_kl_diag = tf.reduce_mean(
-          dist.log_prob(samps) - mvn_diag.log_prob(samps), 0)
-      analytical_kl_diag = tfd.kl_divergence(dist, mvn_diag)
+    sample_kl_diag = tf.reduce_mean(
+        dist.log_prob(samps) - mvn_diag.log_prob(samps), 0)
+    analytical_kl_diag = tfd.kl_divergence(dist, mvn_diag)
 
-      sample_kl_chol = tf.reduce_mean(
-          dist.log_prob(samps) - mvn_chol.log_prob(samps), 0)
-      analytical_kl_chol = tfd.kl_divergence(dist, mvn_chol)
+    sample_kl_chol = tf.reduce_mean(
+        dist.log_prob(samps) - mvn_chol.log_prob(samps), 0)
+    analytical_kl_chol = tfd.kl_divergence(dist, mvn_chol)
 
-      n = int(10e3)
-      baseline = tfd.MultivariateNormalDiag(
-          loc=np.array([-1., 0.25, 1.25], dtype=np.float32),
-          scale_diag=np.array([1.5, 0.5, 1.], dtype=np.float32),
-          validate_args=True)
-      samps = baseline.sample(n, seed=0)
+    n = int(10e3)
+    baseline = tfd.MultivariateNormalDiag(
+        loc=np.array([-1., 0.25, 1.25], dtype=np.float32),
+        scale_diag=np.array([1.5, 0.5, 1.], dtype=np.float32),
+        validate_args=True)
+    samps = baseline.sample(n, seed=0)
 
-      sample_kl_identity_diag_baseline = tf.reduce_mean(
-          baseline.log_prob(samps) - mvn_identity.log_prob(samps), 0)
-      analytical_kl_identity_diag_baseline = tfd.kl_divergence(
-          baseline, mvn_identity)
+    sample_kl_identity_diag_baseline = tf.reduce_mean(
+        baseline.log_prob(samps) - mvn_identity.log_prob(samps), 0)
+    analytical_kl_identity_diag_baseline = tfd.kl_divergence(
+        baseline, mvn_identity)
 
-      sample_kl_scaled_diag_baseline = tf.reduce_mean(
-          baseline.log_prob(samps) - mvn_scaled.log_prob(samps), 0)
-      analytical_kl_scaled_diag_baseline = tfd.kl_divergence(
-          baseline, mvn_scaled)
+    sample_kl_scaled_diag_baseline = tf.reduce_mean(
+        baseline.log_prob(samps) - mvn_scaled.log_prob(samps), 0)
+    analytical_kl_scaled_diag_baseline = tfd.kl_divergence(baseline, mvn_scaled)
 
-      sample_kl_diag_diag_baseline = tf.reduce_mean(
-          baseline.log_prob(samps) - mvn_diag.log_prob(samps), 0)
-      analytical_kl_diag_diag_baseline = tfd.kl_divergence(baseline, mvn_diag)
+    sample_kl_diag_diag_baseline = tf.reduce_mean(
+        baseline.log_prob(samps) - mvn_diag.log_prob(samps), 0)
+    analytical_kl_diag_diag_baseline = tfd.kl_divergence(baseline, mvn_diag)
 
-      sample_kl_chol_diag_baseline = tf.reduce_mean(
-          baseline.log_prob(samps) - mvn_chol.log_prob(samps), 0)
-      analytical_kl_chol_diag_baseline = tfd.kl_divergence(baseline, mvn_chol)
+    sample_kl_chol_diag_baseline = tf.reduce_mean(
+        baseline.log_prob(samps) - mvn_chol.log_prob(samps), 0)
+    analytical_kl_chol_diag_baseline = tfd.kl_divergence(baseline, mvn_chol)
 
-      [
-          sample_mean_,
-          analytical_mean_,
-          sample_covariance_,
-          analytical_covariance_,
-          analytical_variance_,
-          analytical_stddev_,
-          scale_,
-          sample_kl_identity_, analytical_kl_identity_,
-          sample_kl_scaled_, analytical_kl_scaled_,
-          sample_kl_diag_, analytical_kl_diag_,
-          sample_kl_chol_, analytical_kl_chol_,
-          sample_kl_identity_diag_baseline_,
-          analytical_kl_identity_diag_baseline_,
-          sample_kl_scaled_diag_baseline_, analytical_kl_scaled_diag_baseline_,
-          sample_kl_diag_diag_baseline_, analytical_kl_diag_diag_baseline_,
-          sample_kl_chol_diag_baseline_, analytical_kl_chol_diag_baseline_,
-      ] = sess.run([
-          sample_mean,
-          dist.mean(),
-          sample_covariance,
-          dist.covariance(),
-          dist.variance(),
-          dist.stddev(),
-          scale,
-          sample_kl_identity, analytical_kl_identity,
-          sample_kl_scaled, analytical_kl_scaled,
-          sample_kl_diag, analytical_kl_diag,
-          sample_kl_chol, analytical_kl_chol,
-          sample_kl_identity_diag_baseline,
-          analytical_kl_identity_diag_baseline,
-          sample_kl_scaled_diag_baseline, analytical_kl_scaled_diag_baseline,
-          sample_kl_diag_diag_baseline, analytical_kl_diag_diag_baseline,
-          sample_kl_chol_diag_baseline, analytical_kl_chol_diag_baseline,
-      ])
+    [
+        sample_mean_,
+        analytical_mean_,
+        sample_covariance_,
+        analytical_covariance_,
+        analytical_variance_,
+        analytical_stddev_,
+        scale_,
+        sample_kl_identity_,
+        analytical_kl_identity_,
+        sample_kl_scaled_,
+        analytical_kl_scaled_,
+        sample_kl_diag_,
+        analytical_kl_diag_,
+        sample_kl_chol_,
+        analytical_kl_chol_,
+        sample_kl_identity_diag_baseline_,
+        analytical_kl_identity_diag_baseline_,
+        sample_kl_scaled_diag_baseline_,
+        analytical_kl_scaled_diag_baseline_,
+        sample_kl_diag_diag_baseline_,
+        analytical_kl_diag_diag_baseline_,
+        sample_kl_chol_diag_baseline_,
+        analytical_kl_chol_diag_baseline_,
+    ] = self.evaluate([
+        sample_mean,
+        dist.mean(),
+        sample_covariance,
+        dist.covariance(),
+        dist.variance(),
+        dist.stddev(),
+        scale,
+        sample_kl_identity,
+        analytical_kl_identity,
+        sample_kl_scaled,
+        analytical_kl_scaled,
+        sample_kl_diag,
+        analytical_kl_diag,
+        sample_kl_chol,
+        analytical_kl_chol,
+        sample_kl_identity_diag_baseline,
+        analytical_kl_identity_diag_baseline,
+        sample_kl_scaled_diag_baseline,
+        analytical_kl_scaled_diag_baseline,
+        sample_kl_diag_diag_baseline,
+        analytical_kl_diag_diag_baseline,
+        sample_kl_chol_diag_baseline,
+        analytical_kl_chol_diag_baseline,
+    ])
 
-      sample_variance_ = np.diag(sample_covariance_)
-      sample_stddev_ = np.sqrt(sample_variance_)
+    sample_variance_ = np.diag(sample_covariance_)
+    sample_stddev_ = np.sqrt(sample_variance_)
 
-      logging.vlog(2, "true_mean:\n{}  ".format(true_mean))
-      logging.vlog(2, "sample_mean:\n{}".format(sample_mean_))
-      logging.vlog(2, "analytical_mean:\n{}".format(analytical_mean_))
+    logging.vlog(2, "true_mean:\n{}  ".format(true_mean))
+    logging.vlog(2, "sample_mean:\n{}".format(sample_mean_))
+    logging.vlog(2, "analytical_mean:\n{}".format(analytical_mean_))
 
-      logging.vlog(2, "true_covariance:\n{}".format(true_covariance))
-      logging.vlog(2, "sample_covariance:\n{}".format(sample_covariance_))
-      logging.vlog(2, "analytical_covariance:\n{}".format(
-          analytical_covariance_))
+    logging.vlog(2, "true_covariance:\n{}".format(true_covariance))
+    logging.vlog(2, "sample_covariance:\n{}".format(sample_covariance_))
+    logging.vlog(2, "analytical_covariance:\n{}".format(analytical_covariance_))
 
-      logging.vlog(2, "true_variance:\n{}".format(true_variance))
-      logging.vlog(2, "sample_variance:\n{}".format(sample_variance_))
-      logging.vlog(2, "analytical_variance:\n{}".format(analytical_variance_))
+    logging.vlog(2, "true_variance:\n{}".format(true_variance))
+    logging.vlog(2, "sample_variance:\n{}".format(sample_variance_))
+    logging.vlog(2, "analytical_variance:\n{}".format(analytical_variance_))
 
-      logging.vlog(2, "true_stddev:\n{}".format(true_stddev))
-      logging.vlog(2, "sample_stddev:\n{}".format(sample_stddev_))
-      logging.vlog(2, "analytical_stddev:\n{}".format(analytical_stddev_))
+    logging.vlog(2, "true_stddev:\n{}".format(true_stddev))
+    logging.vlog(2, "sample_stddev:\n{}".format(sample_stddev_))
+    logging.vlog(2, "analytical_stddev:\n{}".format(analytical_stddev_))
 
-      logging.vlog(2, "true_scale:\n{}".format(true_scale))
-      logging.vlog(2, "scale:\n{}".format(scale_))
+    logging.vlog(2, "true_scale:\n{}".format(true_scale))
+    logging.vlog(2, "scale:\n{}".format(scale_))
 
-      logging.vlog(2, "kl_identity:  analytical:{}  sample:{}".format(
-          analytical_kl_identity_, sample_kl_identity_))
+    logging.vlog(
+        2, "kl_identity:  analytical:{}  sample:{}".format(
+            analytical_kl_identity_, sample_kl_identity_))
 
-      logging.vlog(2, "kl_scaled:    analytical:{}  sample:{}".format(
-          analytical_kl_scaled_, sample_kl_scaled_))
+    logging.vlog(
+        2, "kl_scaled:    analytical:{}  sample:{}".format(
+            analytical_kl_scaled_, sample_kl_scaled_))
 
-      logging.vlog(2, "kl_diag:      analytical:{}  sample:{}".format(
-          analytical_kl_diag_, sample_kl_diag_))
+    logging.vlog(
+        2, "kl_diag:      analytical:{}  sample:{}".format(
+            analytical_kl_diag_, sample_kl_diag_))
 
-      logging.vlog(2, "kl_chol:      analytical:{}  sample:{}".format(
-          analytical_kl_chol_, sample_kl_chol_))
+    logging.vlog(
+        2, "kl_chol:      analytical:{}  sample:{}".format(
+            analytical_kl_chol_, sample_kl_chol_))
 
-      logging.vlog(
-          2, "kl_identity_diag_baseline:  analytical:{}  sample:{}".format(
-              analytical_kl_identity_diag_baseline_,
-              sample_kl_identity_diag_baseline_))
+    logging.vlog(
+        2, "kl_identity_diag_baseline:  analytical:{}  sample:{}".format(
+            analytical_kl_identity_diag_baseline_,
+            sample_kl_identity_diag_baseline_))
 
-      logging.vlog(
-          2, "kl_scaled_diag_baseline:  analytical:{}  sample:{}".format(
-              analytical_kl_scaled_diag_baseline_,
-              sample_kl_scaled_diag_baseline_))
+    logging.vlog(
+        2, "kl_scaled_diag_baseline:  analytical:{}  sample:{}".format(
+            analytical_kl_scaled_diag_baseline_,
+            sample_kl_scaled_diag_baseline_))
 
-      logging.vlog(2, "kl_diag_diag_baseline:  analytical:{}  sample:{}".format(
-          analytical_kl_diag_diag_baseline_,
-          sample_kl_diag_diag_baseline_))
+    logging.vlog(
+        2, "kl_diag_diag_baseline:  analytical:{}  sample:{}".format(
+            analytical_kl_diag_diag_baseline_, sample_kl_diag_diag_baseline_))
 
-      logging.vlog(2, "kl_chol_diag_baseline:  analytical:{}  sample:{}".format(
-          analytical_kl_chol_diag_baseline_,
-          sample_kl_chol_diag_baseline_))
+    logging.vlog(
+        2, "kl_chol_diag_baseline:  analytical:{}  sample:{}".format(
+            analytical_kl_chol_diag_baseline_, sample_kl_chol_diag_baseline_))
 
-      self.assertAllClose(true_mean, sample_mean_,
-                          atol=0., rtol=0.02)
-      self.assertAllClose(true_mean, analytical_mean_,
-                          atol=0., rtol=1e-6)
+    self.assertAllClose(true_mean, sample_mean_, atol=0., rtol=0.02)
+    self.assertAllClose(true_mean, analytical_mean_, atol=0., rtol=1e-6)
 
-      self.assertAllClose(true_covariance, sample_covariance_,
-                          atol=0., rtol=0.02)
-      self.assertAllClose(true_covariance, analytical_covariance_,
-                          atol=0., rtol=1e-6)
+    self.assertAllClose(true_covariance, sample_covariance_, atol=0., rtol=0.02)
+    self.assertAllClose(
+        true_covariance, analytical_covariance_, atol=0., rtol=1e-6)
 
-      self.assertAllClose(true_variance, sample_variance_,
-                          atol=0., rtol=0.02)
-      self.assertAllClose(true_variance, analytical_variance_,
-                          atol=0., rtol=1e-6)
+    self.assertAllClose(true_variance, sample_variance_, atol=0., rtol=0.02)
+    self.assertAllClose(true_variance, analytical_variance_, atol=0., rtol=1e-6)
 
-      self.assertAllClose(true_stddev, sample_stddev_,
-                          atol=0., rtol=0.02)
-      self.assertAllClose(true_stddev, analytical_stddev_,
-                          atol=0., rtol=1e-6)
+    self.assertAllClose(true_stddev, sample_stddev_, atol=0., rtol=0.02)
+    self.assertAllClose(true_stddev, analytical_stddev_, atol=0., rtol=1e-6)
 
-      self.assertAllClose(true_scale, scale_,
-                          atol=0., rtol=1e-6)
+    self.assertAllClose(true_scale, scale_, atol=0., rtol=1e-6)
 
-      self.assertAllClose(sample_kl_identity_, analytical_kl_identity_,
-                          atol=0., rtol=0.02)
-      self.assertAllClose(sample_kl_scaled_, analytical_kl_scaled_,
-                          atol=0., rtol=0.02)
-      self.assertAllClose(sample_kl_diag_, analytical_kl_diag_,
-                          atol=0., rtol=0.02)
-      self.assertAllClose(sample_kl_chol_, analytical_kl_chol_,
-                          atol=0., rtol=0.02)
+    self.assertAllClose(
+        sample_kl_identity_, analytical_kl_identity_, atol=0., rtol=0.02)
+    self.assertAllClose(
+        sample_kl_scaled_, analytical_kl_scaled_, atol=0., rtol=0.02)
+    self.assertAllClose(
+        sample_kl_diag_, analytical_kl_diag_, atol=0., rtol=0.02)
+    self.assertAllClose(
+        sample_kl_chol_, analytical_kl_chol_, atol=0., rtol=0.02)
 
-      self.assertAllClose(
-          sample_kl_identity_diag_baseline_,
-          analytical_kl_identity_diag_baseline_,
-          atol=0., rtol=0.02)
-      self.assertAllClose(
-          sample_kl_scaled_diag_baseline_,
-          analytical_kl_scaled_diag_baseline_,
-          atol=0., rtol=0.02)
-      self.assertAllClose(
-          sample_kl_diag_diag_baseline_,
-          analytical_kl_diag_diag_baseline_,
-          atol=0., rtol=0.04)
-      self.assertAllClose(
-          sample_kl_chol_diag_baseline_,
-          analytical_kl_chol_diag_baseline_,
-          atol=0., rtol=0.02)
+    self.assertAllClose(
+        sample_kl_identity_diag_baseline_,
+        analytical_kl_identity_diag_baseline_,
+        atol=0.,
+        rtol=0.02)
+    self.assertAllClose(
+        sample_kl_scaled_diag_baseline_,
+        analytical_kl_scaled_diag_baseline_,
+        atol=0.,
+        rtol=0.02)
+    self.assertAllClose(
+        sample_kl_diag_diag_baseline_,
+        analytical_kl_diag_diag_baseline_,
+        atol=0.,
+        rtol=0.04)
+    self.assertAllClose(
+        sample_kl_chol_diag_baseline_,
+        analytical_kl_chol_diag_baseline_,
+        atol=0.,
+        rtol=0.02)
 
   def testImplicitLargeDiag(self):
     mu = np.array([[1., 2, 3],
@@ -378,11 +366,10 @@ class MultivariateNormalDiagPlusLowRankTest(tf.test.TestCase):
     cov = np.stack([np.matmul(scale[0], scale[0].T),
                     np.matmul(scale[1], scale[1].T)])
     logging.vlog(2, "expected_cov:\n{}".format(cov))
-    with self.test_session():
-      mvn = tfd.MultivariateNormalDiagPlusLowRank(
-          loc=mu, scale_perturb_factor=u, scale_perturb_diag=m)
-      self.assertAllClose(
-          cov, self.evaluate(mvn.covariance()), atol=0., rtol=1e-6)
+    mvn = tfd.MultivariateNormalDiagPlusLowRank(
+        loc=mu, scale_perturb_factor=u, scale_perturb_diag=m)
+    self.assertAllClose(
+        cov, self.evaluate(mvn.covariance()), atol=0., rtol=1e-6)
 
 
 if __name__ == "__main__":

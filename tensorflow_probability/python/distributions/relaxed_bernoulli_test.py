@@ -35,68 +35,57 @@ class RelaxedBernoulliTest(tf.test.TestCase):
     temperature = 1.0
     p = [0.1, 0.4]
     dist = tfd.RelaxedBernoulli(temperature, probs=p)
-    with self.test_session():
-      self.assertAllClose(p, self.evaluate(dist.probs))
+    self.assertAllClose(p, self.evaluate(dist.probs))
 
   def testLogits(self):
     temperature = 2.0
     logits = [-42., 42.]
     dist = tfd.RelaxedBernoulli(temperature, logits=logits)
-    with self.test_session():
-      self.assertAllClose(logits, self.evaluate(dist.logits))
+    self.assertAllClose(logits, self.evaluate(dist.logits))
 
-    with self.test_session():
-      self.assertAllClose(
-          scipy.special.expit(logits), self.evaluate(dist.probs))
+    self.assertAllClose(scipy.special.expit(logits), self.evaluate(dist.probs))
 
     p = [0.01, 0.99, 0.42]
     dist = tfd.RelaxedBernoulli(temperature, probs=p)
-    with self.test_session():
-      self.assertAllClose(scipy.special.logit(p), self.evaluate(dist.logits))
+    self.assertAllClose(scipy.special.logit(p), self.evaluate(dist.logits))
 
   def testInvalidP(self):
     temperature = 1.0
     invalid_ps = [1.01, 2.]
     for p in invalid_ps:
-      with self.test_session():
-        with self.assertRaisesOpError("probs has components greater than 1"):
-          dist = tfd.RelaxedBernoulli(temperature, probs=p, validate_args=True)
-          self.evaluate(dist.probs)
+      with self.assertRaisesOpError("probs has components greater than 1"):
+        dist = tfd.RelaxedBernoulli(temperature, probs=p, validate_args=True)
+        self.evaluate(dist.probs)
 
     invalid_ps = [-0.01, -3.]
     for p in invalid_ps:
-      with self.test_session():
-        with self.assertRaisesOpError("Condition x >= 0"):
-          dist = tfd.RelaxedBernoulli(temperature, probs=p, validate_args=True)
-          self.evaluate(dist.probs)
+      with self.assertRaisesOpError("Condition x >= 0"):
+        dist = tfd.RelaxedBernoulli(temperature, probs=p, validate_args=True)
+        self.evaluate(dist.probs)
 
     valid_ps = [0.0, 0.5, 1.0]
     for p in valid_ps:
-      with self.test_session():
-        dist = tfd.RelaxedBernoulli(temperature, probs=p)
-        self.assertEqual(p, self.evaluate(dist.probs))
+      dist = tfd.RelaxedBernoulli(temperature, probs=p)
+      self.assertEqual(p, self.evaluate(dist.probs))
 
   def testShapes(self):
-    with self.test_session():
-      for batch_shape in ([], [1], [2, 3, 4]):
-        temperature = 1.0
-        p = np.random.random(batch_shape).astype(np.float32)
-        dist = tfd.RelaxedBernoulli(temperature, probs=p)
-        self.assertAllEqual(batch_shape, dist.batch_shape.as_list())
-        self.assertAllEqual(
-            batch_shape, self.evaluate(dist.batch_shape_tensor()))
-        self.assertAllEqual([], dist.event_shape.as_list())
-        self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
+    for batch_shape in ([], [1], [2, 3, 4]):
+      temperature = 1.0
+      p = np.random.random(batch_shape).astype(np.float32)
+      dist = tfd.RelaxedBernoulli(temperature, probs=p)
+      self.assertAllEqual(batch_shape, dist.batch_shape.as_list())
+      self.assertAllEqual(batch_shape, self.evaluate(dist.batch_shape_tensor()))
+      self.assertAllEqual([], dist.event_shape.as_list())
+      self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
 
   def testZeroTemperature(self):
     """If validate_args, raises InvalidArgumentError when temperature is 0."""
     temperature = tf.constant(0.0)
     p = tf.constant([0.1, 0.4])
     dist = tfd.RelaxedBernoulli(temperature, probs=p, validate_args=True)
-    with self.test_session():
-      sample = dist.sample()
-      with self.assertRaises(errors_impl.InvalidArgumentError):
-        self.evaluate(sample)
+    sample = dist.sample()
+    with self.assertRaises(errors_impl.InvalidArgumentError):
+      self.evaluate(sample)
 
   def testDtype(self):
     temperature = tf.constant(1.0, dtype=tf.float32)
@@ -114,41 +103,38 @@ class RelaxedBernoulliTest(tf.test.TestCase):
     self.assertEqual(dist64.dtype, dist64.sample(5).dtype)
 
   def testLogProb(self):
-    with self.test_session():
-      t = np.array(1.0, dtype=np.float64)
-      p = np.array(0.1, dtype=np.float64)  # P(x=1)
-      dist = tfd.RelaxedBernoulli(t, probs=p)
-      xs = np.array([0.1, 0.3, 0.5, 0.9], dtype=np.float64)
-      # analytical density from Maddison et al. 2016
-      alpha = np.array(p/(1-p), dtype=np.float64)
-      expected_log_pdf = (np.log(t) + np.log(alpha) +
-                          (-t-1)*(np.log(xs)+np.log(1-xs)) -
-                          2*np.log(alpha*np.power(xs, -t) + np.power(1-xs, -t)))
-      log_pdf = self.evaluate(dist.log_prob(xs))
-      self.assertAllClose(expected_log_pdf, log_pdf)
+    t = np.array(1.0, dtype=np.float64)
+    p = np.array(0.1, dtype=np.float64)  # P(x=1)
+    dist = tfd.RelaxedBernoulli(t, probs=p)
+    xs = np.array([0.1, 0.3, 0.5, 0.9], dtype=np.float64)
+    # analytical density from Maddison et al. 2016
+    alpha = np.array(p / (1 - p), dtype=np.float64)
+    expected_log_pdf = (
+        np.log(t) + np.log(alpha) + (-t - 1) * (np.log(xs) + np.log(1 - xs)) -
+        2 * np.log(alpha * np.power(xs, -t) + np.power(1 - xs, -t)))
+    log_pdf = self.evaluate(dist.log_prob(xs))
+    self.assertAllClose(expected_log_pdf, log_pdf)
 
   def testBoundaryConditions(self):
-    with self.test_session():
-      temperature = 1e-2
-      dist = tfd.RelaxedBernoulli(temperature, probs=1.0)
-      self.assertAllClose(np.nan, self.evaluate(dist.log_prob(0.0)))
-      self.assertAllClose([np.nan], [self.evaluate(dist.log_prob(1.0))])
+    temperature = 1e-2
+    dist = tfd.RelaxedBernoulli(temperature, probs=1.0)
+    self.assertAllClose(np.nan, self.evaluate(dist.log_prob(0.0)))
+    self.assertAllClose([np.nan], [self.evaluate(dist.log_prob(1.0))])
 
   def testSampleN(self):
     """mean of quantized samples still approximates the Bernoulli mean."""
-    with self.test_session():
-      temperature = 1e-2
-      p = [0.2, 0.6, 0.5]
-      dist = tfd.RelaxedBernoulli(temperature, probs=p)
-      n = 10000
-      samples = dist.sample(n)
-      self.assertEqual(samples.dtype, tf.float32)
-      sample_values = self.evaluate(samples)
-      self.assertTrue(np.all(sample_values >= 0))
-      self.assertTrue(np.all(sample_values <= 1))
+    temperature = 1e-2
+    p = [0.2, 0.6, 0.5]
+    dist = tfd.RelaxedBernoulli(temperature, probs=p)
+    n = 10000
+    samples = dist.sample(n)
+    self.assertEqual(samples.dtype, tf.float32)
+    sample_values = self.evaluate(samples)
+    self.assertTrue(np.all(sample_values >= 0))
+    self.assertTrue(np.all(sample_values <= 1))
 
-      frac_ones_like = np.sum(sample_values >= 0.5, axis=0)/n
-      self.assertAllClose(p, frac_ones_like, atol=1e-2)
+    frac_ones_like = np.sum(sample_values >= 0.5, axis=0) / n
+    self.assertAllClose(p, frac_ones_like, atol=1e-2)
 
 
 if __name__ == "__main__":

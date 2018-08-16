@@ -74,27 +74,29 @@ class VectorStudentTTest(tf.test.TestCase):
     self._rng = np.random.RandomState(42)
 
   def testProbStaticScalar(self):
-    with self.test_session():
-      # Scalar batch_shape.
-      df = np.asarray(3., dtype=np.float32)
-      # Scalar batch_shape.
-      loc = np.asarray([1], dtype=np.float32)
-      scale_diag = np.asarray([2.], dtype=np.float32)
-      scale_tril = np.diag(scale_diag)
+    # Scalar batch_shape.
+    df = np.asarray(3., dtype=np.float32)
+    # Scalar batch_shape.
+    loc = np.asarray([1], dtype=np.float32)
+    scale_diag = np.asarray([2.], dtype=np.float32)
+    scale_tril = np.diag(scale_diag)
 
-      expected_mst = _FakeVectorStudentT(
-          df=df, loc=loc, scale_tril=scale_tril)
+    expected_mst = _FakeVectorStudentT(df=df, loc=loc, scale_tril=scale_tril)
 
-      actual_mst = _VectorStudentT(df=df, loc=loc, scale_diag=scale_diag,
-                                   validate_args=True)
-      x = 2. * self._rng.rand(4, 1).astype(np.float32) - 1.
+    actual_mst = _VectorStudentT(
+        df=df, loc=loc, scale_diag=scale_diag, validate_args=True)
+    x = 2. * self._rng.rand(4, 1).astype(np.float32) - 1.
 
-      self.assertAllClose(expected_mst.log_prob(x),
-                          self.evaluate(actual_mst.log_prob(x)),
-                          rtol=0., atol=1e-5)
-      self.assertAllClose(expected_mst.prob(x),
-                          self.evaluate(actual_mst.prob(x)),
-                          rtol=0., atol=1e-5)
+    self.assertAllClose(
+        expected_mst.log_prob(x),
+        self.evaluate(actual_mst.log_prob(x)),
+        rtol=0.,
+        atol=1e-5)
+    self.assertAllClose(
+        expected_mst.prob(x),
+        self.evaluate(actual_mst.prob(x)),
+        rtol=0.,
+        atol=1e-5)
 
   def testProbStatic(self):
     # Non-scalar batch_shape.
@@ -115,15 +117,18 @@ class VectorStudentTTest(tf.test.TestCase):
     expected_mst = _FakeVectorStudentT(
         df=df, loc=loc, scale_tril=scale_tril)
 
-    with self.test_session():
-      actual_mst = _VectorStudentT(df=df, loc=loc, scale_diag=scale_diag,
-                                   validate_args=True)
-      self.assertAllClose(expected_mst.log_prob(x),
-                          self.evaluate(actual_mst.log_prob(x)),
-                          rtol=0., atol=1e-5)
-      self.assertAllClose(expected_mst.prob(x),
-                          self.evaluate(actual_mst.prob(x)),
-                          rtol=0., atol=1e-5)
+    actual_mst = _VectorStudentT(
+        df=df, loc=loc, scale_diag=scale_diag, validate_args=True)
+    self.assertAllClose(
+        expected_mst.log_prob(x),
+        self.evaluate(actual_mst.log_prob(x)),
+        rtol=0.,
+        atol=1e-5)
+    self.assertAllClose(
+        expected_mst.prob(x),
+        self.evaluate(actual_mst.prob(x)),
+        rtol=0.,
+        atol=1e-5)
 
   def testProbDynamic(self):
     # Non-scalar batch_shape.
@@ -144,19 +149,22 @@ class VectorStudentTTest(tf.test.TestCase):
     expected_mst = _FakeVectorStudentT(
         df=df, loc=loc, scale_tril=scale_tril)
 
-    with self.test_session():
-      df_pl = tf.placeholder(tf.float32, name="df")
-      loc_pl = tf.placeholder(tf.float32, name="loc")
-      scale_diag_pl = tf.placeholder(tf.float32, name="scale_diag")
-      feed_dict = {df_pl: df, loc_pl: loc, scale_diag_pl: scale_diag}
-      actual_mst = _VectorStudentT(df=df, loc=loc, scale_diag=scale_diag,
-                                   validate_args=True)
-      self.assertAllClose(expected_mst.log_prob(x),
-                          actual_mst.log_prob(x).eval(feed_dict=feed_dict),
-                          rtol=0., atol=1e-5)
-      self.assertAllClose(expected_mst.prob(x),
-                          actual_mst.prob(x).eval(feed_dict=feed_dict),
-                          rtol=0., atol=1e-5)
+    df_pl = tf.placeholder_with_default(input=df, shape=df.shape, name="df")
+    loc_pl = tf.placeholder_with_default(input=loc, shape=loc.shape, name="loc")
+    scale_diag_pl = tf.placeholder_with_default(
+        input=scale_diag, shape=scale_diag.shape, name="scale_diag")
+    actual_mst = _VectorStudentT(
+        df=df_pl, loc=loc_pl, scale_diag=scale_diag_pl, validate_args=True)
+    self.assertAllClose(
+        expected_mst.log_prob(x),
+        self.evaluate(actual_mst.log_prob(x)),
+        rtol=0.,
+        atol=1e-5)
+    self.assertAllClose(
+        expected_mst.prob(x),
+        self.evaluate(actual_mst.prob(x)),
+        rtol=0.,
+        atol=1e-5)
 
   def testProbScalarBaseDistributionNonScalarTransform(self):
     # Scalar batch_shape.
@@ -179,15 +187,18 @@ class VectorStudentTTest(tf.test.TestCase):
         loc=loc,
         scale_tril=scale_tril)
 
-    with self.test_session():
-      actual_mst = _VectorStudentT(df=df, loc=loc, scale_diag=scale_diag,
-                                   validate_args=True)
-      self.assertAllClose(expected_mst.log_prob(x),
-                          self.evaluate(actual_mst.log_prob(x)),
-                          rtol=0., atol=1e-5)
-      self.assertAllClose(expected_mst.prob(x),
-                          self.evaluate(actual_mst.prob(x)),
-                          rtol=0., atol=1e-5)
+    actual_mst = _VectorStudentT(
+        df=df, loc=loc, scale_diag=scale_diag, validate_args=True)
+    self.assertAllClose(
+        expected_mst.log_prob(x),
+        self.evaluate(actual_mst.log_prob(x)),
+        rtol=0.,
+        atol=1e-5)
+    self.assertAllClose(
+        expected_mst.prob(x),
+        self.evaluate(actual_mst.prob(x)),
+        rtol=0.,
+        atol=1e-5)
 
   def testProbScalarBaseDistributionNonScalarTransformDynamic(self):
     # Scalar batch_shape.
@@ -210,19 +221,22 @@ class VectorStudentTTest(tf.test.TestCase):
         loc=loc,
         scale_tril=scale_tril)
 
-    with self.test_session():
-      df_pl = tf.placeholder(tf.float32, name="df")
-      loc_pl = tf.placeholder(tf.float32, name="loc")
-      scale_diag_pl = tf.placeholder(tf.float32, name="scale_diag")
-      feed_dict = {df_pl: df, loc_pl: loc, scale_diag_pl: scale_diag}
-      actual_mst = _VectorStudentT(df=df, loc=loc, scale_diag=scale_diag,
-                                   validate_args=True)
-      self.assertAllClose(expected_mst.log_prob(x),
-                          actual_mst.log_prob(x).eval(feed_dict=feed_dict),
-                          rtol=0., atol=1e-5)
-      self.assertAllClose(expected_mst.prob(x),
-                          actual_mst.prob(x).eval(feed_dict=feed_dict),
-                          rtol=0., atol=1e-5)
+    df_pl = tf.placeholder_with_default(input=df, shape=df.shape, name="df")
+    loc_pl = tf.placeholder_with_default(input=loc, shape=loc.shape, name="loc")
+    scale_diag_pl = tf.placeholder_with_default(
+        input=scale_diag, shape=scale_diag.shape, name="scale_diag")
+    actual_mst = _VectorStudentT(
+        df=df_pl, loc=loc_pl, scale_diag=scale_diag_pl, validate_args=True)
+    self.assertAllClose(
+        expected_mst.log_prob(x),
+        self.evaluate(actual_mst.log_prob(x)),
+        rtol=0.,
+        atol=1e-5)
+    self.assertAllClose(
+        expected_mst.prob(x),
+        self.evaluate(actual_mst.prob(x)),
+        rtol=0.,
+        atol=1e-5)
 
   def testProbNonScalarBaseDistributionScalarTransform(self):
     # Non-scalar batch_shape.
@@ -238,15 +252,18 @@ class VectorStudentTTest(tf.test.TestCase):
         loc=np.tile(loc[tf.newaxis, :], reps=[len(df), 1]),
         scale_tril=np.tile(scale_tril[tf.newaxis, :, :], reps=[len(df), 1, 1]))
 
-    with self.test_session():
-      actual_mst = _VectorStudentT(df=df, loc=loc, scale_diag=scale_diag,
-                                   validate_args=True)
-      self.assertAllClose(expected_mst.log_prob(x),
-                          self.evaluate(actual_mst.log_prob(x)),
-                          rtol=0., atol=1e-5)
-      self.assertAllClose(expected_mst.prob(x),
-                          self.evaluate(actual_mst.prob(x)),
-                          rtol=0., atol=1e-5)
+    actual_mst = _VectorStudentT(
+        df=df, loc=loc, scale_diag=scale_diag, validate_args=True)
+    self.assertAllClose(
+        expected_mst.log_prob(x),
+        self.evaluate(actual_mst.log_prob(x)),
+        rtol=0.,
+        atol=1e-5)
+    self.assertAllClose(
+        expected_mst.prob(x),
+        self.evaluate(actual_mst.prob(x)),
+        rtol=0.,
+        atol=1e-5)
 
   def testProbNonScalarBaseDistributionScalarTransformDynamic(self):
     # Non-scalar batch_shape.
@@ -263,19 +280,22 @@ class VectorStudentTTest(tf.test.TestCase):
         loc=np.tile(loc[tf.newaxis, :], reps=[len(df), 1]),
         scale_tril=np.tile(scale_tril[tf.newaxis, :, :], reps=[len(df), 1, 1]))
 
-    with self.test_session():
-      df_pl = tf.placeholder(tf.float32, name="df")
-      loc_pl = tf.placeholder(tf.float32, name="loc")
-      scale_diag_pl = tf.placeholder(tf.float32, name="scale_diag")
-      feed_dict = {df_pl: df, loc_pl: loc, scale_diag_pl: scale_diag}
-      actual_mst = _VectorStudentT(df=df, loc=loc, scale_diag=scale_diag,
-                                   validate_args=True)
-      self.assertAllClose(expected_mst.log_prob(x),
-                          actual_mst.log_prob(x).eval(feed_dict=feed_dict),
-                          rtol=0., atol=1e-5)
-      self.assertAllClose(expected_mst.prob(x),
-                          actual_mst.prob(x).eval(feed_dict=feed_dict),
-                          rtol=0., atol=1e-5)
+    df_pl = tf.placeholder_with_default(input=df, shape=df.shape, name="df")
+    loc_pl = tf.placeholder_with_default(input=loc, shape=loc.shape, name="loc")
+    scale_diag_pl = tf.placeholder_with_default(
+        input=scale_diag, shape=scale_diag.shape, name="scale_diag")
+    actual_mst = _VectorStudentT(
+        df=df_pl, loc=loc_pl, scale_diag=scale_diag_pl, validate_args=True)
+    self.assertAllClose(
+        expected_mst.log_prob(x),
+        self.evaluate(actual_mst.log_prob(x)),
+        rtol=0.,
+        atol=1e-5)
+    self.assertAllClose(
+        expected_mst.prob(x),
+        self.evaluate(actual_mst.prob(x)),
+        rtol=0.,
+        atol=1e-5)
 
 
 if __name__ == "__main__":

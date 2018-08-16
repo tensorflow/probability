@@ -236,25 +236,22 @@ class LKJTest(test.TestCase):
         target_discrepancy=0.41, seed=37)
 
   def testDimensionGuard(self):
-    with self.test_session():
-      testee_lkj = tfd.LKJ(
-          dimension=3, concentration=[1., 4.], validate_args=True)
-      with self.assertRaisesRegexp(ValueError, 'dimension mismatch'):
-        testee_lkj.log_prob(tf.eye(4))
+    testee_lkj = tfd.LKJ(
+        dimension=3, concentration=[1., 4.], validate_args=True)
+    with self.assertRaisesRegexp(ValueError, 'dimension mismatch'):
+      testee_lkj.log_prob(tf.eye(4))
 
   def testZeroDimension(self):
-    with self.test_session():
-      testee_lkj = tfd.LKJ(
-          dimension=0, concentration=[1., 4.], validate_args=True)
-      results = testee_lkj.sample(sample_shape=[4, 3])
-      self.assertEqual(results.shape, [4, 3, 2, 0, 0])
+    testee_lkj = tfd.LKJ(
+        dimension=0, concentration=[1., 4.], validate_args=True)
+    results = testee_lkj.sample(sample_shape=[4, 3])
+    self.assertEqual(results.shape, [4, 3, 2, 0, 0])
 
   def testOneDimension(self):
-    with self.test_session():
-      testee_lkj = tfd.LKJ(
-          dimension=1, concentration=[1., 4.], validate_args=True)
-      results = testee_lkj.sample(sample_shape=[4, 3])
-      self.assertEqual(results.shape, [4, 3, 2, 1, 1])
+    testee_lkj = tfd.LKJ(
+        dimension=1, concentration=[1., 4.], validate_args=True)
+    results = testee_lkj.sample(sample_shape=[4, 3])
+    self.assertEqual(results.shape, [4, 3, 2, 1, 1])
 
   def testMean(self):
     testee_lkj = tfd.LKJ(dimension=3, concentration=[1., 3., 5.])
@@ -281,13 +278,13 @@ class LKJTest(test.TestCase):
 class LKJTestGraphOnly(test.TestCase):
 
   def testDimensionGuardDynamicShape(self):
-    with self.test_session():
-      testee_lkj = tfd.LKJ(
-          dimension=3, concentration=[1., 4.], validate_args=True)
-      with self.assertRaisesOpError('dimension mismatch'):
-        self.evaluate(
-            testee_lkj.log_prob(tf.placeholder_with_default(
-                tf.eye(4), shape=None)))
+    testee_lkj = tfd.LKJ(
+        dimension=3, concentration=[1., 4.], validate_args=True)
+    with self.assertRaisesOpError('dimension mismatch'):
+      self.evaluate(
+          testee_lkj.log_prob(
+              tf.placeholder_with_default(tf.eye(4), shape=None)))
+
 
 if __name__ == '__main__':
   test.main()

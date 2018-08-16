@@ -65,15 +65,14 @@ class ConditionalTransformedDistributionTest(
     return tfd.ConditionalTransformedDistribution
 
   def testConditioning(self):
-    with self.test_session():
-      conditional_normal = tfd.ConditionalTransformedDistribution(
-          distribution=tfd.Normal(loc=0., scale=1.),
-          bijector=_ChooseLocation(loc=[-100., 100.]))
-      z = [-1, +1, -1, -1, +1]
-      self.assertAllClose(
-          np.sign(self.evaluate(
-              conditional_normal.sample(
-                  5, bijector_kwargs={"z": z}))), z)
+    conditional_normal = tfd.ConditionalTransformedDistribution(
+        distribution=tfd.Normal(loc=0., scale=1.),
+        bijector=_ChooseLocation(loc=[-100., 100.]))
+    z = [-1, +1, -1, -1, +1]
+    self.assertAllClose(
+        np.sign(
+            self.evaluate(
+                conditional_normal.sample(5, bijector_kwargs={"z": z}))), z)
 
 
 class ConditionalScalarToMultiTest(
