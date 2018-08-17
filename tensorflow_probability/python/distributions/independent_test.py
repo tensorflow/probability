@@ -24,6 +24,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow.python.framework import test_util
 from tensorflow.python.ops.distributions import bernoulli as bernoulli_lib
 
 
@@ -40,6 +41,7 @@ stats = try_import("scipy.stats")
 tfd = tfp.distributions
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class ProductDistributionTest(tf.test.TestCase):
 
   def setUp(self):

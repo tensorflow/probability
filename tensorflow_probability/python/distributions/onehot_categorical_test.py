@@ -23,6 +23,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow.python.framework import tensor_util
+from tensorflow.python.framework import test_util
 
 tfd = tfp.distributions
 
@@ -33,6 +34,7 @@ def make_onehot_categorical(batch_shape, num_classes, dtype=tf.int32):
   return tfd.OneHotCategorical(logits, dtype=dtype)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class OneHotCategoricalTest(tf.test.TestCase):
 
   def setUp(self):

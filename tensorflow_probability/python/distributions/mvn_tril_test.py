@@ -23,12 +23,14 @@ import numpy as np
 from scipy import stats
 import tensorflow as tf
 import tensorflow_probability as tfp
+from tensorflow.python.framework import test_util
 from tensorflow.python.platform import tf_logging as logging
 
 
 tfd = tfp.distributions
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class MultivariateNormalTriLTest(tf.test.TestCase):
 
   def setUp(self):

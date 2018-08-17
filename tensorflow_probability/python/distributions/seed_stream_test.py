@@ -21,9 +21,12 @@ from __future__ import print_function
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow.python.framework import test_util
+
 tfd = tfp.distributions
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class SeedStreamTest(tf.test.TestCase):
 
   def assertAllUnique(self, items):

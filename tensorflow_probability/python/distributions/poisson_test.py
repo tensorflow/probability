@@ -23,9 +23,12 @@ from scipy import stats
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow.python.framework import test_util
+
 tfd = tfp.distributions
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class PoissonTest(tf.test.TestCase):
 
   def _make_poisson(self, rate, validate_args=False):
@@ -226,6 +229,7 @@ class PoissonTest(tf.test.TestCase):
         sample_values.var(axis=0), stats.poisson.var(lam_v), rtol=.03, atol=0)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class PoissonLogRateTest(PoissonTest):
 
   def _make_poisson(self, rate, validate_args=False):

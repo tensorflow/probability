@@ -29,7 +29,6 @@ from tensorflow.python.framework import test_util
 
 class _GaussianProcessTest(object):
 
-  @test_util.run_in_graph_and_eager_modes()
   def testShapes(self):
     # 5x5 grid of index points in R^2 and flatten to 25x2
     index_points = np.linspace(-4., 4., 5, dtype=np.float32)
@@ -79,7 +78,6 @@ class _GaussianProcessTest(object):
       self.assertEqual(gp.event_shape.ndims, 1)
       self.assertIsNone(gp.event_shape.dims[0].value)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testVarianceAndCovarianceMatrix(self):
     amp = np.float64(.5)
     len_scale = np.float64(.2)
@@ -109,7 +107,6 @@ class _GaussianProcessTest(object):
     self.assertAllClose(np.diag(expected_covariance),
                         self.evaluate(gp.variance()))
 
-  @test_util.run_in_graph_and_eager_modes()
   def testMean(self):
     mean_fn = lambda x: x[:, 0]**2
     kernel = psd_kernels.ExponentiatedQuadratic()
@@ -119,7 +116,6 @@ class _GaussianProcessTest(object):
     self.assertAllClose(expected_mean,
                         self.evaluate(gp.mean()))
 
-  @test_util.run_in_graph_and_eager_modes()
   def testCopy(self):
     # 5 random index points in R^2
     index_points_1 = np.random.uniform(-4., 4., (5, 2)).astype(np.float32)
@@ -168,10 +164,12 @@ class _GaussianProcessTest(object):
       self.assertAllEqual(self.evaluate(gp2.index_points), index_points_2)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class GaussianProcessStaticTest(_GaussianProcessTest, tf.test.TestCase):
   is_static = True
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class GaussianProcessDynamicTest(_GaussianProcessTest, tf.test.TestCase):
   is_static = False
 

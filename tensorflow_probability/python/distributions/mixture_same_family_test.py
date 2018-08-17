@@ -24,12 +24,14 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util
+from tensorflow.python.framework import test_util as tf_test_util
 from tensorflow.python.ops.distributions import bernoulli as bernoulli_lib
 from tensorflow.python.ops.distributions import categorical as categorical_lib
 
 tfd = tfp.distributions
 
 
+@tf_test_util.run_all_in_graph_and_eager_modes
 class MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers,
                             tf.test.TestCase):
 

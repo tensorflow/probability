@@ -26,6 +26,8 @@ import tensorflow as tf
 
 from tensorflow_probability.python.distributions.vector_student_t import _VectorStudentT
 
+from tensorflow.python.framework import test_util
+
 
 class _FakeVectorStudentT(object):
   """Fake scipy implementation for Multivariate Student's t-distribution.
@@ -68,6 +70,7 @@ class _FakeVectorStudentT(object):
     return np.exp(self.log_prob(x))
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class VectorStudentTTest(tf.test.TestCase):
 
   def setUp(self):

@@ -38,6 +38,7 @@ tfl = tf.linalg
 tfd = tfp.distributions
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class IIDNormalTest(test.TestCase):
 
   def setUp(self):
@@ -73,7 +74,6 @@ class IIDNormalTest(test.TestCase):
 
     return model
 
-  @test_util.run_in_graph_and_eager_modes()
   def test_iid_normal_sample(self):
     num_timesteps = 10
     latent_size = 3
@@ -106,7 +106,6 @@ class IIDNormalTest(test.TestCase):
                             np.ones(result_shape) * marginal_variance,
                             rtol=5*stderr_variance)
 
-  @test_util.run_in_graph_and_eager_modes()
   def test_iid_normal_logprob(self):
 
     # In the case where the latent states are iid normal (achieved by
@@ -139,6 +138,7 @@ class IIDNormalTest(test.TestCase):
                             rtol=delta, atol=0.)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class BatchTest(test.TestCase):
   """Test that methods broadcast batch dimensions for each parameter."""
 
@@ -216,7 +216,6 @@ class BatchTest(test.TestCase):
     self.assertEqual(model.variance().shape.as_list(),
                      batch_shape + event_shape)
 
-  @test_util.run_in_graph_and_eager_modes()
   def test_constant_batch_shape(self):
     """Simple case where all components have the same batch shape."""
     num_timesteps = 5
@@ -239,7 +238,6 @@ class BatchTest(test.TestCase):
     self.assertEqual(model.observation_size, observation_size)
     self._sanity_check_shapes(model, batch_shape, event_shape)
 
-  @test_util.run_in_graph_and_eager_modes()
   def test_broadcast_batch_shape(self):
     """Broadcasting when only one component has batch shape."""
 
@@ -310,7 +308,6 @@ class _KalmanStepsTest(object):
     self.get_observation_noise_for_timestep = (
         lambda t: tfd.MultivariateNormalDiag(self.observation_bias, [1.]))
 
-  @test_util.run_in_graph_and_eager_modes()
   def testKalmanFilterStep(self):
     prev_mean = np.asarray([[-2], [.4]], dtype=np.float32)
     prev_cov = np.asarray([[.5, .1], [.2, .6]], dtype=np.float32)
@@ -366,7 +363,6 @@ class _KalmanStepsTest(object):
                         expected_log_marginal_likelihood)
     self.assertAllClose(filter_state.timestep, 1)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testKalmanTransition(self):
 
     prev_mean = np.asarray([[-2], [.4]], dtype=np.float32)
@@ -387,7 +383,6 @@ class _KalmanStepsTest(object):
                                np.dot(prev_cov,
                                       self.transition_matrix.T)) + np.eye(2))
 
-  @test_util.run_in_graph_and_eager_modes()
   def testLinearGaussianObservation(self):
 
     prev_mean = np.asarray([[-2], [.4]], dtype=np.float32)
@@ -422,7 +417,6 @@ class _KalmanStepsTest(object):
     self.assertAllClose(self.evaluate(predictive_dist.covariance()),
                         expected_predicted_cov)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testMeanStep(self):
     prev_mean = np.asarray([[-2], [.4]], dtype=np.float32)
     prev_mean_tensor = self.build_tensor(prev_mean)
@@ -441,7 +435,6 @@ class _KalmanStepsTest(object):
                         np.sum(self.evaluate(new_mean)) +
                         self.observation_bias[:, np.newaxis])
 
-  @test_util.run_in_graph_and_eager_modes()
   def testCovStep(self):
 
     prev_cov = np.asarray([[.5, -.2], [-.2, .9]], dtype=np.float32)
@@ -462,6 +455,7 @@ class _KalmanStepsTest(object):
                         [[np.sum(self.evaluate(new_cov)) + 1.]])
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class KalmanStepsTestStatic(test.TestCase, _KalmanStepsTest):
 
   def setUp(self):
@@ -471,6 +465,7 @@ class KalmanStepsTestStatic(test.TestCase, _KalmanStepsTest):
     return tf.convert_to_tensor(tensor)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class KalmanStepsTestDynamic(test.TestCase, _KalmanStepsTest):
 
   def setUp(self):
@@ -483,7 +478,6 @@ class KalmanStepsTestDynamic(test.TestCase, _KalmanStepsTest):
 
 class _AugmentSampleShapeTest(object):
 
-  @test_util.run_in_graph_and_eager_modes()
   def testAugmentsShape(self):
 
     full_batch_shape, dist = self.build_inputs([5, 4, 2, 3], [2, 3])
@@ -493,7 +487,6 @@ class _AugmentSampleShapeTest(object):
 
     self.assertAllEqual(self.maybe_evaluate(sample_shape), [5, 4])
 
-  @test_util.run_in_graph_and_eager_modes()
   def testSameShape(self):
 
     full_batch_shape, dist = self.build_inputs([5, 4, 2, 3], [5, 4, 2, 3])
@@ -525,6 +518,7 @@ class _AugmentSampleShapeTest(object):
                                 validate_args=True))
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class AugmentSampleShapeTestStatic(test.TestCase, _AugmentSampleShapeTest):
 
   def assertRaisesError(self, msg):
@@ -541,6 +535,7 @@ class AugmentSampleShapeTestStatic(test.TestCase, _AugmentSampleShapeTest):
     return x
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class AugmentSampleShapeTestDynamic(test.TestCase, _AugmentSampleShapeTest):
 
   def assertRaisesError(self, msg):
