@@ -23,6 +23,7 @@ from tensorflow_probability.python import distributions
 from tensorflow_probability.python import edward2
 from tensorflow_probability.python import glm
 from tensorflow_probability.python import layers
+from tensorflow_probability.python import math
 from tensorflow_probability.python import mcmc
 from tensorflow_probability.python import monte_carlo
 from tensorflow_probability.python import optimizer

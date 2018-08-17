@@ -22,9 +22,8 @@ from __future__ import print_function
 import numpy as np
 
 import tensorflow as tf
+import tensorflow_probability as tfp
 
-from tensorflow_probability.python.math import matvecmul as matvecmul
-from tensorflow_probability.python.math import pinv as pinv
 from tensorflow.python.framework import test_util
 
 
@@ -39,7 +38,7 @@ class _MatvecmulTest(object):
 
     a = make_tensor_hiding_attributes(a, hide_shape=self.use_dynamic_shape)
     b = make_tensor_hiding_attributes(b, hide_shape=self.use_dynamic_shape)
-    result = matvecmul(a, b)
+    result = tfp.math.matvecmul(a, b)
     result = self.evaluate(result)
 
     self.assertAllClose(expected_result, result)
@@ -53,7 +52,7 @@ class _MatvecmulTest(object):
 
     a = make_tensor_hiding_attributes(a, hide_shape=self.use_dynamic_shape)
     b = make_tensor_hiding_attributes(b, hide_shape=self.use_dynamic_shape)
-    result = matvecmul(a, b, transpose_a=True)
+    result = tfp.math.matvecmul(a, b, transpose_a=True)
     result = self.evaluate(result)
 
     self.assertAllClose(expected_result, result)
@@ -71,7 +70,7 @@ class _MatvecmulTest(object):
 
     a = make_tensor_hiding_attributes(a, hide_shape=self.use_dynamic_shape)
     b = make_tensor_hiding_attributes(b, hide_shape=self.use_dynamic_shape)
-    result = matvecmul(a, b)
+    result = tfp.math.matvecmul(a, b)
     result = self.evaluate(result)
 
     self.assertAllClose(expected_result, result)
@@ -82,7 +81,7 @@ class _MatvecmulTest(object):
     b = [1., 1.]
     expected_result = np.matmul(a, b)
 
-    result = matvecmul(a, b)
+    result = tfp.math.matvecmul(a, b)
     result = self.evaluate(result)
 
     self.assertAllClose(expected_result, result)
@@ -103,17 +102,17 @@ class _MatvecmulTest(object):
                                             hide_shape=self.use_dynamic_shape)
 
     with self.assertRaisesRegexp(Exception, 'similarly batched'):
-      self.evaluate(matvecmul(data_2d, data_3d,
-                              validate_args=self.use_dynamic_shape))
+      self.evaluate(tfp.math.matvecmul(data_2d, data_3d,
+                                       validate_args=self.use_dynamic_shape))
     with self.assertRaisesRegexp(Exception, 'similarly batched'):
-      self.evaluate(matvecmul(data_2d, data_2d,
-                              validate_args=self.use_dynamic_shape))
+      self.evaluate(tfp.math.matvecmul(data_2d, data_2d,
+                                       validate_args=self.use_dynamic_shape))
     with self.assertRaisesRegexp(Exception, 'similarly batched'):
-      self.evaluate(matvecmul(data_3d, data_3d,
-                              validate_args=self.use_dynamic_shape))
+      self.evaluate(tfp.math.matvecmul(data_3d, data_3d,
+                                       validate_args=self.use_dynamic_shape))
     with self.assertRaisesRegexp(Exception, 'similarly batched'):
-      self.evaluate(matvecmul(data_3d, data_1d,
-                              validate_args=self.use_dynamic_shape))
+      self.evaluate(tfp.math.matvecmul(data_3d, data_1d,
+                                       validate_args=self.use_dynamic_shape))
 
 
 class MatvecmulTestStatic32(tf.test.TestCase, _MatvecmulTest):
@@ -166,7 +165,7 @@ class _PinvTest(object):
     else:
       rcond = self.dtype([0., 0.01])  # Smallest 1 component is forced to zero.
     expected_a_pinv_ = self.expected_pinv(a_, rcond)
-    a_pinv = pinv(a, rcond, validate_args=True)
+    a_pinv = tfp.math.pinv(a, rcond, validate_args=True)
     a_pinv_ = self.evaluate(a_pinv)
     self.assertAllClose(expected_a_pinv_, a_pinv_,
                         atol=1e-5, rtol=1e-5)
@@ -189,7 +188,7 @@ class _PinvTest(object):
       # Smallest 2 components are forced to zero.
       rcond = self.dtype([0., 0.25])
     expected_a_pinv_ = self.expected_pinv(a_, rcond)
-    a_pinv = pinv(a, rcond, validate_args=True)
+    a_pinv = tfp.math.pinv(a, rcond, validate_args=True)
     a_pinv_ = self.evaluate(a_pinv)
     self.assertAllClose(expected_a_pinv_, a_pinv_,
                         atol=1e-5, rtol=1e-4)

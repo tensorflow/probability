@@ -22,8 +22,7 @@ from __future__ import print_function
 import numpy as np
 
 import tensorflow as tf
-
-from tensorflow_probability.python.math import custom_gradient as tfp_math
+import tensorflow_probability as tfp
 
 
 class CustomGradientTest(tf.test.TestCase):
@@ -35,7 +34,7 @@ class CustomGradientTest(tf.test.TestCase):
       x_ = np.linspace(-100, 100, int(1e4)) + [0.]
 
       x = tf.constant(x_)
-      fx = tfp_math.custom_gradient(f(x), g(x), x)
+      fx = tfp.math.custom_gradient(f(x), g(x), x)
       gx = tf.gradients(fx, x)[0]
       [fx_, gx_] = sess.run([fx, gx])
 
@@ -49,7 +48,7 @@ class CustomGradientTest(tf.test.TestCase):
       x_ = np.linspace(-100, 100, int(1e4)) + [0.]
 
       x = tf.constant(x_)
-      fx = tfp_math.custom_gradient(f(x), g(x), x)
+      fx = tfp.math.custom_gradient(f(x), g(x), x)
       gx = tf.gradients(fx, x)[0]
       [fx_, gx_] = sess.run([fx, gx])
 
@@ -74,7 +73,7 @@ class CustomGradientTest(tf.test.TestCase):
       g = lambda z: z[0]**2 * z[1]**2 / 2
 
       z = tf.stack([x, y])
-      fz = tfp_math.custom_gradient(f(z), g(z), z)
+      fz = tfp.math.custom_gradient(f(z), g(z), z)
       gz = tf.gradients(fz, tf.trainable_variables())
       [z_, fz_, gx_, gy_] = sess.run([z, fz, gz[0], gz[1]])
 
@@ -101,7 +100,7 @@ class CustomGradientTest(tf.test.TestCase):
       f = lambda x: x * y
       g = lambda z: tf.square(x) * y
 
-      fx = tfp_math.custom_gradient(f(x), g(x), x)
+      fx = tfp.math.custom_gradient(f(x), g(x), x)
       gx = tf.gradients(fx, tf.trainable_variables())
       [x_, fx_, gx_] = sess.run([x, fx, gx[0]])
       gy_ = gx[1]
@@ -133,7 +132,7 @@ class CustomGradientTest(tf.test.TestCase):
       # part.
       f = lambda x: stop(x) * y
       g = lambda x: stop(tf.square(x)) * y
-      fx = tfp_math.custom_gradient(f(x), g(x), x + stop(y),
+      fx = tfp.math.custom_gradient(f(x), g(x), x + stop(y),
                                     fx_gx_manually_stopped=True)
 
       gx = tf.gradients(fx, tf.trainable_variables())
