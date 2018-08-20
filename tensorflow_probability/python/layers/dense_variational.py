@@ -458,7 +458,11 @@ class DenseLocalReparameterization(_DenseVariational):
 
   It uses the local reparameterization estimator [(Kingma et al., 2015)][1],
   which performs a Monte Carlo approximation of the distribution on the hidden
-  units induced by the `kernel` and `bias`.
+  units induced by the `kernel` and `bias`. The default `kernel_posterior_fn`
+  is a normal distribution which factorizes across all elements of the weight
+  matrix and bias vector. Unlike [1]'s multiplicative parameterization, this
+  distribution has trainable location and scale parameters which is known as
+  an additive noise parameterization [(Molchanov et al., 2017)][2].
 
   The arguments permit separate specification of the surrogate posterior
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
@@ -511,6 +515,9 @@ class DenseLocalReparameterization(_DenseVariational):
   [1]: Diederik Kingma, Tim Salimans, and Max Welling. Variational Dropout and
        the Local Reparameterization Trick. In _Neural Information Processing
        Systems_, 2015. https://arxiv.org/abs/1506.02557
+  [2]: Dmitry Molchanov, Arsenii Ashukha, Dmitry Vetrov. Variational Dropout
+       Sparsifies Deep Neural Networks. In _International Conference on Machine
+       Learning_, 2017. https://arxiv.org/abs/1701.05369
   """
 
   @docstring_util.expand_docstring(args=doc_args)
