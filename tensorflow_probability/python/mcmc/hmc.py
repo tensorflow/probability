@@ -411,17 +411,6 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
       seed: Python integer to seed the random number generator.
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., 'hmc_kernel').
-
-    Returns:
-      next_state: Tensor or Python list of `Tensor`s representing the state(s)
-        of the Markov chain(s) at each result step. Has same shape as
-        `current_state`.
-      kernel_results: `collections.namedtuple` of internal calculations used to
-        advance the chain.
-
-    Raises:
-      ValueError: if there isn't one `step_size` or a list with same length as
-        `current_state`.
     """
     impl = metropolis_hastings.MetropolisHastings(
         inner_kernel=UncalibratedHamiltonianMonteCarlo(
