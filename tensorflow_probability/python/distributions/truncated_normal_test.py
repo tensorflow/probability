@@ -273,6 +273,15 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase,
       self.assertLess(low_err, 0.05)
       self.assertLess(high_err, 0.05)
 
+  def testReparametrizableBatch(self):
+    loc = tf.constant([0., 1.])
+    dist = tfp.distributions.TruncatedNormal(
+        loc=loc, scale=1., low=-1., high=1.)
+    empirical_sum = tf.reduce_sum(dist.sample(100))
+    dy_loc_op = tf.gradients(empirical_sum, loc)[0]
+    dy_loc = self.evaluate(dy_loc_op)
+    self.assertAllGreaterEqual(dy_loc, 0.)
+
   @parameterized.parameters(
       itertools.product((np.float32, np.float64),
                         ("prob", "log_prob", "cdf", "log_cdf",

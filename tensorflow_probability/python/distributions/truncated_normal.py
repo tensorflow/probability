@@ -239,6 +239,9 @@ class TruncatedNormal(tf.distributions.Distribution):
     @tf.custom_gradient
     def _std_samples_with_gradients(lower, upper):
       """Standard truncated Normal with gradient support for low, high."""
+      # Note: Unlike the convention in tf_probability,
+      # parameterized_truncated_normal returns a tensor with the final dimension
+      # being the sample dimension.
       std_samples = random_ops.parameterized_truncated_normal(
           shape=flat_batch_and_sample_shape,
           means=0.0,
@@ -263,9 +266,17 @@ class TruncatedNormal(tf.distributions.Distribution):
            The standard normal samples and the gradients wrt the upper
            bound and lower bound.
         """
+        # std_samples has an extra dimension (the sample dimension), expand
+        # lower and upper so they broadcast along this dimension.
+        # See note above regarding parameterized_truncated_normal, the sample
+        # dimension is the final dimension.
+        lower_broadcast = lower[..., tf.newaxis]
+        upper_broadcast = upper[..., tf.newaxis]
+
         cdf_samples = ((special_math.ndtr(std_samples) -
-                        special_math.ndtr(lower)) /
-                       (special_math.ndtr(upper) - special_math.ndtr(lower)))
+                        special_math.ndtr(lower_broadcast)) /
+                       (special_math.ndtr(upper_broadcast)
+                        - special_math.ndtr(lower_broadcast)))
 
         # tiny, eps are tolerance parameters to ensure we stay away from giving
         # a zero arg to the log CDF expression.
@@ -274,8 +285,10 @@ class TruncatedNormal(tf.distributions.Distribution):
         eps = np.finfo(self.dtype.as_numpy_dtype).eps
         cdf_samples = tf.clip_by_value(cdf_samples, tiny, 1 - eps)
 
-        du = tf.exp(0.5 * (std_samples**2 - upper**2) + tf.log(cdf_samples))
-        dl = tf.exp(0.5 * (std_samples**2 - lower**2) + tf.log(1 - cdf_samples))
+        du = tf.exp(0.5 * (std_samples**2 - upper_broadcast**2)
+                    + tf.log(cdf_samples))
+        dl = tf.exp(0.5 * (std_samples**2 - lower_broadcast**2)
+                    + tf.log1p(-cdf_samples))
 
         # Reduce the gradient across the samples
         grad_u = tf.reduce_sum(dy * du, axis=-1)
@@ -294,6 +307,7 @@ class TruncatedNormal(tf.distributions.Distribution):
     std_samples = tf.reshape(std_samples, sample_and_batch_shape)
     samples = (std_samples * tf.expand_dims(self._scale, axis=0) +
                tf.expand_dims(self._loc, axis=0))
+
     return samples
 
   def _log_prob(self, x):
