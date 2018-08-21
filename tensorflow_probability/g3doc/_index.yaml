@@ -21,19 +21,21 @@ landing_page:
   - heading: TensorFlow Probability is a library for probabilistic reasoning and statistical analysis.
     items:
     - description: >
-        TensorFlow Probability (TFP) is for statisticians, ML researchers,
-        data&nbsp;scientists, and scientists who want to get the most out of
-        their data—encoding their domain knowledge to understand the data and
-        make predictions. TFP lets you:
-        <ul>
-          <li>Quantify uncertainty in both the inputs and outputs of your model.</li>
-          <li>Handle data with more features than examples.</li>
-          <li>Support risk-conscious decision-making.</li>
-          <li>Reason about hidden or causal processes.</li>
-          <li>Leverage structure in data.</li>
+        TensorFlow Probability (TFP) is a Python library built on TensorFlow
+        that makes it easy to combine probabilistic models and deep learning on
+        modern hardware (TPU, GPU). It's for data scientists, statisticians, ML
+        researchers, and practitioners who want to encode domain knowledge to
+        understand data and make predictions. TFP includes:
+        <ul style="padding-left: 20px; margin: 20px 0;">
+          <li>A wide selection of probability distributions and bijectors.</li>
+          <li>Tools to build deep probabilistic models, including probabilistic
+          layers and the Edward2 language.</li>
+          <li>Variational inference and Markov chain Monte Carlo.</li>
+          <li>Optimizers such as Nelder-Mead, BFGS, and SGLD.</li>
         </ul>
-        TensorFlow Probability enjoys the benefits of TensorFlow: build, fit,
-        and deploy a model, then scale to production. To get started, see the
+        Since TFP inherits the benefits of TensorFlow, you can build, fit, and
+        deploy a model using a single language throughout the lifecycle of model
+        exploration and production. To get started, see the
         <a href="./overview">TensorFlow Probability Guide</a>.
 
     - code_block: |
@@ -41,21 +43,19 @@ landing_page:
         import tensorflow as tf
         import tensorflow_probability as tfp
 
-        # Example: Monte Carlo importance weighted calculation of an integral
-        d = tfp.distributions.Kumaraswamy(concentration1=0.9,
-                                          concentration0=1.1)
-        x = d.sample(int(100e3))  # Samples are in the unit interval.
-        z = tf.reduce_mean((4. / (1. + x**2)) / d.prob(x))
-        # ==> z is approximately 3.1416 (Easy as pie!)
+        # Pretend to load synthetic data set.
+        features = tfp.distributions.Normal(loc=0., scale=1.).sample(int(100e3))
+        labels = tfp.distributions.Bernoulli(logits=1.618 * features).sample()
 
-        # Example: Logistic regression. Load fake data and results:
-        x = tfp.distributions.Normal(loc=0., scale=1.).sample(int(100e3))
-        y = tfp.distributions.Bernoulli(logits=1.618 * x).sample()
-        w, linear_response, is_converged, num_iter = tfp.glm.fit(
-            model_matrix=x[:, tf.newaxis],
-            response=tf.to_float(y),
-            model=tfp.glm.Bernoulli())
-        # ==> w is approximately [1.618] (We're golden!)
+        # Specify model.
+        model = tfp.glm.Bernoulli()
+
+        # Fit model given data.
+        coeffs, linear_response, is_converged, num_iter = tfp.glm.fit(
+            model_matrix=features[:, tf.newaxis],
+            response=tf.to_float(labels),
+            model=model)
+        # ==> coeffs is approximately [1.618] (We're golden!)
         </pre>
         {% dynamic if request.tld != 'cn' %}
         <a class="colab-button" target="_blank" href="https://colab.research.google.com/github/tensorflow/probability/blob/master/tensorflow_probability/g3doc/_index.ipynb">Run in a <span>Notebook</span></a>
