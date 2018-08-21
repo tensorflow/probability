@@ -38,38 +38,43 @@ tfl = tf.linalg
 tfd = tfp.distributions
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class IIDNormalTest(test.TestCase):
+class _IIDNormalTest(object):
 
   def setUp(self):
     pass
 
-  def _build_iid_normal_model(self,
-                              num_timesteps,
-                              latent_size,
-                              observation_size,
-                              transition_variance,
-                              obs_variance):
+  def _build_iid_normal_model(self, num_timesteps, latent_size,
+                              observation_size, transition_variance,
+                              observation_variance):
     """Build a model whose outputs are IID normal by construction."""
+
+    transition_variance = tf.convert_to_tensor(
+        transition_variance, dtype=self.dtype)
+    observation_variance = tf.convert_to_tensor(
+        observation_variance, dtype=self.dtype)
 
     # Use orthogonal matrices to project a (potentially
     # high-dimensional) latent space of IID normal variables into a
     # low-dimensional observation that is still IID normal.
     random_orthogonal_matrix = lambda: np.linalg.qr(
         np.random.randn(latent_size, latent_size))[0][:observation_size, :]
-    obs_matrix = tf.convert_to_tensor(random_orthogonal_matrix(),
-                                      dtype=tf.float32)
+    observation_matrix = tf.convert_to_tensor(
+        random_orthogonal_matrix(), dtype=self.dtype)
 
     model = tfd.LinearGaussianStateSpaceModel(
         num_timesteps=num_timesteps,
-        transition_matrix=tf.zeros((latent_size, latent_size)),
+        transition_matrix=tf.zeros(
+            [latent_size, latent_size], dtype=self.dtype),
         transition_noise=tfd.MultivariateNormalDiag(
-            scale_diag=tf.sqrt(transition_variance)*tf.ones((latent_size))),
-        observation_matrix=obs_matrix,
+            scale_diag=tf.sqrt(transition_variance) *
+            tf.ones([latent_size], dtype=self.dtype)),
+        observation_matrix=observation_matrix,
         observation_noise=tfd.MultivariateNormalDiag(
-            scale_diag=tf.sqrt(obs_variance)*tf.ones((observation_size))),
+            scale_diag=tf.sqrt(observation_variance) *
+            tf.ones([observation_size], dtype=self.dtype)),
         initial_state_prior=tfd.MultivariateNormalDiag(
-            scale_diag=tf.sqrt(transition_variance)*tf.ones((latent_size))),
+            scale_diag=tf.sqrt(transition_variance) *
+            tf.ones([latent_size], dtype=self.dtype)),
         validate_args=True)
 
     return model
@@ -81,20 +86,20 @@ class IIDNormalTest(test.TestCase):
     num_samples = 10000
 
     for transition_variance_val in [.3, 100.]:
-      for obs_variance_val in [.6, 40.]:
+      for observation_variance_val in [.6, 40.]:
 
         iid_latents = self._build_iid_normal_model(
             num_timesteps=num_timesteps,
             latent_size=latent_size,
             observation_size=observation_size,
             transition_variance=transition_variance_val,
-            obs_variance=obs_variance_val)
+            observation_variance=observation_variance_val)
 
         x = iid_latents.sample(num_samples)
 
         x_val = self.evaluate(x)
         result_shape = [num_timesteps, observation_size]
-        marginal_variance = transition_variance_val + obs_variance_val
+        marginal_variance = transition_variance_val + observation_variance_val
 
         stderr_mean = np.sqrt(num_samples * marginal_variance)
         stderr_variance = marginal_variance * np.sqrt(2./(num_samples-1))
@@ -115,27 +120,41 @@ class IIDNormalTest(test.TestCase):
     # we can verify log_prob as a simple iid Gaussian log density.
     delta = 1e-4
     for transition_variance_val in [1., 1e-8]:
-      for obs_variance_val in [1., 1e-8]:
+      for observation_variance_val in [1., 1e-8]:
 
         iid_latents = self._build_iid_normal_model(
             num_timesteps=10,
             latent_size=4,
             observation_size=2,
             transition_variance=transition_variance_val,
-            obs_variance=obs_variance_val)
+            observation_variance=observation_variance_val)
 
         x = iid_latents.sample([5, 3])
         lp_kalman = iid_latents.log_prob(x)
 
-        marginal_variance = transition_variance_val + obs_variance_val
+        marginal_variance = tf.convert_to_tensor(
+            transition_variance_val + observation_variance_val,
+            dtype=self.dtype)
         lp_iid = tf.reduce_sum(
-            tfd.Normal(0., tf.sqrt(marginal_variance)).log_prob(x),
+            tfd.Normal(
+                loc=tf.zeros([], dtype=self.dtype),
+                scale=tf.sqrt(marginal_variance)).log_prob(x),
             axis=(-2, -1))
 
         lp_kalman_val, lp_iid_val = self.evaluate((lp_kalman, lp_iid))
         self.assertAllClose(lp_kalman_val,
                             lp_iid_val,
                             rtol=delta, atol=0.)
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class IIDNormalTest32(_IIDNormalTest, test.TestCase):
+  dtype = np.float32
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class IIDNormalTest64(_IIDNormalTest, test.TestCase):
+  dtype = np.float64
 
 
 @test_util.run_all_in_graph_and_eager_modes

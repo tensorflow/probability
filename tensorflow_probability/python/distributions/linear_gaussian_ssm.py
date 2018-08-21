@@ -336,6 +336,8 @@ class LinearGaussianStateSpaceModel(tf.distributions.Distribution):
       self.initial_step = initial_step
       self.final_step = self.initial_step + self.num_timesteps
 
+      dtype = initial_state_prior.dtype
+
       # Internally, the transition and observation matrices are
       # canonicalized as callables returning a LinearOperator. This
       # creates no overhead when the model is actually fixed, since in
@@ -344,8 +346,9 @@ class LinearGaussianStateSpaceModel(tf.distributions.Distribution):
       def _maybe_make_linop(x, name):
         """Converts Tensors into LinearOperators."""
         if not isinstance(x, tfl.LinearOperator):
-          x = tfl.LinearOperatorFullMatrix(tf.convert_to_tensor(x),
-                                           name=name)
+          x = tfl.LinearOperatorFullMatrix(
+              tf.convert_to_tensor(x, dtype=dtype),
+              name=name)
         return x
       def _maybe_make_callable_from_linop(f, name):
         """Converts fixed objects into trivial callables."""
@@ -425,7 +428,7 @@ class LinearGaussianStateSpaceModel(tf.distributions.Distribution):
         _, _ = self._batch_shape(), self._batch_shape_tensor()
 
       super(LinearGaussianStateSpaceModel, self).__init__(
-          dtype=self.initial_state_prior.dtype,
+          dtype=dtype,
           reparameterization_type=tf.distributions.FULLY_REPARAMETERIZED,
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
@@ -664,11 +667,11 @@ class LinearGaussianStateSpaceModel(tf.distributions.Distribution):
           predicted_mean=prior_mean,
           predicted_cov=prior_cov,
           filtered_mean=prior_mean,  # establishes shape, value ignored
-          filtered_cov=prior_cov,    # establishes shape, value ignored
+          filtered_cov=prior_cov,  # establishes shape, value ignored
           observation_mean=initial_observation_mean,
           observation_cov=initial_observation_cov,
           log_marginal_likelihood=tf.zeros(
-              shape=sample_and_batch_shape, dtype=tf.float32),
+              shape=sample_and_batch_shape, dtype=self.dtype),
           timestep=tf.convert_to_tensor(
               self.initial_step, dtype=tf.int32, name="initial_step"))
 
@@ -1004,8 +1007,9 @@ def linear_gaussian_update(prior_mean, prior_cov,
   # as an intermediate quantity.
   latent_size = util.prefer_static_value(
       observation_matrix.shape_tensor())[-1]
-  tmp_term = tf.eye(latent_size) - observation_matrix.matmul(
-      gain, adjoint=True, adjoint_arg=True)
+  tmp_term = (
+      tf.eye(latent_size, dtype=observation_matrix.dtype) -
+      observation_matrix.matmul(gain, adjoint=True, adjoint_arg=True))
   posterior_cov = (
       _matmul(tf.matrix_transpose(tmp_term),
               _matmul(prior_cov, tmp_term))
