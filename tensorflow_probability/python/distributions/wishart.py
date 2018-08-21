@@ -358,18 +358,23 @@ class _WishartLinearOperator(tf.distributions.Distribution):
             (half_dp1 - half_df) * self._multi_digamma(half_df, self.dimension))
 
   def _mean(self):
+    # Because df is a scalar, we need to expand dimensions to match
+    # scale_operator. We use ellipses notation (...) to select all dimensions
+    # and add two dimensions to the end.
+    df = self.df[..., tf.newaxis, tf.newaxis]
     if self.input_output_cholesky:
-      return tf.sqrt(self.df) * self.scale_operator.to_dense()
-    return self.df * self._square_scale_operator()
+      return tf.sqrt(df) * self.scale_operator.to_dense()
+    return df * self._square_scale_operator()
 
   def _variance(self):
-    x = tf.sqrt(self.df) * self._square_scale_operator()
+    # Because df is a scalar, we need to expand dimensions to match
+    # scale_operator. We use ellipses notation (...) to select all dimensions
+    # and add two dimensions to the end.
+    df = self.df[..., tf.newaxis, tf.newaxis]
+    x = tf.sqrt(df) * self._square_scale_operator()
     d = tf.expand_dims(tf.matrix_diag_part(x), -1)
     v = tf.square(x) + tf.matmul(d, d, adjoint_b=True)
     return v
-
-  def _stddev(self):
-    return tf.sqrt(self.variance())
 
   def _mode(self):
     s = self.df - self.dimension - 1.

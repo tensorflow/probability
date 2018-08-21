@@ -41,9 +41,11 @@ def chol(x):
 
 def wishart_var(df, x):
   """Compute Wishart variance for numpy scale matrix."""
+  df = np.asarray(df)[..., np.newaxis, np.newaxis]
   x = np.sqrt(df) * np.asarray(x)
-  d = np.expand_dims(np.diag(x), -1)
-  return x**2 + np.dot(d, d.T)
+  d = np.diagonal(x, axis1=-2, axis2=-1)
+  return x**2 + np.matmul(
+      d[..., np.newaxis], d[..., np.newaxis, :])
 
 
 class WishartTest(tf.test.TestCase):
@@ -78,6 +80,15 @@ class WishartTest(tf.test.TestCase):
     w = tfd.Wishart(df, scale_tril=chol(scale))
     self.assertAllEqual(df * scale, self.evaluate(w.mean()))
 
+  def testMeanBroadcast(self):
+    scale = [make_pd(1., 2), make_pd(1., 2)]
+    chol_scale = np.float32([chol(s) for s in scale])
+    scale = np.float32(scale)
+    df = np.array([4., 3.], dtype=np.float32)
+    w = tfd.Wishart(df, scale_tril=chol_scale)
+    self.assertAllEqual(
+        df[..., np.newaxis, np.newaxis] * scale, self.evaluate(w.mean()))
+
   def testMode(self):
     scale = make_pd(1., 2)
     df = 4
@@ -89,12 +100,20 @@ class WishartTest(tf.test.TestCase):
     df = 4
     w = tfd.Wishart(df, scale_tril=chol(scale))
     self.assertAllEqual(
-        tf.sqrt(wishart_var(df, scale)), self.evaluate(w.stddev()))
+        np.sqrt(wishart_var(df, scale)), self.evaluate(w.stddev()))
 
   def testVariance(self):
     scale = make_pd(1., 2)
     df = 4
     w = tfd.Wishart(df, scale_tril=chol(scale))
+    self.assertAllEqual(wishart_var(df, scale), self.evaluate(w.variance()))
+
+  def testVarianceBroadcast(self):
+    scale = [make_pd(1., 2), make_pd(1., 2)]
+    chol_scale = np.float32([chol(s) for s in scale])
+    scale = np.float32(scale)
+    df = np.array([4., 3.], dtype=np.float32)
+    w = tfd.Wishart(df, scale_tril=chol_scale)
     self.assertAllEqual(wishart_var(df, scale), self.evaluate(w.variance()))
 
   def testSample(self):
