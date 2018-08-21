@@ -78,6 +78,7 @@ py_library(
         ":vector_laplace_linear_operator",
         ":vector_sinh_arcsinh_diag",
         ":vector_student_t",
+        ":von_mises",
         ":von_mises_fisher",
         ":wishart",
         # numpy dep,
@@ -524,6 +525,16 @@ py_library(
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/internal:distribution_util",
+    ],
+)
+
+py_library(
+    name = "von_mises",
+    srcs = ["von_mises.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
@@ -984,6 +995,18 @@ py_test(
     size = "medium",
     srcs = ["sample_stats_test.py"],
     tags = ["nomsan"],  # disable to avoid false positives from scipy.
+    deps = [
+        ":distributions",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_test(
+    name = "von_mises_test",
+    size = "medium",
+    srcs = ["von_mises_test.py"],
     deps = [
         ":distributions",
         # numpy dep,
