@@ -484,18 +484,6 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
 
         is_exchange_accepted = log_uniforms[i] < log_accept_ratio
 
-        is_exchange_accepted = tf.Print(
-            is_exchange_accepted, [
-                'is_exchange_accepted: ',
-                is_exchange_accepted,
-                'temp_diff: ',
-                temp_diff,
-                'log_accept_ratio: ',
-                log_accept_ratio,
-            ],
-            summarize=2,
-            first_n=0)
-
         for k in range(num_state_parts):
           new_m, new_n = _swap(is_exchange_accepted, old_states[k].read(m),
                                old_states[k].read(n))
