@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-
 # TensorFlow Probability
 
 TensorFlow Probability is a library for probabilistic reasoning and statistical
