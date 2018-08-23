@@ -59,6 +59,9 @@ upper_tabs:
       - title: Probabilistic PCA
         path: https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Probabilistic_PCA.ipynb
         status: external
+      - title: Factorial mixture
+        path: https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Factorial_Mixture.ipynb
+        status: external
     - name: API
       contents:
       - include: /probability/api_docs/python/_toc.yaml
