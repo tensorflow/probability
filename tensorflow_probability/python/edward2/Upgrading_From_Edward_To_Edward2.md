@@ -31,6 +31,9 @@ to TensorFlow Probability. For current examples:
 + Variational Autoencoder
   ([Edward](https://github.com/blei-lab/edward/blob/master/examples/vae_convolutional.py),
   [TensorFlow Probability](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/vae.py))
++ Deep Exponential Family
+  ([Edward](https://github.com/blei-lab/edward/blob/master/examples/deep_exponential_family.py),
+  [TensorFlow Probability](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/deep_exponential_family.py))
 + Mixture of Gaussians
   ([Edward](https://github.com/blei-lab/edward/blob/master/notebooks/unsupervised.ipynb),
   [TensorFlow Probability](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Bayesian_Gaussian_Mixture_Model.ipynb))
@@ -89,24 +92,28 @@ dir(ed)
 
 __Edward__. You write models inline with any other code, composing
 random variables. As illustration, consider a
-[deep exponential family](https://github.com/blei-lab/edward/blob/master/examples/deep_exponential_family.py)
-(Ranganath et al., 2015).
+deep exponential family
+(Ranganath et al., 2015). (For runnable versions of the example code presented
+here, see the full
+[Edward](https://github.com/blei-lab/edward/blob/master/examples/deep_exponential_family.py)
+and
+[Edward2](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/deep_exponential_family.py)
+source files.)
 
 ```python
 bag_of_words = np.random.poisson(5., size=[256, 32000])  # training data as matrix of counts
-data_size = bag_of_words.shape[0]  # number of documents
-feature_size = bag_of_words.shape[1]  # number of words (vocabulary)
+data_size, feature_size = bag_of_words.shape  # number of documents x words (vocabulary)
 units = [100, 30, 15]  # number of stochastic units per layer
 shape = 0.1  # Gamma shape parameter
 
-W2 = Gamma(0.1, 0.3, sample_shape=[units[2], units[1]])
-W1 = Gamma(0.1, 0.3, sample_shape=[units[1], units[0]])
-W0 = Gamma(0.1, 0.3, sample_shape=[units[0], feature_size])
+w2 = Gamma(0.1, 0.3, sample_shape=[units[2], units[1]])
+w1 = Gamma(0.1, 0.3, sample_shape=[units[1], units[0]])
+w0 = Gamma(0.1, 0.3, sample_shape=[units[0], feature_size])
 
 z2 = Gamma(0.1, 0.1, sample_shape=[data_size, units[2]])
-z1 = Gamma(shape, shape / tf.matmul(z2, W2))
-z0 = Gamma(shape, shape / tf.matmul(z1, W1))
-x = Poisson(tf.matmul(z1, W0))
+z1 = Gamma(shape, shape / tf.matmul(z2, w2))
+z0 = Gamma(shape, shape / tf.matmul(z1, w1))
+x = Poisson(tf.matmul(z1, w0))
 ```
 
 __Edward2 / TensorFlow Probability__. You write models as functions, where
@@ -115,14 +122,14 @@ random variables operate with the same behavior as Edward's.
 ```python
 def deep_exponential_family(data_size, feature_size, units, shape):
   """A multi-layered topic model over a documents-by-terms matrix."""
-  W2 = ed.Gamma(0.1, 0.3, sample_shape=[units[2], units[1]], name="W2")
-  W1 = ed.Gamma(0.1, 0.3, sample_shape=[units[1], units[0]], name="W1")
-  W0 = ed.Gamma(0.1, 0.3, sample_shape=[units[0], feature_size], name="W0")
+  w2 = ed.Gamma(0.1, 0.3, sample_shape=[units[2], units[1]], name="w2")
+  w1 = ed.Gamma(0.1, 0.3, sample_shape=[units[1], units[0]], name="w1")
+  w0 = ed.Gamma(0.1, 0.3, sample_shape=[units[0], feature_size], name="w0")
 
   z2 = ed.Gamma(0.1, 0.1, sample_shape=[data_size, units[2]], name="z2")
-  z1 = ed.Gamma(shape, shape / tf.matmul(z2, W2), name="z1")
-  z0 = ed.Gamma(shape, shape / tf.matmul(z1, W1), name="z0")
-  x = ed.Poisson(tf.matmul(z0, W0), name="x")
+  z1 = ed.Gamma(shape, shape / tf.matmul(z2, w2), name="z1")
+  z0 = ed.Gamma(shape, shape / tf.matmul(z1, w1), name="z0")
+  x = ed.Poisson(tf.matmul(z0, w0), name="x")
   return x
 ```
 
@@ -155,7 +162,7 @@ with tf.Session() as sess:  # or, e.g., tf.train.MonitoredSession()
 ```
 
 You can also use Edward2 in eager mode (`tf.enable_eager_execution()`), where
-`x` already fetches the sampled NumPy array (obtainable as `x.value`).
+`x` already fetches the sampled NumPy array (obtainable as `x.numpy()`).
 
 ## Probabilistic Inference
 
@@ -173,25 +180,26 @@ the model's posterior approximation. You align these random variables together
 with the model's and construct an inference class.
 
 ```python
-def trainable_pointmass(shape, name=None):
-  """Learnable point mass distribution with softplus unconstraints."""
-  with tf.variable_scope(name, default_name="trainable_pointmass"):
-    return PointMass(tf.nn.softplus(tf.get_variable("mean", shape)))
+def trainable_positive_pointmass(shape, name=None):
+  """Learnable point mass distribution over positive reals."""
+  with tf.variable_scope(None, default_name="trainable_positive_pointmass"):
+    return PointMass(tf.nn.softplus(tf.get_variable("mean", shape)), name=name)
 
 def trainable_gamma(shape, name=None):
-  """Learnable Gamma via shape and scale, with softplus unconstraints."""
-  with tf.variable_scope(name, default_name="trainable_gamma"):
+  """Learnable Gamma via shape and scale parameterization."""
+  with tf.variable_scope(None, default_name="trainable_gamma"):
     return Gamma(tf.nn.softplus(tf.get_variable("shape", shape)),
-                 1.0 / tf.nn.softplus(tf.get_variable("scale", shape)))
+                 1.0 / tf.nn.softplus(tf.get_variable("scale", shape)),
+                 name=name)
 
-qW2 = trainable_pointmass(W2.shape)
-qW1 = trainable_pointmass(W1.shape)
-qW0 = trainable_pointmass(W0.shape)
+qw2 = trainable_positive_pointmass(w2.shape)
+qw1 = trainable_positive_pointmass(w1.shape)
+qw0 = trainable_positive_pointmass(w0.shape)
 qz2 = trainable_gamma(z2.shape)
 qz1 = trainable_gamma(z1.shape)
 qz0 = trainable_gamma(z0.shape)
 
-inference = ed.KLqp({W0: qW0, W1: qW1, W2: qW2, z0: qz0, z1: qz1, z2: qz2},
+inference = ed.KLqp({w0: qw0, w1: qw1, w2: qw2, z0: qz0, z1: qz1, z2: qz2},
                     data={x: bag_of_words})
 ```
 
@@ -207,58 +215,47 @@ evidence lower bound (Hinton & Camp, 1993; Jordan, Ghahramani, Jaakkola, & Saul,
 1999; Waterhouse, MacKay, & Robinson, 1996).
 
 ```python
-def def_variational():
-  """Posterior approx. for deep exponential family p(W{0,1,2}, z{1,2,3} | x)."""
-  qW2 = trainable_pointmass(W2.shape)  # same func as above but with ed2 rv's
-  qW1 = trainable_pointmass(W1.shape)
-  qW0 = trainable_pointmass(W0.shape)
-  qz2 = trainable_gamma(z2.shape)  # same func as above but with ed2 rv's
-  qz1 = trainable_gamma(z1.shape)
-  qz0 = trainable_gamma(z0.shape)
-  return qW2, qW1, qW0, qz2, qz1, qz0
+def deep_exponential_family_variational():
+  """Posterior approx. for deep exponential family p(w{0,1,2}, z{1,2,3} | x)."""
+  qw2 = trainable_positive_pointmass(w2.shape, name="qw2")  # same func as above but with ed2 rv's
+  qw1 = trainable_positive_pointmass(w1.shape, name="qw1")
+  qw0 = trainable_positive_pointmass(w0.shape, name="qw0")
+  qz2 = trainable_gamma(z2.shape, name="qz2")  # same func as above but with ed2 rv's
+  qz1 = trainable_gamma(z1.shape, name="qz1")
+  qz0 = trainable_gamma(z0.shape, name="qz0")
+  return qw2, qw1, qw0, qz2, qz1, qz0
 
-def make_recording(trace):
-  def record(f, *args, **kwargs):
-    """Records execution to a trace."""
-    output = ed.interceptable(f)(*args, **kwargs)
-    trace[kwargs.get("name")] = output
-    return output
-  return record
-
-def make_value_settings(trace):
-  alignment = {"z0": "qz0", "z1": "qz1", "z2": "qz2",
-               "W0": "qW0", "W1": "qW1", "W2": "qW2"}
+def make_value_setter(**model_kwargs):
+  """Creates a value-setting interceptor."""
   def set_values(f, *args, **kwargs):
-    """Sets random variable values to the trace's aligned value."""
+    """Sets random variable values to its aligned value."""
     name = kwargs.get("name")
-    if name in alignment:
-      kwargs["value"] = trace.get(alignment[name])
+    if name in model_kwargs:
+      kwargs["value"] = model_kwargs[name]
     return ed.interceptable(f)(*args, **kwargs)
   return set_values
 
 # Compute expected log-likelihood. First, sample from the variational
 # distribution; second, compute the log-likelihood given the sample.
-variational_trace = collections.OrderedDict({})
-with ed.interception(make_recording(variational_trace)):
-  _ = def_variational()
+qw2, qw1, qw0, qz2, qz1, qz0 = deep_exponential_family_variational()
 
-model_trace = collections.OrderedDict({})
-with ed.interception(make_recording(model_trace)):
-  with ed.interception(make_value_settings(variational_trace)):
+with ed.tape() as model_tape:
+  with ed.interception(make_value_setter(w2=qw2, w1=qw1, w0=qw0,
+                                         z2=qz2, z1=qz1, z0=qz0)):
     posterior_predictive = deep_exponential_family(data_size, feature_size, units, shape)
 
-log_likelihood = posterior_predictive.log_prob(bag_of_words)
+log_likelihood = posterior_predictive.distribution.log_prob(bag_of_words)
 
 # Compute analytic KL-divergence between variational and prior distributions.
-kl = variational_trace["qz0"].kl_divergence(model_trace["z0"])
-kl += variational_trace["qz1"].kl_divergence(model_trace["z1"])
-kl += variational_trace["qz2"].kl_divergence(model_trace["z2"])
-kl += variational_trace["qW0"].kl_divergence(model_trace["W0"])
-kl += variational_trace["qW1"].kl_divergence(model_trace["W1"])
-kl += variational_trace["qW2"].kl_divergence(model_trace["W2"])
+kl = 0.
+for rv_name, variational_rv in [("z0", qz0), ("z1", qz1), ("z2", qz2),
+                                ("w0", qw0), ("w1", qw1), ("w2", qw2)]:
+  kl += tf.reduce_sum(variational_rv.distribution.kl_divergence(
+      model_tape[rv_name].distribution))
 
 elbo = tf.reduce_mean(log_likelihood - kl)
 tf.summary.scalar("elbo", elbo)
+optimizer = tf.train.AdamOptimizer(1e-3)
 train_op = optimizer.minimize(-elbo)
 ```
 
@@ -272,14 +269,14 @@ inference class.
 ```python
 num_samples = 10000  # number of events to approximate posterior
 
-qW2 = Empirical(tf.get_variable("qW2/params", [num_samples, units[2], units[1]]))
-qW1 = Empirical(tf.get_variable("qW1/params", [num_samples, units[1], units[0]]))
-qW0 = Empirical(tf.get_variable("qW0/params", [num_samples, units[0], feature_size]))
+qw2 = Empirical(tf.get_variable("qw2/params", [num_samples, units[2], units[1]]))
+qw1 = Empirical(tf.get_variable("qw1/params", [num_samples, units[1], units[0]]))
+qw0 = Empirical(tf.get_variable("qw0/params", [num_samples, units[0], feature_size]))
 qz2 = Empirical(tf.get_variable("qz2/params", [num_samples, data_size, units[2]]))
 qz1 = Empirical(tf.get_variable("qz1/params", [num_samples, data_size, units[1]]))
 qz0 = Empirical(tf.get_variable("qz0/params", [num_samples, data_size, units[0]]))
 
-inference = ed.HMC({W0: qW0, W1: qW1, W2: qW2, z0: qz0, z1: qz1, z2: qz2},
+inference = ed.HMC({w0: qw0, w1: qw1, w2: qw2, z0: qz0, z1: qz1, z2: qz2},
                    data={x: bag_of_words})
 ```
 
@@ -297,19 +294,19 @@ transitions.
 
 ```python
 num_samples = 10000  # number of events to approximate posterior
-qW2 = tf.nn.softplus(tf.random_normal([units[2], units[1]]))  # initial state
-qW1 = tf.nn.softplus(tf.random_normal([units[1], units[0]]))
-qW0 = tf.nn.softplus(tf.random_normal([units[0], feature_size]))
+qw2 = tf.nn.softplus(tf.random_normal([units[2], units[1]]))  # initial state
+qw1 = tf.nn.softplus(tf.random_normal([units[1], units[0]]))
+qw0 = tf.nn.softplus(tf.random_normal([units[0], feature_size]))
 qz2 = tf.nn.softplus(tf.random_normal([data_size, units[2]]))
 qz1 = tf.nn.softplus(tf.random_normal([data_size, units[1]]))
 qz0 = tf.nn.softplus(tf.random_normal([data_size, units[0]]))
 
 log_joint = ed.make_log_joint_fn(deep_exponential_family)
 
-def target_log_prob_fn(W2, W1, W0, z2, z1, z0):
+def target_log_prob_fn(w2, w1, w0, z2, z1, z0):
   """Target log-probability as a function of states."""
   return log_joint(data_size, feature_size, units, shape,
-                   W2=W2, W1=W1, W0=W0, z2=z2, z1=z1, z0=z0, x=bag_of_words)
+                   w2=w2, w1=w1, w0=w0, z2=z2, z1=z1, z0=z0, x=bag_of_words)
 
 hmc_kernel = tfp.mcmc.HamiltonianMonteCarlo(
     target_log_prob_fn=target_log_prob_fn,
@@ -317,7 +314,7 @@ hmc_kernel = tfp.mcmc.HamiltonianMonteCarlo(
     num_leapfrog_steps=5)
 states, kernels_results = tfp.mcmc.sample_chain(
     num_results=num_samples,
-    current_state=[qW2, qW1, qW0, qz2, qz1, qz0],
+    current_state=[qw2, qw1, qw0, qz2, qz1, qz0],
     kernel=hmc_kernel,
     num_burnin_steps=1000)
 ```
@@ -354,18 +351,22 @@ summary = tf.summary.merge_all()
 summary_writer = tf.summary.FileWriter(model_dir, sess.graph)
 start_time = time.time()
 
-tf.global_variables_initializer().run()
+sess.run(tf.global_variables_initializer())
 for step in range(max_steps):
   start_time = time.time()
   _, elbo_value = sess.run([train_op, elbo])
   if step % 500 == 0:
     duration = time.time() - start_time
-    tf.logging.info("Step: {:>3d} Loss: {:.3f} ({:.3f} sec)".format(
+    print("Step: {:>3d} Loss: {:.3f} ({:.3f} sec)".format(
         step, elbo_value, duration))
     summary_str = sess.run(summary)
     summary_writer.add_summary(summary_str, step)
     summary_writer.flush()
 ```
+
+See the
+[deep exponential family](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/deep_exponential_family.py)
+example for more details.
 
 Finetuning Markov chain Monte Carlo is similar. Instead of tracking a loss
 function, one uses, for example, a counter for the number of accepted samples.
@@ -381,7 +382,7 @@ assessing how data generated from the model matches the true data.
 ```python
 # Build posterior predictive: it is parameterized by a variational posterior sample.
 posterior_predictive = ed.copy(
-    x, {W0: qW0, W1: qW1, W2: qW2, z0: qz0, z1: qz1, z2: qz2})
+    x, {w0: qw0, w1: qw1, w2: qw2, z0: qz0, z1: qz1, z2: qz2})
 
 # Evaluate average log-likelihood of data.
 ed.evaluate('log_likelihood', data={posterior_predictive: bag_of_words})

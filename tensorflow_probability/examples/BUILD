@@ -58,6 +58,35 @@ py_binary(
 # )
 
 py_binary(
+    name = "deep_exponential_family",
+    srcs = ["deep_exponential_family.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # absl/flags dep,
+        # numpy dep,
+        # six dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_test(
+    name = "deep_exponential_family_test",
+    size = "small",
+    srcs = ["deep_exponential_family.py"],
+    args = [
+        "--fake_data",
+        "--max_steps=5",
+        "--layer_sizes=5,3,2",
+    ],
+    main = "deep_exponential_family.py",
+    srcs_version = "PY2AND3",
+    deps = [
+        ":deep_exponential_family",
+    ],
+)
+
+py_binary(
     name = "latent_dirichlet_allocation_distributions",
     srcs = ["latent_dirichlet_allocation_distributions.py"],
     srcs_version = "PY2AND3",
