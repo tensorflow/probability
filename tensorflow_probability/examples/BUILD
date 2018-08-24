@@ -58,8 +58,8 @@ py_binary(
 # )
 
 py_binary(
-    name = "latent_dirichlet_allocation",
-    srcs = ["latent_dirichlet_allocation.py"],
+    name = "latent_dirichlet_allocation_distributions",
+    srcs = ["latent_dirichlet_allocation_distributions.py"],
     srcs_version = "PY2AND3",
     deps = [
         # absl/flags dep,
@@ -73,9 +73,9 @@ py_binary(
 )
 
 py_test(
-    name = "latent_dirichlet_allocation_test",
+    name = "latent_dirichlet_allocation_distributions_test",
     size = "medium",
-    srcs = ["latent_dirichlet_allocation.py"],
+    srcs = ["latent_dirichlet_allocation_distributions.py"],
     args = [
         "--fake_data",
         "--max_steps=5",
@@ -83,10 +83,42 @@ py_test(
         "--viz_steps=5",
         "--learning_rate=1e-7",
     ],
-    main = "latent_dirichlet_allocation.py",
+    main = "latent_dirichlet_allocation_distributions.py",
     srcs_version = "PY2AND3",
     deps = [
-        ":latent_dirichlet_allocation",
+        ":latent_dirichlet_allocation_distributions",
+    ],
+)
+
+py_binary(
+    name = "latent_dirichlet_allocation_edward2",
+    srcs = ["latent_dirichlet_allocation_edward2.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # absl/flags dep,
+        # numpy dep,
+        # scipy dep,
+        # six dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_test(
+    name = "latent_dirichlet_allocation_edward2_test",
+    size = "medium",
+    srcs = ["latent_dirichlet_allocation_edward2.py"],
+    args = [
+        "--fake_data",
+        "--max_steps=5",
+        "--delete_existing",
+        "--viz_steps=5",
+        "--learning_rate=1e-7",
+    ],
+    main = "latent_dirichlet_allocation_edward2.py",
+    srcs_version = "PY2AND3",
+    deps = [
+        ":latent_dirichlet_allocation_edward2",
     ],
 )
 
