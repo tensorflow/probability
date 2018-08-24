@@ -234,7 +234,7 @@ py_test(
     size = "small",
     srcs = ["vq_vae.py"],
     args = [
-        "--fake_data",
+        "--mnist_type='fake_data'",
         "--max_steps=5",
     ],
     main = "vq_vae.py",
