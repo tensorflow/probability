@@ -12,7 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Edward2 probabilistic programming language."""
+
+"""Edward2 probabilistic programming language.
+
+For user guides, see:
+
++ [Overview](
+   https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/edward2/README.md)
++ [Upgrading from Edward to Edward2](
+   https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/edward2/Upgrading_From_Edward_To_Edward2.md)
+
+"""
 
 from __future__ import absolute_import
 from __future__ import division
