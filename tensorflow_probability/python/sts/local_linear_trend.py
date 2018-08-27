@@ -312,12 +312,14 @@ class LocalLinearTrend(StructuralTimeSeries):
       ])
 
       self._initial_state_prior = tfd.MultivariateNormalDiag(
-          loc=[initial_level_prior.mean(),
-               initial_slope_prior.mean()],
-          scale_diag=[
+          loc=tf.stack(
+              [initial_level_prior.mean(),
+               initial_slope_prior.mean()
+              ], axis=-1),
+          scale_diag=tf.stack([
               initial_level_prior.stddev(),
               initial_slope_prior.stddev()
-          ])
+          ], axis=-1))
 
       super(LocalLinearTrend, self).__init__(
           parameters=[
