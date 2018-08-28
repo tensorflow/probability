@@ -58,6 +58,36 @@ py_binary(
 # )
 
 py_binary(
+    name = "grammar_vae",
+    srcs = ["grammar_vae.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # absl/flags dep,
+        # numpy dep,
+        # scipy dep,
+        # six dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_test(
+    name = "grammar_vae_test",
+    size = "small",
+    srcs = ["grammar_vae.py"],
+    args = [
+        "--max_steps=5",
+        "--latent_size=2",
+        "--num_units=3",
+    ],
+    main = "grammar_vae.py",
+    srcs_version = "PY2AND3",
+    deps = [
+        ":grammar_vae",
+    ],
+)
+
+py_binary(
     name = "deep_exponential_family",
     srcs = ["deep_exponential_family.py"],
     srcs_version = "PY2AND3",

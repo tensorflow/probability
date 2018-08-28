@@ -95,11 +95,13 @@ It also includes example scripts such as:
   Representation learning with a latent code and variational inference.
 * [Vector-Quantized Autoencoder](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/vq_vae.py).
   Discrete representation learning with vector quantization.
+* [Grammar Variational Autoencoder](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/grammar_vae.py).
+  Representation learning over productions in a context-free grammar.
 * Latent Dirichlet Allocation
   ([Distributions version](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/latent_dirichlet_allocation_distributions.py),
   [Edward2 version](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/latent_dirichlet_allocation_edward2.py)).
   Mixed membership modeling for capturing topics in a document.
-+ [Deep Exponential Family](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/deep_exponential_family.py)
++ [Deep Exponential Family](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/deep_exponential_family.py).
   A deep, sparse generative model for discovering a hierarchy of topics.
 * [Bayesian Neural Networks](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/bayesian_neural_network.py).
   Neural networks with uncertainty over their weights.
