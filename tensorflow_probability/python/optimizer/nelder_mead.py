@@ -122,7 +122,8 @@ def minimize(objective_function,
       # Check that the search converged
       assert(results.converged)
       # Check that the argmin is close to the actual value.
-      np.testing.assert_allclose(results.position, np.array([0.0, 0.0]))
+      np.testing.assert_allclose(results.position, np.array([0.0, 0.0]),
+                                 atol=1e-7)
       # Print out the total number of function evaluations it took.
       print ("Function evaluations: %d" % results.num_objective_evaluations)
   ```
