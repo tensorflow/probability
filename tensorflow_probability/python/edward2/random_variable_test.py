@@ -52,8 +52,9 @@ class RandomVariableTest(parameterized.TestCase, tf.test.TestCase):
     with self.assertRaises(ValueError):
       _ = ed.RandomVariable(tfd.Bernoulli(probs=0.5),
                             value=tf.zeros([2, 5], dtype=tf.int32))
+    x = ed.RandomVariable(FakeDistribution())
     with self.assertRaises(NotImplementedError):
-      _ = ed.RandomVariable(FakeDistribution())
+      _ = x.value
 
   @tfe.run_test_in_graph_and_eager_modes
   def testGradientsFirstOrder(self):

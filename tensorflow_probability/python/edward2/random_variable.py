@@ -105,30 +105,20 @@ class RandomVariable(object):
     Raises:
       ValueError: `value` has incompatible shape with
         `sample_shape + distribution.batch_shape + distribution.event_shape`.
-      NotImplementedError: `distribution` does not have a `sample` method.
     """
     self._distribution = distribution
     self._sample_shape = sample_shape
     if value is not None:
-      t_value = tf.convert_to_tensor(value, self.distribution.dtype)
-      value_shape = t_value.shape
-      expected_shape = self.sample_shape.concatenate(
+      value = tf.cast(value, self.distribution.dtype)
+      value_shape = value.shape
+      expected_value_shape = self.sample_shape.concatenate(
           self.distribution.batch_shape).concatenate(
               self.distribution.event_shape)
-      if not value_shape.is_compatible_with(expected_shape):
+      if not value_shape.is_compatible_with(expected_value_shape):
         raise ValueError(
             "Incompatible shape for initialization argument 'value'. "
-            "Expected %s, got %s." % (expected_shape, value_shape))
-      else:
-        self._value = t_value
-    else:
-      try:
-        self._value = self.distribution.sample(self.sample_shape_tensor())
-      except NotImplementedError:
-        raise NotImplementedError(
-            "sample is not implemented for {0}. You must either pass in the "
-            "value argument or implement sample for {0}."
-            .format(self.__class__.__name__))
+            "Expected %s, got %s." % (expected_value_shape, value_shape))
+    self._value = value
 
   @property
   def distribution(self):
@@ -169,6 +159,14 @@ class RandomVariable(object):
   @property
   def value(self):
     """Get tensor that the random variable corresponds to."""
+    if self._value is None:
+      try:
+        self._value = self.distribution.sample(self.sample_shape_tensor())
+      except NotImplementedError:
+        raise NotImplementedError(
+            "sample is not implemented for {0}. You must either pass in the "
+            "value argument or implement sample for {0}."
+            .format(self.distribution.__class__.__name__))
     return self._value
 
   def __str__(self):
