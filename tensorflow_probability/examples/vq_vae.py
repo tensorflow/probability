@@ -236,51 +236,26 @@ def make_decoder(layers, activation, output_shape):
   return decoder
 
 
-def make_vq_vae(images,
-                encoder_fn,
-                decoder_fn,
-                vector_quantizer,
-                beta=0.25,
-                decay=0.99):
-  """Builds the vector-quantized variational autoencoder and its loss function.
+def add_ema_control_dependencies(vector_quantizer,
+                                 one_hot_assignments,
+                                 codes,
+                                 commitment_loss,
+                                 decay):
+  """Add control dependencies to the commmitment loss to update the codebook.
 
   Args:
-    images: A `int`-like `Tensor` containing observed inputs X. The first
-      dimension (axis 0) indexes batch elements; all other dimensions index
-      event elements.
-    encoder_fn: A callable to build the encoder output `Z_e`. This takes a
-      single argument, a `int`-like `Tensor` representing a batch of inputs `X`,
-      and returns the latent codes `Z_e`.
-    decoder_fn: A callable to build the decoder `p(X|Z_q)`. This takes a single
-      argument, a `float`-like `Tensor` representing a batch of latent codes
-      from the codebook `Z_q`, and returns a Distribution over the batch of
-      observations `X`.
-    vector_quantizer: An instance of the VectorQuantizer class, which contains
-      a codebook and a callable that returns matched codes `Z_q` and their
-      one-hot assignments from an input `Z_e`.
-    beta: Beta factor for the loss (Default: 0.25).
-    decay: Decay factor for the exponential moving average (Default: 0.99).
+    vector_quantizer: An instance of the VectorQuantizer class.
+    one_hot_assignments: The one-hot vectors corresponding to the matched
+      codebook entry for each code in the batch.
+    codes: A `float`-like `Tensor` containing the latent vectors to be compared
+      to the codebook.
+    commitment_loss: The commitment loss from comparing the encoder outputs to
+      their neighboring codebook entries.
+    decay: Decay factor for exponential moving average.
 
   Returns:
-    loss: A scalar `Tensor` computing the loss function.
-    decoder_distribution: A `tf.distributions.Distribution` instance conditional
-      on a draw from the encoder.
+    commitment_loss: Commitment loss with control dependencies.
   """
-  codes = encoder_fn(images)
-  nearest_codebook_entries, one_hot_assignments = vector_quantizer(codes)
-
-  # Use the straight-through estimator so the encoder receives gradients from
-  # reconstruction loss.
-  codes_straight_through = codes + tf.stop_gradient(
-      nearest_codebook_entries - codes)
-  decoder_distribution = decoder_fn(codes_straight_through)
-  reconstruction_loss = -tf.reduce_mean(decoder_distribution.log_prob(images))
-  commitment_loss = tf.reduce_mean(
-      tf.square(codes - tf.stop_gradient(nearest_codebook_entries)))
-
-  tf.summary.scalar("reconstruction_loss", reconstruction_loss)
-  tf.summary.scalar("commitment_loss", commitment_loss)
-
   # Use an exponential moving average to update the codebook.
   updated_ema_count = moving_averages.assign_moving_average(
       vector_quantizer.ema_count, tf.reduce_sum(
@@ -297,11 +272,7 @@ def make_vq_vae(images,
   with tf.control_dependencies([commitment_loss]):
     update_means = tf.assign(vector_quantizer.codebook, updated_ema_means)
     with tf.control_dependencies([update_means]):
-      loss = beta * commitment_loss
-  loss += reconstruction_loss
-
-  tf.summary.scalar("loss", loss)
-  return loss, decoder_distribution
+      return tf.identity(commitment_loss)
 
 
 def save_imgs(x, fname):
@@ -473,15 +444,40 @@ def main(argv):
                            IMAGE_SHAPE)
     vector_quantizer = VectorQuantizer(FLAGS.num_codes, FLAGS.code_size)
 
-    # Build the model and loss function.
-    loss, decoder_distribution = make_vq_vae(
-        images, encoder, decoder, vector_quantizer, FLAGS.beta, FLAGS.decay)
+    codes = encoder(images)
+    nearest_codebook_entries, one_hot_assignments = vector_quantizer(codes)
+    codes_straight_through = codes + tf.stop_gradient(
+        nearest_codebook_entries - codes)
+    decoder_distribution = decoder(codes_straight_through)
     reconstructed_images = decoder_distribution.mean()
 
+    reconstruction_loss = -tf.reduce_mean(decoder_distribution.log_prob(images))
+    commitment_loss = tf.reduce_mean(
+        tf.square(codes - tf.stop_gradient(nearest_codebook_entries)))
+    commitment_loss = add_ema_control_dependencies(
+        vector_quantizer,
+        one_hot_assignments,
+        codes,
+        commitment_loss,
+        FLAGS.decay)
+    prior_dist = tfd.Multinomial(
+        total_count=1.0, logits=tf.zeros([FLAGS.latent_size, FLAGS.num_codes]))
+    prior_loss = -tf.reduce_mean(tf.reduce_sum(
+        prior_dist.log_prob(one_hot_assignments), 1))
+
+    loss = reconstruction_loss + FLAGS.beta * commitment_loss + prior_loss
+    # Upper bound marginal negative log-likelihood as prior loss +
+    # reconstruction loss.
+    marginal_nll = prior_loss + reconstruction_loss
+
+    tf.summary.scalar("losses/total_loss", loss)
+    tf.summary.scalar("losses/reconstruction_loss", reconstruction_loss)
+    tf.summary.scalar("losses/prior_loss", prior_loss)
+    tf.summary.scalar("losses/commitment_loss", FLAGS.beta * commitment_loss)
+
     # Decode samples from a uniform prior for visualization.
-    prior = tfd.Multinomial(total_count=1., logits=tf.zeros(FLAGS.num_codes))
     prior_samples = tf.reduce_sum(
-        tf.expand_dims(prior.sample([10, FLAGS.latent_size]), -1) *
+        tf.expand_dims(prior_dist.sample(10), -1) *
         tf.reshape(vector_quantizer.codebook,
                    [1, 1, FLAGS.num_codes, FLAGS.code_size]),
         axis=2)
@@ -508,8 +504,11 @@ def main(argv):
                                  feed_dict={handle: train_handle})
         duration = time.time() - start_time
         if step % 100 == 0:
-          print("Step: {:>3d} Loss: {:.3f} ({:.3f} sec)".format(
-              step, loss_value, duration))
+          marginal_nll_val = sess.run(marginal_nll,
+                                      feed_dict={handle: heldout_handle})
+          print("Step: {:>3d} Training Loss: {:.3f} Heldout NLL: {:.3f} "
+                "({:.3f} sec)".format(step, loss_value, marginal_nll_val,
+                                      duration))
 
           # Update the events file.
           summary_str = sess.run(summary, feed_dict={handle: train_handle})
