@@ -155,10 +155,11 @@ class SinhArcsinhBijectorTest(tf.test.TestCase):
         self.assertAllClose(
             x, self.evaluate(bijector.inverse(y)), rtol=1e-4, atol=0.)
 
-        # On IBM PPC systems, longdouble (np.float128) is same as double except that it can have more precision.
-        # Type double being of 8 bytes, can't hold square of max of float64 (which is also 8 bytes) and
-        # below test fails due to overflow error giving inf. So this check avoids that error by skipping square
-        # calculation and corresponding assert.
+        # On IBM PPC systems, longdouble (np.float128) is same as double except
+        # that it can have more precision. Type double being of 8 bytes, can't
+        # hold square of max of float64 (which is also 8 bytes).
+        # Below test fails due to overflow error giving inf. This check avoids
+        # that error by skipping square calculation and corresponding assert.
 
         if np.amax(y) <= np.sqrt(np.finfo(np.float128).max) and \
            np.fabs(np.amin(y)) <= np.sqrt(np.fabs(np.finfo(np.float128).min)):
@@ -170,7 +171,8 @@ class SinhArcsinhBijectorTest(tf.test.TestCase):
                   np.arcsinh(y_float128) / tailweight - skewness) / np.sqrt(
                       y_float128**2 + 1)) -
               np.log(tailweight),
-              self.evaluate(bijector.inverse_log_det_jacobian(y, event_ndims=0)),
+              self.evaluate(
+                  bijector.inverse_log_det_jacobian(y, event_ndims=0)),
               rtol=1e-4,
               atol=0.)
         self.assertAllClose(
