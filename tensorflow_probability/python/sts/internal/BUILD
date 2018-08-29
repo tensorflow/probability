@@ -12,9 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Description:
-#   Framework for Bayesian structural time series models
-
 licenses(["notice"])  # Apache 2.0
 
 package(
@@ -26,52 +23,30 @@ package(
 exports_files(["LICENSE"])
 
 py_library(
-    name = "sts",
+    name = "internal",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
     deps = [
-        ":local_linear_trend",
-        ":structural_time_series",
+        ":util",
     ],
 )
 
 py_library(
-    name = "local_linear_trend",
-    srcs = ["local_linear_trend.py"],
+    name = "util",
+    srcs = [
+        "util.py",
+    ],
     srcs_version = "PY2AND3",
     deps = [
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/sts/internal",
     ],
 )
 
 py_test(
-    name = "local_linear_trend_test",
+    name = "util_test",
     size = "medium",
-    srcs = ["local_linear_trend_test.py"],
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-    ],
-)
-
-py_library(
-    name = "structural_time_series",
-    srcs = ["structural_time_series.py"],
-    srcs_version = "PY2AND3",
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability/python/sts/internal",
-    ],
-)
-
-py_test(
-    name = "structural_time_series_test",
-    size = "medium",
-    srcs = ["structural_time_series_test.py"],
+    srcs = ["util_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
