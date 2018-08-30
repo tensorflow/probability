@@ -258,11 +258,12 @@ py_binary(
 
 py_test(
     name = "vq_vae_test",
-    size = "small",
+    size = "medium",
     srcs = ["vq_vae.py"],
     args = [
         "--mnist_type='fake_data'",
-        "--max_steps=5",
+        "--max_steps=2",
+        "--base_depth=2",
     ],
     main = "vq_vae.py",
     srcs_version = "PY2AND3",
