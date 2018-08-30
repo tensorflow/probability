@@ -468,6 +468,21 @@ class DenseVariational(tf.test.TestCase):
 
       self.assertLess(np.sum(np.isclose(outputs_one_, outputs_two_)), out_size)
 
+  def testDenseLayersInSequential(self):
+    batch_size, in_size, out_size = 2, 3, 4
+    inputs = tf.random_uniform([batch_size, in_size])
+    net = tf.keras.Sequential([
+        tfp.layers.DenseReparameterization(6, activation=tf.nn.relu),
+        tfp.layers.DenseFlipout(6, activation=tf.nn.relu),
+        tfp.layers.DenseLocalReparameterization(out_size)
+    ])
+    outputs = net(inputs)
+
+    with self.test_session() as sess:
+      sess.run(tf.global_variables_initializer())
+      outputs_ = sess.run(outputs)
+
+    self.assertAllEqual(outputs_.shape, [batch_size, out_size])
 
 if __name__ == '__main__':
   tf.test.main()

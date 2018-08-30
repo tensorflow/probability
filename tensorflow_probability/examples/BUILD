@@ -39,23 +39,20 @@ py_binary(
     ],
 )
 
-# Temporarily disable BNN test, which was breaking the build
-# due to upstream Keras changes affecting tfp.layers.
-# TODO (b/112436745): re-enable this test once the issue is fixed.
-# py_test(
-#     name = "bayesian_neural_network_test",
-#     size = "small",
-#     srcs = ["bayesian_neural_network.py"],
-#     args = [
-#         "--fake_data",
-#         "--max_steps=5",
-#     ],
-#     main = "bayesian_neural_network.py",
-#     srcs_version = "PY2AND3",
-#     deps = [
-#         ":bayesian_neural_network",
-#     ],
-# )
+py_test(
+    name = "bayesian_neural_network_test",
+    size = "small",
+    srcs = ["bayesian_neural_network.py"],
+    args = [
+        "--fake_data",
+        "--max_steps=5",
+    ],
+    main = "bayesian_neural_network.py",
+    srcs_version = "PY2AND3",
+    deps = [
+        ":bayesian_neural_network",
+    ],
+)
 
 py_binary(
     name = "grammar_vae",

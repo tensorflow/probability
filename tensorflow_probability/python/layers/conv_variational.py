@@ -178,7 +178,9 @@ class _ConvVariational(tf.keras.layers.Layer):
                        'should be defined. Found `None`.')
     input_dim = input_shape[channel_axis].value
     kernel_shape = self.kernel_size + (input_dim, self.filters)
-    dtype = tf.as_dtype(self.dtype)
+
+    # If self.dtype is None, build weights using the default dtype.
+    dtype = tf.as_dtype(self.dtype or tf.keras.backend.floatx())
 
     # Must have a posterior kernel.
     self.kernel_posterior = self.kernel_posterior_fn(

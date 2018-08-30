@@ -133,7 +133,9 @@ class _DenseVariational(tf.keras.layers.Layer):
       raise ValueError('The last dimension of the inputs to `Dense` '
                        'should be defined. Found `None`.')
     self._input_spec = tf.layers.InputSpec(min_ndim=2, axes={-1: in_size})
-    dtype = tf.as_dtype(self.dtype)
+
+    # If self.dtype is None, build weights using the default dtype.
+    dtype = tf.as_dtype(self.dtype or tf.keras.backend.floatx())
 
     # Must have a posterior kernel.
     self.kernel_posterior = self.kernel_posterior_fn(

@@ -489,6 +489,27 @@ class ConvVariational(tf.test.TestCase):
       self.assertLess(np.sum(np.isclose(outputs_one_, outputs_two_)),
                       np.prod(outputs_one_.shape))
 
+  def _testLayerInSequential(self, layer_class):
+    with self.test_session() as sess:
+      if layer_class in (tfp.layers.Convolution1DReparameterization,
+                         tfp.layers.Convolution1DFlipout):
+        inputs = tf.random_uniform([2, 3, 1])
+      elif layer_class in (tfp.layers.Convolution2DReparameterization,
+                           tfp.layers.Convolution2DFlipout):
+        inputs = tf.random_uniform([2, 3, 3, 1])
+      elif layer_class in (tfp.layers.Convolution3DReparameterization,
+                           tfp.layers.Convolution3DFlipout):
+        inputs = tf.random_uniform([2, 3, 3, 3, 1])
+
+      net = tf.keras.Sequential([
+          layer_class(filters=2, kernel_size=3),
+          layer_class(filters=2, kernel_size=1)])
+      output = net(inputs)
+
+      # Verify that the network runs without errors
+      sess.run(tf.global_variables_initializer())
+      sess.run(output)
+
   def testKerasLayerConvolution1DReparameterization(self):
     self._testKerasLayer(tfp.layers.Convolution1DReparameterization)
 
@@ -563,6 +584,24 @@ class ConvVariational(tf.test.TestCase):
 
   def testRandomConvolution1DFlipout(self):
     self._testRandomConvFlipout(tfp.layers.Convolution1DFlipout)
+
+  def testSequentialConvolution1DReparameterization(self):
+    self._testLayerInSequential(tfp.layers.Convolution1DReparameterization)
+
+  def testSequentialConvolution2DReparameterization(self):
+    self._testLayerInSequential(tfp.layers.Convolution2DReparameterization)
+
+  def testSequentialConvolution3DReparameterization(self):
+    self._testLayerInSequential(tfp.layers.Convolution3DReparameterization)
+
+  def testSequentialConvolution1DFlipout(self):
+    self._testLayerInSequential(tfp.layers.Convolution1DFlipout)
+
+  def testSequentialConvolution2DFlipout(self):
+    self._testLayerInSequential(tfp.layers.Convolution2DFlipout)
+
+  def testSequentialConvolution3DFlipout(self):
+    self._testLayerInSequential(tfp.layers.Convolution3DFlipout)
 
 
 if __name__ == '__main__':
