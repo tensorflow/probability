@@ -570,6 +570,15 @@ class LinearGaussianStateSpaceModel(tf.distributions.Distribution):
   def forward_filter(self, x):
     """Run a Kalman filter over a provided sequence of outputs.
 
+    Note that the returned values `filtered_means`, `predicted_means`, and
+    `observation_means` depend on the observed time series `x`, while the
+    corresponding covariances are independent of the observed series; i.e., they
+    depend only on the model itself. This means that the mean values have shape
+    `concat([sample_shape(x), batch_shape, [num_timesteps,
+    {latent/observation}_size]])`, while the covariances have shape
+    `concat[(batch_shape, [num_timesteps, {latent/observation}_size,
+    {latent/observation}_size]])`, which does not depend on the sample shape.
+
     Args:
       x: a float-type `Tensor` with rightmost dimensions
         `[num_timesteps, observation_size]` matching
@@ -583,21 +592,22 @@ class LinearGaussianStateSpaceModel(tf.distributions.Distribution):
         of shape `sample_shape(x) + batch_shape + [num_timesteps].`
       filtered_means: Means of the per-timestep filtered marginal
          distributions p(z_t | x_{:t}), as a Tensor of shape
-        `batch_shape + [num_timesteps, latent_size]`.
+        `sample_shape(x) + batch_shape + [num_timesteps, latent_size]`.
       filtered_covs: Covariances of the per-timestep filtered marginal
          distributions p(z_t | x_{:t}), as a Tensor of shape
         `batch_shape + [num_timesteps, latent_size, latent_size]`.
       predicted_means: Means of the per-timestep predictive
          distributions over latent states, p(z_{t+1} | x_{:t}), as a
-         Tensor of shape `batch_shape + [num_timesteps, latent_size]`.
+         Tensor of shape `sample_shape(x) + batch_shape +
+         [num_timesteps, latent_size]`.
       predicted_covs: Covariances of the per-timestep predictive
          distributions over latent states, p(z_{t+1} | x_{:t}), as a
          Tensor of shape `batch_shape + [num_timesteps, latent_size,
          latent_size]`.
       observation_means: Means of the per-timestep predictive
          distributions over observations, p(x_{t} | x_{:t-1}), as a
-         Tensor of shape `batch_shape + [num_timesteps,
-         observation_size]`.
+         Tensor of shape `sample_shape(x) + batch_shape +
+         [num_timesteps, observation_size]`.
       observation_covs: Covariances of the per-timestep predictive
          distributions over observations, p(x_{t} | x_{:t-1}), as a
          Tensor of shape `batch_shape + [num_timesteps,
