@@ -88,6 +88,53 @@ class UtilTest(tf.test.TestCase):
             util.sum_rightmost_ndims_preserving_shape(x, ndims=2)).shape,
         [5, 4])
 
+  def testSqrtWithFiniteGradsHasCorrectValues(self):
+    self.assertTrue(np.isnan(self.evaluate(util.sqrt_with_finite_grads(-1.))))
+    xs = np.linspace(0., 10., 100)
+    self.assertAllEqual(
+        self.evaluate(tf.sqrt(xs)),
+        self.evaluate(util.sqrt_with_finite_grads(xs)))
+
+  def testSqrtWithFiniteGradsHasCorrectGradients(self):
+    self.assertTrue(np.isnan(self.evaluate(util.sqrt_with_finite_grads(-1.))))
+    xs = tf.constant(np.linspace(1e-10, 10., 100))
+    tf_sqrt = tf.sqrt(xs)
+    safe_sqrt = util.sqrt_with_finite_grads(xs)
+
+    self.assertAllEqual(
+        self.evaluate(tf.gradients(tf_sqrt, xs)[0]),
+        self.evaluate(tf.gradients(safe_sqrt, xs)[0]))
+
+    zero = tf.constant(0.)
+    tf_sqrt = tf.sqrt(zero)
+    safe_sqrt = util.sqrt_with_finite_grads(zero)
+    self.assertNotEqual(
+        self.evaluate(tf.gradients(tf_sqrt, zero)[0]),
+        self.evaluate(tf.gradients(safe_sqrt, zero)[0]))
+
+  def testSqrtWithFiniteGradsBackpropsCorrectly(self):
+    # Part of implementing a tf.custom_gradient is correctly handling the
+    # `grad_ys` value that is propagating back from downstream ops. This test
+    # checks that we got this right, in a particular case where our sqrt
+    # function is squashed between a couple of other functions.
+    def f(x):
+      return x ** 2
+
+    def g(x):
+      return util.sqrt_with_finite_grads(x)
+
+    def h(x):
+      return tf.sin(x) ** 2
+
+    # We only test away from zero, since we know the values don't match there.
+    xs = tf.constant(np.linspace(1e-10, 10., 100))
+    tf_sqrt = f(tf.sqrt(h(xs)))
+    safe_sqrt = f(g(h(xs)))
+
+    self.assertAllClose(
+        self.evaluate(tf.gradients(tf_sqrt, xs)[0]),
+        self.evaluate(tf.gradients(safe_sqrt, xs)[0]),
+        rtol=1e-10)
 
 if __name__ == '__main__':
   tf.test.main()

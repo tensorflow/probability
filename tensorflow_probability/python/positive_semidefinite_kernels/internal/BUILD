@@ -38,6 +38,7 @@ py_library(
     name = "util",
     srcs = ["util.py"],
     deps = [
+        # numpy dep,
         # tensorflow dep,
     ],
 )
