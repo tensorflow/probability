@@ -22,7 +22,7 @@ import collections
 
 import tensorflow as tf
 
-from tensorflow_probability.python.distributions.seed_stream import SeedStream
+from tensorflow_probability.python import distributions
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import util as mcmc_util
 
@@ -78,7 +78,7 @@ def default_exchange_proposed_fn(prob_exchange):
 
   def default_exchange_proposed_fn_(num_replica, seed=None):
     """Default function for `exchange_proposed_fn` of `kernel`."""
-    seed_stream = SeedStream(seed, 'default_exchange_proposed_fn')
+    seed_stream = distributions.SeedStream(seed, 'default_exchange_proposed_fn')
 
     zero_start = tf.random_uniform([], seed=seed_stream()) > 0.5
     if num_replica % 2 == 0:
@@ -264,7 +264,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
     inverse_temperatures.shape.assert_is_fully_defined()
     inverse_temperatures.shape.assert_has_rank(1)
 
-    self._seed_stream = SeedStream(seed, salt=name)
+    self._seed_stream = distributions.SeedStream(seed, salt=name)
     self._seeded_mcmc = seed is not None
     self._parameters = dict(
         target_log_prob_fn=target_log_prob_fn,
@@ -484,18 +484,6 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
 
         is_exchange_accepted = log_uniforms[i] < log_accept_ratio
 
-        is_exchange_accepted = tf.Print(
-            is_exchange_accepted, [
-                'is_exchange_accepted: ',
-                is_exchange_accepted,
-                'temp_diff: ',
-                temp_diff,
-                'log_accept_ratio: ',
-                log_accept_ratio,
-            ],
-            summarize=2,
-            first_n=0)
-
         for k in range(num_state_parts):
           new_m, new_n = _swap(is_exchange_accepted, old_states[k].read(m),
                                old_states[k].read(n))
@@ -530,7 +518,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
 
     Args:
       init_state: `Tensor` or Python `list` of `Tensor`s representing the
-        a state(s) of the Markov chain(s).
+        initial state(s) of the Markov chain(s).
 
     Returns:
       kernel_results: A (possibly nested) `tuple`, `namedtuple` or `list` of

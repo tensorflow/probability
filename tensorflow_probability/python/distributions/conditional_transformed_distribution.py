@@ -18,7 +18,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from tensorflow_probability.python.distributions.conditional_distribution import ConditionalDistribution
+from tensorflow_probability.python.distributions import conditional_distribution
 from tensorflow.python.ops.distributions import transformed_distribution
 from tensorflow.python.ops.distributions import util as distribution_util
 
@@ -42,7 +42,8 @@ _condition_kwargs_dict = {
 
 
 class ConditionalTransformedDistribution(
-    ConditionalDistribution, transformed_distribution.TransformedDistribution):
+    conditional_distribution.ConditionalDistribution,
+    transformed_distribution.TransformedDistribution):
   """A TransformedDistribution that allows intrinsic conditioning."""
 
   @distribution_util.AppendDocstring(kwargs_dict=_condition_kwargs_dict)

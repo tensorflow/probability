@@ -22,9 +22,8 @@ from __future__ import print_function
 import numpy as np
 
 import tensorflow as tf
+from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import monte_carlo
-
-tfd = tf.contrib.distributions
 
 __all__ = [
     "amari_alpha",

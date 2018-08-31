@@ -1,8 +1,6 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.bijectors.Affine" />
+<meta itemprop="property" content="adjoint"/>
 <meta itemprop="property" content="dtype"/>
 <meta itemprop="property" content="forward_min_event_ndims"/>
 <meta itemprop="property" content="graph_parents"/>
@@ -84,6 +82,10 @@ b = Affine(shift=[1., 2, 3],
 
 ## Properties
 
+<h3 id="adjoint"><code>adjoint</code></h3>
+
+`bool` indicating `scale` should be used as conjugate transpose.
+
 <h3 id="dtype"><code>dtype</code></h3>
 
 dtype of `Tensor`s transformable by this distribution.
@@ -141,6 +143,7 @@ __init__(
     scale_tril=None,
     scale_perturb_factor=None,
     scale_perturb_diag=None,
+    adjoint=False,
     validate_args=False,
     name='affine'
 )
@@ -197,6 +200,9 @@ specified then `scale += IdentityMatrix`. Otherwise specifying a
     matrix. `scale_perturb_diag` has shape [N1, N2, ...  r], which
     represents an `r x r` diagonal matrix. When `None` low rank updates will
     take the form `scale_perturb_factor * scale_perturb_factor.T`.
+* <b>`adjoint`</b>: Python `bool` indicating whether to use the `scale` matrix as
+    specified or its adjoint.
+    Default value: `False`.
 * <b>`validate_args`</b>: Python `bool` indicating whether arguments should be
     checked for correctness.
 * <b>`name`</b>: Python `str` name given to ops managed by this object.

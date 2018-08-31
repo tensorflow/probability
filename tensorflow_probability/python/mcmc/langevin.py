@@ -23,6 +23,7 @@ import collections
 
 import tensorflow as tf
 
+from tensorflow_probability.python import distributions
 from tensorflow_probability.python.math import diag_jacobian
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import metropolis_hastings
@@ -172,7 +173,7 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
   import tensorflow_probability as tfp
   import numpy as np
 
-  tfd = tf.contrib.distributions
+  tfd = tfp.distributions
 
   dtype = np.float32
   true_mean = dtype([0, 0, 0])
@@ -419,7 +420,7 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
         `current_state`.
       TypeError: if `volatility_fn` is not callable.
     """
-    self._seed_stream = tf.contrib.distributions.SeedStream(
+    self._seed_stream = distributions.SeedStream(
         seed, salt='UncalibratedLangevin')
     # Default value of `volatility_fn` is the identity function.
     if volatility_fn is None:

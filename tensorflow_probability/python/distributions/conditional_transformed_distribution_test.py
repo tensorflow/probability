@@ -23,13 +23,12 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.bijectors.conditional_bijector import ConditionalBijector
 from tensorflow_probability.python.distributions import transformed_distribution_test
 
 tfd = tfp.distributions
 
 
-class _ChooseLocation(ConditionalBijector):
+class _ChooseLocation(tfp.bijectors.ConditionalBijector):
   """A Bijector which chooses between one of two location parameters."""
 
   def __init__(self, loc, name="ChooseLocation"):
@@ -66,14 +65,14 @@ class ConditionalTransformedDistributionTest(
     return tfd.ConditionalTransformedDistribution
 
   def testConditioning(self):
-    with self.test_session():
-      conditional_normal = tfd.ConditionalTransformedDistribution(
-          distribution=tfd.Normal(loc=0., scale=1.),
-          bijector=_ChooseLocation(loc=[-100., 100.]))
-      z = [-1, +1, -1, -1, +1]
-      self.assertAllClose(
-          np.sign(conditional_normal.sample(
-              5, bijector_kwargs={"z": z}).eval()), z)
+    conditional_normal = tfd.ConditionalTransformedDistribution(
+        distribution=tfd.Normal(loc=0., scale=1.),
+        bijector=_ChooseLocation(loc=[-100., 100.]))
+    z = [-1, +1, -1, -1, +1]
+    self.assertAllClose(
+        np.sign(
+            self.evaluate(
+                conditional_normal.sample(5, bijector_kwargs={"z": z}))), z)
 
 
 class ConditionalScalarToMultiTest(

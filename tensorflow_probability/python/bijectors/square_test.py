@@ -39,14 +39,15 @@ class SquareBijectorTest(tf.test.TestCase):
             [np.sqrt(8.), 1]]]
       y = np.square(x)
       ildj = -np.log(2.) - np.log(x)
-      self.assertAllClose(y, bijector.forward(x).eval())
-      self.assertAllClose(x, bijector.inverse(y).eval())
+      self.assertAllClose(y, self.evaluate(bijector.forward(x)))
+      self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
       self.assertAllClose(
-          ildj, bijector.inverse_log_det_jacobian(
-              y, event_ndims=0).eval(), atol=0., rtol=1e-7)
+          ildj,
+          self.evaluate(bijector.inverse_log_det_jacobian(
+              y, event_ndims=0)), atol=0., rtol=1e-7)
       self.assertAllClose(
-          -bijector.inverse_log_det_jacobian(y, event_ndims=0).eval(),
-          bijector.forward_log_det_jacobian(x, event_ndims=0).eval(),
+          self.evaluate(-bijector.inverse_log_det_jacobian(y, event_ndims=0)),
+          self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=0)),
           atol=0.,
           rtol=1e-7)
 

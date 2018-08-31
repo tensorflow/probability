@@ -19,10 +19,8 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from tensorflow_probability.python.bijectors.sigmoid import Sigmoid
-# Bijectors must be directly imported because `remove_undocumented` prevents
-# individual file imports.
-from tensorflow_probability.python.distributions.logistic import Logistic
+from tensorflow_probability.python import bijectors
+from tensorflow_probability.python.distributions import logistic
 from tensorflow.python.ops.distributions import transformed_distribution
 from tensorflow.python.ops.distributions import util as distribution_util
 
@@ -170,13 +168,13 @@ class RelaxedBernoulli(transformed_distribution.TransformedDistribution):
       self._logits, self._probs = distribution_util.get_logits_and_probs(
           logits=logits, probs=probs, validate_args=validate_args)
       super(RelaxedBernoulli, self).__init__(
-          distribution=Logistic(
+          distribution=logistic.Logistic(
               self._logits / self._temperature,
               1. / self._temperature,
               validate_args=validate_args,
               allow_nan_stats=allow_nan_stats,
               name=name + "/Logistic"),
-          bijector=Sigmoid(validate_args=validate_args),
+          bijector=bijectors.Sigmoid(validate_args=validate_args),
           validate_args=validate_args,
           name=name)
     self._parameters = parameters

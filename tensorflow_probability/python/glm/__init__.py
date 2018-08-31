@@ -33,12 +33,18 @@ from tensorflow_probability.python.glm.family import PoissonSoftplus
 from tensorflow_probability.python.glm.fisher_scoring import convergence_criteria_small_relative_norm_weights_change
 from tensorflow_probability.python.glm.fisher_scoring import fit
 from tensorflow_probability.python.glm.fisher_scoring import fit_one_step
+from tensorflow_probability.python.glm.proximal_hessian import fit_sparse
+from tensorflow_probability.python.glm.proximal_hessian import fit_sparse_one_step
+from tensorflow_probability.python.glm.proximal_hessian import soft_threshold
 
 from tensorflow.python.util.all_util import remove_undocumented
 
 _allowed_symbols = [
     'fit',
     'fit_one_step',
+    'fit_sparse',
+    'fit_sparse_one_step',
+    'soft_threshold',
     'convergence_criteria_small_relative_norm_weights_change',
     'Bernoulli',
     'BernoulliNormalCDF',

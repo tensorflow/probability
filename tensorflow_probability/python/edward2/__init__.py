@@ -12,7 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Edward2 probabilistic programming language."""
+
+"""Edward2 probabilistic programming language.
+
+For user guides, see:
+
++ [Overview](
+   https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/edward2/README.md)
++ [Upgrading from Edward to Edward2](
+   https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/edward2/Upgrading_From_Edward_To_Edward2.md)
+
+"""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -22,8 +32,10 @@ from __future__ import print_function
 from tensorflow_probability.python.edward2.generated_random_variables import *
 from tensorflow_probability.python.edward2.generated_random_variables import as_random_variable
 from tensorflow_probability.python.edward2.generated_random_variables import rv_all
-from tensorflow_probability.python.edward2.interceptor import get_interceptor
+from tensorflow_probability.python.edward2.interceptor import get_next_interceptor
+from tensorflow_probability.python.edward2.interceptor import interceptable
 from tensorflow_probability.python.edward2.interceptor import interception
+from tensorflow_probability.python.edward2.interceptor import tape
 from tensorflow_probability.python.edward2.program_transformations import make_log_joint_fn
 from tensorflow_probability.python.edward2.random_variable import RandomVariable
 # pylint: enable=wildcard-import
@@ -33,9 +45,11 @@ from tensorflow.python.util.all_util import remove_undocumented
 _allowed_symbols = rv_all + [
     "RandomVariable",
     "as_random_variable",
-    "get_interceptor",
     "interception",
+    "get_next_interceptor",
+    "interceptable",
     "make_log_joint_fn",
+    "tape",
 ]
 
 remove_undocumented(__name__, _allowed_symbols)

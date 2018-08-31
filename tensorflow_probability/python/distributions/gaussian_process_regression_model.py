@@ -290,7 +290,7 @@ class GaussianProcessRegressionModel(
   # of index points.
   gprm = tfd.GaussianProcessRegressionModel(
       # Batch of `num_results` kernels parameterized by the MCMC samples.
-      kernel=psd_kernels.ExponentiatedQuadratic(amplitudes, length_scales)
+      kernel=psd_kernels.ExponentiatedQuadratic(amplitudes, length_scales),
       index_points=np.linspace(-2., 2., 200)[..., np.newaxis],
       observation_index_points=observation_index_points,
       observations=observations,

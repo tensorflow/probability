@@ -28,12 +28,6 @@ from tensorflow.python.framework import tensor_util
 _empty_shape = np.array([], dtype=np.int32)
 
 
-def _eval(x):
-  if hasattr(x, "__iter__"):
-    return [x.eval() for x in x]
-  return x.eval()
-
-
 def _constant(x):
   if hasattr(x, "__iter__"):
     return [tensor_util.constant_value(x) for x in x]
@@ -546,29 +540,29 @@ class DistributionShapeTest(tf.test.TestCase):
     with self.test_session():
       shaper = _DistributionShape(batch_ndims=0, event_ndims=0)
       x = 1
-      self.assertEqual(0, shaper.get_sample_ndims(x).eval())
-      self.assertEqual(0, shaper.batch_ndims.eval())
-      self.assertEqual(0, shaper.event_ndims.eval())
+      self.assertEqual(0, self.evaluate(shaper.get_sample_ndims(x)))
+      self.assertEqual(0, self.evaluate(shaper.batch_ndims))
+      self.assertEqual(0, self.evaluate(shaper.event_ndims))
 
       shaper = _DistributionShape(batch_ndims=1, event_ndims=1)
       x = self._random_sample((1, 2, 3))
-      self.assertAllEqual(3, shaper.get_ndims(x).eval())
-      self.assertEqual(1, shaper.get_sample_ndims(x).eval())
-      self.assertEqual(1, shaper.batch_ndims.eval())
-      self.assertEqual(1, shaper.event_ndims.eval())
+      self.assertAllEqual(3, self.evaluate(shaper.get_ndims(x)))
+      self.assertEqual(1, self.evaluate(shaper.get_sample_ndims(x)))
+      self.assertEqual(1, self.evaluate(shaper.batch_ndims))
+      self.assertEqual(1, self.evaluate(shaper.event_ndims))
 
       x += self._random_sample((1, 2, 3))
-      self.assertAllEqual(3, shaper.get_ndims(x).eval())
-      self.assertEqual(1, shaper.get_sample_ndims(x).eval())
-      self.assertEqual(1, shaper.batch_ndims.eval())
-      self.assertEqual(1, shaper.event_ndims.eval())
+      self.assertAllEqual(3, self.evaluate(shaper.get_ndims(x)))
+      self.assertEqual(1, self.evaluate(shaper.get_sample_ndims(x)))
+      self.assertEqual(1, self.evaluate(shaper.batch_ndims))
+      self.assertEqual(1, self.evaluate(shaper.event_ndims))
 
       # Test ndims functions work, even despite unfed Tensors.
       y = tf.placeholder(tf.float32, shape=(1024, None, 1024))
-      self.assertEqual(3, shaper.get_ndims(y).eval())
-      self.assertEqual(1, shaper.get_sample_ndims(y).eval())
-      self.assertEqual(1, shaper.batch_ndims.eval())
-      self.assertEqual(1, shaper.event_ndims.eval())
+      self.assertEqual(3, self.evaluate(shaper.get_ndims(y)))
+      self.assertEqual(1, self.evaluate(shaper.get_sample_ndims(y)))
+      self.assertEqual(1, self.evaluate(shaper.batch_ndims))
+      self.assertEqual(1, self.evaluate(shaper.event_ndims))
 
   def testDistributionShapeGetNdimsDynamic(self):
     with self.test_session() as sess:
@@ -600,7 +594,8 @@ class DistributionShapeTest(tf.test.TestCase):
       # Works for static {batch,event}_ndims despite unfed input.
       shaper = _DistributionShape(batch_ndims=1, event_ndims=2)
       y = tf.placeholder(tf.float32, shape=(10, None, 5, 5))
-      self._assertNdArrayEqual([[0], [1], [2, 3]], _eval(shaper.get_dims(y)))
+      self._assertNdArrayEqual(
+          [[0], [1], [2, 3]], self.evaluate(shaper.get_dims(y)))
 
       # Works for deferred {batch,event}_ndims.
       batch_ndims = tf.placeholder(tf.int32)

@@ -23,6 +23,7 @@ import math
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow.contrib.framework.python.framework import tensor_util as contrib_tensor_util
 from tensorflow.python.framework import tensor_util
@@ -212,10 +213,11 @@ class _WishartLinearOperator(tf.distributions.Distribution):
 
     ndims = batch_ndims + 3  # sample_ndims=1, event_ndims=2
     shape = tf.concat([[n], batch_shape, event_shape], 0)
+    stream = seed_stream.SeedStream(seed, salt="Wishart")
 
     # Complexity: O(nbk**2)
     x = tf.random_normal(
-        shape=shape, mean=0., stddev=1., dtype=self.dtype, seed=seed)
+        shape=shape, mean=0., stddev=1., dtype=self.dtype, seed=stream())
 
     # Complexity: O(nbk)
     # This parametrization is equivalent to Chi2, i.e.,
@@ -223,12 +225,13 @@ class _WishartLinearOperator(tf.distributions.Distribution):
     expanded_df = self.df * tf.ones(
         self.scale_operator.batch_shape_tensor(),
         dtype=self.df.dtype.base_dtype)
+
     g = tf.random_gamma(
         shape=[n],
         alpha=self._multi_gamma_sequence(0.5 * expanded_df, self.dimension),
         beta=0.5,
         dtype=self.dtype,
-        seed=distribution_util.gen_new_seed(seed, "wishart"))
+        seed=stream())
 
     # Complexity: O(nbk**2)
     x = tf.matrix_band_part(x, -1, 0)  # Tri-lower.
@@ -355,18 +358,23 @@ class _WishartLinearOperator(tf.distributions.Distribution):
             (half_dp1 - half_df) * self._multi_digamma(half_df, self.dimension))
 
   def _mean(self):
+    # Because df is a scalar, we need to expand dimensions to match
+    # scale_operator. We use ellipses notation (...) to select all dimensions
+    # and add two dimensions to the end.
+    df = self.df[..., tf.newaxis, tf.newaxis]
     if self.input_output_cholesky:
-      return tf.sqrt(self.df) * self.scale_operator.to_dense()
-    return self.df * self._square_scale_operator()
+      return tf.sqrt(df) * self.scale_operator.to_dense()
+    return df * self._square_scale_operator()
 
   def _variance(self):
-    x = tf.sqrt(self.df) * self._square_scale_operator()
+    # Because df is a scalar, we need to expand dimensions to match
+    # scale_operator. We use ellipses notation (...) to select all dimensions
+    # and add two dimensions to the end.
+    df = self.df[..., tf.newaxis, tf.newaxis]
+    x = tf.sqrt(df) * self._square_scale_operator()
     d = tf.expand_dims(tf.matrix_diag_part(x), -1)
     v = tf.square(x) + tf.matmul(d, d, adjoint_b=True)
     return v
-
-  def _stddev(self):
-    return tf.sqrt(self.variance())
 
   def _mode(self):
     s = self.df - self.dimension - 1.
@@ -466,7 +474,7 @@ class Wishart(_WishartLinearOperator):
   dist.prob(x)  # Shape is [2, 2].
 
   # (*) - To efficiently create a trainable covariance matrix, see the example
-  #   in tf.contrib.distributions.matrix_diag_transform.
+  #   in tfp.distributions.matrix_diag_transform.
   ```
   """
 

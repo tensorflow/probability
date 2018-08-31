@@ -105,10 +105,10 @@ class MakeTrilScaleTest(tf.test.TestCase):
           # Not enough shape information was specified.
           with self.assertRaisesRegexp(ValueError, ("is specified.")):
             scale = distribution_util.make_tril_scale(**scale_args)
-            scale.to_dense().eval()
+            self.evaluate(scale.to_dense())
         else:
           scale = distribution_util.make_tril_scale(**scale_args)
-          self.assertAllClose(expected_scale, scale.to_dense().eval())
+          self.assertAllClose(expected_scale, self.evaluate(scale.to_dense()))
 
   def testLegalInputs(self):
     self._testLegalInputs(
@@ -139,14 +139,14 @@ class MakeTrilScaleTest(tf.test.TestCase):
   def testZeroTriU(self):
     with self.test_session():
       scale = distribution_util.make_tril_scale(scale_tril=[[1., 1], [1., 1.]])
-      self.assertAllClose([[1., 0], [1., 1.]], scale.to_dense().eval())
+      self.assertAllClose([[1., 0], [1., 1.]], self.evaluate(scale.to_dense()))
 
   def testValidateArgs(self):
     with self.test_session():
       with self.assertRaisesOpError("diagonal part must be non-zero"):
         scale = distribution_util.make_tril_scale(
             scale_tril=[[0., 1], [1., 1.]], validate_args=True)
-        scale.to_dense().eval()
+        self.evaluate(scale.to_dense())
 
   def testAssertPositive(self):
     with self.test_session():
@@ -155,7 +155,7 @@ class MakeTrilScaleTest(tf.test.TestCase):
             scale_tril=[[-1., 1], [1., 1.]],
             validate_args=True,
             assert_positive=True)
-        scale.to_dense().eval()
+        self.evaluate(scale.to_dense())
 
 
 class MakeDiagScaleTest(tf.test.TestCase):
@@ -174,10 +174,10 @@ class MakeDiagScaleTest(tf.test.TestCase):
           # Not enough shape information was specified.
           with self.assertRaisesRegexp(ValueError, ("is specified.")):
             scale = distribution_util.make_diag_scale(**scale_args)
-            scale.to_dense().eval()
+            self.evaluate(scale.to_dense())
         else:
           scale = distribution_util.make_diag_scale(**scale_args)
-          self.assertAllClose(expected_scale, scale.to_dense().eval())
+          self.assertAllClose(expected_scale, self.evaluate(scale.to_dense()))
 
   def testLegalInputs(self):
     self._testLegalInputs(
@@ -202,7 +202,7 @@ class MakeDiagScaleTest(tf.test.TestCase):
       with self.assertRaisesOpError("diagonal part must be non-zero"):
         scale = distribution_util.make_diag_scale(
             scale_diag=[[0., 1], [1., 1.]], validate_args=True)
-        scale.to_dense().eval()
+        self.evaluate(scale.to_dense())
 
   def testAssertPositive(self):
     with self.test_session():
@@ -211,7 +211,7 @@ class MakeDiagScaleTest(tf.test.TestCase):
             scale_diag=[[-1., 1], [1., 1.]],
             validate_args=True,
             assert_positive=True)
-        scale.to_dense().eval()
+        self.evaluate(scale.to_dense())
 
 
 class ShapesFromLocAndScaleTest(tf.test.TestCase):
@@ -317,10 +317,10 @@ class TridiagTest(tf.test.TestCase):
            [1., 5., 9., 0.],
            [0., 2., 6., 10.],
            [0., 0., 3, 7.]],
-          distribution_util.tridiag(
+          self.evaluate(distribution_util.tridiag(
               [1., 2., 3.],
               [4., 5., 6., 7.],
-              [8., 9., 10.]).eval())
+              [8., 9., 10.])))
 
   def testWorksCorrectlyBatches(self):
     with self.test_session():
@@ -333,13 +333,13 @@ class TridiagTest(tf.test.TestCase):
             [0.8, 0.6, 0.2, 0.0],
             [0.0, 0.9, 0.5, 0.3],
             [0.0, 0.0, 1.0, 0.4]]],
-          distribution_util.tridiag(
+          self.evaluate(distribution_util.tridiag(
               [[1., 2., 3.],
                [0.8, 0.9, 1.]],
               [[4., 5., 6., 7.],
                [0.7, 0.6, 0.5, 0.4]],
               [[8., 9., 10.],
-               [0.1, 0.2, 0.3]]).eval(),
+               [0.1, 0.2, 0.3]])),
           rtol=1e-5, atol=0.)
 
   def testHandlesNone(self):
@@ -353,9 +353,9 @@ class TridiagTest(tf.test.TestCase):
             [0.0, 0.6, 0.0, 0.0],
             [0.0, 0.0, 0.5, 0.0],
             [0.0, 0.0, 0.0, 0.4]]],
-          distribution_util.tridiag(
+          self.evaluate(distribution_util.tridiag(
               diag=[[4., 5., 6., 7.],
-                    [0.7, 0.6, 0.5, 0.4]]).eval(),
+                    [0.7, 0.6, 0.5, 0.4]])),
           rtol=1e-5, atol=0.)
 
 

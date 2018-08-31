@@ -48,6 +48,7 @@ py_library(
         ":inverse_gamma",
         ":kumaraswamy",
         ":linear_gaussian_ssm",
+        ":lkj",
         ":logistic",
         ":lognormal",
         ":mixture",
@@ -60,6 +61,7 @@ py_library(
         ":negative_binomial",
         ":normal_conjugate_posteriors",
         ":onehot_categorical",
+        ":pareto",
         ":poisson",
         ":poisson_lognormal",
         ":quantized_distribution",
@@ -76,6 +78,7 @@ py_library(
         ":vector_laplace_linear_operator",
         ":vector_sinh_arcsinh_diag",
         ":vector_student_t",
+        ":von_mises",
         ":von_mises_fisher",
         ":wishart",
         # numpy dep,
@@ -247,6 +250,15 @@ py_library(
 )
 
 py_library(
+    name = "lkj",
+    srcs = ["lkj.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_library(
     name = "logistic",
     srcs = ["logistic.py"],
     deps = [
@@ -361,6 +373,15 @@ py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors",
         "//tensorflow_probability/python/internal:distribution_util",
+    ],
+)
+
+py_library(
+    name = "pareto",
+    srcs = ["pareto.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
     ],
 )
 
@@ -504,6 +525,16 @@ py_library(
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/internal:distribution_util",
+    ],
+)
+
+py_library(
+    name = "von_mises",
+    srcs = ["von_mises.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
@@ -890,6 +921,18 @@ py_test(
 )
 
 py_test(
+    name = "pareto_test",
+    size = "small",
+    srcs = ["pareto_test.py"],
+    deps = [
+        ":distributions",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_test(
     name = "poisson_test",
     size = "small",
     srcs = ["poisson_test.py"],
@@ -961,6 +1004,32 @@ py_test(
 )
 
 py_test(
+    name = "von_mises_test",
+    size = "medium",
+    srcs = ["von_mises_test.py"],
+    deps = [
+        ":distributions",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_test(
+    name = "lkj_test",
+    size = "medium",
+    srcs = [
+        "lkj_test.py",
+    ],
+    deps = [
+        ":distributions",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_test(
     name = "seed_stream_test",
     size = "small",
     srcs = ["seed_stream_test.py"],
@@ -999,6 +1068,7 @@ py_test(
     name = "truncated_normal_test",
     size = "large",
     srcs = ["truncated_normal_test.py"],
+    shard_count = 10,
     deps = [
         ":distributions",
         # absl/testing:parameterized dep,

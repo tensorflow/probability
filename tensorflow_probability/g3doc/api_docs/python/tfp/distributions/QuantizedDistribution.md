@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions.QuantizedDistribution" />
 <meta itemprop="property" content="allow_nan_stats"/>
@@ -8,6 +5,8 @@ page_type: reference
 <meta itemprop="property" content="distribution"/>
 <meta itemprop="property" content="dtype"/>
 <meta itemprop="property" content="event_shape"/>
+<meta itemprop="property" content="high"/>
+<meta itemprop="property" content="low"/>
 <meta itemprop="property" content="name"/>
 <meta itemprop="property" content="parameters"/>
 <meta itemprop="property" content="reparameterization_type"/>
@@ -106,7 +105,7 @@ parameter determining the unnormalized probability of that component.
 
 ```python
 tfd = tfp.distributions
-tfb = tfd.bijectors
+tfb = tfp.bijectors
 
 net = wavenet(inputs)
 loc, unconstrained_scale, logits = tf.split(net,
@@ -193,6 +192,14 @@ May be partially defined or unknown.
 #### Returns:
 
 * <b>`event_shape`</b>: `TensorShape`, possibly unknown.
+
+<h3 id="high"><code>high</code></h3>
+
+Highest value that quantization returns.
+
+<h3 id="low"><code>low</code></h3>
+
+Lowest value that quantization returns.
 
 <h3 id="name"><code>name</code></h3>
 

@@ -25,7 +25,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow.python.framework import test_util
 
-tfd = tf.contrib.distributions
+tfd = tfp.distributions
 
 
 class FitTestFast(tf.test.TestCase):
@@ -34,7 +34,7 @@ class FitTestFast(tf.test.TestCase):
   fast = True
 
   def make_dataset(self, n, d, link, scale=1.):
-    seed = tf.contrib.distributions.SeedStream(
+    seed = tfd.SeedStream(
         seed=213356351, salt='tfp.glm.fisher_scoring_test')
     model_coefficients = tfd.Uniform(
         low=np.array(-0.5, self.dtype),

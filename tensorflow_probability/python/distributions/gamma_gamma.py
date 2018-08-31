@@ -22,7 +22,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
-from tensorflow_probability.python.distributions.seed_stream import SeedStream
+from tensorflow_probability.python.distributions import seed_stream
 
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.ops import control_flow_ops
@@ -81,6 +81,11 @@ class GammaGamma(tf.distributions.Distribution):
   See:
     http://www.brucehardie.com/notes/025/gamma_gamma.pdf
 
+  Samples of this distribution are reparameterized as samples of the Gamma
+  distribution are reparameterized using the technique described in the paper
+
+  [Michael Figurnov, Shakir Mohamed, Andriy Mnih.
+  Implicit Reparameterization Gradients, 2018](https://arxiv.org/abs/1805.08498)
   """
 
   def __init__(self,
@@ -139,7 +144,7 @@ class GammaGamma(tf.distributions.Distribution):
         dtype=self._concentration.dtype,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
-        reparameterization_type=tf.distributions.NOT_REPARAMETERIZED,
+        reparameterization_type=tf.distributions.FULLY_REPARAMETERIZED,
         parameters=parameters,
         graph_parents=[
             self._concentration, self._mixing_concentration, self._mixing_rate
@@ -179,7 +184,7 @@ class GammaGamma(tf.distributions.Distribution):
       """Note: See `tf.random_gamma` docstring for sampling details and
       caveats.""")
   def _sample_n(self, n, seed=None):
-    seed = SeedStream(seed, "gamma_gamma")
+    seed = seed_stream.SeedStream(seed, "gamma_gamma")
     rate = tf.random_gamma(
         shape=[n],
         alpha=self.mixing_concentration,

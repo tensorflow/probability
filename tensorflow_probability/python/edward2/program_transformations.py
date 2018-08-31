@@ -12,14 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Transformations of Edward programs to alternative representations.
-
-An Edward program is a Python callable which executes the generative process of
-a computable probability distribution using Edward `RandomVariable`s. Given an
-Edward program, the `program_transformations` submodule lets us obtain
-alternative representations of the probability distribution such as the log
-joint probability function of its outcomes.
-"""
+"""Transformations of Edward2 programs."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -41,7 +34,7 @@ def make_log_joint_fn(model):
 
   Args:
     model: Python callable which executes the generative process of a
-      computable probability distribution using Edward `RandomVariable`s.
+      computable probability distribution using `ed.RandomVariable`s.
 
   Returns:
     A log-joint probability function. Its inputs are `model`'s original inputs
@@ -50,25 +43,26 @@ def make_log_joint_fn(model):
 
   #### Examples
 
-  Below we define Bayesian logistic regression as an Edward program, which
-  represents the model's generative process. We apply `make_log_joint_fn` in
-  order to alternatively represent the model in terms of its joint probability
-  function.
+  Below we define Bayesian logistic regression as an Edward program,
+  representing the model's generative process. We apply `make_log_joint_fn` in
+  order to represent the model in terms of its joint probability function.
 
   ```python
   from tensorflow_probability import edward2 as ed
 
-  def model(X):
-    w = ed.Normal(loc=0., scale=1., sample_shape=X.shape[1], name="w")
-    y = ed.Normal(loc=tf.tensordot(X, w, [[1], [0]]), scale=0.1, name="y")
-    return y
+  def logistic_regression(features):
+    coeffs = ed.Normal(loc=0., scale=1.,
+                       sample_shape=features.shape[1], name="coeffs")
+    outcomes = ed.Bernoulli(logits=tf.tensordot(features, coeffs, [[1], [0]]),
+                            name="outcomes")
+    return outcomes
 
-  log_joint = ed.make_log_joint_fn(model)
+  log_joint = ed.make_log_joint_fn(logistic_regression)
 
-  X = tf.random_normal([3, 2])
-  w_value = tf.random_normal([2])
-  y_value = tf.random_normal([3])
-  output = log_joint(X, w=w_value, y=y_value)
+  features = tf.random_normal([3, 2])
+  coeffs_value = tf.random_normal([2])
+  outcomes_value = tf.round(tf.random_uniform([3]))
+  output = log_joint(features, coeffs=coeffs_value, outcomes=outcomes_value)
   ```
 
   """

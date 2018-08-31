@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions.Beta" />
 <meta itemprop="property" content="allow_nan_stats"/>
@@ -87,13 +84,19 @@ This happens more often when some of the concentrations are very small.
 Make sure to round the samples to `np.finfo(dtype).tiny` before computing the
 density.
 
+Samples of this distribution are reparameterized (pathwise differentiable).
+The derivatives are computed using the approach described in the paper
+
+[Michael Figurnov, Shakir Mohamed, Andriy Mnih.
+Implicit Reparameterization Gradients, 2018](https://arxiv.org/abs/1805.08498)
+
 #### Examples
 
 ```python
 # Create a batch of three Beta distributions.
 alpha = [1, 2, 3]
 beta = [1, 2, 3]
-dist = Beta(alpha, beta)
+dist = tf.distributions.Beta(alpha, beta)
 
 dist.sample([4, 5])  # Shape [4, 5, 3]
 
@@ -109,7 +112,7 @@ dist.prob(x)         # Shape [2, 3]
 # Create batch_shape=[2, 3] via parameter broadcast:
 alpha = [[1.], [2]]      # Shape [2, 1]
 beta = [3., 4, 5]        # Shape [3]
-dist = Beta(alpha, beta)
+dist = tf.distributions.Beta(alpha, beta)
 
 # alpha broadcast as: [[1., 1, 1,],
 #                      [2, 2, 2]]
@@ -123,6 +126,18 @@ x = [.2, .3, .5]
 #                         [.2, .3, .5]],
 # thus matching batch_shape [2, 3].
 dist.prob(x)         # Shape [2, 3]
+```
+
+Compute the gradients of samples w.r.t. the parameters:
+
+```python
+alpha = tf.constant(1.0)
+beta = tf.constant(2.0)
+dist = tf.distributions.Beta(alpha, beta)
+samples = dist.sample(5)  # Shape [5]
+loss = tf.reduce_mean(tf.square(samples))  # Arbitrary loss function
+# Unbiased stochastic gradients of the loss function
+grads = tf.gradients(loss, [alpha, beta])
 ```
 
 ## Properties

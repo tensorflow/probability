@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp" />
 </div>
@@ -20,6 +17,8 @@ Tools for probabilistic reasoning in TensorFlow.
 [`glm`](./tfp/glm.md) module: TensorFlow Probability GLM python package.
 
 [`layers`](./tfp/layers.md) module: Probabilistic Layers.
+
+[`math`](./tfp/math.md) module: TensorFlow Probability math functions.
 
 [`mcmc`](./tfp/mcmc.md) module: TensorFlow Probability MCMC python package.
 

@@ -65,11 +65,19 @@ class InverseGamma(tf.distributions.Distribution):
   where `GammaInc` is the [upper incomplete Gamma function](
   https://en.wikipedia.org/wiki/Incomplete_gamma_function).
 
-  The parameters can be intuited via their relationship to mean and stddev,
+  The parameters can be intuited via their relationship to mean and variance
+  when these moments exist,
 
   ```none
-  concentration = alpha = (mean / stddev)**2
-  rate = beta = mean / stddev**2
+  mean = beta / (alpha - 1)                           when alpha > 1
+  variance = beta**2 / (alpha - 1)**2 / (alpha - 2)   when alpha > 2
+  ```
+
+  i.e., under the same conditions:
+
+  ```none
+  alpha = mean**2 / variance + 2
+  beta = mean * (mean**2 / variance + 1)
   ```
 
   Distribution parameters are automatically broadcast in all functions; see

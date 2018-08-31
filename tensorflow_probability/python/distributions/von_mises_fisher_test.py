@@ -25,7 +25,10 @@ import tensorflow_probability as tfp
 from tensorflow_probability.python.distributions.von_mises_fisher import _bessel_ive
 from tensorflow_probability.python.internal import test_util
 
+from tensorflow.python.framework import test_util as tf_test_util
 
+
+@tf_test_util.run_all_in_graph_and_eager_modes
 class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
                          tf.test.TestCase):
 
@@ -95,7 +98,7 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
         allow_nan_stats=False)
     self.assertEqual([5, 2], vmf.batch_shape.as_list())
     self.assertEqual([3], vmf.event_shape.as_list())
-    nsamples = 10000
+    nsamples = int(2e4)
     samples = vmf.sample(sample_shape=[nsamples])
     self.assertEqual([nsamples, 5, 2, 3], samples.shape.as_list())
     sample_mean = self.evaluate(samples).mean(axis=0)

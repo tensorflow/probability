@@ -42,6 +42,7 @@ from matplotlib import cm
 from matplotlib import figure
 from matplotlib.backends import backend_agg
 import numpy as np
+from six.moves import urllib
 import tensorflow as tf
 
 from tensorflow_probability import distributions as tfd
@@ -83,6 +84,11 @@ flags.DEFINE_float("decay",
 flags.DEFINE_integer("batch_size",
                      default=128,
                      help="Batch size.")
+flags.DEFINE_string("mnist_type",
+                    default="threshold",
+                    help="""Type of MNIST used. Choices include 'fake_data',
+                    'bernoulli' for Hugo Larochelle's randomly binarized MNIST,
+                     and 'threshold' for binarized MNIST at 0.5 threshold.""")
 flags.DEFINE_string("data_dir",
                     default=os.path.join(os.getenv("TEST_TMPDIR", "/tmp"),
                                          "vq_vae/data"),
@@ -94,11 +100,17 @@ flags.DEFINE_string(
 flags.DEFINE_integer("viz_steps",
                      default=500,
                      help="Frequency at which to save visualizations.")
-flags.DEFINE_bool("fake_data",
-                  default=False,
-                  help="If true, uses fake data.")
 
 FLAGS = flags.FLAGS
+BERNOULLI_PATH = "http://www.cs.toronto.edu/~larocheh/public/datasets/binarized_mnist/"
+FILE_TEMPLATE = "binarized_mnist_{split}.amat"
+
+
+class MnistType(object):
+  """MNIST types for input data."""
+  FAKE_DATA = "fake_data"
+  THRESHOLD = "threshold"
+  BERNOULLI = "bernoulli"
 
 
 class VectorQuantizer(object):
@@ -364,19 +376,57 @@ def build_fake_data(num_examples=10):
   return mnist_data
 
 
-def build_input_pipeline(mnist_data, batch_size, heldout_size):
+def download(directory, filename):
+  """Downloads a file."""
+  filepath = os.path.join(directory, filename)
+  if tf.gfile.Exists(filepath):
+    return filepath
+  if not tf.gfile.Exists(directory):
+    tf.gfile.MakeDirs(directory)
+  url = os.path.join(BERNOULLI_PATH, filename)
+  print("Downloading %s to %s" % (url, filepath))
+  urllib.request.urlretrieve(url, filepath)
+  return filepath
+
+
+def load_bernoulli_mnist_dataset(directory, split_name):
+  """Returns Hugo Larochelle's binary static MNIST tf.data.Dataset."""
+  amat_file = download(directory, FILE_TEMPLATE.format(split=split_name))
+  dataset = tf.data.TextLineDataset(amat_file)
+  str_to_arr = lambda string: np.array([c == b"1" for c in string.split()])
+
+  def _parser(s):
+    booltensor = tf.py_func(str_to_arr, [s], tf.bool)
+    reshaped = tf.reshape(booltensor, [28, 28, 1])
+    return tf.to_float(reshaped), tf.constant(0, tf.int32)
+
+  return dataset.map(_parser)
+
+
+def build_input_pipeline(data_dir, batch_size, heldout_size, mnist_type):
   """Builds an Iterator switching between train and heldout data."""
   # Build an iterator over training batches.
-  training_dataset = tf.data.Dataset.from_tensor_slices(
-      (mnist_data.train.images, np.int32(mnist_data.train.labels)))
+  if mnist_type in [MnistType.FAKE_DATA, MnistType.THRESHOLD]:
+    if mnist_type == MnistType.FAKE_DATA:
+      mnist_data = build_fake_data()
+    else:
+      mnist_data = mnist.read_data_sets(data_dir)
+    training_dataset = tf.data.Dataset.from_tensor_slices(
+        (mnist_data.train.images, np.int32(mnist_data.train.labels)))
+    heldout_dataset = tf.data.Dataset.from_tensor_slices(
+        (mnist_data.validation.images,
+         np.int32(mnist_data.validation.labels)))
+  elif mnist_type == MnistType.BERNOULLI:
+    training_dataset = load_bernoulli_mnist_dataset(data_dir, "train")
+    heldout_dataset = load_bernoulli_mnist_dataset(data_dir, "valid")
+  else:
+    raise ValueError("Unknown MNIST type.")
+
   training_batches = training_dataset.repeat().batch(batch_size)
   training_iterator = training_batches.make_one_shot_iterator()
 
   # Build a iterator over the heldout set with batch_size=heldout_size,
   # i.e., return the entire heldout set as a constant.
-  heldout_dataset = tf.data.Dataset.from_tensor_slices(
-      (mnist_data.validation.images,
-       np.int32(mnist_data.validation.labels)))
   heldout_frozen = (heldout_dataset.take(heldout_size).
                     repeat().batch(heldout_size))
   heldout_iterator = heldout_frozen.make_one_shot_iterator()
@@ -387,6 +437,10 @@ def build_input_pipeline(mnist_data, batch_size, heldout_size):
   feedable_iterator = tf.data.Iterator.from_string_handle(
       handle, training_batches.output_types, training_batches.output_shapes)
   images, labels = feedable_iterator.get_next()
+  # Reshape as a pixel image and binarize pixels.
+  images = tf.reshape(images, shape=[-1] + IMAGE_SHAPE)
+  if mnist_type in [MnistType.FAKE_DATA, MnistType.THRESHOLD]:
+    images = tf.cast(images > 0.5, dtype=tf.int32)
 
   return images, labels, handle, training_iterator, heldout_iterator
 
@@ -403,19 +457,12 @@ def main(argv):
     tf.gfile.DeleteRecursively(FLAGS.model_dir)
   tf.gfile.MakeDirs(FLAGS.model_dir)
 
-  if FLAGS.fake_data:
-    mnist_data = build_fake_data()
-  else:
-    mnist_data = mnist.read_data_sets(FLAGS.data_dir)
-
   with tf.Graph().as_default():
+    # TODO(b/113163167): Speed up and tune hyperparameters for Bernoulli MNIST.
     (images, _, handle,
      training_iterator, heldout_iterator) = build_input_pipeline(
-         mnist_data, FLAGS.batch_size, mnist_data.validation.num_examples)
-
-    # Reshape as a pixel image and binarize pixels.
-    images = tf.reshape(images, shape=[-1] + IMAGE_SHAPE)
-    images = tf.cast(images > 0.5, dtype=tf.int32)
+         FLAGS.data_dir, FLAGS.batch_size, heldout_size=10000,
+         mnist_type=FLAGS.mnist_type)
 
     encoder = make_encoder(FLAGS.encoder_layers,
                            FLAGS.activation,

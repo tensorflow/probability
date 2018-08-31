@@ -1,8 +1,6 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.bijectors.Permute" />
+<meta itemprop="property" content="axis"/>
 <meta itemprop="property" content="dtype"/>
 <meta itemprop="property" content="forward_min_event_ndims"/>
 <meta itemprop="property" content="graph_parents"/>
@@ -31,9 +29,7 @@ Inherits From: [`Bijector`](../../tfp/bijectors/Bijector.md)
 Permutes the rightmost dimension of a `Tensor`.
 
 ```python
-tfd = tfp.distributions
-
-reverse = tfd.bijectors.Permute(permutation=[2, 1, 0])
+reverse = tfp.bijectors.Permute(permutation=[2, 1, 0])
 
 reverse.forward([-1., 0., 1.])
 # ==> [1., 0., -1]
@@ -64,6 +60,10 @@ Permute(permutation=init_once(
 ```
 
 ## Properties
+
+<h3 id="axis"><code>axis</code></h3>
+
+
 
 <h3 id="dtype"><code>dtype</code></h3>
 
@@ -113,6 +113,7 @@ Returns True if Tensor arguments will be validated.
 ``` python
 __init__(
     permutation,
+    axis=-1,
     validate_args=False,
     name=None
 )
@@ -123,8 +124,12 @@ Creates the `Permute` bijector.
 #### Args:
 
 * <b>`permutation`</b>: An `int`-like vector-shaped `Tensor` representing the
-    permutation to apply to the rightmost dimension of the transformed
+    permutation to apply to the `axis` dimension of the transformed
     `Tensor`.
+* <b>`axis`</b>: Scalar `int` `Tensor` representing the dimension over which to
+    `tf.gather`. `axis` must be relative to the end (reading left to right)
+    thus must be negative.
+    Default value: `-1` (i.e., right-most).
 * <b>`validate_args`</b>: Python `bool` indicating whether arguments should be
     checked for correctness.
 * <b>`name`</b>: Python `str`, name given to ops managed by this object.
@@ -135,6 +140,8 @@ Creates the `Permute` bijector.
 * <b>`TypeError`</b>: if `not permutation.dtype.is_integer`.
 * <b>`ValueError`</b>: if `permutation` does not contain exactly one of each of
     `{0, 1, ..., d}`.
+* <b>`NotImplementedError`</b>: if `axis` is not known prior to graph execution.
+* <b>`NotImplementedError`</b>: if `axis` is not negative.
 
 <h3 id="forward"><code>forward</code></h3>
 

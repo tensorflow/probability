@@ -46,7 +46,7 @@ class SoftplusBijectorTest(tf.test.TestCase):
     with self.test_session():
       bijector = tfb.Softplus(hinge_softness=0., validate_args=True)
       with self.assertRaisesOpError("must be non-zero"):
-        bijector.forward([1., 1.]).eval()
+        self.evaluate(bijector.forward([1., 1.]))
 
   def testBijectorForwardInverseEventDimsZero(self):
     with self.test_session():
@@ -55,8 +55,8 @@ class SoftplusBijectorTest(tf.test.TestCase):
       x = 2 * rng.randn(2, 10)
       y = self._softplus(x)
 
-      self.assertAllClose(y, bijector.forward(x).eval())
-      self.assertAllClose(x, bijector.inverse(y).eval())
+      self.assertAllClose(y, self.evaluate(bijector.forward(x)))
+      self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
 
   def testBijectorForwardInverseWithHingeSoftnessEventDimsZero(self):
     with self.test_session():
@@ -64,8 +64,8 @@ class SoftplusBijectorTest(tf.test.TestCase):
       x = 2 * rng.randn(2, 10)
       y = 1.5 * self._softplus(x / 1.5)
 
-      self.assertAllClose(y, bijector.forward(x).eval())
-      self.assertAllClose(x, bijector.inverse(y).eval())
+      self.assertAllClose(y, self.evaluate(bijector.forward(x)))
+      self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
 
   def testBijectorLogDetJacobianEventDimsZero(self):
     with self.test_session():
@@ -74,8 +74,10 @@ class SoftplusBijectorTest(tf.test.TestCase):
       # No reduction needed if event_dims = 0.
       ildj = self._softplus_ildj_before_reduction(y)
 
-      self.assertAllClose(ildj, bijector.inverse_log_det_jacobian(
-          y, event_ndims=0).eval())
+      self.assertAllClose(
+          ildj,
+          self.evaluate(bijector.inverse_log_det_jacobian(
+              y, event_ndims=0)))
 
   def testBijectorForwardInverseEventDimsOne(self):
     with self.test_session():
@@ -84,8 +86,8 @@ class SoftplusBijectorTest(tf.test.TestCase):
       x = 2 * rng.randn(2, 10)
       y = self._softplus(x)
 
-      self.assertAllClose(y, bijector.forward(x).eval())
-      self.assertAllClose(x, bijector.inverse(y).eval())
+      self.assertAllClose(y, self.evaluate(bijector.forward(x)))
+      self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
 
   def testBijectorLogDetJacobianEventDimsOne(self):
     with self.test_session():
@@ -94,8 +96,11 @@ class SoftplusBijectorTest(tf.test.TestCase):
       ildj_before = self._softplus_ildj_before_reduction(y)
       ildj = np.sum(ildj_before, axis=1)
 
-      self.assertAllClose(ildj, bijector.inverse_log_det_jacobian(
-          y, event_ndims=1).eval())
+      self.assertAllClose(
+          ildj,
+          self.evaluate(
+              bijector.inverse_log_det_jacobian(
+                  y, event_ndims=1)))
 
   def testScalarCongruency(self):
     with self.test_session():

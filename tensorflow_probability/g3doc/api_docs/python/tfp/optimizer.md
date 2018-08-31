@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.optimizer" />
 </div>
@@ -22,4 +19,8 @@ TensorFlow Probability Optimizer python package.
 ## Functions
 
 [`bfgs_minimize(...)`](../tfp/optimizer/bfgs_minimize.md): Applies the BFGS algorithm to minimize a differentiable function.
+
+[`nelder_mead_minimize(...)`](../tfp/optimizer/nelder_mead_minimize.md): Minimum of the objective function using the Nelder Mead simplex algorithm.
+
+[`nelder_mead_one_step(...)`](../tfp/optimizer/nelder_mead_one_step.md): A single iteration of the Nelder Mead algorithm.
 

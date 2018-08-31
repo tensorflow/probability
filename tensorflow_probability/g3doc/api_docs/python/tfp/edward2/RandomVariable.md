@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.edward2.RandomVariable" />
 <meta itemprop="property" content="distribution"/>
@@ -83,8 +80,9 @@ shape of dependent dimensions (e.g., `Normal` has scalar `event_shape`;
 #### Examples
 
 ```python
+import tensorflow_probability as tfp
 from tensorflow_probability import edward2 as ed
-tfd = tf.contrib.distributions
+tfd = tfp.distributions
 
 z1 = tf.constant([[1.0, -0.8], [0.3, -1.0]])
 z2 = tf.constant([[0.9, 0.2], [2.0, -0.1]])

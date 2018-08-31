@@ -39,24 +39,56 @@ py_binary(
     ],
 )
 
+# Temporarily disable BNN test, which was breaking the build
+# due to upstream Keras changes affecting tfp.layers.
+# TODO (b/112436745): re-enable this test once the issue is fixed.
+# py_test(
+#     name = "bayesian_neural_network_test",
+#     size = "small",
+#     srcs = ["bayesian_neural_network.py"],
+#     args = [
+#         "--fake_data",
+#         "--max_steps=5",
+#     ],
+#     main = "bayesian_neural_network.py",
+#     srcs_version = "PY2AND3",
+#     deps = [
+#         ":bayesian_neural_network",
+#     ],
+# )
+
+py_binary(
+    name = "deep_exponential_family",
+    srcs = ["deep_exponential_family.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # absl/flags dep,
+        # numpy dep,
+        # six dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
 py_test(
-    name = "bayesian_neural_network_test",
+    name = "deep_exponential_family_test",
     size = "small",
-    srcs = ["bayesian_neural_network.py"],
+    srcs = ["deep_exponential_family.py"],
     args = [
         "--fake_data",
         "--max_steps=5",
+        "--layer_sizes=5,3,2",
     ],
-    main = "bayesian_neural_network.py",
+    main = "deep_exponential_family.py",
     srcs_version = "PY2AND3",
     deps = [
-        ":bayesian_neural_network",
+        ":deep_exponential_family",
     ],
 )
 
 py_binary(
-    name = "latent_dirichlet_allocation",
-    srcs = ["latent_dirichlet_allocation.py"],
+    name = "latent_dirichlet_allocation_distributions",
+    srcs = ["latent_dirichlet_allocation_distributions.py"],
     srcs_version = "PY2AND3",
     deps = [
         # absl/flags dep,
@@ -70,9 +102,9 @@ py_binary(
 )
 
 py_test(
-    name = "latent_dirichlet_allocation_test",
+    name = "latent_dirichlet_allocation_distributions_test",
     size = "medium",
-    srcs = ["latent_dirichlet_allocation.py"],
+    srcs = ["latent_dirichlet_allocation_distributions.py"],
     args = [
         "--fake_data",
         "--max_steps=5",
@@ -80,10 +112,42 @@ py_test(
         "--viz_steps=5",
         "--learning_rate=1e-7",
     ],
-    main = "latent_dirichlet_allocation.py",
+    main = "latent_dirichlet_allocation_distributions.py",
     srcs_version = "PY2AND3",
     deps = [
-        ":latent_dirichlet_allocation",
+        ":latent_dirichlet_allocation_distributions",
+    ],
+)
+
+py_binary(
+    name = "latent_dirichlet_allocation_edward2",
+    srcs = ["latent_dirichlet_allocation_edward2.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # absl/flags dep,
+        # numpy dep,
+        # scipy dep,
+        # six dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_test(
+    name = "latent_dirichlet_allocation_edward2_test",
+    size = "medium",
+    srcs = ["latent_dirichlet_allocation_edward2.py"],
+    args = [
+        "--fake_data",
+        "--max_steps=5",
+        "--delete_existing",
+        "--viz_steps=5",
+        "--learning_rate=1e-7",
+    ],
+    main = "latent_dirichlet_allocation_edward2.py",
+    srcs_version = "PY2AND3",
+    deps = [
+        ":latent_dirichlet_allocation_edward2",
     ],
 )
 
@@ -170,7 +234,7 @@ py_test(
     size = "small",
     srcs = ["vq_vae.py"],
     args = [
-        "--fake_data",
+        "--mnist_type='fake_data'",
         "--max_steps=5",
     ],
     main = "vq_vae.py",

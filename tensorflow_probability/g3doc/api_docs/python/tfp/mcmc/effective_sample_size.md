@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.mcmc.effective_sample_size" />
 </div>
@@ -64,7 +61,7 @@ We use ESS to estimate standard error.
 ```
 import tensorflow as tf
 import tensorflow_probability as tfp
-tfd = tf.contrib.distributions
+tfd = tfp.distributions
 
 target = tfd.MultivariateNormalDiag(scale_diag=[1., 2.])
 

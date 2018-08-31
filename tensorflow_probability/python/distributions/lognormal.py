@@ -20,7 +20,7 @@ from __future__ import print_function
 
 import numpy as np
 import tensorflow as tf
-from tensorflow_probability.python.bijectors import Exp
+from tensorflow_probability.python import bijectors
 from tensorflow.python.ops.distributions import transformed_distribution
 
 
@@ -64,7 +64,7 @@ class LogNormal(transformed_distribution.TransformedDistribution):
           distribution=tf.distributions.Normal(
               loc=loc,
               scale=scale),
-          bijector=Exp(),
+          bijector=bijectors.Exp(),
           validate_args=validate_args,
           name=name)
 

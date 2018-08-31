@@ -26,9 +26,8 @@ import tensorflow_probability as tfp
 
 from tensorflow.python.framework import test_util
 
-
-tfd = tf.contrib.distributions
-tfb = tf.contrib.distributions.bijectors
+tfd = tfp.distributions
+tfb = tfp.bijectors
 
 
 class LogNormal(tfd.TransformedDistribution):

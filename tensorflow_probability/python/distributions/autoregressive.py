@@ -18,11 +18,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# Dependency imports
-import numpy as np
 import tensorflow as tf
 
-from tensorflow.python.ops.distributions import util as distribution_util
+from tensorflow_probability.python.distributions import seed_stream
 
 
 class Autoregressive(tf.distributions.Distribution):
@@ -196,10 +194,7 @@ class Autoregressive(tf.distributions.Distribution):
     return self.distribution0.event_shape_tensor()
 
   def _sample_n(self, n, seed=None):
-    if seed is None:
-      seed = distribution_util.gen_new_seed(
-          seed=np.random.randint(2**32 - 1),
-          salt="autoregressive")
+    seed = seed_stream.SeedStream(seed, salt="Autoregressive")()
     samples = self.distribution0.sample(n, seed=seed)
     for _ in range(self._num_steps):
       samples = self.distribution_fn(samples).sample(seed=seed)

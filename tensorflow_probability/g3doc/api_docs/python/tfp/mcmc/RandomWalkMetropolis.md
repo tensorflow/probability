@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.mcmc.RandomWalkMetropolis" />
 <meta itemprop="property" content="is_calibrated"/>
@@ -72,7 +69,7 @@ sample_std = tf.sqrt(
 with tf.Session() as sess:
   [sample_mean_, sample_std_] = sess.run([sample_mean, sample_std])
 
-print('Estimated mean: '.format(sample_mean_))
+print('Estimated mean: {}'.format(sample_mean_))
 print('Estimated standard deviation: {}'.format(sample_std_))
 ```
 
@@ -153,6 +150,7 @@ print('Estimated covariance of covariance: {}'.format(cov_sample_cov_))
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
+from tensorflow.python.ops.distributions import util as distributions_util
 
 tfd = tfp.distributions
 
@@ -162,13 +160,14 @@ num_chain_results = 1000
 
 def cauchy_new_state_fn(scale, dtype):
   cauchy = tfd.Cauchy(loc=dtype(0), scale=dtype(scale))
-  seed_stream = tfd.SeedStream(seed, salt='random_walk_cauchy_new_state_fn')
   def _fn(state_parts, seed):
     next_state_parts = []
     for sp in state_parts:
       # Mutate seed with each use.
+      seed = distributions_util.gen_new_seed(
+          seed, salt='random_walk_cauchy_new_state_fn')
       next_state_parts.append(sp + cauchy.sample(
-        sample_shape=sp.shape, seed=seed_stream()))
+        sample_shape=sp.shape, seed=seed))
     return next_state_parts
   return _fn
 

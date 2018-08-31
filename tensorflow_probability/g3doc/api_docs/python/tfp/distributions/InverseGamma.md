@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions.InverseGamma" />
 <meta itemprop="property" content="allow_nan_stats"/>
@@ -86,8 +83,11 @@ rate = beta = mean / stddev**2
 Distribution parameters are automatically broadcast in all functions; see
 examples for details.
 
-WARNING: This distribution may draw 0-valued samples for small concentration
-values. See note in `tf.random_gamma` docstring.
+Samples of this distribution are reparameterized (pathwise differentiable).
+The derivatives are computed using the approach described in the paper
+
+[Michael Figurnov, Shakir Mohamed, Andriy Mnih.
+Implicit Reparameterization Gradients, 2018](https://arxiv.org/abs/1805.08498)
 
 #### Examples
 
@@ -95,6 +95,19 @@ values. See note in `tf.random_gamma` docstring.
 tfd = tfp.distributions
 dist = tfd.InverseGamma(concentration=3.0, rate=2.0)
 dist2 = tfd.InverseGamma(concentration=[3.0, 4.0], rate=[2.0, 3.0])
+```
+
+Compute the gradients of samples w.r.t. the parameters:
+
+```python
+tfd = tfp.distributions
+concentration = tf.constant(3.0)
+rate = tf.constant(2.0)
+dist = tfd.InverseGamma(concentration, rate)
+samples = dist.sample(5)  # Shape [5]
+loss = tf.reduce_mean(tf.square(samples))  # Arbitrary loss function
+# Unbiased stochastic gradients of the loss function
+grads = tf.gradients(loss, [concentration, rate])
 ```
 
 ## Properties

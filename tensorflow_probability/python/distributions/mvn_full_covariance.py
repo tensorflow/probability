@@ -19,7 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from tensorflow_probability.python.distributions.mvn_tril import MultivariateNormalTriL
+from tensorflow_probability.python.distributions import mvn_tril
 from tensorflow.python.ops import control_flow_ops
 
 
@@ -28,7 +28,7 @@ __all__ = [
 ]
 
 
-class MultivariateNormalFullCovariance(MultivariateNormalTriL):
+class MultivariateNormalFullCovariance(mvn_tril.MultivariateNormalTriL):
   """The multivariate normal distribution on `R^k`.
 
   The Multivariate Normal distribution is defined over `R^k` and parameterized

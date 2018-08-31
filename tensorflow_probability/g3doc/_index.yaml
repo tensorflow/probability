@@ -1,0 +1,88 @@
+# Copyright 2018 The TensorFlow Probability Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ============================================================================
+book_path: /probability/_book.yaml
+project_path: /probability/_project.yaml
+description: <!--no description-->
+landing_page:
+  custom_css_path: /site-assets/css/style.css
+  rows:
+  - heading: TensorFlow Probability is a library for probabilistic reasoning and statistical analysis.
+    items:
+    - description: >
+        TensorFlow Probability (TFP) is a Python library built on TensorFlow
+        that makes it easy to combine probabilistic models and deep learning on
+        modern hardware (TPU, GPU). It's for data scientists, statisticians, ML
+        researchers, and practitioners who want to encode domain knowledge to
+        understand data and make predictions. TFP includes:
+        <ul style="padding-left: 20px; margin: 20px 0;">
+          <li>A wide selection of probability distributions and bijectors.</li>
+          <li>Tools to build deep probabilistic models, including probabilistic
+          layers and the Edward2 language.</li>
+          <li>Variational inference and Markov chain Monte Carlo.</li>
+          <li>Optimizers such as Nelder-Mead, BFGS, and SGLD.</li>
+        </ul>
+        Since TFP inherits the benefits of TensorFlow, you can build, fit, and
+        deploy a model using a single language throughout the lifecycle of model
+        exploration and production. To get started, see the
+        <a href="./overview">TensorFlow Probability Guide</a>.
+
+    - code_block: |
+        <pre class = "prettyprint">
+        import tensorflow as tf
+        import tensorflow_probability as tfp
+
+        # Pretend to load synthetic data set.
+        features = tfp.distributions.Normal(loc=0., scale=1.).sample(int(100e3))
+        labels = tfp.distributions.Bernoulli(logits=1.618 * features).sample()
+
+        # Specify model.
+        model = tfp.glm.Bernoulli()
+
+        # Fit model given data.
+        coeffs, linear_response, is_converged, num_iter = tfp.glm.fit(
+            model_matrix=features[:, tf.newaxis],
+            response=tf.to_float(labels),
+            model=model)
+        # ==> coeffs is approximately [1.618] (We're golden!)
+        </pre>
+        {% dynamic if request.tld != 'cn' %}
+        <a class="colab-button" target="_blank" href="https://colab.research.google.com/github/tensorflow/probability/blob/master/tensorflow_probability/g3doc/_index.ipynb">Run in a <span>Notebook</span></a>
+        {% dynamic endif %}
+
+  - classname: devsite-landing-row-cards
+    items:
+    - heading: Introducing TensorFlow Probability
+      image_path: /ecosystem/images/tf-logo-card-16x9.png
+      path: https://medium.com/tensorflow/introducing-tensorflow-probability-dca4c304e245
+      buttons:
+      - label: Read on TensorFlow blog
+        path: https://medium.com/tensorflow/introducing-tensorflow-probability-dca4c304e245
+    - heading: Probabilistic Machine Learning in TensorFlow
+      youtube_id: BjUkL8DFH5Q
+      buttons:
+      - label: Watch the video
+        path: https://www.youtube.com/watch?v=BjUkL8DFH5Q
+    - heading: TensorFlow Distributions
+      image_path: /ecosystem/images/tf-logo-card-16x9.png
+      path: https://arxiv.org/abs/1711.10604
+      buttons:
+      - label: Read the paper
+        path: https://arxiv.org/abs/1711.10604
+    - heading: TensorFlow Probability on GitHub
+      image_path: /ecosystem/images/github-card-16x9.png
+      path: https://github.com/tensorflow/probability
+      buttons:
+      - label: View on GitHub
+        path: https://github.com/tensorflow/probability

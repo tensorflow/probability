@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.edward2" />
 </div>
@@ -103,9 +100,7 @@ Edward2 probabilistic programming language.
 
 [`VectorSinhArcsinhDiag(...)`](../tfp/edward2/VectorSinhArcsinhDiag.md): Create a random variable for VectorSinhArcsinhDiag.
 
-[`WishartCholesky(...)`](../tfp/edward2/WishartCholesky.md): Create a random variable for WishartCholesky.
-
-[`WishartFull(...)`](../tfp/edward2/WishartFull.md): Create a random variable for WishartFull.
+[`Wishart(...)`](../tfp/edward2/Wishart.md): Create a random variable for Wishart.
 
 [`as_random_variable(...)`](../tfp/edward2/as_random_variable.md): Wrap an existing distribution as a traceable random variable.
 

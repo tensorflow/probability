@@ -28,12 +28,12 @@ from tensorflow.python.framework import test_util
 tfd = tfp.distributions
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class LogNormalTest(tf.test.TestCase):
 
   def setUp(self):
     self._rng = np.random.RandomState(123)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testLogNormalStats(self):
 
     loc = np.float32([3., 1.5])
@@ -51,7 +51,6 @@ class LogNormalTest(tf.test.TestCase):
     self.assertAllClose(self.evaluate(dist.entropy()),
                         np.log(scale * np.exp(loc + 0.5) * np.sqrt(2 * np.pi)))
 
-  @test_util.run_in_graph_and_eager_modes()
   def testLogNormalSample(self):
     loc, scale = 1.5, 0.4
     dist = tfd.LogNormal(loc=loc, scale=scale)
@@ -63,7 +62,6 @@ class LogNormalTest(tf.test.TestCase):
                         self.evaluate(dist.stddev()),
                         atol=0.1)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testLogNormalPDF(self):
     loc, scale = 1.5, 0.4
     dist = tfd.LogNormal(loc=loc, scale=scale)
@@ -76,7 +74,6 @@ class LogNormalTest(tf.test.TestCase):
 
     self.assertAllClose(self.evaluate(log_pdf), analytical_log_pdf)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testLogNormalCDF(self):
     loc, scale = 1.5, 0.4
     dist = tfd.LogNormal(loc=loc, scale=scale)

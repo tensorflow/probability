@@ -20,7 +20,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python.positive_semidefinite_kernels import positive_semidefinite_kernel as psd_kernel
-from tensorflow_probability.python.positive_semidefinite_kernels import util
+from tensorflow_probability.python.positive_semidefinite_kernels.internal import util
 
 
 __all__ = [
@@ -98,17 +98,16 @@ class ExponentiatedQuadratic(psd_kernel.PositiveSemidefiniteKernel):
     x1 = tf.convert_to_tensor(x1)
     x2 = tf.convert_to_tensor(x2)
 
-    exponent = -.5 * util.sum_rightmost_ndims_preserving_shape(
+    exponent = -0.5 * util.sum_rightmost_ndims_preserving_shape(
         tf.squared_difference(x1, x2), self.feature_ndims)
     if self.length_scale is not None:
       length_scale = util.pad_shape_right_with_ones(
           self.length_scale, param_expansion_ndims)
       exponent /= length_scale**2
 
-    exponential = tf.exp(exponent)
     if self.amplitude is not None:
       amplitude = util.pad_shape_right_with_ones(
           self.amplitude, param_expansion_ndims)
-      return amplitude * exponential
-    else:
-      return exponential
+      exponent += 2. * tf.log(amplitude)
+
+    return tf.exp(exponent)

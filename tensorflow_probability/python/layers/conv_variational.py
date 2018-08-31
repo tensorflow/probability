@@ -20,14 +20,12 @@ from __future__ import print_function
 
 import tensorflow as tf
 
+from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.layers import util as tfp_layers_util
 from tensorflow_probability.python.math import random_rademacher
 from tensorflow_probability.python.util import docstring as docstring_util
 from tensorflow.python.layers import utils as tf_layers_util
 from tensorflow.python.ops import nn_ops
-from tensorflow.python.ops.distributions import util as distribution_util
-
-tfd = tf.contrib.distributions
 
 
 __all__ = [
@@ -1161,17 +1159,18 @@ class _ConvFlipout(_ConvVariational):
     batch_shape = tf.expand_dims(input_shape[0], 0)
     channels = input_shape[-1]
 
+    seed_stream = tfd.SeedStream(self.seed, salt='ConvFlipout')
+
     sign_input = random_rademacher(
         tf.concat([batch_shape,
                    tf.expand_dims(channels, 0)], 0),
         dtype=inputs.dtype,
-        seed=self.seed)
+        seed=seed_stream())
     sign_output = random_rademacher(
         tf.concat([batch_shape,
                    tf.expand_dims(self.filters, 0)], 0),
         dtype=inputs.dtype,
-        seed=distribution_util.gen_new_seed(
-            self.seed, salt='conv_flipout'))
+        seed=seed_stream())
     for _ in range(self.rank):
       sign_input = tf.expand_dims(sign_input, 1)  # 2D ex: (B, 1, 1, C)
       sign_output = tf.expand_dims(sign_output, 1)

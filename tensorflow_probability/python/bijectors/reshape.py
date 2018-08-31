@@ -52,11 +52,9 @@ class Reshape(bijector.Bijector):
     `event_shape_in` (`event_ndims_in = len(event_shape_in)`).
 
   Example usage:
+
   ```python
-
-  tfd = tfp.distributions
-
-  r = tfd.bijectors.Reshape(event_shape_out=[1, -1])
+  r = tfp.bijectors.Reshape(event_shape_out=[1, -1])
 
   r.forward([3., 4.])    # shape [2]
   # ==> [[3., 4.]]       # shape [1, 2]

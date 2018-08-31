@@ -26,7 +26,7 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.monte_carlo import _get_samples
 
-tfd = tf.contrib.distributions
+tfd = tfp.distributions
 
 
 class GetSamplesTest(tf.test.TestCase):

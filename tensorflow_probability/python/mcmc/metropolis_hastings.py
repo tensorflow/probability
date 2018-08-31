@@ -23,6 +23,7 @@ import warnings
 
 import tensorflow as tf
 
+from tensorflow_probability.python import distributions
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import util as mcmc_util
 
@@ -132,7 +133,7 @@ class MetropolisHastings(kernel_base.TransitionKernel):
       warnings.warn('Supplied `TransitionKernel` is already calibrated. '
                     'Composing `MetropolisHastings` `TransitionKernel` '
                     'may not be required.')
-    self._seed_stream = tf.contrib.distributions.SeedStream(
+    self._seed_stream = distributions.SeedStream(
         seed, 'metropolis_hastings_one_step')
     self._parameters = dict(
         inner_kernel=inner_kernel,
@@ -246,7 +247,7 @@ class MetropolisHastings(kernel_base.TransitionKernel):
 
     Args:
       init_state: `Tensor` or Python `list` of `Tensor`s representing the
-        a state(s) of the Markov chain(s).
+        initial state(s) of the Markov chain(s).
 
     Returns:
       kernel_results: A (possibly nested) `tuple`, `namedtuple` or `list` of

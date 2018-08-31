@@ -12,13 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Trains a deep Bayesian neural net to classify MNIST digits."""
+"""Trains a Bayesian neural network to classify MNIST digits.
+
+The architecture is LeNet-5 [1].
+
+#### References
+
+[1]: Yann LeCun, Leon Bottou, Yoshua Bengio, and Patrick Haffner.
+     Gradient-based learning applied to document recognition.
+     _Proceedings of the IEEE_, 1998.
+     http://yann.lecun.com/exdb/publis/pdf/lecun-01a.pdf
+"""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
 import os
+import warnings
 
 # Dependency imports
 from absl import flags
@@ -33,28 +44,24 @@ import tensorflow_probability as tfp
 from tensorflow.contrib.learn.python.learn.datasets import mnist
 
 # TODO(b/78137893): Integration tests currently fail with seaborn imports.
+warnings.simplefilter(action="ignore")
+
 try:
   import seaborn as sns  # pylint: disable=g-import-not-at-top
   HAS_SEABORN = True
 except ImportError:
   HAS_SEABORN = False
 
-tfd = tf.contrib.distributions
+tfd = tfp.distributions
 
-IMAGE_SHAPE = [28, 28]
+IMAGE_SHAPE = [28, 28, 1]
 
 flags.DEFINE_float("learning_rate",
-                   default=0.01,
+                   default=0.001,
                    help="Initial learning rate.")
 flags.DEFINE_integer("max_steps",
                      default=6000,
                      help="Number of training steps to run.")
-flags.DEFINE_list("layer_sizes",
-                  default=["128", "128"],
-                  help="Comma-separated list denoting hidden units per layer.")
-flags.DEFINE_string("activation",
-                    default="relu",
-                    help="Activation function for all hidden layers.")
 flags.DEFINE_integer("batch_size",
                      default=128,
                      help="Batch size.")
@@ -101,7 +108,6 @@ def plot_weight_posteriors(names, qm_vals, qs_vals, fname):
     sns.distplot(qm.flatten(), ax=ax, label=n)
   ax.set_title("weight means")
   ax.set_xlim([-1.5, 1.5])
-  ax.set_ylim([0, 4.])
   ax.legend()
 
   ax = fig.add_subplot(1, 2, 2)
@@ -109,7 +115,6 @@ def plot_weight_posteriors(names, qm_vals, qs_vals, fname):
     sns.distplot(qs.flatten(), ax=ax)
   ax.set_title("weight stddevs")
   ax.set_xlim([0, 1.])
-  ax.set_ylim([0, 25.])
 
   fig.tight_layout()
   canvas.print_figure(fname, format="png")
@@ -134,7 +139,7 @@ def plot_heldout_prediction(input_vals, probs,
   canvas = backend_agg.FigureCanvasAgg(fig)
   for i in range(n):
     ax = fig.add_subplot(n, 3, 3*i + 1)
-    ax.imshow(input_vals[i, :].reshape(IMAGE_SHAPE), interpolation="None")
+    ax.imshow(input_vals[i, :].reshape(IMAGE_SHAPE[:-1]), interpolation="None")
 
     ax = fig.add_subplot(n, 3, 3*i + 2)
     for prob_sample in probs:
@@ -155,10 +160,12 @@ def plot_heldout_prediction(input_vals, probs,
 
 def build_input_pipeline(mnist_data, batch_size, heldout_size):
   """Build an Iterator switching between train and heldout data."""
+
   # Build an iterator over training batches.
   training_dataset = tf.data.Dataset.from_tensor_slices(
       (mnist_data.train.images, np.int32(mnist_data.train.labels)))
-  training_batches = training_dataset.repeat().batch(batch_size)
+  training_batches = training_dataset.shuffle(
+      50000, reshuffle_each_iteration=True).repeat().batch(batch_size)
   training_iterator = training_batches.make_one_shot_iterator()
 
   # Build a iterator over the heldout set with batch_size=heldout_size,
@@ -190,13 +197,13 @@ def build_fake_data(num_examples=10):
   mnist_data = Dummy()
   mnist_data.train = Dummy()
   mnist_data.train.images = np.float32(np.random.randn(
-      num_examples, np.prod(IMAGE_SHAPE)))
+      num_examples, *IMAGE_SHAPE))
   mnist_data.train.labels = np.int32(np.random.permutation(
       np.arange(num_examples)))
   mnist_data.train.num_examples = num_examples
   mnist_data.validation = Dummy()
   mnist_data.validation.images = np.float32(np.random.randn(
-      num_examples, np.prod(IMAGE_SHAPE)))
+      num_examples, *IMAGE_SHAPE))
   mnist_data.validation.labels = np.int32(np.random.permutation(
       np.arange(num_examples)))
   mnist_data.validation.num_examples = num_examples
@@ -205,8 +212,6 @@ def build_fake_data(num_examples=10):
 
 def main(argv):
   del argv  # unused
-  FLAGS.layer_sizes = [int(units) for units in FLAGS.layer_sizes]
-  FLAGS.activation = getattr(tf.nn, FLAGS.activation)
   if tf.gfile.Exists(FLAGS.model_dir):
     tf.logging.warning(
         "Warning: deleting old log directory at {}".format(FLAGS.model_dir))
@@ -216,24 +221,41 @@ def main(argv):
   if FLAGS.fake_data:
     mnist_data = build_fake_data()
   else:
-    mnist_data = mnist.read_data_sets(FLAGS.data_dir)
+    mnist_data = mnist.read_data_sets(FLAGS.data_dir, reshape=False)
 
   with tf.Graph().as_default():
     (images, labels, handle,
      training_iterator, heldout_iterator) = build_input_pipeline(
          mnist_data, FLAGS.batch_size, mnist_data.validation.num_examples)
 
-    # Build a Bayesian neural net. We use the Flipout Monte Carlo estimator for
-    # each layer: this enables lower variance stochastic gradients than naive
-    # reparameterization.
+    # Build a Bayesian LeNet5 network. We use the Flipout Monte Carlo estimator
+    # for the convolution and fully-connected layers: this enables lower
+    # variance stochastic gradients than naive reparameterization.
     with tf.name_scope("bayesian_neural_net", values=[images]):
-      neural_net = tf.keras.Sequential()
-      for units in FLAGS.layer_sizes:
-        layer = tfp.layers.DenseFlipout(
-            units,
-            activation=FLAGS.activation)
-        neural_net.add(layer)
-      neural_net.add(tfp.layers.DenseFlipout(10))
+      neural_net = tf.keras.Sequential([
+          tfp.layers.Convolution2DFlipout(6,
+                                          kernel_size=5,
+                                          padding="SAME",
+                                          activation=tf.nn.relu),
+          tf.keras.layers.MaxPooling2D(pool_size=[2, 2],
+                                       strides=[2, 2],
+                                       padding="SAME"),
+          tfp.layers.Convolution2DFlipout(16,
+                                          kernel_size=5,
+                                          padding="SAME",
+                                          activation=tf.nn.relu),
+          tf.keras.layers.MaxPooling2D(pool_size=[2, 2],
+                                       strides=[2, 2],
+                                       padding="SAME"),
+          tfp.layers.Convolution2DFlipout(120,
+                                          kernel_size=5,
+                                          padding="SAME",
+                                          activation=tf.nn.relu),
+          tf.keras.layers.Flatten(),
+          tfp.layers.DenseFlipout(84, activation=tf.nn.relu),
+          tfp.layers.DenseFlipout(10)
+          ])
+
       logits = neural_net(images)
       labels_distribution = tfd.Categorical(logits=logits)
 
@@ -248,12 +270,16 @@ def main(argv):
     accuracy, accuracy_update_op = tf.metrics.accuracy(
         labels=labels, predictions=predictions)
 
-    # Extract weight posterior statistics for later visualization.
+    # Extract weight posterior statistics for layers with weight distributions
+    # for later visualization.
     names = []
     qmeans = []
     qstds = []
     for i, layer in enumerate(neural_net.layers):
-      q = layer.kernel_posterior
+      try:
+        q = layer.kernel_posterior
+      except AttributeError:
+        continue
       names.append("Layer {}".format(i))
       qmeans.append(q.mean())
       qstds.append(q.stddev())

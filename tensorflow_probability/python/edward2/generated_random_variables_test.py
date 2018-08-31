@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import inspect
+from absl.testing import parameterized
 import numpy as np
 import tensorflow as tf
 
@@ -28,93 +29,124 @@ from tensorflow_probability import edward2 as ed
 tfe = tf.contrib.eager
 
 
-class GeneratedRandomVariablesTest(tf.test.TestCase):
+class GeneratedRandomVariablesTest(parameterized.TestCase, tf.test.TestCase):
 
-  @tfe.run_test_in_graph_and_eager_modes()
+  @tfe.run_test_in_graph_and_eager_modes
   def testBernoulliDoc(self):
     self.assertGreater(len(ed.Bernoulli.__doc__), 0)
-    self.assertTrue(inspect.cleandoc(tfd.Bernoulli.__init__.__doc__) in
-                    ed.Bernoulli.__doc__)
+    self.assertIn(inspect.cleandoc(tfd.Bernoulli.__init__.__doc__),
+                  ed.Bernoulli.__doc__)
     self.assertEqual(ed.Bernoulli.__name__, "Bernoulli")
 
-  def _testBernoulliLogProb(self, probs, n):
-    rv = ed.Bernoulli(probs)
-    dist = tfd.Bernoulli(probs)
+  @parameterized.named_parameters(
+      {"testcase_name": "1d_rv_1d_event", "logits": np.zeros(1), "n": [1]},
+      {"testcase_name": "1d_rv_5d_event", "logits": np.zeros(1), "n": [5]},
+      {"testcase_name": "5d_rv_1d_event", "logits": np.zeros(5), "n": [1]},
+      {"testcase_name": "5d_rv_5d_event", "logits": np.zeros(5), "n": [5]},
+  )
+  @tfe.run_test_in_graph_and_eager_modes
+  def testBernoulliLogProb(self, logits, n):
+    rv = ed.Bernoulli(logits)
+    dist = tfd.Bernoulli(logits)
     x = rv.distribution.sample(n)
     rv_log_prob, dist_log_prob = self.evaluate(
         [rv.distribution.log_prob(x), dist.log_prob(x)])
     self.assertAllEqual(rv_log_prob, dist_log_prob)
 
-  @tfe.run_test_in_graph_and_eager_modes()
-  def testBernoulliLogProb1D(self):
-    self._testBernoulliLogProb(tf.zeros([1]) + 0.5, [1])
-    self._testBernoulliLogProb(tf.zeros([1]) + 0.5, [5])
-    self._testBernoulliLogProb(tf.zeros([5]) + 0.5, [1])
-    self._testBernoulliLogProb(tf.zeros([5]) + 0.5, [5])
-
-  def _testBernoulliSample(self, probs, n):
-    rv = ed.Bernoulli(probs)
-    dist = tfd.Bernoulli(probs)
+  @parameterized.named_parameters(
+      {"testcase_name": "0d_rv_0d_sample",
+       "logits": 0.,
+       "n": 1},
+      {"testcase_name": "0d_rv_1d_sample",
+       "logits": 0.,
+       "n": [1]},
+      {"testcase_name": "1d_rv_1d_sample",
+       "logits": np.array([0.]),
+       "n": [1]},
+      {"testcase_name": "1d_rv_5d_sample",
+       "logits": np.array([0.]),
+       "n": [5]},
+      {"testcase_name": "2d_rv_1d_sample",
+       "logits": np.array([-0.2, 0.8]),
+       "n": [1]},
+      {"testcase_name": "2d_rv_5d_sample",
+       "logits": np.array([-0.2, 0.8]),
+       "n": [5]},
+  )
+  @tfe.run_test_in_graph_and_eager_modes
+  def testBernoulliSample(self, logits, n):
+    rv = ed.Bernoulli(logits)
+    dist = tfd.Bernoulli(logits)
     self.assertEqual(rv.distribution.sample(n).shape, dist.sample(n).shape)
 
-  @tfe.run_test_in_graph_and_eager_modes()
-  def testBernoulliSample0D(self):
-    self._testBernoulliSample(0.5, [1])
-    self._testBernoulliSample(np.array(0.5), [1])
-    self._testBernoulliSample(tf.constant(0.5), [1])
-
-  @tfe.run_test_in_graph_and_eager_modes()
-  def testBernoulliSample1D(self):
-    self._testBernoulliSample(np.array([0.5]), [1])
-    self._testBernoulliSample(np.array([0.5]), [5])
-    self._testBernoulliSample(np.array([0.2, 0.8]), [1])
-    self._testBernoulliSample(np.array([0.2, 0.8]), [10])
-    self._testBernoulliSample(tf.constant([0.5]), [1])
-    self._testBernoulliSample(tf.constant([0.5]), [5])
-    self._testBernoulliSample(tf.constant([0.2, 0.8]), [1])
-    self._testBernoulliSample(tf.constant([0.2, 0.8]), [10])
-
-  def _testShape(self, rv, sample_shape, batch_shape, event_shape):
+  @parameterized.named_parameters(
+      {"testcase_name": "0d_bernoulli",
+       "rv": ed.Bernoulli(probs=0.5),
+       "sample_shape": [],
+       "batch_shape": [],
+       "event_shape": []},
+      {"testcase_name": "2d_bernoulli",
+       "rv": ed.Bernoulli(tf.zeros([2, 3])),
+       "sample_shape": [],
+       "batch_shape": [2, 3],
+       "event_shape": []},
+      {"testcase_name": "2x0d_bernoulli",
+       "rv": ed.Bernoulli(probs=0.5, sample_shape=2),
+       "sample_shape": [2],
+       "batch_shape": [],
+       "event_shape": []},
+      {"testcase_name": "2x1d_bernoulli",
+       "rv": ed.Bernoulli(probs=0.5, sample_shape=[2, 1]),
+       "sample_shape": [2, 1],
+       "batch_shape": [],
+       "event_shape": []},
+      {"testcase_name": "3d_dirichlet",
+       "rv": ed.Dirichlet(tf.zeros(3)),
+       "sample_shape": [],
+       "batch_shape": [],
+       "event_shape": [3]},
+      {"testcase_name": "2x3d_dirichlet",
+       "rv": ed.Dirichlet(tf.zeros([2, 3])),
+       "sample_shape": [],
+       "batch_shape": [2],
+       "event_shape": [3]},
+      {"testcase_name": "1x3d_dirichlet",
+       "rv": ed.Dirichlet(tf.zeros(3), sample_shape=1),
+       "sample_shape": [1],
+       "batch_shape": [],
+       "event_shape": [3]},
+      {"testcase_name": "2x1x3d_dirichlet",
+       "rv": ed.Dirichlet(tf.zeros(3), sample_shape=[2, 1]),
+       "sample_shape": [2, 1],
+       "batch_shape": [],
+       "event_shape": [3]},
+  )
+  @tfe.run_test_in_graph_and_eager_modes
+  def testShape(self, rv, sample_shape, batch_shape, event_shape):
     self.assertEqual(rv.shape, sample_shape + batch_shape + event_shape)
     self.assertEqual(rv.sample_shape, sample_shape)
     self.assertEqual(rv.distribution.batch_shape, batch_shape)
     self.assertEqual(rv.distribution.event_shape, event_shape)
 
-  @tfe.run_test_in_graph_and_eager_modes()
-  def testShapeBernoulli(self):
-    self._testShape(ed.Bernoulli(probs=0.5), [], [], [])
-    self._testShape(ed.Bernoulli(tf.zeros([2, 3])), [], [2, 3], [])
-    self._testShape(ed.Bernoulli(probs=0.5, sample_shape=2), [2], [], [])
-    self._testShape(
-        ed.Bernoulli(probs=0.5, sample_shape=[2, 1]), [2, 1], [], [])
-
-  @tfe.run_test_in_graph_and_eager_modes()
-  def testShapeDirichlet(self):
-    self._testShape(ed.Dirichlet(tf.zeros(3)), [], [], [3])
-    self._testShape(ed.Dirichlet(tf.zeros([2, 3])), [], [2], [3])
-    self._testShape(ed.Dirichlet(tf.zeros(3), sample_shape=1), [1], [], [3])
-    self._testShape(
-        ed.Dirichlet(tf.zeros(3), sample_shape=[2, 1]), [2, 1], [], [3])
-
-  def _testValueShapeAndDtype(self, cls, value, *args, **kwargs):
-    rv = cls(*args, value=value, **kwargs)
+  def _testValueShapeAndDtype(self, cls, value, **kwargs):
+    rv = cls(value=value, **kwargs)
     value_shape = rv.value.shape
     expected_shape = rv.sample_shape.concatenate(
         rv.distribution.batch_shape).concatenate(rv.distribution.event_shape)
     self.assertEqual(value_shape, expected_shape)
     self.assertEqual(rv.distribution.dtype, rv.value.dtype)
 
-  @tfe.run_test_in_graph_and_eager_modes()
-  def testValueShapeAndDtype(self):
-    self._testValueShapeAndDtype(ed.Normal, 2, loc=0.5, scale=1.0)
-    self._testValueShapeAndDtype(ed.Normal, [2], loc=[0.5], scale=[1.0])
-    self._testValueShapeAndDtype(ed.Poisson, 2, rate=0.5)
+  @parameterized.parameters(
+      {"cls": ed.Normal, "value": 2, "kwargs": {"loc": 0.5, "scale": 1.0}},
+      {"cls": ed.Normal, "value": [2],
+       "kwargs": {"loc": [0.5], "scale": [1.0]}},
+      {"cls": ed.Poisson, "value": 2, "kwargs": {"rate": 0.5}},
+  )
+  @tfe.run_test_in_graph_and_eager_modes
+  def testValueShapeAndDtype(self, cls, value, kwargs):
+    self._testValueShapeAndDtype(cls, value, **kwargs)
 
-  def testValueUnknownShape(self):
-    # should not raise error
-    ed.Bernoulli(probs=0.5, value=tf.placeholder(tf.int32))
-
-  @tfe.run_test_in_graph_and_eager_modes()
+  @tfe.run_test_in_graph_and_eager_modes
   def testValueMismatchRaises(self):
     with self.assertRaises(ValueError):
       self._testValueShapeAndDtype(ed.Normal, 2, loc=[0.5, 0.5], scale=1.0)
@@ -124,8 +156,12 @@ class GeneratedRandomVariablesTest(tf.test.TestCase):
       self._testValueShapeAndDtype(
           ed.Normal, np.zeros([10, 3]), loc=[0.5, 0.5], scale=[1.0, 1.0])
 
-  def testAsRandomVariable(self):
+  def testValueUnknownShape(self):
+    # should not raise error
+    ed.Bernoulli(probs=0.5, value=tf.placeholder(tf.int32))
 
+  @tfe.run_test_in_graph_and_eager_modes
+  def testAsRandomVariable(self):
     # A wrapped Normal distribution should behave identically to
     # the builtin Normal RV.
     def model_builtin():

@@ -14,6 +14,7 @@
 # ============================================================================
 """Install tensorflow_probability."""
 import datetime
+import os
 import sys
 
 from setuptools import find_packages
@@ -21,14 +22,22 @@ from setuptools import setup
 from setuptools.command.install import install as InstallCommandBase
 from setuptools.dist import Distribution
 
-VERSION = '0.3.0'
+# To enable importing version.py directly, we add its path to sys.path.
+version_path = os.path.join(
+    os.path.dirname(__file__), 'tensorflow_probability', 'python')
+sys.path.append(version_path)
+from version import __version__  # pylint: disable=g-import-not-at-top
 
 REQUIRED_PACKAGES = [
     'six >= 1.10.0',
-    'numpy >= 1.11.1',
+    # Currently numpy>=1.15.0 causes test failures in TensorFlow so they've
+    # constrained to these slightly older versions. Fix is planned for 1.11
+    # release.
+    # TODO(b/112417381): revert this once TF issues are fixed.
+    'numpy <=1.14.5, >=1.13.3',
 ]
 
-REQUIRED_TENSORFLOW_VERSION = '1.9.0'
+REQUIRED_TENSORFLOW_VERSION = '1.10.0'
 
 if '--gpu' in sys.argv:
   use_gpu = True
@@ -54,7 +63,7 @@ else:
   # '0.0.1.dev20180305'
   project_name = 'tfp-nightly' + maybe_gpu_suffix
   datestring = datetime.datetime.now().strftime('%Y%m%d')
-  VERSION += '.dev' + datestring
+  __version__ += datestring
   tensorflow_package_name = 'tf-nightly{}'.format(
       maybe_gpu_suffix)
 
@@ -69,7 +78,7 @@ class BinaryDistribution(Distribution):
 
 setup(
     name=project_name,
-    version=VERSION,
+    version=__version__,
     description='Probabilistic modeling and statistical '
                 'inference in TensorFlow',
     author='Google LLC',

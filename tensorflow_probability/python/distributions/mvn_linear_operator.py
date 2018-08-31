@@ -19,7 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from tensorflow_probability.python.bijectors import AffineLinearOperator
+from tensorflow_probability.python import bijectors
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow.python.ops.distributions import transformed_distribution
 
@@ -181,7 +181,7 @@ class MultivariateNormalLinearOperator(
         distribution=tf.distributions.Normal(
             loc=tf.zeros([], dtype=scale.dtype),
             scale=tf.ones([], dtype=scale.dtype)),
-        bijector=AffineLinearOperator(
+        bijector=bijectors.AffineLinearOperator(
             shift=loc, scale=scale, validate_args=validate_args),
         batch_shape=batch_shape,
         event_shape=event_shape,

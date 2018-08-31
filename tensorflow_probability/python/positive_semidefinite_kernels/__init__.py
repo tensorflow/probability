@@ -24,7 +24,6 @@ from tensorflow_probability.python.positive_semidefinite_kernels.matern import M
 from tensorflow_probability.python.positive_semidefinite_kernels.matern import MaternOneHalf
 from tensorflow_probability.python.positive_semidefinite_kernels.matern import MaternThreeHalves
 from tensorflow_probability.python.positive_semidefinite_kernels.positive_semidefinite_kernel import PositiveSemidefiniteKernel
-import tensorflow_probability.python.positive_semidefinite_kernels.util
 
 from tensorflow.python.util.all_util import remove_undocumented
 
@@ -35,7 +34,6 @@ _allowed_symbols = [
     'MaternOneHalf',
     'MaternThreeHalves',
     'PositiveSemidefiniteKernel',
-    'util',
 ]
 
 remove_undocumented(__name__, _allowed_symbols)

@@ -42,6 +42,7 @@ from tensorflow_probability.python.distributions.inverse_gamma import InverseGam
 from tensorflow_probability.python.distributions.inverse_gamma import InverseGammaWithSoftplusConcentrationRate
 from tensorflow_probability.python.distributions.kumaraswamy import Kumaraswamy
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import LinearGaussianStateSpaceModel
+from tensorflow_probability.python.distributions.lkj import LKJ
 from tensorflow_probability.python.distributions.logistic import Logistic
 from tensorflow_probability.python.distributions.lognormal import LogNormal
 from tensorflow_probability.python.distributions.mixture import Mixture
@@ -56,6 +57,7 @@ from tensorflow_probability.python.distributions.negative_binomial import Negati
 from tensorflow_probability.python.distributions.normal_conjugate_posteriors import normal_conjugates_known_scale_posterior
 from tensorflow_probability.python.distributions.normal_conjugate_posteriors import normal_conjugates_known_scale_predictive
 from tensorflow_probability.python.distributions.onehot_categorical import OneHotCategorical
+from tensorflow_probability.python.distributions.pareto import Pareto
 from tensorflow_probability.python.distributions.poisson import Poisson
 from tensorflow_probability.python.distributions.poisson_lognormal import PoissonLogNormalQuadratureCompound
 from tensorflow_probability.python.distributions.poisson_lognormal import quadrature_scheme_lognormal_gauss_hermite
@@ -75,6 +77,7 @@ from tensorflow_probability.python.distributions.vector_diffeomixture import Vec
 from tensorflow_probability.python.distributions.vector_exponential_diag import VectorExponentialDiag
 from tensorflow_probability.python.distributions.vector_laplace_diag import VectorLaplaceDiag
 from tensorflow_probability.python.distributions.vector_sinh_arcsinh_diag import VectorSinhArcsinhDiag
+from tensorflow_probability.python.distributions.von_mises import VonMises
 from tensorflow_probability.python.distributions.von_mises_fisher import VonMisesFisher
 from tensorflow_probability.python.distributions.wishart import Wishart
 
@@ -152,6 +155,7 @@ __all__ = [
     'LinearGaussianStateSpaceModel',
     'Laplace',
     'LaplaceWithSoftplusScale',
+    'LKJ',
     'Logistic',
     'LogNormal',
     'NegativeBinomial',
@@ -177,6 +181,7 @@ __all__ = [
     'VectorDiffeomixture',
     'VectorLaplaceDiag',
     'VectorSinhArcsinhDiag',
+    'VonMises',
     'VonMisesFisher',
     'Wishart',
     'TransformedDistribution',
@@ -185,6 +190,7 @@ __all__ = [
     'MixtureSameFamily',
     'ExpRelaxedOneHotCategorical',
     'OneHotCategorical',
+    'Pareto',
     'RelaxedBernoulli',
     'RelaxedOneHotCategorical',
     'kl_divergence',

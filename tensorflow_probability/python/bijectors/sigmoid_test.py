@@ -38,12 +38,18 @@ class SigmoidBijectorTest(tf.test.TestCase):
       y = special.expit(x)
       ildj = -np.log(y) - np.log1p(-y)
       bijector = tfb.Sigmoid()
-      self.assertAllClose(y, bijector.forward(x).eval(), atol=0., rtol=1e-2)
-      self.assertAllClose(x, bijector.inverse(y).eval(), atol=0., rtol=1e-4)
-      self.assertAllClose(ildj, bijector.inverse_log_det_jacobian(
-          y, event_ndims=0).eval(), atol=0., rtol=1e-6)
-      self.assertAllClose(-ildj, bijector.forward_log_det_jacobian(
-          x, event_ndims=0).eval(), atol=0., rtol=1e-4)
+      self.assertAllClose(
+          y, self.evaluate(bijector.forward(x)), atol=0., rtol=1e-2)
+      self.assertAllClose(
+          x, self.evaluate(bijector.inverse(y)), atol=0., rtol=1e-4)
+      self.assertAllClose(
+          ildj,
+          self.evaluate(bijector.inverse_log_det_jacobian(
+              y, event_ndims=0)), atol=0., rtol=1e-6)
+      self.assertAllClose(
+          -ildj,
+          self.evaluate(bijector.forward_log_det_jacobian(
+              x, event_ndims=0)), atol=0., rtol=1e-4)
 
   def testScalarCongruency(self):
     with self.test_session():

@@ -40,17 +40,17 @@ class KumaraswamyBijectorTest(tf.test.TestCase):
       x = np.array([[[0.1], [0.2], [0.3], [0.4], [0.5]]], dtype=np.float32)
       # Kumaraswamy cdf. This is the same as inverse(x).
       y = 1. - (1. - x ** a) ** b
-      self.assertAllClose(y, bijector.inverse(x).eval())
-      self.assertAllClose(x, bijector.forward(y).eval())
+      self.assertAllClose(y, self.evaluate(bijector.inverse(x)))
+      self.assertAllClose(x, self.evaluate(bijector.forward(y)))
       kumaraswamy_log_pdf = (np.log(a) + np.log(b) + (a - 1) * np.log(x) +
                              (b - 1) * np.log1p(-x ** a))
 
       self.assertAllClose(
           np.squeeze(kumaraswamy_log_pdf, axis=-1),
-          bijector.inverse_log_det_jacobian(x, event_ndims=1).eval())
+          self.evaluate(bijector.inverse_log_det_jacobian(x, event_ndims=1)))
       self.assertAllClose(
-          -bijector.inverse_log_det_jacobian(x, event_ndims=1).eval(),
-          bijector.forward_log_det_jacobian(y, event_ndims=1).eval(),
+          self.evaluate(-bijector.inverse_log_det_jacobian(x, event_ndims=1)),
+          self.evaluate(bijector.forward_log_det_jacobian(y, event_ndims=1)),
           rtol=1e-4,
           atol=0.)
 

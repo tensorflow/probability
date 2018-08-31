@@ -337,7 +337,7 @@ def model_fn(features, labels, mode, params, config):
   """
   del labels, config
 
-  if params["analytic_kl"] and params["latent_size"] != 1:
+  if params["analytic_kl"] and params["mixture_components"] != 1:
     raise NotImplementedError(
         "Using `analytic_kl` is only supported when `mixture_components = 1` "
         "since there's no closed form otherwise.")
@@ -440,7 +440,7 @@ def static_mnist_dataset(directory, split_name):
   """Returns binary static MNIST tf.data.Dataset."""
   amat_file = download(directory, FILE_TEMPLATE.format(split=split_name))
   dataset = tf.data.TextLineDataset(amat_file)
-  str_to_arr = lambda string: np.array([char == "1" for char in string.split()])
+  str_to_arr = lambda string: np.array([c == b"1" for c in string.split()])
 
   def _parser(s):
     booltensor = tf.py_func(str_to_arr, [s], tf.bool)

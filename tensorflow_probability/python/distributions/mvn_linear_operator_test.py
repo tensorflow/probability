@@ -24,10 +24,13 @@ from scipy import stats
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow.python.framework import test_util
+
 
 tfd = tfp.distributions
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class MultivariateNormalLinearOperatorTest(tf.test.TestCase):
 
   def setUp(self):
@@ -49,34 +52,31 @@ class MultivariateNormalLinearOperatorTest(tf.test.TestCase):
     return loc, scale
 
   def testNamePropertyIsSetByInitArg(self):
-    with self.test_session():
-      loc = [1., 2.]
-      scale = tf.linalg.LinearOperatorIdentity(2)
-      mvn = tfd.MultivariateNormalLinearOperator(loc, scale, name="Billy")
-      self.assertEqual(mvn.name, "Billy/")
+    loc = [1., 2.]
+    scale = tf.linalg.LinearOperatorIdentity(2)
+    mvn = tfd.MultivariateNormalLinearOperator(loc, scale, name="Billy")
+    self.assertEqual(mvn.name, "Billy/")
 
   def testLogPDFScalarBatch(self):
-    with self.test_session():
-      loc = self.rng.rand(2)
-      scale = tf.linalg.LinearOperatorLowerTriangular(
-          self._random_tril_matrix([2, 2]), is_non_singular=True)
-      mvn = tfd.MultivariateNormalLinearOperator(loc, scale, validate_args=True)
-      x = self.rng.rand(2)
+    loc = self.rng.rand(2)
+    scale = tf.linalg.LinearOperatorLowerTriangular(
+        self._random_tril_matrix([2, 2]), is_non_singular=True)
+    mvn = tfd.MultivariateNormalLinearOperator(loc, scale, validate_args=True)
+    x = self.rng.rand(2)
 
-      log_pdf = mvn.log_prob(x)
-      pdf = mvn.prob(x)
+    log_pdf = mvn.log_prob(x)
+    pdf = mvn.prob(x)
 
-      covariance = tf.matmul(scale.to_dense(),
-                             scale.to_dense(),
-                             adjoint_b=True).eval()
-      scipy_mvn = stats.multivariate_normal(mean=loc, cov=covariance)
+    covariance = self.evaluate(
+        tf.matmul(scale.to_dense(), scale.to_dense(), adjoint_b=True))
+    scipy_mvn = stats.multivariate_normal(mean=loc, cov=covariance)
 
-      expected_log_pdf = scipy_mvn.logpdf(x)
-      expected_pdf = scipy_mvn.pdf(x)
-      self.assertEqual((), log_pdf.get_shape())
-      self.assertEqual((), pdf.get_shape())
-      self.assertAllClose(expected_log_pdf, log_pdf.eval())
-      self.assertAllClose(expected_pdf, pdf.eval())
+    expected_log_pdf = scipy_mvn.logpdf(x)
+    expected_pdf = scipy_mvn.pdf(x)
+    self.assertEqual((), log_pdf.get_shape())
+    self.assertEqual((), pdf.get_shape())
+    self.assertAllClose(expected_log_pdf, self.evaluate(log_pdf))
+    self.assertAllClose(expected_pdf, self.evaluate(pdf))
 
   def testRaisesIfScaleNotProvided(self):
     loc = self.rng.rand(2)
@@ -84,92 +84,90 @@ class MultivariateNormalLinearOperatorTest(tf.test.TestCase):
       tfd.MultivariateNormalLinearOperator(loc, scale=None, validate_args=True)
 
   def testShapes(self):
-    with self.test_session():
-      loc = self.rng.rand(3, 5, 2)
-      scale = tf.linalg.LinearOperatorLowerTriangular(
-          self._random_tril_matrix([3, 5, 2, 2]), is_non_singular=True)
+    loc = self.rng.rand(3, 5, 2)
+    scale = tf.linalg.LinearOperatorLowerTriangular(
+        self._random_tril_matrix([3, 5, 2, 2]), is_non_singular=True)
 
-      mvn = tfd.MultivariateNormalLinearOperator(
-          loc, scale, validate_args=True)
+    mvn = tfd.MultivariateNormalLinearOperator(loc, scale, validate_args=True)
 
-      # Shapes known at graph construction time.
-      self.assertEqual((2,), tuple(mvn.event_shape.as_list()))
-      self.assertEqual((3, 5), tuple(mvn.batch_shape.as_list()))
+    # Shapes known at graph construction time.
+    self.assertEqual((2,), tuple(mvn.event_shape.as_list()))
+    self.assertEqual((3, 5), tuple(mvn.batch_shape.as_list()))
 
-      # Shapes known at runtime.
-      self.assertEqual((2,), tuple(mvn.event_shape_tensor().eval()))
-      self.assertEqual((3, 5), tuple(mvn.batch_shape_tensor().eval()))
+    # Shapes known at runtime.
+    self.assertEqual((2,), tuple(self.evaluate(mvn.event_shape_tensor())))
+    self.assertEqual((3, 5), tuple(self.evaluate(mvn.batch_shape_tensor())))
 
   def testMeanAndCovariance(self):
     loc, scale = self._random_loc_and_scale(
         batch_shape=[3, 4], event_shape=[5])
     mvn = tfd.MultivariateNormalLinearOperator(loc, scale)
 
-    with self.test_session():
-      self.assertAllEqual(mvn.mean().eval(), loc)
-      self.assertAllClose(
-          mvn.covariance().eval(),
-          np.matmul(
-              scale.to_dense().eval(),
-              np.transpose(scale.to_dense().eval(), [0, 1, 3, 2])))
+    self.assertAllEqual(self.evaluate(mvn.mean()), loc)
+    self.assertAllClose(
+        self.evaluate(mvn.covariance()),
+        np.matmul(
+            self.evaluate(scale.to_dense()),
+            np.transpose(self.evaluate(scale.to_dense()), [0, 1, 3, 2])))
 
   def testKLBatch(self):
     batch_shape = [2]
     event_shape = [3]
-    with self.test_session():
-      loc_a, scale_a = self._random_loc_and_scale(batch_shape, event_shape)
-      loc_b, scale_b = self._random_loc_and_scale(batch_shape, event_shape)
-      mvn_a = tfd.MultivariateNormalLinearOperator(
-          loc=loc_a, scale=scale_a, validate_args=True)
-      mvn_b = tfd.MultivariateNormalLinearOperator(
-          loc=loc_b, scale=scale_b, validate_args=True)
+    loc_a, scale_a = self._random_loc_and_scale(batch_shape, event_shape)
+    loc_b, scale_b = self._random_loc_and_scale(batch_shape, event_shape)
+    mvn_a = tfd.MultivariateNormalLinearOperator(
+        loc=loc_a, scale=scale_a, validate_args=True)
+    mvn_b = tfd.MultivariateNormalLinearOperator(
+        loc=loc_b, scale=scale_b, validate_args=True)
 
-      kl = tfd.kl_divergence(mvn_a, mvn_b)
-      self.assertEqual(batch_shape, kl.get_shape())
+    kl = tfd.kl_divergence(mvn_a, mvn_b)
+    self.assertEqual(batch_shape, kl.get_shape())
 
-      kl_v = kl.eval()
-      expected_kl_0 = self._compute_non_batch_kl(
-          loc_a[0, :], scale_a.to_dense().eval()[0, :, :],
-          loc_b[0, :], scale_b.to_dense().eval()[0, :])
-      expected_kl_1 = self._compute_non_batch_kl(
-          loc_a[1, :], scale_a.to_dense().eval()[1, :, :],
-          loc_b[1, :], scale_b.to_dense().eval()[1, :])
-      self.assertAllClose(expected_kl_0, kl_v[0])
-      self.assertAllClose(expected_kl_1, kl_v[1])
+    kl_v = self.evaluate(kl)
+    expected_kl_0 = self._compute_non_batch_kl(
+        loc_a[0, :],
+        self.evaluate(scale_a.to_dense())[0, :, :], loc_b[0, :],
+        self.evaluate(scale_b.to_dense())[0, :])
+    expected_kl_1 = self._compute_non_batch_kl(
+        loc_a[1, :],
+        self.evaluate(scale_a.to_dense())[1, :, :], loc_b[1, :],
+        self.evaluate(scale_b.to_dense())[1, :])
+    self.assertAllClose(expected_kl_0, kl_v[0])
+    self.assertAllClose(expected_kl_1, kl_v[1])
 
   def testKLBatchBroadcast(self):
     batch_shape = [2]
     event_shape = [3]
-    with self.test_session():
-      loc_a, scale_a = self._random_loc_and_scale(batch_shape, event_shape)
-      # No batch shape.
-      loc_b, scale_b = self._random_loc_and_scale([], event_shape)
-      mvn_a = tfd.MultivariateNormalLinearOperator(
-          loc=loc_a, scale=scale_a, validate_args=True)
-      mvn_b = tfd.MultivariateNormalLinearOperator(
-          loc=loc_b, scale=scale_b, validate_args=True)
+    loc_a, scale_a = self._random_loc_and_scale(batch_shape, event_shape)
+    # No batch shape.
+    loc_b, scale_b = self._random_loc_and_scale([], event_shape)
+    mvn_a = tfd.MultivariateNormalLinearOperator(
+        loc=loc_a, scale=scale_a, validate_args=True)
+    mvn_b = tfd.MultivariateNormalLinearOperator(
+        loc=loc_b, scale=scale_b, validate_args=True)
 
-      kl = tfd.kl_divergence(mvn_a, mvn_b)
-      self.assertEqual(batch_shape, kl.get_shape())
+    kl = tfd.kl_divergence(mvn_a, mvn_b)
+    self.assertEqual(batch_shape, kl.get_shape())
 
-      kl_v = kl.eval()
-      expected_kl_0 = self._compute_non_batch_kl(
-          loc_a[0, :], scale_a.to_dense().eval()[0, :, :],
-          loc_b, scale_b.to_dense().eval())
-      expected_kl_1 = self._compute_non_batch_kl(
-          loc_a[1, :], scale_a.to_dense().eval()[1, :, :],
-          loc_b, scale_b.to_dense().eval())
-      self.assertAllClose(expected_kl_0, kl_v[0])
-      self.assertAllClose(expected_kl_1, kl_v[1])
+    kl_v = self.evaluate(kl)
+    expected_kl_0 = self._compute_non_batch_kl(
+        loc_a[0, :],
+        self.evaluate(scale_a.to_dense())[0, :, :], loc_b,
+        self.evaluate(scale_b.to_dense()))
+    expected_kl_1 = self._compute_non_batch_kl(
+        loc_a[1, :],
+        self.evaluate(scale_a.to_dense())[1, :, :], loc_b,
+        self.evaluate(scale_b.to_dense()))
+    self.assertAllClose(expected_kl_0, kl_v[0])
+    self.assertAllClose(expected_kl_1, kl_v[1])
 
   def _compute_non_batch_kl(self, loc_a, scale_a, loc_b, scale_b):
     """Non-batch KL for N(loc_a, scale_a), N(loc_b, scale_b)."""
     # Check using numpy operations
     # This mostly repeats the tensorflow code _kl_mvn_mvn(), but in numpy.
     # So it is important to also check that KL(mvn, mvn) = 0.
-    with self.test_session():
-      covariance_a = np.dot(scale_a, scale_a.T)
-      covariance_b = np.dot(scale_b, scale_b.T)
+    covariance_a = np.dot(scale_a, scale_a.T)
+    covariance_b = np.dot(scale_b, scale_b.T)
     covariance_b_inv = np.linalg.inv(covariance_b)
 
     t = np.trace(covariance_b_inv.dot(covariance_a))

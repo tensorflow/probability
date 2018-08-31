@@ -24,10 +24,8 @@ from __future__ import print_function
 
 import tensorflow as tf
 
+from tensorflow_probability.python import distributions as tfd
 from tensorflow.python.framework import tensor_util
-
-tfd = tf.contrib.distributions
-
 
 __all__ = [
     'effective_sample_size',
@@ -82,7 +80,7 @@ def effective_sample_size(states,
   ```
   import tensorflow as tf
   import tensorflow_probability as tfp
-  tfd = tf.contrib.distributions
+  tfd = tfp.distributions
 
   target = tfd.MultivariateNormalDiag(scale_diag=[1., 2.])
 
@@ -259,7 +257,7 @@ def potential_scale_reduction(chains_states,
   ```python
   import tensorflow as tf
   import tensorflow_probability as tfp
-  tfd = tf.contrib.distributions
+  tfd = tfp.distributions
 
   target = tfd.MultivariateNormalDiag(scale_diag=[1., 2.])
 

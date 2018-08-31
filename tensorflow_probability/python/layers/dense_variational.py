@@ -20,12 +20,10 @@ from __future__ import print_function
 
 import tensorflow as tf
 
+from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.layers import util as tfp_layers_util
 from tensorflow_probability.python.math import random_rademacher
 from tensorflow_probability.python.util import docstring as docstring_util
-from tensorflow.python.ops.distributions import util as distribution_util
-
-tfd = tf.contrib.distributions
 
 
 __all__ = [
@@ -460,7 +458,11 @@ class DenseLocalReparameterization(_DenseVariational):
 
   It uses the local reparameterization estimator [(Kingma et al., 2015)][1],
   which performs a Monte Carlo approximation of the distribution on the hidden
-  units induced by the `kernel` and `bias`.
+  units induced by the `kernel` and `bias`. The default `kernel_posterior_fn`
+  is a normal distribution which factorizes across all elements of the weight
+  matrix and bias vector. Unlike [1]'s multiplicative parameterization, this
+  distribution has trainable location and scale parameters which is known as
+  an additive noise parameterization [(Molchanov et al., 2017)][2].
 
   The arguments permit separate specification of the surrogate posterior
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
@@ -513,6 +515,9 @@ class DenseLocalReparameterization(_DenseVariational):
   [1]: Diederik Kingma, Tim Salimans, and Max Welling. Variational Dropout and
        the Local Reparameterization Trick. In _Neural Information Processing
        Systems_, 2015. https://arxiv.org/abs/1506.02557
+  [2]: Dmitry Molchanov, Arsenii Ashukha, Dmitry Vetrov. Variational Dropout
+       Sparsifies Deep Neural Networks. In _International Conference on Machine
+       Learning_, 2017. https://arxiv.org/abs/1701.05369
   """
 
   @docstring_util.expand_docstring(args=doc_args)
@@ -709,16 +714,17 @@ class DenseFlipout(_DenseVariational):
     input_shape = tf.shape(inputs)
     batch_shape = input_shape[:-1]
 
+    seed_stream = tfd.SeedStream(self.seed, salt='DenseFlipout')
+
     sign_input = random_rademacher(
         input_shape,
         dtype=inputs.dtype,
-        seed=self.seed)
+        seed=seed_stream())
     sign_output = random_rademacher(
         tf.concat([batch_shape,
                    tf.expand_dims(self.units, 0)], 0),
         dtype=inputs.dtype,
-        seed=distribution_util.gen_new_seed(
-            self.seed, salt='dense_flipout'))
+        seed=seed_stream())
     perturbed_inputs = self._matmul(
         inputs * sign_input, self.kernel_posterior_affine_tensor) * sign_output
 

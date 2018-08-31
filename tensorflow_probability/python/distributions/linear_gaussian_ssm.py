@@ -24,14 +24,14 @@ import collections
 import tensorflow as tf
 
 
-from tensorflow_probability.python.distributions.mvn_tril import MultivariateNormalTriL
-from tensorflow_probability.python.distributions.seed_stream import SeedStream
+from tensorflow_probability.python.distributions import mvn_tril
+from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util as util
 
 from tensorflow.python.framework import tensor_util
 from tensorflow.python.ops.linalg import linear_operator_util
 
-tfl = tf.contrib.linalg
+tfl = tf.linalg
 
 # The built-in tf.matmul doesn't broadcast batch dimensions, so we
 # need to use `matmul_with_broadcast` throughout to ensure we support
@@ -336,6 +336,8 @@ class LinearGaussianStateSpaceModel(tf.distributions.Distribution):
       self.initial_step = initial_step
       self.final_step = self.initial_step + self.num_timesteps
 
+      dtype = initial_state_prior.dtype
+
       # Internally, the transition and observation matrices are
       # canonicalized as callables returning a LinearOperator. This
       # creates no overhead when the model is actually fixed, since in
@@ -344,8 +346,9 @@ class LinearGaussianStateSpaceModel(tf.distributions.Distribution):
       def _maybe_make_linop(x, name):
         """Converts Tensors into LinearOperators."""
         if not isinstance(x, tfl.LinearOperator):
-          x = tfl.LinearOperatorFullMatrix(tf.convert_to_tensor(x),
-                                           name=name)
+          x = tfl.LinearOperatorFullMatrix(
+              tf.convert_to_tensor(x, dtype=dtype),
+              name=name)
         return x
       def _maybe_make_callable_from_linop(f, name):
         """Converts fixed objects into trivial callables."""
@@ -425,7 +428,7 @@ class LinearGaussianStateSpaceModel(tf.distributions.Distribution):
         _, _ = self._batch_shape(), self._batch_shape_tensor()
 
       super(LinearGaussianStateSpaceModel, self).__init__(
-          dtype=self.initial_state_prior.dtype,
+          dtype=dtype,
           reparameterization_type=tf.distributions.FULLY_REPARAMETERIZED,
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
@@ -485,7 +488,7 @@ class LinearGaussianStateSpaceModel(tf.distributions.Distribution):
     """Draw a joint sample from the prior over latents and observations."""
 
     with tf.name_scope("sample_n_joint"):
-      seed_stream = SeedStream(
+      stream = seed_stream.SeedStream(
           seed, salt="LinearGaussianStateSpaceModel_sample_n_joint")
 
       sample_and_batch_shape = util.prefer_static_value(
@@ -503,7 +506,7 @@ class LinearGaussianStateSpaceModel(tf.distributions.Distribution):
                 self.initial_state_prior,
                 sample_and_batch_shape,
                 self.validate_args),
-            seed=seed_stream())
+            seed=stream())
 
         # Add a dummy dimension so that matmul() does matrix-vector
         # multiplication.
@@ -522,7 +525,7 @@ class LinearGaussianStateSpaceModel(tf.distributions.Distribution):
                                      initial_observation_noise,
                                      sample_and_batch_shape,
                                      self.validate_args),
-                                 seed=seed_stream())[..., tf.newaxis])
+                                 seed=stream())[..., tf.newaxis])
 
       sample_step = build_kalman_sample_step(
           self.get_transition_matrix_for_timestep,
@@ -530,7 +533,7 @@ class LinearGaussianStateSpaceModel(tf.distributions.Distribution):
           self.get_observation_matrix_for_timestep,
           self.get_observation_noise_for_timestep,
           full_sample_and_batch_shape=sample_and_batch_shape,
-          seed_stream=seed_stream,
+          stream=stream,
           validate_args=self.validate_args)
 
       # Scan over all timesteps to sample latents and observations.
@@ -664,11 +667,11 @@ class LinearGaussianStateSpaceModel(tf.distributions.Distribution):
           predicted_mean=prior_mean,
           predicted_cov=prior_cov,
           filtered_mean=prior_mean,  # establishes shape, value ignored
-          filtered_cov=prior_cov,    # establishes shape, value ignored
+          filtered_cov=prior_cov,  # establishes shape, value ignored
           observation_mean=initial_observation_mean,
           observation_cov=initial_observation_cov,
           log_marginal_likelihood=tf.zeros(
-              shape=sample_and_batch_shape, dtype=tf.float32),
+              shape=sample_and_batch_shape, dtype=self.dtype),
           timestep=tf.convert_to_tensor(
               self.initial_step, dtype=tf.int32, name="initial_step"))
 
@@ -1004,15 +1007,16 @@ def linear_gaussian_update(prior_mean, prior_cov,
   # as an intermediate quantity.
   latent_size = util.prefer_static_value(
       observation_matrix.shape_tensor())[-1]
-  tmp_term = tf.eye(latent_size) - observation_matrix.matmul(
-      gain, adjoint=True, adjoint_arg=True)
+  tmp_term = (
+      tf.eye(latent_size, dtype=observation_matrix.dtype) -
+      observation_matrix.matmul(gain, adjoint=True, adjoint_arg=True))
   posterior_cov = (
       _matmul(tf.matrix_transpose(tmp_term),
               _matmul(prior_cov, tmp_term))
       + _matmul(gain, _matmul(observation_noise.covariance(),
                               tf.matrix_transpose(gain))))
 
-  predictive_dist = MultivariateNormalTriL(
+  predictive_dist = mvn_tril.MultivariateNormalTriL(
       loc=x_expected[..., 0],
       scale_tril=predicted_obs_cov_chol)
 
@@ -1124,7 +1128,7 @@ def build_kalman_sample_step(get_transition_matrix_for_timestep,
                              get_observation_matrix_for_timestep,
                              get_observation_noise_for_timestep,
                              full_sample_and_batch_shape,
-                             seed_stream,
+                             stream,
                              validate_args=False):
   """Build a callable for one step of Kalman sampling recursion.
 
@@ -1145,7 +1149,7 @@ def build_kalman_sample_step(get_transition_matrix_for_timestep,
       `[observation_size]`.
     full_sample_and_batch_shape: Desired sample and batch shape of the
       returned samples, concatenated in a single `Tensor`.
-    seed_stream: `tfd.SeedStream` instance used to generate a
+    stream: `tfd.SeedStream` instance used to generate a
       sequence of random seeds.
     validate_args: if True, perform error checking at runtime.
 
@@ -1167,7 +1171,7 @@ def build_kalman_sample_step(get_transition_matrix_for_timestep,
             transition_noise,
             full_sample_and_batch_shape,
             validate_args),
-        seed=seed_stream())[..., tf.newaxis]
+        seed=stream())[..., tf.newaxis]
 
     observation_matrix = get_observation_matrix_for_timestep(t)
     observation_noise = get_observation_noise_for_timestep(t)
@@ -1178,7 +1182,7 @@ def build_kalman_sample_step(get_transition_matrix_for_timestep,
             observation_noise,
             full_sample_and_batch_shape,
             validate_args),
-        seed=seed_stream())[..., tf.newaxis]
+        seed=stream())[..., tf.newaxis]
 
     return (latent_sampled, observation_sampled)
 

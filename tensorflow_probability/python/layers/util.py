@@ -23,9 +23,8 @@ import types
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python import distributions as tfd
 from tensorflow.python.keras.utils import generic_utils
-
-tfd = tf.contrib.distributions
 
 
 __all__ = [

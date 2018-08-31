@@ -45,6 +45,9 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/distributions:seed_stream",
+        "//tensorflow_probability/python/math",
+        "//tensorflow_probability/python/util:docstring",
     ],
 )
 
@@ -66,8 +69,11 @@ py_library(
     ],
     srcs_version = "PY2AND3",
     deps = [
-        # numpy dep,
+        ":util",
         # tensorflow dep,
+        "//tensorflow_probability/python/distributions:seed_stream",
+        "//tensorflow_probability/python/math",
+        "//tensorflow_probability/python/util:docstring",
     ],
 )
 

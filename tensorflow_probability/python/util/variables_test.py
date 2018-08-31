@@ -58,7 +58,7 @@ class _WrapCallableTest(object):
       z_actual = tf.get_variable('z', dtype=self.dtype)
 
       tf.global_variables_initializer().run()
-      result_ = result.eval()
+      result_ = self.evaluate(result)
 
       self.assertEqual(self.dtype, result_.dtype)
       self.assertAllEqual([5.5, 6.5, 7.5], result_)
@@ -79,7 +79,7 @@ class _WrapCallableTest(object):
       result = wrapped_fn(self.dtype([2, 3]), 0.5)  # x, y
 
       tf.global_variables_initializer().run()
-      result_ = result.eval()
+      result_ = self.evaluate(result)
 
       self.assertEqual(self.dtype, result_.dtype)
       self.assertAllEqual([2.5, 4.5], result_)

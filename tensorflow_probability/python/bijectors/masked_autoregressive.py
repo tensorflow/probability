@@ -53,7 +53,7 @@ class MaskedAutoregressiveFlow(bijector.Bijector):
   this property by zeroing out weights in its `masked_dense` layers.
 
   In the `tf.distributions` framework, a "normalizing flow" is implemented as a
-  `tf.contrib.distributions.bijectors.Bijector`. The `forward` "autoregression"
+  `tfp.distributions.bijectors.Bijector`. The `forward` "autoregression"
   is implemented using a `tf.while_loop` and a deep neural network (DNN) with
   masked weights such that the autoregressive property is automatically met in
   the `inverse`.
@@ -118,7 +118,7 @@ class MaskedAutoregressiveFlow(bijector.Bijector):
 
   ```python
   tfd = tfp.distributions
-  tfb = tfd.bijectors
+  tfb = tfp.bijectors
 
   dims = 5
 

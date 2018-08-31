@@ -29,7 +29,6 @@ from tensorflow.python.framework import test_util
 
 class _GaussianProcessTest(object):
 
-  @test_util.run_in_graph_and_eager_modes()
   def testShapes(self):
     # 5x5 grid of index points in R^2 and flatten to 25x2
     index_points = np.linspace(-4., 4., 5, dtype=np.float32)
@@ -59,27 +58,26 @@ class _GaussianProcessTest(object):
 
     samples = gp.sample(sample_shape)
 
-    with self.test_session():
-      if self.is_static or tf.executing_eagerly():
-        self.assertAllEqual(gp.batch_shape_tensor(), batch_shape)
-        self.assertAllEqual(gp.event_shape_tensor(), event_shape)
-        self.assertAllEqual(samples.shape,
-                            sample_shape + batch_shape + event_shape)
-        self.assertAllEqual(gp.batch_shape, batch_shape)
-        self.assertAllEqual(gp.event_shape, event_shape)
-        self.assertAllEqual(samples.shape,
-                            sample_shape + batch_shape + event_shape)
-      else:
-        self.assertAllEqual(gp.batch_shape_tensor().eval(), batch_shape)
-        self.assertAllEqual(gp.event_shape_tensor().eval(), event_shape)
-        self.assertAllEqual(samples.eval().shape,
-                            sample_shape + batch_shape + event_shape)
-        self.assertIsNone(samples.shape.ndims)
-        self.assertIsNone(gp.batch_shape.ndims)
-        self.assertEqual(gp.event_shape.ndims, 1)
-        self.assertIsNone(gp.event_shape.dims[0].value)
+    if self.is_static or tf.executing_eagerly():
+      self.assertAllEqual(gp.batch_shape_tensor(), batch_shape)
+      self.assertAllEqual(gp.event_shape_tensor(), event_shape)
+      self.assertAllEqual(samples.shape,
+                          sample_shape + batch_shape + event_shape)
+      self.assertAllEqual(gp.batch_shape, batch_shape)
+      self.assertAllEqual(gp.event_shape, event_shape)
+      self.assertAllEqual(samples.shape,
+                          sample_shape + batch_shape + event_shape)
+    else:
+      self.assertAllEqual(self.evaluate(gp.batch_shape_tensor()), batch_shape)
+      self.assertAllEqual(self.evaluate(gp.event_shape_tensor()), event_shape)
+      self.assertAllEqual(
+          self.evaluate(samples).shape,
+          sample_shape + batch_shape + event_shape)
+      self.assertIsNone(samples.shape.ndims)
+      self.assertIsNone(gp.batch_shape.ndims)
+      self.assertEqual(gp.event_shape.ndims, 1)
+      self.assertIsNone(gp.event_shape.dims[0].value)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testVarianceAndCovarianceMatrix(self):
     amp = np.float64(.5)
     len_scale = np.float64(.2)
@@ -97,7 +95,7 @@ class _GaussianProcessTest(object):
         jitter=jitter)
 
     def _kernel_fn(x, y):
-      return amp * np.exp(-.5 * (np.squeeze((x - y)**2)) / (len_scale**2))
+      return amp ** 2 * np.exp(-.5 * (np.squeeze((x - y)**2)) / (len_scale**2))
 
     expected_covariance = (
         _kernel_fn(np.expand_dims(index_points, 0),
@@ -109,7 +107,6 @@ class _GaussianProcessTest(object):
     self.assertAllClose(np.diag(expected_covariance),
                         self.evaluate(gp.variance()))
 
-  @test_util.run_in_graph_and_eager_modes()
   def testMean(self):
     mean_fn = lambda x: x[:, 0]**2
     kernel = psd_kernels.ExponentiatedQuadratic()
@@ -119,7 +116,6 @@ class _GaussianProcessTest(object):
     self.assertAllClose(expected_mean,
                         self.evaluate(gp.mean()))
 
-  @test_util.run_in_graph_and_eager_modes()
   def testCopy(self):
     # 5 random index points in R^2
     index_points_1 = np.random.uniform(-4., 4., (5, 2)).astype(np.float32)
@@ -142,33 +138,38 @@ class _GaussianProcessTest(object):
     event_shape_1 = [5]
     event_shape_2 = [10]
 
-    with self.test_session():
-      self.assertEqual(gp1.mean_fn, gp2.mean_fn)
-      self.assertIsInstance(gp1.kernel, psd_kernels.ExponentiatedQuadratic)
-      self.assertIsInstance(gp2.kernel, psd_kernels.ExpSinSquared)
+    self.assertEqual(gp1.mean_fn, gp2.mean_fn)
+    self.assertIsInstance(gp1.kernel, psd_kernels.ExponentiatedQuadratic)
+    self.assertIsInstance(gp2.kernel, psd_kernels.ExpSinSquared)
 
-      if self.is_static or tf.executing_eagerly():
-        self.assertAllEqual(gp1.batch_shape, gp2.batch_shape)
-        self.assertAllEqual(gp1.event_shape, event_shape_1)
-        self.assertAllEqual(gp2.event_shape, event_shape_2)
-        self.assertAllEqual(gp1.index_points, index_points_1)
-        self.assertAllEqual(gp2.index_points, index_points_2)
-        self.assertAllEqual(tensor_util.constant_value(gp1.jitter),
-                            tensor_util.constant_value(gp2.jitter))
-      else:
-        self.assertAllEqual(gp1.batch_shape_tensor().eval(),
-                            gp2.batch_shape_tensor().eval())
-        self.assertAllEqual(gp1.event_shape_tensor().eval(), event_shape_1)
-        self.assertAllEqual(gp2.event_shape_tensor().eval(), event_shape_2)
-        self.assertEqual(gp1.jitter.eval(), gp2.jitter.eval())
-        self.assertAllEqual(gp1.index_points.eval(), index_points_1)
-        self.assertAllEqual(gp2.index_points.eval(), index_points_2)
+    if self.is_static or tf.executing_eagerly():
+      self.assertAllEqual(gp1.batch_shape, gp2.batch_shape)
+      self.assertAllEqual(gp1.event_shape, event_shape_1)
+      self.assertAllEqual(gp2.event_shape, event_shape_2)
+      self.assertAllEqual(gp1.index_points, index_points_1)
+      self.assertAllEqual(gp2.index_points, index_points_2)
+      self.assertAllEqual(
+          tensor_util.constant_value(gp1.jitter),
+          tensor_util.constant_value(gp2.jitter))
+    else:
+      self.assertAllEqual(
+          self.evaluate(gp1.batch_shape_tensor()),
+          self.evaluate(gp2.batch_shape_tensor()))
+      self.assertAllEqual(
+          self.evaluate(gp1.event_shape_tensor()), event_shape_1)
+      self.assertAllEqual(
+          self.evaluate(gp2.event_shape_tensor()), event_shape_2)
+      self.assertEqual(self.evaluate(gp1.jitter), self.evaluate(gp2.jitter))
+      self.assertAllEqual(self.evaluate(gp1.index_points), index_points_1)
+      self.assertAllEqual(self.evaluate(gp2.index_points), index_points_2)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class GaussianProcessStaticTest(_GaussianProcessTest, tf.test.TestCase):
   is_static = True
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class GaussianProcessDynamicTest(_GaussianProcessTest, tf.test.TestCase):
   is_static = False
 

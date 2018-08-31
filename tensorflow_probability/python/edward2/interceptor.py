@@ -18,15 +18,17 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import collections
 from contextlib import contextmanager
 
 import functools
 import threading
 
 __all__ = [
-    "get_interceptor",
+    "get_next_interceptor",
     "interceptable",
     "interception",
+    "tape",
 ]
 
 
@@ -69,7 +71,7 @@ def interception(interceptor):
   def interceptor(f, *args, **kwargs):
     if kwargs.get("name") == "y":
       kwargs["value"] = 42
-    return f(*args, **kwargs)
+    return interceptable(f)(*args, **kwargs)
 
   with ed.interception(interceptor):
     y = model()
@@ -77,6 +79,11 @@ def interception(interceptor):
   with tf.Session() as sess:
     assert sess.run(y.value) == 42
   ```
+
+  Wrapping `f` as `interceptable` allows interceptors down the stack to
+  additionally modify this operation. Since the operation `f()` is not wrapped
+  by default, we could have called it directly. Refer also to the example in
+  `get_next_interceptor()` for more details on nested interceptors.
   """
   try:
     _interceptor_stack.stack.append(interceptor)
@@ -85,20 +92,94 @@ def interception(interceptor):
     _interceptor_stack.stack.pop()
 
 
-def get_interceptor():
-  """Returns the top-most (last) interceptor on the thread's stack.
+@contextmanager
+def get_next_interceptor():
+  """Yields the top-most interceptor on the thread-local interceptor stack.
 
-  The bottom-most (first) interceptor in the stack is a function which takes
-  `f, *args, **kwargs` as input and returns `f(*args, **kwargs)`. It is the
-  default if no `interception` contexts have been entered.
+  Operations may be intercepted by multiple nested interceptors. Once reached,
+  an operation can be forwarded through nested interceptors until resolved.
+  To allow for nesting, implement interceptors by re-wrapping their first
+  argument (`f`) as an `interceptable`. To avoid nesting, manipulate the
+  computation without using `interceptable`.
+
+  This function allows for nesting by manipulating the thread-local interceptor
+  stack, so that operations are intercepted in the order of interceptor nesting.
+
+  #### Examples
+
+  ```python
+  from tensorflow_probability import edward2 as ed
+
+  def model():
+    x = ed.Normal(loc=0., scale=1., name="x")
+    y = ed.Normal(loc=x, scale=1., name="y")
+    return x + y
+
+  def double(f, *args, **kwargs):
+    return 2. * interceptable(f)(*args, **kwargs)
+
+  def set_y(f, *args, **kwargs):
+    if kwargs.get("name") == "y":
+      kwargs["value"] = 0.42
+    return interceptable(f)(*args, **kwargs)
+
+  with interception(double):
+    with interception(set_y):
+      z = model()
+  ```
+
+  This will firstly put `double` on the stack, and then `set_y`,
+  resulting in the stack:
+  (TOP) set_y -> double -> apply (BOTTOM)
+
+  The execution of `model` is then (top lines are current stack state):
+  1) (TOP) set_y -> double -> apply (BOTTOM);
+  `ed.Normal(0., 1., "x")` is intercepted by `set_y`, and as the name is not "y"
+  the operation is simply forwarded to the next interceptor on the stack.
+
+  2) (TOP) double -> apply (BOTTOM);
+  `ed.Normal(0., 1., "x")` is intercepted by `double`, to produce
+  `2*ed.Normal(0., 1., "x")`, with the operation being forwarded down the stack.
+
+  3) (TOP) apply (BOTTOM);
+  `ed.Normal(0., 1., "x")` is intercepted by `apply`, which simply calls the
+  constructor.
+
+  (At this point, the nested calls to `get_next_interceptor()`, produced by
+  forwarding operations, exit, and the current stack is again:
+  (TOP) set_y -> double -> apply (BOTTOM))
+
+  4) (TOP) set_y -> double -> apply (BOTTOM);
+  `ed.Normal(0., 1., "y")` is intercepted by `set_y`,
+  the value of `y` is set to 0.42 and the operation is forwarded down the stack.
+
+  5) (TOP) double -> apply (BOTTOM);
+  `ed.Normal(0., 1., "y")` is intercepted by `double`, to produce
+  `2*ed.Normal(0., 1., "y")`, with the operation being forwarded down the stack.
+
+  6) (TOP) apply (BOTTOM);
+  `ed.Normal(0., 1., "y")` is intercepted by `apply`, which simply calls the
+  constructor.
+
+  The final values for `x` and `y` inside of `model()` are tensors where `x` is
+  a random draw from Normal(0., 1.) doubled, and `y` is a constant 0.84, thus
+  z = 2 * Normal(0., 1.) + 0.84.
   """
-  return _interceptor_stack.stack[-1]
+  try:
+    interceptor = _interceptor_stack.stack.pop()
+    yield interceptor
+  finally:
+    _interceptor_stack.stack.append(interceptor)
 
 
 def interceptable(func):
   """Decorator that wraps `func` so that its execution is intercepted.
 
   The wrapper passes `func` to the interceptor for the current thread.
+
+  If there is no next interceptor, we perform an "immediate" call to `func`.
+  That is, `func` terminates without forwarding its execution to another
+  interceptor.
 
   Args:
     func: Function to wrap.
@@ -108,5 +189,57 @@ def interceptable(func):
   """
   @functools.wraps(func)
   def func_wrapped(*args, **kwargs):
-    return get_interceptor()(func, *args, **kwargs)
+    with get_next_interceptor() as interceptor:
+      return interceptor(func, *args, **kwargs)
+
   return func_wrapped
+
+
+@contextmanager
+def tape():
+  """Context manager for recording interceptable executions onto a tape.
+
+  Similar to `tf.GradientTape`, operations are recorded if they are executed
+  within this context manager. In addition, the operation must be registered
+  (wrapped) as `ed.interceptable`.
+
+  Yields:
+    tape: OrderedDict where operations are recorded in sequence. Keys are
+      the `name` keyword argument to the operation (typically, a random
+      variable's `name`) and values are the corresponding output of the
+      operation. If the operation has no name, it is not recorded.
+
+  #### Examples
+
+  ```python
+  from tensorflow_probability import edward2 as ed
+
+  def probabilistic_matrix_factorization():
+    users = ed.Normal(0., 1., sample_shape=[5000, 128], name="users")
+    items = ed.Normal(0., 1., sample_shape=[7500, 128], name="items")
+    ratings = ed.Normal(loc=tf.matmul(users, items, transpose_b=True),
+                        scale=0.1,
+                        name="ratings")
+    return ratings
+
+  with ed.tape() as model_tape:
+    ratings = probabilistic_matrix_factorization()
+
+  assert model_tape["users"].shape == (5000, 128)
+  assert model_tape["items"].shape == (7500, 128)
+  assert model_tape["ratings"] == ratings
+  ```
+
+  """
+  tape_data = collections.OrderedDict({})
+
+  def record(f, *args, **kwargs):
+    """Records execution to a tape."""
+    name = kwargs.get("name")
+    output = interceptable(f)(*args, **kwargs)
+    if name:
+      tape_data[name] = output
+    return output
+
+  with interception(record):
+    yield tape_data

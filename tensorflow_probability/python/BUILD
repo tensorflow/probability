@@ -35,6 +35,7 @@ py_library(
     deps = [
         ":monte_carlo",
         ":trainable_distributions",
+        ":version",
         "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/edward2",
         "//tensorflow_probability/python/glm",
@@ -44,9 +45,16 @@ py_library(
         "//tensorflow_probability/python/mcmc",
         "//tensorflow_probability/python/optimizer",
         "//tensorflow_probability/python/positive_semidefinite_kernels",
+        "//tensorflow_probability/python/sts",
         "//tensorflow_probability/python/util",
         "//tensorflow_probability/python/vi",
     ],
+)
+
+py_library(
+    name = "version",
+    srcs = ["version.py"],
+    srcs_version = "PY2AND3",
 )
 
 py_library(

@@ -22,8 +22,8 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
-from tensorflow_probability.python.bijectors.affine_linear_operator import AffineLinearOperator
-from tensorflow_probability.python.bijectors.softmax_centered import SoftmaxCentered
+from tensorflow_probability.python import bijectors
+from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow.contrib.linalg.python.ops import linear_operator_addition as linop_add_lib
 from tensorflow.python.framework import tensor_util
@@ -172,7 +172,7 @@ def quadrature_scheme_softmaxnormal_quantiles(
           shape=tf.concat(
               [[-1], tf.ones([batch_ndims], dtype=tf.int32)], axis=0))
       quantiles = dist.quantile(edges)
-      quantiles = SoftmaxCentered().forward(quantiles)
+      quantiles = bijectors.SoftmaxCentered().forward(quantiles)
       # Cyclically permute left by one.
       perm = tf.concat([tf.range(1, 1 + batch_ndims), [0]], axis=0)
       quantiles = tf.transpose(quantiles, perm)
@@ -415,10 +415,10 @@ class VectorDiffeomixture(tf.distributions.Distribution):
                   k, scale_.dtype.base_dtype.name, dtype.name))
 
       self._endpoint_affine = [
-          AffineLinearOperator(shift=loc_,
-                               scale=scale_,
-                               validate_args=validate_args,
-                               name="endpoint_affine_{}".format(k))
+          bijectors.AffineLinearOperator(
+              shift=loc_, scale=scale_,
+              validate_args=validate_args,
+              name="endpoint_affine_{}".format(k))
           for k, (loc_, scale_) in enumerate(zip(loc, scale))]
 
       # TODO(jvdillon): Remove once we support k-mixtures.
@@ -453,10 +453,10 @@ class VectorDiffeomixture(tf.distributions.Distribution):
       self._distribution = distribution
 
       self._interpolated_affine = [
-          AffineLinearOperator(shift=loc_,
-                               scale=scale_,
-                               validate_args=validate_args,
-                               name="interpolated_affine_{}".format(k))
+          bijectors.AffineLinearOperator(
+              shift=loc_, scale=scale_,
+              validate_args=validate_args,
+              name="interpolated_affine_{}".format(k))
           for k, (loc_, scale_) in enumerate(zip(
               interpolate_loc(self._grid, loc),
               interpolate_scale(self._grid, scale)))]
@@ -529,12 +529,13 @@ class VectorDiffeomixture(tf.distributions.Distribution):
     return self._event_shape_
 
   def _sample_n(self, n, seed=None):
+    stream = seed_stream.SeedStream(seed, salt="VectorDiffeomixture")
     x = self.distribution.sample(
         sample_shape=concat_vectors(
             [n],
             self.batch_shape_tensor(),
             self.event_shape_tensor()),
-        seed=seed)   # shape: [n, B, e]
+        seed=stream())   # shape: [n, B, e]
     x = [aff.forward(x) for aff in self.endpoint_affine]
 
     # Get ids as a [n, batch_size]-shaped matrix, unless batch_shape=[] then get
@@ -553,8 +554,7 @@ class VectorDiffeomixture(tf.distributions.Distribution):
                 self.is_scalar_batch(),
                 np.int32([]),
                 [batch_size // mix_batch_size])),
-        seed=distribution_util.gen_new_seed(
-            seed, "vector_diffeomixture"))
+        seed=stream())
     # We need to flatten batch dims in case mixture_distribution has its own
     # batch dims.
     ids = tf.reshape(

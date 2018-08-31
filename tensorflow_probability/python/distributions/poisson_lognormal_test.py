@@ -22,6 +22,8 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import test_util
 
+from tensorflow.python.framework import test_util as tf_test_util
+
 tfd = tfp.distributions
 
 
@@ -30,78 +32,72 @@ class _PoissonLogNormalQuadratureCompoundTest(
   """Tests the PoissonLogNormalQuadratureCompoundTest distribution."""
 
   def testSampleProbConsistent(self):
-    with self.test_session() as sess:
-      pln = tfd.PoissonLogNormalQuadratureCompound(
-          loc=tf.placeholder_with_default(
-              -2., shape=[] if self.static_shape else None),
-          scale=tf.placeholder_with_default(
-              1.1, shape=[] if self.static_shape else None),
-          quadrature_size=10,
-          validate_args=True)
-      self.run_test_sample_consistent_log_prob(
-          sess.run, pln, batch_size=1, rtol=0.1)
+    pln = tfd.PoissonLogNormalQuadratureCompound(
+        loc=tf.placeholder_with_default(
+            -2., shape=[] if self.static_shape else None),
+        scale=tf.placeholder_with_default(
+            1.1, shape=[] if self.static_shape else None),
+        quadrature_size=10,
+        validate_args=True)
+    self.run_test_sample_consistent_log_prob(
+        self.evaluate, pln, batch_size=1, rtol=0.1)
 
   def testMeanVariance(self):
-    with self.test_session() as sess:
-      pln = tfd.PoissonLogNormalQuadratureCompound(
-          loc=tf.placeholder_with_default(
-              0., shape=[] if self.static_shape else None),
-          scale=tf.placeholder_with_default(
-              1., shape=[] if self.static_shape else None),
-          quadrature_size=10,
-          validate_args=True)
-      self.run_test_sample_consistent_mean_variance(
-          sess.run, pln, rtol=0.02)
+    pln = tfd.PoissonLogNormalQuadratureCompound(
+        loc=tf.placeholder_with_default(
+            0., shape=[] if self.static_shape else None),
+        scale=tf.placeholder_with_default(
+            1., shape=[] if self.static_shape else None),
+        quadrature_size=10,
+        validate_args=True)
+    self.run_test_sample_consistent_mean_variance(self.evaluate, pln, rtol=0.02)
 
   def testSampleProbConsistentBroadcastScalar(self):
-    with self.test_session() as sess:
-      pln = tfd.PoissonLogNormalQuadratureCompound(
-          loc=tf.placeholder_with_default(
-              [0., -0.5], shape=[2] if self.static_shape else None),
-          scale=tf.placeholder_with_default(
-              1., shape=[] if self.static_shape else None),
-          quadrature_size=10,
-          validate_args=True)
-      self.run_test_sample_consistent_log_prob(
-          sess.run, pln, batch_size=2, rtol=0.1, atol=0.01)
+    pln = tfd.PoissonLogNormalQuadratureCompound(
+        loc=tf.placeholder_with_default(
+            [0., -0.5], shape=[2] if self.static_shape else None),
+        scale=tf.placeholder_with_default(
+            1., shape=[] if self.static_shape else None),
+        quadrature_size=10,
+        validate_args=True)
+    self.run_test_sample_consistent_log_prob(
+        self.evaluate, pln, batch_size=2, rtol=0.1, atol=0.01)
 
   def testMeanVarianceBroadcastScalar(self):
-    with self.test_session() as sess:
-      pln = tfd.PoissonLogNormalQuadratureCompound(
-          loc=tf.placeholder_with_default(
-              [0., -0.5], shape=[2] if self.static_shape else None),
-          scale=tf.placeholder_with_default(
-              1., shape=[] if self.static_shape else None),
-          quadrature_size=10,
-          validate_args=True)
-      self.run_test_sample_consistent_mean_variance(
-          sess.run, pln, rtol=0.1, atol=0.01)
+    pln = tfd.PoissonLogNormalQuadratureCompound(
+        loc=tf.placeholder_with_default(
+            [0., -0.5], shape=[2] if self.static_shape else None),
+        scale=tf.placeholder_with_default(
+            1., shape=[] if self.static_shape else None),
+        quadrature_size=10,
+        validate_args=True)
+    self.run_test_sample_consistent_mean_variance(
+        self.evaluate, pln, rtol=0.1, atol=0.01)
 
   def testSampleProbConsistentBroadcastBoth(self):
-    with self.test_session() as sess:
-      pln = tfd.PoissonLogNormalQuadratureCompound(
-          loc=tf.placeholder_with_default(
-              [[0.], [-0.5]], shape=[2, 1] if self.static_shape else None),
-          scale=tf.placeholder_with_default(
-              [[1., 0.9]], shape=[1, 2] if self.static_shape else None),
-          quadrature_size=10,
-          validate_args=True)
-      self.run_test_sample_consistent_log_prob(
-          sess.run, pln, batch_size=4, rtol=0.1, atol=0.08)
+    pln = tfd.PoissonLogNormalQuadratureCompound(
+        loc=tf.placeholder_with_default(
+            [[0.], [-0.5]], shape=[2, 1] if self.static_shape else None),
+        scale=tf.placeholder_with_default(
+            [[1., 0.9]], shape=[1, 2] if self.static_shape else None),
+        quadrature_size=10,
+        validate_args=True)
+    self.run_test_sample_consistent_log_prob(
+        self.evaluate, pln, batch_size=4, rtol=0.1, atol=0.08)
 
   def testMeanVarianceBroadcastBoth(self):
-    with self.test_session() as sess:
-      pln = tfd.PoissonLogNormalQuadratureCompound(
-          loc=tf.placeholder_with_default(
-              [[0.], [-0.5]], shape=[2, 1] if self.static_shape else None),
-          scale=tf.placeholder_with_default(
-              [[1., 0.9]], shape=[1, 2] if self.static_shape else None),
-          quadrature_size=10,
-          validate_args=True)
-      self.run_test_sample_consistent_mean_variance(
-          sess.run, pln, rtol=0.1, atol=0.01)
+    pln = tfd.PoissonLogNormalQuadratureCompound(
+        loc=tf.placeholder_with_default(
+            [[0.], [-0.5]], shape=[2, 1] if self.static_shape else None),
+        scale=tf.placeholder_with_default(
+            [[1., 0.9]], shape=[1, 2] if self.static_shape else None),
+        quadrature_size=10,
+        validate_args=True)
+    self.run_test_sample_consistent_mean_variance(
+        self.evaluate, pln, rtol=0.1, atol=0.01)
 
 
+@tf_test_util.run_all_in_graph_and_eager_modes
 class PoissonLogNormalQuadratureCompoundStaticShapeTest(
     _PoissonLogNormalQuadratureCompoundTest, tf.test.TestCase):
 
@@ -110,6 +106,7 @@ class PoissonLogNormalQuadratureCompoundStaticShapeTest(
     return True
 
 
+@tf_test_util.run_all_in_graph_and_eager_modes
 class PoissonLogNormalQuadratureCompoundDynamicShapeTest(
     _PoissonLogNormalQuadratureCompoundTest, tf.test.TestCase):
 

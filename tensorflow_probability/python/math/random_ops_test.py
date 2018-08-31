@@ -22,9 +22,8 @@ from __future__ import print_function
 import numpy as np
 
 import tensorflow as tf
+import tensorflow_probability as tfp
 
-from tensorflow_probability.python.math import random_rademacher
-from tensorflow_probability.python.math import random_rayleigh
 from tensorflow.python.framework import test_util
 
 
@@ -35,7 +34,7 @@ class _RandomRademacher(object):
     shape_ = np.array([2, 3, int(1e3)], np.int32)
     shape = (tf.constant(shape_) if self.use_static_shape
              else tf.placeholder_with_default(shape_, shape=None))
-    x = random_rademacher(shape, self.dtype, seed=42)
+    x = tfp.math.random_rademacher(shape, self.dtype, seed=42)
     if self.use_static_shape:
       self.assertAllEqual(shape_, x.shape)
     x_ = self.evaluate(x)
@@ -69,10 +68,10 @@ class _RandomRayleigh(object):
     scale_ = np.linspace(0.1, 0.5, 3 * 2).astype(self.dtype).reshape(3, 2)
     scale = (tf.constant(scale_) if self.use_static_shape
              else tf.placeholder_with_default(scale_, shape=None))
-    x = random_rayleigh(shape,
-                        scale=scale[..., tf.newaxis],
-                        dtype=self.dtype,
-                        seed=42)
+    x = tfp.math.random_rayleigh(shape,
+                                 scale=scale[..., tf.newaxis],
+                                 dtype=self.dtype,
+                                 seed=42)
     self.assertEqual(self.dtype, x.dtype.as_numpy_dtype)
     final_shape_ = [3, 2, int(1e3)]
     if self.use_static_shape:

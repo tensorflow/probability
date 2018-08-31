@@ -26,10 +26,8 @@ import tensorflow_probability as tfp
 
 from tensorflow.python.keras import testing_utils
 from tensorflow.python.ops import nn_ops
-from tensorflow.python.ops.distributions import util as distribution_util
 
-
-tfd = tf.contrib.distributions
+tfd = tfp.distributions
 
 
 class Counter(object):
@@ -109,8 +107,9 @@ class ConvVariational(tf.test.TestCase):
       del name, trainable, add_variable_fn  # unused
       # Deserialized Keras objects do not perform lexical scoping. Any modules
       # that the function requires must be imported within the function.
-      import tensorflow as tf  # pylint: disable=g-import-not-at-top,redefined-outer-name
-      tfd = tf.contrib.distributions  # pylint: disable=redefined-outer-name
+      import tensorflow as tf  # pylint: disable=g-import-not-at-top,redefined-outer-name,reimported
+      import tensorflow_probability as tfp  # pylint: disable=g-import-not-at-top,redefined-outer-name,reimported
+      tfd = tfp.distributions  # pylint: disable=redefined-outer-name
 
       dist = tfd.Normal(loc=tf.zeros(shape, dtype),
                         scale=dtype.as_numpy_dtype(1))
@@ -346,13 +345,15 @@ class ConvVariational(tf.test.TestCase):
       channels = input_shape[-1]
       rank = len(inputs.get_shape()) - 2
 
+      seed_stream = tfd.SeedStream(layer.seed, salt='ConvFlipout')
+
       sign_input = tf.random_uniform(
           tf.concat([batch_shape,
                      tf.expand_dims(channels, 0)], 0),
           minval=0,
           maxval=2,
           dtype=tf.int32,
-          seed=layer.seed)
+          seed=seed_stream())
       sign_input = tf.cast(2 * sign_input - 1, inputs.dtype)
       sign_output = tf.random_uniform(
           tf.concat([batch_shape,
@@ -360,8 +361,7 @@ class ConvVariational(tf.test.TestCase):
           minval=0,
           maxval=2,
           dtype=tf.int32,
-          seed=distribution_util.gen_new_seed(
-              layer.seed, salt='conv_flipout'))
+          seed=seed_stream())
       sign_output = tf.cast(2 * sign_output - 1, inputs.dtype)
       for _ in range(rank):
         sign_input = tf.expand_dims(sign_input, 1)  # 2D ex: (B, 1, 1, C)

@@ -138,12 +138,12 @@ class Cauchy(tf.distributions.Distribution):
 
   @property
   def loc(self):
-    """Distribution parameter for the mean."""
+    """Distribution parameter for the location."""
     return self._loc
 
   @property
   def scale(self):
-    """Distribution parameter for standard deviation."""
+    """Distribution parameter for the scale."""
     return self._scale
 
   def _batch_shape_tensor(self):

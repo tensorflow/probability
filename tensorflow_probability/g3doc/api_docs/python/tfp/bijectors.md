@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.bijectors" />
 <meta itemprop="property" content="__all__"/>
@@ -27,6 +24,8 @@ Bijector Ops.
 [`class Chain`](../tfp/bijectors/Chain.md): Bijector which applies a sequence of bijectors.
 
 [`class CholeskyOuterProduct`](../tfp/bijectors/CholeskyOuterProduct.md): Compute `g(X) = X @ X.T`; X is lower-triangular, positive-diagonal matrix.
+
+[`class CholeskyToInvCholesky`](../tfp/bijectors/CholeskyToInvCholesky.md): Maps the Cholesky factor of `M` to the Cholesky factor of `M^{-1}`.
 
 [`class ConditionalBijector`](../tfp/bijectors/ConditionalBijector.md): Conditional Bijector is a Bijector that allows intrinsic conditioning.
 
@@ -70,7 +69,11 @@ Bijector Ops.
 
 [`class Square`](../tfp/bijectors/Square.md): Compute `g(X) = X^2`; X is a positive real number.
 
+[`class Tanh`](../tfp/bijectors/Tanh.md): Bijector that computes `Y = tanh(X)`, therefore `Y in (-1, 1)`.
+
 [`class TransformDiagonal`](../tfp/bijectors/TransformDiagonal.md): Applies a Bijector to the diagonal of a matrix.
+
+[`class Transpose`](../tfp/bijectors/Transpose.md): Compute `Y = g(X) = transpose_rightmost_dims(X, rightmost_perm)`.
 
 [`class Weibull`](../tfp/bijectors/Weibull.md): Compute `Y = g(X) = 1 - exp((-X / scale) ** concentration), X >= 0`.
 

@@ -23,7 +23,6 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.math.diag_jacobian import diag_jacobian
 from tensorflow.contrib import eager as tfe
 from tensorflow.python.framework import test_util
 
@@ -59,9 +58,9 @@ class JacobianTest(tf.test.TestCase):
     else:
       grads = tf.gradients(fn_val, state)
 
-    _, diag_jacobian_shape_passed = diag_jacobian(
+    _, diag_jacobian_shape_passed = tfp.math.diag_jacobian(
         xs=state, ys=grads, fn=grad_fn, sample_shape=tf.shape(fn_val))
-    _, diag_jacobian_shape_none = diag_jacobian(
+    _, diag_jacobian_shape_none = tfp.math.diag_jacobian(
         xs=state, ys=grads, fn=grad_fn)
 
     true_diag_jacobian_1 = np.zeros(sample_shape + [2])
@@ -109,9 +108,9 @@ class JacobianTest(tf.test.TestCase):
     else:
       grads = tf.gradients(fn_val, state)
 
-    _, diag_jacobian_shape_passed = diag_jacobian(
+    _, diag_jacobian_shape_passed = tfp.math.diag_jacobian(
         xs=state, ys=grads, fn=grad_fn, sample_shape=tf.shape(fn_val))
-    _, diag_jacobian_shape_none = diag_jacobian(
+    _, diag_jacobian_shape_none = tfp.math.diag_jacobian(
         xs=state, ys=grads, fn=grad_fn)
 
     true_diag_jacobian = np.zeros(sample_shape + [2, 2])

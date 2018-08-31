@@ -25,9 +25,8 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow.python.keras import testing_utils
-from tensorflow.python.ops.distributions import util as distribution_util
 
-tfd = tf.contrib.distributions
+tfd = tfp.distributions
 
 
 class Counter(object):
@@ -107,8 +106,9 @@ class DenseVariational(tf.test.TestCase):
       del name, trainable, add_variable_fn  # unused
       # Deserialized Keras objects do not perform lexical scoping. Any modules
       # that the function requires must be imported within the function.
-      import tensorflow as tf  # pylint: disable=g-import-not-at-top,redefined-outer-name
-      tfd = tf.contrib.distributions  # pylint: disable=redefined-outer-name
+      import tensorflow as tf  # pylint: disable=g-import-not-at-top,redefined-outer-name,reimported
+      import tensorflow_probability as tfp  # pylint: disable=g-import-not-at-top,redefined-outer-name,reimported
+      tfd = tfp.distributions  # pylint: disable=redefined-outer-name
 
       dist = tfd.Normal(loc=tf.zeros(shape, dtype), scale=tf.ones(shape, dtype))
       batch_ndims = tf.size(dist.batch_shape_tensor())
@@ -360,20 +360,21 @@ class DenseVariational(tf.test.TestCase):
       expected_kernel_posterior_affine_tensor = (
           expected_kernel_posterior_affine.sample(seed=42))
 
+      stream = tfd.SeedStream(layer.seed, salt='DenseFlipout')
+
       sign_input = tf.random_uniform(
           [batch_size, in_size],
           minval=0,
           maxval=2,
           dtype=tf.int32,
-          seed=layer.seed)
+          seed=stream())
       sign_input = tf.cast(2 * sign_input - 1, inputs.dtype)
       sign_output = tf.random_uniform(
           [batch_size, out_size],
           minval=0,
           maxval=2,
           dtype=tf.int32,
-          seed=distribution_util.gen_new_seed(
-              layer.seed, salt='dense_flipout'))
+          seed=stream())
       sign_output = tf.cast(2 * sign_output - 1, inputs.dtype)
       perturbed_inputs = tf.matmul(
           inputs * sign_input, expected_kernel_posterior_affine_tensor)

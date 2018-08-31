@@ -120,7 +120,7 @@ class _TransposeBijectorTest(object):
           bijector = tfb.Transpose(
               perm=tf.placeholder_with_default([1, 2], shape=[2]),
               validate_args=True)
-          bijector.forward([[0, 1]]).eval()
+          self.evaluate(bijector.forward([[0, 1]]))
 
   @test_util.run_in_graph_and_eager_modes()
   def testInvalidEventNdimsException(self):

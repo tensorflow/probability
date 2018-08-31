@@ -19,7 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from tensorflow_probability.python.distributions.vector_laplace_linear_operator import VectorLaplaceLinearOperator
+from tensorflow_probability.python.distributions import vector_laplace_linear_operator as vllo
 from tensorflow_probability.python.internal import distribution_util
 
 
@@ -28,7 +28,7 @@ __all__ = [
 ]
 
 
-class VectorLaplaceDiag(VectorLaplaceLinearOperator):
+class VectorLaplaceDiag(vllo.VectorLaplaceLinearOperator):
   """The vectorization of the Laplace distribution on `R^k`.
 
   The vector laplace distribution is defined over `R^k`, and parameterized by

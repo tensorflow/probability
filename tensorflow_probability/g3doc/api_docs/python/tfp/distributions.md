@@ -1,6 +1,3 @@
-Project: /probability/_project.yaml
-Book: /probability/_book.yaml
-page_type: reference
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions" />
 <meta itemprop="property" content="FULLY_REPARAMETERIZED"/>
@@ -54,7 +51,13 @@ Statistical distributions and bijective transformations.
 
 [`class Gamma`](../tfp/distributions/Gamma.md): Gamma distribution.
 
+[`class GammaGamma`](../tfp/distributions/GammaGamma.md): Gamma-Gamma distribution.
+
 [`class GammaWithSoftplusConcentrationRate`](../tfp/distributions/GammaWithSoftplusConcentrationRate.md): `Gamma` with softplus of `concentration` and `rate`.
+
+[`class GaussianProcess`](../tfp/distributions/GaussianProcess.md): Marginal distribution of a Gaussian process at finitely many points.
+
+[`class GaussianProcessRegressionModel`](../tfp/distributions/GaussianProcessRegressionModel.md): Posterior predictive distribution in a conjugate GP regression model.
 
 [`class Geometric`](../tfp/distributions/Geometric.md): Geometric distribution.
 
@@ -67,6 +70,8 @@ Statistical distributions and bijective transformations.
 [`class InverseGammaWithSoftplusConcentrationRate`](../tfp/distributions/InverseGammaWithSoftplusConcentrationRate.md): `InverseGamma` with softplus of `concentration` and `rate`.
 
 [`class Kumaraswamy`](../tfp/distributions/Kumaraswamy.md): Kumaraswamy distribution.
+
+[`class LKJ`](../tfp/distributions/LKJ.md): The LKJ distribution on correlation matrices.
 
 [`class Laplace`](../tfp/distributions/Laplace.md): The Laplace distribution with location `loc` and `scale` parameters.
 
@@ -128,6 +133,8 @@ Statistical distributions and bijective transformations.
 
 [`class TransformedDistribution`](../tfp/distributions/TransformedDistribution.md): A Transformed Distribution.
 
+[`class TruncatedNormal`](../tfp/distributions/TruncatedNormal.md): The Truncated Normal distribution.
+
 [`class Uniform`](../tfp/distributions/Uniform.md): Uniform distribution with `low` and `high` parameters.
 
 [`class VectorDeterministic`](../tfp/distributions/VectorDeterministic.md): Vector `Deterministic` distribution on `R^k`.
@@ -140,9 +147,9 @@ Statistical distributions and bijective transformations.
 
 [`class VectorSinhArcsinhDiag`](../tfp/distributions/VectorSinhArcsinhDiag.md): The (diagonal) SinhArcsinh transformation of a distribution on `R^k`.
 
-[`class WishartCholesky`](../tfp/distributions/WishartCholesky.md): The matrix Wishart distribution on positive definite matrices.
+[`class VonMisesFisher`](../tfp/distributions/VonMisesFisher.md): The von Mises-Fisher distribution over unit vectors on `S^{n-1}`.
 
-[`class WishartFull`](../tfp/distributions/WishartFull.md): The matrix Wishart distribution on positive definite matrices.
+[`class Wishart`](../tfp/distributions/Wishart.md): The matrix Wishart distribution on positive definite matrices.
 
 ## Functions
 

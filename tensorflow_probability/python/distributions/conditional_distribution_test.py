@@ -19,14 +19,16 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from tensorflow_probability.python import distributions
+import tensorflow_probability as tfp
 from tensorflow_probability.python.distributions import distribution_test
+
+tfd = tfp.distributions
 
 
 class ConditionalDistributionTest(distribution_test.DistributionTest):
 
   def _GetFakeDistribution(self):
-    class _FakeDistribution(distributions.ConditionalDistribution):
+    class _FakeDistribution(tfd.ConditionalDistribution):
       """Fake Distribution for testing _set_sample_static_shape."""
 
       def __init__(self, batch_shape=None, event_shape=None):
@@ -34,7 +36,7 @@ class ConditionalDistributionTest(distribution_test.DistributionTest):
         self._static_event_shape = tf.TensorShape(event_shape)
         super(_FakeDistribution, self).__init__(
             dtype=tf.float32,
-            reparameterization_type=distributions.NOT_REPARAMETERIZED,
+            reparameterization_type=tfd.NOT_REPARAMETERIZED,
             validate_args=True,
             allow_nan_stats=True,
             name="DummyDistribution")

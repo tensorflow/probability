@@ -138,6 +138,9 @@ class _BaseDeterministic(tf.distributions.Distribution):
     """Relative tolerance for comparing points to `self.loc`."""
     return self._rtol
 
+  def _entropy(self):
+    return tf.zeros(self.batch_shape_tensor(), dtype=self.dtype)
+
   def _mean(self):
     return tf.identity(self.loc)
 
@@ -182,7 +185,7 @@ class Deterministic(_BaseDeterministic):
 
   ```python
   # Initialize a single Deterministic supported at zero.
-  constant = tf.contrib.distributions.Deterministic(0.)
+  constant = tfp.distributions.Deterministic(0.)
   constant.prob(0.)
   ==> 1.
   constant.prob(2.)
@@ -191,7 +194,7 @@ class Deterministic(_BaseDeterministic):
   # Initialize a [2, 2] batch of scalar constants.
   loc = [[0., 1.], [2., 3.]]
   x = [[0., 1.1], [1.99, 3.]]
-  constant = tf.contrib.distributions.Deterministic(loc)
+  constant = tfp.distributions.Deterministic(loc)
   constant.prob(x)
   ==> [[1., 0.], [0., 1.]]
   ```
@@ -378,3 +381,20 @@ class VectorDeterministic(_BaseDeterministic):
     return tf.cast(
         tf.reduce_all(tf.abs(x - self.loc) <= self._slack, axis=-1),
         dtype=self.dtype)
+
+
+@tf.distributions.RegisterKL(_BaseDeterministic, tf.distributions.Distribution)
+def _kl_deterministic_distribution(a, b, name=None):
+  """Calculate the batched KL divergence `KL(a || b)` with `a` Deterministic.
+
+  Args:
+    a: instance of a Deterministic distribution object.
+    b: instance of a Distribution distribution object.
+    name: (optional) Name to use for created operations. Default is
+      "kl_deterministic_distribution".
+
+  Returns:
+    Batchwise `KL(a || b)`.
+  """
+  with tf.name_scope(name, "kl_deterministic_distribution", [a.loc]):
+    return -b.log_prob(a.loc)

@@ -23,7 +23,8 @@ __Layer 1: Statistical Building Blocks__
   A large collection of probability
   distributions and related statistics with batch and
   [broadcasting](https://docs.scipy.org/doc/numpy-1.14.0/user/basics.broadcasting.html)
-  semantics.
+  semantics. See the
+  [Distributions Tutorial](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/TensorFlow_Distributions_Tutorial.ipynb).
 * Bijectors ([`tfp.bijectors`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/bijectors)):
   Reversible and composable transformations of random variables. Bijectors
   provide a rich class of transformed distributions, from classical examples
@@ -36,7 +37,8 @@ __Layer 2: Model Building__
 
 * Edward2 ([`tfp.edward2`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2)):
   A probabilistic programming language for specifying flexible probabilistic
-  models as programs.
+  models as programs. See the
+  [Edward2 `README.md`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/README.md).
 * Probabilistic Layers ([`tfp.layers`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/layers)):
   Neural network layers with uncertainty over the functions they represent,
   extending TensorFlow Layers.
@@ -79,6 +81,8 @@ for end-to-end examples. It includes tutorial notebooks such as:
   Dimensionality reduction with latent variables.
 * [Gaussian Copulas](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Gaussian_Copula.ipynb).
   Probability distributions for capturing dependence across random variables.
+* [TensorFlow Distributions: A Gentle Introduction](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/TensorFlow_Distributions_Tutorial.ipynb).
+  Introduction to TensorFlow Distributions.
 * [Understanding TensorFlow Distributions Shapes](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Understanding_TensorFlow_Distributions_Shapes.ipynb).
   How to distinguish between samples, batches, and events for arbitrarily shaped
   probabilistic computations.
@@ -91,8 +95,12 @@ It also includes example scripts such as:
   Representation learning with a latent code and variational inference.
 * [Vector-Quantized Autoencoder](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/vq_vae.py).
   Discrete representation learning with vector quantization.
-* [Latent Dirichlet Allocation](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/latent_dirichlet_allocation.py).
+* Latent Dirichlet Allocation
+  ([Distributions version](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/latent_dirichlet_allocation_distributions.py),
+  [Edward2 version](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/latent_dirichlet_allocation_edward2.py)).
   Mixed membership modeling for capturing topics in a document.
++ [Deep Exponential Family](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/deep_exponential_family.py)
+  A deep, sparse generative model for discovering a hierarchy of topics.
 * [Bayesian Neural Networks](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/bayesian_neural_network.py).
   Neural networks with uncertainty over their weights.
 * [Bayesian Logistic Regression](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/logistic_regression.py).
@@ -110,7 +118,7 @@ pip install --user --upgrade tensorflow-probability  # depends on tensorflow (CP
 ```
 
 TensorFlow Probability depends on a recent stable release of TensorFlow
-(pip package `tensorflow`); see [TF release notes](
+(pip package `tensorflow`); see [TFP release notes](
 https://github.com/tensorflow/probability/releases) for details on the latest
 version of TensorFlow Probability, and the version of TensorFlow it depends on.
 
@@ -163,7 +171,8 @@ environment.
 * [TensorFlow Blog](https://medium.com/tensorflow): Stay up to date on content
   from the TensorFlow team and best articles from the community.
 * [Youtube Channel](http://youtube.com/tensorflow/): Follow TensorFlow shows.
-* Mailing list: Stay tuned!
+* [tfprobability@tensorflow.org](https://groups.google.com/a/tensorflow.org/forum/#!forum/tfprobability):
+  Open mailing list for discussion and questions.
 
 See the [TensorFlow Community](https://www.tensorflow.org/community/) page for
 more details. Check out our latest publicity here:

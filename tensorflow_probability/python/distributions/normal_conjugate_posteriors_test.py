@@ -23,9 +23,12 @@ import math
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow.python.framework import test_util
+
 tfd = tfp.distributions
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class NormalTest(tf.test.TestCase):
 
   def testNormalConjugateKnownSigmaPosterior(self):
@@ -42,7 +45,7 @@ class NormalTest(tf.test.TestCase):
 
       # Smoke test
       self.assertTrue(isinstance(posterior, tfd.Normal))
-      posterior_log_pdf = posterior.log_prob(x).eval()
+      posterior_log_pdf = self.evaluate(posterior.log_prob(x))
       self.assertEqual(posterior_log_pdf.shape, (6,))
 
   def testNormalConjugateKnownSigmaPosteriorND(self):
@@ -61,7 +64,7 @@ class NormalTest(tf.test.TestCase):
 
       # Smoke test
       self.assertTrue(isinstance(posterior, tfd.Normal))
-      posterior_log_pdf = posterior.log_prob(x).eval()
+      posterior_log_pdf = self.evaluate(posterior.log_prob(x))
       self.assertEqual(posterior_log_pdf.shape, (6, 2))
 
   def testNormalConjugateKnownSigmaNDPosteriorND(self):
@@ -86,7 +89,7 @@ class NormalTest(tf.test.TestCase):
       # Calculate log_pdf under the 2 models
       posterior_log_pdf = posterior.log_prob(x)
       self.assertEqual(posterior_log_pdf.get_shape(), (6, 2))
-      self.assertEqual(posterior_log_pdf.eval().shape, (6, 2))
+      self.assertEqual(self.evaluate(posterior_log_pdf).shape, (6, 2))
 
   def testNormalConjugateKnownSigmaPredictive(self):
     with tf.Session():
@@ -103,7 +106,7 @@ class NormalTest(tf.test.TestCase):
 
       # Smoke test
       self.assertTrue(isinstance(predictive, tfd.Normal))
-      predictive_log_pdf = predictive.log_prob(x).eval()
+      predictive_log_pdf = self.evaluate(predictive.log_prob(x))
       self.assertEqual(predictive_log_pdf.shape, (6,))
 
 

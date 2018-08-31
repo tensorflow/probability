@@ -23,10 +23,12 @@ from tensorflow_probability.python import distributions
 from tensorflow_probability.python import edward2
 from tensorflow_probability.python import glm
 from tensorflow_probability.python import layers
+from tensorflow_probability.python import math
 from tensorflow_probability.python import mcmc
 from tensorflow_probability.python import monte_carlo
 from tensorflow_probability.python import optimizer
 from tensorflow_probability.python import positive_semidefinite_kernels
+from tensorflow_probability.python import sts
 from tensorflow_probability.python import trainable_distributions
 from tensorflow_probability.python import util
 from tensorflow_probability.python import vi
@@ -34,7 +36,6 @@ from tensorflow_probability.python import vi
 from tensorflow.python.util.all_util import remove_undocumented
 
 _allowed_symbols = [
-    '__version__',
     'bijectors',
     'distributions',
     'edward2',
@@ -46,10 +47,9 @@ _allowed_symbols = [
     'optimizer',
     'positive_semidefinite_kernels',
     'trainable_distributions',
+    'sts',
     'util',
     'vi',
 ]
-
-__version__ = '0.3.0'
 
 remove_undocumented(__name__, _allowed_symbols)

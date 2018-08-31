@@ -19,7 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from tensorflow_probability.python.distributions.mvn_linear_operator import MultivariateNormalLinearOperator
+from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow.python.ops.distributions import util as distribution_util
 
 
@@ -28,7 +28,8 @@ __all__ = [
 ]
 
 
-class MultivariateNormalTriL(MultivariateNormalLinearOperator):
+class MultivariateNormalTriL(
+    mvn_linear_operator.MultivariateNormalLinearOperator):
   """The multivariate normal distribution on `R^k`.
 
   The Multivariate Normal distribution is defined over `R^k` and parameterized
@@ -74,8 +75,8 @@ class MultivariateNormalTriL(MultivariateNormalLinearOperator):
   ```
 
   Trainable (batch) lower-triangular matrices can be created with
-  `tf.contrib.distributions.matrix_diag_transform()` and/or
-  `tf.contrib.distributions.fill_triangular()`
+  `tfp.distributions.matrix_diag_transform()` and/or
+  `tfp.distributions.fill_triangular()`
 
   #### Examples
 
