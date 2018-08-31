@@ -311,5 +311,25 @@ class MaternFiveHalvesTest(tf.test.TestCase, parameterized.TestCase):
     self.evaluate(k.apply([1.], [1.]))
 
 
+class MaternGradsTest(tf.test.TestCase, parameterized.TestCase):
+
+  @parameterized.parameters({
+      'matern_class': psd_kernels.MaternOneHalf
+  }, {
+      'matern_class': psd_kernels.MaternThreeHalves
+  }, {
+      'matern_class': psd_kernels.MaternFiveHalves
+  })
+  def testGradsAtIdenticalInputsAreZeroNotNaN(self, matern_class):
+    k = matern_class()
+    x = tf.constant(np.arange(3 * 5, dtype=np.float32).reshape(3, 5))
+
+    kernel_values = k.apply(x, x)
+    grads = [tf.gradients(kernel_values[i], x)[0] for i in range(3)]
+
+    self.assertAllEqual(
+        [self.evaluate(grad) for grad in grads],
+        [np.zeros(grad.shape.as_list(), np.float32) for grad in grads])
+
 if __name__ == '__main__':
   tf.test.main()

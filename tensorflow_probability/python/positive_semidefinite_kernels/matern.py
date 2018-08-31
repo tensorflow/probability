@@ -99,7 +99,8 @@ class MaternOneHalf(psd_kernel.PositiveSemidefiniteKernel):
     return self._length_scale
 
   def _apply(self, x1, x2, param_expansion_ndims=0):
-    norm = tf.sqrt(
+    # Use util.sqrt_with_finite_grads to avoid NaN gradients when `x1 == x2`.
+    norm = util.sqrt_with_finite_grads(
         util.sum_rightmost_ndims_preserving_shape(
             tf.squared_difference(x1, x2), self.feature_ndims))
     if self.length_scale is not None:
@@ -181,7 +182,8 @@ class MaternThreeHalves(psd_kernel.PositiveSemidefiniteKernel):
     return self._length_scale
 
   def _apply(self, x1, x2, param_expansion_ndims=0):
-    norm = tf.sqrt(
+    # Use util.sqrt_with_finite_grads to avoid NaN gradients when `x1 == x2`.
+    norm = util.sqrt_with_finite_grads(
         util.sum_rightmost_ndims_preserving_shape(
             tf.squared_difference(x1, x2), self.feature_ndims))
     if self.length_scale is not None:
@@ -264,7 +266,8 @@ class MaternFiveHalves(psd_kernel.PositiveSemidefiniteKernel):
     return self._length_scale
 
   def _apply(self, x1, x2, param_expansion_ndims=0):
-    norm = tf.sqrt(
+    # Use util.sqrt_with_finite_grads to avoid NaN gradients when `x1 == x2`.
+    norm = util.sqrt_with_finite_grads(
         util.sum_rightmost_ndims_preserving_shape(
             tf.squared_difference(x1, x2), self.feature_ndims))
     if self.length_scale is not None:
