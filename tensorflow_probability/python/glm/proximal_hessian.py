@@ -938,7 +938,7 @@ def fit_sparse(model_matrix,
                learning_rate=None,
                model_coefficients_update_var=None,
                name=None):
-  """Fits a GLM using coordinate-wise FIM-informed proximal gradient descent.
+  r"""Fits a GLM using coordinate-wise FIM-informed proximal gradient descent.
 
   This function uses a L1- and L2-regularized, second-order quasi-Newton method
   to find maximum-likelihood parameters for the given model and observed data.
@@ -1008,6 +1008,143 @@ def fit_sparse(model_matrix,
     iter: scalar, `int` `Tensor` indicating the actual number of iterations of
       the outer loop of the optimizer completed (i.e., number of calls to
       `fit_sparse_one_step` before achieving convergence).
+
+  #### Example
+
+  ```python
+  from __future__ import print_function
+  import numpy as np
+  import tensorflow as tf
+  import tensorflow_probability as tfp
+  tfd = tfp.distributions
+
+  def make_dataset(n, d, link, scale=1., dtype=np.float32):
+    model_coefficients = tfd.Uniform(
+        low=np.array(-1, dtype), high=np.array(1, dtype)).sample(
+            d, seed=42)
+    radius = np.sqrt(2.)
+    model_coefficients *= radius / tf.linalg.norm(model_coefficients)
+    mask = tf.random_shuffle(tf.range(d)) < tf.to_int32(0.5 * tf.to_float(d))
+    model_coefficients = tf.where(mask, model_coefficients,
+                                  tf.zeros_like(model_coefficients))
+    model_matrix = tfd.Normal(
+        loc=np.array(0, dtype), scale=np.array(1, dtype)).sample(
+            [n, d], seed=43)
+    scale = tf.convert_to_tensor(scale, dtype)
+    linear_response = tf.matmul(model_matrix,
+                                model_coefficients[..., tf.newaxis])[..., 0]
+    if link == 'linear':
+      response = tfd.Normal(loc=linear_response, scale=scale).sample(seed=44)
+    elif link == 'probit':
+      response = tf.cast(
+          tfd.Normal(loc=linear_response, scale=scale).sample(seed=44) > 0,
+                     dtype)
+    elif link == 'logit':
+      response = tfd.Bernoulli(logits=linear_response).sample(seed=44)
+    else:
+      raise ValueError('unrecognized true link: {}'.format(link))
+    return model_matrix, response, model_coefficients, mask
+
+  with tf.Session() as sess:
+    x_, y_, model_coefficients_true_, _ = sess.run(make_dataset(
+        n=int(1e5), d=100, link='probit'))
+
+    model = tfp.glm.Bernoulli()
+    model_coefficients_start = tf.zeros(x_.shape[-1], np.float32)
+
+    with tf.variable_scope(tf.get_variable_scope(), reuse=tf.AUTO_REUSE):
+      model_coefficients, is_converged, num_iter = tfp.glm.fit_sparse(
+          model_matrix=tf.convert_to_tensor(x_),
+          response=tf.convert_to_tensor(y_),
+          model=model,
+          model_coefficients_start=model_coefficients_start,
+          l1_regularizer=800.,
+          l2_regularizer=None,
+          maximum_iterations=10,
+          maximum_full_sweeps_per_iteration=10,
+          tolerance=1e-6,
+          learning_rate=None)
+
+    init_op = tf.global_variables_initializer()
+    sess.run([init_op])
+    model_coefficients_, is_converged_, num_iter_ = sess.run([
+        model_coefficients, is_converged, num_iter])
+
+    print("is_converged:", is_converged_)
+    print("    num_iter:", num_iter_)
+    print("\nLearned / True")
+    print(np.concatenate(
+        [[model_coefficients_], [model_coefficients_true_]], axis=0).T)
+
+  # ==>
+  # is_converged: True
+  #     num_iter: 1
+  #
+  # Learned / True
+  # [[ 0.          0.        ]
+  #  [ 0.          0.        ]
+  #  [ 0.          0.        ]
+  #  [ 0.11195257  0.12484948]
+  #  [ 0.          0.        ]
+  #  [ 0.05191106  0.06394956]
+  #  [-0.15090358 -0.15325639]
+  #  [-0.18187316 -0.18825999]
+  #  [-0.06140942 -0.07994166]
+  #  [ 0.          0.        ]
+  #  [ 0.          0.        ]
+  #  [ 0.          0.        ]
+  #  [ 0.14474444  0.15810856]
+  #  [ 0.          0.        ]
+  #  [-0.25249591 -0.24260855]
+  #  [ 0.          0.        ]
+  #  [ 0.          0.        ]
+  #  [-0.03888761 -0.06755984]
+  #  [ 0.          0.        ]
+  #  [ 0.          0.        ]
+  #  [ 0.          0.        ]
+  #  [-0.0192222  -0.04169233]
+  #  [ 0.          0.        ]
+  #  [ 0.          0.        ]
+  #  [ 0.01434913  0.03568212]
+  #  [-0.11336883 -0.12873614]
+  #  [ 0.          0.        ]
+  #  [-0.24496339 -0.24048163]
+  #  [ 0.          0.        ]
+  #  [ 0.          0.        ]
+  #  [ 0.04088281  0.06565224]
+  #  [-0.12784363 -0.13359821]
+  #  [ 0.05618424  0.07396613]
+  #  [ 0.          0.        ]
+  #  [ 0.          0.        ]
+  #  [ 0.          0.        ]
+  #  [ 0.         -0.01719233]
+  #  [ 0.          0.        ]
+  #  [ 0.          0.        ]
+  #  [-0.00076072 -0.03607186]
+  #  [ 0.21801499  0.21146794]
+  #  [-0.02161094 -0.04031265]
+  #  [ 0.0918689   0.10487888]
+  #  [ 0.0106154   0.03233612]
+  #  [-0.07817317 -0.09725142]
+  #  [ 0.          0.        ]
+  #  [ 0.          0.        ]
+  #  [-0.23725343 -0.24194022]
+  #  [ 0.          0.        ]
+  #  [-0.08725718 -0.1048776 ]
+  #  [ 0.          0.        ]
+  #  [ 0.          0.        ]
+  #  [-0.02114314 -0.04145789]
+  #  [ 0.          0.        ]
+  #  [ 0.          0.        ]
+  #  [-0.02710908 -0.04590397]
+  #  [ 0.15293184  0.15415154]
+  #  [ 0.2114463   0.2088728 ]
+  #  [-0.10969634 -0.12368613]
+  #  [ 0.         -0.01505797]
+  #  [-0.01140458 -0.03234904]
+  #  [ 0.16051085  0.1680062 ]
+  #  [ 0.09816848  0.11094204]
+  ```
 
   #### References
 
