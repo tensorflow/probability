@@ -343,25 +343,28 @@ class LinearGaussianStateSpaceModel(tf.distributions.Distribution):
       # creates no overhead when the model is actually fixed, since in
       # that case we simply build the trivial callable that returns
       # the same matrix at each timestep.
-      def _maybe_make_linop(x, name):
+      def _maybe_make_linop(x, is_square=None, name=None):
         """Converts Tensors into LinearOperators."""
         if not isinstance(x, tfl.LinearOperator):
           x = tfl.LinearOperatorFullMatrix(
               tf.convert_to_tensor(x, dtype=dtype),
+              is_square=is_square,
               name=name)
         return x
-      def _maybe_make_callable_from_linop(f, name):
+      def _maybe_make_callable_from_linop(f, name, make_square_linop=None):
         """Converts fixed objects into trivial callables."""
         if not callable(f):
-          linop = _maybe_make_linop(f, name)
+          linop = _maybe_make_linop(f, is_square=make_square_linop, name=name)
           f = lambda t: linop
         return f
       self.get_transition_matrix_for_timestep = (
           _maybe_make_callable_from_linop(
-              transition_matrix, "transition_matrix"))
+              transition_matrix,
+              name="transition_matrix",
+              make_square_linop=True))
       self.get_observation_matrix_for_timestep = (
           _maybe_make_callable_from_linop(
-              observation_matrix, "observation_matrix"))
+              observation_matrix, name="observation_matrix"))
 
       # Similarly, we canonicalize the transition and observation
       # noise models as callables returning a
