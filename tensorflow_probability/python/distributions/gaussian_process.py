@@ -266,6 +266,7 @@ class GaussianProcess(mvn_linear_operator.MultivariateNormalLinearOperator):
         kernel_matrix = _add_diagonal_shift(
             kernel.matrix(self.index_points, self.index_points),
             jitter + observation_noise_variance)
+        self._covariance_matrix = kernel_matrix
 
         scale = tf.linalg.LinearOperatorLowerTriangular(
             tf.linalg.cholesky(kernel_matrix),
@@ -300,3 +301,6 @@ class GaussianProcess(mvn_linear_operator.MultivariateNormalLinearOperator):
   @property
   def jitter(self):
     return self._jitter
+
+  def _covariance(self):
+    return self._covariance_matrix

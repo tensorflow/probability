@@ -451,7 +451,9 @@ class GaussianProcessRegressionModel(
       self._validate_args = validate_args
 
       with tf.name_scope('init', values=[index_points, jitter]):
-        loc, scale = self._compute_marginal_distribution_loc_and_scale()
+        (loc,
+         covariance) = self._compute_marginal_distribution_loc_and_covariance()
+        self._covariance_matrix = covariance
 
         graph_parents = [index_points, observation_noise_variance, jitter]
         def _maybe_append(x):
@@ -460,41 +462,42 @@ class GaussianProcessRegressionModel(
         _maybe_append(observation_index_points)
         _maybe_append(observations)
 
+        scale = tf.linalg.LinearOperatorLowerTriangular(
+            tf.linalg.cholesky(covariance))
         super(GaussianProcessRegressionModel, self).__init__(
             loc=loc, scale=scale, validate_args=validate_args,
             allow_nan_stats=allow_nan_stats, name=name)
         self._parameters = parameters
         self._graph_parents = graph_parents
 
-  def _compute_marginal_distribution_loc_and_scale(self):
+  def _compute_marginal_distribution_loc_and_covariance(self):
     # If the observed inputs/outputs are empty (None), we can avoid a lot of
     # computation by just using the prior predictive model.
     if self._is_empty_observation_data():
-      loc, scale = self._compute_prior_predictive_loc_and_scale()
+      loc, covariance = self._compute_prior_predictive_loc_and_covariance()
     else:
       with tf.control_dependencies(self._validate_observation_data()):
-        loc, scale = self._compute_posterior_predictive_loc_and_scale()
-    return loc, scale
+        (loc,
+         covariance) = self._compute_posterior_predictive_loc_and_covariance()
+    return loc, covariance
 
-  def _compute_prior_predictive_loc_and_scale(self):
+  def _compute_prior_predictive_loc_and_covariance(self):
     covariance = _add_diagonal_shift(
         self.kernel.matrix(self.index_points, self.index_points),
         self.jitter + self.observation_noise_variance)
 
     loc = self._mean_fn(self.index_points)
-    scale = tf.linalg.LinearOperatorLowerTriangular(
-        tf.linalg.cholesky(covariance))
-    return loc, scale
+    return loc, covariance
 
-  def _compute_posterior_predictive_loc_and_scale(self):
-    # Need to compute two things: posterior mean and posterior scale; call them
-    # loc and scale, resp. Let `v` be observation noise variance, `k_ij` the
-    # kernel matrix over index points (sets) where `i, j \in {t, x}`, `t` are
-    # the "test" points, and `x` are the observed points (`I` is identity matrix
-    # of context-appropriate dimension).
+  def _compute_posterior_predictive_loc_and_covariance(self):
+    # Need to compute two things: posterior mean and posterior covariance; call
+    # them loc and covariance, resp. Let `v` be observation noise variance,
+    # `k_ij` the kernel matrix over index points (sets) where `i, j \in {t, x}`,
+    # `t` are the "test" points, and `x` are the observed points (`I` is the
+    # identity matrix of context-appropriate dimension).
     #
     # loc = k_tx @ inv(k_xx + vI) @ (y - m(x))
-    # scale = chol(k_tt - k_tx @ inv(k_xx + vI) @ k_xt)
+    # covariance = chol(k_tt - k_tx @ inv(k_xx + vI) @ k_xt)
     #
     # As written above, this involves a Cholesky decomposition and two dense
     # solves (each, implicitly, a Cholesky and two triangular solves). We can
@@ -541,9 +544,7 @@ class GaussianProcessRegressionModel(
         posterior_covariance_full,
         self.jitter + self.predictive_noise_variance)
 
-    scale = tf.linalg.LinearOperatorLowerTriangular(
-        tf.linalg.cholesky(posterior_covariance_full))
-    return loc, scale
+    return loc, posterior_covariance_full
 
   def _is_empty_observation_data(self):
     # If both input locations and observations are `None`, we consider this
@@ -618,3 +619,6 @@ class GaussianProcessRegressionModel(
   @property
   def jitter(self):
     return self._jitter
+
+  def _covariance(self):
+    return self._covariance_matrix
