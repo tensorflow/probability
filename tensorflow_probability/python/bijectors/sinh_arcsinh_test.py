@@ -161,8 +161,8 @@ class SinhArcsinhBijectorTest(tf.test.TestCase):
         # Below test fails due to overflow error giving inf. This check avoids
         # that error by skipping square calculation and corresponding assert.
 
-        if np.amax(y) <= np.sqrt(np.finfo(np.float128).max) and \
-           np.fabs(np.amin(y)) <= np.sqrt(np.fabs(np.finfo(np.float128).min)):
+        if (np.amax(y) <= np.sqrt(np.finfo(np.float128).max) and
+            np.fabs(np.amin(y)) <= np.sqrt(np.fabs(np.finfo(np.float128).min))):
 
           # Do the numpy calculation in float128 to avoid inf/nan.
           y_float128 = np.float128(y)
