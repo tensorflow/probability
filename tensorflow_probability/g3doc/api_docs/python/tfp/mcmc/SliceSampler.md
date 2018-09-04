@@ -137,6 +137,8 @@ with tf.Session() as sess:
 print "sample_mean: ", sample_mean
 print "sample_cov: ", sample_cov
 
+```
+
 #### References
 
 [1]: Radford M. Neal. Slice Sampling. The Annals of Statistics. 2003, Vol 31,
