@@ -30,8 +30,8 @@ __all__ = [
 class Gumbel(bijector.Bijector):
   """Compute `Y = g(X) = exp(-exp(-(X - loc) / scale))`.
 
-  This bijector maps inputs from `[-inf, inf]` to [0, 1]`. The inverse of the
-  bijector applied to a uniform random variable `X ~ U(0, 1) gives back a
+  This bijector maps inputs from `[-inf, inf]` to `[0, 1]`. The inverse of the
+  bijector applied to a uniform random variable `X ~ U(0, 1)` gives back a
   random variable with the
   [Gumbel distribution](https://en.wikipedia.org/wiki/Gumbel_distribution):
 
