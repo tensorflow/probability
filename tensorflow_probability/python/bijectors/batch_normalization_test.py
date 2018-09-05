@@ -139,13 +139,14 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
   def testMaximumLikelihoodTraining(self):
     # Test Maximum Likelihood training with default bijector.
     with self.test_session() as sess:
+      training = tf.placeholder_with_default(True, (), "training")
       base_dist = distributions.MultivariateNormalDiag(loc=[0., 0.])
-      batch_norm = tfb.BatchNormalization(training=True)
+      batch_norm = tfb.BatchNormalization(training=training)
       dist = transformed_distribution_lib.TransformedDistribution(
           distribution=base_dist,
           bijector=batch_norm)
       target_dist = distributions.MultivariateNormalDiag(loc=[1., 2.])
-      target_samples = target_dist.sample(100)
+      target_samples = target_dist.sample(200)
       dist_samples = dist.sample(3000)
       loss = -tf.reduce_mean(dist.log_prob(target_samples))
       with tf.control_dependencies(batch_norm.batchnorm.updates):
@@ -170,8 +171,10 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
 
   def testLogProb(self):
     with self.test_session() as sess:
+      training = tf.placeholder_with_default(False, (), "training")
       layer = normalization.BatchNormalization(epsilon=0.)
-      batch_norm = tfb.BatchNormalization(batchnorm_layer=layer, training=False)
+      batch_norm = tfb.BatchNormalization(batchnorm_layer=layer,
+                                          training=training)
       base_dist = distributions.MultivariateNormalDiag(loc=[0., 0.])
       dist = transformed_distribution_lib.TransformedDistribution(
           distribution=base_dist,
@@ -190,8 +193,10 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
     # BatchNorm bijector is only mutually consistent when training=False.
     dims = 4
     with self.test_session() as sess:
+      training = tf.placeholder_with_default(False, (), "training")
       layer = normalization.BatchNormalization(epsilon=0.)
-      batch_norm = tfb.BatchNormalization(batchnorm_layer=layer, training=False)
+      batch_norm = tfb.BatchNormalization(batchnorm_layer=layer,
+                                          training=training)
       dist = transformed_distribution_lib.TransformedDistribution(
           distribution=tf.distributions.Normal(loc=0., scale=1.),
           bijector=batch_norm,
@@ -209,9 +214,10 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
     # BatchNorm bijector is only mutually consistent when training=False.
     dims = 4
     with self.test_session() as sess:
+      training = tf.placeholder_with_default(False, (), "training")
       layer = normalization.BatchNormalization(epsilon=0.)
       batch_norm = tfb.Invert(
-          tfb.BatchNormalization(batchnorm_layer=layer, training=False))
+          tfb.BatchNormalization(batchnorm_layer=layer, training=training))
       dist = transformed_distribution_lib.TransformedDistribution(
           distribution=tf.distributions.Normal(loc=0., scale=1.),
           bijector=batch_norm,

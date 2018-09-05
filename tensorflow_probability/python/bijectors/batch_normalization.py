@@ -241,14 +241,17 @@ class BatchNormalization(bijector.Bijector):
     event_dims = self.batchnorm.axis
     reduction_axes = [i for i in range(len(input_shape)) if i not in event_dims]
 
-    if use_saved_statistics or not self._training:
-      log_variance = tf.log(self.batchnorm.moving_variance +
-                            self.batchnorm.epsilon)
-    else:
-      # At training-time, ildj is computed from the mean and log-variance across
-      # the current minibatch.
-      _, v = tf.nn.moments(y, axes=reduction_axes, keep_dims=True)
-      log_variance = tf.log(v + self.batchnorm.epsilon)
+    # At training-time, ildj is computed from the mean and log-variance across
+    # the current minibatch.
+    # We use multiplication instead of tf.where() to get easier broadcasting.
+    use_saved_statistics = tf.cast(
+        tf.logical_or(use_saved_statistics, tf.logical_not(self._training)),
+        tf.float32)
+    log_variance = tf.log(
+        (1 - use_saved_statistics) * tf.nn.moments(y, axes=reduction_axes,
+                                                   keep_dims=True)[1]
+        + use_saved_statistics * self.batchnorm.moving_variance
+        + self.batchnorm.epsilon)
 
     # `gamma` and `log Var(y)` reductions over event_dims.
     # Log(total change in area from gamma term).
