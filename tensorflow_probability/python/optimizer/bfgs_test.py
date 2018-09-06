@@ -46,6 +46,26 @@ class BfgsTest(tf.test.TestCase):
       self.assertTrue(final_gradient_norm <= 1e-8)
       self.assertArrayNear(results.position, minimum, 1e-5)
 
+  def test_inverse_hessian_spec(self):
+    """Checks that specifying the 'initial_inverse_hessian_estimate' works."""
+    minimum = np.array([1.0, 1.0], dtype=np.float32)
+    scales = np.array([2.0, 3.0], dtype=np.float32)
+    def quadratic(x):
+      value = tf.reduce_sum(scales * (x - minimum) ** 2)
+      return value, tf.gradients(value, x)[0]
+
+    start = tf.constant([0.6, 0.8])
+    test_inv_hessian = tf.constant([[2.0, 1.0], [1.0, 2.0]],
+                                   dtype=np.float32)
+    results = self.evaluate(tfp.optimizer.bfgs_minimize(
+        quadratic, initial_position=start, tolerance=1e-8,
+        initial_inverse_hessian_estimate=test_inv_hessian))
+    self.assertTrue(results.converged)
+    final_gradient = results.objective_gradient
+    final_gradient_norm = np.sqrt(np.sum(final_gradient * final_gradient))
+    self.assertTrue(final_gradient_norm <= 1e-8)
+    self.assertArrayNear(results.position, minimum, 1e-5)
+
   def test_quadratic_bowl_10d(self):
     """Can minimize a ten dimensional quadratic function."""
     dim = 10

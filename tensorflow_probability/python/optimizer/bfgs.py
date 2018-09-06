@@ -177,6 +177,7 @@ def minimize(value_and_gradients_function,
                                             name='initial_position')
     dtype = initial_position.dtype.base_dtype
     domain_shape = initial_position.shape
+    initial_inv_hessian = initial_inverse_hessian_estimate
     if initial_inverse_hessian_estimate is None:
       inv_hessian_shape = domain_shape.concatenate(domain_shape)
       initial_inv_hessian = tf.eye(tf.size(initial_position), dtype=dtype)
