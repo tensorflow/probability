@@ -405,27 +405,40 @@ class LinearGaussianStateSpaceModel(tf.distributions.Distribution):
                                     transition_noise,
                                     observation_matrix,
                                     observation_noise])
+
+        latent_size_ = util.static_value(self.latent_size)
+        observation_size_ = util.static_value(self.observation_size)
         runtime_assertions = [
-            _check_equal_shape("transition_matrix",
-                               transition_matrix.shape[-2:],
-                               transition_matrix.shape_tensor()[-2:],
-                               [self.latent_size, self.latent_size]),
-            _check_equal_shape("observation_matrix",
-                               observation_matrix.shape[-2:],
-                               observation_matrix.shape_tensor()[-2:],
-                               [self.observation_size, self.latent_size]),
-            _check_equal_shape("initial_state_prior",
-                               initial_state_prior.event_shape,
-                               initial_state_prior.event_shape_tensor(),
-                               [self.latent_size]),
-            _check_equal_shape("transition_noise",
-                               transition_noise.event_shape,
-                               transition_noise.event_shape_tensor(),
-                               [self.latent_size]),
-            _check_equal_shape("observation_noise",
-                               observation_noise.event_shape,
-                               observation_noise.event_shape_tensor(),
-                               [self.observation_size])]
+            _check_equal_shape(
+                name="transition_matrix",
+                static_shape=transition_matrix.shape[-2:],
+                dynamic_shape=transition_matrix.shape_tensor()[-2:],
+                static_target_shape=[latent_size_, latent_size_],
+                dynamic_target_shape=[self.latent_size, self.latent_size]),
+            _check_equal_shape(
+                name="observation_matrix",
+                static_shape=observation_matrix.shape[-2:],
+                dynamic_shape=observation_matrix.shape_tensor()[-2:],
+                static_target_shape=[observation_size_, latent_size_],
+                dynamic_target_shape=[self.observation_size, self.latent_size]),
+            _check_equal_shape(
+                name="initial_state_prior",
+                static_shape=initial_state_prior.event_shape,
+                dynamic_shape=initial_state_prior.event_shape_tensor(),
+                static_target_shape=[latent_size_],
+                dynamic_target_shape=[self.latent_size]),
+            _check_equal_shape(
+                name="transition_noise",
+                static_shape=transition_noise.event_shape,
+                dynamic_shape=transition_noise.event_shape_tensor(),
+                static_target_shape=[latent_size_],
+                dynamic_target_shape=[self.latent_size]),
+            _check_equal_shape(
+                name="observation_noise",
+                static_shape=observation_noise.event_shape,
+                dynamic_shape=observation_noise.event_shape_tensor(),
+                static_target_shape=[observation_size_],
+                dynamic_target_shape=[self.observation_size])]
         self.runtime_assertions = [op for op in runtime_assertions
                                    if op is not None]
         _, _ = self._batch_shape(), self._batch_shape_tensor()
@@ -622,7 +635,7 @@ class LinearGaussianStateSpaceModel(tf.distributions.Distribution):
 
       # Check event shape statically if possible
       check_shape_op = _check_equal_shape(
-          "x", x.shape[-2:], tf.shape(x),
+          "x", x.shape[-2:], tf.shape(x)[-2:],
           self.event_shape, self.event_shape_tensor())
       if self.validate_args:
         runtime_assertions = (self.runtime_assertions
