@@ -43,6 +43,20 @@ class HaltonSequenceTest(tf.test.TestCase):
           2, num_results=5, randomized=False)
       self.assertAllClose(expected, self.evaluate(sample), rtol=1e-6)
 
+  def test_dynamic_num_samples(self):
+    """Tests that num_samples argument supports Tensors."""
+    with self.test_session():
+      # The first five elements of the non-randomized Halton sequence
+      # with base 2 and 3.
+      expected = np.array([[1. / 2, 1. / 3],
+                           [1. / 4, 2. / 3],
+                           [3. / 4, 1. / 9],
+                           [1. / 8, 4. / 9],
+                           [5. / 8, 7. / 9]], dtype=np.float32)
+      sample = tfp.mcmc.sample_halton_sequence(
+          2, num_results=tf.constant(5), randomized=False)
+      self.assertAllClose(expected, self.evaluate(sample), rtol=1e-6)
+
   def test_sequence_indices(self):
     """Tests access of sequence elements by index."""
     with self.test_session():
@@ -56,8 +70,8 @@ class HaltonSequenceTest(tf.test.TestCase):
           self.evaluate(sample_direct), self.evaluate(sample_from_indices),
           rtol=1e-6)
 
-  def test_tf_works_correctly(self):
-    """Tests that all supported tf work without error."""
+  def test_dtypes_works_correctly(self):
+    """Tests that all supported dtypes work without error."""
     with self.test_session():
       dim = 3
       sample_float32 = tfp.mcmc.sample_halton_sequence(

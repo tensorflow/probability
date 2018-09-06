@@ -124,10 +124,10 @@ def sample_halton_sequence(dim,
   Args:
     dim: Positive Python `int` representing each sample's `event_size.` Must
       not be greater than 1000.
-    num_results: (Optional) positive Python `int`. The number of samples to
-      generate. Either this parameter or sequence_indices must be specified but
-      not both. If this parameter is None, then the behaviour is determined by
-      the `sequence_indices`.
+    num_results: (Optional) Positive scalar `Tensor` of dtype int32. The number
+      of samples to generate. Either this parameter or sequence_indices must
+      be specified but not both. If this parameter is None, then the behaviour
+      is determined by the `sequence_indices`.
       Default value: `None`.
     sequence_indices: (Optional) `Tensor` of dtype int32 and rank 1. The
       elements of the sequence to compute specified by their position in the
@@ -178,12 +178,16 @@ def sample_halton_sequence(dim,
   if not dtype.is_floating:
     raise ValueError('dtype must be of `float`-type')
 
-  with tf.name_scope(name, 'sample', values=[sequence_indices]):
+  with tf.name_scope(name, 'sample', values=[num_results, sequence_indices]):
     # Here and in the following, the shape layout is as follows:
     # [sample dimension, event dimension, coefficient dimension].
     # The coefficient dimension is an intermediate axes which will hold the
     # weights of the starting integer when expressed in the (prime) base for
     # an event dimension.
+    if num_results is not None:
+      num_results = tf.convert_to_tensor(num_results)
+    if sequence_indices is not None:
+      sequence_indices = tf.convert_to_tensor(sequence_indices)
     indices = _get_indices(num_results, sequence_indices, dtype)
     radixes = tf.constant(_PRIMES[0:dim], dtype=dtype, shape=[dim, 1])
 
@@ -297,7 +301,7 @@ def _get_permutations(num_results, dims, seed=None):
                    axis=-1)
 
 
-def _get_indices(n, sequence_indices, dtype, name=None):
+def _get_indices(num_results, sequence_indices, dtype, name=None):
   """Generates starting points for the Halton sequence procedure.
 
   The k'th element of the sequence is generated starting from a positive integer
@@ -307,8 +311,9 @@ def _get_indices(n, sequence_indices, dtype, name=None):
   later use.
 
   Args:
-    n: Positive `int`. The number of samples to generate. If this
-      parameter is supplied, then `sequence_indices` should be None.
+    num_results: Positive scalar `Tensor` of dtype int32. The number of samples
+      to generate. If this parameter is supplied, then `sequence_indices`
+      should be None.
     sequence_indices: `Tensor` of dtype int32 and rank 1. The entries
       index into the Halton sequence starting with 0 and hence, must be whole
       numbers. For example, sequence_indices=[0, 5, 6] will produce the first,
@@ -321,9 +326,10 @@ def _get_indices(n, sequence_indices, dtype, name=None):
   Returns:
     indices: `Tensor` of dtype `dtype` and shape = `[n, 1, 1]`.
   """
-  with tf.name_scope(name, '_get_indices', [n, sequence_indices]):
+  with tf.name_scope(name, '_get_indices', [num_results, sequence_indices]):
     if sequence_indices is None:
-      sequence_indices = tf.range(n, dtype=dtype)
+      num_results = tf.cast(num_results, dtype=dtype)
+      sequence_indices = tf.range(num_results, dtype=dtype)
     else:
       sequence_indices = tf.cast(sequence_indices, dtype)
 
