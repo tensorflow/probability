@@ -68,7 +68,7 @@ def _resnet_block(x, filters, kernel, stride, kernel_posterior_fn):
   out = tf.keras.layers.Activation('relu')(out)
 
   if stride != 1 or filters != x.shape[1]:
-    shortcut = _projection_shortcut(out, filters, stride)
+    shortcut = _projection_shortcut(out, filters, stride, kernel_posterior_fn)
   else:
     shortcut = x
 

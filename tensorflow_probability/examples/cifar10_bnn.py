@@ -84,7 +84,7 @@ flags.DEFINE_integer("num_monte_carlo",
                      default=50,
                      help="Network draws to compute predictive probabilities.")
 flags.DEFINE_string("arch",
-                    default="vgg",
+                    default="resnet",
                     help="Network architecture to use.")
 flags.DEFINE_integer(
     "kernel_mean",
