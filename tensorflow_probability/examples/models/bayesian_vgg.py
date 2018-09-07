@@ -4,23 +4,26 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 
-def BayesianVGG(input_dim,
-                num_classes=10,
-                kernel_posterior_mean=-9,
-                kernel_posterior_stddev=0.1,
-                kernel_posterior_constraint=0.2):
+def bayesian_vgg(input_dim,
+                 num_classes=10,
+                 kernel_posterior_scale_mean=-9,
+                 kernel_posterior_scale_stddev=0.1,
+                 kernel_posterior_scale_constraint=0.2):
   """
+  Constructs a VGG16 model for training.
+
   Args:
-    input_dim: A Numpy `array` of IMAGE_SHAPE.
-    kernel_posterior_mean: Python `int` number for the initial kernel
-      posterior log mean. The smaller the mean the closer is the
-      initialization to a deterministic network.
-    kernel_posterior_stddev: Python `float` number for the initial kernel
-      posterior stddev.
-      i.e. log_var ~ N(kernel_posterior_mean, kernel_posterior_stddev)
-    kernel_posterior_constraint: Python `float` number for the log value
+    input_dim: A `tuple` indicating the Tensor shape.
+    kernel_posterior_scale_mean: Python `int` number for the kernel
+      posterior's scale (log variance) mean. The smaller the mean the closer 
+      is the initialization to a deterministic network.
+    kernel_posterior_scale_stddev: Python `float` number for the initial kernel
+      posterior's scale stddev.
+      i.e. q(W|x) ~ N(mu, var), 
+           log_var ~ N(kernel_posterior_scale_mean, kernel_posterior_scale_stddev)
+    kernel_posterior_scale_constraint: Python `float` number for the log value
       to constrain the log variance throughout training.
-      i.e. log_var <= log(kernel_posterior_constraint).
+      i.e. log_var <= log(kernel_posterior_scale_constraint).
   """
 
   filters = [64, 128, 256, 512, 512]
@@ -29,10 +32,10 @@ def BayesianVGG(input_dim,
 
   kernel_posterior_fn = tfp.layers.default_mean_field_normal_fn(
       untransformed_scale_initializer=tf.random_normal_initializer(
-          mean=kernel_posterior_mean,
-          stddev=kernel_posterior_stddev),
+          mean=kernel_posterior_scale_mean,
+          stddev=kernel_posterior_scale_stddev),
       untransformed_scale_constraint=lambda t: tf.clip_by_value(
-          t, -1000, tf.log(kernel_posterior_constraint)))
+          t, -1000, tf.log(kernel_posterior_scale_constraint)))
 
   image = tf.keras.layers.Input(shape=input_dim, dtype='float32')
 
