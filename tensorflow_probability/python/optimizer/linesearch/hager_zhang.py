@@ -277,12 +277,6 @@ def hager_zhang(value_and_gradients_function,
     # If it did, then we quit.
     eval_failed = ~_is_finite(val_0, val_c)
 
-    # Check if the initial step size already satisfies the Wolfe conditions.
-    # If it does, there is no further work.
-    already_converged = _satisfies_wolfe(val_0, val_c, f_lim,
-                                         sufficient_decrease_param,
-                                         curvature_param)
-
     def _cond(converged, failed, *ignored_args):  # pylint:disable=unused-argument
       """Loops until convergence is reached."""
       return tf.logical_not(converged | failed)
@@ -342,13 +336,10 @@ def hager_zhang(value_and_gradients_function,
                             right),
                            parallel_iterations=1)
 
-    converged, failed, func_evals, left, right = smart_cond.smart_case(
-        [
-            (already_converged,
-             lambda: (already_converged, False, prepare_evals, val_c, val_c)),
-            (eval_failed, lambda: (False, True, prepare_evals, val_0, val_c))
-        ],
-        default=do_line_search)
+    converged, failed, func_evals, left, right = smart_cond.smart_cond(
+        eval_failed,
+        true_fn=lambda: (False, True, prepare_evals, val_0, val_c),
+        false_fn=do_line_search)
 
     return HagerZhangLineSearchResult(
         converged=tf.convert_to_tensor(converged, name='converged'),
