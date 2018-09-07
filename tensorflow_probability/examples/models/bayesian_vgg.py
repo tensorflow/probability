@@ -1,19 +1,22 @@
-"""Builds a Bayesian VGG16 Model"""
+"""Builds a Bayesian VGG16 Model."""
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 
 import tensorflow as tf
 import tensorflow_probability as tfp
 
 
-def bayesian_vgg(input_dim,
+def bayesian_vgg(input_shape,
                  num_classes=10,
                  kernel_posterior_scale_mean=-9,
                  kernel_posterior_scale_stddev=0.1,
                  kernel_posterior_scale_constraint=0.2):
-  """
-  Constructs a VGG16 model for training.
+  """Constructs a VGG16 model.
 
   Args:
-    input_dim: A `tuple` indicating the Tensor shape.
+    input_shape: A `tuple` indicating the Tensor shape.
     kernel_posterior_scale_mean: Python `int` number for the kernel
       posterior's scale (log variance) mean. The smaller the mean the closer 
       is the initialization to a deterministic network.
@@ -37,7 +40,7 @@ def bayesian_vgg(input_dim,
       untransformed_scale_constraint=lambda t: tf.clip_by_value(
           t, -1000, tf.log(kernel_posterior_scale_constraint)))
 
-  image = tf.keras.layers.Input(shape=input_dim, dtype='float32')
+  image = tf.keras.layers.Input(shape=input_shape, dtype='float32')
 
   x = image
   for i in range(len(kernels)):

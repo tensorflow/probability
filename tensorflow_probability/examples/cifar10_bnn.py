@@ -19,13 +19,13 @@ The architecture can be either ResNet [1] or VGG [2].
 #### References
 
 [1]: He, Kaiming, Xiangyu Zhang, Shaoqing Ren, and Jian Sun.
-    "Deep residual learning for image recognition."
+     "Deep residual learning for image recognition."
      _Proceedings of the IEEE_, 2016.
      https://arxiv.org/abs/1512.03385
 [2]: Simonyan, Karen, and Andrew Zisserman.
-    "Very deep convolutional networks for large-scale image recognition."
-    arXiv preprint arXiv:1409.1556 (2014).
-    https://arxiv.org/pdf/1409.1556.pdf
+     "Very deep convolutional networks for large-scale image recognition."
+     arXiv preprint arXiv:1409.1556 (2014).
+     https://arxiv.org/pdf/1409.1556.pdf
 """
 
 from __future__ import absolute_import
@@ -82,16 +82,19 @@ flags.DEFINE_string("architecture",
                     default="resnet",
                     help="Network architecture to use.")
 flags.DEFINE_integer(
-    "kernel_scale_mean",
+    "kernel_posterior_scale_mean",
     default=-9,
     help="Initial kernel posterior mean of the scale (log var) for q(w)")
 flags.DEFINE_float(
-    "kernel_scale_constraint",
+    "kernel_posterior_scale_constraint",
     default=0.2,
     help="Posterior kernel constraint for the scale (log var) of q(w).")
 flags.DEFINE_integer("kl_annealing",
-                     default=100,
+                     default=50,
                      help="Epochs to anneal the KL term (anneals from 0 to 1)")
+flags.DEFINE_boolean("subtract_pixel_mean", 
+                     default=True,
+                     help="Boolean for normalizing the images")
 
 FLAGS = flags.FLAGS
 
@@ -108,6 +111,11 @@ def build_input_pipeline(x_train, x_test, y_train, y_test,
 
   y_train = y_train.flatten()
   y_test = y_test.flatten()
+  
+  if FLAGS.subtract_pixel_mean:
+    x_train_mean = np.mean(x_train, axis=0)
+    x_train -= x_train_mean
+    x_test -= x_train_mean
 
   print('x_train shape:' + str(x_train.shape))
   print(str(x_train.shape[0]) + ' train samples')
@@ -158,10 +166,11 @@ def main(argv):
   else:
     model_fn = bayesian_vgg
   
-  model = model_fn(IMAGE_SHAPE,
-                   num_classes=10,
-                   kernel_posterior_scale_mean=FLAGS.kernel_scale_mean,
-                   kernel_posterior_scale_constraint=FLAGS.kernel_scale_constraint)
+  model = model_fn(
+      IMAGE_SHAPE,
+      num_classes=10,
+      kernel_posterior_scale_mean=FLAGS.kernel_posterior_scale_mean,
+      kernel_posterior_scale_constraint=FLAGS.kernel_posterior_scale_constraint)
   logits = model(images)
   labels_distribution = tfd.Categorical(logits=logits)
 
@@ -170,7 +179,8 @@ def main(argv):
   t = tf.Variable(0.0)
   kl_regularizer = t / (FLAGS.kl_annealing * len(x_train) / FLAGS.batch_size)
 
-  # Compute the -ELBO as the loss, averaged over the batch size.
+  # Compute the -ELBO as the loss. The kl term is annealed from 0 to 1 over 
+  # the epochs specified by the kl_annealing flag.
   log_likelihood = labels_distribution.log_prob(labels)
   neg_log_likelihood = -tf.reduce_mean(log_likelihood)
   kl = sum(model.losses) / len(x_train) * tf.minimum(1.0, kl_regularizer)
