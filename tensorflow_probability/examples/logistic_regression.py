@@ -105,7 +105,8 @@ def visualize_decision(features, labels, true_w_b, candidate_w_bs, fname):
   ax = fig.add_subplot(1, 1, 1)
   ax.scatter(features[:, 0], features[:, 1],
              c=np.float32(labels[:, 0]),
-             cmap=cm.get_cmap("binary"))
+             cmap=cm.get_cmap("binary"),
+             edgecolors='k')
 
   def plot_weights(w, b, **kwargs):
     w1, w2 = w
