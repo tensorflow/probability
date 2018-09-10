@@ -1002,7 +1002,7 @@ def linear_gaussian_update(prior_mean, prior_cov,
   # reused below to compute Kalman gain.
   tmp_obs_cov = observation_matrix.matmul(prior_cov)
   predicted_obs_cov = (
-      observation_matrix.matmul(tf.matrix_transpose(tmp_obs_cov))
+      observation_matrix.matmul(tmp_obs_cov, adjoint_arg=True)
       + observation_noise.covariance())
 
   # Compute optimal Kalman gain:
@@ -1223,5 +1223,4 @@ def _propagate_mean(mean, linop, dist):
 def _propagate_cov(cov, linop, dist):
   """Propagate covariance through linear Gaussian transformation."""
   # For linop A and input cov P, returns `A P A' + dist.cov()`
-  return (linop.matmul(tf.matrix_transpose(linop.matmul(cov)))
-          + dist.covariance())
+  return linop.matmul(linop.matmul(cov), adjoint_arg=True) + dist.covariance()
