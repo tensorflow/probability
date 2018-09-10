@@ -199,6 +199,8 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
 
@@ -717,6 +719,19 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+    ],
+)
+
+py_test(
+    name = "gumbel_test",
+    size = "small",
+    srcs = ["gumbel_test.py"],
+    deps = [
+        ":distributions",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 
