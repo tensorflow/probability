@@ -16,6 +16,12 @@
 
 The architecture can be either ResNet [1] or VGG [2].
 
+To run with default arguments:
+
+  ```
+  bazel run tensorflow_probability/examples:cifar10_bnn
+  ```
+
 #### References
 
 [1]: He, Kaiming, Xiangyu Zhang, Shaoqing Ren, and Jian Sun.
@@ -43,8 +49,8 @@ import tensorflow as tf
 
 from tensorflow.python.keras.datasets import cifar10
 
-from models.bayesian_resnet import bayesian_resnet
-from models.bayesian_vgg import bayesian_vgg
+from tensorflow_probability.examples.models.bayesian_resnet import bayesian_resnet
+from tensorflow_probability.examples.models.bayesian_vgg import bayesian_vgg
 
 import warnings
 warnings.simplefilter(action='ignore')
@@ -92,9 +98,13 @@ flags.DEFINE_float(
 flags.DEFINE_integer("kl_annealing",
                      default=50,
                      help="Epochs to anneal the KL term (anneals from 0 to 1)")
-flags.DEFINE_boolean("subtract_pixel_mean", 
+flags.DEFINE_boolean("subtract_pixel_mean",
                      default=True,
                      help="Boolean for normalizing the images")
+flags.DEFINE_bool("fake_data",
+                  default=None,
+                  help="If true, uses fake data. Defaults to real data.")
+
 
 FLAGS = flags.FLAGS
 
@@ -111,7 +121,7 @@ def build_input_pipeline(x_train, x_test, y_train, y_test,
 
   y_train = y_train.flatten()
   y_test = y_test.flatten()
-  
+
   if FLAGS.subtract_pixel_mean:
     x_train_mean = np.mean(x_train, axis=0)
     x_train -= x_train_mean
@@ -145,6 +155,15 @@ def build_input_pipeline(x_train, x_test, y_train, y_test,
   return images, labels, handle, training_iterator, heldout_iterator
 
 
+def build_fake_data():
+  """Build fake CIFAR10-style data for unit testing."""
+  num_examples = 10
+  x_train = np.random.rand(num_examples, *IMAGE_SHAPE).astype(np.float32)
+  y_train = np.random.permutation(np.arange(num_examples)).astype(np.int32)
+  x_test = np.random.rand(num_examples, *IMAGE_SHAPE).astype(np.float32)
+  y_test = np.random.permutation(np.arange(num_examples)).astype(np.int32)
+  return (x_train, y_train), (x_test, y_test)
+
 def main(argv):
   del argv  # unused
   if tf.gfile.Exists(FLAGS.model_dir):
@@ -154,7 +173,10 @@ def main(argv):
     tf.gfile.DeleteRecursively(FLAGS.model_dir)
   tf.gfile.MakeDirs(FLAGS.model_dir)
 
-  (x_train, y_train), (x_test, y_test) = cifar10.load_data()
+  if FLAGS.fake_data:
+    (x_train, y_train), (x_test, y_test) = build_fake_data()
+  else:
+    (x_train, y_train), (x_test, y_test) = cifar10.load_data()
 
   (images, labels, handle,
    training_iterator,
@@ -165,7 +187,7 @@ def main(argv):
     model_fn = bayesian_resnet
   else:
     model_fn = bayesian_vgg
-  
+
   model = model_fn(
       IMAGE_SHAPE,
       num_classes=10,
@@ -174,12 +196,12 @@ def main(argv):
   logits = model(images)
   labels_distribution = tfd.Categorical(logits=logits)
 
-  # Perform KL annealing. The optimal number of annealing steps 
-  # depends on the dataset and architecture.   
+  # Perform KL annealing. The optimal number of annealing steps
+  # depends on the dataset and architecture.
   t = tf.Variable(0.0)
   kl_regularizer = t / (FLAGS.kl_annealing * len(x_train) / FLAGS.batch_size)
 
-  # Compute the -ELBO as the loss. The kl term is annealed from 0 to 1 over 
+  # Compute the -ELBO as the loss. The kl term is annealed from 0 to 1 over
   # the epochs specified by the kl_annealing flag.
   log_likelihood = labels_distribution.log_prob(labels)
   neg_log_likelihood = -tf.reduce_mean(log_likelihood)

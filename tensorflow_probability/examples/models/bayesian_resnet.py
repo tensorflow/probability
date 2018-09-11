@@ -32,11 +32,11 @@ def bayesian_resnet(input_shape,
   Args:
     input_shape: A `tuple` indicating the Tensor shape.
     kernel_posterior_scale_mean: Python `int` number for the kernel
-      posterior's scale (log variance) mean. The smaller the mean the closer 
+      posterior's scale (log variance) mean. The smaller the mean the closer
       is the initialization to a deterministic network.
     kernel_posterior_scale_stddev: Python `float` number for the initial kernel
       posterior's scale stddev.
-      i.e. q(W|x) ~ N(mu, var), 
+      i.e. q(W|x) ~ N(mu, var),
            log_var ~ N(kernel_posterior_scale_mean, kernel_posterior_scale_stddev)
     kernel_posterior_scale_constraint: Python `float` number for the log value
       to constrain the log variance throughout training.
