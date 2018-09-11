@@ -25,14 +25,6 @@ conventions may be moved upstream.)
     gradients. It can also lead to unnecessary graph ops as subsequent TF calls
     will keep creating a tensor from the same op.
 
-4.  Use overloaded operators rather than functions. For example, avoid `tf.pow`,
-    `tf.add`, `tf.div`, `tf.mul`, `tf.subtract`, and `tf.logical*`. (You must
-    use `tf.equal`, however, for assessing Tensor equality.)
-
-    Justification: using operators makes the code read more like the math.
-
-5.  Never write code that bakes in a TensorFlow session `eval()` or `run()`.
-
 6.  Every module should define the constant `__all__` in order to list all
     public members of the module.
 
