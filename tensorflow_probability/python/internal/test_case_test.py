@@ -28,6 +28,9 @@ from tensorflow.python.framework import test_util
 
 class _TestCaseTest(object):
 
+  def setUp(self):
+    np.random.seed(932)
+
   def test_assert_all_finite_input_finite(self):
     minval = tf.constant(self.dtype.min, dtype=self.dtype)
     maxval = tf.constant(self.dtype.max, dtype=self.dtype)
@@ -77,6 +80,34 @@ class _TestCaseTest(object):
 
     c = (1, 2., 3, 4)
     self.assertAllFinite(c)
+
+  def test_assert_all_nan_input_all_nan(self):
+    a = tf.convert_to_tensor(
+        np.full((10, 10, 10), np.nan), dtype=self.dtype)
+    self.assertAllNan(a)
+
+  def test_assert_all_nan_input_some_nan(self):
+    a = np.random.rand(10, 10, 10)
+    a[1, :, :] = np.nan
+    a = tf.convert_to_tensor(a, dtype=self.dtype)
+    with self.assertRaisesRegexp(AssertionError, "Arrays are not equal"):
+      self.assertAllNan(a)
+
+  def test_assert_all_nan_input_numpy_rand(self):
+    a = np.random.rand(10, 10, 10).astype(self.dtype.as_numpy_dtype)
+    with self.assertRaisesRegexp(AssertionError, "Arrays are not equal"):
+      self.assertAllNan(a)
+
+  def test_assert_all_nan_input_inf(self):
+    a = tf.convert_to_tensor(
+        np.full((10, 10, 10), np.inf), dtype=self.dtype)
+    with self.assertRaisesRegexp(AssertionError, "Arrays are not equal"):
+      self.assertAllNan(a)
+
+  def test_assert_all_nan_input_placeholder_with_default(self):
+    all_nan = np.full((10, 10, 10), np.nan).astype(self.dtype.as_numpy_dtype)
+    a = tf.placeholder_with_default(input=all_nan, shape=all_nan.shape)
+    self.assertAllNan(a)
 
 
 @test_util.run_all_in_graph_and_eager_modes

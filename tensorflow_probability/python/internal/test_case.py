@@ -41,3 +41,13 @@ class TestCase(tf.test.TestCase):
     is_finite = np.isfinite(self._GetNdArray(a))
     all_true = np.ones_like(is_finite, dtype=np.bool)
     self.assertAllEqual(all_true, is_finite)
+
+  def assertAllNan(self, a):
+    """Assert that every entry in a `Tensor` is NaN.
+
+    Args:
+      a: A `Tensor` whose entries must be verified as NaN.
+    """
+    is_nan = np.isnan(self._GetNdArray(a))
+    all_true = np.ones_like(is_nan, dtype=np.bool)
+    self.assertAllEqual(all_true, is_nan)
