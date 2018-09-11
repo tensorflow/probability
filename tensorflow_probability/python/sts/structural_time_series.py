@@ -27,7 +27,7 @@ from tensorflow_probability.python.sts.internal import util as sts_util
 from tensorflow.contrib.distributions.python.ops import distribution_util
 from tensorflow.contrib.distributions.python.ops.seed_stream import SeedStream
 
-tfl = tf.contrib.linalg
+tfl = tf.linalg
 
 Parameter = collections.namedtuple('Parameter', ['name', 'prior', 'bijector'])
 
