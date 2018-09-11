@@ -49,8 +49,8 @@ from models.bayesian_vgg import bayesian_vgg
 import warnings
 warnings.simplefilter(action='ignore')
 
-
-tfd = tf.contrib.distributions
+import tensorflow_probability as tfp
+tfd = tfp.distributions
 
 IMAGE_SHAPE = [32, 32, 3]
 
@@ -81,9 +81,9 @@ flags.DEFINE_integer("num_monte_carlo",
 flags.DEFINE_string("architecture",
                     default="resnet",
                     help="Network architecture to use.")
-flags.DEFINE_integer(
+flags.DEFINE_float(
     "kernel_posterior_scale_mean",
-    default=-9,
+    default=-9.0,
     help="Initial kernel posterior mean of the scale (log var) for q(w)")
 flags.DEFINE_float(
     "kernel_posterior_scale_constraint",

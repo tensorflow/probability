@@ -10,7 +10,7 @@ import tensorflow_probability as tfp
 
 def bayesian_vgg(input_shape,
                  num_classes=10,
-                 kernel_posterior_scale_mean=-9,
+                 kernel_posterior_scale_mean=-9.0,
                  kernel_posterior_scale_stddev=0.1,
                  kernel_posterior_scale_constraint=0.2):
   """Constructs a VGG16 model.
