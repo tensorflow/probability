@@ -1014,13 +1014,13 @@ def linear_gaussian_update(prior_mean, prior_cov,
   #      = (S^{-1} * tmp_obs_cov) '
   #      = (S \ tmp_obs_cov)'
   predicted_obs_cov_chol = tf.cholesky(predicted_obs_cov)
-  gain = tf.matrix_transpose(
-      tf.cholesky_solve(predicted_obs_cov_chol, tmp_obs_cov))
+  gain_transpose = tf.cholesky_solve(predicted_obs_cov_chol, tmp_obs_cov)
 
   # Compute the posterior mean, incorporating the observation.
   #  u* = u + K (x_observed - x_expected)
   posterior_mean = (prior_mean +
-                    _matmul(gain, x_observed - x_expected))
+                    _matmul(gain_transpose, x_observed - x_expected,
+                            adjoint_a=True))
 
   # For the posterior covariance, we could use the simple update
   #  P* = P - K * H * P
@@ -1031,16 +1031,15 @@ def linear_gaussian_update(prior_mean, prior_cov,
   # which always produces a PSD result. This uses
   #  tmp_term = (I - K * H)'
   # as an intermediate quantity.
-  latent_size = util.prefer_static_value(
-      observation_matrix.shape_tensor())[-1]
+  latent_size = util.prefer_static_value(observation_matrix.shape_tensor())[-1]
   tmp_term = (
       tf.eye(latent_size, dtype=observation_matrix.dtype) -
-      observation_matrix.matmul(gain, adjoint=True, adjoint_arg=True))
+      observation_matrix.matmul(gain_transpose, adjoint=True))
   posterior_cov = (
-      _matmul(tf.matrix_transpose(tmp_term),
-              _matmul(prior_cov, tmp_term))
-      + _matmul(gain, _matmul(observation_noise.covariance(),
-                              tf.matrix_transpose(gain))))
+      _matmul(tmp_term, _matmul(prior_cov, tmp_term), adjoint_a=True)
+      + _matmul(gain_transpose,
+                _matmul(observation_noise.covariance(), gain_transpose),
+                adjoint_a=True))
 
   predictive_dist = mvn_tril.MultivariateNormalTriL(
       loc=x_expected[..., 0],
