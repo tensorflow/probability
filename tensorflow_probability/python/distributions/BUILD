@@ -46,6 +46,7 @@ py_library(
         ":half_normal",
         ":independent",
         ":inverse_gamma",
+        ":inverse_gaussian",
         ":kumaraswamy",
         ":linear_gaussian_ssm",
         ":lkj",
@@ -225,6 +226,15 @@ py_library(
 py_library(
     name = "inverse_gamma",
     srcs = ["inverse_gamma.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "inverse_gaussian",
+    srcs = ["inverse_gaussian.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -763,6 +773,17 @@ py_test(
 py_test(
     name = "inverse_gamma_test",
     srcs = ["inverse_gamma_test.py"],
+    deps = [
+        ":distributions",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_test(
+    name = "inverse_gaussian_test",
+    srcs = ["inverse_gaussian_test.py"],
     deps = [
         ":distributions",
         # numpy dep,

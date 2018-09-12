@@ -41,6 +41,7 @@ from tensorflow_probability.python.distributions.internal.moving_stats import as
 from tensorflow_probability.python.distributions.internal.moving_stats import moving_mean_variance
 from tensorflow_probability.python.distributions.inverse_gamma import InverseGamma
 from tensorflow_probability.python.distributions.inverse_gamma import InverseGammaWithSoftplusConcentrationRate
+from tensorflow_probability.python.distributions.inverse_gaussian import InverseGaussian
 from tensorflow_probability.python.distributions.kumaraswamy import Kumaraswamy
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import LinearGaussianStateSpaceModel
 from tensorflow_probability.python.distributions.lkj import LKJ
@@ -144,6 +145,7 @@ __all__ = [
     'VectorExponentialDiag',
     'Gamma',
     'GammaGamma',
+    'InverseGaussian',
     'GammaWithSoftplusConcentrationRate',
     'Geometric',
     'GaussianProcess',
