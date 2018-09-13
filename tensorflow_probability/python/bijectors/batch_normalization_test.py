@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+from absl.testing import parameterized
 import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
@@ -30,7 +31,9 @@ from tensorflow.python.ops.distributions import transformed_distribution as tran
 from tensorflow.python.training import adam
 
 
-class BatchNormTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
+class BatchNormTest(test_util.VectorDistributionTestHelpers,
+                    parameterized.TestCase,
+                    tf.test.TestCase):
 
   def _reduction_axes(self, input_shape, event_dims):
     if isinstance(event_dims, int):
@@ -43,98 +46,97 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
         event_dims[idx] = ndims + x
     return tuple(i for i in range(ndims) if i not in event_dims)
 
-  def testForwardInverse(self):
-    """Tests forward and backward passes with different event shapes.
+  @parameterized.parameters(
+      ((5*2, 4), [-1], False),
+      ((5, 2, 4), [-1], False),
+      ((5, 2, 4), [1, 2], False),
+      ((5, 2, 4), [0, 1], False),
+      ((5*2, 4), [-1], True),
+      ((5, 2, 4), [-1], True),
+      ((5, 2, 4), [1, 2], True),
+      ((5, 2, 4), [0, 1], True))
+  def testForwardInverse(self, input_shape, event_dims, training):
+    """Tests forward and backward passes with different event shapes and axes.
 
-    input_shape: Tuple of shapes for input tensor.
-    event_dims: Tuple of dimension indices that will be normalized.
-    training: Boolean of whether bijector runs in training or inference mode.
+    Args:
+      input_shape: Tuple of shapes for input tensor.
+      event_dims: Tuple of dimension indices that will be normalized.
+      training: Boolean of whether bijector runs in training or inference mode.
     """
-    params = [
-        ((5*2, 4), [-1], False),
-        ((5, 2, 4), [-1], False),
-        ((5, 2, 4), [1, 2], False),
-        ((5, 2, 4), [0, 1], False),
-        ((5*2, 4), [-1], True),
-        ((5, 2, 4), [-1], True),
-        ((5, 2, 4), [1, 2], True),
-        ((5, 2, 4), [0, 1], True)
-    ]
-    for input_shape, event_dims, training in params:
-      x_ = np.arange(5 * 4 * 2).astype(np.float32).reshape(input_shape)
-      with self.test_session() as sess:
-        x = tf.constant(x_)
-        # When training, memorize the exact mean of the last
-        # minibatch that it normalized (instead of moving average assignment).
-        layer = normalization.BatchNormalization(
-            axis=event_dims, momentum=0., epsilon=0.)
-        batch_norm = tfb.BatchNormalization(
-            batchnorm_layer=layer, training=training)
-        # Minibatch statistics are saved only after norm_x has been computed.
-        norm_x = batch_norm.inverse(x)
-        with tf.control_dependencies(batch_norm.batchnorm.updates):
-          moving_mean = tf.identity(batch_norm.batchnorm.moving_mean)
-          moving_var = tf.identity(batch_norm.batchnorm.moving_variance)
-          denorm_x = batch_norm.forward(tf.identity(norm_x))
-          fldj = batch_norm.forward_log_det_jacobian(
-              x, event_ndims=len(event_dims))
-          # Use identity to invalidate cache.
-          ildj = batch_norm.inverse_log_det_jacobian(
-              tf.identity(denorm_x), event_ndims=len(event_dims))
-        tf.global_variables_initializer().run()
-        # Update variables.
-        norm_x_ = sess.run(norm_x)
-        [
-            norm_x_,
-            moving_mean_,
-            moving_var_,
-            denorm_x_,
-            ildj_,
-            fldj_,
-        ] = sess.run([
-            norm_x,
-            moving_mean,
-            moving_var,
-            denorm_x,
-            ildj,
-            fldj,
-        ])
-        self.assertEqual("batch_normalization", batch_norm.name)
+    x_ = np.arange(5 * 4 * 2).astype(np.float32).reshape(input_shape)
+    with self.test_session() as sess:
+      x = tf.constant(x_)
+      # When training, memorize the exact mean of the last
+      # minibatch that it normalized (instead of moving average assignment).
+      layer = normalization.BatchNormalization(
+          axis=event_dims, momentum=0., epsilon=0.)
+      batch_norm = tfb.BatchNormalization(
+          batchnorm_layer=layer, training=training)
+      # Minibatch statistics are saved only after norm_x has been computed.
+      norm_x = batch_norm.inverse(x)
+      with tf.control_dependencies(batch_norm.batchnorm.updates):
+        moving_mean = tf.identity(batch_norm.batchnorm.moving_mean)
+        moving_var = tf.identity(batch_norm.batchnorm.moving_variance)
+        denorm_x = batch_norm.forward(tf.identity(norm_x))
+        fldj = batch_norm.forward_log_det_jacobian(
+            x, event_ndims=len(event_dims))
+        # Use identity to invalidate cache.
+        ildj = batch_norm.inverse_log_det_jacobian(
+            tf.identity(denorm_x), event_ndims=len(event_dims))
+      tf.global_variables_initializer().run()
+      # Update variables.
+      norm_x_ = sess.run(norm_x)
+      [
+          norm_x_,
+          moving_mean_,
+          moving_var_,
+          denorm_x_,
+          ildj_,
+          fldj_,
+      ] = sess.run([
+          norm_x,
+          moving_mean,
+          moving_var,
+          denorm_x,
+          ildj,
+          fldj,
+      ])
+      self.assertEqual("batch_normalization", batch_norm.name)
 
-        reduction_axes = self._reduction_axes(input_shape, event_dims)
-        keepdims = len(event_dims) > 1
+      reduction_axes = self._reduction_axes(input_shape, event_dims)
+      keepdims = len(event_dims) > 1
 
-        expected_batch_mean = np.mean(
-            x_, axis=reduction_axes, keepdims=keepdims)
-        expected_batch_var = np.var(x_, axis=reduction_axes, keepdims=keepdims)
+      expected_batch_mean = np.mean(
+          x_, axis=reduction_axes, keepdims=keepdims)
+      expected_batch_var = np.var(x_, axis=reduction_axes, keepdims=keepdims)
 
-        if training:
-          # When training=True, values become normalized across batch dim and
-          # original values are recovered after de-normalizing.
-          zeros = np.zeros_like(norm_x_)
-          self.assertAllClose(np.mean(zeros, axis=reduction_axes),
-                              np.mean(norm_x_, axis=reduction_axes))
+      if training:
+        # When training=True, values become normalized across batch dim and
+        # original values are recovered after de-normalizing.
+        zeros = np.zeros_like(norm_x_)
+        self.assertAllClose(np.mean(zeros, axis=reduction_axes),
+                            np.mean(norm_x_, axis=reduction_axes))
 
-          self.assertAllClose(expected_batch_mean, moving_mean_)
-          self.assertAllClose(expected_batch_var, moving_var_)
-          self.assertAllClose(x_, denorm_x_, atol=1e-5)
-          # Since moving statistics are set to batch statistics after
-          # normalization, ildj and -fldj should match.
-          self.assertAllClose(ildj_, -fldj_)
-          # ildj is computed with minibatch statistics.
-          expected_ildj = np.sum(np.log(1.) - .5 * np.log(
-              expected_batch_var + batch_norm.batchnorm.epsilon))
-          self.assertAllClose(expected_ildj, ildj_)
-        else:
-          # When training=False, moving_mean, moving_var remain at their
-          # initialized values (0., 1.), resulting in no scale/shift (a small
-          # shift occurs if epsilon > 0.)
-          self.assertAllClose(x_, norm_x_)
-          self.assertAllClose(x_, denorm_x_, atol=1e-5)
-          # ildj is computed with saved statistics.
-          expected_ildj = np.sum(
-              np.log(1.) - .5 * np.log(1. + batch_norm.batchnorm.epsilon))
-          self.assertAllClose(expected_ildj, ildj_)
+        self.assertAllClose(expected_batch_mean, moving_mean_)
+        self.assertAllClose(expected_batch_var, moving_var_)
+        self.assertAllClose(x_, denorm_x_, atol=1e-5)
+        # Since moving statistics are set to batch statistics after
+        # normalization, ildj and -fldj should match.
+        self.assertAllClose(ildj_, -fldj_)
+        # ildj is computed with minibatch statistics.
+        expected_ildj = np.sum(np.log(1.) - .5 * np.log(
+            expected_batch_var + batch_norm.batchnorm.epsilon))
+        self.assertAllClose(expected_ildj, np.squeeze(ildj_))
+      else:
+        # When training=False, moving_mean, moving_var remain at their
+        # initialized values (0., 1.), resulting in no scale/shift (a small
+        # shift occurs if epsilon > 0.)
+        self.assertAllClose(x_, norm_x_)
+        self.assertAllClose(x_, denorm_x_, atol=1e-5)
+        # ildj is computed with saved statistics.
+        expected_ildj = np.sum(
+            np.log(1.) - .5 * np.log(1. + batch_norm.batchnorm.epsilon))
+        self.assertAllClose(expected_ildj, np.squeeze(ildj_))
 
   def testMaximumLikelihoodTraining(self):
     # Test Maximum Likelihood training with default bijector.
@@ -169,13 +171,23 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
       self.assertAllClose([1., 2.], moving_mean_, atol=5e-2)
       self.assertAllClose([1., 1.], moving_var_, atol=5e-2)
 
-  def testLogProb(self):
+  @parameterized.named_parameters(
+      ("2d_event_ndims", (10, 4), [-1], False),
+      ("1d_event_ndims", 2, [-1], False))
+  def testLogProb(self, event_shape, event_dims, training):
     with self.test_session() as sess:
-      training = tf.placeholder_with_default(False, (), "training")
-      layer = normalization.BatchNormalization(epsilon=0.)
+      training = tf.placeholder_with_default(training, (), "training")
+      layer = normalization.BatchNormalization(axis=event_dims, epsilon=0.)
       batch_norm = tfb.BatchNormalization(batchnorm_layer=layer,
                                           training=training)
-      base_dist = distributions.MultivariateNormalDiag(loc=[0., 0.])
+      base_dist = distributions.MultivariateNormalDiag(
+          loc=np.zeros(np.prod(event_shape), dtype=np.float32))
+      # Reshape the events.
+      if isinstance(event_shape, int):
+        event_shape = [event_shape]
+      base_dist = transformed_distribution_lib.TransformedDistribution(
+          distribution=base_dist,
+          bijector=tfb.Reshape(event_shape_out=event_shape))
       dist = transformed_distribution_lib.TransformedDistribution(
           distribution=base_dist,
           bijector=batch_norm,

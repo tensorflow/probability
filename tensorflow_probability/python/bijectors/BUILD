@@ -393,10 +393,11 @@ py_test(
 
 py_test(
     name = "batch_normalization_test",
-    size = "small",
+    size = "medium",
     srcs = ["batch_normalization_test.py"],
     deps = [
         ":bijectors",
+        # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
