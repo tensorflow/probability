@@ -20,7 +20,6 @@ from __future__ import print_function
 
 
 # Dependency imports
-import numpy as np
 import tensorflow as tf
 
 from tensorflow.python.layers import normalization
@@ -183,18 +182,12 @@ class BatchNormalization(bijector.Bijector):
           "BatchNorm Bijector does not support virtual batch sizes.")
 
   def _get_broadcast_fn(self, x):
-    # Compute shape to broadcast scale/shift parameters to.
-    if not x.shape.is_fully_defined():
-      raise ValueError("Input must have shape known at graph construction.")
-    input_shape = np.int32(x.shape.as_list())
-
-    ndims = len(input_shape)
+    ndims = len(x.shape)
     reduction_axes = [i for i in range(ndims) if i not in self.batchnorm.axis]
     # Broadcasting only necessary for single-axis batch norm where the axis is
     # not the last dimension
     broadcast_shape = [1] * ndims
-    broadcast_shape[self.batchnorm.axis[0]] = (
-        input_shape[self.batchnorm.axis[0]])
+    broadcast_shape[self.batchnorm.axis[0]] = x.shape[self.batchnorm.axis[0]]
     def _broadcast(v):
       if (v is not None and
           len(v.get_shape()) != ndims and
@@ -209,8 +202,7 @@ class BatchNormalization(bijector.Bijector):
   def _de_normalize(self, x):
     # Uses the saved statistics.
     if not self.batchnorm.built:
-      input_shape = x.get_shape()
-      self.batchnorm.build(input_shape)
+      self.batchnorm.build(x.shape)
     broadcast_fn = self._get_broadcast_fn(x)
     mean = broadcast_fn(self.batchnorm.moving_mean)
     variance = broadcast_fn(self.batchnorm.moving_variance)
@@ -230,16 +222,12 @@ class BatchNormalization(bijector.Bijector):
     return -self._inverse_log_det_jacobian(x, use_saved_statistics=True)
 
   def _inverse_log_det_jacobian(self, y, use_saved_statistics=False):
-    if not y.shape.is_fully_defined():
-      raise ValueError("Input must have shape known at graph construction.")
-    input_shape = np.int32(y.shape.as_list())
-
     if not self.batchnorm.built:
       # Create variables.
-      self.batchnorm.build(input_shape)
+      self.batchnorm.build(y.shape)
 
     event_dims = self.batchnorm.axis
-    reduction_axes = [i for i in range(len(input_shape)) if i not in event_dims]
+    reduction_axes = [i for i in range(len(y.shape)) if i not in event_dims]
 
     # At training-time, ildj is computed from the mean and log-variance across
     # the current minibatch.

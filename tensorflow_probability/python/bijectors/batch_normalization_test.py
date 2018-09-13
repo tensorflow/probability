@@ -65,7 +65,9 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers,
     """
     x_ = np.arange(5 * 4 * 2).astype(np.float32).reshape(input_shape)
     with self.test_session() as sess:
-      x = tf.constant(x_)
+      x = tf.placeholder_with_default(
+          x_,
+          input_shape if 0 in event_dims else (None,) + input_shape[1:])
       # When training, memorize the exact mean of the last
       # minibatch that it normalized (instead of moving average assignment).
       layer = normalization.BatchNormalization(
