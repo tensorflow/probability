@@ -546,7 +546,7 @@ class PadDynamicTest(_PadTest, tf.test.TestCase):
 
 class TestMoveDimension(tf.test.TestCase):
 
-  @test_util.run_in_graph_and_eager_modes()
+  @test_util.run_in_graph_and_eager_modes
   def test_move_dimension_static_shape(self):
 
     x = tf.random_normal(shape=[200, 30, 4, 1, 6])
@@ -563,27 +563,82 @@ class TestMoveDimension(tf.test.TestCase):
     x_perm = distribution_util.move_dimension(x, 4, 2)
     self.assertAllEqual(x_perm.shape.as_list(), [200, 30, 6, 4, 1])
 
-  @test_util.run_in_graph_and_eager_modes()
+  @test_util.run_in_graph_and_eager_modes
   def test_move_dimension_dynamic_shape(self):
 
     x_ = tf.random_normal(shape=[200, 30, 4, 1, 6])
     x = tf.placeholder_with_default(input=x_, shape=None)
 
-    x_perm = distribution_util.move_dimension(x, 1, 1)
-    self.assertAllEqual(self.evaluate(tf.shape(x_perm)), [200, 30, 4, 1, 6])
+    x_perm1 = distribution_util.move_dimension(x, 1, 1)
+    x_perm2 = distribution_util.move_dimension(x, 0, 3)
+    x_perm3 = distribution_util.move_dimension(x, 0, -2)
+    x_perm4 = distribution_util.move_dimension(x, 4, 2)
+    x_perm5 = distribution_util.move_dimension(x, -1, 2)
 
-    x_perm = distribution_util.move_dimension(x, 0, 3)
-    self.assertAllEqual(self.evaluate(tf.shape(x_perm)), [30, 4, 1, 200, 6])
+    x_perm1_, x_perm2_, x_perm3_, x_perm4_, x_perm5_ = self.evaluate(
+        [tf.shape(x_perm1),
+         tf.shape(x_perm2),
+         tf.shape(x_perm3),
+         tf.shape(x_perm4),
+         tf.shape(x_perm5)])
 
-    x_perm = distribution_util.move_dimension(x, 0, -2)
-    self.assertAllEqual(self.evaluate(tf.shape(x_perm)), [30, 4, 1, 200, 6])
+    self.assertAllEqual(x_perm1_, [200, 30, 4, 1, 6])
 
-    x_perm = distribution_util.move_dimension(x, 4, 2)
-    self.assertAllEqual(self.evaluate(tf.shape(x_perm)), [200, 30, 6, 4, 1])
+    self.assertAllEqual(x_perm2_, [30, 4, 1, 200, 6])
 
-    x_perm = distribution_util.move_dimension(x, -1, 2)
-    self.assertAllEqual(self.evaluate(tf.shape(x_perm)), [200, 30, 6, 4, 1])
+    self.assertAllEqual(x_perm3_, [30, 4, 1, 200, 6])
 
+    self.assertAllEqual(x_perm4_, [200, 30, 6, 4, 1])
+
+    self.assertAllEqual(x_perm5_, [200, 30, 6, 4, 1])
+
+  @test_util.run_in_graph_and_eager_modes
+  def test_move_dimension_dynamic_indices(self):
+
+    x_ = tf.random_normal(shape=[200, 30, 4, 1, 6])
+    x = tf.placeholder_with_default(input=x_, shape=None)
+
+    x_perm1 = distribution_util.move_dimension(
+        x,
+        tf.placeholder_with_default(input=1, shape=[]),
+        tf.placeholder_with_default(input=1, shape=[]))
+
+    x_perm2 = distribution_util.move_dimension(
+        x,
+        tf.placeholder_with_default(input=0, shape=[]),
+        tf.placeholder_with_default(input=3, shape=[]))
+
+    x_perm3 = distribution_util.move_dimension(
+        x,
+        tf.placeholder_with_default(input=0, shape=[]),
+        tf.placeholder_with_default(input=-2, shape=[]))
+
+    x_perm4 = distribution_util.move_dimension(
+        x,
+        tf.placeholder_with_default(input=4, shape=[]),
+        tf.placeholder_with_default(input=2, shape=[]))
+
+    x_perm5 = distribution_util.move_dimension(
+        x,
+        tf.placeholder_with_default(input=-1, shape=[]),
+        tf.placeholder_with_default(input=2, shape=[]))
+
+    x_perm1_, x_perm2_, x_perm3_, x_perm4_, x_perm5_ = self.evaluate(
+        [tf.shape(x_perm1),
+         tf.shape(x_perm2),
+         tf.shape(x_perm3),
+         tf.shape(x_perm4),
+         tf.shape(x_perm5)])
+
+    self.assertAllEqual(x_perm1_, [200, 30, 4, 1, 6])
+
+    self.assertAllEqual(x_perm2_, [30, 4, 1, 200, 6])
+
+    self.assertAllEqual(x_perm3_, [30, 4, 1, 200, 6])
+
+    self.assertAllEqual(x_perm4_, [200, 30, 6, 4, 1])
+
+    self.assertAllEqual(x_perm5_, [200, 30, 6, 4, 1])
 
 if __name__ == "__main__":
   tf.test.main()
