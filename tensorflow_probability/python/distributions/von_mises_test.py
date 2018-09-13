@@ -23,6 +23,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util
 
 tfd = tfp.distributions
@@ -145,28 +146,6 @@ class _VonMisesTest(object):
       self.assertLess(
           tf.test.compute_gradient_error(concentrations, concentrations.shape,
                                          cdf, cdf.shape), 1e-3)
-
-  def compute_gradients(self, f, args, grad_ys=None):
-    """Computes gradients using tf.GradientTape or tf.gradients.
-
-    Arguments:
-      f: Function to evaluate.
-      args: The arguments to pass to the function and w.r.t. which to compute
-        the gradients.
-      grad_ys: The incoming gradients.
-
-    Returns:
-      A list of gradients of f w.r.t. args.
-    """
-    if tf.executing_eagerly():
-      grad_fn = tf.contrib.eager.gradients_function(f)
-      grads = grad_fn(*args)
-      if grad_ys is not None:
-        grads *= grad_ys
-    else:
-      res = f(*args)
-      grads = tf.gradients(res, args, grad_ys=grad_ys)
-    return self.evaluate(grads)
 
   def testVonMisesCdfGradientSimple(self):
     # This is a simple finite difference test that also works in the Eager mode.
@@ -428,12 +407,12 @@ class _VonMisesTest(object):
     self.assertEqual(self.evaluate(samples).shape, (5,))
 
 
-class VonMisesTestStaticShapeFloat32(tf.test.TestCase, _VonMisesTest):
+class VonMisesTestStaticShapeFloat32(test_case.TestCase, _VonMisesTest):
   dtype = tf.float32
   use_static_shape = True
 
 
-class VonMisesTestDynamicShapeFloat64(tf.test.TestCase, _VonMisesTest):
+class VonMisesTestDynamicShapeFloat64(test_case.TestCase, _VonMisesTest):
   dtype = tf.float64
   use_static_shape = False
 
