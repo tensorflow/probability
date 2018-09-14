@@ -271,3 +271,34 @@ py_test(
         ":vq_vae",
     ],
 )
+
+py_binary(
+    name = "cifar10_bnn",
+    srcs = ["cifar10_bnn.py"],
+    main = "cifar10_bnn.py",
+    srcs_version = "PY2AND3",
+    deps = [
+        # absl/flags dep,
+        # matplotlib dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/examples/models",
+    ],
+)
+
+py_test(
+    name = "cifar10_bnn_test",
+    size = "medium",
+    srcs = ["cifar10_bnn.py"],
+    args = [
+        "--fake_data",
+        "--epochs=1",
+        "--batch_size=5",
+    ],
+    main = "cifar10_bnn.py",
+    srcs_version = "PY2AND3",
+    deps = [
+        ":cifar10_bnn",
+    ],
+)
