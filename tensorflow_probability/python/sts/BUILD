@@ -32,6 +32,7 @@ py_library(
     deps = [
         ":local_linear_trend",
         ":structural_time_series",
+        ":sum",
     ],
 )
 
@@ -72,6 +73,28 @@ py_test(
     name = "structural_time_series_test",
     size = "medium",
     srcs = ["structural_time_series_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "sum",
+    srcs = ["sum.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/sts/internal",
+    ],
+)
+
+py_test(
+    name = "sum_test",
+    size = "medium",
+    srcs = ["sum_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,

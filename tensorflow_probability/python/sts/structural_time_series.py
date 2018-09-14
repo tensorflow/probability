@@ -59,7 +59,6 @@ class StructuralTimeSeries(object):
     """
 
     self._parameters = parameters
-    self._num_parameters = len(parameters)
     self._latent_size = latent_size
     self._name = name
 

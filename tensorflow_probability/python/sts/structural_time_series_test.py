@@ -23,6 +23,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.sts import LocalLinearTrend
+from tensorflow_probability.python.sts import Sum
 
 from tensorflow.python.framework import test_util
 from tensorflow.python.platform import test
@@ -133,6 +134,18 @@ class LocalLinearTrendTest(test.TestCase, _StsTestHarness):
 
   def _build_sts(self, observed_time_series=None):
     return LocalLinearTrend(observed_time_series=observed_time_series)
+
+
+class SumTest(test.TestCase, _StsTestHarness):
+
+  def _build_sts(self, observed_time_series=None):
+    first_component = LocalLinearTrend(
+        observed_time_series=observed_time_series, name='first_component')
+    second_component = LocalLinearTrend(
+        observed_time_series=observed_time_series, name='second_component')
+    return Sum(
+        components=[first_component, second_component],
+        observed_time_series=observed_time_series)
 
 
 if __name__ == '__main__':

@@ -21,12 +21,17 @@ from __future__ import print_function
 from tensorflow_probability.python.sts.local_linear_trend import LocalLinearTrend
 from tensorflow_probability.python.sts.local_linear_trend import LocalLinearTrendStateSpaceModel
 from tensorflow_probability.python.sts.structural_time_series import StructuralTimeSeries
+from tensorflow_probability.python.sts.sum import AdditiveStateSpaceModel
+from tensorflow_probability.python.sts.sum import Sum
 
 from tensorflow.python.util.all_util import remove_undocumented
 
 _allowed_symbols = [
-    'LocalLinearTrend', 'LocalLinearTrendStateSpaceModel',
-    'StructuralTimeSeries'
+    'AdditiveStateSpaceModel',
+    'LocalLinearTrend',
+    'LocalLinearTrendStateSpaceModel',
+    'StructuralTimeSeries',
+    'Sum',
 ]
 
 remove_undocumented(__name__, _allowed_symbols)

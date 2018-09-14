@@ -20,6 +20,114 @@ from __future__ import print_function
 # Dependency imports
 import tensorflow as tf
 
+from tensorflow_probability.python import distributions as tfd
+
+from tensorflow_probability.python.distributions.mvn_linear_operator import MultivariateNormalLinearOperator
+
+tfl = tf.contrib.linalg
+
+
+def broadcast_batch_shape(distributions):
+  """Get broadcast batch shape from distributions, statically if possible."""
+
+  # Static case
+  batch_shape = distributions[0].batch_shape
+  for distribution in distributions:
+    batch_shape = tf.broadcast_static_shape(batch_shape,
+                                            distribution.batch_shape)
+  if batch_shape.is_fully_defined():
+    return batch_shape.as_list()
+
+  # Fallback on dynamic.
+  batch_shape = distributions[0].batch_shape_tensor()
+  for distribution in distributions:
+    batch_shape = tf.broadcast_dynamic_shape(batch_shape,
+                                             distribution.batch_shape_tensor())
+
+  return tf.convert_to_tensor(batch_shape)
+
+
+def factored_joint_mvn(distributions):
+  """Combine MultivariateNormals into a factored joint distribution.
+
+   Given a list of multivariate normal distributions
+   `dist[i] = Normal(loc[i], scale[i])`, construct the joint
+   distribution given by concatenating independent samples from these
+   distributions. This is multivariate normal with mean vector given by the
+   concatenation of the component mean vectors, and block-diagonal covariance
+   matrix in which the blocks are the component covariances.
+
+   Note that for computational efficiency, multivariate normals are represented
+   by a 'scale' (factored covariance) linear operator rather than the full
+   covariance matrix.
+
+  Args:
+    distributions: Python `iterable` of MultivariateNormal distribution
+      instances (e.g., `tfd.MultivariateNormalDiag`,
+      `tfd.MultivariateNormalTriL`, etc.). These must be broadcastable to a
+      consistent batch shape, but may have different event shapes
+      (i.e., defined over spaces of different dimension).
+
+  Returns:
+    joint_distribution: An instance of `tfd.MultivariateNormalLinearOperator`
+      representing the joint distribution constructed by concatenating
+      an independent sample from each input distributions.
+  """
+
+  graph_parents = [tensor for distribution in distributions
+                   for tensor in distribution._graph_parents]  # pylint: disable=protected-access
+  with tf.name_scope('factored_joint_mvn', values=graph_parents):
+
+    # We explicitly broadcast the `locs` so that we can concatenate them.
+    # We don't have direct numerical access to the `scales`, which are arbitrary
+    # linear operators, but `LinearOperatorBlockDiag` appears to do the right
+    # thing without further intervention.
+    dtype = tf.assert_same_float_dtype(distributions)
+    broadcast_ones = tf.ones(broadcast_batch_shape(distributions),
+                             dtype=dtype)[..., tf.newaxis]
+    return MultivariateNormalLinearOperator(
+        loc=tf.concat([mvn.mean() * broadcast_ones for mvn in distributions],
+                      axis=-1),
+        scale=tfl.LinearOperatorBlockDiag([mvn.scale for mvn in distributions],
+                                          is_square=True))
+
+
+def sum_mvns(distributions):
+  """Attempt to sum MultivariateNormal distributions.
+
+  The sum of (multivariate) normal random variables is itself (multivariate)
+  normal, with mean given by the sum of means and (co)variance given by the
+  sum of (co)variances. This method exploits this fact to compute the
+  sum of a list of `tfd.MultivariateNormalDiag` objects.
+
+  It may in the future be extended to support summation of other forms of
+  (Multivariate)Normal distributions.
+
+  Args:
+    distributions: Python `iterable` of `tfd.MultivariateNormalDiag`
+      distribution instances. These must all have the same event
+      shape, and broadcast to a consistent batch shape.
+
+  Returns:
+    sum_distribution: A `tfd.MultivariateNormalDiag` instance with mean
+      equal to the sum of input means and covariance equal to the sum of
+      input covariances.
+  """
+
+  graph_parents = [tensor for distribution in distributions
+                   for tensor in distribution._graph_parents]  # pylint: disable=protected-access
+  with tf.name_scope('sum_mvns', values=graph_parents):
+    if all([isinstance(mvn, tfd.MultivariateNormalDiag)
+            for mvn in distributions]):
+      return tfd.MultivariateNormalDiag(
+          loc=sum([mvn.mean() for mvn in distributions]),
+          scale_diag=tf.sqrt(sum([
+              mvn.scale.diag**2 for mvn in distributions])))
+    else:
+      raise NotImplementedError(
+          'Sums of distributions other than MultivariateNormalDiag are not '
+          'currently implemented. (given: {})'.format(distributions))
+
 
 def empirical_statistics(observed_time_series):
   """Compute statistics of a provided time series, as heuristic initialization.
@@ -36,9 +144,9 @@ def empirical_statistics(observed_time_series):
       of each time series in the batch.
   """
 
-  with tf.name_scope("empirical_statistics", values=[observed_time_series]):
+  with tf.name_scope('empirical_statistics', values=[observed_time_series]):
     observed_time_series = tf.convert_to_tensor(
-        observed_time_series, name="observed_time_series")
+        observed_time_series, name='observed_time_series')
     observed_time_series = maybe_expand_trailing_dim(observed_time_series)
     _, observed_variance = tf.nn.moments(
         tf.squeeze(observed_time_series, -1), axes=-1)
@@ -68,7 +176,7 @@ def maybe_expand_trailing_dim(observed_time_series):
   """
 
   with tf.name_scope(
-      "maybe_expand_trailing_dim", values=[observed_time_series]):
+      'maybe_expand_trailing_dim', values=[observed_time_series]):
     if (observed_time_series.shape.ndims is not None and
         observed_time_series.shape[-1].value is not None):
       expanded_time_series = (
