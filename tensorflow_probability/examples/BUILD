@@ -85,6 +85,57 @@ py_test(
 )
 
 py_binary(
+    name = "disentangled_vae",
+    srcs = ["disentangled_vae.py"],
+    main = "disentangled_vae.py",
+    srcs_version = "PY2AND3",
+    deps = [
+        ":sprites_dataset",
+        # absl:app dep,
+        # absl/flags dep,
+        # numpy dep,
+        # six dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_test(
+    name = "disentangled_vae_dry_run_test",
+    size = "medium",
+    srcs = ["disentangled_vae.py"],
+    args = [
+        "--fake_data",
+        "--batch_size=2",
+        "--hidden_size=3",
+        "--latent_size_static=4",
+        "--latent_size_dynamic=5",
+        "--log_steps=1",
+        "--max_steps=2",
+        "--enable_debug_logging",
+    ],
+    main = "disentangled_vae.py",
+    srcs_version = "PY2AND3",
+    deps = [
+        ":disentangled_vae",
+    ],
+)
+
+py_test(
+    name = "disentangled_vae_test",
+    size = "medium",
+    srcs = ["disentangled_vae_test.py"],
+    main = "disentangled_vae_test.py",
+    srcs_version = "PY2AND3",
+    deps = [
+        ":disentangled_vae",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_binary(
     name = "deep_exponential_family",
     srcs = ["deep_exponential_family.py"],
     srcs_version = "PY2AND3",
@@ -206,6 +257,17 @@ py_test(
     srcs_version = "PY2AND3",
     deps = [
         ":logistic_regression",
+    ],
+)
+
+py_library(
+    name = "sprites_dataset",
+    srcs = ["sprites_dataset.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # absl/flags dep,
+        # six dep,
+        # tensorflow dep,
     ],
 )
 

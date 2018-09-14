@@ -95,6 +95,8 @@ It also includes example scripts such as:
   Representation learning with a latent code and variational inference.
 * [Vector-Quantized Autoencoder](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/vq_vae.py).
   Discrete representation learning with vector quantization.
+* [Disentangled Sequential Variational Autoencoder](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/disentangled_vae.py)
+  Disentangled representation learning over sequences with variational inference.
 * [Grammar Variational Autoencoder](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/grammar_vae.py).
   Representation learning over productions in a context-free grammar.
 * Latent Dirichlet Allocation
