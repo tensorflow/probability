@@ -21,7 +21,10 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 import tensorflow as tf
+from tensorflow_probability.python.distributions import seed_stream
 from tensorflow.python.framework import tensor_shape
+from tensorflow.python.ops.distributions import special_math
+from tensorflow.python.ops.distributions import util as distribution_util
 
 __all__ = [
     "InverseGaussian",
@@ -57,7 +60,14 @@ class InverseGaussian(tf.distributions.Distribution):
 
   The support of the distribution is defined on `(0, infinity)`.
 
-  TODO(jmiao): Add mapping to R and Python scipy's parameterization.
+  Mapping to R and Python scipy's parameterization:
+  * R: statmod::invgauss
+     - mean = loc
+     - shape = concentration
+     - dispersion = 1 / concentration. Used only if shape is NULL.
+  * Python: scipy.stats.invgauss
+     - mu = loc / concentration
+     - scale = concentration
   """
 
   def __init__(self,
@@ -128,7 +138,24 @@ class InverseGaussian(tf.distributions.Distribution):
   def _event_shape(self):
     return tensor_shape.scalar()
 
-  # TODO(b/112596766): Add  _sample_n(), _mean(), _variance(), _cdf().
+  def _sample_n(self, n, seed=None):
+    # See https://en.wikipedia.org/wiki/Inverse_Gaussian_distribution or
+    # https://www.jstor.org/stable/2683801
+    seed = seed_stream.SeedStream(seed, "inverse_gaussian")
+    shape = tf.concat([[n], self.batch_shape_tensor()], axis=0)
+    sampled_chi2 = (tf.random_normal(
+        shape, mean=0., stddev=1., seed=seed(), dtype=self.dtype)) ** 2.
+    sampled_uniform = tf.random_uniform(
+        shape, minval=0., maxval=1., seed=seed(), dtype=self.dtype)
+    sampled = (
+        self.loc + self.loc ** 2. * sampled_chi2 / (2. * self.concentration) -
+        self.loc / (2. * self.concentration) *
+        (4. * self.loc * self.concentration * sampled_chi2 +
+         (self.loc * sampled_chi2) ** 2) ** 0.5)
+    return tf.where(
+        sampled_uniform <= self.loc / (self.loc + sampled),
+        sampled,
+        self.loc ** 2 / sampled)
 
   def _log_prob(self, x):
     with tf.control_dependencies([
@@ -143,3 +170,29 @@ class InverseGaussian(tf.distributions.Distribution):
               (-self.concentration * (x - self.loc) ** 2.) /
               (2. * self.loc ** 2. * x))
 
+  def _cdf(self, x):
+    with tf.control_dependencies([
+        tf.assert_greater(
+            x, tf.cast(0., x.dtype.base_dtype),
+            message="x must be positive."
+        )] if self.validate_args else []):
+
+      return (
+          special_math.ndtr(
+              ((self.concentration / x) ** 0.5 *
+               (x / self.loc - 1.))) +
+          tf.exp(2. * self.concentration / self.loc) *
+          special_math.ndtr(
+              - (self.concentration / x) ** 0.5 *
+              (x / self.loc + 1)))
+
+  @distribution_util.AppendDocstring(
+      """The mean of inverse Gaussian is the `loc` parameter.""")
+  def _mean(self):
+    # Shape is broadcasted with + tf.zeros_like().
+    return self.loc + tf.zeros_like(self.concentration)
+
+  @distribution_util.AppendDocstring(
+      """The variance of inverse Gaussian is `loc` ** 3 / `concentration`.""")
+  def _variance(self):
+    return self.loc ** 3 / self.concentration

@@ -159,6 +159,200 @@ class _InverseGaussianTest(object):
         self.evaluate(prob),
         _scipy_invgauss(loc_v, np.array(concentration_v)).pdf(x_v))
 
+  def testInverseGaussianLogCdf(self):
+    batch_size = 6
+    loc_v = 2.
+    concentration_v = 3.
+    x_v = [3., 3.1, 4., 5., 6., 7.]
+    inverse_gaussian = tfd.InverseGaussian(
+        self.make_tensor([loc_v] * batch_size),
+        self.make_tensor([concentration_v] * batch_size))
+
+    log_cdf = inverse_gaussian.log_cdf(self.make_tensor(x_v))
+    if self.use_static_shape:
+      self.assertEqual(log_cdf.shape, (6,))
+    self.assertAllClose(
+        self.evaluate(log_cdf),
+        _scipy_invgauss(loc_v, concentration_v).logcdf(x_v))
+
+    cdf = inverse_gaussian.cdf(self.make_tensor(x_v))
+    if self.use_static_shape:
+      self.assertEqual(cdf.shape, (6,))
+    self.assertAllClose(
+        self.evaluate(cdf),
+        _scipy_invgauss(loc_v, concentration_v).cdf(x_v))
+
+  def testInverseGaussianLogCdfValidateArgs(self):
+    batch_size = 2
+    loc = self.make_tensor([2.] * batch_size)
+    concentration = self.make_tensor([2., 3.])
+    x = self.make_tensor([-1., 2.])
+    inverse_gaussian = tfd.InverseGaussian(loc, concentration,
+                                           validate_args=True)
+
+    with self.assertRaisesOpError("x must be positive."):
+      self.evaluate(inverse_gaussian.log_cdf(x))
+
+  def testInverseGaussianCdfValidateArgs(self):
+    batch_size = 2
+    loc = self.make_tensor([2.] * batch_size)
+    concentration = self.make_tensor([2., 3.])
+    x = self.make_tensor([-1., 2.])
+    inverse_gaussian = tfd.InverseGaussian(loc, concentration,
+                                           validate_args=True)
+
+    with self.assertRaisesOpError("x must be positive."):
+      self.evaluate(inverse_gaussian.cdf(x))
+
+  def testInverseGaussianLogCdfMultidimensional(self):
+    batch_size = 6
+    loc_v = 1.
+    concentration_v = [2., 4., 5.]
+    x_v = np.array([[6., 7., 9.2, 5., 6., 7.]]).T
+    inverse_gaussian = tfd.InverseGaussian(
+        self.make_tensor([[loc_v]] * batch_size),
+        self.make_tensor([concentration_v] * batch_size))
+
+    log_cdf = inverse_gaussian.log_cdf(self.make_tensor(x_v))
+    if self.use_static_shape:
+      self.assertEqual(log_cdf.shape, (6, 3))
+    self.assertAllClose(
+        self.evaluate(log_cdf),
+        _scipy_invgauss(loc_v, np.array(concentration_v)).logcdf(x_v))
+
+    cdf = inverse_gaussian.cdf(self.make_tensor(x_v))
+    if self.use_static_shape:
+      self.assertEqual(cdf.shape, (6, 3))
+    self.assertAllClose(
+        self.evaluate(cdf),
+        _scipy_invgauss(loc_v, np.array(concentration_v)).cdf(x_v))
+
+  def testInverseGaussianMean(self):
+    loc_v = [2., 3., 2.5]
+    concentration_v = [1.4, 2., 2.5]
+    inverse_gaussian = tfd.InverseGaussian(
+        self.make_tensor(loc_v),
+        self.make_tensor(concentration_v))
+    if self.use_static_shape:
+      self.assertEqual(inverse_gaussian.mean().shape, (3,))
+    self.assertAllClose(
+        self.evaluate(inverse_gaussian.mean()),
+        _scipy_invgauss(np.array(loc_v), np.array(concentration_v)).mean())
+
+  def testInverseGaussianMeanBroadCast(self):
+    loc_v = 2.
+    concentration_v = [1.4, 2., 2.5]
+    inverse_gaussian = tfd.InverseGaussian(
+        self.make_tensor(loc_v),
+        self.make_tensor(concentration_v))
+    if self.use_static_shape:
+      self.assertEqual(inverse_gaussian.mean().shape, (3,))
+    self.assertAllClose(
+        self.evaluate(inverse_gaussian.mean()),
+        _scipy_invgauss(np.array(loc_v), np.array(concentration_v)).mean())
+
+  def testInverseGaussianVariance(self):
+    loc_v = [2., 3., 2.5]
+    concentration_v = [1.4, 2., 2.5]
+    inverse_gaussian = tfd.InverseGaussian(
+        self.make_tensor(loc_v),
+        self.make_tensor(concentration_v))
+
+    if self.use_static_shape:
+      self.assertEqual(inverse_gaussian.variance().shape, (3,))
+    self.assertAllClose(
+        self.evaluate(inverse_gaussian.variance()),
+        _scipy_invgauss(np.array(loc_v), np.array(concentration_v)).var())
+
+  def testInverseGaussianVarianceBroadcast(self):
+    loc_v = 2.
+    concentration_v = [1.4, 2., 2.5]
+    inverse_gaussian = tfd.InverseGaussian(
+        self.make_tensor(loc_v),
+        self.make_tensor(concentration_v))
+
+    if self.use_static_shape:
+      self.assertEqual(inverse_gaussian.variance().shape, (3,))
+    self.assertAllClose(
+        self.evaluate(inverse_gaussian.variance()),
+        _scipy_invgauss(np.array(loc_v), np.array(concentration_v)).var())
+
+  def testInverseGaussianSampleMean(self):
+    loc_v = 3.
+    concentration_v = 4.
+    n = int(1e6)
+    inverse_gaussian = tfd.InverseGaussian(
+        self.make_tensor(loc_v),
+        self.make_tensor(concentration_v))
+    samples = inverse_gaussian.sample(n, seed=12345678)
+    sample_values = self.evaluate(samples)
+
+    if self.use_static_shape:
+      self.assertEqual(samples.shape, (n,))
+    self.assertEqual(sample_values.shape, (n,))
+    self.assertAllClose(
+        sample_values.mean(),
+        _scipy_invgauss(loc_v, concentration_v).mean(),
+        rtol=.02,
+        atol=0)
+
+  def testInverseGaussianSampleVariance(self):
+    loc_v = 3.
+    concentration_v = 4.
+    n = int(1e6)
+    inverse_gaussian = tfd.InverseGaussian(
+        self.make_tensor(loc_v),
+        self.make_tensor(concentration_v))
+    samples = inverse_gaussian.sample(n, seed=12345678)
+    sample_values = self.evaluate(samples)
+
+    if self.use_static_shape:
+      self.assertEqual(samples.shape, (n,))
+    self.assertEqual(sample_values.shape, (n,))
+    self.assertAllClose(
+        sample_values.var(),
+        _scipy_invgauss(loc_v, concentration_v).var(),
+        rtol=.02,
+        atol=0)
+
+  def testInverseGaussianSampleMultidimensionalMean(self):
+    loc_v = 3.
+    concentration_v = np.array([np.arange(1, 11)])
+    n = int(1e6)
+    inverse_gaussian = tfd.InverseGaussian(
+        self.make_tensor(loc_v),
+        self.make_tensor(concentration_v))
+    samples = inverse_gaussian.sample(n, seed=12345678)
+    sample_values = self.evaluate(samples)
+
+    if self.use_static_shape:
+      self.assertEqual(samples.shape, (n, 1, 10))
+    self.assertEqual(sample_values.shape, (n, 1, 10))
+    self.assertAllClose(
+        sample_values.mean(axis=0),
+        _scipy_invgauss(loc_v, concentration_v).mean(),
+        rtol=.02,
+        atol=0)
+
+  def testInverseGaussianSampleMultidimensionalVariance(self):
+    loc_v = 3.
+    concentration_v = np.array([np.arange(1, 11)])
+    n = int(1e6)
+    inverse_gaussian = tfd.InverseGaussian(
+        self.make_tensor(loc_v),
+        self.make_tensor(concentration_v))
+    samples = inverse_gaussian.sample(n, seed=12345678)
+    sample_values = self.evaluate(samples)
+
+    if self.use_static_shape:
+      self.assertEqual(samples.shape, (n, 1, 10))
+    self.assertEqual(sample_values.shape, (n, 1, 10))
+    self.assertAllClose(
+        sample_values.var(axis=0),
+        _scipy_invgauss(loc_v, concentration_v).var(),
+        rtol=.02,
+        atol=0)
+
 
 class InverseGaussianTestStaticShapeFloat32(tf.test.TestCase,
                                             _InverseGaussianTest):
