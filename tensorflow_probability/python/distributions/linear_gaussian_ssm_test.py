@@ -179,6 +179,73 @@ class IIDNormalTestDynamic32(_IIDNormalTest, test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
+class SanityChecks(test.TestCase):
+
+  def test_deterministic_system(self):
+
+    # Define a deterministic linear system
+    num_timesteps = 5
+    prior_mean = 17.
+    step_coef = 1.3
+    step_shift = -1.5
+    observation_coef = 0.3
+    observation_shift = -1.
+    model = tfd.LinearGaussianStateSpaceModel(
+        num_timesteps=num_timesteps,
+        transition_matrix=[[step_coef]],
+        transition_noise=tfd.MultivariateNormalDiag(loc=[step_shift],
+                                                    scale_diag=[0.]),
+        observation_matrix=[[observation_coef]],
+        observation_noise=tfd.MultivariateNormalDiag(loc=[observation_shift],
+                                                     scale_diag=[0.]),
+        initial_state_prior=tfd.MultivariateNormalDiag(loc=[prior_mean],
+                                                       scale_diag=[0.]))
+
+    # Manually compute expected output.
+    expected_latents = [prior_mean]
+    for _ in range(num_timesteps-1):
+      expected_latents.append(step_coef * expected_latents[-1] + step_shift)
+    expected_latents = np.asarray(expected_latents)
+    expected_observations = (
+        expected_latents * observation_coef + observation_shift)
+
+    mean_, sample_ = self.evaluate([model.mean(), model.sample()])
+    self.assertAllClose(mean_[..., 0], expected_observations)
+    self.assertAllClose(sample_[..., 0], expected_observations)
+
+  def test_variance(self):
+
+    num_timesteps = 5
+    prior_scale = 17.
+    step_coef = 1.3
+    step_scale = 0.5
+    observation_coef = 20.0
+    observation_scale = 1.9
+
+    model = tfd.LinearGaussianStateSpaceModel(
+        num_timesteps=num_timesteps,
+        transition_matrix=[[step_coef]],
+        transition_noise=tfd.MultivariateNormalDiag(
+            loc=[0.], scale_diag=[step_scale]),
+        observation_matrix=[[observation_coef]],
+        observation_noise=tfd.MultivariateNormalDiag(
+            loc=[0.], scale_diag=[observation_scale]),
+        initial_state_prior=tfd.MultivariateNormalDiag(
+            loc=[0.], scale_diag=[prior_scale]))
+
+    # Manually compute the marginal variance at each step
+    latent_variance = [prior_scale**2]
+    for _ in range(num_timesteps-1):
+      latent_variance.append(step_coef**2 * latent_variance[-1] + step_scale**2)
+    latent_variance = np.asarray(latent_variance)
+    observation_variance = (
+        latent_variance * observation_coef**2 + observation_scale**2)
+
+    variance_ = self.evaluate(model.variance())
+    self.assertAllClose(variance_[..., 0], observation_variance)
+
+
+@test_util.run_all_in_graph_and_eager_modes
 class BatchTest(test.TestCase):
   """Test that methods broadcast batch dimensions for each parameter."""
 
