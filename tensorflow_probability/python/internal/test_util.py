@@ -273,15 +273,16 @@ class VectorDistributionTestHelpers(object):
       return tf.exp((dims / 2.) * np.log(np.pi) - tf.lgamma(1. + dims / 2.) +
                     dims * tf.log(radius))
 
-    def is_in_ball(x, radius, center):
-      return tf.cast(tf.norm(x - center, axis=-1) <= radius, dtype=x.dtype)
-
     def monte_carlo_hypersphere_volume(dist, num_samples, radius, center):
       # https://en.wikipedia.org/wiki/Importance_sampling
       x = dist.sample(num_samples, seed=seed)
       x = tf.identity(x)  # Invalidate bijector cacheing.
-      return tf.reduce_mean(
-          tf.exp(-dist.log_prob(x)) * is_in_ball(x, radius, center), axis=0)
+      inverse_log_prob = tf.exp(-dist.log_prob(x))
+      importance_weights = tf.where(
+          tf.norm(x - center, axis=-1) <= radius,
+          inverse_log_prob,
+          tf.zeros_like(inverse_log_prob))
+      return tf.reduce_mean(importance_weights, axis=0)
 
     # Build graph.
     with tf.name_scope(
