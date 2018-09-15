@@ -39,23 +39,21 @@ from __future__ import division
 from __future__ import print_function
 
 import os
+import warnings
 
 # Dependency imports
 from absl import flags
 import matplotlib
-matplotlib.use("Agg")
 import numpy as np
 import tensorflow as tf
-
-from tensorflow.python.keras.datasets import cifar10
+import tensorflow_probability as tfp
 
 from tensorflow_probability.examples.models.bayesian_resnet import bayesian_resnet
 from tensorflow_probability.examples.models.bayesian_vgg import bayesian_vgg
+from tensorflow.python.keras.datasets import cifar10
 
-import warnings
-warnings.simplefilter(action='ignore')
-
-import tensorflow_probability as tfp
+matplotlib.use("Agg")
+warnings.simplefilter(action="ignore")
 tfd = tfp.distributions
 
 IMAGE_SHAPE = [32, 32, 3]
@@ -113,8 +111,8 @@ def build_input_pipeline(x_train, x_test, y_train, y_test,
                          batch_size, valid_size):
   """Build an Iterator switching between train and heldout data."""
 
-  x_train = x_train.astype('float32')
-  x_test = x_test.astype('float32')
+  x_train = x_train.astype("float32")
+  x_test = x_test.astype("float32")
 
   x_train /= 255
   x_test /= 255
@@ -127,9 +125,9 @@ def build_input_pipeline(x_train, x_test, y_train, y_test,
     x_train -= x_train_mean
     x_test -= x_train_mean
 
-  print('x_train shape:' + str(x_train.shape))
-  print(str(x_train.shape[0]) + ' train samples')
-  print(str(x_test.shape[0]) + ' test samples')
+  print("x_train shape:" + str(x_train.shape))
+  print(str(x_train.shape[0]) + " train samples")
+  print(str(x_test.shape[0]) + " test samples")
 
   # Build an iterator over training batches.
   training_dataset = tf.data.Dataset.from_tensor_slices(
@@ -163,6 +161,7 @@ def build_fake_data():
   x_test = np.random.rand(num_examples, *IMAGE_SHAPE).astype(np.float32)
   y_test = np.random.permutation(np.arange(num_examples)).astype(np.int32)
   return (x_train, y_train), (x_test, y_test)
+
 
 def main(argv):
   del argv  # unused
@@ -226,7 +225,7 @@ def main(argv):
   init_op = tf.group(tf.global_variables_initializer(),
                      tf.local_variables_initializer())
 
-  stream_vars_valid = [v for v in tf.local_variables() if 'valid/' in v.name]
+  stream_vars_valid = [v for v in tf.local_variables() if "valid/" in v.name]
   reset_valid_op = tf.variables_initializer(stream_vars_valid)
 
   with tf.Session() as sess:
@@ -262,7 +261,7 @@ def main(argv):
                             for _ in range(FLAGS.num_monte_carlo)])
         mean_probs = np.mean(probs, axis=0)
 
-        image_vals, label_vals = sess.run(
+        _, label_vals = sess.run(
             (images, labels), feed_dict={handle: heldout_handle})
         heldout_lp = np.mean(np.log(mean_probs[np.arange(mean_probs.shape[0]),
                                                label_vals.flatten()]))
@@ -270,8 +269,8 @@ def main(argv):
 
         # Calculate validation accuracy
         for _ in range(20):
-            sess.run(
-                valid_accuracy_update_op, feed_dict={handle: heldout_handle})
+          sess.run(
+              valid_accuracy_update_op, feed_dict={handle: heldout_handle})
         valid_value = sess.run(
             valid_accuracy, feed_dict={handle: heldout_handle})
 
