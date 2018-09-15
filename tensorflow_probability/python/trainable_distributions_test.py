@@ -28,12 +28,12 @@ from tensorflow.python.framework import test_util
 tfd = tfp.distributions
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class TestMVNTriL(tf.test.TestCase):
 
   def setUp(self):
     np.random.seed(142)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testDefaultsYieldCorrectShapesAndValues(self):
     batch_shape = [4, 3]
     x_size = 3
@@ -71,7 +71,6 @@ class TestMVNTriL(tf.test.TestCase):
                         scale_diag_ > 0.)
     self.assertAllEqual(np.zeros_like(scale_upper_), scale_upper_)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testNonDefaultsYieldCorrectShapesAndValues(self):
     batch_shape = [4, 3]
     x_size = 3
@@ -116,12 +115,12 @@ class TestMVNTriL(tf.test.TestCase):
     self.assertAllEqual(expected_scale_, scale_)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class TestBernoulli(tf.test.TestCase):
 
   def setUp(self):
     np.random.seed(142)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testDefaultsYieldCorrectShape(self):
     batch_shape = [4, 3]
     x_size = 3
@@ -145,7 +144,6 @@ class TestBernoulli(tf.test.TestCase):
     self.assertAllEqual([], bernoulli.event_shape)
     self.assertAllEqual([], event_shape_)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testNonDefaultsYieldCorrectShapeAndValues(self):
     batch_shape = [4, 3]
     x_size = 3
@@ -175,12 +173,12 @@ class TestBernoulli(tf.test.TestCase):
     self.assertAllClose(np.sum(x_, axis=-1), logits_, atol=0, rtol=1e-3)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class TestNormal(tf.test.TestCase):
 
   def setUp(self):
     np.random.seed(142)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testDefaultsYieldCorrectShape(self):
     batch_shape = [4, 3]
     x_size = 3
@@ -204,7 +202,6 @@ class TestNormal(tf.test.TestCase):
     self.assertAllEqual([], normal.event_shape)
     self.assertAllEqual([], event_shape_)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testNonDefaultsYieldCorrectShapeAndValues(self):
     batch_shape = [4, 3]
     x_size = 3
@@ -234,12 +231,12 @@ class TestNormal(tf.test.TestCase):
     self.assertAllClose(np.sum(x_, axis=-1), loc_, atol=0, rtol=1e-3)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class TestPoisson(tf.test.TestCase):
 
   def setUp(self):
     np.random.seed(142)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testDefaultsYieldCorrectShape(self):
     batch_shape = [4, 3]
     x_size = 3
@@ -263,7 +260,6 @@ class TestPoisson(tf.test.TestCase):
     self.assertAllEqual([], poisson.event_shape)
     self.assertAllEqual([], event_shape_)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testNonDefaultsYieldCorrectShapeAndValues(self):
     batch_shape = [4, 3]
     x_size = 3
@@ -293,12 +289,12 @@ class TestPoisson(tf.test.TestCase):
     self.assertAllClose(np.sum(x_, axis=-1), log_rate_, atol=0, rtol=1e-3)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class TestMakePositiveFunctions(tf.test.TestCase):
 
   def softplus(self, x):
     return np.log1p(np.exp(x))
 
-  @test_util.run_in_graph_and_eager_modes()
   def testPositiveTriLWorks(self):
     x_ = np.float32(np.arange(6) - 3)
     y = tfp.trainable_distributions.tril_with_diag_softplus_and_shift(
@@ -317,7 +313,6 @@ class TestMakePositiveFunctions(tf.test.TestCase):
         [-2 + 1, -3 + 1, self.softplus(-3) + 1]])
     self.assertAllClose(expected_y, y_, atol=1e-5, rtol=1e-5)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testPositiveWorks(self):
     x_ = np.float32(np.arange(6) - 3)
     y = tfp.trainable_distributions.softplus_and_shift(x_, shift=1.)

@@ -21,12 +21,14 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow.python.framework import test_util
+
 tfd = tfp.distributions
-tfe = tf.contrib.eager
 
 rng = np.random.RandomState(0)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class DeterministicTest(tf.test.TestCase):
 
   def testShape(self):
@@ -41,8 +43,8 @@ class DeterministicTest(tf.test.TestCase):
 
   def testInvalidTolRaises(self):
     loc = rng.rand(2, 3, 4).astype(np.float32)
-    deterministic = tfd.Deterministic(loc, atol=-1, validate_args=True)
     with self.assertRaisesOpError("Condition x >= 0"):
+      deterministic = tfd.Deterministic(loc, atol=-1, validate_args=True)
       self.evaluate(deterministic.prob(0.))
 
   def testProbWithNoBatchDimsIntegerType(self):
@@ -165,7 +167,6 @@ class DeterministicTest(tf.test.TestCase):
     entropy_ = self.evaluate(deterministic.entropy())
     self.assertAllEqual(np.zeros(3), entropy_)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testDeterministicDeterministicKL(self):
     batch_size = 6
     a_loc = np.array([0.5] * batch_size, dtype=np.float32)
@@ -178,7 +179,6 @@ class DeterministicTest(tf.test.TestCase):
     kl_ = self.evaluate(kl)
     self.assertAllEqual(np.zeros(6) + np.inf, kl_)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testDeterministicGammaKL(self):
     batch_size = 2
     a_loc = np.array([0.5] * batch_size, dtype=np.float32)
@@ -303,7 +303,6 @@ class VectorDeterministicTest(tf.test.TestCase):
     entropy_ = self.evaluate(deterministic.entropy())
     self.assertAllEqual(np.zeros(2), entropy_)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testVectorDeterministicVectorDeterministicKL(self):
     batch_size = 6
     event_size = 3
@@ -317,7 +316,6 @@ class VectorDeterministicTest(tf.test.TestCase):
     kl_ = self.evaluate(kl)
     self.assertAllEqual(np.zeros(6) + np.inf, kl_)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testVectorDeterministicMultivariateNormalDiagKL(self):
     batch_size = 4
     event_size = 5

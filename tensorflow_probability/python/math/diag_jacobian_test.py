@@ -29,9 +29,9 @@ from tensorflow.python.framework import test_util
 tfd = tfp.distributions
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class JacobianTest(tf.test.TestCase):
 
-  @test_util.run_in_graph_and_eager_modes()
   def testJacobianDiagonal3DListInput(self):
     """Tests that the diagonal of the Jacobian matrix computes correctly."""
 
@@ -83,7 +83,6 @@ class JacobianTest(tf.test.TestCase):
                         true_diag_jacobian_2,
                         atol=0.01, rtol=0.01)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testJacobianDiagonal4D(self):
     """Tests that the diagonal of the Jacobian matrix computes correctly."""
 

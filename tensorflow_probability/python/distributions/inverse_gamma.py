@@ -145,8 +145,12 @@ class InverseGamma(tf.distributions.Distribution):
     parameters = dict(locals())
     with tf.name_scope(name, values=[concentration, rate]) as name:
       with tf.control_dependencies([
-          tf.assert_positive(concentration),
-          tf.assert_positive(rate),
+          tf.assert_positive(
+              concentration,
+              message="Concentration must be positive."),
+          tf.assert_positive(
+              rate,
+              message="Rate must be positive."),
       ] if validate_args else []):
         self._concentration = tf.identity(concentration, name="concentration")
         self._rate = tf.identity(rate, name="rate")

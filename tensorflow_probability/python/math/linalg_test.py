@@ -29,7 +29,6 @@ from tensorflow.python.framework import test_util
 
 class _MatvecmulTest(object):
 
-  @test_util.run_in_graph_and_eager_modes()
   def testMultiplicationWorks(self):
     a = self.dtype([[1., .4, .5],
                     [.4, .2, .25]])
@@ -43,7 +42,6 @@ class _MatvecmulTest(object):
 
     self.assertAllClose(expected_result, result)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testTransposedMultiplicationWorks(self):
     a = self.dtype([[1., .4, .5],
                     [.4, .2, .25]])
@@ -57,7 +55,6 @@ class _MatvecmulTest(object):
 
     self.assertAllClose(expected_result, result)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testBatchedMultiplicationWorks(self):
     a = self.dtype([[[1., .4, .5],
                      [.4, .2, .25]],
@@ -75,7 +72,6 @@ class _MatvecmulTest(object):
 
     self.assertAllClose(expected_result, result)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testLiteralsWithMismatchedDtypes(self):
     a = np.array([[1, 2], [3, 4]], np.float64)
     b = [1., 1.]
@@ -86,7 +82,6 @@ class _MatvecmulTest(object):
 
     self.assertAllClose(expected_result, result)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testMismatchedRanksFails(self):
     data_1d = self.dtype([0.3, 0.7])
     data_2d = self.dtype([[1., .4],
@@ -115,21 +110,25 @@ class _MatvecmulTest(object):
                                        validate_args=self.use_dynamic_shape))
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class MatvecmulTestStatic32(tf.test.TestCase, _MatvecmulTest):
   dtype = np.float32
   use_dynamic_shape = False
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class MatvecmulTestDynamic32(tf.test.TestCase, _MatvecmulTest):
   dtype = np.float32
   use_dynamic_shape = True
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class MatvecmulTestStatic64(tf.test.TestCase, _MatvecmulTest):
   dtype = np.float64
   use_dynamic_shape = False
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class MatvecmulTestDynamic64(tf.test.TestCase, _MatvecmulTest):
   dtype = np.float64
   use_dynamic_shape = True
@@ -151,7 +150,6 @@ class _PinvTest(object):
           rcond=rcond if isinstance(rcond, float) else rcond[i])
     return a_pinv
 
-  @test_util.run_in_graph_and_eager_modes()
   def test_symmetric(self):
     a_ = self.dtype([[1., .4, .5],
                      [.4, .2, .25],
@@ -173,7 +171,6 @@ class _PinvTest(object):
       return
     self.assertAllEqual(expected_a_pinv_.shape, a_pinv.shape)
 
-  @test_util.run_in_graph_and_eager_modes()
   def test_nonsquare(self):
     a_ = self.dtype([[1., .4, .5, 1.],
                      [.4, .2, .25, 2.],
@@ -197,24 +194,28 @@ class _PinvTest(object):
     self.assertAllEqual(expected_a_pinv_.shape, a_pinv.shape)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class PinvTestDynamic32DefaultRcond(tf.test.TestCase, _PinvTest):
   dtype = np.float32
   use_static_shape = False
   use_default_rcond = True
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class PinvTestStatic64DefaultRcond(tf.test.TestCase, _PinvTest):
   dtype = np.float64
   use_static_shape = True
   use_default_rcond = True
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class PinvTestDynamic32CustomtRcond(tf.test.TestCase, _PinvTest):
   dtype = np.float32
   use_static_shape = False
   use_default_rcond = False
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class PinvTestStatic64CustomRcond(tf.test.TestCase, _PinvTest):
   dtype = np.float64
   use_static_shape = True

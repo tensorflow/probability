@@ -22,13 +22,15 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util
+from tensorflow.python.framework import test_util as tf_test_util
+
 from tensorflow.python.ops.distributions import transformed_distribution as transformed_distribution_lib
 from tensorflow.python.ops.distributions import util as distribution_util
-
 tfd = tfp.distributions
 tfb = tfp.bijectors
 
 
+@tf_test_util.run_all_in_graph_and_eager_modes
 class AutogressiveTest(test_util.VectorDistributionTestHelpers,
                        tf.test.TestCase):
   """Tests the Autoregressive distribution."""
@@ -57,8 +59,11 @@ class AutogressiveTest(test_util.VectorDistributionTestHelpers,
     affine = tfb.Affine(scale_tril=self._random_scale_tril(event_size))
     ar = tfd.Autoregressive(
         self._normal_fn(affine), sample0, validate_args=True)
+    if tf.executing_eagerly():
+      return
     self.run_test_sample_consistent_log_prob(
-        self.evaluate, ar, radius=1., center=0., rtol=0.01)
+        self.evaluate, ar, num_samples=int(1e6),
+        radius=1., center=0., rtol=0.01, seed=77)
 
   def testCompareToBijector(self):
     """Demonstrates equivalence between TD, Bijector approach and AR dist."""

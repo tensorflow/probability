@@ -24,10 +24,15 @@ from scipy import stats
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_case
+
+from tensorflow.python.framework import test_util
+
 tfd = tfp.distributions
 
 
-class MultivariateNormalDiagTest(tf.test.TestCase):
+@test_util.run_all_in_graph_and_eager_modes
+class MultivariateNormalDiagTest(test_case.TestCase):
   """Well tested because this is a simple override of the base class."""
 
   def setUp(self):
@@ -195,28 +200,31 @@ class MultivariateNormalDiagTest(tf.test.TestCase):
         initializer=tf.constant_initializer(1.))
     self.evaluate([tf.global_variables_initializer()])
 
-    mvn = tfd.MultivariateNormalDiag(
-        loc=mu_var, scale_diag=tf.ones(shape=[dims], dtype=tf.float32))
+    def neg_log_likelihood(mu):
+      mvn = tfd.MultivariateNormalDiag(
+          loc=mu, scale_diag=tf.ones(shape=[dims], dtype=tf.float32))
 
-    # Typically you'd use `mvn.log_prob(x_pl)` which is always at least as
-    # numerically stable as `tf.log(mvn.prob(x_pl))`. However in this test
-    # we're testing a bug specific to `prob` and not `log_prob`;
-    # http://stackoverflow.com/q/45109305. (The underlying issue was not
-    # related to `Distributions` but that `reduce_prod` didn't correctly
-    # handle negative indexes.)
-    neg_log_likelihood = -tf.reduce_sum(tf.log(mvn.prob(x_pl)))
-    grad_neg_log_likelihood = tf.gradients(neg_log_likelihood,
-                                           tf.trainable_variables())
+      # Typically you'd use `mvn.log_prob(x_pl)` which is always at least as
+      # numerically stable as `tf.log(mvn.prob(x_pl))`. However in this test
+      # we're testing a bug specific to `prob` and not `log_prob`;
+      # http://stackoverflow.com/q/45109305. (The underlying issue was not
+      # related to `Distributions` but that `reduce_prod` didn't correctly
+      # handle negative indexes.)
+      return -tf.reduce_sum(tf.log(mvn.prob(x_pl)))
 
-    grad_neg_log_likelihood_ = self.evaluate(grad_neg_log_likelihood)
-    self.assertEqual(1, len(grad_neg_log_likelihood_))
+    grad_neg_log_likelihood = self.compute_gradients(
+        neg_log_likelihood, args=[mu_var])
+
+    self.assertEqual(1, len(grad_neg_log_likelihood))
     self.assertAllClose(
-        grad_neg_log_likelihood_[0],
+        grad_neg_log_likelihood[0],
         np.tile(num_draws, dims),
         rtol=1e-6,
         atol=0.)
 
   def testDynamicBatchShape(self):
+    if tf.executing_eagerly():
+      return
     loc = np.float32(self._rng.rand(1, 1, 2))
     scale_diag = np.float32(self._rng.rand(1, 1, 2))
     mvn = tfd.MultivariateNormalDiag(
@@ -227,6 +235,8 @@ class MultivariateNormalDiagTest(tf.test.TestCase):
     self.assertListEqual(mvn.event_shape.as_list(), [2])
 
   def testDynamicEventShape(self):
+    if tf.executing_eagerly():
+      return
     loc = np.float32(self._rng.rand(2, 3, 2))
     scale_diag = np.float32(self._rng.rand(2, 3, 2))
     mvn = tfd.MultivariateNormalDiag(
@@ -239,11 +249,14 @@ class MultivariateNormalDiagTest(tf.test.TestCase):
   def testKLDivIdenticalGradientDefined(self):
     dims = 3
     loc = tf.zeros([dims], dtype=tf.float32)
-    mvn = tfd.MultivariateNormalDiag(
-        loc=loc, scale_diag=np.ones([dims], dtype=np.float32))
-    g = tf.gradients(tfd.kl_divergence(mvn, mvn), loc)
-    g_ = self.evaluate(g)
-    self.assertAllEqual(np.ones_like(g_, dtype=np.bool), np.isfinite(g_))
+    def self_kl_divergence(loc):
+      mvn = tfd.MultivariateNormalDiag(
+          loc=loc, scale_diag=np.ones([dims], dtype=np.float32))
+      return tfd.kl_divergence(mvn, mvn)
+    gradients = self.compute_gradients(self_kl_divergence, args=[loc])
+    self.assertAllEqual(
+        np.ones_like(gradients, dtype=np.bool),
+        np.isfinite(gradients))
 
 
 if __name__ == "__main__":

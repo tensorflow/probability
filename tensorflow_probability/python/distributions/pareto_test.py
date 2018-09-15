@@ -19,21 +19,24 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 from scipy import stats
+
 import tensorflow as tf
 import tensorflow_probability as tfp
+
+from tensorflow_probability.python.internal import test_case
 
 from tensorflow.python.framework import test_util
 
 tfd = tfp.distributions
 
 
-class ParetoTest(tf.test.TestCase):
+@test_util.run_all_in_graph_and_eager_modes
+class ParetoTest(test_case.TestCase):
 
   def _scipy_pareto(self, concentration, scale):
     # In scipy pareto is defined with scale = 1, so we need to scale.
     return stats.pareto(concentration, scale=scale)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testParetoShape(self):
     scale = tf.constant([2.] * 5)
     concentration = tf.constant([2.] * 5)
@@ -44,7 +47,6 @@ class ParetoTest(tf.test.TestCase):
     self.assertAllEqual(self.evaluate(pareto.event_shape_tensor()), [])
     self.assertEqual(pareto.event_shape, tf.TensorShape([]))
 
-  @test_util.run_in_graph_and_eager_modes()
   def testParetoShapeBroadcast(self):
     scale = tf.constant([[3., 2.]])
     concentration = tf.constant([[4.], [5.], [6.]])
@@ -55,7 +57,6 @@ class ParetoTest(tf.test.TestCase):
     self.assertAllEqual(self.evaluate(pareto.event_shape_tensor()), [])
     self.assertEqual(pareto.event_shape, tf.TensorShape([]))
 
-  @test_util.run_in_graph_and_eager_modes()
   def testInvalidScale(self):
     invalid_scales = [-.01, 0., -2.]
     concentration = 3.
@@ -64,7 +65,6 @@ class ParetoTest(tf.test.TestCase):
         pareto = tfd.Pareto(concentration, scale, validate_args=True)
         self.evaluate(pareto.scale)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testInvalidConcentration(self):
     scale = 1.
     invalid_concentrations = [-.01, 0., -2.]
@@ -73,7 +73,6 @@ class ParetoTest(tf.test.TestCase):
         pareto = tfd.Pareto(concentration, scale, validate_args=True)
         self.evaluate(pareto.concentration)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testParetoLogPdf(self):
     batch_size = 6
     scale = tf.constant([3.] * batch_size)
@@ -115,7 +114,6 @@ class ParetoTest(tf.test.TestCase):
       log_prob = pareto.log_prob(x)
       self.evaluate(log_prob)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testParetoLogPdfMultidimensional(self):
     batch_size = 6
     scale = tf.constant([[2., 4., 5.]] * batch_size)
@@ -138,7 +136,6 @@ class ParetoTest(tf.test.TestCase):
         self.evaluate(prob),
         self._scipy_pareto(concentration_v, scale_v).pdf(x))
 
-  @test_util.run_in_graph_and_eager_modes()
   def testParetoLogCdf(self):
     batch_size = 6
     scale = tf.constant([3.] * batch_size)
@@ -159,7 +156,6 @@ class ParetoTest(tf.test.TestCase):
         self.evaluate(cdf),
         self._scipy_pareto(concentration_v, scale_v).cdf(x))
 
-  @test_util.run_in_graph_and_eager_modes()
   def testParetoLogCdfMultidimensional(self):
     batch_size = 6
     scale = tf.constant([[2., 4., 5.]] * batch_size)
@@ -189,8 +185,9 @@ class ParetoTest(tf.test.TestCase):
     x = scale - 1
 
     pareto = tfd.Pareto(concentration, scale)
-    pdf = pareto.prob(x)
-    self.assertAlmostEqual(self.evaluate(tf.gradients(pdf, x)[0]), 0.)
+    compute_pdf = lambda x: pareto.prob(x)  # pylint:disable=unnecessary-lambda
+    self.assertAlmostEqual(self.compute_gradients(
+        compute_pdf, args=[x])[0], 0.)
 
   def testParetoCDFGradientZeroOutsideSupport(self):
     scale = tf.constant(1.)
@@ -199,10 +196,11 @@ class ParetoTest(tf.test.TestCase):
     x = scale - 1
 
     pareto = tfd.Pareto(concentration, scale)
-    cdf = pareto.cdf(x)
-    self.assertAlmostEqual(self.evaluate(tf.gradients(cdf, x)[0]), 0.)
+    compute_cdf = lambda x: pareto.cdf(x)  # pylint:disable=unnecessary-lambda
+    self.assertAlmostEqual(
+        self.compute_gradients(
+            compute_cdf, args=[x])[0], 0.)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testParetoMean(self):
     scale = [1.4, 2., 2.5]
     concentration = [2., 3., 2.5]
@@ -212,7 +210,6 @@ class ParetoTest(tf.test.TestCase):
         self.evaluate(pareto.mean()),
         self._scipy_pareto(concentration, scale).mean())
 
-  @test_util.run_in_graph_and_eager_modes()
   def testParetoMeanInf(self):
     scale = [1.4, 2., 2.5]
     concentration = [0.4, 0.9, 0.99]
@@ -222,7 +219,6 @@ class ParetoTest(tf.test.TestCase):
     self.assertTrue(
         np.all(np.isinf(self.evaluate(pareto.mean()))))
 
-  @test_util.run_in_graph_and_eager_modes()
   def testParetoVariance(self):
     scale = [1.4, 2., 2.5]
     concentration = [2., 3., 2.5]
@@ -232,7 +228,6 @@ class ParetoTest(tf.test.TestCase):
         self.evaluate(pareto.variance()),
         self._scipy_pareto(concentration, scale).var())
 
-  @test_util.run_in_graph_and_eager_modes()
   def testParetoVarianceInf(self):
     scale = [1.4, 2., 2.5]
     concentration = [0.4, 0.9, 0.99]
@@ -241,7 +236,6 @@ class ParetoTest(tf.test.TestCase):
     self.assertTrue(
         np.all(np.isinf(self.evaluate(pareto.variance()))))
 
-  @test_util.run_in_graph_and_eager_modes()
   def testParetoStd(self):
     scale = [1.4, 2., 2.5]
     concentration = [2., 3., 2.5]
@@ -251,7 +245,6 @@ class ParetoTest(tf.test.TestCase):
         self.evaluate(pareto.stddev()),
         self._scipy_pareto(concentration, scale).std())
 
-  @test_util.run_in_graph_and_eager_modes()
   def testParetoMode(self):
     scale = [0.4, 1.4, 2., 2.5]
     concentration = [1., 2., 3., 2.5]
@@ -259,7 +252,6 @@ class ParetoTest(tf.test.TestCase):
     self.assertEqual(pareto.mode().shape, (4,))
     self.assertAllClose(self.evaluate(pareto.mode()), scale)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testParetoSampleMean(self):
     scale = 4.
     concentration = 3.
@@ -275,7 +267,6 @@ class ParetoTest(tf.test.TestCase):
         rtol=.01,
         atol=0)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testParetoSampleVariance(self):
     scale = 1.
     concentration = 3.
@@ -291,7 +282,6 @@ class ParetoTest(tf.test.TestCase):
         rtol=.03,
         atol=0)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testParetoSampleMultidimensionalMean(self):
     scale = np.array([np.arange(1, 21, dtype=np.float32)])
     concentration = 3.
@@ -307,7 +297,6 @@ class ParetoTest(tf.test.TestCase):
         rtol=.01,
         atol=0)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testParetoSampleMultidimensionalVariance(self):
     scale = np.array([np.arange(1, 11, dtype=np.float32)])
     concentration = 4.
