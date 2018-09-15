@@ -31,28 +31,35 @@ def bayesian_resnet(input_shape,
 
   Args:
     input_shape: A `tuple` indicating the Tensor shape.
+    num_classes: `int` representing the number of class labels.
     kernel_posterior_scale_mean: Python `int` number for the kernel
       posterior's scale (log variance) mean. The smaller the mean the closer
       is the initialization to a deterministic network.
     kernel_posterior_scale_stddev: Python `float` number for the initial kernel
       posterior's scale stddev.
-      i.e. q(W|x) ~ N(mu, var),
-           log_var ~ N(kernel_posterior_scale_mean, kernel_posterior_scale_stddev)
+      ```
+      q(W|x) ~ N(mu, var),
+      log_var ~ N(kernel_posterior_scale_mean, kernel_posterior_scale_stddev)
+      ````
     kernel_posterior_scale_constraint: Python `float` number for the log value
       to constrain the log variance throughout training.
       i.e. log_var <= log(kernel_posterior_scale_constraint).
+
+  Returns:
+    tf.keras.Model.
   """
 
   filters = [64, 128, 256, 512]
   kernels = [3, 3, 3, 3]
   strides = [1, 2, 2, 2]
 
+  def _untransformed_scale_constraint(t):
+    return tf.clip_by_value(t, -1000, tf.log(kernel_posterior_scale_constraint))
   kernel_posterior_fn = tfp.layers.default_mean_field_normal_fn(
       untransformed_scale_initializer=tf.random_normal_initializer(
           mean=kernel_posterior_scale_mean,
           stddev=kernel_posterior_scale_stddev),
-      untransformed_scale_constraint=lambda t: tf.clip_by_value(
-          t, -1000, tf.log(kernel_posterior_scale_constraint)))
+      untransformed_scale_constraint=_untransformed_scale_constraint)
 
   image = tf.keras.layers.Input(shape=input_shape, dtype='float32')
   x = tfp.layers.Convolution2DFlipout(
@@ -84,6 +91,7 @@ def bayesian_resnet(input_shape,
 
 
 def _resnet_block(x, filters, kernel, stride, kernel_posterior_fn):
+  """Network block for ResNet."""
   x = tf.keras.layers.BatchNormalization()(x)
   x = tf.keras.layers.Activation('relu')(x)
 
