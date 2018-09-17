@@ -27,19 +27,6 @@ __all__ = [
 ]
 
 
-_poisson_sample_note = """
-The Poisson distribution is technically only defined for non-negative integer
-values. When `validate_args=False`, non-integral inputs trigger an assertion.
-
-When `validate_args=False` calculations are otherwise unchanged despite
-integral or non-integral inputs.
-
-When `validate_args=False`, evaluating the pmf at non-integral values,
-corresponds to evaluations of an unnormalized distribution, that does not
-correspond to evaluations of the cdf.
-"""
-
-
 class Poisson(tf.distributions.Distribution):
   """Poisson distribution.
 
@@ -137,26 +124,34 @@ class Poisson(tf.distributions.Distribution):
   def _event_shape(self):
     return tensor_shape.scalar()
 
-  @distribution_util.AppendDocstring(_poisson_sample_note)
   def _log_prob(self, x):
-    return self._log_unnormalized_prob(x) - self._log_normalization()
+    # The log-probability at negative and non-integer points is -inf.
+    # Catch such xs and set the output value accordingly.
+    n = tf.maximum(tf.floor(x), 0.)
+    log_prob = self._log_unnormalized_prob(n) - self._log_normalization()
+    zero_prob = tf.less(x, 0.) | tf.not_equal(x, tf.floor(x))
+    return tf.where(tf.broadcast_to(zero_prob, tf.shape(log_prob)),
+                    float("-inf") + tf.zeros_like(log_prob),
+                    log_prob)
 
-  @distribution_util.AppendDocstring(_poisson_sample_note)
   def _log_cdf(self, x):
     return tf.log(self.cdf(x))
 
-  @distribution_util.AppendDocstring(_poisson_sample_note)
   def _cdf(self, x):
-    if self.validate_args:
-      x = distribution_util.embed_check_nonnegative_integer_form(x)
-    return tf.igammac(1. + x, self.rate)
+    # CDF is the probability that the Poisson variable is less or equal to x.
+    # For fractional x, the CDF is equal to the CDF at n = floor(x).
+    # For negative x, the CDF is zero, but tf.igammac gives NaNs, so we impute
+    # the values and handle this case explicitly.
+    n = tf.maximum(tf.floor(x), 0.)
+    cdf = tf.igammac(1. + n, self.rate)
+    return tf.where(tf.broadcast_to(tf.less(x, 0.), tf.shape(cdf)),
+                    tf.zeros_like(cdf),
+                    cdf)
 
   def _log_normalization(self):
     return self.rate
 
   def _log_unnormalized_prob(self, x):
-    if self.validate_args:
-      x = distribution_util.embed_check_nonnegative_integer_form(x)
     return x * self.log_rate - tf.lgamma(1. + x)
 
   def _mean(self):
