@@ -94,20 +94,20 @@ class BatchNormalization(bijector.Bijector):
 
   dist = tfd.TransformedDistribution(
       distribution=tfd.Normal()),
-      bijector=tfb.BatchNorm())
+      bijector=tfb.BatchNormalization())
 
   y = tfd.MultivariateNormalDiag(loc=1., scale=2.).sample(100)  # ~ N(1, 2)
   x = dist.bijector.inverse(y)  # ~ N(0, 1)
   y = dist.sample()  # ~ N(1, 2)
   ```
 
-  During training time, `BatchNorm.inverse` and `BatchNorm.forward` are not
-  guaranteed to be inverses of each other because `inverse(y)` uses statistics
-  of the current minibatch, while `forward(x)` uses running-average statistics
-  accumulated from training. In other words,
-  `BatchNorm.inverse(BatchNorm.forward(...))` and
-  `BatchNorm.forward(BatchNorm.inverse(...))` will be identical when
-  `training=False` but may be different when `training=True`.
+  During training time, `BatchNormalization.inverse` and
+  `BatchNormalization.forward` are not guaranteed to be inverses of each other
+  because `inverse(y)` uses statistics of the current minibatch, while
+  `forward(x)` uses running-average statistics accumulated from training. In
+  other words, `BatchNormalization.inverse(BatchNormalization.forward(...))` and
+  `BatchNormalization.forward(BatchNormalization.inverse(...))` will be
+  identical when `training=False` but may be different when `training=True`.
 
   #### References
 
@@ -130,7 +130,7 @@ class BatchNormalization(bijector.Bijector):
                training=True,
                validate_args=False,
                name="batch_normalization"):
-    """Instantiates the `BatchNorm` bijector.
+    """Instantiates the `BatchNormalization` bijector.
 
     Args:
       batchnorm_layer: `tf.layers.BatchNormalization` layer object. If `None`,
