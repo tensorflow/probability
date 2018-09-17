@@ -30,7 +30,7 @@ from tensorflow_probability.python.sts import LocalLinearTrendStateSpaceModel
 from tensorflow.python.framework import test_util
 from tensorflow.python.platform import test
 
-tfl = tf.contrib.linalg
+tfl = tf.linalg
 
 
 class _AdditiveStateSpaceModelTest(object):

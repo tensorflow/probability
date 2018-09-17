@@ -24,7 +24,7 @@ from tensorflow_probability.python import distributions as tfd
 
 from tensorflow_probability.python.distributions.mvn_linear_operator import MultivariateNormalLinearOperator
 
-tfl = tf.contrib.linalg
+tfl = tf.linalg
 
 
 def broadcast_batch_shape(distributions):
