@@ -24,6 +24,8 @@ from scipy import stats
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow.python.framework import test_util
+
 tfd = tfp.distributions
 tfb = tfp.bijectors
 
@@ -57,6 +59,7 @@ class DummyMatrixTransform(tfb.Bijector):
     return tf.matrix_determinant(x)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class TransformedDistributionTest(tf.test.TestCase):
 
   def _cls(self):
@@ -204,6 +207,7 @@ class TransformedDistributionTest(tf.test.TestCase):
     multi_logit_normal = self._cls()(
         distribution=standard_normal, bijector=softmax, event_shape=[1])
     x = [[[-np.log(3.)], [0.]], [[np.log(3)], [np.log(5)]]]
+    x = np.float32(x)
     y = self.evaluate(softmax.forward(x))
     expected_log_pdf = (
         np.squeeze(stats.norm(loc=0., scale=1.).logpdf(x)) - np.sum(

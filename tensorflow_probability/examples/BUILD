@@ -39,23 +39,101 @@ py_binary(
     ],
 )
 
-# Temporarily disable BNN test, which was breaking the build
-# due to upstream Keras changes affecting tfp.layers.
-# TODO (b/112436745): re-enable this test once the issue is fixed.
-# py_test(
-#     name = "bayesian_neural_network_test",
-#     size = "small",
-#     srcs = ["bayesian_neural_network.py"],
-#     args = [
-#         "--fake_data",
-#         "--max_steps=5",
-#     ],
-#     main = "bayesian_neural_network.py",
-#     srcs_version = "PY2AND3",
-#     deps = [
-#         ":bayesian_neural_network",
-#     ],
-# )
+py_test(
+    name = "bayesian_neural_network_test",
+    size = "small",
+    srcs = ["bayesian_neural_network.py"],
+    args = [
+        "--fake_data",
+        "--max_steps=5",
+    ],
+    main = "bayesian_neural_network.py",
+    srcs_version = "PY2AND3",
+    deps = [
+        ":bayesian_neural_network",
+    ],
+)
+
+py_binary(
+    name = "grammar_vae",
+    srcs = ["grammar_vae.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # absl/flags dep,
+        # numpy dep,
+        # scipy dep,
+        # six dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_test(
+    name = "grammar_vae_test",
+    size = "small",
+    srcs = ["grammar_vae.py"],
+    args = [
+        "--max_steps=5",
+        "--latent_size=2",
+        "--num_units=3",
+    ],
+    main = "grammar_vae.py",
+    srcs_version = "PY2AND3",
+    deps = [
+        ":grammar_vae",
+    ],
+)
+
+py_binary(
+    name = "disentangled_vae",
+    srcs = ["disentangled_vae.py"],
+    main = "disentangled_vae.py",
+    srcs_version = "PY2AND3",
+    deps = [
+        ":sprites_dataset",
+        # absl:app dep,
+        # absl/flags dep,
+        # numpy dep,
+        # six dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_test(
+    name = "disentangled_vae_dry_run_test",
+    size = "medium",
+    srcs = ["disentangled_vae.py"],
+    args = [
+        "--fake_data",
+        "--batch_size=2",
+        "--hidden_size=3",
+        "--latent_size_static=4",
+        "--latent_size_dynamic=5",
+        "--log_steps=1",
+        "--max_steps=2",
+        "--enable_debug_logging",
+    ],
+    main = "disentangled_vae.py",
+    srcs_version = "PY2AND3",
+    deps = [
+        ":disentangled_vae",
+    ],
+)
+
+py_test(
+    name = "disentangled_vae_test",
+    size = "medium",
+    srcs = ["disentangled_vae_test.py"],
+    main = "disentangled_vae_test.py",
+    srcs_version = "PY2AND3",
+    deps = [
+        ":disentangled_vae",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
 
 py_binary(
     name = "deep_exponential_family",
@@ -182,6 +260,17 @@ py_test(
     ],
 )
 
+py_library(
+    name = "sprites_dataset",
+    srcs = ["sprites_dataset.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # absl/flags dep,
+        # six dep,
+        # tensorflow dep,
+    ],
+)
+
 py_binary(
     name = "vae",
     srcs = ["vae.py"],
@@ -231,15 +320,47 @@ py_binary(
 
 py_test(
     name = "vq_vae_test",
-    size = "small",
+    size = "medium",
     srcs = ["vq_vae.py"],
     args = [
         "--mnist_type='fake_data'",
-        "--max_steps=5",
+        "--max_steps=2",
+        "--base_depth=2",
     ],
     main = "vq_vae.py",
     srcs_version = "PY2AND3",
     deps = [
         ":vq_vae",
+    ],
+)
+
+py_binary(
+    name = "cifar10_bnn",
+    srcs = ["cifar10_bnn.py"],
+    main = "cifar10_bnn.py",
+    srcs_version = "PY2AND3",
+    deps = [
+        # absl/flags dep,
+        # matplotlib dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/examples/models",
+    ],
+)
+
+py_test(
+    name = "cifar10_bnn_test",
+    size = "medium",
+    srcs = ["cifar10_bnn.py"],
+    args = [
+        "--fake_data",
+        "--epochs=1",
+        "--batch_size=5",
+    ],
+    main = "cifar10_bnn.py",
+    srcs_version = "PY2AND3",
+    deps = [
+        ":cifar10_bnn",
     ],
 )

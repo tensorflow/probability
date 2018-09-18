@@ -23,11 +23,14 @@ import collections
 import numpy as np
 
 import tensorflow as tf
+import tensorflow_probability as tfp
 
 from tensorflow_probability.python.mcmc.util import choose
 from tensorflow_probability.python.mcmc.util import is_namedtuple_like
 from tensorflow_probability.python.mcmc.util import maybe_call_fn_and_grads
 from tensorflow.python.framework import test_util
+
+tfd = tfp.distributions
 
 
 class ChooseTest(tf.test.TestCase):
@@ -111,9 +114,9 @@ class IsNamedTupleLikeTest(tf.test.TestCase):
     self.assertFalse(is_namedtuple_like(np.int32()))
 
 
+@tf.contrib.eager.run_all_tests_in_graph_and_eager_modes
 class GradientTest(tf.test.TestCase):
 
-  @test_util.run_in_graph_and_eager_modes()
   def testGradientComputesCorrectly(self):
     dtype = np.float32
     def fn(x, y):
@@ -127,6 +130,13 @@ class GradientTest(tf.test.TestCase):
     self.assertNear(18., fn_result_, err=1e-5)
     for grad in grads_:
       self.assertAllClose(grad, dtype(6), atol=0., rtol=1e-5)
+
+  def testGradientWorksDespiteBijectorCaching(self):
+    d = tfd.LogNormal(loc=0., scale=1.)
+    x = tf.constant(2.)
+    fn_result, grads = maybe_call_fn_and_grads(lambda x: d.log_prob(x), x)  # pylint: disable=unnecessary-lambda
+    self.assertAllEqual(False, fn_result is None)
+    self.assertAllEqual([False], [g is None for g in grads])
 
 
 if __name__ == '__main__':

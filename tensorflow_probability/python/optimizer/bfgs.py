@@ -177,6 +177,7 @@ def minimize(value_and_gradients_function,
                                             name='initial_position')
     dtype = initial_position.dtype.base_dtype
     domain_shape = initial_position.shape
+    initial_inv_hessian = initial_inverse_hessian_estimate
     if initial_inverse_hessian_estimate is None:
       inv_hessian_shape = domain_shape.concatenate(domain_shape)
       initial_inv_hessian = tf.eye(tf.size(initial_position), dtype=dtype)
@@ -232,7 +233,7 @@ def minimize(value_and_gradients_function,
       next_position = position + position_delta
       next_objective, next_objective_gradient = value_and_gradients_function(
           next_position)
-      grad_norm = tf.norm(next_objective_gradient, ord=2)
+      grad_norm = tf.norm(next_objective_gradient, ord=np.inf)
       has_converged = grad_norm <= tolerance
       grad_delta = next_objective_gradient - objective_gradient
       updated_inv_hessian = _bfgs_inv_hessian_update(grad_delta,

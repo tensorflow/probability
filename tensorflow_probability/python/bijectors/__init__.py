@@ -29,6 +29,7 @@ from tensorflow_probability.python.bijectors.chain import Chain
 from tensorflow_probability.python.bijectors.cholesky_outer_product import CholeskyOuterProduct
 from tensorflow_probability.python.bijectors.cholesky_to_inv_cholesky import CholeskyToInvCholesky
 from tensorflow_probability.python.bijectors.conditional_bijector import ConditionalBijector
+from tensorflow_probability.python.bijectors.discrete_cosine_transform import DiscreteCosineTransform
 from tensorflow_probability.python.bijectors.exp import Exp
 from tensorflow_probability.python.bijectors.fill_triangular import FillTriangular
 from tensorflow_probability.python.bijectors.gumbel import Gumbel
@@ -73,6 +74,7 @@ __all__ = [
     "CholeskyOuterProduct",
     "CholeskyToInvCholesky",
     "ConditionalBijector",
+    "DiscreteCosineTransform",
     "Exp",
     "FillTriangular",
     "Gumbel",

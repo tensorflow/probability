@@ -311,14 +311,15 @@ class TruncatedNormal(tf.distributions.Distribution):
     return samples
 
   def _log_prob(self, x):
-    log_prob = -(0.5 * tf.square((x - self.loc) / self.scale) +
+    log_prob = -(0.5 * ((x - self.loc) / self.scale) ** 2 +
                  0.5 * np.log(2. * np.pi)
                  + tf.log(self.scale * self._normalizer))
     # p(x) is 0 outside the bounds.
     neg_inf = tf.log(tf.zeros_like(log_prob))
-    bounded_log_prob = tf.where(tf.logical_or(tf.greater(x, self._high),
-                                              tf.less(x, self._low)),
-                                neg_inf, log_prob)
+    bounded_log_prob = tf.where(
+        tf.logical_or(x > self._high, x < self._low),
+        neg_inf,
+        log_prob)
     return bounded_log_prob
 
   def _cdf(self, x):

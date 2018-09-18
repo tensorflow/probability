@@ -28,6 +28,7 @@ from tensorflow.python.framework import test_util
 tfd = tfp.distributions
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class FitTestFast(tf.test.TestCase):
 
   dtype = np.float32
@@ -60,7 +61,6 @@ class FitTestFast(tf.test.TestCase):
       raise ValueError('unrecognized true link: {}'.format(link))
     return model_matrix, response, model_coefficients, linear_response
 
-  @test_util.run_in_graph_and_eager_modes()
   def testProbitWorksCorrectly(self):
     [
         model_matrix,
@@ -105,7 +105,6 @@ class FitTestFast(tf.test.TestCase):
                         atol=0.03, rtol=0.15)
     self.assertTrue(is_converged_)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testLinearWorksCorrectly(self):
     [
         model_matrix,
@@ -148,7 +147,6 @@ class FitTestFast(tf.test.TestCase):
     # loop means that the procedure can only terminate on the second iteration.
     self.assertTrue(num_iter_ < 3)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testBatchedOperationConverges(self):
     model_1 = self.make_dataset(n=10, d=3, link='linear')
     model_2 = self.make_dataset(n=10, d=3, link='probit')
@@ -237,13 +235,11 @@ class FitTestSlow(FitTestFast):
     self.assertEqual(expected_is_converged_, actual_is_converged_)
     self.assertEqual(expected_num_iter_, actual_num_iter_)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testStaticL2RegularizationWorksCorrectly(self):
     self._testL2RegularizationWorksCorrectly(static_l2=True)
 
 # TODO(jvdillon): Re-enable once matrix_solve_ls correctly casts
 # l2_regularization.
-# @test_util.run_in_graph_and_eager_modes()
 # def testDynamicL2RegularizationWorksCorrectly(self):
 #   self._testL2RegularizationWorksCorrectly(static_l2=False)
 

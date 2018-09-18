@@ -94,25 +94,6 @@ class _ConvVariational(tf.keras.layers.Layer):
   The arguments permit separate specification of the surrogate posterior
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
   distributions.
-
-  Properties:
-    rank: Python integer, dimensionality of convolution.
-    filters: Python integer, dimensionality of the output space.
-    kernel_size: Size of the convolution window.
-    strides: Stride length of convolution.
-    padding: Python string describing padding approach.
-    data_format: Python string describing input data's dimensions.
-    dilation_rate: Dilation rate for an atrous convolution.
-    activation: Activation function (`callable`).
-    activity_regularizer: Regularizer function for the output.
-    kernel_posterior_fn: `callable` returning posterior.
-    kernel_posterior_tensor_fn: `callable` operating on posterior.
-    kernel_prior_fn: `callable` returning prior.
-    kernel_divergence_fn: `callable` returning divergence.
-    bias_posterior_fn: `callable` returning posterior.
-    bias_posterior_tensor_fn: `callable` operating on posterior.
-    bias_prior_fn: `callable` returning prior.
-    bias_divergence_fn: `callable` returning divergence.
   """
 
   @docstring_util.expand_docstring(args=doc_args)
@@ -197,7 +178,9 @@ class _ConvVariational(tf.keras.layers.Layer):
                        'should be defined. Found `None`.')
     input_dim = input_shape[channel_axis].value
     kernel_shape = self.kernel_size + (input_dim, self.filters)
-    dtype = tf.as_dtype(self.dtype)
+
+    # If self.dtype is None, build weights using the default dtype.
+    dtype = tf.as_dtype(self.dtype or tf.keras.backend.floatx())
 
     # Must have a posterior kernel.
     self.kernel_posterior = self.kernel_posterior_fn(
@@ -450,25 +433,6 @@ class _ConvReparameterization(_ConvVariational):
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
   distributions.
 
-  Properties:
-    rank: Python integer, dimensionality of convolution.
-    filters: Python integer, dimensionality of the output space.
-    kernel_size: Size of the convolution window.
-    strides: Stride length of convolution.
-    padding: Python string describing padding approach.
-    data_format: Python string describing input data's dimensions.
-    dilation_rate: Dilation rate for an atrous convolution.
-    activation: Activation function (`callable`).
-    activity_regularizer: Regularizer function for the output.
-    kernel_posterior_fn: `callable` returning posterior.
-    kernel_posterior_tensor_fn: `callable` operating on posterior.
-    kernel_prior_fn: `callable` returning prior.
-    kernel_divergence_fn: `callable` returning divergence.
-    bias_posterior_fn: `callable` returning posterior.
-    bias_posterior_tensor_fn: `callable` operating on posterior.
-    bias_prior_fn: `callable` returning prior.
-    bias_divergence_fn: `callable` returning divergence.
-
   #### References
 
   [1]: Diederik Kingma and Max Welling. Auto-Encoding Variational Bayes. In
@@ -574,24 +538,6 @@ class Conv1DReparameterization(_ConvReparameterization):
   The arguments permit separate specification of the surrogate posterior
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
   distributions.
-
-  Properties:
-    filters: Python integer, dimensionality of the output space.
-    kernel_size: Size of the convolution window.
-    strides: Stride length of convolution.
-    padding: Python string describing padding approach.
-    data_format: Python string describing input data's dimensions.
-    dilation_rate: Dilation rate for an atrous convolution.
-    activation: Activation function (`callable`).
-    activity_regularizer: Regularizer function for the output.
-    kernel_posterior_fn: `callable` returning posterior.
-    kernel_posterior_tensor_fn: `callable` operating on posterior.
-    kernel_prior_fn: `callable` returning prior.
-    kernel_divergence_fn: `callable` returning divergence.
-    bias_posterior_fn: `callable` returning posterior.
-    bias_posterior_tensor_fn: `callable` operating on posterior.
-    bias_prior_fn: `callable` returning prior.
-    bias_divergence_fn: `callable` returning divergence.
 
   #### Examples
 
@@ -720,24 +666,6 @@ class Conv2DReparameterization(_ConvReparameterization):
   The arguments permit separate specification of the surrogate posterior
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
   distributions.
-
-  Properties:
-    filters: Python integer, dimensionality of the output space.
-    kernel_size: Size of the convolution window.
-    strides: Stride length of convolution.
-    padding: Python string describing padding approach.
-    data_format: Python string describing input data's dimensions.
-    dilation_rate: Dilation rate for an atrous convolution.
-    activation: Activation function (`callable`).
-    activity_regularizer: Regularizer function for the output.
-    kernel_posterior_fn: `callable` returning posterior.
-    kernel_posterior_tensor_fn: `callable` operating on posterior.
-    kernel_prior_fn: `callable` returning prior.
-    kernel_divergence_fn: `callable` returning divergence.
-    bias_posterior_fn: `callable` returning posterior.
-    bias_posterior_tensor_fn: `callable` operating on posterior.
-    bias_prior_fn: `callable` returning prior.
-    bias_divergence_fn: `callable` returning divergence.
 
   #### Examples
 
@@ -875,24 +803,6 @@ class Conv3DReparameterization(_ConvReparameterization):
   The arguments permit separate specification of the surrogate posterior
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
   distributions.
-
-  Properties:
-    filters: Python integer, dimensionality of the output space.
-    kernel_size: Size of the convolution window.
-    strides: Stride length of convolution.
-    padding: Python string describing padding approach.
-    data_format: Python string describing input data's dimensions.
-    dilation_rate: Dilation rate for an atrous convolution.
-    activation: Activation function (`callable`).
-    activity_regularizer: Regularizer function for the output.
-    kernel_posterior_fn: `callable` returning posterior.
-    kernel_posterior_tensor_fn: `callable` operating on posterior.
-    kernel_prior_fn: `callable` returning prior.
-    kernel_divergence_fn: `callable` returning divergence.
-    bias_posterior_fn: `callable` returning posterior.
-    bias_posterior_tensor_fn: `callable` operating on posterior.
-    bias_prior_fn: `callable` returning prior.
-    bias_divergence_fn: `callable` returning divergence.
 
   #### Examples
 
@@ -1033,26 +943,6 @@ class _ConvFlipout(_ConvVariational):
   The arguments permit separate specification of the surrogate posterior
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
   distributions.
-
-  Properties:
-    rank: Python integer, dimensionality of convolution.
-    filters: Python integer, dimensionality of the output space.
-    kernel_size: Size of the convolution window.
-    strides: Stride length of convolution.
-    padding: Python string describing padding approach.
-    data_format: Python string describing input data's dimensions.
-    dilation_rate: Dilation rate for an atrous convolution.
-    activation: Activation function (`callable`).
-    activity_regularizer: Regularizer function for the output.
-    kernel_posterior_fn: `callable` returning posterior.
-    kernel_posterior_tensor_fn: `callable` operating on posterior.
-    kernel_prior_fn: `callable` returning prior.
-    kernel_divergence_fn: `callable` returning divergence.
-    bias_posterior_fn: `callable` returning posterior.
-    bias_posterior_tensor_fn: `callable` operating on posterior.
-    bias_prior_fn: `callable` returning prior.
-    bias_divergence_fn: `callable` returning divergence.
-    seed: Python integer, used to create random seeds.
 
   #### References
 
@@ -1230,25 +1120,6 @@ class Conv1DFlipout(_ConvFlipout):
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
   distributions.
 
-  Properties:
-    filters: Python integer, dimensionality of the output space.
-    kernel_size: Size of the convolution window.
-    strides: Stride length of convolution.
-    padding: Python string describing padding approach.
-    data_format: Python string describing input data's dimensions.
-    dilation_rate: Dilation rate for an atrous convolution.
-    activation: Activation function (`callable`).
-    activity_regularizer: Regularizer function for the output.
-    kernel_posterior_fn: `callable` returning posterior.
-    kernel_posterior_tensor_fn: `callable` operating on posterior.
-    kernel_prior_fn: `callable` returning prior.
-    kernel_divergence_fn: `callable` returning divergence.
-    bias_posterior_fn: `callable` returning posterior.
-    bias_posterior_tensor_fn: `callable` operating on posterior.
-    bias_prior_fn: `callable` returning prior.
-    bias_divergence_fn: `callable` returning divergence.
-    seed: Python integer, used to create random seeds.
-
   #### Examples
 
   We illustrate a Bayesian neural network with [variational inference](
@@ -1383,25 +1254,6 @@ class Conv2DFlipout(_ConvFlipout):
   The arguments permit separate specification of the surrogate posterior
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
   distributions.
-
-  Properties:
-    filters: Python integer, dimensionality of the output space.
-    kernel_size: Size of the convolution window.
-    strides: Stride length of convolution.
-    padding: Python string describing padding approach.
-    data_format: Python string describing input data's dimensions.
-    dilation_rate: Dilation rate for an atrous convolution.
-    activation: Activation function (`callable`).
-    activity_regularizer: Regularizer function for the output.
-    kernel_posterior_fn: `callable` returning posterior.
-    kernel_posterior_tensor_fn: `callable` operating on posterior.
-    kernel_prior_fn: `callable` returning prior.
-    kernel_divergence_fn: `callable` returning divergence.
-    bias_posterior_fn: `callable` returning posterior.
-    bias_posterior_tensor_fn: `callable` operating on posterior.
-    bias_prior_fn: `callable` returning prior.
-    bias_divergence_fn: `callable` returning divergence.
-    seed: Python integer, used to create random seeds.
 
   #### Examples
 
@@ -1546,25 +1398,6 @@ class Conv3DFlipout(_ConvFlipout):
   The arguments permit separate specification of the surrogate posterior
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
   distributions.
-
-  Properties:
-    filters: Python integer, dimensionality of the output space.
-    kernel_size: Size of the convolution window.
-    strides: Stride length of convolution.
-    padding: Python string describing padding approach.
-    data_format: Python string describing input data's dimensions.
-    dilation_rate: Dilation rate for an atrous convolution.
-    activation: Activation function (`callable`).
-    activity_regularizer: Regularizer function for the output.
-    kernel_posterior_fn: `callable` returning posterior.
-    kernel_posterior_tensor_fn: `callable` operating on posterior.
-    kernel_prior_fn: `callable` returning prior.
-    kernel_divergence_fn: `callable` returning divergence.
-    bias_posterior_fn: `callable` returning posterior.
-    bias_posterior_tensor_fn: `callable` operating on posterior.
-    bias_prior_fn: `callable` returning prior.
-    bias_divergence_fn: `callable` returning divergence.
-    seed: Python integer, used to create random seeds.
 
   #### Examples
 

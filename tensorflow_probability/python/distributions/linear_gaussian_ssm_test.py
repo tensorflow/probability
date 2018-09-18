@@ -48,23 +48,20 @@ class _IIDNormalTest(object):
                               observation_variance):
     """Build a model whose outputs are IID normal by construction."""
 
-    transition_variance = tf.convert_to_tensor(
-        transition_variance, dtype=self.dtype)
-    observation_variance = tf.convert_to_tensor(
-        observation_variance, dtype=self.dtype)
+    transition_variance = self._build_placeholder(transition_variance)
+    observation_variance = self._build_placeholder(observation_variance)
 
     # Use orthogonal matrices to project a (potentially
     # high-dimensional) latent space of IID normal variables into a
     # low-dimensional observation that is still IID normal.
     random_orthogonal_matrix = lambda: np.linalg.qr(
         np.random.randn(latent_size, latent_size))[0][:observation_size, :]
-    observation_matrix = tf.convert_to_tensor(
-        random_orthogonal_matrix(), dtype=self.dtype)
+    observation_matrix = self._build_placeholder(random_orthogonal_matrix())
 
     model = tfd.LinearGaussianStateSpaceModel(
         num_timesteps=num_timesteps,
-        transition_matrix=tf.zeros(
-            [latent_size, latent_size], dtype=self.dtype),
+        transition_matrix=self._build_placeholder(
+            np.zeros([latent_size, latent_size])),
         transition_noise=tfd.MultivariateNormalDiag(
             scale_diag=tf.sqrt(transition_variance) *
             tf.ones([latent_size], dtype=self.dtype)),
@@ -146,15 +143,106 @@ class _IIDNormalTest(object):
                             lp_iid_val,
                             rtol=delta, atol=0.)
 
+  def _build_placeholder(self, ndarray):
+    """Convert a numpy array to a TF placeholder.
+
+    Args:
+      ndarray: any object convertible to a numpy array via `np.asarray()`.
+
+    Returns:
+      placeholder: a TensorFlow `placeholder` with default value given by the
+      provided `ndarray`, dtype given by `self.dtype`, and shape specified
+      statically only if `self.use_static_shape` is `True`.
+    """
+
+    ndarray = np.asarray(ndarray).astype(self.dtype)
+    return tf.placeholder_with_default(
+        input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
+
 
 @test_util.run_all_in_graph_and_eager_modes
-class IIDNormalTest32(_IIDNormalTest, test.TestCase):
+class IIDNormalTestStatic32(_IIDNormalTest, test.TestCase):
+  use_static_shape = True
   dtype = np.float32
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class IIDNormalTest64(_IIDNormalTest, test.TestCase):
+class IIDNormalTestStatic64(_IIDNormalTest, test.TestCase):
+  use_static_shape = True
   dtype = np.float64
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class IIDNormalTestDynamic32(_IIDNormalTest, test.TestCase):
+  use_static_shape = False
+  dtype = np.float32
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class SanityChecks(test.TestCase):
+
+  def test_deterministic_system(self):
+
+    # Define a deterministic linear system
+    num_timesteps = 5
+    prior_mean = 17.
+    step_coef = 1.3
+    step_shift = -1.5
+    observation_coef = 0.3
+    observation_shift = -1.
+    model = tfd.LinearGaussianStateSpaceModel(
+        num_timesteps=num_timesteps,
+        transition_matrix=[[step_coef]],
+        transition_noise=tfd.MultivariateNormalDiag(loc=[step_shift],
+                                                    scale_diag=[0.]),
+        observation_matrix=[[observation_coef]],
+        observation_noise=tfd.MultivariateNormalDiag(loc=[observation_shift],
+                                                     scale_diag=[0.]),
+        initial_state_prior=tfd.MultivariateNormalDiag(loc=[prior_mean],
+                                                       scale_diag=[0.]))
+
+    # Manually compute expected output.
+    expected_latents = [prior_mean]
+    for _ in range(num_timesteps-1):
+      expected_latents.append(step_coef * expected_latents[-1] + step_shift)
+    expected_latents = np.asarray(expected_latents)
+    expected_observations = (
+        expected_latents * observation_coef + observation_shift)
+
+    mean_, sample_ = self.evaluate([model.mean(), model.sample()])
+    self.assertAllClose(mean_[..., 0], expected_observations)
+    self.assertAllClose(sample_[..., 0], expected_observations)
+
+  def test_variance(self):
+
+    num_timesteps = 5
+    prior_scale = 17.
+    step_coef = 1.3
+    step_scale = 0.5
+    observation_coef = 20.0
+    observation_scale = 1.9
+
+    model = tfd.LinearGaussianStateSpaceModel(
+        num_timesteps=num_timesteps,
+        transition_matrix=[[step_coef]],
+        transition_noise=tfd.MultivariateNormalDiag(
+            loc=[0.], scale_diag=[step_scale]),
+        observation_matrix=[[observation_coef]],
+        observation_noise=tfd.MultivariateNormalDiag(
+            loc=[0.], scale_diag=[observation_scale]),
+        initial_state_prior=tfd.MultivariateNormalDiag(
+            loc=[0.], scale_diag=[prior_scale]))
+
+    # Manually compute the marginal variance at each step
+    latent_variance = [prior_scale**2]
+    for _ in range(num_timesteps-1):
+      latent_variance.append(step_coef**2 * latent_variance[-1] + step_scale**2)
+    latent_variance = np.asarray(latent_variance)
+    observation_variance = (
+        latent_variance * observation_coef**2 + observation_scale**2)
+
+    variance_ = self.evaluate(model.variance())
+    self.assertAllClose(variance_[..., 0], observation_variance)
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -300,11 +388,6 @@ class BatchTest(test.TestCase):
                                      observation_size,
                                      observation_noise_batch_shape=batch_shape)
     self._sanity_check_shapes(model, batch_shape, event_shape)
-
-  def test_batch_shape_error(self):
-    # build a dist where components have incompatible batch
-    # shapes. this should cause a problem somehow.
-    pass
 
 
 class _KalmanStepsTest(object):

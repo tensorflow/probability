@@ -24,6 +24,8 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow.python.framework import test_util
+
 
 def try_import(name):  # pylint: disable=invalid-name
   module = None
@@ -38,6 +40,7 @@ stats = try_import("scipy.stats")
 tfd = tfp.distributions
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class HalfNormalTest(tf.test.TestCase):
 
   def setUp(self):
@@ -275,8 +278,8 @@ class HalfNormalTest(tf.test.TestCase):
     self.assertAllEqual(expected_shape_static, self.evaluate(sample).shape)
 
   def testNegativeSigmaFails(self):
-    halfnorm = tfd.HalfNormal(scale=[-5.], validate_args=True, name="G")
     with self.assertRaisesOpError("Condition x > 0 did not hold"):
+      halfnorm = tfd.HalfNormal(scale=[-5.], validate_args=True, name="G")
       self.evaluate(halfnorm.mean())
 
   def testHalfNormalShape(self):
@@ -289,6 +292,8 @@ class HalfNormalTest(tf.test.TestCase):
     self.assertEqual(halfnorm.event_shape, tf.TensorShape([]))
 
   def testHalfNormalShapeWithPlaceholders(self):
+    if tf.executing_eagerly():
+      return
     scale = tf.placeholder_with_default(input=[1., 2], shape=None)
     halfnorm = tfd.HalfNormal(scale=scale)
 

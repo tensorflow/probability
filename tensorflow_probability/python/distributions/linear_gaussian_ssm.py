@@ -343,25 +343,28 @@ class LinearGaussianStateSpaceModel(tf.distributions.Distribution):
       # creates no overhead when the model is actually fixed, since in
       # that case we simply build the trivial callable that returns
       # the same matrix at each timestep.
-      def _maybe_make_linop(x, name):
+      def _maybe_make_linop(x, is_square=None, name=None):
         """Converts Tensors into LinearOperators."""
         if not isinstance(x, tfl.LinearOperator):
           x = tfl.LinearOperatorFullMatrix(
               tf.convert_to_tensor(x, dtype=dtype),
+              is_square=is_square,
               name=name)
         return x
-      def _maybe_make_callable_from_linop(f, name):
+      def _maybe_make_callable_from_linop(f, name, make_square_linop=None):
         """Converts fixed objects into trivial callables."""
         if not callable(f):
-          linop = _maybe_make_linop(f, name)
+          linop = _maybe_make_linop(f, is_square=make_square_linop, name=name)
           f = lambda t: linop
         return f
       self.get_transition_matrix_for_timestep = (
           _maybe_make_callable_from_linop(
-              transition_matrix, "transition_matrix"))
+              transition_matrix,
+              name="transition_matrix",
+              make_square_linop=True))
       self.get_observation_matrix_for_timestep = (
           _maybe_make_callable_from_linop(
-              observation_matrix, "observation_matrix"))
+              observation_matrix, name="observation_matrix"))
 
       # Similarly, we canonicalize the transition and observation
       # noise models as callables returning a
@@ -402,27 +405,40 @@ class LinearGaussianStateSpaceModel(tf.distributions.Distribution):
                                     transition_noise,
                                     observation_matrix,
                                     observation_noise])
+
+        latent_size_ = util.static_value(self.latent_size)
+        observation_size_ = util.static_value(self.observation_size)
         runtime_assertions = [
-            _check_equal_shape("transition_matrix",
-                               transition_matrix.shape[-2:],
-                               transition_matrix.shape_tensor()[-2:],
-                               [self.latent_size, self.latent_size]),
-            _check_equal_shape("observation_matrix",
-                               observation_matrix.shape[-2:],
-                               observation_matrix.shape_tensor()[-2:],
-                               [self.observation_size, self.latent_size]),
-            _check_equal_shape("initial_state_prior",
-                               initial_state_prior.event_shape,
-                               initial_state_prior.event_shape_tensor(),
-                               [self.latent_size]),
-            _check_equal_shape("transition_noise",
-                               transition_noise.event_shape,
-                               transition_noise.event_shape_tensor(),
-                               [self.latent_size]),
-            _check_equal_shape("observation_noise",
-                               observation_noise.event_shape,
-                               observation_noise.event_shape_tensor(),
-                               [self.observation_size])]
+            _check_equal_shape(
+                name="transition_matrix",
+                static_shape=transition_matrix.shape[-2:],
+                dynamic_shape=transition_matrix.shape_tensor()[-2:],
+                static_target_shape=[latent_size_, latent_size_],
+                dynamic_target_shape=[self.latent_size, self.latent_size]),
+            _check_equal_shape(
+                name="observation_matrix",
+                static_shape=observation_matrix.shape[-2:],
+                dynamic_shape=observation_matrix.shape_tensor()[-2:],
+                static_target_shape=[observation_size_, latent_size_],
+                dynamic_target_shape=[self.observation_size, self.latent_size]),
+            _check_equal_shape(
+                name="initial_state_prior",
+                static_shape=initial_state_prior.event_shape,
+                dynamic_shape=initial_state_prior.event_shape_tensor(),
+                static_target_shape=[latent_size_],
+                dynamic_target_shape=[self.latent_size]),
+            _check_equal_shape(
+                name="transition_noise",
+                static_shape=transition_noise.event_shape,
+                dynamic_shape=transition_noise.event_shape_tensor(),
+                static_target_shape=[latent_size_],
+                dynamic_target_shape=[self.latent_size]),
+            _check_equal_shape(
+                name="observation_noise",
+                static_shape=observation_noise.event_shape,
+                dynamic_shape=observation_noise.event_shape_tensor(),
+                static_target_shape=[observation_size_],
+                dynamic_target_shape=[self.observation_size])]
         self.runtime_assertions = [op for op in runtime_assertions
                                    if op is not None]
         _, _ = self._batch_shape(), self._batch_shape_tensor()
@@ -570,6 +586,15 @@ class LinearGaussianStateSpaceModel(tf.distributions.Distribution):
   def forward_filter(self, x):
     """Run a Kalman filter over a provided sequence of outputs.
 
+    Note that the returned values `filtered_means`, `predicted_means`, and
+    `observation_means` depend on the observed time series `x`, while the
+    corresponding covariances are independent of the observed series; i.e., they
+    depend only on the model itself. This means that the mean values have shape
+    `concat([sample_shape(x), batch_shape, [num_timesteps,
+    {latent/observation}_size]])`, while the covariances have shape
+    `concat[(batch_shape, [num_timesteps, {latent/observation}_size,
+    {latent/observation}_size]])`, which does not depend on the sample shape.
+
     Args:
       x: a float-type `Tensor` with rightmost dimensions
         `[num_timesteps, observation_size]` matching
@@ -583,21 +608,22 @@ class LinearGaussianStateSpaceModel(tf.distributions.Distribution):
         of shape `sample_shape(x) + batch_shape + [num_timesteps].`
       filtered_means: Means of the per-timestep filtered marginal
          distributions p(z_t | x_{:t}), as a Tensor of shape
-        `batch_shape + [num_timesteps, latent_size]`.
+        `sample_shape(x) + batch_shape + [num_timesteps, latent_size]`.
       filtered_covs: Covariances of the per-timestep filtered marginal
          distributions p(z_t | x_{:t}), as a Tensor of shape
         `batch_shape + [num_timesteps, latent_size, latent_size]`.
       predicted_means: Means of the per-timestep predictive
          distributions over latent states, p(z_{t+1} | x_{:t}), as a
-         Tensor of shape `batch_shape + [num_timesteps, latent_size]`.
+         Tensor of shape `sample_shape(x) + batch_shape +
+         [num_timesteps, latent_size]`.
       predicted_covs: Covariances of the per-timestep predictive
          distributions over latent states, p(z_{t+1} | x_{:t}), as a
          Tensor of shape `batch_shape + [num_timesteps, latent_size,
          latent_size]`.
       observation_means: Means of the per-timestep predictive
          distributions over observations, p(x_{t} | x_{:t-1}), as a
-         Tensor of shape `batch_shape + [num_timesteps,
-         observation_size]`.
+         Tensor of shape `sample_shape(x) + batch_shape +
+         [num_timesteps, observation_size]`.
       observation_covs: Covariances of the per-timestep predictive
          distributions over observations, p(x_{t} | x_{:t-1}), as a
          Tensor of shape `batch_shape + [num_timesteps,
@@ -609,7 +635,7 @@ class LinearGaussianStateSpaceModel(tf.distributions.Distribution):
 
       # Check event shape statically if possible
       check_shape_op = _check_equal_shape(
-          "x", x.shape[-2:], tf.shape(x),
+          "x", x.shape[-2:], tf.shape(x)[-2:],
           self.event_shape, self.event_shape_tensor())
       if self.validate_args:
         runtime_assertions = (self.runtime_assertions
@@ -976,7 +1002,7 @@ def linear_gaussian_update(prior_mean, prior_cov,
   # reused below to compute Kalman gain.
   tmp_obs_cov = observation_matrix.matmul(prior_cov)
   predicted_obs_cov = (
-      observation_matrix.matmul(tf.matrix_transpose(tmp_obs_cov))
+      observation_matrix.matmul(tmp_obs_cov, adjoint_arg=True)
       + observation_noise.covariance())
 
   # Compute optimal Kalman gain:
@@ -988,13 +1014,13 @@ def linear_gaussian_update(prior_mean, prior_cov,
   #      = (S^{-1} * tmp_obs_cov) '
   #      = (S \ tmp_obs_cov)'
   predicted_obs_cov_chol = tf.cholesky(predicted_obs_cov)
-  gain = tf.matrix_transpose(
-      tf.cholesky_solve(predicted_obs_cov_chol, tmp_obs_cov))
+  gain_transpose = tf.cholesky_solve(predicted_obs_cov_chol, tmp_obs_cov)
 
   # Compute the posterior mean, incorporating the observation.
   #  u* = u + K (x_observed - x_expected)
   posterior_mean = (prior_mean +
-                    _matmul(gain, x_observed - x_expected))
+                    _matmul(gain_transpose, x_observed - x_expected,
+                            adjoint_a=True))
 
   # For the posterior covariance, we could use the simple update
   #  P* = P - K * H * P
@@ -1005,16 +1031,15 @@ def linear_gaussian_update(prior_mean, prior_cov,
   # which always produces a PSD result. This uses
   #  tmp_term = (I - K * H)'
   # as an intermediate quantity.
-  latent_size = util.prefer_static_value(
-      observation_matrix.shape_tensor())[-1]
+  latent_size = util.prefer_static_value(observation_matrix.shape_tensor())[-1]
   tmp_term = (
       tf.eye(latent_size, dtype=observation_matrix.dtype) -
-      observation_matrix.matmul(gain, adjoint=True, adjoint_arg=True))
+      observation_matrix.matmul(gain_transpose, adjoint=True))
   posterior_cov = (
-      _matmul(tf.matrix_transpose(tmp_term),
-              _matmul(prior_cov, tmp_term))
-      + _matmul(gain, _matmul(observation_noise.covariance(),
-                              tf.matrix_transpose(gain))))
+      _matmul(tmp_term, _matmul(prior_cov, tmp_term), adjoint_a=True)
+      + _matmul(gain_transpose,
+                _matmul(observation_noise.covariance(), gain_transpose),
+                adjoint_a=True))
 
   predictive_dist = mvn_tril.MultivariateNormalTriL(
       loc=x_expected[..., 0],
@@ -1197,5 +1222,4 @@ def _propagate_mean(mean, linop, dist):
 def _propagate_cov(cov, linop, dist):
   """Propagate covariance through linear Gaussian transformation."""
   # For linop A and input cov P, returns `A P A' + dist.cov()`
-  return (linop.matmul(tf.matrix_transpose(linop.matmul(cov)))
-          + dist.covariance())
+  return linop.matmul(linop.matmul(cov), adjoint_arg=True) + dist.covariance()

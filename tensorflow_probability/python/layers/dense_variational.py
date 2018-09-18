@@ -87,19 +87,6 @@ class _DenseVariational(tf.keras.layers.Layer):
   The arguments permit separate specification of the surrogate posterior
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
   distributions.
-
-  Properties:
-    units: Python integer, dimensionality of the output space.
-    activation: Activation function (`callable`).
-    activity_regularizer: Regularizer function for the output.
-    kernel_posterior_fn: `callable` returning posterior.
-    kernel_posterior_tensor_fn: `callable` operating on posterior.
-    kernel_prior_fn: `callable` returning prior.
-    kernel_divergence_fn: `callable` returning divergence.
-    bias_posterior_fn: `callable` returning posterior.
-    bias_posterior_tensor_fn: `callable` operating on posterior.
-    bias_prior_fn: `callable` returning prior.
-    bias_divergence_fn: `callable` returning divergence.
   """
 
   @docstring_util.expand_docstring(args=doc_args)
@@ -146,7 +133,9 @@ class _DenseVariational(tf.keras.layers.Layer):
       raise ValueError('The last dimension of the inputs to `Dense` '
                        'should be defined. Found `None`.')
     self._input_spec = tf.layers.InputSpec(min_ndim=2, axes={-1: in_size})
-    dtype = tf.as_dtype(self.dtype)
+
+    # If self.dtype is None, build weights using the default dtype.
+    dtype = tf.as_dtype(self.dtype or tf.keras.backend.floatx())
 
     # Must have a posterior kernel.
     self.kernel_posterior = self.kernel_posterior_fn(
@@ -346,19 +335,6 @@ class DenseReparameterization(_DenseVariational):
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
   distributions.
 
-  Properties:
-    units: Python integer, dimensionality of the output space.
-    activation: Activation function (`callable`).
-    activity_regularizer: Regularizer function for the output.
-    kernel_posterior_fn: `callable` returning posterior.
-    kernel_posterior_tensor_fn: `callable` operating on posterior.
-    kernel_prior_fn: `callable` returning prior.
-    kernel_divergence_fn: `callable` returning divergence.
-    bias_posterior_fn: `callable` returning posterior.
-    bias_posterior_tensor_fn: `callable` operating on posterior.
-    bias_prior_fn: `callable` returning prior.
-    bias_divergence_fn: `callable` returning divergence.
-
   #### Examples
 
   We illustrate a Bayesian neural network with [variational inference](
@@ -467,19 +443,6 @@ class DenseLocalReparameterization(_DenseVariational):
   The arguments permit separate specification of the surrogate posterior
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
   distributions.
-
-  Properties:
-    units: Python integer, dimensionality of the output space.
-    activation: Activation function (`callable`).
-    activity_regularizer: Regularizer function for the output.
-    kernel_posterior_fn: `callable` returning posterior.
-    kernel_posterior_tensor_fn: `callable` operating on posterior.
-    kernel_prior_fn: `callable` returning prior.
-    kernel_divergence_fn: `callable` returning divergence.
-    bias_posterior_fn: `callable` returning posterior.
-    bias_posterior_tensor_fn: `callable` operating on posterior.
-    bias_prior_fn: `callable` returning prior.
-    bias_divergence_fn: `callable` returning divergence.
 
   #### Examples
 
@@ -600,20 +563,6 @@ class DenseFlipout(_DenseVariational):
   The arguments permit separate specification of the surrogate posterior
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
   distributions.
-
-  Properties:
-    units: Python integer, dimensionality of the output space.
-    activation: Activation function (`callable`).
-    activity_regularizer: Regularizer function for the output.
-    kernel_posterior_fn: `callable` returning posterior.
-    kernel_posterior_tensor_fn: `callable` operating on posterior.
-    kernel_prior_fn: `callable` returning prior.
-    kernel_divergence_fn: `callable` returning divergence.
-    bias_posterior_fn: `callable` returning posterior.
-    bias_posterior_tensor_fn: `callable` operating on posterior.
-    bias_prior_fn: `callable` returning prior.
-    bias_divergence_fn: `callable` returning divergence.
-    seed: Python integer, used to create random seeds.
 
   #### Examples
 

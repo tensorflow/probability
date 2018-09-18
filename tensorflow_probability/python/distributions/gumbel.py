@@ -22,10 +22,14 @@ import math
 # Dependency imports
 import numpy as np
 import tensorflow as tf
-from tensorflow.python.framework import tensor_shape
+
+from tensorflow_probability.python import bijectors
+from tensorflow_probability.python.internal import distribution_util
+
+from tensorflow.python.ops.distributions import transformed_distribution
 
 
-class _Gumbel(tf.distributions.Distribution):
+class Gumbel(transformed_distribution.TransformedDistribution):
   """The scalar Gumbel distribution with location `loc` and `scale` parameters.
 
   #### Mathematical details
@@ -109,30 +113,38 @@ class _Gumbel(tf.distributions.Distribution):
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
+        Default value: `False`.
       allow_nan_stats: Python `bool`, default `True`. When `True`,
         statistics (e.g., mean, mode, variance) use the value "`NaN`" to
         indicate the result is undefined. When `False`, an exception is raised
         if one or more of the statistic's batch members are undefined.
+        Default value: `True`.
       name: Python `str` name prefixed to Ops created by this class.
+        Default value: `'Gumbel'`.
 
     Raises:
       TypeError: if loc and scale are different dtypes.
     """
-    parameters = dict(locals())
     with tf.name_scope(name, values=[loc, scale]) as name:
       with tf.control_dependencies([tf.assert_positive(scale)]
                                    if validate_args else []):
-        self._loc = tf.identity(loc, name="loc")
-        self._scale = tf.identity(scale, name="scale")
-        tf.assert_same_float_dtype([self._loc, self._scale])
-    super(_Gumbel, self).__init__(
-        dtype=self._scale.dtype,
-        reparameterization_type=tf.distributions.FULLY_REPARAMETERIZED,
-        validate_args=validate_args,
-        allow_nan_stats=allow_nan_stats,
-        parameters=parameters,
-        graph_parents=[self._loc, self._scale],
-        name=name)
+        loc = tf.identity(loc, name="loc")
+        scale = tf.identity(scale, name="scale")
+        tf.assert_same_float_dtype([loc, scale])
+        self._gumbel_bijector = bijectors.Gumbel(
+            loc=loc, scale=scale, validate_args=validate_args)
+
+      super(Gumbel, self).__init__(
+          distribution=tf.distributions.Uniform(
+              low=tf.zeros([], dtype=loc.dtype),
+              high=tf.ones([], dtype=loc.dtype),
+              allow_nan_stats=allow_nan_stats),
+          # The Gumbel bijector encodes the quantile
+          # function as the forward, and hence needs to
+          # be inverted.
+          bijector=bijectors.Invert(self._gumbel_bijector),
+          batch_shape=distribution_util.get_broadcast_shape(loc, scale),
+          name=name)
 
   @staticmethod
   def _param_shapes(sample_shape):
@@ -143,63 +155,17 @@ class _Gumbel(tf.distributions.Distribution):
   @property
   def loc(self):
     """Distribution parameter for the location."""
-    return self._loc
+    return self._gumbel_bijector.loc
 
   @property
   def scale(self):
     """Distribution parameter for scale."""
-    return self._scale
-
-  def _batch_shape_tensor(self):
-    return tf.broadcast_dynamic_shape(tf.shape(self.loc), tf.shape(self.scale))
-
-  def _batch_shape(self):
-    return tf.broadcast_static_shape(self.loc.get_shape(),
-                                     self.scale.get_shape())
-
-  def _event_shape_tensor(self):
-    return tf.constant([], dtype=tf.int32)
-
-  def _event_shape(self):
-    return tensor_shape.scalar()
-
-  def _sample_n(self, n, seed=None):
-    # Uniform variates must be sampled from the open-interval `(0, 1)` rather
-    # than `[0, 1)`. To do so, we use `np.finfo(self.dtype.as_numpy_dtype).tiny`
-    # because it is the smallest, positive, "normal" number. A "normal" number
-    # is such that the mantissa has an implicit leading 1. Normal, positive
-    # numbers x, y have the reasonable property that, `x + y >= max(x, y)`. In
-    # this case, a subnormal number (i.e., np.nextafter) can cause us to sample
-    # 0.
-    uniform = tf.random_uniform(
-        shape=tf.concat([[n], self.batch_shape_tensor()], 0),
-        minval=np.finfo(self.dtype.as_numpy_dtype).tiny,
-        maxval=1.,
-        dtype=self.dtype,
-        seed=seed)
-    sampled = -tf.log(-tf.log(uniform))
-    return sampled * self.scale + self.loc
-
-  def _log_prob(self, x):
-    return self._log_unnormalized_prob(x) - self._log_normalization()
-
-  def _log_cdf(self, x):
-    return -tf.exp(-self._z(x))
-
-  def _cdf(self, x):
-    return tf.exp(-tf.exp(-self._z(x)))
-
-  def _log_unnormalized_prob(self, x):
-    z = self._z(x)
-    return -z - tf.exp(-z)
-
-  def _log_normalization(self):
-    return tf.log(self.scale)
+    return self._gumbel_bijector.scale
 
   def _entropy(self):
     # Use broadcasting rules to calculate the full broadcast sigma.
     scale = self.scale * tf.ones_like(self.loc)
-    return 1 + tf.log(scale) + np.euler_gamma
+    return 1. + tf.log(scale) + np.euler_gamma
 
   def _mean(self):
     return self.loc + self.scale * np.euler_gamma
@@ -209,8 +175,3 @@ class _Gumbel(tf.distributions.Distribution):
 
   def _mode(self):
     return self.loc * tf.ones_like(self.scale)
-
-  def _z(self, x):
-    """Standardize input `x` to a unit logistic."""
-    with tf.name_scope("standardize", values=[x]):
-      return (x - self.loc) / self.scale

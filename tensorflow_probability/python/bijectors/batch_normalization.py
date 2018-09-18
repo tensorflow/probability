@@ -20,7 +20,6 @@ from __future__ import print_function
 
 
 # Dependency imports
-import numpy as np
 import tensorflow as tf
 
 from tensorflow.python.layers import normalization
@@ -95,20 +94,20 @@ class BatchNormalization(bijector.Bijector):
 
   dist = tfd.TransformedDistribution(
       distribution=tfd.Normal()),
-      bijector=tfb.BatchNorm())
+      bijector=tfb.BatchNormalization())
 
   y = tfd.MultivariateNormalDiag(loc=1., scale=2.).sample(100)  # ~ N(1, 2)
   x = dist.bijector.inverse(y)  # ~ N(0, 1)
   y = dist.sample()  # ~ N(1, 2)
   ```
 
-  During training time, `BatchNorm.inverse` and `BatchNorm.forward` are not
-  guaranteed to be inverses of each other because `inverse(y)` uses statistics
-  of the current minibatch, while `forward(x)` uses running-average statistics
-  accumulated from training. In other words,
-  `BatchNorm.inverse(BatchNorm.forward(...))` and
-  `BatchNorm.forward(BatchNorm.inverse(...))` will be identical when
-  `training=False` but may be different when `training=True`.
+  During training time, `BatchNormalization.inverse` and
+  `BatchNormalization.forward` are not guaranteed to be inverses of each other
+  because `inverse(y)` uses statistics of the current minibatch, while
+  `forward(x)` uses running-average statistics accumulated from training. In
+  other words, `BatchNormalization.inverse(BatchNormalization.forward(...))` and
+  `BatchNormalization.forward(BatchNormalization.inverse(...))` will be
+  identical when `training=False` but may be different when `training=True`.
 
   #### References
 
@@ -131,7 +130,7 @@ class BatchNormalization(bijector.Bijector):
                training=True,
                validate_args=False,
                name="batch_normalization"):
-    """Instantiates the `BatchNorm` bijector.
+    """Instantiates the `BatchNormalization` bijector.
 
     Args:
       batchnorm_layer: `tf.layers.BatchNormalization` layer object. If `None`,
@@ -183,18 +182,12 @@ class BatchNormalization(bijector.Bijector):
           "BatchNorm Bijector does not support virtual batch sizes.")
 
   def _get_broadcast_fn(self, x):
-    # Compute shape to broadcast scale/shift parameters to.
-    if not x.shape.is_fully_defined():
-      raise ValueError("Input must have shape known at graph construction.")
-    input_shape = np.int32(x.shape.as_list())
-
-    ndims = len(input_shape)
+    ndims = len(x.shape)
     reduction_axes = [i for i in range(ndims) if i not in self.batchnorm.axis]
     # Broadcasting only necessary for single-axis batch norm where the axis is
     # not the last dimension
     broadcast_shape = [1] * ndims
-    broadcast_shape[self.batchnorm.axis[0]] = (
-        input_shape[self.batchnorm.axis[0]])
+    broadcast_shape[self.batchnorm.axis[0]] = x.shape[self.batchnorm.axis[0]]
     def _broadcast(v):
       if (v is not None and
           len(v.get_shape()) != ndims and
@@ -209,8 +202,7 @@ class BatchNormalization(bijector.Bijector):
   def _de_normalize(self, x):
     # Uses the saved statistics.
     if not self.batchnorm.built:
-      input_shape = x.get_shape()
-      self.batchnorm.build(input_shape)
+      self.batchnorm.build(x.shape)
     broadcast_fn = self._get_broadcast_fn(x)
     mean = broadcast_fn(self.batchnorm.moving_mean)
     variance = broadcast_fn(self.batchnorm.moving_variance)
@@ -230,25 +222,24 @@ class BatchNormalization(bijector.Bijector):
     return -self._inverse_log_det_jacobian(x, use_saved_statistics=True)
 
   def _inverse_log_det_jacobian(self, y, use_saved_statistics=False):
-    if not y.shape.is_fully_defined():
-      raise ValueError("Input must have shape known at graph construction.")
-    input_shape = np.int32(y.shape.as_list())
-
     if not self.batchnorm.built:
       # Create variables.
-      self.batchnorm.build(input_shape)
+      self.batchnorm.build(y.shape)
 
     event_dims = self.batchnorm.axis
-    reduction_axes = [i for i in range(len(input_shape)) if i not in event_dims]
+    reduction_axes = [i for i in range(len(y.shape)) if i not in event_dims]
 
-    if use_saved_statistics or not self._training:
-      log_variance = tf.log(self.batchnorm.moving_variance +
-                            self.batchnorm.epsilon)
-    else:
-      # At training-time, ildj is computed from the mean and log-variance across
-      # the current minibatch.
-      _, v = tf.nn.moments(y, axes=reduction_axes, keep_dims=True)
-      log_variance = tf.log(v + self.batchnorm.epsilon)
+    # At training-time, ildj is computed from the mean and log-variance across
+    # the current minibatch.
+    # We use multiplication instead of tf.where() to get easier broadcasting.
+    use_saved_statistics = tf.cast(
+        tf.logical_or(use_saved_statistics, tf.logical_not(self._training)),
+        tf.float32)
+    log_variance = tf.log(
+        (1 - use_saved_statistics) * tf.nn.moments(y, axes=reduction_axes,
+                                                   keep_dims=True)[1]
+        + use_saved_statistics * self.batchnorm.moving_variance
+        + self.batchnorm.epsilon)
 
     # `gamma` and `log Var(y)` reductions over event_dims.
     # Log(total change in area from gamma term).

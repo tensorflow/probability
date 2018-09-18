@@ -492,6 +492,17 @@ def static_value(x):
   return tensor_util.constant_value(tf.convert_to_tensor(x))
 
 
+def pick_scalar_condition(pred, cond_true, cond_false):
+  """Convenience function which chooses the condition based on the predicate."""
+  # Note: This function is only valid if all of pred, cond_true, and cond_false
+  # are scalars. This means its semantics are arguably more like tf.cond than
+  # tf.select even though we use tf.select to implement it.
+  pred_ = static_value(pred)
+  if pred_ is None:
+    return tf.where(pred, cond_true, cond_false)
+  return cond_true if pred_ else cond_false
+
+
 def move_dimension(x, source_idx, dest_idx):
   """Move a single tensor dimension within its shape.
 
@@ -526,12 +537,11 @@ def move_dimension(x, source_idx, dest_idx):
   else:
     dtype = tf.as_dtype(source_idx.dtype)
 
-  # Handle negative indexing. Since ndims might be dynamic, this makes
-  # source_idx and dest_idx also possibly dynamic.
-  if source_idx < 0:
-    source_idx = ndims + source_idx
-  if dest_idx < 0:
-    dest_idx = ndims + dest_idx
+  # Handle negative indexing.
+  source_idx = pick_scalar_condition(
+      source_idx < 0, ndims + source_idx, source_idx)
+  dest_idx = pick_scalar_condition(
+      dest_idx < 0, ndims + dest_idx, dest_idx)
 
   # Construct the appropriate permutation of dimensions, depending
   # whether the source is before or after the destination.

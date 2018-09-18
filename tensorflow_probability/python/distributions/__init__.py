@@ -33,6 +33,7 @@ from tensorflow_probability.python.distributions.gamma_gamma import GammaGamma
 from tensorflow_probability.python.distributions.gaussian_process import GaussianProcess
 from tensorflow_probability.python.distributions.gaussian_process_regression_model import GaussianProcessRegressionModel
 from tensorflow_probability.python.distributions.geometric import Geometric
+from tensorflow_probability.python.distributions.gumbel import Gumbel
 from tensorflow_probability.python.distributions.half_normal import HalfNormal
 from tensorflow_probability.python.distributions.independent import Independent
 from tensorflow_probability.python.distributions.internal.moving_stats import assign_log_moving_mean_exp
@@ -40,6 +41,7 @@ from tensorflow_probability.python.distributions.internal.moving_stats import as
 from tensorflow_probability.python.distributions.internal.moving_stats import moving_mean_variance
 from tensorflow_probability.python.distributions.inverse_gamma import InverseGamma
 from tensorflow_probability.python.distributions.inverse_gamma import InverseGammaWithSoftplusConcentrationRate
+from tensorflow_probability.python.distributions.inverse_gaussian import InverseGaussian
 from tensorflow_probability.python.distributions.kumaraswamy import Kumaraswamy
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import LinearGaussianStateSpaceModel
 from tensorflow_probability.python.distributions.lkj import LKJ
@@ -143,10 +145,12 @@ __all__ = [
     'VectorExponentialDiag',
     'Gamma',
     'GammaGamma',
+    'InverseGaussian',
     'GammaWithSoftplusConcentrationRate',
     'Geometric',
     'GaussianProcess',
     'GaussianProcessRegressionModel',
+    'Gumbel',
     'HalfNormal',
     'Independent',
     'InverseGamma',

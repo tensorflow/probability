@@ -293,7 +293,7 @@ def percentile(x,
       raise ValueError("Argument 'interpolation' must be in %s.  Found %s" %
                        (allowed_interpolations, interpolation))
 
-  with tf.name_scope(name, [x, q]):
+  with tf.name_scope(name, values=[x, q]):
     x = tf.convert_to_tensor(x, name="x")
     # Double is needed here and below, else we get the wrong index if the array
     # is huge along axis.

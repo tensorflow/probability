@@ -29,7 +29,6 @@ from tensorflow.python.framework import test_util
 
 class _RandomRademacher(object):
 
-  @test_util.run_in_graph_and_eager_modes()
   def test_expected_value(self):
     shape_ = np.array([2, 3, int(1e3)], np.int32)
     shape = (tf.constant(shape_) if self.use_static_shape
@@ -47,11 +46,13 @@ class _RandomRademacher(object):
         atol=0.05, rtol=0.)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class RandomRademacherDynamic32(tf.test.TestCase, _RandomRademacher):
   dtype = np.float32
   use_static_shape = False
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class RandomRademacherDynamic64(tf.test.TestCase, _RandomRademacher):
   dtype = np.float64
   use_static_shape = True
@@ -59,7 +60,6 @@ class RandomRademacherDynamic64(tf.test.TestCase, _RandomRademacher):
 
 class _RandomRayleigh(object):
 
-  @test_util.run_in_graph_and_eager_modes()
   def test_expected_value(self):
     shape_ = np.array([2, int(1e3)], np.int32)
     shape = (tf.constant(shape_) if self.use_static_shape
@@ -89,11 +89,13 @@ class _RandomRayleigh(object):
                         atol=0.05, rtol=0.)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class RandomRayleighDynamic32(tf.test.TestCase, _RandomRayleigh):
   dtype = np.float32
   use_static_shape = False
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class RandomRayleighDynamic64(tf.test.TestCase, _RandomRayleigh):
   dtype = np.float64
   use_static_shape = True

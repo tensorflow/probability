@@ -74,12 +74,13 @@ landing_page:
       buttons:
       - label: Watch the video
         path: https://www.youtube.com/watch?v=BjUkL8DFH5Q
-    - heading: TensorFlow Distributions
-      image_path: /ecosystem/images/tf-logo-card-16x9.png
-      path: https://arxiv.org/abs/1711.10604
+    - heading: TFP Walk-through
+      description: >
+        Watch TFP present at SF Big Analytics (50 min). <a href="https://docs.google.com/presentation/d/1FO28i-ZpP1yw-ZiJtZGnTtBDYhfS5GicgP416Bix9U0/preview" class="external">Slides available</a>
+      youtube_id: CkD4PKwn9Dk
       buttons:
-      - label: Read the paper
-        path: https://arxiv.org/abs/1711.10604
+      - label: Watch the video
+        path: https://www.youtube.com/watch?v=CkD4PKwn9Dk
     - heading: TensorFlow Probability on GitHub
       image_path: /ecosystem/images/github-card-16x9.png
       path: https://github.com/tensorflow/probability

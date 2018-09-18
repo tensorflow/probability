@@ -18,18 +18,18 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-from scipy import special
 from scipy import stats
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util
 
 tfd = tfp.distributions
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class PoissonTest(tf.test.TestCase):
+class PoissonTest(test_case.TestCase):
 
   def _make_poisson(self, rate, validate_args=False):
     return tfd.Poisson(rate=rate, validate_args=validate_args)
@@ -51,38 +51,50 @@ class PoissonTest(tf.test.TestCase):
         self.evaluate(poisson.rate)
 
   def testPoissonLogPmf(self):
-    batch_size = 6
+    batch_size = 12
     lam = tf.constant([3.0] * batch_size)
     lam_v = 3.0
-    x = [2., 3., 4., 5., 6., 7.]
+    x = [-3., -0.5, 0., 2., 2.2, 3., 3.1, 4., 5., 5.5, 6., 7.]
     poisson = self._make_poisson(rate=lam)
     log_pmf = poisson.log_prob(x)
-    self.assertEqual(log_pmf.get_shape(), (6,))
+    self.assertEqual(log_pmf.get_shape(), (batch_size,))
     self.assertAllClose(self.evaluate(log_pmf), stats.poisson.logpmf(x, lam_v))
 
     pmf = poisson.prob(x)
-    self.assertEqual(pmf.get_shape(), (6,))
+    self.assertEqual(pmf.get_shape(), (batch_size,))
     self.assertAllClose(self.evaluate(pmf), stats.poisson.pmf(x, lam_v))
 
-  def testPoissonLogPmfValidateArgs(self):
+  def testPoissonLogPmfGradient(self):
     batch_size = 6
     lam = tf.constant([3.0] * batch_size)
-    x = tf.placeholder_with_default(
-        input=[2.5, 3.2, 4.3, 5.1, 6., 7.], shape=[6])
-    poisson = self._make_poisson(rate=lam, validate_args=True)
+    lam_v = 3.0
+    # Only non-negative values, as negative ones cause nans in the expected
+    # value.
+    x = [0., 2., 3., 4., 5., 6.]
 
-    # Non-integer
-    with self.assertRaisesOpError("cannot contain fractional components"):
-      self.evaluate(poisson.log_prob(x))
+    dlog_pmf_dlam = self.compute_gradients(
+        lambda lam: self._make_poisson(rate=lam).log_prob(x), [lam])[0]
 
-    with self.assertRaisesOpError("Condition x >= 0"):
-      self.evaluate(poisson.log_prob([-1.]))
+    # A finite difference approximation of the derivative.
+    eps = 1e-6
+    expected = (stats.poisson.logpmf(x, lam_v + eps)
+                - stats.poisson.logpmf(x, lam_v - eps)) / (2 * eps)
 
-    poisson = self._make_poisson(rate=lam, validate_args=False)
-    log_pmf = poisson.log_prob(x)
-    self.assertEqual(log_pmf.get_shape(), (6,))
-    pmf = poisson.prob(x)
-    self.assertEqual(pmf.get_shape(), (6,))
+    self.assertEqual(dlog_pmf_dlam.shape, (batch_size,))
+    self.assertAllClose(dlog_pmf_dlam, expected)
+
+  def testPoissonLogPmfGradientAtZeroPmf(self):
+    # Check that the derivative wrt parameter at the zero-prob points is zero.
+    batch_size = 6
+    lam = tf.constant([3.0] * batch_size)
+    x = [-2., -1., -0.5, 0.2, 1.5, 10.5]
+
+    dlog_pmf_dlam = self.compute_gradients(
+        lambda lam: self._make_poisson(rate=lam).log_prob(x), [lam])[0]
+
+    self.assertEqual(dlog_pmf_dlam.shape, (batch_size,))
+    print(dlog_pmf_dlam)
+    self.assertAllClose(dlog_pmf_dlam, np.zeros([batch_size]))
 
   def testPoissonLogPmfMultidimensional(self):
     batch_size = 6
@@ -99,38 +111,37 @@ class PoissonTest(tf.test.TestCase):
     self.assertEqual(pmf.get_shape(), (6, 3))
     self.assertAllClose(self.evaluate(pmf), stats.poisson.pmf(x, lam_v))
 
-  def testPoissonCDF(self):
-    batch_size = 6
+  def testPoissonCdf(self):
+    batch_size = 12
     lam = tf.constant([3.0] * batch_size)
     lam_v = 3.0
-    x = [2., 3., 4., 5., 6., 7.]
+    x = [-3., -0.5, 0., 2., 2.2, 3., 3.1, 4., 5., 5.5, 6., 7.]
 
     poisson = self._make_poisson(rate=lam)
     log_cdf = poisson.log_cdf(x)
-    self.assertEqual(log_cdf.get_shape(), (6,))
+    self.assertEqual(log_cdf.get_shape(), (batch_size,))
     self.assertAllClose(self.evaluate(log_cdf), stats.poisson.logcdf(x, lam_v))
 
     cdf = poisson.cdf(x)
-    self.assertEqual(cdf.get_shape(), (6,))
+    self.assertEqual(cdf.get_shape(), (batch_size,))
     self.assertAllClose(self.evaluate(cdf), stats.poisson.cdf(x, lam_v))
 
-  def testPoissonCDFNonIntegerValues(self):
-    batch_size = 6
+  def testPoissonCdfGradient(self):
+    batch_size = 12
     lam = tf.constant([3.0] * batch_size)
     lam_v = 3.0
-    x = np.array([2.2, 3.1, 4., 5.5, 6., 7.], dtype=np.float32)
+    x = [-3., -0.5, 0., 2., 2.2, 3., 3.1, 4., 5., 5.5, 6., 7.]
 
-    poisson = self._make_poisson(rate=lam)
-    cdf = poisson.cdf(x)
-    self.assertEqual(cdf.get_shape(), (6,))
+    dcdf_dlam = self.compute_gradients(
+        lambda lam: self._make_poisson(rate=lam).cdf(x), [lam])[0]
 
-    # The Poisson CDF should be valid on these non-integer values, and
-    # equal to igammac(1 + x, rate).
-    self.assertAllClose(self.evaluate(cdf), special.gammaincc(1. + x, lam_v))
+    # A finite difference approximation of the derivative.
+    eps = 1e-6
+    expected = (stats.poisson.cdf(x, lam_v + eps)
+                - stats.poisson.cdf(x, lam_v - eps)) / (2 * eps)
 
-    with self.assertRaisesOpError("cannot contain fractional components"):
-      poisson_validate = self._make_poisson(rate=lam, validate_args=True)
-      self.evaluate(poisson_validate.cdf(x))
+    self.assertEqual(dcdf_dlam.shape, (batch_size,))
+    self.assertAllClose(dcdf_dlam, expected)
 
   def testPoissonCdfMultidimensional(self):
     batch_size = 6

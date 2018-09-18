@@ -146,23 +146,23 @@ class HMCTest(tf.test.TestCase):
     x = tf.constant(np.random.rand(50, 10, 2), np.float32)
     self._integrator_conserves_energy(x, independent_chain_ndims)
 
-  @test_util.run_in_graph_and_eager_modes()
+  @test_util.run_in_graph_and_eager_modes
   def testIntegratorEnergyConservationNullShape(self):
     self._integrator_conserves_energy_wrapper(0)
 
-  @test_util.run_in_graph_and_eager_modes()
+  @test_util.run_in_graph_and_eager_modes
   def testIntegratorEnergyConservation1(self):
     self._integrator_conserves_energy_wrapper(1)
 
-  @test_util.run_in_graph_and_eager_modes()
+  @test_util.run_in_graph_and_eager_modes
   def testIntegratorEnergyConservation2(self):
     self._integrator_conserves_energy_wrapper(2)
 
-  @test_util.run_in_graph_and_eager_modes()
+  @test_util.run_in_graph_and_eager_modes
   def testIntegratorEnergyConservation3(self):
     self._integrator_conserves_energy_wrapper(3)
 
-  @test_util.run_in_graph_and_eager_modes()
+  @test_util.run_in_graph_and_eager_modes
   def testSampleChainSeedReproducibleWorksCorrectly(self):
     num_results = 10
     independent_chain_ndims = 1
@@ -268,19 +268,19 @@ class HMCTest(tf.test.TestCase):
     x = tf.constant(np.random.rand(50, 10, 2), np.float32, name='x')
     self._chain_gets_correct_expectations(x, independent_chain_ndims)
 
-  @test_util.run_in_graph_and_eager_modes()
+  @test_util.run_in_graph_and_eager_modes
   def testHMCChainExpectationsNullShape(self):
     self._chain_gets_correct_expectations_wrapper(0)
 
-  @test_util.run_in_graph_and_eager_modes()
+  @test_util.run_in_graph_and_eager_modes
   def testHMCChainExpectations1(self):
     self._chain_gets_correct_expectations_wrapper(1)
 
-  @test_util.run_in_graph_and_eager_modes()
+  @test_util.run_in_graph_and_eager_modes
   def testHMCChainExpectations2(self):
     self._chain_gets_correct_expectations_wrapper(2)
 
-  @test_util.run_in_graph_and_eager_modes()
+  @test_util.run_in_graph_and_eager_modes
   def testKernelResultsUsingTruncatedDistribution(self):
     def log_prob(x):
       return tf.where(
@@ -471,19 +471,19 @@ class HMCTest(tf.test.TestCase):
     x = tf.constant(initial_draws, np.float32)
     self._kernel_leaves_target_invariant(x, independent_chain_ndims)
 
-  @test_util.run_in_graph_and_eager_modes()
+  @test_util.run_in_graph_and_eager_modes
   def testKernelLeavesTargetInvariant1(self):
     self._kernel_leaves_target_invariant_wrapper(1)
 
-  @test_util.run_in_graph_and_eager_modes()
+  @test_util.run_in_graph_and_eager_modes
   def testKernelLeavesTargetInvariant2(self):
     self._kernel_leaves_target_invariant_wrapper(2)
 
-  @test_util.run_in_graph_and_eager_modes()
+  @test_util.run_in_graph_and_eager_modes
   def testKernelLeavesTargetInvariant3(self):
     self._kernel_leaves_target_invariant_wrapper(3)
 
-  @test_util.run_in_graph_and_eager_modes()
+  @test_util.run_in_graph_and_eager_modes
   def testNanRejection(self):
     """Tests that an update that yields NaN potentials gets rejected.
 
@@ -576,15 +576,15 @@ class HMCTest(tf.test.TestCase):
     self.assertEqual(dtype, states_.dtype)
     self.assertEqual(dtype, log_accept_ratio_.dtype)
 
-  @test_util.run_in_graph_and_eager_modes()
+  @test_util.run_in_graph_and_eager_modes
   def testChainWorksIn64Bit(self):
     self._testChainWorksDtype(np.float64)
 
-  @test_util.run_in_graph_and_eager_modes()
+  @test_util.run_in_graph_and_eager_modes
   def testChainWorksIn16Bit(self):
     self._testChainWorksDtype(np.float16)
 
-  @test_util.run_in_graph_and_eager_modes()
+  @test_util.run_in_graph_and_eager_modes
   def testChainWorksCorrelatedMultivariate(self):
     dtype = np.float32
     true_mean = dtype([0, 0])
@@ -635,7 +635,7 @@ class HMCTest(tf.test.TestCase):
     self.assertAllClose(true_cov, sample_cov_,
                         atol=0., rtol=0.2)
 
-  @test_util.run_in_graph_and_eager_modes()
+  @test_util.run_in_graph_and_eager_modes
   def testUncalibratedHMCPreservesStaticShape(self):
     uncal_hmc = tfp.mcmc.UncalibratedHamiltonianMonteCarlo(
         target_log_prob_fn=lambda x: tf.reduce_sum(-x**2., axis=-1),
@@ -652,7 +652,7 @@ class HMCTest(tf.test.TestCase):
     self.assertAllEqual([3, 2], x1.shape)
     self.assertAllEqual([3], r1.target_log_prob.shape)
 
-  @test_util.run_in_graph_and_eager_modes()
+  @test_util.run_in_graph_and_eager_modes
   def testHMCPreservesStaticShape(self):
     hmc = tfp.mcmc.HamiltonianMonteCarlo(
         target_log_prob_fn=lambda x: tf.reduce_sum(-x**2., axis=-1),
@@ -672,7 +672,7 @@ class HMCTest(tf.test.TestCase):
 
 class _LogCorrectionTest(object):
 
-  @test_util.run_in_graph_and_eager_modes()
+  @test_util.run_in_graph_and_eager_modes
   def testHandlesNanFromPotential(self):
     tlp = [1, np.inf, -np.inf, np.nan]
     target_log_prob, proposed_target_log_prob = [
@@ -764,7 +764,7 @@ class LogCorrectionTest64(tf.test.TestCase, _LogCorrectionTest):
 
 class _HMCHandlesLists(object):
 
-  @test_util.run_in_graph_and_eager_modes()
+  @test_util.run_in_graph_and_eager_modes
   def testStateParts(self):
     cast = lambda x: np.array(x, self.dtype)
     dist_x = tfd.Normal(loc=cast(0), scale=cast(1))
@@ -828,7 +828,7 @@ class HMCAdaptiveStepSize(tf.test.TestCase):
     random_seed.set_random_seed(10014)
     np.random.seed(10014)
 
-  @test_util.run_in_graph_and_eager_modes()
+  @test_util.run_in_graph_and_eager_modes
   def test_multiple_step_sizes(self):
     num_results = 5
     initial_step_sizes = [1e-5, 1e-4]
@@ -879,7 +879,7 @@ class HMCAdaptiveStepSize(tf.test.TestCase):
     self.assertNear(step_size_[0][0]/step_size_[1][0],
                     step_size_[0][-1]/step_size_[1][-1], err=1e-4)
 
-  @test_util.run_in_graph_and_eager_modes()
+  @test_util.run_in_graph_and_eager_modes
   def test_finite_adaptation(self):
 
     # Test that the adaptation runs for the specified number of steps.
@@ -1078,7 +1078,7 @@ class HMCEMAdaptiveStepSize(tf.test.TestCase):
                     weights_prior_estimated_scale_[-5:].mean(),
                     err=0.005)
 
-  @test_util.run_in_graph_and_eager_modes()
+  @test_util.run_in_graph_and_eager_modes
   def test_step_size_adapts(self):
     dtype = np.float32
 

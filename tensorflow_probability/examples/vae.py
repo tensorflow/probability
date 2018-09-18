@@ -124,7 +124,7 @@ import tensorflow_probability as tfp
 
 tfd = tfp.distributions
 
-IMAGE_SHAPE = (28, 28, 1)
+IMAGE_SHAPE = [28, 28, 1]
 
 flags.DEFINE_float(
     "learning_rate", default=0.001, help="Initial learning rate.")
@@ -261,10 +261,9 @@ def make_decoder(activation, latent_size, output_shape, base_depth):
     logits = decoder_net(codes)
     logits = tf.reshape(
         logits, shape=tf.concat([original_shape[:-1], output_shape], axis=0))
-    return tfd.Independent(
-        tfd.Bernoulli(logits=logits),
-        reinterpreted_batch_ndims=len(output_shape),
-        name="image")
+    return tfd.Independent(tfd.Bernoulli(logits=logits),
+                           reinterpreted_batch_ndims=len(output_shape),
+                           name="image")
 
   return decoder
 

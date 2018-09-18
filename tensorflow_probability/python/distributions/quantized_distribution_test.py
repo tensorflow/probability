@@ -22,11 +22,16 @@ from scipy import stats
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_case
+
+from tensorflow.python.framework import test_util
+
 tfd = tfp.distributions
 rng = np.random.RandomState(123)
 
 
-class QuantizedDistributionTest(tf.test.TestCase):
+@test_util.run_all_in_graph_and_eager_modes
+class QuantizedDistributionTest(test_case.TestCase):
 
   def _assert_all_finite(self, array):
     self.assertTrue(np.isfinite(array).all())
@@ -301,59 +306,64 @@ class QuantizedDistributionTest(tf.test.TestCase):
         atol=0)
 
   def testLogProbAndGradGivesFiniteResults(self):
-    for dtype in [np.float32, np.float64]:
-      g = tf.Graph()
-      with g.as_default():
-        mu = tf.Variable(0., name="mu", dtype=dtype)
-        sigma = tf.Variable(1., name="sigma", dtype=dtype)
+    def quantized_log_prob(dtype):
+      x = np.arange(-100, 100, 2).astype(dtype)
+
+      def inner_func(mu, sigma):
         qdist = tfd.QuantizedDistribution(
             distribution=tfd.Normal(loc=mu, scale=sigma))
-        x = np.arange(-100, 100, 2).astype(dtype)
-        proba = qdist.log_prob(x)
-        grads = tf.gradients(proba, [mu, sigma])
-        with self.test_session(graph=g):
-          tf.global_variables_initializer().run()
-          self._assert_all_finite(self.evaluate(proba))
-          self._assert_all_finite(self.evaluate(grads[0]))
-          self._assert_all_finite(self.evaluate(grads[1]))
+        return qdist.log_prob(x)
+
+      return inner_func
+
+    for dtype in [np.float32, np.float64]:
+      mu = tf.Variable(0., name="mu", dtype=dtype)
+      sigma = tf.Variable(1., name="sigma", dtype=dtype)
+      self.evaluate(tf.global_variables_initializer())
+      grads = self.compute_gradients(
+          quantized_log_prob(dtype), args=[mu, sigma])
+      self._assert_all_finite(
+          self.evaluate(quantized_log_prob(dtype)(mu, sigma)))
+      self._assert_all_finite(grads[0])
+      self._assert_all_finite(grads[1])
 
   def testProbAndGradGivesFiniteResultsForCommonEvents(self):
+    def quantized_log_prob(mu, sigma):
+      x = tf.ceil(4 * rng.rand(100).astype(np.float32) - 2)
+
+      qdist = tfd.QuantizedDistribution(
+          distribution=tfd.Normal(loc=mu, scale=sigma))
+      return qdist.log_prob(x)
+
     mu = tf.Variable(0.0, name="mu")
     sigma = tf.Variable(1.0, name="sigma")
-    qdist = tfd.QuantizedDistribution(
-        distribution=tfd.Normal(loc=mu, scale=sigma))
-    x = tf.ceil(4 * rng.rand(100).astype(np.float32) - 2)
 
     self.evaluate(tf.global_variables_initializer())
-
-    proba = qdist.prob(x)
-    self._assert_all_finite(self.evaluate(proba))
-
-    grads = tf.gradients(proba, [mu, sigma])
-    self._assert_all_finite(self.evaluate(grads[0]))
-    self._assert_all_finite(self.evaluate(grads[1]))
+    grads = self.compute_gradients(
+        quantized_log_prob, args=[mu, sigma])
+    self._assert_all_finite(
+        self.evaluate(quantized_log_prob(mu, sigma)))
+    self._assert_all_finite(grads[0])
+    self._assert_all_finite(grads[1])
 
   def testLowerCutoffMustBeBelowUpperCutoffOrWeRaise(self):
-    qdist = tfd.QuantizedDistribution(
-        distribution=tfd.Normal(loc=0., scale=1.),
-        low=1.,  # not strictly less than high.
-        high=1.,
-        validate_args=True)
-
-    self.assertTrue(qdist.validate_args)  # Default is True.
     with self.assertRaisesOpError("must be strictly less"):
+      qdist = tfd.QuantizedDistribution(
+          distribution=tfd.Normal(loc=0., scale=1.),
+          low=1.,  # not strictly less than high.
+          high=1.,
+          validate_args=True)
+
       self.evaluate(qdist.sample())
 
   def testCutoffsMustBeIntegerValuedIfValidateArgsTrue(self):
     low = tf.placeholder_with_default(input=1.5, shape=[])
-    qdist = tfd.QuantizedDistribution(
-        distribution=tfd.Normal(loc=0., scale=1.),
-        low=low,
-        high=10.,
-        validate_args=True)
-
-    self.assertTrue(qdist.validate_args)  # Default is True.
     with self.assertRaisesOpError("has non-integer components"):
+      qdist = tfd.QuantizedDistribution(
+          distribution=tfd.Normal(loc=0., scale=1.),
+          low=low,
+          high=10.,
+          validate_args=True)
       self.evaluate(qdist.sample())
 
   def testCutoffsCanBeFloatValuedIfValidateArgsFalse(self):

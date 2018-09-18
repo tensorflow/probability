@@ -159,7 +159,7 @@ def fit(
     [w_, linear_response_, is_converged_, num_iter_, Y_, w_true_,
      log_likelihood_] = sess.run([
         w, linear_response, is_converged, num_iter, Y, w_true,
-        log_likelihood_])
+        log_likelihood])
 
   print('is_converged: ', is_converged_)
   print('    num_iter: ', num_iter_)

@@ -30,31 +30,11 @@ tfd = tfp.distributions
 tfb = tfp.bijectors
 
 
-class LogNormal(tfd.TransformedDistribution):
-  """LogNormal distribution."""
-
-  def __init__(self, loc, scale):
-    with tf.name_scope('LogNormal', values=[loc]) as name:
-      loc = tf.convert_to_tensor(loc, name='loc')
-      scale = tf.convert_to_tensor(scale, name='scale')
-      super(LogNormal, self).__init__(
-          distribution=tfd.Normal(loc=loc, scale=scale),
-          bijector=tfb.Exp(),
-          name=name)
-
-  def _mean(self):
-    return tf.exp(self.distribution.loc + 0.5 * self.distribution.scale**2.)
-
-  def _variance(self):
-    return tf.expm1(self.distribution.scale**2.) * tf.exp(
-        2. * self.distribution.loc + self.distribution.scale**2.)
-
-
 def make_lognormal(mean):
   """Helper which creates a LogNormal with a specific mean."""
   mean = tf.convert_to_tensor(mean, name='mean')
   s2 = np.log(2.).astype(mean.dtype.as_numpy_dtype())
-  return LogNormal(tf.log(mean) - 0.5 * s2, np.sqrt(s2))
+  return tfd.LogNormal(tf.log(mean) - 0.5 * s2, np.sqrt(s2))
 
 
 class _GLMTestHarness(object):
@@ -65,13 +45,11 @@ class _GLMTestHarness(object):
         np.linspace(1e-3, 5, 11)]).reshape(2, 11, 1).astype(self.dtype)
     _, expected_variance, expected_grad_mean = self.expected(
         predicted_linear_response)
-    with self.test_session() as sess:
-      expected_variance_, expected_grad_mean_ = sess.run([
-          expected_variance, expected_grad_mean])
+    expected_variance_, expected_grad_mean_ = self.evaluate([
+        expected_variance, expected_grad_mean])
     self.assertEqual(self.model.is_canonical,
                      np.all(expected_variance_ == expected_grad_mean_))
 
-  @test_util.run_in_graph_and_eager_modes()
   def testCallWorksCorrectly(self):
     predicted_linear_response = np.stack([
         np.linspace(-5., -1e-3, 11),
@@ -102,7 +80,6 @@ class _GLMTestHarness(object):
     self.assertAllClose(expected_grad_mean_, actual_grad_mean_,
                         atol=1e-6, rtol=1e-4)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testLogProbWorksCorrectly(self):
     predicted_linear_response = np.stack([
         np.linspace(-5., -1e-3, 11),
@@ -127,6 +104,7 @@ class _GLMTestHarness(object):
                         atol=1e-6, rtol=1e-4)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class BernoulliTest(tf.test.TestCase, _GLMTestHarness):
 
   def setUp(self):
@@ -136,6 +114,7 @@ class BernoulliTest(tf.test.TestCase, _GLMTestHarness):
         lambda mu: tfd.Bernoulli(probs=mu), tf.nn.sigmoid)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class BernoulliNormalCDFTest(tf.test.TestCase, _GLMTestHarness):
 
   def setUp(self):
@@ -150,6 +129,7 @@ class BernoulliNormalCDFTest(tf.test.TestCase, _GLMTestHarness):
         lambda mu: tfd.Bernoulli(probs=mu), normal_cdf)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class GammaExpTest(tf.test.TestCase, _GLMTestHarness):
 
   def setUp(self):
@@ -161,6 +141,7 @@ class GammaExpTest(tf.test.TestCase, _GLMTestHarness):
         tf.exp)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class GammaSoftplusTest(tf.test.TestCase, _GLMTestHarness):
 
   def setUp(self):
@@ -172,6 +153,7 @@ class GammaSoftplusTest(tf.test.TestCase, _GLMTestHarness):
         tf.nn.softplus)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class LogNormalTest(tf.test.TestCase, _GLMTestHarness):
 
   def setUp(self):
@@ -181,6 +163,7 @@ class LogNormalTest(tf.test.TestCase, _GLMTestHarness):
         make_lognormal, tf.exp)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class LogNormalSoftplusTest(tf.test.TestCase, _GLMTestHarness):
 
   def setUp(self):
@@ -190,6 +173,7 @@ class LogNormalSoftplusTest(tf.test.TestCase, _GLMTestHarness):
         make_lognormal, tf.nn.softplus)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class NormalTest(tf.test.TestCase, _GLMTestHarness):
 
   def setUp(self):
@@ -199,6 +183,7 @@ class NormalTest(tf.test.TestCase, _GLMTestHarness):
         lambda mu: tfd.Normal(mu, self.dtype(1)), tf.identity)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class NormalReciprocalTest(tf.test.TestCase, _GLMTestHarness):
 
   def setUp(self):
@@ -208,6 +193,7 @@ class NormalReciprocalTest(tf.test.TestCase, _GLMTestHarness):
         lambda mu: tfd.Normal(mu, self.dtype(1)), tf.reciprocal)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class PoissonTest(tf.test.TestCase, _GLMTestHarness):
 
   def setUp(self):
@@ -217,6 +203,7 @@ class PoissonTest(tf.test.TestCase, _GLMTestHarness):
         lambda mu: tfd.Poisson(rate=mu), tf.exp)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class PoissonSoftplusTest(tf.test.TestCase, _GLMTestHarness):
 
   def setUp(self):

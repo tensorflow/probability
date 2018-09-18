@@ -22,10 +22,12 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow.python.framework import tensor_util
+from tensorflow.python.framework import test_util
 
 tfd = tfp.distributions
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class DistributionTest(tf.test.TestCase):
 
   def testParamShapesAndFromParams(self):
@@ -97,17 +99,22 @@ class DistributionTest(tf.test.TestCase):
     # function.
 
     # Test case 1, 2.
-    x = tf.placeholder(dtype=tf.int32, shape=[])
+    x = tf.placeholder_with_default(input=1, shape=[])
     # None would fire an exception were it actually executed.
     self.assertTrue(normal._is_scalar_helper(x.get_shape(), lambda: None))
     self.assertTrue(
         normal._is_scalar_helper(tf.TensorShape(None), lambda: tf.shape(x)))
 
-    x = tf.placeholder(dtype=tf.int32, shape=[1])
+    x = tf.placeholder_with_default(input=[1], shape=[1])
     # None would fire an exception were it actually executed.
     self.assertFalse(normal._is_scalar_helper(x.get_shape(), lambda: None))
     self.assertFalse(
         normal._is_scalar_helper(tf.TensorShape(None), lambda: tf.shape(x)))
+
+    # There's no notion of partially known shapes in eager mode, so exit
+    # early.
+    if tf.executing_eagerly():
+      return
 
     # Test case 3.
     x = tf.placeholder_with_default(input=1, shape=None)
@@ -141,10 +148,16 @@ class DistributionTest(tf.test.TestCase):
     return FakeDistribution
 
   def testSampleShapeHints(self):
+    # In eager mode, all shapes are known, so these tests do not need to
+    # execute.
+    if tf.executing_eagerly():
+      return
+
     fake_distribution = self._GetFakeDistribution()
 
     # Make a new session since we're playing with static shapes. [And below.]
-    x = tf.placeholder(dtype=tf.float32)
+    x = tf.placeholder_with_default(
+        input=np.ones((6, 7, 2, 3, 5), dtype=np.float32), shape=None)
     dist = fake_distribution(batch_shape=[2, 3], event_shape=[5])
     sample_shape = tf.convert_to_tensor([6, 7], dtype=tf.int32)
     y = dist._set_sample_static_shape(x, sample_shape)
@@ -152,26 +165,32 @@ class DistributionTest(tf.test.TestCase):
     # unknown values, ie, Dimension(None).
     self.assertAllEqual([6, 7, 2, 3, 5], y.get_shape().as_list())
 
-    x = tf.placeholder(dtype=tf.float32)
+    x = tf.placeholder_with_default(
+        input=np.ones((6, 7, 2, 3, 5), dtype=np.float32), shape=None)
     dist = fake_distribution(batch_shape=[None, 3], event_shape=[5])
     sample_shape = tf.convert_to_tensor([6, 7], dtype=tf.int32)
     y = dist._set_sample_static_shape(x, sample_shape)
     self.assertAllEqual([6, 7, None, 3, 5], y.get_shape().as_list())
 
-    x = tf.placeholder(dtype=tf.float32)
+    x = tf.placeholder_with_default(
+        input=np.ones((6, 7, 2, 3, 5), dtype=np.float32), shape=None)
     dist = fake_distribution(batch_shape=[None, 3], event_shape=[None])
     sample_shape = tf.convert_to_tensor([6, 7], dtype=tf.int32)
     y = dist._set_sample_static_shape(x, sample_shape)
     self.assertAllEqual([6, 7, None, 3, None], y.get_shape().as_list())
 
-    x = tf.placeholder(dtype=tf.float32)
+    x = tf.placeholder_with_default(
+        input=np.ones((6, 7, 2, 3, 5), dtype=np.float32), shape=None)
     dist = fake_distribution(batch_shape=None, event_shape=None)
     sample_shape = tf.convert_to_tensor([6, 7], dtype=tf.int32)
     y = dist._set_sample_static_shape(x, sample_shape)
     self.assertTrue(y.get_shape().ndims is None)
 
-    x = tf.placeholder(dtype=tf.float32)
+    x = tf.placeholder_with_default(
+        input=np.ones((6, 7, 2, 3, 5), dtype=np.float32), shape=None)
     dist = fake_distribution(batch_shape=[None, 3], event_shape=None)
+    # There's no notion of partially known shapes in eager mode, so exit
+    # early.
     sample_shape = tf.convert_to_tensor([6, 7], dtype=tf.int32)
     y = dist._set_sample_static_shape(x, sample_shape)
     self.assertTrue(y.get_shape().ndims is None)
@@ -187,16 +206,26 @@ class DistributionTest(tf.test.TestCase):
     x_duplicate_sample = x_duplicate.sample(name="custom_sample")
 
     self.assertEqual(x.name, "x/")
-    self.assertEqual(x_duplicate.name, "x_1/")
     self.assertEqual(y.name, "y/")
+
+    # There's no notion of graph, hence the same name will be reused.
+    # Tensors also do not have names in eager mode, so exit early.
+    if tf.executing_eagerly():
+      return
     self.assertTrue(x_sample.name.startswith("x/custom_sample"))
-    self.assertTrue(x_sample_duplicate.name.startswith("x/custom_sample_1"))
     self.assertTrue(x_log_prob.name.startswith("x/custom_log_prob"))
+
+    self.assertEqual(x_duplicate.name, "x_1/")
     self.assertTrue(x_duplicate_sample.name.startswith(
         "x_1/custom_sample"))
+    self.assertTrue(x_sample_duplicate.name.startswith("x/custom_sample_1"))
 
   def testStrWorksCorrectlyScalar(self):
-    normal = tfd.Normal(loc=np.float16(0), scale=np.float16(1))
+    # Usually we'd write np.float(X) here, but a recent Eager bug would
+    # erroneously coerce the value to float32 anyway. We therefore use constants
+    # here, until the bug is resolved in TensorFlow 1.12.
+    normal = tfd.Normal(loc=tf.constant(0, tf.float16),
+                        scale=tf.constant(1, tf.float16))
     self.assertEqual(
         ("tf.distributions.Normal("
          "\"Normal/\", "
@@ -214,7 +243,13 @@ class DistributionTest(tf.test.TestCase):
          "dtype=float32)"),
         str(chi2))
 
-    exp = tfd.Exponential(rate=tf.placeholder(dtype=tf.float32))
+    # There's no notion of partially known shapes in eager mode, so exit
+    # early.
+    if tf.executing_eagerly():
+      return
+
+    exp = tfd.Exponential(rate=tf.placeholder_with_default(
+        input=1., shape=None))
     self.assertEqual(
         ("tf.distributions.Exponential(\"Exponential/\", "
          # No batch shape.
@@ -233,8 +268,15 @@ class DistributionTest(tf.test.TestCase):
          "dtype=float64)"),
         str(mvn_static))
 
+    # There's no notion of partially known shapes in eager mode, so exit
+    # early.
+    if tf.executing_eagerly():
+      return
+
     mvn_dynamic = tfd.MultivariateNormalDiag(
-        loc=tf.placeholder(shape=[None, 3], dtype=tf.float32), name="MVN2")
+        loc=tf.placeholder_with_default(
+            input=np.ones((3, 3), dtype=np.float32), shape=[None, 3]),
+        name="MVN2")
     self.assertEqual(
         ("tf.distributions.MultivariateNormalDiag("
          "\"MVN2/\", "
@@ -244,7 +286,11 @@ class DistributionTest(tf.test.TestCase):
         str(mvn_dynamic))
 
   def testReprWorksCorrectlyScalar(self):
-    normal = tfd.Normal(loc=np.float16(0), scale=np.float16(1))
+    # Usually we'd write np.float(X) here, but a recent Eager bug would
+    # erroneously coerce the value to float32 anyway. We therefore use constants
+    # here, until the bug is resolved in TensorFlow 1.12.
+    normal = tfd.Normal(loc=tf.constant(0, tf.float16),
+                        scale=tf.constant(1, tf.float16))
     self.assertEqual(
         ("<tf.distributions.Normal"
          " 'Normal/'"
@@ -262,7 +308,13 @@ class DistributionTest(tf.test.TestCase):
          " dtype=float32>"),
         repr(chi2))
 
-    exp = tfd.Exponential(rate=tf.placeholder(dtype=tf.float32))
+    # There's no notion of partially known shapes in eager mode, so exit
+    # early.
+    if tf.executing_eagerly():
+      return
+
+    exp = tfd.Exponential(rate=tf.placeholder_with_default(
+        input=1., shape=None))
     self.assertEqual(
         ("<tf.distributions.Exponential"
          " 'Exponential/'"
@@ -282,8 +334,15 @@ class DistributionTest(tf.test.TestCase):
          " dtype=float64>"),
         repr(mvn_static))
 
+    # There's no notion of partially known shapes in eager mode, so exit
+    # early.
+    if tf.executing_eagerly():
+      return
+
     mvn_dynamic = tfd.MultivariateNormalDiag(
-        loc=tf.placeholder(shape=[None, 3], dtype=tf.float32), name="MVN2")
+        loc=tf.placeholder_with_default(
+            input=np.ones((3, 3), dtype=np.float32), shape=[None, 3]),
+        name="MVN2")
     self.assertEqual(
         ("<tf.distributions.MultivariateNormalDiag"
          " 'MVN2/'"

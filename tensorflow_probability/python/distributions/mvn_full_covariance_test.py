@@ -24,11 +24,14 @@ from scipy import stats
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow.python.framework import test_util
+
 
 tfd = tfp.distributions
 rng = np.random.RandomState(42)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class MultivariateNormalFullCovarianceTest(tf.test.TestCase):
 
   def _random_pd_matrix(self, *shape):
@@ -40,8 +43,8 @@ class MultivariateNormalFullCovarianceTest(tf.test.TestCase):
   def testRaisesIfInitializedWithNonSymmetricMatrix(self):
     mu = [1., 2.]
     sigma = [[1., 0.], [1., 1.]]  # Nonsingular, but not symmetric
-    mvn = tfd.MultivariateNormalFullCovariance(mu, sigma, validate_args=True)
     with self.assertRaisesOpError("not symmetric"):
+      mvn = tfd.MultivariateNormalFullCovariance(mu, sigma, validate_args=True)
       self.evaluate(mvn.covariance())
 
   def testNamePropertyIsSetByInitArg(self):

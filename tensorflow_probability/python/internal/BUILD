@@ -31,6 +31,7 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         ":distribution_util",
+        ":test_case",
         ":test_util",
     ],
 )
@@ -53,6 +54,26 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
+    ],
+)
+
+py_library(
+    name = "test_case",
+    srcs = ["test_case.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "test_case_test",
+    size = "small",
+    srcs = ["test_case_test.py"],
+    deps = [
+        ":test_case",
+        # numpy dep,
+        # tensorflow dep,
     ],
 )
 

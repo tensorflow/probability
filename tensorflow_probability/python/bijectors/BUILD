@@ -39,6 +39,7 @@ py_library(
         ":cholesky_outer_product",
         ":cholesky_to_inv_cholesky",
         ":conditional_bijector",
+        ":discrete_cosine_transform",
         ":exp",
         ":fill_triangular",
         ":gumbel",
@@ -138,6 +139,15 @@ py_library(
     srcs = ["conditional_bijector.py"],
     deps = [
         # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "discrete_cosine_transform",
+    srcs = ["discrete_cosine_transform.py"],
+    deps = [
+        # tensorflow dep,
+#         "//tensorflow_probability/google:platform_google",  # DisableOnExport
     ],
 )
 
@@ -393,10 +403,11 @@ py_test(
 
 py_test(
     name = "batch_normalization_test",
-    size = "small",
+    size = "medium",
     srcs = ["batch_normalization_test.py"],
     deps = [
         ":bijectors",
+        # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
@@ -447,6 +458,19 @@ py_test(
     deps = [
         ":bijectors",
         # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_test(
+    name = "discrete_cosine_transform_test",
+    size = "small",
+    srcs = ["discrete_cosine_transform_test.py"],
+    deps = [
+        ":bijectors",
+        # numpy dep,
+        # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],

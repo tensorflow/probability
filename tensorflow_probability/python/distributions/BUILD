@@ -46,6 +46,7 @@ py_library(
         ":half_normal",
         ":independent",
         ":inverse_gamma",
+        ":inverse_gaussian",
         ":kumaraswamy",
         ":linear_gaussian_ssm",
         ":lkj",
@@ -199,6 +200,8 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
 
@@ -223,6 +226,15 @@ py_library(
 py_library(
     name = "inverse_gamma",
     srcs = ["inverse_gamma.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "inverse_gaussian",
+    srcs = ["inverse_gaussian.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -721,6 +733,19 @@ py_test(
 )
 
 py_test(
+    name = "gumbel_test",
+    size = "small",
+    srcs = ["gumbel_test.py"],
+    deps = [
+        ":distributions",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
+    ],
+)
+
+py_test(
     name = "half_normal_test",
     size = "medium",
     srcs = ["half_normal_test.py"],
@@ -748,6 +773,18 @@ py_test(
 py_test(
     name = "inverse_gamma_test",
     srcs = ["inverse_gamma_test.py"],
+    deps = [
+        ":distributions",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
+    ],
+)
+
+py_test(
+    name = "inverse_gaussian_test",
+    srcs = ["inverse_gaussian_test.py"],
     deps = [
         ":distributions",
         # numpy dep,
@@ -846,6 +883,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 
@@ -929,6 +967,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 
@@ -965,6 +1004,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 

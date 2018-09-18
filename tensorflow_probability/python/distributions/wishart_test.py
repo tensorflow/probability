@@ -24,6 +24,7 @@ from scipy import linalg
 import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow.python.framework import errors_impl
+from tensorflow.python.framework import test_util
 
 tfd = tfp.distributions
 
@@ -48,6 +49,7 @@ def wishart_var(df, x):
       d[..., np.newaxis], d[..., np.newaxis, :])
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class WishartTest(tf.test.TestCase):
 
   def testEntropy(self):
@@ -116,7 +118,9 @@ class WishartTest(tf.test.TestCase):
     w = tfd.Wishart(df, scale_tril=chol_scale)
     self.assertAllEqual(wishart_var(df, scale), self.evaluate(w.variance()))
 
-  def testSample(self):
+  def testSampleWithSameSeed(self):
+    if tf.executing_eagerly():
+      return
     scale = make_pd(1., 2)
     df = 4
 
@@ -140,6 +144,7 @@ class WishartTest(tf.test.TestCase):
     eigen_values = tf.matrix_diag_part(full_w_chol.sample(1000, seed=42))
     np.testing.assert_array_less(0., self.evaluate(eigen_values))
 
+  def testSample(self):
     # Check first and second moments.
     df = 4.
     chol_w = tfd.Wishart(
@@ -309,15 +314,19 @@ class WishartTest(tf.test.TestCase):
     chol_scale_deferred = tf.placeholder_with_default(
         input=np.float32(chol_scale), shape=chol_scale.shape)
 
+    # In eager mode, these checks are done statically and hence
+    # ValueError is returned on object construction.
+    error_type = errors_impl.InvalidArgumentError
+    if tf.executing_eagerly():
+      error_type = ValueError
+
     # Check expensive, deferred assertions.
-    with self.assertRaisesRegexp(errors_impl.InvalidArgumentError,
-                                 "cannot be less than"):
+    with self.assertRaisesRegexp(error_type, "cannot be less than"):
       chol_w = tfd.Wishart(
           df=df_deferred, scale_tril=chol_scale_deferred, validate_args=True)
       self.evaluate(chol_w.log_prob(np.asarray(x, dtype=np.float32)))
 
-    with self.assertRaisesRegexp(errors_impl.InvalidArgumentError,
-                                 "Cholesky decomposition was not successful"):
+    with self.assertRaisesOpError("Cholesky decomposition was not successful"):
       df_deferred = tf.placeholder_with_default(input=2., shape=None)
       chol_scale_deferred = tf.placeholder_with_default(
           input=np.ones([3, 3], dtype=np.float32), shape=[3, 3])

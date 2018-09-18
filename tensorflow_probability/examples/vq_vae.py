@@ -33,6 +33,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
 import os
 import time
 
@@ -49,7 +50,7 @@ from tensorflow_probability import distributions as tfd
 from tensorflow.contrib.learn.python.learn.datasets import mnist
 from tensorflow.python.training import moving_averages
 
-IMAGE_SHAPE = [28, 28]
+IMAGE_SHAPE = [28, 28, 1]
 
 flags.DEFINE_float("learning_rate",
                    default=0.001,
@@ -66,12 +67,9 @@ flags.DEFINE_integer("num_codes",
 flags.DEFINE_integer("code_size",
                      default=16,
                      help="Dimension of each entry in codebook.")
-flags.DEFINE_string("encoder_layers",
-                    default="256,128",
-                    help="Comma-separated list of layer sizes for the encoder.")
-flags.DEFINE_string("decoder_layers",
-                    default="128,256",
-                    help="Comma-separated list of layer sizes for the decoder.")
+flags.DEFINE_integer("base_depth",
+                     default=32,
+                     help="Base depth for encoder and decoder CNNs.")
 flags.DEFINE_string("activation",
                     default="elu",
                     help="Activation function for all hidden layers.")
@@ -160,11 +158,11 @@ class VectorQuantizer(object):
     return nearest_codebook_entries, one_hot_assignments
 
 
-def make_encoder(layers, activation, latent_size, code_size):
+def make_encoder(base_depth, activation, latent_size, code_size):
   """Creates the encoder function.
 
   Args:
-    layers: List of integers denoting number of units in hidden layers.
+    base_depth: Layer base depth in encoder net.
     activation: Activation function in hidden layers.
     latent_size: The number of latent variables in the code.
     code_size: The dimensionality of each latent variable.
@@ -173,12 +171,19 @@ def make_encoder(layers, activation, latent_size, code_size):
     encoder: A `callable` mapping a `Tensor` of images to a `Tensor` of shape
       `[..., latent_size, code_size]`.
   """
-  encoder_net = tf.keras.Sequential(
-      [tf.keras.layers.Flatten()] +
-      [tf.keras.layers.Dense(units, activation=activation)
-       for units in layers] +
-      [tf.keras.layers.Dense(latent_size * code_size, activation=None)] +
-      [tf.keras.layers.Reshape([latent_size, code_size])])
+  conv = functools.partial(
+      tf.keras.layers.Conv2D, padding="SAME", activation=activation)
+
+  encoder_net = tf.keras.Sequential([
+      conv(base_depth, 5, 1),
+      conv(base_depth, 5, 2),
+      conv(2 * base_depth, 5, 1),
+      conv(2 * base_depth, 5, 2),
+      conv(4 * latent_size, 7, padding="VALID"),
+      tf.keras.layers.Flatten(),
+      tf.keras.layers.Dense(latent_size * code_size, activation=None),
+      tf.keras.layers.Reshape([latent_size, code_size])
+  ])
 
   def encoder(images):
     """Encodes a batch of images.
@@ -191,30 +196,41 @@ def make_encoder(layers, activation, latent_size, code_size):
       codes: A `float`-like `Tensor` of shape `[..., latent_size, code_size]`.
         It represents latent vectors to be matched with the codebook.
     """
-    images = tf.cast(images, dtype=tf.float32)
+    images = 2 * tf.cast(images, dtype=tf.float32) - 1
     codes = encoder_net(images)
     return codes
 
   return encoder
 
 
-def make_decoder(layers, activation, output_shape):
+def make_decoder(base_depth, activation, input_size, output_shape):
   """Creates the decoder function.
 
   Args:
-    layers: List of integers denoting number of units in hidden layers.
+    base_depth: Layer base depth in decoder net.
     activation: Activation function in hidden layers.
-    output_shape: The output image shape.
+    input_size: The flattened latent input shape as an int.
+    output_shape: The output image shape as a list.
 
   Returns:
     decoder: A `callable` mapping a `Tensor` of encodings to a
       `tf.distributions.Distribution` instance over images.
   """
-  decoder_net = tf.keras.Sequential(
-      [tf.keras.layers.Flatten()] +
-      [tf.keras.layers.Dense(units, activation=activation)
-       for units in layers] +
-      [tf.keras.layers.Dense(np.prod(output_shape), activation=None)])
+  deconv = functools.partial(
+      tf.keras.layers.Conv2DTranspose, padding="SAME", activation=activation)
+  conv = functools.partial(
+      tf.keras.layers.Conv2D, padding="SAME", activation=activation)
+  decoder_net = tf.keras.Sequential([
+      tf.keras.layers.Reshape((1, 1, input_size)),
+      deconv(2 * base_depth, 7, padding="VALID"),
+      deconv(2 * base_depth, 5),
+      deconv(2 * base_depth, 5, 2),
+      deconv(base_depth, 5),
+      deconv(base_depth, 5, 2),
+      deconv(base_depth, 5),
+      conv(output_shape[-1], 5, activation=None),
+      tf.keras.layers.Reshape(output_shape),
+  ])
 
   def decoder(codes):
     """Builds a distribution over images given codes.
@@ -226,9 +242,7 @@ def make_decoder(layers, activation, output_shape):
     Returns:
       decoder_distribution: A multivariate `Bernoulli` distribution.
     """
-    net = decoder_net(codes)
-    new_shape = tf.concat([tf.shape(net)[:-1], output_shape], axis=0)
-    logits = tf.reshape(net, shape=new_shape)
+    logits = decoder_net(codes)
     return tfd.Independent(tfd.Bernoulli(logits=logits),
                            reinterpreted_batch_ndims=len(output_shape),
                            name="decoder_distribution")
@@ -236,51 +250,26 @@ def make_decoder(layers, activation, output_shape):
   return decoder
 
 
-def make_vq_vae(images,
-                encoder_fn,
-                decoder_fn,
-                vector_quantizer,
-                beta=0.25,
-                decay=0.99):
-  """Builds the vector-quantized variational autoencoder and its loss function.
+def add_ema_control_dependencies(vector_quantizer,
+                                 one_hot_assignments,
+                                 codes,
+                                 commitment_loss,
+                                 decay):
+  """Add control dependencies to the commmitment loss to update the codebook.
 
   Args:
-    images: A `int`-like `Tensor` containing observed inputs X. The first
-      dimension (axis 0) indexes batch elements; all other dimensions index
-      event elements.
-    encoder_fn: A callable to build the encoder output `Z_e`. This takes a
-      single argument, a `int`-like `Tensor` representing a batch of inputs `X`,
-      and returns the latent codes `Z_e`.
-    decoder_fn: A callable to build the decoder `p(X|Z_q)`. This takes a single
-      argument, a `float`-like `Tensor` representing a batch of latent codes
-      from the codebook `Z_q`, and returns a Distribution over the batch of
-      observations `X`.
-    vector_quantizer: An instance of the VectorQuantizer class, which contains
-      a codebook and a callable that returns matched codes `Z_q` and their
-      one-hot assignments from an input `Z_e`.
-    beta: Beta factor for the loss (Default: 0.25).
-    decay: Decay factor for the exponential moving average (Default: 0.99).
+    vector_quantizer: An instance of the VectorQuantizer class.
+    one_hot_assignments: The one-hot vectors corresponding to the matched
+      codebook entry for each code in the batch.
+    codes: A `float`-like `Tensor` containing the latent vectors to be compared
+      to the codebook.
+    commitment_loss: The commitment loss from comparing the encoder outputs to
+      their neighboring codebook entries.
+    decay: Decay factor for exponential moving average.
 
   Returns:
-    loss: A scalar `Tensor` computing the loss function.
-    decoder_distribution: A `tf.distributions.Distribution` instance conditional
-      on a draw from the encoder.
+    commitment_loss: Commitment loss with control dependencies.
   """
-  codes = encoder_fn(images)
-  nearest_codebook_entries, one_hot_assignments = vector_quantizer(codes)
-
-  # Use the straight-through estimator so the encoder receives gradients from
-  # reconstruction loss.
-  codes_straight_through = codes + tf.stop_gradient(
-      nearest_codebook_entries - codes)
-  decoder_distribution = decoder_fn(codes_straight_through)
-  reconstruction_loss = -tf.reduce_mean(decoder_distribution.log_prob(images))
-  commitment_loss = tf.reduce_mean(
-      tf.square(codes - tf.stop_gradient(nearest_codebook_entries)))
-
-  tf.summary.scalar("reconstruction_loss", reconstruction_loss)
-  tf.summary.scalar("commitment_loss", commitment_loss)
-
   # Use an exponential moving average to update the codebook.
   updated_ema_count = moving_averages.assign_moving_average(
       vector_quantizer.ema_count, tf.reduce_sum(
@@ -297,11 +286,7 @@ def make_vq_vae(images,
   with tf.control_dependencies([commitment_loss]):
     update_means = tf.assign(vector_quantizer.codebook, updated_ema_means)
     with tf.control_dependencies([update_means]):
-      loss = beta * commitment_loss
-  loss += reconstruction_loss
-
-  tf.summary.scalar("loss", loss)
-  return loss, decoder_distribution
+      return tf.identity(commitment_loss)
 
 
 def save_imgs(x, fname):
@@ -447,10 +432,6 @@ def build_input_pipeline(data_dir, batch_size, heldout_size, mnist_type):
 
 def main(argv):
   del argv  # unused
-  FLAGS.encoder_layers = [int(units) for units
-                          in FLAGS.encoder_layers.split(",")]
-  FLAGS.decoder_layers = [int(units) for units
-                          in FLAGS.decoder_layers.split(",")]
   FLAGS.activation = getattr(tf.nn, FLAGS.activation)
   if tf.gfile.Exists(FLAGS.model_dir):
     tf.logging.warn("Deleting old log directory at {}".format(FLAGS.model_dir))
@@ -464,24 +445,50 @@ def main(argv):
          FLAGS.data_dir, FLAGS.batch_size, heldout_size=10000,
          mnist_type=FLAGS.mnist_type)
 
-    encoder = make_encoder(FLAGS.encoder_layers,
+    encoder = make_encoder(FLAGS.base_depth,
                            FLAGS.activation,
                            FLAGS.latent_size,
                            FLAGS.code_size)
-    decoder = make_decoder(FLAGS.decoder_layers,
+    decoder = make_decoder(FLAGS.base_depth,
                            FLAGS.activation,
+                           FLAGS.latent_size * FLAGS.code_size,
                            IMAGE_SHAPE)
     vector_quantizer = VectorQuantizer(FLAGS.num_codes, FLAGS.code_size)
 
-    # Build the model and loss function.
-    loss, decoder_distribution = make_vq_vae(
-        images, encoder, decoder, vector_quantizer, FLAGS.beta, FLAGS.decay)
+    codes = encoder(images)
+    nearest_codebook_entries, one_hot_assignments = vector_quantizer(codes)
+    codes_straight_through = codes + tf.stop_gradient(
+        nearest_codebook_entries - codes)
+    decoder_distribution = decoder(codes_straight_through)
     reconstructed_images = decoder_distribution.mean()
 
+    reconstruction_loss = -tf.reduce_mean(decoder_distribution.log_prob(images))
+    commitment_loss = tf.reduce_mean(
+        tf.square(codes - tf.stop_gradient(nearest_codebook_entries)))
+    commitment_loss = add_ema_control_dependencies(
+        vector_quantizer,
+        one_hot_assignments,
+        codes,
+        commitment_loss,
+        FLAGS.decay)
+    prior_dist = tfd.Multinomial(
+        total_count=1.0, logits=tf.zeros([FLAGS.latent_size, FLAGS.num_codes]))
+    prior_loss = -tf.reduce_mean(tf.reduce_sum(
+        prior_dist.log_prob(one_hot_assignments), 1))
+
+    loss = reconstruction_loss + FLAGS.beta * commitment_loss + prior_loss
+    # Upper bound marginal negative log-likelihood as prior loss +
+    # reconstruction loss.
+    marginal_nll = prior_loss + reconstruction_loss
+
+    tf.summary.scalar("losses/total_loss", loss)
+    tf.summary.scalar("losses/reconstruction_loss", reconstruction_loss)
+    tf.summary.scalar("losses/prior_loss", prior_loss)
+    tf.summary.scalar("losses/commitment_loss", FLAGS.beta * commitment_loss)
+
     # Decode samples from a uniform prior for visualization.
-    prior = tfd.Multinomial(total_count=1., logits=tf.zeros(FLAGS.num_codes))
     prior_samples = tf.reduce_sum(
-        tf.expand_dims(prior.sample([10, FLAGS.latent_size]), -1) *
+        tf.expand_dims(prior_dist.sample(10), -1) *
         tf.reshape(vector_quantizer.codebook,
                    [1, 1, FLAGS.num_codes, FLAGS.code_size]),
         axis=2)
@@ -508,8 +515,11 @@ def main(argv):
                                  feed_dict={handle: train_handle})
         duration = time.time() - start_time
         if step % 100 == 0:
-          print("Step: {:>3d} Loss: {:.3f} ({:.3f} sec)".format(
-              step, loss_value, duration))
+          marginal_nll_val = sess.run(marginal_nll,
+                                      feed_dict={handle: heldout_handle})
+          print("Step: {:>3d} Training Loss: {:.3f} Heldout NLL: {:.3f} "
+                "({:.3f} sec)".format(step, loss_value, marginal_nll_val,
+                                      duration))
 
           # Update the events file.
           summary_str = sess.run(summary, feed_dict={handle: train_handle})

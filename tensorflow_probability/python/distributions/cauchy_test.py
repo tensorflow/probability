@@ -24,6 +24,8 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow.python.framework import test_util
+
 
 def try_import(name):  # pylint: disable=invalid-name
   module = None
@@ -39,6 +41,7 @@ stats = try_import("scipy.stats")
 tfd = tfp.distributions
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class CauchyTest(tf.test.TestCase):
 
   def setUp(self):
@@ -78,7 +81,7 @@ class CauchyTest(tf.test.TestCase):
   def testCauchyLogPDF(self):
     batch_size = 6
     loc = tf.constant([3.0] * batch_size)
-    scale = tf.constant([np.sqrt(10.0)] * batch_size)
+    scale = tf.constant([np.sqrt(10.0, dtype=np.float32)] * batch_size)
     x = np.array([-2.5, 2.5, 4.0, 0.0, -1.0, 2.0], dtype=np.float32)
     cauchy = tfd.Cauchy(loc=loc, scale=scale)
 
@@ -109,7 +112,9 @@ class CauchyTest(tf.test.TestCase):
   def testCauchyLogPDFMultidimensional(self):
     batch_size = 6
     loc = tf.constant([[3.0, -3.0]] * batch_size)
-    scale = tf.constant([[np.sqrt(10.0), np.sqrt(15.0)]] * batch_size)
+    scale = tf.constant([
+        [np.sqrt(10.0, dtype=np.float32),
+         np.sqrt(15.0, dtype=np.float32)]] * batch_size)
     x = np.array([[-2.5, 2.5, 4.0, 0.0, -1.0, 2.0]], dtype=np.float32).T
     cauchy = tfd.Cauchy(loc=loc, scale=scale)
 
@@ -391,8 +396,8 @@ class CauchyTest(tf.test.TestCase):
     self.assertAllEqual(expected_shape, sample_values.shape)
 
   def testCauchyNegativeLocFails(self):
-    cauchy = tfd.Cauchy(loc=[1.], scale=[-5.], validate_args=True)
     with self.assertRaisesOpError("Condition x > 0 did not hold"):
+      cauchy = tfd.Cauchy(loc=[1.], scale=[-5.], validate_args=True)
       self.evaluate(cauchy.mode())
 
   def testCauchyShape(self):
@@ -406,6 +411,8 @@ class CauchyTest(tf.test.TestCase):
     self.assertEqual(cauchy.event_shape, tf.TensorShape([]))
 
   def testCauchyShapeWithPlaceholders(self):
+    if tf.executing_eagerly():
+      return
     loc = tf.placeholder_with_default(input=5., shape=[])
     scale = tf.placeholder_with_default(input=[1., 2], shape=None)
     cauchy = tfd.Cauchy(loc=loc, scale=scale)
