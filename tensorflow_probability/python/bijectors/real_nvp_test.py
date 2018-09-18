@@ -132,9 +132,9 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
         fldj,
     ])
     self.assertEqual("real_nvp", nvp.name)
-    self.assertAllClose(forward_x_, forward_inverse_y_, rtol=1e-1, atol=0.)
-    self.assertAllClose(x_, inverse_y_, rtol=1e-1, atol=0.)
-    self.assertAllClose(ildj_, -fldj_, rtol=1e-6, atol=0.)
+    self.assertAllClose(forward_x_, forward_inverse_y_, rtol=1e-6)
+    self.assertAllClose(x_, inverse_y_, rtol=1e-6)
+    self.assertAllClose(ildj_, -fldj_, rtol=1e-6)
 
   def testMutuallyConsistent(self):
     dims = 4
