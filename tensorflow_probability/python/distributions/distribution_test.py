@@ -221,7 +221,11 @@ class DistributionTest(tf.test.TestCase):
     self.assertTrue(x_sample_duplicate.name.startswith("x/custom_sample_1"))
 
   def testStrWorksCorrectlyScalar(self):
-    normal = tfd.Normal(loc=np.float16(0), scale=np.float16(1))
+    # Usually we'd write np.float(X) here, but a recent Eager bug would
+    # erroneously coerce the value to float32 anyway. We therefore use constants
+    # here, until the bug is resolved in TensorFlow 1.12.
+    normal = tfd.Normal(loc=tf.constant(0, tf.float16),
+                        scale=tf.constant(1, tf.float16))
     self.assertEqual(
         ("tf.distributions.Normal("
          "\"Normal/\", "
@@ -282,7 +286,11 @@ class DistributionTest(tf.test.TestCase):
         str(mvn_dynamic))
 
   def testReprWorksCorrectlyScalar(self):
-    normal = tfd.Normal(loc=np.float16(0), scale=np.float16(1))
+    # Usually we'd write np.float(X) here, but a recent Eager bug would
+    # erroneously coerce the value to float32 anyway. We therefore use constants
+    # here, until the bug is resolved in TensorFlow 1.12.
+    normal = tfd.Normal(loc=tf.constant(0, tf.float16),
+                        scale=tf.constant(1, tf.float16))
     self.assertEqual(
         ("<tf.distributions.Normal"
          " 'Normal/'"
