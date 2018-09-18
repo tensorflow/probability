@@ -19,8 +19,8 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from tensorflow.python.layers import core as layers
 from tensorflow_probability.python.bijectors import conditional_bijector
+from tensorflow.python.layers import core as layers
 
 
 
@@ -270,7 +270,8 @@ def real_nvp_default_template(hidden_layers,
     def _fn(x, output_units, **condition_kwargs):
       """Fully connected MLP parameterized via `real_nvp_template`."""
       x = tf.concat(
-        [x] + [condition_kwargs[k] for k in sorted(condition_kwargs)], axis=-1)
+          [x] + [condition_kwargs[k] for k in sorted(condition_kwargs)],
+          axis=-1)
 
       for units in hidden_layers:
         x = layers.dense(

@@ -98,11 +98,16 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
       self.assertAllClose(ildj_, -fldj_, rtol=1e-6, atol=0.)
 
   def testBijectorConditionKwargs(self):
-    N = 3
-    x_ = np.arange(N * 4 * 2).astype(np.float32).reshape(N, 4 * 2)
+    batch_size = 3
+    x_ = np.arange(batch_size * 4 * 2).astype(np.float32).reshape(
+        batch_size, 4 * 2)
     conditions = {
-        'a': tf.reshape(tf.range(N * 4, dtype=tf.float32), (N, 4)),
-        'b': tf.reshape(tf.range(N * 2, dtype=tf.float32), (N, 2)),
+        'a':
+        tf.reshape(
+            tf.range(batch_size * 4, dtype=tf.float32), (batch_size, 4)),
+        'b':
+        tf.reshape(
+            tf.range(batch_size * 2, dtype=tf.float32), (batch_size, 2)),
     }
 
     nvp = tfb.RealNVP(
