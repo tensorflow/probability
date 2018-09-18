@@ -181,6 +181,12 @@ def _value_and_gradients(fn, fn_arg_list, result=None, grads=None, name=None):
 
     if result is None:
       result = fn(*fn_arg_list)
+      if grads is None and tfe.executing_eagerly():
+        # Ensure we disable bijector cacheing in eager mode.
+        # TODO(b/72831017): Remove this once bijector cacheing is fixed for
+        # eager mode.
+        fn_arg_list = [0 + x for x in fn_arg_list]
+
     result = _convert_to_tensor(result, 'fn_result')
 
     if grads is not None:
