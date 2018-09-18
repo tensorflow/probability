@@ -25,10 +25,10 @@ import tensorflow as tf
 from tensorflow_probability.python import bijectors
 from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow.contrib.linalg.python.ops import linear_operator_addition as linop_add_lib
 from tensorflow.python.framework import tensor_util
 from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.ops.distributions import categorical as categorical_lib
-from tensorflow.python.ops.linalg import linear_operator_addition as linop_add_lib
 
 
 __all__ = [
