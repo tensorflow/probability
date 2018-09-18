@@ -102,10 +102,10 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
     x_ = np.arange(batch_size * 4 * 2).astype(np.float32).reshape(
         batch_size, 4 * 2)
     conditions = {
-        'a':
+        "a":
         tf.reshape(
             tf.range(batch_size * 4, dtype=tf.float32), (batch_size, 4)),
-        'b':
+        "b":
         tf.reshape(
             tf.range(batch_size * 2, dtype=tf.float32), (batch_size, 2)),
     }
