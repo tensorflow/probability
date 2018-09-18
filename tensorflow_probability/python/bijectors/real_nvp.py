@@ -20,7 +20,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow.python.layers import core as layers
-from tensorflow_probability.python.bijectors.conditional_bijector import ConditionalBijector
+from tensorflow_probability.python.bijectors import conditional_bijector
 
 
 
@@ -30,7 +30,7 @@ __all__ = [
 ]
 
 
-class RealNVP(ConditionalBijector):
+class RealNVP(conditional_bijector.ConditionalBijector):
   """RealNVP "affine coupling layer" for vector-valued events.
 
   Real NVP models a normalizing flow on a `D`-dimensional distribution via a
