@@ -29,7 +29,6 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # pylint: disable=g-import-not-at-top
 import numpy as np
-import sklearn.datasets
 import tensorflow as tf
 
 from tensorflow_probability import edward2 as ed
@@ -79,6 +78,7 @@ def logistic_regression(features):
 
 def covertype():
   """Builds the Covertype data set."""
+  import sklearn.datasets  # pylint: disable=g-import-not-at-top
   data = sklearn.datasets.covtype.fetch_covtype()
   features = data.data
   labels = data.target
