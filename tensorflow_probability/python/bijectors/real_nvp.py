@@ -23,7 +23,6 @@ from tensorflow_probability.python.bijectors import conditional_bijector
 from tensorflow.python.layers import core as layers
 
 
-
 __all__ = [
     "RealNVP",
     "real_nvp_default_template"
