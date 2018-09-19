@@ -23,7 +23,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from tensorflow.python.ops.distributions.bijector_test_util import assert_scalar_congruency
+from tensorflow_probability.python.bijectors import bijector_test_util
 
 tfb = tfp.bijectors
 
@@ -155,7 +155,9 @@ class AffineScalarBijectorTest(tf.test.TestCase):
   def testScalarCongruency(self):
     with self.test_session():
       bijector = tfb.AffineScalar(shift=3.6, scale=0.42)
-      assert_scalar_congruency(bijector, lower_x=-2., upper_x=2.)
+      bijector_test_util.assert_scalar_congruency(
+          bijector, lower_x=-2., upper_x=2.)
+
 
 if __name__ == "__main__":
   tf.test.main()

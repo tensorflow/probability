@@ -22,8 +22,8 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python.bijectors import bijector
 from tensorflow.python.framework import tensor_util
-from tensorflow.python.ops.distributions import bijector
 
 
 __all__ = [

@@ -23,11 +23,10 @@ import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
-from tensorflow.python.ops.distributions import bijector
-from tensorflow.python.ops.distributions.bijector_test_util import assert_scalar_congruency
+from tensorflow_probability.python.bijectors import bijector_test_util
 
 
-class ShapeChanging(bijector.Bijector):
+class ShapeChanging(tfb.Bijector):
   """Only used for op_ndims manipulation."""
 
   def __init__(self, forward_min_event_ndims=0, inverse_min_event_ndims=3):
@@ -71,7 +70,7 @@ class ChainBijectorTest(tf.test.TestCase):
   def testScalarCongruency(self):
     with self.test_session():
       chain = tfb.Chain((tfb.Exp(), tfb.Softplus()))
-      assert_scalar_congruency(
+      bijector_test_util.assert_scalar_congruency(
           chain, lower_x=1e-3, upper_x=1.5, rtol=0.05)
 
   def testShapeGetters(self):

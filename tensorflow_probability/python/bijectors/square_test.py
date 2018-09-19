@@ -23,7 +23,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
-from tensorflow.python.ops.distributions.bijector_test_util import assert_scalar_congruency
+from tensorflow_probability.python.bijectors import bijector_test_util
 
 
 class SquareBijectorTest(tf.test.TestCase):
@@ -54,7 +54,8 @@ class SquareBijectorTest(tf.test.TestCase):
   def testScalarCongruency(self):
     with self.test_session():
       bijector = tfb.Square(validate_args=True)
-      assert_scalar_congruency(bijector, lower_x=1e-3, upper_x=1.5, rtol=0.05)
+      bijector_test_util.assert_scalar_congruency(
+          bijector, lower_x=1e-3, upper_x=1.5, rtol=0.05)
 
 
 if __name__ == "__main__":

@@ -20,9 +20,8 @@ from __future__ import print_function
 
 # Dependency imports
 import tensorflow as tf
+from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.bijectors import CholeskyOuterProduct
-
-from tensorflow.python.ops.distributions import bijector
 
 
 __all__ = [

@@ -23,7 +23,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
-from tensorflow.python.ops.distributions.bijector_test_util import assert_bijective_and_finite
+from tensorflow_probability.python.bijectors import bijector_test_util
 
 
 rng = np.random.RandomState(42)
@@ -104,7 +104,8 @@ class SoftmaxCenteredBijectorTest(tf.test.TestCase):
       y = np.array([y_0, y_1, y_2])
       y /= y.sum(axis=0)
       y = y.T  # y.shape = [5, 3]
-      assert_bijective_and_finite(softmax, x, y, event_ndims=1)
+      bijector_test_util.assert_bijective_and_finite(
+          softmax, x, y, event_ndims=1)
 
 
 if __name__ == "__main__":

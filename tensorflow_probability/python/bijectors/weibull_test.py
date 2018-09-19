@@ -24,8 +24,7 @@ from scipy import stats
 import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
-from tensorflow.python.ops.distributions.bijector_test_util import assert_bijective_and_finite
-from tensorflow.python.ops.distributions.bijector_test_util import assert_scalar_congruency
+from tensorflow_probability.python.bijectors import bijector_test_util
 
 
 class WeibullBijectorTest(tf.test.TestCase):
@@ -55,7 +54,7 @@ class WeibullBijectorTest(tf.test.TestCase):
 
   def testScalarCongruency(self):
     with self.test_session():
-      assert_scalar_congruency(
+      bijector_test_util.assert_scalar_congruency(
           tfb.Weibull(scale=20., concentration=0.3),
           lower_x=1.,
           upper_x=100.,
@@ -68,7 +67,8 @@ class WeibullBijectorTest(tf.test.TestCase):
       y = np.linspace(
           -np.expm1(-1 / 400.),
           -np.expm1(-16), num=10).astype(np.float32)
-      assert_bijective_and_finite(bijector, x, y, event_ndims=0, rtol=1e-3)
+      bijector_test_util.assert_bijective_and_finite(
+          bijector, x, y, event_ndims=0, rtol=1e-3)
 
 
 if __name__ == "__main__":

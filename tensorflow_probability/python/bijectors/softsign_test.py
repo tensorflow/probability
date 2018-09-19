@@ -23,9 +23,8 @@ import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
+from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow.python.framework import test_util
-from tensorflow.python.ops.distributions.bijector_test_util import assert_bijective_and_finite
-from tensorflow.python.ops.distributions.bijector_test_util import assert_scalar_congruency
 
 
 class SoftsignBijectorTest(tf.test.TestCase):
@@ -97,14 +96,15 @@ class SoftsignBijectorTest(tf.test.TestCase):
   def testScalarCongruency(self):
     with self.test_session():
       bijector = tfb.Softsign(validate_args=True)
-      assert_scalar_congruency(bijector, lower_x=-20., upper_x=20.)
+      bijector_test_util.assert_scalar_congruency(
+          bijector, lower_x=-20., upper_x=20.)
 
   def testBijectiveAndFinite(self):
     with self.test_session():
       bijector = tfb.Softsign(validate_args=True)
       x = np.linspace(-20., 20., 100).astype(np.float32)
       y = np.linspace(-0.99, 0.99, 100).astype(np.float32)
-      assert_bijective_and_finite(
+      bijector_test_util.assert_bijective_and_finite(
           bijector, x, y, event_ndims=0, rtol=1e-3, atol=1e-3)
 
 

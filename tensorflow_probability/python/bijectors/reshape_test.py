@@ -23,7 +23,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
-from tensorflow.python.ops.distributions.bijector_test_util import assert_bijective_and_finite
+from tensorflow_probability.python.bijectors import bijector_test_util
 
 
 class _ReshapeBijectorTest(object):
@@ -271,7 +271,7 @@ class ReshapeBijectorTestStatic(tf.test.TestCase, _ReshapeBijectorTest):
     with self.test_session():
       bijector = tfb.Reshape(
           event_shape_in=[2, 3], event_shape_out=[1, 2, 3], validate_args=True)
-      assert_bijective_and_finite(
+      bijector_test_util.assert_bijective_and_finite(
           bijector, x, y, event_ndims=2, rtol=1e-6, atol=0)
 
   def testMultipleUnspecifiedDimensionsOpError(self):

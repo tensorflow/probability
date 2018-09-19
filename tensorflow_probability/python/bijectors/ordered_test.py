@@ -23,8 +23,8 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow.python.framework import test_util
-from tensorflow.python.ops.distributions.bijector_test_util import assert_bijective_and_finite
 
 tfd = tfp.distributions
 tfb = tfp.bijectors
@@ -100,7 +100,8 @@ class OrderedBijectorTest(tf.test.TestCase):
       ordered = tfb.Ordered()
       x = np.sort(self._rng.randn(3, 10), axis=-1).astype(np.float32)
       y = (self._rng.randn(3, 10)).astype(np.float32)
-      assert_bijective_and_finite(ordered, x, y, event_ndims=1)
+      bijector_test_util.assert_bijective_and_finite(
+          ordered, x, y, event_ndims=1)
 
 
 if __name__ == "__main__":

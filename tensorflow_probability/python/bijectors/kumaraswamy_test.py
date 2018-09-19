@@ -23,8 +23,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
-from tensorflow.python.ops.distributions.bijector_test_util import assert_bijective_and_finite
-from tensorflow.python.ops.distributions.bijector_test_util import assert_scalar_congruency
+from tensorflow_probability.python.bijectors import bijector_test_util
 
 
 class KumaraswamyBijectorTest(tf.test.TestCase):
@@ -56,7 +55,7 @@ class KumaraswamyBijectorTest(tf.test.TestCase):
 
   def testScalarCongruency(self):
     with self.test_session():
-      assert_scalar_congruency(
+      bijector_test_util.assert_scalar_congruency(
           tfb.Kumaraswamy(concentration1=0.5, concentration0=1.1),
           lower_x=0.,
           upper_x=1.,
@@ -75,7 +74,8 @@ class KumaraswamyBijectorTest(tf.test.TestCase):
       # endpoints.
       y = np.linspace(.01, 0.99, num=10).astype(np.float32)
       x = 1 - (1 - y ** concentration1) ** concentration0
-      assert_bijective_and_finite(bijector, x, y, event_ndims=0, rtol=1e-3)
+      bijector_test_util.assert_bijective_and_finite(
+          bijector, x, y, event_ndims=0, rtol=1e-3)
 
 
 if __name__ == "__main__":

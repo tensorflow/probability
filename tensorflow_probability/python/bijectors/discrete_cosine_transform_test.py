@@ -24,7 +24,7 @@ from scipy import fftpack
 import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
-from tensorflow.python.ops.distributions.bijector_test_util import assert_bijective_and_finite
+from tensorflow_probability.python.bijectors import bijector_test_util
 
 
 class DiscreteCosineTransformTest(tf.test.TestCase):
@@ -63,9 +63,12 @@ class DiscreteCosineTransformTest(tf.test.TestCase):
       x = np.linspace(-10., 10., num=10).astype(np.float32)
       y = np.linspace(0.01, 0.99, num=10).astype(np.float32)
       for dct_type in 2, 3:
-        assert_bijective_and_finite(
+        bijector_test_util.assert_bijective_and_finite(
             tfb.DiscreteCosineTransform(dct_type=dct_type, validate_args=True),
-            x, y, event_ndims=1, rtol=1e-3)
+            x,
+            y,
+            event_ndims=1,
+            rtol=1e-3)
 
 
 if __name__ == '__main__':

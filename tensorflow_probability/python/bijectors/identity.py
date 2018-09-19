@@ -12,38 +12,53 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Sigmoid bijector."""
+"""Identity bijector."""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+# Dependency imports
 import tensorflow as tf
+
 from tensorflow_probability.python.bijectors import bijector
 
-
 __all__ = [
-    "Sigmoid",
+    "Identity",
 ]
 
 
-class Sigmoid(bijector.Bijector):
-  """Bijector which computes `Y = g(X) = 1 / (1 + exp(-X))`."""
+class Identity(bijector.Bijector):
+  """Compute Y = g(X) = X.
 
-  def __init__(self, validate_args=False, name="sigmoid"):
-    super(Sigmoid, self).__init__(
+    Example Use:
+
+    ```python
+    # Create the Y=g(X)=X transform which is intended for Tensors with 1 batch
+    # ndim and 1 event ndim (i.e., vector of vectors).
+    identity = Identity()
+    x = [[1., 2],
+         [3, 4]]
+    x == identity.forward(x) == identity.inverse(x)
+    ```
+
+  """
+
+  def __init__(self, validate_args=False, name="identity"):
+    super(Identity, self).__init__(
         forward_min_event_ndims=0,
+        is_constant_jacobian=True,
         validate_args=validate_args,
         name=name)
 
   def _forward(self, x):
-    return tf.sigmoid(x)
+    return x
 
   def _inverse(self, y):
-    return tf.log(y) - tf.log1p(-y)
+    return y
 
   def _inverse_log_det_jacobian(self, y):
-    return -tf.log(y) - tf.log1p(-y)
+    return tf.constant(0., dtype=y.dtype)
 
   def _forward_log_det_jacobian(self, x):
-    return -tf.nn.softplus(-x) - tf.nn.softplus(x)
+    return tf.constant(0., dtype=x.dtype)

@@ -25,6 +25,7 @@ from tensorflow_probability.python.bijectors.affine import Affine
 from tensorflow_probability.python.bijectors.affine_linear_operator import AffineLinearOperator
 from tensorflow_probability.python.bijectors.affine_scalar import AffineScalar
 from tensorflow_probability.python.bijectors.batch_normalization import BatchNormalization
+from tensorflow_probability.python.bijectors.bijector import Bijector
 from tensorflow_probability.python.bijectors.chain import Chain
 from tensorflow_probability.python.bijectors.cholesky_outer_product import CholeskyOuterProduct
 from tensorflow_probability.python.bijectors.cholesky_to_inv_cholesky import CholeskyToInvCholesky
@@ -33,6 +34,7 @@ from tensorflow_probability.python.bijectors.discrete_cosine_transform import Di
 from tensorflow_probability.python.bijectors.exp import Exp
 from tensorflow_probability.python.bijectors.fill_triangular import FillTriangular
 from tensorflow_probability.python.bijectors.gumbel import Gumbel
+from tensorflow_probability.python.bijectors.identity import Identity
 from tensorflow_probability.python.bijectors.inline import Inline
 from tensorflow_probability.python.bijectors.invert import Invert
 from tensorflow_probability.python.bijectors.kumaraswamy import Kumaraswamy
@@ -56,8 +58,6 @@ from tensorflow_probability.python.bijectors.tanh import Tanh
 from tensorflow_probability.python.bijectors.transform_diagonal import TransformDiagonal
 from tensorflow_probability.python.bijectors.transpose import Transpose
 from tensorflow_probability.python.bijectors.weibull import Weibull
-from tensorflow.python.ops.distributions.bijector import Bijector
-from tensorflow.python.ops.distributions.identity_bijector import Identity
 
 # pylint: enable=unused-import,line-too-long,g-importing-member
 

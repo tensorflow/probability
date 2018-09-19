@@ -23,8 +23,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
-from tensorflow.python.ops.distributions.bijector_test_util import assert_bijective_and_finite
-from tensorflow.python.ops.distributions.bijector_test_util import assert_scalar_congruency
+from tensorflow_probability.python.bijectors import bijector_test_util
 
 rng = np.random.RandomState(42)
 
@@ -105,19 +104,19 @@ class SoftplusBijectorTest(tf.test.TestCase):
   def testScalarCongruency(self):
     with self.test_session():
       bijector = tfb.Softplus()
-      assert_scalar_congruency(
+      bijector_test_util.assert_scalar_congruency(
           bijector, lower_x=-2., upper_x=2.)
 
   def testScalarCongruencyWithPositiveHingeSoftness(self):
     with self.test_session():
       bijector = tfb.Softplus(hinge_softness=1.3)
-      assert_scalar_congruency(
+      bijector_test_util.assert_scalar_congruency(
           bijector, lower_x=-2., upper_x=2.)
 
   def testScalarCongruencyWithNegativeHingeSoftness(self):
     with self.test_session():
       bijector = tfb.Softplus(hinge_softness=-1.3)
-      assert_scalar_congruency(
+      bijector_test_util.assert_scalar_congruency(
           bijector, lower_x=-2., upper_x=2.)
 
   def testBijectiveAndFinite32bit(self):
@@ -125,7 +124,7 @@ class SoftplusBijectorTest(tf.test.TestCase):
       bijector = tfb.Softplus()
       x = np.linspace(-20., 20., 100).astype(np.float32)
       y = np.logspace(-10, 10, 100).astype(np.float32)
-      assert_bijective_and_finite(
+      bijector_test_util.assert_bijective_and_finite(
           bijector, x, y, event_ndims=0, rtol=1e-2, atol=1e-2)
 
   def testBijectiveAndFiniteWithPositiveHingeSoftness32Bit(self):
@@ -133,7 +132,7 @@ class SoftplusBijectorTest(tf.test.TestCase):
       bijector = tfb.Softplus(hinge_softness=1.23)
       x = np.linspace(-20., 20., 100).astype(np.float32)
       y = np.logspace(-10, 10, 100).astype(np.float32)
-      assert_bijective_and_finite(
+      bijector_test_util.assert_bijective_and_finite(
           bijector, x, y, event_ndims=0, rtol=1e-2, atol=1e-2)
 
   def testBijectiveAndFiniteWithNegativeHingeSoftness32Bit(self):
@@ -141,7 +140,7 @@ class SoftplusBijectorTest(tf.test.TestCase):
       bijector = tfb.Softplus(hinge_softness=-0.7)
       x = np.linspace(-20., 20., 100).astype(np.float32)
       y = -np.logspace(-10, 10, 100).astype(np.float32)
-      assert_bijective_and_finite(
+      bijector_test_util.assert_bijective_and_finite(
           bijector, x, y, event_ndims=0, rtol=1e-2, atol=1e-2)
 
   def testBijectiveAndFinite16bit(self):
@@ -153,7 +152,7 @@ class SoftplusBijectorTest(tf.test.TestCase):
       # logspace range.  The actual range was (-7, 4), so use something smaller
       # for the test.
       y = np.logspace(-6, 3, 100).astype(np.float16)
-      assert_bijective_and_finite(
+      bijector_test_util.assert_bijective_and_finite(
           bijector, x, y, event_ndims=0, rtol=1e-1, atol=1e-3)
 
 

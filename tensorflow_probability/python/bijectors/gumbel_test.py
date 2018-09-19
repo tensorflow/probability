@@ -24,8 +24,7 @@ from scipy import stats
 import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
-from tensorflow.python.ops.distributions.bijector_test_util import assert_bijective_and_finite
-from tensorflow.python.ops.distributions.bijector_test_util import assert_scalar_congruency
+from tensorflow_probability.python.bijectors import bijector_test_util
 
 
 class GumbelBijectorTest(tf.test.TestCase):
@@ -54,7 +53,7 @@ class GumbelBijectorTest(tf.test.TestCase):
 
   def testScalarCongruency(self):
     with self.test_session():
-      assert_scalar_congruency(
+      bijector_test_util.assert_scalar_congruency(
           tfb.Gumbel(loc=0.3, scale=20.), lower_x=1., upper_x=100., rtol=0.02)
 
   def testBijectiveAndFinite(self):
@@ -62,7 +61,8 @@ class GumbelBijectorTest(tf.test.TestCase):
       bijector = tfb.Gumbel(loc=0., scale=3.0, validate_args=True)
       x = np.linspace(-10., 10., num=10).astype(np.float32)
       y = np.linspace(0.01, 0.99, num=10).astype(np.float32)
-      assert_bijective_and_finite(bijector, x, y, event_ndims=0, rtol=1e-3)
+      bijector_test_util.assert_bijective_and_finite(
+          bijector, x, y, event_ndims=0, rtol=1e-3)
 
 
 if __name__ == "__main__":

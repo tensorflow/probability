@@ -19,8 +19,8 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
+from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.bijectors.shape import _DistributionShape
-from tensorflow.python.ops.distributions import bijector
 from tensorflow.python.ops.linalg import linear_operator
 
 

@@ -24,8 +24,7 @@ from scipy import special
 import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
-from tensorflow.python.ops.distributions.bijector_test_util import assert_bijective_and_finite
-from tensorflow.python.ops.distributions.bijector_test_util import assert_scalar_congruency
+from tensorflow_probability.python.bijectors import bijector_test_util
 
 
 class SigmoidBijectorTest(tf.test.TestCase):
@@ -53,14 +52,15 @@ class SigmoidBijectorTest(tf.test.TestCase):
 
   def testScalarCongruency(self):
     with self.test_session():
-      assert_scalar_congruency(tfb.Sigmoid(), lower_x=-7., upper_x=7.)
+      bijector_test_util.assert_scalar_congruency(
+          tfb.Sigmoid(), lower_x=-7., upper_x=7.)
 
   def testBijectiveAndFinite(self):
     with self.test_session():
       x = np.linspace(-7., 7., 100).astype(np.float32)
       eps = 1e-3
       y = np.linspace(eps, 1. - eps, 100).astype(np.float32)
-      assert_bijective_and_finite(
+      bijector_test_util.assert_bijective_and_finite(
           tfb.Sigmoid(), x, y, event_ndims=0, atol=0., rtol=1e-4)
 
 

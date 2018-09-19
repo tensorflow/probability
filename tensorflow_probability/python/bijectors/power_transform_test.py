@@ -23,8 +23,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
-from tensorflow.python.ops.distributions.bijector_test_util import assert_bijective_and_finite
-from tensorflow.python.ops.distributions.bijector_test_util import assert_scalar_congruency
+from tensorflow_probability.python.bijectors import bijector_test_util
 
 
 class PowerTransformBijectorTest(tf.test.TestCase):
@@ -51,7 +50,7 @@ class PowerTransformBijectorTest(tf.test.TestCase):
   def testScalarCongruency(self):
     with self.test_session():
       bijector = tfb.PowerTransform(power=0.2, validate_args=True)
-      assert_scalar_congruency(
+      bijector_test_util.assert_scalar_congruency(
           bijector, lower_x=-2., upper_x=1.5, rtol=0.05)
 
   def testBijectiveAndFinite(self):
@@ -59,7 +58,8 @@ class PowerTransformBijectorTest(tf.test.TestCase):
       bijector = tfb.PowerTransform(power=0.2, validate_args=True)
       x = np.linspace(-4.999, 10, num=10).astype(np.float32)
       y = np.logspace(0.001, 10, num=10).astype(np.float32)
-      assert_bijective_and_finite(bijector, x, y, event_ndims=0, rtol=1e-3)
+      bijector_test_util.assert_bijective_and_finite(
+          bijector, x, y, event_ndims=0, rtol=1e-3)
 
 
 if __name__ == "__main__":

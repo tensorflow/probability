@@ -24,8 +24,7 @@ import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
 # pylint: disable=g-importing-member
-from tensorflow.python.ops.distributions.bijector_test_util import assert_bijective_and_finite
-from tensorflow.python.ops.distributions.bijector_test_util import assert_scalar_congruency
+from tensorflow_probability.python.bijectors import bijector_test_util
 
 # pylint: enable=g-importing-member
 
@@ -94,13 +93,15 @@ class SinhArcsinhBijectorTest(tf.test.TestCase):
     with self.test_session():
       bijector = tfb.SinhArcsinh(
           skewness=1.0, tailweight=0.5, validate_args=True)
-      assert_scalar_congruency(bijector, lower_x=-2., upper_x=2.0, rtol=0.05)
+      bijector_test_util.assert_scalar_congruency(
+          bijector, lower_x=-2., upper_x=2.0, rtol=0.05)
 
   def testScalarCongruencySkewnessNeg1Tailweight1p5(self):
     with self.test_session():
       bijector = tfb.SinhArcsinh(
           skewness=-1.0, tailweight=1.5, validate_args=True)
-      assert_scalar_congruency(bijector, lower_x=-2., upper_x=2.0, rtol=0.05)
+      bijector_test_util.assert_scalar_congruency(
+          bijector, lower_x=-2., upper_x=2.0, rtol=0.05)
 
   def testBijectiveAndFiniteSkewnessNeg1Tailweight0p5(self):
     with self.test_session():
@@ -108,14 +109,15 @@ class SinhArcsinhBijectorTest(tf.test.TestCase):
           skewness=-1., tailweight=0.5, validate_args=True)
       x = np.concatenate((-np.logspace(-2, 10, 1000), [0], np.logspace(
           -2, 10, 1000))).astype(np.float32)
-      assert_bijective_and_finite(bijector, x, x, event_ndims=0, rtol=1e-3)
+      bijector_test_util.assert_bijective_and_finite(
+          bijector, x, x, event_ndims=0, rtol=1e-3)
 
   def testBijectiveAndFiniteSkewness1Tailweight3(self):
     with self.test_session():
       bijector = tfb.SinhArcsinh(skewness=1., tailweight=3., validate_args=True)
       x = np.concatenate((-np.logspace(-2, 5, 1000), [0], np.logspace(
           -2, 5, 1000))).astype(np.float32)
-      assert_bijective_and_finite(
+      bijector_test_util.assert_bijective_and_finite(
           bijector, x, x, event_ndims=0, rtol=1e-3)
 
   def testBijectorEndpoints(self):
@@ -127,7 +129,7 @@ class SinhArcsinhBijectorTest(tf.test.TestCase):
             [np.finfo(dtype).min, np.finfo(dtype).max], dtype=dtype)
         # Note that the above bijector is the identity bijector. Hence, the
         # log_det_jacobian will be 0. Because of this we use atol.
-        assert_bijective_and_finite(
+        bijector_test_util.assert_bijective_and_finite(
             bijector, bounds, bounds, event_ndims=0, atol=2e-6)
 
   def testBijectorOverRange(self):

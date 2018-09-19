@@ -23,7 +23,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
-from tensorflow.python.ops.distributions.bijector_test_util import assert_bijective_and_finite
+from tensorflow_probability.python.bijectors import bijector_test_util
 
 
 class PermuteBijectorTest(tf.test.TestCase):
@@ -74,7 +74,7 @@ class PermuteBijectorTest(tf.test.TestCase):
     y = x[..., permutation]
     with self.test_session():
       bijector = tfb.Permute(permutation=permutation, validate_args=True)
-      assert_bijective_and_finite(
+      bijector_test_util.assert_bijective_and_finite(
           bijector, x, y, event_ndims=1, rtol=1e-6, atol=0)
 
   def testBijectiveAndFiniteAxis(self):
@@ -86,7 +86,7 @@ class PermuteBijectorTest(tf.test.TestCase):
           permutation=permutation,
           axis=-2,
           validate_args=True)
-      assert_bijective_and_finite(
+      bijector_test_util.assert_bijective_and_finite(
           bijector, x, y, event_ndims=2, rtol=1e-6, atol=0)
 
 
