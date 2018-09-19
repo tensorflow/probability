@@ -829,7 +829,7 @@ py_test(
 
 py_test(
     name = "linear_gaussian_ssm_test",
-    size = "medium",
+    size = "large",
     srcs = ["linear_gaussian_ssm_test.py"],
     deps = [
         # numpy dep,
