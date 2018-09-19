@@ -236,6 +236,11 @@ def real_nvp_default_template(hidden_layers,
   created once. It takes the `d`-dimensional input x[0:d] and returns the `D-d`
   dimensional outputs `loc` ("mu") and `log_scale` ("alpha").
 
+  The default template does not support conditioning, and will raise an
+  exception if `condition_kwargs` are passed to it. To use conditioning in a
+  real nvp bijector, implement a conditioned scale/translation template that
+  handles the `condition_kwargs`.
+
   Arguments:
     hidden_layers: Python `list`-like of non-negative integer, scalars
       indicating the number of units in each hidden layer. Default: `[512, 512].
@@ -256,7 +261,7 @@ def real_nvp_default_template(hidden_layers,
 
   Raises:
     NotImplementedError: if rightmost dimension of `inputs` is unknown prior to
-      graph execution.
+      graph execution, or if `condition_kwargs` is not empty.
 
   #### References
 
@@ -269,9 +274,9 @@ def real_nvp_default_template(hidden_layers,
 
     def _fn(x, output_units, **condition_kwargs):
       """Fully connected MLP parameterized via `real_nvp_template`."""
-      x = tf.concat(
-          [x] + [condition_kwargs[k] for k in sorted(condition_kwargs)],
-          axis=-1)
+      if condition_kwargs:
+        raise NotImplementedError(
+            "Conditioning not implemented in the default template.")
 
       for units in hidden_layers:
         x = layers.dense(
