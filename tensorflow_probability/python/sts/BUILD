@@ -93,7 +93,7 @@ py_library(
 
 py_test(
     name = "sum_test",
-    size = "medium",
+    size = "large",
     srcs = ["sum_test.py"],
     deps = [
         # numpy dep,
