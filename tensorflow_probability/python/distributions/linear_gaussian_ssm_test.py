@@ -244,6 +244,90 @@ class SanityChecks(test.TestCase):
     variance_ = self.evaluate(model.variance())
     self.assertAllClose(variance_[..., 0], observation_variance)
 
+  def test_time_varying_operators(self):
+
+    num_timesteps = 5
+    prior_mean = 1.3
+    prior_scale = 1e-4
+    transition_scale = 0.
+    observation_noise_scale = 1e-4
+
+    # Define time-varying transition and observation matrices.
+    def transition_matrix(t):
+      t = tf.cast(t, tf.float32)
+      return tf.linalg.LinearOperatorFullMatrix([[t+1]])
+
+    def observation_matrix(t):
+      t = tf.cast(t, tf.float32)
+      return tf.linalg.LinearOperatorFullMatrix([[tf.sqrt(t+1.)]])
+
+    model = tfd.LinearGaussianStateSpaceModel(
+        num_timesteps=num_timesteps,
+        transition_matrix=transition_matrix,
+        transition_noise=tfd.MultivariateNormalDiag(
+            scale_diag=[transition_scale]),
+        observation_matrix=observation_matrix,
+        observation_noise=tfd.MultivariateNormalDiag(
+            scale_diag=[observation_noise_scale]),
+        initial_state_prior=tfd.MultivariateNormalDiag(
+            loc=[prior_mean], scale_diag=[prior_scale]))
+
+    mean_, sample_ = self.evaluate([model.mean(), model.sample()])
+
+    # Manually compute the expected output of the model (i.e., the prior
+    # mean). Since the model is near-deterministic, we expect any samples to
+    # be close to this value, so we can also use this to test the `sample`
+    # method.
+    latent_means = [prior_mean]
+    for t in range(0, num_timesteps-1):
+      latent_means.append((t+1) * latent_means[-1])
+    observation_means = [latent_means[t] * np.sqrt(t+1)
+                         for t in range(num_timesteps)]
+
+    self.assertAllClose(observation_means, mean_[..., 0], atol=1e-4)
+    self.assertAllClose(observation_means, sample_[..., 0], atol=3.)
+
+    # this model is near-deterministic, so the log density of a sample will
+    # be high (about 35) if computed using the correct model, and very low
+    # (approximately -1e10) if there's an off-by-one-timestep error.
+    lp_ = self.evaluate(model.log_prob(sample_))
+    self.assertGreater(lp_, 0.)
+
+  def test_time_varying_noise(self):
+
+    num_timesteps = 5
+    prior_mean = 0.
+    prior_scale = 1.
+
+    # Define time-varying transition and observation noise models.
+    def transition_noise(t):
+      t = tf.cast(t, tf.float32)
+      return tfd.MultivariateNormalDiag(scale_diag=[t])
+
+    def observation_noise(t):
+      t = tf.cast(t, tf.float32)
+      return tfd.MultivariateNormalDiag(scale_diag=[tf.log(t+1.)])
+
+    model = tfd.LinearGaussianStateSpaceModel(
+        num_timesteps=num_timesteps,
+        transition_matrix=[[1.]],
+        transition_noise=transition_noise,
+        observation_matrix=[[1.]],
+        observation_noise=observation_noise,
+        initial_state_prior=tfd.MultivariateNormalDiag(
+            loc=[prior_mean], scale_diag=[prior_scale]))
+
+    variance_ = self.evaluate(model.variance())
+
+    # Manually compute the prior variance at each timestep.
+    latent_variances = [prior_scale**2]
+    for t in range(0, num_timesteps-1):
+      latent_variances.append(latent_variances[t] + t**2)
+    observation_variances = [latent_variances[t] + np.log(t+1)**2
+                             for t in range(num_timesteps)]
+
+    self.assertAllClose(observation_variances, variance_[..., 0])
+
 
 @test_util.run_all_in_graph_and_eager_modes
 class BatchTest(test.TestCase):

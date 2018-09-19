@@ -286,13 +286,14 @@ class LinearGaussianStateSpaceModel(tf.distributions.Distribution):
       transition_matrix: A transition operator, represented by a Tensor or
         LinearOperator of shape `[latent_size, latent_size]`, or by a
         callable taking as argument a scalar integer Tensor `t` and
-        returning a timestep-specific Tensor or LinearOperator.
+        returning a Tensor or LinearOperator representing the transition
+        operator from latent state at time `t` to time `t + 1`.
       transition_noise: An instance of
         `tfd.MultivariateNormalLinearOperator` with event shape
         `[latent_size]`, representing the mean and covariance of the
         transition noise model, or a callable taking as argument a
-        scalar integer Tensor `t` and returning a timestep-specific
-        noise model.
+        scalar integer Tensor `t` and returning such a distribution
+        representing the noise in the transition from time `t` to time `t + 1`.
       observation_matrix: An observation operator, represented by a Tensor
         or LinearOperator of shape `[observation_size, latent_size]`,
         or by a callable taking as argument a scalar integer Tensor
@@ -1093,8 +1094,8 @@ def build_kalman_mean_step(get_transition_matrix_for_timestep,
     previous_latent_mean, _ = previous_means
 
     latent_mean = _propagate_mean(previous_latent_mean,
-                                  get_transition_matrix_for_timestep(t),
-                                  get_transition_noise_for_timestep(t))
+                                  get_transition_matrix_for_timestep(t - 1),
+                                  get_transition_noise_for_timestep(t - 1))
     observation_mean = _propagate_mean(latent_mean,
                                        get_observation_matrix_for_timestep(t),
                                        get_observation_noise_for_timestep(t))
@@ -1136,8 +1137,8 @@ def build_kalman_cov_step(get_transition_matrix_for_timestep,
 
     latent_cov = _propagate_cov(
         previous_latent_cov,
-        get_transition_matrix_for_timestep(t),
-        get_transition_noise_for_timestep(t))
+        get_transition_matrix_for_timestep(t - 1),
+        get_transition_noise_for_timestep(t - 1))
     observation_cov = _propagate_cov(
         latent_cov,
         get_observation_matrix_for_timestep(t),
@@ -1187,8 +1188,8 @@ def build_kalman_sample_step(get_transition_matrix_for_timestep,
     """Sample values for a single timestep."""
     latent_prev, _ = sampled_prev
 
-    transition_matrix = get_transition_matrix_for_timestep(t)
-    transition_noise = get_transition_noise_for_timestep(t)
+    transition_matrix = get_transition_matrix_for_timestep(t - 1)
+    transition_noise = get_transition_noise_for_timestep(t - 1)
 
     latent_pred = transition_matrix.matmul(latent_prev)
     latent_sampled = latent_pred + transition_noise.sample(
