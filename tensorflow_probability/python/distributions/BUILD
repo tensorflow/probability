@@ -43,6 +43,7 @@ py_library(
         ":gaussian_process_regression_model",
         ":geometric",
         ":gumbel",
+        ":half_cauchy",
         ":half_normal",
         ":independent",
         ":inverse_gamma",
@@ -202,6 +203,15 @@ py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors",
         "//tensorflow_probability/python/internal:distribution_util",
+    ],
+)
+
+py_library(
+    name = "half_cauchy",
+    srcs = ["half_cauchy.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
     ],
 )
 
@@ -736,6 +746,19 @@ py_test(
     name = "gumbel_test",
     size = "small",
     srcs = ["gumbel_test.py"],
+    deps = [
+        ":distributions",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
+    ],
+)
+
+py_test(
+    name = "half_cauchy_test",
+    size = "medium",
+    srcs = ["half_cauchy_test.py"],
     deps = [
         ":distributions",
         # numpy dep,

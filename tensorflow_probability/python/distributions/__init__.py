@@ -34,6 +34,7 @@ from tensorflow_probability.python.distributions.gaussian_process import Gaussia
 from tensorflow_probability.python.distributions.gaussian_process_regression_model import GaussianProcessRegressionModel
 from tensorflow_probability.python.distributions.geometric import Geometric
 from tensorflow_probability.python.distributions.gumbel import Gumbel
+from tensorflow_probability.python.distributions.half_cauchy import HalfCauchy
 from tensorflow_probability.python.distributions.half_normal import HalfNormal
 from tensorflow_probability.python.distributions.independent import Independent
 from tensorflow_probability.python.distributions.internal.moving_stats import assign_log_moving_mean_exp
@@ -151,6 +152,7 @@ __all__ = [
     'GaussianProcess',
     'GaussianProcessRegressionModel',
     'Gumbel',
+    'HalfCauchy',
     'HalfNormal',
     'Independent',
     'InverseGamma',
