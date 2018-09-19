@@ -23,6 +23,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.internal import test_util
+from tensorflow.python.layers import core as layers
 from tensorflow.python.ops.distributions import transformed_distribution as transformed_distribution_lib
 
 
@@ -110,8 +111,22 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
             tf.range(batch_size * 2, dtype=tf.float32), (batch_size, 2)),
     }
 
+    def condition_shift_and_log_scale_fn(x0, output_units, **condition_kwargs):
+      x = tf.concat(
+          [x0] + [condition_kwargs[k] for k in sorted(condition_kwargs)],
+          axis=-1)
+      out = layers.dense(
+          inputs=x,
+          units=2 * output_units)
+      shift, log_scale = tf.split(out, 2, axis=-1)
+      return shift, log_scale
+
     nvp = tfb.RealNVP(
-        num_masked=4, validate_args=True, **self._real_nvp_kwargs)
+        num_masked=4,
+        validate_args=True,
+        is_constant_jacobian=False,
+        shift_and_log_scale_fn=condition_shift_and_log_scale_fn)
+
     x = tf.constant(x_)
 
     forward_x = nvp.forward(x, **conditions)
