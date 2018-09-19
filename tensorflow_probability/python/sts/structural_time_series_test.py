@@ -23,6 +23,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.sts import LocalLinearTrend
+from tensorflow_probability.python.sts import Seasonal
 from tensorflow_probability.python.sts import Sum
 
 from tensorflow.python.framework import test_util
@@ -84,13 +85,14 @@ class _StsTestHarness(object):
             np.random.standard_normal(sample_shape + full_batch_shape +
                                       [num_timesteps, 1])))
 
-    lp = self.evaluate(
-        log_joint_fn(*[
-            p.prior.sample(
-                sample_shape=full_batch_shape if (
-                    i % 2 == 1) else partial_batch_shape)
-            for (i, p) in enumerate(model.parameters)
-        ]))
+    # We alternate full_batch_shape, partial_batch_shape in sequence so that in
+    # a model with only one parameter, that parameter is constructed with full
+    # batch shape.
+    batch_shaped_parameters = [
+        p.prior.sample(sample_shape=full_batch_shape if (i % 2 == 0)
+                       else partial_batch_shape)
+        for (i, p) in enumerate(model.parameters)]
+    lp = self.evaluate(log_joint_fn(*batch_shaped_parameters))
     self.assertEqual(tf.TensorShape(full_batch_shape), lp.shape)
 
   @test_util.run_in_graph_and_eager_modes
@@ -134,6 +136,32 @@ class LocalLinearTrendTest(test.TestCase, _StsTestHarness):
 
   def _build_sts(self, observed_time_series=None):
     return LocalLinearTrend(observed_time_series=observed_time_series)
+
+
+class SeasonalTest(test.TestCase, _StsTestHarness):
+
+  def _build_sts(self, observed_time_series=None):
+    # Note that a Seasonal model with `num_steps_per_season > 1` would have
+    # deterministic dependence between timesteps, so evaluating `log_prob` of an
+    # arbitary time series leads to Cholesky decomposition errors unless the
+    # model also includes an observation noise component (which it would in
+    # practice, but this test harness attempts to test the component in
+    # isolation). The `num_steps_per_season=1` case tested here will not suffer
+    # from this issue.
+    return Seasonal(num_seasons=7,
+                    num_steps_per_season=1,
+                    observed_time_series=observed_time_series)
+
+
+class SeasonalWithMultipleStepsAndNoiseTest(test.TestCase, _StsTestHarness):
+
+  def _build_sts(self, observed_time_series=None):
+    day_of_week = tfp.sts.Seasonal(num_seasons=7,
+                                   num_steps_per_season=24,
+                                   observed_time_series=observed_time_series,
+                                   name='day_of_week')
+    return tfp.sts.Sum(components=[day_of_week],
+                       observed_time_series=observed_time_series)
 
 
 class SumTest(test.TestCase, _StsTestHarness):

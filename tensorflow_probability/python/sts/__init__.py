@@ -20,6 +20,8 @@ from __future__ import print_function
 
 from tensorflow_probability.python.sts.local_linear_trend import LocalLinearTrend
 from tensorflow_probability.python.sts.local_linear_trend import LocalLinearTrendStateSpaceModel
+from tensorflow_probability.python.sts.seasonal import Seasonal
+from tensorflow_probability.python.sts.seasonal import SeasonalStateSpaceModel
 from tensorflow_probability.python.sts.structural_time_series import StructuralTimeSeries
 from tensorflow_probability.python.sts.sum import AdditiveStateSpaceModel
 from tensorflow_probability.python.sts.sum import Sum
@@ -30,6 +32,8 @@ _allowed_symbols = [
     'AdditiveStateSpaceModel',
     'LocalLinearTrend',
     'LocalLinearTrendStateSpaceModel',
+    'Seasonal',
+    'SeasonalStateSpaceModel',
     'StructuralTimeSeries',
     'Sum',
 ]
