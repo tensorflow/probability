@@ -192,11 +192,35 @@ class Independent(tf.distributions.Distribution):
 
   def _log_prob(self, x):
     with tf.control_dependencies(self._runtime_assertions):
-      return self._reduce_sum(self.distribution.log_prob(x))
+      # We directly call the underlying _log_prob to avoid the fallback logic in
+      # Distribution.log_prob [which falls back to log(Distribution._prob)].
+      # Said fallback logic will also be wrapped around calls to this method.
+      return self._reduce(tf.reduce_sum, self.distribution._log_prob(x))  # pylint:disable=protected-access
+
+  def _prob(self, x):
+    with tf.control_dependencies(self._runtime_assertions):
+      # We directly call the underlying _prob to avoid the fallback logic in
+      # Distribution.prob [which falls back to exp(Distribution._log_prob)].
+      # Said fallback logic will also be wrapped around calls to this method.
+      return self._reduce(tf.reduce_prod, self.distribution._prob(x))  # pylint:disable=protected-access
+
+  def _log_cdf(self, x):
+    with tf.control_dependencies(self._runtime_assertions):
+      # We directly call the underlying _log_cdf to avoid the fallback logic in
+      # Distribution.log_cdf [which falls back to log(Distribution._cdf)].
+      # Said fallback logic will also be wrapped around calls to this method.
+      return self._reduce(tf.reduce_sum, self.distribution._log_cdf(x))  # pylint:disable=protected-access
+
+  def _cdf(self, x):
+    with tf.control_dependencies(self._runtime_assertions):
+      # We directly call the underlying _cdf to avoid the fallback logic in
+      # Distribution.cdf [which falls back to exp(Distribution._log_cdf)].
+      # Said fallback logic will also be wrapped around calls to this method.
+      return self._reduce(tf.reduce_prod, self.distribution._cdf(x))  # pylint:disable=protected-access
 
   def _entropy(self):
     with tf.control_dependencies(self._runtime_assertions):
-      return self._reduce_sum(self.distribution.entropy())
+      return self._reduce(tf.reduce_sum, self.distribution.entropy())
 
   def _mean(self):
     with tf.control_dependencies(self._runtime_assertions):
@@ -239,12 +263,12 @@ class Independent(tf.distributions.Distribution):
                        "distribution.batch_ndims")))
     return assertions
 
-  def _reduce_sum(self, stat):
+  def _reduce(self, op, stat):
     if self._static_reinterpreted_batch_ndims is None:
       range_ = tf.range(self._reinterpreted_batch_ndims)
     else:
       range_ = np.arange(self._static_reinterpreted_batch_ndims)
-    return tf.reduce_sum(stat, axis=-1 - range_)
+    return op(stat, axis=-1 - range_)
 
   def _get_default_reinterpreted_batch_ndims(self, distribution):
     """Computes the default value for reinterpreted_batch_ndim __init__ arg."""

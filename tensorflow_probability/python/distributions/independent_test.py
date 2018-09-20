@@ -89,6 +89,20 @@ class ProductDistributionTest(tf.test.TestCase):
     self.assertAllClose(
         expected_log_prob_x, actual_log_prob_x, rtol=1e-6, atol=0.)
 
+  def testCdfMultivariate(self):
+    ind = tfd.Independent(
+        distribution=tfd.Normal(loc=tf.zeros([3]), scale=1.),
+        reinterpreted_batch_ndims=1)
+
+    cdfs = ind.cdf([[-50., 0., 0.], [0., 0., 0.], [50., 0., 0.], [50., 0., 50.],
+                    [50., 50., 50.]])
+    log_cdfs = ind.log_cdf([[0., 0., 0.], [50., 0., 0.], [50., 0., 50.],
+                            [50., 50., 50.]])
+    cdfs_, log_cdfs_ = self.evaluate([cdfs, log_cdfs])
+    self.assertAllClose([0, .5**3, .5**2, .5, 1.], cdfs_)
+    self.assertAllClose([np.log(.5) * 3, np.log(.5) * 2, np.log(.5), 0.],
+                        log_cdfs_)
+
   def testSampleConsistentStats(self):
     loc = np.float32([[-1., 1], [1, -1]])
     scale = np.float32([1., 0.5])
