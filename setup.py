@@ -30,11 +30,7 @@ from version import __version__  # pylint: disable=g-import-not-at-top
 
 REQUIRED_PACKAGES = [
     'six >= 1.10.0',
-    # Currently numpy>=1.15.0 causes test failures in TensorFlow so they've
-    # constrained to these slightly older versions. Fix is planned for 1.11
-    # release.
-    # TODO(b/112417381): revert this once TF issues are fixed.
-    'numpy <=1.14.5, >=1.13.3',
+    'numpy >= 1.13.3',
 ]
 
 REQUIRED_TENSORFLOW_VERSION = '1.10.0'
