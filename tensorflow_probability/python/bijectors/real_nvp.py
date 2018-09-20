@@ -235,9 +235,9 @@ def real_nvp_default_template(hidden_layers,
   created once. It takes the `d`-dimensional input x[0:d] and returns the `D-d`
   dimensional outputs `loc` ("mu") and `log_scale` ("alpha").
 
-  The default template does not support conditioning, and will raise an
-  exception if `condition_kwargs` are passed to it. To use conditioning in a
-  real nvp bijector, implement a conditioned scale/translation template that
+  The default template does not support conditioning and will raise an
+  exception if `condition_kwargs` are passed to it. To use conditioning in
+  real nvp bijector, implement a conditioned shift/scale template that
   handles the `condition_kwargs`.
 
   Arguments:
