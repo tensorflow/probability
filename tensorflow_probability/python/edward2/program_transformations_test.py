@@ -47,7 +47,9 @@ class ProgramTransformationsTest(tf.test.TestCase):
 
     log_joint = ed.make_log_joint_fn(normal_with_unknown_mean)
     actual_log_prob = true_log_joint(loc_value, x_value)
-    expected_log_prob = log_joint(loc=loc_value, x=x_value)
+    expected_log_prob = log_joint(
+        loc=loc_value, x=x_value,
+        f="https://github.com/tensorflow/probability/issues/160")
 
     with self.assertRaises(LookupError):
       _ = log_joint(loc=loc_value)
