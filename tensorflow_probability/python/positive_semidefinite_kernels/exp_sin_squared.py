@@ -88,9 +88,9 @@ class ExpSinSquared(psd_kernel.PositiveSemidefiniteKernel):
           period, tf.assert_positive, validate_args)
       self._length_scale = _validate_arg_if_not_none(
           length_scale, tf.assert_positive, validate_args)
-      tf.assert_same_float_dtype(
+      dtype = tf.assert_same_float_dtype(
           [self._amplitude, self._length_scale, self._period])
-    super(ExpSinSquared, self).__init__(feature_ndims, name)
+    super(ExpSinSquared, self).__init__(feature_ndims, dtype=dtype, name=name)
 
   def _apply(self, x1, x2, param_expansion_ndims=0):
     difference = np.pi * tf.abs(x1 - x2)

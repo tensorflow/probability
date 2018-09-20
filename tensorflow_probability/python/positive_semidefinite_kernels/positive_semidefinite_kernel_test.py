@@ -44,9 +44,10 @@ class TestKernel(kernels_lib.PositiveSemidefiniteKernel):
   Not at all positive semidefinite, but we don't care about this here.
   """
 
-  def __init__(self, multiplier):
+  def __init__(self, multiplier, feature_ndims=1):
     self._multiplier = tf.convert_to_tensor(multiplier)
-    super(TestKernel, self).__init__(feature_ndims=1)
+    super(TestKernel, self).__init__(feature_ndims=feature_ndims,
+                                     dtype=self._multiplier.dtype.base_dtype)
 
   def _batch_shape(self):
     return self._multiplier.shape
@@ -89,6 +90,50 @@ class PositiveSemidefiniteKernelTest(tf.test.TestCase, parameterized.TestCase):
     self.params_2_dynamic = tf.placeholder_with_default([1., 2.], shape=None)
     self.params_21_dynamic = tf.placeholder_with_default(
         [[1.], [2.]], shape=None)
+
+  def testStr(self):
+    k32_batch_unk = TestKernel(tf.placeholder(tf.float32))
+    k32_batch2 = TestKernel(tf.to_float([123., 456.]))
+    k64_batch2x1 = TestKernel(tf.to_double([[123.], [456.]]))
+    k_fdim3 = TestKernel(tf.to_float(123.), feature_ndims=3)
+    self.assertEqual(
+        'tfp.positive_semidefinite_kernels.TestKernel('
+        '"TestKernel", feature_ndims=1, dtype=float32)',
+        str(k32_batch_unk))
+    self.assertEqual(
+        'tfp.positive_semidefinite_kernels.TestKernel('
+        '"TestKernel", batch_shape=(2,), feature_ndims=1, dtype=float32)',
+        str(k32_batch2))
+    self.assertEqual(
+        'tfp.positive_semidefinite_kernels.TestKernel('
+        '"TestKernel", batch_shape=(2, 1), feature_ndims=1, dtype=float64)',
+        str(k64_batch2x1))
+    self.assertEqual(
+        'tfp.positive_semidefinite_kernels.TestKernel('
+        '"TestKernel", batch_shape=(), feature_ndims=3, dtype=float32)',
+        str(k_fdim3))
+
+  def testRepr(self):
+    k32_batch_unk = TestKernel(tf.placeholder(tf.float32))
+    k32_batch2 = TestKernel(tf.to_float([123., 456.]))
+    k64_batch2x1 = TestKernel(tf.to_double([[123.], [456.]]))
+    k_fdim3 = TestKernel(tf.to_float(123.), feature_ndims=3)
+    self.assertEqual(
+        '<tfp.positive_semidefinite_kernels.TestKernel '
+        '\'TestKernel\' batch_shape=<unknown> feature_ndims=1 dtype=float32>',
+        repr(k32_batch_unk))
+    self.assertEqual(
+        '<tfp.positive_semidefinite_kernels.TestKernel '
+        '\'TestKernel\' batch_shape=(2,) feature_ndims=1 dtype=float32>',
+        repr(k32_batch2))
+    self.assertEqual(
+        '<tfp.positive_semidefinite_kernels.TestKernel '
+        '\'TestKernel\' batch_shape=(2, 1) feature_ndims=1 dtype=float64>',
+        repr(k64_batch2x1))
+    self.assertEqual(
+        '<tfp.positive_semidefinite_kernels.TestKernel '
+        '\'TestKernel\' batch_shape=() feature_ndims=3 dtype=float32>',
+        repr(k_fdim3))
 
   def testNotImplementedExceptions(self):
     k = IncompletelyDefinedKernel()

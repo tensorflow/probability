@@ -115,12 +115,13 @@ class PositiveSemidefiniteKernel(object):
     with each other and with the kernel's parameter batch shapes (see above).
   """
 
-  def __init__(self, feature_ndims, name=None):
+  def __init__(self, feature_ndims, dtype=None, name=None):
     """Construct a PositiveSemidefiniteKernel (subclass) instance.
 
     Args:
       feature_ndims: Python `integer` indicating the number of dims (the rank)
         of the feature space this kernel acts on.
+      dtype: `DType` on which this kernel operates.
       name: Python `str` name prefixed to Ops created by this class. Default:
         subclass name.
 
@@ -145,6 +146,7 @@ class PositiveSemidefiniteKernel(object):
           '`feature_ndims` must be a Python `integer` greater than zero. ' +
           'Got: {}'.format(feature_ndims))
     self._feature_ndims = feature_ndims
+    self._dtype = dtype
     if not name or name[-1] != '/':  # `name` is not a name scope
       name = tf.name_scope(name or type(self).__name__).name
     self._name = name
@@ -168,6 +170,11 @@ class PositiveSemidefiniteKernel(object):
       The number of feature dimensions (feature rank) of this kernel.
     """
     return self._feature_ndims
+
+  @property
+  def dtype(self):
+    """DType over which the kernel operates."""
+    return self._dtype
 
   @property
   def name(self):
@@ -564,6 +571,32 @@ class PositiveSemidefiniteKernel(object):
   def __imul__(self, k):
     return self.__mul__(k)
 
+  def __str__(self):
+    return ('tfp.positive_semidefinite_kernels.{type_name}('
+            '"{self_name}"'
+            '{maybe_batch_shape}'
+            ', feature_ndims={feature_ndims}'
+            ', dtype={dtype})'.format(
+                type_name=type(self).__name__,
+                self_name=self.name,
+                maybe_batch_shape=(', batch_shape={}'.format(self.batch_shape)
+                                   if self.batch_shape.ndims is not None
+                                   else ''),
+                feature_ndims=self.feature_ndims,
+                dtype=self.dtype.name))
+
+  def __repr__(self):
+    return ('<tfp.positive_semidefinite_kernels.{type_name} '
+            '\'{self_name}\''
+            ' batch_shape={batch_shape}'
+            ' feature_ndims={feature_ndims}'
+            ' dtype={dtype}>'.format(
+                type_name=type(self).__name__,
+                self_name=self.name,
+                batch_shape=self.batch_shape,
+                feature_ndims=self.feature_ndims,
+                dtype=self.dtype.name))
+
 
 def _flatten_summand_list(kernels):
   """Flatten a list of kernels which may contain _SumKernel instances.
@@ -743,4 +776,3 @@ class _ProductKernel(PositiveSemidefiniteKernel):
   def _batch_shape_tensor(self):
     return functools.reduce(tf.broadcast_dynamic_shape,
                             [k.batch_shape_tensor() for k in self.kernels])
-

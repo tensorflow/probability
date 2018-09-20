@@ -85,8 +85,8 @@ class MaternOneHalf(psd_kernel.PositiveSemidefiniteKernel):
                                                   validate_args)
       self._length_scale = _validate_arg_if_not_none(
           length_scale, tf.assert_positive, validate_args)
-      tf.assert_same_float_dtype([self._amplitude, self._length_scale])
-    super(MaternOneHalf, self).__init__(feature_ndims, name)
+      dtype = tf.assert_same_float_dtype([self._amplitude, self._length_scale])
+    super(MaternOneHalf, self).__init__(feature_ndims, dtype=dtype, name=name)
 
   @property
   def amplitude(self):
@@ -168,8 +168,9 @@ class MaternThreeHalves(psd_kernel.PositiveSemidefiniteKernel):
                                                   validate_args)
       self._length_scale = _validate_arg_if_not_none(
           length_scale, tf.assert_positive, validate_args)
-      tf.assert_same_float_dtype([self._amplitude, self._length_scale])
-    super(MaternThreeHalves, self).__init__(feature_ndims, name)
+      dtype = tf.assert_same_float_dtype([self._amplitude, self._length_scale])
+    super(MaternThreeHalves, self).__init__(
+        feature_ndims, dtype=dtype, name=name)
 
   @property
   def amplitude(self):
@@ -252,8 +253,9 @@ class MaternFiveHalves(psd_kernel.PositiveSemidefiniteKernel):
                                                   validate_args)
       self._length_scale = _validate_arg_if_not_none(
           length_scale, tf.assert_positive, validate_args)
-      tf.assert_same_float_dtype([self._amplitude, self._length_scale])
-    super(MaternFiveHalves, self).__init__(feature_ndims, name)
+      dtype = tf.assert_same_float_dtype([self._amplitude, self._length_scale])
+    super(MaternFiveHalves, self).__init__(
+        feature_ndims, dtype=dtype, name=name)
 
   @property
   def amplitude(self):
