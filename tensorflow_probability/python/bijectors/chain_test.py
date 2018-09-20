@@ -68,10 +68,9 @@ class ChainBijectorTest(tf.test.TestCase):
           0., self.evaluate(chain.forward_log_det_jacobian(x, event_ndims=1)))
 
   def testScalarCongruency(self):
-    with self.test_session():
-      chain = tfb.Chain((tfb.Exp(), tfb.Softplus()))
-      bijector_test_util.assert_scalar_congruency(
-          chain, lower_x=1e-3, upper_x=1.5, rtol=0.05)
+    chain = tfb.Chain((tfb.Exp(), tfb.Softplus()))
+    bijector_test_util.assert_scalar_congruency(
+        chain, lower_x=1e-3, upper_x=1.5, rtol=0.05, eval_func=self.evaluate)
 
   def testShapeGetters(self):
     with self.test_session():

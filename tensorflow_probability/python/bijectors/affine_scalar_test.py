@@ -153,10 +153,9 @@ class AffineScalarBijectorTest(tf.test.TestCase):
             run(bijector.inverse_log_det_jacobian, x, event_ndims=0))
 
   def testScalarCongruency(self):
-    with self.test_session():
-      bijector = tfb.AffineScalar(shift=3.6, scale=0.42)
-      bijector_test_util.assert_scalar_congruency(
-          bijector, lower_x=-2., upper_x=2.)
+    bijector = tfb.AffineScalar(shift=3.6, scale=0.42)
+    bijector_test_util.assert_scalar_congruency(
+        bijector, lower_x=-2., upper_x=2., eval_func=self.evaluate)
 
 
 if __name__ == "__main__":

@@ -46,9 +46,9 @@ def assert_strictly_monotonic(array):
 def assert_scalar_congruency(bijector,
                              lower_x,
                              upper_x,
+                             eval_func,
                              n=int(10e3),
-                             rtol=0.01,
-                             sess=None):
+                             rtol=0.01):
   """Assert `bijector`'s forward/inverse/inverse_log_det_jacobian are congruent.
 
   We draw samples `X ~ U(lower_x, upper_x)`, then feed these through the
@@ -70,17 +70,13 @@ def assert_scalar_congruency(bijector,
       huge variation in values in the interval `(lower_x, upper_x)`, or else the
       variance based check of the Jacobian will require small `rtol` or huge
       `n`.
+    eval_func: Function to evaluate any intermediate results.
     n:  Number of samples to draw for the checks.
     rtol:  Positive number.  Used for the Jacobian check.
-    sess:  `tf.Session`.  Defaults to the default session.
 
   Raises:
     AssertionError:  If tests fail.
   """
-  # Checks and defaults.
-  if sess is None:
-    sess = tf.get_default_session()
-
   # Should be monotonic over this interval
   ten_x_pts = np.linspace(lower_x, upper_x, num=10).astype(np.float32)
   if bijector.dtype is not None:
@@ -88,7 +84,7 @@ def assert_scalar_congruency(bijector,
   forward_on_10_pts = bijector.forward(ten_x_pts)
 
   # Set the lower/upper limits in the range of the bijector.
-  lower_y, upper_y = sess.run(
+  lower_y, upper_y = eval_func(
       [bijector.forward(lower_x),
        bijector.forward(upper_x)])
   if upper_y < lower_y:  # If bijector.forward is a decreasing function.
@@ -135,7 +131,7 @@ def assert_scalar_congruency(bijector,
       uniform_y_samps_v,
       inverse_forward_x_v,
       forward_inverse_y_v,
-  ] = sess.run([
+  ] = eval_func([
       forward_on_10_pts,
       dy_dx,
       dx_dy,
@@ -165,9 +161,9 @@ def assert_bijective_and_finite(bijector,
                                 x,
                                 y,
                                 event_ndims,
+                                eval_func,
                                 atol=0,
-                                rtol=1e-5,
-                                sess=None):
+                                rtol=1e-5):
   """Assert that forward/inverse (along with jacobians) are inverses and finite.
 
   It is recommended to use x and y values that are very very close to the edge
@@ -179,15 +175,13 @@ def assert_bijective_and_finite(bijector,
     y:  np.array of values in the domain of bijector.inverse.
     event_ndims: Integer describing the number of event dimensions this bijector
       operates on.
+    eval_func: Function to evaluate any intermediate results.
     atol:  Absolute tolerance.
     rtol:  Relative tolerance.
-    sess:  TensorFlow session.  Defaults to the default session.
 
   Raises:
     AssertionError:  If tests fail.
   """
-  sess = sess or tf.get_default_session()
-
   # These are the incoming points, but people often create a crazy range of
   # values for which these end up being bad, especially in 16bit.
   assert_finite(x)
@@ -205,7 +199,7 @@ def assert_bijective_and_finite(bijector,
       fldj_g_y,
       f_x_v,
       g_y_v,
-  ] = sess.run([
+  ] = eval_func([
       bijector.inverse(f_x),
       bijector.forward(g_y),
       bijector.inverse_log_det_jacobian(f_x, event_ndims=event_ndims),

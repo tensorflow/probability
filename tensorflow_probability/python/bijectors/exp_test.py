@@ -48,18 +48,17 @@ class ExpBijectorTest(tf.test.TestCase):
               x, event_ndims=1)))
 
   def testScalarCongruency(self):
-    with self.test_session():
-      bijector = tfb.Exp()
-      bijector_test_util.assert_scalar_congruency(
-          bijector, lower_x=-2., upper_x=1.5, rtol=0.05)
+    bijector = tfb.Exp()
+    bijector_test_util.assert_scalar_congruency(
+        bijector, lower_x=-2., upper_x=1.5, eval_func=self.evaluate,
+        rtol=0.05)
 
   def testBijectiveAndFinite(self):
-    with self.test_session():
-      bijector = tfb.Exp()
-      x = np.linspace(-10, 10, num=10).astype(np.float32)
-      y = np.logspace(-10, 10, num=10).astype(np.float32)
-      bijector_test_util.assert_bijective_and_finite(
-          bijector, x, y, event_ndims=0)
+    bijector = tfb.Exp()
+    x = np.linspace(-10, 10, num=10).astype(np.float32)
+    y = np.logspace(-10, 10, num=10).astype(np.float32)
+    bijector_test_util.assert_bijective_and_finite(
+        bijector, x, y, eval_func=self.evaluate, event_ndims=0)
 
 
 if __name__ == "__main__":

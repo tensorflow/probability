@@ -54,10 +54,9 @@ class InvertBijectorTest(tf.test.TestCase):
             self.evaluate(rev.forward_log_det_jacobian(x, event_ndims=1)))
 
   def testScalarCongruency(self):
-    with self.test_session():
-      bijector = tfb.Invert(tfb.Exp())
-      bijector_test_util.assert_scalar_congruency(
-          bijector, lower_x=1e-3, upper_x=1.5, rtol=0.05)
+    bijector = tfb.Invert(tfb.Exp())
+    bijector_test_util.assert_scalar_congruency(
+        bijector, lower_x=1e-3, upper_x=1.5, eval_func=self.evaluate, rtol=0.05)
 
   def testShapeGetters(self):
     with self.test_session():

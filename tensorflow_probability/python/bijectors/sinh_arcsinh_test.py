@@ -90,47 +90,43 @@ class SinhArcsinhBijectorTest(tf.test.TestCase):
       self.assertLess(np.abs(y[2, 0]), np.abs(y[2, 1]))
 
   def testScalarCongruencySkewness1Tailweight0p5(self):
-    with self.test_session():
-      bijector = tfb.SinhArcsinh(
-          skewness=1.0, tailweight=0.5, validate_args=True)
-      bijector_test_util.assert_scalar_congruency(
-          bijector, lower_x=-2., upper_x=2.0, rtol=0.05)
+    bijector = tfb.SinhArcsinh(
+        skewness=1.0, tailweight=0.5, validate_args=True)
+    bijector_test_util.assert_scalar_congruency(
+        bijector, lower_x=-2., upper_x=2.0, eval_func=self.evaluate, rtol=0.05)
 
   def testScalarCongruencySkewnessNeg1Tailweight1p5(self):
-    with self.test_session():
-      bijector = tfb.SinhArcsinh(
-          skewness=-1.0, tailweight=1.5, validate_args=True)
-      bijector_test_util.assert_scalar_congruency(
-          bijector, lower_x=-2., upper_x=2.0, rtol=0.05)
+    bijector = tfb.SinhArcsinh(
+        skewness=-1.0, tailweight=1.5, validate_args=True)
+    bijector_test_util.assert_scalar_congruency(
+        bijector, lower_x=-2., upper_x=2.0, eval_func=self.evaluate, rtol=0.05)
 
   def testBijectiveAndFiniteSkewnessNeg1Tailweight0p5(self):
-    with self.test_session():
-      bijector = tfb.SinhArcsinh(
-          skewness=-1., tailweight=0.5, validate_args=True)
-      x = np.concatenate((-np.logspace(-2, 10, 1000), [0], np.logspace(
-          -2, 10, 1000))).astype(np.float32)
-      bijector_test_util.assert_bijective_and_finite(
-          bijector, x, x, event_ndims=0, rtol=1e-3)
+    bijector = tfb.SinhArcsinh(
+        skewness=-1., tailweight=0.5, validate_args=True)
+    x = np.concatenate((-np.logspace(-2, 10, 1000), [0], np.logspace(
+        -2, 10, 1000))).astype(np.float32)
+    bijector_test_util.assert_bijective_and_finite(
+        bijector, x, x, eval_func=self.evaluate, event_ndims=0, rtol=1e-3)
 
   def testBijectiveAndFiniteSkewness1Tailweight3(self):
-    with self.test_session():
-      bijector = tfb.SinhArcsinh(skewness=1., tailweight=3., validate_args=True)
-      x = np.concatenate((-np.logspace(-2, 5, 1000), [0], np.logspace(
-          -2, 5, 1000))).astype(np.float32)
-      bijector_test_util.assert_bijective_and_finite(
-          bijector, x, x, event_ndims=0, rtol=1e-3)
+    bijector = tfb.SinhArcsinh(skewness=1., tailweight=3., validate_args=True)
+    x = np.concatenate((-np.logspace(-2, 5, 1000), [0], np.logspace(
+        -2, 5, 1000))).astype(np.float32)
+    bijector_test_util.assert_bijective_and_finite(
+        bijector, x, x, eval_func=self.evaluate, event_ndims=0, rtol=1e-3)
 
   def testBijectorEndpoints(self):
-    with self.test_session():
-      for dtype in (np.float32, np.float64):
-        bijector = tfb.SinhArcsinh(
-            skewness=dtype(0.), tailweight=dtype(1.), validate_args=True)
-        bounds = np.array(
-            [np.finfo(dtype).min, np.finfo(dtype).max], dtype=dtype)
-        # Note that the above bijector is the identity bijector. Hence, the
-        # log_det_jacobian will be 0. Because of this we use atol.
-        bijector_test_util.assert_bijective_and_finite(
-            bijector, bounds, bounds, event_ndims=0, atol=2e-6)
+    for dtype in (np.float32, np.float64):
+      bijector = tfb.SinhArcsinh(
+          skewness=dtype(0.), tailweight=dtype(1.), validate_args=True)
+      bounds = np.array(
+          [np.finfo(dtype).min, np.finfo(dtype).max], dtype=dtype)
+      # Note that the above bijector is the identity bijector. Hence, the
+      # log_det_jacobian will be 0. Because of this we use atol.
+      bijector_test_util.assert_bijective_and_finite(
+          bijector, bounds, bounds, eval_func=self.evaluate, event_ndims=0,
+          atol=2e-6)
 
   def testBijectorOverRange(self):
     with self.test_session():

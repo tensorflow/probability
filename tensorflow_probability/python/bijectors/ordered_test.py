@@ -96,12 +96,11 @@ class OrderedBijectorTest(tf.test.TestCase):
                             y.as_list())))
 
   def testBijectiveAndFinite(self):
-    with self.test_session():
-      ordered = tfb.Ordered()
-      x = np.sort(self._rng.randn(3, 10), axis=-1).astype(np.float32)
-      y = (self._rng.randn(3, 10)).astype(np.float32)
-      bijector_test_util.assert_bijective_and_finite(
-          ordered, x, y, event_ndims=1)
+    ordered = tfb.Ordered()
+    x = np.sort(self._rng.randn(3, 10), axis=-1).astype(np.float32)
+    y = (self._rng.randn(3, 10)).astype(np.float32)
+    bijector_test_util.assert_bijective_and_finite(
+        ordered, x, y, eval_func=self.evaluate, event_ndims=1)
 
 
 if __name__ == "__main__":

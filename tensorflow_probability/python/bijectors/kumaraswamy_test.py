@@ -54,13 +54,13 @@ class KumaraswamyBijectorTest(tf.test.TestCase):
           atol=0.)
 
   def testScalarCongruency(self):
-    with self.test_session():
-      bijector_test_util.assert_scalar_congruency(
-          tfb.Kumaraswamy(concentration1=0.5, concentration0=1.1),
-          lower_x=0.,
-          upper_x=1.,
-          n=int(10e3),
-          rtol=0.02)
+    bijector_test_util.assert_scalar_congruency(
+        tfb.Kumaraswamy(concentration1=0.5, concentration0=1.1),
+        lower_x=0.,
+        upper_x=1.,
+        eval_func=self.evaluate,
+        n=int(10e3),
+        rtol=0.02)
 
   def testBijectiveAndFinite(self):
     with self.test_session():
@@ -75,7 +75,8 @@ class KumaraswamyBijectorTest(tf.test.TestCase):
       y = np.linspace(.01, 0.99, num=10).astype(np.float32)
       x = 1 - (1 - y ** concentration1) ** concentration0
       bijector_test_util.assert_bijective_and_finite(
-          bijector, x, y, event_ndims=0, rtol=1e-3)
+          bijector, x, y, eval_func=self.evaluate, event_ndims=0,
+          rtol=1e-3)
 
 
 if __name__ == "__main__":

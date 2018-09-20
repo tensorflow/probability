@@ -268,11 +268,11 @@ class ReshapeBijectorTestStatic(tf.test.TestCase, _ReshapeBijectorTest):
   def testBijectiveAndFinite(self):
     x = np.random.randn(4, 2, 3)
     y = np.reshape(x, [4, 1, 2, 3])
-    with self.test_session():
-      bijector = tfb.Reshape(
-          event_shape_in=[2, 3], event_shape_out=[1, 2, 3], validate_args=True)
-      bijector_test_util.assert_bijective_and_finite(
-          bijector, x, y, event_ndims=2, rtol=1e-6, atol=0)
+    bijector = tfb.Reshape(
+        event_shape_in=[2, 3], event_shape_out=[1, 2, 3], validate_args=True)
+    bijector_test_util.assert_bijective_and_finite(
+        bijector, x, y, eval_func=self.evaluate, event_ndims=2, rtol=1e-6,
+        atol=0)
 
   def testMultipleUnspecifiedDimensionsOpError(self):
     shape_in, shape_out = self.build_shapes([2, 3], [4, -1, -1,])

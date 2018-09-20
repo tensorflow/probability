@@ -52,17 +52,16 @@ class GumbelBijectorTest(tf.test.TestCase):
           atol=0.)
 
   def testScalarCongruency(self):
-    with self.test_session():
-      bijector_test_util.assert_scalar_congruency(
-          tfb.Gumbel(loc=0.3, scale=20.), lower_x=1., upper_x=100., rtol=0.02)
+    bijector_test_util.assert_scalar_congruency(
+        tfb.Gumbel(loc=0.3, scale=20.), lower_x=1., upper_x=100.,
+        eval_func=self.evaluate, rtol=0.02)
 
   def testBijectiveAndFinite(self):
-    with self.test_session():
-      bijector = tfb.Gumbel(loc=0., scale=3.0, validate_args=True)
-      x = np.linspace(-10., 10., num=10).astype(np.float32)
-      y = np.linspace(0.01, 0.99, num=10).astype(np.float32)
-      bijector_test_util.assert_bijective_and_finite(
-          bijector, x, y, event_ndims=0, rtol=1e-3)
+    bijector = tfb.Gumbel(loc=0., scale=3.0, validate_args=True)
+    x = np.linspace(-10., 10., num=10).astype(np.float32)
+    y = np.linspace(0.01, 0.99, num=10).astype(np.float32)
+    bijector_test_util.assert_bijective_and_finite(
+        bijector, x, y, eval_func=self.evaluate, event_ndims=0, rtol=1e-3)
 
 
 if __name__ == "__main__":

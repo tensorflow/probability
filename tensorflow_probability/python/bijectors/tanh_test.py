@@ -50,17 +50,17 @@ class TanhBijectorTest(tf.test.TestCase):
               x, event_ndims=0)), atol=0., rtol=1e-4)
 
   def testScalarCongruency(self):
-    with self.test_session():
-      bijector_test_util.assert_scalar_congruency(
-          tfb.Tanh(), lower_x=-9., upper_x=9., n=int(10e4))
+    bijector_test_util.assert_scalar_congruency(
+        tfb.Tanh(), lower_x=-9., upper_x=9., eval_func=self.evaluate,
+        n=int(10e4))
 
   def testBijectiveAndFinite(self):
-    with self.test_session():
-      x = np.linspace(-5., 5., 100).astype(np.float32)
-      eps = 1e-3
-      y = np.linspace(eps, 1. - eps, 100).astype(np.float32)
-      bijector_test_util.assert_bijective_and_finite(
-          tfb.Tanh(), x, y, event_ndims=0, atol=0., rtol=1e-4)
+    x = np.linspace(-5., 5., 100).astype(np.float32)
+    eps = 1e-3
+    y = np.linspace(eps, 1. - eps, 100).astype(np.float32)
+    bijector_test_util.assert_bijective_and_finite(
+        tfb.Tanh(), x, y, eval_func=self.evaluate, event_ndims=0, atol=0.,
+        rtol=1e-4)
 
   def testMatchWithAffineTransform(self):
     with self.test_session():

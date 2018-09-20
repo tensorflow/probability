@@ -94,18 +94,17 @@ class SoftmaxCenteredBijectorTest(tf.test.TestCase):
                                   y.as_list())))
 
   def testBijectiveAndFinite(self):
-    with self.test_session():
-      softmax = tfb.SoftmaxCentered()
-      x = np.linspace(-50, 50, num=10).reshape(5, 2).astype(np.float32)
-      # Make y values on the simplex with a wide range.
-      y_0 = np.ones(5).astype(np.float32)
-      y_1 = (1e-5 * rng.rand(5)).astype(np.float32)
-      y_2 = (1e1 * rng.rand(5)).astype(np.float32)
-      y = np.array([y_0, y_1, y_2])
-      y /= y.sum(axis=0)
-      y = y.T  # y.shape = [5, 3]
-      bijector_test_util.assert_bijective_and_finite(
-          softmax, x, y, event_ndims=1)
+    softmax = tfb.SoftmaxCentered()
+    x = np.linspace(-50, 50, num=10).reshape(5, 2).astype(np.float32)
+    # Make y values on the simplex with a wide range.
+    y_0 = np.ones(5).astype(np.float32)
+    y_1 = (1e-5 * rng.rand(5)).astype(np.float32)
+    y_2 = (1e1 * rng.rand(5)).astype(np.float32)
+    y = np.array([y_0, y_1, y_2])
+    y /= y.sum(axis=0)
+    y = y.T  # y.shape = [5, 3]
+    bijector_test_util.assert_bijective_and_finite(
+        softmax, x, y, eval_func=self.evaluate, event_ndims=1)
 
 
 if __name__ == "__main__":

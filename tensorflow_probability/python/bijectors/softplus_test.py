@@ -102,58 +102,55 @@ class SoftplusBijectorTest(tf.test.TestCase):
                   y, event_ndims=1)))
 
   def testScalarCongruency(self):
-    with self.test_session():
-      bijector = tfb.Softplus()
-      bijector_test_util.assert_scalar_congruency(
-          bijector, lower_x=-2., upper_x=2.)
+    bijector = tfb.Softplus()
+    bijector_test_util.assert_scalar_congruency(
+        bijector, lower_x=-2., upper_x=2., eval_func=self.evaluate)
 
   def testScalarCongruencyWithPositiveHingeSoftness(self):
-    with self.test_session():
-      bijector = tfb.Softplus(hinge_softness=1.3)
-      bijector_test_util.assert_scalar_congruency(
-          bijector, lower_x=-2., upper_x=2.)
+    bijector = tfb.Softplus(hinge_softness=1.3)
+    bijector_test_util.assert_scalar_congruency(
+        bijector, lower_x=-2., upper_x=2., eval_func=self.evaluate)
 
   def testScalarCongruencyWithNegativeHingeSoftness(self):
-    with self.test_session():
-      bijector = tfb.Softplus(hinge_softness=-1.3)
-      bijector_test_util.assert_scalar_congruency(
-          bijector, lower_x=-2., upper_x=2.)
+    bijector = tfb.Softplus(hinge_softness=-1.3)
+    bijector_test_util.assert_scalar_congruency(
+        bijector, lower_x=-2., upper_x=2., eval_func=self.evaluate)
 
   def testBijectiveAndFinite32bit(self):
-    with self.test_session():
-      bijector = tfb.Softplus()
-      x = np.linspace(-20., 20., 100).astype(np.float32)
-      y = np.logspace(-10, 10, 100).astype(np.float32)
-      bijector_test_util.assert_bijective_and_finite(
-          bijector, x, y, event_ndims=0, rtol=1e-2, atol=1e-2)
+    bijector = tfb.Softplus()
+    x = np.linspace(-20., 20., 100).astype(np.float32)
+    y = np.logspace(-10, 10, 100).astype(np.float32)
+    bijector_test_util.assert_bijective_and_finite(
+        bijector, x, y, eval_func=self.evaluate, event_ndims=0, rtol=1e-2,
+        atol=1e-2)
 
   def testBijectiveAndFiniteWithPositiveHingeSoftness32Bit(self):
-    with self.test_session():
-      bijector = tfb.Softplus(hinge_softness=1.23)
-      x = np.linspace(-20., 20., 100).astype(np.float32)
-      y = np.logspace(-10, 10, 100).astype(np.float32)
-      bijector_test_util.assert_bijective_and_finite(
-          bijector, x, y, event_ndims=0, rtol=1e-2, atol=1e-2)
+    bijector = tfb.Softplus(hinge_softness=1.23)
+    x = np.linspace(-20., 20., 100).astype(np.float32)
+    y = np.logspace(-10, 10, 100).astype(np.float32)
+    bijector_test_util.assert_bijective_and_finite(
+        bijector, x, y, eval_func=self.evaluate, event_ndims=0, rtol=1e-2,
+        atol=1e-2)
 
   def testBijectiveAndFiniteWithNegativeHingeSoftness32Bit(self):
-    with self.test_session():
-      bijector = tfb.Softplus(hinge_softness=-0.7)
-      x = np.linspace(-20., 20., 100).astype(np.float32)
-      y = -np.logspace(-10, 10, 100).astype(np.float32)
-      bijector_test_util.assert_bijective_and_finite(
-          bijector, x, y, event_ndims=0, rtol=1e-2, atol=1e-2)
+    bijector = tfb.Softplus(hinge_softness=-0.7)
+    x = np.linspace(-20., 20., 100).astype(np.float32)
+    y = -np.logspace(-10, 10, 100).astype(np.float32)
+    bijector_test_util.assert_bijective_and_finite(
+        bijector, x, y, eval_func=self.evaluate, event_ndims=0, rtol=1e-2,
+        atol=1e-2)
 
   def testBijectiveAndFinite16bit(self):
-    with self.test_session():
-      bijector = tfb.Softplus()
-      # softplus(-20) is zero, so we can't use such a large range as in 32bit.
-      x = np.linspace(-10., 20., 100).astype(np.float16)
-      # Note that float16 is only in the open set (0, inf) for a smaller
-      # logspace range.  The actual range was (-7, 4), so use something smaller
-      # for the test.
-      y = np.logspace(-6, 3, 100).astype(np.float16)
-      bijector_test_util.assert_bijective_and_finite(
-          bijector, x, y, event_ndims=0, rtol=1e-1, atol=1e-3)
+    bijector = tfb.Softplus()
+    # softplus(-20) is zero, so we can't use such a large range as in 32bit.
+    x = np.linspace(-10., 20., 100).astype(np.float16)
+    # Note that float16 is only in the open set (0, inf) for a smaller
+    # logspace range.  The actual range was (-7, 4), so use something smaller
+    # for the test.
+    y = np.logspace(-6, 3, 100).astype(np.float16)
+    bijector_test_util.assert_bijective_and_finite(
+        bijector, x, y, eval_func=self.evaluate, event_ndims=0, rtol=1e-1,
+        atol=1e-3)
 
 
 if __name__ == "__main__":
