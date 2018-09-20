@@ -26,7 +26,7 @@ import numpy as np
 
 import tensorflow as tf
 
-from tensorflow_probability.python.glm.util import common_dtype
+from tensorflow_probability.python.internal import dtype_util
 
 __all__ = [
     'matvecmul',
@@ -75,7 +75,7 @@ def matvecmul(a, b, transpose_a=False, validate_args=False, name=None):
   """
 
   with tf.name_scope(name, 'matvecmul', [a, b]):
-    dtype = common_dtype([a, b], np.float32)
+    dtype = dtype_util.common_dtype([a, b], np.float32)
     a = tf.convert_to_tensor(a, name='a', dtype=dtype)
     b = tf.convert_to_tensor(b, name='b', dtype=dtype)
     with tf.control_dependencies(

@@ -24,7 +24,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python import bijectors
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.glm.util import common_dtype
+from tensorflow_probability.python.internal import dtype_util
 
 tfe = tf.contrib.eager
 
@@ -154,7 +154,7 @@ class ExponentialFamily(object):
 
     with self._name_scope(
         name, 'log_prob', [response, predicted_linear_response]):
-      dtype = common_dtype([response, predicted_linear_response])
+      dtype = dtype_util.common_dtype([response, predicted_linear_response])
       response = tf.convert_to_tensor(
           response, dtype=dtype, name='response')
       predicted_linear_response = tf.convert_to_tensor(

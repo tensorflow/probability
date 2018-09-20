@@ -21,7 +21,7 @@ from __future__ import print_function
 import numpy as np
 
 import tensorflow as tf
-from tensorflow_probability.python.glm.util import common_dtype
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.math import matvecmul
 from tensorflow.python.framework import smart_cond
 from tensorflow.python.ops.distributions import util as distributions_util
@@ -552,7 +552,7 @@ def prepare_args(model_matrix,
   graph_deps = [model_matrix, response, model_coefficients,
                 predicted_linear_response, offset]
   with tf.name_scope(name, 'prepare_args', graph_deps):
-    dtype = common_dtype(graph_deps, np.float32)
+    dtype = dtype_util.common_dtype(graph_deps, np.float32)
 
     model_matrix = tf.convert_to_tensor(
         model_matrix, dtype=dtype, name='model_matrix')

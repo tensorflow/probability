@@ -41,9 +41,9 @@ py_library(
     srcs = ["fisher_scoring.py"],
     srcs_version = "PY2AND3",
     deps = [
-        ":util",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -63,7 +63,6 @@ py_library(
     srcs = ["proximal_hessian.py"],
     srcs_version = "PY2AND3",
     deps = [
-        ":util",
         # numpy dep,
         # tensorflow dep,
     ],
@@ -85,9 +84,9 @@ py_library(
     srcs = ["family.py"],
     srcs_version = "PY2AND3",
     deps = [
-        ":util",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -99,15 +98,5 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-    ],
-)
-
-py_library(
-    name = "util",
-    srcs = ["util.py"],
-    srcs_version = "PY2AND3",
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
     ],
 )
