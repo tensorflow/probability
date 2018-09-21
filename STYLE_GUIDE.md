@@ -42,8 +42,8 @@ it supercedes all previous conventions.
 1.  __Importing submodule aliases.__ Use the Pythonic style `from
     tensorflow_probability import edward2 as ed`. For now, do not use this style
     for `tfd`, `tfb`, and `tfe`; use variable assignment via `tfd =
-    tf.contrib.distributions`. We will change the latter to use the Pythonic
-    style in the future.
+    tfp.distributions`. We will change the latter to use the Pythonic style in
+    the future.
 
 2.  __Examples in Docstrings.__ Write a `#### Examples` subsection below `Args`,
     `Returns`, `Raises`, etc. to illustrate examples. If the docstring's last
