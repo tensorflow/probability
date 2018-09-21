@@ -100,15 +100,15 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
 
   def testBijectorConditionKwargs(self):
     batch_size = 3
-    x_ = np.arange(batch_size * 4 * 2).astype(np.float32).reshape(
+    x_ = np.arange(batch_size * 4 * 2).astype(np.float64).reshape(
         batch_size, 4 * 2)
     conditions = {
         "a":
         tf.reshape(
-            tf.range(batch_size * 4, dtype=tf.float32), (batch_size, 4)),
+            tf.range(batch_size * 4, dtype=tf.float64), (batch_size, 4)),
         "b":
         tf.reshape(
-            tf.range(batch_size * 2, dtype=tf.float32), (batch_size, 2)),
+            tf.range(batch_size * 2, dtype=tf.float64), (batch_size, 2)),
     }
 
     def _condition_shift_and_log_scale_fn(x0, output_units, **condition_kwargs):
