@@ -111,7 +111,7 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
             tf.range(batch_size * 2, dtype=tf.float32), (batch_size, 2)),
     }
 
-    def condition_shift_and_log_scale_fn(x0, output_units, **condition_kwargs):
+    def _condition_shift_and_log_scale_fn(x0, output_units, **condition_kwargs):
       x = tf.concat(
           [x0] + [condition_kwargs[k] for k in sorted(condition_kwargs)],
           axis=-1)
@@ -120,6 +120,9 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
           units=2 * output_units)
       shift, log_scale = tf.split(out, 2, axis=-1)
       return shift, log_scale
+
+    condition_shift_and_log_scale_fn = tf.make_template(
+        "real_nvp_condition_template", _condition_shift_and_log_scale_fn)
 
     nvp = tfb.RealNVP(
         num_masked=4,
