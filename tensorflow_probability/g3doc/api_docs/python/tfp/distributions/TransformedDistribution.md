@@ -89,20 +89,22 @@ A simple example constructing a Log-Normal distribution from a Normal
 distribution:
 
 ```python
-ds = tf.contrib.distributions
-log_normal = ds.TransformedDistribution(
-  distribution=ds.Normal(loc=0., scale=1.),
-  bijector=ds.bijectors.Exp(),
+tfd = tfp.distributions
+tfb = tfp.bijectors
+log_normal = tfd.TransformedDistribution(
+  distribution=tfd.Normal(loc=0., scale=1.),
+  bijector=tfb.Exp(),
   name="LogNormalTransformedDistribution")
 ```
 
 A `LogNormal` made from callables:
 
 ```python
-ds = tf.contrib.distributions
-log_normal = ds.TransformedDistribution(
-  distribution=ds.Normal(loc=0., scale=1.),
-  bijector=ds.bijectors.Inline(
+tfd = tfp.distributions
+tfb = tfp.bijectors
+log_normal = tfd.TransformedDistribution(
+  distribution=tfd.Normal(loc=0., scale=1.),
+  bijector=tfb.Inline(
     forward_fn=tf.exp,
     inverse_fn=tf.log,
     inverse_log_det_jacobian_fn=(
@@ -113,10 +115,11 @@ log_normal = ds.TransformedDistribution(
 Another example constructing a Normal from a StandardNormal:
 
 ```python
-ds = tf.contrib.distributions
-normal = ds.TransformedDistribution(
-  distribution=ds.Normal(loc=0., scale=1.),
-  bijector=ds.bijectors.Affine(
+tfd = tfp.distributions
+tfb = tfp.bijectors
+normal = tfd.TransformedDistribution(
+  distribution=tfd.Normal(loc=0., scale=1.),
+  bijector=tfb.Affine(
     shift=-1.,
     scale_identity_multiplier=2.)
   name="NormalTransformedDistribution")
@@ -131,7 +134,8 @@ the overridden shape(s). The following example demonstrates how to construct a
 multivariate Normal as a `TransformedDistribution`.
 
 ```python
-ds = tf.contrib.distributions
+tfd = tfp.distributions
+tfb = tfp.bijectors
 # We will create two MVNs with batch_shape = event_shape = 2.
 mean = [[-1., 0],      # batch:0
         [0., 1]]       # batch:1
@@ -139,12 +143,12 @@ chol_cov = [[[1., 0],
              [0, 1]],  # batch:0
             [[1, 0],
              [2, 2]]]  # batch:1
-mvn1 = ds.TransformedDistribution(
-    distribution=ds.Normal(loc=0., scale=1.),
-    bijector=ds.bijectors.Affine(shift=mean, scale_tril=chol_cov),
+mvn1 = tfd.TransformedDistribution(
+    distribution=tfd.Normal(loc=0., scale=1.),
+    bijector=tfb.Affine(shift=mean, scale_tril=chol_cov),
     batch_shape=[2],  # Valid because base_distribution.batch_shape == [].
     event_shape=[2])  # Valid because base_distribution.event_shape == [].
-mvn2 = ds.MultivariateNormalTriL(loc=mean, scale_tril=chol_cov)
+mvn2 = tfd.MultivariateNormalTriL(loc=mean, scale_tril=chol_cov)
 # mvn1.log_prob(x) == mvn2.log_prob(x)
 ```
 
