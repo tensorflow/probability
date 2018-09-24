@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-sh_binary(
+py_binary(
     name = "pip_pkg",
-    srcs = ["pip_pkg.sh"],
+    srcs = ["pip_pkg.py"],
     data = [
         "setup.py",
         "//tensorflow_probability",
