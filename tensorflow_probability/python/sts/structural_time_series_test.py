@@ -32,6 +32,93 @@ from tensorflow.python.platform import test
 tfd = tfp.distributions
 
 
+class _StructuralTimeSeriesTests(object):
+
+  def test_broadcast_batch_shapes(self):
+
+    batch_shape = [3, 1, 4]
+    partial_batch_shape = [2, 1]
+    expected_broadcast_batch_shape = [3, 2, 4]
+
+    # Build a model where parameters have different batch shapes.
+    partial_batch_loc = self._build_placeholder(
+        np.random.randn(*partial_batch_shape))
+    full_batch_loc = self._build_placeholder(
+        np.random.randn(*batch_shape))
+
+    partial_scale_prior = tfd.LogNormal(
+        loc=partial_batch_loc, scale=tf.ones_like(partial_batch_loc))
+    full_scale_prior = tfd.LogNormal(
+        loc=full_batch_loc, scale=tf.ones_like(full_batch_loc))
+    loc_prior = tfd.Normal(loc=partial_batch_loc,
+                           scale=tf.ones_like(partial_batch_loc))
+
+    linear_trend = LocalLinearTrend(level_scale_prior=full_scale_prior,
+                                    slope_scale_prior=full_scale_prior,
+                                    initial_level_prior=loc_prior,
+                                    initial_slope_prior=loc_prior)
+    seasonal = Seasonal(num_seasons=3,
+                        drift_scale_prior=partial_scale_prior,
+                        initial_effect_prior=loc_prior)
+    model = Sum([linear_trend, seasonal],
+                observation_noise_scale_prior=partial_scale_prior)
+    param_samples = [p.prior.sample() for p in model.parameters]
+    ssm = model.make_state_space_model(num_timesteps=2,
+                                       param_vals=param_samples)
+
+    # Test that the model's batch shape matches the SSM's batch shape,
+    # and that they both match the expected broadcast shape.
+    self.assertAllEqual(model.batch_shape, ssm.batch_shape)
+
+    (model_batch_shape_tensor_,
+     ssm_batch_shape_tensor_) = self.evaluate((model.batch_shape_tensor(),
+                                               ssm.batch_shape_tensor()))
+    self.assertAllEqual(model_batch_shape_tensor_, ssm_batch_shape_tensor_)
+    self.assertAllEqual(model_batch_shape_tensor_,
+                        expected_broadcast_batch_shape)
+
+  def _build_placeholder(self, ndarray, dtype=None):
+    """Convert a numpy array to a TF placeholder.
+
+    Args:
+      ndarray: any object convertible to a numpy array via `np.asarray()`.
+      dtype: optional `dtype`; if not specified, defaults to `self.dtype`.
+
+    Returns:
+      placeholder: a TensorFlow `placeholder` with default value given by the
+      provided `ndarray`, dtype given by `self.dtype`, and shape specified
+      statically only if `self.use_static_shape` is `True`.
+    """
+
+    if dtype is None:
+      dtype = self.dtype
+
+    ndarray = np.asarray(ndarray).astype(dtype)
+    return tf.placeholder_with_default(
+        input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class StructuralTimeSeriesTestsStaticShape32(
+    _StructuralTimeSeriesTests, tf.test.TestCase):
+  dtype = np.float32
+  use_static_shape = True
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class StructuralTimeSeriesTestsDynamicShape32(
+    _StructuralTimeSeriesTests, tf.test.TestCase):
+  dtype = np.float32
+  use_static_shape = False
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class StructuralTimeSeriesTestsStaticShape64(
+    _StructuralTimeSeriesTests, tf.test.TestCase):
+  dtype = np.float64
+  use_static_shape = True
+
+
 class _StsTestHarness(object):
 
   def setUp(self):
@@ -174,7 +261,6 @@ class SumTest(test.TestCase, _StsTestHarness):
     return Sum(
         components=[first_component, second_component],
         observed_time_series=observed_time_series)
-
 
 if __name__ == '__main__':
   test.main()
