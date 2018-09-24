@@ -38,8 +38,8 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
     }
 
   def testBijectorWithTrivialTransform(self):
-    flat_x_ = np.arange(8).astype(np.float32).reshape(8)
-    batched_x_ = np.arange(3 * 8).astype(np.float32).reshape(3, 8)
+    flat_x_ = np.random.normal(0., 1., 8).astype(np.float32)
+    batched_x_ = np.random.normal(0., 1., (3, 8)).astype(np.float32)
     for x_ in [flat_x_, batched_x_]:
       nvp = tfb.RealNVP(
           num_masked=4,
@@ -61,12 +61,12 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
       fldj_ = self.evaluate(fldj)
 
       self.assertEqual("real_nvp", nvp.name)
-      self.assertAllClose(forward_x_, forward_inverse_y_, rtol=1e-1, atol=0.)
-      self.assertAllClose(x_, inverse_y_, rtol=1e-1, atol=0.)
+      self.assertAllClose(forward_x_, forward_inverse_y_, rtol=1e-4, atol=0.)
+      self.assertAllClose(x_, inverse_y_, rtol=1e-4, atol=0.)
       self.assertAllClose(ildj_, -fldj_, rtol=1e-6, atol=0.)
 
   def testBatchedBijectorWithMLPTransform(self):
-    x_ = np.arange(3 * 4 * 2).astype(np.float32).reshape(3, 4 * 2)
+    x_ = np.random.normal(0., 1., (3, 8)).astype(np.float32)
     with self.test_session() as sess:
       nvp = tfb.RealNVP(
           num_masked=4, validate_args=True, **self._real_nvp_kwargs)
@@ -93,8 +93,8 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
           fldj,
       ])
       self.assertEqual("real_nvp", nvp.name)
-      self.assertAllClose(forward_x_, forward_inverse_y_, rtol=1e-1, atol=0.)
-      self.assertAllClose(x_, inverse_y_, rtol=1e-1, atol=0.)
+      self.assertAllClose(forward_x_, forward_inverse_y_, rtol=1e-4, atol=0.)
+      self.assertAllClose(x_, inverse_y_, rtol=1e-4, atol=0.)
       self.assertAllClose(ildj_, -fldj_, rtol=1e-6, atol=0.)
 
   def testMutuallyConsistent(self):
