@@ -544,6 +544,52 @@ class PadDynamicTest(_PadTest, tf.test.TestCase):
     return False
 
 
+class PickScalarConditionTest(tf.test.TestCase):
+
+  @test_util.run_in_graph_and_eager_modes
+  def test_pick_scalar_condition_static(self):
+
+    pos = np.exp(np.random.randn(3, 2, 4)).astype(np.float32)
+    neg = -np.exp(np.random.randn(3, 2, 4)).astype(np.float32)
+
+    # Python static cond
+    self.assertAllEqual(
+        distribution_util.pick_scalar_condition(True, pos, neg), pos)
+    self.assertAllEqual(
+        distribution_util.pick_scalar_condition(False, pos, neg), neg)
+
+    # TF static cond
+    self.assertAllEqual(distribution_util.pick_scalar_condition(
+        tf.constant(True), pos, neg), pos)
+    self.assertAllEqual(distribution_util.pick_scalar_condition(
+        tf.constant(False), pos, neg), neg)
+
+  # Dynamic tests don't need to (/can't) run in Eager mode.
+  def test_pick_scalar_condition_dynamic(self):
+    pos = np.exp(np.random.randn(3, 2, 4)).astype(np.float32)
+    neg = -np.exp(np.random.randn(3, 2, 4)).astype(np.float32)
+
+    # TF dynamic cond
+    dynamic_true = tf.placeholder_with_default(input=True, shape=None)
+    dynamic_false = tf.placeholder_with_default(input=False, shape=None)
+    pos_ = self.evaluate(distribution_util.pick_scalar_condition(
+        dynamic_true, pos, neg))
+    neg_ = self.evaluate(distribution_util.pick_scalar_condition(
+        dynamic_false, pos, neg))
+    self.assertAllEqual(pos_, pos)
+    self.assertAllEqual(neg_, neg)
+
+    # TF dynamic everything
+    pos_dynamic = tf.placeholder_with_default(input=pos, shape=None)
+    neg_dynamic = tf.placeholder_with_default(input=neg, shape=None)
+    pos_ = self.evaluate(distribution_util.pick_scalar_condition(
+        dynamic_true, pos_dynamic, neg_dynamic))
+    neg_ = self.evaluate(distribution_util.pick_scalar_condition(
+        dynamic_false, pos_dynamic, neg_dynamic))
+    self.assertAllEqual(pos_, pos)
+    self.assertAllEqual(neg_, neg)
+
+
 class TestMoveDimension(tf.test.TestCase):
 
   @test_util.run_in_graph_and_eager_modes

@@ -492,15 +492,40 @@ def static_value(x):
   return tensor_util.constant_value(tf.convert_to_tensor(x))
 
 
-def pick_scalar_condition(pred, cond_true, cond_false):
-  """Convenience function which chooses the condition based on the predicate."""
-  # Note: This function is only valid if all of pred, cond_true, and cond_false
-  # are scalars. This means its semantics are arguably more like tf.cond than
-  # tf.select even though we use tf.select to implement it.
-  pred_ = static_value(pred)
-  if pred_ is None:
-    return tf.where(pred, cond_true, cond_false)
-  return cond_true if pred_ else cond_false
+def pick_scalar_condition(pred, true_value, false_value, name=None):
+  """Convenience function that chooses one of two values based on the predicate.
+
+  This utility is equivalent to a version of `tf.where` that accepts only a
+  scalar predicate and computes its result statically when possible. It may also
+  be used in place of `tf.cond` when both branches yield a `Tensor` of the same
+  shape; the operational difference is that `tf.cond` uses control flow to
+  evaluate only the branch that's needed, while `tf.where` (and thus
+  this method) may evaluate both branches before the predicate's truth is known.
+  This means that `tf.cond` is preferred when one of the branches is expensive
+  to evaluate (like performing a large matmul), while this method is preferred
+  when both branches are cheap, e.g., constants. In the latter case, we expect
+  this method to be substantially faster than `tf.cond` on GPU and to give
+  similar performance on CPU.
+
+  Args:
+    pred: Scalar `bool` `Tensor` predicate.
+    true_value: `Tensor` to return if `pred` is `True`.
+    false_value: `Tensor` to return if `pred` is `False`. Must have the
+      same shape as `true_value`.
+    name: Python `str` name given to ops managed by this object.
+
+  Returns:
+    result: a `Tensor` (or `Tensor`-convertible Python value) equal to
+      `true_value` if `pred` evaluates to `True` and `false_value` otherwise.
+      If the condition can be evaluated statically, the result returned is one
+      of the input Python values, with no graph side effects.
+  """
+  with tf.name_scope(name, "pick_scalar_condition",
+                     values=[pred, true_value, false_value]):
+    pred_ = static_value(pred)
+    if pred_ is None:
+      return tf.where(pred, true_value, false_value)
+    return true_value if pred_ else false_value
 
 
 def move_dimension(x, source_idx, dest_idx):
