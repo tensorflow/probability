@@ -29,7 +29,9 @@ from tensorflow_probability import positive_semidefinite_kernels as psd_kernels
 class ExponentiatedQuadraticTest(tf.test.TestCase, parameterized.TestCase):
 
   def testMismatchedFloatTypesAreBad(self):
-    with self.assertRaises(ValueError):
+    psd_kernels.ExponentiatedQuadratic(1, 1)  # Should be OK (float32 fallback).
+    psd_kernels.ExponentiatedQuadratic(np.float32(1.), 1.)  # Should be OK.
+    with self.assertRaises(TypeError):
       psd_kernels.ExponentiatedQuadratic(np.float32(1.), np.float64(1.))
 
   @parameterized.parameters(
@@ -54,6 +56,11 @@ class ExponentiatedQuadraticTest(tf.test.TestCase, parameterized.TestCase):
           self.evaluate(k.apply(x, y)),
           amplitude ** 2 * np.exp(
               -np.float32(.5) * np.sum((x - y)**2) / length_scale**2))
+
+  def testNoneShapes(self):
+    k = psd_kernels.ExponentiatedQuadratic(
+        amplitude=np.reshape(np.arange(12.), [2, 3, 2]))
+    self.assertEqual([2, 3, 2], k.batch_shape.as_list())
 
   def testShapesAreCorrect(self):
     k = psd_kernels.ExponentiatedQuadratic(amplitude=1., length_scale=1.)

@@ -61,6 +61,7 @@ py_library(
     deps = [
         ":positive_semidefinite_kernel",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -81,6 +82,7 @@ py_library(
     deps = [
         ":positive_semidefinite_kernel",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -92,6 +94,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
