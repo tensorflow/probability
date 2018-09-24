@@ -26,7 +26,7 @@ if __name__ == "__main__":
   if not os.path.exists(args.dest):
     os.makedirs(args.dest)
   
-  shargs = [sys.executable,"setup.py","bdist_wheel","--universal","--dist-dir",args.dest]
+  shargs = [sys.executable,"setup.py","bdist_wheel","--universal","--dist-dir",args.dest] + args.args
   with open(os.devnull,'w') as devnull:
     proc = subprocess.run(shargs, cwd=os.path.dirname(__file__), stdout=devnull)
 
