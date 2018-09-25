@@ -108,10 +108,8 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
         "b": tf.random_normal((batch_size, 2), dtype=tf.float32),
     }
 
-    def _condition_shift_and_log_scale_fn(x0, output_units, **condition_kwargs):
-      x = tf.concat(
-          [x0] + [condition_kwargs[k] for k in sorted(condition_kwargs)],
-          axis=-1)
+    def _condition_shift_and_log_scale_fn(x0, output_units, a, b):
+      x = tf.concat((x0, a, b), axis=-1)
       out = layers.dense(
           inputs=x,
           units=2 * output_units)
@@ -211,8 +209,8 @@ class RealNVPConstantShiftScaleTest(RealNVPTest):
   @property
   def _real_nvp_kwargs(self):
 
-    def constant_shift_log_scale_fn(x0, output_units, **condition_kwargs):
-      del x0, output_units, condition_kwargs
+    def constant_shift_log_scale_fn(x0, output_units):
+      del x0, output_units
       shift = tf.constant([0.1])
       log_scale = tf.constant([0.5])
       return shift, log_scale
