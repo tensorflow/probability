@@ -336,14 +336,14 @@ class VectorDiffeomixture(tf.distributions.Distribution):
         In terms of samples, smaller `temperature` means one component is more
         likely to dominate.  I.e., smaller `temperature` makes the VDM look more
         like a standard mixture of `K` components.
-      distribution: `tf.Distribution`-like instance. Distribution from which `d`
-        iid samples are used as input to the selected affine transformation.
-        Must be a scalar-batch, scalar-event distribution.  Typically
-        `distribution.reparameterization_type = FULLY_REPARAMETERIZED` or it is
-        a function of non-trainable parameters. WARNING: If you backprop through
-        a VectorDiffeomixture sample and the `distribution` is not
-        `FULLY_REPARAMETERIZED` yet is a function of trainable variables, then
-        the gradient will be incorrect!
+      distribution: `tfp.distributions.Distribution`-like instance. Distribution
+        from which `d` iid samples are used as input to the selected affine
+        transformation. Must be a scalar-batch, scalar-event distribution.
+        Typically `distribution.reparameterization_type = FULLY_REPARAMETERIZED`
+        or it is a function of non-trainable parameters. WARNING: If you
+        backprop through a VectorDiffeomixture sample and the `distribution`
+        is not `FULLY_REPARAMETERIZED` yet is a function of trainable variables,
+        then the gradient will be incorrect!
       loc: Length-`K` list of `float`-type `Tensor`s. The `k`-th element
         represents the `shift` used for the `k`-th affine transformation.  If
         the `k`-th item is `None`, `loc` is implicitly `0`.  When specified,
