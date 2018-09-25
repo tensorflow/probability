@@ -63,5 +63,6 @@ upper_tabs:
         path: https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Factorial_Mixture.ipynb
         status: external
     - name: API
+      skip_translation: true
       contents:
       - include: /probability/api_docs/python/_toc.yaml
