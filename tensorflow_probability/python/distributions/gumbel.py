@@ -18,13 +18,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import math
 # Dependency imports
 import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python import bijectors
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 
 from tensorflow.python.ops.distributions import transformed_distribution
 
@@ -128,8 +128,9 @@ class Gumbel(transformed_distribution.TransformedDistribution):
     with tf.name_scope(name, values=[loc, scale]) as name:
       with tf.control_dependencies([tf.assert_positive(scale)]
                                    if validate_args else []):
-        loc = tf.identity(loc, name="loc")
-        scale = tf.identity(scale, name="scale")
+        dtype = dtype_util.common_dtype([loc, scale], tf.float32)
+        loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
+        scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
         tf.assert_same_float_dtype([loc, scale])
         self._gumbel_bijector = bijectors.Gumbel(
             loc=loc, scale=scale, validate_args=validate_args)
@@ -171,7 +172,7 @@ class Gumbel(transformed_distribution.TransformedDistribution):
     return self.loc + self.scale * np.euler_gamma
 
   def _stddev(self):
-    return self.scale * tf.ones_like(self.loc) * math.pi / math.sqrt(6)
+    return self.scale * tf.ones_like(self.loc) * np.pi / np.sqrt(6)
 
   def _mode(self):
     return self.loc * tf.ones_like(self.scale)

@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python.distributions import mvn_linear_operator
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow.python.ops.distributions import util as distribution_util
 
 
@@ -179,15 +180,19 @@ class MultivariateNormalTriL(
       ValueError: if neither `loc` nor `scale_tril` are specified.
     """
     parameters = dict(locals())
-    def _convert_to_tensor(x, name):
-      return None if x is None else tf.convert_to_tensor(x, name=name)
+
+    def _convert_to_tensor(x, name, dtype):
+      return None if x is None else tf.convert_to_tensor(
+          x, name=name, dtype=dtype)
 
     if loc is None and scale_tril is None:
       raise ValueError("Must specify one or both of `loc`, `scale_tril`.")
     with tf.name_scope(name) as name:
       with tf.name_scope("init", values=[loc, scale_tril]):
-        loc = _convert_to_tensor(loc, name="loc")
-        scale_tril = _convert_to_tensor(scale_tril, name="scale_tril")
+        dtype = dtype_util.common_dtype([loc, scale_tril], tf.float32)
+        loc = _convert_to_tensor(loc, name="loc", dtype=dtype)
+        scale_tril = _convert_to_tensor(
+            scale_tril, name="scale_tril", dtype=dtype)
         if scale_tril is None:
           scale = tf.linalg.LinearOperatorIdentity(
               num_rows=distribution_util.dimension_size(loc, -1),

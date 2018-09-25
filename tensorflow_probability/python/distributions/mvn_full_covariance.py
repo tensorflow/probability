@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python.distributions import mvn_tril
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow.python.ops import control_flow_ops
 
 
@@ -157,11 +158,14 @@ class MultivariateNormalFullCovariance(mvn_tril.MultivariateNormalTriL):
     # Convert the covariance_matrix up to a scale_tril and call MVNTriL.
     with tf.name_scope(name) as name:
       with tf.name_scope("init", values=[loc, covariance_matrix]):
+        dtype = dtype_util.common_dtype([loc, covariance_matrix], tf.float32)
+        loc = loc if loc is None else tf.convert_to_tensor(
+            loc, name="loc", dtype=dtype)
         if covariance_matrix is None:
           scale_tril = None
         else:
           covariance_matrix = tf.convert_to_tensor(
-              covariance_matrix, name="covariance_matrix")
+              covariance_matrix, name="covariance_matrix", dtype=dtype)
           if validate_args:
             covariance_matrix = control_flow_ops.with_dependencies([
                 tf.assert_near(

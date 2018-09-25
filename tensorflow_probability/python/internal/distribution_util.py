@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow.python.framework import smart_cond
 from tensorflow.python.framework import tensor_util
 from tensorflow.python.ops import control_flow_ops
@@ -31,8 +32,8 @@ from tensorflow.python.ops.distributions import util
 from tensorflow.python.ops.distributions.util import *  # pylint: disable=wildcard-import
 
 
-def _convert_to_tensor(x, name):
-  return None if x is None else tf.convert_to_tensor(x, name=name)
+def _convert_to_tensor(x, name, dtype=None):
+  return None if x is None else tf.convert_to_tensor(x, name=name, dtype=dtype)
 
 
 def mixture_stddev(mixture_weight_vector, mean_vector, stddev_vector):
@@ -175,35 +176,36 @@ def make_tril_scale(
       name=name)
 
 
-def make_diag_scale(
-    loc=None,
-    scale_diag=None,
-    scale_identity_multiplier=None,
-    shape_hint=None,
-    validate_args=False,
-    assert_positive=False,
-    name=None):
+def make_diag_scale(loc=None,
+                    scale_diag=None,
+                    scale_identity_multiplier=None,
+                    shape_hint=None,
+                    validate_args=False,
+                    assert_positive=False,
+                    name=None,
+                    dtype=None):
   """Creates a LinearOperator representing a diagonal matrix.
 
   Args:
     loc: Floating-point `Tensor`. This is used for inferring shape in the case
       where only `scale_identity_multiplier` is set.
     scale_diag: Floating-point `Tensor` representing the diagonal matrix.
-      `scale_diag` has shape [N1, N2, ...  k], which represents a k x k
-      diagonal matrix.
-      When `None` no diagonal term is added to the LinearOperator.
+      `scale_diag` has shape [N1, N2, ...  k], which represents a k x k diagonal
+      matrix. When `None` no diagonal term is added to the LinearOperator.
     scale_identity_multiplier: floating point rank 0 `Tensor` representing a
-      scaling done to the identity matrix.
-      When `scale_identity_multiplier = scale_diag = scale_tril = None` then
-      `scale += IdentityMatrix`. Otherwise no scaled-identity-matrix is added
-      to `scale`.
+      scaling done to the identity matrix. When `scale_identity_multiplier =
+      scale_diag = scale_tril = None` then `scale += IdentityMatrix`. Otherwise
+      no scaled-identity-matrix is added to `scale`.
     shape_hint: scalar integer `Tensor` representing a hint at the dimension of
       the identity matrix when only `scale_identity_multiplier` is set.
-    validate_args: Python `bool` indicating whether arguments should be
-      checked for correctness.
+    validate_args: Python `bool` indicating whether arguments should be checked
+      for correctness.
     assert_positive: Python `bool` indicating whether LinearOperator should be
       checked for being positive definite.
     name: Python `str` name given to ops managed by this object.
+    dtype: TF `DType` to prefer when converting args to `Tensor`s. Else, we fall
+      back to a compatible dtype across all of `loc`, `scale_diag`, and
+      `scale_identity_multiplier`.
 
   Returns:
     `LinearOperator` representing a lower triangular matrix.
@@ -229,11 +231,15 @@ def make_diag_scale(
       name,
       "make_diag_scale",
       values=[loc, scale_diag, scale_identity_multiplier]):
-    loc = _convert_to_tensor(loc, name="loc")
-    scale_diag = _convert_to_tensor(scale_diag, name="scale_diag")
+    if dtype is None:
+      dtype = dtype_util.common_dtype(
+          [loc, scale_diag, scale_identity_multiplier])
+    loc = _convert_to_tensor(loc, name="loc", dtype=dtype)
+    scale_diag = _convert_to_tensor(scale_diag, name="scale_diag", dtype=dtype)
     scale_identity_multiplier = _convert_to_tensor(
         scale_identity_multiplier,
-        name="scale_identity_multiplier")
+        name="scale_identity_multiplier",
+        dtype=dtype)
 
     if scale_diag is not None:
       if scale_identity_multiplier is not None:
@@ -255,7 +261,7 @@ def make_diag_scale(
     if scale_identity_multiplier is None:
       return tf.linalg.LinearOperatorIdentity(
           num_rows=shape_hint,
-          dtype=loc.dtype.base_dtype,
+          dtype=dtype,
           is_self_adjoint=True,
           is_positive_definite=True,
           assert_proper_shapes=validate_args)

@@ -24,6 +24,7 @@ import tensorflow as tf
 
 from tensorflow_probability.python import bijectors
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.ops.distributions import transformed_distribution
 
@@ -145,10 +146,12 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     with tf.name_scope(name, values=[concentration1, concentration0]) as name:
+      dtype = dtype_util.common_dtype([concentration1, concentration0],
+                                      tf.float32)
       concentration1 = tf.convert_to_tensor(
-          concentration1, name="concentration1")
+          concentration1, name="concentration1", dtype=dtype)
       concentration0 = tf.convert_to_tensor(
-          concentration0, name="concentration0")
+          concentration0, name="concentration0", dtype=dtype)
     super(Kumaraswamy, self).__init__(
         distribution=tf.distributions.Uniform(
             low=tf.zeros([], dtype=concentration1.dtype),

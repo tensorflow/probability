@@ -22,6 +22,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow.python.framework import tensor_shape
 
 __all__ = [
@@ -118,8 +119,9 @@ class Cauchy(tf.distributions.Distribution):
     with tf.name_scope(name, values=[loc, scale]) as name:
       with tf.control_dependencies([tf.assert_positive(scale)]
                                    if validate_args else []):
-        self._loc = tf.identity(loc, name="loc")
-        self._scale = tf.identity(scale, name="scale")
+        dtype = dtype_util.common_dtype([loc, scale], tf.float32)
+        self._loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
+        self._scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
         tf.assert_same_float_dtype([self._loc, self._scale])
     super(Cauchy, self).__init__(
         dtype=self._scale.dtype,

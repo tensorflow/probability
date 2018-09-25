@@ -22,6 +22,7 @@ import numpy as np
 
 import tensorflow as tf
 from tensorflow_probability.python.distributions import seed_stream
+from tensorflow_probability.python.internal import dtype_util
 
 
 __all__ = ['VonMisesFisher']
@@ -160,6 +161,12 @@ class VonMisesFisher(tf.distributions.Distribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name, values=[mean_direction, concentration]) as name:
+      dtype = dtype_util.common_dtype([mean_direction, concentration],
+                                      tf.float32)
+      mean_direction = tf.convert_to_tensor(
+          mean_direction, name='mean_direction', dtype=dtype)
+      concentration = tf.convert_to_tensor(
+          concentration, name='concentration', dtype=dtype)
       assertions = [
           tf.assert_non_negative(
               concentration, message='`concentration` must be non-negative'),
@@ -178,11 +185,9 @@ class VonMisesFisher(tf.distributions.Distribution):
             tf.shape(mean_direction)[-1], 5,
             message='vMF ndims > 5 is not currently supported')]
       with tf.control_dependencies(assertions):
-        self._mean_direction = tf.convert_to_tensor(
-            mean_direction, name='mean_direction')
-        self._concentration = tf.convert_to_tensor(
-            concentration, name='concentration')
-        tf.assert_same_float_dtype([self._mean_direction, self._concentration])
+        self._mean_direction = tf.identity(mean_direction)
+        self._concentration = tf.identity(concentration)
+      tf.assert_same_float_dtype([self._mean_direction, self._concentration])
       # mean_direction is always reparameterized.
       # concentration is only for event_dim==3, via an inversion sampler.
       reparameterization_type = (

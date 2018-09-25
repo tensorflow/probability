@@ -21,6 +21,7 @@ from __future__ import print_function
 import tensorflow as tf
 from tensorflow_probability.python import bijectors
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.ops.distributions import transformed_distribution
 
@@ -168,7 +169,11 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
         values=[
             loc, scale_diag, scale_identity_multiplier, skewness, tailweight
         ]) as name:
-      loc = tf.convert_to_tensor(loc, name="loc") if loc is not None else loc
+      dtype = dtype_util.common_dtype(
+          [loc, scale_diag, scale_identity_multiplier, skewness, tailweight],
+          tf.float32)
+      loc = loc if loc is None else tf.convert_to_tensor(
+          loc, name="loc", dtype=dtype)
       tailweight = 1. if tailweight is None else tailweight
       has_default_skewness = skewness is None
       skewness = 0. if skewness is None else skewness
@@ -189,7 +194,8 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
           scale_diag=scale_diag,
           scale_identity_multiplier=scale_identity_multiplier,
           validate_args=False,
-          assert_positive=False)
+          assert_positive=False,
+          dtype=dtype)
       batch_shape, event_shape = distribution_util.shapes_from_loc_and_scale(
           loc, scale_linop)
       # scale_linop.diag_part() is efficient since it is a diag type linop.

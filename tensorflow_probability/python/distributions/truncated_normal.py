@@ -24,6 +24,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.ops import random_ops
 from tensorflow.python.ops.distributions import special_math
@@ -119,9 +120,9 @@ class TruncatedNormal(tf.distributions.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[scale]) as name:
-      loc = tf.convert_to_tensor(loc, name="loc")
-      dtype = loc.dtype
+    with tf.name_scope(name, values=[loc, scale, low, high]) as name:
+      dtype = dtype_util.common_dtype([loc, scale, low, high], tf.float32)
+      loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
       scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
       low = tf.convert_to_tensor(low, name="low", dtype=dtype)
       high = tf.convert_to_tensor(high, name="high", dtype=dtype)

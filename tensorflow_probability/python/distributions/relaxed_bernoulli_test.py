@@ -129,7 +129,7 @@ class RelaxedBernoulliTest(tf.test.TestCase):
     p = [0.2, 0.6, 0.5]
     dist = tfd.RelaxedBernoulli(temperature, probs=p)
     n = 10000
-    samples = dist.sample(n)
+    samples = dist.sample(n, seed=123)
     self.assertEqual(samples.dtype, tf.float32)
     sample_values = self.evaluate(samples)
     self.assertTrue(np.all(sample_values >= 0))

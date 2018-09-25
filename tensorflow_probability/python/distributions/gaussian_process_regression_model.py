@@ -19,10 +19,10 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.distributions import mvn_linear_operator
+from tensorflow_probability.python.internal import dtype_util
 
 __all__ = [
     'GaussianProcessRegressionModel',
@@ -407,8 +407,12 @@ class GaussianProcessRegressionModel(
     """
     parameters = dict(locals())
     with tf.name_scope(name) as name:
-      index_points = tf.convert_to_tensor(index_points, name='index_points')
-      dtype = index_points.dtype.as_numpy_dtype
+      dtype = dtype_util.common_dtype([
+          index_points, observation_index_points, observations,
+          observation_noise_variance, predictive_noise_variance, jitter
+      ], tf.float32)
+      index_points = tf.convert_to_tensor(
+          index_points, name='index_points', dtype=dtype)
       observation_index_points = (
           None if observation_index_points is None else
           tf.convert_to_tensor(observation_index_points,
@@ -434,7 +438,7 @@ class GaussianProcessRegressionModel(
       # Default to a constant zero function, borrowing the dtype from
       # index_points to ensure consistency.
       if mean_fn is None:
-        mean_fn = lambda x: np.array([0.], dtype)
+        mean_fn = lambda x: tf.zeros([1], dtype=dtype)
       else:
         if not callable(mean_fn):
           raise ValueError('`mean_fn` must be a Python callable')

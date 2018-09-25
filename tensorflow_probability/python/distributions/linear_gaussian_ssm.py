@@ -337,6 +337,7 @@ class LinearGaussianStateSpaceModel(tf.distributions.Distribution):
       self.initial_step = initial_step
       self.final_step = self.initial_step + self.num_timesteps
 
+      # TODO(b/78475680): Friendly dtype inference.
       dtype = initial_state_prior.dtype
 
       # Internally, the transition and observation matrices are

@@ -115,6 +115,7 @@ py_library(
     srcs = ["binomial.py"],
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -124,6 +125,7 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -156,6 +158,7 @@ py_library(
     srcs = ["deterministic.py"],
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -165,6 +168,7 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -174,6 +178,7 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -183,6 +188,7 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -203,6 +209,7 @@ py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors",
         "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -212,6 +219,7 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -239,6 +247,7 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -248,6 +257,7 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -259,6 +269,7 @@ py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors",
         "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -286,6 +297,7 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -296,6 +308,7 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -325,6 +338,7 @@ py_library(
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -342,6 +356,7 @@ py_library(
     srcs = ["mvn_full_covariance.py"],
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -360,6 +375,7 @@ py_library(
     srcs = ["mvn_tril.py"],
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -368,6 +384,7 @@ py_library(
     srcs = ["negative_binomial.py"],
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -388,6 +405,16 @@ py_library(
 )
 
 py_library(
+    name = "pareto",
+    srcs = ["pareto.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+    ],
+)
+
+py_library(
     name = "poisson_lognormal",
     srcs = ["poisson_lognormal.py"],
     deps = [
@@ -395,15 +422,7 @@ py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors",
         "//tensorflow_probability/python/internal:distribution_util",
-    ],
-)
-
-py_library(
-    name = "pareto",
-    srcs = ["pareto.py"],
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -431,6 +450,8 @@ py_library(
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -441,6 +462,8 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -468,6 +491,7 @@ py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors",
         "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -478,6 +502,7 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -517,6 +542,7 @@ py_library(
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -538,6 +564,7 @@ py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors",
         "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -548,6 +575,7 @@ py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors",
         "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -558,6 +586,7 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -567,6 +596,7 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -577,6 +607,7 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 

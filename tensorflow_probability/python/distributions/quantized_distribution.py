@@ -22,9 +22,9 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.ops.distributions import distribution as distributions
-from tensorflow.python.ops.distributions import util as distribution_util
 
 __all__ = ["QuantizedDistribution"]
 
@@ -269,9 +269,9 @@ class QuantizedDistribution(distributions.Distribution):
       self._dist = distribution
 
       if low is not None:
-        low = tf.convert_to_tensor(low, name="low")
+        low = tf.convert_to_tensor(low, name="low", dtype=distribution.dtype)
       if high is not None:
-        high = tf.convert_to_tensor(high, name="high")
+        high = tf.convert_to_tensor(high, name="high", dtype=distribution.dtype)
       tf.assert_same_float_dtype(tensors=[self.distribution, low, high])
 
       # We let QuantizedDistribution access _graph_parents since this class is

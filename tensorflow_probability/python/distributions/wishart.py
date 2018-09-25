@@ -25,6 +25,7 @@ import tensorflow as tf
 
 from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow.contrib.framework.python.framework import tensor_util as contrib_tensor_util
 from tensorflow.python.framework import tensor_util
 from tensorflow.python.ops import control_flow_ops
@@ -522,18 +523,21 @@ class Wishart(_WishartLinearOperator):
     """
     parameters = dict(locals())
 
-    with tf.name_scope(name, values=[scale, scale_tril]) as name:
-      with tf.name_scope("init", values=[scale, scale_tril]):
+    with tf.name_scope(name) as name:
+      with tf.name_scope("init", values=[df, scale, scale_tril]):
         if (scale is None) == (scale_tril is None):
           raise ValueError("Must pass scale or scale_tril, but not both.")
 
+        dtype = dtype_util.common_dtype([df, scale, scale_tril], tf.float32)
+        df = tf.convert_to_tensor(df, name="df", dtype=dtype)
         if scale is not None:
-          scale = tf.convert_to_tensor(scale)
+          scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
           if validate_args:
             scale = distribution_util.assert_symmetric(scale)
           scale_tril = tf.cholesky(scale)
         else:  # scale_tril is not None
-          scale_tril = tf.convert_to_tensor(scale_tril)
+          scale_tril = tf.convert_to_tensor(
+              scale_tril, name="scale_tril", dtype=dtype)
           if validate_args:
             scale_tril = control_flow_ops.with_dependencies([
                 tf.assert_positive(

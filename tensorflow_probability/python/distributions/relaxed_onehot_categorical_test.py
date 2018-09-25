@@ -33,7 +33,7 @@ def make_relaxed_categorical(batch_shape, num_classes, dtype=tf.float32):
   logits = tf.random_uniform(
       list(batch_shape) + [num_classes], -10, 10, dtype=dtype) - 50.
   temperatures = tf.random_uniform(list(batch_shape), 0.1, 10, dtype=tf.float32)
-  return tfd.RelaxedOneHotCategorical(temperatures, logits, dtype=dtype)
+  return tfd.RelaxedOneHotCategorical(temperatures, logits)
 
 
 @test_util.run_all_in_graph_and_eager_modes

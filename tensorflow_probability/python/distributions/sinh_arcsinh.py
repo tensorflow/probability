@@ -21,6 +21,7 @@ from __future__ import print_function
 import tensorflow as tf
 from tensorflow_probability.python import bijectors
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.ops.distributions import transformed_distribution
 
@@ -133,8 +134,9 @@ class SinhArcsinh(transformed_distribution.TransformedDistribution):
     parameters = dict(locals())
 
     with tf.name_scope(name, values=[loc, scale, skewness, tailweight]) as name:
-      loc = tf.convert_to_tensor(loc, name="loc")
-      dtype = loc.dtype
+      dtype = dtype_util.common_dtype([loc, scale, skewness, tailweight],
+                                      tf.float32)
+      loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
       scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
       tailweight = 1. if tailweight is None else tailweight
       has_default_skewness = skewness is None

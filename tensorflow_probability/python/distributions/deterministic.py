@@ -24,6 +24,7 @@ import abc
 import six
 import tensorflow as tf
 
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.framework import tensor_util
 from tensorflow.python.ops import control_flow_ops
@@ -83,7 +84,8 @@ class _BaseDeterministic(tf.distributions.Distribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name, values=[loc, atol, rtol]) as name:
-      loc = tf.convert_to_tensor(loc, name="loc")
+      dtype = dtype_util.common_dtype([loc, atol, rtol])
+      loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
       if is_vector and validate_args:
         msg = "Argument loc must be at least rank 1."
         if loc.get_shape().ndims is not None:

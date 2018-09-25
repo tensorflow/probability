@@ -26,6 +26,7 @@ from tensorflow_probability.python import bijectors
 from tensorflow_probability.python.distributions import poisson
 from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.ops.distributions import categorical as categorical_lib
 from tensorflow.python.ops.distributions import transformed_distribution as transformed_lib
@@ -252,11 +253,11 @@ class PoissonLogNormalQuadratureCompound(tf.distributions.Distribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name, values=[loc, scale]) as name:
+      dtype = dtype_util.common_dtype([loc, scale], tf.float32)
       if loc is not None:
-        loc = tf.convert_to_tensor(loc, name="loc")
+        loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
       if scale is not None:
-        scale = tf.convert_to_tensor(
-            scale, dtype=None if loc is None else loc.dtype, name="scale")
+        scale = tf.convert_to_tensor(scale, dtype=dtype, name="scale")
       self._quadrature_grid, self._quadrature_probs = tuple(quadrature_fn(
           loc, scale, quadrature_size, validate_args))
 

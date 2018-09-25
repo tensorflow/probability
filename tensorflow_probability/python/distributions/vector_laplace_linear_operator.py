@@ -198,7 +198,8 @@ class VectorLaplaceLinearOperator(
     with tf.name_scope(name, values=[loc] + scale.graph_parents):
       # Since expand_dims doesn't preserve constant-ness, we obtain the
       # non-dynamic value if possible.
-      loc = tf.convert_to_tensor(loc, name="loc") if loc is not None else loc
+      loc = loc if loc is None else tf.convert_to_tensor(
+          loc, name="loc", dtype=scale.dtype)
       batch_shape, event_shape = distribution_util.shapes_from_loc_and_scale(
           loc, scale)
 

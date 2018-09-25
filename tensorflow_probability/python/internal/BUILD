@@ -51,6 +51,7 @@ py_library(
     srcs = ["distribution_util.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":dtype_util",
         # tensorflow dep,
     ],
 )

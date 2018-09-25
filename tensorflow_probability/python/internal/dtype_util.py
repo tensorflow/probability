@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
+import tensorflow as tf
 
 from tensorflow.contrib import framework as contrib_framework
 
@@ -35,11 +36,11 @@ def common_dtype(args_list, preferred_dtype=None):
     if isinstance(a, (np.ndarray, np.generic)):
       dt = a.dtype.type
     elif contrib_framework.is_tensor(a):
-      dt = a.dtype.as_numpy_dtype
+      dt = a.dtype.base_dtype.as_numpy_dtype
     else:
       continue
     if dtype is None:
       dtype = dt
     elif dtype != dt:
       raise TypeError('Found incompatible dtypes, {} and {}.'.format(dtype, dt))
-  return preferred_dtype if dtype is None else dtype
+  return preferred_dtype if dtype is None else tf.as_dtype(dtype)

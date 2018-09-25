@@ -22,9 +22,10 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python import bijectors
+from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.ops.distributions import transformed_distribution
-from tensorflow.python.ops.distributions import util as distribution_util
 
 
 class ExpRelaxedOneHotCategorical(tf.distributions.Distribution):
@@ -124,7 +125,6 @@ class ExpRelaxedOneHotCategorical(tf.distributions.Distribution):
       temperature,
       logits=None,
       probs=None,
-      dtype=None,
       validate_args=False,
       allow_nan_stats=True,
       name="ExpRelaxedOneHotCategorical"):
@@ -144,8 +144,6 @@ class ExpRelaxedOneHotCategorical(tf.distributions.Distribution):
         `N - 1` dimensions index into a batch of independent distributions and
         the last dimension represents a vector of probabilities for each
         class. Only one of `logits` or `probs` should be passed in.
-      dtype: The type of the event samples (default: inferred from
-        logits/probs).
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -159,20 +157,21 @@ class ExpRelaxedOneHotCategorical(tf.distributions.Distribution):
     parameters = dict(locals())
     with tf.name_scope(name, values=[logits, probs, temperature]) as name:
 
+      dtype = dtype_util.common_dtype([logits, probs, temperature], tf.float32)
       self._logits, self._probs = distribution_util.get_logits_and_probs(
-          name=name, logits=logits, probs=probs, validate_args=validate_args,
-          multidimensional=True)
-
-      if dtype is None:
-        dtype = self._logits.dtype
-        if not validate_args:
-          temperature = tf.cast(temperature, dtype)
+          name=name,
+          logits=logits,
+          probs=probs,
+          validate_args=validate_args,
+          multidimensional=True,
+          dtype=dtype)
 
       with tf.control_dependencies([tf.assert_positive(temperature)]
                                    if validate_args else []):
-        self._temperature = tf.identity(temperature, name="temperature")
+        self._temperature = tf.convert_to_tensor(
+            temperature, name="temperature", dtype=dtype)
         self._temperature_2d = tf.reshape(
-            temperature, [-1, 1], name="temperature_2d")
+            self._temperature, [-1, 1], name="temperature_2d")
 
       logits_shape_static = self._logits.get_shape().with_rank_at_least(1)
       if logits_shape_static.ndims is not None:
@@ -244,7 +243,7 @@ class ExpRelaxedOneHotCategorical(tf.distributions.Distribution):
         dtype=self.dtype,
         seed=seed)
     gumbel = -tf.log(-tf.log(uniform))
-    noisy_logits = tf.div(gumbel + logits_2d, self._temperature_2d)
+    noisy_logits = (gumbel + logits_2d) / self._temperature_2d
     samples = tf.nn.log_softmax(noisy_logits)
     ret = tf.reshape(samples, sample_shape)
     return ret
@@ -360,7 +359,6 @@ class RelaxedOneHotCategorical(
       temperature,
       logits=None,
       probs=None,
-      dtype=None,
       validate_args=False,
       allow_nan_stats=True,
       name="RelaxedOneHotCategorical"):
@@ -380,8 +378,6 @@ class RelaxedOneHotCategorical(
         dimensions index into a batch of independent distributions and the last
         dimension represents a vector of probabilities for each class. Only one
         of `logits` or `probs` should be passed in.
-      dtype: The type of the event samples (default: inferred from
-        logits/probs).
       validate_args: Unused in this distribution.
       allow_nan_stats: Python `bool`, default `True`. If `False`, raise an
         exception if a statistic (e.g. mean/mode/etc...) is undefined for any
@@ -392,7 +388,6 @@ class RelaxedOneHotCategorical(
     dist = ExpRelaxedOneHotCategorical(temperature,
                                        logits=logits,
                                        probs=probs,
-                                       dtype=dtype,
                                        validate_args=validate_args,
                                        allow_nan_stats=allow_nan_stats)
     super(RelaxedOneHotCategorical, self).__init__(dist,

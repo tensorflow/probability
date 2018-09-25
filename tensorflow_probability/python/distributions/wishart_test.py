@@ -361,12 +361,14 @@ class WishartTest(tf.test.TestCase):
     chol_scale = chol(x)
 
     # Still has these assertions because they're resolveable at graph
-    # construction
+    # construction:
+    # df < rank
     with self.assertRaisesRegexp(ValueError, "cannot be less than"):
       tfd.Wishart(df=2, scale_tril=chol_scale, validate_args=False)
+    # non-float dtype
     with self.assertRaisesRegexp(TypeError, "Argument tril must have dtype"):
       tfd.Wishart(
-          df=4.,
+          df=4,
           scale_tril=np.asarray(chol_scale, dtype=np.int32),
           validate_args=False)
 

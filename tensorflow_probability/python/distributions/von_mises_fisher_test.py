@@ -58,7 +58,7 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
         allow_nan_stats=False)
     self.assertEqual([5, 3], vmf.batch_shape.as_list())
     self.assertEqual([2], vmf.event_shape.as_list())
-    nsamples = 10000
+    nsamples = 12000
     samples = vmf.sample(sample_shape=[nsamples])
     self.assertEqual([nsamples, 5, 3, 2], samples.shape.as_list())
     sample_mean = self.evaluate(samples).mean(axis=0)

@@ -18,6 +18,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.ops.distributions import util as distribution_util
@@ -159,13 +160,16 @@ class Binomial(tf.distributions.Distribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name, values=[total_count, logits, probs]) as name:
+      dtype = dtype_util.common_dtype([total_count, logits, probs], tf.float32)
       self._total_count = self._maybe_assert_valid_total_count(
-          tf.convert_to_tensor(total_count, name="total_count"), validate_args)
+          tf.convert_to_tensor(total_count, name="total_count", dtype=dtype),
+          validate_args)
       self._logits, self._probs = distribution_util.get_logits_and_probs(
           logits=logits,
           probs=probs,
           validate_args=validate_args,
-          name=name)
+          name=name,
+          dtype=dtype)
     super(Binomial, self).__init__(
         dtype=self._probs.dtype,
         reparameterization_type=tf.distributions.NOT_REPARAMETERIZED,
