@@ -26,7 +26,6 @@ import tensorflow as tf
 from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow.contrib.framework.python.framework import tensor_util as contrib_tensor_util
 from tensorflow.python.framework import tensor_util
 from tensorflow.python.ops import control_flow_ops
 
@@ -119,8 +118,7 @@ class _WishartLinearOperator(tf.distributions.Distribution):
         self._scale_operator = scale_operator
         self._df = tf.convert_to_tensor(
             df, dtype=scale_operator.dtype, name="df")
-        contrib_tensor_util.assert_same_float_dtype(
-            (self._df, self._scale_operator))
+        tf.assert_same_float_dtype([self._df, self._scale_operator])
         if (self._scale_operator.shape.ndims is None or
             self._scale_operator.shape[-1].value is None):
           self._dimension = tf.cast(
@@ -202,10 +200,12 @@ class _WishartLinearOperator(tf.distributions.Distribution):
     return tf.TensorShape([dimension, dimension])
 
   def _batch_shape_tensor(self):
-    return self.scale_operator.batch_shape_tensor()
+    return tf.broadcast_dynamic_shape(
+        tf.shape(self.df), self.scale_operator.batch_shape_tensor())
 
   def _batch_shape(self):
-    return self.scale_operator.batch_shape
+    return tf.broadcast_static_shape(
+        self.df.shape, self.scale_operator.batch_shape)
 
   def _sample_n(self, n, seed):
     batch_shape = self.batch_shape_tensor()
