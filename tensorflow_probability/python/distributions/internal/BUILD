@@ -74,3 +74,43 @@ py_test(
         # tensorflow dep,
     ],
 )
+
+py_library(
+    name = "correlation_matrix_volumes_py",
+    srcs = [
+        "correlation_matrix_volumes_lib.py",
+    ],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions",
+    ],
+)
+
+py_binary(
+    name = "correlation_matrix_volumes",
+    srcs = [
+        "correlation_matrix_volumes.py",
+    ],
+    deps = [
+        ":correlation_matrix_volumes_py",
+    ],
+)
+
+py_test(
+    name = "correlation_matrix_volumes_test",
+    size = "medium",
+    srcs = ["correlation_matrix_volumes_test.py"],
+    shard_count = 4,
+    tags = [
+        "no_pip",
+        "optonly",
+    ],
+    deps = [
+        ":correlation_matrix_volumes_py",
+        # numpy dep,
+        # tensorflow dep,
+        # For statistical testing
+        "//tensorflow_probability/python/distributions",
+    ],
+)
