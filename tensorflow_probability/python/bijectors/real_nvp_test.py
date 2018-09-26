@@ -23,6 +23,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.internal import test_util
+from tensorflow.python.layers import core as layers
 from tensorflow.python.ops.distributions import transformed_distribution as transformed_distribution_lib
 
 
@@ -96,6 +97,62 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
       self.assertAllClose(forward_x_, forward_inverse_y_, rtol=1e-4, atol=0.)
       self.assertAllClose(x_, inverse_y_, rtol=1e-4, atol=0.)
       self.assertAllClose(ildj_, -fldj_, rtol=1e-6, atol=0.)
+
+  def testBijectorConditionKwargs(self):
+    batch_size = 3
+    x_ = np.linspace(-1.0, 1.0, (batch_size * 4 * 2)).astype(
+        np.float32).reshape((batch_size, 4 * 2))
+
+    conditions = {
+        "a": tf.random_normal((batch_size, 4), dtype=tf.float32),
+        "b": tf.random_normal((batch_size, 2), dtype=tf.float32),
+    }
+
+    def _condition_shift_and_log_scale_fn(x0, output_units, a, b):
+      x = tf.concat((x0, a, b), axis=-1)
+      out = layers.dense(
+          inputs=x,
+          units=2 * output_units)
+      shift, log_scale = tf.split(out, 2, axis=-1)
+      return shift, log_scale
+
+    condition_shift_and_log_scale_fn = tf.make_template(
+        "real_nvp_condition_template", _condition_shift_and_log_scale_fn)
+
+    nvp = tfb.RealNVP(
+        num_masked=4,
+        validate_args=True,
+        is_constant_jacobian=False,
+        shift_and_log_scale_fn=condition_shift_and_log_scale_fn)
+
+    x = tf.constant(x_)
+
+    forward_x = nvp.forward(x, **conditions)
+    # Use identity to invalidate cache.
+    inverse_y = nvp.inverse(tf.identity(forward_x), **conditions)
+    forward_inverse_y = nvp.forward(inverse_y, **conditions)
+    fldj = nvp.forward_log_det_jacobian(x, event_ndims=1, **conditions)
+    # Use identity to invalidate cache.
+    ildj = nvp.inverse_log_det_jacobian(
+        tf.identity(forward_x), event_ndims=1, **conditions)
+    self.evaluate(tf.global_variables_initializer())
+    [
+        forward_x_,
+        inverse_y_,
+        forward_inverse_y_,
+        ildj_,
+        fldj_,
+    ] = self.evaluate([
+        forward_x,
+        inverse_y,
+        forward_inverse_y,
+        ildj,
+        fldj,
+    ])
+    self.assertEqual("real_nvp", nvp.name)
+    self.assertAllClose(forward_x_, forward_inverse_y_, rtol=1e-6, atol=0.)
+    self.assertAllClose(x_, inverse_y_, rtol=1e-6, atol=0.)
+    self.assertAllClose(ildj_, -fldj_, rtol=1e-6, atol=0.)
 
   def testMutuallyConsistent(self):
     dims = 4
