@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""The Broyden-Fletcher-Shanno-Goldfarb minimization algorithm.
+"""The Broyden-Fletcher-Goldfarb-Shanno minimization algorithm.
 
 Quasi Newton methods are a class of popular first order optimization algorithm.
 These methods use a positive definite approximation to the exact
-Hessian to find the search direction. The Broyden-Fletcher-Shanno-Goldfarb
+Hessian to find the search direction. The Broyden-Fletcher-Goldfarb-Shanno
 algorithm (BFGS) is a specific implementation of this general idea.
 
 This module provides an implementation of the BFGS scheme using the Hager Zhang
@@ -72,7 +72,10 @@ BfgsOptimizerResults = collections.namedtuple(
 def minimize(value_and_gradients_function,
              initial_position,
              tolerance=1e-8,
+             x_tolerance=0,
+             f_relative_tolerance=0,
              initial_inverse_hessian_estimate=None,
+             max_iterations=50,
              parallel_iterations=1,
              name=None):
   """Applies the BFGS algorithm to minimize a differentiable function.
@@ -123,9 +126,15 @@ def minimize(value_and_gradients_function,
     initial_position: `Tensor` of real dtype. The starting point of the search
       procedure. Should be a point at which the function value and the gradient
       norm are finite.
-    tolerance: Scalar `Tensor` of real dtype. Specifies the tolerance for the
-      procedure. The algorithm is said to have converged when the Euclidean
-      norm of the gradient is below this value.
+    tolerance: Scalar `Tensor` of real dtype. Specifies the gradient tolerance
+      for the procedure. If the supremum norm of the gradient vector is below
+      this number, the algorithm is stopped.
+    x_tolerance: Scalar `Tensor` of real dtype. If the absolute change in the
+      position between one iteration and the next is smaller than this number,
+      the algorithm is stopped.
+    f_relative_tolerance: Scalar `Tensor` of real dtype. If the relative change
+      in the objective value between one iteration and the next is smaller
+      than this value, the algorithm is stopped.
     initial_inverse_hessian_estimate: Optional `Tensor` of the same dtype
       as the components of the output of the `value_and_gradients_function`.
       If specified, the shape should be `initial_position.shape` * 2.
@@ -139,6 +148,8 @@ def minimize(value_and_gradients_function,
       the inverse of the Hessian at the initial point. If not specified,
       the identity matrix is used as the starting estimate for the
       inverse Hessian.
+    max_iterations: Scalar positive int32 `Tensor`. The maximum number of
+      iterations for BFGS updates.
     parallel_iterations: Positive integer. The number of iterations allowed to
       run in parallel.
     name: (Optional) Python str. The name prefixed to the ops created by this
@@ -176,102 +187,147 @@ def minimize(value_and_gradients_function,
     initial_position = tf.convert_to_tensor(initial_position,
                                             name='initial_position')
     dtype = initial_position.dtype.base_dtype
+    tolerance = tf.convert_to_tensor(tolerance, dtype=dtype,
+                                     name='grad_tolerance')
+    f_relative_tolerance = tf.convert_to_tensor(f_relative_tolerance,
+                                                dtype=dtype,
+                                                name='f_relative_tolerance')
+    x_tolerance = tf.convert_to_tensor(x_tolerance,
+                                       dtype=dtype,
+                                       name='x_tolerance')
+    max_iterations = tf.convert_to_tensor(max_iterations, name='max_iterations')
+
     domain_shape = initial_position.shape
-    initial_inv_hessian = initial_inverse_hessian_estimate
+
     if initial_inverse_hessian_estimate is None:
       inv_hessian_shape = domain_shape.concatenate(domain_shape)
       initial_inv_hessian = tf.eye(tf.size(initial_position), dtype=dtype)
-      initial_inv_hessian = tf.reshape(initial_inv_hessian, inv_hessian_shape)
+      initial_inv_hessian = tf.reshape(initial_inv_hessian,
+                                       inv_hessian_shape,
+                                       name='initial_inv_hessian')
+    else:
+      initial_inv_hessian = tf.convert_to_tensor(
+          initial_inverse_hessian_estimate,
+          dtype=dtype,
+          name='initial_inv_hessian')
 
-    f0, df0 = value_and_gradients_function(initial_position)
-    converged = tf.norm(df0, ord=2) < tolerance
+    # If an initial inverse Hessian is supplied, ensure that it is positive
+    # definite. The easiest way to validate this is to compute the Cholesky
+    # decomposition. However, it seems that simply adding a control dependency
+    # on the decomposition result is not enough to trigger it. We need to
+    # add an assert on the result.
+    if initial_inverse_hessian_estimate is not None:
+      # The supplied Hessian may not be of rank 2. Reshape it so it is.
+      initial_inv_hessian_sqr_mat = tf.reshape(
+          initial_inverse_hessian_estimate,
+          tf.stack([tf.size(initial_position),
+                    tf.size(initial_position)], axis=0))
+      # If the matrix is not positive definite, the Cholesky decomposition will
+      # fail. Adding an assert on it ensures it will be triggered.
+      cholesky_factor = tf.cholesky(initial_inv_hessian_sqr_mat)
+      is_positive_definite = tf.reduce_all(tf.is_finite(cholesky_factor))
+      asymmetry = tf.norm(initial_inv_hessian_sqr_mat -
+                          tf.transpose(initial_inv_hessian_sqr_mat), np.inf)
+      is_symmetric = tf.equal(asymmetry, 0)
+      with tf.control_dependencies(
+          [tf.Assert(is_positive_definite,
+                     ['Initial inverse Hessian is not positive definite.',
+                      initial_inverse_hessian_estimate]),
+           tf.Assert(is_symmetric,
+                     ['Initial inverse Hessian is not symmetric',
+                      initial_inverse_hessian_estimate])]):
+        f0, df0 = value_and_gradients_function(initial_position)
+    else:
+      f0, df0 = value_and_gradients_function(initial_position)
+
+    initial_convergence = _initial_convergence_test(df0, tolerance)
 
     def _cond(converged,
               failed,
+              iteration,
               *ignored_args):  # pylint: disable=unused-argument
       """Stopping condition for the algorithm."""
-      return tf.logical_not(converged | failed)
+      keep_going = tf.logical_not(converged | failed |
+                                  (iteration >= max_iterations))
+      return keep_going
 
-    def _body(_,
-              failed,    # pylint: disable=unused-argument
-              num_iterations,
+    def _body(converged,  # pylint: disable=unused-argument
+              stopped,  # pylint: disable=unused-argument
+              iteration,
               total_evals,
               position,
               objective_value,
               objective_gradient,
-              inv_hessian_estimate):
+              input_inv_hessian_estimate):
       """Main optimization loop."""
-      search_direction = _get_search_direction(inv_hessian_estimate,
+
+      search_direction = _get_search_direction(input_inv_hessian_estimate,
                                                objective_gradient)
+      derivative_at_start_pt = tf.reduce_sum(objective_gradient *
+                                             search_direction)
+      # If the derivative at the start point is not negative, reset the
+      # Hessian estimate and recompute the search direction.
+      needs_reset = derivative_at_start_pt >= 0
+      def _reset_search_dirn():
+        search_direction = _get_search_direction(initial_inv_hessian,
+                                                 objective_gradient)
+        return search_direction, initial_inv_hessian
+
+      search_direction, inv_hessian_estimate = smart_cond.smart_cond(
+          needs_reset,
+          true_fn=_reset_search_dirn,
+          false_fn=lambda: (search_direction, input_inv_hessian_estimate))
       line_search_value_grad_func = _restrict_along_direction(
           value_and_gradients_function, position, search_direction)
       derivative_at_start_pt = tf.reduce_sum(objective_gradient *
                                              search_direction)
+
       ls_result = linesearch.hager_zhang(
           line_search_value_grad_func,
-          initial_step_size=tf.constant(1, dtype=dtype),
+          initial_step_size=tf.convert_to_tensor(1, dtype=dtype),
           objective_at_zero=objective_value,
           grad_objective_at_zero=derivative_at_start_pt)
 
-      # If the line search failed, then quit at this point.
-      failed_retval = BfgsOptimizerResults(
-          converged=False,
-          failed=True,
-          num_iterations=num_iterations + 1,
-          num_objective_evaluations=total_evals + ls_result.func_evals,
-          position=position,
-          objective_value=objective_value,
-          objective_gradient=objective_gradient,
-          inverse_hessian_estimate=inv_hessian_estimate)
       # Fail if the objective value is not finite or the line search failed.
-      ls_failed_case = (~(tf.is_finite(objective_value) & ls_result.converged),
-                        lambda: failed_retval)
+      ls_failed = ~ls_result.converged
 
-      # If the line search didn't fail, then either we need to continue
-      # searching or need to stop because we have converged.
-      position_delta = search_direction * ls_result.left_pt
-      next_position = position + position_delta
-      next_objective, next_objective_gradient = value_and_gradients_function(
-          next_position)
-      grad_norm = tf.norm(next_objective_gradient, ord=np.inf)
-      has_converged = grad_norm <= tolerance
-      grad_delta = next_objective_gradient - objective_gradient
-      updated_inv_hessian = _bfgs_inv_hessian_update(grad_delta,
-                                                     position_delta,
-                                                     inv_hessian_estimate)
-      updated_inv_hessian.set_shape(inv_hessian_estimate.shape)
-      converged_retval = BfgsOptimizerResults(
-          converged=tf.constant(True, name='converged'),
-          failed=tf.constant(False, name='failed'),
-          num_iterations=tf.convert_to_tensor(num_iterations+1,
-                                              name='num_iterations'),
-          num_objective_evaluations=tf.convert_to_tensor(
-              total_evals + ls_result.func_evals + 1,
-              name='num_objective_evaluations'),
-          position=next_position,
-          objective_value=next_objective,
-          objective_gradient=next_objective_gradient,
-          inverse_hessian_estimate=updated_inv_hessian)
-      converged_case = (has_converged, lambda: converged_retval)
-      default_retval = BfgsOptimizerResults(
-          converged=tf.constant(False, name='converged'),
-          failed=tf.constant(False, name='failed'),
-          num_iterations=tf.convert_to_tensor(num_iterations+1,
-                                              name='num_iterations'),
-          num_objective_evaluations=total_evals + ls_result.func_evals + 1,
-          position=next_position,
-          objective_value=next_objective,
-          objective_gradient=next_objective_gradient,
-          inverse_hessian_estimate=updated_inv_hessian)
-      default_fn = lambda: default_retval
-      return smart_cond.smart_case([ls_failed_case, converged_case],
-                                   default=default_fn,
-                                   exclusive=False)
+      # If the line search failed, then quit at this point.
+      def _failed_fn():
+        """Line search failed action."""
+        failed_retval = BfgsOptimizerResults(
+            converged=False,
+            failed=True,
+            num_iterations=iteration + 1,
+            num_objective_evaluations=total_evals + ls_result.func_evals,
+            position=position,
+            objective_value=objective_value,
+            objective_gradient=objective_gradient,
+            inverse_hessian_estimate=inv_hessian_estimate)
+        return failed_retval
+
+      def _success_fn():
+        return _bfgs_update(value_and_gradients_function,
+                            position,
+                            objective_value,
+                            objective_gradient,
+                            search_direction,
+                            inv_hessian_estimate,
+                            ls_result.left_pt,
+                            iteration,
+                            total_evals + ls_result.func_evals,
+                            tolerance,
+                            f_relative_tolerance,
+                            x_tolerance)
+
+      return smart_cond.smart_cond(ls_failed,
+                                   true_fn=_failed_fn,
+                                   false_fn=_success_fn)
+
     initial_values = BfgsOptimizerResults(
-        converged=converged,
+        converged=initial_convergence,
         failed=False,
         num_iterations=0,
-        num_objective_evaluations=0,
+        num_objective_evaluations=1,
         position=initial_position,
         objective_value=f0,
         objective_gradient=df0,
@@ -279,6 +335,146 @@ def minimize(value_and_gradients_function,
 
     return tf.while_loop(_cond, _body, initial_values,
                          parallel_iterations=parallel_iterations)
+
+
+_UpdatedPosition = collections.namedtuple('_UpdatedPosition', [
+    'failed',
+    'position_delta',
+    'gradient_delta',
+    'next_position',
+    'next_value',
+    'next_gradient',
+    'evals'])
+
+
+def _is_finite(arg1, *args):
+  """Checks if the supplied tensors are finite.
+
+  Args:
+    arg1: A numeric `Tensor`.
+    *args: (Optional) Other `Tensors` to check for finiteness.
+
+  Returns:
+    is_finite: Scalar boolean `Tensor` indicating whether all the supplied
+      tensors are finite.
+  """
+  finite = tf.reduce_all(tf.is_finite(arg1))
+  for arg in args:
+    finite = finite & tf.reduce_all(tf.is_finite(arg))
+  return finite
+
+
+def _bfgs_update(value_and_gradients_function,
+                 current_position,
+                 current_objective,
+                 current_gradient,
+                 search_direction,
+                 current_inverse_hessian,
+                 step_size,
+                 iteration,
+                 num_evaluations,
+                 grad_tolerance,
+                 f_relative_tolerance,
+                 x_tolerance):
+  """Perform a BFGS update."""
+  updated = _update_position(value_and_gradients_function,
+                             current_position,
+                             current_gradient,
+                             search_direction,
+                             step_size)
+
+  # Check for convergence.
+  converged = _check_convergence(current_position,
+                                 updated.next_position,
+                                 current_objective,
+                                 updated.next_value,
+                                 updated.next_gradient,
+                                 grad_tolerance,
+                                 f_relative_tolerance,
+                                 x_tolerance)
+  # If not converged, update the Hessian.
+  def _update_hessian():
+    return _bfgs_inv_hessian_update(updated.gradient_delta,
+                                    updated.position_delta,
+                                    current_inverse_hessian)
+
+  next_inverse_hessian = smart_cond.smart_cond(
+      converged,
+      lambda: current_inverse_hessian,
+      _update_hessian)
+
+  return BfgsOptimizerResults(
+      converged=converged,
+      failed=updated.failed,
+      num_iterations=iteration + 1,
+      num_objective_evaluations=num_evaluations + updated.evals,
+      position=updated.next_position,
+      objective_value=updated.next_value,
+      objective_gradient=updated.next_gradient,
+      inverse_hessian_estimate=next_inverse_hessian)
+
+
+def _update_position(value_and_gradients_function,
+                     position,
+                     gradient,
+                     search_direction,
+                     step_size):
+  """Perform a step of the BFGS update.
+
+  Args:
+    value_and_gradients_function: The objective function.
+    position: The current position.
+    gradient: The current gradient.
+    search_direction: The direction of the search.
+    step_size: The size of the step to take along the search direction.
+
+  Returns:
+    A named tuple containing the following fields
+      failed: Indicates whether the update failed.
+      position_delta: The change in the position.
+      gradient_delta: The change in the derivative.
+      next_position: The next position.
+      next_value: The value of the objective function at the next position.
+      next_gradient: The gradient of the objective function at the next
+        position.
+      evals: The number of evaluations made.
+  """
+  position_delta = search_direction * step_size
+  next_position = position + position_delta
+  next_objective, next_gradient = value_and_gradients_function(
+      next_position)
+
+  grad_delta = next_gradient - gradient
+  return _UpdatedPosition(
+      failed=~_is_finite(next_objective, next_gradient),
+      position_delta=position_delta,
+      gradient_delta=grad_delta,
+      next_position=next_position,
+      next_value=next_objective,
+      next_gradient=next_gradient,
+      evals=1)
+
+
+def _check_convergence(current_position,
+                       next_position,
+                       current_objective,
+                       next_objective,
+                       next_gradient,
+                       grad_tolerance,
+                       f_relative_tolerance,
+                       x_tolerance):
+  """Checks if the algorithm satisfies the convergence criteria."""
+  norm = lambda x: tf.norm(x, np.inf)
+  grad_converged = norm(next_gradient) <= grad_tolerance
+  x_converged = norm(next_position - current_position) <= x_tolerance
+  f_converged = (norm(next_objective - current_objective) <=
+                 f_relative_tolerance * current_objective)
+  return grad_converged | x_converged | f_converged
+
+
+def _initial_convergence_test(gradient, tolerance):
+  """Checks whether the gradient is below the supplied tolerance."""
+  return tf.norm(gradient, ord=np.inf) < tolerance
 
 
 def _get_search_direction(inv_hessian_approx, gradient):
@@ -338,7 +534,7 @@ def _restrict_along_direction(value_and_gradients_function,
 def _bfgs_inv_hessian_update(grad_delta,
                              position_delta,
                              inv_hessian_estimate):
-  """Applies the BFGS update to the inverse hessian estimate.
+  """Applies the BFGS update to the inverse Hessian estimate.
 
   The BFGS update rule is (note A^T denotes the transpose of a vector/matrix A).
 
@@ -385,39 +581,60 @@ def _bfgs_inv_hessian_update(grad_delta,
       inverse Hessian. Should be positive definite and symmetric.
 
   Returns:
+    A tuple containing the following fields
+    is_valid: Boolean `Tensor` indicating whether the update succeeded. The
+      update can fail if the position change becomes orthogonal to the gradient
+      change.
     next_inv_hessian_estimate: `Tensor` of same shape and dtype as
       `inv_hessian_estimate`. The next Hessian estimate updated using the
       BFGS update scheme. If the `inv_hessian_estimate` is symmetric and
       positive definite, the `next_inv_hessian_estimate` is guaranteed to
       satisfy the same conditions.
   """
-  n = len(grad_delta.shape.as_list())
-  contraction_axes = np.arange(-n, 0)
-  # H.y where H is the inverse Hessian and y is the gradient change.
-  conditioned_grad_delta = tf.tensordot(inv_hessian_estimate,
-                                        grad_delta,
-                                        axes=[contraction_axes,
-                                              contraction_axes])
-  # The normalization term 1 / (y^T . s)
-  normalization_factor = 1 / tf.reduce_sum(grad_delta * position_delta)
+  # The normalization term (y^T . s)
+  normalization_factor = tf.reduce_sum(grad_delta * position_delta)
 
-  # The quadratic form: y^T.H.y.
-  conditioned_grad_delta_norm = tf.reduce_sum(
-      conditioned_grad_delta * grad_delta)
-  # The first rank 1 update term requires the outer product: s.y^T.
-  # We leverage broadcasting to do this in a shape agnostic manner.
-  # The position delta and the grad delta have the same rank, say, `n`. We
-  # adjust the shape of the position delta by adding extra 'n' dimensions to
-  # the right so its `padded` shape is original_shape + ([1] * n).
-  cross_term = _tensor_product(position_delta, conditioned_grad_delta)
-  # Symmetrize.
-  cross_term += _tensor_product(conditioned_grad_delta, position_delta)
+  is_singular = tf.equal(normalization_factor, 0)
 
-  position_term = _tensor_product(position_delta, position_delta)
-  position_term *= (normalization_factor * conditioned_grad_delta_norm + 1)
+  def _is_singular_fn():
+    """If the update is singular, returns the old value."""
+    return inv_hessian_estimate  # Return the old value
 
-  inv_hessian_estimate += normalization_factor * (position_term - cross_term)
-  return inv_hessian_estimate
+  def _do_update_fn():
+    """Updates the Hessian estimate."""
+    # The quadratic form: y^T.H.y.
+    n = len(grad_delta.shape.as_list())
+    contraction_axes = np.arange(-n, 0)
+    # H.y where H is the inverse Hessian and y is the gradient change.
+    conditioned_grad_delta = tf.tensordot(inv_hessian_estimate,
+                                          grad_delta,
+                                          axes=[contraction_axes,
+                                                contraction_axes])
+    conditioned_grad_delta_norm = tf.reduce_sum(
+        conditioned_grad_delta * grad_delta)
+
+    # The first rank 1 update term requires the outer product: s.y^T.
+    # We leverage broadcasting to do this in a shape agnostic manner.
+    # The position delta and the grad delta have the same rank, say, `n`. We
+    # adjust the shape of the position delta by adding extra 'n' dimensions to
+    # the right so its `padded` shape is original_shape + ([1] * n).
+    cross_term = _tensor_product(position_delta, conditioned_grad_delta)
+    # Symmetrize
+    cross_term += _tensor_product(conditioned_grad_delta, position_delta)
+    position_term = _tensor_product(position_delta, position_delta)
+    with tf.control_dependencies([position_term]):
+      position_term *= (1 + conditioned_grad_delta_norm / normalization_factor)
+
+    next_inv_hessian_estimate = (
+        inv_hessian_estimate +
+        (position_term - cross_term) / normalization_factor)
+    return next_inv_hessian_estimate
+
+  next_estimate = smart_cond.smart_cond(is_singular,
+                                        true_fn=_is_singular_fn,
+                                        false_fn=_do_update_fn)
+
+  return next_estimate
 
 
 def _tensor_product(t1, t2):
@@ -448,3 +665,4 @@ def _tensor_product(t1, t2):
   padded_shape = tf.concat([t1_shape, padding], axis=0)
   t1_padded = tf.reshape(t1, padded_shape)
   return t1_padded * t2
+
