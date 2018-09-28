@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.bijectors.ConditionalBijector" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="dtype"/>
 <meta itemprop="property" content="forward_min_event_ndims"/>
 <meta itemprop="property" content="graph_parents"/>
@@ -26,48 +27,7 @@ Inherits From: [`Bijector`](../../tfp/bijectors/Bijector.md)
 
 Conditional Bijector is a Bijector that allows intrinsic conditioning.
 
-## Properties
-
-<h3 id="dtype"><code>dtype</code></h3>
-
-dtype of `Tensor`s transformable by this distribution.
-
-<h3 id="forward_min_event_ndims"><code>forward_min_event_ndims</code></h3>
-
-Returns the minimal number of dimensions bijector.forward operates on.
-
-<h3 id="graph_parents"><code>graph_parents</code></h3>
-
-Returns this `Bijector`'s graph_parents as a Python list.
-
-<h3 id="inverse_min_event_ndims"><code>inverse_min_event_ndims</code></h3>
-
-Returns the minimal number of dimensions bijector.inverse operates on.
-
-<h3 id="is_constant_jacobian"><code>is_constant_jacobian</code></h3>
-
-Returns true iff the Jacobian matrix is not a function of x.
-
-Note: Jacobian matrix is either constant for both forward and inverse or
-neither.
-
-#### Returns:
-
-* <b>`is_constant_jacobian`</b>: Python `bool`.
-
-<h3 id="name"><code>name</code></h3>
-
-Returns the string name of this `Bijector`.
-
-<h3 id="validate_args"><code>validate_args</code></h3>
-
-Returns True if Tensor arguments will be validated.
-
-
-
-## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
+<h2 id="__init__"><code>__init__</code></h2>
 
 ``` python
 __init__(
@@ -121,6 +81,49 @@ See `Bijector` subclass docstring for more details and specific examples.
     `inverse_min_event_ndims` are specified, or if either of them is
     negative.
 * <b>`ValueError`</b>:  If a member of `graph_parents` is not a `Tensor`.
+
+
+
+## Properties
+
+<h3 id="dtype"><code>dtype</code></h3>
+
+dtype of `Tensor`s transformable by this distribution.
+
+<h3 id="forward_min_event_ndims"><code>forward_min_event_ndims</code></h3>
+
+Returns the minimal number of dimensions bijector.forward operates on.
+
+<h3 id="graph_parents"><code>graph_parents</code></h3>
+
+Returns this `Bijector`'s graph_parents as a Python list.
+
+<h3 id="inverse_min_event_ndims"><code>inverse_min_event_ndims</code></h3>
+
+Returns the minimal number of dimensions bijector.inverse operates on.
+
+<h3 id="is_constant_jacobian"><code>is_constant_jacobian</code></h3>
+
+Returns true iff the Jacobian matrix is not a function of x.
+
+Note: Jacobian matrix is either constant for both forward and inverse or
+neither.
+
+#### Returns:
+
+* <b>`is_constant_jacobian`</b>: Python `bool`.
+
+<h3 id="name"><code>name</code></h3>
+
+Returns the string name of this `Bijector`.
+
+<h3 id="validate_args"><code>validate_args</code></h3>
+
+Returns True if Tensor arguments will be validated.
+
+
+
+## Methods
 
 <h3 id="forward"><code>forward</code></h3>
 

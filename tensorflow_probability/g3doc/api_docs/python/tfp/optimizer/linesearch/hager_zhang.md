@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.optimizer.linesearch.hager_zhang" />
+<meta itemprop="path" content="Stable" />
 </div>
 
 # tfp.optimizer.linesearch.hager_zhang
@@ -90,10 +91,12 @@ usage of the line search.
   guaranteed descent and an efficient line search. SIAM J. Optim., Vol 16. 1,
   pp. 170-172. 2005.
   https://www.math.lsu.edu/~hozhang/papers/cg_descent.pdf
+
 [2]: William Hager, Hongchao Zhang. Algorithm 851: CG_DESCENT, a conjugate
   gradient method with guaranteed descent. ACM Transactions on Mathematical
   Software, Vol 32., 1, pp. 113-137. 2006.
   http://users.clas.ufl.edu/hager/papers/CG/cg_compare.pdf
+
 [3]: Jorge Nocedal, Stephen Wright. Numerical Optimization. Springer Series in
   Operations Research. pp 33-36. 2006
 

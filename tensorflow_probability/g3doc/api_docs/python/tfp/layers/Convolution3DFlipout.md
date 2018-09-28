@@ -1,8 +1,8 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.layers.Convolution3DFlipout" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="activity_regularizer"/>
 <meta itemprop="property" content="dtype"/>
-<meta itemprop="property" content="inbound_nodes"/>
 <meta itemprop="property" content="input"/>
 <meta itemprop="property" content="input_mask"/>
 <meta itemprop="property" content="input_shape"/>
@@ -10,7 +10,6 @@
 <meta itemprop="property" content="name"/>
 <meta itemprop="property" content="non_trainable_variables"/>
 <meta itemprop="property" content="non_trainable_weights"/>
-<meta itemprop="property" content="outbound_nodes"/>
 <meta itemprop="property" content="output"/>
 <meta itemprop="property" content="output_mask"/>
 <meta itemprop="property" content="output_shape"/>
@@ -21,13 +20,8 @@
 <meta itemprop="property" content="weights"/>
 <meta itemprop="property" content="__call__"/>
 <meta itemprop="property" content="__init__"/>
-<meta itemprop="property" content="add_loss"/>
-<meta itemprop="property" content="add_update"/>
-<meta itemprop="property" content="add_variable"/>
-<meta itemprop="property" content="add_weight"/>
 <meta itemprop="property" content="apply"/>
 <meta itemprop="property" content="build"/>
-<meta itemprop="property" content="call"/>
 <meta itemprop="property" content="compute_mask"/>
 <meta itemprop="property" content="compute_output_shape"/>
 <meta itemprop="property" content="count_params"/>
@@ -74,25 +68,6 @@ The arguments permit separate specification of the surrogate posterior
 (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
 distributions.
 
-Properties:
-  filters: Python integer, dimensionality of the output space.
-  kernel_size: Size of the convolution window.
-  strides: Stride length of convolution.
-  padding: Python string describing padding approach.
-  data_format: Python string describing input data's dimensions.
-  dilation_rate: Dilation rate for an atrous convolution.
-  activation: Activation function (`callable`).
-  activity_regularizer: Regularizer function for the output.
-  kernel_posterior_fn: `callable` returning posterior.
-  kernel_posterior_tensor_fn: `callable` operating on posterior.
-  kernel_prior_fn: `callable` returning prior.
-  kernel_divergence_fn: `callable` returning divergence.
-  bias_posterior_fn: `callable` returning posterior.
-  bias_posterior_tensor_fn: `callable` operating on posterior.
-  bias_prior_fn: `callable` returning prior.
-  bias_divergence_fn: `callable` returning divergence.
-  seed: Python integer, used to create random seeds.
-
 #### Examples
 
 We illustrate a Bayesian neural network with [variational inference](
@@ -136,195 +111,7 @@ terms which are arguments to the layer.
      _International Conference on Learning Representations_, 2018.
      https://arxiv.org/abs/1803.04386
 
-## Properties
-
-<h3 id="activity_regularizer"><code>activity_regularizer</code></h3>
-
-Optional regularizer function for the output of this layer.
-
-<h3 id="dtype"><code>dtype</code></h3>
-
-
-
-<h3 id="inbound_nodes"><code>inbound_nodes</code></h3>
-
-Deprecated, do NOT use! Only for compatibility with external Keras.
-
-<h3 id="input"><code>input</code></h3>
-
-Retrieves the input tensor(s) of a layer.
-
-Only applicable if the layer has exactly one input,
-i.e. if it is connected to one incoming layer.
-
-#### Returns:
-
-Input tensor or list of input tensors.
-
-
-#### Raises:
-
-* <b>`AttributeError`</b>: if the layer is connected to
-    more than one incoming layers.
-
-
-#### Raises:
-
-* <b>`RuntimeError`</b>: If called in Eager mode.
-* <b>`AttributeError`</b>: If no inbound nodes are found.
-
-<h3 id="input_mask"><code>input_mask</code></h3>
-
-Retrieves the input mask tensor(s) of a layer.
-
-Only applicable if the layer has exactly one inbound node,
-i.e. if it is connected to one incoming layer.
-
-#### Returns:
-
-Input mask tensor (potentially None) or list of input
-mask tensors.
-
-
-#### Raises:
-
-* <b>`AttributeError`</b>: if the layer is connected to
-    more than one incoming layers.
-
-<h3 id="input_shape"><code>input_shape</code></h3>
-
-Retrieves the input shape(s) of a layer.
-
-Only applicable if the layer has exactly one input,
-i.e. if it is connected to one incoming layer, or if all inputs
-have the same shape.
-
-#### Returns:
-
-Input shape, as an integer shape tuple
-(or list of shape tuples, one tuple per input tensor).
-
-
-#### Raises:
-
-* <b>`AttributeError`</b>: if the layer has no defined input_shape.
-* <b>`RuntimeError`</b>: if called in Eager mode.
-
-<h3 id="losses"><code>losses</code></h3>
-
-Losses which are associated with this `Layer`.
-
-Note that when executing eagerly, getting this property evaluates
-regularizers. When using graph execution, variable regularization ops have
-already been created and are simply returned here.
-
-#### Returns:
-
-A list of tensors.
-
-<h3 id="name"><code>name</code></h3>
-
-
-
-<h3 id="non_trainable_variables"><code>non_trainable_variables</code></h3>
-
-
-
-<h3 id="non_trainable_weights"><code>non_trainable_weights</code></h3>
-
-
-
-<h3 id="outbound_nodes"><code>outbound_nodes</code></h3>
-
-Deprecated, do NOT use! Only for compatibility with external Keras.
-
-<h3 id="output"><code>output</code></h3>
-
-Retrieves the output tensor(s) of a layer.
-
-Only applicable if the layer has exactly one output,
-i.e. if it is connected to one incoming layer.
-
-#### Returns:
-
-Output tensor or list of output tensors.
-
-
-#### Raises:
-
-* <b>`AttributeError`</b>: if the layer is connected to more than one incoming
-    layers.
-* <b>`RuntimeError`</b>: if called in Eager mode.
-
-<h3 id="output_mask"><code>output_mask</code></h3>
-
-Retrieves the output mask tensor(s) of a layer.
-
-Only applicable if the layer has exactly one inbound node,
-i.e. if it is connected to one incoming layer.
-
-#### Returns:
-
-Output mask tensor (potentially None) or list of output
-mask tensors.
-
-
-#### Raises:
-
-* <b>`AttributeError`</b>: if the layer is connected to
-    more than one incoming layers.
-
-<h3 id="output_shape"><code>output_shape</code></h3>
-
-Retrieves the output shape(s) of a layer.
-
-Only applicable if the layer has one output,
-or if all outputs have the same shape.
-
-#### Returns:
-
-Output shape, as an integer shape tuple
-(or list of shape tuples, one tuple per output tensor).
-
-
-#### Raises:
-
-* <b>`AttributeError`</b>: if the layer has no defined output shape.
-* <b>`RuntimeError`</b>: if called in Eager mode.
-
-<h3 id="trainable_variables"><code>trainable_variables</code></h3>
-
-
-
-<h3 id="trainable_weights"><code>trainable_weights</code></h3>
-
-
-
-<h3 id="updates"><code>updates</code></h3>
-
-
-
-<h3 id="variables"><code>variables</code></h3>
-
-Returns the list of all layer variables/weights.
-
-#### Returns:
-
-A list of variables.
-
-<h3 id="weights"><code>weights</code></h3>
-
-Returns the list of all layer variables/weights.
-
-#### Returns:
-
-A list of variables.
-
-
-
-## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
+<h2 id="__init__"><code>__init__</code></h2>
 
 ``` python
 __init__(
@@ -416,6 +203,188 @@ Construct layer.
 * <b>`seed`</b>: Python scalar `int` which initializes the random number
     generator. Default value: `None` (i.e., use global seed).
 
+
+
+## Properties
+
+<h3 id="activity_regularizer"><code>activity_regularizer</code></h3>
+
+Optional regularizer function for the output of this layer.
+
+<h3 id="dtype"><code>dtype</code></h3>
+
+
+
+<h3 id="input"><code>input</code></h3>
+
+Retrieves the input tensor(s) of a layer.
+
+Only applicable if the layer has exactly one input,
+i.e. if it is connected to one incoming layer.
+
+#### Returns:
+
+Input tensor or list of input tensors.
+
+
+#### Raises:
+
+* <b>`AttributeError`</b>: if the layer is connected to
+    more than one incoming layers.
+
+
+#### Raises:
+
+* <b>`RuntimeError`</b>: If called in Eager mode.
+* <b>`AttributeError`</b>: If no inbound nodes are found.
+
+<h3 id="input_mask"><code>input_mask</code></h3>
+
+Retrieves the input mask tensor(s) of a layer.
+
+Only applicable if the layer has exactly one inbound node,
+i.e. if it is connected to one incoming layer.
+
+#### Returns:
+
+Input mask tensor (potentially None) or list of input
+mask tensors.
+
+
+#### Raises:
+
+* <b>`AttributeError`</b>: if the layer is connected to
+    more than one incoming layers.
+
+<h3 id="input_shape"><code>input_shape</code></h3>
+
+Retrieves the input shape(s) of a layer.
+
+Only applicable if the layer has exactly one input,
+i.e. if it is connected to one incoming layer, or if all inputs
+have the same shape.
+
+#### Returns:
+
+Input shape, as an integer shape tuple
+(or list of shape tuples, one tuple per input tensor).
+
+
+#### Raises:
+
+* <b>`AttributeError`</b>: if the layer has no defined input_shape.
+* <b>`RuntimeError`</b>: if called in Eager mode.
+
+<h3 id="losses"><code>losses</code></h3>
+
+Losses which are associated with this `Layer`.
+
+Note that when executing eagerly, getting this property evaluates
+regularizers. When using graph execution, variable regularization ops have
+already been created and are simply returned here.
+
+#### Returns:
+
+A list of tensors.
+
+<h3 id="name"><code>name</code></h3>
+
+
+
+<h3 id="non_trainable_variables"><code>non_trainable_variables</code></h3>
+
+
+
+<h3 id="non_trainable_weights"><code>non_trainable_weights</code></h3>
+
+
+
+<h3 id="output"><code>output</code></h3>
+
+Retrieves the output tensor(s) of a layer.
+
+Only applicable if the layer has exactly one output,
+i.e. if it is connected to one incoming layer.
+
+#### Returns:
+
+Output tensor or list of output tensors.
+
+
+#### Raises:
+
+* <b>`AttributeError`</b>: if the layer is connected to more than one incoming
+    layers.
+* <b>`RuntimeError`</b>: if called in Eager mode.
+
+<h3 id="output_mask"><code>output_mask</code></h3>
+
+Retrieves the output mask tensor(s) of a layer.
+
+Only applicable if the layer has exactly one inbound node,
+i.e. if it is connected to one incoming layer.
+
+#### Returns:
+
+Output mask tensor (potentially None) or list of output
+mask tensors.
+
+
+#### Raises:
+
+* <b>`AttributeError`</b>: if the layer is connected to
+    more than one incoming layers.
+
+<h3 id="output_shape"><code>output_shape</code></h3>
+
+Retrieves the output shape(s) of a layer.
+
+Only applicable if the layer has one output,
+or if all outputs have the same shape.
+
+#### Returns:
+
+Output shape, as an integer shape tuple
+(or list of shape tuples, one tuple per output tensor).
+
+
+#### Raises:
+
+* <b>`AttributeError`</b>: if the layer has no defined output shape.
+* <b>`RuntimeError`</b>: if called in Eager mode.
+
+<h3 id="trainable_variables"><code>trainable_variables</code></h3>
+
+
+
+<h3 id="trainable_weights"><code>trainable_weights</code></h3>
+
+
+
+<h3 id="updates"><code>updates</code></h3>
+
+
+
+<h3 id="variables"><code>variables</code></h3>
+
+Returns the list of all layer variables/weights.
+
+#### Returns:
+
+A list of variables.
+
+<h3 id="weights"><code>weights</code></h3>
+
+Returns the list of all layer variables/weights.
+
+#### Returns:
+
+A list of variables.
+
+
+
+## Methods
+
 <h3 id="__call__"><code>__call__</code></h3>
 
 ``` python
@@ -455,159 +424,6 @@ Note:
 
 * <b>`ValueError`</b>: if the layer's `call` method returns None (an invalid value).
 
-<h3 id="add_loss"><code>add_loss</code></h3>
-
-``` python
-add_loss(
-    losses,
-    inputs=None
-)
-```
-
-Add loss tensor(s), potentially dependent on layer inputs.
-
-Some losses (for instance, activity regularization losses) may be dependent
-on the inputs passed when calling a layer. Hence, when reusing the same
-layer on different inputs `a` and `b`, some entries in `layer.losses` may
-be dependent on `a` and some on `b`. This method automatically keeps track
-of dependencies.
-
-The `get_losses_for` method allows to retrieve the losses relevant to a
-specific set of inputs.
-
-Note that `add_loss` is not supported when executing eagerly. Instead,
-variable regularizers may be added through `add_variable`. Activity
-regularization is not supported directly (but such losses may be returned
-from `Layer.call()`).
-
-#### Arguments:
-
-* <b>`losses`</b>: Loss tensor, or list/tuple of tensors.
-* <b>`inputs`</b>: If anything other than None is passed, it signals the losses
-    are conditional on some of the layer's inputs,
-    and thus they should only be run where these inputs are available.
-    This is the case for activity regularization losses, for instance.
-    If `None` is passed, the losses are assumed
-    to be unconditional, and will apply across all dataflows of the layer
-    (e.g. weight regularization losses).
-
-
-#### Raises:
-
-* <b>`RuntimeError`</b>: If called in Eager mode.
-
-<h3 id="add_update"><code>add_update</code></h3>
-
-``` python
-add_update(
-    updates,
-    inputs=None
-)
-```
-
-Add update op(s), potentially dependent on layer inputs.
-
-Weight updates (for instance, the updates of the moving mean and variance
-in a BatchNormalization layer) may be dependent on the inputs passed
-when calling a layer. Hence, when reusing the same layer on
-different inputs `a` and `b`, some entries in `layer.updates` may be
-dependent on `a` and some on `b`. This method automatically keeps track
-of dependencies.
-
-The `get_updates_for` method allows to retrieve the updates relevant to a
-specific set of inputs.
-
-This call is ignored when eager execution is enabled (in that case, variable
-updates are run on the fly and thus do not need to be tracked for later
-execution).
-
-#### Arguments:
-
-* <b>`updates`</b>: Update op, or list/tuple of update ops.
-* <b>`inputs`</b>: If anything other than None is passed, it signals the updates
-    are conditional on some of the layer's inputs,
-    and thus they should only be run where these inputs are available.
-    This is the case for BatchNormalization updates, for instance.
-    If None, the updates will be taken into account unconditionally,
-    and you are responsible for making sure that any dependency they might
-    have is available at runtime.
-    A step counter might fall into this category.
-
-<h3 id="add_variable"><code>add_variable</code></h3>
-
-``` python
-add_variable(
-    *args,
-    **kwargs
-)
-```
-
-Alias for `add_weight`.
-
-<h3 id="add_weight"><code>add_weight</code></h3>
-
-``` python
-add_weight(
-    name,
-    shape,
-    dtype=None,
-    initializer=None,
-    regularizer=None,
-    trainable=None,
-    constraint=None,
-    partitioner=None,
-    use_resource=None,
-    synchronization=vs.VariableSynchronization.AUTO,
-    aggregation=vs.VariableAggregation.NONE,
-    getter=None
-)
-```
-
-Adds a new variable to the layer, or gets an existing one; returns it.
-
-#### Arguments:
-
-* <b>`name`</b>: variable name.
-* <b>`shape`</b>: variable shape.
-* <b>`dtype`</b>: The type of the variable. Defaults to `self.dtype` or `float32`.
-* <b>`initializer`</b>: initializer instance (callable).
-* <b>`regularizer`</b>: regularizer instance (callable).
-* <b>`trainable`</b>: whether the variable should be part of the layer's
-    "trainable_variables" (e.g. variables, biases)
-    or "non_trainable_variables" (e.g. BatchNorm mean, stddev).
-    Note, if the current variable scope is marked as non-trainable
-    then this parameter is ignored and any added variables are also
-    marked as non-trainable. `trainable` defaults to `True` unless
-    `synchronization` is set to `ON_READ`.
-* <b>`constraint`</b>: constraint instance (callable).
-* <b>`partitioner`</b>: Partitioner to be passed to the `Checkpointable` API.
-* <b>`use_resource`</b>: Whether to use `ResourceVariable`.
-* <b>`synchronization`</b>: Indicates when a distributed a variable will be
-    aggregated. Accepted values are constants defined in the class
-    `tf.VariableSynchronization`. By default the synchronization is set to
-    `AUTO` and the current `DistributionStrategy` chooses
-    when to synchronize. If `synchronization` is set to `ON_READ`,
-    `trainable` must not be set to `True`.
-* <b>`aggregation`</b>: Indicates how a distributed variable will be aggregated.
-    Accepted values are constants defined in the class
-    `tf.VariableAggregation`.
-* <b>`getter`</b>: Variable getter argument to be passed to the `Checkpointable` API.
-
-
-#### Returns:
-
-The created variable.  Usually either a `Variable` or `ResourceVariable`
-instance.  If `partitioner` is not `None`, a `PartitionedVariable`
-instance is returned.
-
-
-#### Raises:
-
-* <b>`RuntimeError`</b>: If called with partioned variable regularization and
-    eager execution is enabled.
-* <b>`ValueError`</b>: When giving unsupported dtype and no initializer or when
-    trainable has been set to True with synchronization set as `ON_READ`.
-
 <h3 id="apply"><code>apply</code></h3>
 
 ``` python
@@ -637,14 +453,6 @@ Output tensor(s).
 
 ``` python
 build(input_shape)
-```
-
-
-
-<h3 id="call"><code>call</code></h3>
-
-``` python
-call(inputs)
 ```
 
 

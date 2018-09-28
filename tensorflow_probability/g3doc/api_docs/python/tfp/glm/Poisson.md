@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.glm.Poisson" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="is_canonical"/>
 <meta itemprop="property" content="name"/>
 <meta itemprop="property" content="__call__"/>
@@ -15,6 +16,21 @@ Inherits From: [`ExponentialFamily`](../../tfp/glm/ExponentialFamily.md)
 
 `Poisson(rate=mean)` where `mean = exp(matmul(X, weights))`.
 
+<h2 id="__init__"><code>__init__</code></h2>
+
+``` python
+__init__(name=None)
+```
+
+Creates the ExponentialFamily.
+
+#### Args:
+
+* <b>`name`</b>: Python `str` used as TF namescope for ops created by member
+    functions. Default value: `None` (i.e., the subclass name).
+
+
+
 ## Properties
 
 <h3 id="is_canonical"><code>is_canonical</code></h3>
@@ -28,19 +44,6 @@ Returns TF namescope prefixed to ops created by member functions.
 
 
 ## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
-
-``` python
-__init__(name=None)
-```
-
-Creates the ExponentialFamily.
-
-#### Args:
-
-* <b>`name`</b>: Python `str` used as TF namescope for ops created by member
-    functions. Default value: `None` (i.e., the subclass name).
 
 <h3 id="__call__"><code>__call__</code></h3>
 

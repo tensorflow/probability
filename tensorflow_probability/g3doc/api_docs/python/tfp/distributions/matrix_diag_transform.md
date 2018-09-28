@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions.matrix_diag_transform" />
+<meta itemprop="path" content="Stable" />
 </div>
 
 # tfp.distributions.matrix_diag_transform
@@ -43,7 +44,7 @@ chol = matrix_diag_transform(matrix, transform=tf.nn.softplus)
 mu = tf.contrib.layers.fully_connected(activations, 2)
 
 # This is a fully trainable multivariate normal!
-dist = tfd.MVNCholesky(mu, chol)
+dist = tfd.MultivariateNormalTriL(mu, chol)
 
 # Standard log loss. Minimizing this will "train" mu and chol, and then dist
 # will be a distribution predicting labels as multivariate Gaussians.

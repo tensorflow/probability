@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.edward2.Beta" />
+<meta itemprop="path" content="Stable" />
 </div>
 
 # tfp.edward2.Beta

@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.layers.default_loc_scale_fn" />
+<meta itemprop="path" content="Stable" />
 </div>
 
 # tfp.layers.default_loc_scale_fn

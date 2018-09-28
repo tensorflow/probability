@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.mcmc.make_simple_step_size_update_policy" />
+<meta itemprop="path" content="Stable" />
 </div>
 
 # tfp.mcmc.make_simple_step_size_update_policy

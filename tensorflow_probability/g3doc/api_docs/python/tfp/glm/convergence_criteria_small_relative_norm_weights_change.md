@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.glm.convergence_criteria_small_relative_norm_weights_change" />
+<meta itemprop="path" content="Stable" />
 </div>
 
 # tfp.glm.convergence_criteria_small_relative_norm_weights_change

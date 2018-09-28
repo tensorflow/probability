@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.layers.default_mean_field_normal_fn" />
+<meta itemprop="path" content="Stable" />
 </div>
 
 # tfp.layers.default_mean_field_normal_fn

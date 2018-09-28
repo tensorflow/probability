@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.bijectors.MaskedAutoregressiveFlow" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="dtype"/>
 <meta itemprop="property" content="forward_min_event_ndims"/>
 <meta itemprop="property" content="graph_parents"/>
@@ -166,6 +167,45 @@ maf_no_scale_hidden2 = tfd.TransformedDistribution(
      Autoregressive Flow for Density Estimation. In _Neural Information
      Processing Systems_, 2017. https://arxiv.org/abs/1705.07057
 
+<h2 id="__init__"><code>__init__</code></h2>
+
+``` python
+__init__(
+    shift_and_log_scale_fn,
+    is_constant_jacobian=False,
+    validate_args=False,
+    unroll_loop=False,
+    name=None
+)
+```
+
+Creates the MaskedAutoregressiveFlow bijector.
+
+#### Args:
+
+* <b>`shift_and_log_scale_fn`</b>: Python `callable` which computes `shift` and
+    `log_scale` from both the forward domain (`x`) and the inverse domain
+    (`y`). Calculation must respect the "autoregressive property" (see class
+    docstring). Suggested default
+    `masked_autoregressive_default_template(hidden_layers=...)`.
+    Typically the function contains `tf.Variables` and is wrapped using
+    `tf.make_template`. Returning `None` for either (both) `shift`,
+    `log_scale` is equivalent to (but more efficient than) returning zero.
+* <b>`is_constant_jacobian`</b>: Python `bool`. Default: `False`. When `True` the
+    implementation assumes `log_scale` does not depend on the forward domain
+    (`x`) or inverse domain (`y`) values. (No validation is made;
+    `is_constant_jacobian=False` is always safe but possibly computationally
+    inefficient.)
+* <b>`validate_args`</b>: Python `bool` indicating whether arguments should be
+    checked for correctness.
+* <b>`unroll_loop`</b>: Python `bool` indicating whether the `tf.while_loop` in
+    `_forward` should be replaced with a static for loop. Requires that
+    the final dimension of `x` be known at graph construction time. Defaults
+    to `False`.
+* <b>`name`</b>: Python `str`, name given to ops managed by this object.
+
+
+
 ## Properties
 
 <h3 id="dtype"><code>dtype</code></h3>
@@ -206,43 +246,6 @@ Returns True if Tensor arguments will be validated.
 
 
 ## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
-
-``` python
-__init__(
-    shift_and_log_scale_fn,
-    is_constant_jacobian=False,
-    validate_args=False,
-    unroll_loop=False,
-    name=None
-)
-```
-
-Creates the MaskedAutoregressiveFlow bijector.
-
-#### Args:
-
-* <b>`shift_and_log_scale_fn`</b>: Python `callable` which computes `shift` and
-    `log_scale` from both the forward domain (`x`) and the inverse domain
-    (`y`). Calculation must respect the "autoregressive property" (see class
-    docstring). Suggested default
-    `masked_autoregressive_default_template(hidden_layers=...)`.
-    Typically the function contains `tf.Variables` and is wrapped using
-    `tf.make_template`. Returning `None` for either (both) `shift`,
-    `log_scale` is equivalent to (but more efficient than) returning zero.
-* <b>`is_constant_jacobian`</b>: Python `bool`. Default: `False`. When `True` the
-    implementation assumes `log_scale` does not depend on the forward domain
-    (`x`) or inverse domain (`y`) values. (No validation is made;
-    `is_constant_jacobian=False` is always safe but possibly computationally
-    inefficient.)
-* <b>`validate_args`</b>: Python `bool` indicating whether arguments should be
-    checked for correctness.
-* <b>`unroll_loop`</b>: Python `bool` indicating whether the `tf.while_loop` in
-    `_forward` should be replaced with a static for loop. Requires that
-    the final dimension of `x` be known at graph construction time. Defaults
-    to `False`.
-* <b>`name`</b>: Python `str`, name given to ops managed by this object.
 
 <h3 id="forward"><code>forward</code></h3>
 
@@ -334,8 +337,8 @@ Returns both the forward_log_det_jacobian.
 * <b>`event_ndims`</b>: Number of dimensions in the probabilistic events being
     transformed. Must be greater than or equal to
     `self.forward_min_event_ndims`. The result is summed over the final
-    dimensions to produce a scalar Jacobian determinant for each event,
-    i.e. it has shape `x.shape.ndims - event_ndims` dimensions.
+    dimensions to produce a scalar Jacobian determinant for each event, i.e.
+    it has shape `x.shape.ndims - event_ndims` dimensions.
 * <b>`name`</b>: The name to give this op.
 
 
@@ -450,8 +453,8 @@ evaluated at `g^{-1}(y)`.
 * <b>`event_ndims`</b>: Number of dimensions in the probabilistic events being
     transformed. Must be greater than or equal to
     `self.inverse_min_event_ndims`. The result is summed over the final
-    dimensions to produce a scalar Jacobian determinant for each event,
-    i.e. it has shape `y.shape.ndims - event_ndims` dimensions.
+    dimensions to produce a scalar Jacobian determinant for each event, i.e.
+    it has shape `y.shape.ndims - event_ndims` dimensions.
 * <b>`name`</b>: The name to give this op.
 
 

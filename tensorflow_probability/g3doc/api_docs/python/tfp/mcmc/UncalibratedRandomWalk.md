@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.mcmc.UncalibratedRandomWalk" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="is_calibrated"/>
 <meta itemprop="property" content="name"/>
 <meta itemprop="property" content="new_state_fn"/>
@@ -27,37 +28,7 @@ Warning: this kernel will not result in a chain which converges to the
 For more details on `UncalibratedRandomWalk`, see
 `RandomWalkMetropolis`.
 
-## Properties
-
-<h3 id="is_calibrated"><code>is_calibrated</code></h3>
-
-
-
-<h3 id="name"><code>name</code></h3>
-
-
-
-<h3 id="new_state_fn"><code>new_state_fn</code></h3>
-
-
-
-<h3 id="parameters"><code>parameters</code></h3>
-
-Return `dict` of ``__init__`` arguments and their values.
-
-<h3 id="seed"><code>seed</code></h3>
-
-
-
-<h3 id="target_log_prob_fn"><code>target_log_prob_fn</code></h3>
-
-
-
-
-
-## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
+<h2 id="__init__"><code>__init__</code></h2>
 
 ``` python
 __init__(
@@ -98,6 +69,38 @@ Initializes this transition kernel.
 
 * <b>`ValueError`</b>: if there isn't one `scale` or a list with same length as
     `current_state`.
+
+
+
+## Properties
+
+<h3 id="is_calibrated"><code>is_calibrated</code></h3>
+
+
+
+<h3 id="name"><code>name</code></h3>
+
+
+
+<h3 id="new_state_fn"><code>new_state_fn</code></h3>
+
+
+
+<h3 id="parameters"><code>parameters</code></h3>
+
+Return `dict` of ``__init__`` arguments and their values.
+
+<h3 id="seed"><code>seed</code></h3>
+
+
+
+<h3 id="target_log_prob_fn"><code>target_log_prob_fn</code></h3>
+
+
+
+
+
+## Methods
 
 <h3 id="bootstrap_results"><code>bootstrap_results</code></h3>
 

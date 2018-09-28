@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions.GammaGamma" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="allow_nan_stats"/>
 <meta itemprop="property" content="batch_shape"/>
 <meta itemprop="property" content="concentration"/>
@@ -75,6 +76,56 @@ where the normalizing constant `Z = Beta(alpha, alpha0) * beta0**(-alpha0)`.
 
 See:
   http://www.brucehardie.com/notes/025/gamma_gamma.pdf
+
+Samples of this distribution are reparameterized as samples of the Gamma
+distribution are reparameterized using the technique described in the paper
+
+[Michael Figurnov, Shakir Mohamed, Andriy Mnih.
+Implicit Reparameterization Gradients, 2018](https://arxiv.org/abs/1805.08498)
+
+<h2 id="__init__"><code>__init__</code></h2>
+
+``` python
+__init__(
+    concentration,
+    mixing_concentration,
+    mixing_rate,
+    validate_args=False,
+    allow_nan_stats=True,
+    name='GammaGamma'
+)
+```
+
+Initializes a batch of Gamma-Gamma distributions.
+
+The parameters `concentration` and `rate` must be shaped in a way that
+supports broadcasting (e.g.
+`concentration + mixing_concentration + mixing_rate` is a valid operation).
+
+#### Args:
+
+* <b>`concentration`</b>: Floating point tensor, the concentration params of the
+    distribution(s). Must contain only positive values.
+* <b>`mixing_concentration`</b>: Floating point tensor, the concentration params of
+    the mixing Gamma distribution(s). Must contain only positive values.
+* <b>`mixing_rate`</b>: Floating point tensor, the rate params of the mixing Gamma
+    distribution(s). Must contain only positive values.
+* <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
+    parameters are checked for validity despite possibly degrading runtime
+    performance. When `False` invalid inputs may silently render incorrect
+    outputs.
+* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
+    (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
+    result is undefined. When `False`, an exception is raised if one or more
+    of the statistic's batch members are undefined.
+* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
+
+
+#### Raises:
+
+* <b>`TypeError`</b>: if `concentration` and `rate` are different dtypes.
+
+
 
 ## Properties
 
@@ -160,48 +211,6 @@ Python `bool` indicating possibly expensive checks are enabled.
 
 
 ## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
-
-``` python
-__init__(
-    concentration,
-    mixing_concentration,
-    mixing_rate,
-    validate_args=False,
-    allow_nan_stats=True,
-    name='GammaGamma'
-)
-```
-
-Initializes a batch of Gamma-Gamma distributions.
-
-The parameters `concentration` and `rate` must be shaped in a way that
-supports broadcasting (e.g.
-`concentration + mixing_concentration + mixing_rate` is a valid operation).
-
-#### Args:
-
-* <b>`concentration`</b>: Floating point tensor, the concentration params of the
-    distribution(s). Must contain only positive values.
-* <b>`mixing_concentration`</b>: Floating point tensor, the concentration params of
-    the mixing Gamma distribution(s). Must contain only positive values.
-* <b>`mixing_rate`</b>: Floating point tensor, the rate params of the mixing Gamma
-    distribution(s). Must contain only positive values.
-* <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
-    parameters are checked for validity despite possibly degrading runtime
-    performance. When `False` invalid inputs may silently render incorrect
-    outputs.
-* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
-    (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
-    result is undefined. When `False`, an exception is raised if one or more
-    of the statistic's batch members are undefined.
-* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
-
-
-#### Raises:
-
-* <b>`TypeError`</b>: if `concentration` and `rate` are different dtypes.
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
 
@@ -342,7 +351,7 @@ where `F` denotes the support of the random variable `X ~ P`.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 
@@ -436,7 +445,7 @@ denotes (Shanon) cross entropy, and `H[.]` denotes (Shanon) entropy.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 

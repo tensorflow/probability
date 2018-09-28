@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions.normal_conjugates_known_scale_predictive" />
+<meta itemprop="path" content="Stable" />
 </div>
 
 # tfp.distributions.normal_conjugates_known_scale_predictive

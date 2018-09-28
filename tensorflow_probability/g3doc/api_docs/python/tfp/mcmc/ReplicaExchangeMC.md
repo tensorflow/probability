@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.mcmc.ReplicaExchangeMC" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="exchange_proposed_fn"/>
 <meta itemprop="property" content="inverse_temperatures"/>
 <meta itemprop="property" content="is_calibrated"/>
@@ -134,45 +135,7 @@ plt.plot(samples_[:, 0], samples_[:, 1], '.')
 plt.show()
 ```
 
-## Properties
-
-<h3 id="exchange_proposed_fn"><code>exchange_proposed_fn</code></h3>
-
-
-
-<h3 id="inverse_temperatures"><code>inverse_temperatures</code></h3>
-
-
-
-<h3 id="is_calibrated"><code>is_calibrated</code></h3>
-
-
-
-<h3 id="name"><code>name</code></h3>
-
-
-
-<h3 id="num_replica"><code>num_replica</code></h3>
-
-
-
-<h3 id="parameters"><code>parameters</code></h3>
-
-Return `dict` of ``__init__`` arguments and their values.
-
-<h3 id="seed"><code>seed</code></h3>
-
-
-
-<h3 id="target_log_prob_fn"><code>target_log_prob_fn</code></h3>
-
-
-
-
-
-## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
+<h2 id="__init__"><code>__init__</code></h2>
 
 ``` python
 __init__(
@@ -211,6 +174,46 @@ Instantiates this object.
 #### Raises:
 
 * <b>`ValueError`</b>: `inverse_temperatures` doesn't have statically known 1D shape.
+
+
+
+## Properties
+
+<h3 id="exchange_proposed_fn"><code>exchange_proposed_fn</code></h3>
+
+
+
+<h3 id="inverse_temperatures"><code>inverse_temperatures</code></h3>
+
+
+
+<h3 id="is_calibrated"><code>is_calibrated</code></h3>
+
+
+
+<h3 id="name"><code>name</code></h3>
+
+
+
+<h3 id="num_replica"><code>num_replica</code></h3>
+
+
+
+<h3 id="parameters"><code>parameters</code></h3>
+
+Return `dict` of ``__init__`` arguments and their values.
+
+<h3 id="seed"><code>seed</code></h3>
+
+
+
+<h3 id="target_log_prob_fn"><code>target_log_prob_fn</code></h3>
+
+
+
+
+
+## Methods
 
 <h3 id="bootstrap_results"><code>bootstrap_results</code></h3>
 
