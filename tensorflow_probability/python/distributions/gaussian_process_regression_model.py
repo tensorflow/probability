@@ -580,16 +580,6 @@ class GaussianProcessRegressionModel(
         # Re-raise with our own more contextual error message.
         raise ValueError(msg[:-1] + ': {} and {}, respectively.'.format(
             index_point_count, observation_count))
-    else:
-      if self._validate_args:
-        # Instead of an assertion of broadcastability, we simply append an op
-        # to dynamically broadcast the two shapes; if this fails, the shapes
-        # must not be broadcastable.
-        broadcast_op = tf.broadcast_dynamic_shape(
-            tf.shape(self.observation_index_points)[:-ndims],
-            tf.shape(self.observations),
-            name='check_that_index_points_and_observation_shapes_broadcast')
-        assertions.append(broadcast_op)
     return assertions
 
   @property
