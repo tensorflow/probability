@@ -266,6 +266,11 @@ class LKJ(tfd.Distribution):
       # these to ones.
       result = tf.matrix_set_diag(result, tf.ones(
           shape=tf.shape(result)[:-1], dtype=result.dtype.base_dtype))
+      # TODO(b/116828694): This sampling algorithm can produce non-PSD matrices
+      # sometimes.  Specifically, as documented in b/116828694, around 2% of
+      # trials of 900,000 5x5 matrices (distributed according to 9 different
+      # concentration parameter values) contained at least one matrix on which
+      # the Cholesky decomposition failed.
       return result
 
   def _validate_dimension(self, x):
