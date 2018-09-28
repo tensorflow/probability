@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.optimizer.VariationalSGD" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="variable_scope"/>
 <meta itemprop="property" content="__init__"/>
 <meta itemprop="property" content="apply_gradients"/>
@@ -73,17 +74,7 @@ described below.
      Gradient Descent as Approximate Bayesian Inference. _arXiv preprint
      arXiv:1704.04289_, 2017. https://arxiv.org/abs/1704.04289
 
-## Properties
-
-<h3 id="variable_scope"><code>variable_scope</code></h3>
-
-Variable scope of all calls to `tf.get_variable`.
-
-
-
-## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
+<h2 id="__init__"><code>__init__</code></h2>
 
 ``` python
 __init__(
@@ -100,6 +91,18 @@ __init__(
 ```
 
 
+
+
+
+## Properties
+
+<h3 id="variable_scope"><code>variable_scope</code></h3>
+
+Variable scope of all calls to `tf.get_variable`.
+
+
+
+## Methods
 
 <h3 id="apply_gradients"><code>apply_gradients</code></h3>
 
@@ -301,13 +304,12 @@ was not `None`, that operation also increments `global_step`.
 
 #### Eager Compatibility
 When eager execution is enabled, `loss` should be a Python function that
-takes elements of `var_list` as arguments and computes the value to be
-minimized. If `var_list` is None, `loss` should take no arguments.
-Minimization (and gradient computation) is done with respect to the
-elements of `var_list` if not None, else with respect to any trainable
-variables created during the execution of the `loss` function.
-`gate_gradients`, `aggregation_method`, `colocate_gradients_with_ops` and
-`grad_loss` are ignored when eager execution is enabled.
+takes no arguments and computes the value to be minimized. Minimization (and
+gradient computation) is done with respect to the elements of `var_list` if
+not None, else with respect to any trainable variables created during the
+execution of the `loss` function. `gate_gradients`, `aggregation_method`,
+`colocate_gradients_with_ops` and `grad_loss` are ignored when eager
+execution is enabled.
 
 
 

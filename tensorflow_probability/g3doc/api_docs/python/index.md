@@ -12,6 +12,7 @@
 *  <a href="./tfp/bijectors/CholeskyOuterProduct.md"><code>tfp.bijectors.CholeskyOuterProduct</code></a>
 *  <a href="./tfp/bijectors/CholeskyToInvCholesky.md"><code>tfp.bijectors.CholeskyToInvCholesky</code></a>
 *  <a href="./tfp/bijectors/ConditionalBijector.md"><code>tfp.bijectors.ConditionalBijector</code></a>
+*  <a href="./tfp/bijectors/DiscreteCosineTransform.md"><code>tfp.bijectors.DiscreteCosineTransform</code></a>
 *  <a href="./tfp/bijectors/Exp.md"><code>tfp.bijectors.Exp</code></a>
 *  <a href="./tfp/bijectors/FillTriangular.md"><code>tfp.bijectors.FillTriangular</code></a>
 *  <a href="./tfp/bijectors/Gumbel.md"><code>tfp.bijectors.Gumbel</code></a>
@@ -65,10 +66,13 @@
 *  <a href="./tfp/distributions/GaussianProcess.md"><code>tfp.distributions.GaussianProcess</code></a>
 *  <a href="./tfp/distributions/GaussianProcessRegressionModel.md"><code>tfp.distributions.GaussianProcessRegressionModel</code></a>
 *  <a href="./tfp/distributions/Geometric.md"><code>tfp.distributions.Geometric</code></a>
+*  <a href="./tfp/distributions/Gumbel.md"><code>tfp.distributions.Gumbel</code></a>
+*  <a href="./tfp/distributions/HalfCauchy.md"><code>tfp.distributions.HalfCauchy</code></a>
 *  <a href="./tfp/distributions/HalfNormal.md"><code>tfp.distributions.HalfNormal</code></a>
 *  <a href="./tfp/distributions/Independent.md"><code>tfp.distributions.Independent</code></a>
 *  <a href="./tfp/distributions/InverseGamma.md"><code>tfp.distributions.InverseGamma</code></a>
 *  <a href="./tfp/distributions/InverseGammaWithSoftplusConcentrationRate.md"><code>tfp.distributions.InverseGammaWithSoftplusConcentrationRate</code></a>
+*  <a href="./tfp/distributions/InverseGaussian.md"><code>tfp.distributions.InverseGaussian</code></a>
 *  <a href="./tfp/distributions/Kumaraswamy.md"><code>tfp.distributions.Kumaraswamy</code></a>
 *  <a href="./tfp/distributions/LKJ.md"><code>tfp.distributions.LKJ</code></a>
 *  <a href="./tfp/distributions/Laplace.md"><code>tfp.distributions.Laplace</code></a>
@@ -89,6 +93,7 @@
 *  <a href="./tfp/distributions/Normal.md"><code>tfp.distributions.Normal</code></a>
 *  <a href="./tfp/distributions/NormalWithSoftplusScale.md"><code>tfp.distributions.NormalWithSoftplusScale</code></a>
 *  <a href="./tfp/distributions/OneHotCategorical.md"><code>tfp.distributions.OneHotCategorical</code></a>
+*  <a href="./tfp/distributions/Pareto.md"><code>tfp.distributions.Pareto</code></a>
 *  <a href="./tfp/distributions/Poisson.md"><code>tfp.distributions.Poisson</code></a>
 *  <a href="./tfp/distributions/PoissonLogNormalQuadratureCompound.md"><code>tfp.distributions.PoissonLogNormalQuadratureCompound</code></a>
 *  <a href="./tfp/distributions/QuantizedDistribution.md"><code>tfp.distributions.QuantizedDistribution</code></a>
@@ -108,6 +113,7 @@
 *  <a href="./tfp/distributions/VectorExponentialDiag.md"><code>tfp.distributions.VectorExponentialDiag</code></a>
 *  <a href="./tfp/distributions/VectorLaplaceDiag.md"><code>tfp.distributions.VectorLaplaceDiag</code></a>
 *  <a href="./tfp/distributions/VectorSinhArcsinhDiag.md"><code>tfp.distributions.VectorSinhArcsinhDiag</code></a>
+*  <a href="./tfp/distributions/VonMises.md"><code>tfp.distributions.VonMises</code></a>
 *  <a href="./tfp/distributions/VonMisesFisher.md"><code>tfp.distributions.VonMisesFisher</code></a>
 *  <a href="./tfp/distributions/Wishart.md"><code>tfp.distributions.Wishart</code></a>
 *  <a href="./tfp/distributions/assign_log_moving_mean_exp.md"><code>tfp.distributions.assign_log_moving_mean_exp</code></a>
@@ -176,9 +182,11 @@
 *  <a href="./tfp/edward2/VectorSinhArcsinhDiag.md"><code>tfp.edward2.VectorSinhArcsinhDiag</code></a>
 *  <a href="./tfp/edward2/Wishart.md"><code>tfp.edward2.Wishart</code></a>
 *  <a href="./tfp/edward2/as_random_variable.md"><code>tfp.edward2.as_random_variable</code></a>
-*  <a href="./tfp/edward2/get_interceptor.md"><code>tfp.edward2.get_interceptor</code></a>
+*  <a href="./tfp/edward2/get_next_interceptor.md"><code>tfp.edward2.get_next_interceptor</code></a>
+*  <a href="./tfp/edward2/interceptable.md"><code>tfp.edward2.interceptable</code></a>
 *  <a href="./tfp/edward2/interception.md"><code>tfp.edward2.interception</code></a>
 *  <a href="./tfp/edward2/make_log_joint_fn.md"><code>tfp.edward2.make_log_joint_fn</code></a>
+*  <a href="./tfp/edward2/tape.md"><code>tfp.edward2.tape</code></a>
 *  <a href="./tfp/glm.md"><code>tfp.glm</code></a>
 *  <a href="./tfp/glm/Bernoulli.md"><code>tfp.glm.Bernoulli</code></a>
 *  <a href="./tfp/glm/BernoulliNormalCDF.md"><code>tfp.glm.BernoulliNormalCDF</code></a>
@@ -195,6 +203,9 @@
 *  <a href="./tfp/glm/convergence_criteria_small_relative_norm_weights_change.md"><code>tfp.glm.convergence_criteria_small_relative_norm_weights_change</code></a>
 *  <a href="./tfp/glm/fit.md"><code>tfp.glm.fit</code></a>
 *  <a href="./tfp/glm/fit_one_step.md"><code>tfp.glm.fit_one_step</code></a>
+*  <a href="./tfp/glm/fit_sparse.md"><code>tfp.glm.fit_sparse</code></a>
+*  <a href="./tfp/glm/fit_sparse_one_step.md"><code>tfp.glm.fit_sparse_one_step</code></a>
+*  <a href="./tfp/glm/soft_threshold.md"><code>tfp.glm.soft_threshold</code></a>
 *  <a href="./tfp/layers.md"><code>tfp.layers</code></a>
 *  <a href="./tfp/layers/Convolution1DFlipout.md"><code>tfp.layers.Convolution1DFlipout</code></a>
 *  <a href="./tfp/layers/Convolution1DReparameterization.md"><code>tfp.layers.Convolution1DReparameterization</code></a>
@@ -209,6 +220,7 @@
 *  <a href="./tfp/layers/default_mean_field_normal_fn.md"><code>tfp.layers.default_mean_field_normal_fn</code></a>
 *  <a href="./tfp/layers/default_multivariate_normal_fn.md"><code>tfp.layers.default_multivariate_normal_fn</code></a>
 *  <a href="./tfp/math.md"><code>tfp.math</code></a>
+*  <a href="./tfp/math/custom_gradient.md"><code>tfp.math.custom_gradient</code></a>
 *  <a href="./tfp/math/diag_jacobian.md"><code>tfp.math.diag_jacobian</code></a>
 *  <a href="./tfp/math/matvecmul.md"><code>tfp.math.matvecmul</code></a>
 *  <a href="./tfp/math/pinv.md"><code>tfp.math.pinv</code></a>
@@ -252,6 +264,14 @@
 *  <a href="./tfp/positive_semidefinite_kernels/MaternOneHalf.md"><code>tfp.positive_semidefinite_kernels.MaternOneHalf</code></a>
 *  <a href="./tfp/positive_semidefinite_kernels/MaternThreeHalves.md"><code>tfp.positive_semidefinite_kernels.MaternThreeHalves</code></a>
 *  <a href="./tfp/positive_semidefinite_kernels/PositiveSemidefiniteKernel.md"><code>tfp.positive_semidefinite_kernels.PositiveSemidefiniteKernel</code></a>
+*  <a href="./tfp/sts.md"><code>tfp.sts</code></a>
+*  <a href="./tfp/sts/AdditiveStateSpaceModel.md"><code>tfp.sts.AdditiveStateSpaceModel</code></a>
+*  <a href="./tfp/sts/LocalLinearTrend.md"><code>tfp.sts.LocalLinearTrend</code></a>
+*  <a href="./tfp/sts/LocalLinearTrendStateSpaceModel.md"><code>tfp.sts.LocalLinearTrendStateSpaceModel</code></a>
+*  <a href="./tfp/sts/Seasonal.md"><code>tfp.sts.Seasonal</code></a>
+*  <a href="./tfp/sts/SeasonalStateSpaceModel.md"><code>tfp.sts.SeasonalStateSpaceModel</code></a>
+*  <a href="./tfp/sts/StructuralTimeSeries.md"><code>tfp.sts.StructuralTimeSeries</code></a>
+*  <a href="./tfp/sts/Sum.md"><code>tfp.sts.Sum</code></a>
 *  <a href="./tfp/trainable_distributions.md"><code>tfp.trainable_distributions</code></a>
 *  <a href="./tfp/trainable_distributions/bernoulli.md"><code>tfp.trainable_distributions.bernoulli</code></a>
 *  <a href="./tfp/trainable_distributions/multivariate_normal_tril.md"><code>tfp.trainable_distributions.multivariate_normal_tril</code></a>

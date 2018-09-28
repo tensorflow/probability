@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions.Laplace" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="allow_nan_stats"/>
 <meta itemprop="property" content="batch_shape"/>
 <meta itemprop="property" content="dtype"/>
@@ -66,6 +67,46 @@ constructed as,
 X ~ Laplace(loc=0, scale=1)
 Y = loc + scale * X
 ```
+
+<h2 id="__init__"><code>__init__</code></h2>
+
+``` python
+__init__(
+    loc,
+    scale,
+    validate_args=False,
+    allow_nan_stats=True,
+    name='Laplace'
+)
+```
+
+Construct Laplace distribution with parameters `loc` and `scale`.
+
+The parameters `loc` and `scale` must be shaped in a way that supports
+broadcasting (e.g., `loc / scale` is a valid operation).
+
+#### Args:
+
+* <b>`loc`</b>: Floating point tensor which characterizes the location (center)
+    of the distribution.
+* <b>`scale`</b>: Positive floating point tensor which characterizes the spread of
+    the distribution.
+* <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
+    parameters are checked for validity despite possibly degrading runtime
+    performance. When `False` invalid inputs may silently render incorrect
+    outputs.
+* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`,
+    statistics (e.g., mean, mode, variance) use the value "`NaN`" to
+    indicate the result is undefined. When `False`, an exception is raised
+    if one or more of the statistic's batch members are undefined.
+* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
+
+
+#### Raises:
+
+* <b>`TypeError`</b>: if `loc` and `scale` are of different dtype.
+
+
 
 ## Properties
 
@@ -147,44 +188,6 @@ Python `bool` indicating possibly expensive checks are enabled.
 
 
 ## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
-
-``` python
-__init__(
-    loc,
-    scale,
-    validate_args=False,
-    allow_nan_stats=True,
-    name='Laplace'
-)
-```
-
-Construct Laplace distribution with parameters `loc` and `scale`.
-
-The parameters `loc` and `scale` must be shaped in a way that supports
-broadcasting (e.g., `loc / scale` is a valid operation).
-
-#### Args:
-
-* <b>`loc`</b>: Floating point tensor which characterizes the location (center)
-    of the distribution.
-* <b>`scale`</b>: Positive floating point tensor which characterizes the spread of
-    the distribution.
-* <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
-    parameters are checked for validity despite possibly degrading runtime
-    performance. When `False` invalid inputs may silently render incorrect
-    outputs.
-* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`,
-    statistics (e.g., mean, mode, variance) use the value "`NaN`" to
-    indicate the result is undefined. When `False`, an exception is raised
-    if one or more of the statistic's batch members are undefined.
-* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
-
-
-#### Raises:
-
-* <b>`TypeError`</b>: if `loc` and `scale` are of different dtype.
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
 
@@ -325,7 +328,7 @@ where `F` denotes the support of the random variable `X ~ P`.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 
@@ -419,7 +422,7 @@ denotes (Shanon) cross entropy, and `H[.]` denotes (Shanon) entropy.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 

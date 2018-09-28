@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.trainable_distributions" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="__all__"/>
 <meta itemprop="property" content="absolute_import"/>
 <meta itemprop="property" content="division"/>
@@ -10,7 +11,7 @@
 
 Trainable distributions.
 
-"Trainable distributions" are instances of `tfp.distributions` which are
+"Trainable distributions" are instances of <a href="../tfp/distributions.md"><code>tfp.distributions</code></a> which are
 parameterized by a transformation of a single input `Tensor`. The
 transformations are presumed to use TensorFlow variables and typically need to
 be fit, e.g., using `tf.train` optimizers or `tfp.optimizers`.
@@ -31,11 +32,11 @@ be fit, e.g., using `tf.train` optimizers or `tfp.optimizers`.
 
 ## Other Members
 
-`__all__`
+<h3 id="__all__"><code>__all__</code></h3>
 
-`absolute_import`
+<h3 id="absolute_import"><code>absolute_import</code></h3>
 
-`division`
+<h3 id="division"><code>division</code></h3>
 
-`print_function`
+<h3 id="print_function"><code>print_function</code></h3>
 

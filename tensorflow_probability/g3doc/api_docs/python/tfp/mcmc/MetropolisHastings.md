@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.mcmc.MetropolisHastings" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="inner_kernel"/>
 <meta itemprop="property" content="is_calibrated"/>
 <meta itemprop="property" content="name"/>
@@ -76,33 +77,7 @@ hmc = tfp.mcmc.MetropolisHastings(
 #     num_leapfrog_steps=3)
 ```
 
-## Properties
-
-<h3 id="inner_kernel"><code>inner_kernel</code></h3>
-
-
-
-<h3 id="is_calibrated"><code>is_calibrated</code></h3>
-
-
-
-<h3 id="name"><code>name</code></h3>
-
-
-
-<h3 id="parameters"><code>parameters</code></h3>
-
-Return `dict` of ``__init__`` arguments and their values.
-
-<h3 id="seed"><code>seed</code></h3>
-
-
-
-
-
-## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
+<h2 id="__init__"><code>__init__</code></h2>
 
 ``` python
 __init__(
@@ -129,6 +104,34 @@ Instantiates this object.
 
 * <b>`metropolis_hastings_kernel`</b>: Instance of `TransitionKernel` which wraps the
     input transition kernel with the Metropolis-Hastings algorithm.
+
+
+
+## Properties
+
+<h3 id="inner_kernel"><code>inner_kernel</code></h3>
+
+
+
+<h3 id="is_calibrated"><code>is_calibrated</code></h3>
+
+
+
+<h3 id="name"><code>name</code></h3>
+
+
+
+<h3 id="parameters"><code>parameters</code></h3>
+
+Return `dict` of ``__init__`` arguments and their values.
+
+<h3 id="seed"><code>seed</code></h3>
+
+
+
+
+
+## Methods
 
 <h3 id="bootstrap_results"><code>bootstrap_results</code></h3>
 

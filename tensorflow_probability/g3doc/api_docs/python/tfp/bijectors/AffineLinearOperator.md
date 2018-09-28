@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.bijectors.AffineLinearOperator" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="adjoint"/>
 <meta itemprop="property" content="dtype"/>
 <meta itemprop="property" content="forward_min_event_ndims"/>
@@ -81,6 +82,41 @@ affine = AffineLinearOperator(shift, scale)
 y = affine.forward(x)  # [3., 7, 11]
 ```
 
+<h2 id="__init__"><code>__init__</code></h2>
+
+``` python
+__init__(
+    shift=None,
+    scale=None,
+    adjoint=False,
+    validate_args=False,
+    name='affine_linear_operator'
+)
+```
+
+Instantiates the `AffineLinearOperator` bijector.
+
+#### Args:
+
+* <b>`shift`</b>: Floating-point `Tensor`.
+* <b>`scale`</b>:  Subclass of `LinearOperator`. Represents the (batch) positive
+    definite matrix `M` in `R^{k x k}`.
+* <b>`adjoint`</b>: Python `bool` indicating whether to use the `scale` matrix as
+    specified or its adjoint.
+    Default value: `False`.
+* <b>`validate_args`</b>: Python `bool` indicating whether arguments should be
+    checked for correctness.
+* <b>`name`</b>: Python `str` name given to ops managed by this object.
+
+
+#### Raises:
+
+* <b>`TypeError`</b>: if `scale` is not a `LinearOperator`.
+* <b>`TypeError`</b>: if `shift.dtype` does not match `scale.dtype`.
+* <b>`ValueError`</b>: if not `scale.is_non_singular`.
+
+
+
 ## Properties
 
 <h3 id="adjoint"><code>adjoint</code></h3>
@@ -133,39 +169,6 @@ Returns True if Tensor arguments will be validated.
 
 
 ## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
-
-``` python
-__init__(
-    shift=None,
-    scale=None,
-    adjoint=False,
-    validate_args=False,
-    name='affine_linear_operator'
-)
-```
-
-Instantiates the `AffineLinearOperator` bijector.
-
-#### Args:
-
-* <b>`shift`</b>: Floating-point `Tensor`.
-* <b>`scale`</b>:  Subclass of `LinearOperator`. Represents the (batch) positive
-    definite matrix `M` in `R^{k x k}`.
-* <b>`adjoint`</b>: Python `bool` indicating whether to use the `scale` matrix as
-    specified or its adjoint.
-    Default value: `False`.
-* <b>`validate_args`</b>: Python `bool` indicating whether arguments should be
-    checked for correctness.
-* <b>`name`</b>: Python `str` name given to ops managed by this object.
-
-
-#### Raises:
-
-* <b>`TypeError`</b>: if `scale` is not a `LinearOperator`.
-* <b>`TypeError`</b>: if `shift.dtype` does not match `scale.dtype`.
-* <b>`ValueError`</b>: if not `scale.is_non_singular`.
 
 <h3 id="forward"><code>forward</code></h3>
 
@@ -257,8 +260,8 @@ Returns both the forward_log_det_jacobian.
 * <b>`event_ndims`</b>: Number of dimensions in the probabilistic events being
     transformed. Must be greater than or equal to
     `self.forward_min_event_ndims`. The result is summed over the final
-    dimensions to produce a scalar Jacobian determinant for each event,
-    i.e. it has shape `x.shape.ndims - event_ndims` dimensions.
+    dimensions to produce a scalar Jacobian determinant for each event, i.e.
+    it has shape `x.shape.ndims - event_ndims` dimensions.
 * <b>`name`</b>: The name to give this op.
 
 
@@ -373,8 +376,8 @@ evaluated at `g^{-1}(y)`.
 * <b>`event_ndims`</b>: Number of dimensions in the probabilistic events being
     transformed. Must be greater than or equal to
     `self.inverse_min_event_ndims`. The result is summed over the final
-    dimensions to produce a scalar Jacobian determinant for each event,
-    i.e. it has shape `y.shape.ndims - event_ndims` dimensions.
+    dimensions to produce a scalar Jacobian determinant for each event, i.e.
+    it has shape `y.shape.ndims - event_ndims` dimensions.
 * <b>`name`</b>: The name to give this op.
 
 

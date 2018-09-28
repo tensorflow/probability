@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions.reduce_weighted_logsumexp" />
+<meta itemprop="path" content="Stable" />
 </div>
 
 # tfp.distributions.reduce_weighted_logsumexp

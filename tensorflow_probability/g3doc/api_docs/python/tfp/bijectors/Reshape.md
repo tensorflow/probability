@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.bijectors.Reshape" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="dtype"/>
 <meta itemprop="property" content="forward_min_event_ndims"/>
 <meta itemprop="property" content="graph_parents"/>
@@ -109,6 +110,42 @@ bijector.forward_event_shape(tf.TensorShape([5, 2, 3, 7]))
 # Either policy ==> (5, None, None)
 ```
 
+<h2 id="__init__"><code>__init__</code></h2>
+
+``` python
+__init__(
+    event_shape_out,
+    event_shape_in=(-1,),
+    validate_args=False,
+    name=None
+)
+```
+
+Creates a `Reshape` bijector.
+
+#### Args:
+
+* <b>`event_shape_out`</b>: An `int`-like vector-shaped `Tensor`
+    representing the event shape of the transformed output.
+* <b>`event_shape_in`</b>: An optional `int`-like vector-shape `Tensor`
+    representing the event shape of the input. This is required in
+    order to define inverse operations; the default of (-1,)
+    assumes a vector-shaped input.
+* <b>`validate_args`</b>: Python `bool` indicating whether arguments should
+    be checked for correctness.
+* <b>`name`</b>: Python `str`, name given to ops managed by this object.
+
+
+#### Raises:
+
+* <b>`TypeError`</b>: if either `event_shape_in` or `event_shape_out` has
+    non-integer `dtype`.
+* <b>`ValueError`</b>: if either of `event_shape_in` or `event_shape_out`
+   has non-vector shape (`rank > 1`), or if their sizes do not
+   match.
+
+
+
 ## Properties
 
 <h3 id="dtype"><code>dtype</code></h3>
@@ -149,40 +186,6 @@ Returns True if Tensor arguments will be validated.
 
 
 ## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
-
-``` python
-__init__(
-    event_shape_out,
-    event_shape_in=(-1,),
-    validate_args=False,
-    name=None
-)
-```
-
-Creates a `Reshape` bijector.
-
-#### Args:
-
-* <b>`event_shape_out`</b>: An `int`-like vector-shaped `Tensor`
-    representing the event shape of the transformed output.
-* <b>`event_shape_in`</b>: An optional `int`-like vector-shape `Tensor`
-    representing the event shape of the input. This is required in
-    order to define inverse operations; the default of (-1,)
-    assumes a vector-shaped input.
-* <b>`validate_args`</b>: Python `bool` indicating whether arguments should
-    be checked for correctness.
-* <b>`name`</b>: Python `str`, name given to ops managed by this object.
-
-
-#### Raises:
-
-* <b>`TypeError`</b>: if either `event_shape_in` or `event_shape_out` has
-    non-integer `dtype`.
-* <b>`ValueError`</b>: if either of `event_shape_in` or `event_shape_out`
-   has non-vector shape (`rank > 1`), or if their sizes do not
-   match.
 
 <h3 id="forward"><code>forward</code></h3>
 
@@ -274,8 +277,8 @@ Returns both the forward_log_det_jacobian.
 * <b>`event_ndims`</b>: Number of dimensions in the probabilistic events being
     transformed. Must be greater than or equal to
     `self.forward_min_event_ndims`. The result is summed over the final
-    dimensions to produce a scalar Jacobian determinant for each event,
-    i.e. it has shape `x.shape.ndims - event_ndims` dimensions.
+    dimensions to produce a scalar Jacobian determinant for each event, i.e.
+    it has shape `x.shape.ndims - event_ndims` dimensions.
 * <b>`name`</b>: The name to give this op.
 
 
@@ -390,8 +393,8 @@ evaluated at `g^{-1}(y)`.
 * <b>`event_ndims`</b>: Number of dimensions in the probabilistic events being
     transformed. Must be greater than or equal to
     `self.inverse_min_event_ndims`. The result is summed over the final
-    dimensions to produce a scalar Jacobian determinant for each event,
-    i.e. it has shape `y.shape.ndims - event_ndims` dimensions.
+    dimensions to produce a scalar Jacobian determinant for each event, i.e.
+    it has shape `y.shape.ndims - event_ndims` dimensions.
 * <b>`name`</b>: The name to give this op.
 
 

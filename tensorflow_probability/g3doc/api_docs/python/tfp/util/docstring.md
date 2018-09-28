@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.util.docstring" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="__all__"/>
 <meta itemprop="property" content="absolute_import"/>
 <meta itemprop="property" content="division"/>
@@ -16,11 +17,11 @@ Utilities for programmable docstrings.
 
 ## Other Members
 
-`__all__`
+<h3 id="__all__"><code>__all__</code></h3>
 
-`absolute_import`
+<h3 id="absolute_import"><code>absolute_import</code></h3>
 
-`division`
+<h3 id="division"><code>division</code></h3>
 
-`print_function`
+<h3 id="print_function"><code>print_function</code></h3>
 

@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions.MixtureSameFamily" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="allow_nan_stats"/>
 <meta itemprop="property" content="batch_shape"/>
 <meta itemprop="property" content="components_distribution"/>
@@ -104,6 +105,52 @@ plt.contour(grid[..., 0], grid[..., 1], gm.prob(grid).eval());
 
 ```
 
+<h2 id="__init__"><code>__init__</code></h2>
+
+``` python
+__init__(
+    mixture_distribution,
+    components_distribution,
+    validate_args=False,
+    allow_nan_stats=True,
+    name='MixtureSameFamily'
+)
+```
+
+Construct a `MixtureSameFamily` distribution.
+
+#### Args:
+
+* <b>`mixture_distribution`</b>: `tf.distributions.Categorical`-like instance.
+    Manages the probability of selecting components. The number of
+    categories must match the rightmost batch dimension of the
+    `components_distribution`. Must have either scalar `batch_shape` or
+    `batch_shape` matching `components_distribution.batch_shape[:-1]`.
+* <b>`components_distribution`</b>: `tf.distributions.Distribution`-like instance.
+    Right-most batch dimension indexes components.
+* <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
+    parameters are checked for validity despite possibly degrading runtime
+    performance. When `False` invalid inputs may silently render incorrect
+    outputs.
+* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
+    (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
+    result is undefined. When `False`, an exception is raised if one or
+    more of the statistic's batch members are undefined.
+* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
+
+
+#### Raises:
+
+* <b>`ValueError`</b>: `if not mixture_distribution.dtype.is_integer`.
+* <b>`ValueError`</b>: if mixture_distribution does not have scalar `event_shape`.
+* <b>`ValueError`</b>: if `mixture_distribution.batch_shape` and
+    `components_distribution.batch_shape[:-1]` are both fully defined and
+    the former is neither scalar nor equal to the latter.
+* <b>`ValueError`</b>: if `mixture_distribution` categories does not equal
+    `components_distribution` rightmost batch shape.
+
+
+
 ## Properties
 
 <h3 id="allow_nan_stats"><code>allow_nan_stats</code></h3>
@@ -184,50 +231,6 @@ Python `bool` indicating possibly expensive checks are enabled.
 
 
 ## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
-
-``` python
-__init__(
-    mixture_distribution,
-    components_distribution,
-    validate_args=False,
-    allow_nan_stats=True,
-    name='MixtureSameFamily'
-)
-```
-
-Construct a `MixtureSameFamily` distribution.
-
-#### Args:
-
-* <b>`mixture_distribution`</b>: `tf.distributions.Categorical`-like instance.
-    Manages the probability of selecting components. The number of
-    categories must match the rightmost batch dimension of the
-    `components_distribution`. Must have either scalar `batch_shape` or
-    `batch_shape` matching `components_distribution.batch_shape[:-1]`.
-* <b>`components_distribution`</b>: `tf.distributions.Distribution`-like instance.
-    Right-most batch dimension indexes components.
-* <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
-    parameters are checked for validity despite possibly degrading runtime
-    performance. When `False` invalid inputs may silently render incorrect
-    outputs.
-* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
-    (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
-    result is undefined. When `False`, an exception is raised if one or
-    more of the statistic's batch members are undefined.
-* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
-
-
-#### Raises:
-
-* <b>`ValueError`</b>: `if not mixture_distribution.dtype.is_integer`.
-* <b>`ValueError`</b>: if mixture_distribution does not have scalar `event_shape`.
-* <b>`ValueError`</b>: if `mixture_distribution.batch_shape` and
-    `components_distribution.batch_shape[:-1]` are both fully defined and
-    the former is neither scalar nor equal to the latter.
-* <b>`ValueError`</b>: if `mixture_distribution` categories does not equal
-    `components_distribution` rightmost batch shape.
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
 
@@ -368,7 +371,7 @@ where `F` denotes the support of the random variable `X ~ P`.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 
@@ -462,7 +465,7 @@ denotes (Shanon) cross entropy, and `H[.]` denotes (Shanon) entropy.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 

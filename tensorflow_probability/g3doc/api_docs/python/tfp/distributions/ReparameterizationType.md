@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions.ReparameterizationType" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="__eq__"/>
 <meta itemprop="property" content="__init__"/>
 </div>
@@ -25,15 +26,17 @@ one of two possible properties for samples from a distribution:
   sample results in a `stop_gradients` call and use policy
   gradients / surrogate loss instead.
 
-## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
+<h2 id="__init__"><code>__init__</code></h2>
 
 ``` python
 __init__(rep_type)
 ```
 
 
+
+
+
+## Methods
 
 <h3 id="__eq__"><code>__eq__</code></h3>
 

@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.mcmc.UncalibratedLangevin" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="compute_acceptance"/>
 <meta itemprop="property" content="is_calibrated"/>
 <meta itemprop="property" content="name"/>
@@ -34,49 +35,7 @@ Warning: this kernel will not result in a chain which converges to the
 For more details on `UncalibratedLangevin`, see
 `MetropolisAdjustedLangevinAlgorithm`.
 
-## Properties
-
-<h3 id="compute_acceptance"><code>compute_acceptance</code></h3>
-
-
-
-<h3 id="is_calibrated"><code>is_calibrated</code></h3>
-
-
-
-<h3 id="name"><code>name</code></h3>
-
-
-
-<h3 id="parallel_iterations"><code>parallel_iterations</code></h3>
-
-
-
-<h3 id="parameters"><code>parameters</code></h3>
-
-Return `dict` of ``__init__`` arguments and their values.
-
-<h3 id="seed"><code>seed</code></h3>
-
-
-
-<h3 id="step_size"><code>step_size</code></h3>
-
-
-
-<h3 id="target_log_prob_fn"><code>target_log_prob_fn</code></h3>
-
-
-
-<h3 id="volatility_fn"><code>volatility_fn</code></h3>
-
-
-
-
-
-## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
+<h2 id="__init__"><code>__init__</code></h2>
 
 ``` python
 __init__(
@@ -133,6 +92,50 @@ Initializes Langevin diffusion transition kernel.
 * <b>`ValueError`</b>: if there isn't one `step_size` or a list with same length as
     `current_state`.
 * <b>`TypeError`</b>: if `volatility_fn` is not callable.
+
+
+
+## Properties
+
+<h3 id="compute_acceptance"><code>compute_acceptance</code></h3>
+
+
+
+<h3 id="is_calibrated"><code>is_calibrated</code></h3>
+
+
+
+<h3 id="name"><code>name</code></h3>
+
+
+
+<h3 id="parallel_iterations"><code>parallel_iterations</code></h3>
+
+
+
+<h3 id="parameters"><code>parameters</code></h3>
+
+Return `dict` of ``__init__`` arguments and their values.
+
+<h3 id="seed"><code>seed</code></h3>
+
+
+
+<h3 id="step_size"><code>step_size</code></h3>
+
+
+
+<h3 id="target_log_prob_fn"><code>target_log_prob_fn</code></h3>
+
+
+
+<h3 id="volatility_fn"><code>volatility_fn</code></h3>
+
+
+
+
+
+## Methods
 
 <h3 id="bootstrap_results"><code>bootstrap_results</code></h3>
 

@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.trainable_distributions.poisson" />
+<meta itemprop="path" content="Stable" />
 </div>
 
 # tfp.trainable_distributions.poisson

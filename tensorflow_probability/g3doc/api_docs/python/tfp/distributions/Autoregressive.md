@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions.Autoregressive" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="allow_nan_stats"/>
 <meta itemprop="property" content="batch_shape"/>
 <meta itemprop="property" content="distribution0"/>
@@ -124,6 +125,54 @@ prob_x = ar.prob(x)
      PixelCNN Decoders. In _Neural Information Processing Systems_, 2016.
      https://arxiv.org/abs/1606.05328
 
+<h2 id="__init__"><code>__init__</code></h2>
+
+``` python
+__init__(
+    distribution_fn,
+    sample0=None,
+    num_steps=None,
+    validate_args=False,
+    allow_nan_stats=True,
+    name='Autoregressive'
+)
+```
+
+Construct an `Autoregressive` distribution.
+
+#### Args:
+
+* <b>`distribution_fn`</b>: Python `callable` which constructs a
+    `tf.distributions.Distribution`-like instance from a `Tensor` (e.g.,
+    `sample0`). The function must respect the "autoregressive property",
+    i.e., there exists a permutation of event such that each coordinate is a
+    diffeomorphic function of on preceding coordinates.
+* <b>`sample0`</b>: Initial input to `distribution_fn`; used to
+    build the distribution in `__init__` which in turn specifies this
+    distribution's properties, e.g., `event_shape`, `batch_shape`, `dtype`.
+    If unspecified, then `distribution_fn` should be default constructable.
+* <b>`num_steps`</b>: Number of times `distribution_fn` is composed from samples,
+    e.g., `num_steps=2` implies
+    `distribution_fn(distribution_fn(sample0).sample(n)).sample()`.
+* <b>`validate_args`</b>: Python `bool`.  Whether to validate input with asserts.
+    If `validate_args` is `False`, and the inputs are invalid,
+    correct behavior is not guaranteed.
+* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
+    (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
+    result is undefined. When `False`, an exception is raised if one or
+    more of the statistic's batch members are undefined.
+* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
+    Default value: "Autoregressive".
+
+
+#### Raises:
+
+* <b>`ValueError`</b>: if `num_steps` and
+    `distribution_fn(sample0).event_shape.num_elements()` are both `None`.
+* <b>`ValueError`</b>: if `num_steps < 1`.
+
+
+
 ## Properties
 
 <h3 id="allow_nan_stats"><code>allow_nan_stats</code></h3>
@@ -212,52 +261,6 @@ Python `bool` indicating possibly expensive checks are enabled.
 
 
 ## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
-
-``` python
-__init__(
-    distribution_fn,
-    sample0=None,
-    num_steps=None,
-    validate_args=False,
-    allow_nan_stats=True,
-    name='Autoregressive'
-)
-```
-
-Construct an `Autoregressive` distribution.
-
-#### Args:
-
-* <b>`distribution_fn`</b>: Python `callable` which constructs a
-    `tf.distributions.Distribution`-like instance from a `Tensor` (e.g.,
-    `sample0`). The function must respect the "autoregressive property",
-    i.e., there exists a permutation of event such that each coordinate is a
-    diffeomorphic function of on preceding coordinates.
-* <b>`sample0`</b>: Initial input to `distribution_fn`; used to
-    build the distribution in `__init__` which in turn specifies this
-    distribution's properties, e.g., `event_shape`, `batch_shape`, `dtype`.
-    If unspecified, then `distribution_fn` should be default constructable.
-* <b>`num_steps`</b>: Number of times `distribution_fn` is composed from samples,
-    e.g., `num_steps=2` implies
-    `distribution_fn(distribution_fn(sample0).sample(n)).sample()`.
-* <b>`validate_args`</b>: Python `bool`.  Whether to validate input with asserts.
-    If `validate_args` is `False`, and the inputs are invalid,
-    correct behavior is not guaranteed.
-* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
-    (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
-    result is undefined. When `False`, an exception is raised if one or
-    more of the statistic's batch members are undefined.
-* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
-    Default value: "Autoregressive".
-
-
-#### Raises:
-
-* <b>`ValueError`</b>: if `num_steps` and
-    `distribution_fn(sample0).event_shape.num_elements()` are both `None`.
-* <b>`ValueError`</b>: if `num_steps < 1`.
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
 
@@ -398,7 +401,7 @@ where `F` denotes the support of the random variable `X ~ P`.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 
@@ -492,7 +495,7 @@ denotes (Shanon) cross entropy, and `H[.]` denotes (Shanon) entropy.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 

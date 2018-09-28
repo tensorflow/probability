@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.optimizer.nelder_mead_one_step" />
+<meta itemprop="path" content="Stable" />
 </div>
 
 # tfp.optimizer.nelder_mead_one_step

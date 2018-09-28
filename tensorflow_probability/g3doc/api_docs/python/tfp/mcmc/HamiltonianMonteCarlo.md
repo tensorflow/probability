@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.mcmc.HamiltonianMonteCarlo" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="is_calibrated"/>
 <meta itemprop="property" content="name"/>
 <meta itemprop="property" content="num_leapfrog_steps"/>
@@ -246,49 +247,7 @@ plt.xlabel('iteration')
      stochastic approximation version of the EM algorithm_, Ann. Statist. 27
      (1999), no. 1, 94--128. https://projecteuclid.org/euclid.aos/1018031103
 
-## Properties
-
-<h3 id="is_calibrated"><code>is_calibrated</code></h3>
-
-
-
-<h3 id="name"><code>name</code></h3>
-
-
-
-<h3 id="num_leapfrog_steps"><code>num_leapfrog_steps</code></h3>
-
-
-
-<h3 id="parameters"><code>parameters</code></h3>
-
-Return `dict` of ``__init__`` arguments and their values.
-
-<h3 id="seed"><code>seed</code></h3>
-
-
-
-<h3 id="state_gradients_are_stopped"><code>state_gradients_are_stopped</code></h3>
-
-
-
-<h3 id="step_size"><code>step_size</code></h3>
-
-
-
-<h3 id="step_size_update_fn"><code>step_size_update_fn</code></h3>
-
-
-
-<h3 id="target_log_prob_fn"><code>target_log_prob_fn</code></h3>
-
-
-
-
-
-## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
+<h2 id="__init__"><code>__init__</code></h2>
 
 ``` python
 __init__(
@@ -331,19 +290,48 @@ Initializes this transition kernel.
     Default value: `None` (i.e., 'hmc_kernel').
 
 
-#### Returns:
 
-* <b>`next_state`</b>: Tensor or Python list of `Tensor`s representing the state(s)
-    of the Markov chain(s) at each result step. Has same shape as
-    `current_state`.
-* <b>`kernel_results`</b>: `collections.namedtuple` of internal calculations used to
-    advance the chain.
+## Properties
+
+<h3 id="is_calibrated"><code>is_calibrated</code></h3>
 
 
-#### Raises:
 
-* <b>`ValueError`</b>: if there isn't one `step_size` or a list with same length as
-    `current_state`.
+<h3 id="name"><code>name</code></h3>
+
+
+
+<h3 id="num_leapfrog_steps"><code>num_leapfrog_steps</code></h3>
+
+
+
+<h3 id="parameters"><code>parameters</code></h3>
+
+Return `dict` of ``__init__`` arguments and their values.
+
+<h3 id="seed"><code>seed</code></h3>
+
+
+
+<h3 id="state_gradients_are_stopped"><code>state_gradients_are_stopped</code></h3>
+
+
+
+<h3 id="step_size"><code>step_size</code></h3>
+
+
+
+<h3 id="step_size_update_fn"><code>step_size_update_fn</code></h3>
+
+
+
+<h3 id="target_log_prob_fn"><code>target_log_prob_fn</code></h3>
+
+
+
+
+
+## Methods
 
 <h3 id="bootstrap_results"><code>bootstrap_results</code></h3>
 

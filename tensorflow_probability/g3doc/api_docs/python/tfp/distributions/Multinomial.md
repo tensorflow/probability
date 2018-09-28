@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions.Multinomial" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="allow_nan_stats"/>
 <meta itemprop="property" content="batch_shape"/>
 <meta itemprop="property" content="dtype"/>
@@ -137,6 +138,49 @@ dist.prob(counts)  # Shape [2]
 dist.sample(5) # Shape [5, 2, 3]
 ```
 
+<h2 id="__init__"><code>__init__</code></h2>
+
+``` python
+__init__(
+    total_count,
+    logits=None,
+    probs=None,
+    validate_args=False,
+    allow_nan_stats=True,
+    name='Multinomial'
+)
+```
+
+Initialize a batch of Multinomial distributions.
+
+#### Args:
+
+* <b>`total_count`</b>: Non-negative floating point tensor with shape broadcastable
+    to `[N1,..., Nm]` with `m >= 0`. Defines this as a batch of
+    `N1 x ... x Nm` different Multinomial distributions. Its components
+    should be equal to integer values.
+* <b>`logits`</b>: Floating point tensor representing unnormalized log-probabilities
+    of a positive event with shape broadcastable to
+    `[N1,..., Nm, K]` `m >= 0`, and the same dtype as `total_count`. Defines
+    this as a batch of `N1 x ... x Nm` different `K` class Multinomial
+    distributions. Only one of `logits` or `probs` should be passed in.
+* <b>`probs`</b>: Positive floating point tensor with shape broadcastable to
+    `[N1,..., Nm, K]` `m >= 0` and same dtype as `total_count`. Defines
+    this as a batch of `N1 x ... x Nm` different `K` class Multinomial
+    distributions. `probs`'s components in the last portion of its shape
+    should sum to `1`. Only one of `logits` or `probs` should be passed in.
+* <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
+    parameters are checked for validity despite possibly degrading runtime
+    performance. When `False` invalid inputs may silently render incorrect
+    outputs.
+* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
+    (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
+    result is undefined. When `False`, an exception is raised if one or
+    more of the statistic's batch members are undefined.
+* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
+
+
+
 ## Properties
 
 <h3 id="allow_nan_stats"><code>allow_nan_stats</code></h3>
@@ -221,47 +265,6 @@ Python `bool` indicating possibly expensive checks are enabled.
 
 
 ## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
-
-``` python
-__init__(
-    total_count,
-    logits=None,
-    probs=None,
-    validate_args=False,
-    allow_nan_stats=True,
-    name='Multinomial'
-)
-```
-
-Initialize a batch of Multinomial distributions.
-
-#### Args:
-
-* <b>`total_count`</b>: Non-negative floating point tensor with shape broadcastable
-    to `[N1,..., Nm]` with `m >= 0`. Defines this as a batch of
-    `N1 x ... x Nm` different Multinomial distributions. Its components
-    should be equal to integer values.
-* <b>`logits`</b>: Floating point tensor representing unnormalized log-probabilities
-    of a positive event with shape broadcastable to
-    `[N1,..., Nm, K]` `m >= 0`, and the same dtype as `total_count`. Defines
-    this as a batch of `N1 x ... x Nm` different `K` class Multinomial
-    distributions. Only one of `logits` or `probs` should be passed in.
-* <b>`probs`</b>: Positive floating point tensor with shape broadcastable to
-    `[N1,..., Nm, K]` `m >= 0` and same dtype as `total_count`. Defines
-    this as a batch of `N1 x ... x Nm` different `K` class Multinomial
-    distributions. `probs`'s components in the last portion of its shape
-    should sum to `1`. Only one of `logits` or `probs` should be passed in.
-* <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
-    parameters are checked for validity despite possibly degrading runtime
-    performance. When `False` invalid inputs may silently render incorrect
-    outputs.
-* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
-    (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
-    result is undefined. When `False`, an exception is raised if one or
-    more of the statistic's batch members are undefined.
-* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
 
@@ -402,7 +405,7 @@ where `F` denotes the support of the random variable `X ~ P`.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 
@@ -496,7 +499,7 @@ denotes (Shanon) cross entropy, and `H[.]` denotes (Shanon) entropy.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 

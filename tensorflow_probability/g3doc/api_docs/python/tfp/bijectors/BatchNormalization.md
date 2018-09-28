@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.bijectors.BatchNormalization" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="dtype"/>
 <meta itemprop="property" content="forward_min_event_ndims"/>
 <meta itemprop="property" content="graph_parents"/>
@@ -47,20 +48,20 @@ computed at training-time. De-normalization is useful for sampling.
 
 dist = tfd.TransformedDistribution(
     distribution=tfd.Normal()),
-    bijector=tfb.BatchNorm())
+    bijector=tfb.BatchNormalization())
 
 y = tfd.MultivariateNormalDiag(loc=1., scale=2.).sample(100)  # ~ N(1, 2)
 x = dist.bijector.inverse(y)  # ~ N(0, 1)
 y = dist.sample()  # ~ N(1, 2)
 ```
 
-During training time, `BatchNorm.inverse` and `BatchNorm.forward` are not
-guaranteed to be inverses of each other because `inverse(y)` uses statistics
-of the current minibatch, while `forward(x)` uses running-average statistics
-accumulated from training. In other words,
-`BatchNorm.inverse(BatchNorm.forward(...))` and
-`BatchNorm.forward(BatchNorm.inverse(...))` will be identical when
-`training=False` but may be different when `training=True`.
+During training time, `BatchNormalization.inverse` and
+`BatchNormalization.forward` are not guaranteed to be inverses of each other
+because `inverse(y)` uses statistics of the current minibatch, while
+`forward(x)` uses running-average statistics accumulated from training. In
+other words, `BatchNormalization.inverse(BatchNormalization.forward(...))` and
+`BatchNormalization.forward(BatchNormalization.inverse(...))` will be
+identical when `training=False` but may be different when `training=True`.
 
 #### References
 
@@ -76,6 +77,40 @@ accumulated from training. In other words,
 [3]: George Papamakarios, Theo Pavlakou, and Iain Murray. Masked
      Autoregressive Flow for Density Estimation. In _Neural Information
      Processing Systems_, 2017. https://arxiv.org/abs/1705.07057
+
+<h2 id="__init__"><code>__init__</code></h2>
+
+``` python
+__init__(
+    batchnorm_layer=None,
+    training=True,
+    validate_args=False,
+    name='batch_normalization'
+)
+```
+
+Instantiates the `BatchNormalization` bijector.
+
+#### Args:
+
+* <b>`batchnorm_layer`</b>: `tf.layers.BatchNormalization` layer object. If `None`,
+    defaults to
+    `tf.layers.BatchNormalization(gamma_constraint=tf.nn.relu(x) + 1e-6)`.
+    This ensures positivity of the scale variable.
+
+* <b>`training`</b>: If True, updates running-average statistics during call to
+    `inverse()`.
+* <b>`validate_args`</b>: Python `bool` indicating whether arguments should be
+    checked for correctness.
+* <b>`name`</b>: Python `str` name given to ops managed by this object.
+
+#### Raises:
+
+* <b>`ValueError`</b>: If bn_layer is not an instance of
+    `tf.layers.BatchNormalization`, or if it is specified with `renorm=True`
+    or a virtual batch size.
+
+
 
 ## Properties
 
@@ -117,38 +152,6 @@ Returns True if Tensor arguments will be validated.
 
 
 ## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
-
-``` python
-__init__(
-    batchnorm_layer=None,
-    training=True,
-    validate_args=False,
-    name='batch_normalization'
-)
-```
-
-Instantiates the `BatchNorm` bijector.
-
-#### Args:
-
-* <b>`batchnorm_layer`</b>: `tf.layers.BatchNormalization` layer object. If `None`,
-    defaults to
-    `tf.layers.BatchNormalization(gamma_constraint=tf.nn.relu(x) + 1e-6)`.
-    This ensures positivity of the scale variable.
-
-* <b>`training`</b>: If True, updates running-average statistics during call to
-    `inverse()`.
-* <b>`validate_args`</b>: Python `bool` indicating whether arguments should be
-    checked for correctness.
-* <b>`name`</b>: Python `str` name given to ops managed by this object.
-
-#### Raises:
-
-* <b>`ValueError`</b>: If bn_layer is not an instance of
-    `tf.layers.BatchNormalization`, or if it is specified with `renorm=True`
-    or a virtual batch size.
 
 <h3 id="forward"><code>forward</code></h3>
 
@@ -240,8 +243,8 @@ Returns both the forward_log_det_jacobian.
 * <b>`event_ndims`</b>: Number of dimensions in the probabilistic events being
     transformed. Must be greater than or equal to
     `self.forward_min_event_ndims`. The result is summed over the final
-    dimensions to produce a scalar Jacobian determinant for each event,
-    i.e. it has shape `x.shape.ndims - event_ndims` dimensions.
+    dimensions to produce a scalar Jacobian determinant for each event, i.e.
+    it has shape `x.shape.ndims - event_ndims` dimensions.
 * <b>`name`</b>: The name to give this op.
 
 
@@ -356,8 +359,8 @@ evaluated at `g^{-1}(y)`.
 * <b>`event_ndims`</b>: Number of dimensions in the probabilistic events being
     transformed. Must be greater than or equal to
     `self.inverse_min_event_ndims`. The result is summed over the final
-    dimensions to produce a scalar Jacobian determinant for each event,
-    i.e. it has shape `y.shape.ndims - event_ndims` dimensions.
+    dimensions to produce a scalar Jacobian determinant for each event, i.e.
+    it has shape `y.shape.ndims - event_ndims` dimensions.
 * <b>`name`</b>: The name to give this op.
 
 

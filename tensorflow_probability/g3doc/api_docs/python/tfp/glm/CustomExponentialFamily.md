@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.glm.CustomExponentialFamily" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="distribution_fn"/>
 <meta itemprop="property" content="is_canonical"/>
 <meta itemprop="property" content="linear_model_to_mean_fn"/>
@@ -17,29 +18,7 @@ Inherits From: [`ExponentialFamily`](../../tfp/glm/ExponentialFamily.md)
 
 Constucts GLM from arbitrary distribution and inverse link function.
 
-## Properties
-
-<h3 id="distribution_fn"><code>distribution_fn</code></h3>
-
-
-
-<h3 id="is_canonical"><code>is_canonical</code></h3>
-
-Returns `True` when `variance(r) == grad_mean(r)` for all `r`.
-
-<h3 id="linear_model_to_mean_fn"><code>linear_model_to_mean_fn</code></h3>
-
-
-
-<h3 id="name"><code>name</code></h3>
-
-Returns TF namescope prefixed to ops created by member functions.
-
-
-
-## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
+<h2 id="__init__"><code>__init__</code></h2>
 
 ``` python
 __init__(
@@ -67,6 +46,30 @@ Creates the `CustomExponentialFamily`.
     linear_model_to_mean_fn(r)`.
 * <b>`name`</b>: Python `str` used as TF namescope for ops created by member
     functions. Default value: `None` (i.e., the subclass name).
+
+
+
+## Properties
+
+<h3 id="distribution_fn"><code>distribution_fn</code></h3>
+
+
+
+<h3 id="is_canonical"><code>is_canonical</code></h3>
+
+Returns `True` when `variance(r) == grad_mean(r)` for all `r`.
+
+<h3 id="linear_model_to_mean_fn"><code>linear_model_to_mean_fn</code></h3>
+
+
+
+<h3 id="name"><code>name</code></h3>
+
+Returns TF namescope prefixed to ops created by member functions.
+
+
+
+## Methods
 
 <h3 id="__call__"><code>__call__</code></h3>
 

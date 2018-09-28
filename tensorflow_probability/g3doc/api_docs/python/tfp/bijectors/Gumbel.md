@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.bijectors.Gumbel" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="dtype"/>
 <meta itemprop="property" content="forward_min_event_ndims"/>
 <meta itemprop="property" content="graph_parents"/>
@@ -28,8 +29,8 @@ Inherits From: [`Bijector`](../../tfp/bijectors/Bijector.md)
 
 Compute `Y = g(X) = exp(-exp(-(X - loc) / scale))`.
 
-This bijector maps inputs from `[-inf, inf]` to [0, 1]`. The inverse of the
-bijector applied to a uniform random variable `X ~ U(0, 1) gives back a
+This bijector maps inputs from `[-inf, inf]` to `[0, 1]`. The inverse of the
+bijector applied to a uniform random variable `X ~ U(0, 1)` gives back a
 random variable with the
 [Gumbel distribution](https://en.wikipedia.org/wiki/Gumbel_distribution):
 
@@ -38,6 +39,33 @@ Y ~ Gumbel(loc, scale)
 pdf(y; loc, scale) = exp(
   -( (y - loc) / scale + exp(- (y - loc) / scale) ) ) / scale
 ```
+
+<h2 id="__init__"><code>__init__</code></h2>
+
+``` python
+__init__(
+    loc=0.0,
+    scale=1.0,
+    validate_args=False,
+    name='gumbel'
+)
+```
+
+Instantiates the `Gumbel` bijector.
+
+#### Args:
+
+* <b>`loc`</b>: Float-like `Tensor` that is the same dtype and is
+    broadcastable with `scale`.
+    This is `loc` in `Y = g(X) = exp(-exp(-(X - loc) / scale))`.
+* <b>`scale`</b>: Positive Float-like `Tensor` that is the same dtype and is
+    broadcastable with `loc`.
+    This is `scale` in `Y = g(X) = exp(-exp(-(X - loc) / scale))`.
+* <b>`validate_args`</b>: Python `bool` indicating whether arguments should be
+    checked for correctness.
+* <b>`name`</b>: Python `str` name given to ops managed by this object.
+
+
 
 ## Properties
 
@@ -87,31 +115,6 @@ Returns True if Tensor arguments will be validated.
 
 
 ## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
-
-``` python
-__init__(
-    loc=0.0,
-    scale=1.0,
-    validate_args=False,
-    name='gumbel'
-)
-```
-
-Instantiates the `Gumbel` bijector.
-
-#### Args:
-
-* <b>`loc`</b>: Float-like `Tensor` that is the same dtype and is
-    broadcastable with `scale`.
-    This is `loc` in `Y = g(X) = exp(-exp(-(X - loc) / scale))`.
-* <b>`scale`</b>: Positive Float-like `Tensor` that is the same dtype and is
-    broadcastable with `loc`.
-    This is `scale` in `Y = g(X) = exp(-exp(-(X - loc) / scale))`.
-* <b>`validate_args`</b>: Python `bool` indicating whether arguments should be
-    checked for correctness.
-* <b>`name`</b>: Python `str` name given to ops managed by this object.
 
 <h3 id="forward"><code>forward</code></h3>
 
@@ -203,8 +206,8 @@ Returns both the forward_log_det_jacobian.
 * <b>`event_ndims`</b>: Number of dimensions in the probabilistic events being
     transformed. Must be greater than or equal to
     `self.forward_min_event_ndims`. The result is summed over the final
-    dimensions to produce a scalar Jacobian determinant for each event,
-    i.e. it has shape `x.shape.ndims - event_ndims` dimensions.
+    dimensions to produce a scalar Jacobian determinant for each event, i.e.
+    it has shape `x.shape.ndims - event_ndims` dimensions.
 * <b>`name`</b>: The name to give this op.
 
 
@@ -319,8 +322,8 @@ evaluated at `g^{-1}(y)`.
 * <b>`event_ndims`</b>: Number of dimensions in the probabilistic events being
     transformed. Must be greater than or equal to
     `self.inverse_min_event_ndims`. The result is summed over the final
-    dimensions to produce a scalar Jacobian determinant for each event,
-    i.e. it has shape `y.shape.ndims - event_ndims` dimensions.
+    dimensions to produce a scalar Jacobian determinant for each event, i.e.
+    it has shape `y.shape.ndims - event_ndims` dimensions.
 * <b>`name`</b>: The name to give this op.
 
 

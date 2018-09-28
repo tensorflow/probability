@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.mcmc.random_walk_uniform_fn" />
+<meta itemprop="path" content="Stable" />
 </div>
 
 # tfp.mcmc.random_walk_uniform_fn

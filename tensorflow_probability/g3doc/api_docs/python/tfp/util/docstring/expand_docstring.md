@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.util.docstring.expand_docstring" />
+<meta itemprop="path" content="Stable" />
 </div>
 
 # tfp.util.docstring.expand_docstring
