@@ -43,7 +43,7 @@ class SampleChainTest(tf.test.TestCase):
     true_mean = dtype([0, 0])
     true_cov = dtype([[1, 0.5],
                       [0.5, 1]])
-    num_results = 2000
+    num_results = 3000
     counter = collections.Counter()
     with self.test_session(graph=tf.Graph()) as sess:
       def target_log_prob(x, y):

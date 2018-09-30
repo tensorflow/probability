@@ -23,6 +23,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow.contrib import eager as tfe
+from tensorflow.python.framework import tensor_util
 
 
 __all__ = [
@@ -33,6 +34,7 @@ __all__ = [
     'maybe_call_fn_and_grads',
     'safe_sum',
     'set_doc',
+    'smart_for_loop',
 ]
 
 
@@ -136,7 +138,7 @@ def safe_sum(x, alt_value=-np.inf, name=None):
       raise TypeError('Expected list input.')
     if not x:
       raise ValueError('Input should not be empty.')
-    n = np.int32(len(x))
+    n = np.int64(len(x))
     in_shape = x[0].shape
     x = tf.stack(x, axis=-1)
     # The sum is NaN if any element is NaN or we see both +Inf and -Inf.  Thus
@@ -151,7 +153,7 @@ def safe_sum(x, alt_value=-np.inf, name=None):
         tf.reduce_all(tf.is_finite(x) | (x <= 0.), axis=-1))
     is_sum_determinate = tf.tile(
         is_sum_determinate[..., tf.newaxis],
-        multiples=tf.concat([tf.ones(tf.rank(x) - 1, dtype=tf.int32), [n]],
+        multiples=tf.concat([tf.ones(tf.rank(x) - 1, dtype=tf.int64), [n]],
                             axis=0))
     alt_value = np.array(alt_value, x.dtype.as_numpy_dtype)
     x = tf.where(is_sum_determinate, x, tf.fill(tf.shape(x), value=alt_value))
@@ -242,3 +244,45 @@ def maybe_call_fn_and_grads(fn,
     if check_non_none_grads and any(g is None for g in grads):
       raise ValueError('Encountered `None` gradient.')
     return result, grads
+
+
+def smart_for_loop(loop_num_iter, body_fn, initial_loop_vars,
+                   parallel_iterations=10, name=None):
+  """Construct a for loop, preferring a python loop if `n` is staticaly known.
+
+  Given `loop_num_iter` and `body_fn`, return an op corresponding to executing
+  `body_fn` `loop_num_iter` times, feeding previous outputs of `body_fn` into
+  the next iteration.
+
+  If `loop_num_iter` is statically known, the op is constructed via python for
+  loop, and otherwise a `tf.while_loop` is used.
+
+  Args:
+    loop_num_iter: `Integer` `Tensor` representing the number of loop
+      iterations.
+    body_fn: Callable to be executed `loop_num_iter` times.
+    initial_loop_vars: Listlike object of `Tensors` to be passed in to
+      `body_fn`'s first execution.
+    parallel_iterations: The number of iterations allowed to run in parallel.
+      It must be a positive integer. See `tf.while_loop` for more details.
+      Default value: `10`.
+    name: Python `str` name prefixed to Ops created by this function.
+      Default value: `None` (i.e., "smart_for_loop").
+  Returns:
+    result: `Tensor` representing applying `body_fn` iteratively `n` times.
+  """
+  with tf.name_scope(
+      name, 'smart_for_loop', [loop_num_iter, initial_loop_vars]):
+    loop_num_iter_ = tensor_util.constant_value(tf.convert_to_tensor(
+        loop_num_iter, dtype=tf.int64, name='loop_num_iter'))
+    if loop_num_iter_ is None or tf.contrib.eager.executing_eagerly():
+      return tf.while_loop(
+          cond=lambda i, *args: i < loop_num_iter,
+          body=lambda i, *args: [i + 1] + list(body_fn(*args)),
+          loop_vars=[np.int64(0)] + initial_loop_vars,
+          parallel_iterations=parallel_iterations
+      )[1:]
+    result = initial_loop_vars
+    for _ in range(loop_num_iter_):
+      result = body_fn(*result)
+    return result
