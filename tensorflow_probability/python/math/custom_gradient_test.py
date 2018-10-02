@@ -28,7 +28,7 @@ import tensorflow_probability as tfp
 class CustomGradientTest(tf.test.TestCase):
 
   def test_works_correctly(self):
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       f = lambda x: x**2 / 2
       g = lambda x: (x - 1)**3 / 3
       x_ = np.linspace(-100, 100, int(1e4)) + [0.]
@@ -42,7 +42,7 @@ class CustomGradientTest(tf.test.TestCase):
       self.assertAllClose(g(x_), gx_)
 
   def test_works_correctly_both_f_g_zero(self):
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       f = lambda x: x**2 / 2
       g = lambda x: x**3 / 3
       x_ = np.linspace(-100, 100, int(1e4)) + [0.]
@@ -56,7 +56,7 @@ class CustomGradientTest(tf.test.TestCase):
       self.assertAllClose(g(x_), gx_)
 
   def test_works_correctly_vector_of_vars(self):
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       x = tf.get_variable(
           name='x',
           shape=[],
@@ -82,7 +82,7 @@ class CustomGradientTest(tf.test.TestCase):
       self.assertEqual(g(z_), gy_)
 
   def test_works_correctly_side_vars(self):
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       x_ = np.float32(2.1)  # Adding extra tenth to force imprecision.
       y_ = np.float32(3.1)
       x = tf.get_variable(
@@ -110,7 +110,7 @@ class CustomGradientTest(tf.test.TestCase):
       self.assertEqual(None, gy_)
 
   def test_works_correctly_fx_gx_manually_stopped(self):
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       x_ = np.float32(2.1)  # Adding extra tenth to force imprecision.
       y_ = np.float32(3.1)
       x = tf.get_variable(

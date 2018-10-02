@@ -30,7 +30,7 @@ class InvertBijectorTest(tf.test.TestCase):
   """Tests the correctness of the Y = Invert(bij) transformation."""
 
   def testBijector(self):
-    with self.test_session():
+    with self.cached_session():
       for fwd in [
           tfb.Identity(),
           tfb.Exp(),
@@ -59,7 +59,7 @@ class InvertBijectorTest(tf.test.TestCase):
         bijector, lower_x=1e-3, upper_x=1.5, eval_func=self.evaluate, rtol=0.05)
 
   def testShapeGetters(self):
-    with self.test_session():
+    with self.cached_session():
       bijector = tfb.Invert(
           tfb.SoftmaxCentered(validate_args=True))
       x = tf.TensorShape([2])
@@ -74,7 +74,7 @@ class InvertBijectorTest(tf.test.TestCase):
           self.evaluate(bijector.inverse_event_shape_tensor(y.as_list())))
 
   def testDocstringExample(self):
-    with self.test_session():
+    with self.cached_session():
       exp_gamma_distribution = (
           transformed_distribution_lib.TransformedDistribution(
               distribution=gamma_lib.Gamma(concentration=1., rate=2.),

@@ -111,7 +111,7 @@ class _TransposeBijectorTest(object):
   @test_util.run_in_graph_and_eager_modes()
   def testInvalidPermException(self):
     msg = '`perm` must be a valid permutation vector.'
-    with self.test_session():
+    with self.cached_session():
       if self.is_static or tf.executing_eagerly():
         with self.assertRaisesRegexp(ValueError, msg):
           bijector = tfb.Transpose(perm=[1, 2], validate_args=True)

@@ -56,7 +56,7 @@ class OrderedBijectorTest(tf.test.TestCase):
         rtol=1e-7)
 
   def testBijectorUnknownShape(self):
-    with self.test_session():
+    with self.cached_session():
       ordered = tfb.Ordered()
       self.assertEqual("ordered", ordered.name)
       x = tf.placeholder(shape=[2, None], dtype=tf.float32)

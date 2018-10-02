@@ -46,7 +46,7 @@ def run_in_graph_mode_only(__unused__=None, config=None, use_gpu=True):  # pylin
   def decorator(f):
     def decorated(self, **kwargs):
       with context.graph_mode():
-        with self.test_session(use_gpu=use_gpu):
+        with self.cached_session(use_gpu=use_gpu):
           f(self, **kwargs)
     return decorated
   return decorator

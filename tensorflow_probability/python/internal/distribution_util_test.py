@@ -94,7 +94,7 @@ class MakeTrilScaleTest(tf.test.TestCase):
   def _testLegalInputs(
       self, loc=None, shape_hint=None, scale_params=None):
     for args in _powerset(scale_params.items()):
-      with self.test_session():
+      with self.cached_session():
         args = dict(args)
 
         scale_args = dict({
@@ -137,19 +137,19 @@ class MakeTrilScaleTest(tf.test.TestCase):
         })
 
   def testZeroTriU(self):
-    with self.test_session():
+    with self.cached_session():
       scale = distribution_util.make_tril_scale(scale_tril=[[1., 1], [1., 1.]])
       self.assertAllClose([[1., 0], [1., 1.]], self.evaluate(scale.to_dense()))
 
   def testValidateArgs(self):
-    with self.test_session():
+    with self.cached_session():
       with self.assertRaisesOpError("diagonal part must be non-zero"):
         scale = distribution_util.make_tril_scale(
             scale_tril=[[0., 1], [1., 1.]], validate_args=True)
         self.evaluate(scale.to_dense())
 
   def testAssertPositive(self):
-    with self.test_session():
+    with self.cached_session():
       with self.assertRaisesOpError("diagonal part must be positive"):
         scale = distribution_util.make_tril_scale(
             scale_tril=[[-1., 1], [1., 1.]],
@@ -163,7 +163,7 @@ class MakeDiagScaleTest(tf.test.TestCase):
   def _testLegalInputs(
       self, loc=None, shape_hint=None, scale_params=None):
     for args in _powerset(scale_params.items()):
-      with self.test_session():
+      with self.cached_session():
         args = dict(args)
 
         scale_args = dict({
@@ -198,14 +198,14 @@ class MakeDiagScaleTest(tf.test.TestCase):
         })
 
   def testValidateArgs(self):
-    with self.test_session():
+    with self.cached_session():
       with self.assertRaisesOpError("diagonal part must be non-zero"):
         scale = distribution_util.make_diag_scale(
             scale_diag=[[0., 1], [1., 1.]], validate_args=True)
         self.evaluate(scale.to_dense())
 
   def testAssertPositive(self):
-    with self.test_session():
+    with self.cached_session():
       with self.assertRaisesOpError("diagonal part must be positive"):
         scale = distribution_util.make_diag_scale(
             scale_diag=[[-1., 1], [1., 1.]],
@@ -235,7 +235,7 @@ class ShapesFromLocAndScaleTest(tf.test.TestCase):
     loc = tf.constant(np.zeros((2, 3)))
     diag = tf.placeholder(tf.float64)
     scale = tf.linalg.LinearOperatorDiag(diag)
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       batch_shape, event_shape = sess.run(
           distribution_util.shapes_from_loc_and_scale(loc, scale),
           feed_dict={diag: np.ones((5, 1, 3))})
@@ -246,7 +246,7 @@ class ShapesFromLocAndScaleTest(tf.test.TestCase):
     loc = tf.placeholder(tf.float64)
     diag = tf.constant(np.ones((5, 2, 3)))
     scale = tf.linalg.LinearOperatorDiag(diag)
-    with self.test_session():
+    with self.cached_session():
       batch_shape, event_shape = distribution_util.shapes_from_loc_and_scale(
           loc, scale)
       # batch_shape depends on both args, and so is dynamic.  Since loc did not
@@ -260,7 +260,7 @@ class ShapesFromLocAndScaleTest(tf.test.TestCase):
     loc = tf.placeholder(tf.float64)
     diag = tf.placeholder(tf.float64)
     scale = tf.linalg.LinearOperatorDiag(diag)
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       batch_shape, event_shape = sess.run(
           distribution_util.shapes_from_loc_and_scale(loc, scale),
           feed_dict={diag: np.ones((5, 2, 3)), loc: np.zeros((2, 3))})
@@ -280,7 +280,7 @@ class ShapesFromLocAndScaleTest(tf.test.TestCase):
     loc = None
     diag = tf.placeholder(tf.float64)
     scale = tf.linalg.LinearOperatorDiag(diag)
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       batch_shape, event_shape = sess.run(
           distribution_util.shapes_from_loc_and_scale(loc, scale),
           feed_dict={diag: np.ones((5, 1, 3))})
@@ -301,7 +301,7 @@ class GetBroadcastShapeTest(tf.test.TestCase):
     x = tf.ones((2, 1, 3))
     y = tf.placeholder(x.dtype)
     z = tf.ones(())
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       bcast_shape = sess.run(
           distribution_util.get_broadcast_shape(x, y, z),
           feed_dict={y: np.ones((1, 5, 3)).astype(np.float32)})
@@ -311,7 +311,7 @@ class GetBroadcastShapeTest(tf.test.TestCase):
 class TridiagTest(tf.test.TestCase):
 
   def testWorksCorrectlyNoBatches(self):
-    with self.test_session():
+    with self.cached_session():
       self.assertAllEqual(
           [[4., 8., 0., 0.],
            [1., 5., 9., 0.],
@@ -323,7 +323,7 @@ class TridiagTest(tf.test.TestCase):
               [8., 9., 10.])))
 
   def testWorksCorrectlyBatches(self):
-    with self.test_session():
+    with self.cached_session():
       self.assertAllClose(
           [[[4., 8., 0., 0.],
             [1., 5., 9., 0.],
@@ -343,7 +343,7 @@ class TridiagTest(tf.test.TestCase):
           rtol=1e-5, atol=0.)
 
   def testHandlesNone(self):
-    with self.test_session():
+    with self.cached_session():
       self.assertAllClose(
           [[[4., 0., 0., 0.],
             [0., 5., 0., 0.],
@@ -390,7 +390,7 @@ class MixtureStddevTest(tf.test.TestCase):
                                                means_tf,
                                                sigmas_tf)
 
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       actual_devs = sess.run(mix_dev)
 
     self.assertAllClose(actual_devs, expected_devs)
@@ -399,7 +399,7 @@ class MixtureStddevTest(tf.test.TestCase):
 class PadMixtureDimensionsTest(tf.test.TestCase):
 
   def test_pad_mixture_dimensions_mixture(self):
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       gm = Mixture(
           cat=tf.distributions.Categorical(probs=[[0.3, 0.7]]),
           components=[
@@ -416,7 +416,7 @@ class PadMixtureDimensionsTest(tf.test.TestCase):
     self.assertAllEqual(x_out.reshape([-1]), x_pad_out.reshape([-1]))
 
   def test_pad_mixture_dimensions_mixture_same_family(self):
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       gm = MixtureSameFamily(
           mixture_distribution=tf.distributions.Categorical(probs=[0.3, 0.7]),
           components_distribution=MultivariateNormalDiag(
@@ -438,7 +438,7 @@ class _PadTest(object):
                      [4, 5, 6]])
     value_ = np.float32(0.25)
     count_ = np.int32(2)
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       x = tf.placeholder_with_default(
           x_, shape=x_.shape if self.is_static_shape else None)
       value = (
@@ -489,7 +489,7 @@ class _PadTest(object):
                      [4, 5, 6]])
     value_ = np.float32(0.25)
     count_ = np.int32(2)
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       x = tf.placeholder_with_default(
           x_, shape=x_.shape if self.is_static_shape else None)
       value = (

@@ -45,7 +45,7 @@ def test_fn(x):
 class _WrapCallableTest(object):
 
   def testDefaultArgsWorkCorrectly(self):
-    with self.test_session():
+    with self.cached_session():
       x = tf.constant(self.dtype([0.1, 0.2]))
       wrapped_fn, vars_args = tfp.util.externalize_variables_as_args(
           test_fn, [x])
@@ -65,7 +65,7 @@ class _WrapCallableTest(object):
       self.assertAllEqual([y_actual, z_actual], vars_args)
 
   def testNonDefaultArgsWorkCorrectly(self):
-    with self.test_session():
+    with self.cached_session():
       x = tf.constant(self.dtype([0.1, 0.2]))
 
       _ = test_fn(self.dtype([0., 0.]))   # Needed to create vars.
@@ -86,7 +86,7 @@ class _WrapCallableTest(object):
       self.assertAllEqual([y_actual], vars_args)
 
   def testWarnings(self):
-    with self.test_session():
+    with self.cached_session():
       x = tf.constant(self.dtype([0.1, 0.2]))
       wrapped_fn, _ = tfp.util.externalize_variables_as_args(
           test_fn, [x], possible_ancestor_vars=[])
@@ -103,7 +103,7 @@ class _WrapCallableTest(object):
           r"Variable .* 'z:0' .* not found in bypass dict.")
 
   def testExceptions(self):
-    with self.test_session():
+    with self.cached_session():
       x = tf.constant(self.dtype([0.1, 0.2]))
       wrapped_fn, _ = tfp.util.externalize_variables_as_args(
           test_fn,

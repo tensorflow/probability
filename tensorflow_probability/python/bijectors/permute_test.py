@@ -37,7 +37,7 @@ class PermuteBijectorTest(tf.test.TestCase):
     expected_x = np.random.randn(4, 2, 3)
     expected_y = expected_x[..., expected_permutation]
 
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       permutation_ph = tf.placeholder(dtype=tf.int32)
       bijector = tfb.Permute(permutation=permutation_ph, validate_args=True)
       [
@@ -61,7 +61,7 @@ class PermuteBijectorTest(tf.test.TestCase):
       self.assertAllClose(0., ildj, rtol=1e-6, atol=0)
 
   def testRaisesOpError(self):
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       with self.assertRaisesOpError("Permutation over `d` must contain"):
         permutation_ph = tf.placeholder(dtype=tf.int32)
         bijector = tfb.Permute(permutation=permutation_ph, validate_args=True)

@@ -62,7 +62,7 @@ class TransformedTransitionKernelTest(tf.test.TestCase):
 
   def test_support_works_correctly(self):
     num_results = 2000
-    with self.test_session(graph=tf.Graph()) as sess:
+    with self.cached_session(graph=tf.Graph()) as sess:
       target = tfd.Beta(
           concentration1=self.dtype(1.),
           concentration0=self.dtype(10.))
@@ -114,7 +114,7 @@ class TransformedTransitionKernelTest(tf.test.TestCase):
                            [0.5, 1]])
     num_results = 2000
     counter = collections.Counter()
-    with self.test_session(graph=tf.Graph()) as sess:
+    with self.cached_session(graph=tf.Graph()) as sess:
       def target_log_prob(x, y):
         counter['target_calls'] += 1
         # Corresponds to unnormalized MVN.
@@ -186,7 +186,7 @@ class TransformedTransitionKernelTest(tf.test.TestCase):
     transformed_fake = tfp.mcmc.TransformedTransitionKernel(
         inner_kernel=FakeInnerKernel(target_log_prob_fn=fake_target_log_prob),
         bijector=tfb.Exp())
-    with self.test_session(graph=tf.Graph()) as sess:
+    with self.cached_session(graph=tf.Graph()) as sess:
       [
           automatic_pkr,
           manual_pkr,

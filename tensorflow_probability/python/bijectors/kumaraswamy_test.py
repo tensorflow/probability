@@ -30,7 +30,7 @@ class KumaraswamyBijectorTest(tf.test.TestCase):
   """Tests correctness of the Kumaraswamy bijector."""
 
   def testBijector(self):
-    with self.test_session():
+    with self.cached_session():
       a = 2.
       b = 0.3
       bijector = tfb.Kumaraswamy(
@@ -63,7 +63,7 @@ class KumaraswamyBijectorTest(tf.test.TestCase):
         rtol=0.02)
 
   def testBijectiveAndFinite(self):
-    with self.test_session():
+    with self.cached_session():
       concentration1 = 1.2
       concentration0 = 2.
       bijector = tfb.Kumaraswamy(

@@ -31,7 +31,7 @@ class WeibullBijectorTest(tf.test.TestCase):
   """Tests correctness of the weibull bijector."""
 
   def testBijector(self):
-    with self.test_session():
+    with self.cached_session():
       scale = 5.
       concentration = 0.3
       bijector = tfb.Weibull(

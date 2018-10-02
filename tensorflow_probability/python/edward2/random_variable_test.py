@@ -337,7 +337,7 @@ class RandomVariableTest(parameterized.TestCase, tf.test.TestCase):
       _ = tf.convert_to_tensor(x, dtype=tf.int32)
 
   def testSessionEval(self):
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       x = ed.RandomVariable(tfd.Normal(0.0, 0.1))
       x_ph = tf.placeholder(tf.float32, [])
       y = ed.RandomVariable(tfd.Normal(x_ph, 0.1))
@@ -350,7 +350,7 @@ class RandomVariableTest(parameterized.TestCase, tf.test.TestCase):
       self.assertRaises(tf.errors.InvalidArgumentError, y.eval, sess)
 
   def testSessionRun(self):
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       x = ed.RandomVariable(tfd.Normal(0.0, 0.1))
       x_ph = tf.placeholder(tf.float32, [])
       y = ed.RandomVariable(tfd.Normal(x_ph, 0.1))

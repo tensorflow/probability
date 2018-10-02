@@ -43,7 +43,7 @@ class SoftsignBijectorTest(tf.test.TestCase):
   @test_util.run_in_graph_and_eager_modes()
   def testBijectorBounds(self):
     bijector = tfb.Softsign(validate_args=True)
-    with self.test_session():
+    with self.cached_session():
       with self.assertRaisesOpError("greater than -1"):
         self.evaluate(bijector.inverse(-3.))
       with self.assertRaisesOpError("greater than -1"):

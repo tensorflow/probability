@@ -42,13 +42,13 @@ class SoftplusBijectorTest(tf.test.TestCase):
     return -np.log(1 - np.exp(-y))
 
   def testHingeSoftnessZeroRaises(self):
-    with self.test_session():
+    with self.cached_session():
       bijector = tfb.Softplus(hinge_softness=0., validate_args=True)
       with self.assertRaisesOpError("must be non-zero"):
         self.evaluate(bijector.forward([1., 1.]))
 
   def testBijectorForwardInverseEventDimsZero(self):
-    with self.test_session():
+    with self.cached_session():
       bijector = tfb.Softplus()
       self.assertEqual("softplus", bijector.name)
       x = 2 * rng.randn(2, 10)
@@ -58,7 +58,7 @@ class SoftplusBijectorTest(tf.test.TestCase):
       self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
 
   def testBijectorForwardInverseWithHingeSoftnessEventDimsZero(self):
-    with self.test_session():
+    with self.cached_session():
       bijector = tfb.Softplus(hinge_softness=1.5)
       x = 2 * rng.randn(2, 10)
       y = 1.5 * self._softplus(x / 1.5)
@@ -67,7 +67,7 @@ class SoftplusBijectorTest(tf.test.TestCase):
       self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
 
   def testBijectorLogDetJacobianEventDimsZero(self):
-    with self.test_session():
+    with self.cached_session():
       bijector = tfb.Softplus()
       y = 2 * rng.rand(2, 10)
       # No reduction needed if event_dims = 0.
@@ -79,7 +79,7 @@ class SoftplusBijectorTest(tf.test.TestCase):
               y, event_ndims=0)))
 
   def testBijectorForwardInverseEventDimsOne(self):
-    with self.test_session():
+    with self.cached_session():
       bijector = tfb.Softplus()
       self.assertEqual("softplus", bijector.name)
       x = 2 * rng.randn(2, 10)
@@ -89,7 +89,7 @@ class SoftplusBijectorTest(tf.test.TestCase):
       self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
 
   def testBijectorLogDetJacobianEventDimsOne(self):
-    with self.test_session():
+    with self.cached_session():
       bijector = tfb.Softplus()
       y = 2 * rng.rand(2, 10)
       ildj_before = self._softplus_ildj_before_reduction(y)

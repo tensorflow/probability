@@ -27,7 +27,7 @@ from tensorflow_probability.python import bijectors as tfb
 class AffineLinearOperatorTest(tf.test.TestCase):
 
   def testIdentity(self):
-    with self.test_session():
+    with self.cached_session():
       affine = tfb.AffineLinearOperator(validate_args=True)
       x = np.array([[1, 0, -1], [2, 3, 4]], dtype=np.float32)
       y = x
@@ -46,7 +46,7 @@ class AffineLinearOperatorTest(tf.test.TestCase):
           self.evaluate(affine.forward_log_det_jacobian(x, event_ndims=2)))
 
   def testDiag(self):
-    with self.test_session():
+    with self.cached_session():
       shift = np.array([-1, 0, 1], dtype=np.float32)
       diag = np.array([[1, 2, 3],
                        [2, 5, 6]], dtype=np.float32)
@@ -69,7 +69,7 @@ class AffineLinearOperatorTest(tf.test.TestCase):
           self.evaluate(affine.forward_log_det_jacobian(x, event_ndims=1)))
 
   def testTriL(self):
-    with self.test_session():
+    with self.cached_session():
       shift = np.array([-1, 0, 1], dtype=np.float32)
       tril = np.array([[[3, 0, 0],
                         [2, -1, 0],
@@ -107,7 +107,7 @@ class AffineLinearOperatorTest(tf.test.TestCase):
           self.evaluate(affine.forward_log_det_jacobian(x, event_ndims=2)))
 
   def testTriLAdjoint(self):
-    with self.test_session():
+    with self.cached_session():
       shift = np.array([-1, 0, 1], dtype=np.float32)
       tril = np.array([[[3, 0, 0],
                         [2, -1, 0],

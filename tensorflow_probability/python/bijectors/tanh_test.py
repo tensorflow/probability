@@ -30,7 +30,7 @@ class TanhBijectorTest(tf.test.TestCase):
   """Tests correctness of the Y = g(X) = tanh(X) transformation."""
 
   def testBijector(self):
-    with self.test_session():
+    with self.cached_session():
       self.assertEqual("tanh", tfb.Tanh().name)
       x = np.linspace(-3., 3., 100).reshape([2, 5, 10]).astype(np.float32)
       y = np.tanh(x)
@@ -63,7 +63,7 @@ class TanhBijectorTest(tf.test.TestCase):
         rtol=1e-4)
 
   def testMatchWithAffineTransform(self):
-    with self.test_session():
+    with self.cached_session():
       direct_bj = tfb.Tanh()
       indirect_bj = tfb.Chain([
           tfb.AffineScalar(shift=tf.to_double(-1.0), scale=tf.to_double(2.0)),

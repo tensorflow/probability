@@ -30,7 +30,7 @@ class SquareBijectorTest(tf.test.TestCase):
   """Tests the correctness of the Y = X ** 2 transformation."""
 
   def testBijectorScalar(self):
-    with self.test_session():
+    with self.cached_session():
       bijector = tfb.Square(validate_args=True)
       self.assertEqual("square", bijector.name)
       x = [[[1., 5],

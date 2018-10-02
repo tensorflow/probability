@@ -722,7 +722,7 @@ class MixtureTest(tf.test.TestCase):
     x_log_cdf_tf = mixture_tf.log_cdf(x_tensor)
 
     for x_feed in xs_to_check:
-      with self.test_session() as sess:
+      with self.cached_session() as sess:
         x_cdf_tf_result, x_log_cdf_tf_result = sess.run(
             [x_cdf_tf, x_log_cdf_tf], feed_dict={x_tensor: x_feed})
 
@@ -771,7 +771,7 @@ class MixtureTest(tf.test.TestCase):
     x_log_cdf_tf = mixture_tf.log_cdf(x_tensor)
 
     for x_feed in xs_to_check:
-      with self.test_session() as sess:
+      with self.cached_session() as sess:
         x_cdf_tf_result, x_log_cdf_tf_result = sess.run(
             [x_cdf_tf, x_log_cdf_tf],
             feed_dict={x_tensor: x_feed})

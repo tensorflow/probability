@@ -30,7 +30,7 @@ class PowerTransformBijectorTest(tf.test.TestCase):
   """Tests correctness of the power transformation."""
 
   def testBijector(self):
-    with self.test_session():
+    with self.cached_session():
       c = 0.2
       bijector = tfb.PowerTransform(power=c, validate_args=True)
       self.assertEqual("power_transform", bijector.name)

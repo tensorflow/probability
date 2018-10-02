@@ -31,7 +31,7 @@ class GumbelBijectorTest(tf.test.TestCase):
   """Tests correctness of the Gumbel bijector."""
 
   def testBijector(self):
-    with self.test_session():
+    with self.cached_session():
       loc = 0.3
       scale = 5.
       bijector = tfb.Gumbel(loc=loc, scale=scale, validate_args=True)

@@ -33,7 +33,7 @@ class SinhArcsinhBijectorTest(tf.test.TestCase):
   """Tests correctness of the power transformation."""
 
   def testBijectorVersusNumpyRewriteOfBasicFunctions(self):
-    with self.test_session():
+    with self.cached_session():
       skewness = 0.2
       tailweight = 2.0
       bijector = tfb.SinhArcsinh(
@@ -56,7 +56,7 @@ class SinhArcsinhBijectorTest(tf.test.TestCase):
           atol=0.)
 
   def testLargerTailWeightPutsMoreWeightInTails(self):
-    with self.test_session():
+    with self.cached_session():
       # Will broadcast together to shape [3, 2].
       x = [-1., 1.]
       tailweight = [[0.5], [1.0], [2.0]]
@@ -73,7 +73,7 @@ class SinhArcsinhBijectorTest(tf.test.TestCase):
       self.assertLess(forward_1[1], forward_1[2])
 
   def testSkew(self):
-    with self.test_session():
+    with self.cached_session():
       # Will broadcast together to shape [3, 2].
       x = [-1., 1.]
       skewness = [[-1.], [0.], [1.]]
@@ -129,7 +129,7 @@ class SinhArcsinhBijectorTest(tf.test.TestCase):
           atol=2e-6)
 
   def testBijectorOverRange(self):
-    with self.test_session():
+    with self.cached_session():
       for dtype in (np.float32, np.float64):
         skewness = np.array([1.2, 5.], dtype=dtype)
         tailweight = np.array([2., 10.], dtype=dtype)
@@ -180,13 +180,13 @@ class SinhArcsinhBijectorTest(tf.test.TestCase):
             atol=0.)
 
   def testZeroTailweightRaises(self):
-    with self.test_session():
+    with self.cached_session():
       with self.assertRaisesOpError("not positive"):
         self.evaluate(
             tfb.SinhArcsinh(tailweight=0., validate_args=True).forward(1.0))
 
   def testDefaultDtypeIsFloat32(self):
-    with self.test_session():
+    with self.cached_session():
       bijector = tfb.SinhArcsinh()
       self.assertEqual(bijector.tailweight.dtype, np.float32)
       self.assertEqual(bijector.skewness.dtype, np.float32)

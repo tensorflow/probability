@@ -48,7 +48,7 @@ class BfgsTest(tf.test.TestCase):
     def quadratic(x):
       value = tf.reduce_sum(scales * (x - minimum) ** 2)
       return value, tf.gradients(value, x)[0]
-    with self.test_session() as session:
+    with self.cached_session() as session:
       start = tf.constant([0.6, 0.8])
       results = session.run(tfp.optimizer.bfgs_minimize(
           quadratic, initial_position=start, tolerance=1e-8))
@@ -119,7 +119,7 @@ class BfgsTest(tf.test.TestCase):
     def quadratic(x):
       value = tf.reduce_sum(scales * (x - minimum) ** 2)
       return value, tf.gradients(value, x)[0]
-    with self.test_session() as session:
+    with self.cached_session() as session:
       start = tf.ones_like(minimum)
       results = session.run(tfp.optimizer.bfgs_minimize(
           quadratic, initial_position=start, tolerance=1e-8))
@@ -143,7 +143,7 @@ class BfgsTest(tf.test.TestCase):
       value = tf.reduce_sum(y * yp) / 2
       return value, tf.gradients(value, x)[0]
 
-    with self.test_session() as session:
+    with self.cached_session() as session:
       start = tf.ones_like(minimum)
       results = session.run(tfp.optimizer.bfgs_minimize(
           quadratic, initial_position=start, tolerance=1e-8))
@@ -167,7 +167,7 @@ class BfgsTest(tf.test.TestCase):
       value = tf.reduce_sum(y * yp) / 2
       return value, tf.gradients(value, x)[0]
 
-    with self.test_session() as session:
+    with self.cached_session() as session:
       start = tf.ones_like(minimum)
       results = session.run(tfp.optimizer.bfgs_minimize(
           quadratic, initial_position=start, tolerance=1e-8))
@@ -206,7 +206,7 @@ class BfgsTest(tf.test.TestCase):
       dfy = 200 * (y - x**2)
       return fv, tf.stack([dfx, dfy])
 
-    with self.test_session() as session:
+    with self.cached_session() as session:
       start = tf.constant([-1.2, 1.0])
       results = session.run(tfp.optimizer.bfgs_minimize(
           rosenbrock, initial_position=start, tolerance=1e-5))
@@ -316,7 +316,7 @@ class BfgsTest(tf.test.TestCase):
     start_position = np.random.rand(dim) * 2.0 * 5.12 - 5.12
 
     def get_results():
-      with self.test_session() as session:
+      with self.cached_session() as session:
         start = tf.constant(start_position)
         results = session.run(tfp.optimizer.bfgs_minimize(
             rastrigin, initial_position=start, tolerance=1e-5))

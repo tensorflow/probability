@@ -48,7 +48,7 @@ class _ReshapeBijectorTest(object):
     expected_x = np.random.randn(4, 3, 2)
     expected_y = np.reshape(expected_x, [4, 6])
 
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       shape_in, shape_out = self.build_shapes([3, 2], [6,])
       bijector = tfb.Reshape(
           event_shape_out=shape_out,
@@ -87,7 +87,7 @@ class _ReshapeBijectorTest(object):
 
     # using the _tensor methods, we should always get a fully-specified
     # result since these are evaluated at graph runtime.
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       (shape_out_,
        shape_in_) = sess.run((
            bijector.forward_event_shape_tensor(shape_in),
@@ -106,7 +106,7 @@ class _ReshapeBijectorTest(object):
     expected_y_scalar = expected_x_scalar[0]
 
     shape_in, shape_out = self.build_shapes([], [1,])
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       bijector = tfb.Reshape(
           event_shape_out=shape_in,
           event_shape_in=shape_out,
@@ -129,7 +129,7 @@ class _ReshapeBijectorTest(object):
   def testValidButNonMatchingInputOpError(self):
     x = np.random.randn(4, 3, 2)
 
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       shape_in, shape_out = self.build_shapes([2, 3], [1, 6, 1,])
       bijector = tfb.Reshape(
           event_shape_out=shape_out,
@@ -145,7 +145,7 @@ class _ReshapeBijectorTest(object):
   def testValidButNonMatchingInputPartiallySpecifiedOpError(self):
     x = np.random.randn(4, 3, 2)
 
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       shape_in, shape_out = self.build_shapes([2, -1], [1, 6, 1,])
       bijector = tfb.Reshape(
           event_shape_out=shape_out,
@@ -160,7 +160,7 @@ class _ReshapeBijectorTest(object):
     x1 = np.random.randn(4, 2, 3)
     x2 = np.random.randn(4, 1, 1, 5)
 
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       shape_in, shape_out = self.build_shapes([2, 3], [1, 1, 5])
       bijector = tfb.Reshape(
           event_shape_out=shape_out,
@@ -177,7 +177,7 @@ class _ReshapeBijectorTest(object):
     expected_x = np.random.randn(4, 6)
     expected_y = np.reshape(expected_x, [4, 2, 3])
 
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       # one of input/output shapes is partially specified
       shape_in, shape_out = self.build_shapes([-1,], [2, 3])
       bijector = tfb.Reshape(
@@ -196,7 +196,7 @@ class _ReshapeBijectorTest(object):
   def testBothShapesPartiallySpecified(self):
     expected_x = np.random.randn(4, 2, 3)
     expected_y = np.reshape(expected_x, [4, 3, 2])
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       shape_in, shape_out = self.build_shapes([-1, 3], [-1, 2])
       bijector = tfb.Reshape(
           event_shape_out=shape_out,
@@ -214,7 +214,7 @@ class _ReshapeBijectorTest(object):
   def testDefaultVectorShape(self):
     expected_x = np.random.randn(4, 4)
     expected_y = np.reshape(expected_x, [4, 2, 2])
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       _, shape_out = self.build_shapes([-1,], [-1, 2])
       bijector = tfb.Reshape(shape_out, validate_args=True)
       (x_,
@@ -338,7 +338,7 @@ class ReshapeBijectorTestDynamic(tf.test.TestCase, _ReshapeBijectorTest):
         event_shape_in=shape_in,
         validate_args=True)
 
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       with self.assertRaisesError(
           "elements must have at most one `-1`."):
         sess.run(bijector.forward_event_shape_tensor(shape_in))
@@ -350,7 +350,7 @@ class ReshapeBijectorTestDynamic(tf.test.TestCase, _ReshapeBijectorTest):
         event_shape_in=shape_in,
         validate_args=True)
 
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       with self.assertRaisesError(
           "elements must be either positive integers or `-1`."):
         sess.run(bijector.forward_event_shape_tensor(shape_in))
@@ -396,7 +396,7 @@ class ReshapeBijectorTestDynamicNdims(tf.test.TestCase, _ReshapeBijectorTest):
         event_shape_in=shape_in,
         validate_args=True)
 
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       with self.assertRaisesError(
           "elements must have at most one `-1`."):
         sess.run(bijector.forward_event_shape_tensor(shape_in))
@@ -408,7 +408,7 @@ class ReshapeBijectorTestDynamicNdims(tf.test.TestCase, _ReshapeBijectorTest):
         event_shape_in=shape_in,
         validate_args=True)
 
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       with self.assertRaisesError(
           "elements must be either positive integers or `-1`."):
         sess.run(bijector.forward_event_shape_tensor(shape_in))

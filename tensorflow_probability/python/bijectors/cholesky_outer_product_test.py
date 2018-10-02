@@ -28,7 +28,7 @@ class CholeskyOuterProductBijectorTest(tf.test.TestCase):
   """Tests the correctness of the Y = X @ X.T transformation."""
 
   def testBijectorMatrix(self):
-    with self.test_session():
+    with self.cached_session():
       bijector = tfb.CholeskyOuterProduct(validate_args=True)
       self.assertEqual("cholesky_outer_product", bijector.name)
       x = [[[1., 0], [2, 1]], [[np.sqrt(2.), 0], [np.sqrt(8.), 1]]]
@@ -75,7 +75,7 @@ class CholeskyOuterProductBijectorTest(tf.test.TestCase):
     bijector = tfb.CholeskyOuterProduct()
     x_pl = tf.placeholder(tf.float32)
 
-    with self.test_session():
+    with self.cached_session():
       log_det_jacobian = bijector.forward_log_det_jacobian(x_pl, event_ndims=2)
 
       # The Jacobian matrix is 2 * tf.eye(2), which has jacobian determinant 4.
@@ -86,7 +86,7 @@ class CholeskyOuterProductBijectorTest(tf.test.TestCase):
   def testNoBatchStatic(self):
     x = np.array([[1., 0], [2, 1]])  # np.linalg.cholesky(y)
     y = np.array([[1., 2], [2, 5]])  # np.matmul(x, x.T)
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       y_actual = tfb.CholeskyOuterProduct().forward(x=x)
       x_actual = tfb.CholeskyOuterProduct().inverse(y=y)
     [y_actual_, x_actual_] = sess.run([y_actual, x_actual])
@@ -98,7 +98,7 @@ class CholeskyOuterProductBijectorTest(tf.test.TestCase):
   def testNoBatchDeferred(self):
     x = np.array([[1., 0], [2, 1]])  # np.linalg.cholesky(y)
     y = np.array([[1., 2], [2, 5]])  # np.matmul(x, x.T)
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       x_pl = tf.placeholder(tf.float32)
       y_pl = tf.placeholder(tf.float32)
       y_actual = tfb.CholeskyOuterProduct().forward(x=x_pl)
@@ -119,7 +119,7 @@ class CholeskyOuterProductBijectorTest(tf.test.TestCase):
                    [2, 5]],
                   [[9., 3],
                    [3, 5]]])  # np.matmul(x, x.T)
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       y_actual = tfb.CholeskyOuterProduct().forward(x=x)
       x_actual = tfb.CholeskyOuterProduct().inverse(y=y)
     [y_actual_, x_actual_] = sess.run([y_actual, x_actual])
@@ -137,7 +137,7 @@ class CholeskyOuterProductBijectorTest(tf.test.TestCase):
                    [2, 5]],
                   [[9., 3],
                    [3, 5]]])  # np.matmul(x, x.T)
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       x_pl = tf.placeholder(tf.float32)
       y_pl = tf.placeholder(tf.float32)
       y_actual = tfb.CholeskyOuterProduct().forward(x=x_pl)

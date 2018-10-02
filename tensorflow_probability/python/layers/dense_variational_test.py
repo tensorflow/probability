@@ -120,7 +120,7 @@ class DenseVariational(tf.test.TestCase):
               'bias_posterior_fn': None,
               'bias_prior_fn': None}
     with tf.keras.utils.CustomObjectScope({layer_class.__name__: layer_class}):
-      with self.test_session():
+      with self.cached_session():
         testing_utils.layer_test(
             layer_class,
             kwargs=kwargs,
@@ -131,7 +131,7 @@ class DenseVariational(tf.test.TestCase):
             input_shape=(None, None, 2))
 
   def _testKLPenaltyKernel(self, layer_class):
-    with self.test_session():
+    with self.cached_session():
       layer = layer_class(units=2)
       inputs = tf.random_uniform([2, 3], seed=1)
 
@@ -149,7 +149,7 @@ class DenseVariational(tf.test.TestCase):
       self.assertListEqual(layer.losses, input_dependent_losses)
 
   def _testKLPenaltyBoth(self, layer_class):
-    with self.test_session():
+    with self.cached_session():
       layer = layer_class(
           units=2,
           bias_posterior_fn=tfp.layers.default_mean_field_normal_fn(),
@@ -245,7 +245,7 @@ class DenseVariational(tf.test.TestCase):
 
   def testDenseReparameterization(self):
     batch_size, in_size, out_size = 2, 3, 4
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       (kernel_posterior, kernel_prior, kernel_divergence,
        bias_posterior, bias_prior, bias_divergence, layer, inputs,
        outputs, kl_penalty) = self._testDenseSetUp(
@@ -296,7 +296,7 @@ class DenseVariational(tf.test.TestCase):
 
   def testDenseLocalReparameterization(self):
     batch_size, in_size, out_size = 2, 3, 4
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       (kernel_posterior, kernel_prior, kernel_divergence,
        bias_posterior, bias_prior, bias_divergence, layer, inputs,
        outputs, kl_penalty) = self._testDenseSetUp(
@@ -347,7 +347,7 @@ class DenseVariational(tf.test.TestCase):
 
   def testDenseFlipout(self):
     batch_size, in_size, out_size = 2, 3, 4
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       (kernel_posterior, kernel_prior, kernel_divergence,
        bias_posterior, bias_prior, bias_divergence, layer, inputs,
        outputs, kl_penalty) = self._testDenseSetUp(
@@ -419,7 +419,7 @@ class DenseVariational(tf.test.TestCase):
 
   def testRandomDenseFlipout(self):
     batch_size, in_size, out_size = 2, 3, 4
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       seed = Counter()
       inputs = tf.random_uniform([batch_size, in_size], seed=seed())
 
@@ -478,7 +478,7 @@ class DenseVariational(tf.test.TestCase):
     ])
     outputs = net(inputs)
 
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       sess.run(tf.global_variables_initializer())
       outputs_ = sess.run(outputs)
 

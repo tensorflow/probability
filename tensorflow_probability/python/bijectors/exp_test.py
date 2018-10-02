@@ -30,7 +30,7 @@ class ExpBijectorTest(tf.test.TestCase):
   """Tests correctness of the Y = g(X) = exp(X) transformation."""
 
   def testBijector(self):
-    with self.test_session():
+    with self.cached_session():
       bijector = tfb.Exp()
       self.assertEqual("exp", bijector.name)
       x = [[[1.], [2.]]]

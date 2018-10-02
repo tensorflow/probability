@@ -33,7 +33,7 @@ class SoftmaxCenteredBijectorTest(tf.test.TestCase):
   """Tests correctness of the Y = g(X) = exp(X) / sum(exp(X)) transformation."""
 
   def testBijectorVector(self):
-    with self.test_session():
+    with self.cached_session():
       softmax = tfb.SoftmaxCentered()
       self.assertEqual("softmax_centered", softmax.name)
       x = np.log([[2., 3, 4], [4., 8, 12]])
@@ -52,7 +52,7 @@ class SoftmaxCenteredBijectorTest(tf.test.TestCase):
           rtol=1e-7)
 
   def testBijectorUnknownShape(self):
-    with self.test_session():
+    with self.cached_session():
       softmax = tfb.SoftmaxCentered()
       self.assertEqual("softmax_centered", softmax.name)
       x = tf.placeholder(shape=[2, None], dtype=tf.float32)
@@ -78,7 +78,7 @@ class SoftmaxCenteredBijectorTest(tf.test.TestCase):
           rtol=1e-7)
 
   def testShapeGetters(self):
-    with self.test_session():
+    with self.cached_session():
       x = tf.TensorShape([4])
       y = tf.TensorShape([5])
       bijector = tfb.SoftmaxCentered(validate_args=True)

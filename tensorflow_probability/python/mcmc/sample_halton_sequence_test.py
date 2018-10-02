@@ -31,7 +31,7 @@ tfd = tfp.distributions
 class HaltonSequenceTest(tf.test.TestCase):
 
   def test_known_values_small_bases(self):
-    with self.test_session():
+    with self.cached_session():
       # The first five elements of the non-randomized Halton sequence
       # with base 2 and 3.
       expected = np.array([[1. / 2, 1. / 3],
@@ -45,7 +45,7 @@ class HaltonSequenceTest(tf.test.TestCase):
 
   def test_dynamic_num_samples(self):
     """Tests that num_samples argument supports Tensors."""
-    with self.test_session():
+    with self.cached_session():
       # The first five elements of the non-randomized Halton sequence
       # with base 2 and 3.
       expected = np.array([[1. / 2, 1. / 3],
@@ -59,7 +59,7 @@ class HaltonSequenceTest(tf.test.TestCase):
 
   def test_sequence_indices(self):
     """Tests access of sequence elements by index."""
-    with self.test_session():
+    with self.cached_session():
       dim = 5
       indices = tf.range(10, dtype=tf.int32)
       sample_direct = tfp.mcmc.sample_halton_sequence(
@@ -72,7 +72,7 @@ class HaltonSequenceTest(tf.test.TestCase):
 
   def test_dtypes_works_correctly(self):
     """Tests that all supported dtypes work without error."""
-    with self.test_session():
+    with self.cached_session():
       dim = 3
       sample_float32 = tfp.mcmc.sample_halton_sequence(
           dim, num_results=10, dtype=tf.float32, seed=11)
@@ -90,7 +90,7 @@ class HaltonSequenceTest(tf.test.TestCase):
     # (N=number of samples). For QMC in low dimensions, the expected convergence
     # rate is ~ 1/N. Hence we should only need 1e3 samples as compared to the
     # 1e6 samples used in the pseudo-random monte carlo.
-    with self.test_session():
+    with self.cached_session():
       mu_p = tf.constant([-1., 1.], dtype=tf.float64)
       mu_q = tf.constant([0., 0.], dtype=tf.float64)
       sigma_p = tf.constant([0.5, 0.5], dtype=tf.float64)
@@ -124,7 +124,7 @@ class HaltonSequenceTest(tf.test.TestCase):
     # Produce the first 1000 members of the Halton sequence in 3 dimensions.
     num_results = 1000
     dim = 3
-    with self.test_session():
+    with self.cached_session():
       sample = tfp.mcmc.sample_halton_sequence(
           dim, num_results=num_results, randomized=False)
 
@@ -160,7 +160,7 @@ class HaltonSequenceTest(tf.test.TestCase):
     num_results = 2000
     replica = 5
 
-    with self.test_session():
+    with self.cached_session():
       sample = tfp.mcmc.sample_halton_sequence(
           dim, num_results=num_results, seed=121117)
       f = tf.reduce_mean(tf.reduce_sum(sample, axis=1) ** 2)
@@ -199,7 +199,7 @@ class HaltonSequenceTest(tf.test.TestCase):
           tf.reduce_sum(x[:, -m:], axis=-1),
           m / 2.))
 
-    with self.test_session():
+    with self.cached_session():
       sample_lo = tfp.mcmc.sample_halton_sequence(
           dim, num_results=num_results_lo, seed=1925)
       sample_hi = tfp.mcmc.sample_halton_sequence(
@@ -219,7 +219,7 @@ class HaltonSequenceTest(tf.test.TestCase):
   def test_seed_implies_deterministic_results(self):
     dim = 20
     num_results = 100
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       sample1 = tfp.mcmc.sample_halton_sequence(
           dim, num_results=num_results, seed=1925)
       sample2 = tfp.mcmc.sample_halton_sequence(

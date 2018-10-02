@@ -71,74 +71,70 @@ class TransformedDistributionTest(tf.test.TestCase):
     return _unimplemented
 
   def testTransformedDistribution(self):
-    g = tf.Graph()
-    with g.as_default():
-      mu = 3.0
-      sigma = 2.0
-      # Note: the Jacobian callable only works for this example; more generally
-      # you may or may not need a reduce_sum.
-      log_normal = self._cls()(
-          distribution=tfd.Normal(loc=mu, scale=sigma), bijector=tfb.Exp())
-      sp_dist = stats.lognorm(s=sigma, scale=np.exp(mu))
+    mu = 3.0
+    sigma = 2.0
+    # Note: the Jacobian callable only works for this example; more generally
+    # you may or may not need a reduce_sum.
+    log_normal = self._cls()(
+        distribution=tfd.Normal(loc=mu, scale=sigma), bijector=tfb.Exp())
+    sp_dist = stats.lognorm(s=sigma, scale=np.exp(mu))
 
-      # sample
-      sample = log_normal.sample(100000, seed=235)
-      self.assertAllEqual([], log_normal.event_shape)
-      with self.test_session(graph=g):
-        self.assertAllEqual([], self.evaluate(log_normal.event_shape_tensor()))
+    # sample
+    sample = log_normal.sample(100000, seed=235)
+    self.assertAllEqual([], log_normal.event_shape)
+    with self.cached_session():
+      self.assertAllEqual([], self.evaluate(log_normal.event_shape_tensor()))
+      self.assertAllClose(
+          sp_dist.mean(), np.mean(self.evaluate(sample)), atol=0.0, rtol=0.05)
+
+    # pdf, log_pdf, cdf, etc...
+    # The mean of the lognormal is around 148.
+    test_vals = np.linspace(0.1, 1000., num=20).astype(np.float32)
+    for func in [[log_normal.log_prob, sp_dist.logpdf],
+                 [log_normal.prob, sp_dist.pdf],
+                 [log_normal.log_cdf, sp_dist.logcdf],
+                 [log_normal.cdf, sp_dist.cdf],
+                 [log_normal.survival_function, sp_dist.sf],
+                 [log_normal.log_survival_function, sp_dist.logsf]]:
+      actual = func[0](test_vals)
+      expected = func[1](test_vals)
+      with self.cached_session():
         self.assertAllClose(
-            sp_dist.mean(), np.mean(self.evaluate(sample)), atol=0.0, rtol=0.05)
-
-      # pdf, log_pdf, cdf, etc...
-      # The mean of the lognormal is around 148.
-      test_vals = np.linspace(0.1, 1000., num=20).astype(np.float32)
-      for func in [[log_normal.log_prob, sp_dist.logpdf],
-                   [log_normal.prob, sp_dist.pdf],
-                   [log_normal.log_cdf, sp_dist.logcdf],
-                   [log_normal.cdf, sp_dist.cdf],
-                   [log_normal.survival_function, sp_dist.sf],
-                   [log_normal.log_survival_function, sp_dist.logsf]]:
-        actual = func[0](test_vals)
-        expected = func[1](test_vals)
-        with self.test_session(graph=g):
-          self.assertAllClose(
-              expected, self.evaluate(actual), atol=0, rtol=0.01)
+            expected, self.evaluate(actual), atol=0, rtol=0.01)
 
   def testNonInjectiveTransformedDistribution(self):
-    g = tf.Graph()
-    with g.as_default():
-      mu = 1.
-      sigma = 2.0
-      abs_normal = self._cls()(
-          distribution=tfd.Normal(loc=mu, scale=sigma),
-          bijector=tfb.AbsoluteValue())
-      sp_normal = stats.norm(mu, sigma)
+    mu = 1.
+    sigma = 2.0
+    abs_normal = self._cls()(
+        distribution=tfd.Normal(loc=mu, scale=sigma),
+        bijector=tfb.AbsoluteValue())
+    sp_normal = stats.norm(mu, sigma)
 
-      # sample
-      sample = abs_normal.sample(100000, seed=235)
-      self.assertAllEqual([], abs_normal.event_shape)
-      with self.test_session(graph=g):
-        sample_ = self.evaluate(sample)
-        self.assertAllEqual([], self.evaluate(abs_normal.event_shape_tensor()))
+    # sample
+    sample = abs_normal.sample(100000, seed=235)
+    self.assertAllEqual([], abs_normal.event_shape)
+    with self.cached_session():
+      sample_ = self.evaluate(sample)
+      self.assertAllEqual([], self.evaluate(abs_normal.event_shape_tensor()))
 
-        # Abs > 0, duh!
-        np.testing.assert_array_less(0, sample_)
+      # Abs > 0, duh!
+      np.testing.assert_array_less(0, sample_)
 
-        # Let X ~ Normal(mu, sigma), Y := |X|, then
-        # P[Y < 0.77] = P[-0.77 < X < 0.77]
-        self.assertAllClose(
-            sp_normal.cdf(0.77) - sp_normal.cdf(-0.77),
-            (sample_ < 0.77).mean(), rtol=0.01)
+      # Let X ~ Normal(mu, sigma), Y := |X|, then
+      # P[Y < 0.77] = P[-0.77 < X < 0.77]
+      self.assertAllClose(
+          sp_normal.cdf(0.77) - sp_normal.cdf(-0.77),
+          (sample_ < 0.77).mean(), rtol=0.01)
 
-        # p_Y(y) = p_X(-y) + p_X(y),
-        self.assertAllClose(
-            sp_normal.pdf(1.13) + sp_normal.pdf(-1.13),
-            self.evaluate(abs_normal.prob(1.13)))
+      # p_Y(y) = p_X(-y) + p_X(y),
+      self.assertAllClose(
+          sp_normal.pdf(1.13) + sp_normal.pdf(-1.13),
+          self.evaluate(abs_normal.prob(1.13)))
 
-        # Log[p_Y(y)] = Log[p_X(-y) + p_X(y)]
-        self.assertAllClose(
-            np.log(sp_normal.pdf(2.13) + sp_normal.pdf(-2.13)),
-            self.evaluate(abs_normal.log_prob(2.13)))
+      # Log[p_Y(y)] = Log[p_X(-y) + p_X(y)]
+      self.assertAllClose(
+          np.log(sp_normal.pdf(2.13) + sp_normal.pdf(-2.13)),
+          self.evaluate(abs_normal.log_prob(2.13)))
 
   def testQuantile(self):
     logit_normal = self._cls()(

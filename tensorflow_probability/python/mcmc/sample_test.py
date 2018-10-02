@@ -45,7 +45,7 @@ class SampleChainTest(tf.test.TestCase):
                       [0.5, 1]])
     num_results = 3000
     counter = collections.Counter()
-    with self.test_session(graph=tf.Graph()) as sess:
+    with self.cached_session(graph=tf.Graph()) as sess:
       def target_log_prob(x, y):
         counter['target_calls'] += 1
         # Corresponds to unnormalized MVN.

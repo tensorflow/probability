@@ -66,7 +66,7 @@ class MakeBatchReadyTest(tf.test.TestCase):
     return y, sample_shape, should_be_x_value
 
   def _test_dynamic(self, x, batch_ndims, event_ndims, expand_batch_dim=True):
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       x_pl = tf.placeholder(x.dtype)
       batch_ndims_pl = tf.placeholder(tf.int32)
       event_ndims_pl = tf.placeholder(tf.int32)
@@ -84,7 +84,7 @@ class MakeBatchReadyTest(tf.test.TestCase):
     self.assertAllEqual(x, should_be_x_value_)
 
   def _test_static(self, x, batch_ndims, event_ndims, expand_batch_dim):
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       [y_, sample_shape_, should_be_x_value_] = sess.run(
           self._build_graph(x, batch_ndims, event_ndims, expand_batch_dim))
     expected_y, expected_sample_shape = self._get_expected(
@@ -537,7 +537,7 @@ class DistributionShapeTest(tf.test.TestCase):
       self.assertAllEqual(expected_item, next(actual_item))
 
   def testDistributionShapeGetNdimsStatic(self):
-    with self.test_session():
+    with self.cached_session():
       shaper = _DistributionShape(batch_ndims=0, event_ndims=0)
       x = 1
       self.assertEqual(0, self.evaluate(shaper.get_sample_ndims(x)))
@@ -565,7 +565,7 @@ class DistributionShapeTest(tf.test.TestCase):
       self.assertEqual(1, self.evaluate(shaper.event_ndims))
 
   def testDistributionShapeGetNdimsDynamic(self):
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       batch_ndims = tf.placeholder(tf.int32)
       event_ndims = tf.placeholder(tf.int32)
       shaper = _DistributionShape(
@@ -576,7 +576,7 @@ class DistributionShapeTest(tf.test.TestCase):
       self.assertEqual(2, sess.run(shaper.get_ndims(y), feed_dict=feed_dict))
 
   def testDistributionShapeGetDimsStatic(self):
-    with self.test_session():
+    with self.cached_session():
       shaper = _DistributionShape(batch_ndims=0, event_ndims=0)
       x = 1
       self.assertAllEqual((_empty_shape, _empty_shape, _empty_shape),
@@ -590,7 +590,7 @@ class DistributionShapeTest(tf.test.TestCase):
                                _constant(shaper.get_dims(x)))
 
   def testDistributionShapeGetDimsDynamic(self):
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       # Works for static {batch,event}_ndims despite unfed input.
       shaper = _DistributionShape(batch_ndims=1, event_ndims=2)
       y = tf.placeholder(tf.float32, shape=(10, None, 5, 5))
@@ -609,7 +609,7 @@ class DistributionShapeTest(tf.test.TestCase):
           ([0], [1], [2, 3]), sess.run(shaper.get_dims(y), feed_dict=feed_dict))
 
   def testDistributionShapeGetShapeStatic(self):
-    with self.test_session():
+    with self.cached_session():
       shaper = _DistributionShape(batch_ndims=0, event_ndims=0)
       self.assertAllEqual((_empty_shape, _empty_shape, _empty_shape),
                           _constant(shaper.get_shape(1.)))
@@ -651,7 +651,7 @@ class DistributionShapeTest(tf.test.TestCase):
                                _constant(shaper.get_shape(np.ones((3, 2, 1)))))
 
   def testDistributionShapeGetShapeDynamic(self):
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       # Works for static ndims despite unknown static shape.
       shaper = _DistributionShape(batch_ndims=1, event_ndims=1)
       y = tf.placeholder(tf.int32, shape=(None, None, 2))

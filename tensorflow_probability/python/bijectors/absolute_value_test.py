@@ -29,7 +29,7 @@ class AbsoluteValueTest(tf.test.TestCase):
   """Tests correctness of the absolute value bijector."""
 
   def testBijectorVersusNumpyRewriteOfBasicFunctionsEventNdims0(self):
-    with self.test_session() as sess:
+    with self.cached_session():
       bijector = tfb.AbsoluteValue(validate_args=True)
       self.assertEqual("absolute_value", bijector.name)
       x = tf.constant([[0., 1., -1], [0., -5., 3.]])  # Shape [2, 3]
@@ -38,30 +38,30 @@ class AbsoluteValueTest(tf.test.TestCase):
       y_ = self.evaluate(y)
 
       self.assertAllClose(y_, self.evaluate(bijector.forward(x)))
-      self.assertAllClose((-y_, y_), sess.run(bijector.inverse(y)))
+      self.assertAllClose((-y_, y_), self.evaluate(bijector.inverse(y)))
       self.assertAllClose((0., 0.),
-                          sess.run(bijector.inverse_log_det_jacobian(
+                          self.evaluate(bijector.inverse_log_det_jacobian(
                               y, event_ndims=0)))
 
       # Run things twice to make sure there are no issues in caching the tuples
       # returned by .inverse*
       self.assertAllClose(y_, self.evaluate(bijector.forward(x)))
-      self.assertAllClose((-y_, y_), sess.run(bijector.inverse(y)))
+      self.assertAllClose((-y_, y_), self.evaluate(bijector.inverse(y)))
       self.assertAllClose((0., 0.),
-                          sess.run(bijector.inverse_log_det_jacobian(
+                          self.evaluate(bijector.inverse_log_det_jacobian(
                               y, event_ndims=0)))
 
   def testNegativeYRaisesForInverseIfValidateArgs(self):
-    with self.test_session() as sess:
+    with self.cached_session():
       bijector = tfb.AbsoluteValue(validate_args=True)
       with self.assertRaisesOpError("y was negative"):
-        sess.run(bijector.inverse(-1.))
+        self.evaluate(bijector.inverse(-1.))
 
   def testNegativeYRaisesForILDJIfValidateArgs(self):
-    with self.test_session() as sess:
+    with self.cached_session():
       bijector = tfb.AbsoluteValue(validate_args=True)
       with self.assertRaisesOpError("y was negative"):
-        sess.run(bijector.inverse_log_det_jacobian(-1., event_ndims=0))
+        self.evaluate(bijector.inverse_log_det_jacobian(-1., event_ndims=0))
 
 
 if __name__ == "__main__":

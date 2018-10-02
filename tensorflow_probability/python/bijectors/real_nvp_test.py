@@ -68,7 +68,7 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
 
   def testBatchedBijectorWithMLPTransform(self):
     x_ = np.random.normal(0., 1., (3, 8)).astype(np.float32)
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       nvp = tfb.RealNVP(
           num_masked=4, validate_args=True, **self._real_nvp_kwargs)
       x = tf.constant(x_)
@@ -156,7 +156,7 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
 
   def testMutuallyConsistent(self):
     dims = 4
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       nvp = tfb.RealNVP(
           num_masked=3, validate_args=True, **self._real_nvp_kwargs)
       dist = transformed_distribution_lib.TransformedDistribution(
@@ -174,7 +174,7 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
 
   def testInvertMutuallyConsistent(self):
     dims = 4
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       nvp = tfb.Invert(
           tfb.RealNVP(
               num_masked=3, validate_args=True, **self._real_nvp_kwargs))

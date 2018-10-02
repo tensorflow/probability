@@ -43,7 +43,7 @@ class HagerZhangTest(tf.test.TestCase):
   def test_quadratic(self):
     fdf = lambda x: ((x-1.3)**2, 2*(x-1.3))
     # Case 1: The starting value is close to 0 and doesn't bracket the min.
-    with self.test_session() as session:
+    with self.cached_session() as session:
       close_start, far_start = tf.constant(0.1), tf.constant(7.0)
       results_close = session.run(tfp.optimizer.linesearch.hager_zhang(
           fdf, initial_step_size=close_start))
@@ -77,7 +77,7 @@ class HagerZhangTest(tf.test.TestCase):
              + 5.015 * x**2 - 6.043 * x - 1)
       dval = 4.94 * x**4 - 19.84 * x**3 + 14.934 * x**2 + 10.03 * x - 6.043
       return val, dval
-    with self.test_session() as session:
+    with self.cached_session() as session:
       starts = (tf.constant(0.1), tf.constant(1.5), tf.constant(2.0),
                 tf.constant(4.0))
       for start in starts:
@@ -122,7 +122,7 @@ class HagerZhangTest(tf.test.TestCase):
       dfy = 200 * (y - x**2)
       return fv, tf.stack([dfx, dfy])
 
-    with self.test_session() as session:
+    with self.cached_session() as session:
       x0 = tf.constant([-3.0, -4.0])
       dirn = tf.constant([0.5, 1.0])  # This is a descent direction at x0
       def fdf(t):
@@ -155,7 +155,7 @@ class HagerZhangTest(tf.test.TestCase):
       results = tfp.optimizer.linesearch.hager_zhang(
           fdf, initial_step_size=tf.constant(start))
       init = tf.global_variables_initializer()
-      with self.test_session() as session:
+      with self.cached_session() as session:
         session.run(init)
         results = session.run(results)
         actual_evals = session.run(counter)
@@ -175,7 +175,7 @@ class HagerZhangTest(tf.test.TestCase):
       fv = dtype(1) - dtype(2) * (x + shift) + (x + shift) ** 2
       dfv = - dtype(2) + dtype(2) * (x + shift)
       return fv, dfv
-    with self.test_session() as session:
+    with self.cached_session() as session:
       start = tf.constant(dtype(1e-8))
       results = session.run(
           tfp.optimizer.linesearch.hager_zhang(
@@ -207,7 +207,7 @@ class HagerZhangTest(tf.test.TestCase):
     def fdf(x):
       return (x - 1.8)**2, 2 * (x - 1.8)
     def get_results():
-      with self.test_session() as session:
+      with self.cached_session() as session:
         start = tf.constant(0.9)
         results = tfp.optimizer.linesearch.hager_zhang(
             fdf,
@@ -232,7 +232,7 @@ class HagerZhangTest(tf.test.TestCase):
       return (10.0 + z*z - 10 * cos(2*np.pi*z),
               2 * z + 10 * 2 * np.pi * sin(2*np.pi*z))
 
-    with self.test_session() as session:
+    with self.cached_session() as session:
       start = tf.constant(0.1, dtype=tf.float64)
       results = session.run(
           tfp.optimizer.linesearch.hager_zhang(

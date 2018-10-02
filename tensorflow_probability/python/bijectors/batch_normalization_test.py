@@ -64,7 +64,7 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers,
       training: Boolean of whether bijector runs in training or inference mode.
     """
     x_ = np.arange(5 * 4 * 2).astype(np.float32).reshape(input_shape)
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       x = tf.placeholder_with_default(
           x_,
           input_shape if 0 in event_dims else (None,) + input_shape[1:])
@@ -142,7 +142,7 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers,
 
   def testMaximumLikelihoodTraining(self):
     # Test Maximum Likelihood training with default bijector.
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       training = tf.placeholder_with_default(True, (), "training")
       base_dist = distributions.MultivariateNormalDiag(loc=[0., 0.])
       batch_norm = tfb.BatchNormalization(training=training)
@@ -177,7 +177,7 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers,
       ("2d_event_ndims", (10, 4), [-1], False),
       ("1d_event_ndims", 2, [-1], False))
   def testLogProb(self, event_shape, event_dims, training):
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       training = tf.placeholder_with_default(training, (), "training")
       layer = normalization.BatchNormalization(axis=event_dims, epsilon=0.)
       batch_norm = tfb.BatchNormalization(batchnorm_layer=layer,
@@ -206,7 +206,7 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers,
   def testMutuallyConsistent(self):
     # BatchNorm bijector is only mutually consistent when training=False.
     dims = 4
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       training = tf.placeholder_with_default(False, (), "training")
       layer = normalization.BatchNormalization(epsilon=0.)
       batch_norm = tfb.BatchNormalization(batchnorm_layer=layer,
@@ -227,7 +227,7 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers,
   def testInvertMutuallyConsistent(self):
     # BatchNorm bijector is only mutually consistent when training=False.
     dims = 4
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       training = tf.placeholder_with_default(False, (), "training")
       layer = normalization.BatchNormalization(epsilon=0.)
       batch_norm = tfb.Invert(
