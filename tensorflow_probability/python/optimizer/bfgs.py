@@ -197,10 +197,10 @@ def minimize(value_and_gradients_function,
                                        name='x_tolerance')
     max_iterations = tf.convert_to_tensor(max_iterations, name='max_iterations')
 
-    domain_shape = initial_position.shape
+    domain_shape = tf.shape(initial_position)
 
     if initial_inverse_hessian_estimate is None:
-      inv_hessian_shape = domain_shape.concatenate(domain_shape)
+      inv_hessian_shape = tf.concat((domain_shape, domain_shape), 0)
       initial_inv_hessian = tf.eye(tf.size(initial_position), dtype=dtype)
       initial_inv_hessian = tf.reshape(initial_inv_hessian,
                                        inv_hessian_shape,
@@ -604,12 +604,12 @@ def _bfgs_inv_hessian_update(grad_delta,
     """Updates the Hessian estimate."""
     # The quadratic form: y^T.H.y.
     n = len(grad_delta.shape.as_list())
-    contraction_axes = np.arange(-n, 0)
     # H.y where H is the inverse Hessian and y is the gradient change.
+    # tensordot automatically iterates over the last n axes of the first tensor and
+    # the first n axes of the second tensor. Passing in a scalar preserves shape information.
     conditioned_grad_delta = tf.tensordot(inv_hessian_estimate,
                                           grad_delta,
-                                          axes=[contraction_axes,
-                                                contraction_axes])
+                                          n)
     conditioned_grad_delta_norm = tf.reduce_sum(
         conditioned_grad_delta * grad_delta)
 
