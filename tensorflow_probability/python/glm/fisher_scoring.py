@@ -21,10 +21,10 @@ from __future__ import print_function
 import numpy as np
 
 import tensorflow as tf
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.math import matvecmul
 from tensorflow.python.framework import smart_cond
-from tensorflow.python.ops.distributions import util as distributions_util
 
 
 __all__ = [
@@ -375,7 +375,7 @@ def fit_one_step(
     if l2_regularizer is None:
       l2_regularizer = np.array(0, a.dtype.as_numpy_dtype)
     else:
-      l2_regularizer_ = distributions_util.maybe_get_static_value(
+      l2_regularizer_ = distribution_util.maybe_get_static_value(
           l2_regularizer, a.dtype.as_numpy_dtype)
       if l2_regularizer_ is not None:
         l2_regularizer = l2_regularizer_
@@ -393,7 +393,7 @@ def fit_one_step(
       eye = tf.eye(
           num_model_coefficients, batch_shape=batch_shape, dtype=a.dtype)
       a_ = tf.concat([a, tf.sqrt(l2_regularizer) * eye], axis=-2)
-      b_ = distributions_util.pad(
+      b_ = distribution_util.pad(
           b, count=num_model_coefficients, axis=-1, back=True)
       # Return l2_regularizer=0 since its now embedded.
       l2_regularizer_ = np.array(0, a.dtype.as_numpy_dtype)

@@ -23,10 +23,10 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python import bijectors
+from tensorflow_probability.python.distributions import transformed_distribution
+from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-
-from tensorflow.python.ops.distributions import transformed_distribution
 
 
 class Gumbel(transformed_distribution.TransformedDistribution):
@@ -136,7 +136,7 @@ class Gumbel(transformed_distribution.TransformedDistribution):
             loc=loc, scale=scale, validate_args=validate_args)
 
       super(Gumbel, self).__init__(
-          distribution=tf.distributions.Uniform(
+          distribution=uniform.Uniform(
               low=tf.zeros([], dtype=loc.dtype),
               high=tf.ones([], dtype=loc.dtype),
               allow_nan_stats=allow_nan_stats),

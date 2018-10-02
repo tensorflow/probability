@@ -22,12 +22,14 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
-from tensorflow_probability.python.internal import dtype_util
 
+from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.ops import control_flow_ops
-from tensorflow.python.ops.distributions import util as distribution_util
 
 __all__ = [
     "GammaGamma",
@@ -48,7 +50,7 @@ def _dynamic_broadcast_shape_from_tensors(*tensors):
   return shape
 
 
-class GammaGamma(tf.distributions.Distribution):
+class GammaGamma(distribution.Distribution):
   """Gamma-Gamma distribution.
 
   Gamma-Gamma is a [compound
@@ -149,7 +151,7 @@ class GammaGamma(tf.distributions.Distribution):
         dtype=self._concentration.dtype,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
-        reparameterization_type=tf.distributions.FULLY_REPARAMETERIZED,
+        reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
         parameters=parameters,
         graph_parents=[
             self._concentration, self._mixing_concentration, self._mixing_rate

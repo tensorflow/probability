@@ -164,8 +164,8 @@ class OneHotCategoricalTest(tf.test.TestCase):
         kl_expected = np.sum(
             prob_p * (np.log(prob_p) - np.log(prob_q)), axis=-1)
 
-        kl_actual = tf.distributions.kl_divergence(p, q)
-        kl_same = tf.distributions.kl_divergence(p, p)
+        kl_actual = tfd.kl_divergence(p, q)
+        kl_same = tfd.kl_divergence(p, p)
         x = p.sample(int(2e4), seed=0)
         x = tf.cast(x, dtype=tf.float32)
         # Compute empirical KL(p||q).

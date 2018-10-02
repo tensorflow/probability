@@ -22,12 +22,13 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import distribution_util as distribution_utils
+from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.ops import control_flow_ops
-from tensorflow.python.ops.distributions import util as distribution_util
 
 
-class MixtureSameFamily(tf.distributions.Distribution):
+class MixtureSameFamily(distribution.Distribution):
   """Mixture (same-family) distribution.
 
   The `MixtureSameFamily` distribution implements a (batch of) mixture
@@ -166,7 +167,7 @@ class MixtureSameFamily(tf.distributions.Distribution):
         cdbs = components_distribution.batch_shape_tensor()[:-1]
         self._runtime_assertions += [
             control_flow_ops.assert_equal(
-                distribution_util.pick_vector(
+                distribution_utils.pick_vector(
                     mixture_distribution.is_scalar_batch(), cdbs, mdbs),
                 cdbs,
                 message=(
@@ -195,7 +196,7 @@ class MixtureSameFamily(tf.distributions.Distribution):
 
       super(MixtureSameFamily, self).__init__(
           dtype=self._components_distribution.dtype,
-          reparameterization_type=tf.distributions.NOT_REPARAMETERIZED,
+          reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
           parameters=parameters,

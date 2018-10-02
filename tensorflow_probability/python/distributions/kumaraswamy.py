@@ -23,10 +23,12 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python import bijectors
+from tensorflow_probability.python.distributions import transformed_distribution
+from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.ops import control_flow_ops
-from tensorflow.python.ops.distributions import transformed_distribution
 
 __all__ = [
     "Kumaraswamy",
@@ -153,7 +155,7 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
       concentration0 = tf.convert_to_tensor(
           concentration0, name="concentration0", dtype=dtype)
     super(Kumaraswamy, self).__init__(
-        distribution=tf.distributions.Uniform(
+        distribution=uniform.Uniform(
             low=tf.zeros([], dtype=concentration1.dtype),
             high=tf.ones([], dtype=concentration1.dtype),
             allow_nan_stats=allow_nan_stats),
@@ -164,7 +166,7 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
         batch_shape=distribution_util.get_broadcast_shape(
             concentration1, concentration0),
         name=name)
-    self._reparameterization_type = tf.distributions.FULLY_REPARAMETERIZED
+    self._reparameterization_type = reparameterization.FULLY_REPARAMETERIZED
 
   @property
   def concentration1(self):

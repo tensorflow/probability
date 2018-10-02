@@ -23,9 +23,9 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python import bijectors
+from tensorflow_probability.python.distributions import laplace
+from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
-from tensorflow.python.ops.distributions import laplace
-from tensorflow.python.ops.distributions import transformed_distribution
 
 
 __all__ = [

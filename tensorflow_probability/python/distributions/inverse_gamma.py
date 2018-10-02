@@ -22,8 +22,10 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.ops import control_flow_ops
 
@@ -34,7 +36,7 @@ __all__ = [
 ]
 
 
-class InverseGamma(tf.distributions.Distribution):
+class InverseGamma(distribution.Distribution):
   """InverseGamma distribution.
 
   The `InverseGamma` distribution is defined over positive real numbers using
@@ -165,7 +167,7 @@ class InverseGamma(tf.distributions.Distribution):
         dtype=self._concentration.dtype,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
-        reparameterization_type=tf.distributions.FULLY_REPARAMETERIZED,
+        reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
         parameters=parameters,
         graph_parents=[self._concentration, self._rate],
         name=name)

@@ -24,12 +24,12 @@ import collections
 import tensorflow as tf
 
 from tensorflow_probability.python import distributions
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.math import diag_jacobian
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import metropolis_hastings
-from tensorflow_probability.python.mcmc import util as mcmc_util
 
-from tensorflow.python.ops.distributions import util as distributions_util
+from tensorflow_probability.python.mcmc import util as mcmc_util
 
 
 __all__ = [
@@ -514,7 +514,7 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
               seed=self._seed_stream()))
 
       # Number of independent chains run by the algorithm.
-      independent_chain_ndims = distributions_util.prefer_static_rank(
+      independent_chain_ndims = distribution_util.prefer_static_rank(
           current_target_log_prob)
 
       # Generate the next state of the algorithm using Euler-Maruyama method.
@@ -951,7 +951,7 @@ def _prepare_args(target_log_prob_fn,
       state_parts,
       volatility,
       grads_volatility_fn,
-      distributions_util.prefer_static_shape(target_log_prob),
+      distribution_util.prefer_static_shape(target_log_prob),
       parallel_iterations)
 
   step_sizes = (list(step_size) if mcmc_util.is_list_like(step_size)

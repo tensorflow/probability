@@ -21,9 +21,9 @@ from __future__ import print_function
 import tensorflow as tf
 from tensorflow_probability.python import bijectors
 from tensorflow_probability.python.distributions import logistic
+from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow.python.ops.distributions import transformed_distribution
 
 
 class RelaxedBernoulli(transformed_distribution.TransformedDistribution):

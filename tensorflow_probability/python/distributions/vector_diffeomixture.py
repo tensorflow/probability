@@ -23,11 +23,14 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python import bijectors
+from tensorflow_probability.python.distributions import categorical
+from tensorflow_probability.python.distributions import distribution as distribution_lib
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.framework import tensor_util
 from tensorflow.python.ops import control_flow_ops
-from tensorflow.python.ops.distributions import categorical as categorical_lib
 from tensorflow.python.ops.linalg import linear_operator_addition as linop_add_lib
 
 
@@ -142,7 +145,7 @@ def quadrature_scheme_softmaxnormal_quantiles(
     normal_scale = maybe_check_quadrature_param(
         normal_scale, "normal_scale", validate_args)
 
-    dist = tf.distributions.Normal(loc=normal_loc, scale=normal_scale)
+    dist = normal.Normal(loc=normal_loc, scale=normal_scale)
 
     def _get_batch_ndims():
       """Helper to get dist.batch_shape.ndims, statically if possible."""
@@ -194,7 +197,7 @@ def quadrature_scheme_softmaxnormal_quantiles(
     return grid, probs
 
 
-class VectorDiffeomixture(tf.distributions.Distribution):
+class VectorDiffeomixture(distribution_lib.Distribution):
   """VectorDiffeomixture distribution.
 
   A vector diffeomixture (VDM) is a distribution parameterized by a convex
@@ -440,7 +443,7 @@ class VectorDiffeomixture(tf.distributions.Distribution):
       # Note: by creating the logits as `log(prob)` we ensure that
       # `self.mixture_distribution.logits` is equivalent to
       # `math_ops.log(self.mixture_distribution.probs)`.
-      self._mixture_distribution = categorical_lib.Categorical(
+      self._mixture_distribution = categorical.Categorical(
           logits=tf.log(probs),
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats)
@@ -481,7 +484,7 @@ class VectorDiffeomixture(tf.distributions.Distribution):
           # `FULLY_REPARAMETERIZED` distribution. In such cases IT IS THE USERS
           # RESPONSIBILITY to verify that the base distribution is a function of
           # non-trainable parameters.
-          reparameterization_type=tf.distributions.FULLY_REPARAMETERIZED,
+          reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
           parameters=parameters,

@@ -22,9 +22,9 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_util
 from tensorflow.python.layers import core as layers
-from tensorflow.python.ops.distributions import transformed_distribution as transformed_distribution_lib
 
 
 class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
@@ -159,8 +159,8 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
     with self.cached_session() as sess:
       nvp = tfb.RealNVP(
           num_masked=3, validate_args=True, **self._real_nvp_kwargs)
-      dist = transformed_distribution_lib.TransformedDistribution(
-          distribution=tf.distributions.Normal(loc=0., scale=1.),
+      dist = tfd.TransformedDistribution(
+          distribution=tfd.Normal(loc=0., scale=1.),
           bijector=nvp,
           event_shape=[dims],
           validate_args=True)
@@ -178,8 +178,8 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
       nvp = tfb.Invert(
           tfb.RealNVP(
               num_masked=3, validate_args=True, **self._real_nvp_kwargs))
-      dist = transformed_distribution_lib.TransformedDistribution(
-          distribution=tf.distributions.Normal(loc=0., scale=1.),
+      dist = tfd.TransformedDistribution(
+          distribution=tfd.Normal(loc=0., scale=1.),
           bijector=nvp,
           event_shape=[dims],
           validate_args=True)

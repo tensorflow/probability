@@ -23,8 +23,10 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.ops import random_ops
 from tensorflow.python.ops.distributions import special_math
@@ -35,7 +37,7 @@ __all__ = [
 ]
 
 
-class TruncatedNormal(tf.distributions.Distribution):
+class TruncatedNormal(distribution.Distribution):
   """The Truncated Normal distribution.
 
   #### Mathematical details
@@ -151,7 +153,7 @@ class TruncatedNormal(tf.distributions.Distribution):
         # an equivalent expression can also be found in Sec 9.1.1.
         # of https://arxiv.org/pdf/1806.01851.pdf. The implementation here
         # handles arbitrary bounds.
-        reparameterization_type=tf.distributions.FULLY_REPARAMETERIZED,
+        reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
         parameters=parameters,

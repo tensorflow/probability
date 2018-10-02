@@ -27,7 +27,6 @@ from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions
 from tensorflow_probability.python.internal import test_util
 from tensorflow.python.layers import normalization
-from tensorflow.python.ops.distributions import transformed_distribution as transformed_distribution_lib
 from tensorflow.python.training import adam
 
 
@@ -146,7 +145,7 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers,
       training = tf.placeholder_with_default(True, (), "training")
       base_dist = distributions.MultivariateNormalDiag(loc=[0., 0.])
       batch_norm = tfb.BatchNormalization(training=training)
-      dist = transformed_distribution_lib.TransformedDistribution(
+      dist = distributions.TransformedDistribution(
           distribution=base_dist,
           bijector=batch_norm)
       target_dist = distributions.MultivariateNormalDiag(loc=[1., 2.])
@@ -187,10 +186,10 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers,
       # Reshape the events.
       if isinstance(event_shape, int):
         event_shape = [event_shape]
-      base_dist = transformed_distribution_lib.TransformedDistribution(
+      base_dist = distributions.TransformedDistribution(
           distribution=base_dist,
           bijector=tfb.Reshape(event_shape_out=event_shape))
-      dist = transformed_distribution_lib.TransformedDistribution(
+      dist = distributions.TransformedDistribution(
           distribution=base_dist,
           bijector=batch_norm,
           validate_args=True)
@@ -211,8 +210,8 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers,
       layer = normalization.BatchNormalization(epsilon=0.)
       batch_norm = tfb.BatchNormalization(batchnorm_layer=layer,
                                           training=training)
-      dist = transformed_distribution_lib.TransformedDistribution(
-          distribution=tf.distributions.Normal(loc=0., scale=1.),
+      dist = distributions.TransformedDistribution(
+          distribution=distributions.Normal(loc=0., scale=1.),
           bijector=batch_norm,
           event_shape=[dims],
           validate_args=True)
@@ -232,8 +231,8 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers,
       layer = normalization.BatchNormalization(epsilon=0.)
       batch_norm = tfb.Invert(
           tfb.BatchNormalization(batchnorm_layer=layer, training=training))
-      dist = transformed_distribution_lib.TransformedDistribution(
-          distribution=tf.distributions.Normal(loc=0., scale=1.),
+      dist = distributions.TransformedDistribution(
+          distribution=distributions.Normal(loc=0., scale=1.),
           bijector=batch_norm,
           event_shape=[dims],
           validate_args=True)

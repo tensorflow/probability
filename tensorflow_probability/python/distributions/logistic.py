@@ -23,11 +23,13 @@ import math
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.framework import tensor_shape
 
 
-class Logistic(tf.distributions.Distribution):
+class Logistic(distribution.Distribution):
   """The Logistic distribution with location `loc` and `scale` parameters.
 
   #### Mathematical details
@@ -123,7 +125,7 @@ class Logistic(tf.distributions.Distribution):
         tf.assert_same_float_dtype([self._loc, self._scale])
     super(Logistic, self).__init__(
         dtype=self._scale.dtype,
-        reparameterization_type=tf.distributions.FULLY_REPARAMETERIZED,
+        reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
         parameters=parameters,

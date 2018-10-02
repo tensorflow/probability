@@ -52,13 +52,13 @@ import sys
 # Dependency imports
 import numpy as np
 
+from tensorflow_probability.python.distributions import uniform
+from tensorflow_probability.python.internal import distribution_util as util
 from tensorflow.python.client import session
 from tensorflow.python.framework import ops
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import linalg_ops
 from tensorflow.python.ops import math_ops
-from tensorflow.python.ops.distributions import uniform
-from tensorflow.python.ops.distributions import util
 from tensorflow.python.platform import tf_logging
 
 __all__ = [

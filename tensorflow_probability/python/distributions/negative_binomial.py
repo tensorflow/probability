@@ -20,13 +20,15 @@ from __future__ import print_function
 
 import tensorflow as tf
 
+from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.framework import tensor_shape
 
 
-class NegativeBinomial(tf.distributions.Distribution):
+class NegativeBinomial(distribution.Distribution):
   """NegativeBinomial distribution.
 
   The NegativeBinomial distribution is related to the experiment of performing
@@ -99,7 +101,7 @@ class NegativeBinomial(tf.distributions.Distribution):
 
     super(NegativeBinomial, self).__init__(
         dtype=self._probs.dtype,
-        reparameterization_type=tf.distributions.NOT_REPARAMETERIZED,
+        reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
         parameters=parameters,

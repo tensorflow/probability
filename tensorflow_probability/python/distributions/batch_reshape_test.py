@@ -180,7 +180,7 @@ class _BatchReshapeTest(object):
         np.prod(old_batch_shape)).reshape(old_batch_shape))
     scale_ph = tf.placeholder_with_default(
         scale, shape=scale.shape if self.is_static_shape else None)
-    normal = tf.distributions.Normal(loc=self.dtype(0), scale=scale_ph)
+    normal = tfd.Normal(loc=self.dtype(0), scale=scale_ph)
     reshape_normal = tfd.BatchReshape(
         distribution=normal, batch_shape=new_batch_shape_ph, validate_args=True)
     return normal, reshape_normal

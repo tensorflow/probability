@@ -28,9 +28,12 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 import tensorflow as tf
-import tensorflow.distributions as tfd
 
+from tensorflow_probability.python.distributions import beta
+from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import seed_stream
+from tensorflow_probability.python.internal import reparameterization
 
 
 __all__ = [
@@ -42,7 +45,7 @@ def _uniform_unit_norm(dimension, shape, dtype, seed):
   """Returns a batch of points chosen uniformly from the unit hypersphere."""
   # This works because the Gaussian distribution is spherically symmetric.
   # raw shape: shape + [dimension]
-  raw = tfd.Normal(
+  raw = normal.Normal(
       loc=dtype.as_numpy_dtype(0.),
       scale=dtype.as_numpy_dtype(1.)).sample(
           tf.concat([shape, [dimension]], axis=0), seed=seed())
@@ -57,7 +60,7 @@ def _replicate(n, tensor):
   return tf.tile(tf.expand_dims(tensor, axis=0), multiples)
 
 
-class LKJ(tfd.Distribution):
+class LKJ(distribution.Distribution):
   """The LKJ distribution on correlation matrices.
 
   This is a one-parameter family of distributions on correlation matrices.  The
@@ -129,7 +132,7 @@ class LKJ(tfd.Distribution):
         dtype=self._concentration.dtype,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
-        reparameterization_type=tfd.NOT_REPARAMETERIZED,
+        reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
         parameters=parameters,
         graph_parents=[self._concentration],
         name=name)
@@ -190,7 +193,7 @@ class LKJ(tfd.Distribution):
             concentration_shape, [self.dimension, self.dimension]], axis=0)
         return tf.ones(shape=shape, dtype=self.concentration.dtype)
       beta_conc = concentration + (self.dimension - 2.) / 2.
-      beta_dist = tfd.Beta(concentration1=beta_conc, concentration0=beta_conc)
+      beta_dist = beta.Beta(concentration1=beta_conc, concentration0=beta_conc)
 
       # Note that the sampler below deviates from [1], by doing the sampling in
       # cholesky space. This does not change the fundamental logic of the
@@ -220,7 +223,7 @@ class LKJ(tfd.Distribution):
         # Loop invariant: on entry, result has shape B + [n, n]
         beta_conc -= 0.5
         # norm is y in reference [1].
-        norm = tfd.Beta(concentration1=n/2., concentration0=beta_conc).sample(
+        norm = beta.Beta(concentration1=n/2., concentration0=beta_conc).sample(
             seed=seed())
         # distance shape: B + [1] for broadcast
         distance = tf.sqrt(norm)[..., tf.newaxis]

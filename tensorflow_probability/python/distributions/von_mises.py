@@ -21,13 +21,17 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 import tensorflow as tf
+from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions.seed_stream import SeedStream
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.framework import tensor_shape
 
 
-class VonMises(tf.distributions.Distribution):
+class VonMises(distribution.Distribution):
   """The von Mises distribution over angles.
 
   The von Mises distribution is a univariate directional distribution.
@@ -131,7 +135,7 @@ class VonMises(tf.distributions.Distribution):
         tf.assert_same_float_dtype([self._loc, self._concentration])
     super(VonMises, self).__init__(
         dtype=self._concentration.dtype,
-        reparameterization_type=tf.distributions.FULLY_REPARAMETERIZED,
+        reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
         parameters=parameters,
@@ -233,7 +237,7 @@ class VonMises(tf.distributions.Distribution):
     return samples
 
 
-@tf.distributions.RegisterKL(VonMises, VonMises)
+@kullback_leibler.RegisterKL(VonMises, VonMises)
 def _kl_von_mises_von_mises(d1, d2, name=None):
   """Batchwise KL divergence KL(d1 || d2) with d1 and d2 von Mises.
 
@@ -454,7 +458,7 @@ def _von_mises_cdf_normal(x, concentration, dtype):
     xi = z - z3 / ((c - 2. * z2 - 16.) / 3. -
                    (z4 + (7. / 4.) * z2 + 167. / 2.) / (c - c1 - z2 + 3.)) ** 2
 
-    distrib = tf.distributions.Normal(tf.cast(0., dtype), tf.cast(1., dtype))
+    distrib = normal.Normal(tf.cast(0., dtype), tf.cast(1., dtype))
 
     return distrib.cdf(xi)
 

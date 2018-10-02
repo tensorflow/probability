@@ -20,10 +20,10 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python import bijectors
+from tensorflow_probability.python.distributions import student_t
+from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow.python.ops.distributions import student_t
-from tensorflow.python.ops.distributions import transformed_distribution
 
 
 # TODO(b/116482987): Expose this distribution in TFP.

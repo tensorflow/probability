@@ -23,8 +23,8 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow.python.ops import control_flow_ops
-from tensorflow.python.ops.distributions import util as distribution_util
 
 
 __all__ = [

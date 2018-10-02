@@ -23,7 +23,9 @@ import functools
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.framework import tensor_shape
 
 __all__ = [
@@ -62,7 +64,7 @@ def check_arg_in_support(f):
   return _check_arg_and_apply_f
 
 
-class HalfCauchy(tf.distributions.Distribution):
+class HalfCauchy(distribution.Distribution):
   """Half-Cauchy distribution.
 
   The half-Cauchy distribution is parameterized by a `loc` and a
@@ -123,7 +125,7 @@ class HalfCauchy(tf.distributions.Distribution):
       tf.assert_same_float_dtype([self._loc, self._scale])
     super(HalfCauchy, self).__init__(
         dtype=self._scale.dtype,
-        reparameterization_type=tf.distributions.FULLY_REPARAMETERIZED,
+        reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
         parameters=parameters,

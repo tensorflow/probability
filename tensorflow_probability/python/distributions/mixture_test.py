@@ -789,7 +789,7 @@ class MixtureTest(tf.test.TestCase):
         self.assertAllClose(np.exp(x_log_cdf_tf_result), scipy_cdf_result)
 
   def testSampleBimixGamma(self):
-    """Tests a bug in the underlying tf.Gamma op.
+    """Tests a bug in the underlying tfd.Gamma op.
 
     Mixture's use of dynamic partition requires `random_gamma` correctly returns
     an empty `Tensor`.
@@ -800,6 +800,15 @@ class MixtureTest(tf.test.TestCase):
         use_static_graph=self.use_static_graph)
     x_ = self.evaluate(gm.sample())
     self.assertAllEqual([], x_.shape)
+
+  # TODO(b/117098119): Remove tf.distribution references once they're gone.
+  def testBackwardsCompatibility(self):
+    tfd.Mixture(
+        cat=tf.distributions.Categorical(probs=[.3, .7]),
+        components=[
+            tf.distributions.Normal(1., 2.),
+            tf.distributions.Normal(2., 1.)
+        ])
 
 
 class MixtureStaticSampleTest(MixtureTest):

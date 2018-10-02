@@ -22,10 +22,10 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python import distributions as tfd
 
 from tensorflow_probability.python.bijectors.masked_autoregressive import _gen_mask
 from tensorflow_probability.python.internal import test_util
-from tensorflow.python.ops.distributions import transformed_distribution as transformed_distribution_lib
 
 
 class GenMaskTest(tf.test.TestCase):
@@ -100,8 +100,8 @@ class MaskedAutoregressiveFlowTest(test_util.VectorDistributionTestHelpers,
     with self.cached_session() as sess:
       ma = tfb.MaskedAutoregressiveFlow(
           validate_args=True, **self._autoregressive_flow_kwargs)
-      dist = transformed_distribution_lib.TransformedDistribution(
-          distribution=tf.distributions.Normal(loc=0., scale=1.),
+      dist = tfd.TransformedDistribution(
+          distribution=tfd.Normal(loc=0., scale=1.),
           bijector=ma,
           event_shape=[dims],
           validate_args=True)
@@ -119,8 +119,8 @@ class MaskedAutoregressiveFlowTest(test_util.VectorDistributionTestHelpers,
       ma = tfb.Invert(
           tfb.MaskedAutoregressiveFlow(
               validate_args=True, **self._autoregressive_flow_kwargs))
-      dist = transformed_distribution_lib.TransformedDistribution(
-          distribution=tf.distributions.Normal(loc=0., scale=1.),
+      dist = tfd.TransformedDistribution(
+          distribution=tfd.Normal(loc=0., scale=1.),
           bijector=ma,
           event_shape=[dims],
           validate_args=True)

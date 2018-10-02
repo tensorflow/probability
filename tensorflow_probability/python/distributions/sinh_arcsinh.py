@@ -20,10 +20,11 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python import bijectors
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow.python.ops import control_flow_ops
-from tensorflow.python.ops.distributions import transformed_distribution
 
 __all__ = [
     "SinhArcsinh",
@@ -114,7 +115,7 @@ class SinhArcsinh(transformed_distribution.TransformedDistribution):
       tailweight:  Tailweight parameter. Default is `1.0` (unchanged tailweight)
       distribution: `tf.Distribution`-like instance. Distribution that is
         transformed to produce this distribution.
-        Default is `tf.distributions.Normal(0., 1.)`.
+        Default is `tfd.Normal(0., 1.)`.
         Must be a scalar-batch, scalar-event distribution.  Typically
         `distribution.reparameterization_type = FULLY_REPARAMETERIZED` or it is
         a function of non-trainable parameters. WARNING: If you backprop through
@@ -154,7 +155,7 @@ class SinhArcsinh(transformed_distribution.TransformedDistribution):
       #   F_0(Z) := Sinh( Arcsinh(Z) * tailweight )
       #   C := 2 * scale / F_0(2)
       if distribution is None:
-        distribution = tf.distributions.Normal(
+        distribution = normal.Normal(
             loc=tf.zeros([], dtype=dtype),
             scale=tf.ones([], dtype=dtype),
             allow_nan_stats=allow_nan_stats)

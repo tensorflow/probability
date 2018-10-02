@@ -24,7 +24,10 @@ import abc
 import six
 import tensorflow as tf
 
+from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.framework import tensor_util
 from tensorflow.python.ops import control_flow_ops
@@ -36,7 +39,7 @@ __all__ = [
 
 
 @six.add_metaclass(abc.ABCMeta)
-class _BaseDeterministic(tf.distributions.Distribution):
+class _BaseDeterministic(distribution.Distribution):
   """Base class for Deterministic distributions."""
 
   def __init__(self,
@@ -98,7 +101,7 @@ class _BaseDeterministic(tf.distributions.Distribution):
 
       super(_BaseDeterministic, self).__init__(
           dtype=self._loc.dtype,
-          reparameterization_type=tf.distributions.NOT_REPARAMETERIZED,
+          reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
           parameters=parameters,
@@ -385,7 +388,9 @@ class VectorDeterministic(_BaseDeterministic):
         dtype=self.dtype)
 
 
-@tf.distributions.RegisterKL(_BaseDeterministic, tf.distributions.Distribution)
+# TODO(b/117098119): Remove tf.distribution references once they're gone.
+@kullback_leibler.RegisterKL(_BaseDeterministic, tf.distributions.Distribution)
+@kullback_leibler.RegisterKL(_BaseDeterministic, distribution.Distribution)
 def _kl_deterministic_distribution(a, b, name=None):
   """Calculate the batched KL divergence `KL(a || b)` with `a` Deterministic.
 

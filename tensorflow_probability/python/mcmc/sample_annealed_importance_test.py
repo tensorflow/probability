@@ -27,7 +27,7 @@ import tensorflow_probability as tfp
 from tensorflow.python.framework import random_seed
 
 
-tfd = tf.distributions
+tfd = tfp.distributions
 
 
 def _compute_sample_variance(x, axis=None, keepdims=False):

@@ -20,10 +20,9 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python import distributions as tfd
 
 from tensorflow_probability.python.bijectors import bijector_test_util
-from tensorflow.python.ops.distributions import gamma as gamma_lib
-from tensorflow.python.ops.distributions import transformed_distribution as transformed_distribution_lib
 
 
 class InvertBijectorTest(tf.test.TestCase):
@@ -76,8 +75,8 @@ class InvertBijectorTest(tf.test.TestCase):
   def testDocstringExample(self):
     with self.cached_session():
       exp_gamma_distribution = (
-          transformed_distribution_lib.TransformedDistribution(
-              distribution=gamma_lib.Gamma(concentration=1., rate=2.),
+          tfd.TransformedDistribution(
+              distribution=tfd.Gamma(concentration=1., rate=2.),
               bijector=tfb.Invert(tfb.Exp())))
       self.assertAllEqual(
           [], self.evaluate(tf.shape(exp_gamma_distribution.sample())))

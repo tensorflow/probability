@@ -42,36 +42,36 @@ doc_args = """activation: Activation function. Set it to None to maintain a
       linear activation.
   activity_regularizer: Regularizer function for the output.
   kernel_posterior_fn: Python `callable` which creates
-    `tf.distributions.Distribution` instance representing the surrogate
+    `tfd.Distribution` instance representing the surrogate
     posterior of the `kernel` parameter. Default value:
     `default_mean_field_normal_fn()`.
   kernel_posterior_tensor_fn: Python `callable` which takes a
-    `tf.distributions.Distribution` instance and returns a representative
+    `tfd.Distribution` instance and returns a representative
     value. Default value: `lambda d: d.sample()`.
-  kernel_prior_fn: Python `callable` which creates `tf.distributions`
+  kernel_prior_fn: Python `callable` which creates `tfd`
     instance. See `default_mean_field_normal_fn` docstring for required
     parameter signature.
-    Default value: `tf.distributions.Normal(loc=0., scale=1.)`.
+    Default value: `tfd.Normal(loc=0., scale=1.)`.
   kernel_divergence_fn: Python `callable` which takes the surrogate posterior
     distribution, prior distribution and random variate sample(s) from the
     surrogate posterior and computes or approximates the KL divergence. The
-    distributions are `tf.distributions.Distribution`-like instances and the
+    distributions are `tfd.Distribution`-like instances and the
     sample is a `Tensor`.
   bias_posterior_fn: Python `callable` which creates
-    `tf.distributions.Distribution` instance representing the surrogate
+    `tfd.Distribution` instance representing the surrogate
     posterior of the `bias` parameter. Default value:
     `default_mean_field_normal_fn(is_singular=True)` (which creates an
-    instance of `tf.distributions.Deterministic`).
+    instance of `tfd.Deterministic`).
   bias_posterior_tensor_fn: Python `callable` which takes a
-    `tf.distributions.Distribution` instance and returns a representative
+    `tfd.Distribution` instance and returns a representative
     value. Default value: `lambda d: d.sample()`.
-  bias_prior_fn: Python `callable` which creates `tf.distributions` instance.
+  bias_prior_fn: Python `callable` which creates `tfd` instance.
     See `default_mean_field_normal_fn` docstring for required parameter
     signature. Default value: `None` (no prior, no variational inference)
   bias_divergence_fn: Python `callable` which takes the surrogate posterior
     distribution, prior distribution and random variate sample(s) from the
     surrogate posterior and computes or approximates the KL divergence. The
-    distributions are `tf.distributions.Distribution`-like instances and the
+    distributions are `tfd.Distribution`-like instances and the
     sample is a `Tensor`."""
 
 
@@ -1031,7 +1031,7 @@ class _ConvFlipout(_ConvVariational):
       raise TypeError(
           '`{}` requires '
           '`kernel_posterior_fn` produce an instance of '
-          '`tf.distributions.Independent(tf.distributions.Normal)` '
+          '`tfd.Independent(tfd.Normal)` '
           '(saw: \"{}\").'.format(
               type(self).__name__, self.kernel_posterior.name))
     self.kernel_posterior_affine = tfd.Normal(

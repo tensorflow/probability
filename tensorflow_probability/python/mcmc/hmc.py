@@ -25,11 +25,11 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python import distributions
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import metropolis_hastings
 from tensorflow_probability.python.mcmc import util as mcmc_util
 from tensorflow.contrib import eager as tfe
-from tensorflow.python.ops.distributions import util as distributions_util
 
 
 __all__ = [
@@ -603,7 +603,7 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
           maybe_expand=True,
           state_gradients_are_stopped=self.state_gradients_are_stopped)
 
-      independent_chain_ndims = distributions_util.prefer_static_rank(
+      independent_chain_ndims = distribution_util.prefer_static_rank(
           current_target_log_prob)
 
       current_momentum_parts = []

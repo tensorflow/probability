@@ -23,7 +23,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow.python.ops.distributions import util as dist_util
+from tensorflow_probability.python.internal import distribution_util
 
 
 __all__ = [
@@ -81,10 +81,10 @@ class FillTriangular(bijector.Bijector):
         name=name)
 
   def _forward(self, x):
-    return dist_util.fill_triangular(x, upper=self._upper)
+    return distribution_util.fill_triangular(x, upper=self._upper)
 
   def _inverse(self, y):
-    return dist_util.fill_triangular_inverse(y, upper=self._upper)
+    return distribution_util.fill_triangular_inverse(y, upper=self._upper)
 
   def _forward_log_det_jacobian(self, x):
     return tf.zeros_like(x[..., 0])

@@ -20,9 +20,9 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python import bijectors
+from tensorflow_probability.python.distributions import exponential
+from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
-from tensorflow.python.ops.distributions import exponential
-from tensorflow.python.ops.distributions import transformed_distribution
 
 __all__ = ["VectorExponentialLinearOperator"]
 

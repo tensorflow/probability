@@ -25,8 +25,6 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util
 from tensorflow.python.framework import test_util as tf_test_util
-from tensorflow.python.ops.distributions import bernoulli as bernoulli_lib
-from tensorflow.python.ops.distributions import categorical as categorical_lib
 
 tfd = tfp.distributions
 
@@ -37,8 +35,8 @@ class MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers,
 
   def testSampleAndLogProbUnivariateShapes(self):
     gm = tfd.MixtureSameFamily(
-        mixture_distribution=categorical_lib.Categorical(probs=[0.3, 0.7]),
-        components_distribution=tf.distributions.Normal(
+        mixture_distribution=tfd.Categorical(probs=[0.3, 0.7]),
+        components_distribution=tfd.Normal(
             loc=[-1., 1], scale=[0.1, 0.5]))
     x = gm.sample([4, 5], seed=42)
     log_prob_x = gm.log_prob(x)
@@ -47,8 +45,8 @@ class MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers,
 
   def testSampleAndLogProbBatch(self):
     gm = tfd.MixtureSameFamily(
-        mixture_distribution=categorical_lib.Categorical(probs=[[0.3, 0.7]]),
-        components_distribution=tf.distributions.Normal(
+        mixture_distribution=tfd.Categorical(probs=[[0.3, 0.7]]),
+        components_distribution=tfd.Normal(
             loc=[[-1., 1]], scale=[[0.1, 0.5]]))
     x = gm.sample([4, 5], seed=42)
     log_prob_x = gm.log_prob(x)
@@ -59,8 +57,8 @@ class MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers,
     mix_probs = np.float32([.3, .7])
     bern_probs = np.float32([[.4, .6], [.25, .75]])
     bm = tfd.MixtureSameFamily(
-        mixture_distribution=categorical_lib.Categorical(probs=mix_probs),
-        components_distribution=bernoulli_lib.Bernoulli(probs=bern_probs))
+        mixture_distribution=tfd.Categorical(probs=mix_probs),
+        components_distribution=tfd.Bernoulli(probs=bern_probs))
     x = bm.sample([4, 5], seed=42)
     log_prob_x = bm.log_prob(x)
     x_ = self.evaluate(x)
@@ -71,7 +69,7 @@ class MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers,
 
   def testSampleAndLogProbMultivariateShapes(self):
     gm = tfd.MixtureSameFamily(
-        mixture_distribution=categorical_lib.Categorical(probs=[0.3, 0.7]),
+        mixture_distribution=tfd.Categorical(probs=[0.3, 0.7]),
         components_distribution=tfd.MultivariateNormalDiag(
             loc=[[-1., 1], [1, -1]], scale_identity_multiplier=[1., 0.5]))
     x = gm.sample([4, 5], seed=42)
@@ -81,7 +79,7 @@ class MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers,
 
   def testSampleAndLogProbBatchMultivariateShapes(self):
     gm = tfd.MixtureSameFamily(
-        mixture_distribution=categorical_lib.Categorical(probs=[0.3, 0.7]),
+        mixture_distribution=tfd.Categorical(probs=[0.3, 0.7]),
         components_distribution=tfd.MultivariateNormalDiag(
             loc=[[[-1., 1], [1, -1]], [[0., 1], [1, 0]]],
             scale_identity_multiplier=[1., 0.5]))
@@ -92,7 +90,7 @@ class MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers,
 
   def testSampleConsistentLogProb(self):
     gm = tfd.MixtureSameFamily(
-        mixture_distribution=categorical_lib.Categorical(probs=[0.3, 0.7]),
+        mixture_distribution=tfd.Categorical(probs=[0.3, 0.7]),
         components_distribution=tfd.MultivariateNormalDiag(
             loc=[[-1., 1], [1, -1]], scale_identity_multiplier=[1., 0.5]))
     # Ball centered at component0's mean.
@@ -104,8 +102,8 @@ class MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers,
 
   def testLogCdf(self):
     gm = tfd.MixtureSameFamily(
-        mixture_distribution=categorical_lib.Categorical(probs=[0.3, 0.7]),
-        components_distribution=tf.distributions.Normal(
+        mixture_distribution=tfd.Categorical(probs=[0.3, 0.7]),
+        components_distribution=tfd.Normal(
             loc=[-1., 1], scale=[0.1, 0.5]))
     x = gm.sample(10, seed=42)
     actual_log_cdf = gm.log_cdf(x)
@@ -119,14 +117,14 @@ class MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers,
 
   def testSampleConsistentMeanCovariance(self):
     gm = tfd.MixtureSameFamily(
-        mixture_distribution=categorical_lib.Categorical(probs=[0.3, 0.7]),
+        mixture_distribution=tfd.Categorical(probs=[0.3, 0.7]),
         components_distribution=tfd.MultivariateNormalDiag(
             loc=[[-1., 1], [1, -1]], scale_identity_multiplier=[1., 0.5]))
     self.run_test_sample_consistent_mean_covariance(self.evaluate, gm)
 
   def testVarianceConsistentCovariance(self):
     gm = tfd.MixtureSameFamily(
-        mixture_distribution=categorical_lib.Categorical(probs=[0.3, 0.7]),
+        mixture_distribution=tfd.Categorical(probs=[0.3, 0.7]),
         components_distribution=tfd.MultivariateNormalDiag(
             loc=[[-1., 1], [1, -1]], scale_identity_multiplier=[1., 0.5]))
     cov_, var_ = self.evaluate([gm.covariance(), gm.variance()])

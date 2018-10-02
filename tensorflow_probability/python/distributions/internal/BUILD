@@ -29,10 +29,6 @@ py_library(
     name = "internal",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
-    deps = [
-        ":moving_stats",
-        ":statistical_testing",
-    ],
 )
 
 py_library(
@@ -82,8 +78,8 @@ py_library(
     ],
     deps = [
         # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/distributions:uniform",
+        "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
 
@@ -94,6 +90,8 @@ py_binary(
     ],
     deps = [
         ":correlation_matrix_volumes_py",
+        # absl:app dep,
+        # absl/flags dep,
     ],
 )
 
@@ -108,9 +106,7 @@ py_test(
     ],
     deps = [
         ":correlation_matrix_volumes_py",
+        ":statistical_testing",
         # numpy dep,
-        # tensorflow dep,
-        # For statistical testing
-        "//tensorflow_probability/python/distributions",
     ],
 )

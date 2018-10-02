@@ -42,6 +42,7 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python:monte_carlo",
+        "//tensorflow_probability/python/distributions",
     ],
 )
 
@@ -53,5 +54,6 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )

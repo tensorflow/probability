@@ -21,9 +21,11 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 import tensorflow as tf
+from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.ops.distributions import special_math
 
@@ -32,7 +34,7 @@ __all__ = [
 ]
 
 
-class InverseGaussian(tf.distributions.Distribution):
+class InverseGaussian(distribution.Distribution):
   """Inverse Gaussian distribution.
 
   The [inverse Gaussian distribution]
@@ -111,7 +113,7 @@ class InverseGaussian(tf.distributions.Distribution):
         tf.assert_same_float_dtype([self._loc, self._concentration])
     super(InverseGaussian, self).__init__(
         dtype=self._loc.dtype,
-        reparameterization_type=tf.distributions.NOT_REPARAMETERIZED,
+        reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
         parameters=parameters,

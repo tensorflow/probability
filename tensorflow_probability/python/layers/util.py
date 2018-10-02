@@ -127,7 +127,7 @@ def default_mean_field_normal_fn(
     untransformed_scale_constraint=None):
   """Creates a function to build Normal distributions with trainable params.
 
-  This function produces a closure which produces `tf.distributions.Normal`
+  This function produces a closure which produces `tfd.Normal`
   parameterized by a loc` and `scale` each created using `tf.get_variable`.
 
   Args:
@@ -156,7 +156,7 @@ def default_mean_field_normal_fn(
       safe to use when doing asynchronous distributed training.
 
   Returns:
-    make_normal_fn: Python `callable` which creates a `tf.distributions.Normal`
+    make_normal_fn: Python `callable` which creates a `tfd.Normal`
       using from args: `dtype, shape, name, trainable, add_variable_fn`.
   """
   loc_scale_fn = default_loc_scale_fn(

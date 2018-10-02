@@ -18,10 +18,12 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
+from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.ops import control_flow_ops
-from tensorflow.python.ops.distributions import util as distribution_util
 
 
 _binomial_sample_note = """
@@ -59,7 +61,7 @@ def _bdtr(k, n, p):
   return tf.where(k_eq_n, ones, dk)
 
 
-class Binomial(tf.distributions.Distribution):
+class Binomial(distribution.Distribution):
   """Binomial distribution.
 
   This distribution is parameterized by `probs`, a (batch of) probabilities for
@@ -172,7 +174,7 @@ class Binomial(tf.distributions.Distribution):
           dtype=dtype)
     super(Binomial, self).__init__(
         dtype=self._probs.dtype,
-        reparameterization_type=tf.distributions.NOT_REPARAMETERIZED,
+        reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
         parameters=parameters,

@@ -23,9 +23,11 @@ import math
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.framework import tensor_util
 from tensorflow.python.ops import control_flow_ops
 
@@ -34,7 +36,7 @@ __all__ = [
 ]
 
 
-class _WishartLinearOperator(tf.distributions.Distribution):
+class _WishartLinearOperator(distribution.Distribution):
   """The matrix Wishart distribution on positive definite matrices.
 
   This distribution is defined by a scalar number of degrees of freedom `df` and
@@ -154,7 +156,7 @@ class _WishartLinearOperator(tf.distributions.Distribution):
         dtype=self._scale_operator.dtype,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
-        reparameterization_type=tf.distributions.FULLY_REPARAMETERIZED,
+        reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
         parameters=parameters,
         graph_parents=(
             [self._df, self._dimension] + self._scale_operator.graph_parents),
