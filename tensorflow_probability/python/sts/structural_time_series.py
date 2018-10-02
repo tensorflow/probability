@@ -22,10 +22,9 @@ import collections
 # Dependency imports
 import tensorflow as tf
 
+from tensorflow_probability.python import distributions
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.sts.internal import util as sts_util
-
-from tensorflow.contrib.distributions.python.ops import distribution_util
-from tensorflow.contrib.distributions.python.ops.seed_stream import SeedStream
 
 tfl = tf.linalg
 
@@ -193,7 +192,8 @@ class StructuralTimeSeries(object):
         `params_sample_shape + prior.batch_shape + prior.event_shape`.
     """
 
-    seed = SeedStream(seed, salt='StructuralTimeSeries_prior_sample')
+    seed = distributions.SeedStream(
+        seed, salt='StructuralTimeSeries_prior_sample')
 
     with tf.name_scope(
         'prior_sample',
