@@ -85,13 +85,10 @@ def kl_divergence(distribution_a, distribution_b,
   """
   kl_fn = _registered_kl(type(distribution_a), type(distribution_b))
   if kl_fn is None:
-    # TODO(b/117098119): See the comment in RegisterKL.
-    kl_fn = tf.distributions.kl_divergence(distribution_a, distribution_b)
-    if not kl_fn:
-      raise NotImplementedError(
-          "No KL(distribution_a || distribution_b) registered for "
-          "distribution_a type %s and distribution_b type %s" %
-          (type(distribution_a).__name__, type(distribution_b).__name__))
+    # TODO(b/117098119): For backwards compatibility, we check TF's registry as
+    # well. This typically happens when this function is called on a pair of
+    # TF's distributions.
+    return tf.distributions.kl_divergence(distribution_a, distribution_b)
 
   with tf.name_scope("KullbackLeibler"):
     kl_t = kl_fn(distribution_a, distribution_b, name=name)

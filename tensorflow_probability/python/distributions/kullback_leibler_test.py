@@ -192,6 +192,10 @@ class KLTest(tf.test.TestCase):
     kullback_leibler.kl_divergence(tfp_deterministic, tfp_normal)
     tf.distributions.kl_divergence(tfp_deterministic, tfp_normal)
 
+  def testBackwardsCompatibilityFallback(self):
+    tf_normal = tf.distributions.Normal(0.0, 1.0)
+    kullback_leibler.kl_divergence(tf_normal, tf_normal)
+
 
 if __name__ == "__main__":
   tf.test.main()
