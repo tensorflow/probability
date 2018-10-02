@@ -208,7 +208,7 @@ class GammaGamma(tf.distributions.Distribution):
 
   def _log_unnormalized_prob(self, x):
     x = self._maybe_assert_valid_sample(x)
-    return ((self.concentration - 1.) * tf.log(x) -
+    return (tf.math.xlogy(self.concentration - 1., x) -
             (self.concentration + self.mixing_concentration) *
             tf.log(x + self.mixing_rate))
 

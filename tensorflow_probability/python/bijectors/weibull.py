@@ -106,13 +106,14 @@ class Weibull(bijector.Bijector):
 
   def _inverse_log_det_jacobian(self, y):
     y = self._maybe_assert_valid_y(y)
-    return (-tf.log1p(-y) + (1 / self.concentration - 1) * tf.log(-tf.log1p(-y))
+    return (-tf.log1p(-y) + tf.math.xlogy(
+        1 / self.concentration - 1, -tf.log1p(-y))
             + tf.log(self.scale / self.concentration))
 
   def _forward_log_det_jacobian(self, x):
     x = self._maybe_assert_valid_x(x)
     return (-(x / self.scale)**self.concentration +
-            (self.concentration - 1) * tf.log(x) + tf.log(
+            tf.math.xlogy(self.concentration - 1, x) + tf.log(
                 self.concentration) + -self.concentration * tf.log(self.scale))
 
   def _maybe_assert_valid_x(self, x):

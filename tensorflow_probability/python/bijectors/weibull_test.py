@@ -52,6 +52,14 @@ class WeibullBijectorTest(tf.test.TestCase):
           rtol=1e-4,
           atol=0.)
 
+  def testBijectorConcentration1LogDetJacobianFiniteAtZero(self):
+    # When concentration = 1., forward_log_det_jacobian should be finite at
+    # zero.
+    scale = np.logspace(0.1, 10., num=20).astype(np.float32)
+    bijector = tfb.Weibull(scale, concentration=1.)
+    fldj = self.evaluate(bijector.forward_log_det_jacobian(0., event_ndims=0))
+    self.assertAllEqual(np.ones_like(fldj, dtype=np.bool), np.isfinite(fldj))
+
   def testScalarCongruency(self):
     bijector_test_util.assert_scalar_congruency(
         tfb.Weibull(scale=20., concentration=0.3),
