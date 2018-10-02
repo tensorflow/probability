@@ -26,13 +26,13 @@ from tensorflow_probability.python import bijectors as tfb
 from tensorflow.python.framework import test_util
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class TransformDiagonalBijectorTest(tf.test.TestCase):
   """Tests correctness of the TransformDiagonal bijector."""
 
   def setUp(self):
     self._rng = np.random.RandomState(42)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testBijector(self):
     x = np.float32(np.random.randn(3, 4, 4))
 

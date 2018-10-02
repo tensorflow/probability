@@ -24,32 +24,33 @@ import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow.python.framework import test_util
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class SquareBijectorTest(tf.test.TestCase):
   """Tests the correctness of the Y = X ** 2 transformation."""
 
   def testBijectorScalar(self):
-    with self.cached_session():
-      bijector = tfb.Square(validate_args=True)
-      self.assertEqual("square", bijector.name)
-      x = [[[1., 5],
-            [2, 1]],
-           [[np.sqrt(2.), 3],
-            [np.sqrt(8.), 1]]]
-      y = np.square(x)
-      ildj = -np.log(2.) - np.log(x)
-      self.assertAllClose(y, self.evaluate(bijector.forward(x)))
-      self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
-      self.assertAllClose(
-          ildj,
-          self.evaluate(bijector.inverse_log_det_jacobian(
-              y, event_ndims=0)), atol=0., rtol=1e-7)
-      self.assertAllClose(
-          self.evaluate(-bijector.inverse_log_det_jacobian(y, event_ndims=0)),
-          self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=0)),
-          atol=0.,
-          rtol=1e-7)
+    bijector = tfb.Square(validate_args=True)
+    self.assertEqual("square", bijector.name)
+    x = [[[1., 5],
+          [2, 1]],
+         [[np.sqrt(2.), 3],
+          [np.sqrt(8.), 1]]]
+    y = np.square(x)
+    ildj = -np.log(2.) - np.log(x)
+    self.assertAllClose(y, self.evaluate(bijector.forward(x)))
+    self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
+    self.assertAllClose(
+        ildj,
+        self.evaluate(bijector.inverse_log_det_jacobian(
+            y, event_ndims=0)), atol=0., rtol=1e-7)
+    self.assertAllClose(
+        self.evaluate(-bijector.inverse_log_det_jacobian(y, event_ndims=0)),
+        self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=0)),
+        atol=0.,
+        rtol=1e-7)
 
   def testScalarCongruency(self):
     bijector = tfb.Square(validate_args=True)

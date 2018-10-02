@@ -30,13 +30,13 @@ tfd = tfp.distributions
 tfb = tfp.bijectors
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class OrderedBijectorTest(tf.test.TestCase):
   """Tests correctness of the ordered transformation."""
 
   def setUp(self):
     self._rng = np.random.RandomState(42)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testBijectorVector(self):
     ordered = tfb.Ordered()
     self.assertEqual("ordered", ordered.name)
@@ -56,32 +56,26 @@ class OrderedBijectorTest(tf.test.TestCase):
         rtol=1e-7)
 
   def testBijectorUnknownShape(self):
-    with self.cached_session():
-      ordered = tfb.Ordered()
-      self.assertEqual("ordered", ordered.name)
-      x = tf.placeholder(shape=[2, None], dtype=tf.float32)
-      real_x = np.asarray([[2., 3, 4], [4., 8, 13]])
-      y = tf.placeholder(shape=[2, None], dtype=tf.float32)
-      real_y = [[2., 0, 0], [4., np.log(4.), np.log(5.)]]
-      self.assertAllClose(real_y, ordered.forward(x).eval(
-          feed_dict={x: real_x}))
-      self.assertAllClose(real_x, ordered.inverse(y).eval(
-          feed_dict={y: real_y}))
-      self.assertAllClose(
-          np.sum(np.asarray(real_y)[..., 1:], axis=-1),
-          ordered.inverse_log_det_jacobian(y, event_ndims=1).eval(
-              feed_dict={y: real_y}),
-          atol=0.,
-          rtol=1e-7)
-      self.assertAllClose(
-          -ordered.inverse_log_det_jacobian(y, event_ndims=1).eval(
-              feed_dict={y: real_y}),
-          ordered.forward_log_det_jacobian(x, event_ndims=1).eval(
-              feed_dict={x: real_x}),
-          atol=0.,
-          rtol=1e-7)
+    ordered = tfb.Ordered()
+    self.assertEqual("ordered", ordered.name)
+    x_ = np.asarray([[2., 3, 4], [4., 8, 13]], dtype=np.float32)
+    y_ = np.asarray(
+        [[2., 0, 0], [4., np.log(4.), np.log(5.)]], dtype=np.float32)
+    x = tf.placeholder_with_default(x_, shape=[2, None])
+    y = tf.placeholder_with_default(y_, shape=[2, None])
+    self.assertAllClose(y_, self.evaluate(ordered.forward(x)))
+    self.assertAllClose(x_, self.evaluate(ordered.inverse(y)))
+    self.assertAllClose(
+        np.sum(np.asarray(y_)[..., 1:], axis=-1),
+        self.evaluate(ordered.inverse_log_det_jacobian(y, event_ndims=1)),
+        atol=0.,
+        rtol=1e-7)
+    self.assertAllClose(
+        -self.evaluate(ordered.inverse_log_det_jacobian(y, event_ndims=1)),
+        self.evaluate(ordered.forward_log_det_jacobian(x, event_ndims=1)),
+        atol=0.,
+        rtol=1e-7)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testShapeGetters(self):
     x = tf.TensorShape([4])
     y = tf.TensorShape([4])

@@ -22,53 +22,53 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
+from tensorflow.python.framework import test_util
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class InlineBijectorTest(tf.test.TestCase):
   """Tests correctness of the inline constructed bijector."""
 
   def testBijector(self):
-    with self.cached_session():
-      exp = tfb.Exp()
-      inline = tfb.Inline(
-          forward_fn=tf.exp,
-          inverse_fn=tf.log,
-          inverse_log_det_jacobian_fn=lambda y: -tf.log(y),
-          forward_log_det_jacobian_fn=lambda x: x,
-          forward_min_event_ndims=0,
-          name="exp")
+    exp = tfb.Exp()
+    inline = tfb.Inline(
+        forward_fn=tf.exp,
+        inverse_fn=tf.log,
+        inverse_log_det_jacobian_fn=lambda y: -tf.log(y),
+        forward_log_det_jacobian_fn=lambda x: x,
+        forward_min_event_ndims=0,
+        name="exp")
 
-      self.assertEqual(exp.name, inline.name)
-      x = [[[1., 2.], [3., 4.], [5., 6.]]]
-      y = np.exp(x)
-      self.assertAllClose(y, self.evaluate(inline.forward(x)))
-      self.assertAllClose(x, self.evaluate(inline.inverse(y)))
-      self.assertAllClose(
-          -np.sum(np.log(y), axis=-1),
-          self.evaluate(inline.inverse_log_det_jacobian(y, event_ndims=1)))
-      self.assertAllClose(
-          self.evaluate(-inline.inverse_log_det_jacobian(y, event_ndims=1)),
-          self.evaluate(inline.forward_log_det_jacobian(x, event_ndims=1)))
+    self.assertEqual(exp.name, inline.name)
+    x = [[[1., 2.], [3., 4.], [5., 6.]]]
+    y = np.exp(x)
+    self.assertAllClose(y, self.evaluate(inline.forward(x)))
+    self.assertAllClose(x, self.evaluate(inline.inverse(y)))
+    self.assertAllClose(
+        -np.sum(np.log(y), axis=-1),
+        self.evaluate(inline.inverse_log_det_jacobian(y, event_ndims=1)))
+    self.assertAllClose(
+        self.evaluate(-inline.inverse_log_det_jacobian(y, event_ndims=1)),
+        self.evaluate(inline.forward_log_det_jacobian(x, event_ndims=1)))
 
   def testShapeGetters(self):
-    with self.cached_session():
-      bijector = tfb.Inline(
-          forward_event_shape_tensor_fn=lambda x: tf.concat((x, [1]), 0),
-          forward_event_shape_fn=lambda x: x.as_list() + [1],
-          inverse_event_shape_tensor_fn=lambda x: x[:-1],
-          inverse_event_shape_fn=lambda x: x[:-1],
-          forward_min_event_ndims=0,
-          name="shape_only")
-      x = tf.TensorShape([1, 2, 3])
-      y = tf.TensorShape([1, 2, 3, 1])
-      self.assertAllEqual(y, bijector.forward_event_shape(x))
-      self.assertAllEqual(
-          y.as_list(),
-          self.evaluate(bijector.forward_event_shape_tensor(x.as_list())))
-      self.assertAllEqual(x, bijector.inverse_event_shape(y))
-      self.assertAllEqual(
-          x.as_list(),
-          self.evaluate(bijector.inverse_event_shape_tensor(y.as_list())))
+    bijector = tfb.Inline(
+        forward_event_shape_tensor_fn=lambda x: tf.concat((x, [1]), 0),
+        forward_event_shape_fn=lambda x: x.as_list() + [1],
+        inverse_event_shape_tensor_fn=lambda x: x[:-1],
+        inverse_event_shape_fn=lambda x: x[:-1],
+        forward_min_event_ndims=0,
+        name="shape_only")
+    x = tf.TensorShape([1, 2, 3])
+    y = tf.TensorShape([1, 2, 3, 1])
+    self.assertAllEqual(y, bijector.forward_event_shape(x))
+    self.assertAllEqual(
+        y.as_list(),
+        self.evaluate(bijector.forward_event_shape_tensor(x.as_list())))
+    self.assertAllEqual(x, bijector.inverse_event_shape(y))
+    self.assertAllEqual(
+        x.as_list(),
+        self.evaluate(bijector.inverse_event_shape_tensor(y.as_list())))
 
 
 if __name__ == "__main__":

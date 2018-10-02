@@ -119,7 +119,11 @@ class BrokenBijector(tfb.Bijector):
     return tf.log(2.)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class BijectorTestEventNdims(tf.test.TestCase):
+
+  def assertRaisesError(self, msg):
+    return self.assertRaisesRegexp(Exception, msg)
 
   def testBijectorNonIntegerEventNdims(self):
     bij = BrokenBijector()
@@ -136,19 +140,16 @@ class BijectorTestEventNdims(tf.test.TestCase):
       bij.inverse_log_det_jacobian(1., event_ndims=(1, 2))
 
   def testBijectorDynamicEventNdims(self):
-    bij = BrokenBijector(validate_args=True)
-    event_ndims = tf.placeholder(dtype=np.int32, shape=None)
-    with self.cached_session():
-      with self.assertRaisesOpError("Expected scalar"):
-        bij.forward_log_det_jacobian(
-            1., event_ndims=event_ndims).eval({
-                event_ndims: (1, 2)
-            })
-      with self.assertRaisesOpError("Expected scalar"):
-        bij.inverse_log_det_jacobian(
-            1., event_ndims=event_ndims).eval({
-                event_ndims: (1, 2)
-            })
+    with self.assertRaisesError("Expected scalar"):
+      bij = BrokenBijector(validate_args=True)
+      event_ndims = tf.placeholder_with_default((1, 2), shape=None)
+      self.evaluate(
+          bij.forward_log_det_jacobian(1., event_ndims=event_ndims))
+    with self.assertRaisesError("Expected scalar"):
+      bij = BrokenBijector(validate_args=True)
+      event_ndims = tf.placeholder_with_default((1, 2), shape=None)
+      self.evaluate(
+          bij.inverse_log_det_jacobian(1., event_ndims=event_ndims))
 
 
 @six.add_metaclass(abc.ABCMeta)
@@ -199,6 +200,7 @@ class BijectorCachingTestBase(object):
       broken_bijector.forward_log_det_jacobian(x, event_ndims=1)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class BijectorCachingTest(BijectorCachingTestBase, tf.test.TestCase):
   """Test caching with BrokenBijector."""
 
@@ -241,6 +243,7 @@ class ConstantJacobian(tfb.Bijector):
     return tf.constant(-2., x.dtype)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class BijectorReduceEventDimsTest(tf.test.TestCase):
   """Test caching with BrokenBijector."""
 
@@ -305,13 +308,11 @@ class BijectorReduceEventDimsTest(tf.test.TestCase):
   def testHandlesNonStaticEventNdims(self):
     x_ = [[[1., 2.], [3., 4.]]]
     x = tf.placeholder_with_default(x_, shape=None)
-    event_ndims = tf.placeholder(dtype=np.int32, shape=[])
+    event_ndims = tf.placeholder_with_default(1, shape=None)
     bij = ExpOnlyJacobian(forward_min_event_ndims=1)
     bij.inverse_log_det_jacobian(x, event_ndims=event_ndims)
-    with self.cached_session() as sess:
-      ildj = sess.run(
-          bij.inverse_log_det_jacobian(x, event_ndims=event_ndims),
-          feed_dict={event_ndims: 1})
+    ildj = self.evaluate(
+        bij.inverse_log_det_jacobian(x, event_ndims=event_ndims))
     self.assertAllClose(-np.log(x_), ildj)
 
 

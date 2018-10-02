@@ -26,6 +26,7 @@ from tensorflow_probability.python import bijectors as tfb
 from tensorflow.python.framework import test_util
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class ScaleTriLBijectorTest(tf.test.TestCase):
   """Tests the correctness of the ScaleTriL bijector."""
 
@@ -47,7 +48,6 @@ class ScaleTriLBijectorTest(tf.test.TestCase):
     x_ = self.evaluate(b.inverse(y))
     self.assertAllClose(x, x_)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testInvertible(self):
 
     # Generate random inputs from an unconstrained space, with

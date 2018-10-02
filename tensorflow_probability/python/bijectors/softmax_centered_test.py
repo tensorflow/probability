@@ -24,74 +24,69 @@ import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow.python.framework import test_util
 
 
 rng = np.random.RandomState(42)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class SoftmaxCenteredBijectorTest(tf.test.TestCase):
   """Tests correctness of the Y = g(X) = exp(X) / sum(exp(X)) transformation."""
 
   def testBijectorVector(self):
-    with self.cached_session():
-      softmax = tfb.SoftmaxCentered()
-      self.assertEqual("softmax_centered", softmax.name)
-      x = np.log([[2., 3, 4], [4., 8, 12]])
-      y = [[0.2, 0.3, 0.4, 0.1], [0.16, 0.32, 0.48, 0.04]]
-      self.assertAllClose(y, self.evaluate(softmax.forward(x)))
-      self.assertAllClose(x, self.evaluate(softmax.inverse(y)))
-      self.assertAllClose(
-          -np.sum(np.log(y), axis=1),
-          self.evaluate(softmax.inverse_log_det_jacobian(y, event_ndims=1)),
-          atol=0.,
-          rtol=1e-7)
-      self.assertAllClose(
-          self.evaluate(-softmax.inverse_log_det_jacobian(y, event_ndims=1)),
-          self.evaluate(softmax.forward_log_det_jacobian(x, event_ndims=1)),
-          atol=0.,
-          rtol=1e-7)
+    softmax = tfb.SoftmaxCentered()
+    self.assertEqual("softmax_centered", softmax.name)
+    x = np.log([[2., 3, 4], [4., 8, 12]])
+    y = [[0.2, 0.3, 0.4, 0.1], [0.16, 0.32, 0.48, 0.04]]
+    self.assertAllClose(y, self.evaluate(softmax.forward(x)))
+    self.assertAllClose(x, self.evaluate(softmax.inverse(y)))
+    self.assertAllClose(
+        -np.sum(np.log(y), axis=1),
+        self.evaluate(softmax.inverse_log_det_jacobian(y, event_ndims=1)),
+        atol=0.,
+        rtol=1e-7)
+    self.assertAllClose(
+        self.evaluate(-softmax.inverse_log_det_jacobian(y, event_ndims=1)),
+        self.evaluate(softmax.forward_log_det_jacobian(x, event_ndims=1)),
+        atol=0.,
+        rtol=1e-7)
 
   def testBijectorUnknownShape(self):
-    with self.cached_session():
-      softmax = tfb.SoftmaxCentered()
-      self.assertEqual("softmax_centered", softmax.name)
-      x = tf.placeholder(shape=[2, None], dtype=tf.float32)
-      real_x = np.log([[2., 3, 4], [4., 8, 12]])
-      y = tf.placeholder(shape=[2, None], dtype=tf.float32)
-      real_y = [[0.2, 0.3, 0.4, 0.1], [0.16, 0.32, 0.48, 0.04]]
-      self.assertAllClose(real_y, softmax.forward(x).eval(
-          feed_dict={x: real_x}))
-      self.assertAllClose(real_x, softmax.inverse(y).eval(
-          feed_dict={y: real_y}))
-      self.assertAllClose(
-          -np.sum(np.log(real_y), axis=1),
-          softmax.inverse_log_det_jacobian(y, event_ndims=1).eval(
-              feed_dict={y: real_y}),
-          atol=0.,
-          rtol=1e-7)
-      self.assertAllClose(
-          -softmax.inverse_log_det_jacobian(y, event_ndims=1).eval(
-              feed_dict={y: real_y}),
-          softmax.forward_log_det_jacobian(x, event_ndims=1).eval(
-              feed_dict={x: real_x}),
-          atol=0.,
-          rtol=1e-7)
+    softmax = tfb.SoftmaxCentered()
+    self.assertEqual("softmax_centered", softmax.name)
+    x_ = np.log([[2., 3, 4], [4., 8, 12]]).astype(np.float32)
+    y_ = np.array(
+        [[0.2, 0.3, 0.4, 0.1], [0.16, 0.32, 0.48, 0.04]], dtype=np.float32)
+    x = tf.placeholder_with_default(x_, shape=[2, None])
+    y = tf.placeholder_with_default(y_, shape=[2, None])
+    self.assertAllClose(y_, self.evaluate(softmax.forward(x)))
+    self.assertAllClose(x_, self.evaluate(softmax.inverse(y)))
+    self.assertAllClose(
+        -np.sum(np.log(y_), axis=1),
+        self.evaluate(softmax.inverse_log_det_jacobian(y, event_ndims=1)),
+        atol=0.,
+        rtol=1e-7)
+    self.assertAllClose(
+        -self.evaluate(softmax.inverse_log_det_jacobian(y, event_ndims=1)),
+        self.evaluate(softmax.forward_log_det_jacobian(x, event_ndims=1)),
+        atol=0.,
+        rtol=1e-7)
 
   def testShapeGetters(self):
-    with self.cached_session():
-      x = tf.TensorShape([4])
-      y = tf.TensorShape([5])
-      bijector = tfb.SoftmaxCentered(validate_args=True)
-      self.assertAllEqual(y, bijector.forward_event_shape(x))
-      self.assertAllEqual(y.as_list(),
-                          self.evaluate(
-                              bijector.forward_event_shape_tensor(
-                                  x.as_list())))
-      self.assertAllEqual(x, bijector.inverse_event_shape(y))
-      self.assertAllEqual(x.as_list(),
-                          self.evaluate(
-                              bijector.inverse_event_shape_tensor(
-                                  y.as_list())))
+    x = tf.TensorShape([4])
+    y = tf.TensorShape([5])
+    bijector = tfb.SoftmaxCentered(validate_args=True)
+    self.assertAllEqual(y, bijector.forward_event_shape(x))
+    self.assertAllEqual(y.as_list(),
+                        self.evaluate(
+                            bijector.forward_event_shape_tensor(
+                                x.as_list())))
+    self.assertAllEqual(x, bijector.inverse_event_shape(y))
+    self.assertAllEqual(x.as_list(),
+                        self.evaluate(
+                            bijector.inverse_event_shape_tensor(
+                                y.as_list())))
 
   def testBijectiveAndFinite(self):
     softmax = tfb.SoftmaxCentered()

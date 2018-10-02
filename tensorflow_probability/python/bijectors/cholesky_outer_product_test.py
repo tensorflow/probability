@@ -22,44 +22,45 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
+from tensorflow.python.framework import test_util
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class CholeskyOuterProductBijectorTest(tf.test.TestCase):
   """Tests the correctness of the Y = X @ X.T transformation."""
 
   def testBijectorMatrix(self):
-    with self.cached_session():
-      bijector = tfb.CholeskyOuterProduct(validate_args=True)
-      self.assertEqual("cholesky_outer_product", bijector.name)
-      x = [[[1., 0], [2, 1]], [[np.sqrt(2.), 0], [np.sqrt(8.), 1]]]
-      y = np.matmul(x, np.transpose(x, axes=(0, 2, 1)))
-      # Fairly easy to compute differentials since we have 2x2.
-      dx_dy = [[[2. * 1, 0, 0],
-                [2, 1, 0],
-                [0, 2 * 2, 2 * 1]],
-               [[2 * np.sqrt(2.), 0, 0],
-                [np.sqrt(8.), np.sqrt(2.), 0],
-                [0, 2 * np.sqrt(8.), 2 * 1]]]
-      ildj = -np.sum(
-          np.log(np.asarray(dx_dy).diagonal(
-              offset=0, axis1=1, axis2=2)),
-          axis=1)
-      self.assertAllEqual((2, 2, 2), bijector.forward(x).get_shape())
-      self.assertAllEqual((2, 2, 2), bijector.inverse(y).get_shape())
-      self.assertAllClose(y, self.evaluate(bijector.forward(x)))
-      self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
-      self.assertAllClose(
-          ildj,
-          self.evaluate(
-              bijector.inverse_log_det_jacobian(
-                  y, event_ndims=2)), atol=0., rtol=1e-7)
-      self.assertAllClose(
-          self.evaluate(-bijector.inverse_log_det_jacobian(
-              y, event_ndims=2)),
-          self.evaluate(bijector.forward_log_det_jacobian(
-              x, event_ndims=2)),
-          atol=0.,
-          rtol=1e-7)
+    bijector = tfb.CholeskyOuterProduct(validate_args=True)
+    self.assertEqual("cholesky_outer_product", bijector.name)
+    x = [[[1., 0], [2, 1]], [[np.sqrt(2.), 0], [np.sqrt(8.), 1]]]
+    y = np.matmul(x, np.transpose(x, axes=(0, 2, 1)))
+    # Fairly easy to compute differentials since we have 2x2.
+    dx_dy = [[[2. * 1, 0, 0],
+              [2, 1, 0],
+              [0, 2 * 2, 2 * 1]],
+             [[2 * np.sqrt(2.), 0, 0],
+              [np.sqrt(8.), np.sqrt(2.), 0],
+              [0, 2 * np.sqrt(8.), 2 * 1]]]
+    ildj = -np.sum(
+        np.log(np.asarray(dx_dy).diagonal(
+            offset=0, axis1=1, axis2=2)),
+        axis=1)
+    self.assertAllEqual((2, 2, 2), bijector.forward(x).shape)
+    self.assertAllEqual((2, 2, 2), bijector.inverse(y).shape)
+    self.assertAllClose(y, self.evaluate(bijector.forward(x)))
+    self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
+    self.assertAllClose(
+        ildj,
+        self.evaluate(
+            bijector.inverse_log_det_jacobian(
+                y, event_ndims=2)), atol=0., rtol=1e-7)
+    self.assertAllClose(
+        self.evaluate(-bijector.inverse_log_det_jacobian(
+            y, event_ndims=2)),
+        self.evaluate(bijector.forward_log_det_jacobian(
+            x, event_ndims=2)),
+        atol=0.,
+        rtol=1e-7)
 
   def testNoBatchStaticJacobian(self):
     x = np.eye(2)
@@ -71,44 +72,40 @@ class CholeskyOuterProductBijectorTest(tf.test.TestCase):
         self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=2)))
 
   def testNoBatchDynamicJacobian(self):
-    x = np.eye(2)
     bijector = tfb.CholeskyOuterProduct()
-    x_pl = tf.placeholder(tf.float32)
+    x = tf.placeholder_with_default(np.eye(2, dtype=np.float32), shape=None)
 
-    with self.cached_session():
-      log_det_jacobian = bijector.forward_log_det_jacobian(x_pl, event_ndims=2)
+    log_det_jacobian = bijector.forward_log_det_jacobian(x, event_ndims=2)
 
-      # The Jacobian matrix is 2 * tf.eye(2), which has jacobian determinant 4.
-      self.assertAllClose(
-          np.log(4),
-          log_det_jacobian.eval({x_pl: x}))
+    # The Jacobian matrix is 2 * tf.eye(2), which has jacobian determinant 4.
+    self.assertAllClose(
+        np.log(4), self.evaluate(log_det_jacobian))
 
   def testNoBatchStatic(self):
     x = np.array([[1., 0], [2, 1]])  # np.linalg.cholesky(y)
     y = np.array([[1., 2], [2, 5]])  # np.matmul(x, x.T)
-    with self.cached_session() as sess:
-      y_actual = tfb.CholeskyOuterProduct().forward(x=x)
-      x_actual = tfb.CholeskyOuterProduct().inverse(y=y)
-    [y_actual_, x_actual_] = sess.run([y_actual, x_actual])
-    self.assertAllEqual([2, 2], y_actual.get_shape())
-    self.assertAllEqual([2, 2], x_actual.get_shape())
+    y_actual = tfb.CholeskyOuterProduct().forward(x=x)
+    x_actual = tfb.CholeskyOuterProduct().inverse(y=y)
+    [y_actual_, x_actual_] = self.evaluate([y_actual, x_actual])
+    self.assertAllEqual([2, 2], y_actual.shape)
+    self.assertAllEqual([2, 2], x_actual.shape)
     self.assertAllClose(y, y_actual_)
     self.assertAllClose(x, x_actual_)
 
   def testNoBatchDeferred(self):
-    x = np.array([[1., 0], [2, 1]])  # np.linalg.cholesky(y)
-    y = np.array([[1., 2], [2, 5]])  # np.matmul(x, x.T)
-    with self.cached_session() as sess:
-      x_pl = tf.placeholder(tf.float32)
-      y_pl = tf.placeholder(tf.float32)
-      y_actual = tfb.CholeskyOuterProduct().forward(x=x_pl)
-      x_actual = tfb.CholeskyOuterProduct().inverse(y=y_pl)
-    [y_actual_, x_actual_] = sess.run([y_actual, x_actual],
-                                      feed_dict={x_pl: x, y_pl: y})
-    self.assertEqual(None, y_actual.get_shape())
-    self.assertEqual(None, x_actual.get_shape())
-    self.assertAllClose(y, y_actual_)
-    self.assertAllClose(x, x_actual_)
+    x_ = np.array([[1., 0], [2, 1]])  # np.linalg.cholesky(y)
+    y_ = np.array([[1., 2], [2, 5]])  # np.matmul(x, x.T)
+    x = tf.placeholder_with_default(x_, shape=None)
+    y = tf.placeholder_with_default(y_, shape=None)
+    y_actual = tfb.CholeskyOuterProduct().forward(x=x)
+    x_actual = tfb.CholeskyOuterProduct().inverse(y=y)
+    [y_actual_, x_actual_] = self.evaluate([y_actual, x_actual])
+    # Shapes are always known in eager.
+    if not tf.executing_eagerly():
+      self.assertEqual(None, y_actual.shape)
+      self.assertEqual(None, x_actual.shape)
+    self.assertAllClose(y_, y_actual_)
+    self.assertAllClose(x_, x_actual_)
 
   def testBatchStatic(self):
     x = np.array([[[1., 0],
@@ -119,35 +116,35 @@ class CholeskyOuterProductBijectorTest(tf.test.TestCase):
                    [2, 5]],
                   [[9., 3],
                    [3, 5]]])  # np.matmul(x, x.T)
-    with self.cached_session() as sess:
-      y_actual = tfb.CholeskyOuterProduct().forward(x=x)
-      x_actual = tfb.CholeskyOuterProduct().inverse(y=y)
-    [y_actual_, x_actual_] = sess.run([y_actual, x_actual])
-    self.assertEqual([2, 2, 2], y_actual.get_shape())
-    self.assertEqual([2, 2, 2], x_actual.get_shape())
+    y_actual = tfb.CholeskyOuterProduct().forward(x=x)
+    x_actual = tfb.CholeskyOuterProduct().inverse(y=y)
+    [y_actual_, x_actual_] = self.evaluate([y_actual, x_actual])
+    self.assertEqual([2, 2, 2], y_actual.shape)
+    self.assertEqual([2, 2, 2], x_actual.shape)
     self.assertAllClose(y, y_actual_)
     self.assertAllClose(x, x_actual_)
 
   def testBatchDeferred(self):
-    x = np.array([[[1., 0],
-                   [2, 1]],
-                  [[3., 0],
-                   [1, 2]]])  # np.linalg.cholesky(y)
-    y = np.array([[[1., 2],
-                   [2, 5]],
-                  [[9., 3],
-                   [3, 5]]])  # np.matmul(x, x.T)
-    with self.cached_session() as sess:
-      x_pl = tf.placeholder(tf.float32)
-      y_pl = tf.placeholder(tf.float32)
-      y_actual = tfb.CholeskyOuterProduct().forward(x=x_pl)
-      x_actual = tfb.CholeskyOuterProduct().inverse(y=y_pl)
-    [y_actual_, x_actual_] = sess.run([y_actual, x_actual],
-                                      feed_dict={x_pl: x, y_pl: y})
-    self.assertEqual(None, y_actual.get_shape())
-    self.assertEqual(None, x_actual.get_shape())
-    self.assertAllClose(y, y_actual_)
-    self.assertAllClose(x, x_actual_)
+    x_ = np.array([[[1., 0],
+                    [2, 1]],
+                   [[3., 0],
+                    [1, 2]]])  # np.linalg.cholesky(y)
+    y_ = np.array([[[1., 2],
+                    [2, 5]],
+                   [[9., 3],
+                    [3, 5]]])  # np.matmul(x, x.T)
+    x = tf.placeholder_with_default(x_, shape=None)
+    y = tf.placeholder_with_default(y_, shape=None)
+    y_actual = tfb.CholeskyOuterProduct().forward(x)
+    x_actual = tfb.CholeskyOuterProduct().inverse(y)
+    [y_actual_, x_actual_] = self.evaluate([y_actual, x_actual])
+
+    # Shapes are always known in eager.
+    if not tf.executing_eagerly():
+      self.assertEqual(None, y_actual.shape)
+      self.assertEqual(None, x_actual.shape)
+    self.assertAllClose(y_, y_actual_)
+    self.assertAllClose(x_, x_actual_)
 
 
 if __name__ == "__main__":

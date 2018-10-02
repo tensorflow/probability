@@ -27,6 +27,7 @@ from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow.python.framework import test_util
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class SoftsignBijectorTest(tf.test.TestCase):
   """Tests the correctness of the Y = g(X) = X / (1 + |X|) transformation."""
 
@@ -40,21 +41,18 @@ class SoftsignBijectorTest(tf.test.TestCase):
   def setUp(self):
     self._rng = np.random.RandomState(42)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testBijectorBounds(self):
     bijector = tfb.Softsign(validate_args=True)
-    with self.cached_session():
-      with self.assertRaisesOpError("greater than -1"):
-        self.evaluate(bijector.inverse(-3.))
-      with self.assertRaisesOpError("greater than -1"):
-        self.evaluate(bijector.inverse_log_det_jacobian(-3., event_ndims=0))
+    with self.assertRaisesOpError("greater than -1"):
+      self.evaluate(bijector.inverse(-3.))
+    with self.assertRaisesOpError("greater than -1"):
+      self.evaluate(bijector.inverse_log_det_jacobian(-3., event_ndims=0))
 
-      with self.assertRaisesOpError("less than 1"):
-        self.evaluate(bijector.inverse(3.))
-      with self.assertRaisesOpError("less than 1"):
-        self.evaluate(bijector.inverse_log_det_jacobian(3., event_ndims=0))
+    with self.assertRaisesOpError("less than 1"):
+      self.evaluate(bijector.inverse(3.))
+    with self.assertRaisesOpError("less than 1"):
+      self.evaluate(bijector.inverse_log_det_jacobian(3., event_ndims=0))
 
-  @test_util.run_in_graph_and_eager_modes()
   def testBijectorForwardInverse(self):
     bijector = tfb.Softsign(validate_args=True)
     self.assertEqual("softsign", bijector.name)
@@ -64,7 +62,6 @@ class SoftsignBijectorTest(tf.test.TestCase):
     self.assertAllClose(y, self.evaluate(bijector.forward(x)))
     self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
 
-  @test_util.run_in_graph_and_eager_modes()
   def testBijectorLogDetJacobianEventDimsZero(self):
     bijector = tfb.Softsign(validate_args=True)
     y = self._rng.rand(2, 10)
@@ -74,7 +71,6 @@ class SoftsignBijectorTest(tf.test.TestCase):
     self.assertAllClose(ildj, self.evaluate(
         bijector.inverse_log_det_jacobian(y, event_ndims=0)))
 
-  @test_util.run_in_graph_and_eager_modes()
   def testBijectorForwardInverseEventDimsOne(self):
     bijector = tfb.Softsign(validate_args=True)
     self.assertEqual("softsign", bijector.name)
@@ -83,7 +79,6 @@ class SoftsignBijectorTest(tf.test.TestCase):
     self.assertAllClose(y, self.evaluate(bijector.forward(x)))
     self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
 
-  @test_util.run_in_graph_and_eager_modes()
   def testBijectorLogDetJacobianEventDimsOne(self):
     bijector = tfb.Softsign(validate_args=True)
     y = self._rng.rand(2, 10)

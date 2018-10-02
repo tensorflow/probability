@@ -24,9 +24,11 @@ import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_util
+from tensorflow.python.framework import test_util as tf_test_util
 from tensorflow.python.layers import core as layers
 
 
+@tf_test_util.run_all_in_graph_and_eager_modes
 class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
 
   @property
@@ -68,35 +70,34 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
 
   def testBatchedBijectorWithMLPTransform(self):
     x_ = np.random.normal(0., 1., (3, 8)).astype(np.float32)
-    with self.cached_session() as sess:
-      nvp = tfb.RealNVP(
-          num_masked=4, validate_args=True, **self._real_nvp_kwargs)
-      x = tf.constant(x_)
-      forward_x = nvp.forward(x)
-      # Use identity to invalidate cache.
-      inverse_y = nvp.inverse(tf.identity(forward_x))
-      forward_inverse_y = nvp.forward(inverse_y)
-      fldj = nvp.forward_log_det_jacobian(x, event_ndims=1)
-      # Use identity to invalidate cache.
-      ildj = nvp.inverse_log_det_jacobian(tf.identity(forward_x), event_ndims=1)
-      tf.global_variables_initializer().run()
-      [
-          forward_x_,
-          inverse_y_,
-          forward_inverse_y_,
-          ildj_,
-          fldj_,
-      ] = sess.run([
-          forward_x,
-          inverse_y,
-          forward_inverse_y,
-          ildj,
-          fldj,
-      ])
-      self.assertEqual("real_nvp", nvp.name)
-      self.assertAllClose(forward_x_, forward_inverse_y_, rtol=1e-4, atol=0.)
-      self.assertAllClose(x_, inverse_y_, rtol=1e-4, atol=0.)
-      self.assertAllClose(ildj_, -fldj_, rtol=1e-6, atol=0.)
+    nvp = tfb.RealNVP(
+        num_masked=4, validate_args=True, **self._real_nvp_kwargs)
+    x = tf.constant(x_)
+    forward_x = nvp.forward(x)
+    # Use identity to invalidate cache.
+    inverse_y = nvp.inverse(tf.identity(forward_x))
+    forward_inverse_y = nvp.forward(inverse_y)
+    fldj = nvp.forward_log_det_jacobian(x, event_ndims=1)
+    # Use identity to invalidate cache.
+    ildj = nvp.inverse_log_det_jacobian(tf.identity(forward_x), event_ndims=1)
+    self.evaluate(tf.global_variables_initializer())
+    [
+        forward_x_,
+        inverse_y_,
+        forward_inverse_y_,
+        ildj_,
+        fldj_,
+    ] = self.evaluate([
+        forward_x,
+        inverse_y,
+        forward_inverse_y,
+        ildj,
+        fldj,
+    ])
+    self.assertEqual("real_nvp", nvp.name)
+    self.assertAllClose(forward_x_, forward_inverse_y_, rtol=1e-4, atol=0.)
+    self.assertAllClose(x_, inverse_y_, rtol=1e-4, atol=0.)
+    self.assertAllClose(ildj_, -fldj_, rtol=1e-6, atol=0.)
 
   def testBijectorConditionKwargs(self):
     batch_size = 3
@@ -156,42 +157,41 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
 
   def testMutuallyConsistent(self):
     dims = 4
-    with self.cached_session() as sess:
-      nvp = tfb.RealNVP(
-          num_masked=3, validate_args=True, **self._real_nvp_kwargs)
-      dist = tfd.TransformedDistribution(
-          distribution=tfd.Normal(loc=0., scale=1.),
-          bijector=nvp,
-          event_shape=[dims],
-          validate_args=True)
-      self.run_test_sample_consistent_log_prob(
-          sess_run_fn=sess.run,
-          dist=dist,
-          num_samples=int(1e5),
-          radius=1.,
-          center=0.,
-          rtol=0.02)
+    nvp = tfb.RealNVP(
+        num_masked=3, validate_args=True, **self._real_nvp_kwargs)
+    dist = tfd.TransformedDistribution(
+        distribution=tfd.Normal(loc=0., scale=1.),
+        bijector=nvp,
+        event_shape=[dims],
+        validate_args=True)
+    self.run_test_sample_consistent_log_prob(
+        sess_run_fn=self.evaluate,
+        dist=dist,
+        num_samples=int(2e5),
+        radius=1.,
+        center=0.,
+        rtol=0.02)
 
   def testInvertMutuallyConsistent(self):
     dims = 4
-    with self.cached_session() as sess:
-      nvp = tfb.Invert(
-          tfb.RealNVP(
-              num_masked=3, validate_args=True, **self._real_nvp_kwargs))
-      dist = tfd.TransformedDistribution(
-          distribution=tfd.Normal(loc=0., scale=1.),
-          bijector=nvp,
-          event_shape=[dims],
-          validate_args=True)
-      self.run_test_sample_consistent_log_prob(
-          sess_run_fn=sess.run,
-          dist=dist,
-          num_samples=int(1e5),
-          radius=1.,
-          center=0.,
-          rtol=0.02)
+    nvp = tfb.Invert(
+        tfb.RealNVP(
+            num_masked=3, validate_args=True, **self._real_nvp_kwargs))
+    dist = tfd.TransformedDistribution(
+        distribution=tfd.Normal(loc=0., scale=1.),
+        bijector=nvp,
+        event_shape=[dims],
+        validate_args=True)
+    self.run_test_sample_consistent_log_prob(
+        sess_run_fn=self.evaluate,
+        dist=dist,
+        num_samples=int(1e5),
+        radius=1.,
+        center=0.,
+        rtol=0.02)
 
 
+@tf_test_util.run_all_in_graph_and_eager_modes
 class NICETest(RealNVPTest):
 
   @property
@@ -204,6 +204,7 @@ class NICETest(RealNVPTest):
     }
 
 
+@tf_test_util.run_all_in_graph_and_eager_modes
 class RealNVPConstantShiftScaleTest(RealNVPTest):
 
   @property

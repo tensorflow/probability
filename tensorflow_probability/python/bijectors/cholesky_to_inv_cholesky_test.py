@@ -26,9 +26,9 @@ from tensorflow_probability.python import bijectors as tfb
 from tensorflow.python.framework import test_util
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class CholeskyToInvCholeskyTest(tf.test.TestCase):
 
-  @test_util.run_in_graph_and_eager_modes()
   def testBijector(self):
     bijector = tfb.CholeskyToInvCholesky()
     self.assertEqual("cholesky_to_inv_cholesky", bijector.name)
@@ -42,7 +42,6 @@ class CholeskyToInvCholeskyTest(tf.test.TestCase):
     self.assertAllClose(y, x_fwd_, atol=1.e-5, rtol=1.e-5)
     self.assertAllClose(x, y_inv_, atol=1.e-5, rtol=1.e-5)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testBijectorWithTensors(self):
     bijector = tfb.CholeskyToInvCholesky()
     x = np.array([
@@ -96,7 +95,6 @@ class CholeskyToInvCholeskyTest(tf.test.TestCase):
         input_to_vector.forward_log_det_jacobian(x, event_ndims=event_ndims) -
         output_to_vector.forward_log_det_jacobian(f_x, event_ndims=event_ndims))
 
-  @test_util.run_in_graph_and_eager_modes()
   def testJacobian(self):
     cholesky_to_vector = tfb.Chain([
         tfb.Invert(tfb.FillTriangular()),
@@ -117,7 +115,6 @@ class CholeskyToInvCholeskyTest(tf.test.TestCase):
       fldj_, fldj_numerical_ = self.evaluate([fldj, fldj_numerical])
       self.assertAllClose(fldj_, fldj_numerical_)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testJacobianWithTensors(self):
     bijector = tfb.CholeskyToInvCholesky()
     x = np.array([

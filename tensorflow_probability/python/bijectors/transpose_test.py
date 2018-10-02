@@ -30,7 +30,6 @@ from tensorflow.python.framework import test_util
 class _TransposeBijectorTest(object):
   """Tests correctness of the `Transpose` bijector."""
 
-  @test_util.run_in_graph_and_eager_modes()
   def testTransposeFromPerm(self):
     perm_ = [2, 0, 1]
     actual_x_ = np.array([
@@ -68,7 +67,6 @@ class _TransposeBijectorTest(object):
     self.assertAllEqual(0., ildj_)
     self.assertAllEqual(0., fldj_)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testTransposeFromEventNdim(self):
     rightmost_transposed_ndims_ = np.array(2, dtype=np.int32)
     actual_x_ = np.array([
@@ -108,31 +106,30 @@ class _TransposeBijectorTest(object):
     self.assertAllEqual(0., ildj_)
     self.assertAllEqual(0., fldj_)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testInvalidPermException(self):
     msg = '`perm` must be a valid permutation vector.'
-    with self.cached_session():
-      if self.is_static or tf.executing_eagerly():
-        with self.assertRaisesRegexp(ValueError, msg):
-          bijector = tfb.Transpose(perm=[1, 2], validate_args=True)
-      else:
-        with self.assertRaisesOpError(msg):
-          bijector = tfb.Transpose(
-              perm=tf.placeholder_with_default([1, 2], shape=[2]),
-              validate_args=True)
-          self.evaluate(bijector.forward([[0, 1]]))
+    if self.is_static or tf.executing_eagerly():
+      with self.assertRaisesRegexp(ValueError, msg):
+        bijector = tfb.Transpose(perm=[1, 2], validate_args=True)
+    else:
+      with self.assertRaisesOpError(msg):
+        bijector = tfb.Transpose(
+            perm=tf.placeholder_with_default([1, 2], shape=[2]),
+            validate_args=True)
+        self.evaluate(bijector.forward([[0, 1]]))
 
-  @test_util.run_in_graph_and_eager_modes()
   def testInvalidEventNdimsException(self):
     msg = '`rightmost_transposed_ndims` must be non-negative.'
     with self.assertRaisesRegexp(ValueError, msg):
       tfb.Transpose(rightmost_transposed_ndims=-1, validate_args=True)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class TransposeBijectorDynamicTest(_TransposeBijectorTest, tf.test.TestCase):
   is_static = False
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class TransposeBijectorStaticTest(_TransposeBijectorTest, tf.test.TestCase):
   is_static = True
 

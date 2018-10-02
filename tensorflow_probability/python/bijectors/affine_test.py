@@ -28,444 +28,393 @@ from tensorflow_probability.python import bijectors as tfb
 from tensorflow.python.framework import test_util
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class AffineBijectorTest(tf.test.TestCase):
   """Tests correctness of the Y = scale @ x + shift transformation."""
 
   def testProperties(self):
-    with self.cached_session():
-      mu = -1.
-      # scale corresponds to 1.
-      bijector = tfb.Affine(shift=mu)
-      self.assertEqual("affine", bijector.name)
+    mu = -1.
+    # scale corresponds to 1.
+    bijector = tfb.Affine(shift=mu)
+    self.assertEqual("affine", bijector.name)
 
   def testNoBatchMultivariateIdentity(self):
-    with self.cached_session() as sess:
-      placeholder = tf.placeholder(tf.float32, name="x")
+    def static_run(fun, x, **kwargs):
+      return self.evaluate(fun(x, **kwargs))
 
-      def static_run(fun, x, **kwargs):
-        return self.evaluate(fun(x, **kwargs))
+    def dynamic_run(fun, x_value, **kwargs):
+      x_value = np.array(x_value, dtype=np.float32)
+      placeholder = tf.placeholder_with_default(x_value, shape=None)
+      return self.evaluate(fun(placeholder, **kwargs))
 
-      def dynamic_run(fun, x_value, **kwargs):
-        x_value = np.array(x_value)
-        return sess.run(
-            fun(placeholder, **kwargs), feed_dict={placeholder: x_value})
+    for run in (static_run, dynamic_run):
+      mu = [1., -1]
+      # Multivariate
+      # Corresponds to scale = [[1., 0], [0, 1.]]
+      bijector = tfb.Affine(shift=mu)
+      x = [1., 1]
+      # matmul(sigma, x) + shift
+      # = [-1, -1] + [1, -1]
+      self.assertAllClose([2., 0], run(bijector.forward, x))
+      self.assertAllClose([0., 2], run(bijector.inverse, x))
 
-      for run in (static_run, dynamic_run):
-        mu = [1., -1]
-        # Multivariate
-        # Corresponds to scale = [[1., 0], [0, 1.]]
-        bijector = tfb.Affine(shift=mu)
-        x = [1., 1]
-        # matmul(sigma, x) + shift
-        # = [-1, -1] + [1, -1]
-        self.assertAllClose([2., 0], run(bijector.forward, x))
-        self.assertAllClose([0., 2], run(bijector.inverse, x))
-
-        # x is a 2-batch of 2-vectors.
-        # The first vector is [1, 1], the second is [-1, -1].
-        # Each undergoes matmul(sigma, x) + shift.
-        x = [[1., 1], [-1., -1]]
-        self.assertAllClose([[2., 0], [0., -2]], run(bijector.forward, x))
-        self.assertAllClose([[0., 2], [-2., 0]], run(bijector.inverse, x))
-        self.assertAllClose(
-            0., run(bijector.inverse_log_det_jacobian, x, event_ndims=1))
+      # x is a 2-batch of 2-vectors.
+      # The first vector is [1, 1], the second is [-1, -1].
+      # Each undergoes matmul(sigma, x) + shift.
+      x = [[1., 1], [-1., -1]]
+      self.assertAllClose([[2., 0], [0., -2]], run(bijector.forward, x))
+      self.assertAllClose([[0., 2], [-2., 0]], run(bijector.inverse, x))
+      self.assertAllClose(
+          0., run(bijector.inverse_log_det_jacobian, x, event_ndims=1))
 
   def testNoBatchMultivariateDiag(self):
-    with self.cached_session() as sess:
-      placeholder = tf.placeholder(tf.float32, name="x")
+    def static_run(fun, x, **kwargs):
+      return self.evaluate(fun(x, **kwargs))
 
-      def static_run(fun, x, **kwargs):
-        return self.evaluate(fun(x, **kwargs))
+    def dynamic_run(fun, x_value, **kwargs):
+      x_value = np.array(x_value, dtype=np.float32)
+      placeholder = tf.placeholder_with_default(x_value, shape=None)
+      return self.evaluate(fun(placeholder, **kwargs))
 
-      def dynamic_run(fun, x_value, **kwargs):
-        x_value = np.array(x_value)
-        return sess.run(
-            fun(placeholder, **kwargs), feed_dict={placeholder: x_value})
+    for run in (static_run, dynamic_run):
+      mu = [1., -1]
+      # Multivariate
+      # Corresponds to scale = [[2., 0], [0, 1.]]
+      bijector = tfb.Affine(shift=mu, scale_diag=[2., 1])
+      x = [1., 1]
+      # matmul(sigma, x) + shift
+      # = [-1, -1] + [1, -1]
+      self.assertAllClose([3., 0], run(bijector.forward, x))
+      self.assertAllClose([0., 2], run(bijector.inverse, x))
+      self.assertAllClose(
+          -np.log(2.),
+          run(bijector.inverse_log_det_jacobian, x, event_ndims=1))
 
-      for run in (static_run, dynamic_run):
-        mu = [1., -1]
-        # Multivariate
-        # Corresponds to scale = [[2., 0], [0, 1.]]
-        bijector = tfb.Affine(shift=mu, scale_diag=[2., 1])
-        x = [1., 1]
-        # matmul(sigma, x) + shift
-        # = [-1, -1] + [1, -1]
-        self.assertAllClose([3., 0], run(bijector.forward, x))
-        self.assertAllClose([0., 2], run(bijector.inverse, x))
-        self.assertAllClose(
-            -np.log(2.),
-            run(bijector.inverse_log_det_jacobian, x, event_ndims=1))
-
-        # Reset bijector.
-        bijector = tfb.Affine(shift=mu, scale_diag=[2., 1])
-        # x is a 2-batch of 2-vectors.
-        # The first vector is [1, 1], the second is [-1, -1].
-        # Each undergoes matmul(sigma, x) + shift.
-        x = [[1., 1],
-             [-1., -1]]
-        self.assertAllClose([[3., 0],
-                             [-1., -2]],
-                            run(bijector.forward, x))
-        self.assertAllClose([[0., 2],
-                             [-1., 0]],
-                            run(bijector.inverse, x))
-        self.assertAllClose(
-            -np.log(2.),
-            run(bijector.inverse_log_det_jacobian, x, event_ndims=1))
+      # Reset bijector.
+      bijector = tfb.Affine(shift=mu, scale_diag=[2., 1])
+      # x is a 2-batch of 2-vectors.
+      # The first vector is [1, 1], the second is [-1, -1].
+      # Each undergoes matmul(sigma, x) + shift.
+      x = [[1., 1],
+           [-1., -1]]
+      self.assertAllClose([[3., 0],
+                           [-1., -2]],
+                          run(bijector.forward, x))
+      self.assertAllClose([[0., 2],
+                           [-1., 0]],
+                          run(bijector.inverse, x))
+      self.assertAllClose(
+          -np.log(2.),
+          run(bijector.inverse_log_det_jacobian, x, event_ndims=1))
 
   def testNoBatchMultivariateFullDynamic(self):
-    with self.cached_session() as sess:
-      x = tf.placeholder(tf.float32, name="x")
-      mu = tf.placeholder(tf.float32, name="mu")
-      scale_diag = tf.placeholder(tf.float32, name="scale_diag")
+    x_value = np.array([[1., 1]], dtype=np.float32)
+    mu_value = np.array([1., -1], dtype=np.float32)
+    scale_diag_value = np.array([2., 2], dtype=np.float32)
 
-      x_value = np.array([[1., 1]], dtype=np.float32)
-      mu_value = np.array([1., -1], dtype=np.float32)
-      scale_diag_value = np.array([2., 2], dtype=np.float32)
-      feed_dict = {
-          x: x_value,
-          mu: mu_value,
-          scale_diag: scale_diag_value,
-      }
+    x = tf.placeholder_with_default(x_value, shape=None)
+    mu = tf.placeholder_with_default(mu_value, shape=None)
+    scale_diag = tf.placeholder_with_default(scale_diag_value, shape=None)
 
-      bijector = tfb.Affine(shift=mu, scale_diag=scale_diag)
-      self.assertAllClose([[3., 1]], sess.run(bijector.forward(x), feed_dict))
-      self.assertAllClose([[0., 1]], sess.run(bijector.inverse(x), feed_dict))
-      self.assertAllClose(
-          -np.log(4),
-          sess.run(bijector.inverse_log_det_jacobian(x, event_ndims=1),
-                   feed_dict))
+    bijector = tfb.Affine(shift=mu, scale_diag=scale_diag)
+    self.assertAllClose([[3., 1]], self.evaluate(bijector.forward(x)))
+    self.assertAllClose([[0., 1]], self.evaluate(bijector.inverse(x)))
+    self.assertAllClose(
+        -np.log(4),
+        self.evaluate(bijector.inverse_log_det_jacobian(x, event_ndims=1)))
 
   def testBatchMultivariateIdentity(self):
-    with self.cached_session() as sess:
-      placeholder = tf.placeholder(tf.float32, name="x")
+    def static_run(fun, x, **kwargs):
+      return self.evaluate(fun(x, **kwargs))
 
-      def static_run(fun, x, **kwargs):
-        return self.evaluate(fun(x, **kwargs))
+    def dynamic_run(fun, x_value, **kwargs):
+      x_value = np.array(x_value, dtype=np.float32)
+      placeholder = tf.placeholder_with_default(x_value, shape=None)
+      return self.evaluate(fun(placeholder, **kwargs))
 
-      def dynamic_run(fun, x_value, **kwargs):
-        x_value = np.array(x_value)
-        return sess.run(
-            fun(placeholder, **kwargs), feed_dict={placeholder: x_value})
-
-      for run in (static_run, dynamic_run):
-        mu = [[1., -1]]
-        # Corresponds to 1 2x2 matrix, with twos on the diagonal.
-        scale = 2.
-        bijector = tfb.Affine(shift=mu, scale_identity_multiplier=scale)
-        x = [[[1., 1]]]
-        self.assertAllClose([[[3., 1]]], run(bijector.forward, x))
-        self.assertAllClose([[[0., 1]]], run(bijector.inverse, x))
-        self.assertAllClose(
-            -np.log(4),
-            run(bijector.inverse_log_det_jacobian, x, event_ndims=1))
+    for run in (static_run, dynamic_run):
+      mu = [[1., -1]]
+      # Corresponds to 1 2x2 matrix, with twos on the diagonal.
+      scale = 2.
+      bijector = tfb.Affine(shift=mu, scale_identity_multiplier=scale)
+      x = [[[1., 1]]]
+      self.assertAllClose([[[3., 1]]], run(bijector.forward, x))
+      self.assertAllClose([[[0., 1]]], run(bijector.inverse, x))
+      self.assertAllClose(
+          -np.log(4),
+          run(bijector.inverse_log_det_jacobian, x, event_ndims=1))
 
   def testBatchMultivariateDiag(self):
-    with self.cached_session() as sess:
-      placeholder = tf.placeholder(tf.float32, name="x")
+    def static_run(fun, x, **kwargs):
+      return self.evaluate(fun(x, **kwargs))
 
-      def static_run(fun, x, **kwargs):
-        return self.evaluate(fun(x, **kwargs))
+    def dynamic_run(fun, x_value, **kwargs):
+      x_value = np.array(x_value, dtype=np.float32)
+      placeholder = tf.placeholder_with_default(x_value, shape=None)
+      return self.evaluate(fun(placeholder, **kwargs))
 
-      def dynamic_run(fun, x_value, **kwargs):
-        x_value = np.array(x_value)
-        return sess.run(
-            fun(placeholder, **kwargs), feed_dict={placeholder: x_value})
-
-      for run in (static_run, dynamic_run):
-        mu = [[1., -1]]
-        # Corresponds to 1 2x2 matrix, with twos on the diagonal.
-        scale_diag = [[2., 2]]
-        bijector = tfb.Affine(shift=mu, scale_diag=scale_diag)
-        x = [[[1., 1]]]
-        self.assertAllClose([[[3., 1]]], run(bijector.forward, x))
-        self.assertAllClose([[[0., 1]]], run(bijector.inverse, x))
-        self.assertAllClose(
-            [-np.log(4)],
-            run(bijector.inverse_log_det_jacobian, x, event_ndims=1))
-
-  def testBatchMultivariateFullDynamic(self):
-    with self.cached_session() as sess:
-      x = tf.placeholder(tf.float32, name="x")
-      mu = tf.placeholder(tf.float32, name="mu")
-      scale_diag = tf.placeholder(tf.float32, name="scale_diag")
-
-      x_value = np.array([[[1., 1]]], dtype=np.float32)
-      mu_value = np.array([[1., -1]], dtype=np.float32)
-      scale_diag_value = np.array([[2., 2]], dtype=np.float32)
-
-      feed_dict = {
-          x: x_value,
-          mu: mu_value,
-          scale_diag: scale_diag_value,
-      }
-
+    for run in (static_run, dynamic_run):
+      mu = [[1., -1]]
+      # Corresponds to 1 2x2 matrix, with twos on the diagonal.
+      scale_diag = [[2., 2]]
       bijector = tfb.Affine(shift=mu, scale_diag=scale_diag)
-      self.assertAllClose([[[3., 1]]], sess.run(bijector.forward(x), feed_dict))
-      self.assertAllClose([[[0., 1]]], sess.run(bijector.inverse(x), feed_dict))
+      x = [[[1., 1]]]
+      self.assertAllClose([[[3., 1]]], run(bijector.forward, x))
+      self.assertAllClose([[[0., 1]]], run(bijector.inverse, x))
       self.assertAllClose(
           [-np.log(4)],
-          sess.run(bijector.inverse_log_det_jacobian(
-              x, event_ndims=1), feed_dict))
+          run(bijector.inverse_log_det_jacobian, x, event_ndims=1))
+
+  def testBatchMultivariateFullDynamic(self):
+    x_value = np.array([[[1., 1]]], dtype=np.float32)
+    mu_value = np.array([[1., -1]], dtype=np.float32)
+    scale_diag_value = np.array([[2., 2]], dtype=np.float32)
+
+    x = tf.placeholder_with_default(x_value, shape=None)
+    mu = tf.placeholder_with_default(mu_value, shape=None)
+    scale_diag = tf.placeholder_with_default(scale_diag_value, shape=None)
+
+    bijector = tfb.Affine(shift=mu, scale_diag=scale_diag)
+    self.assertAllClose([[[3., 1]]], self.evaluate(bijector.forward(x)))
+    self.assertAllClose([[[0., 1]]], self.evaluate(bijector.inverse(x)))
+    self.assertAllClose(
+        [-np.log(4)],
+        self.evaluate(bijector.inverse_log_det_jacobian(
+            x, event_ndims=1)))
 
   def testIdentityWithDiagUpdate(self):
-    with self.cached_session() as sess:
-      placeholder = tf.placeholder(tf.float32, name="x")
+    def static_run(fun, x, **kwargs):
+      return self.evaluate(fun(x, **kwargs))
 
-      def static_run(fun, x, **kwargs):
-        return self.evaluate(fun(x, **kwargs))
+    def dynamic_run(fun, x_value, **kwargs):
+      x_value = np.array(x_value, dtype=np.float32)
+      placeholder = tf.placeholder_with_default(x_value, shape=None)
+      return self.evaluate(fun(placeholder, **kwargs))
 
-      def dynamic_run(fun, x_value, **kwargs):
-        x_value = np.array(x_value)
-        return sess.run(
-            fun(placeholder, **kwargs), feed_dict={placeholder: x_value})
-
-      for run in (static_run, dynamic_run):
-        mu = -1.
-        # Corresponds to scale = 2
-        bijector = tfb.Affine(
-            shift=mu, scale_identity_multiplier=1., scale_diag=[1., 1., 1.])
-        x = [1., 2, 3]  # Three scalar samples (no batches).
-        self.assertAllClose([1., 3, 5], run(bijector.forward, x))
-        self.assertAllClose([1., 1.5, 2.], run(bijector.inverse, x))
-        self.assertAllClose(
-            -np.log(2.**3),
-            run(bijector.inverse_log_det_jacobian, x, event_ndims=1))
+    for run in (static_run, dynamic_run):
+      mu = -1.
+      # Corresponds to scale = 2
+      bijector = tfb.Affine(
+          shift=mu, scale_identity_multiplier=1., scale_diag=[1., 1., 1.])
+      x = [1., 2, 3]  # Three scalar samples (no batches).
+      self.assertAllClose([1., 3, 5], run(bijector.forward, x))
+      self.assertAllClose([1., 1.5, 2.], run(bijector.inverse, x))
+      self.assertAllClose(
+          -np.log(2.**3),
+          run(bijector.inverse_log_det_jacobian, x, event_ndims=1))
 
   def testIdentityWithTriL(self):
-    with self.cached_session() as sess:
-      placeholder = tf.placeholder(tf.float32, name="x")
+    def static_run(fun, x, **kwargs):
+      return self.evaluate(fun(x, **kwargs))
 
-      def static_run(fun, x, **kwargs):
-        return self.evaluate(fun(x, **kwargs))
+    def dynamic_run(fun, x_value, **kwargs):
+      x_value = np.array(x_value, dtype=np.float32)
+      placeholder = tf.placeholder_with_default(x_value, shape=None)
+      return self.evaluate(fun(placeholder, **kwargs))
 
-      def dynamic_run(fun, x_value, **kwargs):
-        x_value = np.array(x_value)
-        return sess.run(
-            fun(placeholder, **kwargs), feed_dict={placeholder: x_value})
-
-      for run in (static_run, dynamic_run):
-        mu = -1.
-        # scale = [[2., 0], [2, 2]]
-        bijector = tfb.Affine(
-            shift=mu,
-            scale_identity_multiplier=1.,
-            scale_tril=[[1., 0], [2., 1]])
-        x = [[1., 2]]  # One multivariate sample.
-        self.assertAllClose([[1., 5]], run(bijector.forward, x))
-        self.assertAllClose([[1., 0.5]], run(bijector.inverse, x))
-        self.assertAllClose(
-            -np.log(4.),
-            run(bijector.inverse_log_det_jacobian, x, event_ndims=1))
+    for run in (static_run, dynamic_run):
+      mu = -1.
+      # scale = [[2., 0], [2, 2]]
+      bijector = tfb.Affine(
+          shift=mu,
+          scale_identity_multiplier=1.,
+          scale_tril=[[1., 0], [2., 1]])
+      x = [[1., 2]]  # One multivariate sample.
+      self.assertAllClose([[1., 5]], run(bijector.forward, x))
+      self.assertAllClose([[1., 0.5]], run(bijector.inverse, x))
+      self.assertAllClose(
+          -np.log(4.),
+          run(bijector.inverse_log_det_jacobian, x, event_ndims=1))
 
   def testDiagWithTriL(self):
-    with self.cached_session() as sess:
-      placeholder = tf.placeholder(tf.float32, name="x")
+    def static_run(fun, x, **kwargs):
+      return self.evaluate(fun(x, **kwargs))
 
-      def static_run(fun, x, **kwargs):
-        return self.evaluate(fun(x, **kwargs))
+    def dynamic_run(fun, x_value, **kwargs):
+      x_value = np.array(x_value, dtype=np.float32)
+      placeholder = tf.placeholder_with_default(x_value, shape=None)
+      return self.evaluate(fun(placeholder, **kwargs))
 
-      def dynamic_run(fun, x_value, **kwargs):
-        x_value = np.array(x_value)
-        return sess.run(
-            fun(placeholder, **kwargs), feed_dict={placeholder: x_value})
-
-      for run in (static_run, dynamic_run):
-        mu = -1.
-        # scale = [[2., 0], [2, 3]]
-        bijector = tfb.Affine(
-            shift=mu, scale_diag=[1., 2.], scale_tril=[[1., 0], [2., 1]])
-        x = [[1., 2]]  # One multivariate sample.
-        self.assertAllClose([[1., 7]], run(bijector.forward, x))
-        self.assertAllClose([[1., 1 / 3.]], run(bijector.inverse, x))
-        self.assertAllClose(
-            -np.log(6.),
-            run(bijector.inverse_log_det_jacobian, x, event_ndims=1))
+    for run in (static_run, dynamic_run):
+      mu = -1.
+      # scale = [[2., 0], [2, 3]]
+      bijector = tfb.Affine(
+          shift=mu, scale_diag=[1., 2.], scale_tril=[[1., 0], [2., 1]])
+      x = [[1., 2]]  # One multivariate sample.
+      self.assertAllClose([[1., 7]], run(bijector.forward, x))
+      self.assertAllClose([[1., 1 / 3.]], run(bijector.inverse, x))
+      self.assertAllClose(
+          -np.log(6.),
+          run(bijector.inverse_log_det_jacobian, x, event_ndims=1))
 
   def testIdentityAndDiagWithTriL(self):
-    with self.cached_session() as sess:
-      placeholder = tf.placeholder(tf.float32, name="x")
+    def static_run(fun, x, **kwargs):
+      return self.evaluate(fun(x, **kwargs))
 
-      def static_run(fun, x, **kwargs):
-        return self.evaluate(fun(x, **kwargs))
+    def dynamic_run(fun, x_value, **kwargs):
+      x_value = np.array(x_value, dtype=np.float32)
+      placeholder = tf.placeholder_with_default(x_value, shape=None)
+      return self.evaluate(fun(placeholder, **kwargs))
 
-      def dynamic_run(fun, x_value, **kwargs):
-        x_value = np.array(x_value)
-        return sess.run(
-            fun(placeholder, **kwargs), feed_dict={placeholder: x_value})
-
-      for run in (static_run, dynamic_run):
-        mu = -1.
-        # scale = [[3., 0], [2, 4]]
-        bijector = tfb.Affine(
-            shift=mu,
-            scale_identity_multiplier=1.0,
-            scale_diag=[1., 2.],
-            scale_tril=[[1., 0], [2., 1]])
-        x = [[1., 2]]  # One multivariate sample.
-        self.assertAllClose([[2., 9]], run(bijector.forward, x))
-        self.assertAllClose([[2 / 3., 5 / 12.]], run(bijector.inverse, x))
-        self.assertAllClose(
-            -np.log(12.),
-            run(bijector.inverse_log_det_jacobian, x, event_ndims=1))
+    for run in (static_run, dynamic_run):
+      mu = -1.
+      # scale = [[3., 0], [2, 4]]
+      bijector = tfb.Affine(
+          shift=mu,
+          scale_identity_multiplier=1.0,
+          scale_diag=[1., 2.],
+          scale_tril=[[1., 0], [2., 1]])
+      x = [[1., 2]]  # One multivariate sample.
+      self.assertAllClose([[2., 9]], run(bijector.forward, x))
+      self.assertAllClose([[2 / 3., 5 / 12.]], run(bijector.inverse, x))
+      self.assertAllClose(
+          -np.log(12.),
+          run(bijector.inverse_log_det_jacobian, x, event_ndims=1))
 
   def testIdentityWithVDVTUpdate(self):
-    with self.cached_session() as sess:
-      placeholder = tf.placeholder(tf.float32, name="x")
+    def static_run(fun, x, **kwargs):
+      return self.evaluate(fun(x, **kwargs))
 
-      def static_run(fun, x, **kwargs):
-        return self.evaluate(fun(x, **kwargs))
+    def dynamic_run(fun, x_value, **kwargs):
+      x_value = np.array(x_value, dtype=np.float32)
+      placeholder = tf.placeholder_with_default(x_value, shape=None)
+      return self.evaluate(fun(placeholder, **kwargs))
 
-      def dynamic_run(fun, x_value, **kwargs):
-        x_value = np.array(x_value)
-        return sess.run(
-            fun(placeholder, **kwargs), feed_dict={placeholder: x_value})
+    for run in (static_run, dynamic_run):
+      mu = -1.
+      # Corresponds to scale = [[10, 0, 0], [0, 2, 0], [0, 0, 3]]
+      bijector = tfb.Affine(
+          shift=mu,
+          scale_identity_multiplier=2.,
+          scale_perturb_diag=[2., 1],
+          scale_perturb_factor=[[2., 0], [0., 0], [0, 1]])
+      bijector_ref = tfb.Affine(shift=mu, scale_diag=[10., 2, 3])
 
-      for run in (static_run, dynamic_run):
-        mu = -1.
-        # Corresponds to scale = [[10, 0, 0], [0, 2, 0], [0, 0, 3]]
-        bijector = tfb.Affine(
-            shift=mu,
-            scale_identity_multiplier=2.,
-            scale_perturb_diag=[2., 1],
-            scale_perturb_factor=[[2., 0], [0., 0], [0, 1]])
-        bijector_ref = tfb.Affine(shift=mu, scale_diag=[10., 2, 3])
+      x = [1., 2, 3]  # Vector.
+      self.assertAllClose([9., 3, 8], run(bijector.forward, x))
+      self.assertAllClose(
+          run(bijector_ref.forward, x), run(bijector.forward, x))
 
-        x = [1., 2, 3]  # Vector.
-        self.assertAllClose([9., 3, 8], run(bijector.forward, x))
-        self.assertAllClose(
-            run(bijector_ref.forward, x), run(bijector.forward, x))
-
-        self.assertAllClose([0.2, 1.5, 4 / 3.], run(bijector.inverse, x))
-        self.assertAllClose(
-            run(bijector_ref.inverse, x), run(bijector.inverse, x))
-        self.assertAllClose(
-            -np.log(60.),
-            run(bijector.inverse_log_det_jacobian, x, event_ndims=1))
-        self.assertAllClose(
-            run(bijector.inverse_log_det_jacobian, x, event_ndims=1),
-            run(bijector_ref.inverse_log_det_jacobian, x, event_ndims=1))
+      self.assertAllClose([0.2, 1.5, 4 / 3.], run(bijector.inverse, x))
+      self.assertAllClose(
+          run(bijector_ref.inverse, x), run(bijector.inverse, x))
+      self.assertAllClose(
+          -np.log(60.),
+          run(bijector.inverse_log_det_jacobian, x, event_ndims=1))
+      self.assertAllClose(
+          run(bijector.inverse_log_det_jacobian, x, event_ndims=1),
+          run(bijector_ref.inverse_log_det_jacobian, x, event_ndims=1))
 
   def testDiagWithVDVTUpdate(self):
-    with self.cached_session() as sess:
-      placeholder = tf.placeholder(tf.float32, name="x")
+    def static_run(fun, x, **kwargs):
+      return self.evaluate(fun(x, **kwargs))
 
-      def static_run(fun, x, **kwargs):
-        return self.evaluate(fun(x, **kwargs))
+    def dynamic_run(fun, x_value, **kwargs):
+      x_value = np.array(x_value, dtype=np.float32)
+      placeholder = tf.placeholder_with_default(x_value, shape=None)
+      return self.evaluate(fun(placeholder, **kwargs))
 
-      def dynamic_run(fun, x_value, **kwargs):
-        x_value = np.array(x_value)
-        return sess.run(
-            fun(placeholder, **kwargs), feed_dict={placeholder: x_value})
+    for run in (static_run, dynamic_run):
+      mu = -1.
+      # Corresponds to scale = [[10, 0, 0], [0, 3, 0], [0, 0, 5]]
+      bijector = tfb.Affine(
+          shift=mu,
+          scale_diag=[2., 3, 4],
+          scale_perturb_diag=[2., 1],
+          scale_perturb_factor=[[2., 0], [0., 0], [0, 1]])
+      bijector_ref = tfb.Affine(shift=mu, scale_diag=[10., 3, 5])
 
-      for run in (static_run, dynamic_run):
-        mu = -1.
-        # Corresponds to scale = [[10, 0, 0], [0, 3, 0], [0, 0, 5]]
-        bijector = tfb.Affine(
-            shift=mu,
-            scale_diag=[2., 3, 4],
-            scale_perturb_diag=[2., 1],
-            scale_perturb_factor=[[2., 0], [0., 0], [0, 1]])
-        bijector_ref = tfb.Affine(shift=mu, scale_diag=[10., 3, 5])
-
-        x = [1., 2, 3]  # Vector.
-        self.assertAllClose([9., 5, 14], run(bijector.forward, x))
-        self.assertAllClose(
-            run(bijector_ref.forward, x), run(bijector.forward, x))
-        self.assertAllClose([0.2, 1., 0.8], run(bijector.inverse, x))
-        self.assertAllClose(
-            run(bijector_ref.inverse, x), run(bijector.inverse, x))
-        self.assertAllClose(
-            -np.log(150.),
-            run(bijector.inverse_log_det_jacobian, x, event_ndims=1))
-        self.assertAllClose(
-            run(bijector.inverse_log_det_jacobian, x, event_ndims=1),
-            run(bijector_ref.inverse_log_det_jacobian, x, event_ndims=1))
+      x = [1., 2, 3]  # Vector.
+      self.assertAllClose([9., 5, 14], run(bijector.forward, x))
+      self.assertAllClose(
+          run(bijector_ref.forward, x), run(bijector.forward, x))
+      self.assertAllClose([0.2, 1., 0.8], run(bijector.inverse, x))
+      self.assertAllClose(
+          run(bijector_ref.inverse, x), run(bijector.inverse, x))
+      self.assertAllClose(
+          -np.log(150.),
+          run(bijector.inverse_log_det_jacobian, x, event_ndims=1))
+      self.assertAllClose(
+          run(bijector.inverse_log_det_jacobian, x, event_ndims=1),
+          run(bijector_ref.inverse_log_det_jacobian, x, event_ndims=1))
 
   def testTriLWithVDVTUpdate(self):
-    with self.cached_session() as sess:
-      placeholder = tf.placeholder(tf.float32, name="x")
+    def static_run(fun, x, **kwargs):
+      return self.evaluate(fun(x, **kwargs))
 
-      def static_run(fun, x, **kwargs):
-        return self.evaluate(fun(x, **kwargs))
+    def dynamic_run(fun, x_value, **kwargs):
+      x_value = np.array(x_value, dtype=np.float32)
+      placeholder = tf.placeholder_with_default(x_value, shape=None)
+      return self.evaluate(fun(placeholder, **kwargs))
 
-      def dynamic_run(fun, x_value, **kwargs):
-        x_value = np.array(x_value)
-        return sess.run(
-            fun(placeholder, **kwargs), feed_dict={placeholder: x_value})
+    for run in (static_run, dynamic_run):
+      mu = -1.
+      # Corresponds to scale = [[10, 0, 0], [1, 3, 0], [2, 3, 5]]
+      bijector = tfb.Affine(
+          shift=mu,
+          scale_tril=[[2., 0, 0], [1, 3, 0], [2, 3, 4]],
+          scale_perturb_diag=[2., 1],
+          scale_perturb_factor=[[2., 0], [0., 0], [0, 1]])
+      bijector_ref = tfb.Affine(
+          shift=mu, scale_tril=[[10., 0, 0], [1, 3, 0], [2, 3, 5]])
 
-      for run in (static_run, dynamic_run):
-        mu = -1.
-        # Corresponds to scale = [[10, 0, 0], [1, 3, 0], [2, 3, 5]]
-        bijector = tfb.Affine(
-            shift=mu,
-            scale_tril=[[2., 0, 0], [1, 3, 0], [2, 3, 4]],
-            scale_perturb_diag=[2., 1],
-            scale_perturb_factor=[[2., 0], [0., 0], [0, 1]])
-        bijector_ref = tfb.Affine(
-            shift=mu, scale_tril=[[10., 0, 0], [1, 3, 0], [2, 3, 5]])
-
-        x = [1., 2, 3]  # Vector.
-        self.assertAllClose([9., 6, 22], run(bijector.forward, x))
-        self.assertAllClose(
-            run(bijector_ref.forward, x), run(bijector.forward, x))
-        self.assertAllClose([0.2, 14 / 15., 4 / 25.], run(bijector.inverse, x))
-        self.assertAllClose(
-            run(bijector_ref.inverse, x), run(bijector.inverse, x))
-        self.assertAllClose(
-            -np.log(150.),
-            run(bijector.inverse_log_det_jacobian, x, event_ndims=1))
-        self.assertAllClose(
-            run(bijector.inverse_log_det_jacobian, x, event_ndims=1),
-            run(bijector_ref.inverse_log_det_jacobian, x, event_ndims=1))
+      x = [1., 2, 3]  # Vector.
+      self.assertAllClose([9., 6, 22], run(bijector.forward, x))
+      self.assertAllClose(
+          run(bijector_ref.forward, x), run(bijector.forward, x))
+      self.assertAllClose([0.2, 14 / 15., 4 / 25.], run(bijector.inverse, x))
+      self.assertAllClose(
+          run(bijector_ref.inverse, x), run(bijector.inverse, x))
+      self.assertAllClose(
+          -np.log(150.),
+          run(bijector.inverse_log_det_jacobian, x, event_ndims=1))
+      self.assertAllClose(
+          run(bijector.inverse_log_det_jacobian, x, event_ndims=1),
+          run(bijector_ref.inverse_log_det_jacobian, x, event_ndims=1))
 
   def testTriLWithVDVTUpdateNoDiagonal(self):
-    with self.cached_session() as sess:
-      placeholder = tf.placeholder(tf.float32, name="x")
+    def static_run(fun, x, **kwargs):
+      return self.evaluate(fun(x, **kwargs))
 
-      def static_run(fun, x, **kwargs):
-        return self.evaluate(fun(x, **kwargs))
+    def dynamic_run(fun, x_value, **kwargs):
+      x_value = np.array(x_value, dtype=np.float32)
+      placeholder = tf.placeholder_with_default(x_value, shape=None)
+      return self.evaluate(fun(placeholder, **kwargs))
 
-      def dynamic_run(fun, x_value, **kwargs):
-        x_value = np.array(x_value)
-        return sess.run(
-            fun(placeholder, **kwargs), feed_dict={placeholder: x_value})
+    for run in (static_run, dynamic_run):
+      mu = -1.
+      # Corresponds to scale = [[6, 0, 0], [1, 3, 0], [2, 3, 5]]
+      bijector = tfb.Affine(
+          shift=mu,
+          scale_tril=[[2., 0, 0], [1, 3, 0], [2, 3, 4]],
+          scale_perturb_diag=None,
+          scale_perturb_factor=[[2., 0], [0., 0], [0, 1]])
+      bijector_ref = tfb.Affine(
+          shift=mu, scale_tril=[[6., 0, 0], [1, 3, 0], [2, 3, 5]])
 
-      for run in (static_run, dynamic_run):
-        mu = -1.
-        # Corresponds to scale = [[6, 0, 0], [1, 3, 0], [2, 3, 5]]
-        bijector = tfb.Affine(
-            shift=mu,
-            scale_tril=[[2., 0, 0], [1, 3, 0], [2, 3, 4]],
-            scale_perturb_diag=None,
-            scale_perturb_factor=[[2., 0], [0., 0], [0, 1]])
-        bijector_ref = tfb.Affine(
-            shift=mu, scale_tril=[[6., 0, 0], [1, 3, 0], [2, 3, 5]])
-
-        x = [1., 2, 3]  # Vector.
-        self.assertAllClose([5., 6, 22], run(bijector.forward, x))
-        self.assertAllClose(
-            run(bijector_ref.forward, x), run(bijector.forward, x))
-        self.assertAllClose([1 / 3., 8 / 9., 4 / 30.], run(bijector.inverse, x))
-        self.assertAllClose(
-            run(bijector_ref.inverse, x), run(bijector.inverse, x))
-        self.assertAllClose(
-            -np.log(90.),
-            run(bijector.inverse_log_det_jacobian, x, event_ndims=1))
-        self.assertAllClose(
-            run(bijector.inverse_log_det_jacobian, x, event_ndims=1),
-            run(bijector_ref.inverse_log_det_jacobian, x, event_ndims=1))
+      x = [1., 2, 3]  # Vector.
+      self.assertAllClose([5., 6, 22], run(bijector.forward, x))
+      self.assertAllClose(
+          run(bijector_ref.forward, x), run(bijector.forward, x))
+      self.assertAllClose([1 / 3., 8 / 9., 4 / 30.], run(bijector.inverse, x))
+      self.assertAllClose(
+          run(bijector_ref.inverse, x), run(bijector.inverse, x))
+      self.assertAllClose(
+          -np.log(90.),
+          run(bijector.inverse_log_det_jacobian, x, event_ndims=1))
+      self.assertAllClose(
+          run(bijector.inverse_log_det_jacobian, x, event_ndims=1),
+          run(bijector_ref.inverse_log_det_jacobian, x, event_ndims=1))
 
   def testNoBatchMultivariateRaisesWhenSingular(self):
-    with self.cached_session():
-      mu = [1., -1]
+    mu = [1., -1]
+    with self.assertRaisesOpError("diagonal part must be non-zero"):
       bijector = tfb.Affine(
           shift=mu,
           # Has zero on the diagonal.
           scale_diag=[0., 1],
           validate_args=True)
-      with self.assertRaisesOpError("diagonal part must be non-zero"):
-        self.evaluate(bijector.forward([1., 1.]))
+      self.evaluate(bijector.forward([1., 1.]))
 
   def _makeScale(self,
                  x,
@@ -529,49 +478,48 @@ class AffineBijectorTest(tf.test.TestCase):
           itertools.combinations(s, r) for r in range(len(s) + 1))
 
     for args in _powerset(scale_params.items()):
-      with self.cached_session():
-        args = dict(args)
+      args = dict(args)
 
-        scale_args = dict({"x": x}, **args)
-        scale = self._makeScale(**scale_args)
+      scale_args = dict({"x": x}, **args)
+      scale = self._makeScale(**scale_args)
 
-        # We haven't specified enough information for the scale.
-        if scale is None:
-          with self.assertRaisesRegexp(ValueError, ("must be specified.")):
-            bijector = tfb.Affine(shift=shift, **args)
-        else:
+      # We haven't specified enough information for the scale.
+      if scale is None:
+        with self.assertRaisesRegexp(ValueError, ("must be specified.")):
           bijector = tfb.Affine(shift=shift, **args)
-          np_x = x
-          # For the case a vector is passed in, we need to make the shape
-          # match the matrix for matmul to work.
-          if x.ndim == scale.ndim - 1:
-            np_x = np.expand_dims(x, axis=-1)
+      else:
+        bijector = tfb.Affine(shift=shift, **args)
+        np_x = x
+        # For the case a vector is passed in, we need to make the shape
+        # match the matrix for matmul to work.
+        if x.ndim == scale.ndim - 1:
+          np_x = np.expand_dims(x, axis=-1)
 
-          forward = np.matmul(scale, np_x) + shift
-          if x.ndim == scale.ndim - 1:
-            forward = np.squeeze(forward, axis=-1)
-          self.assertAllClose(forward, self.evaluate(bijector.forward(x)))
+        forward = np.matmul(scale, np_x) + shift
+        if x.ndim == scale.ndim - 1:
+          forward = np.squeeze(forward, axis=-1)
+        self.assertAllClose(forward, self.evaluate(bijector.forward(x)))
 
-          backward = np.linalg.solve(scale, np_x - shift)
-          if x.ndim == scale.ndim - 1:
-            backward = np.squeeze(backward, axis=-1)
-          self.assertAllClose(backward, self.evaluate(bijector.inverse(x)))
+        backward = np.linalg.solve(scale, np_x - shift)
+        if x.ndim == scale.ndim - 1:
+          backward = np.squeeze(backward, axis=-1)
+        self.assertAllClose(backward, self.evaluate(bijector.inverse(x)))
 
-          scale *= np.ones(shape=x.shape[:-1], dtype=scale.dtype)
-          ildj = -np.log(np.abs(np.linalg.det(scale)))
-          # TODO(jvdillon): We need to make it so the scale_identity_multiplier
-          # case does not deviate in expected shape. Fixing this will get rid of
-          # these special cases.
-          if (ildj.ndim > 0 and (len(scale_args) == 1 or (
-              len(scale_args) == 2 and
-              scale_args.get("scale_identity_multiplier", None) is not None))):
-            ildj = np.squeeze(ildj[0])
-          elif ildj.ndim < scale.ndim - 2:
-            ildj = np.reshape(ildj, scale.shape[0:-2])
-          self.assertAllClose(
-              ildj,
-              self.evaluate(bijector.inverse_log_det_jacobian(
-                  x, event_ndims=1)))
+        scale *= np.ones(shape=x.shape[:-1], dtype=scale.dtype)
+        ildj = -np.log(np.abs(np.linalg.det(scale)))
+        # TODO(jvdillon): We need to make it so the scale_identity_multiplier
+        # case does not deviate in expected shape. Fixing this will get rid of
+        # these special cases.
+        if (ildj.ndim > 0 and (len(scale_args) == 1 or (
+            len(scale_args) == 2 and
+            scale_args.get("scale_identity_multiplier", None) is not None))):
+          ildj = np.squeeze(ildj[0])
+        elif ildj.ndim < scale.ndim - 2:
+          ildj = np.reshape(ildj, scale.shape[0:-2])
+        self.assertAllClose(
+            ildj,
+            self.evaluate(bijector.inverse_log_det_jacobian(
+                x, event_ndims=1)))
 
   def testLegalInputs(self):
     self._testLegalInputs(
@@ -620,46 +568,43 @@ class AffineBijectorTest(tf.test.TestCase):
             [1., 2], dtype=np.float32))
 
   def testTriLWithVDVTUpdateAdjoint(self):
-    with self.cached_session() as sess:
-      placeholder = tf.placeholder(tf.float32, name="x")
+    def static_run(fun, x, **kwargs):
+      return self.evaluate(fun(x, **kwargs))
 
-      def static_run(fun, x, **kwargs):
-        return self.evaluate(fun(x, **kwargs))
+    def dynamic_run(fun, x_value, **kwargs):
+      x_value = np.array(x_value, dtype=np.float32)
+      placeholder = tf.placeholder_with_default(x_value, shape=None)
+      return self.evaluate(fun(placeholder, **kwargs))
 
-      def dynamic_run(fun, x_value, **kwargs):
-        x_value = np.array(x_value)
-        return sess.run(
-            fun(placeholder, **kwargs), feed_dict={placeholder: x_value})
-
-      for run in (static_run, dynamic_run):
-        mu = -1.
-        # Corresponds to scale = [[10, 0, 0], [1, 3, 0], [2, 3, 5]]
-        bijector = tfb.Affine(
-            shift=mu,
-            scale_tril=[[2., 0, 0], [1, 3, 0], [2, 3, 4]],
-            scale_perturb_diag=[2., 1],
-            scale_perturb_factor=[[2., 0], [0., 0], [0, 1]],
-            adjoint=True,
-            validate_args=True)
-        scale_ref = np.array([[10., 0, 0],
-                              [1, 3, 0],
-                              [2, 3, 5]], dtype=np.float32)
-        x = np.array([1., 2, 3], dtype=np.float32)
-        expected_forward = np.matmul(scale_ref.T, x) + mu
-        self.assertAllClose(expected_forward,
-                            run(bijector.forward, x))
-        expected_inverse = np.linalg.solve(scale_ref.T, x - mu)
-        self.assertAllClose(expected_inverse,
-                            run(bijector.inverse, x))
-        self.assertAllClose(x,
-                            run(bijector.inverse, expected_forward))
-        expected_fldj = np.log(np.prod(np.diagonal(scale_ref)))
-        self.assertAllClose(
-            -expected_fldj,
-            run(bijector.inverse_log_det_jacobian, x, event_ndims=1))
-        self.assertAllClose(
-            expected_fldj,
-            run(bijector.forward_log_det_jacobian, x, event_ndims=1))
+    for run in (static_run, dynamic_run):
+      mu = -1.
+      # Corresponds to scale = [[10, 0, 0], [1, 3, 0], [2, 3, 5]]
+      bijector = tfb.Affine(
+          shift=mu,
+          scale_tril=[[2., 0, 0], [1, 3, 0], [2, 3, 4]],
+          scale_perturb_diag=[2., 1],
+          scale_perturb_factor=[[2., 0], [0., 0], [0, 1]],
+          adjoint=True,
+          validate_args=True)
+      scale_ref = np.array([[10., 0, 0],
+                            [1, 3, 0],
+                            [2, 3, 5]], dtype=np.float32)
+      x = np.array([1., 2, 3], dtype=np.float32)
+      expected_forward = np.matmul(scale_ref.T, x) + mu
+      self.assertAllClose(expected_forward,
+                          run(bijector.forward, x))
+      expected_inverse = np.linalg.solve(scale_ref.T, x - mu)
+      self.assertAllClose(expected_inverse,
+                          run(bijector.inverse, x))
+      self.assertAllClose(x,
+                          run(bijector.inverse, expected_forward))
+      expected_fldj = np.log(np.prod(np.diagonal(scale_ref)))
+      self.assertAllClose(
+          -expected_fldj,
+          run(bijector.inverse_log_det_jacobian, x, event_ndims=1))
+      self.assertAllClose(
+          expected_fldj,
+          run(bijector.forward_log_det_jacobian, x, event_ndims=1))
 
   def _testScaledIdentityComplexAdjoint(self, is_dynamic):
     shift_ = np.array(-0.5, dtype=np.complex)
@@ -687,11 +632,9 @@ class AffineBijectorTest(tf.test.TestCase):
     self.assertAllClose(z.shape[-1] * np.log(np.abs(scale_)), fldj_)
     self.assertAllClose(-z.shape[-1] * np.log(np.abs(scale_)), ildj_)
 
-  @test_util.run_in_graph_and_eager_modes
   def testScaledIdentityComplexAdjointDynamic(self):
     return self._testScaledIdentityComplexAdjoint(is_dynamic=True)
 
-  @test_util.run_in_graph_and_eager_modes
   def testScaledIdentityComplexAdjointStatic(self):
     return self._testScaledIdentityComplexAdjoint(is_dynamic=False)
 

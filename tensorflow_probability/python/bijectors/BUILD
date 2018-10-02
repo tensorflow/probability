@@ -416,7 +416,7 @@ py_library(
     ],
 )
 
-py_test(
+py_library(
     name = "bijector_test_util",
     srcs = ["bijector_test_util.py"],
     deps = [

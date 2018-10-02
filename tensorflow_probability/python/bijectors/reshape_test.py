@@ -24,6 +24,7 @@ import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow.python.framework import test_util
 
 
 class _ReshapeBijectorTest(object):
@@ -48,33 +49,32 @@ class _ReshapeBijectorTest(object):
     expected_x = np.random.randn(4, 3, 2)
     expected_y = np.reshape(expected_x, [4, 6])
 
-    with self.cached_session() as sess:
-      shape_in, shape_out = self.build_shapes([3, 2], [6,])
-      bijector = tfb.Reshape(
-          event_shape_out=shape_out,
-          event_shape_in=shape_in,
-          validate_args=True)
-      (x_,
-       y_,
-       fldj_,
-       ildj_,
-       fest_,
-       iest_) = sess.run((
-           bijector.inverse(expected_y),
-           bijector.forward(expected_x),
-           bijector.forward_log_det_jacobian(expected_x, event_ndims=2),
-           bijector.inverse_log_det_jacobian(expected_y, event_ndims=2),
-           bijector.forward_event_shape_tensor(expected_x.shape),
-           bijector.inverse_event_shape_tensor(expected_y.shape),
-       ))
-      self.assertEqual("reshape", bijector.name)
-      self.assertAllClose(expected_y, y_, rtol=1e-6, atol=0)
-      self.assertAllClose(expected_x, x_, rtol=1e-6, atol=0)
-      self.assertAllClose(0., fldj_, rtol=1e-6, atol=0)
-      self.assertAllClose(0., ildj_, rtol=1e-6, atol=0)
-      # Test that event_shape_tensors match fwd/inv result shapes.
-      self.assertAllEqual(y_.shape, fest_)
-      self.assertAllEqual(x_.shape, iest_)
+    shape_in, shape_out = self.build_shapes([3, 2], [6,])
+    bijector = tfb.Reshape(
+        event_shape_out=shape_out,
+        event_shape_in=shape_in,
+        validate_args=True)
+    (x_,
+     y_,
+     fldj_,
+     ildj_,
+     fest_,
+     iest_) = self.evaluate((
+         bijector.inverse(expected_y),
+         bijector.forward(expected_x),
+         bijector.forward_log_det_jacobian(expected_x, event_ndims=2),
+         bijector.inverse_log_det_jacobian(expected_y, event_ndims=2),
+         bijector.forward_event_shape_tensor(expected_x.shape),
+         bijector.inverse_event_shape_tensor(expected_y.shape),
+     ))
+    self.assertEqual("reshape", bijector.name)
+    self.assertAllClose(expected_y, y_, rtol=1e-6, atol=0)
+    self.assertAllClose(expected_x, x_, rtol=1e-6, atol=0)
+    self.assertAllClose(0., fldj_, rtol=1e-6, atol=0)
+    self.assertAllClose(0., ildj_, rtol=1e-6, atol=0)
+    # Test that event_shape_tensors match fwd/inv result shapes.
+    self.assertAllEqual(y_.shape, fest_)
+    self.assertAllEqual(x_.shape, iest_)
 
   def testEventShapeTensor(self):
     """Test event_shape_tensor methods when even ndims may be dynamic."""
@@ -87,14 +87,13 @@ class _ReshapeBijectorTest(object):
 
     # using the _tensor methods, we should always get a fully-specified
     # result since these are evaluated at graph runtime.
-    with self.cached_session() as sess:
-      (shape_out_,
-       shape_in_) = sess.run((
-           bijector.forward_event_shape_tensor(shape_in),
-           bijector.inverse_event_shape_tensor(shape_out),
-       ))
-      self.assertAllEqual(shape_out_static, shape_out_)
-      self.assertAllEqual(shape_in_static, shape_in_)
+    (shape_out_,
+     shape_in_) = self.evaluate((
+         bijector.forward_event_shape_tensor(shape_in),
+         bijector.inverse_event_shape_tensor(shape_out),
+     ))
+    self.assertAllEqual(shape_out_static, shape_out_)
+    self.assertAllEqual(shape_in_static, shape_in_)
 
   def testScalarReshape(self):
     """Test reshaping to and from a scalar shape ()."""
@@ -106,130 +105,127 @@ class _ReshapeBijectorTest(object):
     expected_y_scalar = expected_x_scalar[0]
 
     shape_in, shape_out = self.build_shapes([], [1,])
-    with self.cached_session() as sess:
-      bijector = tfb.Reshape(
-          event_shape_out=shape_in,
-          event_shape_in=shape_out,
-          validate_args=True)
-      (x_,
-       y_,
-       x_scalar_,
-       y_scalar_
-      ) = sess.run((
-          bijector.inverse(expected_y),
-          bijector.forward(expected_x),
-          bijector.inverse(expected_y_scalar),
-          bijector.forward(expected_x_scalar),
-      ))
-      self.assertAllClose(expected_y, y_, rtol=1e-6, atol=0)
-      self.assertAllClose(expected_x, x_, rtol=1e-6, atol=0)
-      self.assertAllClose(expected_y_scalar, y_scalar_, rtol=1e-6, atol=0)
-      self.assertAllClose(expected_x_scalar, x_scalar_, rtol=1e-6, atol=0)
+    bijector = tfb.Reshape(
+        event_shape_out=shape_in,
+        event_shape_in=shape_out,
+        validate_args=True)
+    (x_,
+     y_,
+     x_scalar_,
+     y_scalar_
+    ) = self.evaluate((
+        bijector.inverse(expected_y),
+        bijector.forward(expected_x),
+        bijector.inverse(expected_y_scalar),
+        bijector.forward(expected_x_scalar),
+    ))
+    self.assertAllClose(expected_y, y_, rtol=1e-6, atol=0)
+    self.assertAllClose(expected_x, x_, rtol=1e-6, atol=0)
+    self.assertAllClose(expected_y_scalar, y_scalar_, rtol=1e-6, atol=0)
+    self.assertAllClose(expected_x_scalar, x_scalar_, rtol=1e-6, atol=0)
 
   def testValidButNonMatchingInputOpError(self):
     x = np.random.randn(4, 3, 2)
 
-    with self.cached_session() as sess:
-      shape_in, shape_out = self.build_shapes([2, 3], [1, 6, 1,])
-      bijector = tfb.Reshape(
-          event_shape_out=shape_out,
-          event_shape_in=shape_in,
-          validate_args=True)
+    shape_in, shape_out = self.build_shapes([2, 3], [1, 6, 1,])
+    bijector = tfb.Reshape(
+        event_shape_out=shape_out,
+        event_shape_in=shape_in,
+        validate_args=True)
 
-      # Here we pass in a tensor (x) whose shape is compatible with
-      # the output shape, so tf.reshape will throw no error, but
-      # doesn't match the expected input shape.
-      with self.assertRaisesError("Input `event_shape` does not match"):
-        sess.run(bijector.forward(x))
+    # Here we pass in a tensor (x) whose shape is compatible with
+    # the output shape, so tf.reshape will throw no error, but
+    # doesn't match the expected input shape.
+    with self.assertRaisesError("Input `event_shape` does not match"):
+      self.evaluate(bijector.forward(x))
 
   def testValidButNonMatchingInputPartiallySpecifiedOpError(self):
     x = np.random.randn(4, 3, 2)
 
-    with self.cached_session() as sess:
-      shape_in, shape_out = self.build_shapes([2, -1], [1, 6, 1,])
-      bijector = tfb.Reshape(
-          event_shape_out=shape_out,
-          event_shape_in=shape_in,
-          validate_args=True)
+    shape_in, shape_out = self.build_shapes([2, -1], [1, 6, 1,])
+    bijector = tfb.Reshape(
+        event_shape_out=shape_out,
+        event_shape_in=shape_in,
+        validate_args=True)
 
-      with self.assertRaisesError("Input `event_shape` does not match"):
-        sess.run(bijector.forward(x))
+    with self.assertRaisesError("Input `event_shape` does not match"):
+      self.evaluate(bijector.forward(x))
 
   # pylint: disable=invalid-name
   def _testInputOutputMismatchOpError(self, expected_error_message):
     x1 = np.random.randn(4, 2, 3)
     x2 = np.random.randn(4, 1, 1, 5)
 
-    with self.cached_session() as sess:
-      shape_in, shape_out = self.build_shapes([2, 3], [1, 1, 5])
+    shape_in, shape_out = self.build_shapes([2, 3], [1, 1, 5])
+    with self.assertRaisesError(expected_error_message):
       bijector = tfb.Reshape(
           event_shape_out=shape_out,
           event_shape_in=shape_in,
           validate_args=True)
-
-      with self.assertRaisesError(expected_error_message):
-        sess.run(bijector.forward(x1))
-      with self.assertRaisesError(expected_error_message):
-        sess.run(bijector.inverse(x2))
+      self.evaluate(bijector.forward(x1))
+    with self.assertRaisesError(expected_error_message):
+      bijector = tfb.Reshape(
+          event_shape_out=shape_out,
+          event_shape_in=shape_in,
+          validate_args=True)
+      self.evaluate(bijector.inverse(x2))
   # pylint: enable=invalid-name
 
   def testOneShapePartiallySpecified(self):
     expected_x = np.random.randn(4, 6)
     expected_y = np.reshape(expected_x, [4, 2, 3])
 
-    with self.cached_session() as sess:
-      # one of input/output shapes is partially specified
-      shape_in, shape_out = self.build_shapes([-1,], [2, 3])
-      bijector = tfb.Reshape(
-          event_shape_out=shape_out,
-          event_shape_in=shape_in,
-          validate_args=True)
-      (x_,
-       y_,
-      ) = sess.run((
-          bijector.inverse(expected_y),
-          bijector.forward(expected_x),
-      ))
-      self.assertAllClose(expected_y, y_, rtol=1e-6, atol=0)
-      self.assertAllClose(expected_x, x_, rtol=1e-6, atol=0)
+    # one of input/output shapes is partially specified
+    shape_in, shape_out = self.build_shapes([-1,], [2, 3])
+    bijector = tfb.Reshape(
+        event_shape_out=shape_out,
+        event_shape_in=shape_in,
+        validate_args=True)
+    (x_,
+     y_,
+    ) = self.evaluate((
+        bijector.inverse(expected_y),
+        bijector.forward(expected_x),
+    ))
+    self.assertAllClose(expected_y, y_, rtol=1e-6, atol=0)
+    self.assertAllClose(expected_x, x_, rtol=1e-6, atol=0)
 
   def testBothShapesPartiallySpecified(self):
     expected_x = np.random.randn(4, 2, 3)
     expected_y = np.reshape(expected_x, [4, 3, 2])
-    with self.cached_session() as sess:
-      shape_in, shape_out = self.build_shapes([-1, 3], [-1, 2])
-      bijector = tfb.Reshape(
-          event_shape_out=shape_out,
-          event_shape_in=shape_in,
-          validate_args=True)
-      (x_,
-       y_,
-      ) = sess.run((
-          bijector.inverse(expected_y),
-          bijector.forward(expected_x),
-      ))
-      self.assertAllClose(expected_y, y_, rtol=1e-6, atol=0)
-      self.assertAllClose(expected_x, x_, rtol=1e-6, atol=0)
+    shape_in, shape_out = self.build_shapes([-1, 3], [-1, 2])
+    bijector = tfb.Reshape(
+        event_shape_out=shape_out,
+        event_shape_in=shape_in,
+        validate_args=True)
+    (x_,
+     y_,
+    ) = self.evaluate((
+        bijector.inverse(expected_y),
+        bijector.forward(expected_x),
+    ))
+    self.assertAllClose(expected_y, y_, rtol=1e-6, atol=0)
+    self.assertAllClose(expected_x, x_, rtol=1e-6, atol=0)
 
   def testDefaultVectorShape(self):
     expected_x = np.random.randn(4, 4)
     expected_y = np.reshape(expected_x, [4, 2, 2])
-    with self.cached_session() as sess:
-      _, shape_out = self.build_shapes([-1,], [-1, 2])
-      bijector = tfb.Reshape(shape_out, validate_args=True)
-      (x_,
-       y_,
-      ) = sess.run((
-          bijector.inverse(expected_y),
-          bijector.forward(expected_x),
-      ))
-      self.assertAllClose(expected_y, y_, rtol=1e-6, atol=0)
-      self.assertAllClose(expected_x, x_, rtol=1e-6, atol=0)
+    _, shape_out = self.build_shapes([-1,], [-1, 2])
+    bijector = tfb.Reshape(shape_out, validate_args=True)
+    (x_,
+     y_,
+    ) = self.evaluate((
+        bijector.inverse(expected_y),
+        bijector.forward(expected_x),
+    ))
+    self.assertAllClose(expected_y, y_, rtol=1e-6, atol=0)
+    self.assertAllClose(expected_x, x_, rtol=1e-6, atol=0)
 
   def build_shapes(self, *args, **kwargs):
     raise NotImplementedError("Subclass failed to implement `build_shapes`.")
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class ReshapeBijectorTestStatic(tf.test.TestCase, _ReshapeBijectorTest):
 
   def build_shapes(self, shape_in, shape_out):
@@ -253,11 +249,15 @@ class ReshapeBijectorTestStatic(tf.test.TestCase, _ReshapeBijectorTest):
         bijector.forward_event_shape(tf.TensorShape([4, 2, 3])).as_list(),
         [4, 6])
     self.assertEqual(
-        bijector.forward_event_shape(tf.TensorShape([None, 2, 3])).as_list(),
-        [None, 6])
-    self.assertEqual(
         bijector.inverse_event_shape(tf.TensorShape([4, 6])).as_list(),
         [4, 2, 3])
+
+    # Shape is always known for reshaping in eager mode, so we skip these tests.
+    if tf.executing_eagerly():
+      return
+    self.assertEqual(
+        bijector.forward_event_shape(tf.TensorShape([None, 2, 3])).as_list(),
+        [None, 6])
     self.assertEqual(
         bijector.inverse_event_shape(tf.TensorShape([None, 6])).as_list(),
         [None, 2, 3])
@@ -291,7 +291,8 @@ class ReshapeBijectorTestStatic(tf.test.TestCase, _ReshapeBijectorTest):
                   validate_args=True)
 
   def testInputOutputMismatchOpError(self):
-    self._testInputOutputMismatchOpError("Cannot reshape a tensor with")
+    self._testInputOutputMismatchOpError(
+        "(Input to reshape|Cannot reshape a tensor with)")
 
 
 class ReshapeBijectorTestDynamic(tf.test.TestCase, _ReshapeBijectorTest):
@@ -306,6 +307,10 @@ class ReshapeBijectorTestDynamic(tf.test.TestCase, _ReshapeBijectorTest):
     return self.assertRaisesOpError(msg)
 
   def testEventShape(self):
+    # Shape is always known for reshaping in eager mode, so we skip these tests.
+    if tf.executing_eagerly():
+      return
+
     event_shape_in, event_shape_out = self.build_shapes([2, 3], [6])
     bijector = tfb.Reshape(
         event_shape_out=event_shape_out,
@@ -332,28 +337,25 @@ class ReshapeBijectorTestDynamic(tf.test.TestCase, _ReshapeBijectorTest):
     self._testInputOutputMismatchOpError("Input to reshape is a tensor with")
 
   def testMultipleUnspecifiedDimensionsOpError(self):
-    shape_in, shape_out = self.build_shapes([2, 3], [4, -1, -1,])
-    bijector = tfb.Reshape(
-        event_shape_out=shape_out,
-        event_shape_in=shape_in,
-        validate_args=True)
-
-    with self.cached_session() as sess:
-      with self.assertRaisesError(
-          "elements must have at most one `-1`."):
-        sess.run(bijector.forward_event_shape_tensor(shape_in))
+    with self.assertRaisesError(
+        "elements must have at most one `-1`."):
+      shape_in, shape_out = self.build_shapes([2, 3], [4, -1, -1,])
+      bijector = tfb.Reshape(
+          event_shape_out=shape_out,
+          event_shape_in=shape_in,
+          validate_args=True)
+      self.evaluate(bijector.forward_event_shape_tensor(shape_in))
 
   def testInvalidDimensionsOpError(self):
     shape_in, shape_out = self.build_shapes([2, 3], [1, 2, -2,])
-    bijector = tfb.Reshape(
-        event_shape_out=shape_out,
-        event_shape_in=shape_in,
-        validate_args=True)
 
-    with self.cached_session() as sess:
-      with self.assertRaisesError(
-          "elements must be either positive integers or `-1`."):
-        sess.run(bijector.forward_event_shape_tensor(shape_in))
+    with self.assertRaisesError(
+        "elements must be either positive integers or `-1`."):
+      bijector = tfb.Reshape(
+          event_shape_out=shape_out,
+          event_shape_in=shape_in,
+          validate_args=True)
+      self.evaluate(bijector.forward_event_shape_tensor(shape_in))
 
 
 class ReshapeBijectorTestDynamicNdims(tf.test.TestCase, _ReshapeBijectorTest):
@@ -378,9 +380,13 @@ class ReshapeBijectorTestDynamicNdims(tf.test.TestCase, _ReshapeBijectorTest):
     self.assertIsNone(
         bijector.forward_event_shape(tf.TensorShape([4, 2, 3])).ndims)
     self.assertIsNone(
-        bijector.forward_event_shape(tf.TensorShape([None, 2, 3])).ndims)
-    self.assertIsNone(
         bijector.inverse_event_shape(tf.TensorShape([4, 6])).ndims)
+
+    # Shape is always known for reshaping in eager mode, so we skip these tests.
+    if tf.executing_eagerly():
+      return
+    self.assertIsNone(
+        bijector.forward_event_shape(tf.TensorShape([None, 2, 3])).ndims)
     self.assertIsNone(
         bijector.inverse_event_shape(tf.TensorShape([None, 6])).ndims)
     self.assertIsNone(
@@ -391,27 +397,24 @@ class ReshapeBijectorTestDynamicNdims(tf.test.TestCase, _ReshapeBijectorTest):
 
   def testMultipleUnspecifiedDimensionsOpError(self):
     shape_in, shape_out = self.build_shapes([2, 3], [4, -1, -1,])
-    bijector = tfb.Reshape(
-        event_shape_out=shape_out,
-        event_shape_in=shape_in,
-        validate_args=True)
 
-    with self.cached_session() as sess:
-      with self.assertRaisesError(
-          "elements must have at most one `-1`."):
-        sess.run(bijector.forward_event_shape_tensor(shape_in))
+    with self.assertRaisesError(
+        "elements must have at most one `-1`."):
+      bijector = tfb.Reshape(
+          event_shape_out=shape_out,
+          event_shape_in=shape_in,
+          validate_args=True)
+      self.evaluate(bijector.forward_event_shape_tensor(shape_in))
 
   def testInvalidDimensionsOpError(self):
     shape_in, shape_out = self.build_shapes([2, 3], [1, 2, -2,])
-    bijector = tfb.Reshape(
-        event_shape_out=shape_out,
-        event_shape_in=shape_in,
-        validate_args=True)
-
-    with self.cached_session() as sess:
-      with self.assertRaisesError(
-          "elements must be either positive integers or `-1`."):
-        sess.run(bijector.forward_event_shape_tensor(shape_in))
+    with self.assertRaisesError(
+        "elements must be either positive integers or `-1`."):
+      bijector = tfb.Reshape(
+          event_shape_out=shape_out,
+          event_shape_in=shape_in,
+          validate_args=True)
+      self.evaluate(bijector.forward_event_shape_tensor(shape_in))
 
 if __name__ == "__main__":
   tf.test.main()

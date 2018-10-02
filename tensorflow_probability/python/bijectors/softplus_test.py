@@ -24,10 +24,12 @@ import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow.python.framework import test_util
 
 rng = np.random.RandomState(42)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class SoftplusBijectorTest(tf.test.TestCase):
   """Tests the correctness of the Y = g(X) = Log[1 + exp(X)] transformation."""
 
@@ -42,64 +44,58 @@ class SoftplusBijectorTest(tf.test.TestCase):
     return -np.log(1 - np.exp(-y))
 
   def testHingeSoftnessZeroRaises(self):
-    with self.cached_session():
+    with self.assertRaisesOpError("must be non-zero"):
       bijector = tfb.Softplus(hinge_softness=0., validate_args=True)
-      with self.assertRaisesOpError("must be non-zero"):
-        self.evaluate(bijector.forward([1., 1.]))
+      self.evaluate(bijector.forward([1., 1.]))
 
   def testBijectorForwardInverseEventDimsZero(self):
-    with self.cached_session():
-      bijector = tfb.Softplus()
-      self.assertEqual("softplus", bijector.name)
-      x = 2 * rng.randn(2, 10)
-      y = self._softplus(x)
+    bijector = tfb.Softplus()
+    self.assertEqual("softplus", bijector.name)
+    x = 2 * rng.randn(2, 10)
+    y = self._softplus(x)
 
-      self.assertAllClose(y, self.evaluate(bijector.forward(x)))
-      self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
+    self.assertAllClose(y, self.evaluate(bijector.forward(x)))
+    self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
 
   def testBijectorForwardInverseWithHingeSoftnessEventDimsZero(self):
-    with self.cached_session():
-      bijector = tfb.Softplus(hinge_softness=1.5)
-      x = 2 * rng.randn(2, 10)
-      y = 1.5 * self._softplus(x / 1.5)
+    bijector = tfb.Softplus(hinge_softness=1.5)
+    x = 2 * rng.randn(2, 10)
+    y = 1.5 * self._softplus(x / 1.5)
 
-      self.assertAllClose(y, self.evaluate(bijector.forward(x)))
-      self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
+    self.assertAllClose(y, self.evaluate(bijector.forward(x)))
+    self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
 
   def testBijectorLogDetJacobianEventDimsZero(self):
-    with self.cached_session():
-      bijector = tfb.Softplus()
-      y = 2 * rng.rand(2, 10)
-      # No reduction needed if event_dims = 0.
-      ildj = self._softplus_ildj_before_reduction(y)
+    bijector = tfb.Softplus()
+    y = 2 * rng.rand(2, 10)
+    # No reduction needed if event_dims = 0.
+    ildj = self._softplus_ildj_before_reduction(y)
 
-      self.assertAllClose(
-          ildj,
-          self.evaluate(bijector.inverse_log_det_jacobian(
-              y, event_ndims=0)))
+    self.assertAllClose(
+        ildj,
+        self.evaluate(bijector.inverse_log_det_jacobian(
+            y, event_ndims=0)))
 
   def testBijectorForwardInverseEventDimsOne(self):
-    with self.cached_session():
-      bijector = tfb.Softplus()
-      self.assertEqual("softplus", bijector.name)
-      x = 2 * rng.randn(2, 10)
-      y = self._softplus(x)
+    bijector = tfb.Softplus()
+    self.assertEqual("softplus", bijector.name)
+    x = 2 * rng.randn(2, 10)
+    y = self._softplus(x)
 
-      self.assertAllClose(y, self.evaluate(bijector.forward(x)))
-      self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
+    self.assertAllClose(y, self.evaluate(bijector.forward(x)))
+    self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
 
   def testBijectorLogDetJacobianEventDimsOne(self):
-    with self.cached_session():
-      bijector = tfb.Softplus()
-      y = 2 * rng.rand(2, 10)
-      ildj_before = self._softplus_ildj_before_reduction(y)
-      ildj = np.sum(ildj_before, axis=1)
+    bijector = tfb.Softplus()
+    y = 2 * rng.rand(2, 10)
+    ildj_before = self._softplus_ildj_before_reduction(y)
+    ildj = np.sum(ildj_before, axis=1)
 
-      self.assertAllClose(
-          ildj,
-          self.evaluate(
-              bijector.inverse_log_det_jacobian(
-                  y, event_ndims=1)))
+    self.assertAllClose(
+        ildj,
+        self.evaluate(
+            bijector.inverse_log_det_jacobian(
+                y, event_ndims=1)))
 
   def testScalarCongruency(self):
     bijector = tfb.Softplus()

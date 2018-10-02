@@ -58,7 +58,8 @@ class MakeBatchReadyTest(tf.test.TestCase):
 
   def _build_graph(self, x, batch_ndims, event_ndims, expand_batch_dim):
     shaper = _DistributionShape(batch_ndims=batch_ndims,
-                                event_ndims=event_ndims)
+                                event_ndims=event_ndims,
+                                validate_args=True)
     y, sample_shape = shaper.make_batch_of_event_sample_matrices(
         x, expand_batch_dim=expand_batch_dim)
     should_be_x_value = shaper.undo_make_batch_of_event_sample_matrices(
@@ -66,17 +67,12 @@ class MakeBatchReadyTest(tf.test.TestCase):
     return y, sample_shape, should_be_x_value
 
   def _test_dynamic(self, x, batch_ndims, event_ndims, expand_batch_dim=True):
-    with self.cached_session() as sess:
-      x_pl = tf.placeholder(x.dtype)
-      batch_ndims_pl = tf.placeholder(tf.int32)
-      event_ndims_pl = tf.placeholder(tf.int32)
-      [y_, sample_shape_, should_be_x_value_] = sess.run(
-          self._build_graph(
-              x_pl, batch_ndims_pl, event_ndims_pl, expand_batch_dim),
-          feed_dict={
-              x_pl: x,
-              batch_ndims_pl: batch_ndims,
-              event_ndims_pl: event_ndims})
+    x_pl = tf.placeholder_with_default(x, shape=None)
+    batch_ndims_pl = tf.placeholder_with_default(batch_ndims, shape=None)
+    event_ndims_pl = tf.placeholder_with_default(event_ndims, shape=None)
+    [y_, sample_shape_, should_be_x_value_] = self.evaluate(
+        self._build_graph(
+            x_pl, batch_ndims_pl, event_ndims_pl, expand_batch_dim))
     expected_y, expected_sample_shape = self._get_expected(
         x, batch_ndims, event_ndims, expand_batch_dim)
     self.assertAllEqual(expected_sample_shape, sample_shape_)
@@ -84,9 +80,8 @@ class MakeBatchReadyTest(tf.test.TestCase):
     self.assertAllEqual(x, should_be_x_value_)
 
   def _test_static(self, x, batch_ndims, event_ndims, expand_batch_dim):
-    with self.cached_session() as sess:
-      [y_, sample_shape_, should_be_x_value_] = sess.run(
-          self._build_graph(x, batch_ndims, event_ndims, expand_batch_dim))
+    [y_, sample_shape_, should_be_x_value_] = self.evaluate(
+        self._build_graph(x, batch_ndims, event_ndims, expand_batch_dim))
     expected_y, expected_sample_shape = self._get_expected(
         x, batch_ndims, event_ndims, expand_batch_dim)
     self.assertAllEqual(expected_sample_shape, sample_shape_)
@@ -514,8 +509,8 @@ class DistributionShapeTest(tf.test.TestCase):
   def setUp(self):
     self._rng = np.random.RandomState(42)
 
-  def _random_sample(self, sample_shape, dtype=tf.float64):
-    return self._rng.random_sample(sample_shape).astype(dtype.as_numpy_dtype())
+  def _random_sample(self, sample_shape, dtype=np.float32):
+    return self._rng.random_sample(sample_shape).astype(dtype)
 
   def _assertNdArrayEqual(self, expected, actual):
     """Helper which properly compares two np.ndarray-like objects.
@@ -537,152 +532,155 @@ class DistributionShapeTest(tf.test.TestCase):
       self.assertAllEqual(expected_item, next(actual_item))
 
   def testDistributionShapeGetNdimsStatic(self):
-    with self.cached_session():
-      shaper = _DistributionShape(batch_ndims=0, event_ndims=0)
-      x = 1
-      self.assertEqual(0, self.evaluate(shaper.get_sample_ndims(x)))
-      self.assertEqual(0, self.evaluate(shaper.batch_ndims))
-      self.assertEqual(0, self.evaluate(shaper.event_ndims))
+    shaper = _DistributionShape(batch_ndims=0, event_ndims=0)
+    x = 1
+    self.assertEqual(0, self.evaluate(shaper.get_sample_ndims(x)))
+    self.assertEqual(0, self.evaluate(shaper.batch_ndims))
+    self.assertEqual(0, self.evaluate(shaper.event_ndims))
 
-      shaper = _DistributionShape(batch_ndims=1, event_ndims=1)
-      x = self._random_sample((1, 2, 3))
-      self.assertAllEqual(3, self.evaluate(shaper.get_ndims(x)))
-      self.assertEqual(1, self.evaluate(shaper.get_sample_ndims(x)))
-      self.assertEqual(1, self.evaluate(shaper.batch_ndims))
-      self.assertEqual(1, self.evaluate(shaper.event_ndims))
+    shaper = _DistributionShape(batch_ndims=1, event_ndims=1)
+    x = self._random_sample((1, 2, 3))
+    self.assertAllEqual(3, self.evaluate(shaper.get_ndims(x)))
+    self.assertEqual(1, self.evaluate(shaper.get_sample_ndims(x)))
+    self.assertEqual(1, self.evaluate(shaper.batch_ndims))
+    self.assertEqual(1, self.evaluate(shaper.event_ndims))
 
-      x += self._random_sample((1, 2, 3))
-      self.assertAllEqual(3, self.evaluate(shaper.get_ndims(x)))
-      self.assertEqual(1, self.evaluate(shaper.get_sample_ndims(x)))
-      self.assertEqual(1, self.evaluate(shaper.batch_ndims))
-      self.assertEqual(1, self.evaluate(shaper.event_ndims))
+    x += self._random_sample((1, 2, 3))
+    self.assertAllEqual(3, self.evaluate(shaper.get_ndims(x)))
+    self.assertEqual(1, self.evaluate(shaper.get_sample_ndims(x)))
+    self.assertEqual(1, self.evaluate(shaper.batch_ndims))
+    self.assertEqual(1, self.evaluate(shaper.event_ndims))
 
-      # Test ndims functions work, even despite unfed Tensors.
-      y = tf.placeholder(tf.float32, shape=(1024, None, 1024))
-      self.assertEqual(3, self.evaluate(shaper.get_ndims(y)))
-      self.assertEqual(1, self.evaluate(shaper.get_sample_ndims(y)))
-      self.assertEqual(1, self.evaluate(shaper.batch_ndims))
-      self.assertEqual(1, self.evaluate(shaper.event_ndims))
+    # There is no such thing as unfed Tensor in Eager, so exit early.
+    if tf.executing_eagerly():
+      return
+
+    # Test ndims functions work, even despite unfed Tensors.
+    y = tf.placeholder(tf.float32, shape=(1024, None, 1024))
+    self.assertEqual(3, self.evaluate(shaper.get_ndims(y)))
+    self.assertEqual(1, self.evaluate(shaper.get_sample_ndims(y)))
+    self.assertEqual(1, self.evaluate(shaper.batch_ndims))
+    self.assertEqual(1, self.evaluate(shaper.event_ndims))
 
   def testDistributionShapeGetNdimsDynamic(self):
-    with self.cached_session() as sess:
-      batch_ndims = tf.placeholder(tf.int32)
-      event_ndims = tf.placeholder(tf.int32)
-      shaper = _DistributionShape(
-          batch_ndims=batch_ndims, event_ndims=event_ndims)
-      y = tf.placeholder(tf.float32)
-      y_value = np.ones((4, 2), dtype=y.dtype.as_numpy_dtype())
-      feed_dict = {y: y_value, batch_ndims: 1, event_ndims: 1}
-      self.assertEqual(2, sess.run(shaper.get_ndims(y), feed_dict=feed_dict))
+    batch_ndims = tf.placeholder_with_default(1, shape=None)
+    event_ndims = tf.placeholder_with_default(1, shape=None)
+    shaper = _DistributionShape(
+        batch_ndims=batch_ndims, event_ndims=event_ndims)
+    y = tf.placeholder_with_default(
+        np.ones((4, 2), dtype=np.float32), shape=None)
+    self.assertEqual(2, self.evaluate(shaper.get_ndims(y)))
 
   def testDistributionShapeGetDimsStatic(self):
-    with self.cached_session():
-      shaper = _DistributionShape(batch_ndims=0, event_ndims=0)
-      x = 1
-      self.assertAllEqual((_empty_shape, _empty_shape, _empty_shape),
-                          _constant(shaper.get_dims(x)))
-      shaper = _DistributionShape(batch_ndims=1, event_ndims=2)
-      x += self._random_sample((1, 1, 2, 2))
-      self._assertNdArrayEqual(([0], [1], [2, 3]),
-                               _constant(shaper.get_dims(x)))
-      x += x
-      self._assertNdArrayEqual(([0], [1], [2, 3]),
-                               _constant(shaper.get_dims(x)))
+    shaper = _DistributionShape(batch_ndims=0, event_ndims=0)
+    x = 1
+    self.assertAllEqual((_empty_shape, _empty_shape, _empty_shape),
+                        _constant(shaper.get_dims(x)))
+    shaper = _DistributionShape(batch_ndims=1, event_ndims=2)
+    x += self._random_sample((1, 1, 2, 2))
+    self._assertNdArrayEqual(([0], [1], [2, 3]),
+                             _constant(shaper.get_dims(x)))
+    x += x
+    self._assertNdArrayEqual(([0], [1], [2, 3]),
+                             _constant(shaper.get_dims(x)))
 
   def testDistributionShapeGetDimsDynamic(self):
-    with self.cached_session() as sess:
-      # Works for static {batch,event}_ndims despite unfed input.
-      shaper = _DistributionShape(batch_ndims=1, event_ndims=2)
-      y = tf.placeholder(tf.float32, shape=(10, None, 5, 5))
-      self._assertNdArrayEqual(
-          [[0], [1], [2, 3]], self.evaluate(shaper.get_dims(y)))
+    # Works for deferred {batch,event}_ndims.
+    batch_ndims = tf.placeholder_with_default(1, shape=None)
+    event_ndims = tf.placeholder_with_default(2, shape=None)
+    shaper = _DistributionShape(
+        batch_ndims=batch_ndims, event_ndims=event_ndims)
+    y = tf.placeholder_with_default(
+        self._random_sample((10, 3, 5, 5), dtype=np.float32), shape=None)
+    self._assertNdArrayEqual(
+        ([0], [1], [2, 3]), self.evaluate(shaper.get_dims(y)))
 
-      # Works for deferred {batch,event}_ndims.
-      batch_ndims = tf.placeholder(tf.int32)
-      event_ndims = tf.placeholder(tf.int32)
-      shaper = _DistributionShape(
-          batch_ndims=batch_ndims, event_ndims=event_ndims)
-      y = tf.placeholder(tf.float32)
-      y_value = self._random_sample((10, 3, 5, 5), dtype=y.dtype)
-      feed_dict = {y: y_value, batch_ndims: 1, event_ndims: 2}
-      self._assertNdArrayEqual(
-          ([0], [1], [2, 3]), sess.run(shaper.get_dims(y), feed_dict=feed_dict))
+    # In eager mode, there is no such thing as unfed input, so exit early.
+    if tf.executing_eagerly():
+      return
+
+    # Works for static {batch,event}_ndims despite unfed input.
+    shaper = _DistributionShape(batch_ndims=1, event_ndims=2)
+    y = tf.placeholder(tf.float32, shape=(10, None, 5, 5))
+    self._assertNdArrayEqual(
+        [[0], [1], [2, 3]], self.evaluate(shaper.get_dims(y)))
 
   def testDistributionShapeGetShapeStatic(self):
-    with self.cached_session():
-      shaper = _DistributionShape(batch_ndims=0, event_ndims=0)
-      self.assertAllEqual((_empty_shape, _empty_shape, _empty_shape),
-                          _constant(shaper.get_shape(1.)))
-      self._assertNdArrayEqual(([1], _empty_shape, _empty_shape),
-                               _constant(shaper.get_shape(np.ones(1))))
-      self._assertNdArrayEqual(([2, 2], _empty_shape, _empty_shape),
-                               _constant(shaper.get_shape(np.ones((2, 2)))))
-      self._assertNdArrayEqual(([3, 2, 1], _empty_shape, _empty_shape),
-                               _constant(shaper.get_shape(np.ones((3, 2, 1)))))
+    shaper = _DistributionShape(batch_ndims=0, event_ndims=0)
+    self.assertAllEqual((_empty_shape, _empty_shape, _empty_shape),
+                        _constant(shaper.get_shape(1.)))
+    self._assertNdArrayEqual(([1], _empty_shape, _empty_shape),
+                             _constant(shaper.get_shape(np.ones(1))))
+    self._assertNdArrayEqual(([2, 2], _empty_shape, _empty_shape),
+                             _constant(shaper.get_shape(np.ones((2, 2)))))
+    self._assertNdArrayEqual(([3, 2, 1], _empty_shape, _empty_shape),
+                             _constant(shaper.get_shape(np.ones((3, 2, 1)))))
 
-      shaper = _DistributionShape(batch_ndims=0, event_ndims=1)
-      with self.assertRaisesRegexp(ValueError, "expected .* <= ndims"):
-        shaper.get_shape(1.)
-      self._assertNdArrayEqual((_empty_shape, _empty_shape, [1]),
-                               _constant(shaper.get_shape(np.ones(1))))
-      self._assertNdArrayEqual(([2], _empty_shape, [2]),
-                               _constant(shaper.get_shape(np.ones((2, 2)))))
-      self._assertNdArrayEqual(([3, 2], _empty_shape, [1]),
-                               _constant(shaper.get_shape(np.ones((3, 2, 1)))))
+    shaper = _DistributionShape(batch_ndims=0, event_ndims=1)
+    with self.assertRaisesRegexp(ValueError, "expected .* <= ndims"):
+      shaper.get_shape(1.)
+    self._assertNdArrayEqual((_empty_shape, _empty_shape, [1]),
+                             _constant(shaper.get_shape(np.ones(1))))
+    self._assertNdArrayEqual(([2], _empty_shape, [2]),
+                             _constant(shaper.get_shape(np.ones((2, 2)))))
+    self._assertNdArrayEqual(([3, 2], _empty_shape, [1]),
+                             _constant(shaper.get_shape(np.ones((3, 2, 1)))))
 
-      shaper = _DistributionShape(batch_ndims=1, event_ndims=0)
-      with self.assertRaisesRegexp(ValueError, "expected .* <= ndims"):
-        shaper.get_shape(1.)
-      self._assertNdArrayEqual((_empty_shape, [1], _empty_shape),
-                               _constant(shaper.get_shape(np.ones(1))))
-      self._assertNdArrayEqual(([2], [2], _empty_shape),
-                               _constant(shaper.get_shape(np.ones((2, 2)))))
-      self._assertNdArrayEqual(([3, 2], [1], _empty_shape),
-                               _constant(shaper.get_shape(np.ones((3, 2, 1)))))
+    shaper = _DistributionShape(batch_ndims=1, event_ndims=0)
+    with self.assertRaisesRegexp(ValueError, "expected .* <= ndims"):
+      shaper.get_shape(1.)
+    self._assertNdArrayEqual((_empty_shape, [1], _empty_shape),
+                             _constant(shaper.get_shape(np.ones(1))))
+    self._assertNdArrayEqual(([2], [2], _empty_shape),
+                             _constant(shaper.get_shape(np.ones((2, 2)))))
+    self._assertNdArrayEqual(([3, 2], [1], _empty_shape),
+                             _constant(shaper.get_shape(np.ones((3, 2, 1)))))
 
-      shaper = _DistributionShape(batch_ndims=1, event_ndims=1)
-      with self.assertRaisesRegexp(ValueError, "expected .* <= ndims"):
-        shaper.get_shape(1.)
-      with self.assertRaisesRegexp(ValueError, "expected .* <= ndims"):
-        shaper.get_shape(np.ones(1))
-      self._assertNdArrayEqual((_empty_shape, [2], [2]),
-                               _constant(shaper.get_shape(np.ones((2, 2)))))
-      self._assertNdArrayEqual(([3], [2], [1]),
-                               _constant(shaper.get_shape(np.ones((3, 2, 1)))))
+    shaper = _DistributionShape(batch_ndims=1, event_ndims=1)
+    with self.assertRaisesRegexp(ValueError, "expected .* <= ndims"):
+      shaper.get_shape(1.)
+    with self.assertRaisesRegexp(ValueError, "expected .* <= ndims"):
+      shaper.get_shape(np.ones(1))
+    self._assertNdArrayEqual((_empty_shape, [2], [2]),
+                             _constant(shaper.get_shape(np.ones((2, 2)))))
+    self._assertNdArrayEqual(([3], [2], [1]),
+                             _constant(shaper.get_shape(np.ones((3, 2, 1)))))
 
   def testDistributionShapeGetShapeDynamic(self):
-    with self.cached_session() as sess:
-      # Works for static ndims despite unknown static shape.
-      shaper = _DistributionShape(batch_ndims=1, event_ndims=1)
-      y = tf.placeholder(tf.int32, shape=(None, None, 2))
-      y_value = np.ones((3, 4, 2), dtype=y.dtype.as_numpy_dtype())
-      self._assertNdArrayEqual(
-          ([3], [4], [2]),
-          sess.run(shaper.get_shape(y), feed_dict={y: y_value}))
+    # Works for static ndims despite unknown static shape.
+    shaper = _DistributionShape(batch_ndims=1, event_ndims=1)
+    y = tf.placeholder_with_default(
+        self._random_sample((3, 4, 2), dtype=np.float32), shape=None)
+    self._assertNdArrayEqual(
+        ([3], [4], [2]),
+        self.evaluate(shaper.get_shape(y)))
 
-      shaper = _DistributionShape(batch_ndims=0, event_ndims=1)
-      y = tf.placeholder(tf.int32, shape=(None, None))
-      y_value = np.ones((3, 2), dtype=y.dtype.as_numpy_dtype())
-      self._assertNdArrayEqual(
-          ([3], _empty_shape, [2]),
-          sess.run(shaper.get_shape(y), feed_dict={y: y_value}))
+    shaper = _DistributionShape(batch_ndims=0, event_ndims=1)
+    y = tf.placeholder_with_default(
+        np.ones((3, 2), dtype=np.int32), shape=(None, None))
+    self._assertNdArrayEqual(
+        ([3], _empty_shape, [2]),
+        self.evaluate(shaper.get_shape(y)))
 
-      # Works for deferred {batch,event}_ndims.
-      batch_ndims = tf.placeholder(tf.int32)
-      event_ndims = tf.placeholder(tf.int32)
-      shaper = _DistributionShape(
-          batch_ndims=batch_ndims, event_ndims=event_ndims)
-      y = tf.placeholder(tf.float32)
-      y_value = self._random_sample((3, 4, 2), dtype=y.dtype)
-      feed_dict = {y: y_value, batch_ndims: 1, event_ndims: 1}
-      self._assertNdArrayEqual(
-          ([3], [4], [2]), sess.run(shaper.get_shape(y), feed_dict=feed_dict))
+    # Works for deferred {batch,event}_ndims.
+    batch_ndims = tf.placeholder_with_default(1, shape=None)
+    event_ndims = tf.placeholder_with_default(1, shape=None)
+    shaper = _DistributionShape(
+        batch_ndims=batch_ndims, event_ndims=event_ndims)
+    y = tf.placeholder_with_default(
+        np.ones((3, 4, 2), dtype=np.int32), shape=[None, None, 2])
+    self._assertNdArrayEqual(
+        ([3], [4], [2]), self.evaluate(shaper.get_shape(y)))
 
-      y_value = self._random_sample((3, 2), dtype=y.dtype)
-      feed_dict = {y: y_value, batch_ndims: 0, event_ndims: 1}
-      self._assertNdArrayEqual(
-          ([3], _empty_shape, [2]),
-          sess.run(shaper.get_shape(y), feed_dict=feed_dict))
+    y = tf.placeholder_with_default(
+        np.ones((3, 2), dtype=np.int32), shape=None)
+    batch_ndims = tf.placeholder_with_default(0, shape=None)
+    event_ndims = tf.placeholder_with_default(1, shape=None)
+    shaper = _DistributionShape(
+        batch_ndims=batch_ndims, event_ndims=event_ndims)
+    self._assertNdArrayEqual(
+        ([3], _empty_shape, [2]), self.evaluate(shaper.get_shape(y)))
+
 
 if __name__ == "__main__":
   tf.test.main()
