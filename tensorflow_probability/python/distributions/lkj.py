@@ -269,9 +269,10 @@ class LKJ(distribution.Distribution):
       # these to ones.
       result = tf.matrix_set_diag(result, tf.ones(
           shape=tf.shape(result)[:-1], dtype=result.dtype.base_dtype))
-      # TODO(b/116828694): This sampling algorithm can produce non-PSD matrices
-      # sometimes.  Specifically, as documented in b/116828694, around 2% of
-      # trials of 900,000 5x5 matrices (distributed according to 9 different
+      # This sampling algorithm can produce near-PSD matrices on which standard
+      # algorithms such as `tf.cholesky` or `tf.linalg.self_adjoint_eigvals`
+      # fail. Specifically, as documented in b/116828694, around 2% of trials
+      # of 900,000 5x5 matrices (distributed according to 9 different
       # concentration parameter values) contained at least one matrix on which
       # the Cholesky decomposition failed.
       return result
@@ -336,17 +337,24 @@ class LKJ(distribution.Distribution):
     with tf.name_scope('log_unnorm_prob_lkj', name, [self.concentration]):
       x = tf.convert_to_tensor(x, name='x')
       # The density is det(matrix) ** (concentration - 1).
-      # Computing the determinant with `logdet` is fine here, since correlation
-      # matrices are Hermitian and PSD.  If the input is not PSD, will raise an
-      # error, which is not unreasonable.
+      # Computing the determinant with `logdet` is usually fine, since
+      # correlation matrices are Hermitian and PSD. But in some cases, for a
+      # PSD matrix whose eigenvalues are close to zero, `logdet` raises an error
+      # complaining that it is not PSD. The root cause is the computation of the
+      # cholesky decomposition in `logdet`. Hence, we use the less efficient but
+      # more robust `slogdet` which does not use `cholesky`.
+      #
       # An alternative would have been to check allow_nan_stats and use
-      #   eigenvalues, _ = linalg_ops.self_adjoint_eig(x)
-      #   psd_mask = math_ops.cast(
-      #     math_ops.reduce_min(eigenvalues, axis=-1) >= 0, dtype=x.dtype)
+      #   eigenvalues = tf.linalg.self_adjoint_eigvals(x)
+      #   psd_mask = tf.cast(
+      #     tf.reduce_min(eigenvalues, axis=-1) >= 0, dtype=x.dtype)
       #   tf.where(psd_mask, answer, float('-inf'))
-      # to emit probability 0 for inputs that are not PSD, without ever
-      # raising an error.
-      answer = (self.concentration - 1.) * tf.linalg.logdet(x)
+      # to emit probability 0 for inputs that are not PSD, without ever raising
+      # an error. More care must be taken, as due to numerical stability issues,
+      # self_adjoint_eigvals can return slightly negative eigenvalues even for
+      # a PSD matrix.
+      _, logdet = tf.linalg.slogdet(x)
+      answer = (self.concentration - 1.) * logdet
       return answer
 
   def _log_normalization(self, name='log_normalization'):
