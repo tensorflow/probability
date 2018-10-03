@@ -12,6 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
+# Notify docs team for any file changes here
 presubmit: {
   review_notify: "tf-docs+reviews"
+}
+
+# DevSite config files
+presubmit: {
+  path_regexp: ".*\\.yaml"
+  review_notify: "tf-docs+config-reviews"
 }
