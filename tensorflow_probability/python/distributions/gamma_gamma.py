@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
 # Dependency imports
 import numpy as np
 import tensorflow as tf
@@ -34,20 +35,6 @@ from tensorflow.python.ops import control_flow_ops
 __all__ = [
     "GammaGamma",
 ]
-
-
-def _static_broadcast_shape_from_tensors(*tensors):
-  shape = tensors[0].get_shape()
-  for t in tensors[1:]:
-    shape = tf.broadcast_static_shape(shape, t.get_shape())
-  return shape
-
-
-def _dynamic_broadcast_shape_from_tensors(*tensors):
-  shape = tf.shape(tensors[0])
-  for t in tensors[1:]:
-    shape = tf.broadcast_dynamic_shape(shape, tf.shape(t))
-  return shape
 
 
 class GammaGamma(distribution.Distribution):
@@ -174,12 +161,14 @@ class GammaGamma(distribution.Distribution):
     return self._mixing_rate
 
   def _batch_shape_tensor(self):
-    return _dynamic_broadcast_shape_from_tensors(
-        self.concentration, self.mixing_concentration, self.mixing_rate)
+    tensors = [self.concentration, self.mixing_concentration, self.mixing_rate]
+    return functools.reduce(tf.broadcast_dynamic_shape,
+                            [tf.shape(tensor) for tensor in tensors])
 
   def _batch_shape(self):
-    return _static_broadcast_shape_from_tensors(
-        self.concentration, self.mixing_concentration, self.mixing_rate)
+    tensors = [self.concentration, self.mixing_concentration, self.mixing_rate]
+    return functools.reduce(tf.broadcast_static_shape,
+                            [tensor.get_shape() for tensor in tensors])
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
