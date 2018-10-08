@@ -135,18 +135,18 @@ specified then `scale += IdentityMatrix`. Otherwise specifying a
 * <b>`scale_diag`</b>: Floating-point `Tensor` representing the diagonal matrix.
     `scale_diag` has shape [N1, N2, ...  k], which represents a k x k
     diagonal matrix.
-    When `None` no diagonal term is added to `scale`.
+    When `None`, no diagonal term is added to `scale`.
 * <b>`scale_tril`</b>: Floating-point `Tensor` representing a lower triangular matrix.
-    `scale_diag` has shape [N1, N2, ...  k, k], which represents a k x k
+    `scale_tril` has shape [N1, N2, ...  k, k], which represents a k x k
     lower triangular matrix.
-    When `None` no `scale_tril` term is added to `scale`.
+    When `None`, no `scale_tril` term is added to `scale`.
     The upper triangular elements above the diagonal are ignored.
 * <b>`scale_perturb_factor`</b>: Floating-point `Tensor` representing factor matrix
     with last two dimensions of shape `(k, r)`. When `None`, no rank-r
     update is added to `scale`.
 * <b>`scale_perturb_diag`</b>: Floating-point `Tensor` representing the diagonal
     matrix. `scale_perturb_diag` has shape [N1, N2, ...  r], which
-    represents an `r x r` diagonal matrix. When `None` low rank updates will
+    represents an `r x r` diagonal matrix. When `None`, low rank updates will
     take the form `scale_perturb_factor * scale_perturb_factor.T`.
 * <b>`adjoint`</b>: Python `bool` indicating whether to use the `scale` matrix as
     specified or its adjoint.
