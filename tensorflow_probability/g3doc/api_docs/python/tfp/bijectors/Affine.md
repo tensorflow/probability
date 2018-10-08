@@ -136,7 +136,7 @@ specified then `scale += IdentityMatrix`. Otherwise specifying a
     `scale_diag` has shape [N1, N2, ...  k], which represents a k x k
     diagonal matrix.
     When `None` no diagonal term is added to `scale`.
-* <b>`scale_tril`</b>: Floating-point `Tensor` representing the diagonal matrix.
+* <b>`scale_tril`</b>: Floating-point `Tensor` representing a lower triangular matrix.
     `scale_diag` has shape [N1, N2, ...  k, k], which represents a k x k
     lower triangular matrix.
     When `None` no `scale_tril` term is added to `scale`.
