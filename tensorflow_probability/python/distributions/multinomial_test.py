@@ -243,8 +243,8 @@ class MultinomialTest(tf.test.TestCase):
       self.assertEqual((6, 3, 3, 3), covariance2.get_shape())
 
   def testCovarianceFromSampling(self):
-    # We will test mean, cov, var, stddev on a DirichletMultinomial constructed
-    # via broadcast between alpha, n.
+    # We will test mean, cov, var, stddev on a Multinomial constructed via
+    # broadcast between alpha, n.
     theta = np.array([[1., 2, 3],
                       [2.5, 4, 0.01]], dtype=np.float32)
     theta /= np.sum(theta, 1)[..., tf.newaxis]
