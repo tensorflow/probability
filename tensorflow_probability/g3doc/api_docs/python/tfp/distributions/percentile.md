@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions.percentile" />
+<meta itemprop="path" content="Stable" />
 </div>
 
 # tfp.distributions.percentile

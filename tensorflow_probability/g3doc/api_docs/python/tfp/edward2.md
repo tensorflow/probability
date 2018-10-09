@@ -1,10 +1,18 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.edward2" />
+<meta itemprop="path" content="Stable" />
 </div>
 
 # Module: tfp.edward2
 
 Edward2 probabilistic programming language.
+
+For user guides, see:
+
++ [Overview](
+   https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/edward2/README.md)
++ [Upgrading from Edward to Edward2](
+   https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/edward2/Upgrading_From_Edward_To_Edward2.md)
 
 ## Classes
 
@@ -104,9 +112,13 @@ Edward2 probabilistic programming language.
 
 [`as_random_variable(...)`](../tfp/edward2/as_random_variable.md): Wrap an existing distribution as a traceable random variable.
 
-[`get_interceptor(...)`](../tfp/edward2/get_interceptor.md): Returns the top-most (last) interceptor on the thread's stack.
+[`get_next_interceptor(...)`](../tfp/edward2/get_next_interceptor.md): Yields the top-most interceptor on the thread-local interceptor stack.
+
+[`interceptable(...)`](../tfp/edward2/interceptable.md): Decorator that wraps `func` so that its execution is intercepted.
 
 [`interception(...)`](../tfp/edward2/interception.md): Python context manager for interception.
 
 [`make_log_joint_fn(...)`](../tfp/edward2/make_log_joint_fn.md): Takes Edward probabilistic program and returns its log joint function.
+
+[`tape(...)`](../tfp/edward2/tape.md): Context manager for recording interceptable executions onto a tape.
 

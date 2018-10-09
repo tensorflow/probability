@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions.OneHotCategorical" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="allow_nan_stats"/>
 <meta itemprop="property" content="batch_shape"/>
 <meta itemprop="property" content="dtype"/>
@@ -92,6 +93,46 @@ samples = [[0,1,0], [1,0,0]]
 dist.prob(samples)  # Shape [2]
 ```
 
+<h2 id="__init__"><code>__init__</code></h2>
+
+``` python
+__init__(
+    logits=None,
+    probs=None,
+    dtype=tf.int32,
+    validate_args=False,
+    allow_nan_stats=True,
+    name='OneHotCategorical'
+)
+```
+
+Initialize OneHotCategorical distributions using class log-probabilities.
+
+#### Args:
+
+* <b>`logits`</b>: An N-D `Tensor`, `N >= 1`, representing the log probabilities of a
+    set of Categorical distributions. The first `N - 1` dimensions index
+    into a batch of independent distributions and the last dimension
+    represents a vector of logits for each class. Only one of `logits` or
+    `probs` should be passed in.
+* <b>`probs`</b>: An N-D `Tensor`, `N >= 1`, representing the probabilities of a set
+    of Categorical distributions. The first `N - 1` dimensions index into a
+    batch of independent distributions and the last dimension represents a
+    vector of probabilities for each class. Only one of `logits` or `probs`
+    should be passed in.
+* <b>`dtype`</b>: The type of the event samples (default: int32).
+* <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
+    parameters are checked for validity despite possibly degrading runtime
+    performance. When `False` invalid inputs may silently render incorrect
+    outputs.
+* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
+    (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
+    result is undefined. When `False`, an exception is raised if one or
+    more of the statistic's batch members are undefined.
+* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
+
+
+
 ## Properties
 
 <h3 id="allow_nan_stats"><code>allow_nan_stats</code></h3>
@@ -176,44 +217,6 @@ Python `bool` indicating possibly expensive checks are enabled.
 
 
 ## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
-
-``` python
-__init__(
-    logits=None,
-    probs=None,
-    dtype=tf.int32,
-    validate_args=False,
-    allow_nan_stats=True,
-    name='OneHotCategorical'
-)
-```
-
-Initialize OneHotCategorical distributions using class log-probabilities.
-
-#### Args:
-
-* <b>`logits`</b>: An N-D `Tensor`, `N >= 1`, representing the log probabilities of a
-    set of Categorical distributions. The first `N - 1` dimensions index
-    into a batch of independent distributions and the last dimension
-    represents a vector of logits for each class. Only one of `logits` or
-    `probs` should be passed in.
-* <b>`probs`</b>: An N-D `Tensor`, `N >= 1`, representing the probabilities of a set
-    of Categorical distributions. The first `N - 1` dimensions index into a
-    batch of independent distributions and the last dimension represents a
-    vector of probabilities for each class. Only one of `logits` or `probs`
-    should be passed in.
-* <b>`dtype`</b>: The type of the event samples (default: int32).
-* <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
-    parameters are checked for validity despite possibly degrading runtime
-    performance. When `False` invalid inputs may silently render incorrect
-    outputs.
-* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
-    (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
-    result is undefined. When `False`, an exception is raised if one or
-    more of the statistic's batch members are undefined.
-* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
 
@@ -354,7 +357,7 @@ where `F` denotes the support of the random variable `X ~ P`.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 
@@ -448,7 +451,7 @@ denotes (Shanon) cross entropy, and `H[.]` denotes (Shanon) entropy.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 

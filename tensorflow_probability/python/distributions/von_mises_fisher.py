@@ -21,7 +21,11 @@ from __future__ import print_function
 import numpy as np
 
 import tensorflow as tf
+from tensorflow_probability.python.distributions import beta as beta_lib
+from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import reparameterization
 
 
 __all__ = ['VonMisesFisher']
@@ -66,7 +70,7 @@ def _bessel_ive(v, z, cache=None):
   return wrap(cache[v])
 
 
-class VonMisesFisher(tf.distributions.Distribution):
+class VonMisesFisher(distribution.Distribution):
   r"""The von Mises-Fisher distribution over unit vectors on `S^{n-1}`.
 
   The von Mises-Fisher distribution is a directional distribution over vectors
@@ -160,6 +164,12 @@ class VonMisesFisher(tf.distributions.Distribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name, values=[mean_direction, concentration]) as name:
+      dtype = dtype_util.common_dtype([mean_direction, concentration],
+                                      tf.float32)
+      mean_direction = tf.convert_to_tensor(
+          mean_direction, name='mean_direction', dtype=dtype)
+      concentration = tf.convert_to_tensor(
+          concentration, name='concentration', dtype=dtype)
       assertions = [
           tf.assert_non_negative(
               concentration, message='`concentration` must be non-negative'),
@@ -178,17 +188,15 @@ class VonMisesFisher(tf.distributions.Distribution):
             tf.shape(mean_direction)[-1], 5,
             message='vMF ndims > 5 is not currently supported')]
       with tf.control_dependencies(assertions):
-        self._mean_direction = tf.convert_to_tensor(
-            mean_direction, name='mean_direction')
-        self._concentration = tf.convert_to_tensor(
-            concentration, name='concentration')
-        tf.assert_same_float_dtype([self._mean_direction, self._concentration])
+        self._mean_direction = tf.identity(mean_direction)
+        self._concentration = tf.identity(concentration)
+      tf.assert_same_float_dtype([self._mean_direction, self._concentration])
       # mean_direction is always reparameterized.
       # concentration is only for event_dim==3, via an inversion sampler.
       reparameterization_type = (
-          tf.distributions.FULLY_REPARAMETERIZED
+          reparameterization.FULLY_REPARAMETERIZED
           if mean_direction.shape.with_rank_at_least(1)[-1].value == 3 else
-          tf.distributions.NOT_REPARAMETERIZED)
+          reparameterization.NOT_REPARAMETERIZED)
       super(VonMisesFisher, self).__init__(
           dtype=self._concentration.dtype,
           validate_args=validate_args,
@@ -386,7 +394,7 @@ class VonMisesFisher(tf.distributions.Distribution):
       #     https://github.com/nicola-decao/s-vae-tf/
       x = (1 - b) / (1 + b)
       c = self.concentration * x + dim * tf.log1p(-x**2)
-      beta = tf.distributions.Beta(dim / 2, dim / 2)
+      beta = beta_lib.Beta(dim / 2, dim / 2)
 
       def cond_fn(w, should_continue):
         del w

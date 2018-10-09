@@ -24,30 +24,31 @@ import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow.python.framework import test_util
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class TanhBijectorTest(tf.test.TestCase):
   """Tests correctness of the Y = g(X) = tanh(X) transformation."""
 
   def testBijector(self):
-    with self.test_session():
-      self.assertEqual("tanh", tfb.Tanh().name)
-      x = np.linspace(-3., 3., 100).reshape([2, 5, 10]).astype(np.float32)
-      y = np.tanh(x)
-      ildj = -np.log1p(-np.square(np.tanh(x)))
-      bijector = tfb.Tanh()
-      self.assertAllClose(
-          y, self.evaluate(bijector.forward(x)), atol=0., rtol=1e-2)
-      self.assertAllClose(
-          x, self.evaluate(bijector.inverse(y)), atol=0., rtol=1e-4)
-      self.assertAllClose(
-          ildj,
-          self.evaluate(bijector.inverse_log_det_jacobian(
-              y, event_ndims=0)), atol=0., rtol=1e-6)
-      self.assertAllClose(
-          -ildj,
-          self.evaluate(bijector.forward_log_det_jacobian(
-              x, event_ndims=0)), atol=0., rtol=1e-4)
+    self.assertEqual("tanh", tfb.Tanh().name)
+    x = np.linspace(-3., 3., 100).reshape([2, 5, 10]).astype(np.float32)
+    y = np.tanh(x)
+    ildj = -np.log1p(-np.square(np.tanh(x)))
+    bijector = tfb.Tanh()
+    self.assertAllClose(
+        y, self.evaluate(bijector.forward(x)), atol=0., rtol=1e-2)
+    self.assertAllClose(
+        x, self.evaluate(bijector.inverse(y)), atol=0., rtol=1e-4)
+    self.assertAllClose(
+        ildj,
+        self.evaluate(bijector.inverse_log_det_jacobian(
+            y, event_ndims=0)), atol=0., rtol=1e-6)
+    self.assertAllClose(
+        -ildj,
+        self.evaluate(bijector.forward_log_det_jacobian(
+            x, event_ndims=0)), atol=0., rtol=1e-4)
 
   def testScalarCongruency(self):
     bijector_test_util.assert_scalar_congruency(
@@ -63,25 +64,24 @@ class TanhBijectorTest(tf.test.TestCase):
         rtol=1e-4)
 
   def testMatchWithAffineTransform(self):
-    with self.test_session():
-      direct_bj = tfb.Tanh()
-      indirect_bj = tfb.Chain([
-          tfb.AffineScalar(shift=tf.to_double(-1.0), scale=tf.to_double(2.0)),
-          tfb.Sigmoid(),
-          tfb.AffineScalar(scale=tf.to_double(2.0))])
+    direct_bj = tfb.Tanh()
+    indirect_bj = tfb.Chain([
+        tfb.AffineScalar(shift=tf.to_double(-1.0), scale=tf.to_double(2.0)),
+        tfb.Sigmoid(),
+        tfb.AffineScalar(scale=tf.to_double(2.0))])
 
-      x = np.linspace(-3.0, 3.0, 100)
-      y = np.tanh(x)
-      self.assertAllClose(self.evaluate(direct_bj.forward(x)),
-                          self.evaluate(indirect_bj.forward(x)))
-      self.assertAllClose(self.evaluate(direct_bj.inverse(y)),
-                          self.evaluate(indirect_bj.inverse(y)))
-      self.assertAllClose(
-          self.evaluate(direct_bj.inverse_log_det_jacobian(y, event_ndims=0)),
-          self.evaluate(indirect_bj.inverse_log_det_jacobian(y, event_ndims=0)))
-      self.assertAllClose(
-          self.evaluate(direct_bj.forward_log_det_jacobian(x, event_ndims=0)),
-          self.evaluate(indirect_bj.forward_log_det_jacobian(x, event_ndims=0)))
+    x = np.linspace(-3.0, 3.0, 100)
+    y = np.tanh(x)
+    self.assertAllClose(self.evaluate(direct_bj.forward(x)),
+                        self.evaluate(indirect_bj.forward(x)))
+    self.assertAllClose(self.evaluate(direct_bj.inverse(y)),
+                        self.evaluate(indirect_bj.inverse(y)))
+    self.assertAllClose(
+        self.evaluate(direct_bj.inverse_log_det_jacobian(y, event_ndims=0)),
+        self.evaluate(indirect_bj.inverse_log_det_jacobian(y, event_ndims=0)))
+    self.assertAllClose(
+        self.evaluate(direct_bj.forward_log_det_jacobian(x, event_ndims=0)),
+        self.evaluate(indirect_bj.forward_log_det_jacobian(x, event_ndims=0)))
 
 
 if __name__ == "__main__":

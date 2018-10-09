@@ -21,6 +21,7 @@ from __future__ import print_function
 import tensorflow as tf
 from tensorflow_probability.python.distributions import vector_laplace_linear_operator as vllo
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 
 
 __all__ = [
@@ -213,6 +214,8 @@ class VectorLaplaceDiag(vllo.VectorLaplaceLinearOperator):
     with tf.name_scope(name):
       with tf.name_scope(
           "init", values=[loc, scale_diag, scale_identity_multiplier]):
+        dtype = dtype_util.common_dtype(
+            [loc, scale_diag, scale_identity_multiplier], tf.float32)
         # No need to validate_args while making diag_scale.  The returned
         # LinearOperatorDiag has an assert_non_singular method that is called by
         # the Bijector.
@@ -221,7 +224,8 @@ class VectorLaplaceDiag(vllo.VectorLaplaceLinearOperator):
             scale_diag=scale_diag,
             scale_identity_multiplier=scale_identity_multiplier,
             validate_args=False,
-            assert_positive=False)
+            assert_positive=False,
+            dtype=dtype)
     super(VectorLaplaceDiag, self).__init__(
         loc=loc,
         scale=scale,

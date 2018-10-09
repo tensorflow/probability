@@ -42,6 +42,7 @@ from tensorflow_probability.python.bijectors.masked_autoregressive import masked
 from tensorflow_probability.python.bijectors.masked_autoregressive import masked_dense
 from tensorflow_probability.python.bijectors.masked_autoregressive import MaskedAutoregressiveFlow
 from tensorflow_probability.python.bijectors.matrix_inverse_tril import MatrixInverseTriL
+from tensorflow_probability.python.bijectors.ordered import Ordered
 from tensorflow_probability.python.bijectors.permute import Permute
 from tensorflow_probability.python.bijectors.power_transform import PowerTransform
 from tensorflow_probability.python.bijectors.real_nvp import real_nvp_default_template
@@ -86,6 +87,7 @@ __all__ = [
     "MatrixInverseTriL",
     "Permute",
     "PowerTransform",
+    "Ordered",
     "RealNVP",
     "Reshape",
     "ScaleTriL",

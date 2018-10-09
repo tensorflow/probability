@@ -19,12 +19,13 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.positive_semidefinite_kernels import positive_semidefinite_kernel as psd_kernel
 from tensorflow_probability.python.positive_semidefinite_kernels.internal import util
 
 
 __all__ = [
-    """ExponentiatedQuadratic""",
+    'ExponentiatedQuadratic',
 ]
 
 
@@ -49,8 +50,12 @@ class ExponentiatedQuadratic(psd_kernel.PositiveSemidefiniteKernel):
   where the double-bars represent vector length (ie, Euclidean, or L2 norm).
   """
 
-  def __init__(self, amplitude=None, length_scale=None, feature_ndims=1,
-               validate_args=False, name="ExponentiatedQuadratic"):
+  def __init__(self,
+               amplitude=None,
+               length_scale=None,
+               feature_ndims=1,
+               validate_args=False,
+               name='ExponentiatedQuadratic'):
     """Construct an ExponentiatedQuadratic kernel instance.
 
     Args:
@@ -68,11 +73,18 @@ class ExponentiatedQuadratic(psd_kernel.PositiveSemidefiniteKernel):
       name: Python `str` name prefixed to Ops created by this class.
     """
     with tf.name_scope(name, values=[amplitude, length_scale]) as name:
+      dtype = dtype_util.common_dtype([amplitude, length_scale], tf.float32)
+      if amplitude is not None:
+        amplitude = tf.convert_to_tensor(
+            amplitude, name='amplitude', dtype=dtype)
       self._amplitude = _validate_arg_if_not_none(
           amplitude, tf.assert_positive, validate_args)
+      if length_scale is not None:
+        length_scale = tf.convert_to_tensor(
+            length_scale, name='length_scale', dtype=dtype)
       self._length_scale = _validate_arg_if_not_none(
           length_scale, tf.assert_positive, validate_args)
-      dtype = tf.assert_same_float_dtype([self._amplitude, self._length_scale])
+      tf.assert_same_float_dtype([self._amplitude, self._length_scale])
     super(ExponentiatedQuadratic, self).__init__(
         feature_ndims, dtype=dtype, name=name)
 
@@ -87,18 +99,17 @@ class ExponentiatedQuadratic(psd_kernel.PositiveSemidefiniteKernel):
     return self._length_scale
 
   def _batch_shape(self):
+    scalar_shape = tf.TensorShape([])
     return tf.broadcast_static_shape(
-        self.amplitude.shape, self.length_scale.shape)
+        scalar_shape if self.amplitude is None else self.amplitude.shape,
+        scalar_shape if self.length_scale is None else self.length_scale.shape)
 
   def _batch_shape_tensor(self):
-    with self._name_scope("batch_shape_tensor"):
-      return tf.broadcast_dynamic_shape(
-          tf.shape(self.amplitude), tf.shape(self.length_scale))
+    return tf.broadcast_dynamic_shape(
+        [] if self.amplitude is None else tf.shape(self.amplitude),
+        [] if self.length_scale is None else tf.shape(self.length_scale))
 
   def _apply(self, x1, x2, param_expansion_ndims=0):
-    x1 = tf.convert_to_tensor(x1)
-    x2 = tf.convert_to_tensor(x2)
-
     exponent = -0.5 * util.sum_rightmost_ndims_preserving_shape(
         tf.squared_difference(x1, x2), self.feature_ndims)
     if self.length_scale is not None:

@@ -28,6 +28,7 @@ import tensorflow_probability as tfp
 from tensorflow_probability.python.mcmc.util import choose
 from tensorflow_probability.python.mcmc.util import is_namedtuple_like
 from tensorflow_probability.python.mcmc.util import maybe_call_fn_and_grads
+from tensorflow_probability.python.mcmc.util import smart_for_loop
 from tensorflow.python.framework import test_util
 
 tfd = tfp.distributions
@@ -137,6 +138,33 @@ class GradientTest(tf.test.TestCase):
     fn_result, grads = maybe_call_fn_and_grads(lambda x: d.log_prob(x), x)  # pylint: disable=unnecessary-lambda
     self.assertAllEqual(False, fn_result is None)
     self.assertAllEqual([False], [g is None for g in grads])
+
+
+class SmartForLoopTest(tf.test.TestCase):
+
+  def test_python_for_loop(self):
+    n = tf.constant(10, dtype=tf.int64)
+    counter = collections.Counter()
+    def body(x):
+      counter['body_calls'] += 1
+      return [x + 1]
+
+    result = smart_for_loop(
+        loop_num_iter=n, body_fn=body, initial_loop_vars=[tf.constant(1)])
+    self.assertEqual(10, counter['body_calls'])
+    self.assertAllClose([11], self.evaluate(result))
+
+  def test_tf_while_loop(self):
+    n = tf.placeholder_with_default(input=np.int64(10), shape=())
+    counter = collections.Counter()
+    def body(x):
+      counter['body_calls'] += 1
+      return [x + 1]
+
+    result = smart_for_loop(
+        loop_num_iter=n, body_fn=body, initial_loop_vars=[tf.constant(1)])
+    self.assertEqual(1, counter['body_calls'])
+    self.assertAllClose([11], self.evaluate(result))
 
 
 if __name__ == '__main__':

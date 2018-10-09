@@ -115,7 +115,7 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase,
   def _testParamShapes(self, desired_shape):
     tn_param_shapes = tfd.TruncatedNormal.param_shapes(desired_shape)
     # Check the shapes by comparison with the untruncated Normal.
-    n_param_shapes = tf.distributions.Normal.param_shapes(desired_shape)
+    n_param_shapes = tfd.Normal.param_shapes(desired_shape)
     self.assertAllEqual(
         self.evaluate(tn_param_shapes["loc"]),
         self.evaluate(n_param_shapes["loc"]))
@@ -371,7 +371,7 @@ class TruncatedNormalTestCompareWithNormal(_TruncatedNormalTestCase,
     truncated_dist = tfd.TruncatedNormal(loc=loc, scale=scale,
                                          low=loc - (10. * scale),
                                          high=loc + (10. * scale))
-    normal_dist = tf.distributions.Normal(loc=loc, scale=scale)
+    normal_dist = tfd.Normal(loc=loc, scale=scale)
     return truncated_dist, normal_dist
 
   def testEntropy(self, loc, scale):

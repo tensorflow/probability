@@ -76,6 +76,18 @@ class WishartTest(tf.test.TestCase):
     w = tfd.Wishart(df=5, scale_tril=[[1.]])
     self.assertAllClose(self.evaluate(w.entropy()), entropy_alt(w))
 
+  def testParamBroadcasting(self):
+    scale = [[[1., .5], [.5, 1.]]]  # A 1-batch of 2x2 scale operators
+    df = [5, 6, 7]  # A 3-batch of degrees of freedom
+    wish = tfp.distributions.Wishart(df=df, scale=scale)
+    self.assertAllEqual([2, 2], wish.event_shape.as_list())
+    self.assertAllEqual([2, 2], self.evaluate(wish.event_shape_tensor()))
+    self.assertAllEqual([3], wish.batch_shape.as_list())
+    self.assertAllEqual([3], self.evaluate(wish.batch_shape_tensor()))
+    self.assertAllEqual([4, 3, 2, 2], wish.sample(sample_shape=(4,)).shape)
+    self.assertAllEqual([4, 3, 2, 2],
+                        self.evaluate(tf.shape(wish.sample(sample_shape=(4,)))))
+
   def testMean(self):
     scale = make_pd(1., 2)
     df = 4
@@ -361,12 +373,14 @@ class WishartTest(tf.test.TestCase):
     chol_scale = chol(x)
 
     # Still has these assertions because they're resolveable at graph
-    # construction
+    # construction:
+    # df < rank
     with self.assertRaisesRegexp(ValueError, "cannot be less than"):
       tfd.Wishart(df=2, scale_tril=chol_scale, validate_args=False)
+    # non-float dtype
     with self.assertRaisesRegexp(TypeError, "Argument tril must have dtype"):
       tfd.Wishart(
-          df=4.,
+          df=4,
           scale_tril=np.asarray(chol_scale, dtype=np.int32),
           validate_args=False)
 

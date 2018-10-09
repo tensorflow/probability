@@ -30,7 +30,6 @@ py_library(
         ":exponentiated_quadratic",
         ":matern",
         ":positive_semidefinite_kernel",
-        "//tensorflow_probability/python/positive_semidefinite_kernels/internal",
     ],
 )
 
@@ -49,9 +48,9 @@ py_test(
     srcs = ["positive_semidefinite_kernel_test.py"],
     deps = [
         # absl/testing:parameterized dep,
-        # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/positive_semidefinite_kernels/internal:util",
     ],
 )
 
@@ -61,6 +60,8 @@ py_library(
     deps = [
         ":positive_semidefinite_kernel",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/positive_semidefinite_kernels/internal:util",
     ],
 )
 
@@ -80,7 +81,10 @@ py_library(
     srcs = ["exp_sin_squared.py"],
     deps = [
         ":positive_semidefinite_kernel",
+        # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/positive_semidefinite_kernels/internal:util",
     ],
 )
 
@@ -100,7 +104,10 @@ py_library(
     srcs = ["matern.py"],
     deps = [
         ":positive_semidefinite_kernel",
+        # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/positive_semidefinite_kernels/internal:util",
     ],
 )
 

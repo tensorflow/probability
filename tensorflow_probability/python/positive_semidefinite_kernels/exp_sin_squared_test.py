@@ -28,6 +28,12 @@ from tensorflow_probability import positive_semidefinite_kernels as psd_kernels
 
 class ExpSinSquaredTest(tf.test.TestCase, parameterized.TestCase):
 
+  def testMismatchedFloatTypesAreBad(self):
+    psd_kernels.ExpSinSquared(1, 1)  # Should be OK (float32 fallback).
+    psd_kernels.ExpSinSquared(1, np.float64(1))  # Should be OK.
+    with self.assertRaises(TypeError):
+      psd_kernels.ExpSinSquared(1, np.float64(1), np.float32(1))  # Should fail.
+
   def _exp_sin_squared_kernel(self, amplitude, length_scale, period, x, y):
     norm = np.abs(x - y)
     log_kernel = np.sum(-2. * np.sin(np.pi / period * norm) ** 2)
@@ -60,6 +66,10 @@ class ExpSinSquaredTest(tf.test.TestCase, parameterized.TestCase):
           self.evaluate(k.apply(x, y)),
           self._exp_sin_squared_kernel(amplitude, length_scale, period, x, y),
           rtol=1e-4)
+
+  def testNoneShapes(self):
+    k = psd_kernels.ExpSinSquared(amplitude=np.reshape([1.] * 6, [3, 2]))
+    self.assertEqual([3, 2], k.batch_shape.as_list())
 
   def testShapesAreCorrect(self):
     k = psd_kernels.ExpSinSquared(amplitude=1., length_scale=1., period=3.)

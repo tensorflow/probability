@@ -19,7 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow.python.ops.distributions import util as distribution_util
+from tensorflow_probability.python.internal import distribution_util
 
 
 __all__ = ["ConditionalBijector"]

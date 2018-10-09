@@ -24,10 +24,12 @@ import collections
 import tensorflow as tf
 
 
+from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import mvn_tril
 from tensorflow_probability.python.distributions import seed_stream
-from tensorflow_probability.python.internal import distribution_util as util
 
+from tensorflow_probability.python.internal import distribution_util as util
+from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.framework import tensor_util
 from tensorflow.python.ops.linalg import linear_operator_util
 
@@ -153,7 +155,7 @@ def _augment_sample_shape(partial_batch_dist,
     return full_sample_and_batch_shape[:num_broadcast_dims]
 
 
-class LinearGaussianStateSpaceModel(tf.distributions.Distribution):
+class LinearGaussianStateSpaceModel(distribution.Distribution):
   """Observation distribution from a linear Gaussian state space model.
 
   The state space model, sometimes called a Kalman filter, posits a
@@ -337,6 +339,7 @@ class LinearGaussianStateSpaceModel(tf.distributions.Distribution):
       self.initial_step = initial_step
       self.final_step = self.initial_step + self.num_timesteps
 
+      # TODO(b/78475680): Friendly dtype inference.
       dtype = initial_state_prior.dtype
 
       # Internally, the transition and observation matrices are
@@ -446,7 +449,7 @@ class LinearGaussianStateSpaceModel(tf.distributions.Distribution):
 
       super(LinearGaussianStateSpaceModel, self).__init__(
           dtype=dtype,
-          reparameterization_type=tf.distributions.FULLY_REPARAMETERIZED,
+          reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
           parameters=parameters,

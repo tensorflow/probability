@@ -29,10 +29,6 @@ py_library(
     name = "internal",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
-    deps = [
-        ":moving_stats",
-        ":statistical_testing",
-    ],
 )
 
 py_library(
@@ -72,5 +68,45 @@ py_test(
         ":statistical_testing",
         # numpy dep,
         # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "correlation_matrix_volumes_py",
+    srcs = [
+        "correlation_matrix_volumes_lib.py",
+    ],
+    deps = [
+        # numpy dep,
+        "//tensorflow_probability/python/distributions:uniform",
+        "//tensorflow_probability/python/internal:distribution_util",
+    ],
+)
+
+py_binary(
+    name = "correlation_matrix_volumes",
+    srcs = [
+        "correlation_matrix_volumes.py",
+    ],
+    deps = [
+        ":correlation_matrix_volumes_py",
+        # absl:app dep,
+        # absl/flags dep,
+    ],
+)
+
+py_test(
+    name = "correlation_matrix_volumes_test",
+    size = "medium",
+    srcs = ["correlation_matrix_volumes_test.py"],
+    shard_count = 4,
+    tags = [
+        "no_pip",
+        "optonly",
+    ],
+    deps = [
+        ":correlation_matrix_volumes_py",
+        ":statistical_testing",
+        # numpy dep,
     ],
 )

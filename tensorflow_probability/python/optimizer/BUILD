@@ -89,6 +89,7 @@ py_library(
 py_test(
     name = "bfgs_test",
     size = "medium",
+    timeout = "long",
     srcs = ["bfgs_test.py"],
     deps = [
         # numpy dep,

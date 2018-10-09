@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.vi.symmetrized_csiszar_function" />
+<meta itemprop="path" content="Stable" />
 </div>
 
 # tfp.vi.symmetrized_csiszar_function

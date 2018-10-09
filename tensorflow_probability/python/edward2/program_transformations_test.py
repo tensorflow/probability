@@ -172,7 +172,7 @@ class ProgramTransformationsTest(tf.test.TestCase):
     loc = tf.trainable_variables("variational")[0]
     actual_log_prob = true_log_joint(loc, qz_value)
 
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       sess.run(tf.initialize_all_variables())
       actual_log_prob_, expected_log_prob_ = sess.run(
           [actual_log_prob, expected_log_prob])

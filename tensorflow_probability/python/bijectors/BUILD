@@ -50,12 +50,12 @@ py_library(
         ":kumaraswamy",
         ":masked_autoregressive",
         ":matrix_inverse_tril",
+        ":ordered",
         ":permute",
         ":power_transform",
         ":real_nvp",
         ":reshape",
         ":scale_tril",
-        ":shape",
         ":sigmoid",
         ":sinh_arcsinh",
         ":softmax_centered",
@@ -76,6 +76,7 @@ py_library(
         # numpy dep,
         # six dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
 
@@ -93,6 +94,7 @@ py_library(
     srcs = ["affine_linear_operator.py"],
     deps = [
         ":bijector",
+        ":shape",
         # tensorflow dep,
     ],
 )
@@ -101,6 +103,7 @@ py_library(
     name = "affine_scalar",
     srcs = ["affine_scalar.py"],
     deps = [
+        ":bijector",
         # tensorflow dep,
     ],
 )
@@ -110,8 +113,10 @@ py_library(
     srcs = ["affine.py"],
     deps = [
         ":bijector",
+        ":shape",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -120,7 +125,6 @@ py_library(
     srcs = ["batch_normalization.py"],
     deps = [
         ":bijector",
-        # numpy dep,
         # tensorflow dep,
     ],
 )
@@ -141,6 +145,7 @@ py_library(
         ":bijector",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
 
@@ -149,6 +154,7 @@ py_library(
     srcs = ["cholesky_to_inv_cholesky.py"],
     deps = [
         ":bijector",
+        ":cholesky_outer_product",
         # tensorflow dep,
     ],
 )
@@ -158,7 +164,7 @@ py_library(
     srcs = ["conditional_bijector.py"],
     deps = [
         ":bijector",
-        # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
 
@@ -175,10 +181,7 @@ py_library(
 py_library(
     name = "exp",
     srcs = ["exp.py"],
-    deps = [
-        ":bijector",
-        # tensorflow dep,
-    ],
+    deps = [":power_transform"],
 )
 
 py_library(
@@ -188,6 +191,7 @@ py_library(
         ":bijector",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
 
@@ -212,19 +216,13 @@ py_library(
 py_library(
     name = "inline",
     srcs = ["inline.py"],
-    deps = [
-        ":bijector",
-        # tensorflow dep,
-    ],
+    deps = [":bijector"],
 )
 
 py_library(
     name = "invert",
     srcs = ["invert.py"],
-    deps = [
-        ":bijector",
-        # tensorflow dep,
-    ],
+    deps = [":bijector"],
 )
 
 py_library(
@@ -256,6 +254,15 @@ py_library(
 )
 
 py_library(
+    name = "ordered",
+    srcs = ["ordered.py"],
+    deps = [
+        ":bijector",
+        # tensorflow dep,
+    ],
+)
+
+py_library(
     name = "permute",
     srcs = ["permute.py"],
     deps = [
@@ -278,7 +285,7 @@ py_library(
     name = "real_nvp",
     srcs = ["real_nvp.py"],
     deps = [
-        ":bijector",
+        ":conditional_bijector",
         # tensorflow dep,
     ],
 )
@@ -297,8 +304,11 @@ py_library(
     name = "scale_tril",
     srcs = ["scale_tril.py"],
     deps = [
-        ":bijector",
-        # tensorflow dep,
+        ":affine_scalar",
+        ":chain",
+        ":fill_triangular",
+        ":softplus",
+        ":transform_diagonal",
     ],
 )
 
@@ -306,8 +316,8 @@ py_library(
     name = "shape",
     srcs = ["shape.py"],
     deps = [
-        ":bijector",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
 
@@ -346,6 +356,7 @@ py_library(
     deps = [
         ":bijector",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
 
@@ -405,12 +416,13 @@ py_library(
     ],
 )
 
-py_test(
+py_library(
     name = "bijector_test_util",
     srcs = ["bijector_test_util.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/distributions",
     ],
 )
 
@@ -421,8 +433,8 @@ py_test(
     deps = [
         ":bijectors",
         # numpy dep,
+        # six dep,
         # tensorflow dep,
-        "//tensorflow_probability",
     ],
 )
 
@@ -432,9 +444,7 @@ py_test(
     srcs = ["absolute_value_test.py"],
     deps = [
         ":bijectors",
-        # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
     ],
 )
 
@@ -448,7 +458,6 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
     ],
 )
 
@@ -460,7 +469,6 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
     ],
 )
 
@@ -470,7 +478,6 @@ py_test(
     srcs = ["affine_scalar_test.py"],
     deps = [
         ":bijector_test_util",
-        ":bijectors",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
@@ -486,7 +493,7 @@ py_test(
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -500,7 +507,6 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
     ],
 )
 
@@ -512,7 +518,6 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
     ],
 )
 
@@ -524,7 +529,6 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
     ],
 )
 
@@ -534,9 +538,7 @@ py_test(
     srcs = ["conditional_bijector_test.py"],
     deps = [
         ":bijectors",
-        # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
     ],
 )
 
@@ -550,7 +552,6 @@ py_test(
         # numpy dep,
         # scipy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
     ],
 )
 
@@ -563,7 +564,6 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
     ],
 )
 
@@ -575,7 +575,6 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
     ],
 )
 
@@ -587,8 +586,18 @@ py_test(
         ":bijector_test_util",
         ":bijectors",
         # numpy dep,
+        # scipy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+    ],
+)
+
+py_test(
+    name = "identity_test",
+    srcs = ["identity_test.py"],
+    deps = [
+        ":bijector_test_util",
+        ":bijectors",
+        # tensorflow dep,
     ],
 )
 
@@ -600,7 +609,6 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
     ],
 )
 
@@ -611,9 +619,8 @@ py_test(
     deps = [
         ":bijector_test_util",
         ":bijectors",
-        # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions",
     ],
 )
 
@@ -626,7 +633,6 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
     ],
 )
 
@@ -636,9 +642,10 @@ py_test(
     srcs = ["masked_autoregressive_test.py"],
     deps = [
         ":bijectors",
+        ":masked_autoregressive",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -649,6 +656,16 @@ py_test(
     srcs = ["matrix_inverse_tril_test.py"],
     deps = [
         ":bijectors",
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "ordered_test",
+    srcs = ["ordered_test.py"],
+    deps = [
+        ":bijector_test_util",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
@@ -664,7 +681,6 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
     ],
 )
 
@@ -677,7 +693,6 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
     ],
 )
 
@@ -689,7 +704,7 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -703,7 +718,6 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
     ],
 )
 
@@ -715,7 +729,6 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
     ],
 )
 
@@ -727,7 +740,6 @@ py_test(
         ":shape",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
     ],
 )
 
@@ -739,8 +751,8 @@ py_test(
         ":bijector_test_util",
         ":bijectors",
         # numpy dep,
+        # scipy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
     ],
 )
 
@@ -754,7 +766,6 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
     ],
 )
 
@@ -767,7 +778,6 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
     ],
 )
 
@@ -780,7 +790,6 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
     ],
 )
 
@@ -793,7 +802,6 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
     ],
 )
 
@@ -806,7 +814,6 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
     ],
 )
 
@@ -819,7 +826,6 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
     ],
 )
 
@@ -831,7 +837,6 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
     ],
 )
 
@@ -843,7 +848,6 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
     ],
 )
 
@@ -855,7 +859,7 @@ py_test(
         ":bijector_test_util",
         ":bijectors",
         # numpy dep,
+        # scipy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
     ],
 )

@@ -25,11 +25,11 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python import distributions
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import metropolis_hastings
 from tensorflow_probability.python.mcmc import util as mcmc_util
 from tensorflow.contrib import eager as tfe
-from tensorflow.python.ops.distributions import util as distributions_util
 
 
 __all__ = [
@@ -102,7 +102,7 @@ def make_simple_step_size_update_policy(num_adaptation_steps=None,
   if step_counter is None and num_adaptation_steps is not None:
     step_counter = tf.get_variable(
         name='step_size_adaptation_step_counter',
-        initializer=np.array(-1, dtype=np.int32),
+        initializer=np.array(-1, dtype=np.int64),
         trainable=False,
         use_resource=True)
 
@@ -603,7 +603,7 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
           maybe_expand=True,
           state_gradients_are_stopped=self.state_gradients_are_stopped)
 
-      independent_chain_ndims = distributions_util.prefer_static_rank(
+      independent_chain_ndims = distribution_util.prefer_static_rank(
           current_target_log_prob)
 
       current_momentum_parts = []
@@ -625,21 +625,24 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
             current_target_log_prob_grad_parts=args[3],
             state_gradients_are_stopped=self.state_gradients_are_stopped)
 
-      # Do leapfrog integration.
+      num_leapfrog_steps = tf.convert_to_tensor(
+          self.num_leapfrog_steps, dtype=tf.int64, name='num_leapfrog_steps')
+
       [
           next_momentum_parts,
           next_state_parts,
           next_target_log_prob,
           next_target_log_prob_grad_parts,
+
       ] = tf.while_loop(
-          cond=lambda i, *args: i < self.num_leapfrog_steps,
+          cond=lambda i, *args: i < num_leapfrog_steps,
           body=lambda i, *args: [i + 1] + list(_leapfrog_one_step(*args)),
           loop_vars=[
-              tf.zeros([], tf.int32, name='iter'),
+              tf.zeros([], tf.int64, name='iter'),
               current_momentum_parts,
               current_state_parts,
               current_target_log_prob,
-              current_target_log_prob_grad_parts,
+              current_target_log_prob_grad_parts
           ])[1:]
 
       def maybe_flatten(x):

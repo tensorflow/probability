@@ -22,11 +22,15 @@ from __future__ import print_function
 import numpy as np
 
 import tensorflow as tf
+from tensorflow_probability.python.distributions import distribution
+
+from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.framework import tensor_shape
-from tensorflow.python.ops.distributions import util as distribution_util
 
 
-class Pareto(tf.distributions.Distribution):
+class Pareto(distribution.Distribution):
   """Pareto distribution.
 
   The Pareto distribution is parameterized by a `scale` and a
@@ -76,9 +80,10 @@ class Pareto(tf.distributions.Distribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name, values=[concentration, scale]):
+      dtype = dtype_util.common_dtype([concentration, scale], tf.float32)
       self._concentration = tf.convert_to_tensor(
-          concentration, name="concentration")
-      self._scale = tf.convert_to_tensor(scale, name="scale")
+          concentration, name="concentration", dtype=dtype)
+      self._scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
       with tf.control_dependencies([
           tf.assert_positive(self._concentration),
           tf.assert_positive(self._scale)] if validate_args else []):
@@ -87,7 +92,7 @@ class Pareto(tf.distributions.Distribution):
         self._scale = tf.identity(self._scale, name="scale")
     super(Pareto, self).__init__(
         dtype=self._concentration.dtype,
-        reparameterization_type=tf.distributions.FULLY_REPARAMETERIZED,
+        reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
         parameters=parameters,

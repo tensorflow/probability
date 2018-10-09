@@ -72,6 +72,16 @@ class GammaGammaTest(tf.test.TestCase):
     self.assertEqual(log_pdf.get_shape(), (5,))
     self.assertAllClose(self.evaluate(log_pdf), expected_log_pdf)
 
+  def testGammaGammaLogPDFAtZero(self):
+    # When concentration = 1., the log pdf should be finite.
+    gg = tfd.GammaGamma(
+        concentration=1.,
+        mixing_concentration=[0.01, 0.1, 2, 3],
+        mixing_rate=[0.01, 0.1, 2, 3])
+    log_pdf = self.evaluate(gg.log_prob(0.))
+    self.assertAllEqual(
+        np.ones_like(log_pdf, dtype=np.bool), np.isfinite(log_pdf))
+
   def testGammaGammaLogPDFMultidimensional(self):
     batch_size = 6
     alpha = tf.constant([[2., 4.]] * batch_size)

@@ -39,7 +39,7 @@ class RWMTest(tf.test.TestCase):
     """Sampling from the Standard Normal Distribution."""
     dtype = np.float32
 
-    with self.test_session(graph=tf.Graph()) as sess:
+    with tf.Session(graph=tf.Graph()) as sess:
       target = tfd.Normal(loc=dtype(0), scale=dtype(1))
 
       samples, _ = tfp.mcmc.sample_chain(
@@ -65,7 +65,7 @@ class RWMTest(tf.test.TestCase):
     """Sampling from the Standard Normal Distribution with adaptation."""
     dtype = np.float32
 
-    with self.test_session(graph=tf.Graph()) as sess:
+    with tf.Session(graph=tf.Graph()) as sess:
       target = tfd.Normal(loc=dtype(0), scale=dtype(1))
       samples, _ = tfp.mcmc.sample_chain(
           num_results=1000,
@@ -94,7 +94,7 @@ class RWMTest(tf.test.TestCase):
     num_burnin_steps = 1000
     num_chain_results = 500
 
-    with self.test_session(graph=tf.Graph()) as sess:
+    with tf.Session(graph=tf.Graph()) as sess:
       target = tfd.Normal(loc=dtype(0), scale=dtype(1))
 
       def cauchy_new_state_fn(scale, dtype):
@@ -134,7 +134,7 @@ class RWMTest(tf.test.TestCase):
     true_cov = dtype([[1, 0.5], [0.5, 1]])
     num_results = 500
     num_chains = 100
-    with self.test_session(graph=tf.Graph()) as sess:
+    with tf.Session(graph=tf.Graph()) as sess:
       # Targeg distribution is defined through the Cholesky decomposition
       chol = tf.linalg.cholesky(true_cov)
       target = tfd.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)

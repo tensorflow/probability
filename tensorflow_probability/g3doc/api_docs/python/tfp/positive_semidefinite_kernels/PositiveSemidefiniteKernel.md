@@ -1,6 +1,8 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.positive_semidefinite_kernels.PositiveSemidefiniteKernel" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="batch_shape"/>
+<meta itemprop="property" content="dtype"/>
 <meta itemprop="property" content="feature_ndims"/>
 <meta itemprop="property" content="name"/>
 <meta itemprop="property" content="__add__"/>
@@ -101,6 +103,46 @@ partition into 3 pieces:
   requirement is that batch dimensions of inputs `x` and `y` be broadcastable
   with each other and with the kernel's parameter batch shapes (see above).
 
+<h2 id="__init__"><code>__init__</code></h2>
+
+``` python
+__init__(
+    feature_ndims,
+    dtype=None,
+    name=None
+)
+```
+
+Construct a PositiveSemidefiniteKernel (subclass) instance.
+
+#### Args:
+
+* <b>`feature_ndims`</b>: Python `integer` indicating the number of dims (the rank)
+    of the feature space this kernel acts on.
+* <b>`dtype`</b>: `DType` on which this kernel operates.
+* <b>`name`</b>: Python `str` name prefixed to Ops created by this class. Default:
+    subclass name.
+
+
+#### Raises:
+
+* <b>`ValueError`</b>: if `feature_ndims` is not an integer greater than 0
+Inputs to PositiveSemidefiniteKernel methods partition into 3 pieces:
+
+```none
+[b1, ..., bB, e, f1, ..., fF]
+'----------'  |  '---------'
+     |        |       '-- Feature dimensions
+     |        '-- Example dimension (`matrix`-only)
+     '-- Batch dimensions
+```
+
+The `feature_ndims` argument declares how many of the right-most shape
+dimensions belong to the feature dimensions. This enables us to predict
+which shape dimensions will be 'reduced' away during kernel computation.
+
+
+
 ## Properties
 
 <h3 id="batch_shape"><code>batch_shape</code></h3>
@@ -133,6 +175,10 @@ concrete implementation sub-classes are obliged to provide.
 `TensorShape` instance describing the fully broadcast shape of all
 kernel parameters.
 
+<h3 id="dtype"><code>dtype</code></h3>
+
+DType over which the kernel operates.
+
 <h3 id="feature_ndims"><code>feature_ndims</code></h3>
 
 The number of feature dimensions.
@@ -159,42 +205,6 @@ Name prepended to all ops created by this class.
 
 
 ## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
-
-``` python
-__init__(
-    feature_ndims,
-    name=None
-)
-```
-
-Construct a PositiveSemidefiniteKernel (subclass) instance.
-
-#### Args:
-
-* <b>`feature_ndims`</b>: Python `integer` indicating the number of dims (the rank)
-    of the feature space this kernel acts on.
-* <b>`name`</b>: Python `str` name prefixed to Ops created by this class. Default:
-    subclass name.
-
-
-#### Raises:
-
-* <b>`ValueError`</b>: if `feature_ndims` is not an integer greater than 0
-Inputs to PositiveSemidefiniteKernel methods partition into 3 pieces:
-
-```none
-[b1, ..., bB, e, f1, ..., fF]
-'----------'  |  '---------'
-     |        |       '-- Feature dimensions
-     |        '-- Example dimension (`matrix`-only)
-     '-- Batch dimensions
-```
-
-The `feature_ndims` argument declares how many of the right-most shape
-dimensions belong to the feature dimensions. This enables us to predict
-which shape dimensions will be 'reduced' away during kernel computation.
 
 <h3 id="__add__"><code>__add__</code></h3>
 

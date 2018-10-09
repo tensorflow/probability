@@ -26,7 +26,7 @@ class VariationalSGDTest(tf.test.TestCase):
 
   def testBasic(self):
     for dtype in [tf.half, tf.float32, tf.float64]:
-      with self.test_session():
+      with self.cached_session():
         var0 = tf.Variable([1.1, 2.1], dtype=dtype)
         var1 = tf.Variable([3.0, 4.0], dtype=dtype)
         grads0 = tf.constant([0.1, 0.1], dtype=dtype)
@@ -53,7 +53,7 @@ class VariationalSGDTest(tf.test.TestCase):
 
   def testBasicMultiInstance(self):
     for dtype in [tf.half, tf.float32, tf.float64]:
-      with self.test_session():
+      with self.cached_session():
         var0 = tf.Variable([1.1, 2.1], dtype=dtype)
         var1 = tf.Variable([3.0, 4.0], dtype=dtype)
         grads0 = tf.constant([0.1, 0.1], dtype=dtype)
@@ -112,7 +112,7 @@ class VariationalSGDTest(tf.test.TestCase):
 
   def testTensorLearningRate(self):
     for dtype in [tf.half, tf.float32, tf.float64]:
-      with self.test_session():
+      with self.cached_session():
         var0 = tf.Variable([1.1, 2.1], dtype=dtype)
         var1 = tf.Variable([3.0, 4.0], dtype=dtype)
         grads0 = tf.constant([0.1, 0.1], dtype=dtype)
@@ -142,7 +142,7 @@ class VariationalSGDTest(tf.test.TestCase):
 
   def testTensorDecayLearningRate(self):
     for dtype in [tf.half, tf.float32, tf.float64]:
-      with self.test_session():
+      with self.cached_session():
         var0 = tf.Variable([1.1, 2.1], dtype=dtype)
         var1 = tf.Variable([3.0, 4.0], dtype=dtype)
         grads0 = tf.constant([0.1, 0.1], dtype=dtype)
@@ -185,7 +185,7 @@ class VariationalSGDTest(tf.test.TestCase):
 
   def testGradWrtRef(self):
     for dtype in [tf.half, tf.float32, tf.float64]:
-      with self.test_session():
+      with self.cached_session():
         opt = tfp.optimizer.VariationalSGD(1, 1, max_learning_rate=1.0)
         values = [1.0, 3.0]
         vars_ = [tf.Variable([v], dtype=dtype) for v in values]
@@ -196,7 +196,7 @@ class VariationalSGDTest(tf.test.TestCase):
 
   def testWithGlobalStep(self):
     for dtype in [tf.half, tf.float32, tf.float64]:
-      with self.test_session():
+      with self.cached_session():
         global_step = tf.Variable(0, trainable=False)
         var0 = tf.Variable([1.1, 2.1], dtype=dtype)
         var1 = tf.Variable([3.0, 4.0], dtype=dtype)
@@ -231,7 +231,7 @@ class VariationalSGDTest(tf.test.TestCase):
 
   def testSparseBasic(self):
     for dtype in [tf.half, tf.float32, tf.float64]:
-      with self.test_session():
+      with self.cached_session():
         var0 = tf.Variable([[1.1], [2.1]], dtype=dtype)
         var1 = tf.Variable([[3.0], [4.0]], dtype=dtype)
         grads0 = tf.IndexedSlices(

@@ -43,14 +43,14 @@ changes you propose do not break existing unit tests. You can run tests (on CPU)
 using the command,
 
 ```shell
-bazel test --config=opt --copt=-O3 --copt=-march=native \
+bazel test --copt=-O3 --copt=-march=native \
   //tensorflow_probability/...
 ```
 
 or on GPU,
 
 ```shell
-bazel test --config=opt --copt=-O3 --copt=-march=native --config=cuda \
+bazel test --copt=-O3 --copt=-march=native --config=cuda \
   //tensorflow_probability/...
 ```
 

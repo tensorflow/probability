@@ -24,28 +24,29 @@ import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow.python.framework import test_util
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class PowerTransformBijectorTest(tf.test.TestCase):
   """Tests correctness of the power transformation."""
 
   def testBijector(self):
-    with self.test_session():
-      c = 0.2
-      bijector = tfb.PowerTransform(power=c, validate_args=True)
-      self.assertEqual("power_transform", bijector.name)
-      x = np.array([[[-1.], [2.], [-5. + 1e-4]]])
-      y = (1. + x * c)**(1. / c)
-      self.assertAllClose(y, self.evaluate(bijector.forward(x)))
-      self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
-      self.assertAllClose(
-          (c - 1.) * np.sum(np.log(y), axis=-1),
-          self.evaluate(bijector.inverse_log_det_jacobian(y, event_ndims=1)))
-      self.assertAllClose(
-          self.evaluate(-bijector.inverse_log_det_jacobian(y, event_ndims=1)),
-          self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=1)),
-          rtol=1e-4,
-          atol=0.)
+    c = 0.2
+    bijector = tfb.PowerTransform(power=c, validate_args=True)
+    self.assertEqual("power_transform", bijector.name)
+    x = np.array([[[-1.], [2.], [-5. + 1e-4]]])
+    y = (1. + x * c)**(1. / c)
+    self.assertAllClose(y, self.evaluate(bijector.forward(x)))
+    self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
+    self.assertAllClose(
+        (c - 1.) * np.sum(np.log(y), axis=-1),
+        self.evaluate(bijector.inverse_log_det_jacobian(y, event_ndims=1)))
+    self.assertAllClose(
+        self.evaluate(-bijector.inverse_log_det_jacobian(y, event_ndims=1)),
+        self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=1)),
+        rtol=1e-4,
+        atol=0.)
 
   def testScalarCongruency(self):
     bijector = tfb.PowerTransform(power=0.2, validate_args=True)

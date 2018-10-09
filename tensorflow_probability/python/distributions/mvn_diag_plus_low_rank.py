@@ -21,6 +21,7 @@ from __future__ import print_function
 import tensorflow as tf
 from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 
 
 __all__ = [
@@ -215,8 +216,10 @@ class MultivariateNormalDiagPlusLowRank(
       ValueError: if at most `scale_identity_multiplier` is specified.
     """
     parameters = dict(locals())
-    def _convert_to_tensor(x, name):
-      return None if x is None else tf.convert_to_tensor(x, name=name)
+
+    def _convert_to_tensor(x, name, dtype=None):
+      return None if x is None else tf.convert_to_tensor(
+          x, name=name, dtype=dtype)
 
     with tf.name_scope(name) as name:
       with tf.name_scope(
@@ -225,6 +228,10 @@ class MultivariateNormalDiagPlusLowRank(
               loc, scale_diag, scale_identity_multiplier, scale_perturb_factor,
               scale_perturb_diag
           ]):
+        dtype = dtype_util.common_dtype([
+            loc, scale_diag, scale_identity_multiplier, scale_perturb_factor,
+            scale_perturb_diag
+        ], tf.float32)
         has_low_rank = (scale_perturb_factor is not None or
                         scale_perturb_diag is not None)
         scale = distribution_util.make_diag_scale(
@@ -232,13 +239,12 @@ class MultivariateNormalDiagPlusLowRank(
             scale_diag=scale_diag,
             scale_identity_multiplier=scale_identity_multiplier,
             validate_args=validate_args,
-            assert_positive=has_low_rank)
+            assert_positive=has_low_rank,
+            dtype=dtype)
         scale_perturb_factor = _convert_to_tensor(
-            scale_perturb_factor,
-            name="scale_perturb_factor")
+            scale_perturb_factor, name="scale_perturb_factor", dtype=dtype)
         scale_perturb_diag = _convert_to_tensor(
-            scale_perturb_diag,
-            name="scale_perturb_diag")
+            scale_perturb_diag, name="scale_perturb_diag", dtype=dtype)
         if has_low_rank:
           scale = tf.linalg.LinearOperatorLowRankUpdate(
               scale,

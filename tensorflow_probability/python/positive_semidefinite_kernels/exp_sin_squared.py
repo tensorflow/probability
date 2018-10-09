@@ -20,11 +20,12 @@ from __future__ import print_function
 
 import numpy as np
 import tensorflow as tf
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.positive_semidefinite_kernels import positive_semidefinite_kernel as psd_kernel
 from tensorflow_probability.python.positive_semidefinite_kernels.internal import util
 
 __all__ = [
-    "ExpSinSquared",
+    'ExpSinSquared',
 ]
 
 
@@ -51,14 +52,13 @@ class ExpSinSquared(psd_kernel.PositiveSemidefiniteKernel):
     This kernel acts over the space `S = R^(D1 x D2 x D3 ... Dd)`.
   """
 
-  def __init__(
-      self,
-      amplitude=None,
-      length_scale=None,
-      period=None,
-      feature_ndims=1,
-      validate_args=False,
-      name="ExpSinSquared"):
+  def __init__(self,
+               amplitude=None,
+               length_scale=None,
+               period=None,
+               feature_ndims=1,
+               validate_args=False,
+               name='ExpSinSquared'):
     """Construct a ExpSinSquared kernel instance.
 
     Args:
@@ -73,8 +73,8 @@ class ExpSinSquared(psd_kernel.PositiveSemidefiniteKernel):
         `matrix` methods. A value of `None` is treated like 1.
       period: Positive floating point `Tensor` that controls the period of the
         kernel. Must be broadcastable with `amplitude`, `length_scale` and
-        inputs to `apply` and `matrix` methods.  A value of `None` is
-        treated like 1.
+        inputs to `apply` and `matrix` methods.  A value of `None` is treated
+        like 1.
       feature_ndims: Python `int` number of rightmost dims to include in kernel
         computation.
       validate_args: If `True`, parameters are checked for validity despite
@@ -82,13 +82,23 @@ class ExpSinSquared(psd_kernel.PositiveSemidefiniteKernel):
       name: Python `str` name prefixed to Ops created by this class.
     """
     with tf.name_scope(name, values=[amplitude, period, length_scale]) as name:
+      dtype = dtype_util.common_dtype([amplitude, period, length_scale],
+                                      tf.float32)
+      if amplitude is not None:
+        amplitude = tf.convert_to_tensor(
+            amplitude, name='amplitude', dtype=dtype)
       self._amplitude = _validate_arg_if_not_none(
           amplitude, tf.assert_positive, validate_args)
+      if period is not None:
+        period = tf.convert_to_tensor(period, name='period', dtype=dtype)
       self._period = _validate_arg_if_not_none(
           period, tf.assert_positive, validate_args)
+      if length_scale is not None:
+        length_scale = tf.convert_to_tensor(
+            length_scale, name='length_scale', dtype=dtype)
       self._length_scale = _validate_arg_if_not_none(
           length_scale, tf.assert_positive, validate_args)
-      dtype = tf.assert_same_float_dtype(
+      tf.assert_same_float_dtype(
           [self._amplitude, self._length_scale, self._period])
     super(ExpSinSquared, self).__init__(feature_ndims, dtype=dtype, name=name)
 
@@ -109,12 +119,11 @@ class ExpSinSquared(psd_kernel.PositiveSemidefiniteKernel):
           self.length_scale, ndims=param_expansion_ndims)
       log_kernel /= length_scale ** 2
 
-    result = tf.exp(log_kernel)
     if self.amplitude is not None:
       amplitude = util.pad_shape_right_with_ones(
           self.amplitude, ndims=param_expansion_ndims)
-      result *= amplitude ** 2
-    return result
+      log_kernel += 2. * tf.log(amplitude)
+    return tf.exp(log_kernel)
 
   @property
   def amplitude(self):
@@ -132,16 +141,16 @@ class ExpSinSquared(psd_kernel.PositiveSemidefiniteKernel):
     return self._period
 
   def _batch_shape(self):
+    scalar_shape = tf.TensorShape([])
     return tf.broadcast_static_shape(
         tf.broadcast_static_shape(
-            self.amplitude.shape,
-            self.length_scale.shape),
-        self.period.shape)
+            scalar_shape if self.amplitude is None else self.amplitude.shape,
+            scalar_shape if self.period is None else self.period.shape),
+        scalar_shape if self.length_scale is None else self.length_scale.shape)
 
   def _batch_shape_tensor(self):
-    with self._name_scope("batch_shape_tensor"):
-      return tf.broadcast_dynamic_shape(
-          tf.broadcast_dynamic_shape(
-              tf.shape(self.amplitude),
-              tf.shape(self.length_scale)),
-          tf.shape(self.period))
+    return tf.broadcast_dynamic_shape(
+        tf.broadcast_dynamic_shape(
+            [] if self.amplitude is None else tf.shape(self.amplitude),
+            [] if self.length_scale is None else tf.shape(self.length_scale)),
+        [] if self.period is None else tf.shape(self.period))

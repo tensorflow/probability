@@ -25,32 +25,41 @@ import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow.python.framework import test_util
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class WeibullBijectorTest(tf.test.TestCase):
   """Tests correctness of the weibull bijector."""
 
   def testBijector(self):
-    with self.test_session():
-      scale = 5.
-      concentration = 0.3
-      bijector = tfb.Weibull(
-          scale=scale, concentration=concentration, validate_args=True)
-      self.assertEqual("weibull", bijector.name)
-      x = np.array([[[0.], [1.], [14.], [20.], [100.]]], dtype=np.float32)
-      # Weibull distribution
-      weibull_dist = stats.frechet_r(c=concentration, scale=scale)
-      y = weibull_dist.cdf(x).astype(np.float32)
-      self.assertAllClose(y, self.evaluate(bijector.forward(x)))
-      self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
-      self.assertAllClose(
-          weibull_dist.logpdf(x),
-          self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=0)))
-      self.assertAllClose(
-          self.evaluate(-bijector.inverse_log_det_jacobian(y, event_ndims=0)),
-          self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=0)),
-          rtol=1e-4,
-          atol=0.)
+    scale = 5.
+    concentration = 0.3
+    bijector = tfb.Weibull(
+        scale=scale, concentration=concentration, validate_args=True)
+    self.assertEqual("weibull", bijector.name)
+    x = np.array([[[0.], [1.], [14.], [20.], [100.]]], dtype=np.float32)
+    # Weibull distribution
+    weibull_dist = stats.frechet_r(c=concentration, scale=scale)
+    y = weibull_dist.cdf(x).astype(np.float32)
+    self.assertAllClose(y, self.evaluate(bijector.forward(x)))
+    self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
+    self.assertAllClose(
+        weibull_dist.logpdf(x),
+        self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=0)))
+    self.assertAllClose(
+        self.evaluate(-bijector.inverse_log_det_jacobian(y, event_ndims=0)),
+        self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=0)),
+        rtol=1e-4,
+        atol=0.)
+
+  def testBijectorConcentration1LogDetJacobianFiniteAtZero(self):
+    # When concentration = 1., forward_log_det_jacobian should be finite at
+    # zero.
+    scale = np.logspace(0.1, 10., num=20).astype(np.float32)
+    bijector = tfb.Weibull(scale, concentration=1.)
+    fldj = self.evaluate(bijector.forward_log_det_jacobian(0., event_ndims=0))
+    self.assertAllEqual(np.ones_like(fldj, dtype=np.bool), np.isfinite(fldj))
 
   def testScalarCongruency(self):
     bijector_test_util.assert_scalar_congruency(

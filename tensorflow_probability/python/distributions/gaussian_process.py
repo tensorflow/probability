@@ -19,10 +19,10 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.distributions import mvn_linear_operator
+from tensorflow_probability.python.internal import dtype_util
 
 __all__ = [
     'GaussianProcess',
@@ -239,10 +239,13 @@ class GaussianProcess(mvn_linear_operator.MultivariateNormalLinearOperator):
       ValueError: if `mean_fn` is not `None` and is not callable.
     """
     parameters = dict(locals())
-    with tf.name_scope(name) as name:
+    with tf.name_scope(
+        name, values=[index_points, observation_noise_variance,
+                      jitter]) as name:
+      dtype = dtype_util.common_dtype(
+          [index_points, observation_noise_variance, jitter], tf.float32)
       index_points = tf.convert_to_tensor(
-          index_points, name='index_points')
-      dtype = index_points.dtype.as_numpy_dtype
+          index_points, dtype=dtype, name='index_points')
       jitter = tf.convert_to_tensor(jitter, dtype=dtype, name='jitter')
       observation_noise_variance = tf.convert_to_tensor(
           observation_noise_variance,
@@ -254,7 +257,7 @@ class GaussianProcess(mvn_linear_operator.MultivariateNormalLinearOperator):
       # Default to a constant zero function, borrowing the dtype from
       # index_points to ensure consistency.
       if mean_fn is None:
-        mean_fn = lambda x: np.array([0.], dtype)
+        mean_fn = lambda x: tf.zeros([1], dtype=dtype)
       else:
         if not callable(mean_fn):
           raise ValueError('`mean_fn` must be a Python callable')

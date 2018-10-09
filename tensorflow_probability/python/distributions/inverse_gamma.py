@@ -22,9 +22,12 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.ops import control_flow_ops
-from tensorflow.python.ops.distributions import util as distribution_util
 
 
 __all__ = [
@@ -33,7 +36,7 @@ __all__ = [
 ]
 
 
-class InverseGamma(tf.distributions.Distribution):
+class InverseGamma(distribution.Distribution):
   """InverseGamma distribution.
 
   The `InverseGamma` distribution is defined over positive real numbers using
@@ -144,6 +147,10 @@ class InverseGamma(tf.distributions.Distribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name, values=[concentration, rate]) as name:
+      dtype = dtype_util.common_dtype([concentration, rate], tf.float32)
+      concentration = tf.convert_to_tensor(
+          concentration, name="concentration", dtype=dtype)
+      rate = tf.convert_to_tensor(rate, name="rate", dtype=dtype)
       with tf.control_dependencies([
           tf.assert_positive(
               concentration,
@@ -152,14 +159,15 @@ class InverseGamma(tf.distributions.Distribution):
               rate,
               message="Rate must be positive."),
       ] if validate_args else []):
-        self._concentration = tf.identity(concentration, name="concentration")
-        self._rate = tf.identity(rate, name="rate")
-        tf.assert_same_float_dtype([self._concentration, self._rate])
+        self._concentration = tf.identity(concentration)
+        self._rate = tf.identity(rate)
+      tf.assert_same_float_dtype([self._concentration, self._rate])
+
     super(InverseGamma, self).__init__(
         dtype=self._concentration.dtype,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
-        reparameterization_type=tf.distributions.FULLY_REPARAMETERIZED,
+        reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
         parameters=parameters,
         graph_parents=[self._concentration, self._rate],
         name=name)
@@ -296,6 +304,10 @@ class InverseGammaWithSoftplusConcentrationRate(InverseGamma):
                name="InverseGammaWithSoftplusConcentrationRate"):
     parameters = dict(locals())
     with tf.name_scope(name, values=[concentration, rate]) as name:
+      dtype = dtype_util.common_dtype([concentration, rate])
+      concentration = tf.convert_to_tensor(
+          concentration, name="softplus_concentration", dtype=dtype)
+      rate = tf.convert_to_tensor(rate, name="softplus_rate", dtype=dtype)
       super(InverseGammaWithSoftplusConcentrationRate, self).__init__(
           concentration=tf.nn.softplus(
               concentration, name="softplus_concentration"),

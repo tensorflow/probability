@@ -22,6 +22,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.framework import tensor_util
 
@@ -31,7 +32,7 @@ __all__ = [
 ]
 
 
-class BatchReshape(tf.distributions.Distribution):
+class BatchReshape(distribution_lib.Distribution):
   """The Batch-Reshaping distribution.
 
   This "meta-distribution" reshapes the batch dimensions of another

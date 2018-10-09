@@ -28,8 +28,8 @@ import numpy as np
 import six
 import tensorflow as tf
 
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow.python.framework import tensor_util
-from tensorflow.python.ops.distributions import util as distribution_util
 
 __all__ = [
     "Bijector",
@@ -457,7 +457,7 @@ class Bijector(object):
 
 
   ```python
-  abs = tf.contrib.distributions.bijectors.AbsoluteValue()
+  abs = tfp.bijectors.AbsoluteValue()
 
   abs.forward(-1.)
   ==> 1.

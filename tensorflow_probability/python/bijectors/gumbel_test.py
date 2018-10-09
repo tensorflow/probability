@@ -25,31 +25,32 @@ import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow.python.framework import test_util
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class GumbelBijectorTest(tf.test.TestCase):
   """Tests correctness of the Gumbel bijector."""
 
   def testBijector(self):
-    with self.test_session():
-      loc = 0.3
-      scale = 5.
-      bijector = tfb.Gumbel(loc=loc, scale=scale, validate_args=True)
-      self.assertEqual("gumbel", bijector.name)
-      x = np.array([[[-3.], [0.], [0.5], [4.2], [12.]]], dtype=np.float32)
-      # Gumbel distribution
-      gumbel_dist = stats.gumbel_r(loc=loc, scale=scale)
-      y = gumbel_dist.cdf(x).astype(np.float32)
-      self.assertAllClose(y, self.evaluate(bijector.forward(x)))
-      self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
-      self.assertAllClose(
-          np.squeeze(gumbel_dist.logpdf(x), axis=-1),
-          self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=1)))
-      self.assertAllClose(
-          self.evaluate(-bijector.inverse_log_det_jacobian(y, event_ndims=1)),
-          self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=1)),
-          rtol=1e-4,
-          atol=0.)
+    loc = 0.3
+    scale = 5.
+    bijector = tfb.Gumbel(loc=loc, scale=scale, validate_args=True)
+    self.assertEqual("gumbel", bijector.name)
+    x = np.array([[[-3.], [0.], [0.5], [4.2], [12.]]], dtype=np.float32)
+    # Gumbel distribution
+    gumbel_dist = stats.gumbel_r(loc=loc, scale=scale)
+    y = gumbel_dist.cdf(x).astype(np.float32)
+    self.assertAllClose(y, self.evaluate(bijector.forward(x)))
+    self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
+    self.assertAllClose(
+        np.squeeze(gumbel_dist.logpdf(x), axis=-1),
+        self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=1)))
+    self.assertAllClose(
+        self.evaluate(-bijector.inverse_log_det_jacobian(y, event_ndims=1)),
+        self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=1)),
+        rtol=1e-4,
+        atol=0.)
 
   def testScalarCongruency(self):
     bijector_test_util.assert_scalar_congruency(

@@ -22,12 +22,15 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python.distributions import categorical
+from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.framework import tensor_util
 
 
-class Mixture(tf.distributions.Distribution):
+class Mixture(distribution.Distribution):
   """Mixture distribution.
 
   The `Mixture` object implements batched mixture distributions.
@@ -110,7 +113,9 @@ class Mixture(tf.distributions.Distribution):
         have matching static event shapes.
     """
     parameters = dict(locals())
-    if not isinstance(cat, tf.distributions.Categorical):
+    # TODO(b/117098119): Remove tf.distribution references once they're gone.
+    if not isinstance(cat, categorical.Categorical) and not isinstance(
+        cat, tf.distributions.Categorical):
       raise TypeError("cat must be a Categorical distribution, but saw: %s" %
                       cat)
     if not components:
@@ -118,8 +123,10 @@ class Mixture(tf.distributions.Distribution):
     if not isinstance(components, (list, tuple)):
       raise TypeError("components must be a list or tuple, but saw: %s" %
                       components)
+    # TODO(b/117098119): Remove tf.distribution references once they're gone.
     if not all(
-        isinstance(c, tf.distributions.Distribution) for c in components):
+        isinstance(c, distribution.Distribution) or
+        isinstance(cat, tf.distributions.Distribution) for c in components):
       raise TypeError(
           "all entries in components must be Distribution instances"
           " but saw: %s" % components)
@@ -190,7 +197,7 @@ class Mixture(tf.distributions.Distribution):
 
     super(Mixture, self).__init__(
         dtype=dtype,
-        reparameterization_type=tf.distributions.NOT_REPARAMETERIZED,
+        reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
         parameters=parameters,

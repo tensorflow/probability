@@ -22,6 +22,7 @@ import tensorflow as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.bijectors.shape import _DistributionShape
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow.python.framework import tensor_util
 from tensorflow.python.ops import control_flow_ops
 
@@ -31,9 +32,9 @@ __all__ = [
 ]
 
 
-def _as_tensor(x, name):
+def _as_tensor(x, name, dtype):
   """Convenience to convert to `Tensor` or leave as `None`."""
-  return None if x is None else tf.convert_to_tensor(x, name=name)
+  return None if x is None else tf.convert_to_tensor(x, name=name, dtype=dtype)
 
 
 class Affine(bijector.Bijector):
@@ -101,7 +102,8 @@ class Affine(bijector.Bijector):
                scale_perturb_diag=None,
                adjoint=False,
                validate_args=False,
-               name="affine"):
+               name="affine",
+               dtype=None):
     """Instantiates the `Affine` bijector.
 
     This `Bijector` is initialized with `shift` `Tensor` and `scale` arguments,
@@ -137,19 +139,19 @@ class Affine(bijector.Bijector):
         `scale += IdentityMatrix`. Otherwise no scaled-identity-matrix is added
         to `scale`.
       scale_diag: Floating-point `Tensor` representing the diagonal matrix.
-        `scale_diag` has shape [N1, N2, ...  k], which represents a k x k
+        `scale_diag` has shape `[N1, N2, ...  k]`, which represents a k x k
         diagonal matrix.
         When `None` no diagonal term is added to `scale`.
-      scale_tril: Floating-point `Tensor` representing the diagonal matrix.
-        `scale_diag` has shape [N1, N2, ...  k, k], which represents a k x k
-        lower triangular matrix.
+      scale_tril: Floating-point `Tensor` representing the lower triangular
+        matrix. `scale_tril` has shape `[N1, N2, ...  k, k]`, which represents a
+        k x k lower triangular matrix.
         When `None` no `scale_tril` term is added to `scale`.
         The upper triangular elements above the diagonal are ignored.
       scale_perturb_factor: Floating-point `Tensor` representing factor matrix
         with last two dimensions of shape `(k, r)`. When `None`, no rank-r
         update is added to `scale`.
       scale_perturb_diag: Floating-point `Tensor` representing the diagonal
-        matrix. `scale_perturb_diag` has shape [N1, N2, ...  r], which
+        matrix. `scale_perturb_diag` has shape `[N1, N2, ...  r]`, which
         represents an `r x r` diagonal matrix. When `None` low rank updates will
         take the form `scale_perturb_factor * scale_perturb_factor.T`.
       adjoint: Python `bool` indicating whether to use the `scale` matrix as
@@ -158,6 +160,9 @@ class Affine(bijector.Bijector):
       validate_args: Python `bool` indicating whether arguments should be
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
+      dtype: `tf.DType` to prefer when converting args to `Tensor`s. Else, we
+        fall back to a common dtype inferred from the args, finally falling back
+        to float32.
 
     Raises:
       ValueError: if `perturb_diag` is specified but not `perturb_factor`.
@@ -184,12 +189,14 @@ class Affine(bijector.Bijector):
         shift, scale_identity_multiplier, scale_diag, scale_tril,
         scale_perturb_diag, scale_perturb_factor]):
 
-      # In the absence of `loc` and `scale`, we'll assume `dtype` is `float32`.
-      dtype = tf.float32
+      if dtype is None:
+        dtype = dtype_util.common_dtype([
+            shift, scale_identity_multiplier, scale_diag, scale_tril,
+            scale_perturb_diag, scale_perturb_factor
+        ], tf.float32)
 
       if shift is not None:
-        shift = tf.convert_to_tensor(shift, name="shift")
-        dtype = shift.dtype.base_dtype
+        shift = tf.convert_to_tensor(shift, name="shift", dtype=dtype)
       self._shift = shift
 
       # When no args are specified, pretend the scale matrix is the identity
@@ -208,10 +215,8 @@ class Affine(bijector.Bijector):
           perturb_diag=scale_perturb_diag,
           perturb_factor=scale_perturb_factor,
           shift=shift,
-          validate_args=validate_args)
-
-      if scale.dtype is not None:
-        dtype = scale.dtype.base_dtype
+          validate_args=validate_args,
+          dtype=dtype)
 
       if scale is not None and not self._is_only_identity_multiplier:
         if (shift is not None and
@@ -246,25 +251,25 @@ class Affine(bijector.Bijector):
           name=name)
 
   def _create_scale_operator(self, identity_multiplier, diag, tril,
-                             perturb_diag, perturb_factor, shift,
-                             validate_args):
+                             perturb_diag, perturb_factor, shift, validate_args,
+                             dtype):
     """Construct `scale` from various components.
 
     Args:
       identity_multiplier: floating point rank 0 `Tensor` representing a scaling
         done to the identity matrix.
-      diag: Floating-point `Tensor` representing the diagonal matrix.
-        `scale_diag` has shape [N1, N2, ...  k], which represents a k x k
-        diagonal matrix.
-      tril: Floating-point `Tensor` representing the diagonal matrix.
-        `scale_tril` has shape [N1, N2, ...  k], which represents a k x k lower
-        triangular matrix.
+      diag: Floating-point `Tensor` representing the diagonal matrix.`diag` has
+        shape `[N1, N2, ...  k]`, which represents a k x k diagonal matrix.
+      tril: Floating-point `Tensor` representing the lower triangular matrix.
+       `tril` has shape `[N1, N2, ...  k, k]`, which represents a k x k lower
+       triangular matrix.
       perturb_diag: Floating-point `Tensor` representing the diagonal matrix of
         the low rank update.
       perturb_factor: Floating-point `Tensor` representing factor matrix.
       shift: Floating-point `Tensor` representing `shift in `scale @ X + shift`.
       validate_args: Python `bool` indicating whether arguments should be
         checked for correctness.
+      dtype: `DType` for arg `Tensor` conversions.
 
     Returns:
       scale. In the case of scaling by a constant, scale is a
@@ -273,11 +278,12 @@ class Affine(bijector.Bijector):
     Raises:
       ValueError: if all of `tril`, `diag` and `identity_multiplier` are `None`.
     """
-    identity_multiplier = _as_tensor(identity_multiplier, "identity_multiplier")
-    diag = _as_tensor(diag, "diag")
-    tril = _as_tensor(tril, "tril")
-    perturb_diag = _as_tensor(perturb_diag, "perturb_diag")
-    perturb_factor = _as_tensor(perturb_factor, "perturb_factor")
+    identity_multiplier = _as_tensor(identity_multiplier, "identity_multiplier",
+                                     dtype)
+    diag = _as_tensor(diag, "diag", dtype)
+    tril = _as_tensor(tril, "tril", dtype)
+    perturb_diag = _as_tensor(perturb_diag, "perturb_diag", dtype)
+    perturb_factor = _as_tensor(perturb_factor, "perturb_factor", dtype)
 
     # If possible, use the low rank update to infer the shape of
     # the identity matrix, when scale represents a scaled identity matrix

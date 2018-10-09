@@ -31,8 +31,8 @@ tfd = tfp.distributions
 
 
 def _det_ok_mask(x, det_bounds):
-  return tf.cast(tf.matrix_determinant(x) > det_bounds, dtype=x.dtype)
-
+  _, logdet = tf.linalg.slogdet(x)
+  return tf.cast(tf.exp(logdet) > det_bounds, dtype=x.dtype)
 
 # Each leaf entry here is a confidence interval for the volume of some
 # set of correlation matrices.  To wit, k-by-k correlation matrices
@@ -99,6 +99,11 @@ class LKJTest(test.TestCase):
     concentration = np.array(concentrations, dtype=np.float32)
     det_bounds = np.array(det_bounds, dtype=np.float32)
     means = np.array(means, dtype=np.float32)
+    # Add a tolerance to guard against some of the importance_weights exceeding
+    # the theoretical maximum (importance_maxima) due to numerical inaccuracies
+    # while lower bounding the determinant. See corresponding comment in
+    # _testSampleConsistentLogProbInterval.
+    high_tolerance = 1e-6
 
     testee_lkj = tfd.LKJ(
         dimension=dim, concentration=concentration, validate_args=True)
@@ -109,11 +114,11 @@ class LKJTest(test.TestCase):
         testee_lkj._log_normalization())
 
     chk1 = st.assert_true_mean_equal_by_dkwm(
-        importance_weights, low=0., high=importance_maxima,
+        importance_weights, low=0., high=importance_maxima + high_tolerance,
         expected=means, false_fail_rate=1e-6)
     chk2 = tf.assert_less(
         st.min_discrepancy_of_true_means_detectable_by_dkwm(
-            num_samples, low=0., high=importance_maxima,
+            num_samples, low=0., high=importance_maxima + high_tolerance,
             false_fail_rate=1e-6, false_pass_rate=1e-6),
         target_discrepancy)
     self.evaluate([chk1, chk2])
@@ -176,6 +181,12 @@ class LKJTest(test.TestCase):
     highs = [volume_bounds[dim][db][1] for db in det_bounds]
     concentration = np.array(concentrations, dtype=np.float32)
     det_bounds = np.array(det_bounds, dtype=np.float32)
+    # Due to possible numerical inaccuracies while lower bounding the
+    # determinant, the maximum of the importance weights may exceed the
+    # theoretical maximum (importance_maxima). We add a tolerance to guard
+    # against this. An alternative would have been to add a threshold while
+    # filtering in _det_ok_mask, but that would affect the mean as well.
+    high_tolerance = 1e-6
 
     testee_lkj = tfd.LKJ(
         dimension=dim, concentration=concentration, validate_args=True)
@@ -185,15 +196,19 @@ class LKJTest(test.TestCase):
     importance_maxima = (1. / det_bounds) ** (concentration - 1) * tf.exp(
         testee_lkj._log_normalization())
     check1 = st.assert_true_mean_in_interval_by_dkwm(
-        samples=importance_weights, low=0., high=importance_maxima,
-        expected_low=lows, expected_high=highs,
+        samples=importance_weights,
+        low=0.,
+        high=importance_maxima + high_tolerance,
+        expected_low=lows,
+        expected_high=highs,
         false_fail_rate=false_fail_rate)
     check2 = tf.assert_less(
         st.min_discrepancy_of_true_means_detectable_by_dkwm(
-            num_samples, low=0., high=importance_maxima,
+            num_samples,
+            low=0.,
+            high=importance_maxima + high_tolerance,
             false_fail_rate=false_fail_rate,
-            false_pass_rate=false_fail_rate),
-        target_discrepancy)
+            false_pass_rate=false_fail_rate), target_discrepancy)
     self.evaluate([check1, check2])
 
   def testSampleConsistentLogProbInterval3(self):
@@ -231,6 +246,7 @@ class LKJTest(test.TestCase):
         1.00, 1.30, 1.50, 1.70, 1.90, 2.00, 2.10, 2.50, 3.00]
     det_bounds = [
         0.01, 0.20, 0.20, 0.25, 0.30, 0.30, 0.30, 0.35, 0.40]
+
     return self._testSampleConsistentLogProbInterval(
         concentrations, det_bounds, 5, false_fail_rate=5e-7,
         target_discrepancy=0.41, seed=37)

@@ -29,11 +29,6 @@ py_library(
     name = "internal",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
-    deps = [
-        ":distribution_util",
-        ":test_case",
-        ":test_util",
-    ],
 )
 
 py_library(
@@ -47,10 +42,18 @@ py_library(
 )
 
 py_library(
+    name = "reparameterization",
+    srcs = ["reparameterization.py"],
+)
+
+py_library(
     name = "distribution_util",
     srcs = ["distribution_util.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":dtype_util",
+        ":reparameterization",
+        # numpy dep,
         # tensorflow dep,
     ],
 )
@@ -92,6 +95,7 @@ py_library(
     srcs = ["test_util.py"],
     srcs_version = "PY2AND3",
     deps = [
+        # numpy dep,
         # tensorflow dep,
     ],
 )

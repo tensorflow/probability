@@ -42,7 +42,7 @@ class VectorDiffeomixtureTest(test_util.VectorDistributionTestHelpers,
     vdm = tfd.VectorDiffeomixture(
         mix_loc=[[0.], [1.]],
         temperature=[1.],
-        distribution=tf.distributions.Normal(0., 1.),
+        distribution=tfd.Normal(0., 1.),
         loc=[
             None,
             np.float32([2.] * dims),
@@ -80,7 +80,7 @@ class VectorDiffeomixtureTest(test_util.VectorDistributionTestHelpers,
     vdm = tfd.VectorDiffeomixture(
         mix_loc=[[0.], [1.]],
         temperature=[1.],
-        distribution=tf.distributions.Normal(1., 1.5),
+        distribution=tfd.Normal(1., 1.5),
         loc=[
             None,
             np.float32([2.] * dims),
@@ -113,7 +113,7 @@ class VectorDiffeomixtureTest(test_util.VectorDistributionTestHelpers,
     vdm = tfd.VectorDiffeomixture(
         mix_loc=[[0.], [1.]],
         temperature=[1.],
-        distribution=tf.distributions.Normal(0., 1.),
+        distribution=tfd.Normal(0., 1.),
         loc=[
             None,
             np.float32([2.] * dims),
@@ -156,7 +156,7 @@ class VectorDiffeomixtureTest(test_util.VectorDistributionTestHelpers,
     vdm = tfd.VectorDiffeomixture(
         mix_loc=(rng.rand(2, 3, 1) - 0.5).astype(np.float32),
         temperature=[1.],
-        distribution=tf.distributions.Normal(0., 1.),
+        distribution=tfd.Normal(0., 1.),
         loc=[
             None,
             loc_1,
@@ -190,7 +190,7 @@ class VectorDiffeomixtureTest(test_util.VectorDistributionTestHelpers,
     vdm = tfd.VectorDiffeomixture(
         mix_loc=[[0.], [4.]],
         temperature=[1 / 10.],
-        distribution=tf.distributions.Normal(0., 1.),
+        distribution=tfd.Normal(0., 1.),
         loc=[
             np.float32([-2.]),
             None,
@@ -216,7 +216,7 @@ class VectorDiffeomixtureTest(test_util.VectorDistributionTestHelpers,
     vdm = tfd.VectorDiffeomixture(
         mix_loc=[0.],
         temperature=[[2.], [1.], [0.2]],
-        distribution=tf.distributions.Normal(0., 1.),
+        distribution=tfd.Normal(0., 1.),
         loc=[
             np.float32([-2.]),
             np.float32([2.]),
@@ -252,7 +252,7 @@ class VectorDiffeomixtureTest(test_util.VectorDistributionTestHelpers,
     vdm = tfd.VectorDiffeomixture(
         mix_loc=[[-1.], [0.], [1.]],
         temperature=[0.5],
-        distribution=tf.distributions.Normal(0., 1.),
+        distribution=tfd.Normal(0., 1.),
         loc=[
             np.float32([-2.]),
             np.float32([2.]),
@@ -294,7 +294,7 @@ class VectorDiffeomixtureTest(test_util.VectorDistributionTestHelpers,
     vdm = tfd.VectorDiffeomixture(
         mix_loc=[[0.], [4.]],
         temperature=[0.1],
-        distribution=tf.distributions.Normal(-1., 1.5),
+        distribution=tfd.Normal(-1., 1.5),
         loc=[
             np.float32([-2.]),
             np.float32([0.]),
@@ -318,7 +318,7 @@ class VectorDiffeomixtureTest(test_util.VectorDistributionTestHelpers,
     vdm = tfd.VectorDiffeomixture(
         mix_loc=[[0.], [4.]],
         temperature=[0.1],
-        distribution=tf.distributions.Normal(0., 1.),
+        distribution=tfd.Normal(0., 1.),
         loc=[
             np.float32([[-2.]]),
             None,
@@ -345,7 +345,7 @@ class VectorDiffeomixtureTest(test_util.VectorDistributionTestHelpers,
     vdm = tfd.VectorDiffeomixture(
         mix_loc=[0.],
         temperature=[0.1],
-        distribution=tf.distributions.Normal(0., 1.),
+        distribution=tfd.Normal(0., 1.),
         loc=[
             None,
             np.float32([2.] * dims),

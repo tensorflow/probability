@@ -22,10 +22,12 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python.distributions import distribution as distribution_lib
+from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow.python.framework import tensor_util
 
 
-class Independent(tf.distributions.Distribution):
+class Independent(distribution_lib.Distribution):
   """Independent distribution from batch of distributions.
 
   This distribution is useful for regarding a collection of independent,
@@ -281,7 +283,7 @@ class Independent(tf.distributions.Distribution):
     return which_maximum(0, ndims - 1)
 
 
-@tf.distributions.RegisterKL(Independent, Independent)
+@kullback_leibler.RegisterKL(Independent, Independent)
 def _kl_independent(a, b, name="kl_independent"):
   """Batched KL divergence `KL(a || b)` for Independent distributions.
 
@@ -317,7 +319,7 @@ def _kl_independent(a, b, name="kl_independent"):
         reduce_dims = [-i - 1 for i in range(0, num_reduce_dims)]
 
         return tf.reduce_sum(
-            tf.distributions.kl_divergence(p, q, name=name), axis=reduce_dims)
+            kullback_leibler.kl_divergence(p, q, name=name), axis=reduce_dims)
       else:
         raise NotImplementedError("KL between Independents with different "
                                   "event shapes not supported.")
@@ -333,4 +335,4 @@ def _kl_independent(a, b, name="kl_independent"):
               p.event_shape_tensor()[0]))
       reduce_dims = tf.range(-num_reduce_dims - 1, -1, 1)
       return tf.reduce_sum(
-          tf.distributions.kl_divergence(p, q, name=name), axis=reduce_dims)
+          kullback_leibler.kl_divergence(p, q, name=name), axis=reduce_dims)

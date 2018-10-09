@@ -20,10 +20,11 @@ from __future__ import print_function
 
 import tensorflow as tf
 
+from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
 
 
-class Autoregressive(tf.distributions.Distribution):
+class Autoregressive(distribution.Distribution):
   """Autoregressive distributions.
 
   The Autoregressive distribution enables learning (often) richer multivariate
@@ -62,7 +63,7 @@ class Autoregressive(tf.distributions.Distribution):
   ```
 
   where the ellipses (`...`) represent `n-2` composed calls to `fn`, `fn`
-  constructs a `tf.distributions.Distribution`-like instance, and `x0` is a
+  constructs a `tfd.Distribution`-like instance, and `x0` is a
   fixed initializing `Tensor`.
 
   #### Examples
@@ -77,8 +78,8 @@ class Autoregressive(tf.distributions.Distribution):
         scale_tril=tfd.fill_triangular(0.25 * p))
     def _fn(samples):
       scale = tf.exp(affine.forward(samples)).eval()
-      return independent_lib.Independent(
-          tf.distributions.Normal(loc=0., scale=scale, validate_args=True),
+      return tfd.Independent(
+          tfd.Normal(loc=0., scale=scale, validate_args=True),
           reinterpreted_batch_ndims=1)
     return _fn
 
@@ -116,7 +117,7 @@ class Autoregressive(tf.distributions.Distribution):
 
     Args:
       distribution_fn: Python `callable` which constructs a
-        `tf.distributions.Distribution`-like instance from a `Tensor` (e.g.,
+        `tfd.Distribution`-like instance from a `Tensor` (e.g.,
         `sample0`). The function must respect the "autoregressive property",
         i.e., there exists a permutation of event such that each coordinate is a
         diffeomorphic function of on preceding coordinates.

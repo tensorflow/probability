@@ -240,23 +240,15 @@ class _GaussianProcessRegressionModelTest(object):
           mean_fn=0.)
 
     # Observation index point and observation counts must be broadcastable.
-    if self.is_static or tf.executing_eagerly:
+    # Errors based on conditions of dynamic shape in graph mode cannot be
+    # caught, so we only check this error case in static shape or eager mode.
+    if self.is_static or tf.executing_eagerly():
       with self.assertRaises(ValueError):
         tfd.GaussianProcessRegressionModel(
             kernel,
             index_points,
             observation_index_points=np.ones([2, 2, 2]),
             observations=np.ones([5, 5]))
-    else:
-      gprm = tfd.GaussianProcessRegressionModel(
-          kernel,
-          index_points,
-          observation_index_points=tf.placeholder_with_default(
-              np.ones([2, 2, 2]), shape=None),
-          observations=tf.placeholder_with_default(
-              np.ones([5, 5]), shape=None))
-      with self.assertRaises(ValueError):
-        self.evaluate(gprm.event_shape_tensor())
 
   def testCopy(self):
     # 5 random index points in R^2

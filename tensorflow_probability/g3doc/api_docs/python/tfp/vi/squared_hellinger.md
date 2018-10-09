@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.vi.squared_hellinger" />
+<meta itemprop="path" content="Stable" />
 </div>
 
 # tfp.vi.squared_hellinger

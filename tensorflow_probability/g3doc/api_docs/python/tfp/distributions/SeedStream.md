@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions.SeedStream" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="original_seed"/>
 <meta itemprop="property" content="salt"/>
 <meta itemprop="property" content="__call__"/>
@@ -145,21 +146,7 @@ seeds seen by `foo`'s callees will differ from those seen by `bar`'s
 callees, even if `foo` and `bar` are invoked with the same input
 seed.
 
-## Properties
-
-<h3 id="original_seed"><code>original_seed</code></h3>
-
-
-
-<h3 id="salt"><code>salt</code></h3>
-
-
-
-
-
-## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
+<h2 id="__init__"><code>__init__</code></h2>
 
 ``` python
 __init__(
@@ -180,6 +167,22 @@ Initializes a `SeedStream`.
     auxiliary entropy.  Must be unique across the Distributions
     and TensorFlow Probability code base.  See class docstring for
     rationale.
+
+
+
+## Properties
+
+<h3 id="original_seed"><code>original_seed</code></h3>
+
+
+
+<h3 id="salt"><code>salt</code></h3>
+
+
+
+
+
+## Methods
 
 <h3 id="__call__"><code>__call__</code></h3>
 

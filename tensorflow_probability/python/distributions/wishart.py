@@ -23,9 +23,11 @@ import math
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
-from tensorflow.contrib.framework.python.framework import tensor_util as contrib_tensor_util
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.framework import tensor_util
 from tensorflow.python.ops import control_flow_ops
 
@@ -34,7 +36,7 @@ __all__ = [
 ]
 
 
-class _WishartLinearOperator(tf.distributions.Distribution):
+class _WishartLinearOperator(distribution.Distribution):
   """The matrix Wishart distribution on positive definite matrices.
 
   This distribution is defined by a scalar number of degrees of freedom `df` and
@@ -118,8 +120,7 @@ class _WishartLinearOperator(tf.distributions.Distribution):
         self._scale_operator = scale_operator
         self._df = tf.convert_to_tensor(
             df, dtype=scale_operator.dtype, name="df")
-        contrib_tensor_util.assert_same_float_dtype(
-            (self._df, self._scale_operator))
+        tf.assert_same_float_dtype([self._df, self._scale_operator])
         if (self._scale_operator.shape.ndims is None or
             self._scale_operator.shape[-1].value is None):
           self._dimension = tf.cast(
@@ -155,7 +156,7 @@ class _WishartLinearOperator(tf.distributions.Distribution):
         dtype=self._scale_operator.dtype,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
-        reparameterization_type=tf.distributions.FULLY_REPARAMETERIZED,
+        reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
         parameters=parameters,
         graph_parents=(
             [self._df, self._dimension] + self._scale_operator.graph_parents),
@@ -201,10 +202,12 @@ class _WishartLinearOperator(tf.distributions.Distribution):
     return tf.TensorShape([dimension, dimension])
 
   def _batch_shape_tensor(self):
-    return self.scale_operator.batch_shape_tensor()
+    return tf.broadcast_dynamic_shape(
+        tf.shape(self.df), self.scale_operator.batch_shape_tensor())
 
   def _batch_shape(self):
-    return self.scale_operator.batch_shape
+    return tf.broadcast_static_shape(
+        self.df.shape, self.scale_operator.batch_shape)
 
   def _sample_n(self, n, seed):
     batch_shape = self.batch_shape_tensor()
@@ -522,18 +525,21 @@ class Wishart(_WishartLinearOperator):
     """
     parameters = dict(locals())
 
-    with tf.name_scope(name, values=[scale, scale_tril]) as name:
-      with tf.name_scope("init", values=[scale, scale_tril]):
+    with tf.name_scope(name) as name:
+      with tf.name_scope("init", values=[df, scale, scale_tril]):
         if (scale is None) == (scale_tril is None):
           raise ValueError("Must pass scale or scale_tril, but not both.")
 
+        dtype = dtype_util.common_dtype([df, scale, scale_tril], tf.float32)
+        df = tf.convert_to_tensor(df, name="df", dtype=dtype)
         if scale is not None:
-          scale = tf.convert_to_tensor(scale)
+          scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
           if validate_args:
             scale = distribution_util.assert_symmetric(scale)
           scale_tril = tf.cholesky(scale)
         else:  # scale_tril is not None
-          scale_tril = tf.convert_to_tensor(scale_tril)
+          scale_tril = tf.convert_to_tensor(
+              scale_tril, name="scale_tril", dtype=dtype)
           if validate_args:
             scale_tril = control_flow_ops.with_dependencies([
                 tf.assert_positive(

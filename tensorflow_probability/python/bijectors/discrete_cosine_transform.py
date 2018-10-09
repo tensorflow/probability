@@ -50,7 +50,7 @@ class DiscreteCosineTransform(bijector.Bijector):
   """
 
   def __init__(self, dct_type=2, validate_args=False, name='dct'):
-    """Instantiates the `PowerTransform` bijector.
+    """Instantiates the `DiscreteCosineTransform` bijector.
 
     Args:
       dct_type: Python `int`, the DCT type performed by the forward

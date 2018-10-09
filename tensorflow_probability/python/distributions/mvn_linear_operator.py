@@ -20,8 +20,10 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python import bijectors
+from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
-from tensorflow.python.ops.distributions import transformed_distribution
 
 
 __all__ = [
@@ -173,12 +175,13 @@ class MultivariateNormalLinearOperator(
     with tf.name_scope(name, values=[loc] + scale.graph_parents) as name:
       # Since expand_dims doesn't preserve constant-ness, we obtain the
       # non-dynamic value if possible.
-      loc = tf.convert_to_tensor(loc, name="loc") if loc is not None else loc
+      loc = loc if loc is None else tf.convert_to_tensor(
+          loc, name="loc", dtype=scale.dtype)
       batch_shape, event_shape = distribution_util.shapes_from_loc_and_scale(
           loc, scale)
 
     super(MultivariateNormalLinearOperator, self).__init__(
-        distribution=tf.distributions.Normal(
+        distribution=normal.Normal(
             loc=tf.zeros([], dtype=scale.dtype),
             scale=tf.ones([], dtype=scale.dtype)),
         bijector=bijectors.AffineLinearOperator(
@@ -258,7 +261,7 @@ class MultivariateNormalLinearOperator(
     return self._mean()
 
 
-@tf.distributions.RegisterKL(MultivariateNormalLinearOperator,
+@kullback_leibler.RegisterKL(MultivariateNormalLinearOperator,
                              MultivariateNormalLinearOperator)
 def _kl_brute_force(a, b, name=None):
   """Batched KL divergence `KL(a || b)` for multivariate Normals.

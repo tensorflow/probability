@@ -18,36 +18,26 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
 # Dependency imports
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
 
+from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.ops import control_flow_ops
-from tensorflow.python.ops.distributions import util as distribution_util
 
 __all__ = [
     "GammaGamma",
 ]
 
 
-def _static_broadcast_shape_from_tensors(*tensors):
-  shape = tensors[0].get_shape()
-  for t in tensors[1:]:
-    shape = tf.broadcast_static_shape(shape, t.get_shape())
-  return shape
-
-
-def _dynamic_broadcast_shape_from_tensors(*tensors):
-  shape = tf.shape(tensors[0])
-  for t in tensors[1:]:
-    shape = tf.broadcast_dynamic_shape(shape, tf.shape(t))
-  return shape
-
-
-class GammaGamma(tf.distributions.Distribution):
+class GammaGamma(distribution.Distribution):
   """Gamma-Gamma distribution.
 
   Gamma-Gamma is a [compound
@@ -124,27 +114,31 @@ class GammaGamma(tf.distributions.Distribution):
     parameters = dict(locals())
     with tf.name_scope(
         name, values=[concentration, mixing_concentration, mixing_rate]):
+      dtype = dtype_util.common_dtype(
+          [concentration, mixing_concentration, mixing_rate], tf.float32)
+      concentration = tf.convert_to_tensor(
+          concentration, name="concentration", dtype=dtype)
+      mixing_concentration = tf.convert_to_tensor(
+          mixing_concentration, name="mixing_concentration", dtype=dtype)
+      mixing_rate = tf.convert_to_tensor(
+          mixing_rate, name="mixing_rate", dtype=dtype)
       with tf.control_dependencies([
           tf.assert_positive(concentration),
           tf.assert_positive(mixing_concentration),
           tf.assert_positive(mixing_rate),
       ] if validate_args else []):
-        self._concentration = tf.convert_to_tensor(
-            concentration, name="concentration")
-        self._mixing_concentration = tf.convert_to_tensor(
-            mixing_concentration, name="mixing_concentration")
-        self._mixing_rate = tf.convert_to_tensor(
-            mixing_rate, name="mixing_rate")
+        self._concentration = tf.identity(concentration)
+        self._mixing_concentration = tf.identity(mixing_concentration)
+        self._mixing_rate = tf.identity(mixing_rate)
 
-        tf.assert_same_float_dtype([
-            self._concentration, self._mixing_concentration, self._mixing_rate
-        ])
+      tf.assert_same_float_dtype(
+          [self._concentration, self._mixing_concentration, self._mixing_rate])
 
     super(GammaGamma, self).__init__(
         dtype=self._concentration.dtype,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
-        reparameterization_type=tf.distributions.FULLY_REPARAMETERIZED,
+        reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
         parameters=parameters,
         graph_parents=[
             self._concentration, self._mixing_concentration, self._mixing_rate
@@ -167,12 +161,14 @@ class GammaGamma(tf.distributions.Distribution):
     return self._mixing_rate
 
   def _batch_shape_tensor(self):
-    return _dynamic_broadcast_shape_from_tensors(
-        self.concentration, self.mixing_concentration, self.mixing_rate)
+    tensors = [self.concentration, self.mixing_concentration, self.mixing_rate]
+    return functools.reduce(tf.broadcast_dynamic_shape,
+                            [tf.shape(tensor) for tensor in tensors])
 
   def _batch_shape(self):
-    return _static_broadcast_shape_from_tensors(
-        self.concentration, self.mixing_concentration, self.mixing_rate)
+    tensors = [self.concentration, self.mixing_concentration, self.mixing_rate]
+    return functools.reduce(tf.broadcast_static_shape,
+                            [tensor.get_shape() for tensor in tensors])
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
@@ -203,7 +199,7 @@ class GammaGamma(tf.distributions.Distribution):
 
   def _log_unnormalized_prob(self, x):
     x = self._maybe_assert_valid_sample(x)
-    return ((self.concentration - 1.) * tf.log(x) -
+    return (tf.math.xlogy(self.concentration - 1., x) -
             (self.concentration + self.mixing_concentration) *
             tf.log(x + self.mixing_rate))
 

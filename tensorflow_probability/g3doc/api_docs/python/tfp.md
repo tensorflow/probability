@@ -1,5 +1,7 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp" />
+<meta itemprop="path" content="Stable" />
+<meta itemprop="property" content="__version__"/>
 </div>
 
 # Module: tfp
@@ -28,9 +30,15 @@ Tools for probabilistic reasoning in TensorFlow.
 
 [`positive_semidefinite_kernels`](./tfp/positive_semidefinite_kernels.md) module: Positive-semidefinite kernels package.
 
+[`sts`](./tfp/sts.md) module: Framework for Bayesian structural time series models.
+
 [`trainable_distributions`](./tfp/trainable_distributions.md) module: Trainable distributions.
 
 [`util`](./tfp/util.md) module: TensorFlow Probability python utilities.
 
 [`vi`](./tfp/vi.md) module: Methods and objectives for variational inference.
+
+## Other Members
+
+<h3 id="__version__"><code>__version__</code></h3>
 

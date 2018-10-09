@@ -21,12 +21,14 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.ops import control_flow_ops
-from tensorflow.python.ops.distributions import util as distribution_util
 
 
-class Geometric(tf.distributions.Distribution):
+class Geometric(distribution.Distribution):
   """Geometric distribution.
 
   The Geometric distribution is parameterized by p, the probability of a
@@ -89,7 +91,7 @@ class Geometric(tf.distributions.Distribution):
 
     super(Geometric, self).__init__(
         dtype=self._probs.dtype,
-        reparameterization_type=tf.distributions.NOT_REPARAMETERIZED,
+        reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
         parameters=parameters,

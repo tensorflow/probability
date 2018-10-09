@@ -21,11 +21,10 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import test_util
-from tensorflow.python.framework import test_util as tf_test_util
 
-from tensorflow.python.ops.distributions import transformed_distribution as transformed_distribution_lib
-from tensorflow.python.ops.distributions import util as distribution_util
+from tensorflow.python.framework import test_util as tf_test_util
 tfd = tfp.distributions
 tfb = tfp.bijectors
 
@@ -47,7 +46,7 @@ class AutogressiveTest(test_util.VectorDistributionTestHelpers,
     def _fn(samples):
       scale = tf.exp(affine_bijector.forward(samples))
       return tfd.Independent(
-          tf.distributions.Normal(loc=0., scale=scale, validate_args=True),
+          tfd.Normal(loc=0., scale=scale, validate_args=True),
           reinterpreted_batch_ndims=1)
     return _fn
 
@@ -79,8 +78,8 @@ class AutogressiveTest(test_util.VectorDistributionTestHelpers,
         is_constant_jacobian=True,
         shift_and_log_scale_fn=lambda x: [None, affine.forward(x)],
         validate_args=True)
-    td = transformed_distribution_lib.TransformedDistribution(
-        distribution=tf.distributions.Normal(loc=0., scale=1.),
+    td = tfd.TransformedDistribution(
+        distribution=tfd.Normal(loc=0., scale=1.),
         bijector=ar_flow,
         event_shape=[event_size],
         batch_shape=batch_shape,

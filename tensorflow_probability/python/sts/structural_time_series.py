@@ -22,10 +22,9 @@ import collections
 # Dependency imports
 import tensorflow as tf
 
+from tensorflow_probability.python import distributions
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.sts.internal import util as sts_util
-
-from tensorflow.contrib.distributions.python.ops import distribution_util
-from tensorflow.contrib.distributions.python.ops.seed_stream import SeedStream
 
 tfl = tf.linalg
 
@@ -76,6 +75,38 @@ class StructuralTimeSeries(object):
   def name(self):
     """Name of this model component."""
     return self._name
+
+  @property
+  def batch_shape(self):
+    """Static batch shape of models represented by this component.
+
+    Returns:
+      batch_shape: A `tf.TensorShape` giving the broadcast batch shape of
+        all model parameters. This should match the batch shape of
+        derived state space models, i.e.,
+        `self.make_state_space_model(...).batch_shape`. It may be partially
+        defined or unknown.
+    """
+    batch_shape = tf.TensorShape([])
+    for param in self.parameters:
+      batch_shape = tf.broadcast_static_shape(
+          batch_shape, param.prior.batch_shape)
+    return batch_shape
+
+  def batch_shape_tensor(self):
+    """Runtime batch shape of models represented by this component.
+
+    Returns:
+      batch_shape: `int` `Tensor` giving the broadcast batch shape of
+        all model parameters. This should match the batch shape of
+        derived state space models, i.e.,
+        `self.make_state_space_model(...).batch_shape_tensor()`.
+    """
+    batch_shape = tf.constant([], dtype=tf.int32)
+    for param in self.parameters:
+      batch_shape = tf.broadcast_dynamic_shape(
+          batch_shape, param.prior.batch_shape_tensor())
+    return batch_shape
 
   def _maybe_build_param_map(self, param_vals):
     """If given an ordered list of parameter values, build a name:value map.
@@ -161,7 +192,8 @@ class StructuralTimeSeries(object):
         `params_sample_shape + prior.batch_shape + prior.event_shape`.
     """
 
-    seed = SeedStream(seed, salt='StructuralTimeSeries_prior_sample')
+    seed = distributions.SeedStream(
+        seed, salt='StructuralTimeSeries_prior_sample')
 
     with tf.name_scope(
         'prior_sample',
@@ -181,15 +213,16 @@ class StructuralTimeSeries(object):
 
     Args:
       observed_time_series: Observed `Tensor` trajectories of shape
-        `sample_shape + param_batch_shape + [num_timesteps, 1]` (the trailing
+        `sample_shape + batch_shape + [num_timesteps, 1]` (the trailing
         `1` dimension is optional if `num_timesteps > 1`), where
-        `param_batch_shape` is the broadcast batch shape of all priors on
-        parameters for this structural time series model.
+        `batch_shape` should match `self.batch_shape` (the broadcast batch
+        shape of all priors on parameters for this structural time series
+        model).
 
     Returns:
      log_joint_fn: A function taking a `Tensor` argument for each model
        parameter, in canonical order, and returning a `Tensor` log probability
-       of shape `param_batch_shape`. Note that, *unlike* `tfp.Distributions`
+       of shape `batch_shape`. Note that, *unlike* `tfp.Distributions`
        `log_prob` methods, the `log_joint` sums over the `sample_shape` from y,
        so that `sample_shape` does not appear in the output log_prob. This
        corresponds to viewing multiple samples in `y` as iid observations from a

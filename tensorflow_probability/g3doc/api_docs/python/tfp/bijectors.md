@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.bijectors" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="__all__"/>
 </div>
 
@@ -28,6 +29,8 @@ Bijector Ops.
 [`class CholeskyToInvCholesky`](../tfp/bijectors/CholeskyToInvCholesky.md): Maps the Cholesky factor of `M` to the Cholesky factor of `M^{-1}`.
 
 [`class ConditionalBijector`](../tfp/bijectors/ConditionalBijector.md): Conditional Bijector is a Bijector that allows intrinsic conditioning.
+
+[`class DiscreteCosineTransform`](../tfp/bijectors/DiscreteCosineTransform.md): Compute `Y = g(X) = DCT(X)`, where DCT type is indicated by the `type` arg.
 
 [`class Exp`](../tfp/bijectors/Exp.md): Compute `Y = g(X) = exp(X)`.
 
@@ -87,5 +90,5 @@ Bijector Ops.
 
 ## Other Members
 
-`__all__`
+<h3 id="__all__"><code>__all__</code></h3>
 

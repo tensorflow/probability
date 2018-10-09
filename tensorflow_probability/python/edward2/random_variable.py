@@ -94,7 +94,7 @@ class RandomVariable(object):
     """Create a new random variable.
 
     Args:
-      distribution: tf.Distribution governing the distribution of the random
+      distribution: tfd.Distribution governing the distribution of the random
         variable, such as sampling and log-probabilities.
       sample_shape: tf.TensorShape of samples to draw from the random variable.
         Default is `()` corresponding to a single sample.

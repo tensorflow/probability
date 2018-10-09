@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.mcmc.TransitionKernel" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="is_calibrated"/>
 <meta itemprop="property" content="bootstrap_results"/>
 <meta itemprop="property" content="one_step"/>

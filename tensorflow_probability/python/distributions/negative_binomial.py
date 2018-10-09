@@ -20,12 +20,15 @@ from __future__ import print_function
 
 import tensorflow as tf
 
+from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
+from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.framework import tensor_shape
-from tensorflow.python.ops.distributions import util as distribution_util
 
 
-class NegativeBinomial(tf.distributions.Distribution):
+class NegativeBinomial(distribution.Distribution):
   """NegativeBinomial distribution.
 
   The NegativeBinomial distribution is related to the experiment of performing
@@ -88,15 +91,17 @@ class NegativeBinomial(tf.distributions.Distribution):
 
     parameters = dict(locals())
     with tf.name_scope(name, values=[total_count, logits, probs]) as name:
+      dtype = dtype_util.common_dtype([total_count, logits, probs], tf.float32)
       self._logits, self._probs = distribution_util.get_logits_and_probs(
-          logits, probs, validate_args=validate_args, name=name)
+          logits, probs, validate_args=validate_args, name=name, dtype=dtype)
       with tf.control_dependencies([tf.assert_positive(total_count)]
                                    if validate_args else []):
-        self._total_count = tf.identity(total_count)
+        self._total_count = tf.convert_to_tensor(
+            total_count, name="total_count", dtype=dtype)
 
     super(NegativeBinomial, self).__init__(
         dtype=self._probs.dtype,
-        reparameterization_type=tf.distributions.NOT_REPARAMETERIZED,
+        reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
         parameters=parameters,

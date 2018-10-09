@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.mcmc.sample_halton_sequence" />
+<meta itemprop="path" content="Stable" />
 </div>
 
 # tfp.mcmc.sample_halton_sequence
@@ -98,10 +99,10 @@ print ("Leaped Estimated: %f, True Value: %f" % values)
 
 * <b>`dim`</b>: Positive Python `int` representing each sample's `event_size.` Must
     not be greater than 1000.
-* <b>`num_results`</b>: (Optional) positive Python `int`. The number of samples to
-    generate. Either this parameter or sequence_indices must be specified but
-    not both. If this parameter is None, then the behaviour is determined by
-    the `sequence_indices`.
+* <b>`num_results`</b>: (Optional) Positive scalar `Tensor` of dtype int32. The number
+    of samples to generate. Either this parameter or sequence_indices must
+    be specified but not both. If this parameter is None, then the behaviour
+    is determined by the `sequence_indices`.
     Default value: `None`.
 * <b>`sequence_indices`</b>: (Optional) `Tensor` of dtype int32 and rank 1. The
     elements of the sequence to compute specified by their position in the

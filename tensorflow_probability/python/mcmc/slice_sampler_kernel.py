@@ -24,11 +24,11 @@ import collections
 import tensorflow as tf
 
 from tensorflow_probability.python import distributions
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import slice_sampler_utils as ssu
-from tensorflow_probability.python.mcmc import util as mcmc_util
 
-from tensorflow.python.ops.distributions import util as distributions_util
+from tensorflow_probability.python.mcmc import util as mcmc_util
 
 
 __all__ = [
@@ -302,7 +302,7 @@ class SliceSampler(kernel_base.TransitionKernel):
             dtype=tf.int32,
             name='max_doublings')
 
-      independent_chain_ndims = distributions_util.prefer_static_rank(
+      independent_chain_ndims = distribution_util.prefer_static_rank(
           current_target_log_prob)
 
       [

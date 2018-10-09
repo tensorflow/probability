@@ -19,11 +19,14 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
+from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.ops import control_flow_ops
-from tensorflow.python.ops.distributions import util as distribution_util
 
 
-class OneHotCategorical(tf.distributions.Distribution):
+class OneHotCategorical(distribution.Distribution):
   """OneHotCategorical distribution.
 
   The categorical distribution is parameterized by the log-probabilities
@@ -125,7 +128,7 @@ class OneHotCategorical(tf.distributions.Distribution):
 
     super(OneHotCategorical, self).__init__(
         dtype=dtype,
-        reparameterization_type=tf.distributions.NOT_REPARAMETERIZED,
+        reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
         parameters=parameters,
@@ -218,7 +221,7 @@ class OneHotCategorical(tf.distributions.Distribution):
     ], x)
 
 
-@tf.distributions.RegisterKL(OneHotCategorical, OneHotCategorical)
+@kullback_leibler.RegisterKL(OneHotCategorical, OneHotCategorical)
 def _kl_categorical_categorical(a, b, name=None):
   """Calculate the batched KL divergence KL(a || b) with a, b OneHotCategorical.
 

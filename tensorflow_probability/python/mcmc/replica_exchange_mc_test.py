@@ -68,7 +68,7 @@ class DefaultExchangeProposedFnTest(tf.test.TestCase):
         atol=0.05)
 
   def testProbExchange0p5NumReplica4(self):
-    with self.test_session():
+    with self.cached_session():
       prob_exchange = 0.5
       num_replica = 4
       fn = tfp.mcmc.default_exchange_proposed_fn(prob_exchange)
@@ -89,7 +89,7 @@ class DefaultExchangeProposedFnTest(tf.test.TestCase):
         prob_exchange / 2, np.mean([len(e) == 2 for e in exchanges]), atol=0.05)
 
   def testProbExchange0p5NumReplica3(self):
-    with self.test_session():
+    with self.cached_session():
       prob_exchange = 0.5
       num_replica = 3
       fn = tfp.mcmc.default_exchange_proposed_fn(prob_exchange)
@@ -107,7 +107,7 @@ class DefaultExchangeProposedFnTest(tf.test.TestCase):
         atol=0.05)
 
   def testProbExchange0p5NumReplica5(self):
-    with self.test_session():
+    with self.cached_session():
       prob_exchange = 0.5
       num_replica = 5
       fn = tfp.mcmc.default_exchange_proposed_fn(prob_exchange)
@@ -125,7 +125,7 @@ class DefaultExchangeProposedFnTest(tf.test.TestCase):
         atol=0.05)
 
   def testProbExchange1p0(self):
-    with self.test_session():
+    with self.cached_session():
       prob_exchange = 1.0
       num_replica = 15
       fn = tfp.mcmc.default_exchange_proposed_fn(prob_exchange)
@@ -143,7 +143,7 @@ class DefaultExchangeProposedFnTest(tf.test.TestCase):
         atol=0.05)
 
   def testProbExchange0p0(self):
-    with self.test_session():
+    with self.cached_session():
       prob_exchange = 0.0
       num_replica = 15
       fn = tfp.mcmc.default_exchange_proposed_fn(prob_exchange)

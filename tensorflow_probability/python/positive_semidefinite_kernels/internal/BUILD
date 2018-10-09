@@ -29,9 +29,6 @@ py_library(
     name = "internal",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
-    deps = [
-        ":util",
-    ],
 )
 
 py_library(
@@ -40,6 +37,7 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
 
@@ -47,8 +45,8 @@ py_test(
     name = "util_test",
     srcs = ["util_test.py"],
     deps = [
+        ":util",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
     ],
 )

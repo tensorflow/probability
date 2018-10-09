@@ -226,23 +226,22 @@ class DistributionTest(tf.test.TestCase):
     # here, until the bug is resolved in TensorFlow 1.12.
     normal = tfd.Normal(loc=tf.constant(0, tf.float16),
                         scale=tf.constant(1, tf.float16))
-    self.assertIn(
+    self.assertEqual(
         str(normal),
-        ["%s.distributions.Normal("
-         "\"Normal/\", "
-         "batch_shape=(), "
-         "event_shape=(), "
-         "dtype=float16)" % pkg   # Got the dtype right.
-         for pkg in ["tf", "tfp"]])
+        "tfp.distributions.Normal("
+        "\"Normal/\", "
+        "batch_shape=(), "
+        "event_shape=(), "
+        "dtype=float16)")
 
     chi2 = tfd.Chi2(df=np.float32([1., 2.]), name="silly")
-    self.assertIn(
+    self.assertEqual(
         str(chi2),
-        ["%s.distributions.Chi2("
-         "\"silly/\", "  # What a silly name that is!
-         "batch_shape=(2,), "
-         "event_shape=(), "
-         "dtype=float32)" % pkg for pkg in ["tf", "tfp"]])
+        "tfp.distributions.Chi2("
+        "\"silly/\", "  # What a silly name that is!
+        "batch_shape=(2,), "
+        "event_shape=(), "
+        "dtype=float32)")
 
     # There's no notion of partially known shapes in eager mode, so exit
     # early.
@@ -251,23 +250,23 @@ class DistributionTest(tf.test.TestCase):
 
     exp = tfd.Exponential(rate=tf.placeholder_with_default(
         input=1., shape=None))
-    self.assertIn(
+    self.assertEqual(
         str(exp),
-        ["%s.distributions.Exponential(\"Exponential/\", "
-         # No batch shape.
-         "event_shape=(), "
-         "dtype=float32)" % pkg for pkg in ["tf", "tfp"]])
+        "tfp.distributions.Exponential(\"Exponential/\", "
+        # No batch shape.
+        "event_shape=(), "
+        "dtype=float32)")
 
   def testStrWorksCorrectlyMultivariate(self):
     mvn_static = tfd.MultivariateNormalDiag(
         loc=np.zeros([2, 2]), name="MVN")
-    self.assertIn(
+    self.assertEqual(
         str(mvn_static),
-        ["%s.distributions.MultivariateNormalDiag("
-         "\"MVN/\", "
-         "batch_shape=(2,), "
-         "event_shape=(2,), "
-         "dtype=float64)" % pkg for pkg in ["tf", "tfp"]])
+        "tfp.distributions.MultivariateNormalDiag("
+        "\"MVN/\", "
+        "batch_shape=(2,), "
+        "event_shape=(2,), "
+        "dtype=float64)")
 
     # There's no notion of partially known shapes in eager mode, so exit
     # early.
@@ -278,13 +277,13 @@ class DistributionTest(tf.test.TestCase):
         loc=tf.placeholder_with_default(
             input=np.ones((3, 3), dtype=np.float32), shape=[None, 3]),
         name="MVN2")
-    self.assertIn(
+    self.assertEqual(
         str(mvn_dynamic),
-        ["%s.distributions.MultivariateNormalDiag("
-         "\"MVN2/\", "
-         "batch_shape=(?,), "  # Partially known.
-         "event_shape=(3,), "
-         "dtype=float32)" % pkg for pkg in ["tf", "tfp"]])
+        "tfp.distributions.MultivariateNormalDiag("
+        "\"MVN2/\", "
+        "batch_shape=(?,), "  # Partially known.
+        "event_shape=(3,), "
+        "dtype=float32)")
 
   def testReprWorksCorrectlyScalar(self):
     # Usually we'd write np.float(X) here, but a recent Eager bug would
@@ -292,23 +291,22 @@ class DistributionTest(tf.test.TestCase):
     # here, until the bug is resolved in TensorFlow 1.12.
     normal = tfd.Normal(loc=tf.constant(0, tf.float16),
                         scale=tf.constant(1, tf.float16))
-    self.assertIn(
+    self.assertEqual(
         repr(normal),
-        ["<%s.distributions.Normal"
-         " 'Normal/'"
-         " batch_shape=()"
-         " event_shape=()"
-         " dtype=float16>" % pkg  # Got the dtype right.
-         for pkg in ["tf", "tfp"]])
+        "<tfp.distributions.Normal"
+        " 'Normal/'"
+        " batch_shape=()"
+        " event_shape=()"
+        " dtype=float16>")
 
     chi2 = tfd.Chi2(df=np.float32([1., 2.]), name="silly")
-    self.assertIn(
+    self.assertEqual(
         repr(chi2),
-        ["<%s.distributions.Chi2"
-         " 'silly/'"  # What a silly name that is!
-         " batch_shape=(2,)"
-         " event_shape=()"
-         " dtype=float32>" % pkg for pkg in ["tf", "tfp"]])
+        "<tfp.distributions.Chi2"
+        " 'silly/'"  # What a silly name that is!
+        " batch_shape=(2,)"
+        " event_shape=()"
+        " dtype=float32>")
 
     # There's no notion of partially known shapes in eager mode, so exit
     # early.
@@ -317,24 +315,24 @@ class DistributionTest(tf.test.TestCase):
 
     exp = tfd.Exponential(rate=tf.placeholder_with_default(
         input=1., shape=None))
-    self.assertIn(
+    self.assertEqual(
         repr(exp),
-        ["<%s.distributions.Exponential"
-         " 'Exponential/'"
-         " batch_shape=<unknown>"
-         " event_shape=()"
-         " dtype=float32>" % pkg for pkg in ["tf", "tfp"]])
+        "<tfp.distributions.Exponential"
+        " 'Exponential/'"
+        " batch_shape=<unknown>"
+        " event_shape=()"
+        " dtype=float32>")
 
   def testReprWorksCorrectlyMultivariate(self):
     mvn_static = tfd.MultivariateNormalDiag(
         loc=np.zeros([2, 2]), name="MVN")
-    self.assertIn(
+    self.assertEqual(
         repr(mvn_static),
-        ["<%s.distributions.MultivariateNormalDiag"
-         " 'MVN/'"
-         " batch_shape=(2,)"
-         " event_shape=(2,)"
-         " dtype=float64>" % pkg for pkg in ["tf", "tfp"]])
+        "<tfp.distributions.MultivariateNormalDiag"
+        " 'MVN/'"
+        " batch_shape=(2,)"
+        " event_shape=(2,)"
+        " dtype=float64>")
 
     # There's no notion of partially known shapes in eager mode, so exit
     # early.
@@ -345,13 +343,13 @@ class DistributionTest(tf.test.TestCase):
         loc=tf.placeholder_with_default(
             input=np.ones((3, 3), dtype=np.float32), shape=[None, 3]),
         name="MVN2")
-    self.assertIn(
+    self.assertEqual(
         repr(mvn_dynamic),
-        ["<%s.distributions.MultivariateNormalDiag"
-         " 'MVN2/'"
-         " batch_shape=(?,)"  # Partially known.
-         " event_shape=(3,)"
-         " dtype=float32>" % pkg for pkg in ["tf", "tfp"]])
+        "<tfp.distributions.MultivariateNormalDiag"
+        " 'MVN2/'"
+        " batch_shape=(?,)"  # Partially known.
+        " event_shape=(3,)"
+        " dtype=float32>")
 
 
 if __name__ == "__main__":

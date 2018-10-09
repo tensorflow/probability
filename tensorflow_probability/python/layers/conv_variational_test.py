@@ -127,7 +127,7 @@ class ConvVariational(tf.test.TestCase):
       input_shape = (2, 3, 3, 3, 1)
 
     with tf.keras.utils.CustomObjectScope({layer_class.__name__: layer_class}):
-      with self.test_session():
+      with self.cached_session():
         testing_utils.layer_test(
             layer_class,
             kwargs={'filters': 2,
@@ -139,7 +139,7 @@ class ConvVariational(tf.test.TestCase):
             input_shape=input_shape)
 
   def _testKLPenaltyKernel(self, layer_class):
-    with self.test_session():
+    with self.cached_session():
       layer = layer_class(filters=2, kernel_size=3)
       if layer_class in (tfp.layers.Convolution1DReparameterization,
                          tfp.layers.Convolution1DFlipout):
@@ -165,7 +165,7 @@ class ConvVariational(tf.test.TestCase):
       self.assertListEqual(layer.losses, input_dependent_losses)
 
   def _testKLPenaltyBoth(self, layer_class):
-    with self.test_session():
+    with self.cached_session():
       layer = layer_class(
           filters=2,
           kernel_size=3,
@@ -260,7 +260,7 @@ class ConvVariational(tf.test.TestCase):
 
   def _testConvReparameterization(self, layer_class):
     batch_size, depth, height, width, channels, filters = 2, 4, 4, 4, 3, 5
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       (kernel_posterior, kernel_prior, kernel_divergence,
        bias_posterior, bias_prior, bias_divergence, layer, inputs,
        outputs, kl_penalty, kernel_shape) = self._testConvSetUp(
@@ -317,7 +317,7 @@ class ConvVariational(tf.test.TestCase):
 
   def _testConvFlipout(self, layer_class):
     batch_size, depth, height, width, channels, filters = 2, 4, 4, 4, 3, 5
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       (kernel_posterior, kernel_prior, kernel_divergence,
        bias_posterior, bias_prior, bias_divergence, layer, inputs,
        outputs, kl_penalty, kernel_shape) = self._testConvSetUp(
@@ -418,7 +418,7 @@ class ConvVariational(tf.test.TestCase):
 
   def _testRandomConvFlipout(self, layer_class):
     batch_size, depth, height, width, channels, filters = 2, 4, 4, 4, 3, 5
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       seed = Counter()
       if layer_class in (tfp.layers.Convolution1DReparameterization,
                          tfp.layers.Convolution1DFlipout):
@@ -490,7 +490,7 @@ class ConvVariational(tf.test.TestCase):
                       np.prod(outputs_one_.shape))
 
   def _testLayerInSequential(self, layer_class):
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       if layer_class in (tfp.layers.Convolution1DReparameterization,
                          tfp.layers.Convolution1DFlipout):
         inputs = tf.random_uniform([2, 3, 1])

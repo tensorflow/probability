@@ -149,16 +149,17 @@ class UtilityTests(test.TestCase):
   def test_broadcast_batch_shape_static(self):
 
     batch_shapes = ([2], [3, 2], [1, 2])
-    distributions = [tf.distributions.Normal(loc=tf.zeros(batch_shape),
-                                             scale=tf.ones(batch_shape))
-                     for batch_shape in batch_shapes]
+    distributions = [
+        tfd.Normal(loc=tf.zeros(batch_shape), scale=tf.ones(batch_shape))
+        for batch_shape in batch_shapes
+    ]
     self.assertEqual(sts_util.broadcast_batch_shape(distributions), [3, 2])
 
   def test_broadcast_batch_shape_dynamic(self):
     # Run in graph mode only, since eager mode always takes the static path
 
     batch_shapes = ([2], [3, 2], [1, 2])
-    distributions = [tf.distributions.Normal(
+    distributions = [tfd.Normal(
         loc=tf.placeholder_with_default(
             input=tf.zeros(batch_shape), shape=None),
         scale=tf.placeholder_with_default(

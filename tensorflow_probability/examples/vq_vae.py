@@ -214,7 +214,7 @@ def make_decoder(base_depth, activation, input_size, output_shape):
 
   Returns:
     decoder: A `callable` mapping a `Tensor` of encodings to a
-      `tf.distributions.Distribution` instance over images.
+      `tfd.Distribution` instance over images.
   """
   deconv = functools.partial(
       tf.keras.layers.Conv2DTranspose, padding="SAME", activation=activation)
