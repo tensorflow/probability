@@ -27,9 +27,9 @@ _PATCH_VERSION = '0'
 _VERSION_SUFFIX = 'dev'
 
 # Example, '0.4.0.dev'
-__version__ = '.'.join([
+__version__ = '.'.join(s for s in [
     _MAJOR_VERSION,
     _MINOR_VERSION,
     _PATCH_VERSION,
     _VERSION_SUFFIX,
-])
+] if s)  # Prevent trailing dot when version suffix is empty.
