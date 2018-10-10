@@ -24,6 +24,7 @@ import tensorflow as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.ops import control_flow_ops
@@ -169,11 +170,15 @@ class StudentT(distribution.Distribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name, values=[df, loc, scale]) as name:
+      dtype = dtype_util.common_dtype([df, loc, scale], tf.float32)
+      df = tf.convert_to_tensor(df, name="df", dtype=dtype)
+      loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
+      scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
       with tf.control_dependencies([tf.assert_positive(df)]
                                    if validate_args else []):
-        self._df = tf.identity(df, name="df")
-        self._loc = tf.identity(loc, name="loc")
-        self._scale = tf.identity(scale, name="scale")
+        self._df = tf.identity(df)
+        self._loc = tf.identity(loc)
+        self._scale = tf.identity(scale)
         tf.assert_same_float_dtype(
             (self._df, self._loc, self._scale))
     super(StudentT, self).__init__(

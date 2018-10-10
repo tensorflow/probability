@@ -25,6 +25,7 @@ import tensorflow as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import distribution_util as util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.ops import control_flow_ops
@@ -170,24 +171,28 @@ class Beta(distribution.Distribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name, values=[concentration1, concentration0]) as name:
+      dtype = dtype_util.common_dtype([concentration1, concentration0],
+                                      tf.float32)
       self._concentration1 = self._maybe_assert_valid_concentration(
-          tf.convert_to_tensor(concentration1, name="concentration1"),
+          tf.convert_to_tensor(
+              concentration1, name="concentration1", dtype=dtype),
           validate_args)
       self._concentration0 = self._maybe_assert_valid_concentration(
-          tf.convert_to_tensor(concentration0, name="concentration0"),
+          tf.convert_to_tensor(
+              concentration0, name="concentration0", dtype=dtype),
           validate_args)
-      tf.assert_same_float_dtype([
-          self._concentration1, self._concentration0])
+      tf.assert_same_float_dtype([self._concentration1, self._concentration0])
       self._total_concentration = self._concentration1 + self._concentration0
     super(Beta, self).__init__(
-        dtype=self._total_concentration.dtype,
+        dtype=dtype,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
         reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
         parameters=parameters,
-        graph_parents=[self._concentration1,
-                       self._concentration0,
-                       self._total_concentration],
+        graph_parents=[
+            self._concentration1, self._concentration0,
+            self._total_concentration
+        ],
         name=name)
 
   @staticmethod

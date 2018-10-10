@@ -22,6 +22,7 @@ import math
 
 import tensorflow as tf
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.framework import tensor_shape
 
@@ -97,12 +98,15 @@ class Uniform(distribution.Distribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name, values=[low, high]) as name:
+      dtype = dtype_util.common_dtype([low, high], tf.float32)
+      low = tf.convert_to_tensor(low, name="low", dtype=dtype)
+      high = tf.convert_to_tensor(high, name="high", dtype=dtype)
       with tf.control_dependencies([
           tf.assert_less(
               low, high, message="uniform not defined when low >= high.")
       ] if validate_args else []):
-        self._low = tf.identity(low, name="low")
-        self._high = tf.identity(high, name="high")
+        self._low = tf.identity(low)
+        self._high = tf.identity(high)
         tf.assert_same_float_dtype([self._low, self._high])
     super(Uniform, self).__init__(
         dtype=self._low.dtype,

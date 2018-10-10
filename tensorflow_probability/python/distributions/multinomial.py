@@ -21,6 +21,7 @@ from __future__ import print_function
 import tensorflow as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.ops import functional_ops
@@ -177,7 +178,9 @@ class Multinomial(distribution.Distribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name, values=[total_count, logits, probs]) as name:
-      self._total_count = tf.convert_to_tensor(total_count, name="total_count")
+      dtype = dtype_util.common_dtype([total_count, logits, probs], tf.float32)
+      self._total_count = tf.convert_to_tensor(
+          total_count, name="total_count", dtype=dtype)
       if validate_args:
         self._total_count = (
             distribution_util.embed_check_nonnegative_integer_form(
@@ -187,17 +190,16 @@ class Multinomial(distribution.Distribution):
           probs=probs,
           multidimensional=True,
           validate_args=validate_args,
-          name=name)
+          name=name,
+          dtype=dtype)
       self._mean_val = self._total_count[..., tf.newaxis] * self._probs
     super(Multinomial, self).__init__(
-        dtype=self._probs.dtype,
+        dtype=dtype,
         reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
         parameters=parameters,
-        graph_parents=[self._total_count,
-                       self._logits,
-                       self._probs],
+        graph_parents=[self._total_count, self._logits, self._probs],
         name=name)
 
   @property
