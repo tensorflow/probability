@@ -53,6 +53,7 @@ rv_all = [
     "MixtureSameFamily",
     "Multinomial",
     "MultivariateNormalDiag",
+    "MultivariateNormalDiagPlusLowRankCovariance",
     "MultivariateNormalFullCovariance",
     "MultivariateNormalTriL",
     "NegativeBinomial",
@@ -242,6 +243,7 @@ Mixture = _make_random_variable(tfd.Mixture)
 MixtureSameFamily = _make_random_variable(tfd.MixtureSameFamily)
 Multinomial = _make_random_variable(tfd.Multinomial)
 MultivariateNormalDiag = _make_random_variable(tfd.MultivariateNormalDiag)
+MultivariateNormalDiagPlusLowRankCovariance = _make_random_variable(tfd.MultivariateNormalDiagPlusLowRankCovariance)
 MultivariateNormalFullCovariance = _make_random_variable(
     tfd.MultivariateNormalFullCovariance)
 MultivariateNormalTriL = _make_random_variable(tfd.MultivariateNormalTriL)
