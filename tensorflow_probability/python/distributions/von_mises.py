@@ -124,14 +124,15 @@ class VonMises(distribution.Distribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name, values=[loc, concentration]) as name:
-      dtype = dtype_util.common_dtype([loc, concentration], tf.float32)
+      dtype = dtype_util.common_dtype([loc, concentration],
+                                      preferred_dtype=tf.float32)
       loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
       concentration = tf.convert_to_tensor(
           concentration, name="concentration", dtype=dtype)
       with tf.control_dependencies([tf.assert_non_negative(concentration)]
                                    if validate_args else []):
-        self._loc = tf.identity(loc)
-        self._concentration = tf.identity(concentration)
+        self._loc = tf.identity(loc, name="loc")
+        self._concentration = tf.identity(concentration, name="concentration")
         tf.assert_same_float_dtype([self._loc, self._concentration])
     super(VonMises, self).__init__(
         dtype=self._concentration.dtype,

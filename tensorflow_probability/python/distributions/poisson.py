@@ -21,6 +21,7 @@ from __future__ import print_function
 import tensorflow as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.framework import tensor_shape
 
@@ -80,7 +81,10 @@ class Poisson(distribution.Distribution):
       if (rate is None) == (log_rate is None):
         raise ValueError("Must specify exactly one of `rate` and `log_rate`.")
       elif log_rate is None:
-        rate = tf.convert_to_tensor(rate, name="rate")
+        rate = tf.convert_to_tensor(
+            rate,
+            name="rate",
+            dtype=dtype_util.common_dtype([rate], preferred_dtype=tf.float32))
         if not rate.dtype.is_floating:
           raise TypeError("rate.dtype ({}) is a not a float-type.".format(
               rate.dtype.name))
@@ -89,7 +93,10 @@ class Poisson(distribution.Distribution):
           self._rate = tf.identity(rate, name="rate")
           self._log_rate = tf.log(rate, name="log_rate")
       else:
-        log_rate = tf.convert_to_tensor(log_rate, name="log_rate")
+        log_rate = tf.convert_to_tensor(
+            log_rate,
+            name="log_rate",
+            dtype=dtype_util.common_dtype([log_rate], tf.float32))
         if not log_rate.dtype.is_floating:
           raise TypeError("log_rate.dtype ({}) is a not a float-type.".format(
               log_rate.dtype.name))

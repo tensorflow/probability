@@ -126,11 +126,13 @@ class Gumbel(transformed_distribution.TransformedDistribution):
       TypeError: if loc and scale are different dtypes.
     """
     with tf.name_scope(name, values=[loc, scale]) as name:
+      dtype = dtype_util.common_dtype([loc, scale], preferred_dtype=tf.float32)
+      loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
+      scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
       with tf.control_dependencies([tf.assert_positive(scale)]
                                    if validate_args else []):
-        dtype = dtype_util.common_dtype([loc, scale], tf.float32)
-        loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
-        scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
+        loc = tf.identity(loc, name="loc")
+        scale = tf.identity(scale, name="scale")
         tf.assert_same_float_dtype([loc, scale])
         self._gumbel_bijector = bijectors.Gumbel(
             loc=loc, scale=scale, validate_args=validate_args)

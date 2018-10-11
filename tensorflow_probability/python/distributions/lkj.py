@@ -33,6 +33,7 @@ from tensorflow_probability.python.distributions import beta
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import seed_stream
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 
 
@@ -120,7 +121,11 @@ class LKJ(distribution.Distribution):
           'There are no negative-dimension correlation matrices.')
     parameters = dict(locals())
     with tf.name_scope(name, values=[dimension, concentration]):
-      concentration = tf.convert_to_tensor(concentration, name='concentration')
+      concentration = tf.convert_to_tensor(
+          concentration,
+          name='concentration',
+          dtype=dtype_util.common_dtype([concentration],
+                                        preferred_dtype=tf.float32))
       with tf.control_dependencies([
           # concentration >= 1
           # TODO(b/111451422) Generalize to concentration > 0.

@@ -87,7 +87,8 @@ class _BaseDeterministic(distribution.Distribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name, values=[loc, atol, rtol]) as name:
-      dtype = dtype_util.common_dtype([loc, atol, rtol])
+      dtype = dtype_util.common_dtype([loc, atol, rtol],
+                                      preferred_dtype=tf.float32)
       loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
       if is_vector and validate_args:
         msg = "Argument loc must be at least rank 1."

@@ -91,13 +91,15 @@ class NegativeBinomial(distribution.Distribution):
 
     parameters = dict(locals())
     with tf.name_scope(name, values=[total_count, logits, probs]) as name:
-      dtype = dtype_util.common_dtype([total_count, logits, probs], tf.float32)
+      dtype = dtype_util.common_dtype([total_count, logits, probs],
+                                      preferred_dtype=tf.float32)
       self._logits, self._probs = distribution_util.get_logits_and_probs(
           logits, probs, validate_args=validate_args, name=name, dtype=dtype)
+      total_count = tf.convert_to_tensor(
+          total_count, name="total_count", dtype=dtype)
       with tf.control_dependencies([tf.assert_positive(total_count)]
                                    if validate_args else []):
-        self._total_count = tf.convert_to_tensor(
-            total_count, name="total_count", dtype=dtype)
+        self._total_count = tf.identity(total_count, name="total_count")
 
     super(NegativeBinomial, self).__init__(
         dtype=self._probs.dtype,

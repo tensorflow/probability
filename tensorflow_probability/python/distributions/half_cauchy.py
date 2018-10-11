@@ -115,13 +115,13 @@ class HalfCauchy(distribution.Distribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name, values=[loc, scale]) as name:
-      dtype = dtype_util.common_dtype([loc, scale], tf.float32)
+      dtype = dtype_util.common_dtype([loc, scale], preferred_dtype=tf.float32)
       loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
       scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
       with tf.control_dependencies([tf.assert_positive(scale)]
                                    if validate_args else []):
-        self._loc = tf.identity(loc)
-        self._scale = tf.identity(scale)
+        self._loc = tf.identity(loc, name="loc")
+        self._scale = tf.identity(scale, name="loc")
       tf.assert_same_float_dtype([self._loc, self._scale])
     super(HalfCauchy, self).__init__(
         dtype=self._scale.dtype,

@@ -189,6 +189,7 @@ py_library(
     deps = [
         ":gamma",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -234,6 +235,7 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
     ],
 )
@@ -269,6 +271,7 @@ py_library(
         ":gamma",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -365,6 +368,7 @@ py_library(
         ":distribution",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
     ],
 )
@@ -465,6 +469,7 @@ py_library(
         ":seed_stream",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
     ],
 )
@@ -634,25 +639,6 @@ py_library(
 )
 
 py_library(
-    name = "poisson_lognormal",
-    srcs = ["poisson_lognormal.py"],
-    deps = [
-        ":categorical",
-        ":distribution",
-        ":normal",
-        ":poisson",
-        ":seed_stream",
-        ":transformed_distribution",
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability/python/bijectors",
-        "//tensorflow_probability/python/internal:distribution_util",
-        "//tensorflow_probability/python/internal:dtype_util",
-        "//tensorflow_probability/python/internal:reparameterization",
-    ],
-)
-
-py_library(
     name = "pareto",
     srcs = ["pareto.py"],
     deps = [
@@ -672,6 +658,26 @@ py_library(
         ":distribution",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:reparameterization",
+    ],
+)
+
+py_library(
+    name = "poisson_lognormal",
+    srcs = ["poisson_lognormal.py"],
+    deps = [
+        ":categorical",
+        ":distribution",
+        ":normal",
+        ":poisson",
+        ":seed_stream",
+        ":transformed_distribution",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
     ],
 )

@@ -140,14 +140,18 @@ def make_tril_scale(
   with tf.name_scope(
       name,
       "make_tril_scale",
-      values=[loc, scale_diag, scale_identity_multiplier]):
+      values=[loc, scale_tril, scale_diag, scale_identity_multiplier]):
 
-    loc = _convert_to_tensor(loc, name="loc")
-    scale_tril = _convert_to_tensor(scale_tril, name="scale_tril")
-    scale_diag = _convert_to_tensor(scale_diag, name="scale_diag")
+    dtype = dtype_util.common_dtype(
+        [loc, scale_tril, scale_diag, scale_identity_multiplier],
+        preferred_dtype=tf.float32)
+    loc = _convert_to_tensor(loc, name="loc", dtype=dtype)
+    scale_tril = _convert_to_tensor(scale_tril, name="scale_tril", dtype=dtype)
+    scale_diag = _convert_to_tensor(scale_diag, name="scale_diag", dtype=dtype)
     scale_identity_multiplier = _convert_to_tensor(
         scale_identity_multiplier,
-        name="scale_identity_multiplier")
+        name="scale_identity_multiplier",
+        dtype=dtype)
 
   if scale_tril is not None:
     scale_tril = tf.matrix_band_part(scale_tril, -1, 0)  # Zero out TriU.
@@ -232,7 +236,8 @@ def make_diag_scale(loc=None,
       values=[loc, scale_diag, scale_identity_multiplier]):
     if dtype is None:
       dtype = dtype_util.common_dtype(
-          [loc, scale_diag, scale_identity_multiplier])
+          [loc, scale_diag, scale_identity_multiplier],
+          preferred_dtype=tf.float32)
     loc = _convert_to_tensor(loc, name="loc", dtype=dtype)
     scale_diag = _convert_to_tensor(scale_diag, name="scale_diag", dtype=dtype)
     scale_identity_multiplier = _convert_to_tensor(
@@ -753,6 +758,8 @@ def get_logits_and_probs(logits=None,
   Raises:
     ValueError: if neither `probs` nor `logits` were passed in, or both were.
   """
+  if dtype is None:
+    dtype = dtype_util.common_dtype([probs, logits], preferred_dtype=tf.float32)
   with tf.name_scope(name, values=[probs, logits]):
     if (probs is None) == (logits is None):
       raise ValueError("Must pass probs or logits, but not both.")
