@@ -12,11 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Multivariate Normal distribution class initialized with a full covariance."""
+"""Multivariate Normal distribution class initialized with a diagonal plus low-rank covariance."""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+
+import math
 
 import tensorflow as tf
 from tensorflow_probability.python.distributions import mvn_tril
@@ -36,16 +38,21 @@ class MultivariateNormalDiagPlusLowRankCovariance(mvn_tril.MultivariateNormalTri
   `covariance_matrix` matrices that are the covariance.
   This is different than the other multivariate normals, which are parameterized
   by a matrix more akin to the standard deviation.
+
   #### Mathematical Details
   The probability density function (pdf) is, with `@` as matrix multiplication,
   ```none
   pdf(x; loc, covariance_matrix) = exp(-0.5 y) / Z,
   y = (x - loc)^T @ inv(covariance_matrix) @ (x - loc)
   Z = (2 pi)**(0.5 k) |det(covariance_matrix)|**(0.5).
+  covariance_matrix = cov_perturb_factor * cov_perturb_tril * cov_perturb_tril^T * cov_perturb_factor^T + cov_identity_multiplier * I + diag(cov_diag)
   ```
   where:
   * `loc` is a vector in `R^k`,
-  * `covariance_matrix` is an `R^{k x k}` symmetric positive definite matrix,
+  * `cov_diag` is a vector in `R^k`,
+  * `cov_identity_multiplier` is a scalar,
+  * `cov_perturb_factor` is a matrix in R^{k x s}`,
+  * `cov_perturb_tril` is a lower-triangular matrix in R^{s x s},
   * `Z` denotes the normalization constant.
   Additional leading dimensions (if any) in `loc` and `covariance_matrix` allow
   for batch dimensions.
@@ -57,38 +64,7 @@ class MultivariateNormalDiagPlusLowRankCovariance(mvn_tril.MultivariateNormalTri
   scale = Cholesky(covariance_matrix)
   Y = scale @ X + loc
   ```
-  #### Examples
-  ```python
-  tfd = tfp.distributions
-  # Initialize a single 3-variate Gaussian.
-  mu = [1., 2, 3]
-  cov = [[ 0.36,  0.12,  0.06],
-         [ 0.12,  0.29, -0.13],
-         [ 0.06, -0.13,  0.26]]
-  mvn = tfd.MultivariateNormalFullCovariance(
-      loc=mu,
-      covariance_matrix=cov)
-  mvn.mean().eval()
-  # ==> [1., 2, 3]
-  # Covariance agrees with covariance_matrix.
-  mvn.covariance().eval()
-  # ==> [[ 0.36,  0.12,  0.06],
-  #      [ 0.12,  0.29, -0.13],
-  #      [ 0.06, -0.13,  0.26]]
-  # Compute the pdf of an observation in `R^3` ; return a scalar.
-  mvn.prob([-1., 0, 1]).eval()  # shape: []
-  # Initialize a 2-batch of 3-variate Gaussians.
-  mu = [[1., 2, 3],
-        [11, 22, 33]]              # shape: [2, 3]
-  covariance_matrix = ...  # shape: [2, 3, 3], symmetric, positive definite.
-  mvn = tfd.MultivariateNormalFullCovariance(
-      loc=mu,
-      covariance=covariance_matrix)
-  # Compute the pdf of two `R^3` observations; return a length-2 vector.
-  x = [[-0.9, 0, 0.1],
-       [-10, 0, 9]]     # shape: [2, 3]
-  mvn.prob(x).eval()    # shape: [2]
-  ```
+
   """
 
   def __init__(self,
@@ -97,7 +73,6 @@ class MultivariateNormalDiagPlusLowRankCovariance(mvn_tril.MultivariateNormalTri
                cov_identity_multiplier=None,
                cov_perturb_factor=None,
                cov_perturb_tril=None,
-               cov_perturb_diag=None,
                validate_args=False,
                allow_nan_stats=True,
                name="MultivariateNormalFullCovariance"):
@@ -144,15 +119,14 @@ class MultivariateNormalDiagPlusLowRankCovariance(mvn_tril.MultivariateNormalTri
       with tf.name_scope(
           "init",
           values=[
-              loc, cov_diag, cov_identity_multiplier, cov_perturb_factor,
-              cov_perturb_diag
+              loc, cov_diag, cov_identity_multiplier, cov_perturb_factor, cov_perturb_tril
           ]):
         dtype = dtype_util.common_dtype([
             loc, cov_diag, cov_identity_multiplier, cov_perturb_factor,
-            cov_perturb_diag
+            cov_perturb_tril
         ], tf.float32)
         has_low_rank = (cov_perturb_factor is not None or
-                        cov_perturb_diag is not None)
+                        cov_perturb_tril is not None)
         diagonal = distribution_util.make_diag_scale(
             loc=loc,
             scale_diag=cov_diag,
@@ -162,42 +136,26 @@ class MultivariateNormalDiagPlusLowRankCovariance(mvn_tril.MultivariateNormalTri
             dtype=dtype)
         cov_perturb_factor = _convert_to_tensor(
             cov_perturb_factor, name="cov_perturb_factor", dtype=dtype)
-        cov_perturb_diag = _convert_to_tensor(
-            cov_perturb_diag, name="cov_perturb_diag", dtype=dtype)
+        cov_perturb_tril = _convert_to_tensor(
+            cov_perturb_tril, name="cov_perturb_tril", dtype=dtype)
         cov_perturb_factor_sheared = tf.matmul(cov_perturb_factor, cov_perturb_tril, name='cov_perturb_factor_sheared')
         if has_low_rank:
           covariance_matrix = tf.linalg.LinearOperatorLowRankUpdate(
               diagonal,
               u=cov_perturb_factor_sheared,
-              diag_update=cov_perturb_diag,
-              is_diag_update_positive=cov_perturb_diag is None,
+              diag_update=None,
+              is_diag_update_positive=True,
               is_non_singular=True,  # Implied by is_positive_definite=True.
               is_self_adjoint=True,
               is_positive_definite=True,
               is_square=True)
-      covariance_matrix = covariance_matrix.to_dense()
+        else:
+          covariance_matrix = diagonal
+
     # Convert the covariance_matrix up to a scale_tril and call MVNTriL.
-      dtype = dtype_util.common_dtype([loc, covariance_matrix], tf.float32)
       loc = loc if loc is None else tf.convert_to_tensor(
           loc, name="loc", dtype=dtype)
-      if covariance_matrix is None:
-        scale_tril = None
-      else:
-        covariance_matrix = tf.convert_to_tensor(
-            covariance_matrix, name="covariance_matrix", dtype=dtype)
-        if validate_args:
-          covariance_matrix = control_flow_ops.with_dependencies([
-              tf.assert_near(
-                  covariance_matrix,
-                  tf.matrix_transpose(covariance_matrix),
-                  message="Matrix was not symmetric")
-          ], covariance_matrix)
-        # No need to validate that covariance_matrix is non-singular.
-        # LinearOperatorLowerTriangular has an assert_non_singular method that
-        # is called by the Bijector.
-        # However, cholesky() ignores the upper triangular part, so we do need
-        # to separately assert symmetric.
-        scale_tril = tf.cholesky(covariance_matrix)
+      scale_tril = tf.cholesky(covariance_matrix.to_dense())
       super(MultivariateNormalDiagPlusLowRankCovariance, self).__init__(
           loc=loc,
           scale_tril=scale_tril,
@@ -205,18 +163,26 @@ class MultivariateNormalDiagPlusLowRankCovariance(mvn_tril.MultivariateNormalTri
           allow_nan_stats=allow_nan_stats,
           name=name)
     self._parameters = parameters
-    self._auxiliary_factor = cov_perturb_factor_sheared / diagonal.diag_part()[..., None]
+    self._diagonal = diagonal
+    self._covariance_matrix = covariance_matrix
+    self._auxiliary_factor = cov_perturb_factor_sheared / self.diagonal[..., None]
     self._auxiliary_tril = tf.cholesky(tf.eye(cov_perturb_tril.shape[0].value) + tf.matmul(self._auxiliary_factor, cov_perturb_factor_sheared, transpose_a=True))
+
+  @property
+  def diagonal(self):
+    return self._diagonal.diag_part()
+
+  def covariance(self):
+    return self._covariance_matrix.to_dense()
 
   def _log_prob(self, x):
     return self._log_unnormalized_prob(x) - self._log_normalization()
 
   def _log_normalization(self):
-    return (0.5 * self._event_shape() * math.log(2. * math.pi) + 
-            0.5 * tf.log(self.cov_diag) + 
-            tf.reduce_sum(tf.log(tf.diag_part(self._auxiliary_tril))))
+    return (0.5 * self.loc.shape[0].value * math.log(2. * math.pi) + 
+            0.5 * tf.reduce_sum(tf.log(self.diagonal)) + tf.reduce_sum(tf.log(tf.diag_part(self._auxiliary_tril))))
 
   def _log_unnormalized_prob(self, x):
-    z = (x - self.loc) / tf.sqrt(self.diag_scale)
-    auxz = tf.linalg.triangular_solve(self._auxiliary_tril, x - self.loc)
+    z = (x - self.loc) / tf.sqrt(self.diagonal)
+    auxz = tf.linalg.triangular_solve(self._auxiliary_tril, tf.matmul(self._auxiliary_factor, x[...,None] - self.loc[...,None], transpose_a=True))[...,0]
     return -0.5 * tf.reduce_sum(tf.square(z), axis=-1) + 0.5 * tf.reduce_sum(tf.square(auxz), axis=-1)
