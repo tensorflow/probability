@@ -65,6 +65,7 @@ from tensorflow_probability.python.distributions.multinomial import Multinomial
 from tensorflow_probability.python.distributions.mvn_diag import MultivariateNormalDiag
 from tensorflow_probability.python.distributions.mvn_diag import MultivariateNormalDiagWithSoftplusScale
 from tensorflow_probability.python.distributions.mvn_diag_plus_low_rank import MultivariateNormalDiagPlusLowRank
+from tensorflow_probability.python.distributions.mvn_diag_plus_low_rank_covariance import MultivariateNormalDiagPlusLowRankCovariance
 from tensorflow_probability.python.distributions.mvn_full_covariance import MultivariateNormalFullCovariance
 from tensorflow_probability.python.distributions.mvn_linear_operator import MultivariateNormalLinearOperator
 from tensorflow_probability.python.distributions.mvn_tril import MultivariateNormalTriL
@@ -180,6 +181,7 @@ __all__ = [
     'MultivariateNormalLinearOperator',
     'MultivariateNormalTriL',
     'MultivariateNormalDiagPlusLowRank',
+    'MultivariateNormalDiagPlusLowRankCovariance',
     'MultivariateNormalDiagWithSoftplusScale',
     'Dirichlet',
     'DirichletMultinomial',
