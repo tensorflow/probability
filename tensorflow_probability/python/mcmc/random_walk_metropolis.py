@@ -347,7 +347,7 @@ class RandomWalkMetropolis(kernel_base.TransitionKernel):
 
   def __init__(self,
                target_log_prob_fn,
-               new_state_fn=random_walk_normal_fn(),
+               new_state_fn=None,
                seed=None,
                name=None):
     """Initializes this transition kernel.
@@ -360,7 +360,8 @@ class RandomWalkMetropolis(kernel_base.TransitionKernel):
         seed; returns a same-type `list` of `Tensor`s, each being a perturbation
         of the input state parts. The perturbation distribution is assumed to be
         a symmetric distribution centered at the input state part.
-        Default value: `tfp.mcmc.random_walk_normal_fn()`.
+        Default value: `None` which is mapped to
+          `tfp.mcmc.random_walk_normal_fn()`.
       seed: Python integer to seed the random number generator.
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., 'rwm_kernel').
@@ -376,6 +377,9 @@ class RandomWalkMetropolis(kernel_base.TransitionKernel):
       ValueError: if there isn't one `scale` or a list with same length as
         `current_state`.
     """
+    if new_state_fn is None:
+      new_state_fn = random_walk_normal_fn()
+
     self._impl = metropolis_hastings.MetropolisHastings(
         inner_kernel=UncalibratedRandomWalk(
             target_log_prob_fn=target_log_prob_fn,
@@ -453,9 +457,12 @@ class UncalibratedRandomWalk(kernel_base.TransitionKernel):
   @mcmc_util.set_doc(RandomWalkMetropolis.__init__.__doc__)
   def __init__(self,
                target_log_prob_fn,
-               new_state_fn=random_walk_normal_fn(),
+               new_state_fn=None,
                seed=None,
                name=None):
+    if new_state_fn is None:
+      new_state_fn = random_walk_normal_fn()
+
     self._target_log_prob_fn = target_log_prob_fn
     self._seed_stream = distributions.SeedStream(
         seed, salt='RandomWalkMetropolis')
@@ -505,10 +512,10 @@ class UncalibratedRandomWalk(kernel_base.TransitionKernel):
         current_state_parts = [tf.convert_to_tensor(s, name='current_state')
                                for s in current_state_parts]
 
-      new_state_fn = self.new_state_fn
-      next_state_parts = new_state_fn(current_state_parts, self._seed_stream())
+      next_state_parts = self.new_state_fn(current_state_parts,  # pylint: disable=not-callable
+                                           self._seed_stream())
       # Compute `target_log_prob` so its available to MetropolisHastings.
-      next_target_log_prob = self.target_log_prob_fn(*next_state_parts)
+      next_target_log_prob = self.target_log_prob_fn(*next_state_parts)  # pylint: disable=not-callable
 
       def maybe_flatten(x):
         return x if mcmc_util.is_list_like(current_state) else x[0]
@@ -529,7 +536,7 @@ class UncalibratedRandomWalk(kernel_base.TransitionKernel):
       if not mcmc_util.is_list_like(init_state):
         init_state = [init_state]
       init_state = [tf.convert_to_tensor(x) for x in init_state]
-      init_target_log_prob = self.target_log_prob_fn(*init_state)
+      init_target_log_prob = self.target_log_prob_fn(*init_state)  # pylint:disable=not-callable
       return UncalibratedRandomWalkResults(
           log_acceptance_correction=tf.zeros_like(init_target_log_prob),
           target_log_prob=init_target_log_prob)
