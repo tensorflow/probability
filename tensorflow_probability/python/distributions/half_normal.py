@@ -25,8 +25,8 @@ import tensorflow as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import special_math
 from tensorflow.python.framework import tensor_shape
-from tensorflow.python.ops.distributions import special_math
 
 
 __all__ = [
