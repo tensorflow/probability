@@ -57,10 +57,10 @@ class StudentTTest(tf.test.TestCase):
     student = student_t.StudentT(df, loc=mu, scale=-sigma)
 
     log_pdf = student.log_prob(t)
-    self.assertEquals(log_pdf.get_shape(), (6,))
+    self.assertEquals(log_pdf.shape, (6,))
     log_pdf_values = self.evaluate(log_pdf)
     pdf = student.prob(t)
-    self.assertEquals(pdf.get_shape(), (6,))
+    self.assertEquals(pdf.shape, (6,))
     pdf_values = self.evaluate(pdf)
 
     if not stats:
@@ -86,10 +86,10 @@ class StudentTTest(tf.test.TestCase):
     student = student_t.StudentT(df, loc=mu, scale=sigma)
     log_pdf = student.log_prob(t)
     log_pdf_values = self.evaluate(log_pdf)
-    self.assertEqual(log_pdf.get_shape(), (6, 2))
+    self.assertEqual(log_pdf.shape, (6, 2))
     pdf = student.prob(t)
     pdf_values = self.evaluate(pdf)
-    self.assertEqual(pdf.get_shape(), (6, 2))
+    self.assertEqual(pdf.shape, (6, 2))
 
     if not stats:
       return
@@ -112,10 +112,10 @@ class StudentTTest(tf.test.TestCase):
     student = student_t.StudentT(df, loc=mu, scale=sigma)
 
     log_cdf = student.log_cdf(t)
-    self.assertEquals(log_cdf.get_shape(), (6,))
+    self.assertEquals(log_cdf.shape, (6,))
     log_cdf_values = self.evaluate(log_cdf)
     cdf = student.cdf(t)
-    self.assertEquals(cdf.get_shape(), (6,))
+    self.assertEquals(cdf.shape, (6,))
     cdf_values = self.evaluate(cdf)
 
     if not stats:
@@ -210,7 +210,7 @@ class StudentTTest(tf.test.TestCase):
     student = student_t.StudentT(df=df, loc=mu, scale=sigma)
     samples = student.sample(n, seed=123456)
     sample_values = self.evaluate(samples)
-    self.assertEqual(samples.get_shape(), (200000, batch_size, 2))
+    self.assertEqual(samples.shape, (200000, batch_size, 2))
     self.assertAllClose(
         sample_values[:, 0, 0].mean(), mu_v[0], rtol=0.1, atol=0)
     self.assertAllClose(
@@ -251,12 +251,12 @@ class StudentTTest(tf.test.TestCase):
   def testBroadcastingParams(self):
 
     def _check(student):
-      self.assertEqual(student.mean().get_shape(), (3,))
-      self.assertEqual(student.variance().get_shape(), (3,))
-      self.assertEqual(student.entropy().get_shape(), (3,))
-      self.assertEqual(student.log_prob(2.).get_shape(), (3,))
-      self.assertEqual(student.prob(2.).get_shape(), (3,))
-      self.assertEqual(student.sample(37).get_shape(), (37, 3,))
+      self.assertEqual(student.mean().shape, (3,))
+      self.assertEqual(student.variance().shape, (3,))
+      self.assertEqual(student.entropy().shape, (3,))
+      self.assertEqual(student.log_prob(2.).shape, (3,))
+      self.assertEqual(student.prob(2.).shape, (3,))
+      self.assertEqual(student.sample(37).shape, (37, 3,))
 
     _check(student_t.StudentT(df=[2., 3., 4.,], loc=2., scale=1.))
     _check(student_t.StudentT(df=7., loc=[2., 3., 4.,], scale=1.))
@@ -265,8 +265,8 @@ class StudentTTest(tf.test.TestCase):
   def testBroadcastingPdfArgs(self):
 
     def _assert_shape(student, arg, shape):
-      self.assertEqual(student.log_prob(arg).get_shape(), shape)
-      self.assertEqual(student.prob(arg).get_shape(), shape)
+      self.assertEqual(student.log_prob(arg).shape, shape)
+      self.assertEqual(student.prob(arg).shape, shape)
 
     def _check(student):
       _assert_shape(student, 2., (3,))
@@ -414,9 +414,9 @@ class StudentTTest(tf.test.TestCase):
     mean_pdf = student.prob(student.mean())
     sample_vals, pdf_vals, mean_val, mean_pdf_val = self.evaluate(
         [samples, pdfs, student.mean(), mean_pdf])
-    self.assertEqual(samples.get_shape(), (num,))
-    self.assertEqual(pdfs.get_shape(), (num,))
-    self.assertEqual(mean.get_shape(), ())
+    self.assertEqual(samples.shape, (num,))
+    self.assertEqual(pdfs.shape, (num,))
+    self.assertEqual(mean.shape, ())
     self.assertNear(np.pi, np.mean(sample_vals), err=0.1)
     self.assertNear(np.pi, mean_val, err=1e-6)
     # Verify integral over sample*pdf ~= 1.
@@ -451,8 +451,8 @@ class StudentTTest(tf.test.TestCase):
     samples = student.sample(num, seed=123456)
     pdfs = student.prob(samples)
     sample_vals, pdf_vals = self.evaluate([samples, pdfs])
-    self.assertEqual(samples.get_shape(), (num, 2, 2))
-    self.assertEqual(pdfs.get_shape(), (num, 2, 2))
+    self.assertEqual(samples.shape, (num, 2, 2))
+    self.assertEqual(pdfs.shape, (num, 2, 2))
     self.assertNear(5., np.mean(sample_vals[:, 0, :]), err=0.1)
     self.assertNear(6., np.mean(sample_vals[:, 1, :]), err=0.1)
     self._assertIntegral(sample_vals[:, 0, 0], pdf_vals[:, 0, 0], err=0.05)

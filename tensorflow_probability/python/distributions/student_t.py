@@ -220,9 +220,9 @@ class StudentT(distribution.Distribution):
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(
-        tf.broadcast_static_shape(self.df.get_shape(),
-                                  self.loc.get_shape()),
-        self.scale.get_shape())
+        tf.broadcast_static_shape(self.df.shape,
+                                  self.loc.shape),
+        self.scale.shape)
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)

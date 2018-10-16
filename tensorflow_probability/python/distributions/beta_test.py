@@ -75,14 +75,14 @@ class BetaTest(tf.test.TestCase):
     a = [[1., 2, 3]]
     b = [[2., 4, 3]]
     dist = beta_lib.Beta(a, b)
-    self.assertEqual([1, 3], dist.concentration1.get_shape())
+    self.assertEqual([1, 3], dist.concentration1.shape)
     self.assertAllClose(a, self.evaluate(dist.concentration1))
 
   def testBetaProperty(self):
     a = [[1., 2, 3]]
     b = [[2., 4, 3]]
     dist = beta_lib.Beta(a, b)
-    self.assertEqual([1, 3], dist.concentration0.get_shape())
+    self.assertEqual([1, 3], dist.concentration0.shape)
     self.assertAllClose(b, self.evaluate(dist.concentration0))
 
   def testPdfXProper(self):
@@ -108,7 +108,7 @@ class BetaTest(tf.test.TestCase):
     dist = beta_lib.Beta(a, b)
     pdf = dist.prob(x)
     self.assertAllClose([1., 3. / 2], self.evaluate(pdf))
-    self.assertEqual((2,), pdf.get_shape())
+    self.assertEqual((2,), pdf.shape)
 
   def testPdfTwoBatchesNontrivialX(self):
     a = [1., 2]
@@ -117,7 +117,7 @@ class BetaTest(tf.test.TestCase):
     dist = beta_lib.Beta(a, b)
     pdf = dist.prob(x)
     self.assertAllClose([1, 63. / 50], self.evaluate(pdf))
-    self.assertEqual((2,), pdf.get_shape())
+    self.assertEqual((2,), pdf.shape)
 
   def testPdfUniformZeroBatch(self):
     # This is equivalent to a uniform distribution
@@ -127,7 +127,7 @@ class BetaTest(tf.test.TestCase):
     dist = beta_lib.Beta(a, b)
     pdf = dist.prob(x)
     self.assertAllClose([1.] * 5, self.evaluate(pdf))
-    self.assertEqual((5,), pdf.get_shape())
+    self.assertEqual((5,), pdf.shape)
 
   def testPdfAlphaStretchedInBroadcastWhenSameRank(self):
     a = [[1., 2]]
@@ -136,7 +136,7 @@ class BetaTest(tf.test.TestCase):
     dist = beta_lib.Beta(a, b)
     pdf = dist.prob(x)
     self.assertAllClose([[1., 3. / 2], [1., 63. / 50]], self.evaluate(pdf))
-    self.assertEqual((2, 2), pdf.get_shape())
+    self.assertEqual((2, 2), pdf.shape)
 
   def testPdfAlphaStretchedInBroadcastWhenLowerRank(self):
     a = [1., 2]
@@ -144,7 +144,7 @@ class BetaTest(tf.test.TestCase):
     x = [[.5, .5], [.2, .8]]
     pdf = beta_lib.Beta(a, b).prob(x)
     self.assertAllClose([[1., 3. / 2], [1., 24. / 25]], self.evaluate(pdf))
-    self.assertEqual((2, 2), pdf.get_shape())
+    self.assertEqual((2, 2), pdf.shape)
 
   def testPdfXStretchedInBroadcastWhenSameRank(self):
     a = [[1., 2], [2., 3]]
@@ -152,7 +152,7 @@ class BetaTest(tf.test.TestCase):
     x = [[.5, .5]]
     pdf = beta_lib.Beta(a, b).prob(x)
     self.assertAllClose([[1., 3. / 2], [3. / 2, 15. / 8]], self.evaluate(pdf))
-    self.assertEqual((2, 2), pdf.get_shape())
+    self.assertEqual((2, 2), pdf.shape)
 
   def testPdfXStretchedInBroadcastWhenLowerRank(self):
     a = [[1., 2], [2., 3]]
@@ -160,7 +160,7 @@ class BetaTest(tf.test.TestCase):
     x = [.5, .5]
     pdf = beta_lib.Beta(a, b).prob(x)
     self.assertAllClose([[1., 3. / 2], [3. / 2, 15. / 8]], self.evaluate(pdf))
-    self.assertEqual((2, 2), pdf.get_shape())
+    self.assertEqual((2, 2), pdf.shape)
 
   def testLogPdfOnBoundaryIsFiniteWhenAlphaIsOne(self):
     b = [[0.01, 0.1, 1., 2], [5., 10., 2., 3]]
@@ -171,7 +171,7 @@ class BetaTest(tf.test.TestCase):
     a = [1., 2, 3]
     b = [2., 4, 1.2]
     dist = beta_lib.Beta(a, b)
-    self.assertEqual(dist.mean().get_shape(), (3,))
+    self.assertEqual(dist.mean().shape, (3,))
     if not stats:
       return
     expected_mean = stats.beta.mean(a, b)
@@ -181,7 +181,7 @@ class BetaTest(tf.test.TestCase):
     a = [1., 2, 3]
     b = [2., 4, 1.2]
     dist = beta_lib.Beta(a, b)
-    self.assertEqual(dist.variance().get_shape(), (3,))
+    self.assertEqual(dist.variance().shape, (3,))
     if not stats:
       return
     expected_variance = stats.beta.var(a, b)
@@ -192,7 +192,7 @@ class BetaTest(tf.test.TestCase):
     b = np.array([2., 4, 1.2])
     expected_mode = (a - 1) / (a + b - 2)
     dist = beta_lib.Beta(a, b)
-    self.assertEqual(dist.mode().get_shape(), (3,))
+    self.assertEqual(dist.mode().shape, (3,))
     self.assertAllClose(expected_mode, self.evaluate(dist.mode()))
 
   def testBetaModeInvalid(self):
@@ -215,7 +215,7 @@ class BetaTest(tf.test.TestCase):
 
     expected_mode = (a - 1) / (a + b - 2)
     expected_mode[0] = np.nan
-    self.assertEqual((3,), dist.mode().get_shape())
+    self.assertEqual((3,), dist.mode().shape)
     self.assertAllClose(expected_mode, self.evaluate(dist.mode()))
 
     a = np.array([2., 2, 3])
@@ -224,14 +224,14 @@ class BetaTest(tf.test.TestCase):
 
     expected_mode = (a - 1) / (a + b - 2)
     expected_mode[0] = np.nan
-    self.assertEqual((3,), dist.mode().get_shape())
+    self.assertEqual((3,), dist.mode().shape)
     self.assertAllClose(expected_mode, self.evaluate(dist.mode()))
 
   def testBetaEntropy(self):
     a = [1., 2, 3]
     b = [2., 4, 1.2]
     dist = beta_lib.Beta(a, b)
-    self.assertEqual(dist.entropy().get_shape(), (3,))
+    self.assertEqual(dist.entropy().shape, (3,))
     if not stats:
       return
     expected_entropy = stats.beta.entropy(a, b)
@@ -351,7 +351,7 @@ class BetaTest(tf.test.TestCase):
 
       kl = kullback_leibler.kl_divergence(d1, d2)
       kl_val = self.evaluate(kl)
-      self.assertEqual(kl.get_shape(), shape)
+      self.assertEqual(kl.shape, shape)
       self.assertAllClose(kl_val, kl_expected)
 
       # Make sure KL(d1||d1) is 0

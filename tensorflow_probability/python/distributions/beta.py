@@ -220,7 +220,7 @@ class Beta(distribution.Distribution):
     return tf.shape(self.total_concentration)
 
   def _batch_shape(self):
-    return self.total_concentration.get_shape()
+    return self.total_concentration.shape
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)

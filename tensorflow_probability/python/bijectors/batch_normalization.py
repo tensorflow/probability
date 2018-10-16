@@ -190,7 +190,7 @@ class BatchNormalization(bijector.Bijector):
     broadcast_shape[self.batchnorm.axis[0]] = x.shape[self.batchnorm.axis[0]]
     def _broadcast(v):
       if (v is not None and
-          len(v.get_shape()) != ndims and
+          len(v.shape) != ndims and
           reduction_axes != list(range(ndims - 1))):
         return tf.reshape(v, broadcast_shape)
       return v

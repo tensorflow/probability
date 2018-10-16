@@ -56,14 +56,14 @@ class DirichletMultinomialTest(tf.test.TestCase):
     n = [[5.]]
     with self.cached_session():
       dist = ds.DirichletMultinomial(n, alpha)
-      self.assertEqual([1, 1], dist.total_count.get_shape())
+      self.assertEqual([1, 1], dist.total_count.shape)
       self.assertAllClose(n, dist.total_count.eval())
 
   def testAlphaProperty(self):
     alpha = [[1., 2, 3]]
     with self.cached_session():
       dist = ds.DirichletMultinomial(1, alpha)
-      self.assertEqual([1, 3], dist.concentration.get_shape())
+      self.assertEqual([1, 3], dist.concentration.shape)
       self.assertAllClose(alpha, dist.concentration.eval())
 
   def testPmfNandCountsAgree(self):
@@ -107,7 +107,7 @@ class DirichletMultinomialTest(tf.test.TestCase):
       dist = ds.DirichletMultinomial(1., alpha)
       pmf = dist.prob(counts)
       self.assertAllClose(1 / 3., pmf.eval())
-      self.assertEqual((), pmf.get_shape())
+      self.assertEqual((), pmf.shape)
 
   def testPmfBothZeroBatchesNontrivialN(self):
     # The probabilities of one vote falling into class k is the mean for class
@@ -119,7 +119,7 @@ class DirichletMultinomialTest(tf.test.TestCase):
       dist = ds.DirichletMultinomial(5., alpha)
       pmf = dist.prob(counts)
       self.assertAllClose(1 / 7., pmf.eval())
-      self.assertEqual((), pmf.get_shape())
+      self.assertEqual((), pmf.shape)
 
   def testPmfBothZeroBatchesMultidimensionalN(self):
     # The probabilities of one vote falling into class k is the mean for class
@@ -131,7 +131,7 @@ class DirichletMultinomialTest(tf.test.TestCase):
       dist = ds.DirichletMultinomial(n, alpha)
       pmf = dist.prob(counts)
       self.assertAllClose([[1 / 7., 1 / 7., 1 / 7.]] * 4, pmf.eval())
-      self.assertEqual((4, 3), pmf.get_shape())
+      self.assertEqual((4, 3), pmf.shape)
 
   def testPmfAlphaStretchedInBroadcastWhenSameRank(self):
     # The probabilities of one vote falling into class k is the mean for class
@@ -142,7 +142,7 @@ class DirichletMultinomialTest(tf.test.TestCase):
       dist = ds.DirichletMultinomial([1.], alpha)
       pmf = dist.prob(counts)
       self.assertAllClose([1 / 3., 2 / 3.], pmf.eval())
-      self.assertAllEqual([2], pmf.get_shape())
+      self.assertAllEqual([2], pmf.shape)
 
   def testPmfAlphaStretchedInBroadcastWhenLowerRank(self):
     # The probabilities of one vote falling into class k is the mean for class
@@ -152,7 +152,7 @@ class DirichletMultinomialTest(tf.test.TestCase):
       counts = [[1., 0], [0., 1]]
       pmf = ds.DirichletMultinomial(1., alpha).prob(counts)
       self.assertAllClose([1 / 3., 2 / 3.], pmf.eval())
-      self.assertAllEqual([2], pmf.get_shape())
+      self.assertAllEqual([2], pmf.shape)
 
   def testPmfCountsStretchedInBroadcastWhenSameRank(self):
     # The probabilities of one vote falling into class k is the mean for class
@@ -162,7 +162,7 @@ class DirichletMultinomialTest(tf.test.TestCase):
       counts = [[1., 0]]
       pmf = ds.DirichletMultinomial([1., 1.], alpha).prob(counts)
       self.assertAllClose([1 / 3., 2 / 5.], pmf.eval())
-      self.assertAllEqual([2], pmf.get_shape())
+      self.assertAllEqual([2], pmf.shape)
 
   def testPmfCountsStretchedInBroadcastWhenLowerRank(self):
     # The probabilities of one vote falling into class k is the mean for class
@@ -172,7 +172,7 @@ class DirichletMultinomialTest(tf.test.TestCase):
       counts = [1., 0]
       pmf = ds.DirichletMultinomial(1., alpha).prob(counts)
       self.assertAllClose([1 / 3., 2 / 5.], pmf.eval())
-      self.assertAllEqual([2], pmf.get_shape())
+      self.assertAllEqual([2], pmf.shape)
 
   def testPmfForOneVoteIsTheMeanWithOneRecordInput(self):
     # The probabilities of one vote falling into class k is the mean for class
@@ -284,7 +284,7 @@ class DirichletMultinomialTest(tf.test.TestCase):
         covariance = dist.covariance()
         expected_covariance = n * (n + alpha_0) / (1 + alpha_0) * shared_matrix
 
-        self.assertEqual([2, 2], covariance.get_shape())
+        self.assertEqual([2, 2], covariance.shape)
         self.assertAllClose(expected_covariance, covariance.eval())
 
   def testCovarianceNAlphaBroadcast(self):
@@ -322,7 +322,7 @@ class DirichletMultinomialTest(tf.test.TestCase):
       expected_covariance = shared_matrix * (
           ns * (ns + alpha_0) / (1 + alpha_0))[..., tf.newaxis]
 
-      self.assertEqual([4, 3, 3], covariance.get_shape())
+      self.assertEqual([4, 3, 3], covariance.shape)
       self.assertAllClose(expected_covariance, covariance.eval())
 
   def testCovarianceMultidimensional(self):
@@ -338,8 +338,8 @@ class DirichletMultinomialTest(tf.test.TestCase):
 
       covariance = dist.covariance()
       covariance2 = dist2.covariance()
-      self.assertEqual([3, 5, 4, 4], covariance.get_shape())
-      self.assertEqual([6, 3, 3, 3], covariance2.get_shape())
+      self.assertEqual([3, 5, 4, 4], covariance.shape)
+      self.assertEqual([6, 3, 3, 3], covariance2.shape)
 
   def testZeroCountsResultsInPmfEqualToOne(self):
     # There is only one way for zero items to be selected, and this happens with
@@ -350,7 +350,7 @@ class DirichletMultinomialTest(tf.test.TestCase):
       dist = ds.DirichletMultinomial(0., alpha)
       pmf = dist.prob(counts)
       self.assertAllClose(1.0, pmf.eval())
-      self.assertEqual((), pmf.get_shape())
+      self.assertEqual((), pmf.shape)
 
   def testLargeTauGivesPreciseProbabilities(self):
     # If tau is large, we are doing coin flips with probability mu.
@@ -365,7 +365,7 @@ class DirichletMultinomialTest(tf.test.TestCase):
       dist = ds.DirichletMultinomial(1., alpha)
       pmf = dist.prob(counts)
       self.assertAllClose(0.8, pmf.eval(), atol=1e-4)
-      self.assertEqual((), pmf.get_shape())
+      self.assertEqual((), pmf.shape)
 
     # Two (three sided) coin flips.  Prob[coin 3] = 0.8.
     counts = [0., 0, 2]
@@ -373,7 +373,7 @@ class DirichletMultinomialTest(tf.test.TestCase):
       dist = ds.DirichletMultinomial(2., alpha)
       pmf = dist.prob(counts)
       self.assertAllClose(0.8**2, pmf.eval(), atol=1e-2)
-      self.assertEqual((), pmf.get_shape())
+      self.assertEqual((), pmf.shape)
 
     # Three (three sided) coin flips.
     counts = [1., 0, 2]
@@ -381,7 +381,7 @@ class DirichletMultinomialTest(tf.test.TestCase):
       dist = ds.DirichletMultinomial(3., alpha)
       pmf = dist.prob(counts)
       self.assertAllClose(3 * 0.1 * 0.8 * 0.8, pmf.eval(), atol=1e-2)
-      self.assertEqual((), pmf.get_shape())
+      self.assertEqual((), pmf.shape)
 
   def testSmallTauPrefersCorrelatedResults(self):
     # If tau is small, then correlation between draws is large, so draws that
@@ -396,7 +396,7 @@ class DirichletMultinomialTest(tf.test.TestCase):
       dist = ds.DirichletMultinomial(1., alpha)
       pmf = dist.prob(counts)
       self.assertAllClose(0.5, pmf.eval())
-      self.assertEqual((), pmf.get_shape())
+      self.assertEqual((), pmf.shape)
 
     # If there are two draws, it is much more likely that they are the same.
     counts_same = [2., 0]
@@ -406,7 +406,7 @@ class DirichletMultinomialTest(tf.test.TestCase):
       pmf_same = dist.prob(counts_same)
       pmf_different = dist.prob(counts_different)
       self.assertLess(5 * pmf_different.eval(), pmf_same.eval())
-      self.assertEqual((), pmf_same.get_shape())
+      self.assertEqual((), pmf_same.shape)
 
   def testNonStrictTurnsOffAllChecks(self):
     # Make totally invalid input.
@@ -440,9 +440,9 @@ class DirichletMultinomialTest(tf.test.TestCase):
           dist.mean(),
           dist.covariance(),
       ])
-      self.assertAllEqual([4, 3, 2], sample_mean.get_shape())
+      self.assertAllEqual([4, 3, 2], sample_mean.shape)
       self.assertAllClose(actual_mean_, sample_mean_, atol=0., rtol=0.20)
-      self.assertAllEqual([4, 3, 2, 2], sample_covariance.get_shape())
+      self.assertAllEqual([4, 3, 2, 2], sample_covariance.shape)
       self.assertAllClose(
           actual_covariance_, sample_covariance_, atol=0., rtol=0.20)
 
@@ -468,9 +468,9 @@ class DirichletMultinomialTest(tf.test.TestCase):
           dist.mean(),
           dist.covariance(),
       ])
-      self.assertAllEqual([4], sample_mean.get_shape())
+      self.assertAllEqual([4], sample_mean.shape)
       self.assertAllClose(actual_mean_, sample_mean_, atol=0., rtol=0.20)
-      self.assertAllEqual([4, 4], sample_covariance.get_shape())
+      self.assertAllEqual([4, 4], sample_covariance.shape)
       self.assertAllClose(
           actual_covariance_, sample_covariance_, atol=0., rtol=0.20)
 

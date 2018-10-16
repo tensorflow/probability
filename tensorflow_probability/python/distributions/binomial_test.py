@@ -51,21 +51,21 @@ class BinomialTest(tf.test.TestCase):
     p = [[0.1, 0.2, 0.7], [0.2, 0.3, 0.5]]
     n = [[3.], [4]]
     binom = tfd.Binomial(total_count=n, probs=p)
-    self.assertEqual((2, 1), binom.total_count.get_shape())
+    self.assertEqual((2, 1), binom.total_count.shape)
     self.assertAllClose(n, self.evaluate(binom.total_count))
 
   def testPProperty(self):
     p = [[0.1, 0.2, 0.7]]
     binom = tfd.Binomial(total_count=3., probs=p)
-    self.assertEqual((1, 3), binom.probs.get_shape())
-    self.assertEqual((1, 3), binom.logits.get_shape())
+    self.assertEqual((1, 3), binom.probs.shape)
+    self.assertEqual((1, 3), binom.logits.shape)
     self.assertAllClose(p, self.evaluate(binom.probs))
 
   def testLogitsProperty(self):
     logits = [[0., 9., -0.5]]
     binom = tfd.Binomial(total_count=3., logits=logits)
-    self.assertEqual((1, 3), binom.probs.get_shape())
-    self.assertEqual((1, 3), binom.logits.get_shape())
+    self.assertEqual((1, 3), binom.probs.shape)
+    self.assertEqual((1, 3), binom.logits.shape)
     self.assertAllClose(logits, self.evaluate(binom.logits))
 
   def testPmfAndCdfNandCountsAgree(self):
@@ -117,8 +117,8 @@ class BinomialTest(tf.test.TestCase):
     cdf = binom.cdf(counts)
     self.assertAllClose(0.5, self.evaluate(pmf))
     self.assertAllClose(stats.binom.cdf(counts, n=1, p=p), self.evaluate(cdf))
-    self.assertEqual((), pmf.get_shape())
-    self.assertEqual((), cdf.get_shape())
+    self.assertEqual((), pmf.shape)
+    self.assertEqual((), cdf.shape)
 
   def testPmfAndCdfBothZeroBatchesNontrivialN(self):
     # Both zero-batches.  No broadcast
@@ -129,8 +129,8 @@ class BinomialTest(tf.test.TestCase):
     cdf = binom.cdf(counts)
     self.assertAllClose(stats.binom.pmf(counts, n=5., p=p), self.evaluate(pmf))
     self.assertAllClose(stats.binom.cdf(counts, n=5., p=p), self.evaluate(cdf))
-    self.assertEqual((), pmf.get_shape())
-    self.assertEqual((), cdf.get_shape())
+    self.assertEqual((), pmf.shape)
+    self.assertEqual((), cdf.shape)
 
   def testPmfAndCdfPStretchedInBroadcastWhenSameRank(self):
     p = [[0.1, 0.9]]
@@ -140,8 +140,8 @@ class BinomialTest(tf.test.TestCase):
     cdf = binom.cdf(counts)
     self.assertAllClose(stats.binom.pmf(counts, n=3., p=p), self.evaluate(pmf))
     self.assertAllClose(stats.binom.cdf(counts, n=3., p=p), self.evaluate(cdf))
-    self.assertEqual((1, 2), pmf.get_shape())
-    self.assertEqual((1, 2), cdf.get_shape())
+    self.assertEqual((1, 2), pmf.shape)
+    self.assertEqual((1, 2), cdf.shape)
 
   def testPmfAndCdfPStretchedInBroadcastWhenLowerRank(self):
     p = [0.1, 0.4]
@@ -151,15 +151,15 @@ class BinomialTest(tf.test.TestCase):
     cdf = binom.cdf(counts)
     self.assertAllClose([[0.1, 0.4], [0.9, 0.6]], self.evaluate(pmf))
     self.assertAllClose([[1.0, 1.0], [0.9, 0.6]], self.evaluate(cdf))
-    self.assertEqual((2, 2), pmf.get_shape())
-    self.assertEqual((2, 2), cdf.get_shape())
+    self.assertEqual((2, 2), pmf.shape)
+    self.assertEqual((2, 2), cdf.shape)
 
   def testBinomialMean(self):
     n = 5.
     p = [0.1, 0.2, 0.7]
     binom = tfd.Binomial(total_count=n, probs=p)
     expected_means = stats.binom.mean(n, p)
-    self.assertEqual((3,), binom.mean().get_shape())
+    self.assertEqual((3,), binom.mean().shape)
     self.assertAllClose(expected_means, self.evaluate(binom.mean()))
 
   def testBinomialVariance(self):
@@ -167,7 +167,7 @@ class BinomialTest(tf.test.TestCase):
     p = [0.1, 0.2, 0.7]
     binom = tfd.Binomial(total_count=n, probs=p)
     expected_variances = stats.binom.var(n, p)
-    self.assertEqual((3,), binom.variance().get_shape())
+    self.assertEqual((3,), binom.variance().shape)
     self.assertAllClose(expected_variances, self.evaluate(binom.variance()))
 
   def testBinomialMode(self):
@@ -175,7 +175,7 @@ class BinomialTest(tf.test.TestCase):
     p = [0.1, 0.2, 0.7]
     binom = tfd.Binomial(total_count=n, probs=p)
     expected_modes = [0., 1, 4]
-    self.assertEqual((3,), binom.mode().get_shape())
+    self.assertEqual((3,), binom.mode().shape)
     self.assertAllClose(expected_modes, self.evaluate(binom.mode()))
 
   def testBinomialMultipleMode(self):
@@ -186,7 +186,7 @@ class BinomialTest(tf.test.TestCase):
     # (n + 1) * p and (n + 1) * p - 1. In this case, we get back
     # the larger of the two modes.
     expected_modes = [1., 2, 7]
-    self.assertEqual((3,), binom.mode().get_shape())
+    self.assertEqual((3,), binom.mode().shape)
     self.assertAllClose(expected_modes, self.evaluate(binom.mode()))
 
 

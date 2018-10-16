@@ -224,7 +224,7 @@ class StochasticGradientLangevinDynamics(tf.train.Optimizer):
   def _create_slots(self, var_list):
     for v in var_list:
       init_rms = tf.ones_initializer(dtype=v.dtype)
-      self._get_or_make_slot_with_initializer(v, init_rms, v.get_shape(),
+      self._get_or_make_slot_with_initializer(v, init_rms, v.shape,
                                               v.dtype, 'rms', self._name)
 
   def _prepare(self):

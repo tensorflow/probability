@@ -112,7 +112,7 @@ class Geometric(distribution.Distribution):
     return tf.shape(self._probs)
 
   def _batch_shape(self):
-    return self.probs.get_shape()
+    return self.probs.shape
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)

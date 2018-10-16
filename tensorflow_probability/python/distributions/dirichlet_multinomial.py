@@ -233,14 +233,14 @@ class DirichletMultinomial(distribution.Distribution):
     return tf.shape(self.total_concentration)
 
   def _batch_shape(self):
-    return self.total_concentration.get_shape()
+    return self.total_concentration.shape
 
   def _event_shape_tensor(self):
     return tf.shape(self.concentration)[-1:]
 
   def _event_shape(self):
     # Event shape depends only on total_concentration, not "n".
-    return self.concentration.get_shape().with_rank_at_least(1)[-1:]
+    return self.concentration.shape.with_rank_at_least(1)[-1:]
 
   def _sample_n(self, n, seed=None):
     n_draws = tf.cast(self.total_count, dtype=tf.int32)

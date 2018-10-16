@@ -154,8 +154,8 @@ class Logistic(distribution.Distribution):
     return tf.broadcast_dynamic_shape(tf.shape(self.loc), tf.shape(self.scale))
 
   def _batch_shape(self):
-    return tf.broadcast_static_shape(self.loc.get_shape(),
-                                     self.scale.get_shape())
+    return tf.broadcast_static_shape(self.loc.shape,
+                                     self.scale.shape)
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)

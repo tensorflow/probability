@@ -69,7 +69,7 @@ class GammaGammaTest(tf.test.TestCase):
     gg = tfd.GammaGamma(
         concentration=alpha, mixing_concentration=alpha0, mixing_rate=beta0)
     log_pdf = gg.log_prob(x)
-    self.assertEqual(log_pdf.get_shape(), (5,))
+    self.assertEqual(log_pdf.shape, (5,))
     self.assertAllClose(self.evaluate(log_pdf), expected_log_pdf)
 
   def testGammaGammaLogPDFAtZero(self):
@@ -92,7 +92,7 @@ class GammaGammaTest(tf.test.TestCase):
     gg = tfd.GammaGamma(
         concentration=alpha, mixing_concentration=alpha0, mixing_rate=beta0)
     log_pdf = gg.log_prob(x)
-    self.assertEqual(log_pdf.get_shape(), (6, 2))
+    self.assertEqual(log_pdf.shape, (6, 2))
 
   def testGammaGammaLogPDFMultidimensionalBroadcasting(self):
     batch_size = 6
@@ -104,7 +104,7 @@ class GammaGammaTest(tf.test.TestCase):
     gg = tfd.GammaGamma(
         concentration=alpha, mixing_concentration=alpha0, mixing_rate=beta0)
     log_pdf = gg.log_prob(x)
-    self.assertEqual(log_pdf.get_shape(), (6, 2))
+    self.assertEqual(log_pdf.shape, (6, 2))
 
   def testGammaGammaMeanAllDefined(self):
     alpha_v = np.array([2., 4.])
@@ -116,7 +116,7 @@ class GammaGammaTest(tf.test.TestCase):
         concentration=alpha_v,
         mixing_concentration=alpha0_v,
         mixing_rate=beta0_v)
-    self.assertEqual(gg.mean().get_shape(), (2,))
+    self.assertEqual(gg.mean().shape, (2,))
     self.assertAllClose(self.evaluate(gg.mean()), expected_mean)
 
   def testGammaGammaMeanAllowNanStats(self):
@@ -144,7 +144,7 @@ class GammaGammaTest(tf.test.TestCase):
         concentration=alpha_v,
         mixing_concentration=alpha0_v,
         mixing_rate=beta0_v)
-    self.assertEqual(gg.mean().get_shape(), (2,))
+    self.assertEqual(gg.mean().shape, (2,))
     self.assertAllClose(self.evaluate(gg.mean()), expected_mean)
 
   def testGammaGammaSample(self):
@@ -160,7 +160,7 @@ class GammaGammaTest(tf.test.TestCase):
           mixing_rate=beta0_v)
       samples = gg.sample(n, seed=123456)
       sample_values = self.evaluate(samples)
-      self.assertEqual(samples.get_shape(), (n,))
+      self.assertEqual(samples.shape, (n,))
       self.assertEqual(sample_values.shape, (n,))
       self.assertAllClose(
           sample_values.mean(), self.evaluate(gg.mean()), rtol=.01)
@@ -177,7 +177,7 @@ class GammaGammaTest(tf.test.TestCase):
         mixing_rate=beta0_v)
     samples = gg.sample(n, seed=123456)
     sample_values = self.evaluate(samples)
-    self.assertEqual(samples.get_shape(), (n, 10, 100))
+    self.assertEqual(samples.shape, (n, 10, 100))
     self.assertEqual(sample_values.shape, (n, 10, 100))
     self.assertAllClose(
         sample_values.mean(axis=0), self.evaluate(gg.mean()), rtol=.08)

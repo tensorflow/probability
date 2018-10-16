@@ -170,7 +170,7 @@ class GammaGamma(distribution.Distribution):
   def _batch_shape(self):
     tensors = [self.concentration, self.mixing_concentration, self.mixing_rate]
     return functools.reduce(tf.broadcast_static_shape,
-                            [tensor.get_shape() for tensor in tensors])
+                            [tensor.shape for tensor in tensors])
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)

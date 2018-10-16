@@ -93,19 +93,19 @@ def _pick_scalar_condition(pred, cond_true, cond_false):
 def _ones_like(x):
   """Convenience function attempts to statically construct `ones_like`."""
   # Should only be used for small vectors.
-  if x.get_shape().is_fully_defined():
-    return tf.ones(x.get_shape().as_list(), dtype=x.dtype)
+  if x.shape.is_fully_defined():
+    return tf.ones(x.shape.as_list(), dtype=x.dtype)
   return tf.ones_like(x)
 
 
 def _ndims_from_shape(shape):
   """Returns `Tensor`'s `rank` implied by a `Tensor` shape."""
-  if shape.get_shape().ndims not in (None, 1):
+  if shape.shape.ndims not in (None, 1):
     raise ValueError("input is not a valid shape: not 1D")
   if not shape.dtype.is_integer:
     raise TypeError("input is not a valid shape: wrong dtype")
-  if shape.get_shape().is_fully_defined():
-    return tf.constant(shape.get_shape().as_list()[0])
+  if shape.shape.is_fully_defined():
+    return tf.constant(shape.shape.as_list()[0])
   return tf.shape(shape)[0]
 
 
@@ -433,7 +433,7 @@ class TransformedDistribution(distribution_lib.Distribution):
     if self._is_maybe_event_override and isinstance(event_ndims, int):
       log_prob.set_shape(
           tf.broadcast_static_shape(
-              y.get_shape().with_rank_at_least(1)[:-event_ndims],
+              y.shape.with_rank_at_least(1)[:-event_ndims],
               self.batch_shape))
     return log_prob
 
@@ -459,7 +459,7 @@ class TransformedDistribution(distribution_lib.Distribution):
     if self._is_maybe_event_override and isinstance(event_ndims, int):
       prob.set_shape(
           tf.broadcast_static_shape(
-              y.get_shape().with_rank_at_least(1)[:-event_ndims],
+              y.shape.with_rank_at_least(1)[:-event_ndims],
               self.batch_shape))
     return prob
 
@@ -577,8 +577,8 @@ class TransformedDistribution(distribution_lib.Distribution):
 
     dynamic_assertions = []
 
-    if override_shape.get_shape().ndims is not None:
-      if override_shape.get_shape().ndims != 1:
+    if override_shape.shape.ndims is not None:
+      if override_shape.shape.ndims != 1:
         raise ValueError("shape override must be a vector")
     elif validate_args:
       dynamic_assertions += [tf.assert_rank(

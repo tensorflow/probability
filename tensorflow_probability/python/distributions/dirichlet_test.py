@@ -63,7 +63,7 @@ class DirichletTest(tf.test.TestCase):
   def testConcentrationProperty(self):
     alpha = [[1., 2, 3]]
     dist = dirichlet_lib.Dirichlet(alpha)
-    self.assertEqual([1, 3], dist.concentration.get_shape())
+    self.assertEqual([1, 3], dist.concentration.shape)
     self.assertAllClose(alpha, self.evaluate(dist.concentration))
 
   def testPdfXProper(self):
@@ -102,7 +102,7 @@ class DirichletTest(tf.test.TestCase):
     dist = dirichlet_lib.Dirichlet(alpha)
     pdf = dist.prob(x)
     self.assertAllClose(1., self.evaluate(pdf))
-    self.assertEqual((), pdf.get_shape())
+    self.assertEqual((), pdf.shape)
 
   def testPdfZeroBatchesNontrivialX(self):
     alpha = [1., 2]
@@ -110,7 +110,7 @@ class DirichletTest(tf.test.TestCase):
     dist = dirichlet_lib.Dirichlet(alpha)
     pdf = dist.prob(x)
     self.assertAllClose(7. / 5, self.evaluate(pdf))
-    self.assertEqual((), pdf.get_shape())
+    self.assertEqual((), pdf.shape)
 
   def testPdfUniformZeroBatches(self):
     # Corresponds to a uniform distribution
@@ -119,7 +119,7 @@ class DirichletTest(tf.test.TestCase):
     dist = dirichlet_lib.Dirichlet(alpha)
     pdf = dist.prob(x)
     self.assertAllClose([2., 2.], self.evaluate(pdf))
-    self.assertEqual((2), pdf.get_shape())
+    self.assertEqual((2), pdf.shape)
 
   def testPdfAlphaStretchedInBroadcastWhenSameRank(self):
     alpha = [[1., 2]]
@@ -127,33 +127,33 @@ class DirichletTest(tf.test.TestCase):
     dist = dirichlet_lib.Dirichlet(alpha)
     pdf = dist.prob(x)
     self.assertAllClose([1., 7. / 5], self.evaluate(pdf))
-    self.assertEqual((2), pdf.get_shape())
+    self.assertEqual((2), pdf.shape)
 
   def testPdfAlphaStretchedInBroadcastWhenLowerRank(self):
     alpha = [1., 2]
     x = [[.5, .5], [.2, .8]]
     pdf = dirichlet_lib.Dirichlet(alpha).prob(x)
     self.assertAllClose([1., 8. / 5], self.evaluate(pdf))
-    self.assertEqual((2), pdf.get_shape())
+    self.assertEqual((2), pdf.shape)
 
   def testPdfXStretchedInBroadcastWhenSameRank(self):
     alpha = [[1., 2], [2., 3]]
     x = [[.5, .5]]
     pdf = dirichlet_lib.Dirichlet(alpha).prob(x)
     self.assertAllClose([1., 3. / 2], self.evaluate(pdf))
-    self.assertEqual((2), pdf.get_shape())
+    self.assertEqual((2), pdf.shape)
 
   def testPdfXStretchedInBroadcastWhenLowerRank(self):
     alpha = [[1., 2], [2., 3]]
     x = [.5, .5]
     pdf = dirichlet_lib.Dirichlet(alpha).prob(x)
     self.assertAllClose([1., 3. / 2], self.evaluate(pdf))
-    self.assertEqual((2), pdf.get_shape())
+    self.assertEqual((2), pdf.shape)
 
   def testMean(self):
     alpha = [1., 2, 3]
     dirichlet = dirichlet_lib.Dirichlet(concentration=alpha)
-    self.assertEqual(dirichlet.mean().get_shape(), [3])
+    self.assertEqual(dirichlet.mean().shape, [3])
     if not stats:
       return
     expected_mean = stats.dirichlet.mean(alpha)
@@ -200,7 +200,7 @@ class DirichletTest(tf.test.TestCase):
     alpha = [1., 2, 3]
     denominator = np.sum(alpha)**2 * (np.sum(alpha) + 1)
     dirichlet = dirichlet_lib.Dirichlet(concentration=alpha)
-    self.assertEqual(dirichlet.covariance().get_shape(), (3, 3))
+    self.assertEqual(dirichlet.covariance().shape, (3, 3))
     if not stats:
       return
     expected_covariance = np.diag(stats.dirichlet.var(alpha))
@@ -213,7 +213,7 @@ class DirichletTest(tf.test.TestCase):
     alpha = np.array([1.1, 2, 3])
     expected_mode = (alpha - 1) / (np.sum(alpha) - 3)
     dirichlet = dirichlet_lib.Dirichlet(concentration=alpha)
-    self.assertEqual(dirichlet.mode().get_shape(), [3])
+    self.assertEqual(dirichlet.mode().shape, [3])
     self.assertAllClose(self.evaluate(dirichlet.mode()), expected_mode)
 
   def testModeInvalid(self):
@@ -229,13 +229,13 @@ class DirichletTest(tf.test.TestCase):
         concentration=alpha, allow_nan_stats=True)
     expected_mode = np.zeros_like(alpha) + np.nan
 
-    self.assertEqual(dirichlet.mode().get_shape(), [3])
+    self.assertEqual(dirichlet.mode().shape, [3])
     self.assertAllClose(self.evaluate(dirichlet.mode()), expected_mode)
 
   def testEntropy(self):
     alpha = [1., 2, 3]
     dirichlet = dirichlet_lib.Dirichlet(concentration=alpha)
-    self.assertEqual(dirichlet.entropy().get_shape(), ())
+    self.assertEqual(dirichlet.entropy().shape, ())
     if not stats:
       return
     expected_entropy = stats.dirichlet.entropy(alpha)
@@ -281,7 +281,7 @@ class DirichletTest(tf.test.TestCase):
     kl_sample_val = self.evaluate(kl_sample)
     kl_actual_val = self.evaluate(kl_actual)
 
-    self.assertEqual(conc1.shape[:-1], kl_actual.get_shape())
+    self.assertEqual(conc1.shape[:-1], kl_actual.shape)
 
     if not special:
       return

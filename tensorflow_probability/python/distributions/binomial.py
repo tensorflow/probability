@@ -201,8 +201,8 @@ class Binomial(distribution.Distribution):
         tf.shape(self.total_count), tf.shape(self.probs))
 
   def _batch_shape(self):
-    return tf.broadcast_static_shape(self.total_count.get_shape(),
-                                     self.probs.get_shape())
+    return tf.broadcast_static_shape(self.total_count.shape,
+                                     self.probs.shape)
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)

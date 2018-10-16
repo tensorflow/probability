@@ -175,7 +175,7 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
         self._temperature_2d = tf.reshape(
             self._temperature, [-1, 1], name="temperature_2d")
 
-      logits_shape_static = self._logits.get_shape().with_rank_at_least(1)
+      logits_shape_static = self._logits.shape.with_rank_at_least(1)
       if logits_shape_static.ndims is not None:
         self._batch_rank = tf.convert_to_tensor(
             logits_shape_static.ndims - 1, dtype=tf.int32, name="batch_rank")
@@ -219,13 +219,13 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
     return tf.shape(self._logits)[:-1]
 
   def _batch_shape(self):
-    return self.logits.get_shape()[:-1]
+    return self.logits.shape[:-1]
 
   def _event_shape_tensor(self):
     return tf.shape(self.logits)[-1:]
 
   def _event_shape(self):
-    return self.logits.get_shape().with_rank_at_least(1)[-1:]
+    return self.logits.shape.with_rank_at_least(1)[-1:]
 
   def _sample_n(self, n, seed=None):
     sample_shape = tf.concat([[n], tf.shape(self.logits)], 0)
@@ -254,9 +254,9 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
     x = self._assert_valid_sample(x)
     # broadcast logits or x if need be.
     logits = self.logits
-    if (not x.get_shape().is_fully_defined() or
-        not logits.get_shape().is_fully_defined() or
-        x.get_shape() != logits.get_shape()):
+    if (not x.shape.is_fully_defined() or
+        not logits.shape.is_fully_defined() or
+        x.shape != logits.shape):
       logits = tf.ones_like(x, dtype=logits.dtype) * logits
       x = tf.ones_like(logits, dtype=x.dtype) * x
     logits_shape = tf.shape(tf.reduce_sum(logits, axis=[-1]))

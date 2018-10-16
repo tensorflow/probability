@@ -54,7 +54,7 @@ class GetSamplesTest(tf.test.TestCase):
     n = 10
     seed = None
     z = _get_samples(dist, z, n, seed)
-    self.assertEqual((10,), z.get_shape())
+    self.assertEqual((10,), z.shape)
 
   def test_returns_z_if_z_provided(self):
     dist = tfd.Normal(loc=0., scale=1.)
@@ -62,7 +62,7 @@ class GetSamplesTest(tf.test.TestCase):
     n = None
     seed = None
     z = _get_samples(dist, z, n, seed)
-    self.assertEqual((10,), z.get_shape())
+    self.assertEqual((10,), z.shape)
 
 
 class ExpectationTest(tf.test.TestCase):

@@ -343,7 +343,7 @@ class ConvVariational(tf.test.TestCase):
       output_shape = tf.shape(expected_outputs)
       batch_shape = tf.expand_dims(input_shape[0], 0)
       channels = input_shape[-1]
-      rank = len(inputs.get_shape()) - 2
+      rank = len(inputs.shape) - 2
 
       seed_stream = tfd.SeedStream(layer.seed, salt='ConvFlipout')
 

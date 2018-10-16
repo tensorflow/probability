@@ -194,8 +194,8 @@ class InverseGamma(distribution.Distribution):
         tf.shape(self.concentration), tf.shape(self.rate))
 
   def _batch_shape(self):
-    return tf.broadcast_static_shape(self.concentration.get_shape(),
-                                     self.rate.get_shape())
+    return tf.broadcast_static_shape(self.concentration.shape,
+                                     self.rate.shape)
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)

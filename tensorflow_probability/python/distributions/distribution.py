@@ -1170,7 +1170,7 @@ class Distribution(_BaseDistribution):
     else:
       prod = np.prod(x_static_val, dtype=x.dtype.as_numpy_dtype())
 
-    ndims = x.get_shape().ndims  # != sample_ndims
+    ndims = x.shape.ndims  # != sample_ndims
     if ndims is None:
       # Maybe expand_dims.
       ndims = tf.rank(x)
@@ -1197,7 +1197,7 @@ class Distribution(_BaseDistribution):
     sample_shape = tf.TensorShape(
         tensor_util.constant_value(sample_shape))
 
-    ndims = x.get_shape().ndims
+    ndims = x.shape.ndims
     sample_ndims = sample_shape.ndims
     batch_ndims = self.batch_shape.ndims
     event_ndims = self.event_shape.ndims
@@ -1213,13 +1213,13 @@ class Distribution(_BaseDistribution):
     # Infer sample shape.
     if ndims is not None and sample_ndims is not None:
       shape = sample_shape.concatenate([None]*(ndims - sample_ndims))
-      x.set_shape(x.get_shape().merge_with(shape))
+      x.set_shape(x.shape.merge_with(shape))
 
     # Infer event shape.
     if ndims is not None and event_ndims is not None:
       shape = tf.TensorShape(
           [None]*(ndims - event_ndims)).concatenate(self.event_shape)
-      x.set_shape(x.get_shape().merge_with(shape))
+      x.set_shape(x.shape.merge_with(shape))
 
     # Infer batch shape.
     if batch_ndims is not None:
@@ -1231,7 +1231,7 @@ class Distribution(_BaseDistribution):
       if sample_ndims is not None and event_ndims is not None:
         shape = tf.TensorShape([None]*sample_ndims).concatenate(
             self.batch_shape).concatenate([None]*event_ndims)
-        x.set_shape(x.get_shape().merge_with(shape))
+        x.set_shape(x.shape.merge_with(shape))
 
     return x
 
@@ -1240,10 +1240,10 @@ class Distribution(_BaseDistribution):
     if static_shape.ndims is not None:
       return static_shape.ndims == 0
     shape = dynamic_shape_fn()
-    if (shape.get_shape().ndims is not None and
-        shape.get_shape()[0].value is not None):
+    if (shape.shape.ndims is not None and
+        shape.shape[0].value is not None):
       # If the static_shape is correctly written then we should never execute
       # this branch. We keep it just in case there's some unimagined corner
       # case.
-      return shape.get_shape().as_list() == [0]
+      return shape.shape.as_list() == [0]
     return tf.equal(tf.shape(shape)[0], 0)

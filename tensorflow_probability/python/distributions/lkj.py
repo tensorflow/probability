@@ -156,7 +156,7 @@ class LKJ(distribution.Distribution):
     return tf.shape(self.concentration)
 
   def _batch_shape(self):
-    return self.concentration.get_shape()
+    return self.concentration.shape
 
   def _event_shape_tensor(self):
     return tf.constant([self.dimension, self.dimension], dtype=tf.int32)

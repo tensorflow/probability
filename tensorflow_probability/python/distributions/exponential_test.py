@@ -52,10 +52,10 @@ class ExponentialTest(tf.test.TestCase):
     exponential = exponential_lib.Exponential(rate=lam)
 
     log_pdf = exponential.log_prob(x)
-    self.assertEqual(log_pdf.get_shape(), (6,))
+    self.assertEqual(log_pdf.shape, (6,))
 
     pdf = exponential.prob(x)
-    self.assertEqual(pdf.get_shape(), (6,))
+    self.assertEqual(pdf.shape, (6,))
 
     if not stats:
       return
@@ -79,7 +79,7 @@ class ExponentialTest(tf.test.TestCase):
     exponential = exponential_lib.Exponential(rate=lam)
 
     cdf = exponential.cdf(x)
-    self.assertEqual(cdf.get_shape(), (6,))
+    self.assertEqual(cdf.shape, (6,))
 
     if not stats:
       return
@@ -95,7 +95,7 @@ class ExponentialTest(tf.test.TestCase):
     exponential = exponential_lib.Exponential(rate=lam)
 
     log_survival = exponential.log_survival_function(x)
-    self.assertEqual(log_survival.get_shape(), (7,))
+    self.assertEqual(log_survival.shape, (7,))
 
     if not stats:
       return
@@ -105,7 +105,7 @@ class ExponentialTest(tf.test.TestCase):
   def testExponentialMean(self):
     lam_v = np.array([1.0, 4.0, 2.5])
     exponential = exponential_lib.Exponential(rate=lam_v)
-    self.assertEqual(exponential.mean().get_shape(), (3,))
+    self.assertEqual(exponential.mean().shape, (3,))
     if not stats:
       return
     expected_mean = stats.expon.mean(scale=1 / lam_v)
@@ -114,7 +114,7 @@ class ExponentialTest(tf.test.TestCase):
   def testExponentialVariance(self):
     lam_v = np.array([1.0, 4.0, 2.5])
     exponential = exponential_lib.Exponential(rate=lam_v)
-    self.assertEqual(exponential.variance().get_shape(), (3,))
+    self.assertEqual(exponential.variance().shape, (3,))
     if not stats:
       return
     expected_variance = stats.expon.var(scale=1 / lam_v)
@@ -124,7 +124,7 @@ class ExponentialTest(tf.test.TestCase):
   def testExponentialEntropy(self):
     lam_v = np.array([1.0, 4.0, 2.5])
     exponential = exponential_lib.Exponential(rate=lam_v)
-    self.assertEqual(exponential.entropy().get_shape(), (3,))
+    self.assertEqual(exponential.entropy().shape, (3,))
     if not stats:
       return
     expected_entropy = stats.expon.entropy(scale=1 / lam_v)
@@ -156,7 +156,7 @@ class ExponentialTest(tf.test.TestCase):
 
     n = 100000
     samples = exponential.sample(n, seed=138)
-    self.assertEqual(samples.get_shape(), (n, batch_size, 2))
+    self.assertEqual(samples.shape, (n, batch_size, 2))
 
     sample_values = self.evaluate(samples)
 

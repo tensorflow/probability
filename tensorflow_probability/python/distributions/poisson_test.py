@@ -57,11 +57,11 @@ class PoissonTest(test_case.TestCase):
     x = [-3., -0.5, 0., 2., 2.2, 3., 3.1, 4., 5., 5.5, 6., 7.]
     poisson = self._make_poisson(rate=lam)
     log_pmf = poisson.log_prob(x)
-    self.assertEqual(log_pmf.get_shape(), (batch_size,))
+    self.assertEqual(log_pmf.shape, (batch_size,))
     self.assertAllClose(self.evaluate(log_pmf), stats.poisson.logpmf(x, lam_v))
 
     pmf = poisson.prob(x)
-    self.assertEqual(pmf.get_shape(), (batch_size,))
+    self.assertEqual(pmf.shape, (batch_size,))
     self.assertAllClose(self.evaluate(pmf), stats.poisson.pmf(x, lam_v))
 
   def testPoissonLogPmfGradient(self):
@@ -104,11 +104,11 @@ class PoissonTest(test_case.TestCase):
 
     poisson = self._make_poisson(rate=lam)
     log_pmf = poisson.log_prob(x)
-    self.assertEqual(log_pmf.get_shape(), (6, 3))
+    self.assertEqual(log_pmf.shape, (6, 3))
     self.assertAllClose(self.evaluate(log_pmf), stats.poisson.logpmf(x, lam_v))
 
     pmf = poisson.prob(x)
-    self.assertEqual(pmf.get_shape(), (6, 3))
+    self.assertEqual(pmf.shape, (6, 3))
     self.assertAllClose(self.evaluate(pmf), stats.poisson.pmf(x, lam_v))
 
   def testPoissonCdf(self):
@@ -119,11 +119,11 @@ class PoissonTest(test_case.TestCase):
 
     poisson = self._make_poisson(rate=lam)
     log_cdf = poisson.log_cdf(x)
-    self.assertEqual(log_cdf.get_shape(), (batch_size,))
+    self.assertEqual(log_cdf.shape, (batch_size,))
     self.assertAllClose(self.evaluate(log_cdf), stats.poisson.logcdf(x, lam_v))
 
     cdf = poisson.cdf(x)
-    self.assertEqual(cdf.get_shape(), (batch_size,))
+    self.assertEqual(cdf.shape, (batch_size,))
     self.assertAllClose(self.evaluate(cdf), stats.poisson.cdf(x, lam_v))
 
   def testPoissonCdfGradient(self):
@@ -151,17 +151,17 @@ class PoissonTest(test_case.TestCase):
 
     poisson = self._make_poisson(rate=lam)
     log_cdf = poisson.log_cdf(x)
-    self.assertEqual(log_cdf.get_shape(), (6, 3))
+    self.assertEqual(log_cdf.shape, (6, 3))
     self.assertAllClose(self.evaluate(log_cdf), stats.poisson.logcdf(x, lam_v))
 
     cdf = poisson.cdf(x)
-    self.assertEqual(cdf.get_shape(), (6, 3))
+    self.assertEqual(cdf.shape, (6, 3))
     self.assertAllClose(self.evaluate(cdf), stats.poisson.cdf(x, lam_v))
 
   def testPoissonMean(self):
     lam_v = [1.0, 3.0, 2.5]
     poisson = self._make_poisson(rate=lam_v)
-    self.assertEqual(poisson.mean().get_shape(), (3,))
+    self.assertEqual(poisson.mean().shape, (3,))
     self.assertAllClose(
         self.evaluate(poisson.mean()), stats.poisson.mean(lam_v))
     self.assertAllClose(self.evaluate(poisson.mean()), lam_v)
@@ -169,7 +169,7 @@ class PoissonTest(test_case.TestCase):
   def testPoissonVariance(self):
     lam_v = [1.0, 3.0, 2.5]
     poisson = self._make_poisson(rate=lam_v)
-    self.assertEqual(poisson.variance().get_shape(), (3,))
+    self.assertEqual(poisson.variance().shape, (3,))
     self.assertAllClose(
         self.evaluate(poisson.variance()), stats.poisson.var(lam_v))
     self.assertAllClose(self.evaluate(poisson.variance()), lam_v)
@@ -177,7 +177,7 @@ class PoissonTest(test_case.TestCase):
   def testPoissonStd(self):
     lam_v = [1.0, 3.0, 2.5]
     poisson = self._make_poisson(rate=lam_v)
-    self.assertEqual(poisson.stddev().get_shape(), (3,))
+    self.assertEqual(poisson.stddev().shape, (3,))
     self.assertAllClose(
         self.evaluate(poisson.stddev()), stats.poisson.std(lam_v))
     self.assertAllClose(self.evaluate(poisson.stddev()), np.sqrt(lam_v))
@@ -185,7 +185,7 @@ class PoissonTest(test_case.TestCase):
   def testPoissonMode(self):
     lam_v = [1.0, 3.0, 2.5, 3.2, 1.1, 0.05]
     poisson = self._make_poisson(rate=lam_v)
-    self.assertEqual(poisson.mode().get_shape(), (6,))
+    self.assertEqual(poisson.mode().shape, (6,))
     self.assertAllClose(self.evaluate(poisson.mode()), np.floor(lam_v))
 
   def testPoissonMultipleMode(self):
@@ -193,7 +193,7 @@ class PoissonTest(test_case.TestCase):
     poisson = self._make_poisson(rate=lam_v)
     # For the case where lam is an integer, the modes are: lam and lam - 1.
     # In this case, we get back the larger of the two modes.
-    self.assertEqual((6,), poisson.mode().get_shape())
+    self.assertEqual((6,), poisson.mode().shape)
     self.assertAllClose(lam_v, self.evaluate(poisson.mode()))
 
   def testPoissonSample(self):
@@ -205,7 +205,7 @@ class PoissonTest(test_case.TestCase):
     poisson = self._make_poisson(rate=lam)
     samples = poisson.sample(n, seed=123456)
     sample_values = self.evaluate(samples)
-    self.assertEqual(samples.get_shape(), (n,))
+    self.assertEqual(samples.shape, (n,))
     self.assertEqual(sample_values.shape, (n,))
     self.assertAllClose(
         sample_values.mean(), stats.poisson.mean(lam_v), rtol=.01)
@@ -219,7 +219,7 @@ class PoissonTest(test_case.TestCase):
     n = int(100e3)
     samples = poisson.sample(n, seed=123456)
     sample_values = self.evaluate(samples)
-    self.assertEqual(samples.get_shape(), (n, 1, 50))
+    self.assertEqual(samples.shape, (n, 1, 50))
     self.assertEqual(sample_values.shape, (n, 1, 50))
     self.assertAllClose(
         sample_values.mean(axis=0), stats.poisson.mean(lam_v), rtol=.01, atol=0)
@@ -233,7 +233,7 @@ class PoissonTest(test_case.TestCase):
     n = int(300e3)
     samples = poisson.sample(n, seed=123456)
     sample_values = self.evaluate(samples)
-    self.assertEqual(samples.get_shape(), (n, 1, 10))
+    self.assertEqual(samples.shape, (n, 1, 10))
     self.assertEqual(sample_values.shape, (n, 1, 10))
 
     self.assertAllClose(

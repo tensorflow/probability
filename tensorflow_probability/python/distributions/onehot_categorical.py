@@ -115,7 +115,7 @@ class OneHotCategorical(distribution.Distribution):
           name=name, logits=logits, probs=probs, validate_args=validate_args,
           multidimensional=True)
 
-      logits_shape_static = self._logits.get_shape().with_rank_at_least(1)
+      logits_shape_static = self._logits.shape.with_rank_at_least(1)
       if logits_shape_static.ndims is not None:
         self._batch_rank = tf.convert_to_tensor(
             logits_shape_static.ndims - 1, dtype=tf.int32, name="batch_rank")
@@ -154,18 +154,18 @@ class OneHotCategorical(distribution.Distribution):
     return tf.shape(self.logits)[:-1]
 
   def _batch_shape(self):
-    return self.logits.get_shape()[:-1]
+    return self.logits.shape[:-1]
 
   def _event_shape_tensor(self):
     return tf.shape(self.logits)[-1:]
 
   def _event_shape(self):
-    return self.logits.get_shape().with_rank_at_least(1)[-1:]
+    return self.logits.shape.with_rank_at_least(1)[-1:]
 
   def _sample_n(self, n, seed=None):
     sample_shape = tf.concat([[n], tf.shape(self.logits)], 0)
     logits = self.logits
-    if logits.get_shape().ndims == 2:
+    if logits.shape.ndims == 2:
       logits_2d = logits
     else:
       logits_2d = tf.reshape(logits, [-1, self.event_size])
@@ -179,9 +179,9 @@ class OneHotCategorical(distribution.Distribution):
     x = self._assert_valid_sample(x)
     # broadcast logits or x if need be.
     logits = self.logits
-    if (not x.get_shape().is_fully_defined() or
-        not logits.get_shape().is_fully_defined() or
-        x.get_shape() != logits.get_shape()):
+    if (not x.shape.is_fully_defined() or
+        not logits.shape.is_fully_defined() or
+        x.shape != logits.shape):
       logits = tf.ones_like(x, dtype=logits.dtype) * logits
       x = tf.ones_like(logits, dtype=x.dtype) * x
 
@@ -200,7 +200,7 @@ class OneHotCategorical(distribution.Distribution):
   def _mode(self):
     ret = tf.argmax(self.logits, axis=self._batch_rank)
     ret = tf.one_hot(ret, self.event_size, dtype=self.dtype)
-    ret.set_shape(self.logits.get_shape())
+    ret.set_shape(self.logits.shape)
     return ret
 
   def _covariance(self):

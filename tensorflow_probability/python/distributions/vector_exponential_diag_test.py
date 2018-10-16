@@ -45,7 +45,7 @@ class VectorExponentialDiagTest(tf.test.TestCase):
     mu = [-1.]
     diag = [-5.]
     dist = tfd.VectorExponentialDiag(mu, diag, validate_args=True)
-    self.assertAllEqual([3, 1], dist.sample(3).get_shape())
+    self.assertAllEqual([3, 1], dist.sample(3).shape)
 
   def testMean(self):
     mu = [-1., 1]
@@ -93,7 +93,7 @@ class VectorExponentialDiagTest(tf.test.TestCase):
     dist = tfd.VectorExponentialDiag(mu, diag, validate_args=True)
 
     mean = dist.mean()
-    self.assertAllEqual([2, 3], mean.get_shape())
+    self.assertAllEqual([2, 3], mean.shape)
     self.assertAllClose(mu + diag, self.evaluate(mean))
 
     n = int(1e4)

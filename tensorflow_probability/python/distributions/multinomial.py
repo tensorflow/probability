@@ -221,13 +221,13 @@ class Multinomial(distribution.Distribution):
     return tf.shape(self._mean_val)[:-1]
 
   def _batch_shape(self):
-    return self._mean_val.get_shape().with_rank_at_least(1)[:-1]
+    return self._mean_val.shape.with_rank_at_least(1)[:-1]
 
   def _event_shape_tensor(self):
     return tf.shape(self._mean_val)[-1:]
 
   def _event_shape(self):
-    return self._mean_val.get_shape().with_rank_at_least(1)[-1:]
+    return self._mean_val.shape.with_rank_at_least(1)[-1:]
 
   def _sample_n(self, n, seed=None):
     n_draws = tf.cast(self.total_count, dtype=tf.int32)

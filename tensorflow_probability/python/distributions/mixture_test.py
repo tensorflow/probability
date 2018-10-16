@@ -241,7 +241,7 @@ class MixtureTest(tf.test.TestCase):
           num_components=2,
           use_static_graph=self.use_static_graph)
       mean = dist.mean()
-      self.assertEqual(batch_shape, mean.get_shape())
+      self.assertEqual(batch_shape, mean.shape)
 
       cat_probs = tf.nn.softmax(dist.cat.logits)
       dist_means = [d.mean() for d in dist.components]
@@ -264,7 +264,7 @@ class MixtureTest(tf.test.TestCase):
           event_shape=(4,),
           use_static_graph=self.use_static_graph)
       mean = dist.mean()
-      self.assertEqual(batch_shape + (4,), mean.get_shape())
+      self.assertEqual(batch_shape + (4,), mean.shape)
 
       cat_probs = tf.nn.softmax(dist.cat.logits)
       dist_means = [d.mean() for d in dist.components]
@@ -292,7 +292,7 @@ class MixtureTest(tf.test.TestCase):
           num_components=num_components,
           use_static_graph=self.use_static_graph)
       dev = dist.stddev()
-      self.assertEqual(batch_shape, dev.get_shape())
+      self.assertEqual(batch_shape, dev.shape)
 
       cat_probs = tf.nn.softmax(dist.cat.logits)
       dist_devs = [d.stddev() for d in dist.components]
@@ -334,7 +334,7 @@ class MixtureTest(tf.test.TestCase):
           event_shape=(4,),
           use_static_graph=self.use_static_graph)
       dev = dist.stddev()
-      self.assertEqual(batch_shape + (4,), dev.get_shape())
+      self.assertEqual(batch_shape + (4,), dev.shape)
 
       cat_probs = tf.nn.softmax(dist.cat.logits)
       dist_devs = [d.stddev() for d in dist.components]
@@ -394,7 +394,7 @@ class MixtureTest(tf.test.TestCase):
     ]:
       p_x = dist.prob(x)
 
-      self.assertEqual(x.shape, p_x.get_shape())
+      self.assertEqual(x.shape, p_x.shape)
       cat_probs = tf.nn.softmax([dist.cat.logits])[0]
       dist_probs = [d.prob(x) for d in dist.components]
 
@@ -421,7 +421,7 @@ class MixtureTest(tf.test.TestCase):
     ]:
       p_x = dist.prob(x)
 
-      self.assertEqual(x.shape[:-1], p_x.get_shape())
+      self.assertEqual(x.shape[:-1], p_x.shape)
 
       cat_probs = tf.nn.softmax([dist.cat.logits])[0]
       dist_probs = [d.prob(x) for d in dist.components]
@@ -448,7 +448,7 @@ class MixtureTest(tf.test.TestCase):
         np.random.randn(4, 2, 3).astype(np.float32)
     ]:
       p_x = dist.prob(x)
-      self.assertEqual(x.shape, p_x.get_shape())
+      self.assertEqual(x.shape, p_x.shape)
 
       cat_probs = tf.nn.softmax(dist.cat.logits)
       dist_probs = [d.prob(x) for d in dist.components]
@@ -477,7 +477,7 @@ class MixtureTest(tf.test.TestCase):
         np.random.randn(4, 2, 3, 4).astype(np.float32)
     ]:
       p_x = dist.prob(x)
-      self.assertEqual(x.shape[:-1], p_x.get_shape())
+      self.assertEqual(x.shape[:-1], p_x.shape)
 
       cat_probs = tf.nn.softmax(dist.cat.logits)
       dist_probs = [d.prob(x) for d in dist.components]
@@ -504,7 +504,7 @@ class MixtureTest(tf.test.TestCase):
     with _test_capture_normal_sample_outputs() as component_samples:
       samples = dist.sample(n, seed=123)
     self.assertEqual(samples.dtype, tf.float32)
-    self.assertEqual((4,), samples.get_shape())
+    self.assertEqual((4,), samples.shape)
     cat_samples = dist.cat.sample(n, seed=123)
     sample_values, cat_sample_values, dist_sample_values = self.evaluate(
         [samples, cat_samples, component_samples])
@@ -566,7 +566,7 @@ class MixtureTest(tf.test.TestCase):
     with _test_capture_mvndiag_sample_outputs() as component_samples:
       samples = dist.sample(n, seed=123)
     self.assertEqual(samples.dtype, tf.float32)
-    self.assertEqual((4, 2), samples.get_shape())
+    self.assertEqual((4, 2), samples.shape)
     cat_samples = dist.cat.sample(n, seed=123)
     sample_values, cat_sample_values, dist_sample_values = self.evaluate(
         [samples, cat_samples, component_samples])
@@ -591,7 +591,7 @@ class MixtureTest(tf.test.TestCase):
     with _test_capture_normal_sample_outputs() as component_samples:
       samples = dist.sample(n, seed=123)
     self.assertEqual(samples.dtype, tf.float32)
-    self.assertEqual((4, 2, 3), samples.get_shape())
+    self.assertEqual((4, 2, 3), samples.shape)
     cat_samples = dist.cat.sample(n, seed=123)
     sample_values, cat_sample_values, dist_sample_values = self.evaluate(
         [samples, cat_samples, component_samples])
@@ -629,9 +629,9 @@ class MixtureTest(tf.test.TestCase):
       samples = dist.sample(n, seed=123)
     self.assertEqual(samples.dtype, tf.float32)
     if fully_known_batch_shape:
-      self.assertEqual((5, 2, 3, 4), samples.get_shape())
+      self.assertEqual((5, 2, 3, 4), samples.shape)
     else:
-      self.assertEqual([5, None, 3, 4], samples.get_shape().as_list())
+      self.assertEqual([5, None, 3, 4], samples.shape.as_list())
     cat_samples = dist.cat.sample(n, seed=123)
     sample_values, cat_sample_values, dist_sample_values = self.evaluate(
         [samples, cat_samples, component_samples])
@@ -664,7 +664,7 @@ class MixtureTest(tf.test.TestCase):
           event_shape=(4,),
           use_static_graph=self.use_static_graph)
       entropy_lower_bound = dist.entropy_lower_bound()
-      self.assertEqual(batch_shape, entropy_lower_bound.get_shape())
+      self.assertEqual(batch_shape, entropy_lower_bound.shape)
 
       cat_probs = tf.nn.softmax(dist.cat.logits)
       dist_entropy = [d.entropy() for d in dist.components]

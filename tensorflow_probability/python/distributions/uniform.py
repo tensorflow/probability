@@ -146,8 +146,8 @@ class Uniform(distribution.Distribution):
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(
-        self.low.get_shape(),
-        self.high.get_shape())
+        self.low.shape,
+        self.high.shape)
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)

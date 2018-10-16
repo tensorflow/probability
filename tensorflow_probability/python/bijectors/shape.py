@@ -242,7 +242,7 @@ class _DistributionShape(object):
     """
     with self._name_scope(name, values=[x]):
       x = tf.convert_to_tensor(x, name="x")
-      ndims = x.get_shape().ndims
+      ndims = x.shape.ndims
       if ndims is None:
         return tf.rank(x, name="ndims")
       return tf.convert_to_tensor(ndims, dtype=tf.int32, name="ndims")
@@ -345,11 +345,11 @@ class _DistributionShape(object):
         start_sum = start_sum if start_sum else [
             tf.zeros([], dtype=tf.int32, name="zero")
         ]
-        if (x.get_shape().ndims is not None and
+        if (x.shape.ndims is not None and
             self._is_all_constant_helper(size, *start_sum)):
           start = sum(tensor_util.constant_value(s) for s in start_sum)
           stop = start + tensor_util.constant_value(size)
-          slice_ = x.get_shape()[start:stop].as_list()
+          slice_ = x.shape[start:stop].as_list()
           if all(s is not None for s in slice_):
             return tf.convert_to_tensor(slice_, dtype=tf.int32, name=name)
         return tf.slice(tf.shape(x), [sum(start_sum)], [size])
@@ -443,8 +443,8 @@ class _DistributionShape(object):
         _, batch_shape, event_shape = self.get_shape(x)
       else:
         s = (
-            x.get_shape().as_list()
-            if x.get_shape().is_fully_defined() else tf.shape(x))
+            x.shape.as_list()
+            if x.shape.is_fully_defined() else tf.shape(x))
         batch_shape = s[1:1+self.batch_ndims]
         # Since sample_dims=1 and is left-most, we add 1 to the number of
         # batch_ndims to get the event start dim.
@@ -476,10 +476,10 @@ class _DistributionShape(object):
     if x.dtype.base_dtype != tf.int32.base_dtype:
       raise TypeError("%s.dtype=%s is not %s" % (x.name, x.dtype, tf.int32))
     x_value_static = tensor_util.constant_value(x)
-    if x.get_shape().ndims is not None and x_value_static is not None:
-      if x.get_shape().ndims != 0:
+    if x.shape.ndims is not None and x_value_static is not None:
+      if x.shape.ndims != 0:
         raise ValueError("%s.ndims=%d is not 0 (scalar)" %
-                         (x.name, x.get_shape().ndims))
+                         (x.name, x.shape.ndims))
       if x_value_static < 0:
         raise ValueError("%s.value=%d cannot be negative" %
                          (x.name, x_value_static))

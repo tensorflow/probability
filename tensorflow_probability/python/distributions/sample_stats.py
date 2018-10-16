@@ -350,7 +350,7 @@ def percentile(x,
 
     # result.shape = B
     result = sorted_y[..., index]
-    result.set_shape(y.get_shape()[:-1])
+    result.set_shape(y.shape[:-1])
 
     if keep_dims:
       if axis is None:
@@ -391,7 +391,7 @@ def _get_static_ndims(x,
   Raises:
     ValueError:  If any of the expectations above are violated.
   """
-  ndims = x.get_shape().ndims
+  ndims = x.shape.ndims
   if ndims is None:
     shape_const = tensor_util.constant_value(tf.shape(x))
     if shape_const is not None:
@@ -505,8 +505,8 @@ def _move_dims_to_flat_end(x, axis, x_ndims):
   # x_permed.shape = [a, c, b, d]
   x_permed = tf.transpose(x, perm=front_dims + list(axis))
 
-  if x.get_shape().is_fully_defined():
-    x_shape = x.get_shape().as_list()
+  if x.shape.is_fully_defined():
+    x_shape = x.shape.as_list()
     # front_shape = [a, c], end_shape = [b * d]
     front_shape = [x_shape[i] for i in front_dims]
     end_shape = [np.prod([x_shape[i] for i in axis])]

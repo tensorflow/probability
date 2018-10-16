@@ -106,14 +106,14 @@ class KumaraswamyTest(tf.test.TestCase):
     a = [[1., 2, 3]]
     b = [[2., 4, 3]]
     dist = tfd.Kumaraswamy(a, b)
-    self.assertEqual([1, 3], dist.concentration1.get_shape())
+    self.assertEqual([1, 3], dist.concentration1.shape)
     self.assertAllClose(a, self.evaluate(dist.concentration1))
 
   def testBProperty(self):
     a = [[1., 2, 3]]
     b = [[2., 4, 3]]
     dist = tfd.Kumaraswamy(a, b)
-    self.assertEqual([1, 3], dist.concentration0.get_shape())
+    self.assertEqual([1, 3], dist.concentration0.shape)
     self.assertAllClose(b, self.evaluate(dist.concentration0))
 
   def testPdfXProper(self):
@@ -136,7 +136,7 @@ class KumaraswamyTest(tf.test.TestCase):
     pdf = dist.prob(x)
     expected_pdf = _kumaraswamy_pdf(a, b, x)
     self.assertAllClose(expected_pdf, self.evaluate(pdf))
-    self.assertEqual((2,), pdf.get_shape())
+    self.assertEqual((2,), pdf.shape)
 
   def testPdfTwoBatchesNontrivialX(self):
     a = [1., 2]
@@ -146,7 +146,7 @@ class KumaraswamyTest(tf.test.TestCase):
     pdf = dist.prob(x)
     expected_pdf = _kumaraswamy_pdf(a, b, x)
     self.assertAllClose(expected_pdf, self.evaluate(pdf))
-    self.assertEqual((2,), pdf.get_shape())
+    self.assertEqual((2,), pdf.shape)
 
   def testPdfUniformZeroBatch(self):
     # This is equivalent to a uniform distribution
@@ -157,7 +157,7 @@ class KumaraswamyTest(tf.test.TestCase):
     pdf = dist.prob(x)
     expected_pdf = _kumaraswamy_pdf(a, b, x)
     self.assertAllClose(expected_pdf, self.evaluate(pdf))
-    self.assertEqual((5,), pdf.get_shape())
+    self.assertEqual((5,), pdf.shape)
 
   def testPdfAStretchedInBroadcastWhenSameRank(self):
     a = [[1., 2]]
@@ -167,7 +167,7 @@ class KumaraswamyTest(tf.test.TestCase):
     pdf = dist.prob(x)
     expected_pdf = _kumaraswamy_pdf(a, b, x)
     self.assertAllClose(expected_pdf, self.evaluate(pdf))
-    self.assertEqual((2, 2), pdf.get_shape())
+    self.assertEqual((2, 2), pdf.shape)
 
   def testPdfAStretchedInBroadcastWhenLowerRank(self):
     a = [1., 2]
@@ -176,7 +176,7 @@ class KumaraswamyTest(tf.test.TestCase):
     pdf = tfd.Kumaraswamy(a, b).prob(x)
     expected_pdf = _kumaraswamy_pdf(a, b, x)
     self.assertAllClose(expected_pdf, self.evaluate(pdf))
-    self.assertEqual((2, 2), pdf.get_shape())
+    self.assertEqual((2, 2), pdf.shape)
 
   def testPdfXStretchedInBroadcastWhenSameRank(self):
     a = [[1., 2], [2., 3]]
@@ -185,7 +185,7 @@ class KumaraswamyTest(tf.test.TestCase):
     pdf = tfd.Kumaraswamy(a, b).prob(x)
     expected_pdf = _kumaraswamy_pdf(a, b, x)
     self.assertAllClose(expected_pdf, self.evaluate(pdf))
-    self.assertEqual((2, 2), pdf.get_shape())
+    self.assertEqual((2, 2), pdf.shape)
 
   def testPdfXStretchedInBroadcastWhenLowerRank(self):
     a = [[1., 2], [2., 3]]
@@ -194,14 +194,14 @@ class KumaraswamyTest(tf.test.TestCase):
     pdf = tfd.Kumaraswamy(a, b).prob(x)
     expected_pdf = _kumaraswamy_pdf(a, b, x)
     self.assertAllClose(expected_pdf, self.evaluate(pdf))
-    self.assertEqual((2, 2), pdf.get_shape())
+    self.assertEqual((2, 2), pdf.shape)
 
   def testKumaraswamyMean(self):
     with tf.Session():
       a = [1., 2, 3]
       b = [2., 4, 1.2]
       dist = tfd.Kumaraswamy(a, b)
-      self.assertEqual(dist.mean().get_shape(), (3,))
+      self.assertEqual(dist.mean().shape, (3,))
       if not stats:
         return
       expected_mean = _kumaraswamy_moment(a, b, 1)
@@ -212,7 +212,7 @@ class KumaraswamyTest(tf.test.TestCase):
       a = [1., 2, 3]
       b = [2., 4, 1.2]
       dist = tfd.Kumaraswamy(a, b)
-      self.assertEqual(dist.variance().get_shape(), (3,))
+      self.assertEqual(dist.variance().shape, (3,))
       if not stats:
         return
       expected_variance = _kumaraswamy_moment(a, b, 2) - _kumaraswamy_moment(
@@ -225,7 +225,7 @@ class KumaraswamyTest(tf.test.TestCase):
       b = np.array([2., 4, 1.2])
       expected_mode = _kumaraswamy_mode(a, b)
       dist = tfd.Kumaraswamy(a, b)
-      self.assertEqual(dist.mode().get_shape(), (3,))
+      self.assertEqual(dist.mode().shape, (3,))
       self.assertAllClose(expected_mode, self.evaluate(dist.mode()))
 
   def testKumaraswamyModeInvalid(self):
@@ -250,7 +250,7 @@ class KumaraswamyTest(tf.test.TestCase):
 
       expected_mode = _kumaraswamy_mode(a, b)
       expected_mode[0] = np.nan
-      self.assertEqual((3,), dist.mode().get_shape())
+      self.assertEqual((3,), dist.mode().shape)
       self.assertAllClose(expected_mode, self.evaluate(dist.mode()))
 
       a = np.array([2., 2, 3])
@@ -259,7 +259,7 @@ class KumaraswamyTest(tf.test.TestCase):
 
       expected_mode = _kumaraswamy_mode(a, b)
       expected_mode[0] = np.nan
-      self.assertEqual((3,), dist.mode().get_shape())
+      self.assertEqual((3,), dist.mode().shape)
       self.assertAllClose(expected_mode, self.evaluate(dist.mode()))
 
   def testKumaraswamyEntropy(self):
@@ -267,7 +267,7 @@ class KumaraswamyTest(tf.test.TestCase):
       a = np.array([1., 2, 3])
       b = np.array([2., 4, 1.2])
       dist = tfd.Kumaraswamy(a, b)
-      self.assertEqual(dist.entropy().get_shape(), (3,))
+      self.assertEqual(dist.entropy().shape, (3,))
       if not stats:
         return
       expected_entropy = (1 - 1. / a) + (

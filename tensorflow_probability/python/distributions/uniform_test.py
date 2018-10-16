@@ -179,7 +179,7 @@ class UniformTest(tf.test.TestCase):
     n_v = 100000
     n = tf.constant(n_v)
     samples = uniform.sample(n)
-    self.assertEqual(samples.get_shape(), (n_v, batch_size, 2))
+    self.assertEqual(samples.shape, (n_v, batch_size, 2))
 
     sample_values = self.evaluate(samples)
 

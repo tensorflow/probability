@@ -101,13 +101,13 @@ class DistributionTest(tf.test.TestCase):
     # Test case 1, 2.
     x = tf.placeholder_with_default(input=1, shape=[])
     # None would fire an exception were it actually executed.
-    self.assertTrue(normal._is_scalar_helper(x.get_shape(), lambda: None))
+    self.assertTrue(normal._is_scalar_helper(x.shape, lambda: None))
     self.assertTrue(
         normal._is_scalar_helper(tf.TensorShape(None), lambda: tf.shape(x)))
 
     x = tf.placeholder_with_default(input=[1], shape=[1])
     # None would fire an exception were it actually executed.
-    self.assertFalse(normal._is_scalar_helper(x.get_shape(), lambda: None))
+    self.assertFalse(normal._is_scalar_helper(x.shape, lambda: None))
     self.assertFalse(
         normal._is_scalar_helper(tf.TensorShape(None), lambda: tf.shape(x)))
 
@@ -118,11 +118,11 @@ class DistributionTest(tf.test.TestCase):
 
     # Test case 3.
     x = tf.placeholder_with_default(input=1, shape=None)
-    is_scalar = normal._is_scalar_helper(x.get_shape(), lambda: tf.shape(x))
+    is_scalar = normal._is_scalar_helper(x.shape, lambda: tf.shape(x))
     self.assertTrue(self.evaluate(is_scalar))
 
     x = tf.placeholder_with_default(input=[1], shape=None)
-    is_scalar = normal._is_scalar_helper(x.get_shape(), lambda: tf.shape(x))
+    is_scalar = normal._is_scalar_helper(x.shape, lambda: tf.shape(x))
     self.assertFalse(self.evaluate(is_scalar))
 
   def _GetFakeDistribution(self):
@@ -163,28 +163,28 @@ class DistributionTest(tf.test.TestCase):
     y = dist._set_sample_static_shape(x, sample_shape)
     # We use as_list since TensorShape comparison does not work correctly for
     # unknown values, ie, Dimension(None).
-    self.assertAllEqual([6, 7, 2, 3, 5], y.get_shape().as_list())
+    self.assertAllEqual([6, 7, 2, 3, 5], y.shape.as_list())
 
     x = tf.placeholder_with_default(
         input=np.ones((6, 7, 2, 3, 5), dtype=np.float32), shape=None)
     dist = fake_distribution(batch_shape=[None, 3], event_shape=[5])
     sample_shape = tf.convert_to_tensor([6, 7], dtype=tf.int32)
     y = dist._set_sample_static_shape(x, sample_shape)
-    self.assertAllEqual([6, 7, None, 3, 5], y.get_shape().as_list())
+    self.assertAllEqual([6, 7, None, 3, 5], y.shape.as_list())
 
     x = tf.placeholder_with_default(
         input=np.ones((6, 7, 2, 3, 5), dtype=np.float32), shape=None)
     dist = fake_distribution(batch_shape=[None, 3], event_shape=[None])
     sample_shape = tf.convert_to_tensor([6, 7], dtype=tf.int32)
     y = dist._set_sample_static_shape(x, sample_shape)
-    self.assertAllEqual([6, 7, None, 3, None], y.get_shape().as_list())
+    self.assertAllEqual([6, 7, None, 3, None], y.shape.as_list())
 
     x = tf.placeholder_with_default(
         input=np.ones((6, 7, 2, 3, 5), dtype=np.float32), shape=None)
     dist = fake_distribution(batch_shape=None, event_shape=None)
     sample_shape = tf.convert_to_tensor([6, 7], dtype=tf.int32)
     y = dist._set_sample_static_shape(x, sample_shape)
-    self.assertTrue(y.get_shape().ndims is None)
+    self.assertTrue(y.shape.ndims is None)
 
     x = tf.placeholder_with_default(
         input=np.ones((6, 7, 2, 3, 5), dtype=np.float32), shape=None)
@@ -193,7 +193,7 @@ class DistributionTest(tf.test.TestCase):
     # early.
     sample_shape = tf.convert_to_tensor([6, 7], dtype=tf.int32)
     y = dist._set_sample_static_shape(x, sample_shape)
-    self.assertTrue(y.get_shape().ndims is None)
+    self.assertTrue(y.shape.ndims is None)
 
   def testNameScopeWorksCorrectly(self):
     x = tfd.Normal(loc=0., scale=1., name="x")

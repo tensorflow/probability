@@ -318,7 +318,7 @@ def shapes_from_loc_and_scale(loc, scale, name="shapes_from_loc_and_scale"):
 
     # Static check that event shapes match.
     if loc is not None:
-      loc_event_size = loc.get_shape()[-1].value
+      loc_event_size = loc.shape[-1].value
       if loc_event_size is not None and event_size_const is not None:
         if loc_event_size != 1 and loc_event_size != event_size_const:
           raise ValueError(
@@ -332,8 +332,8 @@ def shapes_from_loc_and_scale(loc, scale, name="shapes_from_loc_and_scale"):
       batch_shape = (
           batch_shape_const if batch_shape_const is not None else batch_shape)
     else:
-      loc_batch_shape = loc.get_shape().with_rank_at_least(1)[:-1]
-      if (loc.get_shape().ndims is None or
+      loc_batch_shape = loc.shape.with_rank_at_least(1)[:-1]
+      if (loc.shape.ndims is None or
           not loc_batch_shape.is_fully_defined()):
         loc_batch_shape = tf.shape(loc)[:-1]
       else:
@@ -927,7 +927,7 @@ def embed_check_categorical_event_shape(
       raise TypeError("Unable to validate size of unrecognized dtype "
                       "({}).".format(x_dtype.name))
     try:
-      x_shape_static = x.get_shape().with_rank_at_least(1)
+      x_shape_static = x.shape.with_rank_at_least(1)
     except ValueError:
       raise ValueError("A categorical-distribution parameter must have "
                        "at least 1 dimension.")
@@ -1190,7 +1190,7 @@ def rotate_transpose(x, shift, name="rotate_transpose"):
     # We do not assign back to preserve constant-ness.
     tf.assert_integer(shift)
     shift_value_static = tensor_util.constant_value(shift)
-    ndims = x.get_shape().ndims
+    ndims = x.shape.ndims
     if ndims is not None and shift_value_static is not None:
       if ndims < 2: return x
       shift_value_static = np.sign(shift_value_static) * (
@@ -1375,7 +1375,7 @@ def fill_triangular(x, upper=False, name=None):
   Triangular matrix elements are filled in a clockwise spiral. See example,
   below.
 
-  If `x.get_shape()` is `[b1, b2, ..., bB, d]` then the output shape is
+  If `x.shape` is `[b1, b2, ..., bB, d]` then the output shape is
   `[b1, b2, ..., bB, n, n]` where `n` is such that `d = n(n+1)/2`, i.e.,
   `n = int(np.sqrt(0.25 + 2. * m) - 0.5)`.
 

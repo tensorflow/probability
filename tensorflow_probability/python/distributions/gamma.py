@@ -187,8 +187,8 @@ class Gamma(distribution.Distribution):
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(
-        self.concentration.get_shape(),
-        self.rate.get_shape())
+        self.concentration.shape,
+        self.rate.shape)
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)

@@ -214,12 +214,12 @@ class BernoulliTest(tf.test.TestCase):
       self.assertEqual(2, len(self.evaluate(dist.log_prob([[1], [1]])).shape))
 
       dist = bernoulli.Bernoulli(probs=0.5)
-      self.assertEqual((), dist.log_prob(1).get_shape())
-      self.assertEqual((1), dist.log_prob([1]).get_shape())
-      self.assertEqual((2, 1), dist.log_prob([[1], [1]]).get_shape())
+      self.assertEqual((), dist.log_prob(1).shape)
+      self.assertEqual((1), dist.log_prob([1]).shape)
+      self.assertEqual((2, 1), dist.log_prob([[1], [1]]).shape)
 
       dist = bernoulli.Bernoulli(probs=[[0.5], [0.5]])
-      self.assertEqual((2, 1), dist.log_prob(1).get_shape())
+      self.assertEqual((2, 1), dist.log_prob(1).shape)
 
   @test_util.run_in_graph_and_eager_modes
   def testBoundaryConditions(self):
@@ -261,7 +261,7 @@ class BernoulliTest(tf.test.TestCase):
     # In this test we're just interested in verifying there isn't a crash
     # owing to mismatched types. b/30940152
     dist = bernoulli.Bernoulli(np.log([.2, .4]))
-    self.assertAllEqual((1, 2), dist.sample(1, seed=42).get_shape().as_list())
+    self.assertAllEqual((1, 2), dist.sample(1, seed=42).shape.as_list())
 
   @test_util.run_in_graph_and_eager_modes
   def testNotReparameterized(self):
@@ -323,7 +323,7 @@ class BernoulliTest(tf.test.TestCase):
     kl_expected = (a_p * np.log(a_p / b_p) + (1. - a_p) * np.log(
         (1. - a_p) / (1. - b_p)))
 
-    self.assertEqual(kl.get_shape(), (batch_size,))
+    self.assertEqual(kl.shape, (batch_size,))
     self.assertAllClose(kl_val, kl_expected)
 
 

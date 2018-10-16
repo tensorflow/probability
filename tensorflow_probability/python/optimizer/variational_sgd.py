@@ -170,9 +170,9 @@ class VariationalSGD(tf.train.Optimizer):
     for v in var_list:
       init_moment = tf.zeros_initializer(dtype=v.dtype)
       self._get_or_make_slot_with_initializer(
-          v, init_moment, v.get_shape(), v.dtype, 'first_moment', self._name)
+          v, init_moment, v.shape, v.dtype, 'first_moment', self._name)
       self._get_or_make_slot_with_initializer(
-          v, init_moment, v.get_shape(), v.dtype, 'second_moment', self._name)
+          v, init_moment, v.shape, v.dtype, 'second_moment', self._name)
 
   def _prepare(self):
     self._decay_tensor = tf.convert_to_tensor(
