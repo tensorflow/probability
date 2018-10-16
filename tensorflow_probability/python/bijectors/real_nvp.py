@@ -35,7 +35,7 @@ class RealNVP(conditional_bijector.ConditionalBijector):
   Real NVP models a normalizing flow on a `D`-dimensional distribution via a
   single `D-d`-dimensional conditional distribution [(Dinh et al., 2017)][1]:
 
-  `y[d:D] = y[d:D] * tf.exp(log_scale_fn(y[d:D])) + shift_fn(y[d:D])`
+  `y[d:D] = x[d:D] * tf.exp(log_scale_fn(x[0:d])) + shift_fn(x[0:d])`
   `y[0:d] = x[0:d]`
 
   The last `D-d` units are scaled and shifted based on the first `d` units only,
