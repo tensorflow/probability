@@ -30,6 +30,7 @@ py_library(
         ":exponentiated_quadratic",
         ":matern",
         ":positive_semidefinite_kernel",
+        "//tensorflow_probability/python/positive_semidefinite_kernels/internal",
     ],
 )
 

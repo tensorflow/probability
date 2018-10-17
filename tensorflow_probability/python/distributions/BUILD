@@ -95,7 +95,7 @@ py_library(
         ":von_mises",
         ":von_mises_fisher",
         ":wishart",
-        "//tensorflow_probability/python/distributions/internal:moving_stats",
+        "//tensorflow_probability/python/distributions/internal",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:reparameterization",
     ],

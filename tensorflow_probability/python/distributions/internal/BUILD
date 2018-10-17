@@ -29,19 +29,15 @@ py_library(
     name = "internal",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
+    deps = [
+        ":moving_stats",
+        ":statistical_testing",
+    ],
 )
 
 py_library(
     name = "moving_stats",
     srcs = ["moving_stats.py"],
-    deps = [
-        # tensorflow dep,
-    ],
-)
-
-py_library(
-    name = "statistical_testing",
-    srcs = ["statistical_testing.py"],
     deps = [
         # tensorflow dep,
     ],
@@ -55,6 +51,14 @@ py_test(
     deps = [
         ":moving_stats",
         # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "statistical_testing",
+    srcs = ["statistical_testing.py"],
+    deps = [
         # tensorflow dep,
     ],
 )
