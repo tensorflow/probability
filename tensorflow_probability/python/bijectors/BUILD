@@ -94,7 +94,6 @@ py_library(
     srcs = ["affine_linear_operator.py"],
     deps = [
         ":bijector",
-        ":shape",
         # tensorflow dep,
     ],
 )
@@ -113,7 +112,6 @@ py_library(
     srcs = ["affine.py"],
     deps = [
         ":bijector",
-        ":shape",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
@@ -309,15 +307,6 @@ py_library(
         ":fill_triangular",
         ":softplus",
         ":transform_diagonal",
-    ],
-)
-
-py_library(
-    name = "shape",
-    srcs = ["shape.py"],
-    deps = [
-        # tensorflow dep,
-        "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
 
@@ -727,17 +716,6 @@ py_test(
     srcs = ["scale_tril_test.py"],
     deps = [
         ":bijectors",
-        # numpy dep,
-        # tensorflow dep,
-    ],
-)
-
-py_test(
-    name = "shape_test",
-    size = "medium",
-    srcs = ["shape_test.py"],
-    deps = [
-        ":shape",
         # numpy dep,
         # tensorflow dep,
     ],
