@@ -124,8 +124,6 @@ class _ProximalHessianTest(object):
         tolerance=1e-5,
         learning_rate=1.)
 
-    init_op = tf.global_variables_initializer()
-    self.evaluate(init_op)
     w_, is_converged_, _ = self.evaluate([w, is_converged, num_iter])
 
     expected_w = tf.concat([[a[0]], tf.zeros([n - 1], self.dtype)], axis=0)
@@ -164,8 +162,6 @@ class _ProximalHessianTest(object):
         tolerance=1e-5,
         learning_rate=1.)
 
-    init_op = tf.global_variables_initializer()
-    self.evaluate(init_op)
     w_, is_converged_, _ = self.evaluate([w, is_converged, num_iter])
 
     expected_w = 0.5 * a
@@ -210,9 +206,6 @@ class _ProximalHessianTest(object):
         tolerance=1e-5,
         learning_rate=1.)
 
-    init_op = tf.global_variables_initializer()
-
-    self.evaluate(init_op)
     w_, is_converged_, num_iter_ = self.evaluate([w, is_converged, num_iter])
 
     expected_w = 0.5 * a
@@ -235,15 +228,6 @@ class _ProximalHessianTest(object):
     x_ = self.adjust_dtype_and_shape_hints(x_)
     y_ = self.adjust_dtype_and_shape_hints(y_)
 
-    init_op = tf.global_variables_initializer()
-    self.evaluate(init_op)
-
-    x_update_var = tf.get_variable(
-        name='x_update_var',
-        initializer=tf.zeros_like(model_coefficients_0),
-        trainable=False,
-        use_resource=True)
-
     model_coefficients_1, is_converged, _ = tfp.glm.fit_sparse_one_step(
         model_matrix=x_,
         response=y_,
@@ -253,8 +237,7 @@ class _ProximalHessianTest(object):
         l2_regularizer=None,
         maximum_full_sweeps=1,
         tolerance=1e-6,
-        learning_rate=None,
-        model_coefficients_update_var=x_update_var)
+        learning_rate=None)
     model_coefficients_1_ = self.evaluate(model_coefficients_1)
 
     self.assertAllEqual(False, is_converged)
@@ -268,8 +251,7 @@ class _ProximalHessianTest(object):
         l2_regularizer=None,
         maximum_full_sweeps=1,
         tolerance=1e-6,
-        learning_rate=None,
-        model_coefficients_update_var=x_update_var)
+        learning_rate=None)
     model_coefficients_2_ = self.evaluate(model_coefficients_2)
 
     def _joint_log_prob(model_coefficients_):
@@ -292,18 +274,17 @@ class _ProximalHessianTest(object):
     model = tfp.glm.Bernoulli()
     model_coefficients_start = tf.zeros(x_.shape[-1], self.dtype)
 
-    with tf.variable_scope(tf.get_variable_scope(), reuse=tf.AUTO_REUSE):
-      model_coefficients, is_converged, num_iter = tfp.glm.fit_sparse(
-          self.adjust_dtype_and_shape_hints(x_),
-          self.adjust_dtype_and_shape_hints(y_),
-          model,
-          model_coefficients_start,
-          l1_regularizer=800.,
-          l2_regularizer=None,
-          maximum_iterations=10,
-          maximum_full_sweeps_per_iteration=10,
-          tolerance=1e-6,
-          learning_rate=None)
+    model_coefficients, is_converged, num_iter = tfp.glm.fit_sparse(
+        self.adjust_dtype_and_shape_hints(x_),
+        self.adjust_dtype_and_shape_hints(y_),
+        model,
+        model_coefficients_start,
+        l1_regularizer=800.,
+        l2_regularizer=None,
+        maximum_iterations=10,
+        maximum_full_sweeps_per_iteration=10,
+        tolerance=1e-6,
+        learning_rate=None)
     model_coefficients_, is_converged_, _ = self.evaluate(
         [model_coefficients, is_converged, num_iter])
 

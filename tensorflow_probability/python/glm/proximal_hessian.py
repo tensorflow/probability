@@ -28,6 +28,8 @@ import numpy as np
 
 import tensorflow as tf
 from tensorflow.python.framework import smart_cond
+from tensorflow.python.ops import inplace_ops
+
 
 __all__ = [
     'fit_sparse',
@@ -298,7 +300,6 @@ def minimize_sparse_one_step(gradient_unregularized_loss,
                              l2_regularizer=None,
                              maximum_full_sweeps=1,
                              learning_rate=None,
-                             x_update_var=None,
                              name=None):
   """One step of (the outer loop of) the minimization algorithm.
 
@@ -374,9 +375,6 @@ def minimize_sparse_one_step(gradient_unregularized_loss,
     learning_rate: scalar, `float` `Tensor` representing a multiplicative factor
       used to dampen the proximal gradient descent steps.
       Default value: `None` (i.e., factor is conceptually `1`).
-    x_update_var: `Variable` with the same shape and dtype as `x_start`.  Used
-      to store the current value of `x_update`.
-      Default value: `None` (i.e., a new `Variable` will be created).
     name: Python string representing the name of the TensorFlow operation.
       The default name is `"minimize_sparse_one_step"`.
 
@@ -412,7 +410,6 @@ def minimize_sparse_one_step(gradient_unregularized_loss,
       maximum_full_sweeps,
       tolerance,
       learning_rate,
-      x_update_var,
   ]
   with tf.name_scope(name, 'minimize_sparse_one_step', graph_deps):
     if (x_start.shape.ndims is None or x_start.shape[-1].value is None):
@@ -437,13 +434,6 @@ def minimize_sparse_one_step(gradient_unregularized_loss,
     if (not _is_sparse(hessian_unregularized_loss_outer) and
         hessian_unregularized_loss_outer.shape.ndims is None):
       hessian_unregularized_loss_outer.set_shape([None, None])
-
-    if x_update_var is None:
-      x_update_var = tf.get_variable(
-          name='x_update_var',
-          initializer=tf.zeros([dims], dtype=x_start.dtype.as_numpy_dtype),
-          trainable=False,
-          use_resource=True)
 
     def _hessian_diag_elt_with_l2(coord):  # pylint: disable=missing-docstring
       # Returns the (coord, coord) entry of
@@ -573,7 +563,6 @@ def minimize_sparse_one_step(gradient_unregularized_loss,
           - w_old)
 
       def _do_update(x_update_diff_norm_sq, x_update, hess_matmul_x_update):  # pylint: disable=missing-docstring
-        del x_update
         hessian_column_with_l2 = _sparse_or_dense_matvecmul(
             hessian_unregularized_loss_outer,
             hessian_unregularized_loss_middle * _sparse_or_dense_matmul_onehot(
@@ -584,16 +573,13 @@ def minimize_sparse_one_step(gradient_unregularized_loss,
               hessian_column_with_l2,
               coord,
               on_value=2. * l2_regularizer)
-        changed_x_update_var = tf.scatter_update(x_update_var, [coord],
-                                                 [x_update_var[coord] + delta])
-        with tf.control_dependencies([changed_x_update_var]):
+        x_update = inplace_ops.alias_inplace_update(x_update, [coord],
+                                                    [x_update[coord] + delta])
+        with tf.control_dependencies([x_update]):
           x_update_diff_norm_sq_ = x_update_diff_norm_sq + delta**2.
           hess_matmul_x_update_ = (
               hess_matmul_x_update + delta * hessian_column_with_l2)
-          return [
-              x_update_diff_norm_sq_, changed_x_update_var,
-              hess_matmul_x_update_
-          ]
+          return [x_update_diff_norm_sq_, x_update, hess_matmul_x_update_]
 
       inputs_to_update = [x_update_diff_norm_sq, x_update, hess_matmul_x_update]
       return [iter_ + 1] + smart_cond.smart_cond(
@@ -633,17 +619,15 @@ def minimize_sparse_one_step(gradient_unregularized_loss,
     else:
       dims = tf.shape(x_start)[-1]
 
+    base_dtype = x_start.dtype.base_dtype
     iter_, x_update_diff_norm_sq, x_update, _ = tf.while_loop(
         cond=_loop_cond,
         body=_loop_body,
         loop_vars=[
-            tf.zeros([], np.int32, name='iter'),
-            tf.zeros(
-                [], x_update_var.dtype.base_dtype,
-                name='x_update_diff_norm_sq'),
-            tf.assign(
-                x_update_var, tf.zeros_like(x_update_var), name='x_update'),
-            tf.zeros_like(x_update_var, name='hess_matmul_x_update'),
+            tf.zeros([], dtype=np.int32, name='iter'),
+            tf.zeros([], dtype=base_dtype, name='x_update_diff_norm_sq'),
+            tf.zeros(dims, dtype=base_dtype, name='x_update'),
+            tf.zeros(dims, dtype=base_dtype, name='hess_matmul_x_update'),
         ])
 
     converged = (
@@ -659,7 +643,6 @@ def minimize_sparse(grad_and_hessian_loss_fn,
                     maximum_iterations=1,
                     maximum_full_sweeps_per_iteration=1,
                     learning_rate=None,
-                    x_update_var=None,
                     name=None):
   """Minimize using Hessian-informed proximal gradient descent.
 
@@ -710,9 +693,6 @@ def minimize_sparse(grad_and_hessian_loss_fn,
     learning_rate: scalar, `float` `Tensor` representing a multiplicative factor
       used to dampen the proximal gradient descent steps.
       Default value: `None` (i.e., factor is conceptually `1`).
-    x_update_var: `Variable` with the same shape and dtype as `x_start`.  Used
-      to store the current value of `x_update`.
-      Default value: `None` (i.e., a new `Variable` will be created).
     name: Python string representing the name of the TensorFlow operation.
       The default name is `"minimize_sparse"`.
 
@@ -740,9 +720,6 @@ def minimize_sparse(grad_and_hessian_loss_fn,
        Research_, 13, 2012.
        http://www.jmlr.org/papers/volume13/yuan12a/yuan12a.pdf
   """
-  # TODO(b/111926449): Do we want to require x_update_var to be a
-  # ResourceVariable if the user is in eager mode?  Maybe depends on whether the
-  # error they get would be informative enough.
   graph_deps = [
       x_start,
       l1_regularizer,
@@ -751,17 +728,8 @@ def minimize_sparse(grad_and_hessian_loss_fn,
       maximum_full_sweeps_per_iteration,
       tolerance,
       learning_rate,
-      x_update_var,
   ],
   with tf.name_scope(name, 'minimize_sparse', graph_deps):
-
-    if x_update_var is None:
-      dims = np.array(x_start.shape[-1].value, np.int32)
-      x_update_var = tf.get_variable(
-          name='x_update_var',
-          initializer=np.zeros([dims], dtype=x_start.dtype.as_numpy_dtype),
-          trainable=False,
-          use_resource=True)
 
     def _loop_cond(x_start, converged, iter_):
       del x_start
@@ -779,7 +747,6 @@ def minimize_sparse(grad_and_hessian_loss_fn,
           l2_regularizer=l2_regularizer,
           maximum_full_sweeps=maximum_full_sweeps_per_iteration,
           tolerance=tolerance,
-          x_update_var=x_update_var,
           learning_rate=learning_rate)
       return x_start, converged, iter_ + 1
 
@@ -802,7 +769,6 @@ def fit_sparse_one_step(model_matrix,
                         l2_regularizer=None,
                         maximum_full_sweeps=None,
                         learning_rate=None,
-                        model_coefficients_update_var=None,
                         name=None):
   """One step of (the outer loop of) the GLM fitting algorithm.
 
@@ -876,10 +842,6 @@ def fit_sparse_one_step(model_matrix,
     learning_rate: scalar, `float` `Tensor` representing a multiplicative factor
       used to dampen the proximal gradient descent steps.
       Default value: `None` (i.e., factor is conceptually `1`).
-    model_coefficients_update_var: `Variable` with the same shape and dtype as
-      `model_coefficients_start`.  Used to store the current value of
-      `model_coefficients_update`.
-      Default value: `None` (i.e., a new `Variable` will be created).
     name: Python string representing the name of the TensorFlow operation.
       The default name is `"fit_sparse_one_step"`.
 
@@ -904,7 +866,6 @@ def fit_sparse_one_step(model_matrix,
       maximum_full_sweeps,
       tolerance,
       learning_rate,
-      model_coefficients_update_var,
   ]
   with tf.name_scope(name, 'fit_sparse_one_step', graph_deps):
     predicted_linear_response = _sparse_or_dense_matvecmul(
@@ -922,7 +883,6 @@ def fit_sparse_one_step(model_matrix,
         maximum_full_sweeps=maximum_full_sweeps,
         tolerance=tolerance,
         learning_rate=learning_rate,
-        x_update_var=model_coefficients_update_var,
         name=name)
 
 
@@ -936,7 +896,6 @@ def fit_sparse(model_matrix,
                maximum_iterations=None,
                maximum_full_sweeps_per_iteration=1,
                learning_rate=None,
-               model_coefficients_update_var=None,
                name=None):
   r"""Fits a GLM using coordinate-wise FIM-informed proximal gradient descent.
 
@@ -987,10 +946,6 @@ def fit_sparse(model_matrix,
     learning_rate: scalar, `float` `Tensor` representing a multiplicative factor
       used to dampen the proximal gradient descent steps.
       Default value: `None` (i.e., factor is conceptually `1`).
-    model_coefficients_update_var: `Variable` with the same shape and dtype as
-      `model_coefficients_start`.  Used to store the current value of
-      `model_coefficients_update`.
-      Default value: `None` (i.e., a new `Variable` will be created).
     name: Python string representing the name of the TensorFlow operation.
       The default name is `"fit_sparse"`.
 
@@ -1052,21 +1007,18 @@ def fit_sparse(model_matrix,
     model = tfp.glm.Bernoulli()
     model_coefficients_start = tf.zeros(x_.shape[-1], np.float32)
 
-    with tf.variable_scope(tf.get_variable_scope(), reuse=tf.AUTO_REUSE):
-      model_coefficients, is_converged, num_iter = tfp.glm.fit_sparse(
-          model_matrix=tf.convert_to_tensor(x_),
-          response=tf.convert_to_tensor(y_),
-          model=model,
-          model_coefficients_start=model_coefficients_start,
-          l1_regularizer=800.,
-          l2_regularizer=None,
-          maximum_iterations=10,
-          maximum_full_sweeps_per_iteration=10,
-          tolerance=1e-6,
-          learning_rate=None)
+    model_coefficients, is_converged, num_iter = tfp.glm.fit_sparse(
+        model_matrix=tf.convert_to_tensor(x_),
+        response=tf.convert_to_tensor(y_),
+        model=model,
+        model_coefficients_start=model_coefficients_start,
+        l1_regularizer=800.,
+        l2_regularizer=None,
+        maximum_iterations=10,
+        maximum_full_sweeps_per_iteration=10,
+        tolerance=1e-6,
+        learning_rate=None)
 
-    init_op = tf.global_variables_initializer()
-    sess.run([init_op])
     model_coefficients_, is_converged_, num_iter_ = sess.run([
         model_coefficients, is_converged, num_iter])
 
@@ -1170,7 +1122,6 @@ def fit_sparse(model_matrix,
       # `convergence_criteria_fn`.
       tolerance,
       learning_rate,
-      model_coefficients_update_var,
   ]
   with tf.name_scope(name, 'fit_sparse', graph_deps):
     # TODO(b/111922388): Include dispersion and offset parameters.
@@ -1189,7 +1140,6 @@ def fit_sparse(model_matrix,
         maximum_full_sweeps_per_iteration=maximum_full_sweeps_per_iteration,
         learning_rate=learning_rate,
         tolerance=tolerance,
-        x_update_var=model_coefficients_update_var,
         name=name)
 
 
@@ -1203,7 +1153,6 @@ def _fit_sparse_exact_hessian(model_matrix,  # pylint: disable = missing-docstri
                               maximum_iterations=None,
                               maximum_full_sweeps_per_iteration=1,
                               learning_rate=None,
-                              model_coefficients_update_var=None,
                               name=None):
   graph_deps = [
       model_matrix,
@@ -1217,7 +1166,6 @@ def _fit_sparse_exact_hessian(model_matrix,  # pylint: disable = missing-docstri
       # `convergence_criteria_fn`.
       tolerance,
       learning_rate,
-      model_coefficients_update_var,
   ]
   with tf.name_scope(name, 'fit_sparse_exact_hessian', graph_deps):
     # TODO(b/111922388): Include dispersion and offset parameters.
@@ -1242,5 +1190,4 @@ def _fit_sparse_exact_hessian(model_matrix,  # pylint: disable = missing-docstri
         maximum_full_sweeps_per_iteration=maximum_full_sweeps_per_iteration,
         learning_rate=learning_rate,
         tolerance=tolerance,
-        x_update_var=model_coefficients_update_var,
         name=name)
