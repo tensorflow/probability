@@ -29,6 +29,7 @@ from tensorflow_probability.python.mcmc.util import choose
 from tensorflow_probability.python.mcmc.util import is_namedtuple_like
 from tensorflow_probability.python.mcmc.util import maybe_call_fn_and_grads
 from tensorflow_probability.python.mcmc.util import smart_for_loop
+from tensorflow.contrib import eager as tfe
 from tensorflow.python.framework import test_util
 
 tfd = tfp.distributions
@@ -138,6 +139,27 @@ class GradientTest(tf.test.TestCase):
     fn_result, grads = maybe_call_fn_and_grads(lambda x: d.log_prob(x), x)  # pylint: disable=unnecessary-lambda
     self.assertAllEqual(False, fn_result is None)
     self.assertAllEqual([False], [g is None for g in grads])
+
+  def testNoGradientsNiceError(self):
+    dtype = np.float32
+
+    def fn(x, y):
+      return x**2 + tf.stop_gradient(y)**2
+
+    fn_args = [dtype(3), dtype(3)]
+    # Convert function input to a list of tensors
+    fn_args = [
+        tf.convert_to_tensor(arg, name='arg{}'.format(i))
+        for i, arg in enumerate(fn_args)
+    ]
+    if tfe.executing_eagerly():
+      with self.assertRaisesRegexp(
+          ValueError, 'Encountered `None`.*\n.*fn_arg_list.*\n.*None'):
+        maybe_call_fn_and_grads(fn, fn_args)
+    else:
+      with self.assertRaisesRegexp(
+          ValueError, 'Encountered `None`.*\n.*fn_arg_list.*arg1.*\n.*None'):
+        maybe_call_fn_and_grads(fn, fn_args)
 
 
 class SmartForLoopTest(tf.test.TestCase):

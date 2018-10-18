@@ -242,7 +242,9 @@ def maybe_call_fn_and_grads(fn,
       raise ValueError('Function args must be in one-to-one correspondence '
                        'with grads.')
     if check_non_none_grads and any(g is None for g in grads):
-      raise ValueError('Encountered `None` gradient.')
+      raise ValueError('Encountered `None` gradient.\n'
+                       '  fn_arg_list: {}\n'
+                       '  grads: {}'.format(fn_arg_list, grads))
     return result, grads
 
 
