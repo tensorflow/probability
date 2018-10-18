@@ -129,14 +129,19 @@ def make_simple_step_size_update_policy(num_adaptation_steps=None,
     log_mean_accept_ratio = tf.reduce_logsumexp(
         tf.minimum(kernel_results.log_accept_ratio, 0.)) - log_n
     adjustment = tf.where(
-        log_mean_accept_ratio < tf.log(target_rate),
+        log_mean_accept_ratio < tf.cast(
+            tf.log(target_rate), log_mean_accept_ratio.dtype),
         -decrement_multiplier / (1. + decrement_multiplier),
         increment_multiplier)
 
     def build_assign_op():
       if mcmc_util.is_list_like(step_size_var):
-        return [ss.assign_add(ss * adjustment) for ss in step_size_var]
-      return step_size_var.assign_add(step_size_var * adjustment)
+        return [
+            ss.assign_add(ss * tf.cast(adjustment, ss.dtype))
+            for ss in step_size_var
+        ]
+      return step_size_var.assign_add(
+          step_size_var * tf.cast(adjustment, step_size_var.dtype))
 
     if num_adaptation_steps is None:
       return build_assign_op()
@@ -858,7 +863,7 @@ def _leapfrog_integrator_one_step(
 
     # Step 1: Update momentum.
     proposed_momentum_parts = [
-        v + 0.5 * eps * g
+        v + 0.5 * tf.cast(eps, v.dtype) * g
         for v, eps, g
         in zip(current_momentum_parts,
                step_sizes,
@@ -866,7 +871,7 @@ def _leapfrog_integrator_one_step(
 
     # Step 2: Update state.
     proposed_state_parts = [
-        x + eps * v
+        x + tf.cast(eps, v.dtype) * v
         for x, eps, v
         in zip(current_state_parts,
                step_sizes,
@@ -900,7 +905,7 @@ def _leapfrog_integrator_one_step(
 
     # Step 3b: Update momentum (again).
     proposed_momentum_parts = [
-        v + 0.5 * eps * g
+        v + 0.5 * tf.cast(eps, v.dtype) * g
         for v, eps, g
         in zip(proposed_momentum_parts,
                step_sizes,
