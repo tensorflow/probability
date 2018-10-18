@@ -337,8 +337,7 @@ class Affine(bijector.Bijector):
       return y
     with tf.control_dependencies(self._maybe_check_scale()
                                  if self.validate_args else []):
-      y = tf.squeeze(
-          self.scale.matmul(y[..., tf.newaxis], adjoint=self.adjoint), axis=-1)
+      y = self.scale.matvec(y, adjoint=self.adjoint)
     if self.shift is not None:
       y += self.shift
     return y
@@ -353,8 +352,7 @@ class Affine(bijector.Bijector):
            else self._scale)
       return x / s
     # Solve fails if the op is singular so we may safely skip this assertion.
-    x = tf.squeeze(
-        self.scale.solve(x[..., tf.newaxis], adjoint=self.adjoint), axis=-1)
+    x = self.scale.solvevec(x, adjoint=self.adjoint)
     return x
 
   def _forward_log_det_jacobian(self, x):
