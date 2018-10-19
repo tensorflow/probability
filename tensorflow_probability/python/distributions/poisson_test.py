@@ -31,8 +31,13 @@ tfd = tfp.distributions
 @test_util.run_all_in_graph_and_eager_modes
 class PoissonTest(test_case.TestCase):
 
-  def _make_poisson(self, rate, validate_args=False):
-    return tfd.Poisson(rate=rate, validate_args=validate_args)
+  def _make_poisson(self,
+                    rate,
+                    validate_args=False,
+                    interpolate_nondiscrete=True):
+    return tfd.Poisson(rate=rate,
+                       validate_args=validate_args,
+                       interpolate_nondiscrete=interpolate_nondiscrete)
 
   def testPoissonShape(self):
     lam = tf.constant([3.0] * 5)
@@ -50,12 +55,13 @@ class PoissonTest(test_case.TestCase):
         poisson = self._make_poisson(rate=lam, validate_args=True)
         self.evaluate(poisson.rate)
 
-  def testPoissonLogPmf(self):
+  def testPoissonLogPmfDiscreteMatchesScipy(self):
     batch_size = 12
     lam = tf.constant([3.0] * batch_size)
     lam_v = 3.0
     x = [-3., -0.5, 0., 2., 2.2, 3., 3.1, 4., 5., 5.5, 6., 7.]
-    poisson = self._make_poisson(rate=lam)
+    poisson = self._make_poisson(rate=lam,
+                                 interpolate_nondiscrete=False)
     log_pmf = poisson.log_prob(x)
     self.assertEqual(log_pmf.shape, (batch_size,))
     self.assertAllClose(self.evaluate(log_pmf), stats.poisson.logpmf(x, lam_v))
@@ -63,6 +69,35 @@ class PoissonTest(test_case.TestCase):
     pmf = poisson.prob(x)
     self.assertEqual(pmf.shape, (batch_size,))
     self.assertAllClose(self.evaluate(pmf), stats.poisson.pmf(x, lam_v))
+
+  def testPoissonLogPmfContinuousRelaxation(self):
+    batch_size = 12
+    lam = tf.constant([3.0] * batch_size)
+    x = np.array([-3., -0.5, 0., 2., 2.2, 3., 3.1, 4., 5., 5.5, 6., 7.]).astype(
+        np.float32)
+    poisson = self._make_poisson(rate=lam,
+                                 interpolate_nondiscrete=True)
+
+    expected_continuous_log_pmf = (x * poisson.log_rate - tf.lgamma(1. + x)
+                                   - poisson.rate)
+    neg_inf = tf.fill(
+        tf.shape(expected_continuous_log_pmf),
+        value=np.array(-np.inf,
+                       dtype=expected_continuous_log_pmf.dtype.as_numpy_dtype))
+    expected_continuous_log_pmf = tf.where(x >= 0.,
+                                           expected_continuous_log_pmf,
+                                           neg_inf)
+    expected_continuous_pmf = tf.exp(expected_continuous_log_pmf)
+
+    log_pmf = poisson.log_prob(x)
+    self.assertEqual(log_pmf.get_shape(), (batch_size,))
+    self.assertAllClose(self.evaluate(log_pmf),
+                        self.evaluate(expected_continuous_log_pmf))
+
+    pmf = poisson.prob(x)
+    self.assertEqual(pmf.get_shape(), (batch_size,))
+    self.assertAllClose(self.evaluate(pmf),
+                        self.evaluate(expected_continuous_pmf))
 
   def testPoissonLogPmfGradient(self):
     batch_size = 6
@@ -89,8 +124,10 @@ class PoissonTest(test_case.TestCase):
     lam = tf.constant([3.0] * batch_size)
     x = [-2., -1., -0.5, 0.2, 1.5, 10.5]
 
-    dlog_pmf_dlam = self.compute_gradients(
-        lambda lam: self._make_poisson(rate=lam).log_prob(x), [lam])[0]
+    def poisson_log_prob(lam):
+      return self._make_poisson(
+          rate=lam, interpolate_nondiscrete=False).log_prob(x)
+    dlog_pmf_dlam = self.compute_gradients(poisson_log_prob, [lam])[0]
 
     self.assertEqual(dlog_pmf_dlam.shape, (batch_size,))
     print(dlog_pmf_dlam)
@@ -117,7 +154,7 @@ class PoissonTest(test_case.TestCase):
     lam_v = 3.0
     x = [-3., -0.5, 0., 2., 2.2, 3., 3.1, 4., 5., 5.5, 6., 7.]
 
-    poisson = self._make_poisson(rate=lam)
+    poisson = self._make_poisson(rate=lam, interpolate_nondiscrete=False)
     log_cdf = poisson.log_cdf(x)
     self.assertEqual(log_cdf.shape, (batch_size,))
     self.assertAllClose(self.evaluate(log_cdf), stats.poisson.logcdf(x, lam_v))
@@ -126,14 +163,39 @@ class PoissonTest(test_case.TestCase):
     self.assertEqual(cdf.shape, (batch_size,))
     self.assertAllClose(self.evaluate(cdf), stats.poisson.cdf(x, lam_v))
 
+  def testPoissonCdfContinuousRelaxation(self):
+    batch_size = 12
+    lam = tf.constant([3.0] * batch_size)
+    x = np.array(
+        [-3., -0.5, 0., 2., 2.2, 3., 3.1, 4., 5., 5.5, 6., 7.]).astype(
+            np.float32)
+
+    expected_continuous_cdf = tf.igammac(1. + x, lam)
+    expected_continuous_cdf = tf.where(x >= 0.,
+                                       expected_continuous_cdf,
+                                       tf.zeros_like(expected_continuous_cdf))
+    expected_continuous_log_cdf = tf.log(expected_continuous_cdf)
+
+    poisson = self._make_poisson(rate=lam, interpolate_nondiscrete=True)
+    log_cdf = poisson.log_cdf(x)
+    self.assertEqual(log_cdf.shape, (batch_size,))
+    self.assertAllClose(self.evaluate(log_cdf),
+                        self.evaluate(expected_continuous_log_cdf))
+
+    cdf = poisson.cdf(x)
+    self.assertEqual(cdf.shape, (batch_size,))
+    self.assertAllClose(self.evaluate(cdf),
+                        self.evaluate(expected_continuous_cdf))
+
   def testPoissonCdfGradient(self):
     batch_size = 12
     lam = tf.constant([3.0] * batch_size)
     lam_v = 3.0
     x = [-3., -0.5, 0., 2., 2.2, 3., 3.1, 4., 5., 5.5, 6., 7.]
 
-    dcdf_dlam = self.compute_gradients(
-        lambda lam: self._make_poisson(rate=lam).cdf(x), [lam])[0]
+    def cdf(lam):
+      return self._make_poisson(rate=lam, interpolate_nondiscrete=False).cdf(x)
+    dcdf_dlam = self.compute_gradients(cdf, [lam])[0]
 
     # A finite difference approximation of the derivative.
     eps = 1e-6
@@ -149,7 +211,7 @@ class PoissonTest(test_case.TestCase):
     lam_v = [2.0, 4.0, 5.0]
     x = np.array([[2., 3., 4., 5., 6., 7.]], dtype=np.float32).T
 
-    poisson = self._make_poisson(rate=lam)
+    poisson = self._make_poisson(rate=lam, interpolate_nondiscrete=False)
     log_cdf = poisson.log_cdf(x)
     self.assertEqual(log_cdf.shape, (6, 3))
     self.assertAllClose(self.evaluate(log_cdf), stats.poisson.logcdf(x, lam_v))
@@ -243,8 +305,13 @@ class PoissonTest(test_case.TestCase):
 @test_util.run_all_in_graph_and_eager_modes
 class PoissonLogRateTest(PoissonTest):
 
-  def _make_poisson(self, rate, validate_args=False):
-    return tfd.Poisson(log_rate=tf.log(rate), validate_args=validate_args)
+  def _make_poisson(self,
+                    rate,
+                    validate_args=False,
+                    interpolate_nondiscrete=True):
+    return tfd.Poisson(log_rate=tf.log(rate),
+                       validate_args=validate_args,
+                       interpolate_nondiscrete=interpolate_nondiscrete)
 
   def testInvalidLam(self):
     # No need to worry about the non-negativity of `rate` when using the
