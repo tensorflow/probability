@@ -38,6 +38,8 @@ def common_dtype(args_list, preferred_dtype=None):
       dt = a.dtype.type
     elif contrib_framework.is_tensor(a):
       dt = a.dtype.base_dtype.as_numpy_dtype
+    elif isinstance(a, tf.linalg.LinearOperator):
+      dt = a.dtype.base_dtype.as_numpy_dtype
     else:
       if isinstance(a, list):
         # Allows for nested types, e.g. Normal([np.float16(1.0)], [2.0])

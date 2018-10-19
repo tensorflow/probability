@@ -66,6 +66,7 @@ py_library(
         ":mixture",
         ":mixture_same_family",
         ":multinomial",
+        ":multivariate_student_t",
         ":mvn_diag",
         ":mvn_diag_plus_low_rank",
         ":mvn_full_covariance",
@@ -580,6 +581,23 @@ py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
+    ],
+)
+
+py_library(
+    name = "multivariate_student_t",
+    srcs = ["multivariate_student_t.py"],
+    deps = [
+        ":chi2",
+        ":distribution",
+        ":mvn_linear_operator",
+        ":seed_stream",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/math",
     ],
 )
 
@@ -1347,6 +1365,20 @@ py_test(
         ":multinomial",
         # numpy dep,
         # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "multivariate_student_t_test",
+    srcs = ["multivariate_student_t_test.py"],
+    deps = [
+        ":multivariate_student_t",
+        ":student_t",
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 

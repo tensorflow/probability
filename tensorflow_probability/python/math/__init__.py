@@ -22,6 +22,7 @@ from tensorflow_probability.python.math.custom_gradient import custom_gradient
 from tensorflow_probability.python.math.diag_jacobian import diag_jacobian
 from tensorflow_probability.python.math.linalg import matvecmul
 from tensorflow_probability.python.math.linalg import pinv
+from tensorflow_probability.python.math.numeric import log1psquare
 from tensorflow_probability.python.math.random_ops import random_rademacher
 from tensorflow_probability.python.math.random_ops import random_rayleigh
 
@@ -30,6 +31,7 @@ from tensorflow.python.util.all_util import remove_undocumented
 _allowed_symbols = [
     'custom_gradient',
     'diag_jacobian',
+    'log1psquare',
     'matvecmul',
     'pinv',
     'random_rademacher',

@@ -33,6 +33,7 @@ py_library(
         ":custom_gradient",
         ":diag_jacobian",
         ":linalg",
+        ":numeric",
         ":random_ops",
     ],
 )
@@ -81,6 +82,31 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "numeric",
+    srcs = [
+        "numeric.py",
+    ],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "numeric_test",
+    srcs = [
+        "numeric_test.py",
+    ],
+    deps = [
+        ":numeric",
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 
