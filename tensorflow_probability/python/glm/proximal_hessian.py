@@ -415,14 +415,16 @@ def minimize_sparse_one_step(gradient_unregularized_loss,
     if (x_start.shape.ndims is None or x_start.shape[-1].value is None):
       dims = tf.shape(x_start)[-1]
     else:
-      dims = np.array(x_start.shape[-1].value, np.int32)
+      # TODO(b/117931429): should be able to use np.array instead of Tensor.
+      dims = tf.convert_to_tensor(x_start.shape[-1].value, tf.int32)
 
     if (hessian_unregularized_loss_outer.shape.ndims is None or
         hessian_unregularized_loss_outer.shape[0].value is None):
       num_samples = tf.shape(hessian_unregularized_loss_outer)[0]
     else:
-      num_samples = np.array(
-          hessian_unregularized_loss_outer.shape[0].value, np.int32)
+      # TODO(b/117931429): should be able to use np.array instead of Tensor.
+      num_samples = tf.convert_to_tensor(
+          hessian_unregularized_loss_outer.shape[0].value, tf.int32)
 
     # Hint vector shape for dynamically shaped vector arguments
     if gradient_unregularized_loss.shape.ndims is None:

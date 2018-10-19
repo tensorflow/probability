@@ -68,6 +68,7 @@ def _make_dataset(n, d, link, scale=1., dtype=np.float32):
   return model_matrix, response, model_coefficients, mask
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class _ProximalHessianTest(object):
 
   def adjust_dtype_and_shape_hints(self, x):
@@ -76,9 +77,6 @@ class _ProximalHessianTest(object):
         input=x_, shape=(x_.shape if self.use_static_shape else None))
     return x_
 
-  # TODO(b/111924846): The SparseTensor manipulation used here doesn't work in
-  # eager mode.
-  # @test_util.run_in_graph_and_eager_modes
   def testFindingSparseSolution(self):
     # Test that Proximal Hessian descent prefers sparse solutions when
     # l1_regularizer is large enough.
@@ -132,7 +130,6 @@ class _ProximalHessianTest(object):
     self.assertAllEqual(is_converged_, True)
     self.assertAllClose(w_, expected_w, atol=0., rtol=1e-3)
 
-  @test_util.run_in_graph_and_eager_modes
   def testL2Regularization(self):
     # Define Loss(x) := ||x - a||_2**2, where a is a constant.
     # Set l1_regularizer = 0 and l2_regularizer = 1.
@@ -168,7 +165,6 @@ class _ProximalHessianTest(object):
     self.assertAllEqual(is_converged_, True)
     self.assertAllClose(w_, expected_w, atol=0., rtol=0.03)
 
-  @test_util.run_in_graph_and_eager_modes
   def testNumIter(self):
     # Same as testL2Regularization, except we set
     # maximum_full_sweeps_per_iteration = 1 and check that the number of sweeps
@@ -213,7 +209,6 @@ class _ProximalHessianTest(object):
     self.assertAllEqual(num_iter_, 2)
     self.assertAllClose(w_, expected_w, atol=0., rtol=0.03)
 
-  @test_util.run_in_graph_and_eager_modes
   def testTwoSweepsAreBetterThanOne(self):
     # Compare the log-likelihood after one sweep of fit_sparse to the
     # log-likelihood after two sweeps.  Expect greater log-likelihood after two
@@ -262,7 +257,6 @@ class _ProximalHessianTest(object):
         _joint_log_prob(model_coefficients_2_) -
         _joint_log_prob(model_coefficients_1_), 0)
 
-  @test_util.run_in_graph_and_eager_modes
   def testFitGLMFromData(self):
     # Run fit_sparse where the loss function is negative log likelihood of a
     # synthetic data set generated from a similar model (probit vs. logit).
