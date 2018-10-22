@@ -271,6 +271,15 @@ class PercentileTestWithLowerInterpolation(tf.test.TestCase):
       self.assertAllEqual((), pct.shape)
       self.assertAllClose(expected_percentile, self.evaluate(pct))
 
+  def test_one_dim_odd_input_vector_q(self):
+    x = [1., 5., 3., 2., 4.]
+    q = np.array([0, 10, 25, 49.9, 50, 50.01, 90, 95, 100])
+    expected_percentile = np.percentile(
+        x, q=q, interpolation=self._interpolation, axis=0)
+    pct = tfd.percentile(x, q=q, interpolation=self._interpolation, axis=[0])
+    self.assertAllEqual(q.shape, pct.shape)
+    self.assertAllClose(expected_percentile, self.evaluate(pct))
+
   def test_one_dim_even_input(self):
     x = [1., 5., 3., 2., 4., 5.]
     for q in [0, 10, 25, 49.9, 50, 50.01, 90, 95, 100]:
@@ -321,6 +330,28 @@ class PercentileTestWithLowerInterpolation(tf.test.TestCase):
           x, q=0.77, interpolation=self._interpolation, axis=axis)
       pct = tfd.percentile(
           x, q=0.77, interpolation=self._interpolation, axis=axis)
+      self.assertAllEqual(expected_percentile.shape, pct.shape)
+      self.assertAllClose(expected_percentile, self.evaluate(pct))
+
+  def test_four_dimensional_input_q_vector(self):
+    x = rng.rand(3, 4, 5, 6)
+    q = [0.25, 0.75]
+    for axis in [None, 0, (-1, 1)]:
+      expected_percentile = np.percentile(
+          x, q=q, interpolation=self._interpolation, axis=axis)
+      pct = tfd.percentile(
+          x, q=q, interpolation=self._interpolation, axis=axis)
+      self.assertAllEqual(expected_percentile.shape, pct.shape)
+      self.assertAllClose(expected_percentile, self.evaluate(pct))
+
+  def test_four_dimensional_input_q_vector_and_keepdims(self):
+    x = rng.rand(3, 4, 5, 6)
+    q = [0.25, 0.75]
+    for axis in [None, 0, (-1, 1)]:
+      expected_percentile = np.percentile(
+          x, q=q, interpolation=self._interpolation, axis=axis, keepdims=True)
+      pct = tfd.percentile(
+          x, q=q, interpolation=self._interpolation, axis=axis, keep_dims=True)
       self.assertAllEqual(expected_percentile.shape, pct.shape)
       self.assertAllClose(expected_percentile, self.evaluate(pct))
 
@@ -415,14 +446,14 @@ class PercentileTestWithNearestInterpolation(tf.test.TestCase):
     with self.assertRaisesRegexp(ValueError, "interpolation"):
       tfd.percentile(x, q=0.5, interpolation="bad")
 
-  def test_vector_q_raises_static(self):
+  def test_2d_q_raises_static(self):
     x = [1., 5., 3., 2., 4.]
     with self.assertRaisesRegexp(ValueError, "Expected.*ndims"):
-      tfd.percentile(x, q=[0.5])
+      tfd.percentile(x, q=[[0.5]])
 
-  def test_vector_q_raises_dynamic(self):
+  def test_2d_q_raises_dynamic(self):
     x = [1., 5., 3., 2., 4.]
-    q_ph = tf.placeholder_with_default(input=[0.5], shape=None)
+    q_ph = tf.placeholder_with_default(input=[[0.5]], shape=None)
     pct = tfd.percentile(x, q=q_ph, validate_args=True)
     with self.assertRaisesOpError("rank"):
       self.evaluate(pct)

@@ -207,7 +207,6 @@ def auto_correlation(
 
 
 # TODO(langmore) To make equivalent to numpy.percentile:
-#  Make work with a sequence of floats or single float for 'q'.
 #  Make work with "linear", "midpoint" interpolation. (linear should be default)
 def percentile(x,
                q,
@@ -216,7 +215,7 @@ def percentile(x,
                keep_dims=False,
                validate_args=False,
                name=None):
-  """Compute the `q`-th percentile of `x`.
+  """Compute the `q`-th percentile(s) of `x`.
 
   Given a vector `x`, the `q`-th percentile of `x` is the value `q / 100` of the
   way from the minimum to the maximum in a sorted copy of `x`.
@@ -228,6 +227,9 @@ def percentile(x,
   This function is the same as the median if `q = 50`, the same as the minimum
   if `q = 0` and the same as the maximum if `q = 100`.
 
+  Multiple percentiles can be computed at once by using `1-D` vector `q`.
+  Dimension zero of the returned `Tensor` will index the different percentiles.
+
 
   ```python
   # Get 30th percentile with default ('nearest') interpolation.
@@ -235,16 +237,16 @@ def percentile(x,
   percentile(x, q=30.)
   ==> 2.0
 
-  # Get 30th percentile with 'lower' interpolation
+  # Get 30th and 70th percentiles with 'lower' interpolation
   x = [1., 2., 3., 4.]
-  percentile(x, q=30., interpolation='lower')
-  ==> 1.0
+  percentile(x, q=[30., 70.], interpolation='lower')
+  ==> [1., 3.]
 
   # Get 100th percentile (maximum).  By default, this is computed over every dim
   x = [[1., 2.]
        [3., 4.]]
   percentile(x, q=100.)
-  ==> 4.0
+  ==> 4.
 
   # Treat the leading dim as indexing samples, and find the 100th quantile (max)
   # over all such samples.
@@ -259,7 +261,7 @@ def percentile(x,
   Args:
     x:  Floating point `N-D` `Tensor` with `N > 0`.  If `axis` is not `None`,
       `x` must have statically known number of dimensions.
-    q:  Scalar `Tensor` in `[0, 100]`. The percentile.
+    q:  Scalar or vector `Tensor` with values in `[0, 100]`. The percentile(s).
     axis:  Optional `0-D` or `1-D` integer `Tensor` with constant values.
       The axis that hold independent samples over which to return the desired
       percentile.  If `None` (the default), treat every dimension as a sample
@@ -277,8 +279,9 @@ def percentile(x,
     name:  A Python string name to give this `Op`.  Default is "percentile"
 
   Returns:
-    A `(N - len(axis))` dimensional `Tensor` of same dtype as `x`, or, if
-      `axis` is `None`, a scalar.
+    A `(rank(q) + N - len(axis))` dimensional `Tensor` of same dtype as `x`, or,
+      if `axis` is `None`, a `rank(q)` `Tensor`.  The first `rank(q)` dimensions
+      index quantiles for different values of `q`.
 
   Raises:
     ValueError:  If argument 'interpolation' is not an allowed type.
@@ -298,11 +301,11 @@ def percentile(x,
     # Double is needed here and below, else we get the wrong index if the array
     # is huge along axis.
     q = tf.to_double(q, name="q")
-    _get_static_ndims(q, expect_ndims=0)
+    _get_static_ndims(q, expect_ndims_no_more_than=1)
 
     if validate_args:
       q = control_flow_ops.with_dependencies([
-          tf.assert_rank(q, 0),
+          tf.assert_rank_in(q, [0, 1]),
           tf.assert_greater_equal(q, tf.to_double(0.)),
           tf.assert_less_equal(q, tf.to_double(100.))
       ], q)
@@ -326,41 +329,47 @@ def percentile(x,
       x_ndims = _get_static_ndims(
           x, expect_static=True, expect_ndims_at_least=1)
       axis = _make_static_axis_non_negative(axis, x_ndims)
+      # Move dims in axis to the end, since _sort_tensor, which calls top_k,
+      # only sorts the last dim.
       y = _move_dims_to_flat_end(x, axis, x_ndims)
 
     frac_at_q_or_above = 1. - q / 100.
     d = tf.to_double(tf.shape(y)[-1])
 
     if interpolation == "lower":
-      index = tf.ceil((d - 1) * frac_at_q_or_above)
+      indices = tf.ceil((d - 1) * frac_at_q_or_above)
     elif interpolation == "higher":
-      index = tf.floor((d - 1) * frac_at_q_or_above)
+      indices = tf.floor((d - 1) * frac_at_q_or_above)
     elif interpolation == "nearest":
-      index = tf.round((d - 1) * frac_at_q_or_above)
+      indices = tf.round((d - 1) * frac_at_q_or_above)
 
     # If d is gigantic, then we would have d == d - 1, even in double... So
     # let's use max/min to avoid out of bounds errors.
     d = tf.shape(y)[-1]
     # d - 1 will be distinct from d in int32.
-    index = tf.clip_by_value(tf.to_int32(index), 0, d - 1)
+    indices = tf.clip_by_value(tf.to_int32(indices), 0, d - 1)
 
     # Sort everything, not just the top 'k' entries, which allows multiple calls
     # to sort only once (under the hood) and use CSE.
     sorted_y = _sort_tensor(y)
 
-    # result.shape = B
-    result = sorted_y[..., index]
-    result.set_shape(y.shape[:-1])
+    # Gather the indices along the sorted (last) dimension.
+    # If q is a vector, the last dim of gathered_y indexes different q[i].
+    gathered_y = tf.gather(sorted_y, indices, axis=-1)
 
     if keep_dims:
       if axis is None:
-        # ones_vec = [1, 1,..., 1], total length = len(S) + len(B).
-        ones_vec = tf.ones(shape=[_get_best_effort_ndims(x)], dtype=tf.int32)
-        result *= tf.ones(ones_vec, dtype=x.dtype)
+        ones_vec = tf.ones(
+            shape=[_get_best_effort_ndims(x) + _get_best_effort_ndims(q)],
+            dtype=tf.int32)
+        gathered_y *= tf.ones(ones_vec, dtype=x.dtype)
       else:
-        result = _insert_back_keep_dims(result, axis)
+        gathered_y = _insert_back_keep_dims(gathered_y, axis)
 
-    return result
+    # If q is a scalar, then result has the right shape.
+    # If q is a vector, then result has trailing dim of shape q.shape, which
+    # needs to be rotated to dim 0.
+    return util.rotate_transpose(gathered_y, tf.rank(q))
 
 
 def _get_static_ndims(x,
@@ -521,4 +530,5 @@ def _move_dims_to_flat_end(x, axis, x_ndims):
 def _sort_tensor(tensor):
   """Use `top_k` to sort a `Tensor` along the last dimension."""
   sorted_, _ = tf.nn.top_k(tensor, k=tf.shape(tensor)[-1])
+  sorted_.set_shape(tensor.shape)
   return sorted_
