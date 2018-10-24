@@ -232,8 +232,7 @@ class Binomial(distribution.Distribution):
 
   def _log_unnormalized_prob(self, counts):
     counts = self._maybe_assert_valid_sample(counts)
-    return (counts * tf.log(self.probs) +
-            (self.total_count - counts) * tf.log1p(-self.probs))
+    return counts * self.logits - self.total_count * tf.nn.softplus(self.logits)
 
   def _log_normalization(self, counts):
     counts = self._maybe_assert_valid_sample(counts)
