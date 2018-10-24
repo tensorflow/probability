@@ -19,7 +19,7 @@ upper_tabs:
 # Dropdown menu
 - name: Ecosystem
   path: /ecosystem
-  is_default: True
+  is_default: true
   menu:
   - include: /ecosystem/_menu_toc.yaml
   lower_tabs:
