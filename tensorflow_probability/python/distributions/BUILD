@@ -96,6 +96,7 @@ py_library(
         ":von_mises",
         ":von_mises_fisher",
         ":wishart",
+        ":zipf",
         "//tensorflow_probability/python/distributions/internal",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:reparameterization",
@@ -954,6 +955,16 @@ py_library(
     ],
 )
 
+py_library(
+    name = "zipf",
+    srcs = ["zipf.py"],
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+    ],
+)
+
 py_test(
     name = "autoregressive_test",
     size = "small",
@@ -1748,5 +1759,18 @@ py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+    ],
+)
+
+py_test(
+    name = "zipf_test",
+    size = "large",
+    srcs = ["zipf_test.py"],
+    deps = [
+        ":distributions",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )

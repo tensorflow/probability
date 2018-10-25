@@ -960,11 +960,11 @@ def embed_check_categorical_event_shape(
       ], x)
 
 
-def embed_check_integer_casting_closed(
-    x,
-    target_dtype,
-    assert_nonnegative=True,
-    name="embed_check_casting_closed"):
+def embed_check_integer_casting_closed(x,
+                                       target_dtype,
+                                       assert_nonnegative=True,
+                                       assert_positive=False,
+                                       name="embed_check_casting_closed"):
   """Ensures integers remain unaffected despite casting to/from int/float types.
 
   Example integer-types: `uint8`, `int32`, `bool`.
@@ -983,6 +983,7 @@ def embed_check_integer_casting_closed(
     x: `Tensor` representing integer-form values.
     target_dtype: TF `dtype` under which `x` should have identical values.
     assert_nonnegative: `bool` indicating `x` should contain nonnegative values.
+    assert_positive: `bool` indicating `x` should contain positive values.
     name: A name for this operation (optional).
 
   Returns:
@@ -1011,7 +1012,11 @@ def embed_check_integer_casting_closed(
                           x, x.dtype.name, target_dtype.name))
 
     assertions = []
-    if assert_nonnegative:
+    if assert_positive:
+      assertions += [
+          tf.assert_positive(x, message="Elements must be positive."),
+      ]
+    elif assert_nonnegative:
       assertions += [
           tf.assert_non_negative(
               x, message="Elements must be non-negative."),

@@ -974,6 +974,14 @@ class EmbedCheckIntegerCastingClosedTest(tf.test.TestCase):
             x, target_dtype=tf.int16)
         x_checked.eval(feed_dict={x: np.array([1, -1], dtype=np.float16)})
 
+  def testCorrectlyAssertsPositive(self):
+    with self.cached_session():
+      with self.assertRaisesOpError("Elements must be positive"):
+        x = tf.placeholder(dtype=tf.float16)
+        x_checked = distribution_util.embed_check_integer_casting_closed(
+            x, target_dtype=tf.int16, assert_positive=True)
+        x_checked.eval(feed_dict={x: np.array([1, 0], dtype=np.float16)})
+
   def testCorrectlyAssersIntegerForm(self):
     with self.cached_session():
       with self.assertRaisesOpError("Elements must be int16-equivalent."):

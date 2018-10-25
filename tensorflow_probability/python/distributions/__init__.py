@@ -100,6 +100,7 @@ from tensorflow_probability.python.distributions.vector_sinh_arcsinh_diag import
 from tensorflow_probability.python.distributions.von_mises import VonMises
 from tensorflow_probability.python.distributions.von_mises_fisher import VonMisesFisher
 from tensorflow_probability.python.distributions.wishart import Wishart
+from tensorflow_probability.python.distributions.zipf import Zipf
 
 from tensorflow_probability.python.internal.distribution_util import fill_triangular
 from tensorflow_probability.python.internal.distribution_util import fill_triangular_inverse
@@ -201,6 +202,7 @@ __all__ = [
     'Pareto',
     'RelaxedBernoulli',
     'RelaxedOneHotCategorical',
+    'Zipf',
     'kl_divergence',
     'RegisterKL',
     'fill_triangular',
