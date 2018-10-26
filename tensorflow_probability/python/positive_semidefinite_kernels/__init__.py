@@ -33,6 +33,7 @@ _allowed_symbols = [
     'MaternFiveHalves',
     'MaternOneHalf',
     'MaternThreeHalves',
+    'RationalQuadratic',
     'PositiveSemidefiniteKernel',
 ]
 

@@ -122,3 +122,25 @@ py_test(
         "//tensorflow_probability",
     ],
 )
+
+py_library(
+    name = "rational_quadratic",
+    srcs = ["rational_quadratic.py"],
+    deps = [
+        ":positive_semidefinite_kernel",
+        # six dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/positive_semidefinite_kernels/internal:util",
+    ],
+)
+
+py_test(
+    name = "rational_quadratic_test",
+    srcs = ["rational_quadratic_test.py"],
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
