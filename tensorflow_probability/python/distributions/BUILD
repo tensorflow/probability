@@ -87,6 +87,7 @@ py_library(
         ":sinh_arcsinh",
         ":student_t",
         ":transformed_distribution",
+        ":triangular",
         ":truncated_normal",
         ":uniform",
         ":vector_diffeomixture",
@@ -781,6 +782,19 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:reparameterization",
+    ],
+)
+
+py_library(
+    name = "triangular",
+    srcs = ["triangular.py"],
+    deps = [
+        ":distribution",
+        ":seed_stream",
+        # numpy dep,
+        # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
     ],
@@ -1639,6 +1653,19 @@ py_test(
         ":student_t",
         # numpy dep,
         # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "triangular_test",
+    srcs = ["triangular_test.py"],
+    deps = [
+        ":triangular",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions/internal:statistical_testing",
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 

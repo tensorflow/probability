@@ -89,6 +89,7 @@ from tensorflow_probability.python.distributions.seed_stream import SeedStream
 from tensorflow_probability.python.distributions.sinh_arcsinh import SinhArcsinh
 from tensorflow_probability.python.distributions.student_t import StudentT
 from tensorflow_probability.python.distributions.transformed_distribution import TransformedDistribution
+from tensorflow_probability.python.distributions.triangular import Triangular
 from tensorflow_probability.python.distributions.truncated_normal import TruncatedNormal
 from tensorflow_probability.python.distributions.uniform import Uniform
 from tensorflow_probability.python.distributions.vector_diffeomixture import quadrature_scheme_softmaxnormal_gauss_hermite
@@ -175,6 +176,7 @@ __all__ = [
     'SinhArcsinh',
     'StudentT',
     'StudentTWithAbsDfSoftplusScale',
+    'Triangular',
     'TruncatedNormal',
     'Uniform',
     'MultivariateNormalDiag',
