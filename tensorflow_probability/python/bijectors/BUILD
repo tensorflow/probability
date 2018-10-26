@@ -50,6 +50,7 @@ py_library(
         ":kumaraswamy",
         ":masked_autoregressive",
         ":matrix_inverse_tril",
+        ":normal_cdf",
         ":ordered",
         ":permute",
         ":power_transform",
@@ -248,6 +249,16 @@ py_library(
     deps = [
         ":bijector",
         # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "normal_cdf",
+    srcs = ["normal_cdf.py"],
+    deps = [
+        ":bijector",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:special_math",
     ],
 )
 
@@ -647,6 +658,17 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "normal_cdf_test",
+    srcs = ["normal_cdf_test.py"],
+    deps = [
+        ":bijector_test_util",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
     ],
 )
 
