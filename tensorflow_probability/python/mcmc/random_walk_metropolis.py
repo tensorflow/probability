@@ -492,7 +492,7 @@ class UncalibratedRandomWalk(kernel_base.TransitionKernel):
   @property
   def parameters(self):
     """Return `dict` of ``__init__`` arguments and their values."""
-    return self._impl.inner_kernel.parameters
+    return self._parameters
 
   @property
   def is_calibrated(self):
