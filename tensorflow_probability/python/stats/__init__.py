@@ -12,32 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Functions for computing statistics of samples."""
-
+"""Statistical functions."""
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from tensorflow_probability.python import stats
-from tensorflow.python.util import deprecation
+# pylint: disable=unused-import,line-too-long,g-importing-member
+
+from tensorflow_probability.python.stats.sample_stats import auto_correlation
+from tensorflow_probability.python.stats.sample_stats import covariance
+from tensorflow_probability.python.stats.sample_stats import percentile
+from tensorflow_probability.python.stats.sample_stats import variance
+
+# pylint: enable=unused-import,wildcard-import,line-too-long,g-importing-member
+
+from tensorflow.python.util.all_util import remove_undocumented
 
 __all__ = [
-    "auto_correlation",
-    "percentile",
+    'auto_correlation',
+    'covariance',
+    'percentile',
+    'variance',
 ]
 
-
-auto_correlation_deprecator = deprecation.deprecated(
-    "2018-10-01",
-    "auto_correlation is moved to the `stats` namespace.  Access it via: "
-    "`tfp.stats.auto_correlation`.",
-    warn_once=True)
-auto_correlation = auto_correlation_deprecator(stats.auto_correlation)
-
-
-percentile_deprecator = deprecation.deprecated(
-    "2018-10-01",
-    "percentile is moved to the `stats` namespace.  Access it via: "
-    "`tfp.stats.percentile`.",
-    warn_once=True)
-percentile = percentile_deprecator(stats.percentile)
+remove_undocumented(__name__, __all__)
