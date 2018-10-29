@@ -42,6 +42,7 @@ py_library(
         ":conditional_bijector",
         ":discrete_cosine_transform",
         ":exp",
+        ":expm1",
         ":fill_triangular",
         ":gumbel",
         ":identity",
@@ -181,6 +182,15 @@ py_library(
     name = "exp",
     srcs = ["exp.py"],
     deps = [":power_transform"],
+)
+
+py_library(
+    name = "expm1",
+    srcs = ["expm1.py"],
+    deps = [
+        ":bijector",
+        # tensorflow dep,
+    ],
 )
 
 py_library(
@@ -559,6 +569,18 @@ py_test(
     name = "exp_test",
     size = "small",
     srcs = ["exp_test.py"],
+    deps = [
+        ":bijector_test_util",
+        ":bijectors",
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "expm1_test",
+    size = "small",
+    srcs = ["expm1_test.py"],
     deps = [
         ":bijector_test_util",
         ":bijectors",

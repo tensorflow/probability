@@ -32,6 +32,7 @@ from tensorflow_probability.python.bijectors.cholesky_to_inv_cholesky import Cho
 from tensorflow_probability.python.bijectors.conditional_bijector import ConditionalBijector
 from tensorflow_probability.python.bijectors.discrete_cosine_transform import DiscreteCosineTransform
 from tensorflow_probability.python.bijectors.exp import Exp
+from tensorflow_probability.python.bijectors.expm1 import Expm1
 from tensorflow_probability.python.bijectors.fill_triangular import FillTriangular
 from tensorflow_probability.python.bijectors.gumbel import Gumbel
 from tensorflow_probability.python.bijectors.identity import Identity
@@ -78,6 +79,7 @@ __all__ = [
     "ConditionalBijector",
     "DiscreteCosineTransform",
     "Exp",
+    "Expm1",
     "FillTriangular",
     "Gumbel",
     "Identity",
