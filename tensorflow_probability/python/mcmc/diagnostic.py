@@ -24,7 +24,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python import stats
 from tensorflow.python.framework import tensor_util
 
 __all__ = [
@@ -156,7 +156,7 @@ def _effective_sample_size_single_state(states, filter_beyond_lag,
     dt = states.dtype
 
     # filter_beyond_lag == None ==> auto_corr is the full sequence.
-    auto_corr = tfd.auto_correlation(
+    auto_corr = stats.auto_correlation(
         states, axis=0, max_lags=filter_beyond_lag)
     if filter_threshold is not None:
       filter_threshold = tf.convert_to_tensor(
