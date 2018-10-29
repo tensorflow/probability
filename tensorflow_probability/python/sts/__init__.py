@@ -18,6 +18,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from tensorflow_probability.python.sts.fitting import build_factored_variational_loss
+from tensorflow_probability.python.sts.fitting import fit_with_hmc
+from tensorflow_probability.python.sts.fitting import sample_uniform_initial_state
 from tensorflow_probability.python.sts.local_linear_trend import LocalLinearTrend
 from tensorflow_probability.python.sts.local_linear_trend import LocalLinearTrendStateSpaceModel
 from tensorflow_probability.python.sts.seasonal import Seasonal
@@ -36,6 +39,9 @@ _allowed_symbols = [
     'SeasonalStateSpaceModel',
     'StructuralTimeSeries',
     'Sum',
+    'build_factored_variational_loss',
+    'fit_with_hmc',
+    'sample_uniform_initial_state'
 ]
 
 remove_undocumented(__name__, _allowed_symbols)
