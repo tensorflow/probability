@@ -22,10 +22,10 @@ import importlib
 import numpy as np
 import tensorflow as tf
 
-from tensorflow.python.ops.distributions.kullback_leibler import kl_divergence
-from tensorflow.python.eager import backprop
 from tensorflow_probability.python.distributions import laplace as laplace_lib
+from tensorflow.python.eager import backprop
 from tensorflow.python.framework import test_util
+from tensorflow.python.ops.distributions.kullback_leibler import kl_divergence
 
 tfe = tf.contrib.eager
 

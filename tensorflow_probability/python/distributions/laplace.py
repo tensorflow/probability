@@ -203,6 +203,7 @@ class Laplace(distribution.Distribution):
   def _z(self, x):
     return (x - self.loc) / self.scale
 
+
 @kullback_leibler.RegisterKL(Laplace, tf.distributions.Laplace)
 @kullback_leibler.RegisterKL(tf.distributions.Laplace, Laplace)
 @kullback_leibler.RegisterKL(Laplace, Laplace)
