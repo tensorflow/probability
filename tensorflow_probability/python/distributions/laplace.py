@@ -225,5 +225,5 @@ def _kl_laplace_laplace(a, b, name=None):
     distance = tf.abs(a.loc - b.loc)
     ratio = a.scale / b.scale
 
-    return -tf.log(ratio) - 1 + distance / b.scale + \
-           ratio * tf.exp(-distance / a.scale)
+    return (-tf.log(ratio) - 1 + distance / b.scale +
+           ratio * tf.exp(-distance / a.scale))

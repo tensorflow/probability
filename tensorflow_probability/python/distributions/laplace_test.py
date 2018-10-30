@@ -359,7 +359,6 @@ class LaplaceTest(tf.test.TestCase):
     ratio = a_scale / b_scale
     true_kl = (-tf.log(ratio) - 1 + distance / b_scale +
                ratio * tf.exp(-distance / a_scale))
-              ratio * tf.exp(-distance / a_scale)
 
     kl = kl_divergence(a, b)
     true_kl_, kl_ = self.evaluate([true_kl, kl])
