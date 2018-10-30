@@ -22,12 +22,13 @@ import importlib
 import numpy as np
 import tensorflow as tf
 
-from tensorflow.python.framework import test_util
 from tensorflow.python.ops.distributions.kullback_leibler import kl_divergence
 from tensorflow.python.eager import backprop
 from tensorflow_probability.python.distributions import laplace as laplace_lib
+from tensorflow.python.framework import test_util
 
 tfe = tf.contrib.eager
+
 
 def try_import(name):  # pylint: disable=invalid-name
   module = None

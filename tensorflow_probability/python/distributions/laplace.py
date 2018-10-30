@@ -218,7 +218,7 @@ def _kl_laplace_laplace(a, b, name=None):
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.name_scope(name, 'kl_laplace_laplace',
+  with tf.name_scope(name, "kl_laplace_laplace",
                      [a.loc, b.loc, a.scale, b.scale]):
     # Consistent with
     # http://www.mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 38
@@ -226,4 +226,4 @@ def _kl_laplace_laplace(a, b, name=None):
     ratio = a.scale / b.scale
 
     return (-tf.log(ratio) - 1 + distance / b.scale +
-           ratio * tf.exp(-distance / a.scale))
+            ratio * tf.exp(-distance / a.scale))
