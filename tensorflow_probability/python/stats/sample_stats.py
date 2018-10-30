@@ -308,9 +308,12 @@ def covariance(x,
       batch_axis, _ = tf.setdiff1d(
           tf.range(0, tf.rank(x)), tf.concat((sample_axis, event_axis), 0))
 
-    event_axis = tf.convert_to_tensor(event_axis, name='event_axis')
-    sample_axis = tf.convert_to_tensor(sample_axis, name='sample_axis')
-    batch_axis = tf.convert_to_tensor(batch_axis, name='batch_axis')
+    event_axis = tf.convert_to_tensor(
+        event_axis, name='event_axis', dtype=tf.int32)
+    sample_axis = tf.convert_to_tensor(
+        sample_axis, name='sample_axis', dtype=tf.int32)
+    batch_axis = tf.convert_to_tensor(
+        batch_axis, name='batch_axis', dtype=tf.int32)
 
     # Permute x/y until shape = B + E + S
     perm_for_xy = tf.concat((batch_axis, event_axis, sample_axis), 0)
@@ -527,7 +530,7 @@ def percentile(x,
     if axis is None:
       y = tf.reshape(x, [-1])
     else:
-      axis = tf.convert_to_tensor(axis, name='axis')
+      axis = tf.convert_to_tensor(axis, name='axis', dtype=tf.int32)
       tf.assert_integer(axis)
       axis_ndims = _get_static_ndims(
           axis, expect_static=True, expect_ndims_no_more_than=1)
@@ -775,7 +778,7 @@ def _make_positive_axis(axis, ndims):
   """Rectify possibly negatively axis. Prefer return Python list."""
   axis = _make_list_or_1d_tensor(axis)
 
-  ndims = tf.convert_to_tensor(ndims, name='ndims')
+  ndims = tf.convert_to_tensor(ndims, name='ndims', dtype=tf.int32)
   ndims_ = tensor_util.constant_value(ndims)
 
   if _is_list_like(axis) and ndims_ is not None:
@@ -787,7 +790,7 @@ def _make_positive_axis(axis, ndims):
       positive_axis.append(a)
   else:
     # Dynamic case
-    axis = tf.convert_to_tensor(axis, name='axis')
+    axis = tf.convert_to_tensor(axis, name='axis', dtype=tf.int32)
     positive_axis = tf.where(axis >= 0, axis, axis + ndims)
 
   return positive_axis
@@ -798,7 +801,7 @@ def _squeeze(x, axis):
   x = tf.convert_to_tensor(x, name='x')
   if axis is None:
     return tf.squeeze(x, axis=None)
-  axis = tf.convert_to_tensor(axis, name='axis')
+  axis = tf.convert_to_tensor(axis, name='axis', dtype=tf.int32)
   axis += tf.zeros([1], dtype=axis.dtype)  # Make axis at least 1d.
   keep_axis, _ = tf.setdiff1d(tf.range(0, tf.rank(x)), axis)
   return tf.reshape(x, tf.gather(tf.shape(x), keep_axis))

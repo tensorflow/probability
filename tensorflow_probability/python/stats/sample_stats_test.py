@@ -613,6 +613,14 @@ class CovarianceTest(tf.test.TestCase):
     with self.assertRaisesRegexp(ValueError, 'overlapped'):
       tfp.stats.covariance(x, y, sample_axis=[0, 1], event_axis=[1, 2])
 
+  def test_batch_vector_shape_dtype_ok(self):
+    # Test addresses a particular bug.
+    x = tf.ones((5, 2))
+    # This next line failed, due to concatenating [float32, int32, int32]
+    # traceback went to tf.concat((batch_axis, event_axis, sample_axis), 0)
+    # Test passes when this does not fail.
+    tfp.stats.covariance(x)
+
 
 @test_util.run_all_in_graph_and_eager_modes
 class VarianceTest(tf.test.TestCase):
