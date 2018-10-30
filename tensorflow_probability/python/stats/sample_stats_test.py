@@ -623,6 +623,35 @@ class CovarianceTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
+class CholeskyCovarianceTest(tf.test.TestCase):
+
+  def test_batch_vector_sampaxis1_eventaxis2(self):
+    # x.shape = [2, 5000, 2],
+    # 2-batch members, 5000 samples each, events in R^2.
+    x0 = rng.randn(5000, 2)
+    x1 = 2 * rng.randn(5000, 2)
+    x = np.stack((x0, x1), axis=0)
+
+    # chol.shape = [2 (batch), 2x2 (event x event)]
+    chol = tfp.stats.cholesky_covariance(x, sample_axis=1)
+    chol_kd = tfp.stats.cholesky_covariance(x, sample_axis=1, keepdims=True)
+
+    # Make sure static shape of keepdims works
+    self.assertAllEqual((2, 2, 2), chol.shape)
+    self.assertAllEqual((2, 1, 2, 2), chol_kd.shape)
+
+    chol, chol_kd = self.evaluate([chol, chol_kd])
+
+    # keepdims should not change the numbers in the result.
+    self.assertAllEqual(chol, np.squeeze(chol_kd, axis=1))
+
+    # Covariance is trivial since these are independent normals.
+    # Tolerance chosen to be 2x the lowest passing atol.
+    self.assertAllClose(np.eye(2), chol[0, ...], atol=0.06)
+    self.assertAllClose(2 * np.eye(2), chol[1, ...], atol=0.06)
+
+
+@test_util.run_all_in_graph_and_eager_modes
 class VarianceTest(tf.test.TestCase):
   """Light test:  Most methods tested implicitly by CovarianceTest."""
 
@@ -640,6 +669,26 @@ class VarianceTest(tf.test.TestCase):
     self.assertAllEqual(var, var_kd.reshape(()))
 
     self.assertAllClose(np.var(x), var)
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class StddevTest(tf.test.TestCase):
+  """Light test:  Most methods tested implicitly by VarianceTest."""
+
+  def test_independent_uniform_samples(self):
+    x = rng.rand(10, 10, 10)
+
+    stddev = tfp.stats.stddev(x, sample_axis=[1, -1])
+    self.assertAllEqual((10,), stddev.shape)
+
+    stddev_kd = tfp.stats.stddev(x, sample_axis=[1, -1], keepdims=True)
+    self.assertAllEqual((10, 1, 1), stddev_kd.shape)
+
+    stddev, stddev_kd = self.evaluate([stddev, stddev_kd])
+
+    self.assertAllEqual(stddev, stddev_kd.reshape((10,)))
+
+    self.assertAllClose(np.std(x, axis=(1, -1)), stddev)
 
 
 if __name__ == '__main__':

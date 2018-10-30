@@ -28,9 +28,11 @@ from tensorflow.python.ops import control_flow_ops
 
 __all__ = [
     'auto_correlation',
+    'cholesky_covariance',
     'covariance',
-    'variance',
     'percentile',
+    'stddev',
+    'variance',
 ]
 
 
@@ -207,6 +209,77 @@ def auto_correlation(x,
     return util.rotate_transpose(shifted_product_rotated, -shift)
 
 
+def cholesky_covariance(x, sample_axis=0, keepdims=False, name=None):
+  """Cholesky factor of the covariance matrix of vector-valued random samples.
+
+  This function can be use to fit a multivariate normal to data.
+
+  ```python
+  tf.enable_eager_execution()
+  import tensorflow_probability as tfp
+  tfd = tfp.distributions
+
+  # Assume data.shape = (1000, 2).  1000 samples of a random variable in R^2.
+  observed_data = read_data_samples(...)
+
+  # The mean is easy
+  mu = tf.reduce_mean(observed_data, axis=0)
+
+  # Get the scale matrix
+  L = tfp.stats.cholesky_covariance(observed_data)
+
+  # Make the best fit multivariate normal (under maximum likelihood condition).
+  mvn = tfd.MultivariateNormalTriL(loc=mu, scale_tril=L)
+
+  # Plot contours of the pdf.
+  xs, ys = tf.meshgrid(
+      tf.linspace(-5., 5., 50), tf.linspace(-5., 5., 50), indexing='ij')
+  xy = tf.stack((tf.reshape(xs, [-1]), tf.reshape(ys, [-1])), axis=-1)
+  pdf = tf.reshape(mvn.prob(xy), (50, 50))
+  CS = plt.contour(xs, ys, pdf, 10)
+  plt.clabel(CS, inline=1, fontsize=10)
+  ```
+
+  Why does this work?
+  Given vector-valued random variables `X = (X1, ..., Xd)`, one may obtain the
+  sample covariance matrix in `R^{d x d}` (see `tfp.stats.covariance`).
+
+  The [Cholesky factor](https://en.wikipedia.org/wiki/Cholesky_decomposition)
+  of this matrix is analogous to standard deviation for scalar random variables:
+  Suppose `X` has covariance matrix `C`, with Cholesky factorization `C = L L^T`
+  Then multiplying a vector of iid random variables which have unit variance by
+  `L` produces a vector with covariance `L L^T`, which is the same as `X`.
+
+  ```python
+  observed_data = read_data_samples(...)
+  L = tfp.stats.cholesky_covariance(observed_data, sample_axis=0)
+
+  # Make fake_data with the same covariance as observed_data.
+  uncorrelated_normal = tf.random_normal(shape=(500, 10))
+  fake_data = tf.matmul(L, uncorrelated_normal[..., tf.newaxis])[..., 0]
+  ```
+
+  Args:
+    x:  Numeric `Tensor`.  The rightmost dimension of `x` indexes events. E.g.
+      dimensions of a random vector.
+    sample_axis: Scalar or vector `Tensor` designating axis holding samples.
+      Default value: `0` (leftmost dimension). Cannot be the rightmost dimension
+        (since this indexes events).
+    keepdims:  Boolean.  Whether to keep the sample axis as singletons.
+    name: Python `str` name prefixed to Ops created by this function.
+          Default value: `None` (i.e., `'covariance'`).
+
+  Returns:
+    chol:  `Tensor` of same `dtype` as `x`.  The last two dimensions hold
+      lower triangular matrices (the Cholesky factors).
+  """
+  with tf.name_scope(name, 'cholesky_covariance', values=[x, sample_axis]):
+    sample_axis = tf.convert_to_tensor(sample_axis, dtype=tf.int32)
+    cov = covariance(
+        x, sample_axis=sample_axis, event_axis=-1, keepdims=keepdims)
+    return tf.cholesky(cov)
+
+
 def covariance(x,
                y=None,
                sample_axis=0,
@@ -215,7 +288,8 @@ def covariance(x,
                name=None):
   """Estimate covariance between members of `event_axis`.
 
-  Sample covariance for scalars is defined as:
+  Given `N` samples of scalar random variables `X` and `Y`, covariance may be
+  estimated as
 
   ```none
   Cov[X, Y] := N^{-1} sum_{n=1}^N (X_n - Xbar) Conj{(Y_n - Ybar)}
@@ -223,18 +297,18 @@ def covariance(x,
   Ybar := N^{-1} sum_{n=1}^N Y_n
   ```
 
-  For vectors `X = (X1, ..., XN)`, `Y = (Y1, ..., YN)`, one is often interested
-  in the covariance matrix, `C_{ij} := Cov[Xi, Yj]`.
+  For vector-valued random variables `X = (X1, ..., Xd)`, `Y = (Y1, ..., Yd)`,
+  one is often interested in the covariance matrix, `C_{ij} := Cov[Xi, Yj]`.
 
   ```python
   x = tf.random_normal(shape=(100, 2, 3))
   y = tf.random_normal(shape=(100, 2, 3))
 
   # cov[i, j] is the sample covariance between x[:, i, j] and y[:, i, j].
-  cov = covariance(x, y, sample_axis=0, event_axis=None)
+  cov = tfp.stats.covariance(x, y, sample_axis=0, event_axis=None)
 
   # cov_matrix[i, m, n] is the sample covariance of x[:, i, m] and y[:, i, n]
-  cov_matrix = covariance(x, y, sample_axis=0, event_axis=-1)
+  cov_matrix = tfp.stats.covariance(x, y, sample_axis=0, event_axis=-1)
   ```
 
   Notice we divide by `N` (the numpy default), which does not create `NaN`
@@ -385,10 +459,61 @@ def covariance(x,
     return cov
 
 
+def stddev(x, sample_axis=0, keepdims=False, name=None):
+  """Estimate standard deviation using samples.
+
+  Given `N` samples of scalar valued random variable `X`, standard deviation may
+  be estimated as
+
+  ```none
+  Stddev[X] := Sqrt[Var[X]],
+  Var[X] := N^{-1} sum_{n=1}^N (X_n - Xbar) Conj{(X_n - Xbar)},
+  Xbar := N^{-1} sum_{n=1}^N X_n
+  ```
+
+  ```python
+  x = tf.random_normal(shape=(100, 2, 3))
+
+  # stddev[i, j] is the sample standard deviation of the (i, j) batch member.
+  stddev = tfp.stats.stddev(x, sample_axis=0)
+  ```
+
+  Scaling a unit normal by a standard deviation produces normal samples
+  with that standard deviation.
+
+  ```python
+  observed_data = read_data_samples(...)
+  stddev = tfp.stats.stddev(observed_data)
+
+  # Make fake_data with the same standard deviation as observed_data.
+  fake_data = stddev * tf.random_normal(shape=(100,))
+  ```
+
+  Notice we divide by `N` (the numpy default), which does not create `NaN`
+  when `N = 1`, but is slightly biased.
+
+  Args:
+    x:  A numeric `Tensor` holding samples.
+    sample_axis: Scalar or vector `Tensor` designating axis holding samples, or
+      `None` (meaning all axis hold samples).
+      Default value: `0` (leftmost dimension).
+    keepdims:  Boolean.  Whether to keep the sample axis as singletons.
+    name: Python `str` name prefixed to Ops created by this function.
+          Default value: `None` (i.e., `'stddev'`).
+
+  Returns:
+    stddev: A `Tensor` of same `dtype` as the `x`, and rank equal to
+      `rank(x) - len(sample_axis)`
+  """
+  with tf.name_scope(name, 'stddev', values=[x, sample_axis]):
+    return tf.sqrt(variance(x, sample_axis=sample_axis, keepdims=keepdims))
+
+
 def variance(x, sample_axis=0, keepdims=False, name=None):
   """Estimate variance using samples.
 
-  Sample variance is defined as:
+  Given `N` samples of scalar valued random variable `X`, variance may
+  be estimated as
 
   ```none
   Var[X] := N^{-1} sum_{n=1}^N (X_n - Xbar) Conj{(X_n - Xbar)}
@@ -399,7 +524,7 @@ def variance(x, sample_axis=0, keepdims=False, name=None):
   x = tf.random_normal(shape=(100, 2, 3))
 
   # var[i, j] is the sample variance of the (i, j) batch member of x.
-  var = variance(x, sample_axis=0)
+  var = tfp.stats.variance(x, sample_axis=0)
   ```
 
   Notice we divide by `N` (the numpy default), which does not create `NaN`
@@ -451,25 +576,25 @@ def percentile(x,
   ```python
   # Get 30th percentile with default ('nearest') interpolation.
   x = [1., 2., 3., 4.]
-  percentile(x, q=30.)
+  tfp.stats.percentile(x, q=30.)
   ==> 2.0
 
   # Get 30th and 70th percentiles with 'lower' interpolation
   x = [1., 2., 3., 4.]
-  percentile(x, q=[30., 70.], interpolation='lower')
+  tfp.stats.percentile(x, q=[30., 70.], interpolation='lower')
   ==> [1., 3.]
 
   # Get 100th percentile (maximum).  By default, this is computed over every dim
   x = [[1., 2.]
        [3., 4.]]
-  percentile(x, q=100.)
+  tfp.stats.percentile(x, q=100.)
   ==> 4.
 
   # Treat the leading dim as indexing samples, and find the 100th quantile (max)
   # over all such samples.
   x = [[1., 2.]
        [3., 4.]]
-  percentile(x, q=100., axis=[0])
+  tfp.stats.percentile(x, q=100., axis=[0])
   ==> [3., 4.]
   ```
 
