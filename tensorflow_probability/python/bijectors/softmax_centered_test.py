@@ -88,6 +88,30 @@ class SoftmaxCenteredBijectorTest(tf.test.TestCase):
                             bijector.inverse_event_shape_tensor(
                                 y.as_list())))
 
+  def testShapeGetersWithBatchShape(self):
+    x = tf.TensorShape([2, 4])
+    y = tf.TensorShape([2, 5])
+    bijector = tfb.SoftmaxCentered(validate_args=True)
+    self.assertAllEqual(y, bijector.forward_event_shape(x))
+    self.assertAllEqual(y.as_list(),
+                        self.evaluate(
+                            bijector.forward_event_shape_tensor(
+                                x.as_list())))
+    self.assertAllEqual(x, bijector.inverse_event_shape(y))
+    self.assertAllEqual(x.as_list(),
+                        self.evaluate(
+                            bijector.inverse_event_shape_tensor(
+                                y.as_list())))
+
+  def testShapeGettersWithDynamicShape(self):
+    x = tf.placeholder_with_default(input=[2, 4], shape=None)
+    y = tf.placeholder_with_default(input=[2, 5], shape=None)
+    bijector = tfb.SoftmaxCentered(validate_args=True)
+    self.assertAllEqual(
+        [2, 5], self.evaluate(bijector.forward_event_shape_tensor(x)))
+    self.assertAllEqual(
+        [2, 4], self.evaluate(bijector.inverse_event_shape_tensor(y)))
+
   def testBijectiveAndFinite(self):
     softmax = tfb.SoftmaxCentered()
     x = np.linspace(-50, 50, num=10).reshape(5, 2).astype(np.float32)

@@ -69,17 +69,17 @@ class SoftmaxCentered(bijector.Bijector):
   def _forward_event_shape(self, input_shape):
     if input_shape.ndims is None or input_shape[-1] is None:
       return input_shape
-    return tf.TensorShape([input_shape[-1] + 1])
+    return input_shape[:-1].concatenate(input_shape[-1] + 1)
 
   def _forward_event_shape_tensor(self, input_shape):
-    return (input_shape[-1] + 1)[..., tf.newaxis]
+    return tf.concat([input_shape[:-1], [input_shape[-1] + 1]], axis=0)
 
   def _inverse_event_shape(self, output_shape):
     if output_shape.ndims is None or output_shape[-1] is None:
       return output_shape
     if output_shape[-1] <= 1:
       raise ValueError("output_shape[-1] = %d <= 1" % output_shape[-1])
-    return tf.TensorShape([output_shape[-1] - 1])
+    return output_shape[:-1].concatenate(output_shape[-1] - 1)
 
   def _inverse_event_shape_tensor(self, output_shape):
     if self.validate_args:
@@ -88,7 +88,7 @@ class SoftmaxCentered(bijector.Bijector):
           output_shape[-1], 1, message="Need last dimension greater than 1.")
       output_shape = control_flow_ops.with_dependencies(
           [is_greater_one], output_shape)
-    return (output_shape[-1] - 1)[..., tf.newaxis]
+    return tf.concat([output_shape[:-1], [output_shape[-1] - 1]], axis=0)
 
   def _forward(self, x):
     # Pad the last dim with a zeros vector. We need this because it lets us
