@@ -370,7 +370,7 @@ class LaplaceTest(tf.test.TestCase):
     self.assertAllClose(true_kl_, kl_sample_, atol=0., rtol=1e-1)
 
     zero_kl = kl_divergence(a, a)
-    true_zero_kl_, zero_kl_ = self.evaluate([tf.zeros_like(true_kl_), zero_kl])
+    true_zero_kl_, zero_kl_ = self.evaluate([tf.zeros_like(true_kl), zero_kl])
     self.assertAllEqual(true_zero_kl_, zero_kl_)
 
 if __name__ == "__main__":
