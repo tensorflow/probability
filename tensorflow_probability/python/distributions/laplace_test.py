@@ -21,13 +21,12 @@ import importlib
 # Dependency imports
 import numpy as np
 import tensorflow as tf
-import tensorflow_probability as tfp
 
 from tensorflow_probability.python.distributions import laplace as laplace_lib
 from tensorflow.python.eager import backprop
 from tensorflow.python.framework import test_util
+from tensorflow.python.ops.distributions.kullback_leibler import kl_divergence
 
-tfd = tfp.distributions
 tfe = tf.contrib.eager
 
 def try_import(name):  # pylint: disable=invalid-name
@@ -353,18 +352,18 @@ class LaplaceTest(tf.test.TestCase):
     b_loc = np.array([[0.4] * event_size] * batch_size, dtype=np.float32)
     b_scale = np.array([[0.2] * event_size] * batch_size, dtype=np.float32)
 
-    a = tfd.Laplace(loc=a_loc, scale=a_scale)
-    b = tfd.Laplace(loc=b_loc, scale=b_scale)
+    a = laplace_lib.Laplace(loc=a_loc, scale=a_scale)
+    b = laplace_lib.Laplace(loc=b_loc, scale=b_scale)
 
     distance = tf.abs(a_loc - b_loc)
     ratio = a_scale / b_scale
     true_kl = -tf.log(ratio) - 1 + distance / b_scale + ratio * tf.exp(- distance / a_scale)
 
-    kl = tfd.kl_divergence(a, b)
+    kl = kl_divergence(a, b)
     true_kl_, kl_ = self.evaluate([true_kl, kl])
     self.assertAllEqual(true_kl_, kl_)
 
-    zero_kl = tfd.kl_divergence(a, a)
+    zero_kl = kl_divergence(a, a)
     true_zero_kl_, zero_kl_ = self.evaluate([tf.zeros_like(true_kl_), zero_kl])
     self.assertAllEqual(true_zero_kl_, zero_kl_)
 
