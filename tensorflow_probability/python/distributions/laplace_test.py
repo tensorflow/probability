@@ -361,8 +361,13 @@ class LaplaceTest(tf.test.TestCase):
                ratio * tf.exp(-distance / a_scale))
 
     kl = kl_divergence(a, b)
-    true_kl_, kl_ = self.evaluate([true_kl, kl])
+
+    x = a.sample(int(1e4), seed=0)
+    kl_sample = tf.reduce_mean(a.log_prob(x) - b.log_prob(x), 0)
+
+    true_kl_, kl_, kl_sample_ = self.evaluate([true_kl, kl, kl_sample])
     self.assertAllEqual(true_kl_, kl_)
+    self.assertAllClose(true_kl_, kl_sample_, atol=0., rtol=1e-1)
 
     zero_kl = kl_divergence(a, a)
     true_zero_kl_, zero_kl_ = self.evaluate([tf.zeros_like(true_kl_), zero_kl])
