@@ -207,21 +207,23 @@ class Laplace(distribution.Distribution):
 @kullback_leibler.RegisterKL(tf.distributions.Laplace, Laplace)
 @kullback_leibler.RegisterKL(Laplace, Laplace)
 def _kl_laplace_laplace(a, b, name=None):
-    """Calculate the batched KL divergence KL(a || b) with a and b Laplace.
+  """Calculate the batched KL divergence KL(a || b) with a and b Laplace.
 
-    Args:
-      a: instance of a Laplace distribution object.
-      b: instance of a Laplace distribution object.
-      name: (optional) Name to use for created operations.
-        default is "kl_laplace_laplace".
+  Args:
+    a: instance of a Laplace distribution object.
+    b: instance of a Laplace distribution object.
+    name: (optional) Name to use for created operations.
+      default is "kl_laplace_laplace".
 
-    Returns:
-      Batchwise KL(a || b)
-    """
-    with tf.name_scope(name, 'kl_laplace_laplace', [a.loc, b.loc, a.scale, b.scale]):
-        # Consistent with http://www.mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 38
-        one = tf.constant(1, dtype=a.dtype)
-        distance = tf.abs(a.loc - b.loc)
-        ratio = a.scale / b.scale
+  Returns:
+    Batchwise KL(a || b)
+  """
+  with tf.name_scope(name, 'kl_laplace_laplace',
+                     [a.loc, b.loc, a.scale, b.scale]):
+    # Consistent with
+    # http://www.mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 38
+    distance = tf.abs(a.loc - b.loc)
+    ratio = a.scale / b.scale
 
-        return -tf.log(ratio) - one + distance / b.scale + ratio * tf.exp(- distance / a.scale)
+    return -tf.log(ratio) - 1 + distance / b.scale + \
+           ratio * tf.exp(-distance / a.scale)
