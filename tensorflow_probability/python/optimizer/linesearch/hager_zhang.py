@@ -721,7 +721,7 @@ def _line_search_after_bracketing(
   effective_wolfe = (
       raw_results.found_wolfe |  # Found Wolfe, or
       (
-          tf.math.logical_not(raw_results.failed)
+          ~tf.convert_to_tensor(raw_results.failed, name='failed')
           &  # We didn't fail and didn't exceed the iterations.
           (raw_results.iteration < max_iterations)))
   return _LineSearchInnerResult(
