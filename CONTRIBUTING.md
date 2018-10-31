@@ -46,16 +46,17 @@ To run existing unit-tests on CPU, use the command:
 
 
 ```shell
-bazel test --copt=-O3 --copt=-march=native \
-    //tensorflow_probability/...
+bazel test --copt=-O3 --copt=-march=native //tensorflow_probability/...
 ```
 
 from the root of the `tensorflow_probability` repository. To run tests on GPU,
-use the command:
+you just need to ensure the GPU-enabled version of TensorFlow is installed.
+However, you will also need to include the flag `--jobs=1`, since by default
+Bazel will run many tests in parallel, and each one will try to claim all the
+GPU memory:
 
 ```shell
-bazel test --copt=-O3 --copt=-march=native --config=cuda \
-    //tensorflow_probability/...
+bazel test --jobs=1 --copt=-O3 --copt=-march=native //tensorflow_probability/...
 ```
 
 
