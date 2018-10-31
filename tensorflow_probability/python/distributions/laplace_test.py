@@ -25,6 +25,9 @@ import tensorflow as tf
 from tensorflow_probability.python.distributions import laplace as laplace_lib
 from tensorflow.python.eager import backprop
 from tensorflow.python.framework import test_util
+from tensorflow.python.ops.distributions.kullback_leibler import kl_divergence
+
+tfe = tf.contrib.eager
 
 
 def try_import(name):  # pylint: disable=invalid-name
@@ -339,6 +342,37 @@ class LaplaceTest(tf.test.TestCase):
       laplace = laplace_lib.Laplace(
           loc=loc_v, scale=scale_v, validate_args=True)
       self.evaluate(laplace.mean())
+
+  @tfe.run_test_in_graph_and_eager_modes()
+  def testLaplaceLaplaceKL(self):
+    batch_size = 6
+    event_size = 3
+
+    a_loc = np.array([[0.5] * event_size] * batch_size, dtype=np.float32)
+    a_scale = np.array([[0.1] * event_size] * batch_size, dtype=np.float32)
+    b_loc = np.array([[0.4] * event_size] * batch_size, dtype=np.float32)
+    b_scale = np.array([[0.2] * event_size] * batch_size, dtype=np.float32)
+
+    a = laplace_lib.Laplace(loc=a_loc, scale=a_scale)
+    b = laplace_lib.Laplace(loc=b_loc, scale=b_scale)
+
+    distance = tf.abs(a_loc - b_loc)
+    ratio = a_scale / b_scale
+    true_kl = (-tf.log(ratio) - 1 + distance / b_scale +
+               ratio * tf.exp(-distance / a_scale))
+
+    kl = kl_divergence(a, b)
+
+    x = a.sample(int(1e4), seed=0)
+    kl_sample = tf.reduce_mean(a.log_prob(x) - b.log_prob(x), 0)
+
+    true_kl_, kl_, kl_sample_ = self.evaluate([true_kl, kl, kl_sample])
+    self.assertAllEqual(true_kl_, kl_)
+    self.assertAllClose(true_kl_, kl_sample_, atol=0., rtol=1e-1)
+
+    zero_kl = kl_divergence(a, a)
+    true_zero_kl_, zero_kl_ = self.evaluate([tf.zeros_like(true_kl), zero_kl])
+    self.assertAllEqual(true_zero_kl_, zero_kl_)
 
 if __name__ == "__main__":
   tf.test.main()
