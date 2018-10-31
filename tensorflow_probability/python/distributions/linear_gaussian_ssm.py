@@ -23,9 +23,10 @@ import collections
 # Dependency imports
 import tensorflow as tf
 
-
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.distributions import mvn_tril
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import seed_stream
 
 from tensorflow_probability.python.internal import distribution_util as util
@@ -949,9 +950,8 @@ def build_kalman_filter_step(get_transition_matrix_for_timestep,
   return kalman_filter_step
 
 
-def linear_gaussian_update(prior_mean, prior_cov,
-                           observation_matrix, observation_noise,
-                           x_observed):
+def linear_gaussian_update(
+    prior_mean, prior_cov, observation_matrix, observation_noise, x_observed):
   """Conjugate update for a linear Gaussian model.
 
   Given a normal prior on a latent variable `z`,
@@ -989,9 +989,16 @@ def linear_gaussian_update(prior_mean, prior_cov,
     posterior_cov: `Tensor` with event shape `[latent_size,
       latent_size]` and batch shape `B`.
     predictive_dist: the prior predictive distribution `p(x|z)`,
-      as a `tfd.MultivariateNormalTriL` instance with event
-      shape `[observation_size]` and batch shape `B`.
+      as a `Distribution` instance with event
+      shape `[observation_size]` and batch shape `B`. This will
+      typically be `tfd.MultivariateNormalTriL`, but when
+      `observation_size=1` we return a `tfd.Independent(tfd.Normal)`
+      instance as an optimization.
   """
+
+  # If observations are scalar, we can avoid some matrix ops.
+  observation_size_is_static_and_scalar = (
+      observation_matrix.shape[-2].value == 1)
 
   # Push the predicted mean for the latent state through the
   # observation model
@@ -1017,8 +1024,11 @@ def linear_gaussian_update(prior_mean, prior_cov,
   #      = (S^{-1} * H * P)'
   #      = (S^{-1} * tmp_obs_cov) '
   #      = (S \ tmp_obs_cov)'
-  predicted_obs_cov_chol = tf.cholesky(predicted_obs_cov)
-  gain_transpose = tf.cholesky_solve(predicted_obs_cov_chol, tmp_obs_cov)
+  if observation_size_is_static_and_scalar:
+    gain_transpose = tmp_obs_cov/predicted_obs_cov
+  else:
+    predicted_obs_cov_chol = tf.cholesky(predicted_obs_cov)
+    gain_transpose = tf.cholesky_solve(predicted_obs_cov_chol, tmp_obs_cov)
 
   # Compute the posterior mean, incorporating the observation.
   #  u* = u + K (x_observed - x_expected)
@@ -1035,19 +1045,29 @@ def linear_gaussian_update(prior_mean, prior_cov,
   # which always produces a PSD result. This uses
   #  tmp_term = (I - K * H)'
   # as an intermediate quantity.
-  latent_size = util.prefer_static_value(observation_matrix.shape_tensor())[-1]
-  tmp_term = (
-      tf.eye(latent_size, dtype=observation_matrix.dtype) -
-      observation_matrix.matmul(gain_transpose, adjoint=True))
+  tmp_term = -observation_matrix.matmul(gain_transpose, adjoint=True)  # -K * H
+  tmp_term = tf.matrix_set_diag(tmp_term, tf.matrix_diag_part(tmp_term) + 1)
   posterior_cov = (
       _matmul(tmp_term, _matmul(prior_cov, tmp_term), adjoint_a=True)
       + _matmul(gain_transpose,
                 _matmul(observation_noise.covariance(), gain_transpose),
                 adjoint_a=True))
 
-  predictive_dist = mvn_tril.MultivariateNormalTriL(
-      loc=x_expected[..., 0],
-      scale_tril=predicted_obs_cov_chol)
+  if observation_size_is_static_and_scalar:
+    # A plain Normal would have event shape `[]`; wrapping with Independent
+    # ensures `event_shape=[1]` as required.
+    predictive_dist = independent.Independent(
+        normal.Normal(loc=x_expected[..., 0],
+                      scale=tf.sqrt(predicted_obs_cov[..., 0])),
+        reinterpreted_batch_ndims=1)
+
+    # Minor hack to define the covariance, so that `predictive_dist` can pass as
+    # an MVNTriL-like object.
+    predictive_dist.covariance = lambda: predicted_obs_cov
+  else:
+    predictive_dist = mvn_tril.MultivariateNormalTriL(
+        loc=x_expected[..., 0],
+        scale_tril=predicted_obs_cov_chol)
 
   return posterior_mean, posterior_cov, predictive_dist
 
