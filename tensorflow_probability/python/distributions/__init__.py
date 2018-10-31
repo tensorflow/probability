@@ -88,6 +88,7 @@ from tensorflow_probability.python.distributions.sample_stats import percentile
 from tensorflow_probability.python.distributions.seed_stream import SeedStream
 from tensorflow_probability.python.distributions.sinh_arcsinh import SinhArcsinh
 from tensorflow_probability.python.distributions.student_t import StudentT
+from tensorflow_probability.python.distributions.student_t_process import StudentTProcess
 from tensorflow_probability.python.distributions.transformed_distribution import TransformedDistribution
 from tensorflow_probability.python.distributions.triangular import Triangular
 from tensorflow_probability.python.distributions.truncated_normal import TruncatedNormal
@@ -176,6 +177,7 @@ __all__ = [
     'SinhArcsinh',
     'StudentT',
     'StudentTWithAbsDfSoftplusScale',
+    'StudentTProcess',
     'Triangular',
     'TruncatedNormal',
     'Uniform',

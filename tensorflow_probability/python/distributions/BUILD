@@ -86,6 +86,7 @@ py_library(
         ":seed_stream",
         ":sinh_arcsinh",
         ":student_t",
+        ":student_t_process",
         ":transformed_distribution",
         ":triangular",
         ":truncated_normal",
@@ -785,6 +786,16 @@ py_library(
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
+    ],
+)
+
+py_library(
+    name = "student_t_process",
+    srcs = ["student_t_process.py"],
+    deps = [
+        ":multivariate_student_t",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -1654,6 +1665,18 @@ py_test(
         ":student_t",
         # numpy dep,
         # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "student_t_process_test",
+    size = "small",
+    srcs = ["student_t_process_test.py"],
+    deps = [
+        ":distributions",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/positive_semidefinite_kernels",
     ],
 )
 
