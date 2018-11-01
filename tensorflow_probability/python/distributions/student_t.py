@@ -23,6 +23,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
@@ -237,15 +238,16 @@ class StudentT(distribution.Distribution):
     #   Y = X / sqrt(Z / df)
     # then:
     #   Y ~ StudentT(df).
+    seed = seed_stream.SeedStream(seed, "student_t")
     shape = tf.concat([[n], self.batch_shape_tensor()], 0)
-    normal_sample = tf.random_normal(shape, dtype=self.dtype, seed=seed)
+    normal_sample = tf.random_normal(shape, dtype=self.dtype, seed=seed())
     df = self.df * tf.ones(self.batch_shape_tensor(), dtype=self.dtype)
     gamma_sample = tf.random_gamma(
         [n],
         0.5 * df,
         beta=0.5,
         dtype=self.dtype,
-        seed=distribution_util.gen_new_seed(seed, salt="student_t"))
+        seed=seed())
     samples = normal_sample * tf.rsqrt(gamma_sample / df)
     return samples * self.scale + self.loc  # Abs(scale) not wanted.
 

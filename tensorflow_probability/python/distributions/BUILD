@@ -143,6 +143,7 @@ py_library(
     deps = [
         ":distribution",
         ":kullback_leibler",
+        ":seed_stream",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
@@ -249,6 +250,7 @@ py_library(
     srcs = ["dirichlet_multinomial.py"],
     deps = [
         ":distribution",
+        ":seed_stream",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
@@ -781,6 +783,7 @@ py_library(
     srcs = ["student_t.py"],
     deps = [
         ":distribution",
+        ":seed_stream",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",

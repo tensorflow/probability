@@ -24,6 +24,7 @@ import tensorflow as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util as util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
@@ -229,6 +230,7 @@ class Beta(distribution.Distribution):
     return tensor_shape.scalar()
 
   def _sample_n(self, n, seed=None):
+    seed = seed_stream.SeedStream(seed, "beta")
     expanded_concentration1 = tf.ones_like(
         self.total_concentration, dtype=self.dtype) * self.concentration1
     expanded_concentration0 = tf.ones_like(
@@ -237,12 +239,12 @@ class Beta(distribution.Distribution):
         shape=[n],
         alpha=expanded_concentration1,
         dtype=self.dtype,
-        seed=seed)
+        seed=seed())
     gamma2_sample = tf.random_gamma(
         shape=[n],
         alpha=expanded_concentration0,
         dtype=self.dtype,
-        seed=util.gen_new_seed(seed, "beta"))
+        seed=seed())
     beta_sample = gamma1_sample / (gamma1_sample + gamma2_sample)
     return beta_sample
 

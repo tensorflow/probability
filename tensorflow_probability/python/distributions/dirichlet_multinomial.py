@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
@@ -243,6 +244,7 @@ class DirichletMultinomial(distribution.Distribution):
     return self.concentration.shape.with_rank_at_least(1)[-1:]
 
   def _sample_n(self, n, seed=None):
+    seed = seed_stream.SeedStream(seed, "dirichlet_multinomial")
     n_draws = tf.cast(self.total_count, dtype=tf.int32)
     k = self.event_shape_tensor()[0]
     unnormalized_logits = tf.reshape(
@@ -250,12 +252,12 @@ class DirichletMultinomial(distribution.Distribution):
             shape=[n],
             alpha=self.concentration,
             dtype=self.dtype,
-            seed=seed)),
+            seed=seed())),
         shape=[-1, k])
     draws = tf.multinomial(
         logits=unnormalized_logits,
         num_samples=n_draws,
-        seed=distribution_util.gen_new_seed(seed, salt="dirichlet_multinomial"))
+        seed=seed())
     x = tf.reduce_sum(tf.one_hot(draws, depth=k), -2)
     final_shape = tf.concat([[n], self.batch_shape_tensor(), [k]], 0)
     x = tf.reshape(x, final_shape)
