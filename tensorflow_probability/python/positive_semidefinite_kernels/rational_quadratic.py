@@ -116,7 +116,7 @@ class RationalQuadratic(psd_kernel.PositiveSemidefiniteKernel):
           amplitude, scale_mixture_rate, length_scale], tf.float32)
 
       if amplitude is not None:
-        amplitude = tf.convert_to_tensor(
+        self._amplitude = tf.convert_to_tensor(
             amplitude, name="amplitude", dtype=dtype)
         with tf.control_dependencies([
             tf.assert_positive(self._amplitude)] if validate_args else []):
@@ -146,13 +146,13 @@ class RationalQuadratic(psd_kernel.PositiveSemidefiniteKernel):
     if self.length_scale is not None:
       length_scale = util.pad_shape_right_with_ones(
           self.length_scale, ndims=param_expansion_ndims)
-      difference /= length_scale ** 2
+      difference /= (length_scale ** 2)
 
     scale_mixture_rate = 1.
     if self.scale_mixture_rate is not None:
       scale_mixture_rate = util.pad_shape_right_with_ones(
           self.scale_mixture_rate, ndims=param_expansion_ndims)
-      difference /= scale_mixture_rate
+    difference /= (2 * scale_mixture_rate)
 
     result = (1. + difference) ** -scale_mixture_rate
 
@@ -165,17 +165,23 @@ class RationalQuadratic(psd_kernel.PositiveSemidefiniteKernel):
   @property
   def amplitude(self):
     """Amplitude parameter."""
-    return self.amplitude
+    if "_amplitude" in self.__dict__:
+        return self._amplitude
+    return None
 
   @property
   def length_scale(self):
     """Length scale parameter."""
-    return self.length_scale
+    if "_length_scale" in self.__dict__:
+        return self._length_scale
+    return None
 
   @property
   def scale_mixture_rate(self):
     """scale_mixture_rate parameter."""
-    return self.scale_mixture_rate
+    if "_scale_mixture_rate" in self.__dict__:
+        return self._scale_mixture_rate
+    return None
 
   def _batch_shape(self):
     shape_list = [
