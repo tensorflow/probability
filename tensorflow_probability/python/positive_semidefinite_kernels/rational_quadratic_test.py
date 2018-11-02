@@ -31,10 +31,10 @@ class RationalQuadraticTest(tf.test.TestCase, parameterized.TestCase):
   def _rational_quadratic(
       self, amplitude, length_scale, scale_mixture_rate, x, y):
     return (1. + np.sum((x - y) ** 2) / (
-        2 * scale_mixture_rate * length_scale ** 2)) ** (-scale_mixture_rate)
+        2 * scale_mixture_rate * length_scale ** 2)) ** (-scale_mixture_rate) * (amplitude ** 2)
 
   def testMismatchedFloatTypesAreBad(self):
-    with self.assertRaises(ValueError):
+    with self.assertRaises(TypeError):
       psd_kernels.RationalQuadratic(np.float32(1.), np.float64(1.))
 
   def testBatchShape(self):
