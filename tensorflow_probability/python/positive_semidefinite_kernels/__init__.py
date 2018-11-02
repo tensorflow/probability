@@ -24,6 +24,7 @@ from tensorflow_probability.python.positive_semidefinite_kernels.matern import M
 from tensorflow_probability.python.positive_semidefinite_kernels.matern import MaternOneHalf
 from tensorflow_probability.python.positive_semidefinite_kernels.matern import MaternThreeHalves
 from tensorflow_probability.python.positive_semidefinite_kernels.positive_semidefinite_kernel import PositiveSemidefiniteKernel
+from tensorflow_probability.python.positive_semidefinite_kernels.rational_quadratic import RationalQuadratic
 
 from tensorflow.python.util.all_util import remove_undocumented
 
