@@ -23,7 +23,7 @@ import functools
 import tensorflow as tf
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.positive_semidefinite_kernels import positive_semidefinite_kernel as psd_kernel
-from tensorflow_probability.python.positive_semidefinite_kernels import util
+from tensorflow_probability.python.positive_semidefinite_kernels.internal import util
 from tensorflow.python.framework import tensor_shape
 
 __all__ = [
