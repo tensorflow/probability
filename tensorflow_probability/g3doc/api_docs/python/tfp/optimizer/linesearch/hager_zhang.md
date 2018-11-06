@@ -18,6 +18,8 @@ tfp.optimizer.linesearch.hager_zhang(
     expansion_param=5.0,
     sufficient_decrease_param=0.1,
     curvature_param=0.9,
+    step_size_shrink_param=0.1,
+    max_iterations=50,
     name=None
 )
 ```
@@ -145,6 +147,14 @@ usage of the line search.
 * <b>`curvature_param`</b>: Positive scalar `Tensor` of real dtype. Bounded above
     by `1.`. Corresponds to 'sigma' in the terminology of
     [Hager and Zhang (2006)][2].
+* <b>`step_size_shrink_param`</b>: Positive scalar `Tensor` of real dtype. Bounded
+    above by `1`. If the supplied step size is too big (i.e. either the
+    objective value or the gradient at that point is infinite), this factor
+    is used to shrink the step size until it is finite.
+* <b>`max_iterations`</b>: Positive scalar `Tensor` of integral dtype or None. The
+    maximum number of iterations to perform in the line search. The number of
+    iterations used to bracket the minimum are also counted against this
+    parameter.
 * <b>`name`</b>: (Optional) Python str. The name prefixed to the ops created by this
     function. If not supplied, the default name 'hager_zhang' is used.
 

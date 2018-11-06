@@ -121,12 +121,12 @@ Construct a `MixtureSameFamily` distribution.
 
 #### Args:
 
-* <b>`mixture_distribution`</b>: `tf.distributions.Categorical`-like instance.
+* <b>`mixture_distribution`</b>: <a href="../../tfp/distributions/Categorical.md"><code>tfp.distributions.Categorical</code></a>-like instance.
     Manages the probability of selecting components. The number of
     categories must match the rightmost batch dimension of the
     `components_distribution`. Must have either scalar `batch_shape` or
     `batch_shape` matching `components_distribution.batch_shape[:-1]`.
-* <b>`components_distribution`</b>: `tf.distributions.Distribution`-like instance.
+* <b>`components_distribution`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a>-like instance.
     Right-most batch dimension indexes components.
 * <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
     parameters are checked for validity despite possibly degrading runtime
@@ -217,8 +217,7 @@ Dictionary of parameters used to instantiate this `Distribution`.
 Describes how samples from the distribution are reparameterized.
 
 Currently this is one of the static instances
-`distributions.FULLY_REPARAMETERIZED`
-or `distributions.NOT_REPARAMETERIZED`.
+`tfd.FULLY_REPARAMETERIZED` or `tfd.NOT_REPARAMETERIZED`.
 
 #### Returns:
 

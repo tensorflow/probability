@@ -54,7 +54,7 @@ The Bernoulli distribution with `probs` parameter, i.e., the probability of a
 __init__(
     logits=None,
     probs=None,
-    dtype=dtypes.int32,
+    dtype=tf.int32,
     validate_args=False,
     allow_nan_stats=True,
     name='Bernoulli'
@@ -157,8 +157,7 @@ Probability of a `1` outcome (vs `0`).
 Describes how samples from the distribution are reparameterized.
 
 Currently this is one of the static instances
-`distributions.FULLY_REPARAMETERIZED`
-or `distributions.NOT_REPARAMETERIZED`.
+`tfd.FULLY_REPARAMETERIZED` or `tfd.NOT_REPARAMETERIZED`.
 
 #### Returns:
 

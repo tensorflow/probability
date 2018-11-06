@@ -164,7 +164,7 @@ Additional leading dimensions (if any) will index batches.
     broadcastable with `event_shape`.
 * <b>`distribution`</b>: `tf.Distribution`-like instance. Distribution from which `k`
     iid samples are used as input to transformation `F`.  Default is
-    `tf.distributions.Normal(loc=0., scale=1.)`.
+    `tfd.Normal(loc=0., scale=1.)`.
     Must be a scalar-batch, scalar-event distribution.  Typically
     `distribution.reparameterization_type = FULLY_REPARAMETERIZED` or it is
     a function of non-trainable parameters. WARNING: If you backprop through
@@ -258,8 +258,7 @@ Dictionary of parameters used to instantiate this `Distribution`.
 Describes how samples from the distribution are reparameterized.
 
 Currently this is one of the static instances
-`distributions.FULLY_REPARAMETERIZED`
-or `distributions.NOT_REPARAMETERIZED`.
+`tfd.FULLY_REPARAMETERIZED` or `tfd.NOT_REPARAMETERIZED`.
 
 #### Returns:
 

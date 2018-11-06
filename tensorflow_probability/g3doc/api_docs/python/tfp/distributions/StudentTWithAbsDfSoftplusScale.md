@@ -42,7 +42,7 @@
 
 ## Class `StudentTWithAbsDfSoftplusScale`
 
-Inherits From: [`StudentT`](../../tfp/distributions/StudentT.md)
+
 
 StudentT with `df = floor(abs(df))` and `scale = softplus(scale)`.
 
@@ -59,7 +59,11 @@ __init__(
 )
 ```
 
+DEPRECATED FUNCTION
 
+THIS FUNCTION IS DEPRECATED. It will be removed after 2019-01-01.
+Instructions for updating:
+Use `tfd.StudentT(tf.floor(tf.abs(df)), loc, tf.nn.softplus(scale)) instead.
 
 
 

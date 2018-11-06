@@ -1,16 +1,16 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
-<meta itemprop="name" content="tfp.distributions.GammaGamma" />
+<meta itemprop="name" content="tfp.distributions.MultivariateStudentTLinearOperator" />
 <meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="allow_nan_stats"/>
 <meta itemprop="property" content="batch_shape"/>
-<meta itemprop="property" content="concentration"/>
+<meta itemprop="property" content="df"/>
 <meta itemprop="property" content="dtype"/>
 <meta itemprop="property" content="event_shape"/>
-<meta itemprop="property" content="mixing_concentration"/>
-<meta itemprop="property" content="mixing_rate"/>
+<meta itemprop="property" content="loc"/>
 <meta itemprop="property" content="name"/>
 <meta itemprop="property" content="parameters"/>
 <meta itemprop="property" content="reparameterization_type"/>
+<meta itemprop="property" content="scale"/>
 <meta itemprop="property" content="validate_args"/>
 <meta itemprop="property" content="__init__"/>
 <meta itemprop="property" content="batch_shape_tensor"/>
@@ -38,92 +38,123 @@
 <meta itemprop="property" content="variance"/>
 </div>
 
-# tfp.distributions.GammaGamma
+# tfp.distributions.MultivariateStudentTLinearOperator
 
-## Class `GammaGamma`
+## Class `MultivariateStudentTLinearOperator`
 
 Inherits From: [`Distribution`](../../tfp/distributions/Distribution.md)
 
-Gamma-Gamma distribution.
+The [Multivariate Student's t-distribution](
 
-Gamma-Gamma is a [compound
-distribution](https://en.wikipedia.org/wiki/Compound_probability_distribution)
-defined over positive real numbers using parameters `concentration`,
-`mixing_concentration` and `mixing_rate`.
+https://en.wikipedia.org/wiki/Multivariate_t-distribution) on `R^k`.
 
 #### Mathematical Details
 
-It is derived from the following Gamma-Gamma hierarchical model by integrating
-out the random variable `beta`.
+The probability density function (pdf) is,
 
 ```none
-    beta ~ Gamma(alpha0, beta0)
-X | beta ~ Gamma(alpha, beta)
+pdf(x; df, loc, Sigma) = (1 + ||y||**2 / df)**(-0.5 (df + k)) / Z
+where,
+y = inv(Sigma) (x - loc)
+Z = abs(det(Sigma)) sqrt(df pi)**k Gamma(0.5 df) / Gamma(0.5 (df + k))
 ```
-where
-* `concentration = alpha`
-* `mixing_concentration = alpha0`
-* `mixing_rate = beta0`
 
-The probability density function (pdf) is
+where:
+
+* `df` is a positive scalar.
+* `loc` is a vector in `R^k`,
+* `Sigma` is a positive definite `shape' matrix in `R^{k x k}`, parameterized
+   as `scale @ scale.T` in this class,
+* `Z` denotes the normalization constant, and,
+* `||y||**2` denotes the squared Euclidean norm of `y`.
+
+The Multivariate Student's t-distribution distribution is a member of the
+[location-scale
+family](https://en.wikipedia.org/wiki/Location-scale_family), i.e., it can be
+constructed as,
 
 ```none
-                                       x**(alpha - 1)
-pdf(x; alpha, alpha0, beta0) = ---------------------------------
-                               Z * (x + beta0)**(alpha + alpha0)
+X ~ MultivariateT(loc=0, scale=1)   # Identity scale, zero shift.
+Y = scale @ X + loc
 ```
-where the normalizing constant `Z = Beta(alpha, alpha0) * beta0**(-alpha0)`.
 
-See:
-  http://www.brucehardie.com/notes/025/gamma_gamma.pdf
+#### Examples
 
-Samples of this distribution are reparameterized as samples of the Gamma
-distribution are reparameterized using the technique described in the paper
+```python
+tfd = tfp.distributions
 
-[Michael Figurnov, Shakir Mohamed, Andriy Mnih.
-Implicit Reparameterization Gradients, 2018](https://arxiv.org/abs/1805.08498)
+# Initialize a single 3-variate Student's t.
+df = 3.
+loc = [1., 2, 3]
+scale = [[ 0.6,  0. ,  0. ],
+         [ 0.2,  0.5,  0. ],
+         [ 0.1, -0.3,  0.4]]
+sigma = tf.matmul(scale, scale, adjoint_b=True)
+# ==> [[ 0.36,  0.12,  0.06],
+#      [ 0.12,  0.29, -0.13],
+#      [ 0.06, -0.13,  0.26]]
+
+mvt = tfd.MultivariateStudentTLinearOperator(
+    df=df,
+    loc=loc,
+    scale=tf.linalg.LinearOperatorLowerTriangular(scale))
+
+# Covariance is closely related to the sigma matrix (for df=3, it is 3x of the
+# sigma matrix).
+
+mvt.covariance().eval()
+# ==> [[ 1.08,  0.36,  0.18],
+#      [ 0.36,  0.87, -0.39],
+#      [ 0.18, -0.39,  0.78]]
+
+# Compute the pdf of an`R^3` observation; return a scalar.
+mvt.prob([-1., 0, 1]).eval()  # shape: []
 
 <h2 id="__init__"><code>__init__</code></h2>
 
 ``` python
 __init__(
-    concentration,
-    mixing_concentration,
-    mixing_rate,
+    df,
+    loc,
+    scale,
     validate_args=False,
     allow_nan_stats=True,
-    name='GammaGamma'
+    name='MultivariateStudentTLinearOperator'
 )
 ```
 
-Initializes a batch of Gamma-Gamma distributions.
+Construct Multivariate Student's t-distribution on `R^k`.
 
-The parameters `concentration` and `rate` must be shaped in a way that
-supports broadcasting (e.g.
-`concentration + mixing_concentration + mixing_rate` is a valid operation).
+The `batch_shape` is the broadcast shape between `df`, `loc` and `scale`
+arguments.
+
+The `event_shape` is given by last dimension of the matrix implied by
+`scale`. The last dimension of `loc` must broadcast with this.
+
+Additional leading dimensions (if any) will index batches.
 
 #### Args:
 
-* <b>`concentration`</b>: Floating point tensor, the concentration params of the
-    distribution(s). Must contain only positive values.
-* <b>`mixing_concentration`</b>: Floating point tensor, the concentration params of
-    the mixing Gamma distribution(s). Must contain only positive values.
-* <b>`mixing_rate`</b>: Floating point tensor, the rate params of the mixing Gamma
-    distribution(s). Must contain only positive values.
-* <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
-    parameters are checked for validity despite possibly degrading runtime
-    performance. When `False` invalid inputs may silently render incorrect
-    outputs.
-* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
-    (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
-    result is undefined. When `False`, an exception is raised if one or more
-    of the statistic's batch members are undefined.
-* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
+* <b>`df`</b>: A positive floating-point `Tensor`. Has shape `[B1, ..., Bb]` where `b
+    >= 0`.
+* <b>`loc`</b>: Floating-point `Tensor`. Has shape `[B1, ..., Bb, k]` where `k` is
+    the event size.
+* <b>`scale`</b>: Instance of `LinearOperator` with a floating `dtype` and shape
+    `[B1, ..., Bb, k, k]`.
+* <b>`validate_args`</b>: Python `bool`, default `False`. Whether to validate input
+    with asserts. If `validate_args` is `False`, and the inputs are invalid,
+    correct behavior is not guaranteed.
+* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. If `False`, raise an
+    exception if a statistic (e.g. mean/variance/etc...) is undefined for
+    any batch member If `True`, batch members with valid parameters leading
+    to undefined statistics will return NaN for this statistic.
+* <b>`name`</b>: The name to give Ops created by the initializer.
 
 
 #### Raises:
 
-* <b>`TypeError`</b>: if `concentration` and `rate` are different dtypes.
+* <b>`TypeError`</b>: if not `scale.dtype.is_floating`.
+* <b>`ValueError`</b>: if not `scale.is_positive_definite`.
 
 
 
@@ -158,9 +189,18 @@ parameterizations of this distribution.
 
 * <b>`batch_shape`</b>: `TensorShape`, possibly unknown.
 
-<h3 id="concentration"><code>concentration</code></h3>
+<h3 id="df"><code>df</code></h3>
 
-Concentration parameter.
+The degrees of freedom of the distribution.
+
+This controls the degrees of freedom of the distribution. The tails of the
+distribution get more heavier the smaller `df` is. As `df` goes to
+infinitiy, the distribution approaches the Multivariate Normal with the same
+`loc` and `scale`.
+
+#### Returns:
+
+The `df` `Tensor`.
 
 <h3 id="dtype"><code>dtype</code></h3>
 
@@ -176,13 +216,20 @@ May be partially defined or unknown.
 
 * <b>`event_shape`</b>: `TensorShape`, possibly unknown.
 
-<h3 id="mixing_concentration"><code>mixing_concentration</code></h3>
+<h3 id="loc"><code>loc</code></h3>
 
-Concentration parameter for the mixing Gamma distribution.
+The location parameter of the distribution.
 
-<h3 id="mixing_rate"><code>mixing_rate</code></h3>
+`loc` applies an elementwise shift to the distribution.
 
-Rate parameter for the mixing Gamma distribution.
+```none
+X ~ MultivariateT(loc=0, scale=1)   # Identity scale, zero shift.
+Y = scale @ X + loc
+```
+
+#### Returns:
+
+The `loc` `Tensor`.
 
 <h3 id="name"><code>name</code></h3>
 
@@ -202,6 +249,21 @@ Currently this is one of the static instances
 #### Returns:
 
 An instance of `ReparameterizationType`.
+
+<h3 id="scale"><code>scale</code></h3>
+
+The scale parameter of the distribution.
+
+`scale` applies an affine scale to the distribution.
+
+```none
+X ~ MultivariateT(loc=0, scale=1)   # Identity scale, zero shift.
+Y = scale @ X + loc
+```
+
+#### Returns:
+
+The `scale` `LinearOperator`.
 
 <h3 id="validate_args"><code>validate_args</code></h3>
 
@@ -314,6 +376,20 @@ where `Cov` is a (batch of) `k' x k'` matrices,
 `0 <= (i, j) < k' = reduce_prod(event_shape)`, and `Vec` is some function
 mapping indices of this distribution's event dimensions to indices of a
 length-`k'` vector.
+
+
+Additional documentation from `MultivariateStudentTLinearOperator`:
+
+The covariance for Multivariate Student's t equals
+
+```
+scale @ scale.T * df / (df - 2), when df > 2
+infinity, when 1 < df <= 2
+NaN, when df <= 1
+```
+
+If `self.allow_nan_stats=False`, then an exception will be raised
+rather than returning `NaN`.
 
 #### Args:
 
@@ -549,12 +625,11 @@ mean(name='mean')
 
 Mean.
 
-Additional documentation from `GammaGamma`:
+Additional documentation from `MultivariateStudentTLinearOperator`:
 
-The mean of a Gamma-Gamma distribution is
-`concentration * mixing_rate / (mixing_concentration - 1)`, when
-`mixing_concentration > 1`, and `NaN` otherwise. If `self.allow_nan_stats`
-is `False`, an exception will be raised rather than returning `NaN`
+The mean of Student's T equals `loc` if `df > 1`, otherwise it is
+`NaN`. If `self.allow_nan_stats=False`, then an exception will be raised
+rather than returning `NaN`.
 
 <h3 id="mode"><code>mode</code></h3>
 
@@ -720,6 +795,17 @@ stddev = E[(X - E[X])**2]**0.5
 where `X` is the random variable associated with this distribution, `E`
 denotes expectation, and `stddev.shape = batch_shape + event_shape`.
 
+
+Additional documentation from `MultivariateStudentTLinearOperator`:
+
+The standard deviation for Student's T equals
+
+```none
+sqrt(diag(scale @ scale.T)) * df / (df - 2), when df > 2
+infinity, when 1 < df <= 2
+NaN, when df <= 1
+```
+
 #### Args:
 
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
@@ -776,6 +862,20 @@ Var = E[(X - E[X])**2]
 
 where `X` is the random variable associated with this distribution, `E`
 denotes expectation, and `Var.shape = batch_shape + event_shape`.
+
+
+Additional documentation from `MultivariateStudentTLinearOperator`:
+
+The variance for Student's T equals
+
+```none
+diag(scale @ scale.T) * df / (df - 2), when df > 2
+infinity, when 1 < df <= 2
+NaN, when df <= 1
+```
+
+If `self.allow_nan_stats=False`, then an exception will be raised
+rather than returning `NaN`.
 
 #### Args:
 

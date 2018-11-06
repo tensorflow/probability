@@ -83,7 +83,7 @@ x = fn(...fn(fn(x0).sample()).sample()).sample()
 ```
 
 where the ellipses (`...`) represent `n-2` composed calls to `fn`, `fn`
-constructs a `tf.distributions.Distribution`-like instance, and `x0` is a
+constructs a `tfd.Distribution`-like instance, and `x0` is a
 fixed initializing `Tensor`.
 
 #### Examples
@@ -98,8 +98,8 @@ def normal_fn(self, event_size):
       scale_tril=tfd.fill_triangular(0.25 * p))
   def _fn(samples):
     scale = tf.exp(affine.forward(samples)).eval()
-    return independent_lib.Independent(
-        tf.distributions.Normal(loc=0., scale=scale, validate_args=True),
+    return tfd.Independent(
+        tfd.Normal(loc=0., scale=scale, validate_args=True),
         reinterpreted_batch_ndims=1)
   return _fn
 
@@ -143,7 +143,7 @@ Construct an `Autoregressive` distribution.
 #### Args:
 
 * <b>`distribution_fn`</b>: Python `callable` which constructs a
-    `tf.distributions.Distribution`-like instance from a `Tensor` (e.g.,
+    `tfd.Distribution`-like instance from a `Tensor` (e.g.,
     `sample0`). The function must respect the "autoregressive property",
     i.e., there exists a permutation of event such that each coordinate is a
     diffeomorphic function of on preceding coordinates.
@@ -243,8 +243,7 @@ Dictionary of parameters used to instantiate this `Distribution`.
 Describes how samples from the distribution are reparameterized.
 
 Currently this is one of the static instances
-`distributions.FULLY_REPARAMETERIZED`
-or `distributions.NOT_REPARAMETERIZED`.
+`tfd.FULLY_REPARAMETERIZED` or `tfd.NOT_REPARAMETERIZED`.
 
 #### Returns:
 

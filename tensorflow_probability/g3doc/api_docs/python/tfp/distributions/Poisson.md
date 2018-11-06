@@ -5,6 +5,7 @@
 <meta itemprop="property" content="batch_shape"/>
 <meta itemprop="property" content="dtype"/>
 <meta itemprop="property" content="event_shape"/>
+<meta itemprop="property" content="interpolate_nondiscrete"/>
 <meta itemprop="property" content="log_rate"/>
 <meta itemprop="property" content="name"/>
 <meta itemprop="property" content="parameters"/>
@@ -64,6 +65,7 @@ where `rate = lambda` and `Z` is the normalizing constant.
 __init__(
     rate=None,
     log_rate=None,
+    interpolate_nondiscrete=True,
     validate_args=False,
     allow_nan_stats=True,
     name='Poisson'
@@ -78,14 +80,23 @@ Initialize a batch of Poisson distributions.
     Must specify exactly one of `rate` and `log_rate`.
 * <b>`log_rate`</b>: Floating point tensor, the log of the rate parameter.
     Must specify exactly one of `rate` and `log_rate`.
-* <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
+* <b>`interpolate_nondiscrete`</b>: Python `bool`. When `False`,
+    `log_prob` returns `-inf` (and `prob` returns `0`) for non-integer
+    inputs. When `True`, `log_prob` evaluates the continuous function
+    `k * log_rate - lgamma(k+1) - rate`, which matches the Poisson pmf
+    at integer arguments `k` (note that this function is not itself
+    a normalized probability log-density).
+    Default value: `True`.
+* <b>`validate_args`</b>: Python `bool`. When `True` distribution
     parameters are checked for validity despite possibly degrading runtime
     performance. When `False` invalid inputs may silently render incorrect
     outputs.
-* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
+    Default value: `False`.
+* <b>`allow_nan_stats`</b>: Python `bool`. When `True`, statistics
     (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
     result is undefined. When `False`, an exception is raised if one or
     more of the statistic's batch members are undefined.
+    Default value: `True`.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
 
 
@@ -142,6 +153,10 @@ May be partially defined or unknown.
 
 * <b>`event_shape`</b>: `TensorShape`, possibly unknown.
 
+<h3 id="interpolate_nondiscrete"><code>interpolate_nondiscrete</code></h3>
+
+Interpolate (log) probs on non-integer inputs.
+
 <h3 id="log_rate"><code>log_rate</code></h3>
 
 Log rate parameter.
@@ -163,8 +178,7 @@ Rate parameter.
 Describes how samples from the distribution are reparameterized.
 
 Currently this is one of the static instances
-`distributions.FULLY_REPARAMETERIZED`
-or `distributions.NOT_REPARAMETERIZED`.
+`tfd.FULLY_REPARAMETERIZED` or `tfd.NOT_REPARAMETERIZED`.
 
 #### Returns:
 

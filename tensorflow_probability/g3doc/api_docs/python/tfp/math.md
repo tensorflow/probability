@@ -13,6 +13,8 @@ TensorFlow Probability math functions.
 
 [`diag_jacobian(...)`](../tfp/math/diag_jacobian.md): Computes diagonal of the Jacobian matrix of `ys=fn(xs)` wrt `xs`.
 
+[`log1psquare(...)`](../tfp/math/log1psquare.md): A numerically stable implementation of log(1 + x**2).
+
 [`matvecmul(...)`](../tfp/math/matvecmul.md): Multiply a matrix by a vector.
 
 [`pinv(...)`](../tfp/math/pinv.md): Compute the Moore-Penrose pseudo-inverse of a matrix.

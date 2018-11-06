@@ -10,7 +10,10 @@ tfp.optimizer.bfgs_minimize(
     value_and_gradients_function,
     initial_position,
     tolerance=1e-08,
+    x_tolerance=0,
+    f_relative_tolerance=0,
     initial_inverse_hessian_estimate=None,
+    max_iterations=50,
     parallel_iterations=1,
     name=None
 )
@@ -65,9 +68,15 @@ minimum for a simple two dimensional quadratic objective function.
 * <b>`initial_position`</b>: `Tensor` of real dtype. The starting point of the search
     procedure. Should be a point at which the function value and the gradient
     norm are finite.
-* <b>`tolerance`</b>: Scalar `Tensor` of real dtype. Specifies the tolerance for the
-    procedure. The algorithm is said to have converged when the Euclidean
-    norm of the gradient is below this value.
+* <b>`tolerance`</b>: Scalar `Tensor` of real dtype. Specifies the gradient tolerance
+    for the procedure. If the supremum norm of the gradient vector is below
+    this number, the algorithm is stopped.
+* <b>`x_tolerance`</b>: Scalar `Tensor` of real dtype. If the absolute change in the
+    position between one iteration and the next is smaller than this number,
+    the algorithm is stopped.
+* <b>`f_relative_tolerance`</b>: Scalar `Tensor` of real dtype. If the relative change
+    in the objective value between one iteration and the next is smaller
+    than this value, the algorithm is stopped.
 * <b>`initial_inverse_hessian_estimate`</b>: Optional `Tensor` of the same dtype
     as the components of the output of the `value_and_gradients_function`.
     If specified, the shape should be `initial_position.shape` * 2.
@@ -81,6 +90,8 @@ minimum for a simple two dimensional quadratic objective function.
     the inverse of the Hessian at the initial point. If not specified,
     the identity matrix is used as the starting estimate for the
     inverse Hessian.
+* <b>`max_iterations`</b>: Scalar positive int32 `Tensor`. The maximum number of
+    iterations for BFGS updates.
 * <b>`parallel_iterations`</b>: Positive integer. The number of iterations allowed to
     run in parallel.
 * <b>`name`</b>: (Optional) Python str. The name prefixed to the ops created by this
@@ -109,7 +120,7 @@ minimum for a simple two dimensional quadratic objective function.
       function at the `position`. If the search converged, then this is
       the (local) minimum of the objective function.
 * <b>`objective_gradient`</b>: A tensor containing the gradient of the objective
-      function at the `position`. If the search converged this
-      L2-norm of this tensor should be below the tolerance.
+      function at the `position`. If the search converged the
+      max-norm of this tensor should be below the tolerance.
 * <b>`inverse_hessian_estimate`</b>: A tensor containing the inverse of the
       estimated Hessian.

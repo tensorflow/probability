@@ -41,7 +41,7 @@
 
 ## Class `GammaWithSoftplusConcentrationRate`
 
-Inherits From: [`Gamma`](../../tfp/distributions/Gamma.md)
+
 
 `Gamma` with softplus of `concentration` and `rate`.
 
@@ -57,7 +57,11 @@ __init__(
 )
 ```
 
+DEPRECATED FUNCTION
 
+THIS FUNCTION IS DEPRECATED. It will be removed after 2019-01-01.
+Instructions for updating:
+Use `tfd.Gamma(tf.nn.softplus(concentration), tf.nn.softplus(rate))` instead.
 
 
 

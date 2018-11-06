@@ -119,7 +119,6 @@ __init__(
     temperature,
     logits=None,
     probs=None,
-    dtype=None,
     validate_args=False,
     allow_nan_stats=True,
     name='RelaxedOneHotCategorical'
@@ -143,8 +142,6 @@ Initialize RelaxedOneHotCategorical using class log-probabilities.
     dimensions index into a batch of independent distributions and the last
     dimension represents a vector of probabilities for each class. Only one
     of `logits` or `probs` should be passed in.
-* <b>`dtype`</b>: The type of the event samples (default: inferred from
-    logits/probs).
 * <b>`validate_args`</b>: Unused in this distribution.
 * <b>`allow_nan_stats`</b>: Python `bool`, default `True`. If `False`, raise an
     exception if a statistic (e.g. mean/mode/etc...) is undefined for any
@@ -220,8 +217,7 @@ Dictionary of parameters used to instantiate this `Distribution`.
 Describes how samples from the distribution are reparameterized.
 
 Currently this is one of the static instances
-`distributions.FULLY_REPARAMETERIZED`
-or `distributions.NOT_REPARAMETERIZED`.
+`tfd.FULLY_REPARAMETERIZED` or `tfd.NOT_REPARAMETERIZED`.
 
 #### Returns:
 

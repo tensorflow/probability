@@ -1,15 +1,12 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
-<meta itemprop="name" content="tfp.bijectors.Affine" />
+<meta itemprop="name" content="tfp.bijectors.NormalCDF" />
 <meta itemprop="path" content="Stable" />
-<meta itemprop="property" content="adjoint"/>
 <meta itemprop="property" content="dtype"/>
 <meta itemprop="property" content="forward_min_event_ndims"/>
 <meta itemprop="property" content="graph_parents"/>
 <meta itemprop="property" content="inverse_min_event_ndims"/>
 <meta itemprop="property" content="is_constant_jacobian"/>
 <meta itemprop="property" content="name"/>
-<meta itemprop="property" content="scale"/>
-<meta itemprop="property" content="shift"/>
 <meta itemprop="property" content="validate_args"/>
 <meta itemprop="property" content="__init__"/>
 <meta itemprop="property" content="forward"/>
@@ -22,156 +19,44 @@
 <meta itemprop="property" content="inverse_log_det_jacobian"/>
 </div>
 
-# tfp.bijectors.Affine
+# tfp.bijectors.NormalCDF
 
-## Class `Affine`
+## Class `NormalCDF`
 
 Inherits From: [`Bijector`](../../tfp/bijectors/Bijector.md)
 
-Compute `Y = g(X; shift, scale) = scale @ X + shift`.
+Compute `Y = g(X) = NormalCDF(x)`.
 
-Here `scale = c * I + diag(D1) + tril(L) + V @ diag(D2) @ V.T`.
+This bijector maps inputs from `[-inf, inf]` to `[0, 1]`. The inverse of the
+bijector applied to a uniform random variable `X ~ U(0, 1)` gives back a
+random variable with the
+[Normal distribution](https://en.wikipedia.org/wiki/Normal_distribution):
 
-In TF parlance, the `scale` term is logically equivalent to:
-
-```python
-scale = (
-  scale_identity_multiplier * tf.diag(tf.ones(d)) +
-  tf.diag(scale_diag) +
-  scale_tril +
-  scale_perturb_factor @ diag(scale_perturb_diag) @
-    tf.transpose([scale_perturb_factor])
-)
-```
-
-The `scale` term is applied without necessarily materializing constituent
-matrices, i.e., the matmul is [matrix-free](
-https://en.wikipedia.org/wiki/Matrix-free_methods) when possible.
-
-#### Examples
-
-```python
-# Y = X
-b = Affine()
-
-# Y = X + shift
-b = Affine(shift=[1., 2, 3])
-
-# Y = 2 * I @ X.T + shift
-b = Affine(shift=[1., 2, 3],
-           scale_identity_multiplier=2.)
-
-# Y = tf.diag(d1) @ X.T + shift
-b = Affine(shift=[1., 2, 3],
-           scale_diag=[-1., 2, 1])         # Implicitly 3x3.
-
-# Y = (I + v * v.T) @ X.T + shift
-b = Affine(shift=[1., 2, 3],
-           scale_perturb_factor=[[1., 0],
-                                 [0, 1],
-                                 [1, 1]])
-
-# Y = (diag(d1) + v * diag(d2) * v.T) @ X.T + shift
-b = Affine(shift=[1., 2, 3],
-           scale_diag=[1., 3, 3],          # Implicitly 3x3.
-           scale_perturb_diag=[2., 1],     # Implicitly 2x2.
-           scale_perturb_factor=[[1., 0],
-                                 [0, 1],
-                                 [1, 1]])
-
+```none
+Y ~ Normal(0, 1)
+pdf(y; 0., 1.) = 1 / sqrt(2 * pi) * exp(-y ** 2 / 2)
 ```
 
 <h2 id="__init__"><code>__init__</code></h2>
 
 ``` python
 __init__(
-    shift=None,
-    scale_identity_multiplier=None,
-    scale_diag=None,
-    scale_tril=None,
-    scale_perturb_factor=None,
-    scale_perturb_diag=None,
-    adjoint=False,
     validate_args=False,
-    name='affine',
-    dtype=None
+    name='normal'
 )
 ```
 
-Instantiates the `Affine` bijector.
-
-This `Bijector` is initialized with `shift` `Tensor` and `scale` arguments,
-giving the forward operation:
-
-```none
-Y = g(X) = scale @ X + shift
-```
-
-where the `scale` term is logically equivalent to:
-
-```python
-scale = (
-  scale_identity_multiplier * tf.diag(tf.ones(d)) +
-  tf.diag(scale_diag) +
-  scale_tril +
-  scale_perturb_factor @ diag(scale_perturb_diag) @
-    tf.transpose([scale_perturb_factor])
-)
-```
-
-If none of `scale_identity_multiplier`, `scale_diag`, or `scale_tril` are
-specified then `scale += IdentityMatrix`. Otherwise specifying a
-`scale` argument has the semantics of `scale += Expand(arg)`, i.e.,
-`scale_diag != None` means `scale += tf.diag(scale_diag)`.
+Instantiates the `NormalCDF` bijector.
 
 #### Args:
 
-* <b>`shift`</b>: Floating-point `Tensor`. If this is set to `None`, no shift is
-    applied.
-* <b>`scale_identity_multiplier`</b>: floating point rank 0 `Tensor` representing a
-    scaling done to the identity matrix.
-    When `scale_identity_multiplier = scale_diag = scale_tril = None` then
-    `scale += IdentityMatrix`. Otherwise no scaled-identity-matrix is added
-    to `scale`.
-* <b>`scale_diag`</b>: Floating-point `Tensor` representing the diagonal matrix.
-    `scale_diag` has shape `[N1, N2, ...  k]`, which represents a k x k
-    diagonal matrix.
-    When `None` no diagonal term is added to `scale`.
-* <b>`scale_tril`</b>: Floating-point `Tensor` representing the lower triangular
-    matrix. `scale_tril` has shape `[N1, N2, ...  k, k]`, which represents a
-    k x k lower triangular matrix.
-    When `None` no `scale_tril` term is added to `scale`.
-    The upper triangular elements above the diagonal are ignored.
-* <b>`scale_perturb_factor`</b>: Floating-point `Tensor` representing factor matrix
-    with last two dimensions of shape `(k, r)`. When `None`, no rank-r
-    update is added to `scale`.
-* <b>`scale_perturb_diag`</b>: Floating-point `Tensor` representing the diagonal
-    matrix. `scale_perturb_diag` has shape `[N1, N2, ...  r]`, which
-    represents an `r x r` diagonal matrix. When `None` low rank updates will
-    take the form `scale_perturb_factor * scale_perturb_factor.T`.
-* <b>`adjoint`</b>: Python `bool` indicating whether to use the `scale` matrix as
-    specified or its adjoint.
-    Default value: `False`.
 * <b>`validate_args`</b>: Python `bool` indicating whether arguments should be
     checked for correctness.
 * <b>`name`</b>: Python `str` name given to ops managed by this object.
-* <b>`dtype`</b>: `tf.DType` to prefer when converting args to `Tensor`s. Else, we
-    fall back to a common dtype inferred from the args, finally falling back
-    to float32.
-
-
-#### Raises:
-
-* <b>`ValueError`</b>: if `perturb_diag` is specified but not `perturb_factor`.
-* <b>`TypeError`</b>: if `shift` has different `dtype` from `scale` arguments.
 
 
 
 ## Properties
-
-<h3 id="adjoint"><code>adjoint</code></h3>
-
-`bool` indicating `scale` should be used as conjugate transpose.
 
 <h3 id="dtype"><code>dtype</code></h3>
 
@@ -203,14 +88,6 @@ neither.
 <h3 id="name"><code>name</code></h3>
 
 Returns the string name of this `Bijector`.
-
-<h3 id="scale"><code>scale</code></h3>
-
-The `scale` `LinearOperator` in `Y = scale @ X + shift`.
-
-<h3 id="shift"><code>shift</code></h3>
-
-The `shift` `Tensor` in `Y = scale @ X + shift`.
 
 <h3 id="validate_args"><code>validate_args</code></h3>
 
