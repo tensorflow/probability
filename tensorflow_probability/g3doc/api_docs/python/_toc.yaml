@@ -66,6 +66,10 @@ toc:
       path: /probability/api_docs/python/tfp/bijectors/masked_dense
     - title: MatrixInverseTriL
       path: /probability/api_docs/python/tfp/bijectors/MatrixInverseTriL
+    - title: NormalCDF
+      path: /probability/api_docs/python/tfp/bijectors/NormalCDF
+    - title: Ordered
+      path: /probability/api_docs/python/tfp/bijectors/Ordered
     - title: Permute
       path: /probability/api_docs/python/tfp/bijectors/Permute
     - title: PowerTransform
@@ -214,6 +218,8 @@ toc:
       path: /probability/api_docs/python/tfp/distributions/MultivariateNormalLinearOperator
     - title: MultivariateNormalTriL
       path: /probability/api_docs/python/tfp/distributions/MultivariateNormalTriL
+    - title: MultivariateStudentTLinearOperator
+      path: /probability/api_docs/python/tfp/distributions/MultivariateStudentTLinearOperator
     - title: NegativeBinomial
       path: /probability/api_docs/python/tfp/distributions/NegativeBinomial
     - title: Normal
@@ -266,6 +272,8 @@ toc:
       path: /probability/api_docs/python/tfp/distributions/StudentTWithAbsDfSoftplusScale
     - title: TransformedDistribution
       path: /probability/api_docs/python/tfp/distributions/TransformedDistribution
+    - title: Triangular
+      path: /probability/api_docs/python/tfp/distributions/Triangular
     - title: tridiag
       path: /probability/api_docs/python/tfp/distributions/tridiag
     - title: TruncatedNormal
@@ -288,6 +296,8 @@ toc:
       path: /probability/api_docs/python/tfp/distributions/VonMisesFisher
     - title: Wishart
       path: /probability/api_docs/python/tfp/distributions/Wishart
+    - title: Zipf
+      path: /probability/api_docs/python/tfp/distributions/Zipf
   - title: tfp.edward2
     section:
     - title: Overview
@@ -472,6 +482,8 @@ toc:
       path: /probability/api_docs/python/tfp/math/custom_gradient
     - title: diag_jacobian
       path: /probability/api_docs/python/tfp/math/diag_jacobian
+    - title: log1psquare
+      path: /probability/api_docs/python/tfp/math/log1psquare
     - title: matvecmul
       path: /probability/api_docs/python/tfp/math/matvecmul
     - title: pinv

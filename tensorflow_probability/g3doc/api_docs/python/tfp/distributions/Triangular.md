@@ -1,15 +1,15 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
-<meta itemprop="name" content="tfp.distributions.GammaGamma" />
+<meta itemprop="name" content="tfp.distributions.Triangular" />
 <meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="allow_nan_stats"/>
 <meta itemprop="property" content="batch_shape"/>
-<meta itemprop="property" content="concentration"/>
 <meta itemprop="property" content="dtype"/>
 <meta itemprop="property" content="event_shape"/>
-<meta itemprop="property" content="mixing_concentration"/>
-<meta itemprop="property" content="mixing_rate"/>
+<meta itemprop="property" content="high"/>
+<meta itemprop="property" content="low"/>
 <meta itemprop="property" content="name"/>
 <meta itemprop="property" content="parameters"/>
+<meta itemprop="property" content="peak"/>
 <meta itemprop="property" content="reparameterization_type"/>
 <meta itemprop="property" content="validate_args"/>
 <meta itemprop="property" content="__init__"/>
@@ -38,92 +38,113 @@
 <meta itemprop="property" content="variance"/>
 </div>
 
-# tfp.distributions.GammaGamma
+# tfp.distributions.Triangular
 
-## Class `GammaGamma`
+## Class `Triangular`
 
-Inherits From: [`Distribution`](../../tfp/distributions/Distribution.md)
 
-Gamma-Gamma distribution.
 
-Gamma-Gamma is a [compound
-distribution](https://en.wikipedia.org/wiki/Compound_probability_distribution)
-defined over positive real numbers using parameters `concentration`,
-`mixing_concentration` and `mixing_rate`.
+Triangular distribution with `low`, `high` and `peak` parameters.
 
 #### Mathematical Details
 
-It is derived from the following Gamma-Gamma hierarchical model by integrating
-out the random variable `beta`.
+The Triangular distribution is specified by two line segments in the plane,
+such that:
 
-```none
-    beta ~ Gamma(alpha0, beta0)
-X | beta ~ Gamma(alpha, beta)
+  * The first line segment starts at `(a, 0)` and ends at `(c, z)`.
+  * The second line segment starts at `(c, z)` and ends at `(b, 0)`.
+
+  ```none
+  y
+
+  ^
+z |           o  (c,z)
+  |          / \
+  |         /   \
+  |        /     \
+  | (a,0) /       \ (b,0)
+0 +------o---------o-------> x
+  0      a    c    b
 ```
-where
-* `concentration = alpha`
-* `mixing_concentration = alpha0`
-* `mixing_rate = beta0`
 
-The probability density function (pdf) is
+where:
+* a <= c <= b, a < b
+* `low = a`,
+* `high = b`,
+* `peak = c`,
+* `z = 2 / (b - a)`
 
-```none
-                                       x**(alpha - 1)
-pdf(x; alpha, alpha0, beta0) = ---------------------------------
-                               Z * (x + beta0)**(alpha + alpha0)
+The parameters `low`, `high` and `peak` must be shaped in a way that supports
+broadcasting (e.g., `high - low` is a valid operation).
+
+#### Examples
+
+```python
+import tensorflow_probability as tfp
+tfd = tfp.distributions
+
+# Specify a single Triangular distribution.
+u1 = tfd.Triangular(low=3., high=4., peak=3.5)
+u1.mean()
+# ==> 3.5
+
+# Specify two different Triangular distributions.
+u2 = tfd.Triangular(low=[1., 2.], high=[3., 4.], peak=[2., 3.])
+u2.mean()
+# ==> [2., 3.]
+
+# Specify three different Triangular distributions by leveraging broadcasting.
+u3 = tfd.Triangular(low=3., high=[5., 6., 7.], peak=3.)
+u3.mean()
+# ==> [3.6666, 4., 4.3333]
 ```
-where the normalizing constant `Z = Beta(alpha, alpha0) * beta0**(-alpha0)`.
-
-See:
-  http://www.brucehardie.com/notes/025/gamma_gamma.pdf
-
-Samples of this distribution are reparameterized as samples of the Gamma
-distribution are reparameterized using the technique described in the paper
-
-[Michael Figurnov, Shakir Mohamed, Andriy Mnih.
-Implicit Reparameterization Gradients, 2018](https://arxiv.org/abs/1805.08498)
 
 <h2 id="__init__"><code>__init__</code></h2>
 
 ``` python
 __init__(
-    concentration,
-    mixing_concentration,
-    mixing_rate,
+    low=0.0,
+    high=1.0,
+    peak=0.5,
     validate_args=False,
     allow_nan_stats=True,
-    name='GammaGamma'
+    name='Triangular'
 )
 ```
 
-Initializes a batch of Gamma-Gamma distributions.
-
-The parameters `concentration` and `rate` must be shaped in a way that
-supports broadcasting (e.g.
-`concentration + mixing_concentration + mixing_rate` is a valid operation).
+Initialize a batch of Triangular distributions.
 
 #### Args:
 
-* <b>`concentration`</b>: Floating point tensor, the concentration params of the
-    distribution(s). Must contain only positive values.
-* <b>`mixing_concentration`</b>: Floating point tensor, the concentration params of
-    the mixing Gamma distribution(s). Must contain only positive values.
-* <b>`mixing_rate`</b>: Floating point tensor, the rate params of the mixing Gamma
-    distribution(s). Must contain only positive values.
+* <b>`low`</b>: Floating point tensor, lower boundary of the output interval. Must
+    have `low < high`.
+    Default value: `0`.
+* <b>`high`</b>: Floating point tensor, upper boundary of the output interval. Must
+    have `low < high`.
+    Default value: `1`.
+* <b>`peak`</b>: Floating point tensor, mode of the output interval. Must have
+    `low <= peak` and `peak <= high`.
+    Default value: `0.5`.
 * <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
     parameters are checked for validity despite possibly degrading runtime
     performance. When `False` invalid inputs may silently render incorrect
     outputs.
+    Default value: `False`.
 * <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
     (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
-    result is undefined. When `False`, an exception is raised if one or more
-    of the statistic's batch members are undefined.
+    result is undefined. When `False`, an exception is raised if one or
+    more of the statistic's batch members are undefined.
+    Default value: `True`.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
+    Default value: `'Triangular'`.
 
 
 #### Raises:
 
-* <b>`TypeError`</b>: if `concentration` and `rate` are different dtypes.
+* <b>`InvalidArgumentError`</b>: if `validate_args=True` and one of the following is
+* <b>`True`</b>:     * `low >= high`.
+    * `peak > high`.
+    * `low > peak`.
 
 
 
@@ -158,10 +179,6 @@ parameterizations of this distribution.
 
 * <b>`batch_shape`</b>: `TensorShape`, possibly unknown.
 
-<h3 id="concentration"><code>concentration</code></h3>
-
-Concentration parameter.
-
 <h3 id="dtype"><code>dtype</code></h3>
 
 The `DType` of `Tensor`s handled by this `Distribution`.
@@ -176,13 +193,13 @@ May be partially defined or unknown.
 
 * <b>`event_shape`</b>: `TensorShape`, possibly unknown.
 
-<h3 id="mixing_concentration"><code>mixing_concentration</code></h3>
+<h3 id="high"><code>high</code></h3>
 
-Concentration parameter for the mixing Gamma distribution.
+Upper boundary of the interval.
 
-<h3 id="mixing_rate"><code>mixing_rate</code></h3>
+<h3 id="low"><code>low</code></h3>
 
-Rate parameter for the mixing Gamma distribution.
+Lower boundary of the interval.
 
 <h3 id="name"><code>name</code></h3>
 
@@ -192,12 +209,17 @@ Name prepended to all ops created by this `Distribution`.
 
 Dictionary of parameters used to instantiate this `Distribution`.
 
+<h3 id="peak"><code>peak</code></h3>
+
+Peak of the distribution. Lies in the interval.
+
 <h3 id="reparameterization_type"><code>reparameterization_type</code></h3>
 
 Describes how samples from the distribution are reparameterized.
 
 Currently this is one of the static instances
-`tfd.FULLY_REPARAMETERIZED` or `tfd.NOT_REPARAMETERIZED`.
+`distributions.FULLY_REPARAMETERIZED`
+or `distributions.NOT_REPARAMETERIZED`.
 
 #### Returns:
 
@@ -548,13 +570,6 @@ mean(name='mean')
 ```
 
 Mean.
-
-Additional documentation from `GammaGamma`:
-
-The mean of a Gamma-Gamma distribution is
-`concentration * mixing_rate / (mixing_concentration - 1)`, when
-`mixing_concentration > 1`, and `NaN` otherwise. If `self.allow_nan_stats`
-is `False`, an exception will be raised rather than returning `NaN`
 
 <h3 id="mode"><code>mode</code></h3>
 

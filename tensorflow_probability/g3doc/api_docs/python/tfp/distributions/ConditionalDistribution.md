@@ -68,10 +68,10 @@ Constructs the `Distribution`.
 
 * <b>`dtype`</b>: The type of the event samples. `None` implies no type-enforcement.
 * <b>`reparameterization_type`</b>: Instance of `ReparameterizationType`.
-    If `distributions.FULLY_REPARAMETERIZED`, this
+    If `tfd.FULLY_REPARAMETERIZED`, this
     `Distribution` can be reparameterized in terms of some standard
     distribution with a function whose Jacobian is constant for the support
-    of the standard distribution. If `distributions.NOT_REPARAMETERIZED`,
+    of the standard distribution. If `tfd.NOT_REPARAMETERIZED`,
     then no such reparameterization is available.
 * <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
     parameters are checked for validity despite possibly degrading runtime
@@ -153,8 +153,7 @@ Dictionary of parameters used to instantiate this `Distribution`.
 Describes how samples from the distribution are reparameterized.
 
 Currently this is one of the static instances
-`distributions.FULLY_REPARAMETERIZED`
-or `distributions.NOT_REPARAMETERIZED`.
+`tfd.FULLY_REPARAMETERIZED` or `tfd.NOT_REPARAMETERIZED`.
 
 #### Returns:
 

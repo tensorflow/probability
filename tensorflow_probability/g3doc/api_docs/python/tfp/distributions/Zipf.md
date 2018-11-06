@@ -1,16 +1,16 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
-<meta itemprop="name" content="tfp.distributions.GammaGamma" />
+<meta itemprop="name" content="tfp.distributions.Zipf" />
 <meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="allow_nan_stats"/>
 <meta itemprop="property" content="batch_shape"/>
-<meta itemprop="property" content="concentration"/>
 <meta itemprop="property" content="dtype"/>
 <meta itemprop="property" content="event_shape"/>
-<meta itemprop="property" content="mixing_concentration"/>
-<meta itemprop="property" content="mixing_rate"/>
+<meta itemprop="property" content="interpolate_nondiscrete"/>
 <meta itemprop="property" content="name"/>
 <meta itemprop="property" content="parameters"/>
+<meta itemprop="property" content="power"/>
 <meta itemprop="property" content="reparameterization_type"/>
+<meta itemprop="property" content="sample_maximum_iterations"/>
 <meta itemprop="property" content="validate_args"/>
 <meta itemprop="property" content="__init__"/>
 <meta itemprop="property" content="batch_shape_tensor"/>
@@ -38,92 +38,83 @@
 <meta itemprop="property" content="variance"/>
 </div>
 
-# tfp.distributions.GammaGamma
+# tfp.distributions.Zipf
 
-## Class `GammaGamma`
+## Class `Zipf`
 
-Inherits From: [`Distribution`](../../tfp/distributions/Distribution.md)
 
-Gamma-Gamma distribution.
 
-Gamma-Gamma is a [compound
-distribution](https://en.wikipedia.org/wiki/Compound_probability_distribution)
-defined over positive real numbers using parameters `concentration`,
-`mixing_concentration` and `mixing_rate`.
+Zipf distribution.
+
+The Zipf distribution is parameterized by a `power` parameter.
 
 #### Mathematical Details
 
-It is derived from the following Gamma-Gamma hierarchical model by integrating
-out the random variable `beta`.
+The probability mass function (pmf) is,
 
 ```none
-    beta ~ Gamma(alpha0, beta0)
-X | beta ~ Gamma(alpha, beta)
+pmf(k; alpha, k >= 0) = (k^(-alpha)) / Z
+Z = zeta(alpha).
 ```
-where
-* `concentration = alpha`
-* `mixing_concentration = alpha0`
-* `mixing_rate = beta0`
 
-The probability density function (pdf) is
+where `power = alpha` and Z is the normalization constant.
+`zeta` is the [Riemann zeta function](
+https://en.wikipedia.org/wiki/Riemann_zeta_function).
 
-```none
-                                       x**(alpha - 1)
-pdf(x; alpha, alpha0, beta0) = ---------------------------------
-                               Z * (x + beta0)**(alpha + alpha0)
-```
-where the normalizing constant `Z = Beta(alpha, alpha0) * beta0**(-alpha0)`.
-
-See:
-  http://www.brucehardie.com/notes/025/gamma_gamma.pdf
-
-Samples of this distribution are reparameterized as samples of the Gamma
-distribution are reparameterized using the technique described in the paper
-
-[Michael Figurnov, Shakir Mohamed, Andriy Mnih.
-Implicit Reparameterization Gradients, 2018](https://arxiv.org/abs/1805.08498)
+Note that gradients with respect to the `power` parameter are not
+supported in the current implementation.
 
 <h2 id="__init__"><code>__init__</code></h2>
 
 ``` python
 __init__(
-    concentration,
-    mixing_concentration,
-    mixing_rate,
+    power,
+    dtype=tf.int32,
+    interpolate_nondiscrete=True,
+    sample_maximum_iterations=100,
     validate_args=False,
-    allow_nan_stats=True,
-    name='GammaGamma'
+    allow_nan_stats=False,
+    name='Zipf'
 )
 ```
 
-Initializes a batch of Gamma-Gamma distributions.
-
-The parameters `concentration` and `rate` must be shaped in a way that
-supports broadcasting (e.g.
-`concentration + mixing_concentration + mixing_rate` is a valid operation).
+Initialize a batch of Zipf distributions.
 
 #### Args:
 
-* <b>`concentration`</b>: Floating point tensor, the concentration params of the
-    distribution(s). Must contain only positive values.
-* <b>`mixing_concentration`</b>: Floating point tensor, the concentration params of
-    the mixing Gamma distribution(s). Must contain only positive values.
-* <b>`mixing_rate`</b>: Floating point tensor, the rate params of the mixing Gamma
-    distribution(s). Must contain only positive values.
+* <b>`power`</b>: `Float` like `Tensor` representing the power parameter. Must be
+    strictly greater than `1`.
+* <b>`dtype`</b>: The `dtype` of `Tensor` returned by `sample`.
+    Default value: `tf.int32`.
+* <b>`interpolate_nondiscrete`</b>: Python `bool`. When `False`, `log_prob` returns
+    `-inf` (and `prob` returns `0`) for non-integer inputs. When `True`,
+    `log_prob` evaluates the continuous function `-power log(k) -
+    log(zeta(power))` , which matches the Zipf pmf at integer arguments `k`
+    (note that this function is not itself a normalized probability
+    log-density).
+    Default value: `True`.
+* <b>`sample_maximum_iterations`</b>: Maximum number of iterations of allowable
+    iterations in `sample`. When `validate_args=True`, samples which fail to
+    reach convergence (subject to this cap) are masked out with
+    `self.dtype.min` or `nan` depending on `self.dtype.is_integer`.
+    Default value: `100`.
 * <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
     parameters are checked for validity despite possibly degrading runtime
     performance. When `False` invalid inputs may silently render incorrect
     outputs.
+    Default value: `False`.
 * <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
     (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
     result is undefined. When `False`, an exception is raised if one or more
     of the statistic's batch members are undefined.
+    Default value: `False`.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
+    Default value: `'Zipf'`.
 
 
 #### Raises:
 
-* <b>`TypeError`</b>: if `concentration` and `rate` are different dtypes.
+* <b>`TypeError`</b>: if `power` is not `float` like.
 
 
 
@@ -158,10 +149,6 @@ parameterizations of this distribution.
 
 * <b>`batch_shape`</b>: `TensorShape`, possibly unknown.
 
-<h3 id="concentration"><code>concentration</code></h3>
-
-Concentration parameter.
-
 <h3 id="dtype"><code>dtype</code></h3>
 
 The `DType` of `Tensor`s handled by this `Distribution`.
@@ -176,13 +163,9 @@ May be partially defined or unknown.
 
 * <b>`event_shape`</b>: `TensorShape`, possibly unknown.
 
-<h3 id="mixing_concentration"><code>mixing_concentration</code></h3>
+<h3 id="interpolate_nondiscrete"><code>interpolate_nondiscrete</code></h3>
 
-Concentration parameter for the mixing Gamma distribution.
-
-<h3 id="mixing_rate"><code>mixing_rate</code></h3>
-
-Rate parameter for the mixing Gamma distribution.
+Interpolate (log) probs on non-integer inputs.
 
 <h3 id="name"><code>name</code></h3>
 
@@ -192,16 +175,25 @@ Name prepended to all ops created by this `Distribution`.
 
 Dictionary of parameters used to instantiate this `Distribution`.
 
+<h3 id="power"><code>power</code></h3>
+
+Exponent parameter.
+
 <h3 id="reparameterization_type"><code>reparameterization_type</code></h3>
 
 Describes how samples from the distribution are reparameterized.
 
 Currently this is one of the static instances
-`tfd.FULLY_REPARAMETERIZED` or `tfd.NOT_REPARAMETERIZED`.
+`distributions.FULLY_REPARAMETERIZED`
+or `distributions.NOT_REPARAMETERIZED`.
 
 #### Returns:
 
 An instance of `ReparameterizationType`.
+
+<h3 id="sample_maximum_iterations"><code>sample_maximum_iterations</code></h3>
+
+Maximum number of allowable iterations in `sample`.
 
 <h3 id="validate_args"><code>validate_args</code></h3>
 
@@ -549,12 +541,9 @@ mean(name='mean')
 
 Mean.
 
-Additional documentation from `GammaGamma`:
+Additional documentation from `Zipf`:
 
-The mean of a Gamma-Gamma distribution is
-`concentration * mixing_rate / (mixing_concentration - 1)`, when
-`mixing_concentration > 1`, and `NaN` otherwise. If `self.allow_nan_stats`
-is `False`, an exception will be raised rather than returning `NaN`
+Note: Zipf has an infinite mean when `power` <= 2.
 
 <h3 id="mode"><code>mode</code></h3>
 
@@ -776,6 +765,11 @@ Var = E[(X - E[X])**2]
 
 where `X` is the random variable associated with this distribution, `E`
 denotes expectation, and `Var.shape = batch_shape + event_shape`.
+
+
+Additional documentation from `Zipf`:
+
+Note: Zipf has infinite variance when `power` <= 3.
 
 #### Args:
 

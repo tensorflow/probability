@@ -197,7 +197,7 @@ print('Estimated standard deviation: {}'.format(sample_std_))
 ``` python
 __init__(
     target_log_prob_fn,
-    new_state_fn=random_walk_normal_fn(),
+    new_state_fn=None,
     seed=None,
     name=None
 )
@@ -214,7 +214,8 @@ Initializes this transition kernel.
     seed; returns a same-type `list` of `Tensor`s, each being a perturbation
     of the input state parts. The perturbation distribution is assumed to be
     a symmetric distribution centered at the input state part.
-    Default value: `tfp.mcmc.random_walk_normal_fn()`.
+    Default value: `None` which is mapped to
+      `tfp.mcmc.random_walk_normal_fn()`.
 * <b>`seed`</b>: Python integer to seed the random number generator.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this function.
     Default value: `None` (i.e., 'rwm_kernel').

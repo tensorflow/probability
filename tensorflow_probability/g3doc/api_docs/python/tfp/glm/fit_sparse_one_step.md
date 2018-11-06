@@ -16,7 +16,6 @@ tfp.glm.fit_sparse_one_step(
     l2_regularizer=None,
     maximum_full_sweeps=None,
     learning_rate=None,
-    model_coefficients_update_var=None,
     name=None
 )
 ```
@@ -94,10 +93,6 @@ Note that this function does not support batched inputs.
 * <b>`learning_rate`</b>: scalar, `float` `Tensor` representing a multiplicative factor
     used to dampen the proximal gradient descent steps.
     Default value: `None` (i.e., factor is conceptually `1`).
-* <b>`model_coefficients_update_var`</b>: `Variable` with the same shape and dtype as
-    `model_coefficients_start`.  Used to store the current value of
-    `model_coefficients_update`.
-    Default value: `None` (i.e., a new `Variable` will be created).
 * <b>`name`</b>: Python string representing the name of the TensorFlow operation.
     The default name is `"fit_sparse_one_step"`.
 

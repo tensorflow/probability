@@ -59,7 +59,7 @@ month_of_year = tfp.sts.Seasonal(
   num_seasons=12,
   num_steps_per_season=[31, 28, 31, 30, 30, 31, 31, 31, 30, 31, 30, 31],
   drift_scale_prior=tfd.LogNormal(loc=-1., scale=0.1),
-  initial_effect_prior=tf.Normal(loc=0., scale=5.),
+  initial_effect_prior=tfd.Normal(loc=0., scale=5.),
   name='month_of_year')
 ```
 

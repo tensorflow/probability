@@ -108,6 +108,8 @@ Statistical distributions and bijective transformations.
 
 [`class MultivariateNormalTriL`](../tfp/distributions/MultivariateNormalTriL.md): The multivariate normal distribution on `R^k`.
 
+[`class MultivariateStudentTLinearOperator`](../tfp/distributions/MultivariateStudentTLinearOperator.md): The [Multivariate Student's t-distribution](
+
 [`class NegativeBinomial`](../tfp/distributions/NegativeBinomial.md): NegativeBinomial distribution.
 
 [`class Normal`](../tfp/distributions/Normal.md): The Normal distribution with location `loc` and `scale` parameters.
@@ -142,6 +144,8 @@ Statistical distributions and bijective transformations.
 
 [`class TransformedDistribution`](../tfp/distributions/TransformedDistribution.md): A Transformed Distribution.
 
+[`class Triangular`](../tfp/distributions/Triangular.md): Triangular distribution with `low`, `high` and `peak` parameters.
+
 [`class TruncatedNormal`](../tfp/distributions/TruncatedNormal.md): The Truncated Normal distribution.
 
 [`class Uniform`](../tfp/distributions/Uniform.md): Uniform distribution with `low` and `high` parameters.
@@ -161,6 +165,8 @@ Statistical distributions and bijective transformations.
 [`class VonMisesFisher`](../tfp/distributions/VonMisesFisher.md): The von Mises-Fisher distribution over unit vectors on `S^{n-1}`.
 
 [`class Wishart`](../tfp/distributions/Wishart.md): The matrix Wishart distribution on positive definite matrices.
+
+[`class Zipf`](../tfp/distributions/Zipf.md): Zipf distribution.
 
 ## Functions
 
@@ -184,7 +190,7 @@ Statistical distributions and bijective transformations.
 
 [`normal_conjugates_known_scale_predictive(...)`](../tfp/distributions/normal_conjugates_known_scale_predictive.md): Posterior predictive Normal distribution w. conjugate prior on the mean.
 
-[`percentile(...)`](../tfp/distributions/percentile.md): Compute the `q`-th percentile of `x`.
+[`percentile(...)`](../tfp/distributions/percentile.md): Compute the `q`-th percentile(s) of `x`.
 
 [`quadrature_scheme_lognormal_gauss_hermite(...)`](../tfp/distributions/quadrature_scheme_lognormal_gauss_hermite.md): Use Gauss-Hermite quadrature to form quadrature on positive-reals.
 

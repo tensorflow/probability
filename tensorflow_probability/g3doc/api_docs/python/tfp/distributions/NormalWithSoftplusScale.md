@@ -41,7 +41,7 @@
 
 ## Class `NormalWithSoftplusScale`
 
-Inherits From: [`Normal`](../../tfp/distributions/Normal.md)
+
 
 Normal with softplus applied to `scale`.
 
@@ -57,7 +57,11 @@ __init__(
 )
 ```
 
+DEPRECATED FUNCTION
 
+THIS FUNCTION IS DEPRECATED. It will be removed after 2019-01-01.
+Instructions for updating:
+Use `tfd.Normal(loc, tf.nn.softplus(scale)) instead.
 
 
 
