@@ -25,6 +25,7 @@ from tensorflow_probability.python.math.linalg import pinv
 from tensorflow_probability.python.math.numeric import log1psquare
 from tensorflow_probability.python.math.random_ops import random_rademacher
 from tensorflow_probability.python.math.random_ops import random_rayleigh
+from tensorflow_probability.python.math.root_search import secant_root
 
 from tensorflow.python.util.all_util import remove_undocumented
 
@@ -36,6 +37,7 @@ _allowed_symbols = [
     'pinv',
     'random_rademacher',
     'random_rayleigh',
+    'secant_root',
 ]
 
 remove_undocumented(__name__, _allowed_symbols)
