@@ -53,6 +53,7 @@ py_library(
         ":gumbel",
         ":half_cauchy",
         ":half_normal",
+        ":hidden_markov_model",
         ":independent",
         ":inverse_gamma",
         ":inverse_gaussian",
@@ -377,6 +378,15 @@ py_library(
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:special_math",
+    ],
+)
+
+py_library(
+    name = "hidden_markov_model",
+    srcs = ["hidden_markov_model.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
     ],
 )
 
@@ -1265,6 +1275,18 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_case",
+    ],
+)
+
+py_test(
+    name = "hidden_markov_model_test",
+    size = "small",
+    srcs = ["hidden_markov_model_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
