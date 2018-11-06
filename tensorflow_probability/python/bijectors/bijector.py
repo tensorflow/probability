@@ -989,7 +989,7 @@ class Bijector(object):
     """Helper to check dtype when self.dtype is known."""
     if self.dtype is not None and self.dtype.base_dtype != x.dtype.base_dtype:
       raise TypeError(
-          "Input had dtype %s but expected %s." % (self.dtype, x.dtype))
+          "Input had dtype %s but expected %s." % (x.dtype, self.dtype))
 
   def _cache(self, mapping):
     """Helper which stores mapping info in forward/inverse dicts."""
