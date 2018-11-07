@@ -34,28 +34,7 @@ class AffineLinearOperator(bijector.Bijector):
   `shift` is a numeric `Tensor` and `scale` is a `LinearOperator`.
 
   If `X` is a scalar then the forward transformation is: `scale * X + shift`
-  where `*` denotes the scalar product.
-
-  Note: we don't always simply transpose `X` (but write it this way for
-  brevity). Actually the input `X` undergoes the following transformation
-  before being premultiplied by `scale`:
-
-  1. If there are no sample dims, we call `X = tf.expand_dims(X, 0)`, i.e.,
-     `new_sample_shape = [1]`. Otherwise do nothing.
-  2. The sample shape is flattened to have one dimension, i.e.,
-     `new_sample_shape = [n]` where `n = tf.reduce_prod(old_sample_shape)`.
-  3. The sample dim is cyclically rotated left by 1, i.e.,
-     `new_shape = [B1,...,Bb, k, n]` where `n` is as above, `k` is the
-     event_shape, and `B1,...,Bb` are the batch shapes for each of `b` batch
-     dimensions.
-
-  (For more details see `shape.make_batch_of_event_sample_matrices`.)
-
-  The result of the above transformation is that `X` can be regarded as a batch
-  of matrices where each column is a draw from the distribution. After
-  premultiplying by `scale`, we take the inverse of this procedure. The input
-  `Y` also undergoes the same transformation before/after premultiplying by
-  `inv(scale)`.
+  where `*` denotes broadcasted elementwise product.
 
   Example Use:
 
