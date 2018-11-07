@@ -24,7 +24,6 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.glm.proximal_hessian import minimize_sparse
-from tensorflow_probability.python.math import matvecmul
 from tensorflow.python.framework import test_util
 
 tfd = tfp.distributions
@@ -250,7 +249,7 @@ class _ProximalHessianTest(object):
     model_coefficients_2_ = self.evaluate(model_coefficients_2)
 
     def _joint_log_prob(model_coefficients_):
-      predicted_linear_response_ = matvecmul(x_, model_coefficients_)
+      predicted_linear_response_ = tf.linalg.matvec(x_, model_coefficients_)
       return tf.reduce_sum(model.log_prob(y_, predicted_linear_response_))
 
     self.assertAllGreater(

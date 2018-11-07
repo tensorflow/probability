@@ -256,7 +256,7 @@ def cholesky_covariance(x, sample_axis=0, keepdims=False, name=None):
 
   # Make fake_data with the same covariance as observed_data.
   uncorrelated_normal = tf.random_normal(shape=(500, 10))
-  fake_data = tf.matmul(L, uncorrelated_normal[..., tf.newaxis])[..., 0]
+  fake_data = tf.linalg.matvec(L, uncorrelated_normal)
   ```
 
   Args:
