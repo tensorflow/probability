@@ -567,10 +567,10 @@ def move_dimension(x, source_idx, dest_idx):
   ```
   """
   ndims = prefer_static_rank(x)
-  if isinstance(source_idx, int):
-    dtype = tf.int32
-  else:
-    dtype = tf.as_dtype(source_idx.dtype)
+  dtype = dtype_util.common_dtype([source_idx, dest_idx],
+                                  preferred_dtype=tf.int32)
+  source_idx = tf.convert_to_tensor(source_idx, dtype=dtype)
+  dest_idx = tf.convert_to_tensor(dest_idx, dtype=dtype)
 
   # Handle negative indexing.
   source_idx = pick_scalar_condition(
