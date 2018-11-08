@@ -228,8 +228,10 @@ class LKJ(distribution.Distribution):
         # Loop invariant: on entry, result has shape B + [n, n]
         beta_conc -= 0.5
         # norm is y in reference [1].
-        norm = beta.Beta(concentration1=n/2., concentration0=beta_conc).sample(
-            seed=seed())
+        norm = beta.Beta(
+            concentration1=n/2.,
+            concentration0=beta_conc
+        ).sample(seed=seed())
         # distance shape: B + [1] for broadcast
         distance = tf.sqrt(norm)[..., tf.newaxis]
         # direction is u in reference [1].
@@ -258,7 +260,7 @@ class LKJ(distribution.Distribution):
         # = sqrt(1 - xx^T) = sqrt(1 - |raw_correlation|**2) = sqrt(1 -
         # distance**2).
         new_row = tf.concat(
-            [raw_correlation, tf.sqrt(1. - distance**2)], axis=-1)
+            [raw_correlation, tf.sqrt(1. - norm[..., tf.newaxis])], axis=-1)
 
         # Finally add this new row, by growing the cholesky of the result.
         chol_result = tf.concat([
@@ -304,10 +306,17 @@ class LKJ(distribution.Distribution):
     if not self.validate_args:
       return x
     checks = [
-        tf.assert_less_equal(-1., x, message='Correlations must be >= -1.'),
-        tf.assert_less_equal(x, 1., message='Correlations must be <= 1.'),
+        tf.assert_less_equal(
+            tf.cast(-1., dtype=x.dtype.base_dtype),
+            x,
+            message='Correlations must be >= -1.'),
+        tf.assert_less_equal(
+            x,
+            tf.cast(1., x.dtype.base_dtype),
+            message='Correlations must be <= 1.'),
         tf.assert_near(
-            tf.matrix_diag_part(x), 1.,
+            tf.matrix_diag_part(x),
+            tf.cast(1., x.dtype.base_dtype),
             message='Self-correlations must be = 1.'),
         tf.assert_near(
             x, tf.matrix_transpose(x),

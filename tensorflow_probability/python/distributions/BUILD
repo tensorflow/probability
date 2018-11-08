@@ -1655,6 +1655,7 @@ py_test(
         "lkj_test.py",
     ],
     deps = [
+        # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
@@ -1690,6 +1691,7 @@ py_test(
         ":student_t",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 

@@ -60,6 +60,7 @@ py_library(
     srcs = ["statistical_testing.py"],
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -70,6 +71,7 @@ py_test(
     shard_count = 4,
     deps = [
         ":statistical_testing",
+        # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
     ],
