@@ -32,7 +32,6 @@ py_library(
     deps = [
         ":custom_gradient",
         ":diag_jacobian",
-        ":interpolation",
         ":linalg",
         ":numeric",
         ":random_ops",
@@ -56,29 +55,6 @@ py_test(
     name = "custom_gradient_test",
     size = "small",
     srcs = ["custom_gradient_test.py"],
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-    ],
-)
-
-py_library(
-    name = "interpolation",
-    srcs = [
-        "interpolation.py",
-    ],
-    srcs_version = "PY2AND3",
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-    ],
-)
-
-py_test(
-    name = "interpolation_test",
-    size = "small",
-    srcs = ["interpolation_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
