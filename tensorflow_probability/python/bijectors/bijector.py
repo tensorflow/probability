@@ -29,7 +29,6 @@ import six
 import tensorflow as tf
 
 from tensorflow_probability.python.internal import distribution_util
-from tensorflow.python.framework import tensor_util
 
 __all__ = [
     "Bijector",
@@ -576,7 +575,7 @@ class Bijector(object):
       self._name = camel_to_snake(type(self).__name__.lstrip("_"))
 
     for i, t in enumerate(self._graph_parents):
-      if t is None or not tensor_util.is_tensor(t):
+      if t is None or not tf.contrib.framework.is_tensor(t):
         raise ValueError("Graph parent item %d is not a Tensor; %s." % (i, t))
 
   @property
@@ -1051,7 +1050,7 @@ class Bijector(object):
   def _check_valid_event_ndims(self, min_event_ndims, event_ndims):
     """Check whether event_ndims is atleast min_event_ndims."""
     event_ndims = tf.convert_to_tensor(event_ndims, name="event_ndims")
-    event_ndims_ = tensor_util.constant_value(event_ndims)
+    event_ndims_ = tf.contrib.util.constant_value(event_ndims)
     assertions = []
 
     if not event_ndims.dtype.is_integer:

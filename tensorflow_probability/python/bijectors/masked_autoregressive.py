@@ -23,8 +23,6 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow.python.layers import core as layers
-from tensorflow.python.ops import control_flow_ops
 
 
 __all__ = [
@@ -259,7 +257,7 @@ class MaskedAutoregressiveFlow(bijector.Bijector):
       if shift is not None:
         y += shift
       return index + 1, y
-    _, y = control_flow_ops.while_loop(
+    _, y = tf.while_loop(
         cond=lambda index, _: index < event_size,
         body=_loop_body,
         loop_vars=(0, y0),
@@ -376,7 +374,7 @@ def masked_dense(inputs,
     return mask * kernel_initializer(shape, dtype, partition_info)
 
   with tf.name_scope(name, "masked_dense", [inputs, units, num_blocks]):
-    layer = layers.Dense(
+    layer = tf.layers.Dense(
         units,
         kernel_initializer=masked_initializer,
         kernel_constraint=lambda x: mask * x,

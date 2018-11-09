@@ -23,7 +23,6 @@ from __future__ import print_function
 import tensorflow as tf
 
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow.python.layers import normalization
 
 
 __all__ = [
@@ -150,7 +149,7 @@ class BatchNormalization(bijector.Bijector):
     """
     # Scale must be positive.
     g_constraint = lambda x: tf.nn.relu(x) + 1e-6
-    self.batchnorm = batchnorm_layer or normalization.BatchNormalization(
+    self.batchnorm = batchnorm_layer or tf.layers.BatchNormalization(
         gamma_constraint=g_constraint)
     self._validate_bn_layer(self.batchnorm)
     self._training = training
@@ -172,7 +171,7 @@ class BatchNormalization(bijector.Bijector):
       `tf.layers.BatchNormalization`, or if `batchnorm_layer.renorm=True` or
       if `batchnorm_layer.virtual_batch_size` is specified.
     """
-    if not isinstance(layer, normalization.BatchNormalization):
+    if not isinstance(layer, tf.layers.BatchNormalization):
       raise ValueError(
           "batchnorm_layer must be an instance of BatchNormalization layer.")
     if layer.renorm:

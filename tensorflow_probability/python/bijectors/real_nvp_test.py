@@ -25,7 +25,6 @@ from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_util
 from tensorflow.python.framework import test_util as tf_test_util
-from tensorflow.python.layers import core as layers
 
 
 @tf_test_util.run_all_in_graph_and_eager_modes
@@ -111,7 +110,7 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
 
     def _condition_shift_and_log_scale_fn(x0, output_units, a, b):
       x = tf.concat((x0, a, b), axis=-1)
-      out = layers.dense(
+      out = tf.layers.dense(
           inputs=x,
           units=2 * output_units)
       shift, log_scale = tf.split(out, 2, axis=-1)

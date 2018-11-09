@@ -20,7 +20,6 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python.bijectors import conditional_bijector
-from tensorflow.python.layers import core as layers
 
 
 __all__ = [
@@ -278,13 +277,13 @@ def real_nvp_default_template(hidden_layers,
             "Conditioning not implemented in the default template.")
 
       for units in hidden_layers:
-        x = layers.dense(
+        x = tf.layers.dense(
             inputs=x,
             units=units,
             activation=activation,
             *args,  # pylint: disable=keyword-arg-before-vararg
             **kwargs)
-      x = layers.dense(
+      x = tf.layers.dense(
           inputs=x,
           units=(1 if shift_only else 2) * output_units,
           activation=None,

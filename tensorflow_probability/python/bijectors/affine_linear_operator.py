@@ -20,7 +20,6 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow.python.ops.linalg import linear_operator
 
 
 __all__ = [
@@ -108,7 +107,7 @@ class AffineLinearOperator(bijector.Bijector):
           raise TypeError(
               "shift.dtype({}) is incompatible with scale.dtype({}).".format(
                   shift.dtype, scale.dtype))
-        if not isinstance(scale, linear_operator.LinearOperator):
+        if not isinstance(scale, tf.linalg.LinearOperator):
           raise TypeError("scale is not an instance of tf.LinearOperator")
         if validate_args and not scale.is_non_singular:
           raise ValueError("Scale matrix must be non-singular.")
