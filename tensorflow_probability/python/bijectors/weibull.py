@@ -98,7 +98,7 @@ class Weibull(bijector.Bijector):
 
   def _forward(self, x):
     x = self._maybe_assert_valid_x(x)
-    return -tf.expm1(-((x / self.scale)**self.concentration))
+    return -tf.math.expm1(-((x / self.scale)**self.concentration))
 
   def _inverse(self, y):
     y = self._maybe_assert_valid_y(y)

@@ -1772,7 +1772,7 @@ def softplus_inverse(x, name=None):
     # codepath whenever we used the surrogate `ones_like`.
     x = tf.where(tf.logical_or(is_too_small, is_too_large),
                  tf.ones_like(x), x)
-    y = x + tf.log(-tf.expm1(-x))  # == log(expm1(x))
+    y = x + tf.log(-tf.math.expm1(-x))  # == log(expm1(x))
     return tf.where(is_too_small, too_small_value,
                     tf.where(is_too_large, too_large_value, y))
 

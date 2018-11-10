@@ -318,4 +318,4 @@ class Zipf(tf.distributions.Distribution):
     """Inverse function of _hat_integral."""
     x = tf.cast(x, self.power.dtype)
     t = self.power - 1.
-    return tf.expm1(-(tf.log(t) + tf.log(x)) / t)
+    return tf.math.expm1(-(tf.log(t) + tf.log(x)) / t)

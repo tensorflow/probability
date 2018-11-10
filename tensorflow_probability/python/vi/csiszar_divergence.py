@@ -106,17 +106,17 @@ def amari_alpha(logu, alpha=1., self_normalized=False, name=None):
     elif alpha == 1.:
       f = tf.exp(logu) * logu
     else:
-      f = tf.expm1(alpha * logu) / (alpha * (alpha - 1.))
+      f = tf.math.expm1(alpha * logu) / (alpha * (alpha - 1.))
 
     if not self_normalized:
       return f
 
     if alpha == 0.:
-      return f + tf.expm1(logu)
+      return f + tf.math.expm1(logu)
     elif alpha == 1.:
-      return f - tf.expm1(logu)
+      return f - tf.math.expm1(logu)
     else:
-      return f - tf.expm1(logu) / (alpha - 1.)
+      return f - tf.math.expm1(logu) / (alpha - 1.)
 
 
 def kl_reverse(logu, self_normalized=False, name=None):
@@ -355,7 +355,7 @@ def total_variation(logu, name=None):
 
   with tf.name_scope(name, "total_variation", [logu]):
     logu = tf.convert_to_tensor(logu, name="logu")
-    return 0.5 * tf.abs(tf.expm1(logu))
+    return 0.5 * tf.abs(tf.math.expm1(logu))
 
 
 def pearson(logu, name=None):
@@ -387,7 +387,7 @@ def pearson(logu, name=None):
 
   with tf.name_scope(name, "pearson", [logu]):
     logu = tf.convert_to_tensor(logu, name="logu")
-    return tf.square(tf.expm1(logu))
+    return tf.square(tf.math.expm1(logu))
 
 
 def squared_hellinger(logu, name=None):
@@ -495,9 +495,9 @@ def t_power(logu, t, self_normalized=False, name=None):
   with tf.name_scope(name, "t_power", [logu, t]):
     logu = tf.convert_to_tensor(logu, name="logu")
     t = tf.convert_to_tensor(t, dtype=logu.dtype.base_dtype, name="t")
-    fu = tf.expm1(t * logu)
+    fu = tf.math.expm1(t * logu)
     if self_normalized:
-      fu -= t * tf.expm1(logu)
+      fu -= t * tf.math.expm1(logu)
     fu *= tf.where(tf.logical_and(0. < t, t < 1.),
                    -tf.ones_like(t),
                    tf.ones_like(t))
@@ -545,7 +545,7 @@ def log1p_abs(logu, name=None):
 
   with tf.name_scope(name, "log1p_abs", [logu]):
     logu = tf.convert_to_tensor(logu, name="logu")
-    return tf.expm1(tf.abs(logu))
+    return tf.math.expm1(tf.abs(logu))
 
 
 def jeffreys(logu, name=None):
@@ -583,7 +583,7 @@ def jeffreys(logu, name=None):
 
   with tf.name_scope(name, "jeffreys", [logu]):
     logu = tf.convert_to_tensor(logu, name="logu")
-    return 0.5 * tf.expm1(logu) * logu
+    return 0.5 * tf.math.expm1(logu) * logu
 
 
 def chi_square(logu, name=None):
@@ -615,7 +615,7 @@ def chi_square(logu, name=None):
 
   with tf.name_scope(name, "chi_square", [logu]):
     logu = tf.convert_to_tensor(logu, name="logu")
-    return tf.expm1(2. * logu)
+    return tf.math.expm1(2. * logu)
 
 
 def modified_gan(logu, self_normalized=False, name=None):
@@ -658,7 +658,7 @@ def modified_gan(logu, self_normalized=False, name=None):
     logu = tf.convert_to_tensor(logu, name="logu")
     y = tf.nn.softplus(logu) - logu
     if self_normalized:
-      y += 0.5 * tf.expm1(logu)
+      y += 0.5 * tf.math.expm1(logu)
     return y
 
 

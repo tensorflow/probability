@@ -145,7 +145,7 @@ class Geometric(distribution.Distribution):
       # However, scipy takes the floor, so we do too.
       x = tf.floor(x)
     x *= tf.ones_like(self.probs)
-    return tf.where(x < 0., tf.zeros_like(x), -tf.expm1(
+    return tf.where(x < 0., tf.zeros_like(x), -tf.math.expm1(
         (1. + x) * tf.log1p(-self.probs)))
 
   def _log_prob(self, x):

@@ -32,8 +32,8 @@ class Expm1(bijector.Bijector):
 
     This `Bijector` is no different from Chain([AffineScalar(shift=-1), Exp()]).
 
-    However, this makes use of the more numerically stable routines `tf.expm1`
-    and `tf.log1p`.
+    However, this makes use of the more numerically stable routines
+    `tf.math.expm1` and `tf.log1p`.
 
     Example Use:
 
@@ -62,7 +62,7 @@ class Expm1(bijector.Bijector):
 
   def _forward(self, x):
     """Returns the forward `Bijector` evaluation, i.e., X = g(Y)."""
-    return tf.expm1(x)
+    return tf.math.expm1(x)
 
   def _inverse(self, y):
     """Returns the inverse `Bijector` evaluation, i.e., Y = g^-1(X)."""

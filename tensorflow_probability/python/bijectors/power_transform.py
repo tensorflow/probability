@@ -87,7 +87,7 @@ class PowerTransform(bijector.Bijector):
       return tf.log(y)
     # If large y accuracy is an issue, consider using:
     # (y**self.power - 1.) / self.power when y >> 1.
-    return tf.expm1(tf.log(y) * self.power) / self.power
+    return tf.math.expm1(tf.log(y) * self.power) / self.power
 
   def _inverse_log_det_jacobian(self, y):
     y = self._maybe_assert_valid_y(y)
