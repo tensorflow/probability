@@ -148,7 +148,7 @@ def _ndtr(x):
   z = tf.abs(w)
   y = tf.where(
       tf.less(z, half_sqrt_2), 1. + tf.erf(w),
-      tf.where(tf.greater(w, 0.), 2. - tf.erfc(z), tf.erfc(z)))
+      tf.where(tf.greater(w, 0.), 2. - tf.math.erfc(z), tf.math.erfc(z)))
   return 0.5 * y
 
 
