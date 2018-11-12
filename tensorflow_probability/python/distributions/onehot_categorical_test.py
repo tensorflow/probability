@@ -22,7 +22,6 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow.python.framework import tensor_util
 from tensorflow.python.framework import test_util
 
 tfd = tfp.distributions
@@ -64,8 +63,8 @@ class OneHotCategoricalTest(tf.test.TestCase):
       self.assertAllEqual([10], self.evaluate(dist.event_shape_tensor()))
       # event_shape is available as a constant because the shape is
       # known at graph build time.
-      self.assertEqual(10,
-                       tensor_util.constant_value(dist.event_shape_tensor()))
+      self.assertEqual(
+          10, tf.contrib.util.constant_value(dist.event_shape_tensor()))
 
     for batch_shape in ([], [1], [2, 3, 4]):
       dist = make_onehot_categorical(batch_shape, tf.constant(

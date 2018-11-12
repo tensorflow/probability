@@ -25,8 +25,6 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.distributions import uniform as uniform_lib
-from tensorflow.python.eager import backprop
-from tensorflow.python.framework import errors
 from tensorflow.python.framework import test_util
 
 
@@ -138,8 +136,8 @@ class UniformTest(tf.test.TestCase):
     a_v = np.array([1.0, 1.0, 1.0], dtype=np.float32)
     b_v = np.array([1.0, 2.0, 3.0], dtype=np.float32)
 
-    with self.assertRaisesWithPredicateMatch(errors.InvalidArgumentError,
-                                             "x < y"):
+    with self.assertRaisesWithPredicateMatch(
+        tf.errors.InvalidArgumentError, "x < y"):
       uniform = uniform_lib.Uniform(low=a_v, high=b_v, validate_args=True)
       self.evaluate(uniform.low)
 
@@ -283,7 +281,7 @@ class UniformTest(tf.test.TestCase):
   def testFullyReparameterized(self):
     a = tf.constant(0.1)
     b = tf.constant(0.8)
-    with backprop.GradientTape() as tape:
+    with tf.GradientTape() as tape:
       tape.watch(a)
       tape.watch(b)
       uniform = uniform_lib.Uniform(a, b)

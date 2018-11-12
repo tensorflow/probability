@@ -26,8 +26,6 @@ import tensorflow as tf
 from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import normal
-from tensorflow.python.eager import backprop
-from tensorflow.python.framework import tensor_util
 
 
 def make_categorical(batch_shape, num_classes, dtype=tf.int32):
@@ -66,7 +64,7 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
         self.assertEqual(10, dist.event_size.eval())
         # event_size is available as a constant because the shape is
         # known at graph build time.
-        self.assertEqual(10, tensor_util.constant_value(dist.event_size))
+        self.assertEqual(10, tf.contrib.util.constant_value(dist.event_size))
 
       for batch_shape in ([], [1], [2, 3, 4]):
         dist = make_categorical(
@@ -373,7 +371,7 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
 
   def testNotReparameterized(self):
     p = tf.constant([0.3, 0.3, 0.4])
-    with backprop.GradientTape() as tape:
+    with tf.GradientTape() as tape:
       tape.watch(p)
       dist = categorical.Categorical(p)
       samples = dist.sample(100)

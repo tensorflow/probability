@@ -21,7 +21,6 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.distributions import dirichlet_multinomial
-from tensorflow.python.eager import backprop
 
 
 ds = dirichlet_multinomial
@@ -477,7 +476,7 @@ class DirichletMultinomialTest(tf.test.TestCase):
   def testNotReparameterized(self):
     total_count = tf.constant(5.0)
     concentration = tf.constant([0.1, 0.1, 0.1])
-    with backprop.GradientTape() as tape:
+    with tf.GradientTape() as tape:
       tape.watch(total_count)
       tape.watch(concentration)
       dist = ds.DirichletMultinomial(

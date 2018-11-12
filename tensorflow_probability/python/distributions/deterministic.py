@@ -29,7 +29,6 @@ from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.framework import tensor_shape
-from tensorflow.python.framework import tensor_util
 from tensorflow.python.ops import control_flow_ops
 
 __all__ = [
@@ -157,7 +156,7 @@ class _BaseDeterministic(distribution.Distribution):
     return self.mean()
 
   def _sample_n(self, n, seed=None):  # pylint: disable=unused-arg
-    n_static = tensor_util.constant_value(tf.convert_to_tensor(n))
+    n_static = tf.contrib.util.constant_value(tf.convert_to_tensor(n))
     if n_static is not None and self.loc.shape.ndims is not None:
       ones = [1] * self.loc.shape.ndims
       multiples = [n_static] + ones

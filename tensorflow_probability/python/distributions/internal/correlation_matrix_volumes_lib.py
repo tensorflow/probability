@@ -51,15 +51,10 @@ import sys
 
 # Dependency imports
 import numpy as np
+import tensorflow as tf
 
 from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import distribution_util as util
-from tensorflow.python.client import session
-from tensorflow.python.framework import ops
-from tensorflow.python.ops import array_ops
-from tensorflow.python.ops import linalg_ops
-from tensorflow.python.ops import math_ops
-from tensorflow.python.platform import tf_logging
 
 __all__ = [
     "correlation_matrix_volume_rejection_samples",
@@ -72,7 +67,7 @@ def try_import(name):  # pylint: disable=invalid-name
   try:
     module = importlib.import_module(name)
   except ImportError as e:
-    tf_logging.warning("Could not import %s: %s" % (name, str(e)))
+    tf.logging.warning("Could not import %s: %s" % (name, str(e)))
   return module
 
 optimize = try_import("scipy.optimize")
@@ -104,9 +99,9 @@ def _psd_mask(x):
   # factorization can complete and 'look' like everything is fine
   # (e.g., O(1) entries and a diagonal of all ones) but the matrix can
   # have an exponential condition number.
-  eigenvalues, _ = linalg_ops.self_adjoint_eig(x)
-  return math_ops.cast(
-      math_ops.reduce_min(eigenvalues, axis=-1) >= 0, dtype=x.dtype)
+  eigenvalues, _ = tf.self_adjoint_eig(x)
+  return tf.cast(
+      tf.reduce_min(eigenvalues, axis=-1) >= 0, dtype=x.dtype)
 
 
 def _det_large_enough_mask(x, det_bounds):
@@ -132,8 +127,8 @@ def _det_large_enough_mask(x, det_bounds):
   # Cholesky is roughly half the cost of Gaussian Elimination with
   # Partial Pivoting. But this is less of an impact than the switch in
   # _psd_mask.
-  return math_ops.cast(
-      linalg_ops.matrix_determinant(x) > det_bounds, dtype=x.dtype)
+  return tf.cast(
+      tf.matrix_determinant(x) > det_bounds, dtype=x.dtype)
 
 
 def _uniform_correlation_like_matrix(num_rows, batch_shape, dtype, seed):
@@ -158,7 +153,7 @@ def _uniform_correlation_like_matrix(num_rows, batch_shape, dtype, seed):
       main diagonal.
   """
   num_entries = num_rows * (num_rows + 1) / 2
-  ones = array_ops.ones(shape=[num_entries], dtype=dtype)
+  ones = tf.ones(shape=[num_entries], dtype=dtype)
   # It seems wasteful to generate random values for the diagonal since
   # I am going to throw them away, but `fill_triangular` fills the
   # diagonal, so I probably need them.
@@ -168,11 +163,11 @@ def _uniform_correlation_like_matrix(num_rows, batch_shape, dtype, seed):
   # `matrix_band_part`.
   unifs = uniform.Uniform(-ones, ones).sample(batch_shape, seed=seed)
   tril = util.fill_triangular(unifs)
-  symmetric = tril + array_ops.matrix_transpose(tril)
-  diagonal_ones = array_ops.ones(
+  symmetric = tril + tf.matrix_transpose(tril)
+  diagonal_ones = tf.ones(
       shape=util.pad(batch_shape, axis=0, back=True, value=num_rows),
       dtype=dtype)
-  return array_ops.matrix_set_diag(symmetric, diagonal_ones)
+  return tf.matrix_set_diag(symmetric, diagonal_ones)
 
 
 def correlation_matrix_volume_rejection_samples(
@@ -210,7 +205,7 @@ def correlation_matrix_volume_rejection_samples(
     volume: The volume of the set of `dim` by `dim` correlation-like
       matrices.
   """
-  with ops.name_scope("rejection_sampler"):
+  with tf.name_scope("rejection_sampler"):
     rej_proposals = _uniform_correlation_like_matrix(
         dim, sample_shape, dtype, seed=seed)
     rej_proposal_volume = 2. ** (dim * (dim - 1) / 2.)
@@ -324,7 +319,7 @@ def compute_true_volumes(
       tuple giving the confidence interval.
   """
   bounds = {}
-  with session.Session() as sess:
+  with tf.Session() as sess:
     rej_weights, _ = correlation_matrix_volume_rejection_samples(
         det_bounds, dim, [num_samples, len(det_bounds)], np.float32, seed=seed)
     rej_weights = sess.run(rej_weights)

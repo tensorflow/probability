@@ -21,7 +21,6 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from tensorflow.python.framework import tensor_util
 from tensorflow.python.framework import test_util
 
 tfd = tfp.distributions
@@ -80,20 +79,20 @@ class DistributionTest(tf.test.TestCase):
     sigma = 2.
 
     normal = tfd.Normal(mu, sigma, validate_args=True)
-    self.assertTrue(tensor_util.constant_value(normal.is_scalar_event()))
-    self.assertTrue(tensor_util.constant_value(normal.is_scalar_batch()))
+    self.assertTrue(tf.contrib.util.constant_value(normal.is_scalar_event()))
+    self.assertTrue(tf.contrib.util.constant_value(normal.is_scalar_batch()))
 
     normal = tfd.Normal([mu], [sigma], validate_args=True)
-    self.assertTrue(tensor_util.constant_value(normal.is_scalar_event()))
-    self.assertFalse(tensor_util.constant_value(normal.is_scalar_batch()))
+    self.assertTrue(tf.contrib.util.constant_value(normal.is_scalar_event()))
+    self.assertFalse(tf.contrib.util.constant_value(normal.is_scalar_batch()))
 
     mvn = tfd.MultivariateNormalDiag([mu], [sigma], validate_args=True)
-    self.assertFalse(tensor_util.constant_value(mvn.is_scalar_event()))
-    self.assertTrue(tensor_util.constant_value(mvn.is_scalar_batch()))
+    self.assertFalse(tf.contrib.util.constant_value(mvn.is_scalar_event()))
+    self.assertTrue(tf.contrib.util.constant_value(mvn.is_scalar_batch()))
 
     mvn = tfd.MultivariateNormalDiag([[mu]], [[sigma]], validate_args=True)
-    self.assertFalse(tensor_util.constant_value(mvn.is_scalar_event()))
-    self.assertFalse(tensor_util.constant_value(mvn.is_scalar_batch()))
+    self.assertFalse(tf.contrib.util.constant_value(mvn.is_scalar_event()))
+    self.assertFalse(tf.contrib.util.constant_value(mvn.is_scalar_batch()))
 
     # We now test every codepath within the underlying is_scalar_helper
     # function.

@@ -26,7 +26,6 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.distributions import student_t
-from tensorflow.python.eager import backprop
 from tensorflow.python.framework import test_util
 
 
@@ -430,7 +429,7 @@ class StudentTTest(tf.test.TestCase):
     df = tf.constant(2.0)
     mu = tf.constant(1.0)
     sigma = tf.constant(3.0)
-    with backprop.GradientTape() as tape:
+    with tf.GradientTape() as tape:
       tape.watch(df)
       tape.watch(mu)
       tape.watch(sigma)

@@ -27,7 +27,6 @@ import tensorflow as tf
 
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import normal as normal_lib
-from tensorflow.python.eager import backprop
 from tensorflow.python.framework import test_util
 
 
@@ -432,7 +431,7 @@ class NormalTest(tf.test.TestCase):
   def testNormalFullyReparameterized(self):
     mu = tf.constant(4.0)
     sigma = tf.constant(3.0)
-    with backprop.GradientTape() as tape:
+    with tf.GradientTape() as tape:
       tape.watch(mu)
       tape.watch(sigma)
       normal = normal_lib.Normal(loc=mu, scale=sigma)

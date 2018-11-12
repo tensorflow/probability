@@ -26,7 +26,6 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
 from tensorflow.python.framework import test_util
-from tensorflow.python.platform import test
 
 
 tfd = tfp.distributions
@@ -68,7 +67,7 @@ volume_bounds = {
 
 @test_util.run_all_in_graph_and_eager_modes
 @parameterized.parameters(np.float32, np.float64)
-class LKJTest(parameterized.TestCase, test.TestCase):
+class LKJTest(parameterized.TestCase, tf.test.TestCase):
 
   def testNormConst2D(self, dtype):
     expected = 2.
@@ -295,7 +294,7 @@ class LKJTest(parameterized.TestCase, test.TestCase):
     self.evaluate([check1, check2])
 
 
-class LKJTestGraphOnly(test.TestCase):
+class LKJTestGraphOnly(tf.test.TestCase):
 
   def testDimensionGuardDynamicShape(self):
     testee_lkj = tfd.LKJ(
@@ -307,4 +306,4 @@ class LKJTestGraphOnly(test.TestCase):
 
 
 if __name__ == '__main__':
-  test.main()
+  tf.test.main()

@@ -21,7 +21,6 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.distributions import multinomial
-from tensorflow.python.eager import backprop
 
 
 class MultinomialTest(tf.test.TestCase):
@@ -344,7 +343,7 @@ class MultinomialTest(tf.test.TestCase):
   def testNotReparameterized(self):
     total_count = tf.constant(5.0)
     p = tf.constant([0.2, 0.6])
-    with backprop.GradientTape() as tape:
+    with tf.GradientTape() as tape:
       tape.watch(total_count)
       tape.watch(p)
       dist = multinomial.Multinomial(

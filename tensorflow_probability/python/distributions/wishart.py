@@ -28,7 +28,6 @@ from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.framework import tensor_util
 from tensorflow.python.ops import control_flow_ops
 
 __all__ = [
@@ -132,8 +131,8 @@ class _WishartLinearOperator(distribution.Distribution):
               self._scale_operator.shape[-1].value,
               dtype=self._scale_operator.dtype,
               name="dimension")
-        df_val = tensor_util.constant_value(self._df)
-        dim_val = tensor_util.constant_value(self._dimension)
+        df_val = tf.contrib.util.constant_value(self._df)
+        dim_val = tf.contrib.util.constant_value(self._dimension)
         if df_val is not None and dim_val is not None:
           df_val = np.asarray(df_val)
           if not df_val.shape:

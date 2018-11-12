@@ -24,7 +24,6 @@ import tensorflow as tf
 
 from tensorflow_probability.python.distributions import dirichlet as dirichlet_lib
 from tensorflow_probability.python.distributions import kullback_leibler
-from tensorflow.python.eager import backprop
 from tensorflow.python.framework import test_util
 
 
@@ -260,7 +259,7 @@ class DirichletTest(tf.test.TestCase):
 
   def testDirichletFullyReparameterized(self):
     alpha = tf.constant([1.0, 2.0, 3.0])
-    with backprop.GradientTape() as tape:
+    with tf.GradientTape() as tape:
       tape.watch(alpha)
       dirichlet = dirichlet_lib.Dirichlet(alpha)
       samples = dirichlet.sample(100)

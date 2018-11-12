@@ -27,7 +27,6 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.framework import tensor_util
 
 
 class Mixture(distribution.Distribution):
@@ -148,7 +147,7 @@ class Mixture(distribution.Distribution):
     # Ensure that all batch and event ndims are consistent.
     with tf.name_scope(name, values=[cat.logits]) as name:
       num_components = cat.event_size
-      static_num_components = tensor_util.constant_value(num_components)
+      static_num_components = tf.contrib.util.constant_value(num_components)
       if static_num_components is None:
         raise ValueError(
             "Could not infer number of classes from cat and unable "
@@ -328,7 +327,7 @@ class Mixture(distribution.Distribution):
 
     with tf.control_dependencies(self._assertions):
       n = tf.convert_to_tensor(n, name="n")
-      static_n = tensor_util.constant_value(n)
+      static_n = tf.contrib.util.constant_value(n)
       n = int(static_n) if static_n is not None else n
       cat_samples = self.cat.sample(n, seed=seed)
 

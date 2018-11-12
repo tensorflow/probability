@@ -19,7 +19,6 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.util import deprecation
 from tensorflow.python.util import tf_inspect
 
@@ -101,7 +100,7 @@ def kl_divergence(distribution_a, distribution_b,
     kl_t = tf.identity(kl_t, name="kl")
 
     with tf.control_dependencies([
-        control_flow_ops.Assert(
+        tf.Assert(
             tf.logical_not(
                 tf.reduce_any(tf.is_nan(kl_t))),
             ["KL calculation between %s and %s returned NaN values "

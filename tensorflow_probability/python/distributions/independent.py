@@ -24,7 +24,6 @@ import tensorflow as tf
 
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import kullback_leibler
-from tensorflow.python.framework import tensor_util
 
 
 class Independent(distribution_lib.Distribution):
@@ -124,7 +123,7 @@ class Independent(distribution_lib.Distribution):
           dtype=tf.int32,
           name="reinterpreted_batch_ndims")
       self._reinterpreted_batch_ndims = reinterpreted_batch_ndims
-      self._static_reinterpreted_batch_ndims = tensor_util.constant_value(
+      self._static_reinterpreted_batch_ndims = tf.contrib.util.constant_value(
           reinterpreted_batch_ndims)
       if self._static_reinterpreted_batch_ndims is not None:
         self._reinterpreted_batch_ndims = self._static_reinterpreted_batch_ndims
@@ -243,7 +242,7 @@ class Independent(distribution_lib.Distribution):
   def _make_runtime_assertions(
       self, distribution, reinterpreted_batch_ndims, validate_args):
     assertions = []
-    static_reinterpreted_batch_ndims = tensor_util.constant_value(
+    static_reinterpreted_batch_ndims = tf.contrib.util.constant_value(
         reinterpreted_batch_ndims)
     batch_ndims = distribution.batch_shape.ndims
     if batch_ndims is not None and static_reinterpreted_batch_ndims is not None:

@@ -32,7 +32,6 @@ from tensorflow_probability.python.distributions.linear_gaussian_ssm import Kalm
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import linear_gaussian_update
 
 from tensorflow.python.framework import test_util
-from tensorflow.python.platform import test
 
 tfl = tf.linalg
 tfd = tfp.distributions
@@ -161,25 +160,25 @@ class _IIDNormalTest(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class IIDNormalTestStatic32(_IIDNormalTest, test.TestCase):
+class IIDNormalTestStatic32(_IIDNormalTest, tf.test.TestCase):
   use_static_shape = True
   dtype = np.float32
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class IIDNormalTestStatic64(_IIDNormalTest, test.TestCase):
+class IIDNormalTestStatic64(_IIDNormalTest, tf.test.TestCase):
   use_static_shape = True
   dtype = np.float64
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class IIDNormalTestDynamic32(_IIDNormalTest, test.TestCase):
+class IIDNormalTestDynamic32(_IIDNormalTest, tf.test.TestCase):
   use_static_shape = False
   dtype = np.float32
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SanityChecks(test.TestCase):
+class SanityChecks(tf.test.TestCase):
 
   def test_deterministic_system(self):
 
@@ -330,7 +329,7 @@ class SanityChecks(test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BatchTest(test.TestCase):
+class BatchTest(tf.test.TestCase):
   """Test that methods broadcast batch dimensions for each parameter."""
 
   def setUp(self):
@@ -721,7 +720,7 @@ class _KalmanStepsTest(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class KalmanStepsTestStatic(test.TestCase, _KalmanStepsTest):
+class KalmanStepsTestStatic(tf.test.TestCase, _KalmanStepsTest):
 
   use_static_shape = True
 
@@ -733,7 +732,7 @@ class KalmanStepsTestStatic(test.TestCase, _KalmanStepsTest):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class KalmanStepsTestDynamic(test.TestCase, _KalmanStepsTest):
+class KalmanStepsTestDynamic(tf.test.TestCase, _KalmanStepsTest):
 
   use_static_shape = False
 
@@ -788,7 +787,7 @@ class _AugmentSampleShapeTest(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class AugmentSampleShapeTestStatic(test.TestCase, _AugmentSampleShapeTest):
+class AugmentSampleShapeTestStatic(tf.test.TestCase, _AugmentSampleShapeTest):
 
   def assertRaisesError(self, msg):
     return self.assertRaisesRegexp(Exception, msg)
@@ -805,7 +804,7 @@ class AugmentSampleShapeTestStatic(test.TestCase, _AugmentSampleShapeTest):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class AugmentSampleShapeTestDynamic(test.TestCase, _AugmentSampleShapeTest):
+class AugmentSampleShapeTestDynamic(tf.test.TestCase, _AugmentSampleShapeTest):
 
   def assertRaisesError(self, msg):
     return self.assertRaisesOpError(msg)
@@ -827,4 +826,4 @@ class AugmentSampleShapeTestDynamic(test.TestCase, _AugmentSampleShapeTest):
 
 
 if __name__ == "__main__":
-  test.main()
+  tf.test.main()

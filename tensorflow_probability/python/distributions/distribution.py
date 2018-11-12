@@ -28,8 +28,6 @@ import tensorflow as tf
 
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import distribution_util as util
-from tensorflow.python.eager import context
-from tensorflow.python.framework import tensor_util
 from tensorflow.python.util import tf_inspect
 
 
@@ -123,7 +121,7 @@ def _update_docstring(old_str, append_str):
 def _convert_to_tensor(value, name=None, preferred_dtype=None):
   """Converts to tensor avoiding an eager bug that loses float precision."""
   # TODO(b/116672045): Remove this function.
-  if (context.executing_eagerly() and preferred_dtype is not None and
+  if (tf.executing_eagerly() and preferred_dtype is not None and
       (preferred_dtype.is_integer or preferred_dtype.is_bool)):
     v = tf.convert_to_tensor(value, name=name)
     if v.dtype.is_floating:
@@ -382,7 +380,7 @@ class Distribution(_BaseDistribution):
     """
     graph_parents = [] if graph_parents is None else graph_parents
     for i, t in enumerate(graph_parents):
-      if t is None or not tensor_util.is_tensor(t):
+      if t is None or not tf.contrib.framework.is_tensor(t):
         raise ValueError("Graph parent item %d is not a Tensor; %s." % (i, t))
     if not name or name[-1] != "/":  # `name` is not a name scope
       non_unique_name = name or type(self).__name__
@@ -466,7 +464,7 @@ class Distribution(_BaseDistribution):
 
     static_params = {}
     for name, shape in params.items():
-      static_shape = tensor_util.constant_value(shape)
+      static_shape = tf.contrib.util.constant_value(shape)
       if static_shape is None:
         raise ValueError(
             "sample_shape must be a fully-defined TensorShape or list/tuple")
@@ -1164,7 +1162,7 @@ class Distribution(_BaseDistribution):
 
   def _expand_sample_shape_to_vector(self, x, name):
     """Helper to `sample` which ensures input is 1D."""
-    x_static_val = tensor_util.constant_value(x)
+    x_static_val = tf.contrib.util.constant_value(x)
     if x_static_val is None:
       prod = tf.reduce_prod(x)
     else:
@@ -1195,7 +1193,7 @@ class Distribution(_BaseDistribution):
     """Helper to `sample`; sets static shape info."""
     # Set shape hints.
     sample_shape = tf.TensorShape(
-        tensor_util.constant_value(sample_shape))
+        tf.contrib.util.constant_value(sample_shape))
 
     ndims = x.shape.ndims
     sample_ndims = sample_shape.ndims

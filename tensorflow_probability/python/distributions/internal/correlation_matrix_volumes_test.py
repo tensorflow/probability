@@ -34,13 +34,10 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
+import tensorflow as tf
 
 from tensorflow_probability.python.distributions.internal import correlation_matrix_volumes_lib as corr
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
-from tensorflow.python.framework import ops
-from tensorflow.python.ops import array_ops
-from tensorflow.python.ops import check_ops
-from tensorflow.python.platform import test
 
 
 # NxN correlation matrices are determined by the N*(N-1)/2
@@ -69,7 +66,7 @@ def three_by_three_volume():
 # formula for this volume for all dimensions.  A TensorFlow
 # computation thereof gave the below result for 4x4:
 def four_by_four_volume():
-  # This constant computed as math_ops.exp(lkj.log_norm_const(4, [1.0]))
+  # This constant computed as tf.exp(lkj.log_norm_const(4, [1.0]))
   return 11.6973076
 
 # [1] Rousseeuw, P. J., & Molenberghs, G. (1994). "The shape of
@@ -80,7 +77,7 @@ def four_by_four_volume():
 # method," Journal of Multivariate Analysis 100 (2009), pp 1989-2001.
 
 
-class CorrelationMatrixVolumesTest(test.TestCase):
+class CorrelationMatrixVolumesTest(tf.test.TestCase):
 
   def testRejection2D(self):
     num_samples = int(1e5)  # Chosen for a small min detectable discrepancy
@@ -94,14 +91,14 @@ class CorrelationMatrixVolumesTest(test.TestCase):
     chk1 = st.assert_true_mean_equal_by_dkwm(
         rej_weights, low=0., high=rej_proposal_volume, expected=exact_volumes,
         false_fail_rate=1e-6)
-    chk2 = check_ops.assert_less(
+    chk2 = tf.assert_less(
         st.min_discrepancy_of_true_means_detectable_by_dkwm(
             num_samples, low=0., high=rej_proposal_volume,
             # Correct the false fail rate due to different broadcasting
             false_fail_rate=1.1e-7, false_pass_rate=1e-6),
         0.036)
-    with ops.control_dependencies([chk1, chk2]):
-      rej_weights = array_ops.identity(rej_weights)
+    with tf.control_dependencies([chk1, chk2]):
+      rej_weights = tf.identity(rej_weights)
     self.evaluate(rej_weights)
 
   def testRejection3D(self):
@@ -115,14 +112,14 @@ class CorrelationMatrixVolumesTest(test.TestCase):
     chk1 = st.assert_true_mean_equal_by_dkwm(
         rej_weights, low=0., high=rej_proposal_volume, expected=exact_volumes,
         false_fail_rate=1e-6)
-    chk2 = check_ops.assert_less(
+    chk2 = tf.assert_less(
         st.min_discrepancy_of_true_means_detectable_by_dkwm(
             num_samples, low=0., high=rej_proposal_volume,
             false_fail_rate=1e-6, false_pass_rate=1e-6),
         # Going for about a 3% relative error
         0.15)
-    with ops.control_dependencies([chk1, chk2]):
-      rej_weights = array_ops.identity(rej_weights)
+    with tf.control_dependencies([chk1, chk2]):
+      rej_weights = tf.identity(rej_weights)
     self.evaluate(rej_weights)
 
   def testRejection4D(self):
@@ -136,14 +133,14 @@ class CorrelationMatrixVolumesTest(test.TestCase):
     chk1 = st.assert_true_mean_equal_by_dkwm(
         rej_weights, low=0., high=rej_proposal_volume, expected=exact_volumes,
         false_fail_rate=1e-6)
-    chk2 = check_ops.assert_less(
+    chk2 = tf.assert_less(
         st.min_discrepancy_of_true_means_detectable_by_dkwm(
             num_samples, low=0., high=rej_proposal_volume,
             false_fail_rate=1e-6, false_pass_rate=1e-6),
         # Going for about a 10% relative error
         1.1)
-    with ops.control_dependencies([chk1, chk2]):
-      rej_weights = array_ops.identity(rej_weights)
+    with tf.control_dependencies([chk1, chk2]):
+      rej_weights = tf.identity(rej_weights)
     self.evaluate(rej_weights)
 
   def testVolumeEstimation2D(self):
@@ -162,4 +159,4 @@ class CorrelationMatrixVolumesTest(test.TestCase):
       self.assertGreater(computed_high, volume)
 
 if __name__ == "__main__":
-  test.main()
+  tf.test.main()

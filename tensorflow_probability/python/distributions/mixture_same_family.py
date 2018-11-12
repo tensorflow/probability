@@ -25,7 +25,6 @@ import tensorflow as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import distribution_util as distribution_utils
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.ops import control_flow_ops
 
 
 class MixtureSameFamily(distribution.Distribution):
@@ -149,7 +148,7 @@ class MixtureSameFamily(distribution.Distribution):
         raise ValueError("`mixture_distribution` must have scalar `event_dim`s")
       elif validate_args:
         self._runtime_assertions += [
-            control_flow_ops.assert_has_rank(
+            tf.assert_rank(
                 mixture_distribution.event_shape_tensor(), 0,
                 message="`mixture_distribution` must have scalar `event_dim`s"),
         ]
@@ -166,7 +165,7 @@ class MixtureSameFamily(distribution.Distribution):
         mdbs = mixture_distribution.batch_shape_tensor()
         cdbs = components_distribution.batch_shape_tensor()[:-1]
         self._runtime_assertions += [
-            control_flow_ops.assert_equal(
+            tf.assert_equal(
                 distribution_utils.pick_vector(
                     mixture_distribution.is_scalar_batch(), cdbs, mdbs),
                 cdbs,
@@ -184,7 +183,7 @@ class MixtureSameFamily(distribution.Distribution):
         km = tf.shape(mixture_distribution.logits)[-1]
         kc = components_distribution.batch_shape_tensor()[-1]
         self._runtime_assertions += [
-            control_flow_ops.assert_equal(
+            tf.assert_equal(
                 km, kc,
                 message=("`mixture_distribution components` does not equal "
                          "`components_distribution.batch_shape[-1:]`")),

@@ -23,7 +23,6 @@ import tensorflow as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import positive_semidefinite_kernels as psd_kernels
 
-from tensorflow.python.framework import tensor_util
 from tensorflow.python.framework import test_util
 
 
@@ -162,8 +161,8 @@ class _StudentTProcessTest(object):
       self.assertAllEqual(tp1.index_points, index_points_1)
       self.assertAllEqual(tp2.index_points, index_points_2)
       self.assertAllEqual(
-          tensor_util.constant_value(tp1.jitter),
-          tensor_util.constant_value(tp2.jitter))
+          tf.contrib.util.constant_value(tp1.jitter),
+          tf.contrib.util.constant_value(tp2.jitter))
     else:
       self.assertAllEqual(
           self.evaluate(tp1.batch_shape_tensor()),

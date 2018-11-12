@@ -24,7 +24,6 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.ops import control_flow_ops
-from tensorflow.python.ops import functional_ops
 
 
 __all__ = [
@@ -252,7 +251,7 @@ class Multinomial(distribution.Distribution):
       x = tf.reduce_sum(tf.one_hot(x, depth=k), axis=-2)  # [n, k]
       return x
 
-    x = functional_ops.map_fn(
+    x = tf.map_fn(
         _sample_single, [flat_logits, flat_ndraws],
         dtype=self.dtype)  # [B1B2...Bm, n, k]
 

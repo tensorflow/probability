@@ -29,7 +29,6 @@ from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.framework import tensor_util
 from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.ops.linalg import linear_operator_addition as linop_add_lib
 
@@ -951,7 +950,7 @@ def softmax(x, axis, name=None):
         x.shape.ndims
         if x.shape.ndims is not None else tf.rank(x, name="ndims"))
     axis = tf.convert_to_tensor(axis, dtype=tf.int32, name="axis")
-    axis_ = tensor_util.constant_value(axis)
+    axis_ = tf.contrib.util.constant_value(axis)
     if axis_ is not None:
       axis = np.int(ndims + axis_ if axis_ < 0 else axis_)
     else:

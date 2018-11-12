@@ -26,7 +26,6 @@ import tensorflow as tf
 
 from tensorflow_probability.python.distributions import bernoulli
 from tensorflow_probability.python.distributions import kullback_leibler
-from tensorflow.python.eager import backprop
 from tensorflow.python.framework import test_util
 
 
@@ -266,7 +265,7 @@ class BernoulliTest(tf.test.TestCase):
   @test_util.run_in_graph_and_eager_modes
   def testNotReparameterized(self):
     p = tf.constant([0.2, 0.6])
-    with backprop.GradientTape() as tape:
+    with tf.GradientTape() as tape:
       tape.watch(p)
       dist = bernoulli.Bernoulli(probs=p)
       samples = dist.sample(100)

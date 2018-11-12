@@ -23,7 +23,6 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
 
 from tensorflow_probability.python.internal import distribution_util as util
-from tensorflow.python.framework import tensor_util
 
 
 __all__ = [
@@ -224,8 +223,8 @@ class HiddenMarkovModel(distribution.Distribution):
                                observation_distribution.batch_shape[-1]) or
                               observation_distribution.batch_shape_tensor()[-1])
 
-      if (tensor_util.is_tensor(self._num_states) or
-          tensor_util.is_tensor(observation_states)):
+      if (tf.contrib.framework.is_tensor(self._num_states) or
+          tf.contrib.framework.is_tensor(observation_states)):
         if validate_args:
           self._runtime_assertions += [
               tf.assert_equal(

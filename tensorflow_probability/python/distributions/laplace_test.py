@@ -23,7 +23,6 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.distributions import laplace as laplace_lib
-from tensorflow.python.eager import backprop
 from tensorflow.python.framework import test_util
 from tensorflow.python.ops.distributions.kullback_leibler import kl_divergence
 
@@ -242,7 +241,7 @@ class LaplaceTest(tf.test.TestCase):
   def testLaplaceFullyReparameterized(self):
     loc = tf.constant(4.0)
     scale = tf.constant(3.0)
-    with backprop.GradientTape() as tape:
+    with tf.GradientTape() as tape:
       tape.watch(loc)
       tape.watch(scale)
       laplace = laplace_lib.Laplace(loc=loc, scale=scale)

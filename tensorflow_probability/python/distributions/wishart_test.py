@@ -23,7 +23,6 @@ import numpy as np
 from scipy import linalg
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow.python.framework import errors_impl
 from tensorflow.python.framework import test_util
 
 tfd = tfp.distributions
@@ -328,7 +327,7 @@ class WishartTest(tf.test.TestCase):
 
     # In eager mode, these checks are done statically and hence
     # ValueError is returned on object construction.
-    error_type = errors_impl.InvalidArgumentError
+    error_type = tf.errors.InvalidArgumentError
     if tf.executing_eagerly():
       error_type = ValueError
 

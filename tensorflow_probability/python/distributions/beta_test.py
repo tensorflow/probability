@@ -24,7 +24,6 @@ import tensorflow as tf
 
 from tensorflow_probability.python.distributions import beta as beta_lib
 from tensorflow_probability.python.distributions import kullback_leibler
-from tensorflow.python.eager import backprop
 from tensorflow.python.framework import test_util
 
 
@@ -263,7 +262,7 @@ class BetaTest(tf.test.TestCase):
   def testBetaFullyReparameterized(self):
     a = tf.constant(1.0)
     b = tf.constant(2.0)
-    with backprop.GradientTape() as tape:
+    with tf.GradientTape() as tape:
       tape.watch(a)
       tape.watch(b)
       beta = beta_lib.Beta(a, b)

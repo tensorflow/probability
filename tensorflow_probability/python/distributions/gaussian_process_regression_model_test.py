@@ -23,7 +23,6 @@ import tensorflow as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import positive_semidefinite_kernels as psd_kernels
 
-from tensorflow.python.framework import tensor_util
 from tensorflow.python.framework import test_util
 
 
@@ -305,8 +304,8 @@ class _GaussianProcessRegressionModelTest(object):
       self.assertAllEqual(gprm2.event_shape, event_shape_2)
       self.assertAllEqual(gprm1.index_points, index_points_1)
       self.assertAllEqual(gprm2.index_points, index_points_2)
-      self.assertAllEqual(tensor_util.constant_value(gprm1.jitter),
-                          tensor_util.constant_value(gprm2.jitter))
+      self.assertAllEqual(tf.contrib.util.constant_value(gprm1.jitter),
+                          tf.contrib.util.constant_value(gprm2.jitter))
     else:
       self.assertAllEqual(self.evaluate(gprm1.batch_shape_tensor()),
                           self.evaluate(gprm2.batch_shape_tensor()))

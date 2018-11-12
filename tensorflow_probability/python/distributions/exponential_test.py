@@ -25,7 +25,6 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.distributions import exponential as exponential_lib
-from tensorflow.python.eager import backprop
 from tensorflow.python.framework import test_util
 
 
@@ -173,7 +172,7 @@ class ExponentialTest(tf.test.TestCase):
 
   def testFullyReparameterized(self):
     lam = tf.constant([0.1, 1.0])
-    with backprop.GradientTape() as tape:
+    with tf.GradientTape() as tape:
       tape.watch(lam)
       exponential = exponential_lib.Exponential(rate=lam)
       samples = exponential.sample(100)

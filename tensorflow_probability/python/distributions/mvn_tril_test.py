@@ -24,7 +24,6 @@ from scipy import stats
 import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow.python.framework import test_util
-from tensorflow.python.platform import tf_logging as logging
 
 
 tfd = tfp.distributions
@@ -354,26 +353,27 @@ class MultivariateNormalTriLTest(tf.test.TestCase):
     sample_variance_ = np.diag(sample_covariance_)
     sample_stddev_ = np.sqrt(sample_variance_)
 
-    logging.vlog(2, "true_mean:\n{}  ".format(true_mean))
-    logging.vlog(2, "sample_mean:\n{}".format(sample_mean_))
-    logging.vlog(2, "analytical_mean:\n{}".format(analytical_mean_))
+    tf.logging.vlog(2, "true_mean:\n{}  ".format(true_mean))
+    tf.logging.vlog(2, "sample_mean:\n{}".format(sample_mean_))
+    tf.logging.vlog(2, "analytical_mean:\n{}".format(analytical_mean_))
 
-    logging.vlog(2, "true_covariance:\n{}".format(true_covariance))
-    logging.vlog(2, "sample_covariance:\n{}".format(sample_covariance_))
-    logging.vlog(2, "analytical_covariance:\n{}".format(analytical_covariance_))
+    tf.logging.vlog(2, "true_covariance:\n{}".format(true_covariance))
+    tf.logging.vlog(2, "sample_covariance:\n{}".format(sample_covariance_))
+    tf.logging.vlog(2, "analytical_covariance:\n{}".format(
+        analytical_covariance_))
 
-    logging.vlog(2, "true_variance:\n{}".format(true_variance))
-    logging.vlog(2, "sample_variance:\n{}".format(sample_variance_))
-    logging.vlog(2, "analytical_variance:\n{}".format(analytical_variance_))
+    tf.logging.vlog(2, "true_variance:\n{}".format(true_variance))
+    tf.logging.vlog(2, "sample_variance:\n{}".format(sample_variance_))
+    tf.logging.vlog(2, "analytical_variance:\n{}".format(analytical_variance_))
 
-    logging.vlog(2, "true_stddev:\n{}".format(true_stddev))
-    logging.vlog(2, "sample_stddev:\n{}".format(sample_stddev_))
-    logging.vlog(2, "analytical_stddev:\n{}".format(analytical_stddev_))
+    tf.logging.vlog(2, "true_stddev:\n{}".format(true_stddev))
+    tf.logging.vlog(2, "sample_stddev:\n{}".format(sample_stddev_))
+    tf.logging.vlog(2, "analytical_stddev:\n{}".format(analytical_stddev_))
 
-    logging.vlog(2, "true_scale:\n{}".format(true_scale))
-    logging.vlog(2, "scale:\n{}".format(scale_))
+    tf.logging.vlog(2, "true_scale:\n{}".format(true_scale))
+    tf.logging.vlog(2, "scale:\n{}".format(scale_))
 
-    logging.vlog(
+    tf.logging.vlog(
         2, "kl_chol:      analytical:{}  sample:{}".format(
             analytical_kl_chol_, sample_kl_chol_))
 

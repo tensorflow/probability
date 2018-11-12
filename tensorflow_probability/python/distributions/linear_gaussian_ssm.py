@@ -31,7 +31,6 @@ from tensorflow_probability.python.distributions import seed_stream
 
 from tensorflow_probability.python.internal import distribution_util as util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.framework import tensor_util
 from tensorflow.python.ops.linalg import linear_operator_util
 
 tfl = tf.linalg
@@ -493,9 +492,9 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
 
   def _event_shape(self):
     return tf.TensorShape([
-        tensor_util.constant_value(
+        tf.contrib.util.constant_value(
             tf.convert_to_tensor(self.num_timesteps)),
-        tensor_util.constant_value(
+        tf.contrib.util.constant_value(
             tf.convert_to_tensor(self.observation_size))])
 
   def _event_shape_tensor(self):

@@ -26,8 +26,6 @@ from scipy import stats
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from tensorflow.python.platform import tf_logging as logging
-
 tfd = tfp.distributions
 
 
@@ -840,12 +838,12 @@ class MixtureBenchmark(tf.test.Benchmark):
             name=("%s_%s_components_%d_batch_%d_features_%d_sample_%d" %
                   (name, use_gpu, num_components, batch_size, num_features,
                    sample_size)))
-        logging.vlog(2, "\t".join(["%s", "%d", "%d", "%d", "%d", "%g"]) % (
+        tf.logging.vlog(2, "\t".join(["%s", "%d", "%d", "%d", "%d", "%g"]) % (
             use_gpu, num_components, batch_size, num_features, sample_size,
             reported["wall_time"]))
 
   def benchmarkSamplingMVNDiag(self):
-    logging.vlog(
+    tf.logging.vlog(
         2, "mvn_diag\tuse_gpu\tcomponents\tbatch\tfeatures\tsample\twall_time")
 
     def create_distribution(batch_size, num_components, num_features):
@@ -881,7 +879,7 @@ class MixtureBenchmark(tf.test.Benchmark):
                   sample_size=sample_size)
 
   def benchmarkSamplingMVNFull(self):
-    logging.vlog(
+    tf.logging.vlog(
         2, "mvn_full\tuse_gpu\tcomponents\tbatch\tfeatures\tsample\twall_time")
 
     def psd(x):

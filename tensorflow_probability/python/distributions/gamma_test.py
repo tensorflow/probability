@@ -24,7 +24,6 @@ import tensorflow as tf
 
 from tensorflow_probability.python.distributions import gamma as gamma_lib
 from tensorflow_probability.python.distributions import kullback_leibler
-from tensorflow.python.eager import backprop
 from tensorflow.python.framework import test_util
 
 
@@ -254,7 +253,7 @@ class GammaTest(tf.test.TestCase):
   def testGammaFullyReparameterized(self):
     alpha = tf.constant(4.0)
     beta = tf.constant(3.0)
-    with backprop.GradientTape() as tape:
+    with tf.GradientTape() as tape:
       tape.watch(alpha)
       tape.watch(beta)
       gamma = gamma_lib.Gamma(concentration=alpha, rate=beta)
