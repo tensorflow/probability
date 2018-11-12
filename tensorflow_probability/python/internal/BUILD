@@ -41,6 +41,18 @@ py_library(
     ],
 )
 
+py_test(
+    name = "dtype_util_test",
+    size = "small",
+    srcs = ["dtype_util_test.py"],
+    deps = [
+        ":dtype_util",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
 py_library(
     name = "distribution_util",
     srcs = ["distribution_util.py"],

@@ -12,34 +12,36 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Utility functions for dtypes."""
+"""Tests for dtype_util."""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+# Dependency imports
+
+import numpy as np
 import tensorflow as tf
+import tensorflow_probability as tfp
+
+from tensorflow_probability.python.internal import dtype_util
+
+ed = tfp.edward2
 
 
-__all__ = [
-    'common_dtype',
-]
+class DtypeUtilTest(tf.test.TestCase):
+
+  def testCommonDtypeFromLinop(self):
+    x = tf.linalg.LinearOperatorDiag(tf.ones(3, tf.float16))
+    self.assertEqual(
+        tf.float16, dtype_util.common_dtype([x], preferred_dtype=tf.float32))
+
+  def testCommonDtypeFromEdRV(self):
+    # As in tensorflow_probability github issue #221
+    x = ed.Dirichlet(np.ones(3, dtype='float64'))
+    self.assertEqual(
+        tf.float64, dtype_util.common_dtype([x], preferred_dtype=tf.float32))
 
 
-def common_dtype(args_list, preferred_dtype=None):
-  """Returns explict dtype from `args_list` if there is one."""
-  dtype = None
-  while args_list:
-    a = args_list.pop()
-    if hasattr(a, 'dtype'):
-      dt = tf.as_dtype(getattr(a, 'dtype')).base_dtype.as_numpy_dtype
-    else:
-      if isinstance(a, list):
-        # Allows for nested types, e.g. Normal([np.float16(1.0)], [2.0])
-        args_list.extend(a)
-      continue
-    if dtype is None:
-      dtype = dt
-    elif dtype != dt:
-      raise TypeError('Found incompatible dtypes, {} and {}.'.format(dtype, dt))
-  return preferred_dtype if dtype is None else tf.as_dtype(dtype)
+if __name__ == '__main__':
+  tf.test.main()
