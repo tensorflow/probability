@@ -116,28 +116,27 @@ class RationalQuadratic(psd_kernel.PositiveSemidefiniteKernel):
           amplitude, scale_mixture_rate, length_scale], tf.float32)
 
       if amplitude is not None:
-        self._amplitude = tf.convert_to_tensor(
+        amplitude = tf.convert_to_tensor(
             amplitude, name="amplitude", dtype=dtype)
-        with tf.control_dependencies([
-            tf.assert_positive(self._amplitude)] if validate_args else []):
-          self._amplitude = tf.identity(self._amplitude)
+        with tf.control_dependencies(
+            [tf.assert_positive(amplitude)] if validate_args else []):
+          amplitude = tf.identity(amplitude)
       self._amplitude = _validate_arg_if_not_none(amplitude, tf.assert_positive, validate_args)
 
       if scale_mixture_rate is not None:
-        self._scale_mixture_rate = tf.convert_to_tensor(
+        scale_mixture_rate = tf.convert_to_tensor(
             scale_mixture_rate, name="scale_mixture_rate", dtype=dtype)
-        with tf.control_dependencies([
-            tf.assert_positive(
-                self._scale_mixture_rate)] if validate_args else []):
-          self._scale_mixture_rate = tf.identity(self._scale_mixture_rate)
+        with tf.control_dependencies(
+            [tf.assert_positive(scale_mixture_rate)] if validate_args else []):
+          scale_mixture_rate = tf.identity(scale_mixture_rate)
       self._scale_mixture_rate = _validate_arg_if_not_none(scale_mixture_rate, tf.assert_positive, validate_args)
 
       if length_scale is not None:
-        self._length_scale = tf.convert_to_tensor(
+        length_scale = tf.convert_to_tensor(
             length_scale, name="length_scale", dtype=dtype)
-        with tf.control_dependencies([
-            tf.assert_positive(self._length_scale)] if validate_args else []):
-          self._length_scale = tf.identity(self._length_scale)
+        with tf.control_dependencies(
+            [tf.assert_positive(length_scale)] if validate_args else []):
+          length_scale = tf.identity(length_scale)
       self._length_scale = _validate_arg_if_not_none(length_scale, tf.assert_positive, validate_args)
 
     super(RationalQuadratic, self).__init__(feature_ndims, name)
