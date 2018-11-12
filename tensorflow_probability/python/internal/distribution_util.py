@@ -140,14 +140,18 @@ def make_tril_scale(
   with tf.name_scope(
       name,
       "make_tril_scale",
-      values=[loc, scale_diag, scale_identity_multiplier]):
+      values=[loc, scale_tril, scale_diag, scale_identity_multiplier]):
 
-    loc = _convert_to_tensor(loc, name="loc")
-    scale_tril = _convert_to_tensor(scale_tril, name="scale_tril")
-    scale_diag = _convert_to_tensor(scale_diag, name="scale_diag")
+    dtype = dtype_util.common_dtype(
+        [loc, scale_tril, scale_diag, scale_identity_multiplier],
+        preferred_dtype=tf.float32)
+    loc = _convert_to_tensor(loc, name="loc", dtype=dtype)
+    scale_tril = _convert_to_tensor(scale_tril, name="scale_tril", dtype=dtype)
+    scale_diag = _convert_to_tensor(scale_diag, name="scale_diag", dtype=dtype)
     scale_identity_multiplier = _convert_to_tensor(
         scale_identity_multiplier,
-        name="scale_identity_multiplier")
+        name="scale_identity_multiplier",
+        dtype=dtype)
 
   if scale_tril is not None:
     scale_tril = tf.matrix_band_part(scale_tril, -1, 0)  # Zero out TriU.
@@ -232,7 +236,8 @@ def make_diag_scale(loc=None,
       values=[loc, scale_diag, scale_identity_multiplier]):
     if dtype is None:
       dtype = dtype_util.common_dtype(
-          [loc, scale_diag, scale_identity_multiplier])
+          [loc, scale_diag, scale_identity_multiplier],
+          preferred_dtype=tf.float32)
     loc = _convert_to_tensor(loc, name="loc", dtype=dtype)
     scale_diag = _convert_to_tensor(scale_diag, name="scale_diag", dtype=dtype)
     scale_identity_multiplier = _convert_to_tensor(
@@ -313,7 +318,7 @@ def shapes_from_loc_and_scale(loc, scale, name="shapes_from_loc_and_scale"):
 
     # Static check that event shapes match.
     if loc is not None:
-      loc_event_size = loc.get_shape()[-1].value
+      loc_event_size = loc.shape[-1].value
       if loc_event_size is not None and event_size_const is not None:
         if loc_event_size != 1 and loc_event_size != event_size_const:
           raise ValueError(
@@ -327,8 +332,8 @@ def shapes_from_loc_and_scale(loc, scale, name="shapes_from_loc_and_scale"):
       batch_shape = (
           batch_shape_const if batch_shape_const is not None else batch_shape)
     else:
-      loc_batch_shape = loc.get_shape().with_rank_at_least(1)[:-1]
-      if (loc.get_shape().ndims is None or
+      loc_batch_shape = loc.shape.with_rank_at_least(1)[:-1]
+      if (loc.shape.ndims is None or
           not loc_batch_shape.is_fully_defined()):
         loc_batch_shape = tf.shape(loc)[:-1]
       else:
@@ -753,6 +758,8 @@ def get_logits_and_probs(logits=None,
   Raises:
     ValueError: if neither `probs` nor `logits` were passed in, or both were.
   """
+  if dtype is None:
+    dtype = dtype_util.common_dtype([probs, logits], preferred_dtype=tf.float32)
   with tf.name_scope(name, values=[probs, logits]):
     if (probs is None) == (logits is None):
       raise ValueError("Must pass probs or logits, but not both.")
@@ -920,7 +927,7 @@ def embed_check_categorical_event_shape(
       raise TypeError("Unable to validate size of unrecognized dtype "
                       "({}).".format(x_dtype.name))
     try:
-      x_shape_static = x.get_shape().with_rank_at_least(1)
+      x_shape_static = x.shape.with_rank_at_least(1)
     except ValueError:
       raise ValueError("A categorical-distribution parameter must have "
                        "at least 1 dimension.")
@@ -953,11 +960,11 @@ def embed_check_categorical_event_shape(
       ], x)
 
 
-def embed_check_integer_casting_closed(
-    x,
-    target_dtype,
-    assert_nonnegative=True,
-    name="embed_check_casting_closed"):
+def embed_check_integer_casting_closed(x,
+                                       target_dtype,
+                                       assert_nonnegative=True,
+                                       assert_positive=False,
+                                       name="embed_check_casting_closed"):
   """Ensures integers remain unaffected despite casting to/from int/float types.
 
   Example integer-types: `uint8`, `int32`, `bool`.
@@ -976,6 +983,7 @@ def embed_check_integer_casting_closed(
     x: `Tensor` representing integer-form values.
     target_dtype: TF `dtype` under which `x` should have identical values.
     assert_nonnegative: `bool` indicating `x` should contain nonnegative values.
+    assert_positive: `bool` indicating `x` should contain positive values.
     name: A name for this operation (optional).
 
   Returns:
@@ -1004,7 +1012,11 @@ def embed_check_integer_casting_closed(
                           x, x.dtype.name, target_dtype.name))
 
     assertions = []
-    if assert_nonnegative:
+    if assert_positive:
+      assertions += [
+          tf.assert_positive(x, message="Elements must be positive."),
+      ]
+    elif assert_nonnegative:
       assertions += [
           tf.assert_non_negative(
               x, message="Elements must be non-negative."),
@@ -1183,7 +1195,7 @@ def rotate_transpose(x, shift, name="rotate_transpose"):
     # We do not assign back to preserve constant-ness.
     tf.assert_integer(shift)
     shift_value_static = tensor_util.constant_value(shift)
-    ndims = x.get_shape().ndims
+    ndims = x.shape.ndims
     if ndims is not None and shift_value_static is not None:
       if ndims < 2: return x
       shift_value_static = np.sign(shift_value_static) * (
@@ -1368,7 +1380,7 @@ def fill_triangular(x, upper=False, name=None):
   Triangular matrix elements are filled in a clockwise spiral. See example,
   below.
 
-  If `x.get_shape()` is `[b1, b2, ..., bB, d]` then the output shape is
+  If `x.shape` is `[b1, b2, ..., bB, d]` then the output shape is
   `[b1, b2, ..., bB, n, n]` where `n` is such that `d = n(n+1)/2`, i.e.,
   `n = int(np.sqrt(0.25 + 2. * m) - 0.5)`.
 
@@ -1760,7 +1772,7 @@ def softplus_inverse(x, name=None):
     # codepath whenever we used the surrogate `ones_like`.
     x = tf.where(tf.logical_or(is_too_small, is_too_large),
                  tf.ones_like(x), x)
-    y = x + tf.log(-tf.expm1(-x))  # == log(expm1(x))
+    y = x + tf.log(-tf.math.expm1(-x))  # == log(expm1(x))
     return tf.where(is_too_small, too_small_value,
                     tf.where(is_too_large, too_large_value, y))
 

@@ -86,7 +86,7 @@ class LogNormal(transformed_distribution.TransformedDistribution):
 
   def _variance(self):
     variance = self.distribution.variance()
-    return (tf.expm1(variance) *
+    return (tf.math.expm1(variance) *
             tf.exp(2. * self.distribution.mean() + variance))
 
   def _mode(self):

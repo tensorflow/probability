@@ -20,7 +20,6 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow.python.framework import tensor_util
 from tensorflow.python.ops import control_flow_ops
 
 
@@ -59,7 +58,7 @@ class PowerTransform(bijector.Bijector):
     self._name = name
     self._validate_args = validate_args
     with self._name_scope("init", values=[power]):
-      power = tensor_util.constant_value(
+      power = tf.contrib.util.constant_value(
           tf.convert_to_tensor(power, name="power"))
     if power is None or power < 0:
       raise ValueError("`power` must be a non-negative TF constant.")
@@ -88,7 +87,7 @@ class PowerTransform(bijector.Bijector):
       return tf.log(y)
     # If large y accuracy is an issue, consider using:
     # (y**self.power - 1.) / self.power when y >> 1.
-    return tf.expm1(tf.log(y) * self.power) / self.power
+    return tf.math.expm1(tf.log(y) * self.power) / self.power
 
   def _inverse_log_det_jacobian(self, y):
     y = self._maybe_assert_valid_y(y)

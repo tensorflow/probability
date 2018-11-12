@@ -162,7 +162,7 @@ class WishartTest(tf.test.TestCase):
     chol_w = tfd.Wishart(
         df=df, scale_tril=chol(make_pd(1., 3)), input_output_cholesky=False)
     x = chol_w.sample(10000, seed=42)
-    self.assertAllEqual((10000, 3, 3), x.get_shape())
+    self.assertAllEqual((10000, 3, 3), x.shape)
 
     moment1_estimate = self.evaluate(tf.reduce_mean(x, reduction_indices=[0]))
     self.assertAllClose(
@@ -257,7 +257,7 @@ class WishartTest(tf.test.TestCase):
           np.reshape(np.exp(log_prob), (2, 2)),
           self.evaluate(w.prob(np.reshape(x, (2, 2, 2, 2)))))
       self.assertAllEqual((2, 2),
-                          w.log_prob(np.reshape(x, (2, 2, 2, 2))).get_shape())
+                          w.log_prob(np.reshape(x, (2, 2, 2, 2))).shape)
 
     for w in (tfd.Wishart(
         df=4, scale_tril=chol_x[0], input_output_cholesky=True),
@@ -273,7 +273,7 @@ class WishartTest(tf.test.TestCase):
           np.reshape(np.exp(log_prob), (2, 2)),
           self.evaluate(w.prob(np.reshape(chol_x, (2, 2, 2, 2)))))
       self.assertAllEqual((2, 2),
-                          w.log_prob(np.reshape(x, (2, 2, 2, 2))).get_shape())
+                          w.log_prob(np.reshape(x, (2, 2, 2, 2))).shape)
 
   def testBatchShape(self):
     scale = make_pd(1., 2)

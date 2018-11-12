@@ -25,6 +25,7 @@ import tensorflow as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.ops import control_flow_ops
@@ -143,23 +144,24 @@ class Gamma(distribution.Distribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name, values=[concentration, rate]) as name:
+      dtype = dtype_util.common_dtype([concentration, rate], tf.float32)
+      concentration = tf.convert_to_tensor(
+          concentration, name="concentration", dtype=dtype)
+      rate = tf.convert_to_tensor(rate, name="rate", dtype=dtype)
       with tf.control_dependencies([
           tf.assert_positive(concentration),
           tf.assert_positive(rate),
       ] if validate_args else []):
-        self._concentration = tf.identity(
-            concentration, name="concentration")
-        self._rate = tf.identity(rate, name="rate")
-        tf.assert_same_float_dtype(
-            [self._concentration, self._rate])
+        self._concentration = tf.identity(concentration)
+        self._rate = tf.identity(rate)
+        tf.assert_same_float_dtype([self._concentration, self._rate])
     super(Gamma, self).__init__(
-        dtype=self._concentration.dtype,
+        dtype=dtype,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
         reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
         parameters=parameters,
-        graph_parents=[self._concentration,
-                       self._rate],
+        graph_parents=[self._concentration, self._rate],
         name=name)
 
   @staticmethod
@@ -185,8 +187,8 @@ class Gamma(distribution.Distribution):
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(
-        self.concentration.get_shape(),
-        self.rate.get_shape())
+        self.concentration.shape,
+        self.rate.shape)
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)

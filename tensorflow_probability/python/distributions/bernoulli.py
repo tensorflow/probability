@@ -99,7 +99,7 @@ class Bernoulli(distribution.Distribution):
     return tf.shape(self._logits)
 
   def _batch_shape(self):
-    return self._logits.get_shape()
+    return self._logits.shape
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
@@ -130,9 +130,9 @@ class Bernoulli(distribution.Distribution):
       return (tf.ones_like(event) * logits,
               tf.ones_like(logits) * event)
 
-    if not (event.get_shape().is_fully_defined() and
-            logits.get_shape().is_fully_defined() and
-            event.get_shape() == logits.get_shape()):
+    if not (event.shape.is_fully_defined() and
+            logits.shape.is_fully_defined() and
+            event.shape == logits.shape):
       logits, event = _broadcast(logits, event)
     return -tf.nn.sigmoid_cross_entropy_with_logits(labels=event, logits=logits)
 

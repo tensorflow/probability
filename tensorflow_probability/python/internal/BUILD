@@ -42,11 +42,6 @@ py_library(
 )
 
 py_library(
-    name = "reparameterization",
-    srcs = ["reparameterization.py"],
-)
-
-py_library(
     name = "distribution_util",
     srcs = ["distribution_util.py"],
     srcs_version = "PY2AND3",
@@ -67,6 +62,30 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
+    ],
+)
+
+py_library(
+    name = "reparameterization",
+    srcs = ["reparameterization.py"],
+)
+
+py_library(
+    name = "special_math",
+    srcs = ["special_math.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "special_math_test",
+    srcs = ["special_math_test.py"],
+    deps = [
+        ":special_math",
+        # numpy dep,
+        # tensorflow dep,
     ],
 )
 

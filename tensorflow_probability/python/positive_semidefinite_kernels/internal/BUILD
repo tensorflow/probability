@@ -29,6 +29,9 @@ py_library(
     name = "internal",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
+    deps = [
+        ":util",
+    ],
 )
 
 py_library(

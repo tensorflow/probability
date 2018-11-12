@@ -28,6 +28,7 @@ from tensorflow_probability.python import mcmc
 from tensorflow_probability.python import monte_carlo
 from tensorflow_probability.python import optimizer
 from tensorflow_probability.python import positive_semidefinite_kernels
+from tensorflow_probability.python import stats
 from tensorflow_probability.python import sts
 from tensorflow_probability.python import trainable_distributions
 from tensorflow_probability.python import util
@@ -47,6 +48,7 @@ _allowed_symbols = [
     'optimizer',
     'positive_semidefinite_kernels',
     'trainable_distributions',
+    'stats',
     'sts',
     'util',
     'vi',

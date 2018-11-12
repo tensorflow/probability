@@ -41,7 +41,7 @@
 
 ## Class `ExponentialWithSoftplusRate`
 
-Inherits From: [`Exponential`](../../tfp/distributions/Exponential.md)
+
 
 Exponential with softplus transform on `rate`.
 
@@ -56,7 +56,11 @@ __init__(
 )
 ```
 
+DEPRECATED FUNCTION
 
+THIS FUNCTION IS DEPRECATED. It will be removed after 2019-01-01.
+Instructions for updating:
+Use `tfd.Exponential(tf.nn.softplus(rate)).
 
 
 

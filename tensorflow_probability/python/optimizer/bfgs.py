@@ -62,7 +62,7 @@ BfgsOptimizerResults = collections.namedtuple(
         'objective_gradient',  # A tensor containing the gradient of the
                                # objective function at the
                                # `final_position`. If the search converged
-                               # this L2-norm of this tensor should be
+                               # the max-norm of this tensor should be
                                # below the tolerance.
         'inverse_hessian_estimate'  # A tensor containing the inverse of the
                                     # estimated Hessian.
@@ -176,8 +176,8 @@ def minimize(value_and_gradients_function,
         function at the `position`. If the search converged, then this is
         the (local) minimum of the objective function.
       objective_gradient: A tensor containing the gradient of the objective
-        function at the `position`. If the search converged this
-        L2-norm of this tensor should be below the tolerance.
+        function at the `position`. If the search converged the
+        max-norm of this tensor should be below the tolerance.
       inverse_hessian_estimate: A tensor containing the inverse of the
         estimated Hessian.
   """
@@ -326,7 +326,7 @@ def minimize(value_and_gradients_function,
     initial_values = BfgsOptimizerResults(
         converged=initial_convergence,
         failed=False,
-        num_iterations=0,
+        num_iterations=tf.convert_to_tensor(0),
         num_objective_evaluations=1,
         position=initial_position,
         objective_value=f0,

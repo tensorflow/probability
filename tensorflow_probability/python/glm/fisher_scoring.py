@@ -23,7 +23,6 @@ import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.math import matvecmul
 from tensorflow.python.framework import smart_cond
 
 
@@ -67,7 +66,7 @@ def fit(
       matching `response`; represents `offset` shifted initial linear
       predictions based on `model_coefficients_start`.
       Default value: `offset` if `model_coefficients is None`, and
-      `tfp.math.matvecmul(model_matrix, model_coefficients_start) + offset`
+      `tf.linalg.matvec(model_matrix, model_coefficients_start) + offset`
       otherwise.
     l2_regularizer: Optional scalar `Tensor` representing L2 regularization
       penalty, i.e.,
@@ -108,7 +107,7 @@ def fit(
       fitted model coefficients, one for each column in `model_matrix`.
     predicted_linear_response: `response`-shaped `Tensor` representing linear
       predictions based on new `model_coefficients`, i.e.,
-      `tfp.math.matvecmul(model_matrix, model_coefficients) + offset`.
+      `tf.linalg.matvec(model_matrix, model_coefficients) + offset`.
     is_converged: `bool` `Tensor` indicating that the returned
       `model_coefficients` met the `convergence_criteria_fn` criteria within the
       `maximum_iterations` limit.
@@ -288,7 +287,7 @@ def fit_one_step(
       matching `response`; represents `offset` shifted initial linear
       predictions based on `model_coefficients_start`.
       Default value: `offset` if `model_coefficients is None`, and
-      `tfp.math.matvecmul(model_matrix, model_coefficients_start) + offset`
+      `tf.linalg.matvec(model_matrix, model_coefficients_start) + offset`
       otherwise.
     l2_regularizer: Optional scalar `Tensor` representing L2 regularization
       penalty, i.e.,
@@ -317,7 +316,7 @@ def fit_one_step(
       `model_matrix`.
     predicted_linear_response: `response`-shaped `Tensor` representing linear
       predictions based on new `model_coefficients`, i.e.,
-      `tfp.math.matvecmul(model_matrix, model_coefficients_next) + offset`.
+      `tf.linalg.matvec(model_matrix, model_coefficients_next) + offset`.
   """
   graph_deps = [model_matrix, response, model_coefficients_start,
                 predicted_linear_response_start, dispersion, learning_rate]
@@ -525,7 +524,7 @@ def prepare_args(model_matrix,
       `response`; represents `offset` shifted initial linear predictions based
       on current `model_coefficients`.
       Default value: `offset` if `model_coefficients is None`, and
-      `tfp.math.matvecmul(model_matrix, model_coefficients_start) + offset`
+      `tf.linalg.matvec(model_matrix, model_coefficients_start) + offset`
       otherwise.
     offset: Optional `Tensor` with `shape`, `dtype` matching `response`;
       represents constant shift applied to `predicted_linear_response`.
@@ -610,7 +609,8 @@ def calculate_linear_predictor(model_matrix, model_coefficients, offset=None,
   """Computes `model_matrix @ model_coefficients + offset`."""
   with tf.name_scope(name, 'calculate_linear_predictor',
                      [model_matrix, model_coefficients, offset]):
-    predicted_linear_response = matvecmul(model_matrix, model_coefficients)
+    predicted_linear_response = tf.linalg.matvec(model_matrix,
+                                                 model_coefficients)
     if offset is not None:
       predicted_linear_response += offset
     return predicted_linear_response

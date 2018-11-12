@@ -26,7 +26,6 @@ from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python import distributions
 from tensorflow_probability.python.internal import test_util
-from tensorflow.python.layers import normalization
 
 
 class BatchNormTest(test_util.VectorDistributionTestHelpers,
@@ -67,7 +66,7 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers,
         input_shape if 0 in event_dims else (None,) + input_shape[1:])
     # When training, memorize the exact mean of the last
     # minibatch that it normalized (instead of moving average assignment).
-    layer = normalization.BatchNormalization(
+    layer = tf.layers.BatchNormalization(
         axis=event_dims, momentum=0., epsilon=0.)
     batch_norm = tfb.BatchNormalization(
         batchnorm_layer=layer, training=training)
@@ -174,7 +173,7 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers,
       ("1d_event_ndims", 2, [-1], False))
   def testLogProb(self, event_shape, event_dims, training):
     training = tf.placeholder_with_default(training, (), "training")
-    layer = normalization.BatchNormalization(axis=event_dims, epsilon=0.)
+    layer = tf.layers.BatchNormalization(axis=event_dims, epsilon=0.)
     batch_norm = tfb.BatchNormalization(batchnorm_layer=layer,
                                         training=training)
     base_dist = distributions.MultivariateNormalDiag(
@@ -203,7 +202,7 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers,
     # BatchNorm bijector is only mutually consistent when training=False.
     dims = 4
     training = tf.placeholder_with_default(False, (), "training")
-    layer = normalization.BatchNormalization(epsilon=0.)
+    layer = tf.layers.BatchNormalization(epsilon=0.)
     batch_norm = tfb.BatchNormalization(batchnorm_layer=layer,
                                         training=training)
     dist = distributions.TransformedDistribution(
@@ -223,7 +222,7 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers,
     # BatchNorm bijector is only mutually consistent when training=False.
     dims = 4
     training = tf.placeholder_with_default(False, (), "training")
-    layer = normalization.BatchNormalization(epsilon=0.)
+    layer = tf.layers.BatchNormalization(epsilon=0.)
     batch_norm = tfb.Invert(
         tfb.BatchNormalization(batchnorm_layer=layer, training=training))
     dist = distributions.TransformedDistribution(

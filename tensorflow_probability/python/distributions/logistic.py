@@ -117,11 +117,13 @@ class Logistic(distribution.Distribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name, values=[loc, scale]) as name:
+      dtype = dtype_util.common_dtype([loc, scale], preferred_dtype=tf.float32)
+      loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
+      scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
       with tf.control_dependencies([tf.assert_positive(scale)]
                                    if validate_args else []):
-        dtype = dtype_util.common_dtype([loc, scale], tf.float32)
-        self._loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
-        self._scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
+        self._loc = tf.identity(loc, name="loc")
+        self._scale = tf.identity(scale, name="scale")
         tf.assert_same_float_dtype([self._loc, self._scale])
     super(Logistic, self).__init__(
         dtype=self._scale.dtype,
@@ -152,8 +154,8 @@ class Logistic(distribution.Distribution):
     return tf.broadcast_dynamic_shape(tf.shape(self.loc), tf.shape(self.scale))
 
   def _batch_shape(self):
-    return tf.broadcast_static_shape(self.loc.get_shape(),
-                                     self.scale.get_shape())
+    return tf.broadcast_static_shape(self.loc.shape,
+                                     self.scale.shape)
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)

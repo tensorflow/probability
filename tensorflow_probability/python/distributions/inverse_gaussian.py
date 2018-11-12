@@ -26,8 +26,8 @@ from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import special_math
 from tensorflow.python.framework import tensor_shape
-from tensorflow.python.ops.distributions import special_math
 
 __all__ = [
     "InverseGaussian",
@@ -101,7 +101,8 @@ class InverseGaussian(distribution.Distribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name, values=[loc, concentration]):
-      dtype = dtype_util.common_dtype([loc, concentration], tf.float32)
+      dtype = dtype_util.common_dtype([loc, concentration],
+                                      preferred_dtype=tf.float32)
       loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
       concentration = tf.convert_to_tensor(
           concentration, name="concentration", dtype=dtype)
@@ -110,7 +111,7 @@ class InverseGaussian(distribution.Distribution):
            tf.assert_positive(concentration)] if validate_args else []):
         self._loc = tf.identity(loc, name="loc")
         self._concentration = tf.identity(concentration, name="concentration")
-        tf.assert_same_float_dtype([self._loc, self._concentration])
+      tf.assert_same_float_dtype([self._loc, self._concentration])
     super(InverseGaussian, self).__init__(
         dtype=self._loc.dtype,
         reparameterization_type=reparameterization.NOT_REPARAMETERIZED,

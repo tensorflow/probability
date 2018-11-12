@@ -43,15 +43,15 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
     dist = categorical.Categorical(probs=p)
     with self.cached_session():
       self.assertAllClose(p, dist.probs.eval())
-      self.assertAllEqual([2], dist.logits.get_shape())
+      self.assertAllEqual([2], dist.logits.shape)
 
   def testLogits(self):
     p = np.array([0.2, 0.8], dtype=np.float32)
     logits = np.log(p) - 50.
     dist = categorical.Categorical(logits=logits)
     with self.cached_session():
-      self.assertAllEqual([2], dist.probs.get_shape())
-      self.assertAllEqual([2], dist.logits.get_shape())
+      self.assertAllEqual([2], dist.probs.shape)
+      self.assertAllEqual([2], dist.logits.shape)
       self.assertAllClose(dist.probs.eval(), p)
       self.assertAllClose(dist.logits.eval(), logits)
 
@@ -415,24 +415,24 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
       dist = categorical.Categorical(tf.log(histograms))
 
       log_prob = dist.log_prob([0, 1])
-      self.assertEqual(2, log_prob.get_shape().ndims)
-      self.assertAllEqual([1, 2], log_prob.get_shape())
+      self.assertEqual(2, log_prob.shape.ndims)
+      self.assertAllEqual([1, 2], log_prob.shape)
 
       log_prob = dist.log_prob([[[1, 1], [1, 0]], [[1, 0], [0, 1]]])
-      self.assertEqual(3, log_prob.get_shape().ndims)
-      self.assertAllEqual([2, 2, 2], log_prob.get_shape())
+      self.assertEqual(3, log_prob.shape.ndims)
+      self.assertAllEqual([2, 2, 2], log_prob.shape)
 
   def testLogPMFShapeNoBatch(self):
     histograms = [0.2, 0.8]
     dist = categorical.Categorical(tf.log(histograms))
 
     log_prob = dist.log_prob(0)
-    self.assertEqual(0, log_prob.get_shape().ndims)
-    self.assertAllEqual([], log_prob.get_shape())
+    self.assertEqual(0, log_prob.shape.ndims)
+    self.assertAllEqual([], log_prob.shape)
 
     log_prob = dist.log_prob([[[1, 1], [1, 0]], [[1, 0], [0, 1]]])
-    self.assertEqual(3, log_prob.get_shape().ndims)
-    self.assertAllEqual([2, 2, 2], log_prob.get_shape())
+    self.assertEqual(3, log_prob.shape.ndims)
+    self.assertAllEqual([2, 2, 2], log_prob.shape)
 
   def testMode(self):
     with self.cached_session():
@@ -465,7 +465,7 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
           kl_expected = np.sum(prob_a * (np.log(prob_a) - np.log(prob_b)),
                                axis=-1)
 
-          self.assertEqual(kl.get_shape(), (batch_size,))
+          self.assertEqual(kl.shape, (batch_size,))
           self.assertAllClose(kl_val, kl_expected)
           self.assertAllClose(kl_same, np.zeros_like(kl_expected))
 

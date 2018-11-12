@@ -50,6 +50,10 @@ Bijector Ops.
 
 [`class MatrixInverseTriL`](../tfp/bijectors/MatrixInverseTriL.md): Computes `g(L) = inv(L)`, where `L` is a lower-triangular matrix.
 
+[`class NormalCDF`](../tfp/bijectors/NormalCDF.md): Compute `Y = g(X) = NormalCDF(x)`.
+
+[`class Ordered`](../tfp/bijectors/Ordered.md): Bijector which maps a tensor x_k that has increasing elements in the last
+
 [`class Permute`](../tfp/bijectors/Permute.md): Permutes the rightmost dimension of a `Tensor`.
 
 [`class PowerTransform`](../tfp/bijectors/PowerTransform.md): Compute `Y = g(X) = (1 + X * c)**(1 / c), X >= -1 / c`.

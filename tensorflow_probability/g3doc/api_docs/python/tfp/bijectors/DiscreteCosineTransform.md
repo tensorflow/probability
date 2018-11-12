@@ -55,7 +55,7 @@ __init__(
 )
 ```
 
-Instantiates the `PowerTransform` bijector.
+Instantiates the `DiscreteCosineTransform` bijector.
 
 #### Args:
 

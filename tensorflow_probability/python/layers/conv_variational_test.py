@@ -307,13 +307,25 @@ class ConvVariational(tf.test.TestCase):
           expected_bias_divergence_, actual_bias_divergence_,
           rtol=1e-6, atol=0.)
 
-      self.assertAllEqual(
-          [[kernel_posterior, kernel_prior, kernel_posterior.result_sample]],
-          kernel_divergence.args)
+      expected_args = [kernel_posterior,
+                       kernel_prior,
+                       kernel_posterior.result_sample]
+      # We expect that there was one call to kernel_divergence, with the above
+      # args; MockKLDivergence appends the list of args to a list, so the above
+      # args should be in the 0th position of that list.
+      actual_args = kernel_divergence.args[0]
+      # Test for identity with 'is'. TensorFlowTestCase.assertAllEqual actually
+      # coerces the inputs to numpy arrays, so we can't use that to assert that
+      # the arguments (which are a mixture of Distributions and Tensors) are
+      # equal.
+      for a, b in zip(expected_args, actual_args):
+        self.assertIs(a, b)
 
-      self.assertAllEqual(
-          [[bias_posterior, bias_prior, bias_posterior.result_sample]],
-          bias_divergence.args)
+      # Same story as above.
+      expected_args = [bias_posterior, bias_prior, bias_posterior.result_sample]
+      actual_args = bias_divergence.args[0]
+      for a, b in zip(expected_args, actual_args):
+        self.assertIs(a, b)
 
   def _testConvFlipout(self, layer_class):
     batch_size, depth, height, width, channels, filters = 2, 4, 4, 4, 3, 5
@@ -343,7 +355,7 @@ class ConvVariational(tf.test.TestCase):
       output_shape = tf.shape(expected_outputs)
       batch_shape = tf.expand_dims(input_shape[0], 0)
       channels = input_shape[-1]
-      rank = len(inputs.get_shape()) - 2
+      rank = len(inputs.shape) - 2
 
       seed_stream = tfd.SeedStream(layer.seed, salt='ConvFlipout')
 
@@ -408,13 +420,25 @@ class ConvVariational(tf.test.TestCase):
           expected_bias_divergence_, actual_bias_divergence_,
           rtol=1e-6, atol=0.)
 
-      self.assertAllEqual(
-          [[kernel_posterior, kernel_prior, None]],
-          kernel_divergence.args)
+      expected_args = [kernel_posterior,
+                       kernel_prior,
+                       None]
+      # We expect that there was one call to kernel_divergence, with the above
+      # args; MockKLDivergence appends the list of args to a list, so the above
+      # args should be in the 0th position of that list.
+      actual_args = kernel_divergence.args[0]
+      # Test for identity with 'is'. TensorFlowTestCase.assertAllEqual actually
+      # coerces the inputs to numpy arrays, so we can't use that to assert that
+      # the arguments (which are a mixture of Distributions and Tensors) are
+      # equal.
+      for a, b in zip(expected_args, actual_args):
+        self.assertIs(a, b)
 
-      self.assertAllEqual(
-          [[bias_posterior, bias_prior, bias_posterior.result_sample]],
-          bias_divergence.args)
+      # Same story as above.
+      expected_args = [bias_posterior, bias_prior, bias_posterior.result_sample]
+      actual_args = bias_divergence.args[0]
+      for a, b in zip(expected_args, actual_args):
+        self.assertIs(a, b)
 
   def _testRandomConvFlipout(self, layer_class):
     batch_size, depth, height, width, channels, filters = 2, 4, 4, 4, 3, 5

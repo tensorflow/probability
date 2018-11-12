@@ -28,6 +28,8 @@ import numpy as np
 
 import tensorflow as tf
 from tensorflow.python.framework import smart_cond
+from tensorflow.python.ops import inplace_ops
+
 
 __all__ = [
     'fit_sparse',
@@ -67,9 +69,78 @@ def _mul_or_none(*args):
   return _reduce_exiting_on_none(lambda a, b: a * b, args)
 
 
+def _get_shape(x, out_type=tf.int32):
+  # Return the shape of a Tensor or a SparseTensor as an np.array if its shape
+  # is known statically. Otherwise return a Tensor representing the shape.
+  if x.shape.is_fully_defined():
+    return np.array(x.shape.as_list(), dtype=out_type.as_numpy_dtype)
+  return tf.shape(x, out_type=out_type)
+
+
+def _batched_sparse_tensor_dense_matmul(sp_a, b, **kwargs):
+  """Returns (batched) matmul of a SparseTensor with a Tensor.
+
+  Args:
+    sp_a: `SparseTensor` representing a (batch of) matrices.
+    b: `Tensor` representing a (batch of) matrices, with the same batch shape of
+      `sp_a`. The shape must be compatible with the shape of `sp_a` and kwargs.
+    **kwargs: Keyword arguments to `tf.sparse_tensor_dense_matmul`.
+
+  Returns:
+    product: A dense (batch of) matrix-shaped Tensor of the same batch shape and
+    dtype as `sp_a` and `b`. If `sp_a` or `b` is adjointed through `kwargs` then
+    the shape is adjusted accordingly.
+  """
+  batch_shape = _get_shape(sp_a)[:-2]
+
+  # Reshape the SparseTensor into a rank 3 SparseTensors, with the
+  # batch shape flattened to a single dimension. If the batch rank is 0, then
+  # we add a batch dimension of rank 1.
+  sp_a = tf.sparse_reshape(sp_a, tf.concat([[-1], _get_shape(sp_a)[-2:]],
+                                           axis=0))
+  # Reshape b to stack the batch dimension along the rows.
+  b = tf.reshape(b, tf.concat([[-1], _get_shape(b)[-1:]], axis=0))
+
+  # Convert the SparseTensor to a matrix in block diagonal form with blocks of
+  # matrices [M, N]. This allow us to use tf.sparse_tensor_dense_matmul which
+  # only accepts rank 2 (Sparse)Tensors.
+  out = tf.sparse_tensor_dense_matmul(_sparse_block_diag(sp_a), b, **kwargs)
+
+  # Finally retrieve the original batch shape from the resulting rank 2 Tensor.
+  # Note that we avoid inferring the final shape from `sp_a` or `b` because we
+  # might have transposed one or both of them.
+  return tf.reshape(
+      out, tf.concat([batch_shape, [-1], tf.shape(out)[-1:]], axis=0))
+
+
+def _sparse_block_diag(sp_a):
+  """Returns a block diagonal rank 2 SparseTensor from a batch of SparseTensors.
+
+  Args:
+    sp_a: A rank 3 `SparseTensor` representing a batch of matrices.
+
+  Returns:
+    sp_block_diag_a: matrix-shaped, `float` `SparseTensor` with the same dtype
+    as `sparse_or_matrix`, of shape [B * M, B * N] where `sp_a` has shape
+    [B, M, N]. Each [M, N] batch of `sp_a` is lined up along the diagonal.
+  """
+  # Construct the matrix [[M, N], [1, 0], [0, 1]] which would map the index
+  # (b, i, j) to (Mb + i, Nb + j). This effectively creates a block-diagonal
+  # matrix of dense shape [B * M, B * N].
+  # Note that this transformation doesn't increase the number of non-zero
+  # entries in the SparseTensor.
+  sp_a_shape = tf.convert_to_tensor(_get_shape(sp_a, tf.int64))
+  ind_mat = tf.concat([[sp_a_shape[-2:]], tf.eye(2, dtype=tf.int64)], axis=0)
+  indices = tf.matmul(sp_a.indices, ind_mat)
+  dense_shape = sp_a_shape[0] * sp_a_shape[1:]
+  return tf.SparseTensor(
+      indices=indices, values=sp_a.values, dense_shape=dense_shape)
+
+
 def _sparse_or_dense_matmul(sparse_or_dense_x, dense_y, **kwargs):
   if _is_sparse(sparse_or_dense_x):
-    return tf.sparse_tensor_dense_matmul(sparse_or_dense_x, dense_y, **kwargs)
+    return _batched_sparse_tensor_dense_matmul(sparse_or_dense_x, dense_y,
+                                               **kwargs)
   else:
     return tf.matmul(sparse_or_dense_x, dense_y, **kwargs)
 
@@ -81,17 +152,13 @@ def _sparse_or_dense_matvecmul(sparse_or_dense_matrix, dense_vector, **kwargs):
       axis=[-1])
 
 
-def _sparse_or_dense_matmul_onehot(sparse_or_dense_matrix, col_index, size):
+def _sparse_or_dense_matmul_onehot(sparse_or_dense_matrix, col_index):
   """Returns a (dense) column of a Tensor or SparseTensor.
 
   Args:
     sparse_or_dense_matrix: matrix-shaped, `float` `Tensor` or `SparseTensor`.
     col_index: scalar, `int` `Tensor` representing the index of the desired
       column.
-    size: scalar, `int` `Tensor` representing the number of rows in
-      `sparse_or_dense_matrix`.  Used only in the sparse case, so that the
-      caller can give side information about the shape of
-      `sparse_or_dense_matrix`.
 
   Returns:
     column: vector-shaped, `float` `Tensor` with the same dtype as
@@ -100,22 +167,22 @@ def _sparse_or_dense_matmul_onehot(sparse_or_dense_matrix, col_index, size):
   """
   if _is_sparse(sparse_or_dense_matrix):
     # TODO(b/111924846): Implement better (ideally in a way that allows us to
-    # eliminate the `size` arg, if possible).
-    return tf.sparse_tensor_to_dense(
-        tf.sparse_reshape(
-            tf.sparse_slice(sparse_or_dense_matrix, tf.cast([0, col_index],
-                                                            tf.int64),
-                            tf.cast([size, 1], tf.int64)),
-            [size]))
+    # eliminate the `num_rows` arg, if possible).
+    num_rows = _get_shape(sparse_or_dense_matrix)[-2]
+    batch_shape = _get_shape(sparse_or_dense_matrix)[:-2]
+    slice_start = tf.concat([tf.zeros_like(batch_shape), [0, col_index]],
+                            axis=0)
+    slice_size = tf.concat([batch_shape, [num_rows, 1]], axis=0)
+    # We momentarily lose static shape information in tf.sparse_slice. However
+    # we regain it in the following tf.reshape.
+    sparse_slice = tf.sparse_slice(sparse_or_dense_matrix,
+                                   tf.cast(slice_start, tf.int64),
+                                   tf.cast(slice_size, tf.int64))
+
+    output_shape = tf.concat([batch_shape, [num_rows]], axis=0)
+    return tf.reshape(tf.sparse_tensor_to_dense(sparse_slice), output_shape)
   else:
     return tf.gather(sparse_or_dense_matrix, col_index, axis=-1)
-
-
-def _sparse_or_dense_inner_square(sparse_or_dense_vector):
-  if _is_sparse(sparse_or_dense_vector):
-    return tf.reduce_sum(sparse_or_dense_vector.values**2)
-  else:
-    return tf.reduce_sum(sparse_or_dense_vector**2)
 
 
 def _one_hot_like(x, indices, on_value=None):
@@ -126,8 +193,7 @@ def _one_hot_like(x, indices, on_value=None):
     depth = x.shape[-1].value
   if on_value is not None:
     on_value = tf.cast(on_value, output_dtype)
-  return tf.one_hot(
-      indices, depth=depth, on_value=on_value, dtype=output_dtype)
+  return tf.one_hot(indices, depth=depth, on_value=on_value, dtype=output_dtype)
 
 
 def soft_threshold(x, threshold, name=None):
@@ -240,28 +306,29 @@ def _grad_neg_log_likelihood_and_fim(model_matrix, linear_response, response,
   values.
 
   Args:
-    model_matrix: matrix-shaped, `float` `Tensor` or `SparseTensor` where each
-      row represents a sample's features.  Has shape `[N, n]` where `N` is the
-      number of data samples and `n` is the number of features per sample.
-    linear_response: vector-shaped `Tensor` with the same dtype as
+    model_matrix: (Batch of) matrix-shaped, `float` `Tensor` or `SparseTensor`
+      where each row represents a sample's features.  Has shape `[N, n]` where
+      `N` is the number of data samples and `n` is the number of features per
+      sample.
+    linear_response: (Batch of) vector-shaped `Tensor` with the same dtype as
       `model_matrix`, equal to `model_matix @ model_coefficients` where
       `model_coefficients` are the coefficients of the linear component of the
       GLM.
-    response: vector-shaped `Tensor` with the same dtype as `model_matrix` where
-      each element represents a sample's observed response (to the corresponding
-      row of features).
+    response: (Batch of) vector-shaped `Tensor` with the same dtype as
+      `model_matrix` where each element represents a sample's observed response
+      (to the corresponding row of features).
     model: `tfp.glm.ExponentialFamily`-like instance, which specifies the link
       function and distribution of the GLM, and thus characterizes the negative
       log-likelihood. Must have sufficient statistic equal to the response, that
       is, `T(y) = y`.
 
   Returns:
-    grad_neg_log_likelihood: vector-shaped `Tensor` with the same shape and
-      dtype as a single row of `model_matrix`, representing the gradient of the
-      negative log likelihood of `response` given linear response
-      `linear_response`.
-    fim_middle: vector-shaped `Tensor` with the same shape and dtype as a single
-      column of `model_matrix`, satisfying the equation
+    grad_neg_log_likelihood: (Batch of) vector-shaped `Tensor` with the same
+      shape and dtype as a single row of `model_matrix`, representing the
+      gradient of the negative log likelihood of `response` given linear
+      response `linear_response`.
+    fim_middle: (Batch of) vector-shaped `Tensor` with the same shape and dtype
+      as a single column of `model_matrix`, satisfying the equation
       `Fisher information =
       Transpose(model_matrix)
       @ diag(fim_middle)
@@ -298,7 +365,6 @@ def minimize_sparse_one_step(gradient_unregularized_loss,
                              l2_regularizer=None,
                              maximum_full_sweeps=1,
                              learning_rate=None,
-                             x_update_var=None,
                              name=None):
   """One step of (the outer loop of) the minimization algorithm.
 
@@ -328,35 +394,33 @@ def minimize_sparse_one_step(gradient_unregularized_loss,
   This algorithm assumes that `Loss` is convex, at least in a region surrounding
   the optimum.  (If `l2_regularizer > 0`, then only weak convexity is needed.)
 
-  Note that this function does not support batched inputs.
-
   Args:
-    gradient_unregularized_loss: `Tensor` with the same shape and dtype as
-      `x_start` representing the gradient, evaluated at `x_start`, of the
-      unregularized loss function (denoted `Loss` above).  (In all current use
-      cases, `Loss` is the negative log likelihood.)
-    hessian_unregularized_loss_outer: `Tensor` or `SparseTensor` having the same
-      dtype as `x_start`, and shape `[N, n]` where `x_start` has shape `[n]`,
-      satisfying the property
+    gradient_unregularized_loss: (Batch of) `Tensor` with the same shape and
+      dtype as `x_start` representing the gradient, evaluated at `x_start`, of
+      the unregularized loss function (denoted `Loss` above).  (In all current
+      use cases, `Loss` is the negative log likelihood.)
+    hessian_unregularized_loss_outer: (Batch of) `Tensor` or `SparseTensor`
+      having the same dtype as `x_start`, and shape `[N, n]` where `x_start` has
+      shape `[n]`, satisfying the property
       `Transpose(hessian_unregularized_loss_outer)
       @ diag(hessian_unregularized_loss_middle)
       @ hessian_unregularized_loss_inner
       = (approximation of) Hessian matrix of Loss, evaluated at x_start`.
-    hessian_unregularized_loss_middle: vector-shaped `Tensor` having the same
-      dtype as `x_start`, and shape `[N]` where
+    hessian_unregularized_loss_middle: (Batch of) vector-shaped `Tensor` having
+      the same dtype as `x_start`, and shape `[N]` where
       `hessian_unregularized_loss_outer` has shape `[N, n]`, satisfying the
       property
       `Transpose(hessian_unregularized_loss_outer)
       @ diag(hessian_unregularized_loss_middle)
       @ hessian_unregularized_loss_inner
       = (approximation of) Hessian matrix of Loss, evaluated at x_start`.
-    x_start: vector-shaped, `float` `Tensor` representing the current value of
-      the argument to the Loss function.
+    x_start: (Batch of) vector-shaped, `float` `Tensor` representing the current
+      value of the argument to the Loss function.
     tolerance: scalar, `float` `Tensor` representing the convergence threshold.
       The optimization step will terminate early, returning its current value of
       `x_start + x_update`, once the following condition is met:
       `||x_update_end - x_update_start||_2 / (1 + ||x_start||_2)
-       < sqrt(tolerance)`,
+      < sqrt(tolerance)`,
       where `x_update_end` is the value of `x_update` at the end of a sweep and
       `x_update_start` is the value of `x_update` at the beginning of that
       sweep.
@@ -374,17 +438,14 @@ def minimize_sparse_one_step(gradient_unregularized_loss,
     learning_rate: scalar, `float` `Tensor` representing a multiplicative factor
       used to dampen the proximal gradient descent steps.
       Default value: `None` (i.e., factor is conceptually `1`).
-    x_update_var: `Variable` with the same shape and dtype as `x_start`.  Used
-      to store the current value of `x_update`.
-      Default value: `None` (i.e., a new `Variable` will be created).
     name: Python string representing the name of the TensorFlow operation.
       The default name is `"minimize_sparse_one_step"`.
 
   Returns:
-    x: `Tensor` having the same shape and dtype as `x_start`, representing the
-      updated value of `x`, that is, `x_start + x_update`.
+    x: (Batch of) `Tensor` having the same shape and dtype as `x_start`,
+      representing the updated value of `x`, that is, `x_start + x_update`.
     is_converged: scalar, `bool` `Tensor` indicating whether convergence
-      occurred within the specified number of sweeps.
+      occurred across all batches within the specified number of sweeps.
     iter: scalar, `int` `Tensor` representing the actual number of coordinate
       updates made (before achieving convergence).  Since each sweep consists of
       `tf.size(x_start)` iterations, the maximum number of updates is
@@ -412,38 +473,11 @@ def minimize_sparse_one_step(gradient_unregularized_loss,
       maximum_full_sweeps,
       tolerance,
       learning_rate,
-      x_update_var,
   ]
   with tf.name_scope(name, 'minimize_sparse_one_step', graph_deps):
-    if (x_start.shape.ndims is None or x_start.shape[-1].value is None):
-      dims = tf.shape(x_start)[-1]
-    else:
-      dims = np.array(x_start.shape[-1].value, np.int32)
-
-    if (hessian_unregularized_loss_outer.get_shape().ndims is None or
-        hessian_unregularized_loss_outer.get_shape()[0].value is None):
-      num_samples = tf.shape(hessian_unregularized_loss_outer)[0]
-    else:
-      num_samples = np.array(
-          hessian_unregularized_loss_outer.get_shape()[0].value, np.int32)
-
-    # Hint vector shape for dynamically shaped vector arguments
-    if gradient_unregularized_loss.shape.ndims is None:
-      gradient_unregularized_loss.set_shape([None])
-    if hessian_unregularized_loss_middle.shape.ndims is None:
-      hessian_unregularized_loss_middle.set_shape([None])
-
-    # Hint matrix shape for dynamically shaped matrix arguments
-    if (not _is_sparse(hessian_unregularized_loss_outer) and
-        hessian_unregularized_loss_outer.shape.ndims is None):
-      hessian_unregularized_loss_outer.set_shape([None, None])
-
-    if x_update_var is None:
-      x_update_var = tf.get_variable(
-          name='x_update_var',
-          initializer=tf.zeros([dims], dtype=x_start.dtype.as_numpy_dtype),
-          trainable=False,
-          use_resource=True)
+    x_shape = _get_shape(x_start)
+    batch_shape = x_shape[:-1]
+    dims = x_shape[-1]
 
     def _hessian_diag_elt_with_l2(coord):  # pylint: disable=missing-docstring
       # Returns the (coord, coord) entry of
@@ -451,27 +485,33 @@ def minimize_sparse_one_step(gradient_unregularized_loss,
       #   Hessian(UnregularizedLoss(x) + l2_regularizer * ||x||_2**2)
       #
       # evaluated at x = x_start.
+      inner_square = tf.reduce_sum(
+          _sparse_or_dense_matmul_onehot(hessian_unregularized_loss_outer,
+                                         coord)**2, axis=-1)
       unregularized_component = (
-          hessian_unregularized_loss_middle[coord] *
-          _sparse_or_dense_inner_square(
-              _sparse_or_dense_matmul_onehot(hessian_unregularized_loss_outer,
-                                             coord, num_samples)))
+          hessian_unregularized_loss_middle[..., coord] * inner_square)
       l2_component = _mul_or_none(2., l2_regularizer)
       return _add_ignoring_nones(unregularized_component, l2_component)
 
     grad_loss_with_l2 = _add_ignoring_nones(
-        gradient_unregularized_loss,
-        _mul_or_none(2., l2_regularizer, x_start))
+        gradient_unregularized_loss, _mul_or_none(2., l2_regularizer, x_start))
 
     # We define `x_update_diff_norm_sq_convergence_threshold` such that the
     # convergence condition
     #     ||x_update_end - x_update_start||_2 / (1 + ||x_start||_2)
     #     < sqrt(tolerance)
     # is equivalent to
-    #     ||x_update_end - x_update_start||_2
+    #     ||x_update_end - x_update_start||_2**2
     #     < x_update_diff_norm_sq_convergence_threshold.
     x_update_diff_norm_sq_convergence_threshold = (
-        tolerance * (1. + tf.norm(x_start, ord=2))**2.)
+        tolerance * (1. + tf.norm(x_start, ord=2, axis=-1))**2)
+
+    # Reshape update vectors so that the coordinate sweeps happen along the
+    # first dimension. This is so that we can use alias_inplace_add to
+    # make sparse updates along the first axis without copying the Tensor.
+    # TODO(b/118789120): Switch to using tf.scatter_nd_add when inplace updates
+    # are supported.
+    update_shape = tf.concat([[dims], batch_shape], axis=-1)
 
     def _loop_cond(iter_, x_update_diff_norm_sq, x_update,
                    hess_matmul_x_update):
@@ -482,10 +522,10 @@ def minimize_sparse_one_step(gradient_unregularized_loss,
           x_update_diff_norm_sq < x_update_diff_norm_sq_convergence_threshold)
       converged = sweep_complete & small_delta
       allowed_more_iterations = iter_ < maximum_full_sweeps * dims
-      return allowed_more_iterations & ~converged
+      return allowed_more_iterations & tf.reduce_any(~converged)
 
-    def _loop_body(iter_, x_update_diff_norm_sq, x_update,  # pylint: disable=missing-docstring
-                   hess_matmul_x_update):
+    def _loop_body(  # pylint: disable=missing-docstring
+        iter_, x_update_diff_norm_sq, x_update, hess_matmul_x_update):
       # Inner loop of the minimizer.
       #
       # This loop updates a single coordinate of x_update.  Ideally, an
@@ -556,13 +596,16 @@ def minimize_sparse_one_step(gradient_unregularized_loss,
           tf.equal(coord, 0), tf.zeros_like(x_update_diff_norm_sq),
           x_update_diff_norm_sq)
 
-      w_old = x_start[coord] + x_update[coord]
-      # This is the coordinatwise Newton update if no L1 regularization.
+      # Recall that x_update and hess_matmul_x_update has the rightmost
+      # dimension transposed to the leftmost dimension.
+      w_old = x_start[..., coord] + x_update[coord, ...]
+      # This is the coordinatewise Newton update if no L1 regularization.
       # In above notation, newton_step = -t * (approximation of d/dz|z=0 ULLSC).
       second_deriv = _hessian_diag_elt_with_l2(coord)
       newton_step = -_mul_ignoring_nones(  # pylint: disable=invalid-unary-operand-type
-          learning_rate,
-          grad_loss_with_l2[coord] + hess_matmul_x_update[coord]) / second_deriv
+          learning_rate, grad_loss_with_l2[..., coord] +
+          hess_matmul_x_update[coord, ...]) / second_deriv
+
       # Applying the soft-threshold operator accounts for L1 regularization.
       # In above notation, delta =
       #     prox_{t*l1_regularizer*L1}(w_old + newton_step) - w_old.
@@ -573,27 +616,40 @@ def minimize_sparse_one_step(gradient_unregularized_loss,
           - w_old)
 
       def _do_update(x_update_diff_norm_sq, x_update, hess_matmul_x_update):  # pylint: disable=missing-docstring
-        del x_update
         hessian_column_with_l2 = _sparse_or_dense_matvecmul(
             hessian_unregularized_loss_outer,
             hessian_unregularized_loss_middle * _sparse_or_dense_matmul_onehot(
-                hessian_unregularized_loss_outer, coord, num_samples),
+                hessian_unregularized_loss_outer, coord),
             adjoint_a=True)
+
         if l2_regularizer is not None:
           hessian_column_with_l2 += _one_hot_like(
-              hessian_column_with_l2,
-              coord,
-              on_value=2. * l2_regularizer)
-        changed_x_update_var = tf.scatter_update(x_update_var, [coord],
-                                                 [x_update_var[coord] + delta])
-        with tf.control_dependencies([changed_x_update_var]):
-          x_update_diff_norm_sq_ = x_update_diff_norm_sq + delta**2.
+              hessian_column_with_l2, coord, on_value=2. * l2_regularizer)
+
+        # Move the batch dimensions of `hessian_column_with_l2` to rightmost in
+        # order to conform to `hess_matmul_x_update`.
+        n = tf.rank(hessian_column_with_l2)
+        perm = tf.manip.roll(tf.range(n), shift=1, axis=0)
+        hessian_column_with_l2 = tf.transpose(hessian_column_with_l2, perm)
+
+        # Update the entire batch at `coord` even if `delta` may be 0 at some
+        # batch coordinates. In those cases, adding `delta` is a no-op.
+        x_update = inplace_ops.alias_inplace_add(x_update, coord, delta)
+
+        with tf.control_dependencies([x_update]):
+          x_update_diff_norm_sq_ = x_update_diff_norm_sq + delta**2
           hess_matmul_x_update_ = (
               hess_matmul_x_update + delta * hessian_column_with_l2)
-          return [
-              x_update_diff_norm_sq_, changed_x_update_var,
-              hess_matmul_x_update_
-          ]
+
+          # Hint that loop vars retain the same shape.
+          x_update_diff_norm_sq_.set_shape(
+              x_update_diff_norm_sq_.shape.merge_with(
+                  x_update_diff_norm_sq.shape))
+          hess_matmul_x_update_.set_shape(
+              hess_matmul_x_update_.shape.merge_with(
+                  hess_matmul_x_update.shape))
+
+          return [x_update_diff_norm_sq_, x_update, hess_matmul_x_update_]
 
       inputs_to_update = [x_update_diff_norm_sq, x_update, hess_matmul_x_update]
       return [iter_ + 1] + smart_cond.smart_cond(
@@ -622,31 +678,30 @@ def minimize_sparse_one_step(gradient_unregularized_loss,
           # e.g. if the loss function is piecewise linear and one of the pieces
           # has slope 1.  But since LossSmoothComponent is strictly convex, (i)
           # should not systematically happen.
-          tf.equal(delta, 0.),
+          tf.reduce_all(tf.equal(delta, 0.)),
           lambda: inputs_to_update,
-          lambda: _do_update(*inputs_to_update)
-      )
+          lambda: _do_update(*inputs_to_update))
 
-    if (x_start.shape.ndims is not None and
-        x_start.shape[-1].value is not None):
-      dims = x_start.shape[-1].value
-    else:
-      dims = tf.shape(x_start)[-1]
-
+    base_dtype = x_start.dtype.base_dtype
     iter_, x_update_diff_norm_sq, x_update, _ = tf.while_loop(
         cond=_loop_cond,
         body=_loop_body,
         loop_vars=[
-            tf.zeros([], np.int32, name='iter'),
+            tf.zeros([], dtype=np.int32, name='iter'),
             tf.zeros(
-                [], x_update_var.dtype.base_dtype,
-                name='x_update_diff_norm_sq'),
-            tf.assign(
-                x_update_var, tf.zeros_like(x_update_var), name='x_update'),
-            tf.zeros_like(x_update_var, name='hess_matmul_x_update'),
+                batch_shape, dtype=base_dtype, name='x_update_diff_norm_sq'),
+            tf.zeros(update_shape, dtype=base_dtype, name='x_update'),
+            tf.zeros(
+                update_shape, dtype=base_dtype, name='hess_matmul_x_update'),
         ])
 
-    converged = (
+    # Convert back x_update to the shape of x_start by transposing the leftmost
+    # dimension to the rightmost.
+    n = tf.rank(x_update)
+    perm = tf.manip.roll(tf.range(n), shift=-1, axis=0)
+    x_update = tf.transpose(x_update, perm)
+
+    converged = tf.reduce_all(
         x_update_diff_norm_sq < x_update_diff_norm_sq_convergence_threshold)
     return x_start + x_update, converged, iter_ / dims
 
@@ -659,7 +714,6 @@ def minimize_sparse(grad_and_hessian_loss_fn,
                     maximum_iterations=1,
                     maximum_full_sweeps_per_iteration=1,
                     learning_rate=None,
-                    x_update_var=None,
                     name=None):
   """Minimize using Hessian-informed proximal gradient descent.
 
@@ -679,18 +733,16 @@ def minimize_sparse(grad_and_hessian_loss_fn,
   of `x`.  The gradient and Hessian are often computationally expensive, and
   this optimizer calls them relatively few times compared with other algorithms.
 
-  Note that this function does not support batched inputs.
-
   Args:
-    grad_and_hessian_loss_fn: callable that takes as input a `Tensor` of the
-      same shape and dtype as `x_start` and returns the triple
+    grad_and_hessian_loss_fn: callable that takes as input a (batch of) `Tensor`
+      of the same shape and dtype as `x_start` and returns the triple
       `(gradient_unregularized_loss, hessian_unregularized_loss_outer,
       hessian_unregularized_loss_middle)` as defined in the argument spec of
       `minimize_sparse_one_step`.
-    x_start: vector-shaped, `float` `Tensor` representing the initial value of
-      the argument to the `Loss` function.
+    x_start: (Batch of) vector-shaped, `float` `Tensor` representing the initial
+      value of the argument to the `Loss` function.
     tolerance: scalar, `float` `Tensor` representing the tolerance for each
-      optiization step; see the `tolerance` argument of
+      optimization step; see the `tolerance` argument of
       `minimize_sparse_one_step`.
     l1_regularizer: scalar, `float` `Tensor` representing the weight of the L1
       regularization term (see equation above).
@@ -702,7 +754,7 @@ def minimize_sparse(grad_and_hessian_loss_fn,
       of the outer loop, the algorithm will terminate even if the return value
       `optimal_x` has not converged.
       Default value: `1`.
-    maximum_full_sweeps_per_iteration: Python integer specifying the Maximum
+    maximum_full_sweeps_per_iteration: Python integer specifying the maximum
       number of sweeps allowed in each iteration of the outer loop of the
       optimizer.  Passed as the `maximum_full_sweeps` argument to
       `minimize_sparse_one_step`.
@@ -710,18 +762,15 @@ def minimize_sparse(grad_and_hessian_loss_fn,
     learning_rate: scalar, `float` `Tensor` representing a multiplicative factor
       used to dampen the proximal gradient descent steps.
       Default value: `None` (i.e., factor is conceptually `1`).
-    x_update_var: `Variable` with the same shape and dtype as `x_start`.  Used
-      to store the current value of `x_update`.
-      Default value: `None` (i.e., a new `Variable` will be created).
     name: Python string representing the name of the TensorFlow operation.
       The default name is `"minimize_sparse"`.
 
   Returns:
     x: `Tensor` of the same shape and dtype as `x_start`, representing the
-      computed value of `x` which minimizes `Loss(x)`.
+      (batches of) computed values of `x` which minimizes `Loss(x)`.
     is_converged: scalar, `bool` `Tensor` indicating whether the minimization
-      procedure converged within the specified number of iterations.  Here
-      convergence means that an iteration of the inner loop
+      procedure converged within the specified number of iterations across all
+      batches.  Here convergence means that an iteration of the inner loop
       (`minimize_sparse_one_step`) returns `True` for its `is_converged` output
       value.
     iter: scalar, `int` `Tensor` indicating the actual number of iterations of
@@ -740,9 +789,6 @@ def minimize_sparse(grad_and_hessian_loss_fn,
        Research_, 13, 2012.
        http://www.jmlr.org/papers/volume13/yuan12a/yuan12a.pdf
   """
-  # TODO(b/111926449): Do we want to require x_update_var to be a
-  # ResourceVariable if the user is in eager mode?  Maybe depends on whether the
-  # error they get would be informative enough.
   graph_deps = [
       x_start,
       l1_regularizer,
@@ -751,18 +797,8 @@ def minimize_sparse(grad_and_hessian_loss_fn,
       maximum_full_sweeps_per_iteration,
       tolerance,
       learning_rate,
-      x_update_var,
   ],
   with tf.name_scope(name, 'minimize_sparse', graph_deps):
-
-    if x_update_var is None:
-      dims = np.array(x_start.shape[-1].value, np.int32)
-      x_update_var = tf.get_variable(
-          name='x_update_var',
-          initializer=np.zeros([dims], dtype=x_start.dtype.as_numpy_dtype),
-          trainable=False,
-          use_resource=True)
-
     def _loop_cond(x_start, converged, iter_):
       del x_start
       return tf.logical_and(iter_ < maximum_iterations,
@@ -779,7 +815,6 @@ def minimize_sparse(grad_and_hessian_loss_fn,
           l2_regularizer=l2_regularizer,
           maximum_full_sweeps=maximum_full_sweeps_per_iteration,
           tolerance=tolerance,
-          x_update_var=x_update_var,
           learning_rate=learning_rate)
       return x_start, converged, iter_ + 1
 
@@ -802,7 +837,6 @@ def fit_sparse_one_step(model_matrix,
                         l2_regularizer=None,
                         maximum_full_sweeps=None,
                         learning_rate=None,
-                        model_coefficients_update_var=None,
                         name=None):
   """One step of (the outer loop of) the GLM fitting algorithm.
 
@@ -835,21 +869,20 @@ def fit_sparse_one_step(model_matrix,
   is based on curvature (Fisher information matrix), which significantly speeds
   up convergence.
 
-  Note that this function does not support batched inputs.
-
   Args:
-    model_matrix: matrix-shaped, `float` `Tensor` or `SparseTensor` where each
-      row represents a sample's features.  Has shape `[N, n]` where `N` is the
-      number of data samples and `n` is the number of features per sample.
-    response: vector-shaped `Tensor` with the same dtype as `model_matrix` where
-      each element represents a sample's observed response (to the corresponding
-      row of features).
+    model_matrix: (Batch of) matrix-shaped, `float` `Tensor` or `SparseTensor`
+      where each row represents a sample's features.  Has shape `[N, n]` where
+      `N` is the number of data samples and `n` is the number of features per
+      sample.
+    response: (Batch of) vector-shaped `Tensor` with the same dtype as
+      `model_matrix` where each element represents a sample's observed response
+      (to the corresponding row of features).
     model: `tfp.glm.ExponentialFamily`-like instance, which specifies the link
       function and distribution of the GLM, and thus characterizes the negative
       log-likelihood which will be minimized. Must have sufficient statistic
       equal to the response, that is, `T(y) = y`.
-    model_coefficients_start: vector-shaped, `float` `Tensor` with the same
-      dtype as `model_matrix`, representing the initial values of the
+    model_coefficients_start: (Batch of) vector-shaped, `float` `Tensor` with
+      the same dtype as `model_matrix`, representing the initial values of the
       coefficients for the GLM regression.  Has shape `[n]` where `model_matrix`
       has shape `[N, n]`.
     tolerance: scalar, `float` `Tensor` representing the convergence threshold.
@@ -876,20 +909,16 @@ def fit_sparse_one_step(model_matrix,
     learning_rate: scalar, `float` `Tensor` representing a multiplicative factor
       used to dampen the proximal gradient descent steps.
       Default value: `None` (i.e., factor is conceptually `1`).
-    model_coefficients_update_var: `Variable` with the same shape and dtype as
-      `model_coefficients_start`.  Used to store the current value of
-      `model_coefficients_update`.
-      Default value: `None` (i.e., a new `Variable` will be created).
-    name: Python string representing the name of the TensorFlow operation.
-      The default name is `"fit_sparse_one_step"`.
+    name: Python string representing the name of the TensorFlow operation. The
+      default name is `"fit_sparse_one_step"`.
 
   Returns:
-    model_coefficients: `Tensor` having the same shape and dtype as
+    model_coefficients: (Batch of) `Tensor` having the same shape and dtype as
       `model_coefficients_start`, representing the updated value of
       `model_coefficients`, that is, `model_coefficients_start +
       model_coefficients_update`.
     is_converged: scalar, `bool` `Tensor` indicating whether convergence
-      occurred within the specified number of sweeps.
+      occurred across all batches within the specified number of sweeps.
     iter: scalar, `int` `Tensor` representing the actual number of coordinate
       updates made (before achieving convergence).  Since each sweep consists of
       `tf.size(model_coefficients_start)` iterations, the maximum number of
@@ -904,7 +933,6 @@ def fit_sparse_one_step(model_matrix,
       maximum_full_sweeps,
       tolerance,
       learning_rate,
-      model_coefficients_update_var,
   ]
   with tf.name_scope(name, 'fit_sparse_one_step', graph_deps):
     predicted_linear_response = _sparse_or_dense_matvecmul(
@@ -922,7 +950,6 @@ def fit_sparse_one_step(model_matrix,
         maximum_full_sweeps=maximum_full_sweeps,
         tolerance=tolerance,
         learning_rate=learning_rate,
-        x_update_var=model_coefficients_update_var,
         name=name)
 
 
@@ -936,7 +963,6 @@ def fit_sparse(model_matrix,
                maximum_iterations=None,
                maximum_full_sweeps_per_iteration=1,
                learning_rate=None,
-               model_coefficients_update_var=None,
                name=None):
   r"""Fits a GLM using coordinate-wise FIM-informed proximal gradient descent.
 
@@ -954,18 +980,19 @@ def fit_sparse(model_matrix,
   `SparseTensor`.
 
   Args:
-    model_matrix: matrix-shaped, `float` `Tensor` or `SparseTensor` where each
-      row represents a sample's features.  Has shape `[N, n]` where `N` is the
-      number of data samples and `n` is the number of features per sample.
-    response: vector-shaped `Tensor` with the same dtype as `model_matrix` where
-      each element represents a sample's observed response (to the corresponding
-      row of features).
+    model_matrix: (Batch of) matrix-shaped, `float` `Tensor` or `SparseTensor`
+      where each row represents a sample's features.  Has shape `[N, n]` where
+      `N` is the number of data samples and `n` is the number of features per
+      sample.
+    response: (Batch of) vector-shaped `Tensor` with the same dtype as
+      `model_matrix` where each element represents a sample's observed response
+      (to the corresponding row of features).
     model: `tfp.glm.ExponentialFamily`-like instance, which specifies the link
       function and distribution of the GLM, and thus characterizes the negative
       log-likelihood which will be minimized. Must have sufficient statistic
       equal to the response, that is, `T(y) = y`.
-    model_coefficients_start: vector-shaped, `float` `Tensor` with the same
-      dtype as `model_matrix`, representing the initial values of the
+    model_coefficients_start: (Batch of) vector-shaped, `float` `Tensor` with
+      the same dtype as `model_matrix`, representing the initial values of the
       coefficients for the GLM regression.  Has shape `[n]` where `model_matrix`
       has shape `[N, n]`.
     tolerance: scalar, `float` `Tensor` representing the tolerance for each
@@ -987,22 +1014,16 @@ def fit_sparse(model_matrix,
     learning_rate: scalar, `float` `Tensor` representing a multiplicative factor
       used to dampen the proximal gradient descent steps.
       Default value: `None` (i.e., factor is conceptually `1`).
-    model_coefficients_update_var: `Variable` with the same shape and dtype as
-      `model_coefficients_start`.  Used to store the current value of
-      `model_coefficients_update`.
-      Default value: `None` (i.e., a new `Variable` will be created).
     name: Python string representing the name of the TensorFlow operation.
       The default name is `"fit_sparse"`.
 
-  Note that this function does not support batched inputs.
-
   Returns:
-    model_coefficients: `Tensor` of the same shape and dtype as
+    model_coefficients: (Batch of) `Tensor` of the same shape and dtype as
       `model_coefficients_start`, representing the computed model coefficients
       which minimize the regularized negative log-likelihood.
     is_converged: scalar, `bool` `Tensor` indicating whether the minimization
-      procedure converged within the specified number of iterations.  Here
-      convergence means that an iteration of the inner loop
+      procedure converged across all batches within the specified number of
+      iterations.  Here convergence means that an iteration of the inner loop
       (`fit_sparse_one_step`) returns `True` for its `is_converged` output
       value.
     iter: scalar, `int` `Tensor` indicating the actual number of iterations of
@@ -1052,21 +1073,18 @@ def fit_sparse(model_matrix,
     model = tfp.glm.Bernoulli()
     model_coefficients_start = tf.zeros(x_.shape[-1], np.float32)
 
-    with tf.variable_scope(tf.get_variable_scope(), reuse=tf.AUTO_REUSE):
-      model_coefficients, is_converged, num_iter = tfp.glm.fit_sparse(
-          model_matrix=tf.convert_to_tensor(x_),
-          response=tf.convert_to_tensor(y_),
-          model=model,
-          model_coefficients_start=model_coefficients_start,
-          l1_regularizer=800.,
-          l2_regularizer=None,
-          maximum_iterations=10,
-          maximum_full_sweeps_per_iteration=10,
-          tolerance=1e-6,
-          learning_rate=None)
+    model_coefficients, is_converged, num_iter = tfp.glm.fit_sparse(
+        model_matrix=tf.convert_to_tensor(x_),
+        response=tf.convert_to_tensor(y_),
+        model=model,
+        model_coefficients_start=model_coefficients_start,
+        l1_regularizer=800.,
+        l2_regularizer=None,
+        maximum_iterations=10,
+        maximum_full_sweeps_per_iteration=10,
+        tolerance=1e-6,
+        learning_rate=None)
 
-    init_op = tf.global_variables_initializer()
-    sess.run([init_op])
     model_coefficients_, is_converged_, num_iter_ = sess.run([
         model_coefficients, is_converged, num_iter])
 
@@ -1170,7 +1188,6 @@ def fit_sparse(model_matrix,
       # `convergence_criteria_fn`.
       tolerance,
       learning_rate,
-      model_coefficients_update_var,
   ]
   with tf.name_scope(name, 'fit_sparse', graph_deps):
     # TODO(b/111922388): Include dispersion and offset parameters.
@@ -1189,22 +1206,21 @@ def fit_sparse(model_matrix,
         maximum_full_sweeps_per_iteration=maximum_full_sweeps_per_iteration,
         learning_rate=learning_rate,
         tolerance=tolerance,
-        x_update_var=model_coefficients_update_var,
         name=name)
 
 
-def _fit_sparse_exact_hessian(model_matrix,  # pylint: disable = missing-docstring
-                              response,
-                              model,
-                              model_coefficients_start,
-                              tolerance,
-                              l1_regularizer,
-                              l2_regularizer=None,
-                              maximum_iterations=None,
-                              maximum_full_sweeps_per_iteration=1,
-                              learning_rate=None,
-                              model_coefficients_update_var=None,
-                              name=None):
+def _fit_sparse_exact_hessian(  # pylint: disable = missing-docstring
+    model_matrix,
+    response,
+    model,
+    model_coefficients_start,
+    tolerance,
+    l1_regularizer,
+    l2_regularizer=None,
+    maximum_iterations=None,
+    maximum_full_sweeps_per_iteration=1,
+    learning_rate=None,
+    name=None):
   graph_deps = [
       model_matrix,
       response,
@@ -1217,7 +1233,6 @@ def _fit_sparse_exact_hessian(model_matrix,  # pylint: disable = missing-docstri
       # `convergence_criteria_fn`.
       tolerance,
       learning_rate,
-      model_coefficients_update_var,
   ]
   with tf.name_scope(name, 'fit_sparse_exact_hessian', graph_deps):
     # TODO(b/111922388): Include dispersion and offset parameters.
@@ -1242,5 +1257,4 @@ def _fit_sparse_exact_hessian(model_matrix,  # pylint: disable = missing-docstri
         maximum_full_sweeps_per_iteration=maximum_full_sweeps_per_iteration,
         learning_rate=learning_rate,
         tolerance=tolerance,
-        x_update_var=model_coefficients_update_var,
         name=name)

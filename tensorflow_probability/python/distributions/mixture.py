@@ -332,7 +332,7 @@ class Mixture(distribution.Distribution):
       n = int(static_n) if static_n is not None else n
       cat_samples = self.cat.sample(n, seed=seed)
 
-      static_samples_shape = cat_samples.get_shape()
+      static_samples_shape = cat_samples.shape
       if static_samples_shape.is_fully_defined():
         samples_shape = static_samples_shape.as_list()
         samples_size = static_samples_shape.num_elements()

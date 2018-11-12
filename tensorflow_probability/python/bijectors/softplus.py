@@ -125,7 +125,7 @@ class Softplus(bijector.Bijector):
     # 1 - exp{-Y} approx Y.
     if self.hinge_softness is not None:
       y /= tf.cast(self.hinge_softness, y.dtype)
-    return -tf.log(-tf.expm1(-y))
+    return -tf.log(-tf.math.expm1(-y))
 
   def _forward_log_det_jacobian(self, x):
     if self.hinge_softness is not None:

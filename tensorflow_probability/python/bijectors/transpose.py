@@ -24,7 +24,6 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow.python.framework import tensor_util
 
 
 __all__ = [
@@ -128,7 +127,7 @@ class Transpose(bijector.Bijector):
             rightmost_transposed_ndims,
             dtype=np.int32,
             name='rightmost_transposed_ndims')
-        rightmost_transposed_ndims_ = tensor_util.constant_value(
+        rightmost_transposed_ndims_ = tf.contrib.util.constant_value(
             rightmost_transposed_ndims)
         with tf.control_dependencies(_maybe_validate_rightmost_transposed_ndims(
             rightmost_transposed_ndims, validate_args)):
@@ -142,7 +141,7 @@ class Transpose(bijector.Bijector):
         perm = tf.convert_to_tensor(perm, dtype=np.int32, name='perm')
         rightmost_transposed_ndims = tf.size(
             perm, name='rightmost_transposed_ndims')
-        rightmost_transposed_ndims_ = tensor_util.constant_value(
+        rightmost_transposed_ndims_ = tf.contrib.util.constant_value(
             rightmost_transposed_ndims)
         with tf.control_dependencies(_maybe_validate_perm(perm, validate_args)):
           perm = tf.identity(perm)
@@ -211,7 +210,7 @@ def _maybe_validate_rightmost_transposed_ndims(
     elif validate_args:
       assertions += [tf.assert_rank(rightmost_transposed_ndims, 0)]
 
-    rightmost_transposed_ndims_ = tensor_util.constant_value(
+    rightmost_transposed_ndims_ = tf.contrib.util.constant_value(
         rightmost_transposed_ndims)
     msg = '`rightmost_transposed_ndims` must be non-negative.'
     if rightmost_transposed_ndims_ is not None:
@@ -240,7 +239,7 @@ def _maybe_validate_perm(perm, validate_args, name=None):
     elif validate_args:
       assertions += [tf.assert_rank(perm, 1, message=msg)]
 
-    perm_ = tensor_util.constant_value(perm)
+    perm_ = tf.contrib.util.constant_value(perm)
     msg = '`perm` must be a valid permutation vector.'
     if perm_ is not None:
       if not np.all(np.arange(np.size(perm_)) == np.sort(perm_)):

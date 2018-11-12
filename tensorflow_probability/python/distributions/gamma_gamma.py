@@ -115,7 +115,8 @@ class GammaGamma(distribution.Distribution):
     with tf.name_scope(
         name, values=[concentration, mixing_concentration, mixing_rate]):
       dtype = dtype_util.common_dtype(
-          [concentration, mixing_concentration, mixing_rate], tf.float32)
+          [concentration, mixing_concentration, mixing_rate],
+          preferred_dtype=tf.float32)
       concentration = tf.convert_to_tensor(
           concentration, name="concentration", dtype=dtype)
       mixing_concentration = tf.convert_to_tensor(
@@ -127,9 +128,10 @@ class GammaGamma(distribution.Distribution):
           tf.assert_positive(mixing_concentration),
           tf.assert_positive(mixing_rate),
       ] if validate_args else []):
-        self._concentration = tf.identity(concentration)
-        self._mixing_concentration = tf.identity(mixing_concentration)
-        self._mixing_rate = tf.identity(mixing_rate)
+        self._concentration = tf.identity(concentration, name="concentration")
+        self._mixing_concentration = tf.identity(
+            mixing_concentration, name="mixing_concentration")
+        self._mixing_rate = tf.identity(mixing_rate, name="mixing_rate")
 
       tf.assert_same_float_dtype(
           [self._concentration, self._mixing_concentration, self._mixing_rate])
@@ -168,7 +170,7 @@ class GammaGamma(distribution.Distribution):
   def _batch_shape(self):
     tensors = [self.concentration, self.mixing_concentration, self.mixing_rate]
     return functools.reduce(tf.broadcast_static_shape,
-                            [tensor.get_shape() for tensor in tensors])
+                            [tensor.shape for tensor in tensors])
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)

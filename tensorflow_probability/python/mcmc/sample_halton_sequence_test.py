@@ -114,7 +114,7 @@ class HaltonSequenceTest(tf.test.TestCase):
 
       stddev = tf.sqrt(e_x2 - tf.square(e_x))
       # Keep the tolerance levels the same as in monte_carlo_test.py.
-      self.assertEqual(p.batch_shape, e_x.get_shape())
+      self.assertEqual(p.batch_shape, e_x.shape)
       self.assertAllClose(
           self.evaluate(p.mean()), self.evaluate(e_x), rtol=0.01)
       self.assertAllClose(

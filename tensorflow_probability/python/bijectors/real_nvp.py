@@ -20,7 +20,6 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python.bijectors import conditional_bijector
-from tensorflow.python.layers import core as layers
 
 
 __all__ = [
@@ -35,7 +34,7 @@ class RealNVP(conditional_bijector.ConditionalBijector):
   Real NVP models a normalizing flow on a `D`-dimensional distribution via a
   single `D-d`-dimensional conditional distribution [(Dinh et al., 2017)][1]:
 
-  `y[d:D] = y[d:D] * tf.exp(log_scale_fn(y[d:D])) + shift_fn(y[d:D])`
+  `y[d:D] = x[d:D] * tf.exp(log_scale_fn(x[0:d])) + shift_fn(x[0:d])`
   `y[0:d] = x[0:d]`
 
   The last `D-d` units are scaled and shifted based on the first `d` units only,
@@ -278,13 +277,13 @@ def real_nvp_default_template(hidden_layers,
             "Conditioning not implemented in the default template.")
 
       for units in hidden_layers:
-        x = layers.dense(
+        x = tf.layers.dense(
             inputs=x,
             units=units,
             activation=activation,
             *args,  # pylint: disable=keyword-arg-before-vararg
             **kwargs)
-      x = layers.dense(
+      x = tf.layers.dense(
           inputs=x,
           units=(1 if shift_only else 2) * output_units,
           activation=None,

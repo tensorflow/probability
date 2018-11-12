@@ -17,7 +17,6 @@ tfp.glm.fit_sparse(
     maximum_iterations=None,
     maximum_full_sweeps_per_iteration=1,
     learning_rate=None,
-    model_coefficients_update_var=None,
     name=None
 )
 ```
@@ -72,10 +71,6 @@ For large, sparse data sets, `model_matrix` should be supplied as a
 * <b>`learning_rate`</b>: scalar, `float` `Tensor` representing a multiplicative factor
     used to dampen the proximal gradient descent steps.
     Default value: `None` (i.e., factor is conceptually `1`).
-* <b>`model_coefficients_update_var`</b>: `Variable` with the same shape and dtype as
-    `model_coefficients_start`.  Used to store the current value of
-    `model_coefficients_update`.
-    Default value: `None` (i.e., a new `Variable` will be created).
 * <b>`name`</b>: Python string representing the name of the TensorFlow operation.
     The default name is `"fit_sparse"`.
 
@@ -138,21 +133,18 @@ with tf.Session() as sess:
   model = tfp.glm.Bernoulli()
   model_coefficients_start = tf.zeros(x_.shape[-1], np.float32)
 
-  with tf.variable_scope(tf.get_variable_scope(), reuse=tf.AUTO_REUSE):
-    model_coefficients, is_converged, num_iter = tfp.glm.fit_sparse(
-        model_matrix=tf.convert_to_tensor(x_),
-        response=tf.convert_to_tensor(y_),
-        model=model,
-        model_coefficients_start=model_coefficients_start,
-        l1_regularizer=800.,
-        l2_regularizer=None,
-        maximum_iterations=10,
-        maximum_full_sweeps_per_iteration=10,
-        tolerance=1e-6,
-        learning_rate=None)
+  model_coefficients, is_converged, num_iter = tfp.glm.fit_sparse(
+      model_matrix=tf.convert_to_tensor(x_),
+      response=tf.convert_to_tensor(y_),
+      model=model,
+      model_coefficients_start=model_coefficients_start,
+      l1_regularizer=800.,
+      l2_regularizer=None,
+      maximum_iterations=10,
+      maximum_full_sweeps_per_iteration=10,
+      tolerance=1e-6,
+      learning_rate=None)
 
-  init_op = tf.global_variables_initializer()
-  sess.run([init_op])
   model_coefficients_, is_converged_, num_iter_ = sess.run([
       model_coefficients, is_converged, num_iter])
 

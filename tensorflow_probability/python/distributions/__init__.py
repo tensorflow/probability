@@ -44,6 +44,7 @@ from tensorflow_probability.python.distributions.geometric import Geometric
 from tensorflow_probability.python.distributions.gumbel import Gumbel
 from tensorflow_probability.python.distributions.half_cauchy import HalfCauchy
 from tensorflow_probability.python.distributions.half_normal import HalfNormal
+from tensorflow_probability.python.distributions.hidden_markov_model import HiddenMarkovModel
 from tensorflow_probability.python.distributions.independent import Independent
 from tensorflow_probability.python.distributions.internal.moving_stats import assign_log_moving_mean_exp
 from tensorflow_probability.python.distributions.internal.moving_stats import assign_moving_mean_variance
@@ -62,6 +63,7 @@ from tensorflow_probability.python.distributions.lognormal import LogNormal
 from tensorflow_probability.python.distributions.mixture import Mixture
 from tensorflow_probability.python.distributions.mixture_same_family import MixtureSameFamily
 from tensorflow_probability.python.distributions.multinomial import Multinomial
+from tensorflow_probability.python.distributions.multivariate_student_t import MultivariateStudentTLinearOperator
 from tensorflow_probability.python.distributions.mvn_diag import MultivariateNormalDiag
 from tensorflow_probability.python.distributions.mvn_diag import MultivariateNormalDiagWithSoftplusScale
 from tensorflow_probability.python.distributions.mvn_diag_plus_low_rank import MultivariateNormalDiagPlusLowRank
@@ -88,7 +90,9 @@ from tensorflow_probability.python.distributions.sample_stats import percentile
 from tensorflow_probability.python.distributions.seed_stream import SeedStream
 from tensorflow_probability.python.distributions.sinh_arcsinh import SinhArcsinh
 from tensorflow_probability.python.distributions.student_t import StudentT
+from tensorflow_probability.python.distributions.student_t_process import StudentTProcess
 from tensorflow_probability.python.distributions.transformed_distribution import TransformedDistribution
+from tensorflow_probability.python.distributions.triangular import Triangular
 from tensorflow_probability.python.distributions.truncated_normal import TruncatedNormal
 from tensorflow_probability.python.distributions.uniform import Uniform
 from tensorflow_probability.python.distributions.vector_diffeomixture import quadrature_scheme_softmaxnormal_gauss_hermite
@@ -100,6 +104,7 @@ from tensorflow_probability.python.distributions.vector_sinh_arcsinh_diag import
 from tensorflow_probability.python.distributions.von_mises import VonMises
 from tensorflow_probability.python.distributions.von_mises_fisher import VonMisesFisher
 from tensorflow_probability.python.distributions.wishart import Wishart
+from tensorflow_probability.python.distributions.zipf import Zipf
 
 from tensorflow_probability.python.internal.distribution_util import fill_triangular
 from tensorflow_probability.python.internal.distribution_util import fill_triangular_inverse
@@ -155,6 +160,7 @@ __all__ = [
     'Gumbel',
     'HalfCauchy',
     'HalfNormal',
+    'HiddenMarkovModel',
     'Independent',
     'InverseGamma',
     'InverseGammaWithSoftplusConcentrationRate',
@@ -174,6 +180,8 @@ __all__ = [
     'SinhArcsinh',
     'StudentT',
     'StudentTWithAbsDfSoftplusScale',
+    'StudentTProcess',
+    'Triangular',
     'TruncatedNormal',
     'Uniform',
     'MultivariateNormalDiag',
@@ -183,6 +191,7 @@ __all__ = [
     'MultivariateNormalDiagPlusLowRank',
     'MultivariateNormalDiagPlusLowRankCovariance',
     'MultivariateNormalDiagWithSoftplusScale',
+    'MultivariateStudentTLinearOperator',
     'Dirichlet',
     'DirichletMultinomial',
     'Multinomial',
@@ -201,6 +210,7 @@ __all__ = [
     'Pareto',
     'RelaxedBernoulli',
     'RelaxedOneHotCategorical',
+    'Zipf',
     'kl_divergence',
     'RegisterKL',
     'fill_triangular',

@@ -88,7 +88,7 @@ class NormalTest(tf.test.TestCase):
 
       # Calculate log_pdf under the 2 models
       posterior_log_pdf = posterior.log_prob(x)
-      self.assertEqual(posterior_log_pdf.get_shape(), (6, 2))
+      self.assertEqual(posterior_log_pdf.shape, (6, 2))
       self.assertEqual(self.evaluate(posterior_log_pdf).shape, (6, 2))
 
   def testNormalConjugateKnownSigmaPredictive(self):

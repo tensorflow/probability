@@ -53,15 +53,15 @@ class MultinomialTest(tf.test.TestCase):
     n = [[3.], [4]]
     with self.cached_session():
       dist = multinomial.Multinomial(total_count=n, probs=p)
-      self.assertEqual((2, 1), dist.total_count.get_shape())
+      self.assertEqual((2, 1), dist.total_count.shape)
       self.assertAllClose(n, dist.total_count.eval())
 
   def testP(self):
     p = [[0.1, 0.2, 0.7]]
     with self.cached_session():
       dist = multinomial.Multinomial(total_count=3., probs=p)
-      self.assertEqual((1, 3), dist.probs.get_shape())
-      self.assertEqual((1, 3), dist.logits.get_shape())
+      self.assertEqual((1, 3), dist.probs.shape)
+      self.assertEqual((1, 3), dist.logits.shape)
       self.assertAllClose(p, dist.probs.eval())
 
   def testLogits(self):
@@ -69,8 +69,8 @@ class MultinomialTest(tf.test.TestCase):
     logits = np.log(p) - 50.
     with self.cached_session():
       multinom = multinomial.Multinomial(total_count=3., logits=logits)
-      self.assertEqual((1, 3), multinom.probs.get_shape())
-      self.assertEqual((1, 3), multinom.logits.get_shape())
+      self.assertEqual((1, 3), multinom.probs.shape)
+      self.assertEqual((1, 3), multinom.logits.shape)
       self.assertAllClose(p, multinom.probs.eval())
       self.assertAllClose(logits, multinom.logits.eval())
 
@@ -124,7 +124,7 @@ class MultinomialTest(tf.test.TestCase):
       counts = [1., 0]
       pmf = multinomial.Multinomial(total_count=1., probs=p).prob(counts)
       self.assertAllClose(0.5, pmf.eval())
-      self.assertEqual((), pmf.get_shape())
+      self.assertEqual((), pmf.shape)
 
   def testPmfBothZeroBatchesNontrivialN(self):
     with self.cached_session():
@@ -135,7 +135,7 @@ class MultinomialTest(tf.test.TestCase):
       pmf = dist.prob(counts)
       # 5 choose 3 = 5 choose 2 = 10. 10 * (.9)^2 * (.1)^3 = 81/10000.
       self.assertAllClose(81. / 10000, pmf.eval())
-      self.assertEqual((), pmf.get_shape())
+      self.assertEqual((), pmf.shape)
 
   def testPmfPStretchedInBroadcastWhenSameRank(self):
     with self.cached_session():
@@ -143,7 +143,7 @@ class MultinomialTest(tf.test.TestCase):
       counts = [[1., 0], [0, 1]]
       pmf = multinomial.Multinomial(total_count=1., probs=p).prob(counts)
       self.assertAllClose([0.1, 0.9], pmf.eval())
-      self.assertEqual((2), pmf.get_shape())
+      self.assertEqual((2), pmf.shape)
 
   def testPmfPStretchedInBroadcastWhenLowerRank(self):
     with self.cached_session():
@@ -151,7 +151,7 @@ class MultinomialTest(tf.test.TestCase):
       counts = [[1., 0], [0, 1]]
       pmf = multinomial.Multinomial(total_count=1., probs=p).prob(counts)
       self.assertAllClose([0.1, 0.9], pmf.eval())
-      self.assertEqual((2), pmf.get_shape())
+      self.assertEqual((2), pmf.shape)
 
   def testPmfCountsStretchedInBroadcastWhenSameRank(self):
     with self.cached_session():
@@ -159,7 +159,7 @@ class MultinomialTest(tf.test.TestCase):
       counts = [[1., 0]]
       pmf = multinomial.Multinomial(total_count=1., probs=p).prob(counts)
       self.assertAllClose(pmf.eval(), [0.1, 0.7])
-      self.assertEqual((2), pmf.get_shape())
+      self.assertEqual((2), pmf.shape)
 
   def testPmfCountsStretchedInBroadcastWhenLowerRank(self):
     with self.cached_session():
@@ -167,7 +167,7 @@ class MultinomialTest(tf.test.TestCase):
       counts = [1., 0]
       pmf = multinomial.Multinomial(total_count=1., probs=p).prob(counts)
       self.assertAllClose(pmf.eval(), [0.1, 0.7])
-      self.assertEqual(pmf.get_shape(), (2))
+      self.assertEqual(pmf.shape, (2))
 
   def testPmfShapeCountsStretchedN(self):
     with self.cached_session():
@@ -179,7 +179,7 @@ class MultinomialTest(tf.test.TestCase):
       counts = [2., 1]
       pmf = multinomial.Multinomial(total_count=n, probs=p).prob(counts)
       pmf.eval()
-      self.assertEqual(pmf.get_shape(), (2, 2))
+      self.assertEqual(pmf.shape, (2, 2))
 
   def testPmfShapeCountsPStretchedN(self):
     with self.cached_session():
@@ -188,7 +188,7 @@ class MultinomialTest(tf.test.TestCase):
       n = np.full([4, 3], 5., dtype=np.float32)
       pmf = multinomial.Multinomial(total_count=n, probs=p).prob(counts)
       pmf.eval()
-      self.assertEqual((4, 3), pmf.get_shape())
+      self.assertEqual((4, 3), pmf.shape)
 
   def testMultinomialMean(self):
     with self.cached_session():
@@ -196,7 +196,7 @@ class MultinomialTest(tf.test.TestCase):
       p = [0.1, 0.2, 0.7]
       dist = multinomial.Multinomial(total_count=n, probs=p)
       expected_means = 5 * np.array(p, dtype=np.float32)
-      self.assertEqual((3,), dist.mean().get_shape())
+      self.assertEqual((3,), dist.mean().shape)
       self.assertAllClose(expected_means, dist.mean().eval())
 
   def testMultinomialCovariance(self):
@@ -207,7 +207,7 @@ class MultinomialTest(tf.test.TestCase):
       expected_covariances = [[9. / 20, -1 / 10, -7 / 20],
                               [-1 / 10, 4 / 5, -7 / 10],
                               [-7 / 20, -7 / 10, 21 / 20]]
-      self.assertEqual((3, 3), dist.covariance().get_shape())
+      self.assertEqual((3, 3), dist.covariance().shape)
       self.assertAllClose(expected_covariances, dist.covariance().eval())
 
   def testMultinomialCovarianceBatch(self):
@@ -221,7 +221,7 @@ class MultinomialTest(tf.test.TestCase):
       inner_var = [[9. / 20, -9 / 20], [-9 / 20, 9 / 20]]
       # Shape [4, 2, 2, 2]
       expected_covariances = [[inner_var, inner_var]] * 4
-      self.assertEqual((4, 2, 2, 2), dist.covariance().get_shape())
+      self.assertEqual((4, 2, 2, 2), dist.covariance().shape)
       self.assertAllClose(expected_covariances, dist.covariance().eval())
 
   def testCovarianceMultidimensional(self):
@@ -239,8 +239,8 @@ class MultinomialTest(tf.test.TestCase):
 
       covariance = dist.covariance()
       covariance2 = dist2.covariance()
-      self.assertEqual((3, 5, 4, 4), covariance.get_shape())
-      self.assertEqual((6, 3, 3, 3), covariance2.get_shape())
+      self.assertEqual((3, 5, 4, 4), covariance.shape)
+      self.assertEqual((6, 3, 3, 3), covariance2.shape)
 
   def testCovarianceFromSampling(self):
     # We will test mean, cov, var, stddev on a Multinomial constructed via
@@ -307,9 +307,9 @@ class MultinomialTest(tf.test.TestCase):
           dist.mean(),
           dist.covariance(),
       ])
-      self.assertAllEqual([4, 3, 2], sample_mean.get_shape())
+      self.assertAllEqual([4, 3, 2], sample_mean.shape)
       self.assertAllClose(actual_mean_, sample_mean_, atol=0., rtol=0.10)
-      self.assertAllEqual([4, 3, 2, 2], sample_covariance.get_shape())
+      self.assertAllEqual([4, 3, 2, 2], sample_covariance.shape)
       self.assertAllClose(
           actual_covariance_, sample_covariance_, atol=0., rtol=0.20)
 
@@ -335,9 +335,9 @@ class MultinomialTest(tf.test.TestCase):
           dist.mean(),
           dist.covariance(),
       ])
-      self.assertAllEqual([4], sample_mean.get_shape())
+      self.assertAllEqual([4], sample_mean.shape)
       self.assertAllClose(actual_mean_, sample_mean_, atol=0., rtol=0.10)
-      self.assertAllEqual([4, 4], sample_covariance.get_shape())
+      self.assertAllEqual([4, 4], sample_covariance.shape)
       self.assertAllClose(
           actual_covariance_, sample_covariance_, atol=0., rtol=0.20)
 

@@ -23,7 +23,9 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.ops import control_flow_ops
@@ -169,11 +171,15 @@ class StudentT(distribution.Distribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name, values=[df, loc, scale]) as name:
+      dtype = dtype_util.common_dtype([df, loc, scale], tf.float32)
+      df = tf.convert_to_tensor(df, name="df", dtype=dtype)
+      loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
+      scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
       with tf.control_dependencies([tf.assert_positive(df)]
                                    if validate_args else []):
-        self._df = tf.identity(df, name="df")
-        self._loc = tf.identity(loc, name="loc")
-        self._scale = tf.identity(scale, name="scale")
+        self._df = tf.identity(df)
+        self._loc = tf.identity(loc)
+        self._scale = tf.identity(scale)
         tf.assert_same_float_dtype(
             (self._df, self._loc, self._scale))
     super(StudentT, self).__init__(
@@ -215,9 +221,9 @@ class StudentT(distribution.Distribution):
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(
-        tf.broadcast_static_shape(self.df.get_shape(),
-                                  self.loc.get_shape()),
-        self.scale.get_shape())
+        tf.broadcast_static_shape(self.df.shape,
+                                  self.loc.shape),
+        self.scale.shape)
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
@@ -232,15 +238,16 @@ class StudentT(distribution.Distribution):
     #   Y = X / sqrt(Z / df)
     # then:
     #   Y ~ StudentT(df).
+    seed = seed_stream.SeedStream(seed, "student_t")
     shape = tf.concat([[n], self.batch_shape_tensor()], 0)
-    normal_sample = tf.random_normal(shape, dtype=self.dtype, seed=seed)
+    normal_sample = tf.random_normal(shape, dtype=self.dtype, seed=seed())
     df = self.df * tf.ones(self.batch_shape_tensor(), dtype=self.dtype)
     gamma_sample = tf.random_gamma(
         [n],
         0.5 * df,
         beta=0.5,
         dtype=self.dtype,
-        seed=distribution_util.gen_new_seed(seed, salt="student_t"))
+        seed=seed())
     samples = normal_sample * tf.rsqrt(gamma_sample / df)
     return samples * self.scale + self.loc  # Abs(scale) not wanted.
 

@@ -36,25 +36,29 @@ See the [TensorFlow Probability style guide](STYLE_GUIDE.md).
 
 ## Unit tests
 
-Please include unit tests when contributing new features, as they help to a)
-prove that your code works correctly, and b) guard against future breaking
-changes to lower the maintenance cost. It's also helpful to check that any
-changes you propose do not break existing unit tests. You can run tests (on CPU)
-using the command,
+All TFP code-paths must be unit-tested; see this [unit-test guide](UNITTEST.md)
+for recommended test setup.
+
+Unit tests ensure new features (a) work correctly and (b) guard against future
+breaking changes (thus lower maintenance costs).
+
+To run existing unit-tests on CPU, use the command:
+
 
 ```shell
-bazel test --copt=-O3 --copt=-march=native \
-  //tensorflow_probability/...
+bazel test --copt=-O3 --copt=-march=native //tensorflow_probability/...
 ```
 
-or on GPU,
+from the root of the `tensorflow_probability` repository. To run tests on GPU,
+you just need to ensure the GPU-enabled version of TensorFlow is installed.
+However, you will also need to include the flag `--jobs=1`, since by default
+Bazel will run many tests in parallel, and each one will try to claim all the
+GPU memory:
 
 ```shell
-bazel test --copt=-O3 --copt=-march=native --config=cuda \
-  //tensorflow_probability/...
+bazel test --jobs=1 --copt=-O3 --copt=-march=native //tensorflow_probability/...
 ```
 
-from the root of the `tensorflow_probability` repository.
 
 ## Contributor License Agreement
 

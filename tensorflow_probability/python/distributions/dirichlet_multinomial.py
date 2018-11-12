@@ -20,7 +20,9 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.ops import control_flow_ops
 
@@ -185,6 +187,7 @@ class DirichletMultinomial(distribution.Distribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name, values=[total_count, concentration]) as name:
+      dtype = dtype_util.common_dtype([total_count, concentration], tf.float32)
       # Broadcasting works because:
       # * The broadcasting convention is to prepend dimensions of size [1], and
       #   we use the last dimension for the distribution, whereas
@@ -193,24 +196,23 @@ class DirichletMultinomial(distribution.Distribution):
       #   created automatically by prepending). This forces enough explicitness.
       # * All calls involving `counts` eventually require a broadcast between
       #  `counts` and concentration.
-      self._total_count = tf.convert_to_tensor(total_count, name="total_count")
+      self._total_count = tf.convert_to_tensor(
+          total_count, name="total_count", dtype=dtype)
       if validate_args:
         self._total_count = (
             distribution_util.embed_check_nonnegative_integer_form(
                 self._total_count))
       self._concentration = self._maybe_assert_valid_concentration(
-          tf.convert_to_tensor(concentration,
-                               name="concentration"),
-          validate_args)
+          tf.convert_to_tensor(
+              concentration, name="concentration", dtype=dtype), validate_args)
       self._total_concentration = tf.reduce_sum(self._concentration, -1)
     super(DirichletMultinomial, self).__init__(
-        dtype=self._concentration.dtype,
+        dtype=dtype,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
         reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
         parameters=parameters,
-        graph_parents=[self._total_count,
-                       self._concentration],
+        graph_parents=[self._total_count, self._concentration],
         name=name)
 
   @property
@@ -232,16 +234,17 @@ class DirichletMultinomial(distribution.Distribution):
     return tf.shape(self.total_concentration)
 
   def _batch_shape(self):
-    return self.total_concentration.get_shape()
+    return self.total_concentration.shape
 
   def _event_shape_tensor(self):
     return tf.shape(self.concentration)[-1:]
 
   def _event_shape(self):
     # Event shape depends only on total_concentration, not "n".
-    return self.concentration.get_shape().with_rank_at_least(1)[-1:]
+    return self.concentration.shape.with_rank_at_least(1)[-1:]
 
   def _sample_n(self, n, seed=None):
+    seed = seed_stream.SeedStream(seed, "dirichlet_multinomial")
     n_draws = tf.cast(self.total_count, dtype=tf.int32)
     k = self.event_shape_tensor()[0]
     unnormalized_logits = tf.reshape(
@@ -249,12 +252,12 @@ class DirichletMultinomial(distribution.Distribution):
             shape=[n],
             alpha=self.concentration,
             dtype=self.dtype,
-            seed=seed)),
+            seed=seed())),
         shape=[-1, k])
     draws = tf.multinomial(
         logits=unnormalized_logits,
         num_samples=n_draws,
-        seed=distribution_util.gen_new_seed(seed, salt="dirichlet_multinomial"))
+        seed=seed())
     x = tf.reduce_sum(tf.one_hot(draws, depth=k), -2)
     final_shape = tf.concat([[n], self.batch_shape_tensor(), [k]], 0)
     x = tf.reshape(x, final_shape)

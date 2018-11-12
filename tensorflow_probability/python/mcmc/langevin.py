@@ -285,7 +285,7 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
         `current_state`.
       TypeError: if `volatility_fn` is not callable.
     """
-    self._impl = metropolis_hastings.MetropolisHastings(
+    impl = metropolis_hastings.MetropolisHastings(
         inner_kernel=UncalibratedLangevin(
             target_log_prob_fn=target_log_prob_fn,
             step_size=step_size,
@@ -294,6 +294,13 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
             parallel_iterations=parallel_iterations,
             name=name),
         seed=seed)
+
+    self._impl = impl
+    parameters = impl.inner_kernel.parameters.copy()
+    # Remove `compute_acceptance` parameter as this is not a MALA kernel
+    # `__init__` parameter.
+    del parameters['compute_acceptance']
+    self._parameters = parameters
 
   @property
   def target_log_prob_fn(self):
@@ -322,7 +329,7 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
   @property
   def parameters(self):
     """Return `dict` of ``__init__`` arguments and their values."""
-    return self._impl.inner_kernel.parameters
+    return self._parameters
 
   @property
   def is_calibrated(self):

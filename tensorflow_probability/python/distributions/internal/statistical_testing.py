@@ -128,7 +128,7 @@ from __future__ import print_function
 import itertools
 
 import tensorflow as tf
-from tensorflow.python.ops import gen_math_ops
+from tensorflow_probability.python.internal import dtype_util
 
 __all__ = [
     "true_mean_confidence_interval_by_dkwm",
@@ -158,6 +158,10 @@ def _batch_sort_vector(x, ascending=True, name=None):
 def _do_maximum_mean(samples, envelope, high, name=None):
   """Common code between maximum_mean and minimum_mean."""
   with tf.name_scope(name, "do_maximum_mean", [samples, envelope, high]):
+    dtype = dtype_util.common_dtype([samples, envelope, high], tf.float32)
+    samples = tf.convert_to_tensor(samples, name="samples", dtype=dtype)
+    envelope = tf.convert_to_tensor(envelope, name="envelope", dtype=dtype)
+    high = tf.convert_to_tensor(high, name="high", dtype=dtype)
     n = tf.rank(samples)
     # Move the batch dimension of `samples` to the rightmost position,
     # where the _batch_sort_vector function wants it.
@@ -176,10 +180,9 @@ def _do_maximum_mean(samples, envelope, high, name=None):
     # The following is a vectorized and batched way of computing this.
     # `max_mean_contrib` is a mask implementing the previous.
     batch_size = tf.shape(samples)[-1]
-    batch_size = tf.cast(batch_size, dtype=samples.dtype.base_dtype)
+    batch_size = tf.cast(batch_size, dtype=dtype)
     step = 1. / batch_size
-    cum_steps = step * tf.range(
-        1, batch_size + 1, dtype=samples.dtype.base_dtype)
+    cum_steps = step * tf.range(1, batch_size + 1, dtype=dtype)
     max_mean_contrib = tf.clip_by_value(
         cum_steps - envelope[..., tf.newaxis],
         clip_value_min=0.,
@@ -221,9 +224,10 @@ def _maximum_mean(samples, envelope, high, name=None):
       the corresponding `high`.
   """
   with tf.name_scope(name, "maximum_mean", [samples, envelope, high]):
-    samples = tf.convert_to_tensor(samples, name="samples")
-    envelope = tf.convert_to_tensor(envelope, name="envelope")
-    high = tf.convert_to_tensor(high, name="high")
+    dtype = dtype_util.common_dtype([samples, envelope, high], tf.float32)
+    samples = tf.convert_to_tensor(samples, name="samples", dtype=dtype)
+    envelope = tf.convert_to_tensor(envelope, name="envelope", dtype=dtype)
+    high = tf.convert_to_tensor(high, name="high", dtype=dtype)
 
     xmax = tf.reduce_max(samples, axis=[0])
     msg = "Given sample maximum value exceeds expectations"
@@ -266,9 +270,10 @@ def _minimum_mean(samples, envelope, low, name=None):
       the corresponding `low`.
   """
   with tf.name_scope(name, "minimum_mean", [samples, envelope, low]):
-    samples = tf.convert_to_tensor(samples, name="samples")
-    envelope = tf.convert_to_tensor(envelope, name="envelope")
-    low = tf.convert_to_tensor(low, name="low")
+    dtype = dtype_util.common_dtype([samples, envelope, low], tf.float32)
+    samples = tf.convert_to_tensor(samples, name="samples", dtype=dtype)
+    envelope = tf.convert_to_tensor(envelope, name="envelope", dtype=dtype)
+    low = tf.convert_to_tensor(low, name="low", dtype=dtype)
 
     xmin = tf.reduce_min(samples, axis=[0])
     msg = "Given sample minimum value falls below expectations"
@@ -307,7 +312,7 @@ def _dkwm_cdf_envelope(n, error_rate, name=None):
   """
   with tf.name_scope(name, "dkwm_cdf_envelope", [n, error_rate]):
     n = tf.cast(n, dtype=error_rate.dtype)
-    return tf.sqrt(-gen_math_ops.log(error_rate / 2.) / (2. * n))
+    return tf.sqrt(-tf.log(error_rate / 2.) / (2. * n))
 
 
 def _check_shape_dominates(samples, parameters):
@@ -383,10 +388,13 @@ def true_mean_confidence_interval_by_dkwm(
   """
   with tf.name_scope(name, "true_mean_confidence_interval_by_dkwm",
                      [samples, low, high, error_rate]):
-    samples = tf.convert_to_tensor(samples, name="samples")
-    low = tf.convert_to_tensor(low, name="low")
-    high = tf.convert_to_tensor(high, name="high")
-    error_rate = tf.convert_to_tensor(error_rate, name="error_rate")
+    dtype = dtype_util.common_dtype(
+        [samples, low, high, error_rate], tf.float32)
+    samples = tf.convert_to_tensor(samples, name="samples", dtype=dtype)
+    low = tf.convert_to_tensor(low, name="low", dtype=dtype)
+    high = tf.convert_to_tensor(high, name="high", dtype=dtype)
+    error_rate = tf.convert_to_tensor(
+        error_rate, name="error_rate", dtype=dtype)
     samples = _check_shape_dominates(samples, [low, high])
     tf.assert_scalar(error_rate)  # Static shape
     error_rate = _itemwise_error_rate(error_rate, [low, high], samples)
@@ -510,13 +518,15 @@ def min_discrepancy_of_true_means_detectable_by_dkwm(
   """
   with tf.name_scope(name, "min_discrepancy_of_true_means_detectable_by_dkwm",
                      [n, low, high, false_fail_rate, false_pass_rate]):
-    n = tf.convert_to_tensor(n, name="n")
-    low = tf.convert_to_tensor(low, name="low")
-    high = tf.convert_to_tensor(high, name="high")
+    dtype = dtype_util.common_dtype(
+        [n, low, high, false_fail_rate, false_pass_rate], tf.float32)
+    n = tf.convert_to_tensor(n, name="n", dtype=dtype)
+    low = tf.convert_to_tensor(low, name="low", dtype=dtype)
+    high = tf.convert_to_tensor(high, name="high", dtype=dtype)
     false_fail_rate = tf.convert_to_tensor(
-        false_fail_rate, name="false_fail_rate")
+        false_fail_rate, name="false_fail_rate", dtype=dtype)
     false_pass_rate = tf.convert_to_tensor(
-        false_pass_rate, name="false_pass_rate")
+        false_pass_rate, name="false_pass_rate", dtype=dtype)
     # Algorithm: Assume a true CDF F.  The DKWM inequality gives a
     # stochastic bound on how far the observed empirical CDF F_n can be.
     # Then, using the DKWM inequality again gives a stochastic bound on
@@ -585,13 +595,16 @@ def min_num_samples_for_dkwm_mean_test(
   with tf.name_scope(
       name, "min_num_samples_for_dkwm_mean_test",
       [low, high, false_fail_rate, false_pass_rate, discrepancy]):
-    discrepancy = tf.convert_to_tensor(discrepancy, name="discrepancy")
-    low = tf.convert_to_tensor(low, name="low")
-    high = tf.convert_to_tensor(high, name="high")
+    dtype = dtype_util.common_dtype(
+        [low, high, false_fail_rate, false_pass_rate, discrepancy], tf.float32)
+    discrepancy = tf.convert_to_tensor(
+        discrepancy, name="discrepancy", dtype=dtype)
+    low = tf.convert_to_tensor(low, name="low", dtype=dtype)
+    high = tf.convert_to_tensor(high, name="high", dtype=dtype)
     false_fail_rate = tf.convert_to_tensor(
-        false_fail_rate, name="false_fail_rate")
+        false_fail_rate, name="false_fail_rate", dtype=dtype)
     false_pass_rate = tf.convert_to_tensor(
-        false_pass_rate, name="false_pass_rate")
+        false_pass_rate, name="false_pass_rate", dtype=dtype)
     # Could choose to cleverly allocate envelopes, but this is sound.
     envelope1 = discrepancy / (2. * (high - low))
     envelope2 = envelope1
@@ -643,16 +656,19 @@ def assert_true_mean_in_interval_by_dkwm(
       interval does not overlap with the corresponding confidence
       interval.
   """
+  args_list = [samples, low, high, expected_low, expected_high, false_fail_rate]
   with tf.name_scope(
-      name, "assert_true_mean_in_interval_by_dkwm",
-      [samples, low, high, expected_low, expected_high, false_fail_rate]):
-    samples = tf.convert_to_tensor(samples, name="samples")
-    low = tf.convert_to_tensor(low, name="low")
-    high = tf.convert_to_tensor(high, name="high")
-    expected_low = tf.convert_to_tensor(expected_low, name="expected_low")
-    expected_high = tf.convert_to_tensor(expected_high, name="expected_high")
+      name, "assert_true_mean_in_interval_by_dkwm", args_list):
+    dtype = dtype_util.common_dtype(args_list, tf.float32)
+    samples = tf.convert_to_tensor(samples, name="samples", dtype=dtype)
+    low = tf.convert_to_tensor(low, name="low", dtype=dtype)
+    high = tf.convert_to_tensor(high, name="high", dtype=dtype)
+    expected_low = tf.convert_to_tensor(
+        expected_low, name="expected_low", dtype=dtype)
+    expected_high = tf.convert_to_tensor(
+        expected_high, name="expected_high", dtype=dtype)
     false_fail_rate = tf.convert_to_tensor(
-        false_fail_rate, name="false_fail_rate")
+        false_fail_rate, name="false_fail_rate", dtype=dtype)
     samples = _check_shape_dominates(
         samples, [low, high, expected_low, expected_high])
     min_mean, max_mean = true_mean_confidence_interval_by_dkwm(
@@ -722,17 +738,18 @@ def assert_true_mean_equal_by_dkwm_two_sample(
     check: Op that raises `InvalidArgumentError` if any pair of confidence
       intervals true for corresponding true means do not overlap.
   """
+  args_list = [samples1, low1, high1, samples2, low2, high2, false_fail_rate]
   with tf.name_scope(
-      name, "assert_true_mean_equal_by_dkwm_two_sample",
-      [samples1, low1, high1, samples2, low2, high2, false_fail_rate]):
-    samples1 = tf.convert_to_tensor(samples1, name="samples1")
-    low1 = tf.convert_to_tensor(low1, name="low1")
-    high1 = tf.convert_to_tensor(high1, name="high1")
-    samples2 = tf.convert_to_tensor(samples2, name="samples2")
-    low2 = tf.convert_to_tensor(low2, name="low2")
-    high2 = tf.convert_to_tensor(high2, name="high2")
+      name, "assert_true_mean_equal_by_dkwm_two_sample", args_list):
+    dtype = dtype_util.common_dtype(args_list, tf.float32)
+    samples1 = tf.convert_to_tensor(samples1, name="samples1", dtype=dtype)
+    low1 = tf.convert_to_tensor(low1, name="low1", dtype=dtype)
+    high1 = tf.convert_to_tensor(high1, name="high1", dtype=dtype)
+    samples2 = tf.convert_to_tensor(samples2, name="samples2", dtype=dtype)
+    low2 = tf.convert_to_tensor(low2, name="low2", dtype=dtype)
+    high2 = tf.convert_to_tensor(high2, name="high2", dtype=dtype)
     false_fail_rate = tf.convert_to_tensor(
-        false_fail_rate, name="false_fail_rate")
+        false_fail_rate, name="false_fail_rate", dtype=dtype)
     samples1 = _check_shape_dominates(samples1, [low1, high1])
     samples2 = _check_shape_dominates(samples2, [low2, high2])
     compatible_samples = tf.assert_equal(
@@ -809,19 +826,23 @@ def min_discrepancy_of_true_means_detectable_by_dkwm_two_sample(
   - `O(-log(false_fail_rate/K))`, and
   - `O(-log(false_pass_rate))`.
   """
+  args_list = (
+      [n1, low1, high1, n2, low2, high2, false_fail_rate, false_pass_rate])
   with tf.name_scope(
-      name, "min_discrepancy_of_true_means_detectable_by_dkwm_two_sample",
-      [n1, low1, high1, n2, low2, high2, false_fail_rate, false_pass_rate]):
-    n1 = tf.convert_to_tensor(n1, name="n1")
-    low1 = tf.convert_to_tensor(low1, name="low1")
-    high1 = tf.convert_to_tensor(high1, name="high1")
-    n2 = tf.convert_to_tensor(n2, name="n2")
-    low2 = tf.convert_to_tensor(low2, name="low2")
-    high2 = tf.convert_to_tensor(high2, name="high2")
+      name,
+      "min_discrepancy_of_true_means_detectable_by_dkwm_two_sample",
+      args_list):
+    dtype = dtype_util.common_dtype(args_list, tf.float32)
+    n1 = tf.convert_to_tensor(n1, name="n1", dtype=dtype)
+    low1 = tf.convert_to_tensor(low1, name="low1", dtype=dtype)
+    high1 = tf.convert_to_tensor(high1, name="high1", dtype=dtype)
+    n2 = tf.convert_to_tensor(n2, name="n2", dtype=dtype)
+    low2 = tf.convert_to_tensor(low2, name="low2", dtype=dtype)
+    high2 = tf.convert_to_tensor(high2, name="high2", dtype=dtype)
     false_fail_rate = tf.convert_to_tensor(
-        false_fail_rate, name="false_fail_rate")
+        false_fail_rate, name="false_fail_rate", dtype=dtype)
     false_pass_rate = tf.convert_to_tensor(
-        false_pass_rate, name="false_pass_rate")
+        false_pass_rate, name="false_pass_rate", dtype=dtype)
     det_disc1 = min_discrepancy_of_true_means_detectable_by_dkwm(
         n1, low1, high1, false_fail_rate / 2., false_pass_rate / 2.)
     det_disc2 = min_discrepancy_of_true_means_detectable_by_dkwm(
@@ -878,19 +899,23 @@ def min_num_samples_for_dkwm_mean_two_sample_test(
   - `O(-log(false_pass_rate))`, and
   - `O(1 / discrepancy[i]**2)`.
   """
+  args_list = (
+      [low1, high1, low2, high2, false_fail_rate, false_pass_rate, discrepancy])
   with tf.name_scope(
-      name, "min_num_samples_for_dkwm_mean_two_sample_test",
-      [low1, high1, low2, high2, false_fail_rate, false_pass_rate, discrepancy
-      ]):
-    discrepancy = tf.convert_to_tensor(discrepancy, name="discrepancy")
-    low1 = tf.convert_to_tensor(low1, name="low1")
-    high1 = tf.convert_to_tensor(high1, name="high1")
-    low2 = tf.convert_to_tensor(low2, name="low2")
-    high2 = tf.convert_to_tensor(high2, name="high2")
+      name,
+      "min_num_samples_for_dkwm_mean_two_sample_test",
+      args_list):
+    dtype = dtype_util.common_dtype(args_list, tf.float32)
+    discrepancy = tf.convert_to_tensor(
+        discrepancy, name="discrepancy", dtype=dtype)
+    low1 = tf.convert_to_tensor(low1, name="low1", dtype=dtype)
+    high1 = tf.convert_to_tensor(high1, name="high1", dtype=dtype)
+    low2 = tf.convert_to_tensor(low2, name="low2", dtype=dtype)
+    high2 = tf.convert_to_tensor(high2, name="high2", dtype=dtype)
     false_fail_rate = tf.convert_to_tensor(
-        false_fail_rate, name="false_fail_rate")
+        false_fail_rate, name="false_fail_rate", dtype=dtype)
     false_pass_rate = tf.convert_to_tensor(
-        false_pass_rate, name="false_pass_rate")
+        false_pass_rate, name="false_pass_rate", dtype=dtype)
     # Could choose to cleverly allocate discrepancy tolerances and
     # failure probabilities, but this is sound.
     n1 = min_num_samples_for_dkwm_mean_test(

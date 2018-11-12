@@ -62,7 +62,7 @@ class MultivariateNormalDiagPlusLowRankTest(tf.test.TestCase):
         scale_diag=diag,
         scale_identity_multiplier=identity_multiplier,
         validate_args=True)
-    self.assertAllEqual([3, 3, 2, 2], dist.scale.to_dense().get_shape())
+    self.assertAllEqual([3, 3, 2, 2], dist.scale.to_dense().shape)
 
   def testDiagBroadcastOnlyEvent(self):
     # batch_shape: [3], event_shape: [2]

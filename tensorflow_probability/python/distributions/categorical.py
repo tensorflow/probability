@@ -187,7 +187,7 @@ class Categorical(distribution.Distribution):
         self._logits = util.embed_check_categorical_event_shape(
             self._logits)
 
-      logits_shape_static = self._logits.get_shape().with_rank_at_least(1)
+      logits_shape_static = self._logits.shape.with_rank_at_least(1)
       if logits_shape_static.ndims is not None:
         self._batch_rank = tf.convert_to_tensor(
             logits_shape_static.ndims - 1,
@@ -244,7 +244,7 @@ class Categorical(distribution.Distribution):
     return tf.identity(self._batch_shape_val)
 
   def _batch_shape(self):
-    return self.logits.get_shape()[:-1]
+    return self.logits.shape[:-1]
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
@@ -253,7 +253,7 @@ class Categorical(distribution.Distribution):
     return tensor_shape.scalar()
 
   def _sample_n(self, n, seed=None):
-    if self.logits.get_shape().ndims == 2:
+    if self.logits.shape.ndims == 2:
       logits_2d = self.logits
     else:
       logits_2d = tf.reshape(self.logits, [-1, self.event_size])

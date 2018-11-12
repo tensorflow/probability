@@ -42,11 +42,10 @@ decomposition, `p(x) = prod{ p(x[i] | x[0:i]) : i=0, ..., d }`. The provided
 `shift_and_log_scale_fn`, `masked_autoregressive_default_template`, achieves
 this property by zeroing out weights in its `masked_dense` layers.
 
-In the `tf.distributions` framework, a "normalizing flow" is implemented as a
-`tfp.distributions.bijectors.Bijector`. The `forward` "autoregression"
-is implemented using a `tf.while_loop` and a deep neural network (DNN) with
-masked weights such that the autoregressive property is automatically met in
-the `inverse`.
+In TensorFlow Probability, "normalizing flows" are implemented as
+<a href="../../tfp/bijectors/Bijector.md"><code>tfp.bijectors.Bijector</code></a>s. The `forward` "autoregression" is implemented
+using a `tf.while_loop` and a deep neural network (DNN) with masked weights
+such that the autoregressive property is automatically met in the `inverse`.
 
 A `TransformedDistribution` using `MaskedAutoregressiveFlow(...)` uses the
 (expensive) forward-mode calculation to draw samples and the (cheap)

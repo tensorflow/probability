@@ -23,6 +23,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.distributions import gamma
+from tensorflow_probability.python.internal import dtype_util
 
 
 __all__ = [
@@ -89,9 +90,12 @@ class Exponential(gamma.Gamma):
     # allow_nan_stats=True
     # through to the parent class results in unnecessary asserts.
     with tf.name_scope(name, values=[rate]) as name:
-      self._rate = tf.convert_to_tensor(rate, name="rate")
+      self._rate = tf.convert_to_tensor(
+          rate,
+          name="rate",
+          dtype=dtype_util.common_dtype([rate], preferred_dtype=tf.float32))
     super(Exponential, self).__init__(
-        concentration=tf.ones([], dtype=self._rate.dtype),
+        concentration=1.,
         rate=self._rate,
         allow_nan_stats=allow_nan_stats,
         validate_args=validate_args,

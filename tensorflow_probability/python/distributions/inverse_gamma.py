@@ -147,7 +147,8 @@ class InverseGamma(distribution.Distribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name, values=[concentration, rate]) as name:
-      dtype = dtype_util.common_dtype([concentration, rate], tf.float32)
+      dtype = dtype_util.common_dtype([concentration, rate],
+                                      preferred_dtype=tf.float32)
       concentration = tf.convert_to_tensor(
           concentration, name="concentration", dtype=dtype)
       rate = tf.convert_to_tensor(rate, name="rate", dtype=dtype)
@@ -159,8 +160,8 @@ class InverseGamma(distribution.Distribution):
               rate,
               message="Rate must be positive."),
       ] if validate_args else []):
-        self._concentration = tf.identity(concentration)
-        self._rate = tf.identity(rate)
+        self._concentration = tf.identity(concentration, name="concentration")
+        self._rate = tf.identity(rate, name="rate")
       tf.assert_same_float_dtype([self._concentration, self._rate])
 
     super(InverseGamma, self).__init__(
@@ -193,8 +194,8 @@ class InverseGamma(distribution.Distribution):
         tf.shape(self.concentration), tf.shape(self.rate))
 
   def _batch_shape(self):
-    return tf.broadcast_static_shape(self.concentration.get_shape(),
-                                     self.rate.get_shape())
+    return tf.broadcast_static_shape(self.concentration.shape,
+                                     self.rate.shape)
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)

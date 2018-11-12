@@ -603,8 +603,8 @@ class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
 
   def test_score_trick(self):
     d = 5  # Dimension
-    num_draws = int(1e5)
-    seed = 1
+    num_draws = int(2e5)
+    seed = 23
 
     p = tfd.MultivariateNormalFullCovariance(
         covariance_matrix=tridiag(d, diag_value=1, offdiag_value=0.5))

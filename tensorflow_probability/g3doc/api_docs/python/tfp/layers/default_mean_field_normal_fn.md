@@ -19,7 +19,7 @@ tfp.layers.default_mean_field_normal_fn(
 
 Creates a function to build Normal distributions with trainable params.
 
-This function produces a closure which produces `tf.distributions.Normal`
+This function produces a closure which produces `tfd.Normal`
 parameterized by a loc` and `scale` each created using `tf.get_variable`.
 
 #### Args:
@@ -51,5 +51,5 @@ parameterized by a loc` and `scale` each created using `tf.get_variable`.
 
 #### Returns:
 
-* <b>`make_normal_fn`</b>: Python `callable` which creates a `tf.distributions.Normal`
+* <b>`make_normal_fn`</b>: Python `callable` which creates a `tfd.Normal`
     using from args: `dtype, shape, name, trainable, add_variable_fn`.

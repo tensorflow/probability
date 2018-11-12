@@ -60,7 +60,7 @@ class TransformedTransitionKernelTest(tf.test.TestCase):
   def setUp(self):
     self.dtype = np.float32
 
-  def test_support_works_correctly(self):
+  def test_support_works_correctly_with_HMC(self):
     num_results = 2000
     with self.cached_session(graph=tf.Graph()) as sess:
       target = tfd.Beta(
@@ -107,6 +107,94 @@ class TransformedTransitionKernelTest(tf.test.TestCase):
       self.assertAllClose(true_var_, sample_var_,
                           atol=0.01, rtol=0.1)
       self.assertNear(0.6, is_accepted_.mean(), err=0.05)
+
+  def test_support_works_correctly_with_MALA(self):
+    num_results = 2000
+    with self.cached_session(graph=tf.Graph()) as sess:
+      target = tfd.Beta(
+          concentration1=self.dtype(1.),
+          concentration0=self.dtype(10.))
+      transformed_mala = tfp.mcmc.TransformedTransitionKernel(
+          inner_kernel=tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
+              target_log_prob_fn=target.log_prob,
+              step_size=1.,
+              seed=55),
+          bijector=tfb.Sigmoid())
+      # Recall, tfp.mcmc.sample_chain calls
+      # transformed_hmc.bootstrap_results too.
+      states, _ = tfp.mcmc.sample_chain(
+          num_results=num_results,
+          # The initial state is used by inner_kernel.bootstrap_results.
+          # Note the input is *after* bijector.forward.
+          current_state=self.dtype(0.25),
+          kernel=transformed_mala,
+          num_burnin_steps=200,
+          num_steps_between_results=1,
+          parallel_iterations=1)
+      self.assertEqual(num_results, states.shape[0].value)
+      sample_mean = tf.reduce_mean(states, axis=0)
+      sample_var = tf.reduce_mean(
+          tf.squared_difference(states, sample_mean),
+          axis=0)
+      [
+          sample_mean_,
+          sample_var_,
+          true_mean_,
+          true_var_,
+      ] = sess.run([
+          sample_mean,
+          sample_var,
+          target.mean(),
+          target.variance(),
+      ])
+      self.assertAllClose(true_mean_, sample_mean_,
+                          atol=0.06, rtol=0.)
+      self.assertAllClose(true_var_, sample_var_,
+                          atol=0.01, rtol=0.1)
+
+  def test_support_works_correctly_with_RWM(self):
+    num_results = 2000
+    with self.cached_session(graph=tf.Graph()) as sess:
+      target = tfd.Beta(
+          concentration1=self.dtype(1.),
+          concentration0=self.dtype(10.))
+      transformed_rwm = tfp.mcmc.TransformedTransitionKernel(
+          inner_kernel=tfp.mcmc.RandomWalkMetropolis(
+              target_log_prob_fn=target.log_prob,
+              new_state_fn=tfp.mcmc.random_walk_normal_fn(scale=1.5),
+              seed=55),
+          bijector=tfb.Sigmoid())
+      # Recall, tfp.mcmc.sample_chain calls
+      # transformed_hmc.bootstrap_results too.
+      states, _ = tfp.mcmc.sample_chain(
+          num_results=num_results,
+          # The initial state is used by inner_kernel.bootstrap_results.
+          # Note the input is *after* bijector.forward.
+          current_state=self.dtype(0.25),
+          kernel=transformed_rwm,
+          num_burnin_steps=200,
+          num_steps_between_results=1,
+          parallel_iterations=1)
+      self.assertEqual(num_results, states.shape[0].value)
+      sample_mean = tf.reduce_mean(states, axis=0)
+      sample_var = tf.reduce_mean(
+          tf.squared_difference(states, sample_mean),
+          axis=0)
+      [
+          sample_mean_,
+          sample_var_,
+          true_mean_,
+          true_var_,
+      ] = sess.run([
+          sample_mean,
+          sample_var,
+          target.mean(),
+          target.variance(),
+      ])
+      self.assertAllClose(true_mean_, sample_mean_,
+                          atol=0.06, rtol=0.)
+      self.assertAllClose(true_var_, sample_var_,
+                          atol=0.01, rtol=0.1)
 
   def test_end_to_end_works_correctly(self):
     true_mean = self.dtype([0, 0])

@@ -245,7 +245,7 @@ class VectorLaplaceLinearOperator(
     if self.loc is None:
       return tf.zeros(shape, self.dtype)
 
-    if has_static_shape and shape == self.loc.get_shape():
+    if has_static_shape and shape == self.loc.shape:
       return tf.identity(self.loc)
 
     # Add dummy tensor of zeros to broadcast.  This is only necessary if shape

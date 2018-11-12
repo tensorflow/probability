@@ -185,7 +185,7 @@ FLAGS = flags.FLAGS
 
 def _softplus_inverse(x):
   """Helper which computes the function inverse of `tf.nn.softplus`."""
-  return tf.log(tf.expm1(x))
+  return tf.log(tf.math.expm1(x))
 
 
 def make_encoder(activation, latent_size, base_depth):

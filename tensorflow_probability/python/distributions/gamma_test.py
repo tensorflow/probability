@@ -63,9 +63,9 @@ class GammaTest(tf.test.TestCase):
     x = np.array([2.5, 2.5, 4.0, 0.1, 1.0, 2.0], dtype=np.float32)
     gamma = gamma_lib.Gamma(concentration=alpha, rate=beta)
     log_pdf = gamma.log_prob(x)
-    self.assertEqual(log_pdf.get_shape(), (6,))
+    self.assertEqual(log_pdf.shape, (6,))
     pdf = gamma.prob(x)
-    self.assertEqual(pdf.get_shape(), (6,))
+    self.assertEqual(pdf.shape, (6,))
     if not stats:
       return
     expected_log_pdf = stats.gamma.logpdf(x, alpha_v, scale=1 / beta_v)
@@ -90,10 +90,10 @@ class GammaTest(tf.test.TestCase):
     gamma = gamma_lib.Gamma(concentration=alpha, rate=beta)
     log_pdf = gamma.log_prob(x)
     log_pdf_values = self.evaluate(log_pdf)
-    self.assertEqual(log_pdf.get_shape(), (6, 2))
+    self.assertEqual(log_pdf.shape, (6, 2))
     pdf = gamma.prob(x)
     pdf_values = self.evaluate(pdf)
-    self.assertEqual(pdf.get_shape(), (6, 2))
+    self.assertEqual(pdf.shape, (6, 2))
     if not stats:
       return
     expected_log_pdf = stats.gamma.logpdf(x, alpha_v, scale=1 / beta_v)
@@ -110,10 +110,10 @@ class GammaTest(tf.test.TestCase):
     gamma = gamma_lib.Gamma(concentration=alpha, rate=beta)
     log_pdf = gamma.log_prob(x)
     log_pdf_values = self.evaluate(log_pdf)
-    self.assertEqual(log_pdf.get_shape(), (6, 2))
+    self.assertEqual(log_pdf.shape, (6, 2))
     pdf = gamma.prob(x)
     pdf_values = self.evaluate(pdf)
-    self.assertEqual(pdf.get_shape(), (6, 2))
+    self.assertEqual(pdf.shape, (6, 2))
 
     if not stats:
       return
@@ -131,7 +131,7 @@ class GammaTest(tf.test.TestCase):
 
     gamma = gamma_lib.Gamma(concentration=alpha, rate=beta)
     cdf = gamma.cdf(x)
-    self.assertEqual(cdf.get_shape(), (6,))
+    self.assertEqual(cdf.shape, (6,))
     if not stats:
       return
     expected_cdf = stats.gamma.cdf(x, alpha_v, scale=1 / beta_v)
@@ -141,7 +141,7 @@ class GammaTest(tf.test.TestCase):
     alpha_v = np.array([1.0, 3.0, 2.5])
     beta_v = np.array([1.0, 4.0, 5.0])
     gamma = gamma_lib.Gamma(concentration=alpha_v, rate=beta_v)
-    self.assertEqual(gamma.mean().get_shape(), (3,))
+    self.assertEqual(gamma.mean().shape, (3,))
     if not stats:
       return
     expected_means = stats.gamma.mean(alpha_v, scale=1 / beta_v)
@@ -152,7 +152,7 @@ class GammaTest(tf.test.TestCase):
     beta_v = np.array([1.0, 4.0, 5.0])
     gamma = gamma_lib.Gamma(concentration=alpha_v, rate=beta_v)
     expected_modes = (alpha_v - 1) / beta_v
-    self.assertEqual(gamma.mode().get_shape(), (3,))
+    self.assertEqual(gamma.mode().shape, (3,))
     self.assertAllClose(self.evaluate(gamma.mode()), expected_modes)
 
   def testGammaModeAllowNanStatsFalseRaisesForUndefinedBatchMembers(self):
@@ -172,14 +172,14 @@ class GammaTest(tf.test.TestCase):
         concentration=alpha_v, rate=beta_v, allow_nan_stats=True)
     expected_modes = (alpha_v - 1) / beta_v
     expected_modes[0] = np.nan
-    self.assertEqual(gamma.mode().get_shape(), (3,))
+    self.assertEqual(gamma.mode().shape, (3,))
     self.assertAllClose(self.evaluate(gamma.mode()), expected_modes)
 
   def testGammaVariance(self):
     alpha_v = np.array([1.0, 3.0, 2.5])
     beta_v = np.array([1.0, 4.0, 5.0])
     gamma = gamma_lib.Gamma(concentration=alpha_v, rate=beta_v)
-    self.assertEqual(gamma.variance().get_shape(), (3,))
+    self.assertEqual(gamma.variance().shape, (3,))
     if not stats:
       return
     expected_variances = stats.gamma.var(alpha_v, scale=1 / beta_v)
@@ -189,7 +189,7 @@ class GammaTest(tf.test.TestCase):
     alpha_v = np.array([1.0, 3.0, 2.5])
     beta_v = np.array([1.0, 4.0, 5.0])
     gamma = gamma_lib.Gamma(concentration=alpha_v, rate=beta_v)
-    self.assertEqual(gamma.stddev().get_shape(), (3,))
+    self.assertEqual(gamma.stddev().shape, (3,))
     if not stats:
       return
     expected_stddev = stats.gamma.std(alpha_v, scale=1. / beta_v)
@@ -199,7 +199,7 @@ class GammaTest(tf.test.TestCase):
     alpha_v = np.array([1.0, 3.0, 2.5])
     beta_v = np.array([1.0, 4.0, 5.0])
     gamma = gamma_lib.Gamma(concentration=alpha_v, rate=beta_v)
-    self.assertEqual(gamma.entropy().get_shape(), (3,))
+    self.assertEqual(gamma.entropy().shape, (3,))
     if not stats:
       return
     expected_entropy = stats.gamma.entropy(alpha_v, scale=1 / beta_v)
@@ -214,7 +214,7 @@ class GammaTest(tf.test.TestCase):
     gamma = gamma_lib.Gamma(concentration=alpha, rate=beta)
     samples = gamma.sample(n, seed=137)
     sample_values = self.evaluate(samples)
-    self.assertEqual(samples.get_shape(), (n,))
+    self.assertEqual(samples.shape, (n,))
     self.assertEqual(sample_values.shape, (n,))
     self.assertTrue(self._kstest(alpha_v, beta_v, sample_values))
     if not stats:
@@ -237,7 +237,7 @@ class GammaTest(tf.test.TestCase):
     gamma = gamma_lib.Gamma(concentration=alpha, rate=beta)
     samples = gamma.sample(n, seed=137)
     sample_values = self.evaluate(samples)
-    self.assertEqual(samples.get_shape(), (n,))
+    self.assertEqual(samples.shape, (n,))
     self.assertEqual(sample_values.shape, (n,))
     self.assertTrue(self._kstest(alpha_v, beta_v, sample_values))
     if not stats:
@@ -270,7 +270,7 @@ class GammaTest(tf.test.TestCase):
     n = 10000
     samples = gamma.sample(n, seed=137)
     sample_values = self.evaluate(samples)
-    self.assertEqual(samples.get_shape(), (n, 10, 100))
+    self.assertEqual(samples.shape, (n, 10, 100))
     self.assertEqual(sample_values.shape, (n, 10, 100))
     zeros = np.zeros_like(alpha_v + beta_v)  # 10 x 100
     alpha_bc = alpha_v + zeros
@@ -310,8 +310,8 @@ class GammaTest(tf.test.TestCase):
     samples = gamma.sample(num, seed=137)
     pdfs = gamma.prob(samples)
     sample_vals, pdf_vals = self.evaluate([samples, pdfs])
-    self.assertEqual(samples.get_shape(), (num, 2, 2))
-    self.assertEqual(pdfs.get_shape(), (num, 2, 2))
+    self.assertEqual(samples.shape, (num, 2, 2))
+    self.assertEqual(pdfs.shape, (num, 2, 2))
     self._assertIntegral(sample_vals[:, 0, 0], pdf_vals[:, 0, 0], err=0.02)
     self._assertIntegral(sample_vals[:, 0, 1], pdf_vals[:, 0, 1], err=0.02)
     self._assertIntegral(sample_vals[:, 1, 0], pdf_vals[:, 1, 0], err=0.02)
@@ -370,7 +370,7 @@ class GammaTest(tf.test.TestCase):
     # Execute graph.
     [kl_sample_, kl_actual_] = self.evaluate([kl_sample, kl_actual])
 
-    self.assertEqual(beta0.shape, kl_actual.get_shape())
+    self.assertEqual(beta0.shape, kl_actual.shape)
 
     if not special:
       return

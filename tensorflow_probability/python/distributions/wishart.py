@@ -339,12 +339,12 @@ class _WishartLinearOperator(distribution.Distribution):
     # Set shape hints.
     # Try to merge what we know from the input then what we know from the
     # parameters of this distribution.
-    if x.get_shape().ndims is not None:
-      log_prob.set_shape(x.get_shape()[:-2])
-    if (log_prob.get_shape().ndims is not None and
+    if x.shape.ndims is not None:
+      log_prob.set_shape(x.shape[:-2])
+    if (log_prob.shape.ndims is not None and
         self.batch_shape.ndims is not None and
         self.batch_shape.ndims > 0):
-      log_prob.get_shape()[-self.batch_shape.ndims:].merge_with(
+      log_prob.shape[-self.batch_shape.ndims:].merge_with(
           self.batch_shape)
 
     return log_prob

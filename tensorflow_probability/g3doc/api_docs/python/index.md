@@ -22,6 +22,8 @@
 *  <a href="./tfp/bijectors/Kumaraswamy.md"><code>tfp.bijectors.Kumaraswamy</code></a>
 *  <a href="./tfp/bijectors/MaskedAutoregressiveFlow.md"><code>tfp.bijectors.MaskedAutoregressiveFlow</code></a>
 *  <a href="./tfp/bijectors/MatrixInverseTriL.md"><code>tfp.bijectors.MatrixInverseTriL</code></a>
+*  <a href="./tfp/bijectors/NormalCDF.md"><code>tfp.bijectors.NormalCDF</code></a>
+*  <a href="./tfp/bijectors/Ordered.md"><code>tfp.bijectors.Ordered</code></a>
 *  <a href="./tfp/bijectors/Permute.md"><code>tfp.bijectors.Permute</code></a>
 *  <a href="./tfp/bijectors/PowerTransform.md"><code>tfp.bijectors.PowerTransform</code></a>
 *  <a href="./tfp/bijectors/RealNVP.md"><code>tfp.bijectors.RealNVP</code></a>
@@ -89,6 +91,7 @@
 *  <a href="./tfp/distributions/MultivariateNormalFullCovariance.md"><code>tfp.distributions.MultivariateNormalFullCovariance</code></a>
 *  <a href="./tfp/distributions/MultivariateNormalLinearOperator.md"><code>tfp.distributions.MultivariateNormalLinearOperator</code></a>
 *  <a href="./tfp/distributions/MultivariateNormalTriL.md"><code>tfp.distributions.MultivariateNormalTriL</code></a>
+*  <a href="./tfp/distributions/MultivariateStudentTLinearOperator.md"><code>tfp.distributions.MultivariateStudentTLinearOperator</code></a>
 *  <a href="./tfp/distributions/NegativeBinomial.md"><code>tfp.distributions.NegativeBinomial</code></a>
 *  <a href="./tfp/distributions/Normal.md"><code>tfp.distributions.Normal</code></a>
 *  <a href="./tfp/distributions/NormalWithSoftplusScale.md"><code>tfp.distributions.NormalWithSoftplusScale</code></a>
@@ -106,6 +109,7 @@
 *  <a href="./tfp/distributions/StudentT.md"><code>tfp.distributions.StudentT</code></a>
 *  <a href="./tfp/distributions/StudentTWithAbsDfSoftplusScale.md"><code>tfp.distributions.StudentTWithAbsDfSoftplusScale</code></a>
 *  <a href="./tfp/distributions/TransformedDistribution.md"><code>tfp.distributions.TransformedDistribution</code></a>
+*  <a href="./tfp/distributions/Triangular.md"><code>tfp.distributions.Triangular</code></a>
 *  <a href="./tfp/distributions/TruncatedNormal.md"><code>tfp.distributions.TruncatedNormal</code></a>
 *  <a href="./tfp/distributions/Uniform.md"><code>tfp.distributions.Uniform</code></a>
 *  <a href="./tfp/distributions/VectorDeterministic.md"><code>tfp.distributions.VectorDeterministic</code></a>
@@ -116,6 +120,7 @@
 *  <a href="./tfp/distributions/VonMises.md"><code>tfp.distributions.VonMises</code></a>
 *  <a href="./tfp/distributions/VonMisesFisher.md"><code>tfp.distributions.VonMisesFisher</code></a>
 *  <a href="./tfp/distributions/Wishart.md"><code>tfp.distributions.Wishart</code></a>
+*  <a href="./tfp/distributions/Zipf.md"><code>tfp.distributions.Zipf</code></a>
 *  <a href="./tfp/distributions/assign_log_moving_mean_exp.md"><code>tfp.distributions.assign_log_moving_mean_exp</code></a>
 *  <a href="./tfp/distributions/assign_moving_mean_variance.md"><code>tfp.distributions.assign_moving_mean_variance</code></a>
 *  <a href="./tfp/distributions/auto_correlation.md"><code>tfp.distributions.auto_correlation</code></a>
@@ -222,6 +227,7 @@
 *  <a href="./tfp/math.md"><code>tfp.math</code></a>
 *  <a href="./tfp/math/custom_gradient.md"><code>tfp.math.custom_gradient</code></a>
 *  <a href="./tfp/math/diag_jacobian.md"><code>tfp.math.diag_jacobian</code></a>
+*  <a href="./tfp/math/log1psquare.md"><code>tfp.math.log1psquare</code></a>
 *  <a href="./tfp/math/matvecmul.md"><code>tfp.math.matvecmul</code></a>
 *  <a href="./tfp/math/pinv.md"><code>tfp.math.pinv</code></a>
 *  <a href="./tfp/math/random_rademacher.md"><code>tfp.math.random_rademacher</code></a>

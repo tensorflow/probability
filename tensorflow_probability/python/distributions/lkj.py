@@ -33,6 +33,7 @@ from tensorflow_probability.python.distributions import beta
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import seed_stream
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 
 
@@ -120,7 +121,11 @@ class LKJ(distribution.Distribution):
           'There are no negative-dimension correlation matrices.')
     parameters = dict(locals())
     with tf.name_scope(name, values=[dimension, concentration]):
-      concentration = tf.convert_to_tensor(concentration, name='concentration')
+      concentration = tf.convert_to_tensor(
+          concentration,
+          name='concentration',
+          dtype=dtype_util.common_dtype([concentration],
+                                        preferred_dtype=tf.float32))
       with tf.control_dependencies([
           # concentration >= 1
           # TODO(b/111451422) Generalize to concentration > 0.
@@ -151,7 +156,7 @@ class LKJ(distribution.Distribution):
     return tf.shape(self.concentration)
 
   def _batch_shape(self):
-    return self.concentration.get_shape()
+    return self.concentration.shape
 
   def _event_shape_tensor(self):
     return tf.constant([self.dimension, self.dimension], dtype=tf.int32)
@@ -223,8 +228,10 @@ class LKJ(distribution.Distribution):
         # Loop invariant: on entry, result has shape B + [n, n]
         beta_conc -= 0.5
         # norm is y in reference [1].
-        norm = beta.Beta(concentration1=n/2., concentration0=beta_conc).sample(
-            seed=seed())
+        norm = beta.Beta(
+            concentration1=n/2.,
+            concentration0=beta_conc
+        ).sample(seed=seed())
         # distance shape: B + [1] for broadcast
         distance = tf.sqrt(norm)[..., tf.newaxis]
         # direction is u in reference [1].
@@ -253,7 +260,7 @@ class LKJ(distribution.Distribution):
         # = sqrt(1 - xx^T) = sqrt(1 - |raw_correlation|**2) = sqrt(1 -
         # distance**2).
         new_row = tf.concat(
-            [raw_correlation, tf.sqrt(1. - distance**2)], axis=-1)
+            [raw_correlation, tf.sqrt(1. - norm[..., tf.newaxis])], axis=-1)
 
         # Finally add this new row, by growing the cholesky of the result.
         chol_result = tf.concat([
@@ -299,10 +306,17 @@ class LKJ(distribution.Distribution):
     if not self.validate_args:
       return x
     checks = [
-        tf.assert_less_equal(-1., x, message='Correlations must be >= -1.'),
-        tf.assert_less_equal(x, 1., message='Correlations must be <= 1.'),
+        tf.assert_less_equal(
+            tf.cast(-1., dtype=x.dtype.base_dtype),
+            x,
+            message='Correlations must be >= -1.'),
+        tf.assert_less_equal(
+            x,
+            tf.cast(1., x.dtype.base_dtype),
+            message='Correlations must be <= 1.'),
         tf.assert_near(
-            tf.matrix_diag_part(x), 1.,
+            tf.matrix_diag_part(x),
+            tf.cast(1., x.dtype.base_dtype),
             message='Self-correlations must be = 1.'),
         tf.assert_near(
             x, tf.matrix_transpose(x),

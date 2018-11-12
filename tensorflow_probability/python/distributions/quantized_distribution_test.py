@@ -391,11 +391,11 @@ class QuantizedDistributionTest(test_case.TestCase):
     self.assertAllEqual((), self.evaluate(qdist.event_shape_tensor()))
 
     samps = qdist.sample(10, seed=42)
-    self.assertEqual((10,) + batch_shape, samps.get_shape())
+    self.assertEqual((10,) + batch_shape, samps.shape)
     self.assertAllEqual((10,) + batch_shape, self.evaluate(samps).shape)
 
     y = rng.randint(0, 5, size=batch_shape).astype(np.float32)
-    self.assertEqual(batch_shape, qdist.prob(y).get_shape())
+    self.assertEqual(batch_shape, qdist.prob(y).shape)
 
 
 if __name__ == "__main__":

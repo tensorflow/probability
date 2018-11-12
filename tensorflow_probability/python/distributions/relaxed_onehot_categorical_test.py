@@ -45,7 +45,7 @@ class ExpRelaxedOneHotCategoricalTest(tf.test.TestCase):
     dist = tfd.ExpRelaxedOneHotCategorical(temperature, logits)
     expected_p = np.exp(logits)/np.sum(np.exp(logits))
     self.assertAllClose(expected_p, self.evaluate(dist.probs))
-    self.assertAllEqual([3], dist.probs.get_shape())
+    self.assertAllEqual([3], dist.probs.shape)
 
   def testPdf(self):
     temperature = .4
@@ -72,7 +72,7 @@ class RelaxedOneHotCategoricalTest(tf.test.TestCase):
     dist = tfd.RelaxedOneHotCategorical(temperature, logits)
     # check p for ExpRelaxed base distribution
     self.assertAllClose(logits, self.evaluate(dist._distribution.logits))
-    self.assertAllEqual([3], dist._distribution.logits.get_shape())
+    self.assertAllEqual([3], dist._distribution.logits.shape)
 
   def testSample(self):
     temperature = 1.4

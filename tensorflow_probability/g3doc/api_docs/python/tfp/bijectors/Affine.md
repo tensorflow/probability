@@ -93,7 +93,8 @@ __init__(
     scale_perturb_diag=None,
     adjoint=False,
     validate_args=False,
-    name='affine'
+    name='affine',
+    dtype=None
 )
 ```
 
@@ -133,19 +134,19 @@ specified then `scale += IdentityMatrix`. Otherwise specifying a
     `scale += IdentityMatrix`. Otherwise no scaled-identity-matrix is added
     to `scale`.
 * <b>`scale_diag`</b>: Floating-point `Tensor` representing the diagonal matrix.
-    `scale_diag` has shape [N1, N2, ...  k], which represents a k x k
+    `scale_diag` has shape `[N1, N2, ...  k]`, which represents a k x k
     diagonal matrix.
     When `None` no diagonal term is added to `scale`.
-* <b>`scale_tril`</b>: Floating-point `Tensor` representing the diagonal matrix.
-    `scale_diag` has shape [N1, N2, ...  k, k], which represents a k x k
-    lower triangular matrix.
+* <b>`scale_tril`</b>: Floating-point `Tensor` representing the lower triangular
+    matrix. `scale_tril` has shape `[N1, N2, ...  k, k]`, which represents a
+    k x k lower triangular matrix.
     When `None` no `scale_tril` term is added to `scale`.
     The upper triangular elements above the diagonal are ignored.
 * <b>`scale_perturb_factor`</b>: Floating-point `Tensor` representing factor matrix
     with last two dimensions of shape `(k, r)`. When `None`, no rank-r
     update is added to `scale`.
 * <b>`scale_perturb_diag`</b>: Floating-point `Tensor` representing the diagonal
-    matrix. `scale_perturb_diag` has shape [N1, N2, ...  r], which
+    matrix. `scale_perturb_diag` has shape `[N1, N2, ...  r]`, which
     represents an `r x r` diagonal matrix. When `None` low rank updates will
     take the form `scale_perturb_factor * scale_perturb_factor.T`.
 * <b>`adjoint`</b>: Python `bool` indicating whether to use the `scale` matrix as
@@ -154,6 +155,9 @@ specified then `scale += IdentityMatrix`. Otherwise specifying a
 * <b>`validate_args`</b>: Python `bool` indicating whether arguments should be
     checked for correctness.
 * <b>`name`</b>: Python `str` name given to ops managed by this object.
+* <b>`dtype`</b>: `tf.DType` to prefer when converting args to `Tensor`s. Else, we
+    fall back to a common dtype inferred from the args, finally falling back
+    to float32.
 
 
 #### Raises:

@@ -23,7 +23,6 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow.python.framework import tensor_util
 from tensorflow.python.ops import control_flow_ops
 
 
@@ -99,7 +98,7 @@ class Permute(bijector.Bijector):
       if not permutation.dtype.is_integer:
         raise TypeError("permutation.dtype ({}) should be `int`-like.".format(
             permutation.dtype.name))
-      p = tensor_util.constant_value(permutation)
+      p = tf.contrib.util.constant_value(permutation)
       if p is not None:
         if set(p) != set(np.arange(p.size)):
           raise ValueError("Permutation over `d` must contain exactly one of "
@@ -114,7 +113,7 @@ class Permute(bijector.Bijector):
                 message=("Permutation over `d` must contain exactly one of "
                          "each of `{0, 1, ..., d}`.")),
         ], permutation)
-      axis_ = tensor_util.constant_value(axis)
+      axis_ = tf.contrib.util.constant_value(axis)
       if axis_ is None:
         raise NotImplementedError("`axis` must be known prior to graph "
                                   "execution.")

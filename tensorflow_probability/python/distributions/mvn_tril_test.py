@@ -57,8 +57,8 @@ class MultivariateNormalTriLTest(tf.test.TestCase):
 
     expected_log_pdf = scipy_mvn.logpdf(x)
     expected_pdf = scipy_mvn.pdf(x)
-    self.assertEqual((), log_pdf.get_shape())
-    self.assertEqual((), pdf.get_shape())
+    self.assertEqual((), log_pdf.shape)
+    self.assertEqual((), pdf.shape)
     self.assertAllClose(expected_log_pdf, self.evaluate(log_pdf))
     self.assertAllClose(expected_pdf, self.evaluate(pdf))
 
@@ -76,8 +76,8 @@ class MultivariateNormalTriLTest(tf.test.TestCase):
 
     expected_log_pdf = scipy_mvn.logpdf(x)
     expected_pdf = scipy_mvn.pdf(x)
-    self.assertEqual((3,), log_pdf.get_shape())
-    self.assertEqual((3,), pdf.get_shape())
+    self.assertEqual((3,), log_pdf.shape)
+    self.assertEqual((3,), pdf.shape)
     self.assertAllClose(
         expected_log_pdf, self.evaluate(log_pdf), atol=0., rtol=0.02)
     self.assertAllClose(expected_pdf, self.evaluate(pdf), atol=0., rtol=0.03)
@@ -93,8 +93,8 @@ class MultivariateNormalTriLTest(tf.test.TestCase):
     log_pdf = mvn.log_prob(x)
     pdf = mvn.prob(x)
 
-    self.assertEqual((3,), log_pdf.get_shape())
-    self.assertEqual((3,), pdf.get_shape())
+    self.assertEqual((3,), log_pdf.shape)
+    self.assertEqual((3,), pdf.shape)
 
     # scipy can't do batches, so just test one of them.
     scipy_mvn = stats.multivariate_normal(mean=mu[1, :], cov=sigma[1, :, :])
@@ -113,7 +113,7 @@ class MultivariateNormalTriLTest(tf.test.TestCase):
 
     scipy_mvn = stats.multivariate_normal(mean=mu, cov=sigma)
     expected_entropy = scipy_mvn.entropy()
-    self.assertEqual(entropy.get_shape(), ())
+    self.assertEqual(entropy.shape, ())
     self.assertAllClose(expected_entropy, self.evaluate(entropy))
 
   def testEntropyMultidimensional(self):
@@ -127,7 +127,7 @@ class MultivariateNormalTriLTest(tf.test.TestCase):
     # Scipy doesn't do batches, so test one of them.
     expected_entropy = stats.multivariate_normal(
         mean=mu[1, 1, :], cov=sigma[1, 1, :, :]).entropy()
-    self.assertEqual(entropy.get_shape(), (3, 5))
+    self.assertEqual(entropy.shape, (3, 5))
     self.assertAllClose(expected_entropy, self.evaluate(entropy)[1, 1])
 
   def testSample(self):
@@ -141,7 +141,7 @@ class MultivariateNormalTriLTest(tf.test.TestCase):
     mvn = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
     samples = mvn.sample(n, seed=137)
     sample_values = self.evaluate(samples)
-    self.assertEqual(samples.get_shape(), [int(100e3), 2])
+    self.assertEqual(samples.shape, [int(100e3), 2])
     self.assertAllClose(sample_values.mean(axis=0), mu, atol=1e-2)
     self.assertAllClose(np.cov(sample_values, rowvar=0), sigma, atol=0.06)
 
@@ -187,7 +187,7 @@ class MultivariateNormalTriLTest(tf.test.TestCase):
     samples = mvn.sample(n, seed=137)
     sample_values = self.evaluate(samples)
 
-    self.assertEqual(samples.get_shape(), (100000, 3, 5, 2))
+    self.assertEqual(samples.shape, (100000, 3, 5, 2))
     self.assertAllClose(
         sample_values[:, 1, 1, :].mean(axis=0), mu[1, 1, :], atol=0.05)
     self.assertAllClose(
@@ -235,7 +235,7 @@ class MultivariateNormalTriLTest(tf.test.TestCase):
         loc=mu_b, scale_tril=np.linalg.cholesky(sigma_b), validate_args=True)
 
     kl = tfd.kl_divergence(mvn_a, mvn_b)
-    self.assertEqual(batch_shape, kl.get_shape())
+    self.assertEqual(batch_shape, kl.shape)
 
     kl_v = self.evaluate(kl)
     expected_kl = _compute_non_batch_kl(mu_a, sigma_a, mu_b, sigma_b)
@@ -252,7 +252,7 @@ class MultivariateNormalTriLTest(tf.test.TestCase):
         loc=mu_b, scale_tril=np.linalg.cholesky(sigma_b), validate_args=True)
 
     kl = tfd.kl_divergence(mvn_a, mvn_b)
-    self.assertEqual(batch_shape, kl.get_shape())
+    self.assertEqual(batch_shape, kl.shape)
 
     kl_v = self.evaluate(kl)
     expected_kl_0 = _compute_non_batch_kl(mu_a[0, :], sigma_a[0, :, :],
@@ -274,7 +274,7 @@ class MultivariateNormalTriLTest(tf.test.TestCase):
         loc=mu_b, scale_tril=np.linalg.cholesky(sigma_b), validate_args=True)
 
     kl = tfd.kl_divergence(mvn_a, mvn_b)
-    self.assertEqual(batch_shape, kl.get_shape())
+    self.assertEqual(batch_shape, kl.shape)
 
     kl_v = self.evaluate(kl)
     expected_kl_0 = _compute_non_batch_kl(mu_a[0, :], sigma_a[0, :, :], mu_b,
@@ -293,7 +293,7 @@ class MultivariateNormalTriLTest(tf.test.TestCase):
 
     # Should be zero since KL(p || p) = =.
     kl = tfd.kl_divergence(mvn_a, mvn_a)
-    self.assertEqual(batch_shape, kl.get_shape())
+    self.assertEqual(batch_shape, kl.shape)
 
     kl_v = self.evaluate(kl)
     self.assertAllClose(np.zeros(*batch_shape), kl_v)

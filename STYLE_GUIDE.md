@@ -13,19 +13,19 @@ TensorFlow conventions not noted in those guides. (In the future, these noted
 conventions may be moved upstream.)
 
 1.  The name is TensorFlow, not Tensorflow.
-2.  Use `name_scope` at the beginning of every Python function.
+1.  Use `name_scope` at the beginning of every Python function.
 
     Justification: it’s easier to debug TF graphs when they align with Python
     code.
 
-3.  Run all Tensor args through `tf.convert_to_tensor` immediately after
+1.  Run all Tensor args through `tf.convert_to_tensor` immediately after
     name_scope.
 
     Justification: not doing so can lead to surprising results when computing
     gradients. It can also lead to unnecessary graph ops as subsequent TF calls
     will keep creating a tensor from the same op.
 
-6.  Every module should define the constant `__all__` in order to list all
+1.  Every module should define the constant `__all__` in order to list all
     public members of the module.
 
     Justification: `__all__` is an explicit enumeration of what's intended to be
@@ -45,7 +45,7 @@ it supercedes all previous conventions.
     tfp.distributions`. We will change the latter to use the Pythonic style in
     the future.
 
-2.  __Examples in Docstrings.__ Write a `#### Examples` subsection below `Args`,
+1.  __Examples in Docstrings.__ Write a `#### Examples` subsection below `Args`,
     `Returns`, `Raises`, etc. to illustrate examples. If the docstring's last
     line is a fence bracket (\`\`\`) closing a code snippet, add an empty line
     before closing the docstring with \"\"\". This properly displays the code
@@ -56,7 +56,7 @@ it supercedes all previous conventions.
     examples are usually long (which is great!) it means they have to do a lot
     of annoying scrolling ...unless Examples follow Args/Returns/Raises.
 
-3.  __Citations in Docstrings.__ Write a `#### References` subsection at the
+1.  __Citations in Docstrings.__ Write a `#### References` subsection at the
     bottom of any docstring with citations. Use ICLR’s bibliography style to
     write references; for example, order entries by the first author's last
     name. Add a link to the paper if the publication is open source (ideally,
@@ -96,19 +96,19 @@ it supercedes all previous conventions.
          https://arxiv.org/abs/1803.04386
     ```
 
-4.  When doing float math over literals eg use `1.` instead of `1` or `1.0`.
+1.  When doing float math over literals eg use `1.` instead of `1` or `1.0`.
 
     *   Using `1.` is another line of defense against an automatic casting
         mistake. (Using `1.0` is also such a defense but is not minimal.)
 
-5.  Prefer using named args for functions' 2nd args onward.
+1.  Prefer using named args for functions' 2nd args onward.
 
     *   Definitely use named args for 2nd args onward in docstrings.
 
-6.  Use names which describe semantics not computation or mathematics, e.g.,
+1.  Use names which describe semantics not computation or mathematics, e.g.,
     avoid `xp1 = x+1` or `tfd.Normal(loc=mu, scale=sigma)`.
 
-7.  Prefer inlining intermediates which are used once.
+1.  Prefer inlining intermediates which are used once.
 
     *   For intermediates, usually the actual code is better documentation than
         a variable. However if the intermediate math is not self-documenting,
@@ -117,7 +117,7 @@ it supercedes all previous conventions.
     Justification: intermediates clutter scope and make it hard to see
     dependencies.
 
-8.  Use literals, not `tf.constants`. Never use tf.constant in the API
+1.  Use literals, not `tf.constants`. Never use tf.constant in the API
     (user-side code is ok!). Eg, dont do: `two_pi = tf.constant(2. * np.pi)`.
 
     *   While using `tf.constant` may reduce graph size, it makes for
@@ -125,12 +125,12 @@ it supercedes all previous conventions.
     *   It also means you lose the benefit of automatic dtype casting (which is
         done only for literals).
 
-9.  Avoid LaTeX in docstrings.
+1.  Avoid LaTeX in docstrings.
 
     *   It is not rendered in many (if not most) editors and can be hard to read
         for both LaTeX experts and non-experts.
 
-10. Write docstring and comment math using ASCII friendly notation; python using
+1.  Write docstring and comment math using ASCII friendly notation; python using
     operators. E.g., `x**2` better than `x^2`, `x[i, j]` better than `x_{i,j}`,
     `sum{ f(x[i]) : i=1...n }` better than `\sum_{i=1}^n f(x_i)` `int{sin(x) dx:
     x in [0, 2 pi]}` better than `\int_0^{2\pi} sin(x) dx`.
@@ -139,35 +139,35 @@ it supercedes all previous conventions.
         copy/paste/execute.
     *   Python style is usually easier to read as ASCII.
 
-11. All public functions require docstrings with: one line description, Args,
+1.  All public functions require docstrings with: one line description, Args,
     Returns, Raises (if raises exceptions).
 
     *   Returns docstrings should be in the same format as Args, eg, of the form
         "name: Description." Part of the rationale is that we are suggesting a
         reasonable variable name for the returned object(s).
 
-12. Regard `*args` and/or `**kwargs` as features of last resort.
+1.  Regard `*args` and/or `**kwargs` as features of last resort.
 
     *   Keyword arguments make the intention of a function call more clear.
     *   [Possible exceptions for
         `kwargs`](https://stackoverflow.com/questions/1415812/why-use-kwargs-in-python-what-are-some-real-world-advantages-over-using-named).
 
-13. Prefer using the most specific TF operator. E.g,
+1.  Prefer using the most specific TF operator. E.g,
 
     *   Use `tf.squared_difference(x,y)` over `(x-y)**2`.
     *   Use `tf.rsqrt` over `1./tf.sqrt(x)`.
 
-14. Worry about gradients! (It's often not automatic for API builders!)
+1.  Worry about gradients! (It's often not automatic for API builders!)
 
-15. When forced to choose between FLOPS and numerical accuracy, prefer numerical
+1.  When forced to choose between FLOPS and numerical accuracy, prefer numerical
     accuracy.
 
-16. Avoid tf.cast if possible. Eg, prefer `tf.where(cond, a, b)` over
+1.  Avoid tf.cast if possible. Eg, prefer `tf.where(cond, a, b)` over
     `tf.cast(cond,dtype=a.dtype)*a + (1-tf.cast(cond,dtype=b.dtype)*b`
 
-17. Preserve static shape hints.
+1.  Preserve static shape hints.
 
-18. __Name management.__  Follow these conventions for indicating which
+1.  __Name management.__  Follow these conventions for indicating which
     names are internal vs external:
 
     *   Start names of private methods and private module functions with an
@@ -180,20 +180,28 @@ it supercedes all previous conventions.
     *   Use TensorFlow's `remove_undocumented` feature in each `__init__.py`
         file to seal the package's methods.
 
-19. Submodule names should be singular, except where they overlap to TF.
+1.  Submodule names should be singular, except where they overlap to TF.
 
     Justification: Having plural looks strange in user code, ie,
     tf.optimizer.Foo reads nicer than tf.optimizers.Foo since submodules are
     only used to access a single, specific thing (at a time).
 
-20. Use `tf.newaxis` rather than `None` to `tf.expand_dims`.
+1.  Use `tf.newaxis` rather than `None` to `tf.expand_dims`.
 
     Justification: Both work but only one is self-documenting.
 
-21. Use `"{}".format()` rather than `"" %` for string formatting.
+1.  Use `"{}".format()` rather than `"" %` for string formatting.
 
     Justification: [PEP 3101](https://www.python.org/dev/peps/pep-3101/) and
     [Python official
     tutorials](https://docs.python.org/3.2/tutorial/inputoutput.html#old-string-formatting):
     "...this old style of formatting will eventually be removed from the
     language, str.format() should generally be used."
+
+1.  When calling `tf.convert_to_tensor`, try to specify in advance a
+    user-friendly dtype. If multiple `Tensor`s must be compatible, use
+    `dtype_util.common_dtype([arg1, arg2], tf.float32)` to come up with a dtype
+    that will be compatible across literals (even `int`s will work here),
+    `Tensor`s, and Numpy objects. When converting a user-provided literal to a
+    `Tensor` (see e.g. `Distribution._call_log_prob`), specify the dtype to
+    `tf.convert_to_tensor` if it is available.

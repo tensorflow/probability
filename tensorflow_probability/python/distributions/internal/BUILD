@@ -29,19 +29,15 @@ py_library(
     name = "internal",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
+    deps = [
+        ":moving_stats",
+        ":statistical_testing",
+    ],
 )
 
 py_library(
     name = "moving_stats",
     srcs = ["moving_stats.py"],
-    deps = [
-        # tensorflow dep,
-    ],
-)
-
-py_library(
-    name = "statistical_testing",
-    srcs = ["statistical_testing.py"],
     deps = [
         # tensorflow dep,
     ],
@@ -59,6 +55,15 @@ py_test(
     ],
 )
 
+py_library(
+    name = "statistical_testing",
+    srcs = ["statistical_testing.py"],
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+    ],
+)
+
 py_test(
     name = "statistical_testing_test",
     size = "medium",
@@ -66,6 +71,7 @@ py_test(
     shard_count = 4,
     deps = [
         ":statistical_testing",
+        # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
     ],

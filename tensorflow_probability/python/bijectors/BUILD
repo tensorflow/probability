@@ -42,6 +42,7 @@ py_library(
         ":conditional_bijector",
         ":discrete_cosine_transform",
         ":exp",
+        ":expm1",
         ":fill_triangular",
         ":gumbel",
         ":identity",
@@ -50,6 +51,7 @@ py_library(
         ":kumaraswamy",
         ":masked_autoregressive",
         ":matrix_inverse_tril",
+        ":normal_cdf",
         ":ordered",
         ":permute",
         ":power_transform",
@@ -94,7 +96,6 @@ py_library(
     srcs = ["affine_linear_operator.py"],
     deps = [
         ":bijector",
-        ":shape",
         # tensorflow dep,
     ],
 )
@@ -113,7 +114,6 @@ py_library(
     srcs = ["affine.py"],
     deps = [
         ":bijector",
-        ":shape",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
@@ -182,6 +182,15 @@ py_library(
     name = "exp",
     srcs = ["exp.py"],
     deps = [":power_transform"],
+)
+
+py_library(
+    name = "expm1",
+    srcs = ["expm1.py"],
+    deps = [
+        ":bijector",
+        # tensorflow dep,
+    ],
 )
 
 py_library(
@@ -254,6 +263,16 @@ py_library(
 )
 
 py_library(
+    name = "normal_cdf",
+    srcs = ["normal_cdf.py"],
+    deps = [
+        ":bijector",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:special_math",
+    ],
+)
+
+py_library(
     name = "ordered",
     srcs = ["ordered.py"],
     deps = [
@@ -309,15 +328,6 @@ py_library(
         ":fill_triangular",
         ":softplus",
         ":transform_diagonal",
-    ],
-)
-
-py_library(
-    name = "shape",
-    srcs = ["shape.py"],
-    deps = [
-        # tensorflow dep,
-        "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
 
@@ -568,6 +578,18 @@ py_test(
 )
 
 py_test(
+    name = "expm1_test",
+    size = "small",
+    srcs = ["expm1_test.py"],
+    deps = [
+        ":bijector_test_util",
+        ":bijectors",
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_test(
     name = "fill_triangular_test",
     size = "small",
     srcs = ["fill_triangular_test.py"],
@@ -662,6 +684,17 @@ py_test(
 )
 
 py_test(
+    name = "normal_cdf_test",
+    srcs = ["normal_cdf_test.py"],
+    deps = [
+        ":bijector_test_util",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_test(
     name = "ordered_test",
     srcs = ["ordered_test.py"],
     deps = [
@@ -727,17 +760,6 @@ py_test(
     srcs = ["scale_tril_test.py"],
     deps = [
         ":bijectors",
-        # numpy dep,
-        # tensorflow dep,
-    ],
-)
-
-py_test(
-    name = "shape_test",
-    size = "medium",
-    srcs = ["shape_test.py"],
-    deps = [
-        ":shape",
         # numpy dep,
         # tensorflow dep,
     ],

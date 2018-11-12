@@ -42,7 +42,7 @@
 
 ## Class `BetaWithSoftplusConcentration`
 
-Inherits From: [`Beta`](../../tfp/distributions/Beta.md)
+
 
 Beta with softplus transform of `concentration1` and `concentration0`.
 
@@ -58,7 +58,11 @@ __init__(
 )
 ```
 
+DEPRECATED FUNCTION
 
+THIS FUNCTION IS DEPRECATED. It will be removed after 2019-01-01.
+Instructions for updating:
+Use `tfd.Beta(tf.nn.softplus(concentration1), tf.nn.softplus(concentration2))` instead.
 
 
 

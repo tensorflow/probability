@@ -23,9 +23,10 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import special_math
 from tensorflow.python.framework import tensor_shape
-from tensorflow.python.ops.distributions import special_math
 
 
 __all__ = [
@@ -102,6 +103,10 @@ class HalfNormal(distribution.Distribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name, values=[scale]) as name:
+      scale = tf.convert_to_tensor(
+          scale,
+          name="scale",
+          dtype=dtype_util.common_dtype([scale], preferred_dtype=tf.float32))
       with tf.control_dependencies([tf.assert_positive(scale)]
                                    if validate_args else []):
         self._scale = tf.identity(scale, name="scale")

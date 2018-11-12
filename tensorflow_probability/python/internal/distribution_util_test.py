@@ -974,6 +974,14 @@ class EmbedCheckIntegerCastingClosedTest(tf.test.TestCase):
             x, target_dtype=tf.int16)
         x_checked.eval(feed_dict={x: np.array([1, -1], dtype=np.float16)})
 
+  def testCorrectlyAssertsPositive(self):
+    with self.cached_session():
+      with self.assertRaisesOpError("Elements must be positive"):
+        x = tf.placeholder(dtype=tf.float16)
+        x_checked = distribution_util.embed_check_integer_casting_closed(
+            x, target_dtype=tf.int16, assert_positive=True)
+        x_checked.eval(feed_dict={x: np.array([1, 0], dtype=np.float16)})
+
   def testCorrectlyAssersIntegerForm(self):
     with self.cached_session():
       with self.assertRaisesOpError("Elements must be int16-equivalent."):
@@ -1014,7 +1022,7 @@ class LogCombinationsTest(tf.test.TestCase):
     n = np.array(n, dtype=np.float32)
     counts = [[1., 1], [2., 3], [4., 8], [11, 4]]
     log_binom = distribution_util.log_combinations(n, counts)
-    self.assertEqual([4], log_binom.get_shape())
+    self.assertEqual([4], log_binom.shape)
     self.assertAllClose(log_combs, self.evaluate(log_binom))
 
   def testLogCombinationsShape(self):
@@ -1025,7 +1033,7 @@ class LogCombinationsTest(tf.test.TestCase):
     # Shape [2, 2, 4]
     counts = [[[1., 1, 0, 0], [2., 2, 1, 0]], [[4., 4, 1, 3], [10, 1, 1, 4]]]
     log_binom = distribution_util.log_combinations(n, counts)
-    self.assertEqual([2, 2], log_binom.get_shape())
+    self.assertEqual([2, 2], log_binom.shape)
 
 
 class DynamicShapeTest(tf.test.TestCase):
@@ -1152,7 +1160,7 @@ class RotateTransposeTest(tf.test.TestCase):
         y = distribution_util.rotate_transpose(x, shift)
         self.assertAllEqual(
             self._np_rotate_transpose(x, shift), self.evaluate(y))
-        self.assertAllEqual(np.roll(x.shape, shift), y.get_shape().as_list())
+        self.assertAllEqual(np.roll(x.shape, shift), y.shape.as_list())
 
   def testRollDynamic(self):
     with self.cached_session() as sess:

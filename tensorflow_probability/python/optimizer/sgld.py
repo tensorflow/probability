@@ -74,8 +74,7 @@ class StochasticGradientLangevinDynamics(tf.train.Optimizer):
     # Partially defined loss function
     loss_part = tf.cholesky_solve(chol, tf.expand_dims(var, -1))
     # Loss function
-    loss = 0.5 * tf.squeeze(tf.matmul(loss_part, tf.expand_dims(var, -1),
-                                      transpose_a=True))
+    loss = 0.5 * tf.linalg.matvec(loss_part, var, transpose_a=True)
 
     # Set up the learning rate with a polynomial decay
     global_step = tf.Variable(0, trainable=False)
@@ -224,7 +223,7 @@ class StochasticGradientLangevinDynamics(tf.train.Optimizer):
   def _create_slots(self, var_list):
     for v in var_list:
       init_rms = tf.ones_initializer(dtype=v.dtype)
-      self._get_or_make_slot_with_initializer(v, init_rms, v.get_shape(),
+      self._get_or_make_slot_with_initializer(v, init_rms, v.shape,
                                               v.dtype, 'rms', self._name)
 
   def _prepare(self):

@@ -45,7 +45,7 @@ def _logsum_expbig_minus_expsmall(big, small):
     `Tensor` of same `dtype` of `big` and broadcast shape.
   """
   with tf.name_scope("logsum_expbig_minus_expsmall", values=[small, big]):
-    return tf.log(1. - tf.exp(small - big)) + big
+    return tf.log1p(-tf.exp(small - big)) + big
 
 
 _prob_base_note = """

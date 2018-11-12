@@ -48,7 +48,7 @@ class MultivariateNormalDiagTest(test_case.TestCase):
     mu = [-1.]
     diag = [-5.]
     dist = tfd.MultivariateNormalDiag(mu, diag, validate_args=True)
-    self.assertAllEqual([3, 1], dist.sample(3).get_shape())
+    self.assertAllEqual([3, 1], dist.sample(3).shape)
 
   def testDistWithBatchShapeOneThenTransformedThroughSoftplus(self):
     # This complex combination of events resulted in a loss of static shape
@@ -61,7 +61,7 @@ class MultivariateNormalDiagTest(test_case.TestCase):
     dist = tfd.TransformedDistribution(
         base_dist, validate_args=True, bijector=tfp.bijectors.Softplus())
     samps = dist.sample(5)  # Shape [5, 1, 3].
-    self.assertAllEqual([5, 1], dist.log_prob(samps).get_shape())
+    self.assertAllEqual([5, 1], dist.log_prob(samps).shape)
 
   def testMean(self):
     mu = [-1., 1]
@@ -111,7 +111,7 @@ class MultivariateNormalDiagTest(test_case.TestCase):
     dist = tfd.MultivariateNormalDiag(mu, diag, validate_args=True)
 
     mean = dist.mean()
-    self.assertAllEqual([2, 3], mean.get_shape())
+    self.assertAllEqual([2, 3], mean.shape)
     self.assertAllClose(mu, self.evaluate(mean))
 
     n = int(1e3)

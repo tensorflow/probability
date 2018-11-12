@@ -158,7 +158,8 @@ class Pareto(distribution.Distribution):
 
   def _cdf(self, x):
     return self._extend_support(
-        x, lambda x: -tf.expm1(self.concentration * tf.log(self.scale / x)),
+        x,
+        lambda x: -tf.math.expm1(self.concentration * tf.log(self.scale / x)),
         alt=0.)
 
   def _log_survival_function(self, x):

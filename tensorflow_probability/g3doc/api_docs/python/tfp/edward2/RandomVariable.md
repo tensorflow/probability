@@ -111,7 +111,7 @@ Create a new random variable.
 
 #### Args:
 
-* <b>`distribution`</b>: tf.Distribution governing the distribution of the random
+* <b>`distribution`</b>: tfd.Distribution governing the distribution of the random
     variable, such as sampling and log-probabilities.
 * <b>`sample_shape`</b>: tf.TensorShape of samples to draw from the random variable.
     Default is `()` corresponding to a single sample.

@@ -31,14 +31,23 @@ Initialize a batch of Poisson distributions.
     Must specify exactly one of `rate` and `log_rate`.
 * <b>`log_rate`</b>: Floating point tensor, the log of the rate parameter.
     Must specify exactly one of `rate` and `log_rate`.
-* <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
+* <b>`interpolate_nondiscrete`</b>: Python `bool`. When `False`,
+    `log_prob` returns `-inf` (and `prob` returns `0`) for non-integer
+    inputs. When `True`, `log_prob` evaluates the continuous function
+    `k * log_rate - lgamma(k+1) - rate`, which matches the Poisson pmf
+    at integer arguments `k` (note that this function is not itself
+    a normalized probability log-density).
+    Default value: `True`.
+* <b>`validate_args`</b>: Python `bool`. When `True` distribution
     parameters are checked for validity despite possibly degrading runtime
     performance. When `False` invalid inputs may silently render incorrect
     outputs.
-* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
+    Default value: `False`.
+* <b>`allow_nan_stats`</b>: Python `bool`. When `True`, statistics
     (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
     result is undefined. When `False`, an exception is raised if one or
     more of the statistic's batch members are undefined.
+    Default value: `True`.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
 
 

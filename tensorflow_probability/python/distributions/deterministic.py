@@ -87,12 +87,13 @@ class _BaseDeterministic(distribution.Distribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name, values=[loc, atol, rtol]) as name:
-      dtype = dtype_util.common_dtype([loc, atol, rtol])
+      dtype = dtype_util.common_dtype([loc, atol, rtol],
+                                      preferred_dtype=tf.float32)
       loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
       if is_vector and validate_args:
         msg = "Argument loc must be at least rank 1."
-        if loc.get_shape().ndims is not None:
-          if loc.get_shape().ndims < 1:
+        if loc.shape.ndims is not None:
+          if loc.shape.ndims < 1:
             raise ValueError(msg)
         else:
           loc = control_flow_ops.with_dependencies(
@@ -157,8 +158,8 @@ class _BaseDeterministic(distribution.Distribution):
 
   def _sample_n(self, n, seed=None):  # pylint: disable=unused-arg
     n_static = tensor_util.constant_value(tf.convert_to_tensor(n))
-    if n_static is not None and self.loc.get_shape().ndims is not None:
-      ones = [1] * self.loc.get_shape().ndims
+    if n_static is not None and self.loc.shape.ndims is not None:
+      ones = [1] * self.loc.shape.ndims
       multiples = [n_static] + ones
     else:
       ones = tf.ones_like(tf.shape(self.loc))
@@ -255,7 +256,7 @@ class Deterministic(_BaseDeterministic):
     return tf.shape(self.loc)
 
   def _batch_shape(self):
-    return self.loc.get_shape()
+    return self.loc.shape
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
@@ -363,13 +364,13 @@ class VectorDeterministic(_BaseDeterministic):
     return tf.shape(self.loc)[:-1]
 
   def _batch_shape(self):
-    return self.loc.get_shape()[:-1]
+    return self.loc.shape[:-1]
 
   def _event_shape_tensor(self):
     return tf.shape(self.loc)[-1]
 
   def _event_shape(self):
-    return self.loc.get_shape()[-1:]
+    return self.loc.shape[-1:]
 
   def _prob(self, x):
     if self.validate_args:

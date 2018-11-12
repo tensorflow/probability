@@ -20,10 +20,8 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow_probability.python.bijectors.shape import _DistributionShape
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow.python.framework import tensor_util
 from tensorflow.python.ops import control_flow_ops
 
 
@@ -225,24 +223,12 @@ class Affine(bijector.Bijector):
               "shift.dtype({}) is incompatible with scale.dtype({}).".format(
                   shift.dtype, scale.dtype))
 
-        if scale.tensor_rank is not None:
-          batch_ndims = scale.tensor_rank - 2
-        else:
-          batch_ndims = scale.tensor_rank_tensor() - 2
-      else:
-        # We won't need shape inference when scale is None or when scale is a
-        # scalar.
-        batch_ndims = 0
       self._scale = scale
-      self._shaper = _DistributionShape(
-          batch_ndims=batch_ndims,
-          event_ndims=1,
-          validate_args=validate_args)
       self._adjoint = adjoint
       super(Affine, self).__init__(
           forward_min_event_ndims=1,
           graph_parents=(
-              [self._scale] if tensor_util.is_tensor(self._scale)
+              [self._scale] if tf.contrib.framework.is_tensor(self._scale)
               else self._scale.graph_parents +
               [self._shift] if self._shift is not None else []),
           is_constant_jacobian=True,
@@ -348,13 +334,9 @@ class Affine(bijector.Bijector):
       if self.shift is not None:
         return y + self.shift
       return y
-    y, sample_shape = self._shaper.make_batch_of_event_sample_matrices(
-        y, expand_batch_dim=False)
     with tf.control_dependencies(self._maybe_check_scale()
                                  if self.validate_args else []):
-      y = self.scale.matmul(y, adjoint=self.adjoint)
-    y = self._shaper.undo_make_batch_of_event_sample_matrices(
-        y, sample_shape, expand_batch_dim=False)
+      y = self.scale.matvec(y, adjoint=self.adjoint)
     if self.shift is not None:
       y += self.shift
     return y
@@ -368,12 +350,8 @@ class Affine(bijector.Bijector):
            if self.adjoint and self._scale.dtype.is_complex
            else self._scale)
       return x / s
-    x, sample_shape = self._shaper.make_batch_of_event_sample_matrices(
-        x, expand_batch_dim=False)
     # Solve fails if the op is singular so we may safely skip this assertion.
-    x = self.scale.solve(x, adjoint=self.adjoint)
-    x = self._shaper.undo_make_batch_of_event_sample_matrices(
-        x, sample_shape, expand_batch_dim=False)
+    x = self.scale.solvevec(x, adjoint=self.adjoint)
     return x
 
   def _forward_log_det_jacobian(self, x):

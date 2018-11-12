@@ -390,7 +390,7 @@ class RandomVariableTest(parameterized.TestCase, tf.test.TestCase):
   @tfe.run_test_in_graph_and_eager_modes
   def testShape(self, rv, sample_shape, batch_shape, event_shape):
     self.assertEqual(rv.shape, sample_shape + batch_shape + event_shape)
-    self.assertEqual(rv.shape, rv.get_shape())
+    self.assertEqual(rv.shape, rv.shape)
     self.assertEqual(rv.sample_shape, sample_shape)
     self.assertEqual(rv.distribution.batch_shape, batch_shape)
     self.assertEqual(rv.distribution.event_shape, event_shape)
