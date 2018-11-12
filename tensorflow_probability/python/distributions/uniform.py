@@ -170,7 +170,8 @@ class Uniform(distribution.Distribution):
         broadcasted_x,
         tf.where(
             tf.logical_or(broadcasted_x < self.low,
-                          broadcasted_x >= self.high),
+                          # This > is only sound for continuous uniform
+                          broadcasted_x > self.high),
             tf.zeros_like(broadcasted_x),
             tf.ones_like(broadcasted_x) / self.range()))
 
