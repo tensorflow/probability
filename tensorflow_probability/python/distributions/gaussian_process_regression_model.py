@@ -529,12 +529,13 @@ class GaussianProcessRegressionModel(
 
     # k_tx @ inv(k_xx + vI) @ (y - m(x))
     # = k_tx @ inv(chol(k_xx + vI)^t) @ inv(chol(k_xx + vI)) @ (y - m(t))
-    loc = k_tx_linop.matvec(
-        chol_k_xx_plus_noise.solvevec(
-            adjoint=True,
-            rhs=chol_k_xx_plus_noise.solvevec(
-                self.observations -
-                self._mean_fn(self.observation_index_points))))
+    loc = (self._mean_fn(self.index_points) +
+           k_tx_linop.matvec(
+               chol_k_xx_plus_noise.solvevec(
+                   adjoint=True,
+                   rhs=chol_k_xx_plus_noise.solvevec(
+                       self.observations -
+                       self._mean_fn(self.observation_index_points)))))
 
     # k_tt - k_tx @ inv(k_xx + vI) @ k_xt + vI
     # = k_tt - k_tx @ inv(chol(k_xx + vI)^t) @ inv(chol(k_xx + vI)) @ k_xt + vI

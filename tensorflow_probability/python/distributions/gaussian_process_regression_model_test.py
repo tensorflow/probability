@@ -131,8 +131,10 @@ class _GaussianProcessRegressionModelTest(object):
 
     mean_fn = lambda x: x[:, 0]**2
     prior_mean = mean_fn(observation_index_points)
-    expected_mean = np.dot(
-        k_xn_, np.linalg.solve(k_nn_plus_noise_, observations - prior_mean))
+    expected_mean = (
+        mean_fn(index_points) +
+        np.dot(k_xn_,
+               np.linalg.solve(k_nn_plus_noise_, observations - prior_mean)))
 
     kernel = psd_kernels.ExponentiatedQuadratic(amp, len_scale)
     gprm = tfd.GaussianProcessRegressionModel(
