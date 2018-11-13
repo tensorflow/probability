@@ -21,6 +21,7 @@ from __future__ import print_function
 
 from tensorflow_probability.python.stats.sample_stats import auto_correlation
 from tensorflow_probability.python.stats.sample_stats import cholesky_covariance
+from tensorflow_probability.python.stats.sample_stats import correlation
 from tensorflow_probability.python.stats.sample_stats import covariance
 from tensorflow_probability.python.stats.sample_stats import percentile
 from tensorflow_probability.python.stats.sample_stats import stddev
@@ -33,6 +34,7 @@ from tensorflow.python.util.all_util import remove_undocumented
 __all__ = [
     'auto_correlation',
     'cholesky_covariance',
+    'correlation',
     'covariance',
     'percentile',
     'stddev',

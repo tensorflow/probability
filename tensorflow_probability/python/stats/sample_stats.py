@@ -28,6 +28,7 @@ from tensorflow.python.ops import control_flow_ops
 __all__ = [
     'auto_correlation',
     'cholesky_covariance',
+    'correlation',
     'covariance',
     'percentile',
     'stddev',
@@ -209,7 +210,7 @@ def auto_correlation(x,
 
 
 def cholesky_covariance(x, sample_axis=0, keepdims=False, name=None):
-  """Cholesky factor of the covariance matrix of vector-valued random samples.
+  """Cholesky factor of the covariance matrix of vector-variate random samples.
 
   This function can be use to fit a multivariate normal to data.
 
@@ -240,7 +241,7 @@ def cholesky_covariance(x, sample_axis=0, keepdims=False, name=None):
   ```
 
   Why does this work?
-  Given vector-valued random variables `X = (X1, ..., Xd)`, one may obtain the
+  Given vector-variate random variables `X = (X1, ..., Xd)`, one may obtain the
   sample covariance matrix in `R^{d x d}` (see `tfp.stats.covariance`).
 
   The [Cholesky factor](https://en.wikipedia.org/wiki/Cholesky_decomposition)
@@ -285,7 +286,7 @@ def covariance(x,
                event_axis=-1,
                keepdims=False,
                name=None):
-  """Estimate covariance between members of `event_axis`.
+  """Sample covariance between observations indexed by `event_axis`.
 
   Given `N` samples of scalar random variables `X` and `Y`, covariance may be
   estimated as
@@ -296,7 +297,7 @@ def covariance(x,
   Ybar := N^{-1} sum_{n=1}^N Y_n
   ```
 
-  For vector-valued random variables `X = (X1, ..., Xd)`, `Y = (Y1, ..., Yd)`,
+  For vector-variate random variables `X = (X1, ..., Xd)`, `Y = (Y1, ..., Yd)`,
   one is often interested in the covariance matrix, `C_{ij} := Cov[Xi, Yj]`.
 
   ```python
@@ -320,10 +321,10 @@ def covariance(x,
     sample_axis: Scalar or vector `Tensor` designating axis holding samples, or
       `None` (meaning all axis hold samples).
       Default value: `0` (leftmost dimension).
-    event_axis:  Scalar or vector `Tensor`, or `None`. Axis holding random
-      events, whose covariance we are interested in. If a vector, entries must
-      form a contiguous block of dims. `sample_axis` and `event_axis` should not
-      intersect.
+    event_axis:  Scalar or vector `Tensor`, or `None` (scalar events).
+      Axis indexing random events, whose covariance we are interested in.
+      If a vector, entries must form a contiguous block of dims. `sample_axis`
+      and `event_axis` should not intersect.
       Default value: `-1` (rightmost axis holds events).
     keepdims:  Boolean.  Whether to keep the sample axis as singletons.
     name: Python `str` name prefixed to Ops created by this function.
@@ -456,6 +457,93 @@ def covariance(x,
       cov = _squeeze(cov, axis=squeeze_axis)
 
     return cov
+
+
+def correlation(x,
+                y=None,
+                sample_axis=0,
+                event_axis=-1,
+                keepdims=False,
+                name=None):
+  """Sample correlation (Pearson) between observations indexed by `event_axis`.
+
+  Given `N` samples of scalar random variables `X` and `Y`, correlation may be
+  estimated as
+
+  ```none
+  Corr[X, Y] := Cov[X, Y] / Sqrt(Cov[X, X] * Cov[Y, Y]),
+  where
+  Cov[X, Y] := N^{-1} sum_{n=1}^N (X_n - Xbar) Conj{(Y_n - Ybar)}
+  Xbar := N^{-1} sum_{n=1}^N X_n
+  Ybar := N^{-1} sum_{n=1}^N Y_n
+  ```
+
+  Correlation is always in the interval `[-1, 1]`, and `Corr[X, X] == 1`.
+
+  For vector-variate random variables `X = (X1, ..., Xd)`, `Y = (Y1, ..., Yd)`,
+  one is often interested in the correlation matrix, `C_{ij} := Corr[Xi, Yj]`.
+
+  ```python
+  x = tf.random_normal(shape=(100, 2, 3))
+  y = tf.random_normal(shape=(100, 2, 3))
+
+  # corr[i, j] is the sample correlation between x[:, i, j] and y[:, i, j].
+  corr = tfp.stats.correlation(x, y, sample_axis=0, event_axis=None)
+
+  # corr_matrix[i, m, n] is the sample correlation of x[:, i, m] and y[:, i, n]
+  corr_matrix = tfp.stats.correlation(x, y, sample_axis=0, event_axis=-1)
+  ```
+
+  Notice we divide by `N` (the numpy default), which does not create `NaN`
+  when `N = 1`, but is slightly biased.
+
+  Args:
+    x:  A numeric `Tensor` holding samples.
+    y:  Optional `Tensor` with same `dtype` and `shape` as `x`.
+      Default value: `None` (`y` is effectively set to `x`).
+    sample_axis: Scalar or vector `Tensor` designating axis holding samples, or
+      `None` (meaning all axis hold samples).
+      Default value: `0` (leftmost dimension).
+    event_axis:  Scalar or vector `Tensor`, or `None` (scalar events).
+      Axis indexing random events, whose correlation we are interested in.
+      If a vector, entries must form a contiguous block of dims. `sample_axis`
+      and `event_axis` should not intersect.
+      Default value: `-1` (rightmost axis holds events).
+    keepdims:  Boolean.  Whether to keep the sample axis as singletons.
+    name: Python `str` name prefixed to Ops created by this function.
+          Default value: `None` (i.e., `'correlation'`).
+
+  Returns:
+    corr: A `Tensor` of same `dtype` as the `x`, and rank equal to
+      `rank(x) - len(sample_axis) + 2 * len(event_axis)`.
+
+  Raises:
+    AssertionError:  If `x` and `y` are found to have different shape.
+    ValueError:  If `sample_axis` and `event_axis` are found to overlap.
+    ValueError:  If `event_axis` is found to not be contiguous.
+  """
+
+  with tf.name_scope(
+      name, 'correlation', values=[x, y, event_axis, sample_axis]):
+    # Corr[X, Y] = Cov[X, Y] / (Stddev[X] * Stddev[Y])
+    #            = Cov[X / Stddev[X], Y / Stddev[Y]]
+    # So we could compute covariance first then divide by stddev, or
+    # divide by stddev and compute covariance.
+    # Dividing by stddev then computing covariance is potentially more stable.
+    # But... computing covariance first then dividing involves 2 fewer large
+    # broadcasts.  We choose to divide first, largely because it avoids
+    # difficulties with the various options for sample/event axis kwargs.
+
+    x /= stddev(x, sample_axis=sample_axis, keepdims=True)
+    if y is not None:
+      y /= stddev(y, sample_axis=sample_axis, keepdims=True)
+
+    return covariance(
+        x=x,
+        y=y,
+        event_axis=event_axis,
+        sample_axis=sample_axis,
+        keepdims=keepdims)
 
 
 def stddev(x, sample_axis=0, keepdims=False, name=None):

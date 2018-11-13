@@ -623,6 +623,66 @@ class CovarianceTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
+class CorrelationTest(tf.test.TestCase):
+
+  def _np_corr_1d(self, x, y):
+    assert x.ndim == y.ndim == 1
+    x = x - x.mean()
+    y = y - y.mean()
+    sigma_x = np.sqrt((x**2).mean())
+    sigma_y = np.sqrt((y**2).mean())
+    return (x * y).mean() / (sigma_x * sigma_y)
+
+  def test_batch_scalar(self):
+    # X and Y are correlated, albeit less so in the first component.
+    # They both are 100 samples of 3-batch scalars.
+    x = rng.randn(100, 3)
+    y = x + 0.1 * rng.randn(100, 3)
+    x[:, 0] += 0.1 * rng.randn(100)
+
+    corr = tfp.stats.correlation(x, y, sample_axis=0, event_axis=None)
+    self.assertAllEqual((3,), corr.shape)
+    corr = self.evaluate(corr)
+
+    for i in range(3):  # Iterate over batch index.
+      self.assertAllClose(self._np_corr_1d(x[:, i], y[:, i]), corr[i])
+
+  def test_diagonal_of_correlation_matrix_x_with_x_is_one(self):
+    # Some big numbers, to test stability.
+    x = np.float32(1e10 * rng.randn(100, 3))
+
+    corr = tfp.stats.correlation(x, sample_axis=0, event_axis=1)
+    self.assertAllEqual((3, 3), corr.shape)
+    corr = self.evaluate(corr)
+    self.assertAllClose([1., 1., 1.], np.diag(corr))
+
+  def test_batch_vector_sampaxis0_eventaxisn1(self):
+    # X and Y are correlated, albeit less so in the first component.
+    # They both are both 100 samples of 3-batch vectors in R^2.
+    x = rng.randn(100, 3, 2)
+    y = x + 0.1 * rng.randn(100, 3, 2)
+    x[:, :, 0] += 0.1 * rng.randn(100, 3)
+
+    corr = tfp.stats.correlation(x, y, event_axis=-1)
+    self.assertAllEqual((3, 2, 2), corr.shape)
+    corr = self.evaluate(corr)
+
+    corr_kd = tfp.stats.correlation(x, y, event_axis=-1, keepdims=True)
+    self.assertAllEqual((1, 3, 2, 2), corr_kd.shape)
+    corr_kd = self.evaluate(corr_kd)
+    self.assertAllEqual(corr, corr_kd[0, ...])
+
+    for i in range(3):  # Iterate over batch index.
+      x_i = x[:, i, :]  # Pick out ith batch of samples.
+      y_i = y[:, i, :]
+      corr_i = corr[i, :, :]
+      for m in range(2):  # Iterate over row of matrix
+        for n in range(2):  # Iterate over column of matrix
+          self.assertAllClose(
+              self._np_corr_1d(x_i[:, m], y_i[:, n]), corr_i[m, n])
+
+
+@test_util.run_all_in_graph_and_eager_modes
 class CholeskyCovarianceTest(tf.test.TestCase):
 
   def test_batch_vector_sampaxis1_eventaxis2(self):
