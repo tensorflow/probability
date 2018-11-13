@@ -25,11 +25,10 @@ from tensorflow_probability import distributions as tfd
 from tensorflow_probability.python.sts.internal import util as sts_util
 
 from tensorflow.python.framework import test_util
-from tensorflow.python.platform import test
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class MultivariateNormalUtilsTest(test.TestCase):
+class MultivariateNormalUtilsTest(tf.test.TestCase):
 
   def test_factored_joint_mvn_diag_full(self):
     batch_shape = [3, 2]
@@ -143,7 +142,7 @@ class MultivariateNormalUtilsTest(test.TestCase):
                                       mvn3.covariance()))
 
 
-class UtilityTests(test.TestCase):
+class UtilityTests(tf.test.TestCase):
 
   @test_util.run_in_graph_and_eager_modes
   def test_broadcast_batch_shape_static(self):
@@ -200,4 +199,4 @@ class UtilityTests(test.TestCase):
       self.assertAllEqual(shape_out, expected_shape_out)
 
 if __name__ == "__main__":
-  test.main()
+  tf.test.main()

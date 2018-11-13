@@ -23,7 +23,6 @@ import tensorflow as tf
 
 from tensorflow.python.client import session as tf_session
 from tensorflow.python.framework import ops
-from tensorflow.python.framework import tensor_util
 
 __all__ = [
     "RandomVariable",
@@ -134,7 +133,7 @@ class RandomVariable(object):
   def sample_shape(self):
     """Sample shape of random variable as a `TensorShape`."""
     if isinstance(self._sample_shape, tf.Tensor):
-      return tf.TensorShape(tensor_util.constant_value(self._sample_shape))
+      return tf.TensorShape(tf.contrib.util.constant_value(self._sample_shape))
     return tf.TensorShape(self._sample_shape)
 
   def sample_shape_tensor(self, name="sample_shape_tensor"):

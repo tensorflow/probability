@@ -28,7 +28,6 @@ from tensorflow_probability.python.sts import AdditiveStateSpaceModel
 from tensorflow_probability.python.sts import LocalLinearTrendStateSpaceModel
 
 from tensorflow.python.framework import test_util
-from tensorflow.python.platform import test
 
 tfl = tf.linalg
 
@@ -396,4 +395,4 @@ class AdditiveStateSpaceModelTestStaticShape64(
   use_static_shape = True
 
 if __name__ == '__main__':
-  test.main()
+  tf.test.main()

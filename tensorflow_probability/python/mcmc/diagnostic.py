@@ -25,7 +25,6 @@ from __future__ import print_function
 import tensorflow as tf
 
 from tensorflow_probability.python import stats
-from tensorflow.python.framework import tensor_util
 
 __all__ = [
     'effective_sample_size',
@@ -309,10 +308,10 @@ def potential_scale_reduction(chains_states,
   if not chains_states_was_list:
     chains_states = [chains_states]
 
-  # tensor_util.constant_value returns None iff a constant value (as a numpy
+  # tf.contrib.util.constant_value returns None iff a constant value (as a numpy
   # array) is not efficiently computable.  Therefore, we try constant_value then
   # check for None.
-  icn_const_ = tensor_util.constant_value(
+  icn_const_ = tf.contrib.util.constant_value(
       tf.convert_to_tensor(independent_chain_ndims))
   if icn_const_ is not None:
     independent_chain_ndims = icn_const_

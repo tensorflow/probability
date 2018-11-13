@@ -22,9 +22,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
-from tensorflow.contrib import eager as tfe
-from tensorflow.python.framework import tensor_util
-
+tfe = tf.contrib.eager
 
 __all__ = [
     'choose',
@@ -183,7 +181,7 @@ def _value_and_gradients(fn, fn_arg_list, result=None, grads=None, name=None):
 
     if result is None:
       result = fn(*fn_arg_list)
-      if grads is None and tfe.executing_eagerly():
+      if grads is None and tf.executing_eagerly():
         # Ensure we disable bijector cacheing in eager mode.
         # TODO(b/72831017): Remove this once bijector cacheing is fixed for
         # eager mode.
@@ -195,7 +193,7 @@ def _value_and_gradients(fn, fn_arg_list, result=None, grads=None, name=None):
       grads = _convert_to_tensor(grads, 'fn_grad')
       return result, grads
 
-    if tfe.executing_eagerly():
+    if tf.executing_eagerly():
       if is_list_like(result) and len(result) == len(fn_arg_list):
         # Compute the block diagonal of Jacobian.
         # TODO(b/79158574): Guard this calculation by an arg which explicitly
@@ -275,7 +273,7 @@ def smart_for_loop(loop_num_iter, body_fn, initial_loop_vars,
   """
   with tf.name_scope(
       name, 'smart_for_loop', [loop_num_iter, initial_loop_vars]):
-    loop_num_iter_ = tensor_util.constant_value(tf.convert_to_tensor(
+    loop_num_iter_ = tf.contrib.util.constant_value(tf.convert_to_tensor(
         loop_num_iter, dtype=tf.int64, name='loop_num_iter'))
     if loop_num_iter_ is None or tf.contrib.eager.executing_eagerly():
       return tf.while_loop(

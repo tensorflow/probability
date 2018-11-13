@@ -21,8 +21,7 @@ from __future__ import print_function
 # Dependency imports
 import tensorflow as tf
 
-from tensorflow.contrib import eager as tfe
-
+tfe = tf.contrib.eager
 
 __all__ = [
     'diag_jacobian',

@@ -34,7 +34,6 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.optimizer import linesearch
-from tensorflow.python.framework import smart_cond
 
 
 BfgsOptimizerResults = collections.namedtuple(
@@ -273,7 +272,7 @@ def minimize(value_and_gradients_function,
                                                  objective_gradient)
         return search_direction, initial_inv_hessian
 
-      search_direction, inv_hessian_estimate = smart_cond.smart_cond(
+      search_direction, inv_hessian_estimate = tf.contrib.framework.smart_cond(
           needs_reset,
           true_fn=_reset_search_dirn,
           false_fn=lambda: (search_direction, input_inv_hessian_estimate))
@@ -319,9 +318,10 @@ def minimize(value_and_gradients_function,
                             f_relative_tolerance,
                             x_tolerance)
 
-      return smart_cond.smart_cond(ls_failed,
-                                   true_fn=_failed_fn,
-                                   false_fn=_success_fn)
+      return tf.contrib.framework.smart_cond(
+          ls_failed,
+          true_fn=_failed_fn,
+          false_fn=_success_fn)
 
     initial_values = BfgsOptimizerResults(
         converged=initial_convergence,
@@ -398,7 +398,7 @@ def _bfgs_update(value_and_gradients_function,
                                     updated.position_delta,
                                     current_inverse_hessian)
 
-  next_inverse_hessian = smart_cond.smart_cond(
+  next_inverse_hessian = tf.contrib.framework.smart_cond(
       converged,
       lambda: current_inverse_hessian,
       _update_hessian)
@@ -630,9 +630,10 @@ def _bfgs_inv_hessian_update(grad_delta,
         (position_term - cross_term) / normalization_factor)
     return next_inv_hessian_estimate
 
-  next_estimate = smart_cond.smart_cond(is_singular,
-                                        true_fn=_is_singular_fn,
-                                        false_fn=_do_update_fn)
+  next_estimate = tf.contrib.framework.smart_cond(
+      is_singular,
+      true_fn=_is_singular_fn,
+      false_fn=_do_update_fn)
 
   return next_estimate
 
@@ -665,4 +666,3 @@ def _tensor_product(t1, t2):
   padded_shape = tf.concat([t1_shape, padding], axis=0)
   t1_padded = tf.reshape(t1, padded_shape)
   return t1_padded * t2
-

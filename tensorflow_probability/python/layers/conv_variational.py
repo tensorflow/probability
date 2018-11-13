@@ -218,8 +218,8 @@ class _ConvVariational(tf.keras.layers.Layer):
         dilation_rate=self.dilation_rate,
         strides=self.strides,
         padding=self.padding.upper(),
-        data_format=tf_layers_util.convert_data_format(self.data_format,
-                                                       self.rank + 2))
+        data_format=tf_layers_util.convert_data_format(
+            self.data_format, self.rank + 2))
 
     self.built = True
 

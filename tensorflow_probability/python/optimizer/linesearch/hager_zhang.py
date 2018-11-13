@@ -35,8 +35,6 @@ import collections
 import numpy as np
 import tensorflow as tf
 
-from tensorflow.python.framework import smart_cond
-
 __all__ = [
     'hager_zhang',
 ]
@@ -347,7 +345,7 @@ def hager_zhang(value_and_gradients_function,
                               val_c_input,
                               step_size_shrink_param)
 
-      val_c, fix_evals = smart_cond.smart_cond(
+      val_c, fix_evals = tf.contrib.framework.smart_cond(
           step_size_too_large,
           _is_too_large_fn,
           lambda: (val_c_input, 0))
@@ -391,12 +389,12 @@ def hager_zhang(value_and_gradients_function,
             right_pt=result.right.x,
             objective_at_right_pt=result.right.f,
             grad_objective_at_right_pt=result.right.df)
-      return smart_cond.smart_cond(
+      return tf.contrib.framework.smart_cond(
           valid_at_c,
           true_fn=success_fn,
           false_fn=_failure_fn)
 
-    return smart_cond.smart_cond(
+    return tf.contrib.framework.smart_cond(
         valid_inputs,
         true_fn=_valid_inputs_fn,
         false_fn=_invalid_inputs_fn)
@@ -536,7 +534,7 @@ def _bracket_and_search(
         left=result.left,
         right=result.right)
 
-  return smart_cond.smart_cond(
+  return tf.contrib.framework.smart_cond(
       failed,
       true_fn=_bracketing_failed_fn,
       false_fn=_bracketing_success_fn)
@@ -673,7 +671,7 @@ def _line_search_after_bracketing(
             left=secant2_result.left,
             right=secant2_result.right)
 
-        return smart_cond.smart_cond(
+        return tf.contrib.framework.smart_cond(
             func_is_flat,
             true_fn=lambda: is_flat_retval,
             false_fn=lambda: not_is_flat_retval)
@@ -693,12 +691,12 @@ def _line_search_after_bracketing(
             left=update_result.left,
             right=update_result.right)
 
-      return smart_cond.smart_cond(
+      return tf.contrib.framework.smart_cond(
           sufficient_shrinkage,
           true_fn=_sufficient_shrinkage_fn,
           false_fn=_insufficient_shrinkage_fn)
 
-    return smart_cond.smart_case([
+    return tf.contrib.framework.smart_case([
         (secant2_result.failed, _failed_fn),
         (secant2_result.found_wolfe, _found_wolfe_fn)
     ], default=_default_fn, exclusive=False)
@@ -767,7 +765,7 @@ def _line_search_inner_bisection(
         left=val_left,
         right=val_right)
 
-  return smart_cond.smart_cond(
+  return tf.contrib.framework.smart_cond(
       val_mid_finite,
       true_fn=_success_fn,
       false_fn=_failed_fn)
@@ -990,7 +988,7 @@ def _secant2(value_and_gradients_function,
           left=inner_result.left,
           right=inner_result.right)
 
-    return smart_cond.smart_case([
+    return tf.contrib.framework.smart_case([
         secant_failed_case,
         found_wolfe_case
     ], default=_default_fn, exclusive=False)
@@ -1027,7 +1025,7 @@ def _secant2_inner(value_and_gradients_function,
     def _do_secant(val_1, val_2):
       return _secant(val_1.x, val_2.x, val_1.df, val_2.df), True
 
-    next_c, is_new = smart_cond.smart_case([
+    next_c, is_new = tf.contrib.framework.smart_case([
         (tf.equal(update_result.right.x, val_c.x),
          lambda: _do_secant(val_right, update_result.right)),
         (tf.equal(update_result.left.x, val_c.x),
@@ -1091,12 +1089,12 @@ def _secant2_inner(value_and_gradients_function,
           left=update_result.left,
           right=update_result.right)
 
-    return smart_cond.smart_case([
+    return tf.contrib.framework.smart_case([
         in_range_and_new_case,
         in_range_not_new_case,
     ], default=_default_fn)
 
-  return smart_cond.smart_cond(
+  return tf.contrib.framework.smart_cond(
       update_worked,
       true_fn=_success_fn,
       false_fn=_failed_fn)
@@ -1160,7 +1158,7 @@ def _secant2_inner_update(value_and_gradients_function,
   # we have converged.
   found_wolfe_case = found_wolfe, _found_wolfe_fn
 
-  return smart_cond.smart_case([
+  return tf.contrib.framework.smart_case([
       secant_failed_case,
       found_wolfe_case
   ], default=_default_fn, exclusive=False)
@@ -1293,7 +1291,7 @@ def _update(value_and_gradients_function,
         left=bisection_result.left,
         right=bisection_result.right)
 
-  return smart_cond.smart_case(
+  return tf.contrib.framework.smart_case(
       [
           out_of_range_case,
           can_update_right,
@@ -1426,7 +1424,7 @@ def _bisect(value_and_gradients_function,
           left=val_left,
           right=val_mid)
 
-    return smart_cond.smart_case([
+    return tf.contrib.framework.smart_case([
         failed_case,
         valid_right_case,
         valid_left_case
@@ -1573,7 +1571,7 @@ def _bracket(value_and_gradients_function,
           left=val_right,
           right=val_next_right)
 
-    return smart_cond.smart_case(
+    return tf.contrib.framework.smart_case(
         [
             case0,
             case1,

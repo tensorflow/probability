@@ -25,7 +25,6 @@ import tensorflow_probability as tfp
 from tensorflow_probability.python.sts import SeasonalStateSpaceModel
 
 from tensorflow.python.framework import test_util
-from tensorflow.python.platform import test
 
 tfl = tf.linalg
 tfd = tfp.distributions
@@ -242,4 +241,4 @@ class SeasonalStateSpaceModelTestStaticShape64(
 
 
 if __name__ == "__main__":
-  test.main()
+  tf.test.main()

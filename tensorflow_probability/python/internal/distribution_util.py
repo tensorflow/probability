@@ -25,8 +25,6 @@ import tensorflow as tf
 
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.framework import smart_cond
-from tensorflow.python.framework import tensor_util
 from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.util import tf_inspect
 
@@ -310,7 +308,7 @@ def shapes_from_loc_and_scale(loc, scale, name="shapes_from_loc_and_scale"):
   with tf.name_scope(name, values=[loc] + scale.graph_parents):
     # Get event shape.
     event_size = scale.range_dimension_tensor()
-    event_size_const = tensor_util.constant_value(event_size)
+    event_size_const = tf.contrib.util.constant_value(event_size)
     if event_size_const is not None:
       event_shape = event_size_const.reshape([1])
     else:
@@ -328,7 +326,7 @@ def shapes_from_loc_and_scale(loc, scale, name="shapes_from_loc_and_scale"):
     # Get batch shape.
     batch_shape = scale.batch_shape_tensor()
     if loc is None:
-      batch_shape_const = tensor_util.constant_value(batch_shape)
+      batch_shape_const = tf.contrib.util.constant_value(batch_shape)
       batch_shape = (
           batch_shape_const if batch_shape_const is not None else batch_shape)
     else:
@@ -499,7 +497,7 @@ def pad_mixture_dimensions(x, mixture_distribution, categorical_distribution,
 
 def static_value(x):
   """Returns the static value of a `Tensor` or `None`."""
-  return tensor_util.constant_value(tf.convert_to_tensor(x))
+  return tf.contrib.util.constant_value(tf.convert_to_tensor(x))
 
 
 def pick_scalar_condition(pred, true_value, false_value, name=None):
@@ -604,13 +602,14 @@ def move_dimension(x, source_idx, dest_idx):
   def x_permuted():
     return tf.transpose(
         x,
-        perm=smart_cond.smart_cond(source_idx < dest_idx,
-                                   move_right_permutation,
-                                   move_left_permutation))
+        perm=tf.contrib.framework.smart_cond(
+            source_idx < dest_idx,
+            move_right_permutation,
+            move_left_permutation))
 
   # One final conditional to handle the special case where source
   # and destination indices are equal.
-  return smart_cond.smart_cond(
+  return tf.contrib.framework.smart_cond(
       tf.equal(source_idx, dest_idx), lambda: x, x_permuted)
 
 
@@ -635,7 +634,7 @@ def assert_integer_form(
   with tf.name_scope(name, values=[x, data]):
     x = tf.convert_to_tensor(x, name="x")
     if x.dtype.is_integer:
-      return control_flow_ops.no_op()
+      return tf.no_op()
     message = message or "{} has non-integer components".format(x)
     if int_dtype is None:
       try:
@@ -698,7 +697,7 @@ def same_dynamic_shape(a, b):
 
   # One of the shapes isn't fully defined, so we need to use the dynamic
   # shape.
-  return control_flow_ops.cond(
+  return tf.cond(
       tf.equal(tf.rank(a), tf.rank(b)),
       all_shapes_equal,
       lambda: tf.constant(False))
@@ -721,7 +720,7 @@ def maybe_get_static_value(x, dtype=None):
     return x
   try:
     # This returns an np.ndarray.
-    x_ = tensor_util.constant_value(x)
+    x_ = tf.contrib.util.constant_value(x)
   except TypeError:
     x_ = x
   if x_ is None or dtype is None:
@@ -1194,7 +1193,7 @@ def rotate_transpose(x, shift, name="rotate_transpose"):
     shift = tf.convert_to_tensor(shift, name="shift")
     # We do not assign back to preserve constant-ness.
     tf.assert_integer(shift)
-    shift_value_static = tensor_util.constant_value(shift)
+    shift_value_static = tf.contrib.util.constant_value(shift)
     ndims = x.shape.ndims
     if ndims is not None and shift_value_static is not None:
       if ndims < 2: return x
@@ -1265,7 +1264,7 @@ def pick_vector(cond,
     if cond.dtype != tf.bool:
       raise TypeError("%s.dtype=%s which is not %s" %
                       (cond, cond.dtype, tf.bool))
-    cond_value_static = tensor_util.constant_value(cond)
+    cond_value_static = tf.contrib.util.constant_value(cond)
     if cond_value_static is not None:
       return true_vector if cond_value_static else false_vector
     true_vector = tf.convert_to_tensor(true_vector, name="true_vector")
@@ -1301,7 +1300,7 @@ def prefer_static_broadcast_shape(
     def get_tensor_shape(s):
       if isinstance(s, tf.TensorShape):
         return s
-      s_ = tensor_util.constant_value(make_shape_tensor(s))
+      s_ = tf.contrib.util.constant_value(make_shape_tensor(s))
       if s_ is not None:
         return tf.TensorShape(s_)
       return None
@@ -1357,7 +1356,7 @@ def prefer_static_value(x):
   Returns:
     Numpy array (if static value is obtainable), else `Tensor`.
   """
-  static_x = tensor_util.constant_value(x)
+  static_x = tf.contrib.util.constant_value(x)
   if static_x is not None:
     return static_x
   return x
@@ -1891,12 +1890,12 @@ def pad(x, axis, front=False, back=False, value=0, count=1, name=None):
     ndims = (x.shape.ndims if x.shape.ndims is not None
              else tf.rank(x, name="ndims"))
     axis = tf.convert_to_tensor(axis, name="axis")
-    axis_ = tensor_util.constant_value(axis)
+    axis_ = tf.contrib.util.constant_value(axis)
     if axis_ is not None:
       axis = axis_
       if axis < 0:
         axis = ndims + axis
-      count_ = tensor_util.constant_value(count)
+      count_ = tf.contrib.util.constant_value(count)
       if axis_ >= 0 or x.shape.ndims is not None:
         head = x.shape[:axis]
         middle = tf.TensorShape(

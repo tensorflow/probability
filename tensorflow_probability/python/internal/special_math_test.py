@@ -26,8 +26,6 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.internal import special_math
-from tensorflow.python.eager import backprop as tfe_backprop
-from tensorflow.python.eager import context as tfe_context
 from tensorflow.python.framework import test_util
 
 
@@ -64,8 +62,8 @@ def _make_grid(dtype, grid_spec):
 
 def _value_and_gradient(fn, *args):
   """Calls `fn` and computes the gradient of the result wrt `arg`."""
-  if tfe_context.executing_eagerly():
-    v, g = tfe_backprop.val_and_grad_function(fn)(args)
+  if tf.executing_eagerly():
+    v, g = tf.contrib.eager.value_and_gradients_function(fn)(args)
   else:
     v = fn(*args)
     g = tf.gradients(v, args)

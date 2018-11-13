@@ -27,7 +27,6 @@ from __future__ import print_function
 import numpy as np
 
 import tensorflow as tf
-from tensorflow.python.framework import smart_cond
 from tensorflow.python.ops import inplace_ops
 
 
@@ -652,7 +651,7 @@ def minimize_sparse_one_step(gradient_unregularized_loss,
           return [x_update_diff_norm_sq_, x_update, hess_matmul_x_update_]
 
       inputs_to_update = [x_update_diff_norm_sq, x_update, hess_matmul_x_update]
-      return [iter_ + 1] + smart_cond.smart_cond(
+      return [iter_ + 1] + tf.contrib.framework.smart_cond(
           # Note on why checking delta (a difference of floats) for equality to
           # zero is ok:
           #

@@ -27,8 +27,6 @@ import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util
 
-from tensorflow.python.platform import test
-
 tfd = tfp.distributions
 
 
@@ -972,4 +970,4 @@ class CsiszarVIMCOTest(test_case.TestCase):
 
 
 if __name__ == "__main__":
-  test.main()
+  tf.test.main()

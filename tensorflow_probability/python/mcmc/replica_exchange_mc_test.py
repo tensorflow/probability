@@ -24,7 +24,6 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from tensorflow.contrib import eager as tfe
 from tensorflow.python.framework import test_util
 
 tfd = tfp.distributions
@@ -33,7 +32,7 @@ tfd = tfp.distributions
 def _set_seed(seed):
   """Helper which uses graph seed if using TFE."""
   # TODO(b/68017812): Deprecate once TFE supports seed.
-  if tfe.executing_eagerly():
+  if tf.executing_eagerly():
     tf.set_random_seed(seed)
     return None
   return seed

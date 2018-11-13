@@ -29,7 +29,6 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import metropolis_hastings
 from tensorflow_probability.python.mcmc import util as mcmc_util
-from tensorflow.contrib import eager as tfe
 
 
 __all__ = [
@@ -538,7 +537,7 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
                state_gradients_are_stopped=False,
                seed=None,
                name=None):
-    if seed is not None and tfe.executing_eagerly():
+    if seed is not None and tf.executing_eagerly():
       # TODO(b/68017812): Re-enable once TFE supports `tf.random_shuffle` seed.
       raise NotImplementedError('Specifying a `seed` when running eagerly is '
                                 'not currently supported. To run in Eager '

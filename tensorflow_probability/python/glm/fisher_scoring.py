@@ -23,7 +23,6 @@ import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow.python.framework import smart_cond
 
 
 __all__ = [
@@ -398,7 +397,7 @@ def fit_one_step(
       l2_regularizer_ = np.array(0, a.dtype.as_numpy_dtype)
       return a_, b_, l2_regularizer_
 
-    a, b, l2_regularizer = smart_cond.smart_cond(
+    a, b, l2_regularizer = tf.contrib.framework.smart_cond(
         smart_reduce_all([not(fast_unsafe_numerics),
                           l2_regularizer > 0.]),
         _embed_l2_regularization,
@@ -626,7 +625,7 @@ def num_cols(x):
 def smart_reduce_all(preds, name=None):
   """Identical to `tf.reduce_all` but operates statically if possible."""
   with tf.name_scope(name, 'smart_reduce_all', [preds]):
-    pred_values = [smart_cond.smart_constant_value(p) for p in preds]
+    pred_values = [tf.contrib.framework.smart_constant_value(p) for p in preds]
     if any(p is False for p in pred_values):
       return False
     if any(p is None for p in pred_values):

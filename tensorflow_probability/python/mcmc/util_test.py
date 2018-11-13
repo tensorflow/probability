@@ -29,7 +29,6 @@ from tensorflow_probability.python.mcmc.util import choose
 from tensorflow_probability.python.mcmc.util import is_namedtuple_like
 from tensorflow_probability.python.mcmc.util import maybe_call_fn_and_grads
 from tensorflow_probability.python.mcmc.util import smart_for_loop
-from tensorflow.contrib import eager as tfe
 from tensorflow.python.framework import test_util
 
 tfd = tfp.distributions
@@ -152,7 +151,7 @@ class GradientTest(tf.test.TestCase):
         tf.convert_to_tensor(arg, name='arg{}'.format(i))
         for i, arg in enumerate(fn_args)
     ]
-    if tfe.executing_eagerly():
+    if tf.executing_eagerly():
       with self.assertRaisesRegexp(
           ValueError, 'Encountered `None`.*\n.*fn_arg_list.*\n.*None'):
         maybe_call_fn_and_grads(fn, fn_args)

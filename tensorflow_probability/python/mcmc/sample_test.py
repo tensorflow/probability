@@ -24,7 +24,6 @@ import numpy as np
 
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow.python.framework import random_seed
 
 
 class SampleChainTest(tf.test.TestCase):
@@ -33,7 +32,7 @@ class SampleChainTest(tf.test.TestCase):
     self._shape_param = 5.
     self._rate_param = 10.
 
-    random_seed.set_random_seed(10003)
+    tf.random.set_random_seed(10003)
     np.random.seed(10003)
 
   # TODO(b/74154679): Create Fake TransitionKernel and not rely on HMC tests.

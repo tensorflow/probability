@@ -27,7 +27,6 @@ from tensorflow_probability.python.sts import Seasonal
 from tensorflow_probability.python.sts import Sum
 
 from tensorflow.python.framework import test_util
-from tensorflow.python.platform import test
 
 tfd = tfp.distributions
 
@@ -219,13 +218,13 @@ class _StsTestHarness(object):
     self.assertEqual(ssm.batch_shape, time_series_sample_shape)
 
 
-class LocalLinearTrendTest(test.TestCase, _StsTestHarness):
+class LocalLinearTrendTest(tf.test.TestCase, _StsTestHarness):
 
   def _build_sts(self, observed_time_series=None):
     return LocalLinearTrend(observed_time_series=observed_time_series)
 
 
-class SeasonalTest(test.TestCase, _StsTestHarness):
+class SeasonalTest(tf.test.TestCase, _StsTestHarness):
 
   def _build_sts(self, observed_time_series=None):
     # Note that a Seasonal model with `num_steps_per_season > 1` would have
@@ -240,7 +239,7 @@ class SeasonalTest(test.TestCase, _StsTestHarness):
                     observed_time_series=observed_time_series)
 
 
-class SeasonalWithMultipleStepsAndNoiseTest(test.TestCase, _StsTestHarness):
+class SeasonalWithMultipleStepsAndNoiseTest(tf.test.TestCase, _StsTestHarness):
 
   def _build_sts(self, observed_time_series=None):
     day_of_week = tfp.sts.Seasonal(num_seasons=7,
@@ -251,7 +250,7 @@ class SeasonalWithMultipleStepsAndNoiseTest(test.TestCase, _StsTestHarness):
                        observed_time_series=observed_time_series)
 
 
-class SumTest(test.TestCase, _StsTestHarness):
+class SumTest(tf.test.TestCase, _StsTestHarness):
 
   def _build_sts(self, observed_time_series=None):
     first_component = LocalLinearTrend(
@@ -263,4 +262,4 @@ class SumTest(test.TestCase, _StsTestHarness):
         observed_time_series=observed_time_series)
 
 if __name__ == '__main__':
-  test.main()
+  tf.test.main()

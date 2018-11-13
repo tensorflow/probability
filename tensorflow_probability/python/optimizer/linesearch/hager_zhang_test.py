@@ -22,7 +22,6 @@ import numpy as np
 
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow.python.eager import context
 from tensorflow.python.framework import test_util
 
 
@@ -142,7 +141,7 @@ class HagerZhangTest(tf.test.TestCase):
   @test_util.run_in_graph_and_eager_modes
   def test_eval_count(self):
     """Tests that the evaluation count is reported correctly."""
-    if context.executing_eagerly():
+    if tf.executing_eagerly():
       self._test_eval_count_eager()
     else:
       self._test_eval_count_graph()

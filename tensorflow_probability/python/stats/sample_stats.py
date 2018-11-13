@@ -23,7 +23,6 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.internal import distribution_util as util
-from tensorflow.python.framework import tensor_util
 from tensorflow.python.ops import control_flow_ops
 
 __all__ = [
@@ -173,7 +172,7 @@ def auto_correlation(x,
       max_lags = x_len - 1
     else:
       max_lags = tf.convert_to_tensor(max_lags, name='max_lags')
-      max_lags_ = tensor_util.constant_value(max_lags)
+      max_lags_ = tf.contrib.util.constant_value(max_lags)
       if max_lags_ is None or not know_static_shape:
         know_static_shape = False
         max_lags = tf.minimum(x_len - 1, max_lags)
@@ -659,7 +658,7 @@ def percentile(x,
       tf.assert_integer(axis)
       axis_ndims = _get_static_ndims(
           axis, expect_static=True, expect_ndims_no_more_than=1)
-      axis_const = tensor_util.constant_value(axis)
+      axis_const = tf.contrib.util.constant_value(axis)
       if axis_const is None:
         raise ValueError(
             'Expected argument `axis` to be statically available.  Found: %s' %
@@ -744,7 +743,7 @@ def _get_static_ndims(x,
   """
   ndims = x.shape.ndims
   if ndims is None:
-    shape_const = tensor_util.constant_value(tf.shape(x))
+    shape_const = tf.contrib.util.constant_value(tf.shape(x))
     if shape_const is not None:
       ndims = shape_const.ndim
 
@@ -884,7 +883,7 @@ def _is_list_like(x):
 def _make_list_or_1d_tensor(values):
   """Return a list (preferred) or 1d Tensor from values, if values.ndims < 2."""
   values = tf.convert_to_tensor(values, name='values')
-  values_ = tensor_util.constant_value(values)
+  values_ = tf.contrib.util.constant_value(values)
 
   # Static didn't work.
   if values_ is None:
@@ -904,7 +903,7 @@ def _make_positive_axis(axis, ndims):
   axis = _make_list_or_1d_tensor(axis)
 
   ndims = tf.convert_to_tensor(ndims, name='ndims', dtype=tf.int32)
-  ndims_ = tensor_util.constant_value(ndims)
+  ndims_ = tf.contrib.util.constant_value(ndims)
 
   if _is_list_like(axis) and ndims_ is not None:
     # Static case
