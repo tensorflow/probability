@@ -409,12 +409,12 @@ def _von_mises_cdf_series(x, concentration, num_terms, dtype):
   # Clip the result to [0, 1].
   zero = tf.cast(0., dtype)
   one = tf.cast(1., dtype)
-  cdf = tf.clip_by_value(cdf, zero, one)
+  cdf_clipped = tf.clip_by_value(cdf, zero, one)
   # The clipped values do not depend on concentration anymore, so set their
   # derivative to zero.
   dcdf_dconcentration *= tf.cast((cdf >= zero) & (cdf <= one), dtype)
 
-  return cdf, dcdf_dconcentration
+  return cdf_clipped, dcdf_dconcentration
 
 
 def _compute_value_and_grad(f, x):
