@@ -536,6 +536,33 @@ def pick_scalar_condition(pred, true_value, false_value, name=None):
     return true_value if pred_ else false_value
 
 
+def make_non_negative_axis(axis, rank):
+  """Make (possibly negatively indexed) `axis` argument non-negative."""
+  axis = tf.convert_to_tensor(axis, name="axis")
+  rank = tf.convert_to_tensor(rank, name="rank")
+  axis_ = tf.contrib.util.constant_value(axis)
+  rank_ = tf.contrib.util.constant_value(rank)
+
+  # Static case.
+  if axis_ is not None and rank_ is not None:
+    is_scalar = axis_.ndim == 0
+    if is_scalar:
+      axis_ = [axis_]
+    positive_axis = []
+    for a_ in axis_:
+      if a_ < 0:
+        positive_axis.append(rank_ + a_)
+      else:
+        positive_axis.append(a_)
+    if is_scalar:
+      positive_axis = positive_axis[0]
+    return tf.convert_to_tensor(positive_axis, dtype=axis.dtype)
+
+  # Dynamic case.
+  # Unfortunately static values are lost by this tf.where.
+  return tf.where(axis < 0, rank + axis, axis)
+
+
 def move_dimension(x, source_idx, dest_idx):
   """Move a single tensor dimension within its shape.
 
@@ -565,10 +592,10 @@ def move_dimension(x, source_idx, dest_idx):
   ```
   """
   ndims = prefer_static_rank(x)
-  if isinstance(source_idx, int):
-    dtype = tf.int32
-  else:
-    dtype = tf.as_dtype(source_idx.dtype)
+  dtype = dtype_util.common_dtype([source_idx, dest_idx],
+                                  preferred_dtype=tf.int32)
+  source_idx = tf.convert_to_tensor(source_idx, dtype=dtype)
+  dest_idx = tf.convert_to_tensor(dest_idx, dtype=dtype)
 
   # Handle negative indexing.
   source_idx = pick_scalar_condition(
