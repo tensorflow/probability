@@ -355,6 +355,28 @@ class BfgsTest(tf.test.TestCase):
     self.assertArrayNear(res1.inverse_hessian_estimate.reshape([-1]),
                          res2.inverse_hessian_estimate.reshape([-1]), 1e-5)
 
+  def test_dynamic_shapes(self):
+    """Can build a bfgs_op with dynamic shapes in graph mode."""
+    minimum = np.array([1.0, 1.0])
+    scales = np.array([2.0, 3.0])
+
+    @_make_val_and_grad_fn
+    def quadratic(x):
+      return tf.reduce_sum(scales * (x - minimum) ** 2)
+
+    # Test with a vector of unknown dimension, and a fully unknown shape.
+    for shape in ([None], None):
+      start = tf.placeholder(tf.float32, shape=shape)
+      bfgs_op = tfp.optimizer.bfgs_minimize(
+          quadratic, initial_position=start, tolerance=1e-8)
+      self.assertFalse(bfgs_op.position.shape.is_fully_defined())
+
+      with self.cached_session() as session:
+        results = session.run(bfgs_op, feed_dict={start: [0.6, 0.8]})
+      self.assertTrue(results.converged)
+      self.assertTrue(_norm(results.objective_gradient) <= 1e-8)
+      self.assertArrayNear(results.position, minimum, 1e-5)
+
 
 if __name__ == "__main__":
   tf.test.main()

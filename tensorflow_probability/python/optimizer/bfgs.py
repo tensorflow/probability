@@ -33,6 +33,7 @@ import collections
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.optimizer import linesearch
 
 
@@ -196,10 +197,10 @@ def minimize(value_and_gradients_function,
                                        name='x_tolerance')
     max_iterations = tf.convert_to_tensor(max_iterations, name='max_iterations')
 
-    domain_shape = initial_position.shape
+    domain_shape = distribution_util.prefer_static_shape(initial_position)
 
     if initial_inverse_hessian_estimate is None:
-      inv_hessian_shape = domain_shape.concatenate(domain_shape)
+      inv_hessian_shape = tf.concat([domain_shape, domain_shape], 0)
       initial_inv_hessian = tf.eye(tf.size(initial_position), dtype=dtype)
       initial_inv_hessian = tf.reshape(initial_inv_hessian,
                                        inv_hessian_shape,
@@ -479,12 +480,7 @@ def _initial_convergence_test(gradient, tolerance):
 
 def _get_search_direction(inv_hessian_approx, gradient):
   """Computes the direction along which to perform line search."""
-  n = len(gradient.shape.as_list())
-  contraction_axes = np.arange(-n, 0)
-  dirn = -tf.tensordot(inv_hessian_approx, gradient,
-                       axes=[contraction_axes, contraction_axes])
-  dirn.set_shape(gradient.shape)
-  return dirn
+  return -_mul_right(inv_hessian_approx, gradient)
 
 
 def _restrict_along_direction(value_and_gradients_function,
@@ -603,13 +599,9 @@ def _bfgs_inv_hessian_update(grad_delta,
   def _do_update_fn():
     """Updates the Hessian estimate."""
     # The quadratic form: y^T.H.y.
-    n = len(grad_delta.shape.as_list())
-    contraction_axes = np.arange(-n, 0)
+
     # H.y where H is the inverse Hessian and y is the gradient change.
-    conditioned_grad_delta = tf.tensordot(inv_hessian_estimate,
-                                          grad_delta,
-                                          axes=[contraction_axes,
-                                                contraction_axes])
+    conditioned_grad_delta = _mul_right(inv_hessian_estimate, grad_delta)
     conditioned_grad_delta_norm = tf.reduce_sum(
         conditioned_grad_delta * grad_delta)
 
@@ -636,6 +628,46 @@ def _bfgs_inv_hessian_update(grad_delta,
       false_fn=_do_update_fn)
 
   return next_estimate
+
+
+def _mul_right(mat, vec):
+  """Computes the product of a square matrix with a vector on the right.
+
+  Note this accepts a generalized square matrix `M`, i.e. of shape `s + s`
+  with `rank(s) >= 1`, a generalized vector `v` of shape `s`, and computes
+  the product `M.v` (also of shape `s`).
+
+  Furthermore, the shapes may be fully dynamic.
+
+  Examples:
+
+    v = tf.constant([0, 1])
+    M = tf.constant([[0, 1], [2, 3]])
+    _mul_right(M, v)
+    # => [1, 3]
+
+    v = tf.reshape(tf.range(6), shape=(2, 3))
+    # => [[0, 1, 2],
+    #     [3, 4, 5]]
+    M = tf.reshape(tf.range(36), shape=(2, 3, 2, 3))
+    _mul_right(M, v)
+    # => [[ 55, 145, 235],
+    #     [325, 415, 505]]
+
+  Args:
+    mat: A `tf.Tensor` of shape `s + s`.
+    vec: A `tf.Tensor` of shape `s`.
+
+  Returns:
+    A tensor with the result of the product (also of shape `s`).
+  """
+  contraction_axes = tf.range(-distribution_util.prefer_static_rank(vec), 0)
+  result = tf.tensordot(mat, vec, axes=tf.stack([contraction_axes,
+                                                 contraction_axes]))
+  # This last reshape is needed to help with inference about the shape
+  # information, otherwise a partially-known shape would become completely
+  # unknown.
+  return tf.reshape(result, distribution_util.prefer_static_shape(vec))
 
 
 def _tensor_product(t1, t2):
