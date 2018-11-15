@@ -242,89 +242,72 @@ def minimize(value_and_gradients_function,
 
     initial_convergence = _initial_convergence_test(df0, tolerance)
 
-    def _cond(converged,
-              failed,
-              iteration,
-              *ignored_args):  # pylint: disable=unused-argument
+    # The `state` here is a BfgsOptimizerResults tuple with values for the
+    # current state of the algorithm computation.
+    def _cond(state):
       """Stopping condition for the algorithm."""
-      keep_going = tf.logical_not(converged | failed |
-                                  (iteration >= max_iterations))
+      keep_going = tf.logical_not(state.converged | state.failed |
+                                  (state.num_iterations >= max_iterations))
       return keep_going
 
-    def _body(converged,  # pylint: disable=unused-argument
-              stopped,  # pylint: disable=unused-argument
-              iteration,
-              total_evals,
-              position,
-              objective_value,
-              objective_gradient,
-              input_inv_hessian_estimate):
+    def _body(state):
       """Main optimization loop."""
 
-      search_direction = _get_search_direction(input_inv_hessian_estimate,
-                                               objective_gradient)
-      derivative_at_start_pt = tf.reduce_sum(objective_gradient *
+      search_direction = _get_search_direction(state.inverse_hessian_estimate,
+                                               state.objective_gradient)
+      derivative_at_start_pt = tf.reduce_sum(state.objective_gradient *
                                              search_direction)
       # If the derivative at the start point is not negative, reset the
       # Hessian estimate and recompute the search direction.
       needs_reset = derivative_at_start_pt >= 0
       def _reset_search_dirn():
         search_direction = _get_search_direction(initial_inv_hessian,
-                                                 objective_gradient)
+                                                 state.objective_gradient)
         return search_direction, initial_inv_hessian
 
       search_direction, inv_hessian_estimate = tf.contrib.framework.smart_cond(
           needs_reset,
           true_fn=_reset_search_dirn,
-          false_fn=lambda: (search_direction, input_inv_hessian_estimate))
+          false_fn=lambda: (search_direction, state.inverse_hessian_estimate))
       line_search_value_grad_func = _restrict_along_direction(
-          value_and_gradients_function, position, search_direction)
-      derivative_at_start_pt = tf.reduce_sum(objective_gradient *
+          value_and_gradients_function, state.position, search_direction)
+      derivative_at_start_pt = tf.reduce_sum(state.objective_gradient *
                                              search_direction)
 
       ls_result = linesearch.hager_zhang(
           line_search_value_grad_func,
           initial_step_size=tf.convert_to_tensor(1, dtype=dtype),
-          objective_at_zero=objective_value,
+          objective_at_zero=state.objective_value,
           grad_objective_at_zero=derivative_at_start_pt)
 
-      # Fail if the objective value is not finite or the line search failed.
-      ls_failed = ~ls_result.converged
+      state_after_ls = _update_state(
+          state,
+          failed=~ls_result.converged,  # Fail if line search failed.
+          num_iterations=state.num_iterations + 1,
+          num_objective_evaluations=(
+              state.num_objective_evaluations + ls_result.func_evals),
+          inverse_hessian_estimate=inv_hessian_estimate)
 
-      # If the line search failed, then quit at this point.
-      def _failed_fn():
-        """Line search failed action."""
-        failed_retval = BfgsOptimizerResults(
-            converged=False,
-            failed=True,
-            num_iterations=iteration + 1,
-            num_objective_evaluations=total_evals + ls_result.func_evals,
-            position=position,
-            objective_value=objective_value,
-            objective_gradient=objective_gradient,
-            inverse_hessian_estimate=inv_hessian_estimate)
-        return failed_retval
+      def _do_bfgs_update():
+        state_updated = _update_position(
+            value_and_gradients_function,
+            state_after_ls,
+            search_direction * ls_result.left_pt,
+            tolerance, f_relative_tolerance, x_tolerance)
 
-      def _success_fn():
-        return _bfgs_update(value_and_gradients_function,
-                            position,
-                            objective_value,
-                            objective_gradient,
-                            search_direction,
-                            inv_hessian_estimate,
-                            ls_result.left_pt,
-                            iteration,
-                            total_evals + ls_result.func_evals,
-                            tolerance,
-                            f_relative_tolerance,
-                            x_tolerance)
+        # If not converged, update the Hessian.
+        return tf.contrib.framework.smart_cond(
+            state_updated.converged,
+            lambda: state_updated,
+            lambda: _update_inv_hessian(state_after_ls, state_updated))
 
-      return tf.contrib.framework.smart_cond(
-          ls_failed,
-          true_fn=_failed_fn,
-          false_fn=_success_fn)
+      next_state = tf.contrib.framework.smart_cond(
+          state_after_ls.failed,
+          true_fn=lambda: state_after_ls,
+          false_fn=_do_bfgs_update)
+      return [next_state]
 
-    initial_values = BfgsOptimizerResults(
+    initial_state = BfgsOptimizerResults(
         converged=initial_convergence,
         failed=False,
         num_iterations=tf.convert_to_tensor(0),
@@ -334,18 +317,8 @@ def minimize(value_and_gradients_function,
         objective_gradient=df0,
         inverse_hessian_estimate=initial_inv_hessian)
 
-    return tf.while_loop(_cond, _body, initial_values,
-                         parallel_iterations=parallel_iterations)
-
-
-_UpdatedPosition = collections.namedtuple('_UpdatedPosition', [
-    'failed',
-    'position_delta',
-    'gradient_delta',
-    'next_position',
-    'next_value',
-    'next_gradient',
-    'evals'])
+    return tf.while_loop(_cond, _body, [initial_state],
+                         parallel_iterations=parallel_iterations)[0]
 
 
 def _is_finite(arg1, *args):
@@ -365,95 +338,50 @@ def _is_finite(arg1, *args):
   return finite
 
 
-def _bfgs_update(value_and_gradients_function,
-                 current_position,
-                 current_objective,
-                 current_gradient,
-                 search_direction,
-                 current_inverse_hessian,
-                 step_size,
-                 iteration,
-                 num_evaluations,
-                 grad_tolerance,
-                 f_relative_tolerance,
-                 x_tolerance):
-  """Perform a BFGS update."""
-  updated = _update_position(value_and_gradients_function,
-                             current_position,
-                             current_gradient,
-                             search_direction,
-                             step_size)
-
-  # Check for convergence.
-  converged = _check_convergence(current_position,
-                                 updated.next_position,
-                                 current_objective,
-                                 updated.next_value,
-                                 updated.next_gradient,
-                                 grad_tolerance,
-                                 f_relative_tolerance,
-                                 x_tolerance)
-  # If not converged, update the Hessian.
-  def _update_hessian():
-    return _bfgs_inv_hessian_update(updated.gradient_delta,
-                                    updated.position_delta,
-                                    current_inverse_hessian)
-
-  next_inverse_hessian = tf.contrib.framework.smart_cond(
-      converged,
-      lambda: current_inverse_hessian,
-      _update_hessian)
-
-  return BfgsOptimizerResults(
-      converged=converged,
-      failed=updated.failed,
-      num_iterations=iteration + 1,
-      num_objective_evaluations=num_evaluations + updated.evals,
-      position=updated.next_position,
-      objective_value=updated.next_value,
-      objective_gradient=updated.next_gradient,
-      inverse_hessian_estimate=next_inverse_hessian)
-
-
 def _update_position(value_and_gradients_function,
-                     position,
-                     gradient,
-                     search_direction,
-                     step_size):
-  """Perform a step of the BFGS update.
+                     state,
+                     position_delta,
+                     grad_tolerance,
+                     f_relative_tolerance,
+                     x_tolerance):
+  """Updates the BGFS state advancing its position by a given position_delta.
 
   Args:
     value_and_gradients_function: The objective function.
-    position: The current position.
-    gradient: The current gradient.
-    search_direction: The direction of the search.
-    step_size: The size of the step to take along the search direction.
+    state: The current BFGS state.
+    position_delta: The change in the position.
+    grad_tolerance: The gradient tolerance for the procedure.
+    f_relative_tolerance: The tolerance for the relative change in the
+      objective value.
+    x_tolerance: The tolerance for the change in the position.
 
   Returns:
-    A named tuple containing the following fields
-      failed: Indicates whether the update failed.
-      position_delta: The change in the position.
-      gradient_delta: The change in the derivative.
-      next_position: The next position.
-      next_value: The value of the objective function at the next position.
-      next_gradient: The gradient of the objective function at the next
-        position.
-      evals: The number of evaluations made.
+     A copy of the input BFGS state with the following fields updated:
+       converged: True if the convergence criteria has been met.
+       failed: True if the gradient or objective function have diverged, or
+         become NaN.
+       num_objective_evaluations: Updated as appropriate.
+       position, objective_value, objective_gradient: Updated by the given
+         positon_delta.
   """
-  position_delta = search_direction * step_size
-  next_position = position + position_delta
-  next_objective, next_gradient = value_and_gradients_function(
-      next_position)
-
-  grad_delta = next_gradient - gradient
-  return _UpdatedPosition(
+  next_position = state.position + position_delta
+  next_objective, next_gradient = value_and_gradients_function(next_position)
+  converged = _check_convergence(state.position,
+                                 next_position,
+                                 state.objective_value,
+                                 next_objective,
+                                 next_gradient,
+                                 grad_tolerance,
+                                 f_relative_tolerance,
+                                 x_tolerance)
+  return _update_state(
+      state,
+      converged=converged,
       failed=~_is_finite(next_objective, next_gradient),
-      position_delta=position_delta,
-      gradient_delta=grad_delta,
-      next_position=next_position,
-      next_value=next_objective,
-      next_gradient=next_gradient,
-      evals=1)
+      num_objective_evaluations=state.num_objective_evaluations + 1,
+      position=next_position,
+      objective_value=next_objective,
+      objective_gradient=next_gradient)
 
 
 def _check_convergence(current_position,
@@ -527,9 +455,16 @@ def _restrict_along_direction(value_and_gradients_function,
   return _restricted_func
 
 
-def _bfgs_inv_hessian_update(grad_delta,
-                             position_delta,
-                             inv_hessian_estimate):
+def _update_inv_hessian(prev_state, next_state):
+  """Update the BGFS state by computing the next inverse hessian estimate."""
+  next_inv_hessian = _bfgs_inv_hessian_update(
+      next_state.objective_gradient - prev_state.objective_gradient,
+      next_state.position - prev_state.position,
+      prev_state.inverse_hessian_estimate)
+  return _update_state(next_state, inverse_hessian_estimate=next_inv_hessian)
+
+
+def _bfgs_inv_hessian_update(grad_delta, position_delta, inv_hessian_estimate):
   """Applies the BFGS update to the inverse Hessian estimate.
 
   The BFGS update rule is (note A^T denotes the transpose of a vector/matrix A).
@@ -698,3 +633,19 @@ def _tensor_product(t1, t2):
   padded_shape = tf.concat([t1_shape, padding], axis=0)
   t1_padded = tf.reshape(t1, padded_shape)
   return t1_padded * t2
+
+
+def _update_state(state, **kwargs):
+  """Copies the argument and overrides some of its fields.
+
+  Args:
+    state: A namedtuple instance, e.g. BfgsOptimizerResults, holding values
+      for the current state of the algorithm computation.
+    **kwargs: Other named arguments represent fields in the tuple to override
+      with new values.
+
+  Returns:
+    A namedtuple, of the same class as the input argument, with the updated
+    fields.
+  """
+  return state._replace(**kwargs)
