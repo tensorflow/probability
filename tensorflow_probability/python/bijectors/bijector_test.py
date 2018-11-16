@@ -27,10 +27,10 @@ import six
 import tensorflow as tf
 
 from tensorflow_probability.python import bijectors as tfb
-from tensorflow.python.framework import test_util
+tfe = tf.contrib.eager
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class BaseBijectorTest(tf.test.TestCase):
   """Tests properties of the Bijector base-class."""
 
@@ -119,7 +119,7 @@ class BrokenBijector(tfb.Bijector):
     return tf.log(2.)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class BijectorTestEventNdims(tf.test.TestCase):
 
   def assertRaisesError(self, msg):
@@ -200,7 +200,7 @@ class BijectorCachingTestBase(object):
       broken_bijector.forward_log_det_jacobian(x, event_ndims=1)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class BijectorCachingTest(BijectorCachingTestBase, tf.test.TestCase):
   """Test caching with BrokenBijector."""
 
@@ -243,7 +243,7 @@ class ConstantJacobian(tfb.Bijector):
     return tf.constant(-2., x.dtype)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class BijectorReduceEventDimsTest(tf.test.TestCase):
   """Test caching with BrokenBijector."""
 

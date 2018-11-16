@@ -25,9 +25,8 @@ import tensorflow_probability as tfp
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
 from tensorflow_probability.python.internal import test_case
 
-from tensorflow.python.framework import test_util
-
 tfd = tfp.distributions
+tfe = tf.contrib.eager
 
 
 class _TriangularTest(object):
@@ -337,7 +336,7 @@ class _TriangularTest(object):
         atol=0)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class TriangularTestStaticShape(test_case.TestCase, _TriangularTest):
   _dtype = np.float32
   _use_static_shape = True
@@ -346,7 +345,7 @@ class TriangularTestStaticShape(test_case.TestCase, _TriangularTest):
     self._rng = np.random.RandomState(123)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class TriangularTestFloat64StaticShape(test_case.TestCase, _TriangularTest):
   _dtype = np.float64
   _use_static_shape = True
@@ -355,7 +354,7 @@ class TriangularTestFloat64StaticShape(test_case.TestCase, _TriangularTest):
     self._rng = np.random.RandomState(123)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class TriangularTestDynamicShape(test_case.TestCase, _TriangularTest):
   _dtype = np.float32
   _use_static_shape = False

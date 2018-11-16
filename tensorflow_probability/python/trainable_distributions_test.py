@@ -23,12 +23,11 @@ import numpy as np
 
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow.python.framework import test_util
-
 tfd = tfp.distributions
+tfe = tf.contrib.eager
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class TestMVNTriL(tf.test.TestCase):
 
   def setUp(self):
@@ -115,7 +114,7 @@ class TestMVNTriL(tf.test.TestCase):
     self.assertAllEqual(expected_scale_, scale_)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class TestBernoulli(tf.test.TestCase):
 
   def setUp(self):
@@ -173,7 +172,7 @@ class TestBernoulli(tf.test.TestCase):
     self.assertAllClose(np.sum(x_, axis=-1), logits_, atol=0, rtol=1e-3)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class TestNormal(tf.test.TestCase):
 
   def setUp(self):
@@ -231,7 +230,7 @@ class TestNormal(tf.test.TestCase):
     self.assertAllClose(np.sum(x_, axis=-1), loc_, atol=0, rtol=1e-3)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class TestPoisson(tf.test.TestCase):
 
   def setUp(self):
@@ -289,7 +288,7 @@ class TestPoisson(tf.test.TestCase):
     self.assertAllClose(np.sum(x_, axis=-1), log_rate_, atol=0, rtol=1e-3)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class TestMakePositiveFunctions(tf.test.TestCase):
 
   def softplus(self, x):

@@ -24,9 +24,8 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from tensorflow.python.framework import test_util
-
 tfd = tfp.distributions
+tfe = tf.contrib.eager
 
 
 def _set_seed(seed):
@@ -210,7 +209,7 @@ class REMCTest(tf.test.TestCase):
     self.assertAllClose(samps_.mean(), 0., atol=0.1, rtol=0.1)
     self.assertAllClose(samps_.std(), 1., atol=0.1, rtol=0.1)
 
-  @test_util.run_in_graph_and_eager_modes()
+  @tfe.run_test_in_graph_and_eager_modes()
   def testNormalOddNumReplicasLowTolerance(self):
     """Sampling from the Standard Normal Distribution."""
     samps_ = self._getNormalREMCSamples(
@@ -219,7 +218,7 @@ class REMCTest(tf.test.TestCase):
     self.assertAllClose(samps_.mean(), 0., atol=0.3, rtol=0.1)
     self.assertAllClose(samps_.std(), 1., atol=0.3, rtol=0.1)
 
-  @test_util.run_in_graph_and_eager_modes()
+  @tfe.run_test_in_graph_and_eager_modes()
   def testNormalEvenNumReplicasLowTolerance(self):
     """Sampling from the Standard Normal Distribution."""
     samps_ = self._getNormalREMCSamples(

@@ -24,9 +24,8 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from tensorflow.python.framework import test_util
-
 tfd = tfp.distributions
+tfe = tf.contrib.eager
 
 
 class LangevinTest(tf.test.TestCase):
@@ -162,7 +161,7 @@ class LangevinTest(tf.test.TestCase):
     self.assertAllClose(np.squeeze(sample_mean_), true_mean, atol=0.1, rtol=0.1)
     self.assertAllClose(np.squeeze(sample_cov_), true_cov, atol=0.1, rtol=0.1)
 
-  @test_util.run_in_graph_and_eager_modes()
+  @tfe.run_test_in_graph_and_eager_modes()
   def testLangevinCorrectVolatilityGradient(self):
     """Check that the gradient of the volatility is computed correctly."""
     # Consider the example target distribution as in `testLangevin3DNormal`

@@ -26,7 +26,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.distributions import student_t
-from tensorflow.python.framework import test_util
+tfe = tf.contrib.eager
 
 
 def try_import(name):  # pylint: disable=invalid-name
@@ -41,7 +41,7 @@ def try_import(name):  # pylint: disable=invalid-name
 stats = try_import("scipy.stats")
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class StudentTTest(tf.test.TestCase):
 
   def testStudentPDFAndLogPDF(self):

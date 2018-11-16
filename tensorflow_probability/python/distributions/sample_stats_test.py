@@ -23,11 +23,10 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from tensorflow.python.framework import test_util
 from tensorflow.python.ops import spectral_ops_test_util
 
+tfe = tf.contrib.eager
 tfd = tfp.distributions
-
 rng = np.random.RandomState(0)
 
 
@@ -218,7 +217,7 @@ class _AutoCorrelationTest(object):
       self.assertLess(np.abs(rxx_[1:]).mean(), 0.02)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class AutoCorrelationTestStaticShapeFloat32(tf.test.TestCase,
                                             _AutoCorrelationTest):
 
@@ -231,7 +230,7 @@ class AutoCorrelationTestStaticShapeFloat32(tf.test.TestCase,
     return True
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class AutoCorrelationTestStaticShapeComplex64(tf.test.TestCase,
                                               _AutoCorrelationTest):
 
@@ -244,7 +243,7 @@ class AutoCorrelationTestStaticShapeComplex64(tf.test.TestCase,
     return True
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class AutoCorrelationTestDynamicShapeFloat32(tf.test.TestCase,
                                              _AutoCorrelationTest):
 
@@ -257,7 +256,7 @@ class AutoCorrelationTestDynamicShapeFloat32(tf.test.TestCase,
     return False
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class PercentileTestWithLowerInterpolation(tf.test.TestCase):
 
   _interpolation = "lower"

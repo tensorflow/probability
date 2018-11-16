@@ -23,13 +23,12 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from tensorflow.python.framework import test_util
-
 tfd = tfp.distributions
+tfe = tf.contrib.eager
 rng = np.random.RandomState(123)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class SinhArcsinhTest(tf.test.TestCase):
 
   def test_default_is_same_as_normal(self):

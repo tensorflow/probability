@@ -24,10 +24,10 @@ import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_util
-from tensorflow.python.framework import test_util as tf_test_util
+tfe = tf.contrib.eager
 
 
-@tf_test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
 
   @property
@@ -190,7 +190,7 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
         rtol=0.02)
 
 
-@tf_test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class NICETest(RealNVPTest):
 
   @property
@@ -203,7 +203,7 @@ class NICETest(RealNVPTest):
     }
 
 
-@tf_test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class RealNVPConstantShiftScaleTest(RealNVPTest):
 
   @property

@@ -23,9 +23,9 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from tensorflow.python.framework import test_util
 from tensorflow.python.ops import spectral_ops_test_util
 
+tfe = tf.contrib.eager
 rng = np.random.RandomState(0)
 
 
@@ -214,7 +214,7 @@ class _AutoCorrelationTest(object):
       self.assertLess(np.abs(rxx_[1:]).mean(), 0.02)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class AutoCorrelationTestStaticShapeFloat32(tf.test.TestCase,
                                             _AutoCorrelationTest):
 
@@ -227,7 +227,7 @@ class AutoCorrelationTestStaticShapeFloat32(tf.test.TestCase,
     return True
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class AutoCorrelationTestStaticShapeComplex64(tf.test.TestCase,
                                               _AutoCorrelationTest):
 
@@ -240,7 +240,7 @@ class AutoCorrelationTestStaticShapeComplex64(tf.test.TestCase,
     return True
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class AutoCorrelationTestDynamicShapeFloat32(tf.test.TestCase,
                                              _AutoCorrelationTest):
 
@@ -253,7 +253,7 @@ class AutoCorrelationTestDynamicShapeFloat32(tf.test.TestCase,
     return False
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class PercentileTestWithLowerInterpolation(tf.test.TestCase):
 
   _interpolation = 'lower'
@@ -467,7 +467,7 @@ class PercentileTestWithNearestInterpolation(tf.test.TestCase):
     self.assertAllEqual(0, self.evaluate(minval))
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class CovarianceTest(tf.test.TestCase):
 
   def _np_cov_1d(self, x, y):
@@ -622,7 +622,7 @@ class CovarianceTest(tf.test.TestCase):
     tfp.stats.covariance(x)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class CorrelationTest(tf.test.TestCase):
 
   def _np_corr_1d(self, x, y):
@@ -682,7 +682,7 @@ class CorrelationTest(tf.test.TestCase):
               self._np_corr_1d(x_i[:, m], y_i[:, n]), corr_i[m, n])
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class CholeskyCovarianceTest(tf.test.TestCase):
 
   def test_batch_vector_sampaxis1_eventaxis2(self):
@@ -711,7 +711,7 @@ class CholeskyCovarianceTest(tf.test.TestCase):
     self.assertAllClose(2 * np.eye(2), chol[1, ...], atol=0.06)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class VarianceTest(tf.test.TestCase):
   """Light test:  Most methods tested implicitly by CovarianceTest."""
 
@@ -731,7 +731,7 @@ class VarianceTest(tf.test.TestCase):
     self.assertAllClose(np.var(x), var)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class StddevTest(tf.test.TestCase):
   """Light test:  Most methods tested implicitly by VarianceTest."""
 

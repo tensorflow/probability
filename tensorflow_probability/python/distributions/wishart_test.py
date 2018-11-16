@@ -23,9 +23,8 @@ import numpy as np
 from scipy import linalg
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow.python.framework import test_util
-
 tfd = tfp.distributions
+tfe = tf.contrib.eager
 
 
 def make_pd(start, n):
@@ -48,7 +47,7 @@ def wishart_var(df, x):
       d[..., np.newaxis], d[..., np.newaxis, :])
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class WishartTest(tf.test.TestCase):
 
   def testEntropy(self):

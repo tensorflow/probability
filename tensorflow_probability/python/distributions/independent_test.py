@@ -24,7 +24,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from tensorflow.python.framework import test_util
+tfe = tf.contrib.eager
 
 
 def try_import(name):  # pylint: disable=invalid-name
@@ -40,7 +40,7 @@ stats = try_import("scipy.stats")
 tfd = tfp.distributions
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class ProductDistributionTest(tf.test.TestCase):
 
   def setUp(self):

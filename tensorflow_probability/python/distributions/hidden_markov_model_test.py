@@ -23,14 +23,13 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util
-from tensorflow.python.framework import test_util as tf_test_util
-
 tfd = tfp.distributions
+tfe = tf.contrib.eager
 
 # pylint: disable=no-member
 
 
-@tf_test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class _HiddenMarkovModelTest(test_util.VectorDistributionTestHelpers,
                              test_util.DiscreteScalarDistributionTestHelpers):
 

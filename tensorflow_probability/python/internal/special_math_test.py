@@ -26,7 +26,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.internal import special_math
-from tensorflow.python.framework import test_util
+tfe = tf.contrib.eager
 
 
 def try_import(name):  # pylint: disable=invalid-name
@@ -63,7 +63,7 @@ def _make_grid(dtype, grid_spec):
 def _value_and_gradient(fn, *args):
   """Calls `fn` and computes the gradient of the result wrt `arg`."""
   if tf.executing_eagerly():
-    v, g = tf.contrib.eager.value_and_gradients_function(fn)(args)
+    v, g = tfe.value_and_gradients_function(fn)(args)
   else:
     v = fn(*args)
     g = tf.gradients(v, args)
@@ -82,7 +82,7 @@ class NdtriTest(tf.test.TestCase):
     all_true = np.ones_like(is_finite, dtype=np.bool)
     self.assertAllEqual(all_true, is_finite)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testNdtri(self):
     """Verifies that ndtri computation is correct."""
     if not special:
@@ -130,16 +130,16 @@ class NdtriTest(tf.test.TestCase):
         lambda x: special_math.ndtri(x), p)  # pylint: disable=unnecessary-lambda
     self.assertAllFinite(self.evaluate(grads[0]))
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testNdtriFiniteGradientFloat32(self):
     self._baseNdtriFiniteGradientTest(np.float32)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testNdtriFiniteGradientFloat64(self):
     self._baseNdtriFiniteGradientTest(np.float64)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class NdtrTest(tf.test.TestCase):
   _use_log = False
   # Grid min/max chosen to ensure 0 < cdf(x) < 1.

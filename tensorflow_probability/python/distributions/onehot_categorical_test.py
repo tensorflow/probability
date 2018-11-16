@@ -22,9 +22,8 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow.python.framework import test_util
-
 tfd = tfp.distributions
+tfe = tf.contrib.eager
 
 
 def make_onehot_categorical(batch_shape, num_classes, dtype=tf.int32):
@@ -33,7 +32,7 @@ def make_onehot_categorical(batch_shape, num_classes, dtype=tf.int32):
   return tfd.OneHotCategorical(logits, dtype=dtype)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class OneHotCategoricalTest(tf.test.TestCase):
 
   def setUp(self):

@@ -27,7 +27,7 @@ import tensorflow as tf
 
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import normal as normal_lib
-from tensorflow.python.framework import test_util
+tfe = tf.contrib.eager
 
 
 def try_import(name):  # pylint: disable=invalid-name
@@ -68,7 +68,7 @@ class NormalTest(tf.test.TestCase):
     self.assertEqual(expected, mu_shape)
     self.assertEqual(expected, sigma_shape)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testSampleLikeArgsGetDistDType(self):
     dist = normal_lib.Normal(0., 1.)
     self.assertEqual(tf.float32, dist.dtype)
@@ -76,20 +76,20 @@ class NormalTest(tf.test.TestCase):
                    "log_survival_function", "survival_function", "quantile"):
       self.assertEqual(tf.float32, getattr(dist, method)(1).dtype)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testParamShapes(self):
     sample_shape = [10, 3, 4]
     self._testParamShapes(sample_shape, sample_shape)
     self._testParamShapes(tf.constant(sample_shape), sample_shape)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testParamStaticShapes(self):
     sample_shape = [10, 3, 4]
     self._testParamStaticShapes(sample_shape, sample_shape)
     self._testParamStaticShapes(
         tf.TensorShape(sample_shape), sample_shape)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testNormalLogPDF(self):
     batch_size = 6
     mu = tf.constant([3.0] * batch_size)
@@ -122,7 +122,7 @@ class NormalTest(tf.test.TestCase):
     self.assertAllClose(expected_log_pdf, self.evaluate(log_pdf))
     self.assertAllClose(np.exp(expected_log_pdf), self.evaluate(pdf))
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testNormalLogPDFMultidimensional(self):
     batch_size = 6
     mu = tf.constant([[3.0, -3.0]] * batch_size)
@@ -159,7 +159,7 @@ class NormalTest(tf.test.TestCase):
     self.assertAllClose(expected_log_pdf, log_pdf_values)
     self.assertAllClose(np.exp(expected_log_pdf), pdf_values)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testNormalCDF(self):
     batch_size = 50
     mu = self._rng.randn(batch_size)
@@ -180,7 +180,7 @@ class NormalTest(tf.test.TestCase):
     expected_cdf = stats.norm(mu, sigma).cdf(x)
     self.assertAllClose(expected_cdf, self.evaluate(cdf), atol=0)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testNormalSurvivalFunction(self):
     batch_size = 50
     mu = self._rng.randn(batch_size)
@@ -202,7 +202,7 @@ class NormalTest(tf.test.TestCase):
     expected_sf = stats.norm(mu, sigma).sf(x)
     self.assertAllClose(expected_sf, self.evaluate(sf), atol=0)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testNormalLogCDF(self):
     batch_size = 50
     mu = self._rng.randn(batch_size)
@@ -245,7 +245,7 @@ class NormalTest(tf.test.TestCase):
             self.assertAllFinite(grads[0])
             self.assertAllFinite(grads[1])
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testNormalLogSurvivalFunction(self):
     batch_size = 50
     mu = self._rng.randn(batch_size)
@@ -268,7 +268,7 @@ class NormalTest(tf.test.TestCase):
     expected_sf = stats.norm(mu, sigma).logsf(x)
     self.assertAllClose(expected_sf, self.evaluate(sf), atol=0, rtol=1e-5)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testNormalEntropyWithScalarInputs(self):
     # Scipy.stats.norm cannot deal with the shapes in the other test.
     mu_v = 2.34
@@ -289,7 +289,7 @@ class NormalTest(tf.test.TestCase):
     expected_entropy = stats.norm(mu_v, sigma_v).entropy()
     self.assertAllClose(expected_entropy, self.evaluate(entropy))
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testNormalEntropy(self):
     mu_v = np.array([1.0, 1.0, 1.0])
     sigma_v = np.array([[1.0, 2.0, 3.0]]).T
@@ -308,7 +308,7 @@ class NormalTest(tf.test.TestCase):
     self.assertAllEqual(normal.batch_shape, entropy.shape)
     self.assertAllEqual(normal.batch_shape, self.evaluate(entropy).shape)
 
-  @test_util.run_in_graph_and_eager_modes(assert_no_eager_garbage=True)
+  @tfe.run_test_in_graph_and_eager_modes(assert_no_eager_garbage=True)
   def testNormalMeanAndMode(self):
     # Mu will be broadcast to [7, 7, 7].
     mu = [7.]
@@ -322,7 +322,7 @@ class NormalTest(tf.test.TestCase):
     self.assertAllEqual((3,), normal.mode().shape)
     self.assertAllEqual([7., 7, 7], self.evaluate(normal.mode()))
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testNormalQuantile(self):
     batch_size = 52
     mu = self._rng.randn(batch_size)
@@ -373,7 +373,7 @@ class NormalTest(tf.test.TestCase):
   def testQuantileFiniteGradientAtDifficultPointsFloat64(self):
     self._baseQuantileFiniteGradientAtDifficultPoints(np.float64)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testNormalVariance(self):
     # sigma will be broadcast to [7, 7, 7]
     mu = [1., 2., 3.]
@@ -384,7 +384,7 @@ class NormalTest(tf.test.TestCase):
     self.assertAllEqual((3,), normal.variance().shape)
     self.assertAllEqual([49., 49, 49], self.evaluate(normal.variance()))
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testNormalStandardDeviation(self):
     # sigma will be broadcast to [7, 7, 7]
     mu = [1., 2., 3.]
@@ -395,7 +395,7 @@ class NormalTest(tf.test.TestCase):
     self.assertAllEqual((3,), normal.stddev().shape)
     self.assertAllEqual([7., 7, 7], self.evaluate(normal.stddev()))
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testNormalSample(self):
     mu = tf.constant(3.0)
     sigma = tf.constant(math.sqrt(3.0))
@@ -440,7 +440,7 @@ class NormalTest(tf.test.TestCase):
     self.assertIsNotNone(grad_mu)
     self.assertIsNotNone(grad_sigma)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testNormalSampleMultiDimensional(self):
     batch_size = 2
     mu = tf.constant([[3.0, -3.0]] * batch_size)
@@ -475,14 +475,14 @@ class NormalTest(tf.test.TestCase):
     self.assertAllEqual(expected_samples_shape, samples.shape)
     self.assertAllEqual(expected_samples_shape, sample_values.shape)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testNegativeSigmaFails(self):
     with self.assertRaisesOpError("Condition x > 0 did not hold"):
       normal = normal_lib.Normal(
           loc=[1.], scale=[-5.], validate_args=True, name="G")
       self.evaluate(normal.mean())
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testNormalShape(self):
     mu = tf.constant([-3.0] * 5)
     sigma = tf.constant(11.0)
@@ -508,7 +508,7 @@ class NormalTest(tf.test.TestCase):
                    feed_dict={mu: 5.0,
                               sigma: [1.0, 2.0]}), [2])
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testNormalNormalKL(self):
     batch_size = 6
     mu_a = np.array([3.0] * batch_size)

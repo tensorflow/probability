@@ -25,9 +25,8 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.distributions import transformed_distribution_test
 
-from tensorflow.python.framework import test_util
-
 tfd = tfp.distributions
+tfe = tf.contrib.eager
 
 
 class _ChooseLocation(tfp.bijectors.ConditionalBijector):
@@ -60,7 +59,7 @@ class _ChooseLocation(tfp.bijectors.ConditionalBijector):
     return tf.gather(self._loc, z)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class ConditionalTransformedDistributionTest(
     transformed_distribution_test.TransformedDistributionTest):
 
@@ -78,7 +77,7 @@ class ConditionalTransformedDistributionTest(
                 conditional_normal.sample(5, bijector_kwargs={"z": z}))), z)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class ConditionalScalarToMultiTest(
     transformed_distribution_test.ScalarToMultiTest):
 

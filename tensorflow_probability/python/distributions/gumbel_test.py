@@ -25,9 +25,8 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
-from tensorflow.python.framework import test_util
-
 tfd = tfp.distributions
+tfe = tf.contrib.eager
 
 
 class _GumbelTest(object):
@@ -227,19 +226,19 @@ class _GumbelTest(object):
         atol=0)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class GumbelTestStaticShape(test_case.TestCase, _GumbelTest):
   _dtype = np.float32
   _use_static_shape = True
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class GumbelTestFloat64StaticShape(test_case.TestCase, _GumbelTest):
   _dtype = np.float64
   _use_static_shape = True
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class GumbelTestDynamicShape(test_case.TestCase, _GumbelTest):
   _dtype = np.float32
   _use_static_shape = False

@@ -26,12 +26,11 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
 
-from tensorflow.python.framework import test_util
-
 tfd = tfp.distributions
+tfe = tf.contrib.eager
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class MultivariateNormalDiagTest(test_case.TestCase):
   """Well tested because this is a simple override of the base class."""
 

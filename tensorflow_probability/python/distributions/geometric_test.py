@@ -24,15 +24,14 @@ from scipy import stats
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from tensorflow.python.framework import test_util
-
 tfd = tfp.distributions
+tfe = tf.contrib.eager
 
 
 # In all tests that follow, we use scipy.stats.geom, which
 # represents the "Shifted" Geometric distribution. Hence, loc=-1 is passed
 # in to each scipy function for testing.
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class GeometricTest(tf.test.TestCase):
 
   def testGeometricShape(self):

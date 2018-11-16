@@ -24,7 +24,7 @@ import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
-from tensorflow.python.framework import test_util
+tfe = tf.contrib.eager
 
 
 class _ReshapeBijectorTest(object):
@@ -225,7 +225,7 @@ class _ReshapeBijectorTest(object):
     raise NotImplementedError("Subclass failed to implement `build_shapes`.")
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class ReshapeBijectorTestStatic(tf.test.TestCase, _ReshapeBijectorTest):
 
   def build_shapes(self, shape_in, shape_out):

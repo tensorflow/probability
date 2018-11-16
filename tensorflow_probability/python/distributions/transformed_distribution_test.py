@@ -24,10 +24,9 @@ from scipy import stats
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from tensorflow.python.framework import test_util
-
-tfd = tfp.distributions
 tfb = tfp.bijectors
+tfd = tfp.distributions
+tfe = tf.contrib.eager
 
 
 class DummyMatrixTransform(tfb.Bijector):
@@ -59,7 +58,7 @@ class DummyMatrixTransform(tfb.Bijector):
     return tf.matrix_determinant(x)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class TransformedDistributionTest(tf.test.TestCase):
 
   def _cls(self):

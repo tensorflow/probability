@@ -23,10 +23,10 @@ import tensorflow as tf
 
 from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.math import numeric
-from tensorflow.python.framework import test_util
+tfe = tf.contrib.eager
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class NumericTest(test_case.TestCase, parameterized.TestCase):
 
   # Expected values computed using arbitrary precision.

@@ -27,8 +27,7 @@ from tensorflow_probability import distributions as tfd
 from tensorflow_probability.python.sts import AdditiveStateSpaceModel
 from tensorflow_probability.python.sts import LocalLinearTrendStateSpaceModel
 
-from tensorflow.python.framework import test_util
-
+tfe = tf.contrib.eager
 tfl = tf.linalg
 
 
@@ -357,7 +356,7 @@ class _AdditiveStateSpaceModelTest(object):
                 np.ones(batch_shape + [latent_size]), dtype=dtype)))
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class AdditiveStateSpaceModelTestStaticShape32(
     tf.test.TestCase, _AdditiveStateSpaceModelTest):
   dtype = np.float32
@@ -388,7 +387,7 @@ class AdditiveStateSpaceModelTestDynamicShape32(
     self.assertEqual(additive_ssm.num_timesteps, num_timesteps)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class AdditiveStateSpaceModelTestStaticShape64(
     tf.test.TestCase, _AdditiveStateSpaceModelTest):
   dtype = np.float64

@@ -24,13 +24,12 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
 
-from tensorflow.python.framework import test_util
-
 tfd = tfp.distributions
+tfe = tf.contrib.eager
 rng = np.random.RandomState(123)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class QuantizedDistributionTest(test_case.TestCase):
 
   def _assert_all_finite(self, array):

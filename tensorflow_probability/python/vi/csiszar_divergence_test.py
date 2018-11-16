@@ -25,9 +25,8 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
-from tensorflow.python.framework import test_util
-
 tfd = tfp.distributions
+tfe = tf.contrib.eager
 
 
 def tridiag(d, diag_value, offdiag_value):
@@ -38,7 +37,7 @@ def tridiag(d, diag_value, offdiag_value):
   return diag_mat + three_bands
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class AmariAlphaTest(test_case.TestCase):
 
   def setUp(self):
@@ -92,7 +91,7 @@ class AmariAlphaTest(test_case.TestCase):
            - alpha * (self._u - 1)) / (alpha * (alpha - 1.)))
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class KLReverseTest(test_case.TestCase):
 
   def setUp(self):
@@ -115,7 +114,7 @@ class KLReverseTest(test_case.TestCase):
         -self._logu + (self._u - 1.))
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class KLForwardTest(test_case.TestCase):
 
   def setUp(self):
@@ -138,7 +137,7 @@ class KLForwardTest(test_case.TestCase):
         self._u * self._logu - (self._u - 1.))
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class JensenShannonTest(test_case.TestCase):
 
   def setUp(self):
@@ -175,7 +174,7 @@ class JensenShannonTest(test_case.TestCase):
          - (1 + self._u) * np.log((1 + self._u) / 2)))
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class ArithmeticGeometricMeanTest(test_case.TestCase):
 
   def setUp(self):
@@ -206,7 +205,7 @@ class ArithmeticGeometricMeanTest(test_case.TestCase):
         (1. + self._u) * np.log(0.5 * (1. + self._u) / np.sqrt(self._u)))
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class TotalVariationTest(test_case.TestCase):
 
   def setUp(self):
@@ -222,7 +221,7 @@ class TotalVariationTest(test_case.TestCase):
         0.5 * np.abs(self._u - 1))
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class PearsonTest(test_case.TestCase):
 
   def setUp(self):
@@ -238,7 +237,7 @@ class PearsonTest(test_case.TestCase):
         np.square(self._u - 1))
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class SquaredHellingerTest(test_case.TestCase):
 
   def setUp(self):
@@ -260,7 +259,7 @@ class SquaredHellingerTest(test_case.TestCase):
         np.square(np.sqrt(self._u) - 1))
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class TriangularTest(test_case.TestCase):
 
   def setUp(self):
@@ -282,7 +281,7 @@ class TriangularTest(test_case.TestCase):
         np.square(self._u - 1) / (1 + self._u))
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class TPowerTest(test_case.TestCase):
 
   def setUp(self):
@@ -326,7 +325,7 @@ class TPowerTest(test_case.TestCase):
         self._u ** 1.1 - 1. - 1.1 * (self._u - 1.))
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class Log1pAbsTest(test_case.TestCase):
 
   def setUp(self):
@@ -342,7 +341,7 @@ class Log1pAbsTest(test_case.TestCase):
         self._u**(np.sign(self._u - 1)) - 1)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class JeffreysTest(test_case.TestCase):
 
   def setUp(self):
@@ -364,7 +363,7 @@ class JeffreysTest(test_case.TestCase):
         0.5 * (self._u * self._logu - self._logu))
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class ChiSquareTest(test_case.TestCase):
 
   def setUp(self):
@@ -380,7 +379,7 @@ class ChiSquareTest(test_case.TestCase):
         self._u**2 - 1)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class ModifiedGanTest(test_case.TestCase):
 
   def setUp(self):
@@ -404,7 +403,7 @@ class ModifiedGanTest(test_case.TestCase):
         np.log1p(self._u) - self._logu + 0.5 * (self._u - 1))
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class SymmetrizedCsiszarFunctionTest(test_case.TestCase):
 
   def setUp(self):
@@ -443,7 +442,7 @@ class SymmetrizedCsiszarFunctionTest(test_case.TestCase):
         self.evaluate(tfp.vi.jeffreys(self._logu)))
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class DualCsiszarFunctionTest(test_case.TestCase):
 
   def setUp(self):
@@ -463,7 +462,7 @@ class DualCsiszarFunctionTest(test_case.TestCase):
         self.evaluate(tfp.vi.kl_forward(self._logu)))
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
 
   def test_kl_forward(self):
@@ -696,7 +695,7 @@ class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
         rtol=0.017, atol=0.)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class CsiszarVIMCOTest(test_case.TestCase):
 
   def _csiszar_vimco_helper(self, logu):

@@ -24,12 +24,11 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.bijectors import bijector_test_util
-from tensorflow.python.framework import test_util
-
 tfb = tfp.bijectors
+tfe = tf.contrib.eager
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class AffineScalarBijectorTest(tf.test.TestCase):
   """Tests correctness of the Y = scale @ x + shift transformation."""
 

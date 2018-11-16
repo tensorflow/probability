@@ -19,10 +19,9 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from tensorflow.python.framework import test_util
-
-tfl = tf.linalg
 tfd = tfp.distributions
+tfe = tf.contrib.eager
+tfl = tf.linalg
 
 
 class VariationalInferenceTests(tf.test.TestCase):
@@ -67,7 +66,7 @@ class VariationalInferenceTests(tf.test.TestCase):
       self.assertAllEqual(avg_loss.shape, [num_inits] + batch_shape)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class HMCTests(tf.test.TestCase):
 
   def _build_model(self, observed_time_series):

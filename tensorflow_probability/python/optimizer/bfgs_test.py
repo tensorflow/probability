@@ -25,9 +25,6 @@ from scipy.stats import special_ortho_group
 
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow.python.framework import test_util
-
-
 tfe = tf.contrib.eager
 
 
@@ -47,7 +44,7 @@ def _norm(x):
 class BfgsTest(tf.test.TestCase):
   """Tests for BFGS optimization algorithm."""
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def test_quadratic_bowl_2d(self):
     """Can minimize a two dimensional quadratic function."""
     minimum = np.array([1.0, 1.0])
@@ -66,7 +63,7 @@ class BfgsTest(tf.test.TestCase):
     self.assertTrue(final_gradient_norm <= 1e-8)
     self.assertArrayNear(results.position, minimum, 1e-5)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def test_inverse_hessian_spec(self):
     """Checks that specifying the 'initial_inverse_hessian_estimate' works."""
     minimum = np.array([1.0, 1.0], dtype=np.float32)
@@ -88,7 +85,7 @@ class BfgsTest(tf.test.TestCase):
     self.assertTrue(final_gradient_norm <= 1e-8)
     self.assertArrayNear(results.position, minimum, 1e-5)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def test_bad_inverse_hessian_spec(self):
     """Checks that specifying a non-positive definite inverse hessian fails."""
     minimum = np.array([1.0, 1.0], dtype=np.float32)
@@ -106,7 +103,7 @@ class BfgsTest(tf.test.TestCase):
           quadratic, initial_position=start, tolerance=1e-8,
           initial_inverse_hessian_estimate=bad_inv_hessian))
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def test_asymmetric_inverse_hessian_spec(self):
     """Checks that specifying a asymmetric inverse hessian fails."""
     minimum = np.array([1.0, 1.0], dtype=np.float32)
@@ -124,7 +121,7 @@ class BfgsTest(tf.test.TestCase):
           quadratic, initial_position=start, tolerance=1e-8,
           initial_inverse_hessian_estimate=bad_inv_hessian))
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def test_quadratic_bowl_10d(self):
     """Can minimize a ten dimensional quadratic function."""
     dim = 10
@@ -145,7 +142,7 @@ class BfgsTest(tf.test.TestCase):
     self.assertTrue(final_gradient_norm <= 1e-8)
     self.assertArrayNear(results.position, minimum, 1e-5)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def test_quadratic_with_skew(self):
     """Can minimize a general quadratic function."""
     dim = 3
@@ -170,7 +167,7 @@ class BfgsTest(tf.test.TestCase):
     self.assertTrue(final_gradient_norm <= 1e-8)
     self.assertArrayNear(results.position, minimum, 1e-5)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def test_quadratic_with_strong_skew(self):
     """Can minimize a strongly skewed quadratic function."""
     np.random.seed(89793)
@@ -195,7 +192,7 @@ class BfgsTest(tf.test.TestCase):
     self.assertTrue(final_gradient_norm <= 1e-8)
     self.assertArrayNear(results.position, minimum, 1e-5)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def test_rosenbrock_2d(self):
     """Tests BFGS on the Rosenbrock function.
 
@@ -272,7 +269,7 @@ class BfgsTest(tf.test.TestCase):
                            1e-5)
       self.assertEqual(results.num_objective_evaluations, expected_evals)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def test_data_fitting(self):
     """Tests MLE estimation for a simple geometric GLM."""
     n, dim = 100, 3

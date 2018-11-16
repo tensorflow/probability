@@ -23,7 +23,6 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.distributions import laplace as laplace_lib
-from tensorflow.python.framework import test_util
 from tensorflow.python.ops.distributions.kullback_leibler import kl_divergence
 
 tfe = tf.contrib.eager
@@ -41,7 +40,7 @@ def try_import(name):  # pylint: disable=invalid-name
 stats = try_import("scipy.stats")
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class LaplaceTest(tf.test.TestCase):
 
   def testLaplaceShape(self):

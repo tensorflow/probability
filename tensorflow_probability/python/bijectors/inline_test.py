@@ -22,10 +22,10 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
-from tensorflow.python.framework import test_util
+tfe = tf.contrib.eager
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class InlineBijectorTest(tf.test.TestCase):
   """Tests correctness of the inline constructed bijector."""
 
