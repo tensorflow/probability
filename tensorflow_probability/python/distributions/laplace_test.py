@@ -21,10 +21,9 @@ import importlib
 # Dependency imports
 import numpy as np
 import tensorflow as tf
+import tensorflow_probability as tfp
 
-from tensorflow_probability.python.distributions import laplace as laplace_lib
-from tensorflow.python.ops.distributions.kullback_leibler import kl_divergence
-
+tfd = tfp.distributions
 tfe = tf.contrib.eager
 
 
@@ -46,7 +45,7 @@ class LaplaceTest(tf.test.TestCase):
   def testLaplaceShape(self):
     loc = tf.constant([3.0] * 5)
     scale = tf.constant(11.0)
-    laplace = laplace_lib.Laplace(loc=loc, scale=scale)
+    laplace = tfd.Laplace(loc=loc, scale=scale)
 
     self.assertEqual(self.evaluate(laplace.batch_shape_tensor()), (5,))
     self.assertEqual(laplace.batch_shape, tf.TensorShape([5]))
@@ -60,7 +59,7 @@ class LaplaceTest(tf.test.TestCase):
     loc_v = 2.0
     scale_v = 3.0
     x = np.array([2.5, 2.5, 4.0, 0.1, 1.0, 2.0], dtype=np.float32)
-    laplace = laplace_lib.Laplace(loc=loc, scale=scale)
+    laplace = tfd.Laplace(loc=loc, scale=scale)
     log_pdf = laplace.log_prob(x)
     self.assertEqual(log_pdf.shape, (6,))
     if not stats:
@@ -79,7 +78,7 @@ class LaplaceTest(tf.test.TestCase):
     loc_v = np.array([2.0, 4.0])
     scale_v = np.array([3.0, 4.0])
     x = np.array([[2.5, 2.5, 4.0, 0.1, 1.0, 2.0]], dtype=np.float32).T
-    laplace = laplace_lib.Laplace(loc=loc, scale=scale)
+    laplace = tfd.Laplace(loc=loc, scale=scale)
     log_pdf = laplace.log_prob(x)
     log_pdf_values = self.evaluate(log_pdf)
     self.assertEqual(log_pdf.shape, (6, 2))
@@ -100,7 +99,7 @@ class LaplaceTest(tf.test.TestCase):
     loc_v = np.array([2.0, 4.0])
     scale_v = 3.0
     x = np.array([[2.5, 2.5, 4.0, 0.1, 1.0, 2.0]], dtype=np.float32).T
-    laplace = laplace_lib.Laplace(loc=loc, scale=scale)
+    laplace = tfd.Laplace(loc=loc, scale=scale)
     log_pdf = laplace.log_prob(x)
     log_pdf_values = self.evaluate(log_pdf)
     self.assertEqual(log_pdf.shape, (6, 2))
@@ -122,7 +121,7 @@ class LaplaceTest(tf.test.TestCase):
     scale_v = 3.0
     x = np.array([2.5, 2.5, 4.0, 0.1, 1.0, 2.0], dtype=np.float32)
 
-    laplace = laplace_lib.Laplace(loc=loc, scale=scale)
+    laplace = tfd.Laplace(loc=loc, scale=scale)
 
     cdf = laplace.cdf(x)
     self.assertEqual(cdf.shape, (6,))
@@ -139,7 +138,7 @@ class LaplaceTest(tf.test.TestCase):
     scale_v = 3.0
     x = np.array([-2.5, 2.5, -4.0, 0.1, 1.0, 2.0], dtype=np.float32)
 
-    laplace = laplace_lib.Laplace(loc=loc, scale=scale)
+    laplace = tfd.Laplace(loc=loc, scale=scale)
 
     cdf = laplace.log_cdf(x)
     self.assertEqual(cdf.shape, (6,))
@@ -156,7 +155,7 @@ class LaplaceTest(tf.test.TestCase):
     scale_v = 3.0
     x = np.array([-2.5, 2.5, -4.0, 0.1, 1.0, 2.0], dtype=np.float32)
 
-    laplace = laplace_lib.Laplace(loc=loc, scale=scale)
+    laplace = tfd.Laplace(loc=loc, scale=scale)
 
     sf = laplace.log_survival_function(x)
     self.assertEqual(sf.shape, (6,))
@@ -168,7 +167,7 @@ class LaplaceTest(tf.test.TestCase):
   def testLaplaceMean(self):
     loc_v = np.array([1.0, 3.0, 2.5])
     scale_v = np.array([1.0, 4.0, 5.0])
-    laplace = laplace_lib.Laplace(loc=loc_v, scale=scale_v)
+    laplace = tfd.Laplace(loc=loc_v, scale=scale_v)
     self.assertEqual(laplace.mean().shape, (3,))
     if not stats:
       return
@@ -178,14 +177,14 @@ class LaplaceTest(tf.test.TestCase):
   def testLaplaceMode(self):
     loc_v = np.array([0.5, 3.0, 2.5])
     scale_v = np.array([1.0, 4.0, 5.0])
-    laplace = laplace_lib.Laplace(loc=loc_v, scale=scale_v)
+    laplace = tfd.Laplace(loc=loc_v, scale=scale_v)
     self.assertEqual(laplace.mode().shape, (3,))
     self.assertAllClose(self.evaluate(laplace.mode()), loc_v)
 
   def testLaplaceVariance(self):
     loc_v = np.array([1.0, 3.0, 2.5])
     scale_v = np.array([1.0, 4.0, 5.0])
-    laplace = laplace_lib.Laplace(loc=loc_v, scale=scale_v)
+    laplace = tfd.Laplace(loc=loc_v, scale=scale_v)
     self.assertEqual(laplace.variance().shape, (3,))
     if not stats:
       return
@@ -195,7 +194,7 @@ class LaplaceTest(tf.test.TestCase):
   def testLaplaceStd(self):
     loc_v = np.array([1.0, 3.0, 2.5])
     scale_v = np.array([1.0, 4.0, 5.0])
-    laplace = laplace_lib.Laplace(loc=loc_v, scale=scale_v)
+    laplace = tfd.Laplace(loc=loc_v, scale=scale_v)
     self.assertEqual(laplace.stddev().shape, (3,))
     if not stats:
       return
@@ -205,7 +204,7 @@ class LaplaceTest(tf.test.TestCase):
   def testLaplaceEntropy(self):
     loc_v = np.array([1.0, 3.0, 2.5])
     scale_v = np.array([1.0, 4.0, 5.0])
-    laplace = laplace_lib.Laplace(loc=loc_v, scale=scale_v)
+    laplace = tfd.Laplace(loc=loc_v, scale=scale_v)
     self.assertEqual(laplace.entropy().shape, (3,))
     if not stats:
       return
@@ -218,7 +217,7 @@ class LaplaceTest(tf.test.TestCase):
     loc = tf.constant(loc_v)
     scale = tf.constant(scale_v)
     n = 100000
-    laplace = laplace_lib.Laplace(loc=loc, scale=scale)
+    laplace = tfd.Laplace(loc=loc, scale=scale)
     samples = laplace.sample(n, seed=137)
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n,))
@@ -243,7 +242,7 @@ class LaplaceTest(tf.test.TestCase):
     with tf.GradientTape() as tape:
       tape.watch(loc)
       tape.watch(scale)
-      laplace = laplace_lib.Laplace(loc=loc, scale=scale)
+      laplace = tfd.Laplace(loc=loc, scale=scale)
       samples = laplace.sample(100)
     grad_loc, grad_scale = tape.gradient(samples, [loc, scale])
     self.assertIsNotNone(grad_loc)
@@ -252,7 +251,7 @@ class LaplaceTest(tf.test.TestCase):
   def testLaplaceSampleMultiDimensional(self):
     loc_v = np.array([np.arange(1, 101, dtype=np.float32)])  # 1 x 100
     scale_v = np.array([np.arange(1, 11, dtype=np.float32)]).T  # 10 x 1
-    laplace = laplace_lib.Laplace(loc=loc_v, scale=scale_v)
+    laplace = tfd.Laplace(loc=loc_v, scale=scale_v)
     n = 10000
     samples = laplace.sample(n, seed=137)
     sample_values = self.evaluate(samples)
@@ -291,7 +290,7 @@ class LaplaceTest(tf.test.TestCase):
     return ks < 0.02
 
   def testLaplacePdfOfSampleMultiDims(self):
-    laplace = laplace_lib.Laplace(loc=[7., 11.], scale=[[5.], [6.]])
+    laplace = tfd.Laplace(loc=[7., 11.], scale=[[5.], [6.]])
     num = 50000
     samples = laplace.sample(num, seed=137)
     pdfs = laplace.prob(samples)
@@ -331,13 +330,13 @@ class LaplaceTest(tf.test.TestCase):
     loc_v = tf.constant(0.0, name="loc")
     scale_v = tf.constant(-1.0, name="scale")
     with self.assertRaisesOpError("Condition x > 0 did not hold element-wise"):
-      laplace = laplace_lib.Laplace(
+      laplace = tfd.Laplace(
           loc=loc_v, scale=scale_v, validate_args=True)
       self.evaluate(laplace.mean())
     loc_v = tf.constant(1.0, name="loc")
     scale_v = tf.constant(0.0, name="scale")
     with self.assertRaisesOpError("Condition x > 0 did not hold element-wise"):
-      laplace = laplace_lib.Laplace(
+      laplace = tfd.Laplace(
           loc=loc_v, scale=scale_v, validate_args=True)
       self.evaluate(laplace.mean())
 
@@ -351,15 +350,15 @@ class LaplaceTest(tf.test.TestCase):
     b_loc = np.array([[0.4] * event_size] * batch_size, dtype=np.float32)
     b_scale = np.array([[0.2] * event_size] * batch_size, dtype=np.float32)
 
-    a = laplace_lib.Laplace(loc=a_loc, scale=a_scale)
-    b = laplace_lib.Laplace(loc=b_loc, scale=b_scale)
+    a = tfd.Laplace(loc=a_loc, scale=a_scale)
+    b = tfd.Laplace(loc=b_loc, scale=b_scale)
 
     distance = tf.abs(a_loc - b_loc)
     ratio = a_scale / b_scale
     true_kl = (-tf.log(ratio) - 1 + distance / b_scale +
                ratio * tf.exp(-distance / a_scale))
 
-    kl = kl_divergence(a, b)
+    kl = tfd.kl_divergence(a, b)
 
     x = a.sample(int(1e4), seed=0)
     kl_sample = tf.reduce_mean(a.log_prob(x) - b.log_prob(x), 0)
@@ -368,7 +367,7 @@ class LaplaceTest(tf.test.TestCase):
     self.assertAllEqual(true_kl_, kl_)
     self.assertAllClose(true_kl_, kl_sample_, atol=0., rtol=1e-1)
 
-    zero_kl = kl_divergence(a, a)
+    zero_kl = tfd.kl_divergence(a, a)
     true_zero_kl_, zero_kl_ = self.evaluate([tf.zeros_like(true_kl), zero_kl])
     self.assertAllEqual(true_zero_kl_, zero_kl_)
 

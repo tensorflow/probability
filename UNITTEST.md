@@ -11,11 +11,11 @@ testing static shape).
 
 ```python
 import tensorflow as tf
-from tensorflow.python.framework import test_util
+tfe = tf.contrib.eager
 
 class _DistributionTest(object):
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testSomething(self):
     input_ = ...  # Using `self.dtype`.
     input_ph = tf.placeholder_with_default(
@@ -49,11 +49,11 @@ respectively appropriate check, i.e.,
 
 ```python
 import tensorflow as tf
-from tensorflow.python.framework import test_util
+tfe = tf.contrib.eager
 
 class _DistributionTest(object):
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testSomething(self):
     input_ = ...
     …

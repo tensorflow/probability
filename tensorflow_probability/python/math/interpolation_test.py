@@ -20,14 +20,12 @@ from __future__ import print_function
 import numpy as np
 from scipy import interpolate as scipy_interpolate
 import tensorflow as tf
-
 import tensorflow_probability as tfp
 
-from tensorflow.python.eager import context
-from tensorflow.python.framework import test_util
+tfe = tf.contrib.eager
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class InterpRegular1DGridTest(tf.test.TestCase):
   """Test for tfp.math.interp_regular_1d_grid."""
 
@@ -282,7 +280,7 @@ class InterpRegular1DGridTest(tf.test.TestCase):
       y = tfp.math.interp_regular_1d_grid(x, x_min, x_max, y_ref)
       y_ = self.evaluate(y)
       self.assertAllClose(y_, y_expected, atol=0, rtol=1e-6)
-      if not context.executing_eagerly():
+      if not tf.executing_eagerly():
         dy_dx_ = tf.gradients(y, x)[0].eval()
         self.assertAllClose([2., 2., 0., 2., 2.], dy_dx_)
 

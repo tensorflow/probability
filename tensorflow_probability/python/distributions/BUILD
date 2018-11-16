@@ -1358,6 +1358,7 @@ py_test(
         ":laplace",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability",
     ],
 )
 
