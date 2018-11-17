@@ -24,6 +24,8 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_case
+
 from tensorflow.python.framework import test_util
 
 
@@ -42,13 +44,13 @@ tfd = tfp.distributions
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class CauchyTest(tf.test.TestCase):
+class CauchyTest(test_case.TestCase):
 
   def setUp(self):
     self._rng = np.random.RandomState(123)
 
-  def assertAllFinite(self, tensor):
-    is_finite = np.isfinite(self.evaluate(tensor))
+  def assertAllFinite(self, array):
+    is_finite = np.isfinite(array)
     all_true = np.ones_like(is_finite, dtype=np.bool)
     self.assertAllEqual(all_true, is_finite)
 
@@ -207,23 +209,26 @@ class CauchyTest(tf.test.TestCase):
 
   def testFiniteGradientAtDifficultPoints(self):
     for dtype in [np.float32, np.float64]:
-      g = tf.Graph()
-      with g.as_default():
-        loc = tf.Variable(dtype(0.0))
-        scale = tf.Variable(dtype(1.0))
-        dist = tfd.Cauchy(loc=loc, scale=scale)
-        x = np.array([-100., -20., -5., 0., 5., 20., 100.]).astype(dtype)
-        for func in [
-            dist.cdf, dist.log_cdf, dist.survival_function,
-            dist.log_survival_function, dist.log_prob, dist.prob
-        ]:
-          value = func(x)
-          grads = tf.gradients(value, [loc, scale])
-          with self.test_session(graph=g):
-            tf.global_variables_initializer().run()
-            self.assertAllFinite(value)
-            self.assertAllFinite(grads[0])
-            self.assertAllFinite(grads[1])
+      loc = tf.Variable(dtype(0.0))
+      scale = tf.Variable(dtype(1.0))
+      x = np.array([-100., -20., -5., 0., 5., 20., 100.]).astype(dtype)
+      def cauchy_function(name, x):
+        def cauchy(loc, scale):
+          return getattr(tfd.Cauchy(loc=loc, scale=scale), name)(x)
+        return cauchy
+
+      self.evaluate(tf.global_variables_initializer())
+      for func_name in [
+          "cdf", "log_cdf", "survival_function",
+          "log_survival_function", "log_prob", "prob"
+      ]:
+        print(func_name)
+        value = self.evaluate(cauchy_function(func_name, x)(loc, scale))
+        grads = self.compute_gradients(
+            cauchy_function(func_name, x), args=[loc, scale])
+        self.assertAllFinite(value)
+        self.assertAllFinite(grads[0])
+        self.assertAllFinite(grads[1])
 
   def testCauchyLogSurvivalFunction(self):
     batch_size = 50

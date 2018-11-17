@@ -23,12 +23,14 @@ import collections
 # Dependency imports
 import tensorflow as tf
 
-
+from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.distributions import mvn_tril
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import seed_stream
-from tensorflow_probability.python.internal import distribution_util as util
 
-from tensorflow.python.framework import tensor_util
+from tensorflow_probability.python.internal import distribution_util as util
+from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.ops.linalg import linear_operator_util
 
 tfl = tf.linalg
@@ -153,7 +155,7 @@ def _augment_sample_shape(partial_batch_dist,
     return full_sample_and_batch_shape[:num_broadcast_dims]
 
 
-class LinearGaussianStateSpaceModel(tf.distributions.Distribution):
+class LinearGaussianStateSpaceModel(distribution.Distribution):
   """Observation distribution from a linear Gaussian state space model.
 
   The state space model, sometimes called a Kalman filter, posits a
@@ -286,13 +288,14 @@ class LinearGaussianStateSpaceModel(tf.distributions.Distribution):
       transition_matrix: A transition operator, represented by a Tensor or
         LinearOperator of shape `[latent_size, latent_size]`, or by a
         callable taking as argument a scalar integer Tensor `t` and
-        returning a timestep-specific Tensor or LinearOperator.
+        returning a Tensor or LinearOperator representing the transition
+        operator from latent state at time `t` to time `t + 1`.
       transition_noise: An instance of
         `tfd.MultivariateNormalLinearOperator` with event shape
         `[latent_size]`, representing the mean and covariance of the
         transition noise model, or a callable taking as argument a
-        scalar integer Tensor `t` and returning a timestep-specific
-        noise model.
+        scalar integer Tensor `t` and returning such a distribution
+        representing the noise in the transition from time `t` to time `t + 1`.
       observation_matrix: An observation operator, represented by a Tensor
         or LinearOperator of shape `[observation_size, latent_size]`,
         or by a callable taking as argument a scalar integer Tensor
@@ -336,6 +339,7 @@ class LinearGaussianStateSpaceModel(tf.distributions.Distribution):
       self.initial_step = initial_step
       self.final_step = self.initial_step + self.num_timesteps
 
+      # TODO(b/78475680): Friendly dtype inference.
       dtype = initial_state_prior.dtype
 
       # Internally, the transition and observation matrices are
@@ -445,7 +449,7 @@ class LinearGaussianStateSpaceModel(tf.distributions.Distribution):
 
       super(LinearGaussianStateSpaceModel, self).__init__(
           dtype=dtype,
-          reparameterization_type=tf.distributions.FULLY_REPARAMETERIZED,
+          reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
           parameters=parameters,
@@ -488,9 +492,9 @@ class LinearGaussianStateSpaceModel(tf.distributions.Distribution):
 
   def _event_shape(self):
     return tf.TensorShape([
-        tensor_util.constant_value(
+        tf.contrib.util.constant_value(
             tf.convert_to_tensor(self.num_timesteps)),
-        tensor_util.constant_value(
+        tf.contrib.util.constant_value(
             tf.convert_to_tensor(self.observation_size))])
 
   def _event_shape_tensor(self):
@@ -945,9 +949,8 @@ def build_kalman_filter_step(get_transition_matrix_for_timestep,
   return kalman_filter_step
 
 
-def linear_gaussian_update(prior_mean, prior_cov,
-                           observation_matrix, observation_noise,
-                           x_observed):
+def linear_gaussian_update(
+    prior_mean, prior_cov, observation_matrix, observation_noise, x_observed):
   """Conjugate update for a linear Gaussian model.
 
   Given a normal prior on a latent variable `z`,
@@ -985,9 +988,16 @@ def linear_gaussian_update(prior_mean, prior_cov,
     posterior_cov: `Tensor` with event shape `[latent_size,
       latent_size]` and batch shape `B`.
     predictive_dist: the prior predictive distribution `p(x|z)`,
-      as a `tfd.MultivariateNormalTriL` instance with event
-      shape `[observation_size]` and batch shape `B`.
+      as a `Distribution` instance with event
+      shape `[observation_size]` and batch shape `B`. This will
+      typically be `tfd.MultivariateNormalTriL`, but when
+      `observation_size=1` we return a `tfd.Independent(tfd.Normal)`
+      instance as an optimization.
   """
+
+  # If observations are scalar, we can avoid some matrix ops.
+  observation_size_is_static_and_scalar = (
+      observation_matrix.shape[-2].value == 1)
 
   # Push the predicted mean for the latent state through the
   # observation model
@@ -1013,8 +1023,11 @@ def linear_gaussian_update(prior_mean, prior_cov,
   #      = (S^{-1} * H * P)'
   #      = (S^{-1} * tmp_obs_cov) '
   #      = (S \ tmp_obs_cov)'
-  predicted_obs_cov_chol = tf.cholesky(predicted_obs_cov)
-  gain_transpose = tf.cholesky_solve(predicted_obs_cov_chol, tmp_obs_cov)
+  if observation_size_is_static_and_scalar:
+    gain_transpose = tmp_obs_cov/predicted_obs_cov
+  else:
+    predicted_obs_cov_chol = tf.cholesky(predicted_obs_cov)
+    gain_transpose = tf.cholesky_solve(predicted_obs_cov_chol, tmp_obs_cov)
 
   # Compute the posterior mean, incorporating the observation.
   #  u* = u + K (x_observed - x_expected)
@@ -1031,19 +1044,29 @@ def linear_gaussian_update(prior_mean, prior_cov,
   # which always produces a PSD result. This uses
   #  tmp_term = (I - K * H)'
   # as an intermediate quantity.
-  latent_size = util.prefer_static_value(observation_matrix.shape_tensor())[-1]
-  tmp_term = (
-      tf.eye(latent_size, dtype=observation_matrix.dtype) -
-      observation_matrix.matmul(gain_transpose, adjoint=True))
+  tmp_term = -observation_matrix.matmul(gain_transpose, adjoint=True)  # -K * H
+  tmp_term = tf.matrix_set_diag(tmp_term, tf.matrix_diag_part(tmp_term) + 1)
   posterior_cov = (
       _matmul(tmp_term, _matmul(prior_cov, tmp_term), adjoint_a=True)
       + _matmul(gain_transpose,
                 _matmul(observation_noise.covariance(), gain_transpose),
                 adjoint_a=True))
 
-  predictive_dist = mvn_tril.MultivariateNormalTriL(
-      loc=x_expected[..., 0],
-      scale_tril=predicted_obs_cov_chol)
+  if observation_size_is_static_and_scalar:
+    # A plain Normal would have event shape `[]`; wrapping with Independent
+    # ensures `event_shape=[1]` as required.
+    predictive_dist = independent.Independent(
+        normal.Normal(loc=x_expected[..., 0],
+                      scale=tf.sqrt(predicted_obs_cov[..., 0])),
+        reinterpreted_batch_ndims=1)
+
+    # Minor hack to define the covariance, so that `predictive_dist` can pass as
+    # an MVNTriL-like object.
+    predictive_dist.covariance = lambda: predicted_obs_cov
+  else:
+    predictive_dist = mvn_tril.MultivariateNormalTriL(
+        loc=x_expected[..., 0],
+        scale_tril=predicted_obs_cov_chol)
 
   return posterior_mean, posterior_cov, predictive_dist
 
@@ -1093,8 +1116,8 @@ def build_kalman_mean_step(get_transition_matrix_for_timestep,
     previous_latent_mean, _ = previous_means
 
     latent_mean = _propagate_mean(previous_latent_mean,
-                                  get_transition_matrix_for_timestep(t),
-                                  get_transition_noise_for_timestep(t))
+                                  get_transition_matrix_for_timestep(t - 1),
+                                  get_transition_noise_for_timestep(t - 1))
     observation_mean = _propagate_mean(latent_mean,
                                        get_observation_matrix_for_timestep(t),
                                        get_observation_noise_for_timestep(t))
@@ -1136,8 +1159,8 @@ def build_kalman_cov_step(get_transition_matrix_for_timestep,
 
     latent_cov = _propagate_cov(
         previous_latent_cov,
-        get_transition_matrix_for_timestep(t),
-        get_transition_noise_for_timestep(t))
+        get_transition_matrix_for_timestep(t - 1),
+        get_transition_noise_for_timestep(t - 1))
     observation_cov = _propagate_cov(
         latent_cov,
         get_observation_matrix_for_timestep(t),
@@ -1187,8 +1210,8 @@ def build_kalman_sample_step(get_transition_matrix_for_timestep,
     """Sample values for a single timestep."""
     latent_prev, _ = sampled_prev
 
-    transition_matrix = get_transition_matrix_for_timestep(t)
-    transition_noise = get_transition_noise_for_timestep(t)
+    transition_matrix = get_transition_matrix_for_timestep(t - 1)
+    transition_noise = get_transition_noise_for_timestep(t - 1)
 
     latent_pred = transition_matrix.matmul(latent_prev)
     latent_sampled = latent_pred + transition_noise.sample(

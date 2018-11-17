@@ -22,8 +22,8 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python.bijectors import bijector
 from tensorflow.python.framework import tensor_util
-from tensorflow.python.ops.distributions import bijector
 
 
 __all__ = [
@@ -178,7 +178,7 @@ class Reshape(bijector.Bijector):
     assertions = []
 
     ndims = tf.rank(shape)
-    ndims_ = tensor_util.constant_value(ndims)
+    ndims_ = tf.contrib.util.constant_value(ndims)
     if ndims_ is not None and ndims_ > 1:
       raise ValueError('`{}` rank ({}) should be <= 1.'.format(
           shape, ndims_))
@@ -190,7 +190,7 @@ class Reshape(bijector.Bijector):
     # Note, we might be inclined to use tensor_util.constant_value_as_shape
     # here, but that method coerces negative values into `None`s, rendering the
     # checks we do below impossible.
-    shape_tensor_ = tensor_util.constant_value(shape)
+    shape_tensor_ = tf.contrib.util.constant_value(shape)
     if shape_tensor_ is not None:
       es = np.int32(shape_tensor_)
       if sum(es == -1) > 1:
@@ -359,7 +359,7 @@ class Reshape(bijector.Bijector):
       #
       # If `event_shape_in` is not statically known, we can only add runtime
       # validations to the graph (if enabled).
-      event_shape_in_ = tensor_util.constant_value(event_shape_in)
+      event_shape_in_ = tf.contrib.util.constant_value(event_shape_in)
       if event_shape_in_ is not None:
         # Check that `event_shape_` and `event_shape_in` are compatible in
         # the sense that they have equal entries in any position that isn't a

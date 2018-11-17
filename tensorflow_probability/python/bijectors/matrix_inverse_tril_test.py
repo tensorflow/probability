@@ -23,7 +23,6 @@ import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
-from tensorflow.python.framework import errors
 from tensorflow.python.framework import test_util
 
 
@@ -142,16 +141,16 @@ class MatrixInverseTriLBijectorTest(tf.test.TestCase):
   ##   x_ = np.array([[1., 2., 3.],
   ##                  [4., 5., 6.]], dtype=np.float32)
   ##   square_error_msg = "must be a square matrix"
-  ##   with self.assertRaisesWithPredicateMatch(errors.InvalidArgumentError,
+  ##   with self.assertRaisesWithPredicateMatch(tf.errors.InvalidArgumentError,
   ##                                            square_error_msg):
   ##     self.evaluate(inv.forward(x_))
-  ##   with self.assertRaisesWithPredicateMatch(errors.InvalidArgumentError,
+  ##   with self.assertRaisesWithPredicateMatch(tf.errors.InvalidArgumentError,
   ##                                            square_error_msg):
   ##     self.evaluate(inv.inverse(x_))
-  ##   with self.assertRaisesWithPredicateMatch(errors.InvalidArgumentError,
+  ##   with self.assertRaisesWithPredicateMatch(tf.errors.InvalidArgumentError,
   ##                                            square_error_msg):
   ##     self.evaluate(inv.forward_log_det_jacobian(x_, event_ndims=2))
-  ##   with self.assertRaisesWithPredicateMatch(errors.InvalidArgumentError,
+  ##   with self.assertRaisesWithPredicateMatch(tf.errors.InvalidArgumentError,
   ##                                            square_error_msg):
   ##     self.evaluate(inv.inverse_log_det_jacobian(x_, event_ndims=2))
 
@@ -160,16 +159,16 @@ class MatrixInverseTriLBijectorTest(tf.test.TestCase):
     x_ = np.array([[1., 2.],
                    [3., 4.]], dtype=np.float32)
     triangular_error_msg = "must be lower triangular"
-    with self.assertRaisesWithPredicateMatch(errors.InvalidArgumentError,
+    with self.assertRaisesWithPredicateMatch(tf.errors.InvalidArgumentError,
                                              triangular_error_msg):
       self.evaluate(inv.forward(x_))
-    with self.assertRaisesWithPredicateMatch(errors.InvalidArgumentError,
+    with self.assertRaisesWithPredicateMatch(tf.errors.InvalidArgumentError,
                                              triangular_error_msg):
       self.evaluate(inv.inverse(x_))
-    with self.assertRaisesWithPredicateMatch(errors.InvalidArgumentError,
+    with self.assertRaisesWithPredicateMatch(tf.errors.InvalidArgumentError,
                                              triangular_error_msg):
       self.evaluate(inv.forward_log_det_jacobian(x_, event_ndims=2))
-    with self.assertRaisesWithPredicateMatch(errors.InvalidArgumentError,
+    with self.assertRaisesWithPredicateMatch(tf.errors.InvalidArgumentError,
                                              triangular_error_msg):
       self.evaluate(inv.inverse_log_det_jacobian(x_, event_ndims=2))
 

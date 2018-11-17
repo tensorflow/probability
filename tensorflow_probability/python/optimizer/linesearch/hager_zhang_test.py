@@ -22,6 +22,7 @@ import numpy as np
 
 import tensorflow as tf
 import tensorflow_probability as tfp
+from tensorflow.python.framework import test_util
 
 
 def _is_exact_wolfe(x, f_x, df_x, f_0, df_0, delta, sigma):
@@ -40,35 +41,38 @@ def _is_approx_wolfe(_, f_x, df_x, f_0, df_0, delta, sigma, epsilon):
 class HagerZhangTest(tf.test.TestCase):
   """Tests for Hager Zhang line search algorithm."""
 
+  @test_util.run_in_graph_and_eager_modes
   def test_quadratic(self):
     fdf = lambda x: ((x-1.3)**2, 2*(x-1.3))
-    # Case 1: The starting value is close to 0 and doesn't bracket the min.
-    with self.test_session() as session:
-      close_start, far_start = tf.constant(0.1), tf.constant(7.0)
-      results_close = session.run(tfp.optimizer.linesearch.hager_zhang(
-          fdf, initial_step_size=close_start))
-      self.assertTrue(results_close.converged)
-      self.assertAlmostEqual(results_close.left_pt, results_close.right_pt)
-      f0, df0 = fdf(0.0)
-      self.assertTrue(_is_exact_wolfe(results_close.left_pt,
-                                      results_close.objective_at_left_pt,
-                                      results_close.grad_objective_at_left_pt,
-                                      f0,
-                                      df0,
-                                      0.1,
-                                      0.9))
-      results_far = session.run(tfp.optimizer.linesearch.hager_zhang(
-          fdf, initial_step_size=far_start))
-      self.assertTrue(results_far.converged)
-      self.assertAlmostEqual(results_far.left_pt, results_far.right_pt)
-      self.assertTrue(_is_exact_wolfe(results_far.left_pt,
-                                      results_far.objective_at_left_pt,
-                                      results_far.grad_objective_at_left_pt,
-                                      f0,
-                                      df0,
-                                      0.1,
-                                      0.9))
 
+    # Case 1: The starting value is close to 0 and doesn't bracket the min.
+    close_start, far_start = tf.constant(0.1), tf.constant(7.0)
+    results_close = self.evaluate(tfp.optimizer.linesearch.hager_zhang(
+        fdf, initial_step_size=close_start))
+    self.assertTrue(results_close.converged)
+    self.assertAlmostEqual(results_close.left_pt, results_close.right_pt)
+    f0, df0 = fdf(0.0)
+    self.assertTrue(_is_exact_wolfe(results_close.left_pt,
+                                    results_close.objective_at_left_pt,
+                                    results_close.grad_objective_at_left_pt,
+                                    f0,
+                                    df0,
+                                    0.1,
+                                    0.9))
+
+    results_far = self.evaluate(tfp.optimizer.linesearch.hager_zhang(
+        fdf, initial_step_size=far_start))
+    self.assertTrue(results_far.converged)
+    self.assertAlmostEqual(results_far.left_pt, results_far.right_pt)
+    self.assertTrue(_is_exact_wolfe(results_far.left_pt,
+                                    results_far.objective_at_left_pt,
+                                    results_far.grad_objective_at_left_pt,
+                                    f0,
+                                    df0,
+                                    0.1,
+                                    0.9))
+
+  @test_util.run_in_graph_and_eager_modes
   def test_multiple_minima(self):
     # This function has two minima in the direction of positive x.
     # The first is around x=0.46 and the second around 2.65.
@@ -77,23 +81,24 @@ class HagerZhangTest(tf.test.TestCase):
              + 5.015 * x**2 - 6.043 * x - 1)
       dval = 4.94 * x**4 - 19.84 * x**3 + 14.934 * x**2 + 10.03 * x - 6.043
       return val, dval
-    with self.test_session() as session:
-      starts = (tf.constant(0.1), tf.constant(1.5), tf.constant(2.0),
-                tf.constant(4.0))
-      for start in starts:
-        results = session.run(tfp.optimizer.linesearch.hager_zhang(
-            fdf, initial_step_size=start))
-        self.assertTrue(results.converged)
-        self.assertAlmostEqual(results.left_pt, results.right_pt)
-        f0, df0 = fdf(0.0)
-        self.assertTrue(_is_exact_wolfe(results.left_pt,
-                                        results.objective_at_left_pt,
-                                        results.grad_objective_at_left_pt,
-                                        f0,
-                                        df0,
-                                        0.1,
-                                        0.9))
 
+    starts = (tf.constant(0.1), tf.constant(1.5), tf.constant(2.0),
+              tf.constant(4.0))
+    for start in starts:
+      results = self.evaluate(tfp.optimizer.linesearch.hager_zhang(
+          fdf, initial_step_size=start))
+      self.assertTrue(results.converged)
+      self.assertAlmostEqual(results.left_pt, results.right_pt)
+      f0, df0 = fdf(0.0)
+      self.assertTrue(_is_exact_wolfe(results.left_pt,
+                                      results.objective_at_left_pt,
+                                      results.grad_objective_at_left_pt,
+                                      f0,
+                                      df0,
+                                      0.1,
+                                      0.9))
+
+  @test_util.run_in_graph_and_eager_modes
   def test_rosenbrock(self):
     """Tests one pass of line search on the Rosenbrock function.
 
@@ -122,20 +127,45 @@ class HagerZhangTest(tf.test.TestCase):
       dfy = 200 * (y - x**2)
       return fv, tf.stack([dfx, dfy])
 
-    with self.test_session() as session:
-      x0 = tf.constant([-3.0, -4.0])
-      dirn = tf.constant([0.5, 1.0])  # This is a descent direction at x0
-      def fdf(t):
-        """Value and derivative of Rosenbrock projected along a descent dirn."""
-        coord = x0 + t * dirn
-        ft, df = rosenbrock(coord)
-        return ft, tf.reduce_sum(df * dirn)
-      results = session.run(tfp.optimizer.linesearch.hager_zhang(
-          fdf, initial_step_size=1.0))
-      self.assertTrue(results.converged)
+    x0 = tf.constant([-3.0, -4.0])
+    dirn = tf.constant([0.5, 1.0])  # This is a descent direction at x0
+    def fdf(t):
+      """Value and derivative of Rosenbrock projected along a descent dirn."""
+      coord = x0 + t * dirn
+      ft, df = rosenbrock(coord)
+      return ft, tf.reduce_sum(df * dirn)
+    results = self.evaluate(tfp.optimizer.linesearch.hager_zhang(
+        fdf, initial_step_size=1.0))
+    self.assertTrue(results.converged)
 
+  @test_util.run_in_graph_and_eager_modes
   def test_eval_count(self):
     """Tests that the evaluation count is reported correctly."""
+    if tf.executing_eagerly():
+      self._test_eval_count_eager()
+    else:
+      self._test_eval_count_graph()
+
+  def _test_eval_count_eager(self):
+    starts = [0.1, 4.0]
+
+    def get_val_and_grad_fn():
+      def _val_and_grad_fn(x):
+        _val_and_grad_fn.num_calls += 1
+        f = x * x - 2 * x + 1
+        df = 2 * (x - 1)
+        return f, df
+
+      _val_and_grad_fn.num_calls = 0
+      return _val_and_grad_fn
+
+    for start in starts:
+      fdf = get_val_and_grad_fn()
+      results = self.evaluate(tfp.optimizer.linesearch.hager_zhang(
+          fdf, initial_step_size=tf.constant(start)))
+      self.assertEqual(fdf.num_calls, results.func_evals)
+
+  def _test_eval_count_graph(self):
     starts = [0.1, 4.0]
     def get_fn():
       eval_count = tf.Variable(0)
@@ -155,13 +185,14 @@ class HagerZhangTest(tf.test.TestCase):
       results = tfp.optimizer.linesearch.hager_zhang(
           fdf, initial_step_size=tf.constant(start))
       init = tf.global_variables_initializer()
-      with self.test_session() as session:
+      with self.cached_session() as session:
         session.run(init)
         results = session.run(results)
         actual_evals = session.run(counter)
         self.assertTrue(results.converged)
         self.assertEqual(actual_evals, results.func_evals)
 
+  @test_util.run_in_graph_and_eager_modes
   def test_approx_wolfe(self):
     """Tests appropriate usage of approximate Wolfe conditions."""
     # The approximate Wolfe conditions only kick in when we are very close to
@@ -175,47 +206,47 @@ class HagerZhangTest(tf.test.TestCase):
       fv = dtype(1) - dtype(2) * (x + shift) + (x + shift) ** 2
       dfv = - dtype(2) + dtype(2) * (x + shift)
       return fv, dfv
-    with self.test_session() as session:
-      start = tf.constant(dtype(1e-8))
-      results = session.run(
-          tfp.optimizer.linesearch.hager_zhang(
-              fdf,
-              initial_step_size=start,
-              sufficient_decrease_param=0.1,
-              curvature_param=0.9,
-              threshold_use_approximate_wolfe_condition=1e-6))
-      self.assertTrue(results.converged)
-      f0, df0 = fdf(0.0)
-      self.assertFalse(_is_exact_wolfe(results.left_pt,
-                                       results.objective_at_left_pt,
-                                       results.grad_objective_at_left_pt,
-                                       f0,
-                                       df0,
-                                       0.1,
-                                       0.9))
-      self.assertTrue(_is_approx_wolfe(results.left_pt,
-                                       results.objective_at_left_pt,
-                                       results.grad_objective_at_left_pt,
-                                       f0,
-                                       df0,
-                                       0.1,
-                                       0.9,
-                                       1e-6))
 
+    start = tf.constant(dtype(1e-8))
+    results = self.evaluate(
+        tfp.optimizer.linesearch.hager_zhang(
+            fdf,
+            initial_step_size=start,
+            sufficient_decrease_param=0.1,
+            curvature_param=0.9,
+            threshold_use_approximate_wolfe_condition=1e-6))
+    self.assertTrue(results.converged)
+    f0, df0 = fdf(0.0)
+    self.assertFalse(_is_exact_wolfe(results.left_pt,
+                                     results.objective_at_left_pt,
+                                     results.grad_objective_at_left_pt,
+                                     f0,
+                                     df0,
+                                     0.1,
+                                     0.9))
+    self.assertTrue(_is_approx_wolfe(results.left_pt,
+                                     results.objective_at_left_pt,
+                                     results.grad_objective_at_left_pt,
+                                     f0,
+                                     df0,
+                                     0.1,
+                                     0.9,
+                                     1e-6))
+
+  @test_util.run_in_graph_and_eager_modes
   def test_determinism(self):
     """Tests that the results are determinsitic."""
     def fdf(x):
       return (x - 1.8)**2, 2 * (x - 1.8)
     def get_results():
-      with self.test_session() as session:
-        start = tf.constant(0.9)
-        results = tfp.optimizer.linesearch.hager_zhang(
-            fdf,
-            initial_step_size=start,
-            sufficient_decrease_param=0.1,
-            curvature_param=0.9,
-            threshold_use_approximate_wolfe_condition=1e-6)
-        return session.run(results)
+      start = tf.constant(0.9)
+      results = tfp.optimizer.linesearch.hager_zhang(
+          fdf,
+          initial_step_size=start,
+          sufficient_decrease_param=0.1,
+          curvature_param=0.9,
+          threshold_use_approximate_wolfe_condition=1e-6)
+      return self.evaluate(results)
 
     res1, res2 = get_results(), get_results()
 
@@ -224,6 +255,7 @@ class HagerZhangTest(tf.test.TestCase):
     self.assertEqual(res1.func_evals, res1.func_evals)
     self.assertEqual(res1.left_pt, res2.left_pt)
 
+  @test_util.run_in_graph_and_eager_modes
   def test_consistency(self):
     """Tests that the results are consistent."""
     def rastrigin(x, use_np=False):
@@ -232,20 +264,19 @@ class HagerZhangTest(tf.test.TestCase):
       return (10.0 + z*z - 10 * cos(2*np.pi*z),
               2 * z + 10 * 2 * np.pi * sin(2*np.pi*z))
 
-    with self.test_session() as session:
-      start = tf.constant(0.1, dtype=tf.float64)
-      results = session.run(
-          tfp.optimizer.linesearch.hager_zhang(
-              rastrigin,
-              initial_step_size=start,
-              sufficient_decrease_param=0.1,
-              curvature_param=0.9,
-              threshold_use_approximate_wolfe_condition=1e-6))
-      self.assertTrue(results.converged)
-      x = results.left_pt
-      actual_f, actual_df = rastrigin(x, use_np=True)
-      self.assertAlmostEqual(actual_f, results.objective_at_left_pt)
-      self.assertAlmostEqual(actual_df, results.grad_objective_at_left_pt)
+    start = tf.constant(0.1, dtype=tf.float64)
+    results = self.evaluate(
+        tfp.optimizer.linesearch.hager_zhang(
+            rastrigin,
+            initial_step_size=start,
+            sufficient_decrease_param=0.1,
+            curvature_param=0.9,
+            threshold_use_approximate_wolfe_condition=1e-6))
+    self.assertTrue(results.converged)
+    x = results.left_pt
+    actual_f, actual_df = rastrigin(x, use_np=True)
+    self.assertAlmostEqual(actual_f, results.objective_at_left_pt)
+    self.assertAlmostEqual(actual_df, results.grad_objective_at_left_pt)
 
 
 if __name__ == "__main__":

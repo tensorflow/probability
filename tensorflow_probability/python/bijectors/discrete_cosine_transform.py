@@ -19,7 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from tensorflow.python.ops.distributions import bijector
+from tensorflow_probability.python.bijectors import bijector
 
 
 __all__ = [
@@ -50,7 +50,7 @@ class DiscreteCosineTransform(bijector.Bijector):
   """
 
   def __init__(self, dct_type=2, validate_args=False, name='dct'):
-    """Instantiates the `PowerTransform` bijector.
+    """Instantiates the `DiscreteCosineTransform` bijector.
 
     Args:
       dct_type: Python `int`, the DCT type performed by the forward

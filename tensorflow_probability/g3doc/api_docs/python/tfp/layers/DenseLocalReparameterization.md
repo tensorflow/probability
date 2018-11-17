@@ -1,8 +1,8 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.layers.DenseLocalReparameterization" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="activity_regularizer"/>
 <meta itemprop="property" content="dtype"/>
-<meta itemprop="property" content="inbound_nodes"/>
 <meta itemprop="property" content="input"/>
 <meta itemprop="property" content="input_mask"/>
 <meta itemprop="property" content="input_shape"/>
@@ -10,7 +10,6 @@
 <meta itemprop="property" content="name"/>
 <meta itemprop="property" content="non_trainable_variables"/>
 <meta itemprop="property" content="non_trainable_weights"/>
-<meta itemprop="property" content="outbound_nodes"/>
 <meta itemprop="property" content="output"/>
 <meta itemprop="property" content="output_mask"/>
 <meta itemprop="property" content="output_shape"/>
@@ -21,13 +20,8 @@
 <meta itemprop="property" content="weights"/>
 <meta itemprop="property" content="__call__"/>
 <meta itemprop="property" content="__init__"/>
-<meta itemprop="property" content="add_loss"/>
-<meta itemprop="property" content="add_update"/>
-<meta itemprop="property" content="add_variable"/>
-<meta itemprop="property" content="add_weight"/>
 <meta itemprop="property" content="apply"/>
 <meta itemprop="property" content="build"/>
-<meta itemprop="property" content="call"/>
 <meta itemprop="property" content="compute_mask"/>
 <meta itemprop="property" content="compute_output_shape"/>
 <meta itemprop="property" content="count_params"/>
@@ -65,24 +59,15 @@ outputs = activation(matmul(inputs, kernel) + bias)
 
 It uses the local reparameterization estimator [(Kingma et al., 2015)][1],
 which performs a Monte Carlo approximation of the distribution on the hidden
-units induced by the `kernel` and `bias`.
+units induced by the `kernel` and `bias`. The default `kernel_posterior_fn`
+is a normal distribution which factorizes across all elements of the weight
+matrix and bias vector. Unlike [1]'s multiplicative parameterization, this
+distribution has trainable location and scale parameters which is known as
+an additive noise parameterization [(Molchanov et al., 2017)][2].
 
 The arguments permit separate specification of the surrogate posterior
 (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
 distributions.
-
-Properties:
-  units: Python integer, dimensionality of the output space.
-  activation: Activation function (`callable`).
-  activity_regularizer: Regularizer function for the output.
-  kernel_posterior_fn: `callable` returning posterior.
-  kernel_posterior_tensor_fn: `callable` operating on posterior.
-  kernel_prior_fn: `callable` returning prior.
-  kernel_divergence_fn: `callable` returning divergence.
-  bias_posterior_fn: `callable` returning posterior.
-  bias_posterior_tensor_fn: `callable` operating on posterior.
-  bias_prior_fn: `callable` returning prior.
-  bias_divergence_fn: `callable` returning divergence.
 
 #### Examples
 
@@ -118,6 +103,72 @@ terms which are arguments to the layer.
 [1]: Diederik Kingma, Tim Salimans, and Max Welling. Variational Dropout and
      the Local Reparameterization Trick. In _Neural Information Processing
      Systems_, 2015. https://arxiv.org/abs/1506.02557
+[2]: Dmitry Molchanov, Arsenii Ashukha, Dmitry Vetrov. Variational Dropout
+     Sparsifies Deep Neural Networks. In _International Conference on Machine
+     Learning_, 2017. https://arxiv.org/abs/1701.05369
+
+<h2 id="__init__"><code>__init__</code></h2>
+
+``` python
+__init__(
+    units,
+    activation=None,
+    activity_regularizer=None,
+    trainable=True,
+    kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
+    kernel_posterior_tensor_fn=(lambda d: d.sample()),
+    kernel_prior_fn=tfp.layers.default_multivariate_normal_fn,
+    kernel_divergence_fn=(lambda q, p, ignore: tfd.kl_divergence(q, p)),
+    bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(is_singular=True),
+    bias_posterior_tensor_fn=(lambda d: d.sample()),
+    bias_prior_fn=None,
+    bias_divergence_fn=(lambda q, p, ignore: tfd.kl_divergence(q, p)),
+    **kwargs
+)
+```
+
+Construct layer.
+
+#### Args:
+
+* <b>`units`</b>: Integer or Long, dimensionality of the output space.
+* <b>`activation`</b>: Activation function (`callable`). Set it to None to maintain a
+    linear activation.
+* <b>`activity_regularizer`</b>: Regularizer function for the output.
+* <b>`kernel_posterior_fn`</b>: Python `callable` which creates
+    `tfd.Distribution` instance representing the surrogate
+    posterior of the `kernel` parameter. Default value:
+    `default_mean_field_normal_fn()`.
+* <b>`kernel_posterior_tensor_fn`</b>: Python `callable` which takes a
+    `tfd.Distribution` instance and returns a representative
+    value. Default value: `lambda d: d.sample()`.
+* <b>`kernel_prior_fn`</b>: Python `callable` which creates `tfd`
+    instance. See `default_mean_field_normal_fn` docstring for required
+    parameter signature.
+    Default value: `tfd.Normal(loc=0., scale=1.)`.
+* <b>`kernel_divergence_fn`</b>: Python `callable` which takes the surrogate posterior
+    distribution, prior distribution and random variate sample(s) from the
+    surrogate posterior and computes or approximates the KL divergence. The
+    distributions are `tfd.Distribution`-like instances and the
+    sample is a `Tensor`.
+* <b>`bias_posterior_fn`</b>: Python `callable` which creates
+    `tfd.Distribution` instance representing the surrogate
+    posterior of the `bias` parameter. Default value:
+    `default_mean_field_normal_fn(is_singular=True)` (which creates an
+    instance of `tfd.Deterministic`).
+* <b>`bias_posterior_tensor_fn`</b>: Python `callable` which takes a
+    `tfd.Distribution` instance and returns a representative
+    value. Default value: `lambda d: d.sample()`.
+* <b>`bias_prior_fn`</b>: Python `callable` which creates `tfd` instance.
+    See `default_mean_field_normal_fn` docstring for required parameter
+    signature. Default value: `None` (no prior, no variational inference)
+* <b>`bias_divergence_fn`</b>: Python `callable` which takes the surrogate posterior
+    distribution, prior distribution and random variate sample(s) from the
+    surrogate posterior and computes or approximates the KL divergence. The
+    distributions are `tfd.Distribution`-like instances and the
+    sample is a `Tensor`.
+
+
 
 ## Properties
 
@@ -128,10 +179,6 @@ Optional regularizer function for the output of this layer.
 <h3 id="dtype"><code>dtype</code></h3>
 
 
-
-<h3 id="inbound_nodes"><code>inbound_nodes</code></h3>
-
-Deprecated, do NOT use! Only for compatibility with external Keras.
 
 <h3 id="input"><code>input</code></h3>
 
@@ -197,9 +244,9 @@ Input shape, as an integer shape tuple
 
 Losses which are associated with this `Layer`.
 
-Note that when executing eagerly, getting this property evaluates
-regularizers. When using graph execution, variable regularization ops have
-already been created and are simply returned here.
+Variable regularization tensors are created when this property is accessed,
+so it is eager safe: accessing `losses` under a `tf.GradientTape` will
+propagate gradients back to the corresponding variables.
 
 #### Returns:
 
@@ -216,10 +263,6 @@ A list of tensors.
 <h3 id="non_trainable_weights"><code>non_trainable_weights</code></h3>
 
 
-
-<h3 id="outbound_nodes"><code>outbound_nodes</code></h3>
-
-Deprecated, do NOT use! Only for compatibility with external Keras.
 
 <h3 id="output"><code>output</code></h3>
 
@@ -307,67 +350,6 @@ A list of variables.
 
 ## Methods
 
-<h3 id="__init__"><code>__init__</code></h3>
-
-``` python
-__init__(
-    units,
-    activation=None,
-    activity_regularizer=None,
-    trainable=True,
-    kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
-    kernel_posterior_tensor_fn=(lambda d: d.sample()),
-    kernel_prior_fn=tfp.layers.default_multivariate_normal_fn,
-    kernel_divergence_fn=(lambda q, p, ignore: tfd.kl_divergence(q, p)),
-    bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(is_singular=True),
-    bias_posterior_tensor_fn=(lambda d: d.sample()),
-    bias_prior_fn=None,
-    bias_divergence_fn=(lambda q, p, ignore: tfd.kl_divergence(q, p)),
-    **kwargs
-)
-```
-
-Construct layer.
-
-#### Args:
-
-* <b>`units`</b>: Integer or Long, dimensionality of the output space.
-* <b>`activation`</b>: Activation function (`callable`). Set it to None to maintain a
-    linear activation.
-* <b>`activity_regularizer`</b>: Regularizer function for the output.
-* <b>`kernel_posterior_fn`</b>: Python `callable` which creates
-    `tf.distributions.Distribution` instance representing the surrogate
-    posterior of the `kernel` parameter. Default value:
-    `default_mean_field_normal_fn()`.
-* <b>`kernel_posterior_tensor_fn`</b>: Python `callable` which takes a
-    `tf.distributions.Distribution` instance and returns a representative
-    value. Default value: `lambda d: d.sample()`.
-* <b>`kernel_prior_fn`</b>: Python `callable` which creates `tf.distributions`
-    instance. See `default_mean_field_normal_fn` docstring for required
-    parameter signature.
-    Default value: `tf.distributions.Normal(loc=0., scale=1.)`.
-* <b>`kernel_divergence_fn`</b>: Python `callable` which takes the surrogate posterior
-    distribution, prior distribution and random variate sample(s) from the
-    surrogate posterior and computes or approximates the KL divergence. The
-    distributions are `tf.distributions.Distribution`-like instances and the
-    sample is a `Tensor`.
-* <b>`bias_posterior_fn`</b>: Python `callable` which creates
-    `tf.distributions.Distribution` instance representing the surrogate
-    posterior of the `bias` parameter. Default value:
-    `default_mean_field_normal_fn(is_singular=True)` (which creates an
-    instance of `tf.distributions.Deterministic`).
-* <b>`bias_posterior_tensor_fn`</b>: Python `callable` which takes a
-    `tf.distributions.Distribution` instance and returns a representative
-    value. Default value: `lambda d: d.sample()`.
-* <b>`bias_prior_fn`</b>: Python `callable` which creates `tf.distributions` instance.
-    See `default_mean_field_normal_fn` docstring for required parameter
-    signature. Default value: `None` (no prior, no variational inference)
-* <b>`bias_divergence_fn`</b>: Python `callable` which takes the surrogate posterior
-    distribution, prior distribution and random variate sample(s) from the
-    surrogate posterior and computes or approximates the KL divergence. The
-    distributions are `tf.distributions.Distribution`-like instances and the
-    sample is a `Tensor`.
-
 <h3 id="__call__"><code>__call__</code></h3>
 
 ``` python
@@ -407,159 +389,6 @@ Note:
 
 * <b>`ValueError`</b>: if the layer's `call` method returns None (an invalid value).
 
-<h3 id="add_loss"><code>add_loss</code></h3>
-
-``` python
-add_loss(
-    losses,
-    inputs=None
-)
-```
-
-Add loss tensor(s), potentially dependent on layer inputs.
-
-Some losses (for instance, activity regularization losses) may be dependent
-on the inputs passed when calling a layer. Hence, when reusing the same
-layer on different inputs `a` and `b`, some entries in `layer.losses` may
-be dependent on `a` and some on `b`. This method automatically keeps track
-of dependencies.
-
-The `get_losses_for` method allows to retrieve the losses relevant to a
-specific set of inputs.
-
-Note that `add_loss` is not supported when executing eagerly. Instead,
-variable regularizers may be added through `add_variable`. Activity
-regularization is not supported directly (but such losses may be returned
-from `Layer.call()`).
-
-#### Arguments:
-
-* <b>`losses`</b>: Loss tensor, or list/tuple of tensors.
-* <b>`inputs`</b>: If anything other than None is passed, it signals the losses
-    are conditional on some of the layer's inputs,
-    and thus they should only be run where these inputs are available.
-    This is the case for activity regularization losses, for instance.
-    If `None` is passed, the losses are assumed
-    to be unconditional, and will apply across all dataflows of the layer
-    (e.g. weight regularization losses).
-
-
-#### Raises:
-
-* <b>`RuntimeError`</b>: If called in Eager mode.
-
-<h3 id="add_update"><code>add_update</code></h3>
-
-``` python
-add_update(
-    updates,
-    inputs=None
-)
-```
-
-Add update op(s), potentially dependent on layer inputs.
-
-Weight updates (for instance, the updates of the moving mean and variance
-in a BatchNormalization layer) may be dependent on the inputs passed
-when calling a layer. Hence, when reusing the same layer on
-different inputs `a` and `b`, some entries in `layer.updates` may be
-dependent on `a` and some on `b`. This method automatically keeps track
-of dependencies.
-
-The `get_updates_for` method allows to retrieve the updates relevant to a
-specific set of inputs.
-
-This call is ignored when eager execution is enabled (in that case, variable
-updates are run on the fly and thus do not need to be tracked for later
-execution).
-
-#### Arguments:
-
-* <b>`updates`</b>: Update op, or list/tuple of update ops.
-* <b>`inputs`</b>: If anything other than None is passed, it signals the updates
-    are conditional on some of the layer's inputs,
-    and thus they should only be run where these inputs are available.
-    This is the case for BatchNormalization updates, for instance.
-    If None, the updates will be taken into account unconditionally,
-    and you are responsible for making sure that any dependency they might
-    have is available at runtime.
-    A step counter might fall into this category.
-
-<h3 id="add_variable"><code>add_variable</code></h3>
-
-``` python
-add_variable(
-    *args,
-    **kwargs
-)
-```
-
-Alias for `add_weight`.
-
-<h3 id="add_weight"><code>add_weight</code></h3>
-
-``` python
-add_weight(
-    name,
-    shape,
-    dtype=None,
-    initializer=None,
-    regularizer=None,
-    trainable=None,
-    constraint=None,
-    partitioner=None,
-    use_resource=None,
-    synchronization=vs.VariableSynchronization.AUTO,
-    aggregation=vs.VariableAggregation.NONE,
-    getter=None
-)
-```
-
-Adds a new variable to the layer, or gets an existing one; returns it.
-
-#### Arguments:
-
-* <b>`name`</b>: variable name.
-* <b>`shape`</b>: variable shape.
-* <b>`dtype`</b>: The type of the variable. Defaults to `self.dtype` or `float32`.
-* <b>`initializer`</b>: initializer instance (callable).
-* <b>`regularizer`</b>: regularizer instance (callable).
-* <b>`trainable`</b>: whether the variable should be part of the layer's
-    "trainable_variables" (e.g. variables, biases)
-    or "non_trainable_variables" (e.g. BatchNorm mean, stddev).
-    Note, if the current variable scope is marked as non-trainable
-    then this parameter is ignored and any added variables are also
-    marked as non-trainable. `trainable` defaults to `True` unless
-    `synchronization` is set to `ON_READ`.
-* <b>`constraint`</b>: constraint instance (callable).
-* <b>`partitioner`</b>: Partitioner to be passed to the `Checkpointable` API.
-* <b>`use_resource`</b>: Whether to use `ResourceVariable`.
-* <b>`synchronization`</b>: Indicates when a distributed a variable will be
-    aggregated. Accepted values are constants defined in the class
-    `tf.VariableSynchronization`. By default the synchronization is set to
-    `AUTO` and the current `DistributionStrategy` chooses
-    when to synchronize. If `synchronization` is set to `ON_READ`,
-    `trainable` must not be set to `True`.
-* <b>`aggregation`</b>: Indicates how a distributed variable will be aggregated.
-    Accepted values are constants defined in the class
-    `tf.VariableAggregation`.
-* <b>`getter`</b>: Variable getter argument to be passed to the `Checkpointable` API.
-
-
-#### Returns:
-
-The created variable.  Usually either a `Variable` or `ResourceVariable`
-instance.  If `partitioner` is not `None`, a `PartitionedVariable`
-instance is returned.
-
-
-#### Raises:
-
-* <b>`RuntimeError`</b>: If called with partioned variable regularization and
-    eager execution is enabled.
-* <b>`ValueError`</b>: When giving unsupported dtype and no initializer or when
-    trainable has been set to True with synchronization set as `ON_READ`.
-
 <h3 id="apply"><code>apply</code></h3>
 
 ``` python
@@ -589,14 +418,6 @@ Output tensor(s).
 
 ``` python
 build(input_shape)
-```
-
-
-
-<h3 id="call"><code>call</code></h3>
-
-``` python
-call(inputs)
 ```
 
 

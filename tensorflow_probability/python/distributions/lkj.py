@@ -28,9 +28,13 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 import tensorflow as tf
-import tensorflow.distributions as tfd
 
+from tensorflow_probability.python.distributions import beta
+from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import seed_stream
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import reparameterization
 
 
 __all__ = [
@@ -42,7 +46,7 @@ def _uniform_unit_norm(dimension, shape, dtype, seed):
   """Returns a batch of points chosen uniformly from the unit hypersphere."""
   # This works because the Gaussian distribution is spherically symmetric.
   # raw shape: shape + [dimension]
-  raw = tfd.Normal(
+  raw = normal.Normal(
       loc=dtype.as_numpy_dtype(0.),
       scale=dtype.as_numpy_dtype(1.)).sample(
           tf.concat([shape, [dimension]], axis=0), seed=seed())
@@ -57,7 +61,7 @@ def _replicate(n, tensor):
   return tf.tile(tf.expand_dims(tensor, axis=0), multiples)
 
 
-class LKJ(tfd.Distribution):
+class LKJ(distribution.Distribution):
   """The LKJ distribution on correlation matrices.
 
   This is a one-parameter family of distributions on correlation matrices.  The
@@ -117,7 +121,11 @@ class LKJ(tfd.Distribution):
           'There are no negative-dimension correlation matrices.')
     parameters = dict(locals())
     with tf.name_scope(name, values=[dimension, concentration]):
-      concentration = tf.convert_to_tensor(concentration, name='concentration')
+      concentration = tf.convert_to_tensor(
+          concentration,
+          name='concentration',
+          dtype=dtype_util.common_dtype([concentration],
+                                        preferred_dtype=tf.float32))
       with tf.control_dependencies([
           # concentration >= 1
           # TODO(b/111451422) Generalize to concentration > 0.
@@ -129,7 +137,7 @@ class LKJ(tfd.Distribution):
         dtype=self._concentration.dtype,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
-        reparameterization_type=tfd.NOT_REPARAMETERIZED,
+        reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
         parameters=parameters,
         graph_parents=[self._concentration],
         name=name)
@@ -148,7 +156,7 @@ class LKJ(tfd.Distribution):
     return tf.shape(self.concentration)
 
   def _batch_shape(self):
-    return self.concentration.get_shape()
+    return self.concentration.shape
 
   def _event_shape_tensor(self):
     return tf.constant([self.dimension, self.dimension], dtype=tf.int32)
@@ -190,7 +198,7 @@ class LKJ(tfd.Distribution):
             concentration_shape, [self.dimension, self.dimension]], axis=0)
         return tf.ones(shape=shape, dtype=self.concentration.dtype)
       beta_conc = concentration + (self.dimension - 2.) / 2.
-      beta_dist = tfd.Beta(concentration1=beta_conc, concentration0=beta_conc)
+      beta_dist = beta.Beta(concentration1=beta_conc, concentration0=beta_conc)
 
       # Note that the sampler below deviates from [1], by doing the sampling in
       # cholesky space. This does not change the fundamental logic of the
@@ -220,8 +228,10 @@ class LKJ(tfd.Distribution):
         # Loop invariant: on entry, result has shape B + [n, n]
         beta_conc -= 0.5
         # norm is y in reference [1].
-        norm = tfd.Beta(concentration1=n/2., concentration0=beta_conc).sample(
-            seed=seed())
+        norm = beta.Beta(
+            concentration1=n/2.,
+            concentration0=beta_conc
+        ).sample(seed=seed())
         # distance shape: B + [1] for broadcast
         distance = tf.sqrt(norm)[..., tf.newaxis]
         # direction is u in reference [1].
@@ -250,7 +260,7 @@ class LKJ(tfd.Distribution):
         # = sqrt(1 - xx^T) = sqrt(1 - |raw_correlation|**2) = sqrt(1 -
         # distance**2).
         new_row = tf.concat(
-            [raw_correlation, tf.sqrt(1. - distance**2)], axis=-1)
+            [raw_correlation, tf.sqrt(1. - norm[..., tf.newaxis])], axis=-1)
 
         # Finally add this new row, by growing the cholesky of the result.
         chol_result = tf.concat([
@@ -266,6 +276,12 @@ class LKJ(tfd.Distribution):
       # these to ones.
       result = tf.matrix_set_diag(result, tf.ones(
           shape=tf.shape(result)[:-1], dtype=result.dtype.base_dtype))
+      # This sampling algorithm can produce near-PSD matrices on which standard
+      # algorithms such as `tf.cholesky` or `tf.linalg.self_adjoint_eigvals`
+      # fail. Specifically, as documented in b/116828694, around 2% of trials
+      # of 900,000 5x5 matrices (distributed according to 9 different
+      # concentration parameter values) contained at least one matrix on which
+      # the Cholesky decomposition failed.
       return result
 
   def _validate_dimension(self, x):
@@ -290,10 +306,17 @@ class LKJ(tfd.Distribution):
     if not self.validate_args:
       return x
     checks = [
-        tf.assert_less_equal(-1., x, message='Correlations must be >= -1.'),
-        tf.assert_less_equal(x, 1., message='Correlations must be <= 1.'),
+        tf.assert_less_equal(
+            tf.cast(-1., dtype=x.dtype.base_dtype),
+            x,
+            message='Correlations must be >= -1.'),
+        tf.assert_less_equal(
+            x,
+            tf.cast(1., x.dtype.base_dtype),
+            message='Correlations must be <= 1.'),
         tf.assert_near(
-            tf.matrix_diag_part(x), 1.,
+            tf.matrix_diag_part(x),
+            tf.cast(1., x.dtype.base_dtype),
             message='Self-correlations must be = 1.'),
         tf.assert_near(
             x, tf.matrix_transpose(x),
@@ -328,17 +351,24 @@ class LKJ(tfd.Distribution):
     with tf.name_scope('log_unnorm_prob_lkj', name, [self.concentration]):
       x = tf.convert_to_tensor(x, name='x')
       # The density is det(matrix) ** (concentration - 1).
-      # Computing the determinant with `logdet` is fine here, since correlation
-      # matrices are Hermitian and PSD.  If the input is not PSD, will raise an
-      # error, which is not unreasonable.
+      # Computing the determinant with `logdet` is usually fine, since
+      # correlation matrices are Hermitian and PSD. But in some cases, for a
+      # PSD matrix whose eigenvalues are close to zero, `logdet` raises an error
+      # complaining that it is not PSD. The root cause is the computation of the
+      # cholesky decomposition in `logdet`. Hence, we use the less efficient but
+      # more robust `slogdet` which does not use `cholesky`.
+      #
       # An alternative would have been to check allow_nan_stats and use
-      #   eigenvalues, _ = linalg_ops.self_adjoint_eig(x)
-      #   psd_mask = math_ops.cast(
-      #     math_ops.reduce_min(eigenvalues, axis=-1) >= 0, dtype=x.dtype)
+      #   eigenvalues = tf.linalg.self_adjoint_eigvals(x)
+      #   psd_mask = tf.cast(
+      #     tf.reduce_min(eigenvalues, axis=-1) >= 0, dtype=x.dtype)
       #   tf.where(psd_mask, answer, float('-inf'))
-      # to emit probability 0 for inputs that are not PSD, without ever
-      # raising an error.
-      answer = (self.concentration - 1.) * tf.linalg.logdet(x)
+      # to emit probability 0 for inputs that are not PSD, without ever raising
+      # an error. More care must be taken, as due to numerical stability issues,
+      # self_adjoint_eigvals can return slightly negative eigenvalues even for
+      # a PSD matrix.
+      _, logdet = tf.linalg.slogdet(x)
+      answer = (self.concentration - 1.) * logdet
       return answer
 
   def _log_normalization(self, name='log_normalization'):

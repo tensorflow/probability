@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.edward2.VectorSinhArcsinhDiag" />
+<meta itemprop="path" content="Stable" />
 </div>
 
 # tfp.edward2.VectorSinhArcsinhDiag
@@ -61,7 +62,7 @@ Additional leading dimensions (if any) will index batches.
     broadcastable with `event_shape`.
 * <b>`distribution`</b>: `tf.Distribution`-like instance. Distribution from which `k`
     iid samples are used as input to transformation `F`.  Default is
-    `tf.distributions.Normal(loc=0., scale=1.)`.
+    `tfd.Normal(loc=0., scale=1.)`.
     Must be a scalar-batch, scalar-event distribution.  Typically
     `distribution.reparameterization_type = FULLY_REPARAMETERIZED` or it is
     a function of non-trainable parameters. WARNING: If you backprop through

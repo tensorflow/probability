@@ -19,8 +19,8 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python.distributions import conditional_distribution
-from tensorflow.python.ops.distributions import transformed_distribution
-from tensorflow.python.ops.distributions import util as distribution_util
+from tensorflow_probability.python.distributions import transformed_distribution
+from tensorflow_probability.python.internal import distribution_util
 
 
 # pylint: disable=protected-access

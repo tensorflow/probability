@@ -24,12 +24,12 @@ import collections
 import tensorflow as tf
 
 from tensorflow_probability.python import distributions
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.math import diag_jacobian
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import metropolis_hastings
-from tensorflow_probability.python.mcmc import util as mcmc_util
 
-from tensorflow.python.ops.distributions import util as distributions_util
+from tensorflow_probability.python.mcmc import util as mcmc_util
 
 
 __all__ = [
@@ -285,7 +285,7 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
         `current_state`.
       TypeError: if `volatility_fn` is not callable.
     """
-    self._impl = metropolis_hastings.MetropolisHastings(
+    impl = metropolis_hastings.MetropolisHastings(
         inner_kernel=UncalibratedLangevin(
             target_log_prob_fn=target_log_prob_fn,
             step_size=step_size,
@@ -294,6 +294,13 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
             parallel_iterations=parallel_iterations,
             name=name),
         seed=seed)
+
+    self._impl = impl
+    parameters = impl.inner_kernel.parameters.copy()
+    # Remove `compute_acceptance` parameter as this is not a MALA kernel
+    # `__init__` parameter.
+    del parameters['compute_acceptance']
+    self._parameters = parameters
 
   @property
   def target_log_prob_fn(self):
@@ -322,7 +329,7 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
   @property
   def parameters(self):
     """Return `dict` of ``__init__`` arguments and their values."""
-    return self._impl.inner_kernel.parameters
+    return self._parameters
 
   @property
   def is_calibrated(self):
@@ -514,7 +521,7 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
               seed=self._seed_stream()))
 
       # Number of independent chains run by the algorithm.
-      independent_chain_ndims = distributions_util.prefer_static_rank(
+      independent_chain_ndims = distribution_util.prefer_static_rank(
           current_target_log_prob)
 
       # Generate the next state of the algorithm using Euler-Maruyama method.
@@ -951,7 +958,7 @@ def _prepare_args(target_log_prob_fn,
       state_parts,
       volatility,
       grads_volatility_fn,
-      distributions_util.prefer_static_shape(target_log_prob),
+      distribution_util.prefer_static_shape(target_log_prob),
       parallel_iterations)
 
   step_sizes = (list(step_size) if mcmc_util.is_list_like(step_size)

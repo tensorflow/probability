@@ -24,10 +24,8 @@ import numpy as np
 
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow.python.framework import random_seed
 
-
-tfd = tf.distributions
+tfd = tfp.distributions
 
 
 def _compute_sample_variance(x, axis=None, keepdims=False):
@@ -41,7 +39,7 @@ class SampleAnnealedImportanceTest(tf.test.TestCase):
     self._shape_param = 5.
     self._rate_param = 10.
 
-    random_seed.set_random_seed(10003)
+    tf.random.set_random_seed(10003)
     np.random.seed(10003)
 
   def _log_gamma_log_prob(self, x, event_dims=()):
@@ -145,7 +143,7 @@ class SampleAnnealedImportanceTest(tf.test.TestCase):
 
   def _ais_gets_correct_log_normalizer_wrapper(self, independent_chain_ndims):
     """Tests that AIS yields reasonable estimates of normalizers."""
-    with self.test_session(graph=tf.Graph()) as sess:
+    with self.cached_session(graph=tf.Graph()) as sess:
       initial_draws = np.random.normal(size=[30, 2, 1])
       x_ph = tf.placeholder(np.float32, shape=initial_draws.shape, name='x_ph')
       self._ais_gets_correct_log_normalizer(
@@ -164,7 +162,7 @@ class SampleAnnealedImportanceTest(tf.test.TestCase):
     self._ais_gets_correct_log_normalizer_wrapper(3)
 
   def testSampleAIChainSeedReproducibleWorksCorrectly(self):
-    with self.test_session(graph=tf.Graph()) as sess:
+    with self.cached_session(graph=tf.Graph()) as sess:
       independent_chain_ndims = 1
       x = np.random.rand(4, 3, 2)
 

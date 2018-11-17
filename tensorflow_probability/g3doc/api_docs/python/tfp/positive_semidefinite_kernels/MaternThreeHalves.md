@@ -1,7 +1,9 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.positive_semidefinite_kernels.MaternThreeHalves" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="amplitude"/>
 <meta itemprop="property" content="batch_shape"/>
+<meta itemprop="property" content="dtype"/>
 <meta itemprop="property" content="feature_ndims"/>
 <meta itemprop="property" content="length_scale"/>
 <meta itemprop="property" content="name"/>
@@ -32,6 +34,39 @@ This kernel is part of the Matern family of kernels, with parameter 3/2.
 
 where the double-bars represent vector length (i.e. Euclidean, or L2 Norm).
 This kernel, acts over the space `S = R^(D1 x D2 .. x Dd)`.
+
+<h2 id="__init__"><code>__init__</code></h2>
+
+``` python
+__init__(
+    amplitude=None,
+    length_scale=None,
+    feature_ndims=1,
+    validate_args=False,
+    name='MaternThreeHalves'
+)
+```
+
+Construct a MaternThreeHalves kernel instance.
+
+#### Args:
+
+* <b>`amplitude`</b>: Positive floating point `Tensor` that controls the maximum
+    value of the kernel. Must be broadcastable with `length_scale` and
+    inputs to `apply` and `matrix` methods. A value of `None` is treated
+    like 1.
+* <b>`length_scale`</b>: Positive floating point `Tensor` that controls how sharp or
+    wide the kernel shape is. This provides a characteristic "unit" of
+    length against which `||x - y||` can be compared for scale. Must be
+    broadcastable with `amplitude` and inputs to `apply` and `matrix`
+    methods. A value of `None` is treated like 1.
+* <b>`feature_ndims`</b>: Python `int` number of rightmost dims to include in the
+    squared difference norm in the exponential.
+* <b>`validate_args`</b>: If `True`, parameters are checked for validity despite
+    possibly degrading runtime performance
+* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
+
+
 
 ## Properties
 
@@ -69,6 +104,10 @@ concrete implementation sub-classes are obliged to provide.
 `TensorShape` instance describing the fully broadcast shape of all
 kernel parameters.
 
+<h3 id="dtype"><code>dtype</code></h3>
+
+DType over which the kernel operates.
+
 <h3 id="feature_ndims"><code>feature_ndims</code></h3>
 
 The number of feature dimensions.
@@ -99,37 +138,6 @@ Name prepended to all ops created by this class.
 
 
 ## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
-
-``` python
-__init__(
-    amplitude=None,
-    length_scale=None,
-    feature_ndims=1,
-    validate_args=False,
-    name='MaternThreeHalves'
-)
-```
-
-Construct a MaternThreeHalves kernel instance.
-
-#### Args:
-
-* <b>`amplitude`</b>: Positive floating point `Tensor` that controls the maximum
-    value of the kernel. Must be broadcastable with `length_scale` and
-    inputs to `apply` and `matrix` methods. A value of `None` is treated
-    like 1.
-* <b>`length_scale`</b>: Positive floating point `Tensor` that controls how sharp
-    or wide the kernel shape is. This provides a characteristic "unit" of
-    length against which `||x - y||` can be compared for scale. Must be
-    broadcastable with `amplitude` and inputs to `apply` and `matrix`
-    methods. A value of `None` is treated like 1.
-* <b>`feature_ndims`</b>: Python `int` number of rightmost dims to include in the
-    squared difference norm in the exponential.
-* <b>`validate_args`</b>: If `True`, parameters are checked for validity despite
-    possibly degrading runtime performance
-* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
 
 <h3 id="__add__"><code>__add__</code></h3>
 

@@ -1,9 +1,11 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions.Poisson" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="allow_nan_stats"/>
 <meta itemprop="property" content="batch_shape"/>
 <meta itemprop="property" content="dtype"/>
 <meta itemprop="property" content="event_shape"/>
+<meta itemprop="property" content="interpolate_nondiscrete"/>
 <meta itemprop="property" content="log_rate"/>
 <meta itemprop="property" content="name"/>
 <meta itemprop="property" content="parameters"/>
@@ -57,6 +59,55 @@ Z = exp(lambda).
 
 where `rate = lambda` and `Z` is the normalizing constant.
 
+<h2 id="__init__"><code>__init__</code></h2>
+
+``` python
+__init__(
+    rate=None,
+    log_rate=None,
+    interpolate_nondiscrete=True,
+    validate_args=False,
+    allow_nan_stats=True,
+    name='Poisson'
+)
+```
+
+Initialize a batch of Poisson distributions.
+
+#### Args:
+
+* <b>`rate`</b>: Floating point tensor, the rate parameter. `rate` must be positive.
+    Must specify exactly one of `rate` and `log_rate`.
+* <b>`log_rate`</b>: Floating point tensor, the log of the rate parameter.
+    Must specify exactly one of `rate` and `log_rate`.
+* <b>`interpolate_nondiscrete`</b>: Python `bool`. When `False`,
+    `log_prob` returns `-inf` (and `prob` returns `0`) for non-integer
+    inputs. When `True`, `log_prob` evaluates the continuous function
+    `k * log_rate - lgamma(k+1) - rate`, which matches the Poisson pmf
+    at integer arguments `k` (note that this function is not itself
+    a normalized probability log-density).
+    Default value: `True`.
+* <b>`validate_args`</b>: Python `bool`. When `True` distribution
+    parameters are checked for validity despite possibly degrading runtime
+    performance. When `False` invalid inputs may silently render incorrect
+    outputs.
+    Default value: `False`.
+* <b>`allow_nan_stats`</b>: Python `bool`. When `True`, statistics
+    (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
+    result is undefined. When `False`, an exception is raised if one or
+    more of the statistic's batch members are undefined.
+    Default value: `True`.
+* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
+
+
+#### Raises:
+
+* <b>`ValueError`</b>: if none or both of `rate`, `log_rate` are specified.
+* <b>`TypeError`</b>: if `rate` is not a float-type.
+* <b>`TypeError`</b>: if `log_rate` is not a float-type.
+
+
+
 ## Properties
 
 <h3 id="allow_nan_stats"><code>allow_nan_stats</code></h3>
@@ -102,6 +153,10 @@ May be partially defined or unknown.
 
 * <b>`event_shape`</b>: `TensorShape`, possibly unknown.
 
+<h3 id="interpolate_nondiscrete"><code>interpolate_nondiscrete</code></h3>
+
+Interpolate (log) probs on non-integer inputs.
+
 <h3 id="log_rate"><code>log_rate</code></h3>
 
 Log rate parameter.
@@ -123,8 +178,7 @@ Rate parameter.
 Describes how samples from the distribution are reparameterized.
 
 Currently this is one of the static instances
-`distributions.FULLY_REPARAMETERIZED`
-or `distributions.NOT_REPARAMETERIZED`.
+`tfd.FULLY_REPARAMETERIZED` or `tfd.NOT_REPARAMETERIZED`.
 
 #### Returns:
 
@@ -137,43 +191,6 @@ Python `bool` indicating possibly expensive checks are enabled.
 
 
 ## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
-
-``` python
-__init__(
-    rate=None,
-    log_rate=None,
-    validate_args=False,
-    allow_nan_stats=True,
-    name='Poisson'
-)
-```
-
-Initialize a batch of Poisson distributions.
-
-#### Args:
-
-* <b>`rate`</b>: Floating point tensor, the rate parameter. `rate` must be positive.
-    Must specify exactly one of `rate` and `log_rate`.
-* <b>`log_rate`</b>: Floating point tensor, the log of the rate parameter.
-    Must specify exactly one of `rate` and `log_rate`.
-* <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
-    parameters are checked for validity despite possibly degrading runtime
-    performance. When `False` invalid inputs may silently render incorrect
-    outputs.
-* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
-    (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
-    result is undefined. When `False`, an exception is raised if one or
-    more of the statistic's batch members are undefined.
-* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
-
-
-#### Raises:
-
-* <b>`ValueError`</b>: if none or both of `rate`, `log_rate` are specified.
-* <b>`TypeError`</b>: if `rate` is not a float-type.
-* <b>`TypeError`</b>: if `log_rate` is not a float-type.
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
 
@@ -211,19 +228,6 @@ Given random variable `X`, the cumulative distribution function `cdf` is:
 ```none
 cdf(x) := P[X <= x]
 ```
-
-
-Additional documentation from `Poisson`:
-
-The Poisson distribution is technically only defined for non-negative integer
-values. When `validate_args=False`, non-integral inputs trigger an assertion.
-
-When `validate_args=False` calculations are otherwise unchanged despite
-integral or non-integral inputs.
-
-When `validate_args=False`, evaluating the pmf at non-integral values,
-corresponds to evaluations of an unnormalized distribution, that does not
-correspond to evaluations of the cdf.
 
 #### Args:
 
@@ -327,7 +331,7 @@ where `F` denotes the support of the random variable `X ~ P`.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 
@@ -421,7 +425,7 @@ denotes (Shanon) cross entropy, and `H[.]` denotes (Shanon) entropy.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 
@@ -452,19 +456,6 @@ Often, a numerical approximation can be used for `log_cdf(x)` that yields
 a more accurate answer than simply taking the logarithm of the `cdf` when
 `x << -1`.
 
-
-Additional documentation from `Poisson`:
-
-The Poisson distribution is technically only defined for non-negative integer
-values. When `validate_args=False`, non-integral inputs trigger an assertion.
-
-When `validate_args=False` calculations are otherwise unchanged despite
-integral or non-integral inputs.
-
-When `validate_args=False`, evaluating the pmf at non-integral values,
-corresponds to evaluations of an unnormalized distribution, that does not
-correspond to evaluations of the cdf.
-
 #### Args:
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
@@ -486,19 +477,6 @@ log_prob(
 ```
 
 Log probability density/mass function.
-
-
-Additional documentation from `Poisson`:
-
-The Poisson distribution is technically only defined for non-negative integer
-values. When `validate_args=False`, non-integral inputs trigger an assertion.
-
-When `validate_args=False` calculations are otherwise unchanged despite
-integral or non-integral inputs.
-
-When `validate_args=False`, evaluating the pmf at non-integral values,
-corresponds to evaluations of an unnormalized distribution, that does not
-correspond to evaluations of the cdf.
 
 #### Args:
 

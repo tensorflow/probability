@@ -22,12 +22,14 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python.distributions import categorical
+from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
-from tensorflow.python.framework import tensor_util
+from tensorflow_probability.python.internal import reparameterization
 
 
-class Mixture(tf.distributions.Distribution):
+class Mixture(distribution.Distribution):
   """Mixture distribution.
 
   The `Mixture` object implements batched mixture distributions.
@@ -110,7 +112,9 @@ class Mixture(tf.distributions.Distribution):
         have matching static event shapes.
     """
     parameters = dict(locals())
-    if not isinstance(cat, tf.distributions.Categorical):
+    # TODO(b/117098119): Remove tf.distribution references once they're gone.
+    if not isinstance(cat, categorical.Categorical) and not isinstance(
+        cat, tf.distributions.Categorical):
       raise TypeError("cat must be a Categorical distribution, but saw: %s" %
                       cat)
     if not components:
@@ -118,8 +122,10 @@ class Mixture(tf.distributions.Distribution):
     if not isinstance(components, (list, tuple)):
       raise TypeError("components must be a list or tuple, but saw: %s" %
                       components)
+    # TODO(b/117098119): Remove tf.distribution references once they're gone.
     if not all(
-        isinstance(c, tf.distributions.Distribution) for c in components):
+        isinstance(c, distribution.Distribution) or
+        isinstance(cat, tf.distributions.Distribution) for c in components):
       raise TypeError(
           "all entries in components must be Distribution instances"
           " but saw: %s" % components)
@@ -141,7 +147,7 @@ class Mixture(tf.distributions.Distribution):
     # Ensure that all batch and event ndims are consistent.
     with tf.name_scope(name, values=[cat.logits]) as name:
       num_components = cat.event_size
-      static_num_components = tensor_util.constant_value(num_components)
+      static_num_components = tf.contrib.util.constant_value(num_components)
       if static_num_components is None:
         raise ValueError(
             "Could not infer number of classes from cat and unable "
@@ -190,7 +196,7 @@ class Mixture(tf.distributions.Distribution):
 
     super(Mixture, self).__init__(
         dtype=dtype,
-        reparameterization_type=tf.distributions.NOT_REPARAMETERIZED,
+        reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
         parameters=parameters,
@@ -321,11 +327,11 @@ class Mixture(tf.distributions.Distribution):
 
     with tf.control_dependencies(self._assertions):
       n = tf.convert_to_tensor(n, name="n")
-      static_n = tensor_util.constant_value(n)
+      static_n = tf.contrib.util.constant_value(n)
       n = int(static_n) if static_n is not None else n
       cat_samples = self.cat.sample(n, seed=seed)
 
-      static_samples_shape = cat_samples.get_shape()
+      static_samples_shape = cat_samples.shape
       if static_samples_shape.is_fully_defined():
         samples_shape = static_samples_shape.as_list()
         samples_size = static_samples_shape.num_elements()

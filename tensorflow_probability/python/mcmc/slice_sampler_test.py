@@ -31,7 +31,7 @@ class SliceSamplerTest(tf.test.TestCase):
     """Sampling from the Standard Normal Distribution."""
     dtype = np.float32
 
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       target = tfd.Normal(loc=dtype(0), scale=dtype(1))
 
       samples, _ = tfp.mcmc.sample_chain(
@@ -61,7 +61,7 @@ class SliceSamplerTest(tf.test.TestCase):
     true_cov = dtype([[1, 0.5], [0.5, 1]])
     num_results = 200
     num_chains = 75
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       # Target distribution is defined through the Cholesky decomposition.
       chol = tf.linalg.cholesky(true_cov)
       target = tfd.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
@@ -110,7 +110,7 @@ class SliceSamplerTest(tf.test.TestCase):
     true_cov = dtype([[1, 0.5], [0.5, 1]])
     num_results = 200
     num_chains = 75
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       # Target distribution is defined through the Cholesky decomposition.
       chol = tf.linalg.cholesky(true_cov)
       target = tfd.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
@@ -163,7 +163,7 @@ class SliceSamplerTest(tf.test.TestCase):
     true_cov = dtype([[1, 0.5], [0.5, 1]])
     num_results = 200
     num_chains = 75
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       # Target distribution is defined through the Cholesky decomposition.
       chol = tf.linalg.cholesky(true_cov)
       target = tfd.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
@@ -217,7 +217,7 @@ class SliceSamplerTest(tf.test.TestCase):
     true_cov = dtype([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
     num_results = 25
     num_chains = 500
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       # Target distribution is defined through the Cholesky decomposition
       chol = tf.linalg.cholesky(true_cov)
       target = tfd.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)

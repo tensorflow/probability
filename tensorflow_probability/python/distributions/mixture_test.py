@@ -26,8 +26,6 @@ from scipy import stats
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from tensorflow.python.platform import tf_logging as logging
-
 tfd = tfp.distributions
 
 
@@ -241,7 +239,7 @@ class MixtureTest(tf.test.TestCase):
           num_components=2,
           use_static_graph=self.use_static_graph)
       mean = dist.mean()
-      self.assertEqual(batch_shape, mean.get_shape())
+      self.assertEqual(batch_shape, mean.shape)
 
       cat_probs = tf.nn.softmax(dist.cat.logits)
       dist_means = [d.mean() for d in dist.components]
@@ -264,7 +262,7 @@ class MixtureTest(tf.test.TestCase):
           event_shape=(4,),
           use_static_graph=self.use_static_graph)
       mean = dist.mean()
-      self.assertEqual(batch_shape + (4,), mean.get_shape())
+      self.assertEqual(batch_shape + (4,), mean.shape)
 
       cat_probs = tf.nn.softmax(dist.cat.logits)
       dist_means = [d.mean() for d in dist.components]
@@ -292,7 +290,7 @@ class MixtureTest(tf.test.TestCase):
           num_components=num_components,
           use_static_graph=self.use_static_graph)
       dev = dist.stddev()
-      self.assertEqual(batch_shape, dev.get_shape())
+      self.assertEqual(batch_shape, dev.shape)
 
       cat_probs = tf.nn.softmax(dist.cat.logits)
       dist_devs = [d.stddev() for d in dist.components]
@@ -334,7 +332,7 @@ class MixtureTest(tf.test.TestCase):
           event_shape=(4,),
           use_static_graph=self.use_static_graph)
       dev = dist.stddev()
-      self.assertEqual(batch_shape + (4,), dev.get_shape())
+      self.assertEqual(batch_shape + (4,), dev.shape)
 
       cat_probs = tf.nn.softmax(dist.cat.logits)
       dist_devs = [d.stddev() for d in dist.components]
@@ -394,7 +392,7 @@ class MixtureTest(tf.test.TestCase):
     ]:
       p_x = dist.prob(x)
 
-      self.assertEqual(x.shape, p_x.get_shape())
+      self.assertEqual(x.shape, p_x.shape)
       cat_probs = tf.nn.softmax([dist.cat.logits])[0]
       dist_probs = [d.prob(x) for d in dist.components]
 
@@ -421,7 +419,7 @@ class MixtureTest(tf.test.TestCase):
     ]:
       p_x = dist.prob(x)
 
-      self.assertEqual(x.shape[:-1], p_x.get_shape())
+      self.assertEqual(x.shape[:-1], p_x.shape)
 
       cat_probs = tf.nn.softmax([dist.cat.logits])[0]
       dist_probs = [d.prob(x) for d in dist.components]
@@ -448,7 +446,7 @@ class MixtureTest(tf.test.TestCase):
         np.random.randn(4, 2, 3).astype(np.float32)
     ]:
       p_x = dist.prob(x)
-      self.assertEqual(x.shape, p_x.get_shape())
+      self.assertEqual(x.shape, p_x.shape)
 
       cat_probs = tf.nn.softmax(dist.cat.logits)
       dist_probs = [d.prob(x) for d in dist.components]
@@ -477,7 +475,7 @@ class MixtureTest(tf.test.TestCase):
         np.random.randn(4, 2, 3, 4).astype(np.float32)
     ]:
       p_x = dist.prob(x)
-      self.assertEqual(x.shape[:-1], p_x.get_shape())
+      self.assertEqual(x.shape[:-1], p_x.shape)
 
       cat_probs = tf.nn.softmax(dist.cat.logits)
       dist_probs = [d.prob(x) for d in dist.components]
@@ -504,7 +502,7 @@ class MixtureTest(tf.test.TestCase):
     with _test_capture_normal_sample_outputs() as component_samples:
       samples = dist.sample(n, seed=123)
     self.assertEqual(samples.dtype, tf.float32)
-    self.assertEqual((4,), samples.get_shape())
+    self.assertEqual((4,), samples.shape)
     cat_samples = dist.cat.sample(n, seed=123)
     sample_values, cat_sample_values, dist_sample_values = self.evaluate(
         [samples, cat_samples, component_samples])
@@ -566,7 +564,7 @@ class MixtureTest(tf.test.TestCase):
     with _test_capture_mvndiag_sample_outputs() as component_samples:
       samples = dist.sample(n, seed=123)
     self.assertEqual(samples.dtype, tf.float32)
-    self.assertEqual((4, 2), samples.get_shape())
+    self.assertEqual((4, 2), samples.shape)
     cat_samples = dist.cat.sample(n, seed=123)
     sample_values, cat_sample_values, dist_sample_values = self.evaluate(
         [samples, cat_samples, component_samples])
@@ -591,7 +589,7 @@ class MixtureTest(tf.test.TestCase):
     with _test_capture_normal_sample_outputs() as component_samples:
       samples = dist.sample(n, seed=123)
     self.assertEqual(samples.dtype, tf.float32)
-    self.assertEqual((4, 2, 3), samples.get_shape())
+    self.assertEqual((4, 2, 3), samples.shape)
     cat_samples = dist.cat.sample(n, seed=123)
     sample_values, cat_sample_values, dist_sample_values = self.evaluate(
         [samples, cat_samples, component_samples])
@@ -629,9 +627,9 @@ class MixtureTest(tf.test.TestCase):
       samples = dist.sample(n, seed=123)
     self.assertEqual(samples.dtype, tf.float32)
     if fully_known_batch_shape:
-      self.assertEqual((5, 2, 3, 4), samples.get_shape())
+      self.assertEqual((5, 2, 3, 4), samples.shape)
     else:
-      self.assertEqual([5, None, 3, 4], samples.get_shape().as_list())
+      self.assertEqual([5, None, 3, 4], samples.shape.as_list())
     cat_samples = dist.cat.sample(n, seed=123)
     sample_values, cat_sample_values, dist_sample_values = self.evaluate(
         [samples, cat_samples, component_samples])
@@ -664,7 +662,7 @@ class MixtureTest(tf.test.TestCase):
           event_shape=(4,),
           use_static_graph=self.use_static_graph)
       entropy_lower_bound = dist.entropy_lower_bound()
-      self.assertEqual(batch_shape, entropy_lower_bound.get_shape())
+      self.assertEqual(batch_shape, entropy_lower_bound.shape)
 
       cat_probs = tf.nn.softmax(dist.cat.logits)
       dist_entropy = [d.entropy() for d in dist.components]
@@ -722,7 +720,7 @@ class MixtureTest(tf.test.TestCase):
     x_log_cdf_tf = mixture_tf.log_cdf(x_tensor)
 
     for x_feed in xs_to_check:
-      with self.test_session() as sess:
+      with self.cached_session() as sess:
         x_cdf_tf_result, x_log_cdf_tf_result = sess.run(
             [x_cdf_tf, x_log_cdf_tf], feed_dict={x_tensor: x_feed})
 
@@ -771,7 +769,7 @@ class MixtureTest(tf.test.TestCase):
     x_log_cdf_tf = mixture_tf.log_cdf(x_tensor)
 
     for x_feed in xs_to_check:
-      with self.test_session() as sess:
+      with self.cached_session() as sess:
         x_cdf_tf_result, x_log_cdf_tf_result = sess.run(
             [x_cdf_tf, x_log_cdf_tf],
             feed_dict={x_tensor: x_feed})
@@ -789,7 +787,7 @@ class MixtureTest(tf.test.TestCase):
         self.assertAllClose(np.exp(x_log_cdf_tf_result), scipy_cdf_result)
 
   def testSampleBimixGamma(self):
-    """Tests a bug in the underlying tf.Gamma op.
+    """Tests a bug in the underlying tfd.Gamma op.
 
     Mixture's use of dynamic partition requires `random_gamma` correctly returns
     an empty `Tensor`.
@@ -800,6 +798,15 @@ class MixtureTest(tf.test.TestCase):
         use_static_graph=self.use_static_graph)
     x_ = self.evaluate(gm.sample())
     self.assertAllEqual([], x_.shape)
+
+  # TODO(b/117098119): Remove tf.distribution references once they're gone.
+  def testBackwardsCompatibility(self):
+    tfd.Mixture(
+        cat=tf.distributions.Categorical(probs=[.3, .7]),
+        components=[
+            tf.distributions.Normal(1., 2.),
+            tf.distributions.Normal(2., 1.)
+        ])
 
 
 class MixtureStaticSampleTest(MixtureTest):
@@ -831,12 +838,12 @@ class MixtureBenchmark(tf.test.Benchmark):
             name=("%s_%s_components_%d_batch_%d_features_%d_sample_%d" %
                   (name, use_gpu, num_components, batch_size, num_features,
                    sample_size)))
-        logging.vlog(2, "\t".join(["%s", "%d", "%d", "%d", "%d", "%g"]) % (
+        tf.logging.vlog(2, "\t".join(["%s", "%d", "%d", "%d", "%d", "%g"]) % (
             use_gpu, num_components, batch_size, num_features, sample_size,
             reported["wall_time"]))
 
   def benchmarkSamplingMVNDiag(self):
-    logging.vlog(
+    tf.logging.vlog(
         2, "mvn_diag\tuse_gpu\tcomponents\tbatch\tfeatures\tsample\twall_time")
 
     def create_distribution(batch_size, num_components, num_features):
@@ -872,7 +879,7 @@ class MixtureBenchmark(tf.test.Benchmark):
                   sample_size=sample_size)
 
   def benchmarkSamplingMVNFull(self):
-    logging.vlog(
+    tf.logging.vlog(
         2, "mvn_full\tuse_gpu\tcomponents\tbatch\tfeatures\tsample\twall_time")
 
     def psd(x):

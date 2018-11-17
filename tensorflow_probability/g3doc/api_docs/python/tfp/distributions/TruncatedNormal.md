@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions.TruncatedNormal" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="allow_nan_stats"/>
 <meta itemprop="property" content="batch_shape"/>
 <meta itemprop="property" content="dtype"/>
@@ -51,9 +52,9 @@ The Truncated Normal distribution.
 The truncated normal is a normal distribution bounded between `low`
 and `high` (the pdf is 0 outside these bounds and renormalized).
 
-Samples from this distribution are differentiable with respect to
-`loc` and `scale` but not `low` and `high`, i.e., this distribution is
-partially reparameterizeable.
+Samples from this distribution are differentiable with respect to `loc`,
+`scale` as well as the bounds, `low` and `high`, i.e., this
+implementation is fully reparameterizeable.
 
 For more details, see [here](
 https://en.wikipedia.org/wiki/Truncated_normal_distribution).
@@ -63,7 +64,7 @@ https://en.wikipedia.org/wiki/Truncated_normal_distribution).
 The probability density function (pdf) of this distribution is:
 ```none
   pdf(x; loc, scale, low, high) =
-      { (2 pi)**(-0.5) exp(-0.5 y) / (scale z) for low <= x <= high
+      { (2 pi)**(-0.5) exp(-0.5 y**2) / (scale * z) for low <= x <= high
       { 0                                    otherwise
   y = (x - loc)/scale
   z = NormalCDF((high - loc) / scale) - NormalCDF((lower - loc) / scale)
@@ -72,7 +73,7 @@ The probability density function (pdf) of this distribution is:
 where:
 
 * `NormalCDF` is the cumulative density function of the Normal distribution
-  with 0. mean and unit variance.
+  with 0 mean and unit variance.
 
 This is a scalar distribution so the event shape is always scalar and the
 dimensions of the parameters defined the batch_shape.
@@ -93,6 +94,47 @@ dist.prob([0.5, 0.8])
 # Get 3 samples, returning a 3 x 2 tensor.
 dist.sample([3])
 ```
+
+<h2 id="__init__"><code>__init__</code></h2>
+
+``` python
+__init__(
+    loc,
+    scale,
+    low,
+    high,
+    validate_args=False,
+    allow_nan_stats=True,
+    name='TruncatedNormal'
+)
+```
+
+Construct TruncatedNormal.
+
+All parameters of the distribution will be broadcast to the same shape,
+so the resulting distribution will have a batch_shape of the broadcast
+shape of all parameters.
+
+#### Args:
+
+* <b>`loc`</b>: Floating point tensor; the mean of the normal distribution(s) (
+    note that the mean of the resulting distribution will be different
+    since it is modified by the bounds).
+* <b>`scale`</b>: Floating point tensor; the std deviation of the normal
+    distribution(s).
+* <b>`low`</b>: `float` `Tensor` representing lower bound of the distribution's
+    support. Must be such that `low < high`.
+* <b>`high`</b>: `float` `Tensor` representing upper bound of the distribution's
+    support. Must be such that `low < high`.
+* <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
+    parameters are checked at run-time.
+* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`,
+    statistics (e.g., mean, mode, variance) use the value "`NaN`" to
+    indicate the result is undefined. When `False`, an exception is raised
+    if one or more of the statistic's batch members are undefined.
+* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
+
+
 
 ## Properties
 
@@ -164,8 +206,7 @@ Dictionary of parameters used to instantiate this `Distribution`.
 Describes how samples from the distribution are reparameterized.
 
 Currently this is one of the static instances
-`distributions.FULLY_REPARAMETERIZED`
-or `distributions.NOT_REPARAMETERIZED`.
+`tfd.FULLY_REPARAMETERIZED` or `tfd.NOT_REPARAMETERIZED`.
 
 #### Returns:
 
@@ -182,45 +223,6 @@ Python `bool` indicating possibly expensive checks are enabled.
 
 
 ## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
-
-``` python
-__init__(
-    loc,
-    scale,
-    low,
-    high,
-    validate_args=False,
-    allow_nan_stats=True,
-    name='TruncatedNormal'
-)
-```
-
-Construct TruncatedNormal.
-
-All parameters of the distribution will be broadcast to the same shape,
-so the resulting distribution will have a batch_shape of the broadcast
-shape of all parameters.
-
-#### Args:
-
-* <b>`loc`</b>: Floating point tensor; the mean of the normal distribution(s) (
-    note that the mean of the resulting distribution will be different
-    since it is modified by the bounds).
-* <b>`scale`</b>: Floating point tensor; the std deviation of the normal
-    distribution(s).
-* <b>`low`</b>: `float` `Tensor` representing lower bound of the distribution's
-    support. Must be such that `low < high`.
-* <b>`high`</b>: `float` `Tensor` representing upper bound of the distribution's
-    support. Must be such that `low < high`.
-* <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
-    parameters are checked at run-time.
-* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`,
-    statistics (e.g., mean, mode, variance) use the value "`NaN`" to
-    indicate the result is undefined. When `False`, an exception is raised
-    if one or more of the statistic's batch members are undefined.
-* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
 
@@ -361,7 +363,7 @@ where `F` denotes the support of the random variable `X ~ P`.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 
@@ -455,7 +457,7 @@ denotes (Shanon) cross entropy, and `H[.]` denotes (Shanon) entropy.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 

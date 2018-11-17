@@ -24,45 +24,45 @@ from scipy import stats
 import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
-from tensorflow.python.ops.distributions.bijector_test_util import assert_bijective_and_finite
-from tensorflow.python.ops.distributions.bijector_test_util import assert_scalar_congruency
+from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow.python.framework import test_util
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class GumbelBijectorTest(tf.test.TestCase):
   """Tests correctness of the Gumbel bijector."""
 
   def testBijector(self):
-    with self.test_session():
-      loc = 0.3
-      scale = 5.
-      bijector = tfb.Gumbel(loc=loc, scale=scale, validate_args=True)
-      self.assertEqual("gumbel", bijector.name)
-      x = np.array([[[-3.], [0.], [0.5], [4.2], [12.]]], dtype=np.float32)
-      # Gumbel distribution
-      gumbel_dist = stats.gumbel_r(loc=loc, scale=scale)
-      y = gumbel_dist.cdf(x).astype(np.float32)
-      self.assertAllClose(y, self.evaluate(bijector.forward(x)))
-      self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
-      self.assertAllClose(
-          np.squeeze(gumbel_dist.logpdf(x), axis=-1),
-          self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=1)))
-      self.assertAllClose(
-          self.evaluate(-bijector.inverse_log_det_jacobian(y, event_ndims=1)),
-          self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=1)),
-          rtol=1e-4,
-          atol=0.)
+    loc = 0.3
+    scale = 5.
+    bijector = tfb.Gumbel(loc=loc, scale=scale, validate_args=True)
+    self.assertEqual("gumbel", bijector.name)
+    x = np.array([[[-3.], [0.], [0.5], [4.2], [12.]]], dtype=np.float32)
+    # Gumbel distribution
+    gumbel_dist = stats.gumbel_r(loc=loc, scale=scale)
+    y = gumbel_dist.cdf(x).astype(np.float32)
+    self.assertAllClose(y, self.evaluate(bijector.forward(x)))
+    self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
+    self.assertAllClose(
+        np.squeeze(gumbel_dist.logpdf(x), axis=-1),
+        self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=1)))
+    self.assertAllClose(
+        self.evaluate(-bijector.inverse_log_det_jacobian(y, event_ndims=1)),
+        self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=1)),
+        rtol=1e-4,
+        atol=0.)
 
   def testScalarCongruency(self):
-    with self.test_session():
-      assert_scalar_congruency(
-          tfb.Gumbel(loc=0.3, scale=20.), lower_x=1., upper_x=100., rtol=0.02)
+    bijector_test_util.assert_scalar_congruency(
+        tfb.Gumbel(loc=0.3, scale=20.), lower_x=1., upper_x=100.,
+        eval_func=self.evaluate, rtol=0.02)
 
   def testBijectiveAndFinite(self):
-    with self.test_session():
-      bijector = tfb.Gumbel(loc=0., scale=3.0, validate_args=True)
-      x = np.linspace(-10., 10., num=10).astype(np.float32)
-      y = np.linspace(0.01, 0.99, num=10).astype(np.float32)
-      assert_bijective_and_finite(bijector, x, y, event_ndims=0, rtol=1e-3)
+    bijector = tfb.Gumbel(loc=0., scale=3.0, validate_args=True)
+    x = np.linspace(-10., 10., num=10).astype(np.float32)
+    y = np.linspace(0.01, 0.99, num=10).astype(np.float32)
+    bijector_test_util.assert_bijective_and_finite(
+        bijector, x, y, eval_func=self.evaluate, event_ndims=0, rtol=1e-3)
 
 
 if __name__ == "__main__":

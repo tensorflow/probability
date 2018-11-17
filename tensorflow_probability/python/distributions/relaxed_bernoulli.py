@@ -21,8 +21,9 @@ from __future__ import print_function
 import tensorflow as tf
 from tensorflow_probability.python import bijectors
 from tensorflow_probability.python.distributions import logistic
-from tensorflow.python.ops.distributions import transformed_distribution
-from tensorflow.python.ops.distributions import util as distribution_util
+from tensorflow_probability.python.distributions import transformed_distribution
+from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 
 
 class RelaxedBernoulli(transformed_distribution.TransformedDistribution):
@@ -162,11 +163,14 @@ class RelaxedBernoulli(transformed_distribution.TransformedDistribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name, values=[logits, probs, temperature]) as name:
-      with tf.control_dependencies([tf.assert_positive(temperature)]
-                                   if validate_args else []):
-        self._temperature = tf.identity(temperature, name="temperature")
+      dtype = dtype_util.common_dtype([logits, probs, temperature], tf.float32)
+      self._temperature = tf.convert_to_tensor(
+          temperature, name="temperature", dtype=dtype)
+      if validate_args:
+        with tf.control_dependencies([tf.assert_positive(temperature)]):
+          self._temperature = tf.identity(self._temperature)
       self._logits, self._probs = distribution_util.get_logits_and_probs(
-          logits=logits, probs=probs, validate_args=validate_args)
+          logits=logits, probs=probs, validate_args=validate_args, dtype=dtype)
       super(RelaxedBernoulli, self).__init__(
           distribution=logistic.Logistic(
               self._logits / self._temperature,

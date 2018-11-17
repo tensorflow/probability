@@ -23,7 +23,6 @@ from __future__ import print_function
 
 import warnings
 # Dependency imports
-import numpy as np
 
 import tensorflow as tf
 from tensorflow_probability.python.mcmc import util as mcmc_util
@@ -32,7 +31,6 @@ from tensorflow_probability.python.mcmc import util as mcmc_util
 __all__ = [
     "sample_chain",
 ]
-
 
 # Cause all warnings to always be triggered.
 # Not having this means subsequent calls wont trigger the warning.
@@ -210,11 +208,11 @@ def sample_chain(
         name="num_results")
     num_burnin_steps = tf.convert_to_tensor(
         num_burnin_steps,
-        dtype=tf.int32,
+        dtype=tf.int64,
         name="num_burnin_steps")
     num_steps_between_results = tf.convert_to_tensor(
         num_steps_between_results,
-        dtype=tf.int32,
+        dtype=tf.int64,
         name="num_steps_between_results")
 
     if mcmc_util.is_list_like(current_state):
@@ -225,25 +223,23 @@ def sample_chain(
 
     def _scan_body(args_list, num_steps):
       """Closure which implements `tf.scan` body."""
-      current_state, previous_kernel_results = args_list
-      return tf.while_loop(
-          cond=lambda it_, *args: it_ < num_steps,
-          body=lambda it_, cs, pkr: [it_ + 1] + list(kernel.one_step(cs, pkr)),
-          loop_vars=[
-              np.int32(0),  # it_
-              current_state,
-              previous_kernel_results,
-          ],
-          parallel_iterations=parallel_iterations)[1:]  # Lop off `it_`.
+      next_state, current_kernel_results = mcmc_util.smart_for_loop(
+          loop_num_iter=num_steps,
+          body_fn=kernel.one_step,
+          initial_loop_vars=args_list,
+          parallel_iterations=parallel_iterations
+      )
+      return [next_state, current_kernel_results]
 
     if previous_kernel_results is None:
       previous_kernel_results = kernel.bootstrap_results(current_state)
+
     return tf.scan(
         fn=_scan_body,
         elems=tf.one_hot(indices=0,
                          depth=num_results,
                          on_value=1 + num_burnin_steps,
                          off_value=1 + num_steps_between_results,
-                         dtype=tf.int32),  # num_steps
+                         dtype=tf.int64),  # num_steps
         initializer=[current_state, previous_kernel_results],
         parallel_iterations=parallel_iterations)

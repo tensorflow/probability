@@ -23,12 +23,16 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python import bijectors
+from tensorflow_probability.python.distributions import categorical
+from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import poisson
 from tensorflow_probability.python.distributions import seed_stream
+from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.framework import tensor_shape
-from tensorflow.python.ops.distributions import categorical as categorical_lib
-from tensorflow.python.ops.distributions import transformed_distribution as transformed_lib
 
 
 __all__ = [
@@ -107,8 +111,8 @@ def quadrature_scheme_lognormal_quantiles(
   with tf.name_scope(name, "quadrature_scheme_lognormal_quantiles",
                      [loc, scale]):
     # Create a LogNormal distribution.
-    dist = transformed_lib.TransformedDistribution(
-        distribution=tf.distributions.Normal(loc=loc, scale=scale),
+    dist = transformed_distribution.TransformedDistribution(
+        distribution=normal.Normal(loc=loc, scale=scale),
         bijector=bijectors.Exp(),
         validate_args=validate_args)
     batch_ndims = dist.batch_shape.ndims
@@ -146,7 +150,7 @@ def quadrature_scheme_lognormal_quantiles(
     return grid, probs
 
 
-class PoissonLogNormalQuadratureCompound(tf.distributions.Distribution):
+class PoissonLogNormalQuadratureCompound(distribution.Distribution):
   """`PoissonLogNormalQuadratureCompound` distribution.
 
   The `PoissonLogNormalQuadratureCompound` is an approximation to a
@@ -252,11 +256,11 @@ class PoissonLogNormalQuadratureCompound(tf.distributions.Distribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name, values=[loc, scale]) as name:
+      dtype = dtype_util.common_dtype([loc, scale], tf.float32)
       if loc is not None:
-        loc = tf.convert_to_tensor(loc, name="loc")
+        loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
       if scale is not None:
-        scale = tf.convert_to_tensor(
-            scale, dtype=None if loc is None else loc.dtype, name="scale")
+        scale = tf.convert_to_tensor(scale, dtype=dtype, name="scale")
       self._quadrature_grid, self._quadrature_probs = tuple(quadrature_fn(
           loc, scale, quadrature_size, validate_args))
 
@@ -271,7 +275,7 @@ class PoissonLogNormalQuadratureCompound(tf.distributions.Distribution):
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats)
 
-      self._mixture_distribution = categorical_lib.Categorical(
+      self._mixture_distribution = categorical.Categorical(
           logits=tf.log(self._quadrature_probs),
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats)
@@ -282,7 +286,7 @@ class PoissonLogNormalQuadratureCompound(tf.distributions.Distribution):
 
       super(PoissonLogNormalQuadratureCompound, self).__init__(
           dtype=dt,
-          reparameterization_type=tf.distributions.NOT_REPARAMETERIZED,
+          reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
           parameters=parameters,

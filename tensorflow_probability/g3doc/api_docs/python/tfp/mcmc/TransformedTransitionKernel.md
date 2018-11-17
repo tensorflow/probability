@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.mcmc.TransformedTransitionKernel" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="bijector"/>
 <meta itemprop="property" content="inner_kernel"/>
 <meta itemprop="property" content="is_calibrated"/>
@@ -98,6 +99,38 @@ sample_var = tf.reduce_mean(
      hamiltonian monte carlo methods. In _Journal of the Royal Statistical
      Society_, 2011. https://doi.org/10.1111/j.1467-9868.2010.00765.x
 
+<h2 id="__init__"><code>__init__</code></h2>
+
+``` python
+__init__(
+    inner_kernel,
+    bijector,
+    name=None
+)
+```
+
+Instantiates this object.
+
+#### Args:
+
+* <b>`inner_kernel`</b>: `TransitionKernel`-like object which has a
+    `target_log_prob_fn` argument.
+* <b>`bijector`</b>: `tfp.distributions.Bijector` or list of
+    `tfp.distributions.Bijector`s. These bijectors use `forward` to map the
+    `inner_kernel` state space to the state expected by
+    `inner_kernel.target_log_prob_fn`.
+* <b>`name`</b>: Python `str` name prefixed to Ops created by this function.
+    Default value: `None` (i.e., "transformed_kernel").
+
+
+#### Returns:
+
+* <b>`transformed_kernel`</b>: Instance of `TransitionKernel` which copies the input
+    transition kernel then modifies its `target_log_prob_fn` by applying the
+    provided bijector(s).
+
+
+
 ## Properties
 
 <h3 id="bijector"><code>bijector</code></h3>
@@ -123,36 +156,6 @@ Return `dict` of ``__init__`` arguments and their values.
 
 
 ## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
-
-``` python
-__init__(
-    inner_kernel,
-    bijector,
-    name=None
-)
-```
-
-Instantiates this object.
-
-#### Args:
-
-* <b>`inner_kernel`</b>: `TransitionKernel`-like object which has a
-    `target_log_prob_fn` argument.
-* <b>`bijector`</b>: `tfp.distributions.Bijector` or list of
-    `tfp.distributions.Bijector`s. These bijectors use `forward` to map the
-    `inner_kernel` state space to the state expected by
-    `inner_kernel.target_log_prob_fn`.
-* <b>`name`</b>: Python `str` name prefixed to Ops created by this function.
-    Default value: `None` (i.e., "hmc_kernel").
-
-
-#### Returns:
-
-* <b>`transformed_kernel`</b>: Instance of `TransitionKernel` which copies the input
-    transition kernel then modifies its `target_log_prob_fn` by applying the
-    provided bijector(s).
 
 <h3 id="bootstrap_results"><code>bootstrap_results</code></h3>
 

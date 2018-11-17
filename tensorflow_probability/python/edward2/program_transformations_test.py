@@ -47,7 +47,9 @@ class ProgramTransformationsTest(tf.test.TestCase):
 
     log_joint = ed.make_log_joint_fn(normal_with_unknown_mean)
     actual_log_prob = true_log_joint(loc_value, x_value)
-    expected_log_prob = log_joint(loc=loc_value, x=x_value)
+    expected_log_prob = log_joint(
+        loc=loc_value, x=x_value,
+        f="https://github.com/tensorflow/probability/issues/160")
 
     with self.assertRaises(LookupError):
       _ = log_joint(loc=loc_value)
@@ -170,7 +172,7 @@ class ProgramTransformationsTest(tf.test.TestCase):
     loc = tf.trainable_variables("variational")[0]
     actual_log_prob = true_log_joint(loc, qz_value)
 
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       sess.run(tf.initialize_all_variables())
       actual_log_prob_, expected_log_prob_ = sess.run(
           [actual_log_prob, expected_log_prob])

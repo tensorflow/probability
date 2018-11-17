@@ -22,9 +22,9 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow.python.ops import control_flow_ops
-from tensorflow.python.ops.distributions import bijector
-from tensorflow.python.ops.distributions import util as distribution_util
 
 
 __all__ = [
@@ -158,11 +158,11 @@ class CholeskyOuterProduct(bijector.Bijector):
           [is_matrix, is_square, is_positive_definite], x)
 
     # Create a vector equal to: [p, p-1, ..., 2, 1].
-    if x.get_shape().ndims is None or x.get_shape()[-1].value is None:
+    if x.shape.ndims is None or x.shape[-1].value is None:
       p_int = tf.shape(x)[-1]
       p_float = tf.cast(p_int, dtype=x.dtype)
     else:
-      p_int = x.get_shape()[-1].value
+      p_int = x.shape[-1].value
       p_float = np.array(p_int, dtype=x.dtype.as_numpy_dtype)
     exponents = tf.linspace(p_float, 1., p_int)
 
@@ -172,8 +172,8 @@ class CholeskyOuterProduct(bijector.Bijector):
 
     # We finally need to undo adding an extra column in non-scalar cases
     # where there is a single matrix as input.
-    if x.get_shape().ndims is not None:
-      if x.get_shape().ndims == 2:
+    if x.shape.ndims is not None:
+      if x.shape.ndims == 2:
         fldj = tf.squeeze(fldj, axis=-1)
       return fldj
 
@@ -201,8 +201,8 @@ class CholeskyOuterProduct(bijector.Bijector):
     Returns:
       columnar_x: `Tensor` with at least two dimensions.
     """
-    if x.get_shape().ndims is not None:
-      if x.get_shape().ndims == 1:
+    if x.shape.ndims is not None:
+      if x.shape.ndims == 1:
         x = x[tf.newaxis, :]
       return x
     shape = tf.shape(x)

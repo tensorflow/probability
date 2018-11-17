@@ -23,7 +23,6 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow.python.framework import test_util
-from tensorflow.python.platform import tf_logging as logging
 
 
 tfd = tfp.distributions
@@ -62,7 +61,7 @@ class MultivariateNormalDiagPlusLowRankTest(tf.test.TestCase):
         scale_diag=diag,
         scale_identity_multiplier=identity_multiplier,
         validate_args=True)
-    self.assertAllEqual([3, 3, 2, 2], dist.scale.to_dense().get_shape())
+    self.assertAllEqual([3, 3, 2, 2], dist.scale.to_dense().shape)
 
   def testDiagBroadcastOnlyEvent(self):
     # batch_shape: [3], event_shape: [2]
@@ -250,56 +249,57 @@ class MultivariateNormalDiagPlusLowRankTest(tf.test.TestCase):
     sample_variance_ = np.diag(sample_covariance_)
     sample_stddev_ = np.sqrt(sample_variance_)
 
-    logging.vlog(2, "true_mean:\n{}  ".format(true_mean))
-    logging.vlog(2, "sample_mean:\n{}".format(sample_mean_))
-    logging.vlog(2, "analytical_mean:\n{}".format(analytical_mean_))
+    tf.logging.vlog(2, "true_mean:\n{}  ".format(true_mean))
+    tf.logging.vlog(2, "sample_mean:\n{}".format(sample_mean_))
+    tf.logging.vlog(2, "analytical_mean:\n{}".format(analytical_mean_))
 
-    logging.vlog(2, "true_covariance:\n{}".format(true_covariance))
-    logging.vlog(2, "sample_covariance:\n{}".format(sample_covariance_))
-    logging.vlog(2, "analytical_covariance:\n{}".format(analytical_covariance_))
+    tf.logging.vlog(2, "true_covariance:\n{}".format(true_covariance))
+    tf.logging.vlog(2, "sample_covariance:\n{}".format(sample_covariance_))
+    tf.logging.vlog(2, "analytical_covariance:\n{}".format(
+        analytical_covariance_))
 
-    logging.vlog(2, "true_variance:\n{}".format(true_variance))
-    logging.vlog(2, "sample_variance:\n{}".format(sample_variance_))
-    logging.vlog(2, "analytical_variance:\n{}".format(analytical_variance_))
+    tf.logging.vlog(2, "true_variance:\n{}".format(true_variance))
+    tf.logging.vlog(2, "sample_variance:\n{}".format(sample_variance_))
+    tf.logging.vlog(2, "analytical_variance:\n{}".format(analytical_variance_))
 
-    logging.vlog(2, "true_stddev:\n{}".format(true_stddev))
-    logging.vlog(2, "sample_stddev:\n{}".format(sample_stddev_))
-    logging.vlog(2, "analytical_stddev:\n{}".format(analytical_stddev_))
+    tf.logging.vlog(2, "true_stddev:\n{}".format(true_stddev))
+    tf.logging.vlog(2, "sample_stddev:\n{}".format(sample_stddev_))
+    tf.logging.vlog(2, "analytical_stddev:\n{}".format(analytical_stddev_))
 
-    logging.vlog(2, "true_scale:\n{}".format(true_scale))
-    logging.vlog(2, "scale:\n{}".format(scale_))
+    tf.logging.vlog(2, "true_scale:\n{}".format(true_scale))
+    tf.logging.vlog(2, "scale:\n{}".format(scale_))
 
-    logging.vlog(
+    tf.logging.vlog(
         2, "kl_identity:  analytical:{}  sample:{}".format(
             analytical_kl_identity_, sample_kl_identity_))
 
-    logging.vlog(
+    tf.logging.vlog(
         2, "kl_scaled:    analytical:{}  sample:{}".format(
             analytical_kl_scaled_, sample_kl_scaled_))
 
-    logging.vlog(
+    tf.logging.vlog(
         2, "kl_diag:      analytical:{}  sample:{}".format(
             analytical_kl_diag_, sample_kl_diag_))
 
-    logging.vlog(
+    tf.logging.vlog(
         2, "kl_chol:      analytical:{}  sample:{}".format(
             analytical_kl_chol_, sample_kl_chol_))
 
-    logging.vlog(
+    tf.logging.vlog(
         2, "kl_identity_diag_baseline:  analytical:{}  sample:{}".format(
             analytical_kl_identity_diag_baseline_,
             sample_kl_identity_diag_baseline_))
 
-    logging.vlog(
+    tf.logging.vlog(
         2, "kl_scaled_diag_baseline:  analytical:{}  sample:{}".format(
             analytical_kl_scaled_diag_baseline_,
             sample_kl_scaled_diag_baseline_))
 
-    logging.vlog(
+    tf.logging.vlog(
         2, "kl_diag_diag_baseline:  analytical:{}  sample:{}".format(
             analytical_kl_diag_diag_baseline_, sample_kl_diag_diag_baseline_))
 
-    logging.vlog(
+    tf.logging.vlog(
         2, "kl_chol_diag_baseline:  analytical:{}  sample:{}".format(
             analytical_kl_chol_diag_baseline_, sample_kl_chol_diag_baseline_))
 
@@ -367,7 +367,7 @@ class MultivariateNormalDiagPlusLowRankTest(tf.test.TestCase):
     ])
     cov = np.stack([np.matmul(scale[0], scale[0].T),
                     np.matmul(scale[1], scale[1].T)])
-    logging.vlog(2, "expected_cov:\n{}".format(cov))
+    tf.logging.vlog(2, "expected_cov:\n{}".format(cov))
     mvn = tfd.MultivariateNormalDiagPlusLowRank(
         loc=mu, scale_perturb_factor=u, scale_perturb_diag=m)
     self.assertAllClose(

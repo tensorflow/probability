@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
+from tensorflow_probability.python.distributions import normal
 
 
 def normal_conjugates_known_scale_posterior(prior, scale, s, n):
@@ -63,7 +64,7 @@ def normal_conjugates_known_scale_posterior(prior, scale, s, n):
     TypeError: if dtype of `s` does not match `dtype`, or `prior` is not a
       Normal object.
   """
-  if not isinstance(prior, tf.distributions.Normal):
+  if not isinstance(prior, normal.Normal):
     raise TypeError("Expected prior to be an instance of type Normal")
 
   if s.dtype != prior.dtype:
@@ -75,7 +76,7 @@ def normal_conjugates_known_scale_posterior(prior, scale, s, n):
   scale0_2 = tf.square(prior.scale)
   scale_2 = tf.square(scale)
   scalep_2 = 1.0/(1/scale0_2 + n/scale_2)
-  return tf.distributions.Normal(
+  return normal.Normal(
       loc=(prior.loc / scale0_2 + s / scale_2) * scalep_2,
       scale=tf.sqrt(scalep_2))
 
@@ -129,7 +130,7 @@ def normal_conjugates_known_scale_predictive(prior, scale, s, n):
     TypeError: if dtype of `s` does not match `dtype`, or `prior` is not a
       Normal object.
   """
-  if not isinstance(prior, tf.distributions.Normal):
+  if not isinstance(prior, normal.Normal):
     raise TypeError("Expected prior to be an instance of type Normal")
 
   if s.dtype != prior.dtype:
@@ -141,6 +142,6 @@ def normal_conjugates_known_scale_predictive(prior, scale, s, n):
   scale0_2 = tf.square(prior.scale)
   scale_2 = tf.square(scale)
   scalep_2 = 1.0/(1/scale0_2 + n/scale_2)
-  return tf.distributions.Normal(
+  return normal.Normal(
       loc=(prior.loc / scale0_2 + s / scale_2) * scalep_2,
       scale=tf.sqrt(scalep_2 + scale_2))

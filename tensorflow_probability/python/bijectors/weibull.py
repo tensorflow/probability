@@ -19,8 +19,8 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
+from tensorflow_probability.python.bijectors import bijector
 from tensorflow.python.ops import control_flow_ops
-from tensorflow.python.ops.distributions import bijector
 
 
 __all__ = [
@@ -98,7 +98,7 @@ class Weibull(bijector.Bijector):
 
   def _forward(self, x):
     x = self._maybe_assert_valid_x(x)
-    return -tf.expm1(-((x / self.scale)**self.concentration))
+    return -tf.math.expm1(-((x / self.scale)**self.concentration))
 
   def _inverse(self, y):
     y = self._maybe_assert_valid_y(y)
@@ -106,13 +106,14 @@ class Weibull(bijector.Bijector):
 
   def _inverse_log_det_jacobian(self, y):
     y = self._maybe_assert_valid_y(y)
-    return (-tf.log1p(-y) + (1 / self.concentration - 1) * tf.log(-tf.log1p(-y))
+    return (-tf.log1p(-y) + tf.math.xlogy(
+        1 / self.concentration - 1, -tf.log1p(-y))
             + tf.log(self.scale / self.concentration))
 
   def _forward_log_det_jacobian(self, x):
     x = self._maybe_assert_valid_x(x)
     return (-(x / self.scale)**self.concentration +
-            (self.concentration - 1) * tf.log(x) + tf.log(
+            tf.math.xlogy(self.concentration - 1, x) + tf.log(
                 self.concentration) + -self.concentration * tf.log(self.scale))
 
   def _maybe_assert_valid_x(self, x):

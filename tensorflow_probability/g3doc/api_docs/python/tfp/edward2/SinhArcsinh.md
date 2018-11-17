@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.edward2.SinhArcsinh" />
+<meta itemprop="path" content="Stable" />
 </div>
 
 # tfp.edward2.SinhArcsinh
@@ -35,7 +36,7 @@ Arguments `(loc, scale, skewness, tailweight)` must have broadcastable shape
 * <b>`tailweight`</b>:  Tailweight parameter. Default is `1.0` (unchanged tailweight)
 * <b>`distribution`</b>: `tf.Distribution`-like instance. Distribution that is
     transformed to produce this distribution.
-    Default is `tf.distributions.Normal(0., 1.)`.
+    Default is `tfd.Normal(0., 1.)`.
     Must be a scalar-batch, scalar-event distribution.  Typically
     `distribution.reparameterization_type = FULLY_REPARAMETERIZED` or it is
     a function of non-trainable parameters. WARNING: If you backprop through

@@ -24,6 +24,8 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_case
+
 from tensorflow.python.framework import test_util
 
 
@@ -41,13 +43,13 @@ tfd = tfp.distributions
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class HalfNormalTest(tf.test.TestCase):
+class HalfNormalTest(test_case.TestCase):
 
   def setUp(self):
     self._rng = np.random.RandomState(123)
 
-  def assertAllFinite(self, tensor):
-    is_finite = np.isfinite(self.evaluate(tensor))
+  def assertAllFinite(self, array):
+    is_finite = np.isfinite(array)
     all_true = np.ones_like(is_finite, dtype=np.bool)
     self.assertAllEqual(all_true, is_finite)
 
@@ -169,22 +171,24 @@ class HalfNormalTest(tf.test.TestCase):
 
   def testFiniteGradients(self):
     for dtype in [np.float32, np.float64]:
-      g = tf.Graph()
-      with g.as_default():
-        scale = tf.Variable(dtype(3.0))
-        dist = tfd.HalfNormal(scale=scale)
-        x = np.array([0.01, 0.1, 1., 5., 10.]).astype(dtype)
-        for func in [
-            dist.cdf, dist.log_cdf, dist.survival_function,
-            dist.log_prob, dist.prob, dist.log_survival_function,
-        ]:
-          print(func.__name__)
-          value = func(x)
-          with self.test_session(graph=g):
-            tf.global_variables_initializer().run()
-            grads = tf.gradients(value, [scale])
-            self.assertAllFinite(value)
-            self.assertAllFinite(grads[0])
+      scale = tf.Variable(dtype(3.0))
+      x = np.array([0.01, 0.1, 1., 5., 10.]).astype(dtype)
+      def half_normal_function(name, x):
+        def half_normal(scale):
+          return getattr(tfd.HalfNormal(scale=scale), name)(x)
+        return half_normal
+
+      self.evaluate(tf.global_variables_initializer())
+      for func_name in [
+          "cdf", "log_cdf", "survival_function",
+          "log_prob", "prob", "log_survival_function",
+      ]:
+        print(func_name)
+        value = self.evaluate(half_normal_function(func_name, x)(scale))
+        grads = self.compute_gradients(
+            half_normal_function(func_name, x), args=[scale])
+        self.assertAllFinite(value)
+        self.assertAllFinite(grads)
 
   def testHalfNormalEntropy(self):
     scale = np.array([[1.0, 2.0, 3.0]])

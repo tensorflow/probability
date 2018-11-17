@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions.LinearGaussianStateSpaceModel" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="allow_nan_stats"/>
 <meta itemprop="property" content="batch_shape"/>
 <meta itemprop="property" content="dtype"/>
@@ -154,6 +155,68 @@ final_step = tfd.MultivariateNormalFullCovariance(
 
 * TODO(davmre): show example of fitting parameters.
 
+<h2 id="__init__"><code>__init__</code></h2>
+
+``` python
+__init__(
+    num_timesteps,
+    transition_matrix,
+    transition_noise,
+    observation_matrix,
+    observation_noise,
+    initial_state_prior,
+    initial_step=0,
+    validate_args=False,
+    allow_nan_stats=True,
+    name='LinearGaussianStateSpaceModel'
+)
+```
+
+Initialize a `LinearGaussianStateSpaceModel.
+
+#### Args:
+
+* <b>`num_timesteps`</b>: Python `int` total number of timesteps.
+* <b>`transition_matrix`</b>: A transition operator, represented by a Tensor or
+    LinearOperator of shape `[latent_size, latent_size]`, or by a
+    callable taking as argument a scalar integer Tensor `t` and
+    returning a Tensor or LinearOperator representing the transition
+    operator from latent state at time `t` to time `t + 1`.
+* <b>`transition_noise`</b>: An instance of
+    `tfd.MultivariateNormalLinearOperator` with event shape
+    `[latent_size]`, representing the mean and covariance of the
+    transition noise model, or a callable taking as argument a
+    scalar integer Tensor `t` and returning such a distribution
+    representing the noise in the transition from time `t` to time `t + 1`.
+* <b>`observation_matrix`</b>: An observation operator, represented by a Tensor
+    or LinearOperator of shape `[observation_size, latent_size]`,
+    or by a callable taking as argument a scalar integer Tensor
+    `t` and returning a timestep-specific Tensor or
+    LinearOperator.
+* <b>`observation_noise`</b>: An instance of
+    `tfd.MultivariateNormalLinearOperator` with event shape
+    `[observation_size]`, representing the mean and covariance of
+    the observation noise model, or a callable taking as argument
+    a scalar integer Tensor `t` and returning a timestep-specific
+    noise model.
+* <b>`initial_state_prior`</b>: An instance of `MultivariateNormalLinearOperator`
+    representing the prior distribution on latent states; must
+    have event shape `[latent_size]`.
+* <b>`initial_step`</b>: optional `int` specifying the time of the first
+    modeled timestep.  This is added as an offset when passing
+    timesteps `t` to (optional) callables specifying
+    timestep-specific transition and observation models.
+* <b>`validate_args`</b>: Python `bool`, default `False`. Whether to validate input
+    with asserts. If `validate_args` is `False`, and the inputs are
+    invalid, correct behavior is not guaranteed.
+* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. If `False`, raise an
+    exception if a statistic (e.g. mean/mode/etc...) is undefined for any
+    batch member If `True`, batch members with valid parameters leading to
+    undefined statistics will return NaN for this statistic.
+* <b>`name`</b>: The name to give Ops created by the initializer.
+
+
+
 ## Properties
 
 <h3 id="allow_nan_stats"><code>allow_nan_stats</code></h3>
@@ -212,8 +275,7 @@ Dictionary of parameters used to instantiate this `Distribution`.
 Describes how samples from the distribution are reparameterized.
 
 Currently this is one of the static instances
-`distributions.FULLY_REPARAMETERIZED`
-or `distributions.NOT_REPARAMETERIZED`.
+`tfd.FULLY_REPARAMETERIZED` or `tfd.NOT_REPARAMETERIZED`.
 
 #### Returns:
 
@@ -226,65 +288,6 @@ Python `bool` indicating possibly expensive checks are enabled.
 
 
 ## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
-
-``` python
-__init__(
-    num_timesteps,
-    transition_matrix,
-    transition_noise,
-    observation_matrix,
-    observation_noise,
-    initial_state_prior,
-    initial_step=0,
-    validate_args=False,
-    allow_nan_stats=True,
-    name='LinearGaussianStateSpaceModel'
-)
-```
-
-Initialize a `LinearGaussianStateSpaceModel.
-
-#### Args:
-
-* <b>`num_timesteps`</b>: Python `int` total number of timesteps.
-* <b>`transition_matrix`</b>: A transition operator, represented by a Tensor or
-    LinearOperator of shape `[latent_size, latent_size]`, or by a
-    callable taking as argument a scalar integer Tensor `t` and
-    returning a timestep-specific Tensor or LinearOperator.
-* <b>`transition_noise`</b>: An instance of
-    `tfd.MultivariateNormalLinearOperator` with event shape
-    `[latent_size]`, representing the mean and covariance of the
-    transition noise model, or a callable taking as argument a
-    scalar integer Tensor `t` and returning a timestep-specific
-    noise model.
-* <b>`observation_matrix`</b>: An observation operator, represented by a Tensor
-    or LinearOperator of shape `[observation_size, latent_size]`,
-    or by a callable taking as argument a scalar integer Tensor
-    `t` and returning a timestep-specific Tensor or
-    LinearOperator.
-* <b>`observation_noise`</b>: An instance of
-    `tfd.MultivariateNormalLinearOperator` with event shape
-    `[observation_size]`, representing the mean and covariance of
-    the observation noise model, or a callable taking as argument
-    a scalar integer Tensor `t` and returning a timestep-specific
-    noise model.
-* <b>`initial_state_prior`</b>: An instance of `MultivariateNormalLinearOperator`
-    representing the prior distribution on latent states; must
-    have event shape `[latent_size]`.
-* <b>`initial_step`</b>: optional `int` specifying the time of the first
-    modeled timestep.  This is added as an offset when passing
-    timesteps `t` to (optional) callables specifying
-    timestep-specific transition and observation models.
-* <b>`validate_args`</b>: Python `bool`, default `False`. Whether to validate input
-    with asserts. If `validate_args` is `False`, and the inputs are
-    invalid, correct behavior is not guaranteed.
-* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. If `False`, raise an
-    exception if a statistic (e.g. mean/mode/etc...) is undefined for any
-    batch member If `True`, batch members with valid parameters leading to
-    undefined statistics will return NaN for this statistic.
-* <b>`name`</b>: The name to give Ops created by the initializer.
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
 
@@ -425,7 +428,7 @@ where `F` denotes the support of the random variable `X ~ P`.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 
@@ -467,6 +470,15 @@ forward_filter(x)
 
 Run a Kalman filter over a provided sequence of outputs.
 
+Note that the returned values `filtered_means`, `predicted_means`, and
+`observation_means` depend on the observed time series `x`, while the
+corresponding covariances are independent of the observed series; i.e., they
+depend only on the model itself. This means that the mean values have shape
+`concat([sample_shape(x), batch_shape, [num_timesteps,
+{latent/observation}_size]])`, while the covariances have shape
+`concat[(batch_shape, [num_timesteps, {latent/observation}_size,
+{latent/observation}_size]])`, which does not depend on the sample shape.
+
 #### Args:
 
 * <b>`x`</b>: a float-type `Tensor` with rightmost dimensions
@@ -483,21 +495,22 @@ Run a Kalman filter over a provided sequence of outputs.
     of shape `sample_shape(x) + batch_shape + [num_timesteps].`
 * <b>`filtered_means`</b>: Means of the per-timestep filtered marginal
      distributions p(z_t | x_{:t}), as a Tensor of shape
-    `batch_shape + [num_timesteps, latent_size]`.
+    `sample_shape(x) + batch_shape + [num_timesteps, latent_size]`.
 * <b>`filtered_covs`</b>: Covariances of the per-timestep filtered marginal
      distributions p(z_t | x_{:t}), as a Tensor of shape
     `batch_shape + [num_timesteps, latent_size, latent_size]`.
 * <b>`predicted_means`</b>: Means of the per-timestep predictive
      distributions over latent states, p(z_{t+1} | x_{:t}), as a
-     Tensor of shape `batch_shape + [num_timesteps, latent_size]`.
+     Tensor of shape `sample_shape(x) + batch_shape +
+     [num_timesteps, latent_size]`.
 * <b>`predicted_covs`</b>: Covariances of the per-timestep predictive
      distributions over latent states, p(z_{t+1} | x_{:t}), as a
      Tensor of shape `batch_shape + [num_timesteps, latent_size,
      latent_size]`.
 * <b>`observation_means`</b>: Means of the per-timestep predictive
      distributions over observations, p(x_{t} | x_{:t-1}), as a
-     Tensor of shape `batch_shape + [num_timesteps,
-     observation_size]`.
+     Tensor of shape `sample_shape(x) + batch_shape +
+     [num_timesteps, observation_size]`.
 * <b>`observation_covs`</b>: Covariances of the per-timestep predictive
      distributions over observations, p(x_{t} | x_{:t-1}), as a
      Tensor of shape `batch_shape + [num_timesteps,
@@ -563,7 +576,7 @@ denotes (Shanon) cross entropy, and `H[.]` denotes (Shanon) entropy.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 

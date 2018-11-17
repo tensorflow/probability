@@ -23,11 +23,16 @@ import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
-from tensorflow.python.ops.distributions.bijector_test_util import assert_bijective_and_finite
+from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow.python.framework import test_util
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class PermuteBijectorTest(tf.test.TestCase):
   """Tests correctness of the Permute bijector."""
+
+  def assertRaisesError(self, msg):
+    return self.assertRaisesRegexp(Exception, msg)
 
   def setUp(self):
     self._rng = np.random.RandomState(42)
@@ -37,57 +42,55 @@ class PermuteBijectorTest(tf.test.TestCase):
     expected_x = np.random.randn(4, 2, 3)
     expected_y = expected_x[..., expected_permutation]
 
-    with self.test_session() as sess:
-      permutation_ph = tf.placeholder(dtype=tf.int32)
-      bijector = tfb.Permute(permutation=permutation_ph, validate_args=True)
-      [
-          permutation_,
-          x_,
-          y_,
-          fldj,
-          ildj,
-      ] = sess.run([
-          bijector.permutation,
-          bijector.inverse(expected_y),
-          bijector.forward(expected_x),
-          bijector.forward_log_det_jacobian(expected_x, event_ndims=1),
-          bijector.inverse_log_det_jacobian(expected_y, event_ndims=1),
-      ], feed_dict={permutation_ph: expected_permutation})
-      self.assertEqual("permute", bijector.name)
-      self.assertAllEqual(expected_permutation, permutation_)
-      self.assertAllClose(expected_y, y_, rtol=1e-6, atol=0)
-      self.assertAllClose(expected_x, x_, rtol=1e-6, atol=0)
-      self.assertAllClose(0., fldj, rtol=1e-6, atol=0)
-      self.assertAllClose(0., ildj, rtol=1e-6, atol=0)
+    permutation_ph = tf.placeholder_with_default(
+        expected_permutation, shape=None)
+    bijector = tfb.Permute(permutation=permutation_ph, validate_args=True)
+    [
+        permutation_,
+        x_,
+        y_,
+        fldj,
+        ildj,
+    ] = self.evaluate([
+        bijector.permutation,
+        bijector.inverse(expected_y),
+        bijector.forward(expected_x),
+        bijector.forward_log_det_jacobian(expected_x, event_ndims=1),
+        bijector.inverse_log_det_jacobian(expected_y, event_ndims=1),
+    ])
+    self.assertEqual("permute", bijector.name)
+    self.assertAllEqual(expected_permutation, permutation_)
+    self.assertAllClose(expected_y, y_, rtol=1e-6, atol=0)
+    self.assertAllClose(expected_x, x_, rtol=1e-6, atol=0)
+    self.assertAllClose(0., fldj, rtol=1e-6, atol=0)
+    self.assertAllClose(0., ildj, rtol=1e-6, atol=0)
 
   def testRaisesOpError(self):
-    with self.test_session() as sess:
-      with self.assertRaisesOpError("Permutation over `d` must contain"):
-        permutation_ph = tf.placeholder(dtype=tf.int32)
-        bijector = tfb.Permute(permutation=permutation_ph, validate_args=True)
-        sess.run(bijector.inverse([1.]),
-                 feed_dict={permutation_ph: [1, 2]})
+    with self.assertRaisesError("Permutation over `d` must contain"):
+      permutation = tf.placeholder_with_default([1, 2], shape=None)
+      bijector = tfb.Permute(permutation=permutation, validate_args=True)
+      self.evaluate(bijector.inverse([1.]))
 
   def testBijectiveAndFinite(self):
     permutation = np.int32([2, 0, 1])
     x = np.random.randn(4, 2, 3)
     y = x[..., permutation]
-    with self.test_session():
-      bijector = tfb.Permute(permutation=permutation, validate_args=True)
-      assert_bijective_and_finite(
-          bijector, x, y, event_ndims=1, rtol=1e-6, atol=0)
+    bijector = tfb.Permute(permutation=permutation, validate_args=True)
+    bijector_test_util.assert_bijective_and_finite(
+        bijector, x, y, eval_func=self.evaluate, event_ndims=1, rtol=1e-6,
+        atol=0)
 
   def testBijectiveAndFiniteAxis(self):
     permutation = np.int32([1, 0])
     x = np.random.randn(4, 2, 3)
     y = x[..., permutation, :]
-    with self.test_session():
-      bijector = tfb.Permute(
-          permutation=permutation,
-          axis=-2,
-          validate_args=True)
-      assert_bijective_and_finite(
-          bijector, x, y, event_ndims=2, rtol=1e-6, atol=0)
+    bijector = tfb.Permute(
+        permutation=permutation,
+        axis=-2,
+        validate_args=True)
+    bijector_test_util.assert_bijective_and_finite(
+        bijector, x, y, eval_func=self.evaluate, event_ndims=2, rtol=1e-6,
+        atol=0)
 
 
 if __name__ == "__main__":

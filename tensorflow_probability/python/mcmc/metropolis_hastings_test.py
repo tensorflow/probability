@@ -179,7 +179,7 @@ class MetropolisHastingsTest(tf.test.TestCase):
       self.assertEqual(type(expected_inner_kernel_results), type(kr))
 
     # Now check actual values.
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       [
           expected_init_inner_kernel_results_,
           expected_inner_kernel_results_,
@@ -271,7 +271,7 @@ class MetropolisHastingsTest(tf.test.TestCase):
       self.assertEqual(type(expected_inner_kernel_results), type(kr))
 
     # Now check actual values.
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       [
           expected_init_inner_kernel_results_,
           expected_inner_kernel_results_,

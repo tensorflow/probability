@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions.QuantizedDistribution" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="allow_nan_stats"/>
 <meta itemprop="property" content="batch_shape"/>
 <meta itemprop="property" content="distribution"/>
@@ -144,6 +145,52 @@ calculating its log-probability of audio samples as `target` and optimizing.
      Synthesis. _arXiv preprint arXiv:1711.10433_, 2017.
      https://arxiv.org/abs/1711.10433
 
+<h2 id="__init__"><code>__init__</code></h2>
+
+``` python
+__init__(
+    distribution,
+    low=None,
+    high=None,
+    validate_args=False,
+    name='QuantizedDistribution'
+)
+```
+
+Construct a Quantized Distribution representing `Y = ceiling(X)`.
+
+Some properties are inherited from the distribution defining `X`. Example:
+`allow_nan_stats` is determined for this `QuantizedDistribution` by reading
+the `distribution`.
+
+#### Args:
+
+* <b>`distribution`</b>:  The base distribution class to transform. Typically an
+    instance of `Distribution`.
+* <b>`low`</b>: `Tensor` with same `dtype` as this distribution and shape
+    able to be added to samples. Should be a whole number. Default `None`.
+    If provided, base distribution's `prob` should be defined at
+    `low`.
+* <b>`high`</b>: `Tensor` with same `dtype` as this distribution and shape
+    able to be added to samples. Should be a whole number. Default `None`.
+    If provided, base distribution's `prob` should be defined at
+    `high - 1`.
+    `high` must be strictly greater than `low`.
+* <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
+    parameters are checked for validity despite possibly degrading runtime
+    performance. When `False` invalid inputs may silently render incorrect
+    outputs.
+* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
+
+
+#### Raises:
+
+* <b>`TypeError`</b>: If `dist_cls` is not a subclass of
+      `Distribution` or continuous.
+* <b>`NotImplementedError`</b>:  If the base distribution does not implement `cdf`.
+
+
+
 ## Properties
 
 <h3 id="allow_nan_stats"><code>allow_nan_stats</code></h3>
@@ -214,8 +261,7 @@ Dictionary of parameters used to instantiate this `Distribution`.
 Describes how samples from the distribution are reparameterized.
 
 Currently this is one of the static instances
-`distributions.FULLY_REPARAMETERIZED`
-or `distributions.NOT_REPARAMETERIZED`.
+`tfd.FULLY_REPARAMETERIZED` or `tfd.NOT_REPARAMETERIZED`.
 
 #### Returns:
 
@@ -228,50 +274,6 @@ Python `bool` indicating possibly expensive checks are enabled.
 
 
 ## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
-
-``` python
-__init__(
-    distribution,
-    low=None,
-    high=None,
-    validate_args=False,
-    name='QuantizedDistribution'
-)
-```
-
-Construct a Quantized Distribution representing `Y = ceiling(X)`.
-
-Some properties are inherited from the distribution defining `X`. Example:
-`allow_nan_stats` is determined for this `QuantizedDistribution` by reading
-the `distribution`.
-
-#### Args:
-
-* <b>`distribution`</b>:  The base distribution class to transform. Typically an
-    instance of `Distribution`.
-* <b>`low`</b>: `Tensor` with same `dtype` as this distribution and shape
-    able to be added to samples. Should be a whole number. Default `None`.
-    If provided, base distribution's `prob` should be defined at
-    `low`.
-* <b>`high`</b>: `Tensor` with same `dtype` as this distribution and shape
-    able to be added to samples. Should be a whole number. Default `None`.
-    If provided, base distribution's `prob` should be defined at
-    `high - 1`.
-    `high` must be strictly greater than `low`.
-* <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
-    parameters are checked for validity despite possibly degrading runtime
-    performance. When `False` invalid inputs may silently render incorrect
-    outputs.
-* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
-
-
-#### Raises:
-
-* <b>`TypeError`</b>: If `dist_cls` is not a subclass of
-      `Distribution` or continuous.
-* <b>`NotImplementedError`</b>:  If the base distribution does not implement `cdf`.
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
 
@@ -430,7 +432,7 @@ where `F` denotes the support of the random variable `X ~ P`.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 
@@ -524,7 +526,7 @@ denotes (Shanon) cross entropy, and `H[.]` denotes (Shanon) entropy.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 

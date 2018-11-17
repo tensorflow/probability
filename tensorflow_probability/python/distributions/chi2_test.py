@@ -41,11 +41,11 @@ class Chi2Test(tf.test.TestCase):
     expected_log_pdf = stats.chi2.logpdf(x, df_v)
 
     log_pdf = chi2.log_prob(x)
-    self.assertEqual(log_pdf.get_shape(), (6,))
+    self.assertEqual(log_pdf.shape, (6,))
     self.assertAllClose(self.evaluate(log_pdf), expected_log_pdf)
 
     pdf = chi2.prob(x)
-    self.assertEqual(pdf.get_shape(), (6,))
+    self.assertEqual(pdf.shape, (6,))
     self.assertAllClose(self.evaluate(pdf), np.exp(expected_log_pdf))
 
   def testChi2CDF(self):
@@ -58,28 +58,28 @@ class Chi2Test(tf.test.TestCase):
     expected_cdf = stats.chi2.cdf(x, df_v)
 
     cdf = chi2.cdf(x)
-    self.assertEqual(cdf.get_shape(), (6,))
+    self.assertEqual(cdf.shape, (6,))
     self.assertAllClose(self.evaluate(cdf), expected_cdf)
 
   def testChi2Mean(self):
     df_v = np.array([1., 3, 5], dtype=np.float64)
     expected_mean = stats.chi2.mean(df_v)
     chi2 = tfd.Chi2(df=df_v)
-    self.assertEqual(chi2.mean().get_shape(), (3,))
+    self.assertEqual(chi2.mean().shape, (3,))
     self.assertAllClose(self.evaluate(chi2.mean()), expected_mean)
 
   def testChi2Variance(self):
     df_v = np.array([1., 3, 5], np.float64)
     expected_variances = stats.chi2.var(df_v)
     chi2 = tfd.Chi2(df=df_v)
-    self.assertEqual(chi2.variance().get_shape(), (3,))
+    self.assertEqual(chi2.variance().shape, (3,))
     self.assertAllClose(self.evaluate(chi2.variance()), expected_variances)
 
   def testChi2Entropy(self):
     df_v = np.array([1., 3, 5], dtype=np.float64)
     expected_entropy = stats.chi2.entropy(df_v)
     chi2 = tfd.Chi2(df=df_v)
-    self.assertEqual(chi2.entropy().get_shape(), (3,))
+    self.assertEqual(chi2.entropy().shape, (3,))
     self.assertAllClose(self.evaluate(chi2.entropy()), expected_entropy)
 
   def testChi2WithAbsDf(self):

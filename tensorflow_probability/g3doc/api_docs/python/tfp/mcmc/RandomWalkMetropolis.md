@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.mcmc.RandomWalkMetropolis" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="is_calibrated"/>
 <meta itemprop="property" content="name"/>
 <meta itemprop="property" content="new_state_fn"/>
@@ -150,7 +151,6 @@ print('Estimated covariance of covariance: {}'.format(cov_sample_cov_))
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow.python.ops.distributions import util as distributions_util
 
 tfd = tfp.distributions
 
@@ -162,12 +162,10 @@ def cauchy_new_state_fn(scale, dtype):
   cauchy = tfd.Cauchy(loc=dtype(0), scale=dtype(scale))
   def _fn(state_parts, seed):
     next_state_parts = []
+    seed_stream  = tfd.SeedStream(seed, salt='RandomCauchy')
     for sp in state_parts:
-      # Mutate seed with each use.
-      seed = distributions_util.gen_new_seed(
-          seed, salt='random_walk_cauchy_new_state_fn')
       next_state_parts.append(sp + cauchy.sample(
-        sample_shape=sp.shape, seed=seed))
+        sample_shape=sp.shape, seed=seed_stream()))
     return next_state_parts
   return _fn
 
@@ -193,6 +191,51 @@ with tf.Session() as sess:
 print('Estimated mean: {}'.format(sample_mean_))
 print('Estimated standard deviation: {}'.format(sample_std_))
 ```
+
+<h2 id="__init__"><code>__init__</code></h2>
+
+``` python
+__init__(
+    target_log_prob_fn,
+    new_state_fn=None,
+    seed=None,
+    name=None
+)
+```
+
+Initializes this transition kernel.
+
+#### Args:
+
+* <b>`target_log_prob_fn`</b>: Python callable which takes an argument like
+    `current_state` (or `*current_state` if it's a list) and returns its
+    (possibly unnormalized) log-density under the target distribution.
+* <b>`new_state_fn`</b>: Python callable which takes a list of state parts and a
+    seed; returns a same-type `list` of `Tensor`s, each being a perturbation
+    of the input state parts. The perturbation distribution is assumed to be
+    a symmetric distribution centered at the input state part.
+    Default value: `None` which is mapped to
+      `tfp.mcmc.random_walk_normal_fn()`.
+* <b>`seed`</b>: Python integer to seed the random number generator.
+* <b>`name`</b>: Python `str` name prefixed to Ops created by this function.
+    Default value: `None` (i.e., 'rwm_kernel').
+
+
+#### Returns:
+
+* <b>`next_state`</b>: Tensor or Python list of `Tensor`s representing the state(s)
+    of the Markov chain(s) at each result step. Has same shape as
+    `current_state`.
+* <b>`kernel_results`</b>: `collections.namedtuple` of internal calculations used to
+    advance the chain.
+
+
+#### Raises:
+
+* <b>`ValueError`</b>: if there isn't one `scale` or a list with same length as
+    `current_state`.
+
+
 
 ## Properties
 
@@ -223,48 +266,6 @@ Return `dict` of ``__init__`` arguments and their values.
 
 
 ## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
-
-``` python
-__init__(
-    target_log_prob_fn,
-    new_state_fn=random_walk_normal_fn(),
-    seed=None,
-    name=None
-)
-```
-
-Initializes this transition kernel.
-
-#### Args:
-
-* <b>`target_log_prob_fn`</b>: Python callable which takes an argument like
-    `current_state` (or `*current_state` if it's a list) and returns its
-    (possibly unnormalized) log-density under the target distribution.
-* <b>`new_state_fn`</b>: Python callable which takes a list of state parts and a
-    seed; returns a same-type `list` of `Tensor`s, each being a perturbation
-    of the input state parts. The perturbation distribution is assumed to be
-    a symmetric distribution centered at the input state part.
-    Default value: `tfp.mcmc.random_walk_normal_fn()`.
-* <b>`seed`</b>: Python integer to seed the random number generator.
-* <b>`name`</b>: Python `str` name prefixed to Ops created by this function.
-    Default value: `None` (i.e., 'rwm_kernel').
-
-
-#### Returns:
-
-* <b>`next_state`</b>: Tensor or Python list of `Tensor`s representing the state(s)
-    of the Markov chain(s) at each result step. Has same shape as
-    `current_state`.
-* <b>`kernel_results`</b>: `collections.namedtuple` of internal calculations used to
-    advance the chain.
-
-
-#### Raises:
-
-* <b>`ValueError`</b>: if there isn't one `scale` or a list with same length as
-    `current_state`.
 
 <h3 id="bootstrap_results"><code>bootstrap_results</code></h3>
 

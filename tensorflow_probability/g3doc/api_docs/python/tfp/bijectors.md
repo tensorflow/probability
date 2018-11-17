@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.bijectors" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="__all__"/>
 </div>
 
@@ -29,6 +30,8 @@ Bijector Ops.
 
 [`class ConditionalBijector`](../tfp/bijectors/ConditionalBijector.md): Conditional Bijector is a Bijector that allows intrinsic conditioning.
 
+[`class DiscreteCosineTransform`](../tfp/bijectors/DiscreteCosineTransform.md): Compute `Y = g(X) = DCT(X)`, where DCT type is indicated by the `type` arg.
+
 [`class Exp`](../tfp/bijectors/Exp.md): Compute `Y = g(X) = exp(X)`.
 
 [`class FillTriangular`](../tfp/bijectors/FillTriangular.md): Transforms vectors to triangular.
@@ -46,6 +49,10 @@ Bijector Ops.
 [`class MaskedAutoregressiveFlow`](../tfp/bijectors/MaskedAutoregressiveFlow.md): Affine MaskedAutoregressiveFlow bijector for vector-valued events.
 
 [`class MatrixInverseTriL`](../tfp/bijectors/MatrixInverseTriL.md): Computes `g(L) = inv(L)`, where `L` is a lower-triangular matrix.
+
+[`class NormalCDF`](../tfp/bijectors/NormalCDF.md): Compute `Y = g(X) = NormalCDF(x)`.
+
+[`class Ordered`](../tfp/bijectors/Ordered.md): Bijector which maps a tensor x_k that has increasing elements in the last
 
 [`class Permute`](../tfp/bijectors/Permute.md): Permutes the rightmost dimension of a `Tensor`.
 
@@ -87,5 +94,5 @@ Bijector Ops.
 
 ## Other Members
 
-`__all__`
+<h3 id="__all__"><code>__all__</code></h3>
 

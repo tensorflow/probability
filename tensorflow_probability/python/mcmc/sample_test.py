@@ -24,7 +24,6 @@ import numpy as np
 
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow.python.framework import random_seed
 
 
 class SampleChainTest(tf.test.TestCase):
@@ -33,7 +32,7 @@ class SampleChainTest(tf.test.TestCase):
     self._shape_param = 5.
     self._rate_param = 10.
 
-    random_seed.set_random_seed(10003)
+    tf.random.set_random_seed(10003)
     np.random.seed(10003)
 
   # TODO(b/74154679): Create Fake TransitionKernel and not rely on HMC tests.
@@ -43,9 +42,9 @@ class SampleChainTest(tf.test.TestCase):
     true_mean = dtype([0, 0])
     true_cov = dtype([[1, 0.5],
                       [0.5, 1]])
-    num_results = 2000
+    num_results = 3000
     counter = collections.Counter()
-    with self.test_session(graph=tf.Graph()) as sess:
+    with self.cached_session(graph=tf.Graph()) as sess:
       def target_log_prob(x, y):
         counter['target_calls'] += 1
         # Corresponds to unnormalized MVN.

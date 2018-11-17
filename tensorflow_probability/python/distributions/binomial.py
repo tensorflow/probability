@@ -18,9 +18,12 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
+from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.ops import control_flow_ops
-from tensorflow.python.ops.distributions import util as distribution_util
 
 
 _binomial_sample_note = """
@@ -58,7 +61,7 @@ def _bdtr(k, n, p):
   return tf.where(k_eq_n, ones, dk)
 
 
-class Binomial(tf.distributions.Distribution):
+class Binomial(distribution.Distribution):
   """Binomial distribution.
 
   This distribution is parameterized by `probs`, a (batch of) probabilities for
@@ -159,16 +162,19 @@ class Binomial(tf.distributions.Distribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name, values=[total_count, logits, probs]) as name:
+      dtype = dtype_util.common_dtype([total_count, logits, probs], tf.float32)
       self._total_count = self._maybe_assert_valid_total_count(
-          tf.convert_to_tensor(total_count, name="total_count"), validate_args)
+          tf.convert_to_tensor(total_count, name="total_count", dtype=dtype),
+          validate_args)
       self._logits, self._probs = distribution_util.get_logits_and_probs(
           logits=logits,
           probs=probs,
           validate_args=validate_args,
-          name=name)
+          name=name,
+          dtype=dtype)
     super(Binomial, self).__init__(
         dtype=self._probs.dtype,
-        reparameterization_type=tf.distributions.NOT_REPARAMETERIZED,
+        reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
         parameters=parameters,
@@ -195,8 +201,8 @@ class Binomial(tf.distributions.Distribution):
         tf.shape(self.total_count), tf.shape(self.probs))
 
   def _batch_shape(self):
-    return tf.broadcast_static_shape(self.total_count.get_shape(),
-                                     self.probs.get_shape())
+    return tf.broadcast_static_shape(self.total_count.shape,
+                                     self.probs.shape)
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
@@ -226,8 +232,7 @@ class Binomial(tf.distributions.Distribution):
 
   def _log_unnormalized_prob(self, counts):
     counts = self._maybe_assert_valid_sample(counts)
-    return (counts * tf.log(self.probs) +
-            (self.total_count - counts) * tf.log1p(-self.probs))
+    return counts * self.logits - self.total_count * tf.nn.softplus(self.logits)
 
   def _log_normalization(self, counts):
     counts = self._maybe_assert_valid_sample(counts)

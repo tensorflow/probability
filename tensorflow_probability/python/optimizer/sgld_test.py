@@ -32,7 +32,7 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
 
   def testBasic(self):
     for dtype in [tf.half, tf.float32, tf.float64]:
-      with self.test_session():
+      with self.cached_session():
         var0 = tf.Variable([1.1, 2.1], dtype=dtype)
         var1 = tf.Variable([3., 4.], dtype=dtype)
         grads0 = tf.constant([0.1, 0.1], dtype=dtype)
@@ -66,7 +66,7 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
 
   def testBasicMultiInstance(self):
     for dtype in [tf.half, tf.float32, tf.float64]:
-      with self.test_session():
+      with self.cached_session():
         var0 = tf.Variable([1.1, 2.1], dtype=dtype)
         var1 = tf.Variable([3., 4.], dtype=dtype)
         grads0 = tf.constant([0.1, 0.1], dtype=dtype)
@@ -123,7 +123,7 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
 
   def testTensorLearningRate(self):
     for dtype in [tf.half, tf.float32, tf.float64]:
-      with self.test_session():
+      with self.cached_session():
         var0 = tf.Variable([1.1, 2.1], dtype=dtype)
         var1 = tf.Variable([3., 4.], dtype=dtype)
         grads0 = tf.constant([0.1, 0.1], dtype=dtype)
@@ -156,7 +156,7 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
 
   def testGradWrtRef(self):
     for dtype in [tf.half, tf.float32, tf.float64]:
-      with self.test_session():
+      with self.cached_session():
         opt = tfp.optimizer.StochasticGradientLangevinDynamics(3.0)
         values = [1., 3.]
         vars_ = [tf.Variable([v], dtype=dtype) for v in values]
@@ -167,7 +167,7 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
 
   def testWithGlobalStep(self):
     for dtype in [tf.half, tf.float32, tf.float64]:
-      with self.test_session():
+      with self.cached_session():
         global_step = tf.Variable(0, trainable=False)
         var0 = tf.Variable([1.1, 2.1], dtype=dtype)
         var1 = tf.Variable([3., 4.], dtype=dtype)
@@ -202,7 +202,7 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
 
   def testSparseBasic(self):
     for dtype in [tf.half, tf.float32, tf.float64]:
-      with self.test_session():
+      with self.cached_session():
         var0 = tf.Variable([[1.1], [2.1]], dtype=dtype)
         var1 = tf.Variable([[3.], [4.]], dtype=dtype)
         grads0 = tf.IndexedSlices(
@@ -235,7 +235,7 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
 
   def testPreconditionerComputedCorrectly(self):
     """Test that SGLD step is computed correctly for a 3D Gaussian energy."""
-    with self.test_session(graph=tf.Graph()) as sess:
+    with self.cached_session(graph=tf.Graph()) as sess:
       tf.set_random_seed(42)
       dtype = np.float32
       # Target function is the energy function of normal distribution
@@ -298,7 +298,7 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
 
   def testDiffusionBehavesCorrectly(self):
     """Test that for the SGLD finds minimum of the 3D Gaussian energy."""
-    with self.test_session(graph=tf.Graph()) as sess:
+    with self.cached_session(graph=tf.Graph()) as sess:
       # Set up random seed for the optimizer
       tf.set_random_seed(42)
       dtype = np.float32
@@ -315,8 +315,7 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
       # Partially defined loss function
       loss_part = tf.cholesky_solve(chol, tf.expand_dims(var, -1))
       # Loss function
-      loss = 0.5 * tf.squeeze(tf.matmul(loss_part, tf.expand_dims(var, -1),
-                                        transpose_a=True))
+      loss = 0.5 * tf.linalg.matvec(loss_part, var, transpose_a=True)
 
       # Set up the learning rate with a polynomial decay
       global_step = tf.Variable(0, trainable=False)

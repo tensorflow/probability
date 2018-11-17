@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.positive_semidefinite_kernels" />
+<meta itemprop="path" content="Stable" />
 </div>
 
 # Module: tfp.positive_semidefinite_kernels

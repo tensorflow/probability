@@ -19,9 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from tensorflow_probability.python.bijectors.shape import _DistributionShape
-from tensorflow.python.ops.distributions import bijector
-from tensorflow.python.ops.linalg import linear_operator
+from tensorflow_probability.python.bijectors import bijector
 
 
 __all__ = [
@@ -35,28 +33,7 @@ class AffineLinearOperator(bijector.Bijector):
   `shift` is a numeric `Tensor` and `scale` is a `LinearOperator`.
 
   If `X` is a scalar then the forward transformation is: `scale * X + shift`
-  where `*` denotes the scalar product.
-
-  Note: we don't always simply transpose `X` (but write it this way for
-  brevity). Actually the input `X` undergoes the following transformation
-  before being premultiplied by `scale`:
-
-  1. If there are no sample dims, we call `X = tf.expand_dims(X, 0)`, i.e.,
-     `new_sample_shape = [1]`. Otherwise do nothing.
-  2. The sample shape is flattened to have one dimension, i.e.,
-     `new_sample_shape = [n]` where `n = tf.reduce_prod(old_sample_shape)`.
-  3. The sample dim is cyclically rotated left by 1, i.e.,
-     `new_shape = [B1,...,Bb, k, n]` where `n` is as above, `k` is the
-     event_shape, and `B1,...,Bb` are the batch shapes for each of `b` batch
-     dimensions.
-
-  (For more details see `shape.make_batch_of_event_sample_matrices`.)
-
-  The result of the above transformation is that `X` can be regarded as a batch
-  of matrices where each column is a draw from the distribution. After
-  premultiplying by `scale`, we take the inverse of this procedure. The input
-  `Y` also undergoes the same transformation before/after premultiplying by
-  `inv(scale)`.
+  where `*` denotes broadcasted elementwise product.
 
   Example Use:
 
@@ -130,25 +107,14 @@ class AffineLinearOperator(bijector.Bijector):
           raise TypeError(
               "shift.dtype({}) is incompatible with scale.dtype({}).".format(
                   shift.dtype, scale.dtype))
-        if not isinstance(scale, linear_operator.LinearOperator):
+        if not isinstance(scale, tf.linalg.LinearOperator):
           raise TypeError("scale is not an instance of tf.LinearOperator")
         if validate_args and not scale.is_non_singular:
           raise ValueError("Scale matrix must be non-singular.")
         graph_parents += scale.graph_parents
-        if scale.tensor_rank is not None:
-          batch_ndims = scale.tensor_rank - 2
-        else:
-          batch_ndims = scale.tensor_rank_tensor() - 2
-          graph_parents += [batch_ndims]
         if scale.dtype is not None:
           dtype = scale.dtype.base_dtype
-      else:
-        batch_ndims = 0  # We won't need shape inference when scale is None.
       self._scale = scale
-      self._shaper = _DistributionShape(
-          batch_ndims=batch_ndims,
-          event_ndims=1,
-          validate_args=validate_args)
       self._adjoint = adjoint
       super(AffineLinearOperator, self).__init__(
           forward_min_event_ndims=1,
@@ -176,13 +142,9 @@ class AffineLinearOperator(bijector.Bijector):
   def _forward(self, x):
     y = x
     if self.scale is not None:
-      y, sample_shape = self._shaper.make_batch_of_event_sample_matrices(
-          y, expand_batch_dim=False)
       with tf.control_dependencies(self._maybe_collect_assertions()
                                    if self.validate_args else []):
-        y = self.scale.matmul(y, adjoint=self.adjoint)
-      y = self._shaper.undo_make_batch_of_event_sample_matrices(
-          y, sample_shape, expand_batch_dim=False)
+        y = self.scale.matvec(y, adjoint=self.adjoint)
     if self.shift is not None:
       y += self.shift
     return y
@@ -192,12 +154,8 @@ class AffineLinearOperator(bijector.Bijector):
     if self.shift is not None:
       x -= self.shift
     if self.scale is not None:
-      x, sample_shape = self._shaper.make_batch_of_event_sample_matrices(
-          x, expand_batch_dim=False)
       # Solve fails if the op is singular so we may safely skip this assertion.
-      x = self.scale.solve(x, adjoint=self.adjoint)
-      x = self._shaper.undo_make_batch_of_event_sample_matrices(
-          x, sample_shape, expand_batch_dim=False)
+      x = self.scale.solvevec(x, adjoint=self.adjoint)
     return x
 
   def _forward_log_det_jacobian(self, x):

@@ -30,9 +30,33 @@ py_library(
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":fitting",
         ":local_linear_trend",
+        ":seasonal",
         ":structural_time_series",
         ":sum",
+    ],
+)
+
+py_library(
+    name = "fitting",
+    srcs = ["fitting.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/sts/internal",
+    ],
+)
+
+py_test(
+    name = "fitting_test",
+    size = "large",
+    srcs = ["fitting_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
     ],
 )
 
@@ -51,6 +75,28 @@ py_test(
     name = "local_linear_trend_test",
     size = "medium",
     srcs = ["local_linear_trend_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "seasonal",
+    srcs = ["seasonal.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/sts/internal",
+    ],
+)
+
+py_test(
+    name = "seasonal_test",
+    size = "medium",
+    srcs = ["seasonal_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -93,7 +139,7 @@ py_library(
 
 py_test(
     name = "sum_test",
-    size = "medium",
+    size = "large",
     srcs = ["sum_test.py"],
     deps = [
         # numpy dep,

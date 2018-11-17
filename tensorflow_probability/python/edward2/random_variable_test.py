@@ -337,7 +337,7 @@ class RandomVariableTest(parameterized.TestCase, tf.test.TestCase):
       _ = tf.convert_to_tensor(x, dtype=tf.int32)
 
   def testSessionEval(self):
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       x = ed.RandomVariable(tfd.Normal(0.0, 0.1))
       x_ph = tf.placeholder(tf.float32, [])
       y = ed.RandomVariable(tfd.Normal(x_ph, 0.1))
@@ -350,7 +350,7 @@ class RandomVariableTest(parameterized.TestCase, tf.test.TestCase):
       self.assertRaises(tf.errors.InvalidArgumentError, y.eval, sess)
 
   def testSessionRun(self):
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       x = ed.RandomVariable(tfd.Normal(0.0, 0.1))
       x_ph = tf.placeholder(tf.float32, [])
       y = ed.RandomVariable(tfd.Normal(x_ph, 0.1))
@@ -390,7 +390,7 @@ class RandomVariableTest(parameterized.TestCase, tf.test.TestCase):
   @tfe.run_test_in_graph_and_eager_modes
   def testShape(self, rv, sample_shape, batch_shape, event_shape):
     self.assertEqual(rv.shape, sample_shape + batch_shape + event_shape)
-    self.assertEqual(rv.shape, rv.get_shape())
+    self.assertEqual(rv.shape, rv.shape)
     self.assertEqual(rv.sample_shape, sample_shape)
     self.assertEqual(rv.distribution.batch_shape, batch_shape)
     self.assertEqual(rv.distribution.event_shape, event_shape)

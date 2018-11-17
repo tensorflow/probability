@@ -22,10 +22,11 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
-from tensorflow.python.framework import tensor_util
+from tensorflow_probability.python.distributions import distribution as distribution_lib
+from tensorflow_probability.python.distributions import kullback_leibler
 
 
-class Independent(tf.distributions.Distribution):
+class Independent(distribution_lib.Distribution):
   """Independent distribution from batch of distributions.
 
   This distribution is useful for regarding a collection of independent,
@@ -122,7 +123,7 @@ class Independent(tf.distributions.Distribution):
           dtype=tf.int32,
           name="reinterpreted_batch_ndims")
       self._reinterpreted_batch_ndims = reinterpreted_batch_ndims
-      self._static_reinterpreted_batch_ndims = tensor_util.constant_value(
+      self._static_reinterpreted_batch_ndims = tf.contrib.util.constant_value(
           reinterpreted_batch_ndims)
       if self._static_reinterpreted_batch_ndims is not None:
         self._reinterpreted_batch_ndims = self._static_reinterpreted_batch_ndims
@@ -192,11 +193,35 @@ class Independent(tf.distributions.Distribution):
 
   def _log_prob(self, x):
     with tf.control_dependencies(self._runtime_assertions):
-      return self._reduce_sum(self.distribution.log_prob(x))
+      # We directly call the underlying _log_prob to avoid the fallback logic in
+      # Distribution.log_prob [which falls back to log(Distribution._prob)].
+      # Said fallback logic will also be wrapped around calls to this method.
+      return self._reduce(tf.reduce_sum, self.distribution._log_prob(x))  # pylint:disable=protected-access
+
+  def _prob(self, x):
+    with tf.control_dependencies(self._runtime_assertions):
+      # We directly call the underlying _prob to avoid the fallback logic in
+      # Distribution.prob [which falls back to exp(Distribution._log_prob)].
+      # Said fallback logic will also be wrapped around calls to this method.
+      return self._reduce(tf.reduce_prod, self.distribution._prob(x))  # pylint:disable=protected-access
+
+  def _log_cdf(self, x):
+    with tf.control_dependencies(self._runtime_assertions):
+      # We directly call the underlying _log_cdf to avoid the fallback logic in
+      # Distribution.log_cdf [which falls back to log(Distribution._cdf)].
+      # Said fallback logic will also be wrapped around calls to this method.
+      return self._reduce(tf.reduce_sum, self.distribution._log_cdf(x))  # pylint:disable=protected-access
+
+  def _cdf(self, x):
+    with tf.control_dependencies(self._runtime_assertions):
+      # We directly call the underlying _cdf to avoid the fallback logic in
+      # Distribution.cdf [which falls back to exp(Distribution._log_cdf)].
+      # Said fallback logic will also be wrapped around calls to this method.
+      return self._reduce(tf.reduce_prod, self.distribution._cdf(x))  # pylint:disable=protected-access
 
   def _entropy(self):
     with tf.control_dependencies(self._runtime_assertions):
-      return self._reduce_sum(self.distribution.entropy())
+      return self._reduce(tf.reduce_sum, self.distribution.entropy())
 
   def _mean(self):
     with tf.control_dependencies(self._runtime_assertions):
@@ -217,7 +242,7 @@ class Independent(tf.distributions.Distribution):
   def _make_runtime_assertions(
       self, distribution, reinterpreted_batch_ndims, validate_args):
     assertions = []
-    static_reinterpreted_batch_ndims = tensor_util.constant_value(
+    static_reinterpreted_batch_ndims = tf.contrib.util.constant_value(
         reinterpreted_batch_ndims)
     batch_ndims = distribution.batch_shape.ndims
     if batch_ndims is not None and static_reinterpreted_batch_ndims is not None:
@@ -239,12 +264,12 @@ class Independent(tf.distributions.Distribution):
                        "distribution.batch_ndims")))
     return assertions
 
-  def _reduce_sum(self, stat):
+  def _reduce(self, op, stat):
     if self._static_reinterpreted_batch_ndims is None:
       range_ = tf.range(self._reinterpreted_batch_ndims)
     else:
       range_ = np.arange(self._static_reinterpreted_batch_ndims)
-    return tf.reduce_sum(stat, axis=-1 - range_)
+    return op(stat, axis=-1 - range_)
 
   def _get_default_reinterpreted_batch_ndims(self, distribution):
     """Computes the default value for reinterpreted_batch_ndim __init__ arg."""
@@ -257,7 +282,7 @@ class Independent(tf.distributions.Distribution):
     return which_maximum(0, ndims - 1)
 
 
-@tf.distributions.RegisterKL(Independent, Independent)
+@kullback_leibler.RegisterKL(Independent, Independent)
 def _kl_independent(a, b, name="kl_independent"):
   """Batched KL divergence `KL(a || b)` for Independent distributions.
 
@@ -293,7 +318,7 @@ def _kl_independent(a, b, name="kl_independent"):
         reduce_dims = [-i - 1 for i in range(0, num_reduce_dims)]
 
         return tf.reduce_sum(
-            tf.distributions.kl_divergence(p, q, name=name), axis=reduce_dims)
+            kullback_leibler.kl_divergence(p, q, name=name), axis=reduce_dims)
       else:
         raise NotImplementedError("KL between Independents with different "
                                   "event shapes not supported.")
@@ -309,4 +334,4 @@ def _kl_independent(a, b, name="kl_independent"):
               p.event_shape_tensor()[0]))
       reduce_dims = tf.range(-num_reduce_dims - 1, -1, 1)
       return tf.reduce_sum(
-          tf.distributions.kl_divergence(p, q, name=name), axis=reduce_dims)
+          kullback_leibler.kl_divergence(p, q, name=name), axis=reduce_dims)

@@ -21,12 +21,14 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.ops import control_flow_ops
-from tensorflow.python.ops.distributions import util as distribution_util
 
 
-class Geometric(tf.distributions.Distribution):
+class Geometric(distribution.Distribution):
   """Geometric distribution.
 
   The Geometric distribution is parameterized by p, the probability of a
@@ -89,7 +91,7 @@ class Geometric(tf.distributions.Distribution):
 
     super(Geometric, self).__init__(
         dtype=self._probs.dtype,
-        reparameterization_type=tf.distributions.NOT_REPARAMETERIZED,
+        reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
         parameters=parameters,
@@ -110,7 +112,7 @@ class Geometric(tf.distributions.Distribution):
     return tf.shape(self._probs)
 
   def _batch_shape(self):
-    return self.probs.get_shape()
+    return self.probs.shape
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
@@ -143,7 +145,7 @@ class Geometric(tf.distributions.Distribution):
       # However, scipy takes the floor, so we do too.
       x = tf.floor(x)
     x *= tf.ones_like(self.probs)
-    return tf.where(x < 0., tf.zeros_like(x), -tf.expm1(
+    return tf.where(x < 0., tf.zeros_like(x), -tf.math.expm1(
         (1. + x) * tf.log1p(-self.probs)))
 
   def _log_prob(self, x):

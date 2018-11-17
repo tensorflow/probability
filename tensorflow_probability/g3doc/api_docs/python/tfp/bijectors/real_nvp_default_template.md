@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.bijectors.real_nvp_default_template" />
+<meta itemprop="path" content="Stable" />
 </div>
 
 # tfp.bijectors.real_nvp_default_template
@@ -20,6 +21,11 @@ Build a scale-and-shift function using a multi-layer neural network.
 This will be wrapped in a make_template to ensure the variables are only
 created once. It takes the `d`-dimensional input x[0:d] and returns the `D-d`
 dimensional outputs `loc` ("mu") and `log_scale` ("alpha").
+
+The default template does not support conditioning and will raise an
+exception if `condition_kwargs` are passed to it. To use conditioning in
+real nvp bijector, implement a conditioned shift/scale template that
+handles the `condition_kwargs`.
 
 #### Arguments:
 
@@ -46,7 +52,7 @@ dimensional outputs `loc` ("mu") and `log_scale` ("alpha").
 #### Raises:
 
 * <b>`NotImplementedError`</b>: if rightmost dimension of `inputs` is unknown prior to
-    graph execution.
+    graph execution, or if `condition_kwargs` is not empty.
 
 #### References
 

@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions.Kumaraswamy" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="allow_nan_stats"/>
 <meta itemprop="property" content="batch_shape"/>
 <meta itemprop="property" content="bijector"/>
@@ -106,6 +107,41 @@ x = [.2, .3, .5]
 dist.prob(x)         # Shape [2, 3]
 ```
 
+<h2 id="__init__"><code>__init__</code></h2>
+
+``` python
+__init__(
+    concentration1=None,
+    concentration0=None,
+    validate_args=False,
+    allow_nan_stats=True,
+    name='Kumaraswamy'
+)
+```
+
+Initialize a batch of Kumaraswamy distributions.
+
+#### Args:
+
+* <b>`concentration1`</b>: Positive floating-point `Tensor` indicating mean
+    number of successes; aka "alpha". Implies `self.dtype` and
+    `self.batch_shape`, i.e.,
+    `concentration1.shape = [N1, N2, ..., Nm] = self.batch_shape`.
+* <b>`concentration0`</b>: Positive floating-point `Tensor` indicating mean
+    number of failures; aka "beta". Otherwise has same semantics as
+    `concentration1`.
+* <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
+    parameters are checked for validity despite possibly degrading runtime
+    performance. When `False` invalid inputs may silently render incorrect
+    outputs.
+* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
+    (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
+    result is undefined. When `False`, an exception is raised if one or
+    more of the statistic's batch members are undefined.
+* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
+
+
+
 ## Properties
 
 <h3 id="allow_nan_stats"><code>allow_nan_stats</code></h3>
@@ -180,8 +216,7 @@ Dictionary of parameters used to instantiate this `Distribution`.
 Describes how samples from the distribution are reparameterized.
 
 Currently this is one of the static instances
-`distributions.FULLY_REPARAMETERIZED`
-or `distributions.NOT_REPARAMETERIZED`.
+`tfd.FULLY_REPARAMETERIZED` or `tfd.NOT_REPARAMETERIZED`.
 
 #### Returns:
 
@@ -194,39 +229,6 @@ Python `bool` indicating possibly expensive checks are enabled.
 
 
 ## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
-
-``` python
-__init__(
-    concentration1=None,
-    concentration0=None,
-    validate_args=False,
-    allow_nan_stats=True,
-    name='Kumaraswamy'
-)
-```
-
-Initialize a batch of Kumaraswamy distributions.
-
-#### Args:
-
-* <b>`concentration1`</b>: Positive floating-point `Tensor` indicating mean
-    number of successes; aka "alpha". Implies `self.dtype` and
-    `self.batch_shape`, i.e.,
-    `concentration1.shape = [N1, N2, ..., Nm] = self.batch_shape`.
-* <b>`concentration0`</b>: Positive floating-point `Tensor` indicating mean
-    number of failures; aka "beta". Otherwise has same semantics as
-    `concentration1`.
-* <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
-    parameters are checked for validity despite possibly degrading runtime
-    performance. When `False` invalid inputs may silently render incorrect
-    outputs.
-* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
-    (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
-    result is undefined. When `False`, an exception is raised if one or
-    more of the statistic's batch members are undefined.
-* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
 
@@ -367,7 +369,7 @@ where `F` denotes the support of the random variable `X ~ P`.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 
@@ -461,7 +463,7 @@ denotes (Shanon) cross entropy, and `H[.]` denotes (Shanon) entropy.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 

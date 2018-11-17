@@ -24,8 +24,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 
-from tensorflow_probability.python import distributions as tfd
-from tensorflow.python.framework import tensor_util
+from tensorflow_probability.python import stats
 
 __all__ = [
     'effective_sample_size',
@@ -156,7 +155,7 @@ def _effective_sample_size_single_state(states, filter_beyond_lag,
     dt = states.dtype
 
     # filter_beyond_lag == None ==> auto_corr is the full sequence.
-    auto_corr = tfd.auto_correlation(
+    auto_corr = stats.auto_correlation(
         states, axis=0, max_lags=filter_beyond_lag)
     if filter_threshold is not None:
       filter_threshold = tf.convert_to_tensor(
@@ -309,10 +308,10 @@ def potential_scale_reduction(chains_states,
   if not chains_states_was_list:
     chains_states = [chains_states]
 
-  # tensor_util.constant_value returns None iff a constant value (as a numpy
+  # tf.contrib.util.constant_value returns None iff a constant value (as a numpy
   # array) is not efficiently computable.  Therefore, we try constant_value then
   # check for None.
-  icn_const_ = tensor_util.constant_value(
+  icn_const_ = tf.contrib.util.constant_value(
       tf.convert_to_tensor(independent_chain_ndims))
   if icn_const_ is not None:
     independent_chain_ndims = icn_const_

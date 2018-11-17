@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.bijectors.Affine" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="adjoint"/>
 <meta itemprop="property" content="dtype"/>
 <meta itemprop="property" content="forward_min_event_ndims"/>
@@ -80,6 +81,92 @@ b = Affine(shift=[1., 2, 3],
 
 ```
 
+<h2 id="__init__"><code>__init__</code></h2>
+
+``` python
+__init__(
+    shift=None,
+    scale_identity_multiplier=None,
+    scale_diag=None,
+    scale_tril=None,
+    scale_perturb_factor=None,
+    scale_perturb_diag=None,
+    adjoint=False,
+    validate_args=False,
+    name='affine',
+    dtype=None
+)
+```
+
+Instantiates the `Affine` bijector.
+
+This `Bijector` is initialized with `shift` `Tensor` and `scale` arguments,
+giving the forward operation:
+
+```none
+Y = g(X) = scale @ X + shift
+```
+
+where the `scale` term is logically equivalent to:
+
+```python
+scale = (
+  scale_identity_multiplier * tf.diag(tf.ones(d)) +
+  tf.diag(scale_diag) +
+  scale_tril +
+  scale_perturb_factor @ diag(scale_perturb_diag) @
+    tf.transpose([scale_perturb_factor])
+)
+```
+
+If none of `scale_identity_multiplier`, `scale_diag`, or `scale_tril` are
+specified then `scale += IdentityMatrix`. Otherwise specifying a
+`scale` argument has the semantics of `scale += Expand(arg)`, i.e.,
+`scale_diag != None` means `scale += tf.diag(scale_diag)`.
+
+#### Args:
+
+* <b>`shift`</b>: Floating-point `Tensor`. If this is set to `None`, no shift is
+    applied.
+* <b>`scale_identity_multiplier`</b>: floating point rank 0 `Tensor` representing a
+    scaling done to the identity matrix.
+    When `scale_identity_multiplier = scale_diag = scale_tril = None` then
+    `scale += IdentityMatrix`. Otherwise no scaled-identity-matrix is added
+    to `scale`.
+* <b>`scale_diag`</b>: Floating-point `Tensor` representing the diagonal matrix.
+    `scale_diag` has shape `[N1, N2, ...  k]`, which represents a k x k
+    diagonal matrix.
+    When `None` no diagonal term is added to `scale`.
+* <b>`scale_tril`</b>: Floating-point `Tensor` representing the lower triangular
+    matrix. `scale_tril` has shape `[N1, N2, ...  k, k]`, which represents a
+    k x k lower triangular matrix.
+    When `None` no `scale_tril` term is added to `scale`.
+    The upper triangular elements above the diagonal are ignored.
+* <b>`scale_perturb_factor`</b>: Floating-point `Tensor` representing factor matrix
+    with last two dimensions of shape `(k, r)`. When `None`, no rank-r
+    update is added to `scale`.
+* <b>`scale_perturb_diag`</b>: Floating-point `Tensor` representing the diagonal
+    matrix. `scale_perturb_diag` has shape `[N1, N2, ...  r]`, which
+    represents an `r x r` diagonal matrix. When `None` low rank updates will
+    take the form `scale_perturb_factor * scale_perturb_factor.T`.
+* <b>`adjoint`</b>: Python `bool` indicating whether to use the `scale` matrix as
+    specified or its adjoint.
+    Default value: `False`.
+* <b>`validate_args`</b>: Python `bool` indicating whether arguments should be
+    checked for correctness.
+* <b>`name`</b>: Python `str` name given to ops managed by this object.
+* <b>`dtype`</b>: `tf.DType` to prefer when converting args to `Tensor`s. Else, we
+    fall back to a common dtype inferred from the args, finally falling back
+    to float32.
+
+
+#### Raises:
+
+* <b>`ValueError`</b>: if `perturb_diag` is specified but not `perturb_factor`.
+* <b>`TypeError`</b>: if `shift` has different `dtype` from `scale` arguments.
+
+
+
 ## Properties
 
 <h3 id="adjoint"><code>adjoint</code></h3>
@@ -132,86 +219,6 @@ Returns True if Tensor arguments will be validated.
 
 
 ## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
-
-``` python
-__init__(
-    shift=None,
-    scale_identity_multiplier=None,
-    scale_diag=None,
-    scale_tril=None,
-    scale_perturb_factor=None,
-    scale_perturb_diag=None,
-    adjoint=False,
-    validate_args=False,
-    name='affine'
-)
-```
-
-Instantiates the `Affine` bijector.
-
-This `Bijector` is initialized with `shift` `Tensor` and `scale` arguments,
-giving the forward operation:
-
-```none
-Y = g(X) = scale @ X + shift
-```
-
-where the `scale` term is logically equivalent to:
-
-```python
-scale = (
-  scale_identity_multiplier * tf.diag(tf.ones(d)) +
-  tf.diag(scale_diag) +
-  scale_tril +
-  scale_perturb_factor @ diag(scale_perturb_diag) @
-    tf.transpose([scale_perturb_factor])
-)
-```
-
-If none of `scale_identity_multiplier`, `scale_diag`, or `scale_tril` are
-specified then `scale += IdentityMatrix`. Otherwise specifying a
-`scale` argument has the semantics of `scale += Expand(arg)`, i.e.,
-`scale_diag != None` means `scale += tf.diag(scale_diag)`.
-
-#### Args:
-
-* <b>`shift`</b>: Floating-point `Tensor`. If this is set to `None`, no shift is
-    applied.
-* <b>`scale_identity_multiplier`</b>: floating point rank 0 `Tensor` representing a
-    scaling done to the identity matrix.
-    When `scale_identity_multiplier = scale_diag = scale_tril = None` then
-    `scale += IdentityMatrix`. Otherwise no scaled-identity-matrix is added
-    to `scale`.
-* <b>`scale_diag`</b>: Floating-point `Tensor` representing the diagonal matrix.
-    `scale_diag` has shape [N1, N2, ...  k], which represents a k x k
-    diagonal matrix.
-    When `None` no diagonal term is added to `scale`.
-* <b>`scale_tril`</b>: Floating-point `Tensor` representing the diagonal matrix.
-    `scale_diag` has shape [N1, N2, ...  k, k], which represents a k x k
-    lower triangular matrix.
-    When `None` no `scale_tril` term is added to `scale`.
-    The upper triangular elements above the diagonal are ignored.
-* <b>`scale_perturb_factor`</b>: Floating-point `Tensor` representing factor matrix
-    with last two dimensions of shape `(k, r)`. When `None`, no rank-r
-    update is added to `scale`.
-* <b>`scale_perturb_diag`</b>: Floating-point `Tensor` representing the diagonal
-    matrix. `scale_perturb_diag` has shape [N1, N2, ...  r], which
-    represents an `r x r` diagonal matrix. When `None` low rank updates will
-    take the form `scale_perturb_factor * scale_perturb_factor.T`.
-* <b>`adjoint`</b>: Python `bool` indicating whether to use the `scale` matrix as
-    specified or its adjoint.
-    Default value: `False`.
-* <b>`validate_args`</b>: Python `bool` indicating whether arguments should be
-    checked for correctness.
-* <b>`name`</b>: Python `str` name given to ops managed by this object.
-
-
-#### Raises:
-
-* <b>`ValueError`</b>: if `perturb_diag` is specified but not `perturb_factor`.
-* <b>`TypeError`</b>: if `shift` has different `dtype` from `scale` arguments.
 
 <h3 id="forward"><code>forward</code></h3>
 
@@ -303,8 +310,8 @@ Returns both the forward_log_det_jacobian.
 * <b>`event_ndims`</b>: Number of dimensions in the probabilistic events being
     transformed. Must be greater than or equal to
     `self.forward_min_event_ndims`. The result is summed over the final
-    dimensions to produce a scalar Jacobian determinant for each event,
-    i.e. it has shape `x.shape.ndims - event_ndims` dimensions.
+    dimensions to produce a scalar Jacobian determinant for each event, i.e.
+    it has shape `x.shape.ndims - event_ndims` dimensions.
 * <b>`name`</b>: The name to give this op.
 
 
@@ -419,8 +426,8 @@ evaluated at `g^{-1}(y)`.
 * <b>`event_ndims`</b>: Number of dimensions in the probabilistic events being
     transformed. Must be greater than or equal to
     `self.inverse_min_event_ndims`. The result is summed over the final
-    dimensions to produce a scalar Jacobian determinant for each event,
-    i.e. it has shape `y.shape.ndims - event_ndims` dimensions.
+    dimensions to produce a scalar Jacobian determinant for each event, i.e.
+    it has shape `y.shape.ndims - event_ndims` dimensions.
 * <b>`name`</b>: The name to give this op.
 
 

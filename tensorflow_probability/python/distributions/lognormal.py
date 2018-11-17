@@ -21,7 +21,9 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python import bijectors
-from tensorflow.python.ops.distributions import transformed_distribution
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import transformed_distribution
+from tensorflow_probability.python.internal import dtype_util
 
 
 __all__ = [
@@ -60,10 +62,11 @@ class LogNormal(transformed_distribution.TransformedDistribution):
       name: The name to give Ops created by the initializer.
     """
     with tf.name_scope(name, values=[loc, scale]) as name:
+      dtype = dtype_util.common_dtype([loc, scale], tf.float32)
       super(LogNormal, self).__init__(
-          distribution=tf.distributions.Normal(
-              loc=loc,
-              scale=scale),
+          distribution=normal.Normal(
+              loc=tf.convert_to_tensor(loc, name="loc", dtype=dtype),
+              scale=tf.convert_to_tensor(scale, name="scale", dtype=dtype)),
           bijector=bijectors.Exp(),
           validate_args=validate_args,
           name=name)
@@ -83,7 +86,7 @@ class LogNormal(transformed_distribution.TransformedDistribution):
 
   def _variance(self):
     variance = self.distribution.variance()
-    return (tf.expm1(variance) *
+    return (tf.math.expm1(variance) *
             tf.exp(2. * self.distribution.mean() + variance))
 
   def _mode(self):

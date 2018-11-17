@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.math.random_rademacher" />
+<meta itemprop="path" content="Stable" />
 </div>
 
 # tfp.math.random_rademacher

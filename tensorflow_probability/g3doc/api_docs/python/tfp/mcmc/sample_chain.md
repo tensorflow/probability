@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.mcmc.sample_chain" />
+<meta itemprop="path" content="Stable" />
 </div>
 
 # tfp.mcmc.sample_chain

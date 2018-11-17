@@ -19,8 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from tensorflow.python.layers import core as layers
-from tensorflow.python.ops.distributions import bijector
+from tensorflow_probability.python.bijectors import conditional_bijector
 
 
 __all__ = [
@@ -29,13 +28,13 @@ __all__ = [
 ]
 
 
-class RealNVP(bijector.Bijector):
+class RealNVP(conditional_bijector.ConditionalBijector):
   """RealNVP "affine coupling layer" for vector-valued events.
 
   Real NVP models a normalizing flow on a `D`-dimensional distribution via a
   single `D-d`-dimensional conditional distribution [(Dinh et al., 2017)][1]:
 
-  `y[d:D] = y[d:D] * tf.exp(log_scale_fn(y[d:D])) + shift_fn(y[d:D])`
+  `y[d:D] = x[d:D] * tf.exp(log_scale_fn(x[0:d])) + shift_fn(x[0:d])`
   `y[0:d] = x[0:d]`
 
   The last `D-d` units are scaled and shifted based on the first `d` units only,
@@ -176,12 +175,12 @@ class RealNVP(bijector.Bijector):
         raise ValueError(
             "Number of masked units must be smaller than the event size.")
 
-  def _forward(self, x):
+  def _forward(self, x, **condition_kwargs):
     self._cache_input_depth(x)
     # Performs scale and shift.
     x0, x1 = x[..., :self._num_masked], x[..., self._num_masked:]
     shift, log_scale = self._shift_and_log_scale_fn(
-        x0, self._input_depth - self._num_masked)
+        x0, self._input_depth - self._num_masked, **condition_kwargs)
     y1 = x1
     if log_scale is not None:
       y1 *= tf.exp(log_scale)
@@ -190,12 +189,12 @@ class RealNVP(bijector.Bijector):
     y = tf.concat([x0, y1], axis=-1)
     return y
 
-  def _inverse(self, y):
+  def _inverse(self, y, **condition_kwargs):
     self._cache_input_depth(y)
     # Performs un-shift and un-scale.
     y0, y1 = y[..., :self._num_masked], y[..., self._num_masked:]
     shift, log_scale = self._shift_and_log_scale_fn(
-        y0, self._input_depth - self._num_masked)
+        y0, self._input_depth - self._num_masked, **condition_kwargs)
     x1 = y1
     if shift is not None:
       x1 -= shift
@@ -204,20 +203,20 @@ class RealNVP(bijector.Bijector):
     x = tf.concat([y0, x1], axis=-1)
     return x
 
-  def _inverse_log_det_jacobian(self, y):
+  def _inverse_log_det_jacobian(self, y, **condition_kwargs):
     self._cache_input_depth(y)
     y0 = y[..., :self._num_masked]
     _, log_scale = self._shift_and_log_scale_fn(
-        y0, self._input_depth - self._num_masked)
+        y0, self._input_depth - self._num_masked, **condition_kwargs)
     if log_scale is None:
       return tf.constant(0., dtype=y.dtype, name="ildj")
     return -tf.reduce_sum(log_scale, axis=-1)
 
-  def _forward_log_det_jacobian(self, x):
+  def _forward_log_det_jacobian(self, x, **condition_kwargs):
     self._cache_input_depth(x)
     x0 = x[..., :self._num_masked]
     _, log_scale = self._shift_and_log_scale_fn(
-        x0, self._input_depth - self._num_masked)
+        x0, self._input_depth - self._num_masked, **condition_kwargs)
     if log_scale is None:
       return tf.constant(0., dtype=x.dtype, name="fldj")
     return tf.reduce_sum(log_scale, axis=-1)
@@ -234,6 +233,11 @@ def real_nvp_default_template(hidden_layers,
   This will be wrapped in a make_template to ensure the variables are only
   created once. It takes the `d`-dimensional input x[0:d] and returns the `D-d`
   dimensional outputs `loc` ("mu") and `log_scale` ("alpha").
+
+  The default template does not support conditioning and will raise an
+  exception if `condition_kwargs` are passed to it. To use conditioning in
+  real nvp bijector, implement a conditioned shift/scale template that
+  handles the `condition_kwargs`.
 
   Arguments:
     hidden_layers: Python `list`-like of non-negative integer, scalars
@@ -255,7 +259,7 @@ def real_nvp_default_template(hidden_layers,
 
   Raises:
     NotImplementedError: if rightmost dimension of `inputs` is unknown prior to
-      graph execution.
+      graph execution, or if `condition_kwargs` is not empty.
 
   #### References
 
@@ -266,16 +270,20 @@ def real_nvp_default_template(hidden_layers,
 
   with tf.name_scope(name, "real_nvp_default_template"):
 
-    def _fn(x, output_units):
+    def _fn(x, output_units, **condition_kwargs):
       """Fully connected MLP parameterized via `real_nvp_template`."""
+      if condition_kwargs:
+        raise NotImplementedError(
+            "Conditioning not implemented in the default template.")
+
       for units in hidden_layers:
-        x = layers.dense(
+        x = tf.layers.dense(
             inputs=x,
             units=units,
             activation=activation,
             *args,  # pylint: disable=keyword-arg-before-vararg
             **kwargs)
-      x = layers.dense(
+      x = tf.layers.dense(
           inputs=x,
           units=(1 if shift_only else 2) * output_units,
           activation=None,

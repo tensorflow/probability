@@ -19,7 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from tensorflow.python.ops.distributions import bijector
+from tensorflow_probability.python.bijectors import bijector
 
 
 __all__ = [

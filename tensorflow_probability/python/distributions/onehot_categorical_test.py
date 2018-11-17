@@ -22,7 +22,6 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow.python.framework import tensor_util
 from tensorflow.python.framework import test_util
 
 tfd = tfp.distributions
@@ -44,14 +43,14 @@ class OneHotCategoricalTest(tf.test.TestCase):
     p = [0.2, 0.8]
     dist = tfd.OneHotCategorical(probs=p)
     self.assertAllClose(p, self.evaluate(dist.probs))
-    self.assertAllEqual([2], dist.logits.get_shape())
+    self.assertAllEqual([2], dist.logits.shape)
 
   def testLogits(self):
     p = np.array([0.2, 0.8], dtype=np.float32)
     logits = np.log(p) - 50.
     dist = tfd.OneHotCategorical(logits=logits)
-    self.assertAllEqual([2], dist.probs.get_shape())
-    self.assertAllEqual([2], dist.logits.get_shape())
+    self.assertAllEqual([2], dist.probs.shape)
+    self.assertAllEqual([2], dist.logits.shape)
     self.assertAllClose(self.evaluate(dist.probs), p)
     self.assertAllClose(self.evaluate(dist.logits), logits)
 
@@ -64,8 +63,8 @@ class OneHotCategoricalTest(tf.test.TestCase):
       self.assertAllEqual([10], self.evaluate(dist.event_shape_tensor()))
       # event_shape is available as a constant because the shape is
       # known at graph build time.
-      self.assertEqual(10,
-                       tensor_util.constant_value(dist.event_shape_tensor()))
+      self.assertEqual(
+          10, tf.contrib.util.constant_value(dist.event_shape_tensor()))
 
     for batch_shape in ([], [1], [2, 3, 4]):
       dist = make_onehot_categorical(batch_shape, tf.constant(
@@ -164,8 +163,8 @@ class OneHotCategoricalTest(tf.test.TestCase):
         kl_expected = np.sum(
             prob_p * (np.log(prob_p) - np.log(prob_q)), axis=-1)
 
-        kl_actual = tf.distributions.kl_divergence(p, q)
-        kl_same = tf.distributions.kl_divergence(p, p)
+        kl_actual = tfd.kl_divergence(p, q)
+        kl_same = tfd.kl_divergence(p, p)
         x = p.sample(int(2e4), seed=0)
         x = tf.cast(x, dtype=tf.float32)
         # Compute empirical KL(p||q).
@@ -173,7 +172,7 @@ class OneHotCategoricalTest(tf.test.TestCase):
 
         [kl_sample_, kl_actual_,
          kl_same_] = self.evaluate([kl_sample, kl_actual, kl_same])
-        self.assertEqual(kl_actual.get_shape(), (batch_size,))
+        self.assertEqual(kl_actual.shape, (batch_size,))
         self.assertAllClose(kl_same_, np.zeros_like(kl_expected))
         self.assertAllClose(kl_actual_, kl_expected, atol=0., rtol=1e-6)
         self.assertAllClose(kl_sample_, kl_expected, atol=1e-2, rtol=0.)
@@ -198,9 +197,9 @@ class OneHotCategoricalTest(tf.test.TestCase):
         dist.probs,
         dist.covariance(),
     ])
-    self.assertAllEqual([4, 3, 2], sample_mean.get_shape())
+    self.assertAllEqual([4, 3, 2], sample_mean.shape)
     self.assertAllClose(actual_mean_, sample_mean_, atol=0., rtol=0.07)
-    self.assertAllEqual([4, 3, 2, 2], sample_covariance.get_shape())
+    self.assertAllEqual([4, 3, 2, 2], sample_covariance.shape)
     self.assertAllClose(
         actual_covariance_, sample_covariance_, atol=0., rtol=0.10)
 
@@ -224,9 +223,9 @@ class OneHotCategoricalTest(tf.test.TestCase):
         dist.probs,
         dist.covariance(),
     ])
-    self.assertAllEqual([3], sample_mean.get_shape())
+    self.assertAllEqual([3], sample_mean.shape)
     self.assertAllClose(actual_mean_, sample_mean_, atol=0., rtol=0.1)
-    self.assertAllEqual([3, 3], sample_covariance.get_shape())
+    self.assertAllEqual([3, 3], sample_covariance.shape)
     self.assertAllClose(
         actual_covariance_, sample_covariance_, atol=0., rtol=0.1)
 

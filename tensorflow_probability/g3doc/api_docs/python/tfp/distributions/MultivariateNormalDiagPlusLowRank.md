@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions.MultivariateNormalDiagPlusLowRank" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="allow_nan_stats"/>
 <meta itemprop="property" content="batch_shape"/>
 <meta itemprop="property" content="bijector"/>
@@ -152,96 +153,7 @@ x = [[-0.9, 0, 0.1],
 mvn.prob(x).eval()    # shape: [2]
 ```
 
-## Properties
-
-<h3 id="allow_nan_stats"><code>allow_nan_stats</code></h3>
-
-Python `bool` describing behavior when a stat is undefined.
-
-Stats return +/- infinity when it makes sense. E.g., the variance of a
-Cauchy distribution is infinity. However, sometimes the statistic is
-undefined, e.g., if a distribution's pdf does not achieve a maximum within
-the support of the distribution, the mode is undefined. If the mean is
-undefined, then by definition the variance is undefined. E.g. the mean for
-Student's T for df = 1 is undefined (no clear way to say it is either + or -
-infinity), so the variance = E[(X - mean)**2] is also undefined.
-
-#### Returns:
-
-* <b>`allow_nan_stats`</b>: Python `bool`.
-
-<h3 id="batch_shape"><code>batch_shape</code></h3>
-
-Shape of a single sample from a single event index as a `TensorShape`.
-
-May be partially defined or unknown.
-
-The batch dimensions are indexes into independent, non-identical
-parameterizations of this distribution.
-
-#### Returns:
-
-* <b>`batch_shape`</b>: `TensorShape`, possibly unknown.
-
-<h3 id="bijector"><code>bijector</code></h3>
-
-Function transforming x => y.
-
-<h3 id="distribution"><code>distribution</code></h3>
-
-Base distribution, p(x).
-
-<h3 id="dtype"><code>dtype</code></h3>
-
-The `DType` of `Tensor`s handled by this `Distribution`.
-
-<h3 id="event_shape"><code>event_shape</code></h3>
-
-Shape of a single sample from a single batch as a `TensorShape`.
-
-May be partially defined or unknown.
-
-#### Returns:
-
-* <b>`event_shape`</b>: `TensorShape`, possibly unknown.
-
-<h3 id="loc"><code>loc</code></h3>
-
-The `loc` `Tensor` in `Y = scale @ X + loc`.
-
-<h3 id="name"><code>name</code></h3>
-
-Name prepended to all ops created by this `Distribution`.
-
-<h3 id="parameters"><code>parameters</code></h3>
-
-Dictionary of parameters used to instantiate this `Distribution`.
-
-<h3 id="reparameterization_type"><code>reparameterization_type</code></h3>
-
-Describes how samples from the distribution are reparameterized.
-
-Currently this is one of the static instances
-`distributions.FULLY_REPARAMETERIZED`
-or `distributions.NOT_REPARAMETERIZED`.
-
-#### Returns:
-
-An instance of `ReparameterizationType`.
-
-<h3 id="scale"><code>scale</code></h3>
-
-The `scale` `LinearOperator` in `Y = scale @ X + loc`.
-
-<h3 id="validate_args"><code>validate_args</code></h3>
-
-Python `bool` indicating possibly expensive checks are enabled.
-
-
-
-## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
+<h2 id="__init__"><code>__init__</code></h2>
 
 ``` python
 __init__(
@@ -323,6 +235,96 @@ If both `scale_diag` and `scale_identity_multiplier` are `None`, then
 #### Raises:
 
 * <b>`ValueError`</b>: if at most `scale_identity_multiplier` is specified.
+
+
+
+## Properties
+
+<h3 id="allow_nan_stats"><code>allow_nan_stats</code></h3>
+
+Python `bool` describing behavior when a stat is undefined.
+
+Stats return +/- infinity when it makes sense. E.g., the variance of a
+Cauchy distribution is infinity. However, sometimes the statistic is
+undefined, e.g., if a distribution's pdf does not achieve a maximum within
+the support of the distribution, the mode is undefined. If the mean is
+undefined, then by definition the variance is undefined. E.g. the mean for
+Student's T for df = 1 is undefined (no clear way to say it is either + or -
+infinity), so the variance = E[(X - mean)**2] is also undefined.
+
+#### Returns:
+
+* <b>`allow_nan_stats`</b>: Python `bool`.
+
+<h3 id="batch_shape"><code>batch_shape</code></h3>
+
+Shape of a single sample from a single event index as a `TensorShape`.
+
+May be partially defined or unknown.
+
+The batch dimensions are indexes into independent, non-identical
+parameterizations of this distribution.
+
+#### Returns:
+
+* <b>`batch_shape`</b>: `TensorShape`, possibly unknown.
+
+<h3 id="bijector"><code>bijector</code></h3>
+
+Function transforming x => y.
+
+<h3 id="distribution"><code>distribution</code></h3>
+
+Base distribution, p(x).
+
+<h3 id="dtype"><code>dtype</code></h3>
+
+The `DType` of `Tensor`s handled by this `Distribution`.
+
+<h3 id="event_shape"><code>event_shape</code></h3>
+
+Shape of a single sample from a single batch as a `TensorShape`.
+
+May be partially defined or unknown.
+
+#### Returns:
+
+* <b>`event_shape`</b>: `TensorShape`, possibly unknown.
+
+<h3 id="loc"><code>loc</code></h3>
+
+The `loc` `Tensor` in `Y = scale @ X + loc`.
+
+<h3 id="name"><code>name</code></h3>
+
+Name prepended to all ops created by this `Distribution`.
+
+<h3 id="parameters"><code>parameters</code></h3>
+
+Dictionary of parameters used to instantiate this `Distribution`.
+
+<h3 id="reparameterization_type"><code>reparameterization_type</code></h3>
+
+Describes how samples from the distribution are reparameterized.
+
+Currently this is one of the static instances
+`tfd.FULLY_REPARAMETERIZED` or `tfd.NOT_REPARAMETERIZED`.
+
+#### Returns:
+
+An instance of `ReparameterizationType`.
+
+<h3 id="scale"><code>scale</code></h3>
+
+The `scale` `LinearOperator` in `Y = scale @ X + loc`.
+
+<h3 id="validate_args"><code>validate_args</code></h3>
+
+Python `bool` indicating possibly expensive checks are enabled.
+
+
+
+## Methods
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
 
@@ -463,7 +465,7 @@ where `F` denotes the support of the random variable `X ~ P`.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 
@@ -557,7 +559,7 @@ denotes (Shanon) cross entropy, and `H[.]` denotes (Shanon) entropy.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 

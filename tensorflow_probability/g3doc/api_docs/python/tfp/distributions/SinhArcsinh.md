@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions.SinhArcsinh" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="allow_nan_stats"/>
 <meta itemprop="property" content="batch_shape"/>
 <meta itemprop="property" content="bijector"/>
@@ -107,6 +108,53 @@ P[(Y - loc) / scale <= 2] = P[F(Z) * (2 / F_0(2)) <= 2]
                           = P[Z <= 2]  (if F = F_0).
 ```
 
+<h2 id="__init__"><code>__init__</code></h2>
+
+``` python
+__init__(
+    loc,
+    scale,
+    skewness=None,
+    tailweight=None,
+    distribution=None,
+    validate_args=False,
+    allow_nan_stats=True,
+    name='SinhArcsinh'
+)
+```
+
+Construct SinhArcsinh distribution on `(-inf, inf)`.
+
+Arguments `(loc, scale, skewness, tailweight)` must have broadcastable shape
+(indexing batch dimensions).  They must all have the same `dtype`.
+
+#### Args:
+
+* <b>`loc`</b>: Floating-point `Tensor`.
+* <b>`scale`</b>:  `Tensor` of same `dtype` as `loc`.
+* <b>`skewness`</b>:  Skewness parameter.  Default is `0.0` (no skew).
+* <b>`tailweight`</b>:  Tailweight parameter. Default is `1.0` (unchanged tailweight)
+* <b>`distribution`</b>: `tf.Distribution`-like instance. Distribution that is
+    transformed to produce this distribution.
+    Default is `tfd.Normal(0., 1.)`.
+    Must be a scalar-batch, scalar-event distribution.  Typically
+    `distribution.reparameterization_type = FULLY_REPARAMETERIZED` or it is
+    a function of non-trainable parameters. WARNING: If you backprop through
+    a `SinhArcsinh` sample and `distribution` is not
+    `FULLY_REPARAMETERIZED` yet is a function of trainable variables, then
+    the gradient will be incorrect!
+* <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
+    parameters are checked for validity despite possibly degrading runtime
+    performance. When `False` invalid inputs may silently render incorrect
+    outputs.
+* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`,
+    statistics (e.g., mean, mode, variance) use the value "`NaN`" to
+    indicate the result is undefined. When `False`, an exception is raised
+    if one or more of the statistic's batch members are undefined.
+* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
+
+
+
 ## Properties
 
 <h3 id="allow_nan_stats"><code>allow_nan_stats</code></h3>
@@ -177,8 +225,7 @@ Dictionary of parameters used to instantiate this `Distribution`.
 Describes how samples from the distribution are reparameterized.
 
 Currently this is one of the static instances
-`distributions.FULLY_REPARAMETERIZED`
-or `distributions.NOT_REPARAMETERIZED`.
+`tfd.FULLY_REPARAMETERIZED` or `tfd.NOT_REPARAMETERIZED`.
 
 #### Returns:
 
@@ -203,51 +250,6 @@ Python `bool` indicating possibly expensive checks are enabled.
 
 
 ## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
-
-``` python
-__init__(
-    loc,
-    scale,
-    skewness=None,
-    tailweight=None,
-    distribution=None,
-    validate_args=False,
-    allow_nan_stats=True,
-    name='SinhArcsinh'
-)
-```
-
-Construct SinhArcsinh distribution on `(-inf, inf)`.
-
-Arguments `(loc, scale, skewness, tailweight)` must have broadcastable shape
-(indexing batch dimensions).  They must all have the same `dtype`.
-
-#### Args:
-
-* <b>`loc`</b>: Floating-point `Tensor`.
-* <b>`scale`</b>:  `Tensor` of same `dtype` as `loc`.
-* <b>`skewness`</b>:  Skewness parameter.  Default is `0.0` (no skew).
-* <b>`tailweight`</b>:  Tailweight parameter. Default is `1.0` (unchanged tailweight)
-* <b>`distribution`</b>: `tf.Distribution`-like instance. Distribution that is
-    transformed to produce this distribution.
-    Default is `tf.distributions.Normal(0., 1.)`.
-    Must be a scalar-batch, scalar-event distribution.  Typically
-    `distribution.reparameterization_type = FULLY_REPARAMETERIZED` or it is
-    a function of non-trainable parameters. WARNING: If you backprop through
-    a `SinhArcsinh` sample and `distribution` is not
-    `FULLY_REPARAMETERIZED` yet is a function of trainable variables, then
-    the gradient will be incorrect!
-* <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
-    parameters are checked for validity despite possibly degrading runtime
-    performance. When `False` invalid inputs may silently render incorrect
-    outputs.
-* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`,
-    statistics (e.g., mean, mode, variance) use the value "`NaN`" to
-    indicate the result is undefined. When `False`, an exception is raised
-    if one or more of the statistic's batch members are undefined.
-* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
 
@@ -388,7 +390,7 @@ where `F` denotes the support of the random variable `X ~ P`.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 
@@ -482,7 +484,7 @@ denotes (Shanon) cross entropy, and `H[.]` denotes (Shanon) entropy.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 

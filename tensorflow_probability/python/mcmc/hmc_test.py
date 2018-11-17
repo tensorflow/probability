@@ -29,9 +29,7 @@ import tensorflow_probability as tfp
 from tensorflow_probability.python.mcmc.hmc import _compute_log_acceptance_correction
 from tensorflow_probability.python.mcmc.hmc import _leapfrog_integrator_one_step
 from tensorflow_probability.python.mcmc.util import maybe_call_fn_and_grads
-from tensorflow.contrib import eager as tfe
 from tensorflow.python.eager import context
-from tensorflow.python.framework import random_seed
 from tensorflow.python.framework import test_util
 
 tfb = tfp.bijectors
@@ -46,7 +44,7 @@ def run_in_graph_mode_only(__unused__=None, config=None, use_gpu=True):  # pylin
   def decorator(f):
     def decorated(self, **kwargs):
       with context.graph_mode():
-        with self.test_session(use_gpu=use_gpu):
+        with self.cached_session(use_gpu=use_gpu):
           f(self, **kwargs)
     return decorated
   return decorator
@@ -55,7 +53,7 @@ def run_in_graph_mode_only(__unused__=None, config=None, use_gpu=True):  # pylin
 def _set_seed(seed):
   """Helper which uses graph seed if using TFE."""
   # TODO(b/68017812): Deprecate once TFE supports seed.
-  if tfe.executing_eagerly():
+  if tf.executing_eagerly():
     tf.set_random_seed(seed)
     return None
   return seed
@@ -73,7 +71,7 @@ class HMCTest(tf.test.TestCase):
     self._shape_param = 5.
     self._rate_param = 10.
 
-    random_seed.set_random_seed(10003)
+    tf.random.set_random_seed(10003)
     np.random.seed(10003)
 
   def assertAllFinite(self, x):
@@ -233,7 +231,7 @@ class HMCTest(tf.test.TestCase):
         num_burnin_steps=150,
         parallel_iterations=1)
 
-    if tfe.executing_eagerly():
+    if tf.executing_eagerly():
       # TODO(b/79991421): Figure out why this is approx twice as many as it
       # should be. I.e., `expected_calls = (150 + 150) * 2 + 1`.
       expected_calls = 1202
@@ -614,7 +612,7 @@ class HMCTest(tf.test.TestCase):
         num_burnin_steps=200,
         parallel_iterations=1)
 
-    if tfe.executing_eagerly():
+    if tf.executing_eagerly():
       # TODO(b/79991421): Figure out why this is approx twice as many as it
       # should be. I.e., `expected_calls = (num_results + 200) * 2 * 2 + 1`.
       expected_calls = 6802
@@ -825,7 +823,7 @@ class HMCHandlesLists64(_HMCHandlesLists, tf.test.TestCase):
 class HMCAdaptiveStepSize(tf.test.TestCase):
 
   def setUp(self):
-    random_seed.set_random_seed(10014)
+    tf.random.set_random_seed(10014)
     np.random.seed(10014)
 
   @test_util.run_in_graph_and_eager_modes
@@ -853,12 +851,64 @@ class HMCAdaptiveStepSize(tf.test.TestCase):
         trainable=False)
 
     def target_log_prob_fn(x1, x2):
-      return tf.reduce_sum(tfd.Normal(0., 1.).log_prob([x1, x2]))
+      return tf.reduce_sum(tfd.Normal(dtype(0.), dtype(1.)).log_prob([x1, x2]))
 
     _, kernel_results = tfp.mcmc.sample_chain(
         num_results=num_results,
         num_burnin_steps=0,
-        current_state=initial_state,
+        current_state=[dtype(x) for x in initial_state],
+        kernel=tfp.mcmc.HamiltonianMonteCarlo(
+            target_log_prob_fn=target_log_prob_fn,
+            num_leapfrog_steps=2,
+            step_size=step_size,
+            step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy(
+                step_counter=step_counter),
+            state_gradients_are_stopped=True,
+            seed=_set_seed(252)),
+        parallel_iterations=1)
+
+    init_op = tf.global_variables_initializer()
+    self.evaluate(init_op)
+
+    step_size_ = self.evaluate(kernel_results.extra.step_size_assign)
+
+    # We apply the same adjustment to each step size in the list, so
+    # the starting ratio of step sizes should match the final ratio.
+    self.assertNear(step_size_[0][0]/step_size_[1][0],
+                    step_size_[0][-1]/step_size_[1][-1], err=1e-4)
+
+  @test_util.run_in_graph_and_eager_modes
+  def test_multiple_step_sizes_different_dtype(self):
+    num_results = 5
+    initial_step_sizes = [1e-5, 1e-4]
+    initial_state = [0., 0.]
+    # Non-float32 dtype.
+    dtype = np.float64
+
+    # TODO(b/111765211): Switch to the following once
+    # `get_variable(use_resource=True)` has the same semantics as
+    # `tf.contrib.eager.Variable`.
+    #   step_size = tf.get_variable(
+    #       name='step_size',
+    #       initializer=np.array(1e-3, dtype),
+    #       use_resource=True,
+    #       trainable=False)
+    step_size = [tf.contrib.eager.Variable(
+        initial_value=np.array(initial_step_size, dtype),
+        name='step_size',
+        trainable=False) for initial_step_size in initial_step_sizes]
+    step_counter = tf.contrib.eager.Variable(
+        name='step_size_adaptation_step_counter1',
+        initial_value=np.array(-1, dtype=np.int32),
+        trainable=False)
+
+    def target_log_prob_fn(x1, x2):
+      return tf.reduce_sum(tfd.Normal(dtype(0.), dtype(1.)).log_prob([x1, x2]))
+
+    _, kernel_results = tfp.mcmc.sample_chain(
+        num_results=num_results,
+        num_burnin_steps=0,
+        current_state=[dtype(x) for x in initial_state],
         kernel=tfp.mcmc.HamiltonianMonteCarlo(
             target_log_prob_fn=target_log_prob_fn,
             num_leapfrog_steps=2,
@@ -946,7 +996,7 @@ class HMCEMAdaptiveStepSize(tf.test.TestCase):
   """This test verifies that the docstring example works as advertised."""
 
   def setUp(self):
-    random_seed.set_random_seed(10014)
+    tf.random.set_random_seed(10014)
     np.random.seed(10014)
 
   def make_training_data(self, num_samples, dims, sigma):

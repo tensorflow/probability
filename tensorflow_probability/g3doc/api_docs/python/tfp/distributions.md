@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="FULLY_REPARAMETERIZED"/>
 <meta itemprop="property" content="NOT_REPARAMETERIZED"/>
 <meta itemprop="property" content="__all__"/>
@@ -61,6 +62,10 @@ Statistical distributions and bijective transformations.
 
 [`class Geometric`](../tfp/distributions/Geometric.md): Geometric distribution.
 
+[`class Gumbel`](../tfp/distributions/Gumbel.md): The scalar Gumbel distribution with location `loc` and `scale` parameters.
+
+[`class HalfCauchy`](../tfp/distributions/HalfCauchy.md): Half-Cauchy distribution.
+
 [`class HalfNormal`](../tfp/distributions/HalfNormal.md): The Half Normal distribution with scale `scale`.
 
 [`class Independent`](../tfp/distributions/Independent.md): Independent distribution from batch of distributions.
@@ -68,6 +73,8 @@ Statistical distributions and bijective transformations.
 [`class InverseGamma`](../tfp/distributions/InverseGamma.md): InverseGamma distribution.
 
 [`class InverseGammaWithSoftplusConcentrationRate`](../tfp/distributions/InverseGammaWithSoftplusConcentrationRate.md): `InverseGamma` with softplus of `concentration` and `rate`.
+
+[`class InverseGaussian`](../tfp/distributions/InverseGaussian.md): Inverse Gaussian distribution.
 
 [`class Kumaraswamy`](../tfp/distributions/Kumaraswamy.md): Kumaraswamy distribution.
 
@@ -101,6 +108,8 @@ Statistical distributions and bijective transformations.
 
 [`class MultivariateNormalTriL`](../tfp/distributions/MultivariateNormalTriL.md): The multivariate normal distribution on `R^k`.
 
+[`class MultivariateStudentTLinearOperator`](../tfp/distributions/MultivariateStudentTLinearOperator.md): The [Multivariate Student's t-distribution](
+
 [`class NegativeBinomial`](../tfp/distributions/NegativeBinomial.md): NegativeBinomial distribution.
 
 [`class Normal`](../tfp/distributions/Normal.md): The Normal distribution with location `loc` and `scale` parameters.
@@ -108,6 +117,8 @@ Statistical distributions and bijective transformations.
 [`class NormalWithSoftplusScale`](../tfp/distributions/NormalWithSoftplusScale.md): Normal with softplus applied to `scale`.
 
 [`class OneHotCategorical`](../tfp/distributions/OneHotCategorical.md): OneHotCategorical distribution.
+
+[`class Pareto`](../tfp/distributions/Pareto.md): Pareto distribution.
 
 [`class Poisson`](../tfp/distributions/Poisson.md): Poisson distribution.
 
@@ -133,6 +144,8 @@ Statistical distributions and bijective transformations.
 
 [`class TransformedDistribution`](../tfp/distributions/TransformedDistribution.md): A Transformed Distribution.
 
+[`class Triangular`](../tfp/distributions/Triangular.md): Triangular distribution with `low`, `high` and `peak` parameters.
+
 [`class TruncatedNormal`](../tfp/distributions/TruncatedNormal.md): The Truncated Normal distribution.
 
 [`class Uniform`](../tfp/distributions/Uniform.md): Uniform distribution with `low` and `high` parameters.
@@ -147,9 +160,13 @@ Statistical distributions and bijective transformations.
 
 [`class VectorSinhArcsinhDiag`](../tfp/distributions/VectorSinhArcsinhDiag.md): The (diagonal) SinhArcsinh transformation of a distribution on `R^k`.
 
+[`class VonMises`](../tfp/distributions/VonMises.md): The von Mises distribution over angles.
+
 [`class VonMisesFisher`](../tfp/distributions/VonMisesFisher.md): The von Mises-Fisher distribution over unit vectors on `S^{n-1}`.
 
 [`class Wishart`](../tfp/distributions/Wishart.md): The matrix Wishart distribution on positive definite matrices.
+
+[`class Zipf`](../tfp/distributions/Zipf.md): Zipf distribution.
 
 ## Functions
 
@@ -173,7 +190,7 @@ Statistical distributions and bijective transformations.
 
 [`normal_conjugates_known_scale_predictive(...)`](../tfp/distributions/normal_conjugates_known_scale_predictive.md): Posterior predictive Normal distribution w. conjugate prior on the mean.
 
-[`percentile(...)`](../tfp/distributions/percentile.md): Compute the `q`-th percentile of `x`.
+[`percentile(...)`](../tfp/distributions/percentile.md): Compute the `q`-th percentile(s) of `x`.
 
 [`quadrature_scheme_lognormal_gauss_hermite(...)`](../tfp/distributions/quadrature_scheme_lognormal_gauss_hermite.md): Use Gauss-Hermite quadrature to form quadrature on positive-reals.
 
@@ -191,9 +208,9 @@ Statistical distributions and bijective transformations.
 
 ## Other Members
 
-`FULLY_REPARAMETERIZED`
+<h3 id="FULLY_REPARAMETERIZED"><code>FULLY_REPARAMETERIZED</code></h3>
 
-`NOT_REPARAMETERIZED`
+<h3 id="NOT_REPARAMETERIZED"><code>NOT_REPARAMETERIZED</code></h3>
 
-`__all__`
+<h3 id="__all__"><code>__all__</code></h3>
 

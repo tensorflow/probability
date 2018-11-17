@@ -24,8 +24,6 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from tensorflow.contrib import eager as tfe
-
 tfd = tfp.distributions
 
 
@@ -86,7 +84,7 @@ def benchmark_eight_schools_hmc(
         treatment_effects, treatment_stddevs,
         avg_effect, avg_stddev, school_effects_standard)
 
-  sample_chain = tfe.defun(tfp.mcmc.sample_chain)
+  sample_chain = tf.contrib.eager.defun(tfp.mcmc.sample_chain)
   executing_eagerly = tf.executing_eagerly()
 
   def computation():
@@ -132,7 +130,7 @@ class EightSchoolsHmcBenchmarkTestHarness(object):
   """Test harness for running HMC benchmark tests in graph/eager modes."""
 
   def __init__(self):
-    self._mode = 'eager' if tfe.executing_eagerly() else 'graph'
+    self._mode = 'eager' if tf.executing_eagerly() else 'graph'
 
   def benchmark_eight_schools_hmc_num_leapfrog_1(self):
     self.report_benchmark(

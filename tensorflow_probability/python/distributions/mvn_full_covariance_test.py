@@ -73,8 +73,8 @@ class MultivariateNormalFullCovarianceTest(tf.test.TestCase):
 
     expected_log_pdf = scipy_mvn.logpdf(x)
     expected_pdf = scipy_mvn.pdf(x)
-    self.assertEqual((), log_pdf.get_shape())
-    self.assertEqual((), pdf.get_shape())
+    self.assertEqual((), log_pdf.shape)
+    self.assertEqual((), pdf.shape)
     self.assertAllClose(expected_log_pdf, self.evaluate(log_pdf))
     self.assertAllClose(expected_pdf, self.evaluate(pdf))
 
@@ -92,8 +92,8 @@ class MultivariateNormalFullCovarianceTest(tf.test.TestCase):
 
     expected_log_pdf = scipy_mvn.logpdf(x)
     expected_pdf = scipy_mvn.pdf(x)
-    self.assertEqual((), log_pdf.get_shape())
-    self.assertEqual((), pdf.get_shape())
+    self.assertEqual((), log_pdf.shape)
+    self.assertEqual((), pdf.shape)
     self.assertAllClose(expected_log_pdf, self.evaluate(log_pdf))
     self.assertAllClose(expected_pdf, self.evaluate(pdf))
 
@@ -136,7 +136,7 @@ class MultivariateNormalFullCovarianceTest(tf.test.TestCase):
         loc=mu_b, covariance_matrix=sigma_b, validate_args=True)
 
     kl = tfd.kl_divergence(mvn_a, mvn_b)
-    self.assertEqual(batch_shape, kl.get_shape())
+    self.assertEqual(batch_shape, kl.shape)
 
     kl_v = self.evaluate(kl)
     expected_kl_0 = _compute_non_batch_kl(mu_a[0, :], sigma_a[0, :, :],
@@ -158,7 +158,7 @@ class MultivariateNormalFullCovarianceTest(tf.test.TestCase):
         loc=mu_b, covariance_matrix=sigma_b, validate_args=True)
 
     kl = tfd.kl_divergence(mvn_a, mvn_b)
-    self.assertEqual(batch_shape, kl.get_shape())
+    self.assertEqual(batch_shape, kl.shape)
 
     kl_v = self.evaluate(kl)
     expected_kl_0 = _compute_non_batch_kl(mu_a[0, :], sigma_a[0, :, :], mu_b,

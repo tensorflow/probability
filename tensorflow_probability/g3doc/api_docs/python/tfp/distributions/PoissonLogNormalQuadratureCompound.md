@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions.PoissonLogNormalQuadratureCompound" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="allow_nan_stats"/>
 <meta itemprop="property" content="batch_shape"/>
 <meta itemprop="property" content="distribution"/>
@@ -106,6 +107,58 @@ pln = tfd.PoissonLogNormalQuadratureCompound(
     quadrature_size=10,
     validate_args=True)
 
+<h2 id="__init__"><code>__init__</code></h2>
+
+``` python
+__init__(
+    loc,
+    scale,
+    quadrature_size=8,
+    quadrature_fn=tfp.distributions.quadrature_scheme_lognormal_quantiles,
+    validate_args=False,
+    allow_nan_stats=True,
+    name='PoissonLogNormalQuadratureCompound'
+)
+```
+
+Constructs the PoissonLogNormalQuadratureCompound`.
+
+Note: `probs` returned by (optional) `quadrature_fn` are presumed to be
+either a length-`quadrature_size` vector or a batch of vectors in 1-to-1
+correspondence with the returned `grid`. (I.e., broadcasting is only
+partially supported.)
+
+#### Args:
+
+* <b>`loc`</b>: `float`-like (batch of) scalar `Tensor`; the location parameter of
+    the LogNormal prior.
+* <b>`scale`</b>: `float`-like (batch of) scalar `Tensor`; the scale parameter of
+    the LogNormal prior.
+* <b>`quadrature_size`</b>: Python `int` scalar representing the number of quadrature
+    points.
+* <b>`quadrature_fn`</b>: Python callable taking `loc`, `scale`,
+    `quadrature_size`, `validate_args` and returning `tuple(grid, probs)`
+    representing the LogNormal grid and corresponding normalized weight.
+    normalized) weight.
+    Default value: `quadrature_scheme_lognormal_quantiles`.
+* <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
+    parameters are checked for validity despite possibly degrading runtime
+    performance. When `False` invalid inputs may silently render incorrect
+    outputs.
+* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`,
+    statistics (e.g., mean, mode, variance) use the value "`NaN`" to
+    indicate the result is undefined. When `False`, an exception is raised
+    if one or more of the statistic's batch members are undefined.
+* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
+
+
+#### Raises:
+
+* <b>`TypeError`</b>: if `quadrature_grid` and `quadrature_probs` have different base
+    `dtype`.
+
+
+
 ## Properties
 
 <h3 id="allow_nan_stats"><code>allow_nan_stats</code></h3>
@@ -180,8 +233,7 @@ Dictionary of parameters used to instantiate this `Distribution`.
 Describes how samples from the distribution are reparameterized.
 
 Currently this is one of the static instances
-`distributions.FULLY_REPARAMETERIZED`
-or `distributions.NOT_REPARAMETERIZED`.
+`tfd.FULLY_REPARAMETERIZED` or `tfd.NOT_REPARAMETERIZED`.
 
 #### Returns:
 
@@ -198,56 +250,6 @@ Python `bool` indicating possibly expensive checks are enabled.
 
 
 ## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
-
-``` python
-__init__(
-    loc,
-    scale,
-    quadrature_size=8,
-    quadrature_fn=tfp.distributions.quadrature_scheme_lognormal_quantiles,
-    validate_args=False,
-    allow_nan_stats=True,
-    name='PoissonLogNormalQuadratureCompound'
-)
-```
-
-Constructs the PoissonLogNormalQuadratureCompound`.
-
-Note: `probs` returned by (optional) `quadrature_fn` are presumed to be
-either a length-`quadrature_size` vector or a batch of vectors in 1-to-1
-correspondence with the returned `grid`. (I.e., broadcasting is only
-partially supported.)
-
-#### Args:
-
-* <b>`loc`</b>: `float`-like (batch of) scalar `Tensor`; the location parameter of
-    the LogNormal prior.
-* <b>`scale`</b>: `float`-like (batch of) scalar `Tensor`; the scale parameter of
-    the LogNormal prior.
-* <b>`quadrature_size`</b>: Python `int` scalar representing the number of quadrature
-    points.
-* <b>`quadrature_fn`</b>: Python callable taking `loc`, `scale`,
-    `quadrature_size`, `validate_args` and returning `tuple(grid, probs)`
-    representing the LogNormal grid and corresponding normalized weight.
-    normalized) weight.
-    Default value: `quadrature_scheme_lognormal_quantiles`.
-* <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
-    parameters are checked for validity despite possibly degrading runtime
-    performance. When `False` invalid inputs may silently render incorrect
-    outputs.
-* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`,
-    statistics (e.g., mean, mode, variance) use the value "`NaN`" to
-    indicate the result is undefined. When `False`, an exception is raised
-    if one or more of the statistic's batch members are undefined.
-* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
-
-
-#### Raises:
-
-* <b>`TypeError`</b>: if `quadrature_grid` and `quadrature_probs` have different base
-    `dtype`.
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
 
@@ -388,7 +390,7 @@ where `F` denotes the support of the random variable `X ~ P`.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 
@@ -482,7 +484,7 @@ denotes (Shanon) cross entropy, and `H[.]` denotes (Shanon) entropy.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 

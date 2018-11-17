@@ -18,15 +18,15 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import math
 # Dependency imports
 import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python import bijectors
+from tensorflow_probability.python.distributions import transformed_distribution
+from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import distribution_util
-
-from tensorflow.python.ops.distributions import transformed_distribution
+from tensorflow_probability.python.internal import dtype_util
 
 
 class Gumbel(transformed_distribution.TransformedDistribution):
@@ -126,6 +126,9 @@ class Gumbel(transformed_distribution.TransformedDistribution):
       TypeError: if loc and scale are different dtypes.
     """
     with tf.name_scope(name, values=[loc, scale]) as name:
+      dtype = dtype_util.common_dtype([loc, scale], preferred_dtype=tf.float32)
+      loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
+      scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
       with tf.control_dependencies([tf.assert_positive(scale)]
                                    if validate_args else []):
         loc = tf.identity(loc, name="loc")
@@ -135,7 +138,7 @@ class Gumbel(transformed_distribution.TransformedDistribution):
             loc=loc, scale=scale, validate_args=validate_args)
 
       super(Gumbel, self).__init__(
-          distribution=tf.distributions.Uniform(
+          distribution=uniform.Uniform(
               low=tf.zeros([], dtype=loc.dtype),
               high=tf.ones([], dtype=loc.dtype),
               allow_nan_stats=allow_nan_stats),
@@ -171,7 +174,7 @@ class Gumbel(transformed_distribution.TransformedDistribution):
     return self.loc + self.scale * np.euler_gamma
 
   def _stddev(self):
-    return self.scale * tf.ones_like(self.loc) * math.pi / math.sqrt(6)
+    return self.scale * tf.ones_like(self.loc) * np.pi / np.sqrt(6)
 
   def _mode(self):
     return self.loc * tf.ones_like(self.scale)

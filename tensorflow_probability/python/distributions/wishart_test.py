@@ -23,7 +23,6 @@ import numpy as np
 from scipy import linalg
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow.python.framework import errors_impl
 from tensorflow.python.framework import test_util
 
 tfd = tfp.distributions
@@ -75,6 +74,18 @@ class WishartTest(tf.test.TestCase):
 
     w = tfd.Wishart(df=5, scale_tril=[[1.]])
     self.assertAllClose(self.evaluate(w.entropy()), entropy_alt(w))
+
+  def testParamBroadcasting(self):
+    scale = [[[1., .5], [.5, 1.]]]  # A 1-batch of 2x2 scale operators
+    df = [5, 6, 7]  # A 3-batch of degrees of freedom
+    wish = tfp.distributions.Wishart(df=df, scale=scale)
+    self.assertAllEqual([2, 2], wish.event_shape.as_list())
+    self.assertAllEqual([2, 2], self.evaluate(wish.event_shape_tensor()))
+    self.assertAllEqual([3], wish.batch_shape.as_list())
+    self.assertAllEqual([3], self.evaluate(wish.batch_shape_tensor()))
+    self.assertAllEqual([4, 3, 2, 2], wish.sample(sample_shape=(4,)).shape)
+    self.assertAllEqual([4, 3, 2, 2],
+                        self.evaluate(tf.shape(wish.sample(sample_shape=(4,)))))
 
   def testMean(self):
     scale = make_pd(1., 2)
@@ -150,7 +161,7 @@ class WishartTest(tf.test.TestCase):
     chol_w = tfd.Wishart(
         df=df, scale_tril=chol(make_pd(1., 3)), input_output_cholesky=False)
     x = chol_w.sample(10000, seed=42)
-    self.assertAllEqual((10000, 3, 3), x.get_shape())
+    self.assertAllEqual((10000, 3, 3), x.shape)
 
     moment1_estimate = self.evaluate(tf.reduce_mean(x, reduction_indices=[0]))
     self.assertAllClose(
@@ -245,7 +256,7 @@ class WishartTest(tf.test.TestCase):
           np.reshape(np.exp(log_prob), (2, 2)),
           self.evaluate(w.prob(np.reshape(x, (2, 2, 2, 2)))))
       self.assertAllEqual((2, 2),
-                          w.log_prob(np.reshape(x, (2, 2, 2, 2))).get_shape())
+                          w.log_prob(np.reshape(x, (2, 2, 2, 2))).shape)
 
     for w in (tfd.Wishart(
         df=4, scale_tril=chol_x[0], input_output_cholesky=True),
@@ -261,7 +272,7 @@ class WishartTest(tf.test.TestCase):
           np.reshape(np.exp(log_prob), (2, 2)),
           self.evaluate(w.prob(np.reshape(chol_x, (2, 2, 2, 2)))))
       self.assertAllEqual((2, 2),
-                          w.log_prob(np.reshape(x, (2, 2, 2, 2))).get_shape())
+                          w.log_prob(np.reshape(x, (2, 2, 2, 2))).shape)
 
   def testBatchShape(self):
     scale = make_pd(1., 2)
@@ -316,7 +327,7 @@ class WishartTest(tf.test.TestCase):
 
     # In eager mode, these checks are done statically and hence
     # ValueError is returned on object construction.
-    error_type = errors_impl.InvalidArgumentError
+    error_type = tf.errors.InvalidArgumentError
     if tf.executing_eagerly():
       error_type = ValueError
 
@@ -361,12 +372,14 @@ class WishartTest(tf.test.TestCase):
     chol_scale = chol(x)
 
     # Still has these assertions because they're resolveable at graph
-    # construction
+    # construction:
+    # df < rank
     with self.assertRaisesRegexp(ValueError, "cannot be less than"):
       tfd.Wishart(df=2, scale_tril=chol_scale, validate_args=False)
+    # non-float dtype
     with self.assertRaisesRegexp(TypeError, "Argument tril must have dtype"):
       tfd.Wishart(
-          df=4.,
+          df=4,
           scale_tril=np.asarray(chol_scale, dtype=np.int32),
           validate_args=False)
 

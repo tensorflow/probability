@@ -32,7 +32,6 @@ from tensorflow_probability.python.distributions.linear_gaussian_ssm import Kalm
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import linear_gaussian_update
 
 from tensorflow.python.framework import test_util
-from tensorflow.python.platform import test
 
 tfl = tf.linalg
 tfd = tfp.distributions
@@ -161,25 +160,25 @@ class _IIDNormalTest(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class IIDNormalTestStatic32(_IIDNormalTest, test.TestCase):
+class IIDNormalTestStatic32(_IIDNormalTest, tf.test.TestCase):
   use_static_shape = True
   dtype = np.float32
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class IIDNormalTestStatic64(_IIDNormalTest, test.TestCase):
+class IIDNormalTestStatic64(_IIDNormalTest, tf.test.TestCase):
   use_static_shape = True
   dtype = np.float64
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class IIDNormalTestDynamic32(_IIDNormalTest, test.TestCase):
+class IIDNormalTestDynamic32(_IIDNormalTest, tf.test.TestCase):
   use_static_shape = False
   dtype = np.float32
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SanityChecks(test.TestCase):
+class SanityChecks(tf.test.TestCase):
 
   def test_deterministic_system(self):
 
@@ -244,9 +243,93 @@ class SanityChecks(test.TestCase):
     variance_ = self.evaluate(model.variance())
     self.assertAllClose(variance_[..., 0], observation_variance)
 
+  def test_time_varying_operators(self):
+
+    num_timesteps = 5
+    prior_mean = 1.3
+    prior_scale = 1e-4
+    transition_scale = 0.
+    observation_noise_scale = 1e-4
+
+    # Define time-varying transition and observation matrices.
+    def transition_matrix(t):
+      t = tf.cast(t, tf.float32)
+      return tf.linalg.LinearOperatorFullMatrix([[t+1]])
+
+    def observation_matrix(t):
+      t = tf.cast(t, tf.float32)
+      return tf.linalg.LinearOperatorFullMatrix([[tf.sqrt(t+1.)]])
+
+    model = tfd.LinearGaussianStateSpaceModel(
+        num_timesteps=num_timesteps,
+        transition_matrix=transition_matrix,
+        transition_noise=tfd.MultivariateNormalDiag(
+            scale_diag=[transition_scale]),
+        observation_matrix=observation_matrix,
+        observation_noise=tfd.MultivariateNormalDiag(
+            scale_diag=[observation_noise_scale]),
+        initial_state_prior=tfd.MultivariateNormalDiag(
+            loc=[prior_mean], scale_diag=[prior_scale]))
+
+    mean_, sample_ = self.evaluate([model.mean(), model.sample()])
+
+    # Manually compute the expected output of the model (i.e., the prior
+    # mean). Since the model is near-deterministic, we expect any samples to
+    # be close to this value, so we can also use this to test the `sample`
+    # method.
+    latent_means = [prior_mean]
+    for t in range(0, num_timesteps-1):
+      latent_means.append((t+1) * latent_means[-1])
+    observation_means = [latent_means[t] * np.sqrt(t+1)
+                         for t in range(num_timesteps)]
+
+    self.assertAllClose(observation_means, mean_[..., 0], atol=1e-4)
+    self.assertAllClose(observation_means, sample_[..., 0], atol=3.)
+
+    # this model is near-deterministic, so the log density of a sample will
+    # be high (about 35) if computed using the correct model, and very low
+    # (approximately -1e10) if there's an off-by-one-timestep error.
+    lp_ = self.evaluate(model.log_prob(sample_))
+    self.assertGreater(lp_, 0.)
+
+  def test_time_varying_noise(self):
+
+    num_timesteps = 5
+    prior_mean = 0.
+    prior_scale = 1.
+
+    # Define time-varying transition and observation noise models.
+    def transition_noise(t):
+      t = tf.cast(t, tf.float32)
+      return tfd.MultivariateNormalDiag(scale_diag=[t])
+
+    def observation_noise(t):
+      t = tf.cast(t, tf.float32)
+      return tfd.MultivariateNormalDiag(scale_diag=[tf.log(t+1.)])
+
+    model = tfd.LinearGaussianStateSpaceModel(
+        num_timesteps=num_timesteps,
+        transition_matrix=[[1.]],
+        transition_noise=transition_noise,
+        observation_matrix=[[1.]],
+        observation_noise=observation_noise,
+        initial_state_prior=tfd.MultivariateNormalDiag(
+            loc=[prior_mean], scale_diag=[prior_scale]))
+
+    variance_ = self.evaluate(model.variance())
+
+    # Manually compute the prior variance at each timestep.
+    latent_variances = [prior_scale**2]
+    for t in range(0, num_timesteps-1):
+      latent_variances.append(latent_variances[t] + t**2)
+    observation_variances = [latent_variances[t] + np.log(t+1)**2
+                             for t in range(num_timesteps)]
+
+    self.assertAllClose(observation_variances, variance_[..., 0])
+
 
 @test_util.run_all_in_graph_and_eager_modes
-class BatchTest(test.TestCase):
+class BatchTest(tf.test.TestCase):
   """Test that methods broadcast batch dimensions for each parameter."""
 
   def setUp(self):
@@ -403,12 +486,19 @@ class _KalmanStepsTest(object):
     self.get_transition_noise_for_timestep = (
         lambda t: tfd.MultivariateNormalDiag(self.bias, [1., 1.]))
 
+    self.observation_matrix = np.asarray([[1., 1.], [0.3, -0.7]],
+                                         dtype=np.float32)
     self.get_observation_matrix_for_timestep = (
-        lambda t: tfl.LinearOperatorFullMatrix([[1., 1.]]))
+        lambda t: tfl.LinearOperatorFullMatrix(self.observation_matrix))
 
-    self.observation_bias = np.asarray([-.9], dtype=np.float32)
-    self.get_observation_noise_for_timestep = (
-        lambda t: tfd.MultivariateNormalDiag(self.observation_bias, [1.]))
+    self.observation_bias = np.asarray([-.9, .1], dtype=np.float32)
+    self.observation_noise_scale_diag = np.asarray([1., 0.3], dtype=np.float32)
+    def get_observation_noise_for_timestep(t):
+      del t  # unused
+      return tfd.MultivariateNormalDiag(
+          loc=self.observation_bias,
+          scale_diag=self.observation_noise_scale_diag)
+    self.get_observation_noise_for_timestep = get_observation_noise_for_timestep
 
   def testKalmanFilterStep(self):
     prev_mean = np.asarray([[-2], [.4]], dtype=np.float32)
@@ -441,13 +531,16 @@ class _KalmanStepsTest(object):
 
     # Computed by running a believed-correct version of
     # the code.
-    expected_filtered_mean = [[-0.104167], [2.295833]]
-    expected_filtered_cov = [[0.325, -0.075], [-0.033333, 0.366667]]
-    expected_predicted_mean = [[-3.25625], [1.609583]]
-    expected_predicted_cov = [[1.3625, -0.0125], [-0.029167, 1.0525]]
-    expected_observation_mean = [[-2.5]]
-    expected_observation_cov = [[2.4]]
-    expected_log_marginal_likelihood = -10.1587553024292
+    expected_filtered_mean = [[1.41887522], [-2.82712531]]
+    expected_filtered_cov = [[0.27484685, 0.05869688],
+                             [0.06994689, 0.1369969]]
+    expected_predicted_mean = [[-4.29468775], [-0.23191273]]
+    expected_predicted_cov = [[1.37341797, -0.01930545],
+                              [-0.02380546, 1.01560497]]
+    expected_observation_mean = [[-2.5], [-0.77999997]]
+    expected_observation_cov = [[2.4000001, -0.28000003],
+                                [-0.28000003, 0.366]]
+    expected_log_marginal_likelihood = -56.5381
 
     self.assertAllClose(filter_state.filtered_mean,
                         expected_filtered_mean)
@@ -486,29 +579,29 @@ class _KalmanStepsTest(object):
                                       self.transition_matrix.T)) + np.eye(2))
 
   def testLinearGaussianObservation(self):
+    prior_mean = np.asarray([[-2], [.4]], dtype=np.float32)
+    prior_cov = np.asarray([[.5, -.2], [-.2, .9]], dtype=np.float32)
+    x_observed = np.asarray([[4.], [-1.]], dtype=np.float32)
 
-    prev_mean = np.asarray([[-2], [.4]], dtype=np.float32)
-    prev_cov = np.asarray([[.5, -.2], [-.2, .9]], dtype=np.float32)
-    x_observed = np.asarray([[4.]], dtype=np.float32)
-
-    prev_mean_tensor = self.build_tensor(prev_mean)
-    prev_cov_tensor = self.build_tensor(prev_cov)
+    prior_mean_tensor = self.build_tensor(prior_mean)
+    prior_cov_tensor = self.build_tensor(prior_cov)
     x_observed_tensor = self.build_tensor(x_observed)
 
     observation_matrix = self.get_observation_matrix_for_timestep(0)
     observation_noise = self.get_observation_noise_for_timestep(0)
-
     (posterior_mean,
      posterior_cov,
      predictive_dist) = linear_gaussian_update(
-         prev_mean_tensor, prev_cov_tensor,
+         prior_mean_tensor, prior_cov_tensor,
          observation_matrix, observation_noise,
          x_observed_tensor)
 
-    expected_posterior_mean = [[-1.025], [2.675]]
-    expected_posterior_cov = [[0.455, -0.305], [-0.305, 0.655]]
-    expected_predicted_mean = [-2.5]
-    expected_predicted_cov = [[2.]]
+    expected_posterior_mean = [[-0.373276], [1.65086186]]
+    expected_posterior_cov = [[0.24379307, 0.02689655],
+                              [0.02689655, 0.13344827]]
+    expected_predicted_mean = [-2.5, -0.77999997]
+    expected_predicted_cov = [[1.99999988, -0.39999998],
+                              [-0.39999998, 0.65999997]]
 
     self.assertAllClose(self.evaluate(posterior_mean),
                         expected_posterior_mean)
@@ -519,6 +612,73 @@ class _KalmanStepsTest(object):
     self.assertAllClose(self.evaluate(predictive_dist.covariance()),
                         expected_predicted_cov)
 
+  def testLinearGaussianObservationScalarPath(self):
+
+    # Construct observed data with a scalar observation.
+    prior_mean_tensor = self.build_tensor(
+        np.asarray([[-2], [.4]], dtype=np.float32))
+    prior_cov_tensor = self.build_tensor(
+        np.asarray([[.5, -.2], [-.2, .9]], dtype=np.float32))
+    x_observed_tensor = self.build_tensor(
+        np.asarray([[4.]], dtype=np.float32))
+
+    observation_matrix = tfl.LinearOperatorFullMatrix(
+        self.build_tensor([[1., 1.]]))
+    observation_noise = tfd.MultivariateNormalDiag(
+        loc=self.build_tensor([-.9]), scale_diag=self.build_tensor([1.]))
+
+    (posterior_mean,
+     posterior_cov,
+     predictive_dist) = linear_gaussian_update(
+         prior_mean_tensor, prior_cov_tensor,
+         observation_matrix, observation_noise,
+         x_observed_tensor)
+
+    # Ensure we take the scalar-optimized path when shape is static.
+    self.assertIsInstance(predictive_dist,
+                          (tfd.Independent if self.use_static_shape
+                           else tfd.MultivariateNormalTriL))
+    self.assertAllEqual(
+        self.evaluate(predictive_dist.event_shape_tensor()), [1])
+    self.assertAllEqual(
+        self.evaluate(predictive_dist.batch_shape_tensor()), [])
+
+    # Extend `x_observed` with an extra dimension to force the vector path.
+    # The added dimension is non-informative, so we can check that the scalar
+    # and vector paths yield the same posterior.
+    observation_matrix_extended = tfl.LinearOperatorFullMatrix(
+        self.build_tensor([[1., 1.], [0., 0.]]))
+    observation_noise_extended = tfd.MultivariateNormalDiag(
+        loc=self.build_tensor([-.9, 0.]),
+        scale_diag=self.build_tensor([1., 1e15]))
+    x_observed_extended_tensor = self.build_tensor(
+        np.asarray([[4.], [0.]], dtype=np.float32))
+
+    (posterior_mean_extended,
+     posterior_cov_extended,
+     predictive_dist_extended) = linear_gaussian_update(
+         prior_mean_tensor, prior_cov_tensor,
+         observation_matrix_extended, observation_noise_extended,
+         x_observed_extended_tensor)
+
+    # Ensure we took the vector path.
+    self.assertIsInstance(predictive_dist_extended, tfd.MultivariateNormalTriL)
+    self.assertAllEqual(
+        self.evaluate(predictive_dist_extended.event_shape_tensor()), [2])
+    self.assertAllEqual(
+        self.evaluate(predictive_dist_extended.batch_shape_tensor()), [])
+
+    # Test that the results are the same.
+    self.assertAllClose(*self.evaluate((posterior_mean,
+                                        posterior_mean_extended)))
+    self.assertAllClose(*self.evaluate((posterior_cov,
+                                        posterior_cov_extended)))
+    self.assertAllClose(*self.evaluate((predictive_dist.mean(),
+                                        predictive_dist_extended.mean()[:1])))
+    self.assertAllClose(
+        *self.evaluate((predictive_dist.covariance(),
+                        predictive_dist_extended.covariance()[:1, :1])))
+
   def testMeanStep(self):
     prev_mean = np.asarray([[-2], [.4]], dtype=np.float32)
     prev_mean_tensor = self.build_tensor(prev_mean)
@@ -528,13 +688,13 @@ class _KalmanStepsTest(object):
         self.get_transition_noise_for_timestep,
         self.get_observation_matrix_for_timestep,
         self.get_observation_noise_for_timestep)
-    new_mean, obs_mean = mean_step((prev_mean_tensor, None), t=0)
+    new_mean, obs_mean = self.evaluate(mean_step((prev_mean_tensor, None), t=0))
 
-    self.assertAllClose(self.evaluate(new_mean),
-                        np.dot(self.transition_matrix,
-                               prev_mean) + self.bias[:, np.newaxis])
-    self.assertAllClose(self.evaluate(obs_mean),
-                        np.sum(self.evaluate(new_mean)) +
+    self.assertAllClose(new_mean,
+                        np.dot(self.transition_matrix, prev_mean) +
+                        self.bias[:, np.newaxis])
+    self.assertAllClose(obs_mean,
+                        np.dot(self.observation_matrix, new_mean) +
                         self.observation_bias[:, np.newaxis])
 
   def testCovStep(self):
@@ -547,18 +707,22 @@ class _KalmanStepsTest(object):
         self.get_transition_noise_for_timestep,
         self.get_observation_matrix_for_timestep,
         self.get_observation_noise_for_timestep)
-    new_cov, obs_cov = cov_step((prev_cov_tensor, None), t=0)
+    new_cov, obs_cov = self.evaluate(cov_step((prev_cov_tensor, None), t=0))
 
-    self.assertAllClose(self.evaluate(new_cov),
+    self.assertAllClose(new_cov,
                         np.dot(self.transition_matrix,
                                np.dot(prev_cov,
                                       self.transition_matrix.T)) + np.eye(2))
-    self.assertAllClose(self.evaluate(obs_cov),
-                        [[np.sum(self.evaluate(new_cov)) + 1.]])
+    self.assertAllClose(obs_cov,
+                        np.dot(self.observation_matrix,
+                               np.dot(new_cov, self.observation_matrix.T)) +
+                        np.diag(self.observation_noise_scale_diag**2))
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class KalmanStepsTestStatic(test.TestCase, _KalmanStepsTest):
+class KalmanStepsTestStatic(tf.test.TestCase, _KalmanStepsTest):
+
+  use_static_shape = True
 
   def setUp(self):
     return _KalmanStepsTest.setUp(self)
@@ -568,7 +732,9 @@ class KalmanStepsTestStatic(test.TestCase, _KalmanStepsTest):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class KalmanStepsTestDynamic(test.TestCase, _KalmanStepsTest):
+class KalmanStepsTestDynamic(tf.test.TestCase, _KalmanStepsTest):
+
+  use_static_shape = False
 
   def setUp(self):
     return _KalmanStepsTest.setUp(self)
@@ -621,7 +787,7 @@ class _AugmentSampleShapeTest(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class AugmentSampleShapeTestStatic(test.TestCase, _AugmentSampleShapeTest):
+class AugmentSampleShapeTestStatic(tf.test.TestCase, _AugmentSampleShapeTest):
 
   def assertRaisesError(self, msg):
     return self.assertRaisesRegexp(Exception, msg)
@@ -638,7 +804,7 @@ class AugmentSampleShapeTestStatic(test.TestCase, _AugmentSampleShapeTest):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class AugmentSampleShapeTestDynamic(test.TestCase, _AugmentSampleShapeTest):
+class AugmentSampleShapeTestDynamic(tf.test.TestCase, _AugmentSampleShapeTest):
 
   def assertRaisesError(self, msg):
     return self.assertRaisesOpError(msg)
@@ -660,4 +826,4 @@ class AugmentSampleShapeTestDynamic(test.TestCase, _AugmentSampleShapeTest):
 
 
 if __name__ == "__main__":
-  test.main()
+  tf.test.main()

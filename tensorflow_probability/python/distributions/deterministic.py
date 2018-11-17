@@ -24,8 +24,11 @@ import abc
 import six
 import tensorflow as tf
 
+from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.framework import tensor_shape
-from tensorflow.python.framework import tensor_util
 from tensorflow.python.ops import control_flow_ops
 
 __all__ = [
@@ -35,7 +38,7 @@ __all__ = [
 
 
 @six.add_metaclass(abc.ABCMeta)
-class _BaseDeterministic(tf.distributions.Distribution):
+class _BaseDeterministic(distribution.Distribution):
   """Base class for Deterministic distributions."""
 
   def __init__(self,
@@ -83,11 +86,13 @@ class _BaseDeterministic(tf.distributions.Distribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name, values=[loc, atol, rtol]) as name:
-      loc = tf.convert_to_tensor(loc, name="loc")
+      dtype = dtype_util.common_dtype([loc, atol, rtol],
+                                      preferred_dtype=tf.float32)
+      loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
       if is_vector and validate_args:
         msg = "Argument loc must be at least rank 1."
-        if loc.get_shape().ndims is not None:
-          if loc.get_shape().ndims < 1:
+        if loc.shape.ndims is not None:
+          if loc.shape.ndims < 1:
             raise ValueError(msg)
         else:
           loc = control_flow_ops.with_dependencies(
@@ -96,7 +101,7 @@ class _BaseDeterministic(tf.distributions.Distribution):
 
       super(_BaseDeterministic, self).__init__(
           dtype=self._loc.dtype,
-          reparameterization_type=tf.distributions.NOT_REPARAMETERIZED,
+          reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
           parameters=parameters,
@@ -151,9 +156,9 @@ class _BaseDeterministic(tf.distributions.Distribution):
     return self.mean()
 
   def _sample_n(self, n, seed=None):  # pylint: disable=unused-arg
-    n_static = tensor_util.constant_value(tf.convert_to_tensor(n))
-    if n_static is not None and self.loc.get_shape().ndims is not None:
-      ones = [1] * self.loc.get_shape().ndims
+    n_static = tf.contrib.util.constant_value(tf.convert_to_tensor(n))
+    if n_static is not None and self.loc.shape.ndims is not None:
+      ones = [1] * self.loc.shape.ndims
       multiples = [n_static] + ones
     else:
       ones = tf.ones_like(tf.shape(self.loc))
@@ -250,7 +255,7 @@ class Deterministic(_BaseDeterministic):
     return tf.shape(self.loc)
 
   def _batch_shape(self):
-    return self.loc.get_shape()
+    return self.loc.shape
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
@@ -358,13 +363,13 @@ class VectorDeterministic(_BaseDeterministic):
     return tf.shape(self.loc)[:-1]
 
   def _batch_shape(self):
-    return self.loc.get_shape()[:-1]
+    return self.loc.shape[:-1]
 
   def _event_shape_tensor(self):
     return tf.shape(self.loc)[-1]
 
   def _event_shape(self):
-    return self.loc.get_shape()[-1:]
+    return self.loc.shape[-1:]
 
   def _prob(self, x):
     if self.validate_args:
@@ -383,7 +388,9 @@ class VectorDeterministic(_BaseDeterministic):
         dtype=self.dtype)
 
 
-@tf.distributions.RegisterKL(_BaseDeterministic, tf.distributions.Distribution)
+# TODO(b/117098119): Remove tf.distribution references once they're gone.
+@kullback_leibler.RegisterKL(_BaseDeterministic, tf.distributions.Distribution)
+@kullback_leibler.RegisterKL(_BaseDeterministic, distribution.Distribution)
 def _kl_deterministic_distribution(a, b, name=None):
   """Calculate the batched KL divergence `KL(a || b)` with `a` Deterministic.
 

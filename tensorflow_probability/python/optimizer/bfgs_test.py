@@ -18,41 +18,63 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
 import numpy as np
 from scipy.stats import special_ortho_group
 
 
 import tensorflow as tf
 import tensorflow_probability as tfp
+from tensorflow.python.framework import test_util
+
+
+tfe = tf.contrib.eager
+
+
+def _make_val_and_grad_fn(value_fn):
+  raw_fn = tfe.value_and_gradients_function(value_fn)
+  @functools.wraps(value_fn)
+  def val_and_grad(x):
+    fv = raw_fn(x)
+    return fv[0], fv[1][0]
+  return val_and_grad
+
+
+def _norm(x):
+  return np.linalg.norm(x, np.inf)
 
 
 class BfgsTest(tf.test.TestCase):
   """Tests for BFGS optimization algorithm."""
 
+  @test_util.run_in_graph_and_eager_modes
   def test_quadratic_bowl_2d(self):
     """Can minimize a two dimensional quadratic function."""
     minimum = np.array([1.0, 1.0])
     scales = np.array([2.0, 3.0])
-    def quadratic(x):
-      value = tf.reduce_sum(scales * (x - minimum) ** 2)
-      return value, tf.gradients(value, x)[0]
-    with self.test_session() as session:
-      start = tf.constant([0.6, 0.8])
-      results = session.run(tfp.optimizer.bfgs_minimize(
-          quadratic, initial_position=start, tolerance=1e-8))
-      self.assertTrue(results.converged)
-      final_gradient = results.objective_gradient
-      final_gradient_norm = np.sqrt(np.sum(final_gradient * final_gradient))
-      self.assertTrue(final_gradient_norm <= 1e-8)
-      self.assertArrayNear(results.position, minimum, 1e-5)
 
+    @_make_val_and_grad_fn
+    def quadratic(x):
+      return tf.reduce_sum(scales * (x - minimum) ** 2)
+
+    start = tf.constant([0.6, 0.8])
+    results = self.evaluate(tfp.optimizer.bfgs_minimize(
+        quadratic, initial_position=start, tolerance=1e-8))
+    self.assertTrue(results.converged)
+    final_gradient = results.objective_gradient
+    final_gradient_norm = _norm(final_gradient)
+    self.assertTrue(final_gradient_norm <= 1e-8)
+    self.assertArrayNear(results.position, minimum, 1e-5)
+
+  @test_util.run_in_graph_and_eager_modes
   def test_inverse_hessian_spec(self):
     """Checks that specifying the 'initial_inverse_hessian_estimate' works."""
     minimum = np.array([1.0, 1.0], dtype=np.float32)
     scales = np.array([2.0, 3.0], dtype=np.float32)
+
+    @_make_val_and_grad_fn
     def quadratic(x):
-      value = tf.reduce_sum(scales * (x - minimum) ** 2)
-      return value, tf.gradients(value, x)[0]
+      return tf.reduce_sum(scales * (x - minimum) ** 2)
 
     start = tf.constant([0.6, 0.8])
     test_inv_hessian = tf.constant([[2.0, 1.0], [1.0, 2.0]],
@@ -62,29 +84,68 @@ class BfgsTest(tf.test.TestCase):
         initial_inverse_hessian_estimate=test_inv_hessian))
     self.assertTrue(results.converged)
     final_gradient = results.objective_gradient
-    final_gradient_norm = np.sqrt(np.sum(final_gradient * final_gradient))
+    final_gradient_norm = _norm(final_gradient)
     self.assertTrue(final_gradient_norm <= 1e-8)
     self.assertArrayNear(results.position, minimum, 1e-5)
 
+  @test_util.run_in_graph_and_eager_modes
+  def test_bad_inverse_hessian_spec(self):
+    """Checks that specifying a non-positive definite inverse hessian fails."""
+    minimum = np.array([1.0, 1.0], dtype=np.float32)
+    scales = np.array([2.0, 3.0], dtype=np.float32)
+
+    @_make_val_and_grad_fn
+    def quadratic(x):
+      return tf.reduce_sum(scales * (x - minimum) ** 2)
+
+    start = tf.constant([0.6, 0.8])
+    bad_inv_hessian = tf.constant([[-2.0, 1.0], [1.0, -2.0]],
+                                  dtype=tf.float32)
+    with self.assertRaises(tf.errors.InvalidArgumentError):
+      self.evaluate(tfp.optimizer.bfgs_minimize(
+          quadratic, initial_position=start, tolerance=1e-8,
+          initial_inverse_hessian_estimate=bad_inv_hessian))
+
+  @test_util.run_in_graph_and_eager_modes
+  def test_asymmetric_inverse_hessian_spec(self):
+    """Checks that specifying a asymmetric inverse hessian fails."""
+    minimum = np.array([1.0, 1.0], dtype=np.float32)
+    scales = np.array([2.0, 3.0], dtype=np.float32)
+
+    @_make_val_and_grad_fn
+    def quadratic(x):
+      return tf.reduce_sum(scales * (x - minimum) ** 2)
+
+    start = tf.constant([0.6, 0.8])
+    bad_inv_hessian = tf.constant([[2.0, 0.0], [1.0, 2.0]],
+                                  dtype=tf.float32)
+    with self.assertRaises(tf.errors.InvalidArgumentError):
+      self.evaluate(tfp.optimizer.bfgs_minimize(
+          quadratic, initial_position=start, tolerance=1e-8,
+          initial_inverse_hessian_estimate=bad_inv_hessian))
+
+  @test_util.run_in_graph_and_eager_modes
   def test_quadratic_bowl_10d(self):
     """Can minimize a ten dimensional quadratic function."""
     dim = 10
     np.random.seed(14159)
     minimum = np.random.randn(dim)
     scales = np.exp(np.random.randn(dim))
-    def quadratic(x):
-      value = tf.reduce_sum(scales * (x - minimum) ** 2)
-      return value, tf.gradients(value, x)[0]
-    with self.test_session() as session:
-      start = tf.ones_like(minimum)
-      results = session.run(tfp.optimizer.bfgs_minimize(
-          quadratic, initial_position=start, tolerance=1e-8))
-      self.assertTrue(results.converged)
-      final_gradient = results.objective_gradient
-      final_gradient_norm = np.sqrt(np.sum(final_gradient * final_gradient))
-      self.assertTrue(final_gradient_norm <= 1e-8)
-      self.assertArrayNear(results.position, minimum, 1e-5)
 
+    @_make_val_and_grad_fn
+    def quadratic(x):
+      return tf.reduce_sum(scales * (x - minimum) ** 2)
+
+    start = tf.ones_like(minimum)
+    results = self.evaluate(tfp.optimizer.bfgs_minimize(
+        quadratic, initial_position=start, tolerance=1e-8))
+    self.assertTrue(results.converged)
+    final_gradient = results.objective_gradient
+    final_gradient_norm = _norm(final_gradient)
+    self.assertTrue(final_gradient_norm <= 1e-8)
+    self.assertArrayNear(results.position, minimum, 1e-5)
+
+  @test_util.run_in_graph_and_eager_modes
   def test_quadratic_with_skew(self):
     """Can minimize a general quadratic function."""
     dim = 3
@@ -93,23 +154,23 @@ class BfgsTest(tf.test.TestCase):
     principal_values = np.diag(np.exp(np.random.randn(dim)))
     rotation = special_ortho_group.rvs(dim)
     hessian = np.dot(np.transpose(rotation), np.dot(principal_values, rotation))
+
+    @_make_val_and_grad_fn
     def quadratic(x):
       y = x - minimum
       yp = tf.tensordot(hessian, y, axes=[1, 0])
-      value = tf.reduce_sum(y * yp) / 2
-      return value, tf.gradients(value, x)[0]
+      return tf.reduce_sum(y * yp) / 2
 
-    with self.test_session() as session:
-      start = tf.ones_like(minimum)
-      results = session.run(tfp.optimizer.bfgs_minimize(
-          quadratic, initial_position=start, tolerance=1e-8))
-      self.assertTrue(results.converged)
-      final_gradient = results.objective_gradient
-      final_gradient_norm = np.sqrt(np.sum(final_gradient * final_gradient))
-      print (final_gradient_norm)
-      self.assertTrue(final_gradient_norm <= 1e-8)
-      self.assertArrayNear(results.position, minimum, 1e-5)
+    start = tf.ones_like(minimum)
+    results = self.evaluate(tfp.optimizer.bfgs_minimize(
+        quadratic, initial_position=start, tolerance=1e-8))
+    self.assertTrue(results.converged)
+    final_gradient = results.objective_gradient
+    final_gradient_norm = _norm(final_gradient)
+    self.assertTrue(final_gradient_norm <= 1e-8)
+    self.assertArrayNear(results.position, minimum, 1e-5)
 
+  @test_util.run_in_graph_and_eager_modes
   def test_quadratic_with_strong_skew(self):
     """Can minimize a strongly skewed quadratic function."""
     np.random.seed(89793)
@@ -117,23 +178,24 @@ class BfgsTest(tf.test.TestCase):
     principal_values = np.diag(np.array([0.1, 2.0, 50.0]))
     rotation = special_ortho_group.rvs(3)
     hessian = np.dot(np.transpose(rotation), np.dot(principal_values, rotation))
+
+    @_make_val_and_grad_fn
     def quadratic(x):
       y = x - minimum
       yp = tf.tensordot(hessian, y, axes=[1, 0])
-      value = tf.reduce_sum(y * yp) / 2
-      return value, tf.gradients(value, x)[0]
+      return tf.reduce_sum(y * yp) / 2
 
-    with self.test_session() as session:
-      start = tf.ones_like(minimum)
-      results = session.run(tfp.optimizer.bfgs_minimize(
-          quadratic, initial_position=start, tolerance=1e-8))
-      self.assertTrue(results.converged)
-      final_gradient = results.objective_gradient
-      final_gradient_norm = np.sqrt(np.sum(final_gradient * final_gradient))
-      print (final_gradient_norm)
-      self.assertTrue(final_gradient_norm <= 1e-8)
-      self.assertArrayNear(results.position, minimum, 1e-5)
+    start = tf.ones_like(minimum)
+    results = self.evaluate(tfp.optimizer.bfgs_minimize(
+        quadratic, initial_position=start, tolerance=1e-8))
+    self.assertTrue(results.converged)
+    final_gradient = results.objective_gradient
+    final_gradient_norm = _norm(final_gradient)
+    print (final_gradient_norm)
+    self.assertTrue(final_gradient_norm <= 1e-8)
+    self.assertArrayNear(results.position, minimum, 1e-5)
 
+  @test_util.run_in_graph_and_eager_modes
   def test_rosenbrock_2d(self):
     """Tests BFGS on the Rosenbrock function.
 
@@ -162,19 +224,96 @@ class BfgsTest(tf.test.TestCase):
       dfy = 200 * (y - x**2)
       return fv, tf.stack([dfx, dfy])
 
-    with self.test_session() as session:
-      start = tf.constant([-1.2, 1.0])
-      results = session.run(tfp.optimizer.bfgs_minimize(
-          rosenbrock, initial_position=start, tolerance=1e-5))
-      self.assertTrue(results.converged)
-      final_gradient = results.objective_gradient
-      final_gradient_norm = np.sqrt(np.sum(final_gradient * final_gradient))
-      self.assertTrue(final_gradient_norm <= 1e-5)
-      self.assertArrayNear(results.position, np.array([1.0, 1.0]), 1e-5)
+    start = tf.constant([-1.2, 1.0])
+    results = self.evaluate(tfp.optimizer.bfgs_minimize(
+        rosenbrock, initial_position=start, tolerance=1e-5))
+    self.assertTrue(results.converged)
+    final_gradient = results.objective_gradient
+    final_gradient_norm = _norm(final_gradient)
+    self.assertTrue(final_gradient_norm <= 1e-5)
+    self.assertArrayNear(results.position, np.array([1.0, 1.0]), 1e-5)
 
+  # TODO(b/116767573): Also run in eager mode but as a separate test, otherwise
+  # it takes too long to run.
+  def test_himmelblau(self):
+    """Tests minimization on the Himmelblau's function.
+
+    Himmelblau's function is a standard optimization test case. The function is
+    given by:
+
+      f(x, y) = (x^2 + y - 11)^2 + (x + y^2 - 7)^2
+
+    The function has four minima located at (3, 2), (-2.805118, 3.131312),
+    (-3.779310, -3.283186), (3.584428, -1.848126).
+
+    All these minima may be reached from appropriate starting points.
+    """
+    @_make_val_and_grad_fn
+    def himmelblau(coord):
+      x, y = coord[0], coord[1]
+      return (x * x + y - 11) ** 2 + (x + y * y - 7) ** 2
+
+    starts_and_targets = [
+        # Start Point, Target Minimum, Num evaluations expected.
+        [(1, 1), (3, 2), 39],
+        [(-2, 2), (-2.805118, 3.131312), 31],
+        [(-1, -1), (-3.779310, -3.283186), 38],
+        [(1, -2), (3.584428, -1.848126), 35]
+    ]
+    dtype = "float64"
+    for start, expected_minima, expected_evals in starts_and_targets:
+      start = tf.constant(start, dtype=dtype)
+      results = self.evaluate(tfp.optimizer.bfgs_minimize(
+          himmelblau, initial_position=start, tolerance=1e-8))
+      print (results)
+      self.assertTrue(results.converged)
+      self.assertArrayNear(results.position,
+                           np.array(expected_minima, dtype=dtype),
+                           1e-5)
+      self.assertEqual(results.num_objective_evaluations, expected_evals)
+
+  @test_util.run_in_graph_and_eager_modes
+  def test_data_fitting(self):
+    """Tests MLE estimation for a simple geometric GLM."""
+    n, dim = 100, 3
+    dtype = tf.float64
+    np.random.seed(234095)
+    x = np.random.choice([0, 1], size=[dim, n])
+    s = 0.01 * np.sum(x, 0)
+    p = 1. / (1 + np.exp(-s))
+    y = np.random.geometric(p)
+    x_data = tf.convert_to_tensor(x, dtype=dtype)
+    y_data = tf.expand_dims(tf.convert_to_tensor(y, dtype=dtype), -1)
+
+    @_make_val_and_grad_fn
+    def neg_log_likelihood(state):
+      state_ext = tf.expand_dims(state, 0)
+      linear_part = tf.matmul(state_ext, x_data)
+      linear_part_ex = tf.stack([tf.zeros_like(linear_part),
+                                 linear_part], axis=0)
+      term1 = tf.squeeze(tf.matmul(
+          tf.reduce_logsumexp(linear_part_ex, axis=0), y_data), -1)
+      term2 = (0.5 * tf.reduce_sum(state_ext * state_ext, -1) -
+               tf.reduce_sum(linear_part, -1))
+      return  tf.squeeze(term1 + term2)
+
+    start = tf.ones(shape=[dim], dtype=dtype)
+
+    results = self.evaluate(tfp.optimizer.bfgs_minimize(
+        neg_log_likelihood, initial_position=start, tolerance=1e-6))
+    expected_minima = np.array(
+        [-0.020460034354, 0.171708568111, 0.021200423717], dtype="float64")
+    expected_evals = 27
+    self.assertArrayNear(results.position, expected_minima, 1e-6)
+    self.assertEqual(results.num_objective_evaluations, expected_evals)
+
+  # TODO(b/116767573): Also run in eager mode but as a separate test, otherwise
+  # it takes too long to run.
   def test_determinism(self):
     """Tests that the results are determinsitic."""
     dim = 5
+
+    @_make_val_and_grad_fn
     def rastrigin(x):
       """The value and gradient of the Rastrigin function.
 
@@ -194,18 +333,14 @@ class BfgsTest(tf.test.TestCase):
           gradient: A `Tensor` of shape [2] containing the gradient of the
             function along the two axes.
       """
-      value = tf.reduce_sum(x**2 - 10.0 * tf.cos(2 * np.pi * x)) + 10.0 * dim
-      gradient = tf.gradients(value, x)[0]
-      return value, gradient
+      return tf.reduce_sum(x**2 - 10.0 * tf.cos(2 * np.pi * x)) + 10.0 * dim
 
     start_position = np.random.rand(dim) * 2.0 * 5.12 - 5.12
 
     def get_results():
-      with self.test_session() as session:
-        start = tf.constant(start_position)
-        results = session.run(tfp.optimizer.bfgs_minimize(
-            rastrigin, initial_position=start, tolerance=1e-5))
-        return results
+      start = tf.constant(start_position)
+      return self.evaluate(tfp.optimizer.bfgs_minimize(
+          rastrigin, initial_position=start, tolerance=1e-5))
 
     res1, res2 = get_results(), get_results()
 
@@ -219,6 +354,28 @@ class BfgsTest(tf.test.TestCase):
     self.assertArrayNear(res1.objective_gradient, res2.objective_gradient, 1e-5)
     self.assertArrayNear(res1.inverse_hessian_estimate.reshape([-1]),
                          res2.inverse_hessian_estimate.reshape([-1]), 1e-5)
+
+  def test_dynamic_shapes(self):
+    """Can build a bfgs_op with dynamic shapes in graph mode."""
+    minimum = np.array([1.0, 1.0])
+    scales = np.array([2.0, 3.0])
+
+    @_make_val_and_grad_fn
+    def quadratic(x):
+      return tf.reduce_sum(scales * (x - minimum) ** 2)
+
+    # Test with a vector of unknown dimension, and a fully unknown shape.
+    for shape in ([None], None):
+      start = tf.placeholder(tf.float32, shape=shape)
+      bfgs_op = tfp.optimizer.bfgs_minimize(
+          quadratic, initial_position=start, tolerance=1e-8)
+      self.assertFalse(bfgs_op.position.shape.is_fully_defined())
+
+      with self.cached_session() as session:
+        results = session.run(bfgs_op, feed_dict={start: [0.6, 0.8]})
+      self.assertTrue(results.converged)
+      self.assertTrue(_norm(results.objective_gradient) <= 1e-8)
+      self.assertArrayNear(results.position, minimum, 1e-5)
 
 
 if __name__ == "__main__":

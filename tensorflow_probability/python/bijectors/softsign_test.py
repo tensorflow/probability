@@ -23,11 +23,11 @@ import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
+from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow.python.framework import test_util
-from tensorflow.python.ops.distributions.bijector_test_util import assert_bijective_and_finite
-from tensorflow.python.ops.distributions.bijector_test_util import assert_scalar_congruency
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class SoftsignBijectorTest(tf.test.TestCase):
   """Tests the correctness of the Y = g(X) = X / (1 + |X|) transformation."""
 
@@ -41,21 +41,18 @@ class SoftsignBijectorTest(tf.test.TestCase):
   def setUp(self):
     self._rng = np.random.RandomState(42)
 
-  @test_util.run_in_graph_and_eager_modes()
   def testBijectorBounds(self):
     bijector = tfb.Softsign(validate_args=True)
-    with self.test_session():
-      with self.assertRaisesOpError("greater than -1"):
-        self.evaluate(bijector.inverse(-3.))
-      with self.assertRaisesOpError("greater than -1"):
-        self.evaluate(bijector.inverse_log_det_jacobian(-3., event_ndims=0))
+    with self.assertRaisesOpError("greater than -1"):
+      self.evaluate(bijector.inverse(-3.))
+    with self.assertRaisesOpError("greater than -1"):
+      self.evaluate(bijector.inverse_log_det_jacobian(-3., event_ndims=0))
 
-      with self.assertRaisesOpError("less than 1"):
-        self.evaluate(bijector.inverse(3.))
-      with self.assertRaisesOpError("less than 1"):
-        self.evaluate(bijector.inverse_log_det_jacobian(3., event_ndims=0))
+    with self.assertRaisesOpError("less than 1"):
+      self.evaluate(bijector.inverse(3.))
+    with self.assertRaisesOpError("less than 1"):
+      self.evaluate(bijector.inverse_log_det_jacobian(3., event_ndims=0))
 
-  @test_util.run_in_graph_and_eager_modes()
   def testBijectorForwardInverse(self):
     bijector = tfb.Softsign(validate_args=True)
     self.assertEqual("softsign", bijector.name)
@@ -65,7 +62,6 @@ class SoftsignBijectorTest(tf.test.TestCase):
     self.assertAllClose(y, self.evaluate(bijector.forward(x)))
     self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
 
-  @test_util.run_in_graph_and_eager_modes()
   def testBijectorLogDetJacobianEventDimsZero(self):
     bijector = tfb.Softsign(validate_args=True)
     y = self._rng.rand(2, 10)
@@ -75,7 +71,6 @@ class SoftsignBijectorTest(tf.test.TestCase):
     self.assertAllClose(ildj, self.evaluate(
         bijector.inverse_log_det_jacobian(y, event_ndims=0)))
 
-  @test_util.run_in_graph_and_eager_modes()
   def testBijectorForwardInverseEventDimsOne(self):
     bijector = tfb.Softsign(validate_args=True)
     self.assertEqual("softsign", bijector.name)
@@ -84,7 +79,6 @@ class SoftsignBijectorTest(tf.test.TestCase):
     self.assertAllClose(y, self.evaluate(bijector.forward(x)))
     self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
 
-  @test_util.run_in_graph_and_eager_modes()
   def testBijectorLogDetJacobianEventDimsOne(self):
     bijector = tfb.Softsign(validate_args=True)
     y = self._rng.rand(2, 10)
@@ -95,17 +89,17 @@ class SoftsignBijectorTest(tf.test.TestCase):
             bijector.inverse_log_det_jacobian(y, event_ndims=1)))
 
   def testScalarCongruency(self):
-    with self.test_session():
-      bijector = tfb.Softsign(validate_args=True)
-      assert_scalar_congruency(bijector, lower_x=-20., upper_x=20.)
+    bijector = tfb.Softsign(validate_args=True)
+    bijector_test_util.assert_scalar_congruency(
+        bijector, lower_x=-20., upper_x=20., eval_func=self.evaluate)
 
   def testBijectiveAndFinite(self):
-    with self.test_session():
-      bijector = tfb.Softsign(validate_args=True)
-      x = np.linspace(-20., 20., 100).astype(np.float32)
-      y = np.linspace(-0.99, 0.99, 100).astype(np.float32)
-      assert_bijective_and_finite(
-          bijector, x, y, event_ndims=0, rtol=1e-3, atol=1e-3)
+    bijector = tfb.Softsign(validate_args=True)
+    x = np.linspace(-20., 20., 100).astype(np.float32)
+    y = np.linspace(-0.99, 0.99, 100).astype(np.float32)
+    bijector_test_util.assert_bijective_and_finite(
+        bijector, x, y, eval_func=self.evaluate, event_ndims=0, rtol=1e-3,
+        atol=1e-3)
 
 
 if __name__ == "__main__":

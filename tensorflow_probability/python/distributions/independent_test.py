@@ -25,7 +25,6 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow.python.framework import test_util
-from tensorflow.python.ops.distributions import bernoulli as bernoulli_lib
 
 
 def try_import(name):  # pylint: disable=invalid-name
@@ -51,7 +50,7 @@ class ProductDistributionTest(tf.test.TestCase):
     loc = np.float32([-1., 1])
     scale = np.float32([0.1, 0.5])
     ind = tfd.Independent(
-        distribution=tf.distributions.Normal(loc=loc, scale=scale),
+        distribution=tfd.Normal(loc=loc, scale=scale),
         reinterpreted_batch_ndims=1)
 
     x = ind.sample([4, 5], seed=42)
@@ -88,6 +87,20 @@ class ProductDistributionTest(tf.test.TestCase):
                                      scale[:, None]).logpdf(x_).sum(-1).sum(-1)
     self.assertAllClose(
         expected_log_prob_x, actual_log_prob_x, rtol=1e-6, atol=0.)
+
+  def testCdfMultivariate(self):
+    ind = tfd.Independent(
+        distribution=tfd.Normal(loc=tf.zeros([3]), scale=1.),
+        reinterpreted_batch_ndims=1)
+
+    cdfs = ind.cdf([[-50., 0., 0.], [0., 0., 0.], [50., 0., 0.], [50., 0., 50.],
+                    [50., 50., 50.]])
+    log_cdfs = ind.log_cdf([[0., 0., 0.], [50., 0., 0.], [50., 0., 50.],
+                            [50., 50., 50.]])
+    cdfs_, log_cdfs_ = self.evaluate([cdfs, log_cdfs])
+    self.assertAllClose([0, .5**3, .5**2, .5, 1.], cdfs_)
+    self.assertAllClose([np.log(.5) * 3, np.log(.5) * 2, np.log(.5), 0.],
+                        log_cdfs_)
 
   def testSampleConsistentStats(self):
     loc = np.float32([[-1., 1], [1, -1]])
@@ -134,20 +147,20 @@ class ProductDistributionTest(tf.test.TestCase):
 
   def testKLRaises(self):
     ind1 = tfd.Independent(
-        distribution=tf.distributions.Normal(
+        distribution=tfd.Normal(
             loc=np.float32([-1., 1]), scale=np.float32([0.1, 0.5])),
         reinterpreted_batch_ndims=1)
     ind2 = tfd.Independent(
-        distribution=tf.distributions.Normal(
+        distribution=tfd.Normal(
             loc=np.float32(-1), scale=np.float32(0.5)),
         reinterpreted_batch_ndims=0)
 
     with self.assertRaisesRegexp(
         ValueError, "Event shapes do not match"):
-      tf.distributions.kl_divergence(ind1, ind2)
+      tfd.kl_divergence(ind1, ind2)
 
     ind1 = tfd.Independent(
-        distribution=tf.distributions.Normal(
+        distribution=tfd.Normal(
             loc=np.float32([-1., 1]), scale=np.float32([0.1, 0.5])),
         reinterpreted_batch_ndims=1)
     ind2 = tfd.Independent(
@@ -157,37 +170,37 @@ class ProductDistributionTest(tf.test.TestCase):
 
     with self.assertRaisesRegexp(
         NotImplementedError, "different event shapes"):
-      tf.distributions.kl_divergence(ind1, ind2)
+      tfd.kl_divergence(ind1, ind2)
 
   def testKLScalarToMultivariate(self):
-    normal1 = tf.distributions.Normal(
+    normal1 = tfd.Normal(
         loc=np.float32([-1., 1]), scale=np.float32([0.1, 0.5]))
     ind1 = tfd.Independent(distribution=normal1, reinterpreted_batch_ndims=1)
 
-    normal2 = tf.distributions.Normal(
+    normal2 = tfd.Normal(
         loc=np.float32([-3., 3]), scale=np.float32([0.3, 0.3]))
     ind2 = tfd.Independent(distribution=normal2, reinterpreted_batch_ndims=1)
 
-    normal_kl = tf.distributions.kl_divergence(normal1, normal2)
-    ind_kl = tf.distributions.kl_divergence(ind1, ind2)
+    normal_kl = tfd.kl_divergence(normal1, normal2)
+    ind_kl = tfd.kl_divergence(ind1, ind2)
     self.assertAllClose(
         self.evaluate(tf.reduce_sum(normal_kl, axis=-1)), self.evaluate(ind_kl))
 
   def testKLIdentity(self):
-    normal1 = tf.distributions.Normal(
+    normal1 = tfd.Normal(
         loc=np.float32([-1., 1]), scale=np.float32([0.1, 0.5]))
     # This is functionally just a wrapper around normal1,
     # and doesn't change any outputs.
     ind1 = tfd.Independent(distribution=normal1, reinterpreted_batch_ndims=0)
 
-    normal2 = tf.distributions.Normal(
+    normal2 = tfd.Normal(
         loc=np.float32([-3., 3]), scale=np.float32([0.3, 0.3]))
     # This is functionally just a wrapper around normal2,
     # and doesn't change any outputs.
     ind2 = tfd.Independent(distribution=normal2, reinterpreted_batch_ndims=0)
 
-    normal_kl = tf.distributions.kl_divergence(normal1, normal2)
-    ind_kl = tf.distributions.kl_divergence(ind1, ind2)
+    normal_kl = tfd.kl_divergence(normal1, normal2)
+    ind_kl = tfd.kl_divergence(ind1, ind2)
     self.assertAllClose(
         self.evaluate(normal_kl), self.evaluate(ind_kl))
 
@@ -205,8 +218,8 @@ class ProductDistributionTest(tf.test.TestCase):
 
     ind2 = tfd.Independent(distribution=mvn2, reinterpreted_batch_ndims=2)
 
-    mvn_kl = tf.distributions.kl_divergence(mvn1, mvn2)
-    ind_kl = tf.distributions.kl_divergence(ind1, ind2)
+    mvn_kl = tfd.kl_divergence(mvn1, mvn2)
+    ind_kl = tfd.kl_divergence(ind1, ind2)
     self.assertAllClose(
         self.evaluate(tf.reduce_sum(mvn_kl, axis=[-1, -2])),
         self.evaluate(ind_kl))
@@ -224,7 +237,7 @@ class ProductDistributionTest(tf.test.TestCase):
     logits_ph = tf.placeholder_with_default(
         input=logits, shape=logits.shape if static_shape else None)
     ind = tfd.Independent(
-        distribution=bernoulli_lib.Bernoulli(logits=logits_ph))
+        distribution=tfd.Bernoulli(logits=logits_ph))
     x = ind.sample(sample_shape, seed=42)
     log_prob_x = ind.log_prob(x)
     [

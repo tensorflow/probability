@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.bijectors.ScaleTriL" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="bijectors"/>
 <meta itemprop="property" content="dtype"/>
 <meta itemprop="property" content="forward_min_event_ndims"/>
@@ -70,6 +71,38 @@ b = tfb.ScaleTriL(
      diag_shift=None)
 ```
 
+<h2 id="__init__"><code>__init__</code></h2>
+
+``` python
+__init__(
+    diag_bijector=None,
+    diag_shift=1e-05,
+    validate_args=False,
+    name='scale_tril'
+)
+```
+
+Instantiates the `ScaleTriL` bijector.
+
+#### Args:
+
+* <b>`diag_bijector`</b>: `Bijector` instance, used to transform the output diagonal
+    to be positive.
+    Default value: `None` (i.e., `tfb.Softplus()`).
+* <b>`diag_shift`</b>: Float value broadcastable and added to all diagonal entries
+    after applying the `diag_bijector`. Setting a positive
+    value forces the output diagonal entries to be positive, but
+    prevents inverting the transformation for matrices with
+    diagonal entries less than this value.
+    Default value: `1e-5` (i.e., no shift is applied).
+* <b>`validate_args`</b>: Python `bool` indicating whether arguments should be
+    checked for correctness.
+    Default value: `False` (i.e., arguments are not validated).
+* <b>`name`</b>: Python `str` name given to ops managed by this object.
+    Default value: `scale_tril`.
+
+
+
 ## Properties
 
 <h3 id="bijectors"><code>bijectors</code></h3>
@@ -114,36 +147,6 @@ Returns True if Tensor arguments will be validated.
 
 
 ## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
-
-``` python
-__init__(
-    diag_bijector=None,
-    diag_shift=1e-05,
-    validate_args=False,
-    name='scale_tril'
-)
-```
-
-Instantiates the `ScaleTriL` bijector.
-
-#### Args:
-
-* <b>`diag_bijector`</b>: `Bijector` instance, used to transform the output diagonal
-    to be positive.
-    Default value: `None` (i.e., `tfb.Softplus()`).
-* <b>`diag_shift`</b>: Float value broadcastable and added to all diagonal entries
-    after applying the `diag_bijector`. Setting a positive
-    value forces the output diagonal entries to be positive, but
-    prevents inverting the transformation for matrices with
-    diagonal entries less than this value.
-    Default value: `1e-5` (i.e., no shift is applied).
-* <b>`validate_args`</b>: Python `bool` indicating whether arguments should be
-    checked for correctness.
-    Default value: `False` (i.e., arguments are not validated).
-* <b>`name`</b>: Python `str` name given to ops managed by this object.
-    Default value: `scale_tril`.
 
 <h3 id="forward"><code>forward</code></h3>
 
@@ -235,8 +238,8 @@ Returns both the forward_log_det_jacobian.
 * <b>`event_ndims`</b>: Number of dimensions in the probabilistic events being
     transformed. Must be greater than or equal to
     `self.forward_min_event_ndims`. The result is summed over the final
-    dimensions to produce a scalar Jacobian determinant for each event,
-    i.e. it has shape `x.shape.ndims - event_ndims` dimensions.
+    dimensions to produce a scalar Jacobian determinant for each event, i.e.
+    it has shape `x.shape.ndims - event_ndims` dimensions.
 * <b>`name`</b>: The name to give this op.
 
 
@@ -351,8 +354,8 @@ evaluated at `g^{-1}(y)`.
 * <b>`event_ndims`</b>: Number of dimensions in the probabilistic events being
     transformed. Must be greater than or equal to
     `self.inverse_min_event_ndims`. The result is summed over the final
-    dimensions to produce a scalar Jacobian determinant for each event,
-    i.e. it has shape `y.shape.ndims - event_ndims` dimensions.
+    dimensions to produce a scalar Jacobian determinant for each event, i.e.
+    it has shape `y.shape.ndims - event_ndims` dimensions.
 * <b>`name`</b>: The name to give this op.
 
 

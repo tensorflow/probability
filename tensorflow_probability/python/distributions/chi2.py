@@ -19,7 +19,8 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from tensorflow.python.ops.distributions import gamma
+from tensorflow_probability.python.distributions import gamma
+from tensorflow_probability.python.internal import dtype_util
 
 
 __all__ = [
@@ -84,6 +85,10 @@ class Chi2(gamma.Gamma):
     # allow_nan_stats=True
     # through to the parent class results in unnecessary asserts.
     with tf.name_scope(name, values=[df]) as name:
+      df = tf.convert_to_tensor(
+          df,
+          name="df",
+          dtype=dtype_util.common_dtype([df], preferred_dtype=tf.float32))
       with tf.control_dependencies([
           tf.assert_positive(df),
       ] if validate_args else []):
@@ -91,7 +96,7 @@ class Chi2(gamma.Gamma):
 
       super(Chi2, self).__init__(
           concentration=0.5 * self._df,
-          rate=tf.constant(0.5, dtype=self._df.dtype),
+          rate=0.5,
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
           name=name)

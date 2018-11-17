@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions.RelaxedOneHotCategorical" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="allow_nan_stats"/>
 <meta itemprop="property" content="batch_shape"/>
 <meta itemprop="property" content="bijector"/>
@@ -111,6 +112,45 @@ Gumbel-Softmax. 2016.
 Chris J. Maddison, Andriy Mnih, and Yee Whye Teh. The Concrete Distribution:
 A Continuous Relaxation of Discrete Random Variables. 2016.
 
+<h2 id="__init__"><code>__init__</code></h2>
+
+``` python
+__init__(
+    temperature,
+    logits=None,
+    probs=None,
+    validate_args=False,
+    allow_nan_stats=True,
+    name='RelaxedOneHotCategorical'
+)
+```
+
+Initialize RelaxedOneHotCategorical using class log-probabilities.
+
+#### Args:
+
+* <b>`temperature`</b>: An 0-D `Tensor`, representing the temperature
+    of a set of RelaxedOneHotCategorical distributions. The temperature
+    should be positive.
+* <b>`logits`</b>: An N-D `Tensor`, `N >= 1`, representing the log probabilities
+    of a set of RelaxedOneHotCategorical distributions. The first
+    `N - 1` dimensions index into a batch of independent distributions and
+    the last dimension represents a vector of logits for each class. Only
+    one of `logits` or `probs` should be passed in.
+* <b>`probs`</b>: An N-D `Tensor`, `N >= 1`, representing the probabilities
+    of a set of RelaxedOneHotCategorical distributions. The first `N - 1`
+    dimensions index into a batch of independent distributions and the last
+    dimension represents a vector of probabilities for each class. Only one
+    of `logits` or `probs` should be passed in.
+* <b>`validate_args`</b>: Unused in this distribution.
+* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. If `False`, raise an
+    exception if a statistic (e.g. mean/mode/etc...) is undefined for any
+    batch member. If `True`, batch members with valid parameters leading to
+    undefined statistics will return NaN for this statistic.
+* <b>`name`</b>: A name for this distribution (optional).
+
+
+
 ## Properties
 
 <h3 id="allow_nan_stats"><code>allow_nan_stats</code></h3>
@@ -177,8 +217,7 @@ Dictionary of parameters used to instantiate this `Distribution`.
 Describes how samples from the distribution are reparameterized.
 
 Currently this is one of the static instances
-`distributions.FULLY_REPARAMETERIZED`
-or `distributions.NOT_REPARAMETERIZED`.
+`tfd.FULLY_REPARAMETERIZED` or `tfd.NOT_REPARAMETERIZED`.
 
 #### Returns:
 
@@ -191,46 +230,6 @@ Python `bool` indicating possibly expensive checks are enabled.
 
 
 ## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
-
-``` python
-__init__(
-    temperature,
-    logits=None,
-    probs=None,
-    dtype=None,
-    validate_args=False,
-    allow_nan_stats=True,
-    name='RelaxedOneHotCategorical'
-)
-```
-
-Initialize RelaxedOneHotCategorical using class log-probabilities.
-
-#### Args:
-
-* <b>`temperature`</b>: An 0-D `Tensor`, representing the temperature
-    of a set of RelaxedOneHotCategorical distributions. The temperature
-    should be positive.
-* <b>`logits`</b>: An N-D `Tensor`, `N >= 1`, representing the log probabilities
-    of a set of RelaxedOneHotCategorical distributions. The first
-    `N - 1` dimensions index into a batch of independent distributions and
-    the last dimension represents a vector of logits for each class. Only
-    one of `logits` or `probs` should be passed in.
-* <b>`probs`</b>: An N-D `Tensor`, `N >= 1`, representing the probabilities
-    of a set of RelaxedOneHotCategorical distributions. The first `N - 1`
-    dimensions index into a batch of independent distributions and the last
-    dimension represents a vector of probabilities for each class. Only one
-    of `logits` or `probs` should be passed in.
-* <b>`dtype`</b>: The type of the event samples (default: inferred from
-    logits/probs).
-* <b>`validate_args`</b>: Unused in this distribution.
-* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. If `False`, raise an
-    exception if a statistic (e.g. mean/mode/etc...) is undefined for any
-    batch member. If `True`, batch members with valid parameters leading to
-    undefined statistics will return NaN for this statistic.
-* <b>`name`</b>: A name for this distribution (optional).
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
 
@@ -371,7 +370,7 @@ where `F` denotes the support of the random variable `X ~ P`.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 
@@ -465,7 +464,7 @@ denotes (Shanon) cross entropy, and `H[.]` denotes (Shanon) entropy.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 

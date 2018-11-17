@@ -23,7 +23,6 @@ import tensorflow as tf
 
 from tensorflow.python.client import session as tf_session
 from tensorflow.python.framework import ops
-from tensorflow.python.framework import tensor_util
 
 __all__ = [
     "RandomVariable",
@@ -94,7 +93,7 @@ class RandomVariable(object):
     """Create a new random variable.
 
     Args:
-      distribution: tf.Distribution governing the distribution of the random
+      distribution: tfd.Distribution governing the distribution of the random
         variable, such as sampling and log-probabilities.
       sample_shape: tf.TensorShape of samples to draw from the random variable.
         Default is `()` corresponding to a single sample.
@@ -134,7 +133,7 @@ class RandomVariable(object):
   def sample_shape(self):
     """Sample shape of random variable as a `TensorShape`."""
     if isinstance(self._sample_shape, tf.Tensor):
-      return tf.TensorShape(tensor_util.constant_value(self._sample_shape))
+      return tf.TensorShape(tf.contrib.util.constant_value(self._sample_shape))
     return tf.TensorShape(self._sample_shape)
 
   def sample_shape_tensor(self, name="sample_shape_tensor"):

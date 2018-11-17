@@ -22,9 +22,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
-from tensorflow.python.layers import core as layers
-from tensorflow.python.ops import control_flow_ops
-from tensorflow.python.ops.distributions import bijector
+from tensorflow_probability.python.bijectors import bijector
 
 
 __all__ = [
@@ -52,11 +50,10 @@ class MaskedAutoregressiveFlow(bijector.Bijector):
   `shift_and_log_scale_fn`, `masked_autoregressive_default_template`, achieves
   this property by zeroing out weights in its `masked_dense` layers.
 
-  In the `tf.distributions` framework, a "normalizing flow" is implemented as a
-  `tfp.distributions.bijectors.Bijector`. The `forward` "autoregression"
-  is implemented using a `tf.while_loop` and a deep neural network (DNN) with
-  masked weights such that the autoregressive property is automatically met in
-  the `inverse`.
+  In TensorFlow Probability, "normalizing flows" are implemented as
+  `tfp.bijectors.Bijector`s. The `forward` "autoregression" is implemented
+  using a `tf.while_loop` and a deep neural network (DNN) with masked weights
+  such that the autoregressive property is automatically met in the `inverse`.
 
   A `TransformedDistribution` using `MaskedAutoregressiveFlow(...)` uses the
   (expensive) forward-mode calculation to draw samples and the (cheap)
@@ -260,7 +257,7 @@ class MaskedAutoregressiveFlow(bijector.Bijector):
       if shift is not None:
         y += shift
       return index + 1, y
-    _, y = control_flow_ops.while_loop(
+    _, y = tf.while_loop(
         cond=lambda index, _: index < event_size,
         body=_loop_body,
         loop_vars=(0, y0),
@@ -377,7 +374,7 @@ def masked_dense(inputs,
     return mask * kernel_initializer(shape, dtype, partition_info)
 
   with tf.name_scope(name, "masked_dense", [inputs, units, num_blocks]):
-    layer = layers.Dense(
+    layer = tf.layers.Dense(
         units,
         kernel_initializer=masked_initializer,
         kernel_constraint=lambda x: mask * x,

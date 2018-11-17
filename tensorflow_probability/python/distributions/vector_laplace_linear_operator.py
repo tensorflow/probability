@@ -23,9 +23,9 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python import bijectors
+from tensorflow_probability.python.distributions import laplace
+from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
-from tensorflow.python.ops.distributions import laplace
-from tensorflow.python.ops.distributions import transformed_distribution
 
 
 __all__ = [
@@ -198,7 +198,8 @@ class VectorLaplaceLinearOperator(
     with tf.name_scope(name, values=[loc] + scale.graph_parents):
       # Since expand_dims doesn't preserve constant-ness, we obtain the
       # non-dynamic value if possible.
-      loc = tf.convert_to_tensor(loc, name="loc") if loc is not None else loc
+      loc = loc if loc is None else tf.convert_to_tensor(
+          loc, name="loc", dtype=scale.dtype)
       batch_shape, event_shape = distribution_util.shapes_from_loc_and_scale(
           loc, scale)
 
@@ -244,7 +245,7 @@ class VectorLaplaceLinearOperator(
     if self.loc is None:
       return tf.zeros(shape, self.dtype)
 
-    if has_static_shape and shape == self.loc.get_shape():
+    if has_static_shape and shape == self.loc.shape:
       return tf.identity(self.loc)
 
     # Add dummy tensor of zeros to broadcast.  This is only necessary if shape

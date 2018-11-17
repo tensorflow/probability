@@ -42,6 +42,8 @@ toc:
       path: /probability/api_docs/python/tfp/bijectors/CholeskyToInvCholesky
     - title: ConditionalBijector
       path: /probability/api_docs/python/tfp/bijectors/ConditionalBijector
+    - title: DiscreteCosineTransform
+      path: /probability/api_docs/python/tfp/bijectors/DiscreteCosineTransform
     - title: Exp
       path: /probability/api_docs/python/tfp/bijectors/Exp
     - title: FillTriangular
@@ -64,6 +66,10 @@ toc:
       path: /probability/api_docs/python/tfp/bijectors/masked_dense
     - title: MatrixInverseTriL
       path: /probability/api_docs/python/tfp/bijectors/MatrixInverseTriL
+    - title: NormalCDF
+      path: /probability/api_docs/python/tfp/bijectors/NormalCDF
+    - title: Ordered
+      path: /probability/api_docs/python/tfp/bijectors/Ordered
     - title: Permute
       path: /probability/api_docs/python/tfp/bijectors/Permute
     - title: PowerTransform
@@ -160,6 +166,10 @@ toc:
       path: /probability/api_docs/python/tfp/distributions/GaussianProcessRegressionModel
     - title: Geometric
       path: /probability/api_docs/python/tfp/distributions/Geometric
+    - title: Gumbel
+      path: /probability/api_docs/python/tfp/distributions/Gumbel
+    - title: HalfCauchy
+      path: /probability/api_docs/python/tfp/distributions/HalfCauchy
     - title: HalfNormal
       path: /probability/api_docs/python/tfp/distributions/HalfNormal
     - title: Independent
@@ -168,6 +178,8 @@ toc:
       path: /probability/api_docs/python/tfp/distributions/InverseGamma
     - title: InverseGammaWithSoftplusConcentrationRate
       path: /probability/api_docs/python/tfp/distributions/InverseGammaWithSoftplusConcentrationRate
+    - title: InverseGaussian
+      path: /probability/api_docs/python/tfp/distributions/InverseGaussian
     - title: kl_divergence
       path: /probability/api_docs/python/tfp/distributions/kl_divergence
     - title: Kumaraswamy
@@ -206,6 +218,8 @@ toc:
       path: /probability/api_docs/python/tfp/distributions/MultivariateNormalLinearOperator
     - title: MultivariateNormalTriL
       path: /probability/api_docs/python/tfp/distributions/MultivariateNormalTriL
+    - title: MultivariateStudentTLinearOperator
+      path: /probability/api_docs/python/tfp/distributions/MultivariateStudentTLinearOperator
     - title: NegativeBinomial
       path: /probability/api_docs/python/tfp/distributions/NegativeBinomial
     - title: Normal
@@ -218,6 +232,8 @@ toc:
       path: /probability/api_docs/python/tfp/distributions/normal_conjugates_known_scale_predictive
     - title: OneHotCategorical
       path: /probability/api_docs/python/tfp/distributions/OneHotCategorical
+    - title: Pareto
+      path: /probability/api_docs/python/tfp/distributions/Pareto
     - title: percentile
       path: /probability/api_docs/python/tfp/distributions/percentile
     - title: Poisson
@@ -256,6 +272,8 @@ toc:
       path: /probability/api_docs/python/tfp/distributions/StudentTWithAbsDfSoftplusScale
     - title: TransformedDistribution
       path: /probability/api_docs/python/tfp/distributions/TransformedDistribution
+    - title: Triangular
+      path: /probability/api_docs/python/tfp/distributions/Triangular
     - title: tridiag
       path: /probability/api_docs/python/tfp/distributions/tridiag
     - title: TruncatedNormal
@@ -272,10 +290,14 @@ toc:
       path: /probability/api_docs/python/tfp/distributions/VectorLaplaceDiag
     - title: VectorSinhArcsinhDiag
       path: /probability/api_docs/python/tfp/distributions/VectorSinhArcsinhDiag
+    - title: VonMises
+      path: /probability/api_docs/python/tfp/distributions/VonMises
     - title: VonMisesFisher
       path: /probability/api_docs/python/tfp/distributions/VonMisesFisher
     - title: Wishart
       path: /probability/api_docs/python/tfp/distributions/Wishart
+    - title: Zipf
+      path: /probability/api_docs/python/tfp/distributions/Zipf
   - title: tfp.edward2
     section:
     - title: Overview
@@ -312,12 +334,14 @@ toc:
       path: /probability/api_docs/python/tfp/edward2/Gamma
     - title: Geometric
       path: /probability/api_docs/python/tfp/edward2/Geometric
-    - title: get_interceptor
-      path: /probability/api_docs/python/tfp/edward2/get_interceptor
+    - title: get_next_interceptor
+      path: /probability/api_docs/python/tfp/edward2/get_next_interceptor
     - title: HalfNormal
       path: /probability/api_docs/python/tfp/edward2/HalfNormal
     - title: Independent
       path: /probability/api_docs/python/tfp/edward2/Independent
+    - title: interceptable
+      path: /probability/api_docs/python/tfp/edward2/interceptable
     - title: interception
       path: /probability/api_docs/python/tfp/edward2/interception
     - title: InverseGamma
@@ -364,6 +388,8 @@ toc:
       path: /probability/api_docs/python/tfp/edward2/SinhArcsinh
     - title: StudentT
       path: /probability/api_docs/python/tfp/edward2/StudentT
+    - title: tape
+      path: /probability/api_docs/python/tfp/edward2/tape
     - title: TransformedDistribution
       path: /probability/api_docs/python/tfp/edward2/TransformedDistribution
     - title: Uniform
@@ -398,6 +424,10 @@ toc:
       path: /probability/api_docs/python/tfp/glm/fit
     - title: fit_one_step
       path: /probability/api_docs/python/tfp/glm/fit_one_step
+    - title: fit_sparse
+      path: /probability/api_docs/python/tfp/glm/fit_sparse
+    - title: fit_sparse_one_step
+      path: /probability/api_docs/python/tfp/glm/fit_sparse_one_step
     - title: GammaExp
       path: /probability/api_docs/python/tfp/glm/GammaExp
     - title: GammaSoftplus
@@ -414,6 +444,8 @@ toc:
       path: /probability/api_docs/python/tfp/glm/Poisson
     - title: PoissonSoftplus
       path: /probability/api_docs/python/tfp/glm/PoissonSoftplus
+    - title: soft_threshold
+      path: /probability/api_docs/python/tfp/glm/soft_threshold
   - title: tfp.layers
     section:
     - title: Overview
@@ -446,8 +478,12 @@ toc:
     section:
     - title: Overview
       path: /probability/api_docs/python/tfp/math
+    - title: custom_gradient
+      path: /probability/api_docs/python/tfp/math/custom_gradient
     - title: diag_jacobian
       path: /probability/api_docs/python/tfp/math/diag_jacobian
+    - title: log1psquare
+      path: /probability/api_docs/python/tfp/math/log1psquare
     - title: matvecmul
       path: /probability/api_docs/python/tfp/math/matvecmul
     - title: pinv
@@ -542,6 +578,24 @@ toc:
       path: /probability/api_docs/python/tfp/positive_semidefinite_kernels/MaternThreeHalves
     - title: PositiveSemidefiniteKernel
       path: /probability/api_docs/python/tfp/positive_semidefinite_kernels/PositiveSemidefiniteKernel
+  - title: tfp.sts
+    section:
+    - title: Overview
+      path: /probability/api_docs/python/tfp/sts
+    - title: AdditiveStateSpaceModel
+      path: /probability/api_docs/python/tfp/sts/AdditiveStateSpaceModel
+    - title: LocalLinearTrend
+      path: /probability/api_docs/python/tfp/sts/LocalLinearTrend
+    - title: LocalLinearTrendStateSpaceModel
+      path: /probability/api_docs/python/tfp/sts/LocalLinearTrendStateSpaceModel
+    - title: Seasonal
+      path: /probability/api_docs/python/tfp/sts/Seasonal
+    - title: SeasonalStateSpaceModel
+      path: /probability/api_docs/python/tfp/sts/SeasonalStateSpaceModel
+    - title: StructuralTimeSeries
+      path: /probability/api_docs/python/tfp/sts/StructuralTimeSeries
+    - title: Sum
+      path: /probability/api_docs/python/tfp/sts/Sum
   - title: tfp.trainable_distributions
     section:
     - title: Overview

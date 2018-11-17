@@ -20,68 +20,63 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python import distributions as tfd
 
-from tensorflow.python.ops.distributions import gamma as gamma_lib
-from tensorflow.python.ops.distributions import transformed_distribution as transformed_distribution_lib
-from tensorflow.python.ops.distributions.bijector_test_util import assert_scalar_congruency
+from tensorflow_probability.python.bijectors import bijector_test_util
 
 
 class InvertBijectorTest(tf.test.TestCase):
   """Tests the correctness of the Y = Invert(bij) transformation."""
 
   def testBijector(self):
-    with self.test_session():
-      for fwd in [
-          tfb.Identity(),
-          tfb.Exp(),
-          tfb.Affine(shift=[0., 1.], scale_diag=[2., 3.]),
-          tfb.Softplus(),
-          tfb.SoftmaxCentered(),
-      ]:
-        rev = tfb.Invert(fwd)
-        self.assertEqual("_".join(["invert", fwd.name]), rev.name)
-        x = [[[1., 2.],
-              [2., 3.]]]
-        self.assertAllClose(
-            self.evaluate(fwd.inverse(x)), self.evaluate(rev.forward(x)))
-        self.assertAllClose(
-            self.evaluate(fwd.forward(x)), self.evaluate(rev.inverse(x)))
-        self.assertAllClose(
-            self.evaluate(fwd.forward_log_det_jacobian(x, event_ndims=1)),
-            self.evaluate(rev.inverse_log_det_jacobian(x, event_ndims=1)))
-        self.assertAllClose(
-            self.evaluate(fwd.inverse_log_det_jacobian(x, event_ndims=1)),
-            self.evaluate(rev.forward_log_det_jacobian(x, event_ndims=1)))
+    for fwd in [
+        tfb.Identity(),
+        tfb.Exp(),
+        tfb.Affine(shift=[0., 1.], scale_diag=[2., 3.]),
+        tfb.Softplus(),
+        tfb.SoftmaxCentered(),
+    ]:
+      rev = tfb.Invert(fwd)
+      self.assertEqual("_".join(["invert", fwd.name]), rev.name)
+      x = [[[1., 2.],
+            [2., 3.]]]
+      self.assertAllClose(
+          self.evaluate(fwd.inverse(x)), self.evaluate(rev.forward(x)))
+      self.assertAllClose(
+          self.evaluate(fwd.forward(x)), self.evaluate(rev.inverse(x)))
+      self.assertAllClose(
+          self.evaluate(fwd.forward_log_det_jacobian(x, event_ndims=1)),
+          self.evaluate(rev.inverse_log_det_jacobian(x, event_ndims=1)))
+      self.assertAllClose(
+          self.evaluate(fwd.inverse_log_det_jacobian(x, event_ndims=1)),
+          self.evaluate(rev.forward_log_det_jacobian(x, event_ndims=1)))
 
   def testScalarCongruency(self):
-    with self.test_session():
-      bijector = tfb.Invert(tfb.Exp())
-      assert_scalar_congruency(
-          bijector, lower_x=1e-3, upper_x=1.5, rtol=0.05)
+    bijector = tfb.Invert(tfb.Exp())
+    bijector_test_util.assert_scalar_congruency(
+        bijector, lower_x=1e-3, upper_x=1.5, eval_func=self.evaluate, rtol=0.05)
 
   def testShapeGetters(self):
-    with self.test_session():
-      bijector = tfb.Invert(
-          tfb.SoftmaxCentered(validate_args=True))
-      x = tf.TensorShape([2])
-      y = tf.TensorShape([1])
-      self.assertAllEqual(y, bijector.forward_event_shape(x))
-      self.assertAllEqual(
-          y.as_list(),
-          self.evaluate(bijector.forward_event_shape_tensor(x.as_list())))
-      self.assertAllEqual(x, bijector.inverse_event_shape(y))
-      self.assertAllEqual(
-          x.as_list(),
-          self.evaluate(bijector.inverse_event_shape_tensor(y.as_list())))
+    bijector = tfb.Invert(
+        tfb.SoftmaxCentered(validate_args=True))
+    x = tf.TensorShape([2])
+    y = tf.TensorShape([1])
+    self.assertAllEqual(y, bijector.forward_event_shape(x))
+    self.assertAllEqual(
+        y.as_list(),
+        self.evaluate(bijector.forward_event_shape_tensor(x.as_list())))
+    self.assertAllEqual(x, bijector.inverse_event_shape(y))
+    self.assertAllEqual(
+        x.as_list(),
+        self.evaluate(bijector.inverse_event_shape_tensor(y.as_list())))
 
   def testDocstringExample(self):
-    with self.test_session():
-      exp_gamma_distribution = (
-          transformed_distribution_lib.TransformedDistribution(
-              distribution=gamma_lib.Gamma(concentration=1., rate=2.),
-              bijector=tfb.Invert(tfb.Exp())))
-      self.assertAllEqual(
-          [], self.evaluate(tf.shape(exp_gamma_distribution.sample())))
+    exp_gamma_distribution = (
+        tfd.TransformedDistribution(
+            distribution=tfd.Gamma(concentration=1., rate=2.),
+            bijector=tfb.Invert(tfb.Exp())))
+    self.assertAllEqual(
+        [], self.evaluate(tf.shape(exp_gamma_distribution.sample())))
 
 
 if __name__ == "__main__":

@@ -24,44 +24,44 @@ from scipy import special
 import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
-from tensorflow.python.ops.distributions.bijector_test_util import assert_bijective_and_finite
-from tensorflow.python.ops.distributions.bijector_test_util import assert_scalar_congruency
+from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow.python.framework import test_util
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class SigmoidBijectorTest(tf.test.TestCase):
   """Tests correctness of the Y = g(X) = (1 + exp(-X))^-1 transformation."""
 
   def testBijector(self):
-    with self.test_session():
-      self.assertEqual("sigmoid", tfb.Sigmoid().name)
-      x = np.linspace(-10., 10., 100).reshape([2, 5, 10]).astype(np.float32)
-      y = special.expit(x)
-      ildj = -np.log(y) - np.log1p(-y)
-      bijector = tfb.Sigmoid()
-      self.assertAllClose(
-          y, self.evaluate(bijector.forward(x)), atol=0., rtol=1e-2)
-      self.assertAllClose(
-          x, self.evaluate(bijector.inverse(y)), atol=0., rtol=1e-4)
-      self.assertAllClose(
-          ildj,
-          self.evaluate(bijector.inverse_log_det_jacobian(
-              y, event_ndims=0)), atol=0., rtol=1e-6)
-      self.assertAllClose(
-          -ildj,
-          self.evaluate(bijector.forward_log_det_jacobian(
-              x, event_ndims=0)), atol=0., rtol=1e-4)
+    self.assertEqual("sigmoid", tfb.Sigmoid().name)
+    x = np.linspace(-10., 10., 100).reshape([2, 5, 10]).astype(np.float32)
+    y = special.expit(x)
+    ildj = -np.log(y) - np.log1p(-y)
+    bijector = tfb.Sigmoid()
+    self.assertAllClose(
+        y, self.evaluate(bijector.forward(x)), atol=0., rtol=1e-2)
+    self.assertAllClose(
+        x, self.evaluate(bijector.inverse(y)), atol=0., rtol=1e-4)
+    self.assertAllClose(
+        ildj,
+        self.evaluate(bijector.inverse_log_det_jacobian(
+            y, event_ndims=0)), atol=0., rtol=1e-6)
+    self.assertAllClose(
+        -ildj,
+        self.evaluate(bijector.forward_log_det_jacobian(
+            x, event_ndims=0)), atol=0., rtol=1e-4)
 
   def testScalarCongruency(self):
-    with self.test_session():
-      assert_scalar_congruency(tfb.Sigmoid(), lower_x=-7., upper_x=7.)
+    bijector_test_util.assert_scalar_congruency(
+        tfb.Sigmoid(), lower_x=-7., upper_x=7., eval_func=self.evaluate)
 
   def testBijectiveAndFinite(self):
-    with self.test_session():
-      x = np.linspace(-7., 7., 100).astype(np.float32)
-      eps = 1e-3
-      y = np.linspace(eps, 1. - eps, 100).astype(np.float32)
-      assert_bijective_and_finite(
-          tfb.Sigmoid(), x, y, event_ndims=0, atol=0., rtol=1e-4)
+    x = np.linspace(-7., 7., 100).astype(np.float32)
+    eps = 1e-3
+    y = np.linspace(eps, 1. - eps, 100).astype(np.float32)
+    bijector_test_util.assert_bijective_and_finite(
+        tfb.Sigmoid(), x, y, eval_func=self.evaluate, event_ndims=0, atol=0.,
+        rtol=1e-4)
 
 
 if __name__ == "__main__":

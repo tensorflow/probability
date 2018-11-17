@@ -104,7 +104,7 @@ def make_log_joint_fn(model):
       log_probs.append(log_prob)
       return rv
 
-    model_kwargs = _get_function_inputs(model, **kwargs)
+    model_kwargs = _get_function_inputs(model, kwargs)
     with interception(interceptor):
       model(*args, **model_kwargs)
     log_prob = sum(log_probs)
@@ -112,15 +112,16 @@ def make_log_joint_fn(model):
   return log_joint_fn
 
 
-def _get_function_inputs(f, **kwargs):
+def _get_function_inputs(f, src_kwargs):
   """Filters inputs to be compatible with function `f`'s signature.
 
   Args:
     f: Function according to whose input signature we filter arguments.
-    **kwargs: Keyword arguments to filter according to `f`.
+    src_kwargs: Keyword arguments to filter according to `f`.
 
   Returns:
-    Dict of key-value pairs in `kwargs` which exist in `f`'s signature.
+    kwargs: Dict of key-value pairs in `src_kwargs` which exist in `f`'s
+      signature.
   """
   if hasattr(f, "_func"):  # functions returned by tf.make_template
     f = f._func  # pylint: disable=protected-access
@@ -130,5 +131,5 @@ def _get_function_inputs(f, **kwargs):
   except AttributeError:
     argspec = inspect.getargspec(f)
 
-  fkwargs = {k: v for k, v in six.iteritems(kwargs) if k in argspec.args}
+  fkwargs = {k: v for k, v in six.iteritems(src_kwargs) if k in argspec.args}
   return fkwargs

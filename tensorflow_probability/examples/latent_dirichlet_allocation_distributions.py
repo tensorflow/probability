@@ -171,7 +171,7 @@ def make_encoder(activation, num_topics, layer_sizes):
 
   Returns:
     encoder: A `callable` mapping a bag-of-words `Tensor` to a
-      `tf.distributions.Distribution` instance over topics.
+      `tfd.Distribution` instance over topics.
   """
   encoder_net = tf.keras.Sequential()
   for num_hidden_units in layer_sizes:
@@ -199,7 +199,7 @@ def make_decoder(num_topics, num_words):
 
   Returns:
     decoder: A `callable` mapping a `Tensor` of encodings to a
-      `tf.distributions.Distribution` instance over words.
+      `tfd.Distribution` instance over words.
   """
   topics_words_logits = tf.get_variable(
       "topics_words_logits", shape=[num_topics, num_words],

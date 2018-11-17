@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions.DirichletMultinomial" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="allow_nan_stats"/>
 <meta itemprop="property" content="batch_shape"/>
 <meta itemprop="property" content="concentration"/>
@@ -150,6 +151,43 @@ counts = [2., 1., 0.]
 dist.prob(counts)  # Shape [2]
 ```
 
+<h2 id="__init__"><code>__init__</code></h2>
+
+``` python
+__init__(
+    total_count,
+    concentration,
+    validate_args=False,
+    allow_nan_stats=True,
+    name='DirichletMultinomial'
+)
+```
+
+Initialize a batch of DirichletMultinomial distributions.
+
+#### Args:
+
+* <b>`total_count`</b>:  Non-negative floating point tensor, whose dtype is the same
+    as `concentration`. The shape is broadcastable to `[N1,..., Nm]` with
+    `m >= 0`. Defines this as a batch of `N1 x ... x Nm` different
+    Dirichlet multinomial distributions. Its components should be equal to
+    integer values.
+* <b>`concentration`</b>: Positive floating point tensor, whose dtype is the
+    same as `n` with shape broadcastable to `[N1,..., Nm, K]` `m >= 0`.
+    Defines this as a batch of `N1 x ... x Nm` different `K` class Dirichlet
+    multinomial distributions.
+* <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
+    parameters are checked for validity despite possibly degrading runtime
+    performance. When `False` invalid inputs may silently render incorrect
+    outputs.
+* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
+    (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
+    result is undefined. When `False`, an exception is raised if one or
+    more of the statistic's batch members are undefined.
+* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
+
+
+
 ## Properties
 
 <h3 id="allow_nan_stats"><code>allow_nan_stats</code></h3>
@@ -212,8 +250,7 @@ Dictionary of parameters used to instantiate this `Distribution`.
 Describes how samples from the distribution are reparameterized.
 
 Currently this is one of the static instances
-`distributions.FULLY_REPARAMETERIZED`
-or `distributions.NOT_REPARAMETERIZED`.
+`tfd.FULLY_REPARAMETERIZED` or `tfd.NOT_REPARAMETERIZED`.
 
 #### Returns:
 
@@ -234,41 +271,6 @@ Python `bool` indicating possibly expensive checks are enabled.
 
 
 ## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
-
-``` python
-__init__(
-    total_count,
-    concentration,
-    validate_args=False,
-    allow_nan_stats=True,
-    name='DirichletMultinomial'
-)
-```
-
-Initialize a batch of DirichletMultinomial distributions.
-
-#### Args:
-
-* <b>`total_count`</b>:  Non-negative floating point tensor, whose dtype is the same
-    as `concentration`. The shape is broadcastable to `[N1,..., Nm]` with
-    `m >= 0`. Defines this as a batch of `N1 x ... x Nm` different
-    Dirichlet multinomial distributions. Its components should be equal to
-    integer values.
-* <b>`concentration`</b>: Positive floating point tensor, whose dtype is the
-    same as `n` with shape broadcastable to `[N1,..., Nm, K]` `m >= 0`.
-    Defines this as a batch of `N1 x ... x Nm` different `K` class Dirichlet
-    multinomial distributions.
-* <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
-    parameters are checked for validity despite possibly degrading runtime
-    performance. When `False` invalid inputs may silently render incorrect
-    outputs.
-* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
-    (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
-    result is undefined. When `False`, an exception is raised if one or
-    more of the statistic's batch members are undefined.
-* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
 
@@ -429,7 +431,7 @@ where `F` denotes the support of the random variable `X ~ P`.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 
@@ -523,7 +525,7 @@ denotes (Shanon) cross entropy, and `H[.]` denotes (Shanon) entropy.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 

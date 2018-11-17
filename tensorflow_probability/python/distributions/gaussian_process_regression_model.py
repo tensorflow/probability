@@ -19,10 +19,10 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.distributions import mvn_linear_operator
+from tensorflow_probability.python.internal import dtype_util
 
 __all__ = [
     'GaussianProcessRegressionModel',
@@ -407,8 +407,12 @@ class GaussianProcessRegressionModel(
     """
     parameters = dict(locals())
     with tf.name_scope(name) as name:
-      index_points = tf.convert_to_tensor(index_points, name='index_points')
-      dtype = index_points.dtype.as_numpy_dtype
+      dtype = dtype_util.common_dtype([
+          index_points, observation_index_points, observations,
+          observation_noise_variance, predictive_noise_variance, jitter
+      ], tf.float32)
+      index_points = tf.convert_to_tensor(
+          index_points, name='index_points', dtype=dtype)
       observation_index_points = (
           None if observation_index_points is None else
           tf.convert_to_tensor(observation_index_points,
@@ -434,7 +438,7 @@ class GaussianProcessRegressionModel(
       # Default to a constant zero function, borrowing the dtype from
       # index_points to ensure consistency.
       if mean_fn is None:
-        mean_fn = lambda x: np.array([0.], dtype)
+        mean_fn = lambda x: tf.zeros([1], dtype=dtype)
       else:
         if not callable(mean_fn):
           raise ValueError('`mean_fn` must be a Python callable')
@@ -525,12 +529,13 @@ class GaussianProcessRegressionModel(
 
     # k_tx @ inv(k_xx + vI) @ (y - m(x))
     # = k_tx @ inv(chol(k_xx + vI)^t) @ inv(chol(k_xx + vI)) @ (y - m(t))
-    loc = k_tx_linop.matvec(
-        chol_k_xx_plus_noise.solvevec(
-            adjoint=True,
-            rhs=chol_k_xx_plus_noise.solvevec(
-                self.observations -
-                self._mean_fn(self.observation_index_points))))
+    loc = (self._mean_fn(self.index_points) +
+           k_tx_linop.matvec(
+               chol_k_xx_plus_noise.solvevec(
+                   adjoint=True,
+                   rhs=chol_k_xx_plus_noise.solvevec(
+                       self.observations -
+                       self._mean_fn(self.observation_index_points)))))
 
     # k_tt - k_tx @ inv(k_xx + vI) @ k_xt + vI
     # = k_tt - k_tx @ inv(chol(k_xx + vI)^t) @ inv(chol(k_xx + vI)) @ k_xt + vI
@@ -576,16 +581,6 @@ class GaussianProcessRegressionModel(
         # Re-raise with our own more contextual error message.
         raise ValueError(msg[:-1] + ': {} and {}, respectively.'.format(
             index_point_count, observation_count))
-    else:
-      if self._validate_args:
-        # Instead of an assertion of broadcastability, we simply append an op
-        # to dynamically broadcast the two shapes; if this fails, the shapes
-        # must not be broadcastable.
-        broadcast_op = tf.broadcast_dynamic_shape(
-            tf.shape(self.observation_index_points)[:-ndims],
-            tf.shape(self.observations),
-            name='check_that_index_points_and_observation_shapes_broadcast')
-        assertions.append(broadcast_op)
     return assertions
 
   @property

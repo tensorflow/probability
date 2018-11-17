@@ -23,7 +23,6 @@ import tensorflow as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import positive_semidefinite_kernels as psd_kernels
 
-from tensorflow.python.framework import tensor_util
 from tensorflow.python.framework import test_util
 
 
@@ -132,8 +131,10 @@ class _GaussianProcessRegressionModelTest(object):
 
     mean_fn = lambda x: x[:, 0]**2
     prior_mean = mean_fn(observation_index_points)
-    expected_mean = np.dot(
-        k_xn_, np.linalg.solve(k_nn_plus_noise_, observations - prior_mean))
+    expected_mean = (
+        mean_fn(index_points) +
+        np.dot(k_xn_,
+               np.linalg.solve(k_nn_plus_noise_, observations - prior_mean)))
 
     kernel = psd_kernels.ExponentiatedQuadratic(amp, len_scale)
     gprm = tfd.GaussianProcessRegressionModel(
@@ -240,23 +241,15 @@ class _GaussianProcessRegressionModelTest(object):
           mean_fn=0.)
 
     # Observation index point and observation counts must be broadcastable.
-    if self.is_static or tf.executing_eagerly:
+    # Errors based on conditions of dynamic shape in graph mode cannot be
+    # caught, so we only check this error case in static shape or eager mode.
+    if self.is_static or tf.executing_eagerly():
       with self.assertRaises(ValueError):
         tfd.GaussianProcessRegressionModel(
             kernel,
             index_points,
             observation_index_points=np.ones([2, 2, 2]),
             observations=np.ones([5, 5]))
-    else:
-      gprm = tfd.GaussianProcessRegressionModel(
-          kernel,
-          index_points,
-          observation_index_points=tf.placeholder_with_default(
-              np.ones([2, 2, 2]), shape=None),
-          observations=tf.placeholder_with_default(
-              np.ones([5, 5]), shape=None))
-      with self.assertRaises(ValueError):
-        self.evaluate(gprm.event_shape_tensor())
 
   def testCopy(self):
     # 5 random index points in R^2
@@ -313,8 +306,8 @@ class _GaussianProcessRegressionModelTest(object):
       self.assertAllEqual(gprm2.event_shape, event_shape_2)
       self.assertAllEqual(gprm1.index_points, index_points_1)
       self.assertAllEqual(gprm2.index_points, index_points_2)
-      self.assertAllEqual(tensor_util.constant_value(gprm1.jitter),
-                          tensor_util.constant_value(gprm2.jitter))
+      self.assertAllEqual(tf.contrib.util.constant_value(gprm1.jitter),
+                          tf.contrib.util.constant_value(gprm2.jitter))
     else:
       self.assertAllEqual(self.evaluate(gprm1.batch_shape_tensor()),
                           self.evaluate(gprm2.batch_shape_tensor()))

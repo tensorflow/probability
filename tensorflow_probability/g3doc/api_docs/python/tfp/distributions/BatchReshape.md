@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions.BatchReshape" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="allow_nan_stats"/>
 <meta itemprop="property" content="batch_shape"/>
 <meta itemprop="property" content="distribution"/>
@@ -74,6 +75,48 @@ reshape_mvn.log_prob(x).shape
 # ==> [4, 5, 1, 2, 3] == sample_shape + new_batch_shape
 ```
 
+<h2 id="__init__"><code>__init__</code></h2>
+
+``` python
+__init__(
+    distribution,
+    batch_shape,
+    validate_args=False,
+    allow_nan_stats=True,
+    name=None
+)
+```
+
+Construct BatchReshape distribution.
+
+#### Args:
+
+* <b>`distribution`</b>: The base distribution instance to reshape. Typically an
+    instance of `Distribution`.
+* <b>`batch_shape`</b>: Positive `int`-like vector-shaped `Tensor` representing
+    the new shape of the batch dimensions. Up to one dimension may contain
+    `-1`, meaning the remainder of the batch size.
+* <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
+    parameters are checked for validity despite possibly degrading runtime
+    performance. When `False` invalid inputs may silently render incorrect
+    outputs.
+* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
+    (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
+    result is undefined. When `False`, an exception is raised if one or
+    more of the statistic's batch members are undefined.
+* <b>`name`</b>: The name to give Ops created by the initializer.
+    Default value: `"BatchReshape" + distribution.name`.
+
+
+#### Raises:
+
+* <b>`ValueError`</b>: if `batch_shape` is not a vector.
+* <b>`ValueError`</b>: if `batch_shape` has non-positive elements.
+* <b>`ValueError`</b>: if `batch_shape` size is not the same as a
+    `distribution.batch_shape` size.
+
+
+
 ## Properties
 
 <h3 id="allow_nan_stats"><code>allow_nan_stats</code></h3>
@@ -136,8 +179,7 @@ Dictionary of parameters used to instantiate this `Distribution`.
 Describes how samples from the distribution are reparameterized.
 
 Currently this is one of the static instances
-`distributions.FULLY_REPARAMETERIZED`
-or `distributions.NOT_REPARAMETERIZED`.
+`tfd.FULLY_REPARAMETERIZED` or `tfd.NOT_REPARAMETERIZED`.
 
 #### Returns:
 
@@ -150,46 +192,6 @@ Python `bool` indicating possibly expensive checks are enabled.
 
 
 ## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
-
-``` python
-__init__(
-    distribution,
-    batch_shape,
-    validate_args=False,
-    allow_nan_stats=True,
-    name=None
-)
-```
-
-Construct BatchReshape distribution.
-
-#### Args:
-
-* <b>`distribution`</b>: The base distribution instance to reshape. Typically an
-    instance of `Distribution`.
-* <b>`batch_shape`</b>: Positive `int`-like vector-shaped `Tensor` representing
-    the new shape of the batch dimensions. Up to one dimension may contain
-    `-1`, meaning the remainder of the batch size.
-* <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
-    parameters are checked for validity despite possibly degrading runtime
-    performance. When `False` invalid inputs may silently render incorrect
-    outputs.
-* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
-    (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
-    result is undefined. When `False`, an exception is raised if one or
-    more of the statistic's batch members are undefined.
-* <b>`name`</b>: The name to give Ops created by the initializer.
-    Default value: `"BatchReshape" + distribution.name`.
-
-
-#### Raises:
-
-* <b>`ValueError`</b>: if `batch_shape` is not a vector.
-* <b>`ValueError`</b>: if `batch_shape` has non-positive elements.
-* <b>`ValueError`</b>: if `batch_shape` size is not the same as a
-    `distribution.batch_shape` size.
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
 
@@ -330,7 +332,7 @@ where `F` denotes the support of the random variable `X ~ P`.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 
@@ -424,7 +426,7 @@ denotes (Shanon) cross entropy, and `H[.]` denotes (Shanon) entropy.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 

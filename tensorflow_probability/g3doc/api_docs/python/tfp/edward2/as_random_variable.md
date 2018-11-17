@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.edward2.as_random_variable" />
+<meta itemprop="path" content="Stable" />
 </div>
 
 # tfp.edward2.as_random_variable
@@ -29,7 +30,7 @@ on overriding distribution parameters.
 
 #### Args:
 
-* <b>`distribution`</b>: tf.Distribution governing the distribution of the random
+* <b>`distribution`</b>: tfd.Distribution governing the distribution of the random
     variable, such as sampling and log-probabilities.
 * <b>`sample_shape`</b>: tf.TensorShape of samples to draw from the random variable.
     Default is `()` corresponding to a single sample.

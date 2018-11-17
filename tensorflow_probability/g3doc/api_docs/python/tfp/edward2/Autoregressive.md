@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.edward2.Autoregressive" />
+<meta itemprop="path" content="Stable" />
 </div>
 
 # tfp.edward2.Autoregressive
@@ -27,7 +28,7 @@ Construct an `Autoregressive` distribution.
 #### Args:
 
 * <b>`distribution_fn`</b>: Python `callable` which constructs a
-    `tf.distributions.Distribution`-like instance from a `Tensor` (e.g.,
+    `tfd.Distribution`-like instance from a `Tensor` (e.g.,
     `sample0`). The function must respect the "autoregressive property",
     i.e., there exists a permutation of event such that each coordinate is a
     diffeomorphic function of on preceding coordinates.

@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions.Categorical" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="allow_nan_stats"/>
 <meta itemprop="property" content="batch_shape"/>
 <meta itemprop="property" content="dtype"/>
@@ -52,7 +53,7 @@ log-probabilities of a set of `K` classes. It is defined over the integers
 The Categorical distribution is closely related to the `OneHotCategorical` and
 `Multinomial` distributions.  The Categorical distribution can be intuited as
 generating samples according to `argmax{ OneHotCategorical(probs) }` itself
-being identical to `argmax{ Multinomial(probs, total_count=1) }.
+being identical to `argmax{ Multinomial(probs, total_count=1) }`.
 
 #### Mathematical Details
 
@@ -66,7 +67,7 @@ pmf(k; pi) = prod_j pi_j**[k == j]
 
 The number of classes, `K`, must not exceed:
 - the largest integer representable by `self.dtype`, i.e.,
-  `2**(mantissa_bits+1)` (IEE754),
+  `2**(mantissa_bits+1)` (IEEE 754),
 - the maximum `Tensor` index, i.e., `2**31-1`.
 
 In other words,
@@ -129,6 +130,46 @@ dist.prob(counts)  # Shape [2]
 counts = [[...]] # Shape [5, 7, 3]
 dist.prob(counts)  # Shape [5, 7, 3]
 ```
+
+<h2 id="__init__"><code>__init__</code></h2>
+
+``` python
+__init__(
+    logits=None,
+    probs=None,
+    dtype=tf.int32,
+    validate_args=False,
+    allow_nan_stats=True,
+    name='Categorical'
+)
+```
+
+Initialize Categorical distributions using class log-probabilities.
+
+#### Args:
+
+* <b>`logits`</b>: An N-D `Tensor`, `N >= 1`, representing the log probabilities
+    of a set of Categorical distributions. The first `N - 1` dimensions
+    index into a batch of independent distributions and the last dimension
+    represents a vector of logits for each class. Only one of `logits` or
+    `probs` should be passed in.
+* <b>`probs`</b>: An N-D `Tensor`, `N >= 1`, representing the probabilities
+    of a set of Categorical distributions. The first `N - 1` dimensions
+    index into a batch of independent distributions and the last dimension
+    represents a vector of probabilities for each class. Only one of
+    `logits` or `probs` should be passed in.
+* <b>`dtype`</b>: The type of the event samples (default: int32).
+* <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
+    parameters are checked for validity despite possibly degrading runtime
+    performance. When `False` invalid inputs may silently render incorrect
+    outputs.
+* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
+    (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
+    result is undefined. When `False`, an exception is raised if one or
+    more of the statistic's batch members are undefined.
+* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
+
+
 
 ## Properties
 
@@ -200,8 +241,7 @@ Vector of coordinatewise probabilities.
 Describes how samples from the distribution are reparameterized.
 
 Currently this is one of the static instances
-`distributions.FULLY_REPARAMETERIZED`
-or `distributions.NOT_REPARAMETERIZED`.
+`tfd.FULLY_REPARAMETERIZED` or `tfd.NOT_REPARAMETERIZED`.
 
 #### Returns:
 
@@ -214,44 +254,6 @@ Python `bool` indicating possibly expensive checks are enabled.
 
 
 ## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
-
-``` python
-__init__(
-    logits=None,
-    probs=None,
-    dtype=dtypes.int32,
-    validate_args=False,
-    allow_nan_stats=True,
-    name='Categorical'
-)
-```
-
-Initialize Categorical distributions using class log-probabilities.
-
-#### Args:
-
-* <b>`logits`</b>: An N-D `Tensor`, `N >= 1`, representing the log probabilities
-    of a set of Categorical distributions. The first `N - 1` dimensions
-    index into a batch of independent distributions and the last dimension
-    represents a vector of logits for each class. Only one of `logits` or
-    `probs` should be passed in.
-* <b>`probs`</b>: An N-D `Tensor`, `N >= 1`, representing the probabilities
-    of a set of Categorical distributions. The first `N - 1` dimensions
-    index into a batch of independent distributions and the last dimension
-    represents a vector of probabilities for each class. Only one of
-    `logits` or `probs` should be passed in.
-* <b>`dtype`</b>: The type of the event samples (default: int32).
-* <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
-    parameters are checked for validity despite possibly degrading runtime
-    performance. When `False` invalid inputs may silently render incorrect
-    outputs.
-* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
-    (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
-    result is undefined. When `False`, an exception is raised if one or
-    more of the statistic's batch members are undefined.
-* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
 
@@ -392,7 +394,7 @@ where `F` denotes the support of the random variable `X ~ P`.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 
@@ -486,7 +488,7 @@ denotes (Shanon) cross entropy, and `H[.]` denotes (Shanon) entropy.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 

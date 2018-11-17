@@ -20,7 +20,8 @@ landing_page:
   rows:
   - heading: TensorFlow Probability is a library for probabilistic reasoning and statistical analysis.
     items:
-    - description: >
+    - classname: devsite-landing-row-50
+      description: >
         TensorFlow Probability (TFP) is a Python library built on TensorFlow
         that makes it easy to combine probabilistic models and deep learning on
         modern hardware (TPU, GPU). It's for data scientists, statisticians, ML
@@ -38,7 +39,7 @@ landing_page:
         exploration and production. To get started, see the
         <a href="./overview">TensorFlow Probability Guide</a>.
 
-    - code_block: |
+      code_block: |
         <pre class = "prettyprint">
         import tensorflow as tf
         import tensorflow_probability as tfp
@@ -69,6 +70,20 @@ landing_page:
       buttons:
       - label: Read on TensorFlow blog
         path: https://medium.com/tensorflow/introducing-tensorflow-probability-dca4c304e245
+    - heading: "An Introductory Analysis using TensorFlow Probability"
+      image_path: /ecosystem/images/tf-logo-card-16x9.png
+      path: https://medium.com/tensorflow/the-trinity-of-errors-in-financial-models-an-introductory-analysis-using-tensorflow-probability-9fdefb4d283d
+      buttons:
+      - label: Read on TensorFlow blog
+        path: https://medium.com/tensorflow/the-trinity-of-errors-in-financial-models-an-introductory-analysis-using-tensorflow-probability-9fdefb4d283d
+    - heading: "Industrial AI: Physics-based, Probabilistic Deep Learning using TensorFlow Probability"
+      image_path: /ecosystem/images/tf-logo-card-16x9.png
+      path: https://medium.com/tensorflow/industrial-ai-bhges-physics-based-probabilistic-deep-learning-using-tensorflow-probability-5f215c791863
+      buttons:
+      - label: Read on TensorFlow blog
+        path: https://medium.com/tensorflow/industrial-ai-bhges-physics-based-probabilistic-deep-learning-using-tensorflow-probability-5f215c791863
+  - classname: devsite-landing-row-cards
+    items:
     - heading: Probabilistic Machine Learning in TensorFlow
       youtube_id: BjUkL8DFH5Q
       buttons:

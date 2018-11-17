@@ -25,14 +25,17 @@ from tensorflow_probability.python.bijectors.affine import Affine
 from tensorflow_probability.python.bijectors.affine_linear_operator import AffineLinearOperator
 from tensorflow_probability.python.bijectors.affine_scalar import AffineScalar
 from tensorflow_probability.python.bijectors.batch_normalization import BatchNormalization
+from tensorflow_probability.python.bijectors.bijector import Bijector
 from tensorflow_probability.python.bijectors.chain import Chain
 from tensorflow_probability.python.bijectors.cholesky_outer_product import CholeskyOuterProduct
 from tensorflow_probability.python.bijectors.cholesky_to_inv_cholesky import CholeskyToInvCholesky
 from tensorflow_probability.python.bijectors.conditional_bijector import ConditionalBijector
 from tensorflow_probability.python.bijectors.discrete_cosine_transform import DiscreteCosineTransform
 from tensorflow_probability.python.bijectors.exp import Exp
+from tensorflow_probability.python.bijectors.expm1 import Expm1
 from tensorflow_probability.python.bijectors.fill_triangular import FillTriangular
 from tensorflow_probability.python.bijectors.gumbel import Gumbel
+from tensorflow_probability.python.bijectors.identity import Identity
 from tensorflow_probability.python.bijectors.inline import Inline
 from tensorflow_probability.python.bijectors.invert import Invert
 from tensorflow_probability.python.bijectors.kumaraswamy import Kumaraswamy
@@ -40,6 +43,8 @@ from tensorflow_probability.python.bijectors.masked_autoregressive import masked
 from tensorflow_probability.python.bijectors.masked_autoregressive import masked_dense
 from tensorflow_probability.python.bijectors.masked_autoregressive import MaskedAutoregressiveFlow
 from tensorflow_probability.python.bijectors.matrix_inverse_tril import MatrixInverseTriL
+from tensorflow_probability.python.bijectors.normal_cdf import NormalCDF
+from tensorflow_probability.python.bijectors.ordered import Ordered
 from tensorflow_probability.python.bijectors.permute import Permute
 from tensorflow_probability.python.bijectors.power_transform import PowerTransform
 from tensorflow_probability.python.bijectors.real_nvp import real_nvp_default_template
@@ -56,8 +61,6 @@ from tensorflow_probability.python.bijectors.tanh import Tanh
 from tensorflow_probability.python.bijectors.transform_diagonal import TransformDiagonal
 from tensorflow_probability.python.bijectors.transpose import Transpose
 from tensorflow_probability.python.bijectors.weibull import Weibull
-from tensorflow.python.ops.distributions.bijector import Bijector
-from tensorflow.python.ops.distributions.identity_bijector import Identity
 
 # pylint: enable=unused-import,line-too-long,g-importing-member
 
@@ -76,6 +79,7 @@ __all__ = [
     "ConditionalBijector",
     "DiscreteCosineTransform",
     "Exp",
+    "Expm1",
     "FillTriangular",
     "Gumbel",
     "Identity",
@@ -84,6 +88,8 @@ __all__ = [
     "Kumaraswamy",
     "MaskedAutoregressiveFlow",
     "MatrixInverseTriL",
+    "NormalCDF",
+    "Ordered",
     "Permute",
     "PowerTransform",
     "RealNVP",

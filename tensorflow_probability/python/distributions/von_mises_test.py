@@ -130,7 +130,7 @@ class _VonMisesTest(object):
     if tf.executing_eagerly() or not self.use_static_shape:
       return
 
-    with self.test_session():
+    with self.cached_session():
       n = 10
       locs = tf.cast(tf.constant([1.0] * n), self.dtype)
       concentrations = tf.cast(tf.constant(np.logspace(-3, 3, n)), self.dtype)

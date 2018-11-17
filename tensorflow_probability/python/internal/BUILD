@@ -29,10 +29,27 @@ py_library(
     name = "internal",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
+)
+
+py_library(
+    name = "dtype_util",
+    srcs = ["dtype_util.py"],
+    srcs_version = "PY2AND3",
     deps = [
-        ":distribution_util",
-        ":test_case",
-        ":test_util",
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "dtype_util_test",
+    size = "small",
+    srcs = ["dtype_util_test.py"],
+    deps = [
+        ":dtype_util",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
     ],
 )
 
@@ -41,6 +58,9 @@ py_library(
     srcs = ["distribution_util.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":dtype_util",
+        ":reparameterization",
+        # numpy dep,
         # tensorflow dep,
     ],
 )
@@ -54,6 +74,30 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
+    ],
+)
+
+py_library(
+    name = "reparameterization",
+    srcs = ["reparameterization.py"],
+)
+
+py_library(
+    name = "special_math",
+    srcs = ["special_math.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "special_math_test",
+    srcs = ["special_math_test.py"],
+    deps = [
+        ":special_math",
+        # numpy dep,
+        # tensorflow dep,
     ],
 )
 
@@ -82,6 +126,7 @@ py_library(
     srcs = ["test_util.py"],
     srcs_version = "PY2AND3",
     deps = [
+        # numpy dep,
         # tensorflow dep,
     ],
 )

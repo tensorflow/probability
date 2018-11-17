@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions.softplus_inverse" />
+<meta itemprop="path" content="Stable" />
 </div>
 
 # tfp.distributions.softplus_inverse

@@ -49,6 +49,7 @@ py_test(
     ],
     main = "logistic_regression.py",
     srcs_version = "PY2AND3",
+    tags = ["nozapfhahn"],
     deps = [
         ":logistic_regression",
     ],

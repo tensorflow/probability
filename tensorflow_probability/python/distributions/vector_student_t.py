@@ -20,11 +20,13 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python import bijectors
+from tensorflow_probability.python.distributions import student_t
+from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
-from tensorflow.python.ops.distributions import student_t
-from tensorflow.python.ops.distributions import transformed_distribution
+from tensorflow_probability.python.internal import dtype_util
 
 
+# TODO(b/116482987): Expose this distribution in TFP.
 class _VectorStudentT(transformed_distribution.TransformedDistribution):
   """A vector version of Student's t-distribution on `R^k`.
 
@@ -177,6 +179,8 @@ class _VectorStudentT(transformed_distribution.TransformedDistribution):
                      scale_tril, scale_perturb_factor, scale_perturb_diag]
     with tf.name_scope(name) as name:
       with tf.name_scope("init", values=graph_parents):
+        dtype = dtype_util.common_dtype(graph_parents, tf.float32)
+        df = tf.convert_to_tensor(df, name="df", dtype=dtype)
         # The shape of the _VectorStudentT distribution is governed by the
         # relationship between df.batch_shape and affine.batch_shape. In
         # pseudocode the basic procedure is:
@@ -200,7 +204,8 @@ class _VectorStudentT(transformed_distribution.TransformedDistribution):
             scale_tril=scale_tril,
             scale_perturb_factor=scale_perturb_factor,
             scale_perturb_diag=scale_perturb_diag,
-            validate_args=validate_args)
+            validate_args=validate_args,
+            dtype=dtype)
         distribution = student_t.StudentT(
             df=df,
             loc=tf.zeros([], dtype=affine.dtype),

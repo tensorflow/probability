@@ -185,7 +185,7 @@ FLAGS = flags.FLAGS
 
 def _softplus_inverse(x):
   """Helper which computes the function inverse of `tf.nn.softplus`."""
-  return tf.log(tf.expm1(x))
+  return tf.log(tf.math.expm1(x))
 
 
 def make_encoder(activation, latent_size, base_depth):
@@ -198,7 +198,7 @@ def make_encoder(activation, latent_size, base_depth):
 
   Returns:
     encoder: A `callable` mapping a `Tensor` of images to a
-      `tf.distributions.Distribution` instance over encodings.
+      `tfd.Distribution` instance over encodings.
   """
   conv = functools.partial(
       tf.keras.layers.Conv2D, padding="SAME", activation=activation)
@@ -236,7 +236,7 @@ def make_decoder(activation, latent_size, output_shape, base_depth):
 
   Returns:
     decoder: A `callable` mapping a `Tensor` of encodings to a
-      `tf.distributions.Distribution` instance over images.
+      `tfd.Distribution` instance over images.
   """
   deconv = functools.partial(
       tf.keras.layers.Conv2DTranspose, padding="SAME", activation=activation)
@@ -276,9 +276,8 @@ def make_mixture_prior(latent_size, mixture_components):
     mixture_components: Number of elements of the mixture.
 
   Returns:
-    random_prior: A `tf.distributions.Distribution` instance
-      representing the distribution over encodings in the absence of any
-      evidence.
+    random_prior: A `tfd.Distribution` instance representing the distribution
+      over encodings in the absence of any evidence.
   """
   if mixture_components == 1:
     # See the module docstring for why we don't learn the parameters here.

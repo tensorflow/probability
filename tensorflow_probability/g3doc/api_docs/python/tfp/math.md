@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.math" />
+<meta itemprop="path" content="Stable" />
 </div>
 
 # Module: tfp.math
@@ -8,7 +9,11 @@ TensorFlow Probability math functions.
 
 ## Functions
 
+[`custom_gradient(...)`](../tfp/math/custom_gradient.md): Embeds a custom gradient into a `Tensor`.
+
 [`diag_jacobian(...)`](../tfp/math/diag_jacobian.md): Computes diagonal of the Jacobian matrix of `ys=fn(xs)` wrt `xs`.
+
+[`log1psquare(...)`](../tfp/math/log1psquare.md): A numerically stable implementation of log(1 + x**2).
 
 [`matvecmul(...)`](../tfp/math/matvecmul.md): Multiply a matrix by a vector.
 

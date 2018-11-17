@@ -18,11 +18,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
-from tensorflow.python.ops.distributions import util as distribution_util
+from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.internal import distribution_util
 
 
-class ConditionalDistribution(tf.distributions.Distribution):
+class ConditionalDistribution(distribution.Distribution):
   """Distribution that supports intrinsic parameters (local latents).
 
   Subclasses of this distribution may have additional keyword arguments passed

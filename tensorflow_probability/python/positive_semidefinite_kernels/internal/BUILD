@@ -40,6 +40,7 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
 
@@ -47,8 +48,8 @@ py_test(
     name = "util_test",
     srcs = ["util_test.py"],
     deps = [
+        ":util",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
     ],
 )

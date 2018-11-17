@@ -29,6 +29,7 @@ py_library(
         ":exp_sin_squared",
         ":exponentiated_quadratic",
         ":matern",
+        ":polynomial",
         ":positive_semidefinite_kernel",
         "//tensorflow_probability/python/positive_semidefinite_kernels/internal",
     ],
@@ -49,9 +50,9 @@ py_test(
     srcs = ["positive_semidefinite_kernel_test.py"],
     deps = [
         # absl/testing:parameterized dep,
-        # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/positive_semidefinite_kernels/internal:util",
     ],
 )
 
@@ -61,6 +62,8 @@ py_library(
     deps = [
         ":positive_semidefinite_kernel",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/positive_semidefinite_kernels/internal:util",
     ],
 )
 
@@ -80,7 +83,10 @@ py_library(
     srcs = ["exp_sin_squared.py"],
     deps = [
         ":positive_semidefinite_kernel",
+        # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/positive_semidefinite_kernels/internal:util",
     ],
 )
 
@@ -100,13 +106,60 @@ py_library(
     srcs = ["matern.py"],
     deps = [
         ":positive_semidefinite_kernel",
+        # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/positive_semidefinite_kernels/internal:util",
     ],
 )
 
 py_test(
     name = "matern_test",
     srcs = ["matern_test.py"],
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "rational_quadratic",
+    srcs = ["rational_quadratic.py"],
+    deps = [
+        ":positive_semidefinite_kernel",
+        # six dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/positive_semidefinite_kernels/internal:util",
+    ],
+)
+
+py_test(
+    name = "rational_quadratic_test",
+    srcs = ["rational_quadratic_test.py"],
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "polynomial",
+    srcs = ["polynomial.py"],
+    deps = [
+        ":positive_semidefinite_kernel",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/positive_semidefinite_kernels/internal:util",
+    ],
+)
+
+py_test(
+    name = "polynomial_test",
+    srcs = ["polynomial_test.py"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,

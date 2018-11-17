@@ -25,11 +25,10 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python import distributions
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import metropolis_hastings
 from tensorflow_probability.python.mcmc import util as mcmc_util
-from tensorflow.contrib import eager as tfe
-from tensorflow.python.ops.distributions import util as distributions_util
 
 
 __all__ = [
@@ -102,7 +101,7 @@ def make_simple_step_size_update_policy(num_adaptation_steps=None,
   if step_counter is None and num_adaptation_steps is not None:
     step_counter = tf.get_variable(
         name='step_size_adaptation_step_counter',
-        initializer=np.array(-1, dtype=np.int32),
+        initializer=np.array(-1, dtype=np.int64),
         trainable=False,
         use_resource=True)
 
@@ -129,14 +128,19 @@ def make_simple_step_size_update_policy(num_adaptation_steps=None,
     log_mean_accept_ratio = tf.reduce_logsumexp(
         tf.minimum(kernel_results.log_accept_ratio, 0.)) - log_n
     adjustment = tf.where(
-        log_mean_accept_ratio < tf.log(target_rate),
+        log_mean_accept_ratio < tf.cast(
+            tf.log(target_rate), log_mean_accept_ratio.dtype),
         -decrement_multiplier / (1. + decrement_multiplier),
         increment_multiplier)
 
     def build_assign_op():
       if mcmc_util.is_list_like(step_size_var):
-        return [ss.assign_add(ss * adjustment) for ss in step_size_var]
-      return step_size_var.assign_add(step_size_var * adjustment)
+        return [
+            ss.assign_add(ss * tf.cast(adjustment, ss.dtype))
+            for ss in step_size_var
+        ]
+      return step_size_var.assign_add(
+          step_size_var * tf.cast(adjustment, step_size_var.dtype))
 
     if num_adaptation_steps is None:
       return build_assign_op()
@@ -533,7 +537,7 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
                state_gradients_are_stopped=False,
                seed=None,
                name=None):
-    if seed is not None and tfe.executing_eagerly():
+    if seed is not None and tf.executing_eagerly():
       # TODO(b/68017812): Re-enable once TFE supports `tf.random_shuffle` seed.
       raise NotImplementedError('Specifying a `seed` when running eagerly is '
                                 'not currently supported. To run in Eager '
@@ -603,7 +607,7 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
           maybe_expand=True,
           state_gradients_are_stopped=self.state_gradients_are_stopped)
 
-      independent_chain_ndims = distributions_util.prefer_static_rank(
+      independent_chain_ndims = distribution_util.prefer_static_rank(
           current_target_log_prob)
 
       current_momentum_parts = []
@@ -625,21 +629,24 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
             current_target_log_prob_grad_parts=args[3],
             state_gradients_are_stopped=self.state_gradients_are_stopped)
 
-      # Do leapfrog integration.
+      num_leapfrog_steps = tf.convert_to_tensor(
+          self.num_leapfrog_steps, dtype=tf.int64, name='num_leapfrog_steps')
+
       [
           next_momentum_parts,
           next_state_parts,
           next_target_log_prob,
           next_target_log_prob_grad_parts,
+
       ] = tf.while_loop(
-          cond=lambda i, *args: i < self.num_leapfrog_steps,
+          cond=lambda i, *args: i < num_leapfrog_steps,
           body=lambda i, *args: [i + 1] + list(_leapfrog_one_step(*args)),
           loop_vars=[
-              tf.zeros([], tf.int32, name='iter'),
+              tf.zeros([], tf.int64, name='iter'),
               current_momentum_parts,
               current_state_parts,
               current_target_log_prob,
-              current_target_log_prob_grad_parts,
+              current_target_log_prob_grad_parts
           ])[1:]
 
       def maybe_flatten(x):
@@ -855,7 +862,7 @@ def _leapfrog_integrator_one_step(
 
     # Step 1: Update momentum.
     proposed_momentum_parts = [
-        v + 0.5 * eps * g
+        v + 0.5 * tf.cast(eps, v.dtype) * g
         for v, eps, g
         in zip(current_momentum_parts,
                step_sizes,
@@ -863,7 +870,7 @@ def _leapfrog_integrator_one_step(
 
     # Step 2: Update state.
     proposed_state_parts = [
-        x + eps * v
+        x + tf.cast(eps, v.dtype) * v
         for x, eps, v
         in zip(current_state_parts,
                step_sizes,
@@ -897,7 +904,7 @@ def _leapfrog_integrator_one_step(
 
     # Step 3b: Update momentum (again).
     proposed_momentum_parts = [
-        v + 0.5 * eps * g
+        v + 0.5 * tf.cast(eps, v.dtype) * g
         for v, eps, g
         in zip(proposed_momentum_parts,
                step_sizes,

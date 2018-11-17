@@ -23,10 +23,13 @@ import math
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.framework import tensor_shape
 
 
-class Logistic(tf.distributions.Distribution):
+class Logistic(distribution.Distribution):
   """The Logistic distribution with location `loc` and `scale` parameters.
 
   #### Mathematical details
@@ -114,6 +117,9 @@ class Logistic(tf.distributions.Distribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name, values=[loc, scale]) as name:
+      dtype = dtype_util.common_dtype([loc, scale], preferred_dtype=tf.float32)
+      loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
+      scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
       with tf.control_dependencies([tf.assert_positive(scale)]
                                    if validate_args else []):
         self._loc = tf.identity(loc, name="loc")
@@ -121,7 +127,7 @@ class Logistic(tf.distributions.Distribution):
         tf.assert_same_float_dtype([self._loc, self._scale])
     super(Logistic, self).__init__(
         dtype=self._scale.dtype,
-        reparameterization_type=tf.distributions.FULLY_REPARAMETERIZED,
+        reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
         parameters=parameters,
@@ -148,8 +154,8 @@ class Logistic(tf.distributions.Distribution):
     return tf.broadcast_dynamic_shape(tf.shape(self.loc), tf.shape(self.scale))
 
   def _batch_shape(self):
-    return tf.broadcast_static_shape(self.loc.get_shape(),
-                                     self.scale.get_shape())
+    return tf.broadcast_static_shape(self.loc.shape,
+                                     self.scale.shape)
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)

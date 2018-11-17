@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.optimizer.nelder_mead_minimize" />
+<meta itemprop="path" content="Stable" />
 </div>
 
 # tfp.optimizer.nelder_mead_minimize
@@ -72,7 +73,8 @@ point.
     # Check that the search converged
     assert(results.converged)
     # Check that the argmin is close to the actual value.
-    np.testing.assert_allclose(results.position, np.array([0.0, 0.0]))
+    np.testing.assert_allclose(results.position, np.array([0.0, 0.0]),
+                               atol=1e-7)
     # Print out the total number of function evaluations it took.
     print ("Function evaluations: %d" % results.num_objective_evaluations)
 ```
@@ -81,10 +83,12 @@ point.
 [1]: William Press, Saul Teukolsky, William Vetterling and Brian Flannery.
   Numerical Recipes in C++, third edition. pp. 502-507. (2007).
   http://numerical.recipes/cpppages/chap0sel.pdf
+
 [2]: Jeffrey Lagarias, James Reeds, Margaret Wright and Paul Wright.
   Convergence properties of the Nelder-Mead simplex method in low dimensions,
   Siam J. Optim., Vol 9, No. 1, pp. 112-147. (1998).
   http://www.math.kent.edu/~reichel/courses/Opt/reading.material.2/nelder.mead.pdf
+
 [3]: Fuchang Gao and Lixing Han. Implementing the Nelder-Mead simplex
   algorithm with adaptive parameters. Computational Optimization and
   Applications, Vol 51, Issue 1, pp 259-277. (2012).
@@ -127,20 +131,20 @@ point.
 * <b>`objective_at_initial_vertex`</b>: (Optional) Scalar `Tensor` of real dtype. The
     value of the objective function at the initial vertex. May be supplied
     only if the `initial_vertex` is also supplied.
-* <b>`batch_evaluate_objective`</b>: Python `bool`. If True, the objective function
-    will be evaluated on all the vertices of the simplex packed into a
-    single tensor. If False, the objective will be mapped across each
+* <b>`batch_evaluate_objective`</b>: (Optional) Python `bool`. If True, the objective
+    function will be evaluated on all the vertices of the simplex packed
+    into a single tensor. If False, the objective will be mapped across each
     vertex separately. Evaluating the objective function in a batch allows
     use of vectorization and should be preferred if the objective function
     allows it.
-* <b>`func_tolerance`</b>: Scalar `Tensor` of real dtype. The algorithm stops
-    if the absolute difference between the largest and the smallest
+* <b>`func_tolerance`</b>: (Optional) Scalar `Tensor` of real dtype. The algorithm
+    stops if the absolute difference between the largest and the smallest
     function value on the vertices of the simplex is below this number.
-* <b>`position_tolerance`</b>: Scalar `Tensor` of real dtype. The algorithm stops
-    if the largest absolute difference between the coordinates of the
-    vertices is below this threshold.
-* <b>`parallel_iterations`</b>: Positive integer. The number of iterations allowed to
-    run in parallel.
+* <b>`position_tolerance`</b>: (Optional) Scalar `Tensor` of real dtype. The
+    algorithm stops if the largest absolute difference between the
+    coordinates of the vertices is below this threshold.
+* <b>`parallel_iterations`</b>: (Optional) Positive integer. The number of iterations
+    allowed to run in parallel.
 * <b>`max_iterations`</b>: (Optional) Scalar positive `Tensor` of dtype `int32`.
     The maximum number of iterations allowed. If `None` then no limit is
     applied.

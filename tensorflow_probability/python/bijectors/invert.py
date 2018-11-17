@@ -18,14 +18,14 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from tensorflow.python.ops.distributions import bijector
+from tensorflow_probability.python.bijectors import bijector as bijector_lib
 
 __all__ = [
     "Invert",
 ]
 
 
-class Invert(bijector.Bijector):
+class Invert(bijector_lib.Bijector):
   """Bijector which inverts another Bijector.
 
   Example Use: [ExpGammaDistribution (see Background & Context)](

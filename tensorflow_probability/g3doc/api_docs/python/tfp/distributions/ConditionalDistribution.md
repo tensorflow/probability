@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions.ConditionalDistribution" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="allow_nan_stats"/>
 <meta itemprop="property" content="batch_shape"/>
 <meta itemprop="property" content="dtype"/>
@@ -44,6 +45,55 @@ Distribution that supports intrinsic parameters (local latents).
 
 Subclasses of this distribution may have additional keyword arguments passed
 to their sample-based methods (i.e. `sample`, `log_prob`, etc.).
+
+<h2 id="__init__"><code>__init__</code></h2>
+
+``` python
+__init__(
+    dtype,
+    reparameterization_type,
+    validate_args,
+    allow_nan_stats,
+    parameters=None,
+    graph_parents=None,
+    name=None
+)
+```
+
+Constructs the `Distribution`.
+
+**This is a private method for subclass use.**
+
+#### Args:
+
+* <b>`dtype`</b>: The type of the event samples. `None` implies no type-enforcement.
+* <b>`reparameterization_type`</b>: Instance of `ReparameterizationType`.
+    If `tfd.FULLY_REPARAMETERIZED`, this
+    `Distribution` can be reparameterized in terms of some standard
+    distribution with a function whose Jacobian is constant for the support
+    of the standard distribution. If `tfd.NOT_REPARAMETERIZED`,
+    then no such reparameterization is available.
+* <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
+    parameters are checked for validity despite possibly degrading runtime
+    performance. When `False` invalid inputs may silently render incorrect
+    outputs.
+* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
+    (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
+    result is undefined. When `False`, an exception is raised if one or
+    more of the statistic's batch members are undefined.
+* <b>`parameters`</b>: Python `dict` of parameters used to instantiate this
+    `Distribution`.
+* <b>`graph_parents`</b>: Python `list` of graph prerequisites of this
+    `Distribution`.
+* <b>`name`</b>: Python `str` name prefixed to Ops created by this class. Default:
+    subclass name.
+
+
+#### Raises:
+
+* <b>`ValueError`</b>: if any member of graph_parents is `None` or not a `Tensor`.
+
+
 
 ## Properties
 
@@ -103,8 +153,7 @@ Dictionary of parameters used to instantiate this `Distribution`.
 Describes how samples from the distribution are reparameterized.
 
 Currently this is one of the static instances
-`distributions.FULLY_REPARAMETERIZED`
-or `distributions.NOT_REPARAMETERIZED`.
+`tfd.FULLY_REPARAMETERIZED` or `tfd.NOT_REPARAMETERIZED`.
 
 #### Returns:
 
@@ -117,53 +166,6 @@ Python `bool` indicating possibly expensive checks are enabled.
 
 
 ## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
-
-``` python
-__init__(
-    dtype,
-    reparameterization_type,
-    validate_args,
-    allow_nan_stats,
-    parameters=None,
-    graph_parents=None,
-    name=None
-)
-```
-
-Constructs the `Distribution`.
-
-**This is a private method for subclass use.**
-
-#### Args:
-
-* <b>`dtype`</b>: The type of the event samples. `None` implies no type-enforcement.
-* <b>`reparameterization_type`</b>: Instance of `ReparameterizationType`.
-    If `distributions.FULLY_REPARAMETERIZED`, this
-    `Distribution` can be reparameterized in terms of some standard
-    distribution with a function whose Jacobian is constant for the support
-    of the standard distribution. If `distributions.NOT_REPARAMETERIZED`,
-    then no such reparameterization is available.
-* <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
-    parameters are checked for validity despite possibly degrading runtime
-    performance. When `False` invalid inputs may silently render incorrect
-    outputs.
-* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
-    (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
-    result is undefined. When `False`, an exception is raised if one or
-    more of the statistic's batch members are undefined.
-* <b>`parameters`</b>: Python `dict` of parameters used to instantiate this
-    `Distribution`.
-* <b>`graph_parents`</b>: Python `list` of graph prerequisites of this
-    `Distribution`.
-* <b>`name`</b>: Python `str` name prefixed to Ops created by this class. Default:
-    subclass name.
-
-
-#### Raises:
-
-* <b>`ValueError`</b>: if any member of graph_parents is `None` or not a `Tensor`.
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
 
@@ -289,7 +291,7 @@ where `F` denotes the support of the random variable `X ~ P`.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 
@@ -383,7 +385,7 @@ denotes (Shanon) cross entropy, and `H[.]` denotes (Shanon) entropy.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 

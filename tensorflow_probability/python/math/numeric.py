@@ -12,34 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Utility functions for GLM module."""
+"""Numerically stable variants of common mathematical expressions."""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-
-from tensorflow.contrib import framework as contrib_framework
-
-
-__all__ = [
-    'common_dtype',
-]
+import tensorflow as tf
 
 
-def common_dtype(args_list, preferred_dtype=None):
-  """Returns explict dtype from `args_list` if there is one."""
-  dtype = None
-  for a in args_list:
-    if isinstance(a, (np.ndarray, np.generic)):
-      dt = a.dtype.type
-    elif contrib_framework.is_tensor(a):
-      dt = a.dtype.as_numpy_dtype
-    else:
-      continue
-    if dtype is None:
-      dtype = dt
-    elif dtype != dt:
-      raise TypeError('Found incompatible dtypes, {} and {}.'.format(dtype, dt))
-  return preferred_dtype if dtype is None else dtype
+def log1psquare(x):
+  """A numerically stable implementation of log(1 + x**2)."""
+  # We use the following identity:
+  #
+  # log(1 + x**2) = 2 log(|x|) + log(1 / x**2 + 1)
+  #
+  # Where the last term is 0 up to the numerical precision when 1 / x**2 is
+  # small enough compared to machine epsilon.
+  is_small = tf.abs(x) * np.sqrt(np.finfo(x.dtype.as_numpy_dtype).eps) <= 1.
+  ones = tf.ones_like(x)
+
+  # Also mask out the large/small x's, so the gradients are propagated
+  # correctly.
+  small_x = tf.where(is_small, x, ones)
+  large_x = tf.where(is_small, ones, x)
+
+  return tf.where(is_small, tf.log1p(small_x**2.), 2. * tf.log(tf.abs(large_x)))

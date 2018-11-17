@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions.NegativeBinomial" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="allow_nan_stats"/>
 <meta itemprop="property" content="batch_shape"/>
 <meta itemprop="property" content="dtype"/>
@@ -62,6 +63,53 @@ where:
 * `probs = p`,
 * `Z` is the normalizaing constant, and,
 * `n!` is the factorial of `n`.
+
+<h2 id="__init__"><code>__init__</code></h2>
+
+``` python
+__init__(
+    total_count,
+    logits=None,
+    probs=None,
+    validate_args=False,
+    allow_nan_stats=True,
+    name='NegativeBinomial'
+)
+```
+
+Construct NegativeBinomial distributions.
+
+#### Args:
+
+* <b>`total_count`</b>: Non-negative floating-point `Tensor` with shape
+    broadcastable to `[B1,..., Bb]` with `b >= 0` and the same dtype as
+    `probs` or `logits`. Defines this as a batch of `N1 x ... x Nm`
+    different Negative Binomial distributions. In practice, this represents
+    the number of negative Bernoulli trials to stop at (the `total_count`
+    of failures), but this is still a valid distribution when
+    `total_count` is a non-integer.
+* <b>`logits`</b>: Floating-point `Tensor` with shape broadcastable to
+    `[B1, ..., Bb]` where `b >= 0` indicates the number of batch dimensions.
+    Each entry represents logits for the probability of success for
+    independent Negative Binomial distributions and must be in the open
+    interval `(-inf, inf)`. Only one of `logits` or `probs` should be
+    specified.
+* <b>`probs`</b>: Positive floating-point `Tensor` with shape broadcastable to
+    `[B1, ..., Bb]` where `b >= 0` indicates the number of batch dimensions.
+    Each entry represents the probability of success for independent
+    Negative Binomial distributions and must be in the open interval
+    `(0, 1)`. Only one of `logits` or `probs` should be specified.
+* <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
+    parameters are checked for validity despite possibly degrading runtime
+    performance. When `False` invalid inputs may silently render incorrect
+    outputs.
+* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
+    (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
+    result is undefined. When `False`, an exception is raised if one or
+    more of the statistic's batch members are undefined.
+* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
+
+
 
 ## Properties
 
@@ -129,8 +177,7 @@ Probability of a `1` outcome (vs `0`).
 Describes how samples from the distribution are reparameterized.
 
 Currently this is one of the static instances
-`distributions.FULLY_REPARAMETERIZED`
-or `distributions.NOT_REPARAMETERIZED`.
+`tfd.FULLY_REPARAMETERIZED` or `tfd.NOT_REPARAMETERIZED`.
 
 #### Returns:
 
@@ -147,51 +194,6 @@ Python `bool` indicating possibly expensive checks are enabled.
 
 
 ## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
-
-``` python
-__init__(
-    total_count,
-    logits=None,
-    probs=None,
-    validate_args=False,
-    allow_nan_stats=True,
-    name='NegativeBinomial'
-)
-```
-
-Construct NegativeBinomial distributions.
-
-#### Args:
-
-* <b>`total_count`</b>: Non-negative floating-point `Tensor` with shape
-    broadcastable to `[B1,..., Bb]` with `b >= 0` and the same dtype as
-    `probs` or `logits`. Defines this as a batch of `N1 x ... x Nm`
-    different Negative Binomial distributions. In practice, this represents
-    the number of negative Bernoulli trials to stop at (the `total_count`
-    of failures), but this is still a valid distribution when
-    `total_count` is a non-integer.
-* <b>`logits`</b>: Floating-point `Tensor` with shape broadcastable to
-    `[B1, ..., Bb]` where `b >= 0` indicates the number of batch dimensions.
-    Each entry represents logits for the probability of success for
-    independent Negative Binomial distributions and must be in the open
-    interval `(-inf, inf)`. Only one of `logits` or `probs` should be
-    specified.
-* <b>`probs`</b>: Positive floating-point `Tensor` with shape broadcastable to
-    `[B1, ..., Bb]` where `b >= 0` indicates the number of batch dimensions.
-    Each entry represents the probability of success for independent
-    Negative Binomial distributions and must be in the open interval
-    `(0, 1)`. Only one of `logits` or `probs` should be specified.
-* <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
-    parameters are checked for validity despite possibly degrading runtime
-    performance. When `False` invalid inputs may silently render incorrect
-    outputs.
-* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
-    (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
-    result is undefined. When `False`, an exception is raised if one or
-    more of the statistic's batch members are undefined.
-* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
 
@@ -332,7 +334,7 @@ where `F` denotes the support of the random variable `X ~ P`.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 
@@ -426,7 +428,7 @@ denotes (Shanon) cross entropy, and `H[.]` denotes (Shanon) entropy.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 

@@ -43,14 +43,6 @@ py_library(
     ],
 )
 
-py_library(
-    name = "statistical_testing",
-    srcs = ["statistical_testing.py"],
-    deps = [
-        # tensorflow dep,
-    ],
-)
-
 py_test(
     name = "moving_stats_test",
     size = "small",
@@ -63,6 +55,15 @@ py_test(
     ],
 )
 
+py_library(
+    name = "statistical_testing",
+    srcs = ["statistical_testing.py"],
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+    ],
+)
+
 py_test(
     name = "statistical_testing_test",
     size = "medium",
@@ -70,7 +71,48 @@ py_test(
     shard_count = 4,
     deps = [
         ":statistical_testing",
+        # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "correlation_matrix_volumes_py",
+    srcs = [
+        "correlation_matrix_volumes_lib.py",
+    ],
+    deps = [
+        # numpy dep,
+        "//tensorflow_probability/python/distributions:uniform",
+        "//tensorflow_probability/python/internal:distribution_util",
+    ],
+)
+
+py_binary(
+    name = "correlation_matrix_volumes",
+    srcs = [
+        "correlation_matrix_volumes.py",
+    ],
+    deps = [
+        ":correlation_matrix_volumes_py",
+        # absl:app dep,
+        # absl/flags dep,
+    ],
+)
+
+py_test(
+    name = "correlation_matrix_volumes_test",
+    size = "medium",
+    srcs = ["correlation_matrix_volumes_test.py"],
+    shard_count = 4,
+    tags = [
+        "no_pip",
+        "optonly",
+    ],
+    deps = [
+        ":correlation_matrix_volumes_py",
+        ":statistical_testing",
+        # numpy dep,
     ],
 )

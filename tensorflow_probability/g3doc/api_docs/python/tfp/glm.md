@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.glm" />
+<meta itemprop="path" content="Stable" />
 </div>
 
 # Module: tfp.glm
@@ -39,4 +40,10 @@ TensorFlow Probability GLM python package.
 [`fit(...)`](../tfp/glm/fit.md): Runs multiple Fisher scoring steps.
 
 [`fit_one_step(...)`](../tfp/glm/fit_one_step.md): Runs one step of Fisher scoring.
+
+[`fit_sparse(...)`](../tfp/glm/fit_sparse.md): Fits a GLM using coordinate-wise FIM-informed proximal gradient descent.
+
+[`fit_sparse_one_step(...)`](../tfp/glm/fit_sparse_one_step.md): One step of (the outer loop of) the GLM fitting algorithm.
+
+[`soft_threshold(...)`](../tfp/glm/soft_threshold.md): Soft Thresholding operator.
 

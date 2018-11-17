@@ -52,11 +52,11 @@ class InverseGammaTest(test_case.TestCase):
     inv_gamma = tfd.InverseGamma(concentration=alpha, rate=beta)
     expected_log_pdf = stats.invgamma.logpdf(x, alpha_v, scale=beta_v)
     log_pdf = inv_gamma.log_prob(x)
-    self.assertEqual(log_pdf.get_shape(), (6,))
+    self.assertEqual(log_pdf.shape, (6,))
     self.assertAllClose(self.evaluate(log_pdf), expected_log_pdf)
 
     pdf = inv_gamma.prob(x)
-    self.assertEqual(pdf.get_shape(), (6,))
+    self.assertEqual(pdf.shape, (6,))
     self.assertAllClose(self.evaluate(pdf), np.exp(expected_log_pdf))
 
   def testInverseGammaLogPDFMultidimensional(self):
@@ -70,12 +70,12 @@ class InverseGammaTest(test_case.TestCase):
     expected_log_pdf = stats.invgamma.logpdf(x, alpha_v, scale=beta_v)
     log_pdf = inv_gamma.log_prob(x)
     log_pdf_values = self.evaluate(log_pdf)
-    self.assertEqual(log_pdf.get_shape(), (6, 2))
+    self.assertEqual(log_pdf.shape, (6, 2))
     self.assertAllClose(log_pdf_values, expected_log_pdf)
 
     pdf = inv_gamma.prob(x)
     pdf_values = self.evaluate(pdf)
-    self.assertEqual(pdf.get_shape(), (6, 2))
+    self.assertEqual(pdf.shape, (6, 2))
     self.assertAllClose(pdf_values, np.exp(expected_log_pdf))
 
   def testInverseGammaLogPDFMultidimensionalBroadcasting(self):
@@ -89,12 +89,12 @@ class InverseGammaTest(test_case.TestCase):
     expected_log_pdf = stats.invgamma.logpdf(x, alpha_v, scale=beta_v)
     log_pdf = inv_gamma.log_prob(x)
     log_pdf_values = self.evaluate(log_pdf)
-    self.assertEqual(log_pdf.get_shape(), (6, 2))
+    self.assertEqual(log_pdf.shape, (6, 2))
     self.assertAllClose(log_pdf_values, expected_log_pdf)
 
     pdf = inv_gamma.prob(x)
     pdf_values = self.evaluate(pdf)
-    self.assertEqual(pdf.get_shape(), (6, 2))
+    self.assertEqual(pdf.shape, (6, 2))
     self.assertAllClose(pdf_values, np.exp(expected_log_pdf))
 
   def testInverseGammaCDF(self):
@@ -109,7 +109,7 @@ class InverseGammaTest(test_case.TestCase):
     expected_cdf = stats.invgamma.cdf(x, alpha_v, scale=beta_v)
 
     cdf = inv_gamma.cdf(x)
-    self.assertEqual(cdf.get_shape(), (batch_size,))
+    self.assertEqual(cdf.shape, (batch_size,))
     self.assertAllClose(self.evaluate(cdf), expected_cdf)
 
   def testInverseGammaMode(self):
@@ -117,7 +117,7 @@ class InverseGammaTest(test_case.TestCase):
     beta_v = np.array([1.0, 4.0, 5.0])
     inv_gamma = tfd.InverseGamma(concentration=alpha_v, rate=beta_v)
     expected_modes = beta_v / (alpha_v + 1)
-    self.assertEqual(inv_gamma.mode().get_shape(), (3,))
+    self.assertEqual(inv_gamma.mode().shape, (3,))
     self.assertAllClose(self.evaluate(inv_gamma.mode()), expected_modes)
 
   def testInverseGammaMeanAllDefined(self):
@@ -125,7 +125,7 @@ class InverseGammaTest(test_case.TestCase):
     beta_v = np.array([1.0, 4.0, 5.0])
     inv_gamma = tfd.InverseGamma(concentration=alpha_v, rate=beta_v)
     expected_means = stats.invgamma.mean(alpha_v, scale=beta_v)
-    self.assertEqual(inv_gamma.mean().get_shape(), (3,))
+    self.assertEqual(inv_gamma.mean().shape, (3,))
     self.assertAllClose(self.evaluate(inv_gamma.mean()), expected_means)
 
   def testInverseGammaMeanAllowNanStats(self):
@@ -146,7 +146,7 @@ class InverseGammaTest(test_case.TestCase):
     expected_means = beta_v / (alpha_v - 1)
     expected_means[0] = np.nan
     expected_means[1] = np.nan
-    self.assertEqual(inv_gamma.mean().get_shape(), (4,))
+    self.assertEqual(inv_gamma.mean().shape, (4,))
     self.assertAllClose(self.evaluate(inv_gamma.mean()), expected_means)
 
   def testInverseGammaVarianceAllDefined(self):
@@ -154,7 +154,7 @@ class InverseGammaTest(test_case.TestCase):
     beta_v = np.array([1.0, 4.0, 5.0])
     inv_gamma = tfd.InverseGamma(concentration=alpha_v, rate=beta_v)
     expected_variances = stats.invgamma.var(alpha_v, scale=beta_v)
-    self.assertEqual(inv_gamma.variance().get_shape(), (3,))
+    self.assertEqual(inv_gamma.variance().shape, (3,))
     self.assertAllClose(self.evaluate(inv_gamma.variance()), expected_variances)
 
   def testInverseGammaVarianceAllowNanStats(self):
@@ -172,7 +172,7 @@ class InverseGammaTest(test_case.TestCase):
         concentration=alpha_v, rate=beta_v, allow_nan_stats=True)
     expected_variances = stats.invgamma.var(alpha_v, scale=beta_v)
     expected_variances[0] = np.nan
-    self.assertEqual(inv_gamma.variance().get_shape(), (3,))
+    self.assertEqual(inv_gamma.variance().shape, (3,))
     self.assertAllClose(self.evaluate(inv_gamma.variance()), expected_variances)
 
   def testInverseGammaEntropy(self):
@@ -180,7 +180,7 @@ class InverseGammaTest(test_case.TestCase):
     beta_v = np.array([1.0, 4.0, 5.0])
     expected_entropy = stats.invgamma.entropy(alpha_v, scale=beta_v)
     inv_gamma = tfd.InverseGamma(concentration=alpha_v, rate=beta_v)
-    self.assertEqual(inv_gamma.entropy().get_shape(), (3,))
+    self.assertEqual(inv_gamma.entropy().shape, (3,))
     self.assertAllClose(self.evaluate(inv_gamma.entropy()), expected_entropy)
 
   def testInverseGammaSample(self):
@@ -192,7 +192,7 @@ class InverseGammaTest(test_case.TestCase):
     inv_gamma = tfd.InverseGamma(concentration=alpha, rate=beta)
     samples = inv_gamma.sample(n, seed=137)
     sample_values = self.evaluate(samples)
-    self.assertEqual(samples.get_shape(), (n,))
+    self.assertEqual(samples.shape, (n,))
     self.assertEqual(sample_values.shape, (n,))
     self.assertAllClose(
         sample_values.mean(),
@@ -223,7 +223,7 @@ class InverseGammaTest(test_case.TestCase):
     n = 10000
     samples = inv_gamma.sample(n, seed=137)
     sample_values = self.evaluate(samples)
-    self.assertEqual(samples.get_shape(), (n, 10, 100))
+    self.assertEqual(samples.shape, (n, 10, 100))
     self.assertEqual(sample_values.shape, (n, 10, 100))
     zeros = np.zeros_like(alpha_v + beta_v)  # 10 x 100
     alpha_bc = alpha_v + zeros
@@ -258,8 +258,8 @@ class InverseGammaTest(test_case.TestCase):
     samples = inv_gamma.sample(num, seed=137)
     pdfs = inv_gamma.prob(samples)
     sample_vals, pdf_vals = self.evaluate([samples, pdfs])
-    self.assertEqual(samples.get_shape(), (num, 2, 2))
-    self.assertEqual(pdfs.get_shape(), (num, 2, 2))
+    self.assertEqual(samples.shape, (num, 2, 2))
+    self.assertEqual(pdfs.shape, (num, 2, 2))
     self.assertAllClose(
         stats.invgamma.mean(
             [[7., 11.], [7., 11.]], scale=np.array([[5., 5.], [6., 6.]])),

@@ -19,11 +19,14 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
+from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.ops import control_flow_ops
-from tensorflow.python.ops.distributions import util as distribution_util
 
 
-class OneHotCategorical(tf.distributions.Distribution):
+class OneHotCategorical(distribution.Distribution):
   """OneHotCategorical distribution.
 
   The categorical distribution is parameterized by the log-probabilities
@@ -112,7 +115,7 @@ class OneHotCategorical(tf.distributions.Distribution):
           name=name, logits=logits, probs=probs, validate_args=validate_args,
           multidimensional=True)
 
-      logits_shape_static = self._logits.get_shape().with_rank_at_least(1)
+      logits_shape_static = self._logits.shape.with_rank_at_least(1)
       if logits_shape_static.ndims is not None:
         self._batch_rank = tf.convert_to_tensor(
             logits_shape_static.ndims - 1, dtype=tf.int32, name="batch_rank")
@@ -125,7 +128,7 @@ class OneHotCategorical(tf.distributions.Distribution):
 
     super(OneHotCategorical, self).__init__(
         dtype=dtype,
-        reparameterization_type=tf.distributions.NOT_REPARAMETERIZED,
+        reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
         parameters=parameters,
@@ -151,18 +154,18 @@ class OneHotCategorical(tf.distributions.Distribution):
     return tf.shape(self.logits)[:-1]
 
   def _batch_shape(self):
-    return self.logits.get_shape()[:-1]
+    return self.logits.shape[:-1]
 
   def _event_shape_tensor(self):
     return tf.shape(self.logits)[-1:]
 
   def _event_shape(self):
-    return self.logits.get_shape().with_rank_at_least(1)[-1:]
+    return self.logits.shape.with_rank_at_least(1)[-1:]
 
   def _sample_n(self, n, seed=None):
     sample_shape = tf.concat([[n], tf.shape(self.logits)], 0)
     logits = self.logits
-    if logits.get_shape().ndims == 2:
+    if logits.shape.ndims == 2:
       logits_2d = logits
     else:
       logits_2d = tf.reshape(logits, [-1, self.event_size])
@@ -176,9 +179,9 @@ class OneHotCategorical(tf.distributions.Distribution):
     x = self._assert_valid_sample(x)
     # broadcast logits or x if need be.
     logits = self.logits
-    if (not x.get_shape().is_fully_defined() or
-        not logits.get_shape().is_fully_defined() or
-        x.get_shape() != logits.get_shape()):
+    if (not x.shape.is_fully_defined() or
+        not logits.shape.is_fully_defined() or
+        x.shape != logits.shape):
       logits = tf.ones_like(x, dtype=logits.dtype) * logits
       x = tf.ones_like(logits, dtype=x.dtype) * x
 
@@ -197,7 +200,7 @@ class OneHotCategorical(tf.distributions.Distribution):
   def _mode(self):
     ret = tf.argmax(self.logits, axis=self._batch_rank)
     ret = tf.one_hot(ret, self.event_size, dtype=self.dtype)
-    ret.set_shape(self.logits.get_shape())
+    ret.set_shape(self.logits.shape)
     return ret
 
   def _covariance(self):
@@ -218,7 +221,7 @@ class OneHotCategorical(tf.distributions.Distribution):
     ], x)
 
 
-@tf.distributions.RegisterKL(OneHotCategorical, OneHotCategorical)
+@kullback_leibler.RegisterKL(OneHotCategorical, OneHotCategorical)
 def _kl_categorical_categorical(a, b, name=None):
   """Calculate the batched KL divergence KL(a || b) with a, b OneHotCategorical.
 

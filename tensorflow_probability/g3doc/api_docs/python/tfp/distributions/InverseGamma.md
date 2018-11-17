@@ -1,5 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.distributions.InverseGamma" />
+<meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="allow_nan_stats"/>
 <meta itemprop="property" content="batch_shape"/>
 <meta itemprop="property" content="concentration"/>
@@ -73,11 +74,19 @@ cdf(x; alpha, beta, x > 0) = GammaInc(alpha, beta / x) / Gamma(alpha)
 where `GammaInc` is the [upper incomplete Gamma function](
 https://en.wikipedia.org/wiki/Incomplete_gamma_function).
 
-The parameters can be intuited via their relationship to mean and stddev,
+The parameters can be intuited via their relationship to mean and variance
+when these moments exist,
 
 ```none
-concentration = alpha = (mean / stddev)**2
-rate = beta = mean / stddev**2
+mean = beta / (alpha - 1)                           when alpha > 1
+variance = beta**2 / (alpha - 1)**2 / (alpha - 2)   when alpha > 2
+```
+
+i.e., under the same conditions:
+
+```none
+alpha = mean**2 / variance + 2
+beta = mean * (mean**2 / variance + 1)
 ```
 
 Distribution parameters are automatically broadcast in all functions; see
@@ -109,6 +118,47 @@ loss = tf.reduce_mean(tf.square(samples))  # Arbitrary loss function
 # Unbiased stochastic gradients of the loss function
 grads = tf.gradients(loss, [concentration, rate])
 ```
+
+<h2 id="__init__"><code>__init__</code></h2>
+
+``` python
+__init__(
+    concentration,
+    rate,
+    validate_args=False,
+    allow_nan_stats=True,
+    name='InverseGamma'
+)
+```
+
+Construct InverseGamma with `concentration` and `rate` parameters.
+
+The parameters `concentration` and `rate` must be shaped in a way that
+supports broadcasting (e.g. `concentration + rate` is a valid operation).
+
+#### Args:
+
+* <b>`concentration`</b>: Floating point tensor, the concentration params of the
+    distribution(s). Must contain only positive values.
+* <b>`rate`</b>: Floating point tensor, the inverse scale params of the
+    distribution(s). Must contain only positive values.
+* <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
+    parameters are checked for validity despite possibly degrading runtime
+    performance. When `False` invalid inputs may silently render incorrect
+    outputs.
+* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
+    (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
+    result is undefined. When `False`, an exception is raised if one or
+    more of the statistic's batch members are undefined.
+* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
+
+
+
+#### Raises:
+
+* <b>`TypeError`</b>: if `concentration` and `rate` are different dtypes.
+
+
 
 ## Properties
 
@@ -176,8 +226,7 @@ Rate parameter.
 Describes how samples from the distribution are reparameterized.
 
 Currently this is one of the static instances
-`distributions.FULLY_REPARAMETERIZED`
-or `distributions.NOT_REPARAMETERIZED`.
+`tfd.FULLY_REPARAMETERIZED` or `tfd.NOT_REPARAMETERIZED`.
 
 #### Returns:
 
@@ -190,45 +239,6 @@ Python `bool` indicating possibly expensive checks are enabled.
 
 
 ## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
-
-``` python
-__init__(
-    concentration,
-    rate,
-    validate_args=False,
-    allow_nan_stats=True,
-    name='InverseGamma'
-)
-```
-
-Construct InverseGamma with `concentration` and `rate` parameters.
-
-The parameters `concentration` and `rate` must be shaped in a way that
-supports broadcasting (e.g. `concentration + rate` is a valid operation).
-
-#### Args:
-
-* <b>`concentration`</b>: Floating point tensor, the concentration params of the
-    distribution(s). Must contain only positive values.
-* <b>`rate`</b>: Floating point tensor, the inverse scale params of the
-    distribution(s). Must contain only positive values.
-* <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
-    parameters are checked for validity despite possibly degrading runtime
-    performance. When `False` invalid inputs may silently render incorrect
-    outputs.
-* <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
-    (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
-    result is undefined. When `False`, an exception is raised if one or
-    more of the statistic's batch members are undefined.
-* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
-
-
-
-#### Raises:
-
-* <b>`TypeError`</b>: if `concentration` and `rate` are different dtypes.
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
 
@@ -369,7 +379,7 @@ where `F` denotes the support of the random variable `X ~ P`.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 
@@ -463,7 +473,7 @@ denotes (Shanon) cross entropy, and `H[.]` denotes (Shanon) entropy.
 
 #### Args:
 
-* <b>`other`</b>: `tf.distributions.Distribution` instance.
+* <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 

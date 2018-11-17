@@ -22,6 +22,9 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.framework import tensor_shape
 
 __all__ = [
@@ -29,7 +32,7 @@ __all__ = [
 ]
 
 
-class Cauchy(tf.distributions.Distribution):
+class Cauchy(distribution.Distribution):
   """The Cauchy distribution with location `loc` and scale `scale`.
 
   #### Mathematical details
@@ -116,14 +119,17 @@ class Cauchy(tf.distributions.Distribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name, values=[loc, scale]) as name:
+      dtype = dtype_util.common_dtype([loc, scale], tf.float32)
+      loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
+      scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
       with tf.control_dependencies([tf.assert_positive(scale)]
                                    if validate_args else []):
-        self._loc = tf.identity(loc, name="loc")
-        self._scale = tf.identity(scale, name="scale")
+        self._loc = tf.identity(loc)
+        self._scale = tf.identity(scale)
         tf.assert_same_float_dtype([self._loc, self._scale])
     super(Cauchy, self).__init__(
         dtype=self._scale.dtype,
-        reparameterization_type=tf.distributions.FULLY_REPARAMETERIZED,
+        reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
         parameters=parameters,

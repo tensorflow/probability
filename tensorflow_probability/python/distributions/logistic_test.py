@@ -39,7 +39,7 @@ class LogisticTest(tf.test.TestCase):
     scale = 1.5
     dist = tfd.Logistic(loc, scale)
     self.assertTrue(
-        dist.reparameterization_type == tf.distributions.FULLY_REPARAMETERIZED)
+        dist.reparameterization_type == tfd.FULLY_REPARAMETERIZED)
 
   def testLogisticLogProb(self):
     batch_size = 6
@@ -51,11 +51,11 @@ class LogisticTest(tf.test.TestCase):
     expected_log_prob = stats.logistic.logpdf(x, np_loc, scale)
 
     log_prob = dist.log_prob(x)
-    self.assertEqual(log_prob.get_shape(), (6,))
+    self.assertEqual(log_prob.shape, (6,))
     self.assertAllClose(self.evaluate(log_prob), expected_log_prob)
 
     prob = dist.prob(x)
-    self.assertEqual(prob.get_shape(), (6,))
+    self.assertEqual(prob.shape, (6,))
     self.assertAllClose(self.evaluate(prob), np.exp(expected_log_prob))
 
   def testLogisticCDF(self):
@@ -69,7 +69,7 @@ class LogisticTest(tf.test.TestCase):
     cdf = dist.cdf(x)
     expected_cdf = stats.logistic.cdf(x, np_loc, scale)
 
-    self.assertEqual(cdf.get_shape(), (6,))
+    self.assertEqual(cdf.shape, (6,))
     self.assertAllClose(self.evaluate(cdf), expected_cdf)
 
   def testLogisticLogCDF(self):
@@ -83,7 +83,7 @@ class LogisticTest(tf.test.TestCase):
     logcdf = dist.log_cdf(x)
     expected_logcdf = stats.logistic.logcdf(x, np_loc, scale)
 
-    self.assertEqual(logcdf.get_shape(), (6,))
+    self.assertEqual(logcdf.shape, (6,))
     self.assertAllClose(self.evaluate(logcdf), expected_logcdf)
 
   def testLogisticSurvivalFunction(self):
@@ -97,7 +97,7 @@ class LogisticTest(tf.test.TestCase):
     survival_function = dist.survival_function(x)
     expected_survival_function = stats.logistic.sf(x, np_loc, scale)
 
-    self.assertEqual(survival_function.get_shape(), (6,))
+    self.assertEqual(survival_function.shape, (6,))
     self.assertAllClose(
         self.evaluate(survival_function), expected_survival_function)
 
@@ -112,7 +112,7 @@ class LogisticTest(tf.test.TestCase):
     logsurvival_function = dist.log_survival_function(x)
     expected_logsurvival_function = stats.logistic.logsf(x, np_loc, scale)
 
-    self.assertEqual(logsurvival_function.get_shape(), (6,))
+    self.assertEqual(logsurvival_function.shape, (6,))
     self.assertAllClose(
         self.evaluate(logsurvival_function), expected_logsurvival_function)
 
@@ -144,7 +144,7 @@ class LogisticTest(tf.test.TestCase):
     scale = 1.0
     dist = tfd.Logistic(loc, scale)
     sample = dist.sample(seed=100)
-    self.assertEqual(sample.get_shape(), (3,))
+    self.assertEqual(sample.shape, (3,))
     self.assertAllClose(
         self.evaluate(sample), [6.22460556, 3.79602098, 2.05084133])
 

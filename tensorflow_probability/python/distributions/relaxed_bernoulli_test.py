@@ -23,7 +23,6 @@ import numpy as np
 import scipy.special
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow.python.framework import errors_impl
 from tensorflow.python.framework import test_util
 
 tfd = tfp.distributions
@@ -84,7 +83,7 @@ class RelaxedBernoulliTest(tf.test.TestCase):
     """If validate_args, raises InvalidArgumentError when temperature is 0."""
     temperature = tf.constant(0.0)
     p = tf.constant([0.1, 0.4])
-    with self.assertRaises(errors_impl.InvalidArgumentError):
+    with self.assertRaises(tf.errors.InvalidArgumentError):
       dist = tfd.RelaxedBernoulli(temperature, probs=p, validate_args=True)
       sample = dist.sample()
       self.evaluate(sample)
@@ -129,7 +128,7 @@ class RelaxedBernoulliTest(tf.test.TestCase):
     p = [0.2, 0.6, 0.5]
     dist = tfd.RelaxedBernoulli(temperature, probs=p)
     n = 10000
-    samples = dist.sample(n)
+    samples = dist.sample(n, seed=123)
     self.assertEqual(samples.dtype, tf.float32)
     sample_values = self.evaluate(samples)
     self.assertTrue(np.all(sample_values >= 0))
