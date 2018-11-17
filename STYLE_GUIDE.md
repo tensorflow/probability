@@ -190,13 +190,22 @@ it supercedes all previous conventions.
 
     Justification: Both work but only one is self-documenting.
 
-1.  Use `"{}".format()` rather than `"" %` for string formatting.
+1.  Use `'{}'.format()` rather than `'' %` for string formatting.
 
     Justification: [PEP 3101](https://www.python.org/dev/peps/pep-3101/) and
     [Python official
     tutorials](https://docs.python.org/3.2/tutorial/inputoutput.html#old-string-formatting):
     "...this old style of formatting will eventually be removed from the
     language, str.format() should generally be used."
+
+1.  Prefer single quotes ('hello world') to double quotes ("hello world") for
+    single-line string literals. However, when using triple quotes for multiline
+    literals (docstrings, etc.), prefer """ (three double quotes) to '''.
+
+    Justification: single quotes are slightly faster to type. They also avoid
+    the need to escape double-quotes that occur organically in English text
+    (at the cost of needing to escape contractions, which are debatably more
+    common but can also often be avoided).
 
 1.  When calling `tf.convert_to_tensor`, try to specify in advance a
     user-friendly dtype. If multiple `Tensor`s must be compatible, use
