@@ -116,27 +116,15 @@ class RationalQuadratic(psd_kernel.PositiveSemidefiniteKernel):
           amplitude, scale_mixture_rate, length_scale], tf.float32)
 
       if amplitude is not None:
-        amplitude = tf.convert_to_tensor(
-            amplitude, name="amplitude", dtype=dtype)
-        with tf.control_dependencies(
-            [tf.assert_positive(amplitude)] if validate_args else []):
-          amplitude = tf.identity(amplitude)
+        amplitude = tf.convert_to_tensor(amplitude, name="amplitude", dtype=dtype)
       self._amplitude = _validate_arg_if_not_none(amplitude, tf.assert_positive, validate_args)
 
       if scale_mixture_rate is not None:
-        scale_mixture_rate = tf.convert_to_tensor(
-            scale_mixture_rate, name="scale_mixture_rate", dtype=dtype)
-        with tf.control_dependencies(
-            [tf.assert_positive(scale_mixture_rate)] if validate_args else []):
-          scale_mixture_rate = tf.identity(scale_mixture_rate)
+        scale_mixture_rate = tf.convert_to_tensor(scale_mixture_rate, name="scale_mixture_rate", dtype=dtype)
       self._scale_mixture_rate = _validate_arg_if_not_none(scale_mixture_rate, tf.assert_positive, validate_args)
 
       if length_scale is not None:
-        length_scale = tf.convert_to_tensor(
-            length_scale, name="length_scale", dtype=dtype)
-        with tf.control_dependencies(
-            [tf.assert_positive(length_scale)] if validate_args else []):
-          length_scale = tf.identity(length_scale)
+        length_scale = tf.convert_to_tensor(length_scale, name="length_scale", dtype=dtype)
       self._length_scale = _validate_arg_if_not_none(length_scale, tf.assert_positive, validate_args)
 
     super(RationalQuadratic, self).__init__(feature_ndims, name)
