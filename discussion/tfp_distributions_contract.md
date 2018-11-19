@@ -28,6 +28,9 @@ You are encouraged to subclass `tfp.distributions.Distribution` and invited to
 _disregard any/all of these standards_. We especially recommend you ignore point
 #4.
 
+All TFP code (including `tfp.distributions`) follows the [TFP Style Guide](
+https://github.com/tensorflow/probability/blob/master/STYLE_GUIDE.md#tensorflow-probability-style-guide).
+
 ## Requirements (Comprehensive)
 
 1. A `Distribution` subclass must implement a `sample` function. The `sample`
@@ -83,6 +86,12 @@ _disregard any/all of these standards_. We especially recommend you ignore point
     Any validation requiring graph execution must be gated by a Boolean,
     global parameter.
 
+11. `Distribution` parameters are descriptive English (i.e., not Greek letters)
+    and draw upon a relatively small, shared lexicon. Examples include: `loc`,
+    `scale`, `concentration`, `rate`, `probs`, `logits`, `df`. When forced to
+    choose between mathematical purity and conveying intuitive meaning, prefer
+    the latter but provide extensive documentation.
+
 ## Non-Requirements (Noncomprehensive)
 
 In this section we list items which have historically been presumed true of
@@ -93,3 +102,7 @@ In this section we list items which have historically been presumed true of
    both API owner and user). As of 18-nov-2018, no `tfp.distributions` member
    has its own mutable state although all distributions do mutate the global
    random number generate state on access to `sample`.
+
+2. Subclasses are free to override public base class members. I.e., you don't
+   have to follow the "public calls private" pattern. (However, as of
+   18-nov-2018, there has not yet been a reason to deviate from this pattern.)
