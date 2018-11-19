@@ -94,8 +94,6 @@ def sample_chain(
     next_states: Tensor or Python list of `Tensor`s representing the
       state(s) of the Markov chain(s) at each result step. Has same shape as
       input `current_state` but with a prepended `num_results`-size dimension.
-    kernel_results: `collections.namedtuple` of internal calculations used to
-      advance the chain.
     kernel_results: A (possibly nested) `tuple`, `namedtuple` or `list` of
       `Tensor`s representing internal calculations made within this function.
 
