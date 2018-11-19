@@ -77,7 +77,7 @@ def _copy_fn(fn):
     TypeError: if `fn` is not a callable.
   """
   if not callable(fn):
-    raise TypeError("fn is not callable: %s" % fn)
+    raise TypeError("fn is not callable: {}".format(fn))
   # The blessed way to copy a function. copy.deepcopy fails to create a
   # non-reference copy. Since:
   #   types.FunctionType == type(lambda: None),
@@ -162,23 +162,26 @@ class _DistributionMeta(abc.ABCMeta):
     which_base = [
         base for base in baseclasses
         if base == _BaseDistribution or issubclass(base, Distribution)]
-    base = which_base[0]
-    if base == _BaseDistribution:  # Nothing to be done for Distribution
-      return abc.ABCMeta.__new__(mcs, classname, baseclasses, attrs)
+    base = which_base[0] if which_base else None
+    if base is None or base == _BaseDistribution:
+      # Nothing to be done for Distribution or unrelated subclass.
+      return super(_DistributionMeta, mcs).__new__(
+          mcs, classname, baseclasses, attrs)
     if not issubclass(base, Distribution):
-      raise TypeError("First parent class declared for %s must be "
-                      "Distribution, but saw '%s'" % (classname, base.__name__))
+      raise TypeError("First parent class declared for {} must be "
+                      "Distribution, but saw '{}'".format(
+                          classname, base.__name__))
     for attr in _DISTRIBUTION_PUBLIC_METHOD_WRAPPERS:
-      special_attr = "_%s" % attr
-      class_attr_value = attrs.get(attr, None)
       if attr in attrs:
-        # The method is being overridden, do not update its docstring
+        # The method is being overridden, do not update its docstring.
         continue
+      special_attr = "_{}".format(attr)
+      class_attr_value = attrs.get(attr, None)
       base_attr_value = getattr(base, attr, None)
       if not base_attr_value:
         raise AttributeError(
-            "Internal error: expected base class '%s' to implement method '%s'"
-            % (base.__name__, attr))
+            "Internal error: expected base class '{}' to "
+            "implement method '{}'".format(base.__name__, attr))
       class_special_attr_value = attrs.get(special_attr, None)
       if class_special_attr_value is None:
         # No _special method available, no need to update the docstring.
@@ -191,15 +194,16 @@ class _DistributionMeta(abc.ABCMeta):
       class_attr_docstring = tf_inspect.getdoc(base_attr_value)
       if class_attr_docstring is None:
         raise ValueError(
-            "Expected base class fn to contain a docstring: %s.%s"
-            % (base.__name__, attr))
+            "Expected base class fn to contain a docstring: {}.{}".format(
+                base.__name__, attr))
       class_attr_value.__doc__ = _update_docstring(
           class_attr_value.__doc__,
-          ("Additional documentation from `%s`:\n\n%s"
-           % (classname, class_special_attr_docstring)))
+          "Additional documentation from `{}`:\n\n{}".format(
+              classname, class_special_attr_docstring))
       attrs[attr] = class_attr_value
 
-    return abc.ABCMeta.__new__(mcs, classname, baseclasses, attrs)
+    return super(_DistributionMeta, mcs).__new__(
+        mcs, classname, baseclasses, attrs)
 
 
 @six.add_metaclass(_DistributionMeta)
