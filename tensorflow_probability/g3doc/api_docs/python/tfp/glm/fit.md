@@ -121,7 +121,8 @@ def make_dataset(n, d, link, scale=1., dtype=np.float32):
         dtype)
   elif link == 'logit':
     response = tfd.Bernoulli(logits=linear_response).sample(seed=44)
-* <b>`else`</b>:     raise ValueError('unrecognized true link: {}'.format(link))
+  else:
+    raise ValueError('unrecognized true link: {}'.format(link))
   return model_matrix, response, model_coefficients
 
 X, Y, w_true = make_dataset(n=int(1e6), d=100, link='probit')
