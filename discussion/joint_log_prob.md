@@ -30,7 +30,7 @@ All `joint_log_prob` functions have the following structure:
 1. The function takes a set of **inputs** representing the values of the random
    variables in the model. These inputs must be convertible to `Tensor`s.
    Typically the function would support computing batches of inputs, i.e., a
-   vector of inputs. (For more information on batches see [Tensorflow
+   vector of inputs. (For more information on batches see [TensorFlow
    Distributions](https://arxiv.org/abs/1711.10604), section 3.3.)
 
 2. Internally the `joint_log_prob` function uses probability distributions to
