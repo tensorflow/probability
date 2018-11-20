@@ -245,7 +245,7 @@ class StudentT(distribution.Distribution):
     gamma_sample = tf.random_gamma(
         [n],
         0.5 * df,
-        beta=0.5,
+        beta=2,
         dtype=self.dtype,
         seed=seed())
     samples = normal_sample * tf.rsqrt(gamma_sample / df)
