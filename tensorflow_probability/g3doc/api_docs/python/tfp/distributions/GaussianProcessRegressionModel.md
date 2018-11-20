@@ -151,7 +151,7 @@ observation_noise_variance = .5
 f = lambda x: np.sin(10*x[..., 0]) * np.exp(-x[..., 0]**2)
 observation_index_points = np.random.uniform(-1., 1., 50)[..., np.newaxis]
 observations = (f(observation_index_points) +
-                np.random.normal(0., np.sqrt(observation_noise_variance))
+                np.random.normal(0., np.sqrt(observation_noise_variance)))
 
 index_points = np.linspace(-1., 1., 100)[..., np.newaxis]
 
