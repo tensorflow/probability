@@ -65,19 +65,19 @@ landing_page:
   - classname: devsite-landing-row-cards
     items:
     - heading: Introducing TensorFlow Probability
-      image_path: /ecosystem/images/tf-logo-card-16x9.png
+      image_path: /resources/images/tf-logo-card-16x9.png
       path: https://medium.com/tensorflow/introducing-tensorflow-probability-dca4c304e245
       buttons:
       - label: Read on TensorFlow blog
         path: https://medium.com/tensorflow/introducing-tensorflow-probability-dca4c304e245
     - heading: "An Introductory Analysis using TensorFlow Probability"
-      image_path: /ecosystem/images/tf-logo-card-16x9.png
+      image_path: /resources/images/tf-logo-card-16x9.png
       path: https://medium.com/tensorflow/the-trinity-of-errors-in-financial-models-an-introductory-analysis-using-tensorflow-probability-9fdefb4d283d
       buttons:
       - label: Read on TensorFlow blog
         path: https://medium.com/tensorflow/the-trinity-of-errors-in-financial-models-an-introductory-analysis-using-tensorflow-probability-9fdefb4d283d
     - heading: "Industrial AI: Physics-based, Probabilistic Deep Learning using TensorFlow Probability"
-      image_path: /ecosystem/images/tf-logo-card-16x9.png
+      image_path: /resources/images/tf-logo-card-16x9.png
       path: https://medium.com/tensorflow/industrial-ai-bhges-physics-based-probabilistic-deep-learning-using-tensorflow-probability-5f215c791863
       buttons:
       - label: Read on TensorFlow blog
@@ -97,7 +97,7 @@ landing_page:
       - label: Watch the video
         path: https://www.youtube.com/watch?v=CkD4PKwn9Dk
     - heading: TensorFlow Probability on GitHub
-      image_path: /ecosystem/images/github-card-16x9.png
+      image_path: /resources/images/github-card-16x9.png
       path: https://github.com/tensorflow/probability
       buttons:
       - label: View on GitHub
