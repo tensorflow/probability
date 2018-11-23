@@ -49,6 +49,7 @@ from tensorflow_probability.python.bijectors.permute import Permute
 from tensorflow_probability.python.bijectors.power_transform import PowerTransform
 from tensorflow_probability.python.bijectors.real_nvp import real_nvp_default_template
 from tensorflow_probability.python.bijectors.real_nvp import RealNVP
+from tensorflow_probability.python.bijectors.reciprocal import Reciprocal
 from tensorflow_probability.python.bijectors.reshape import Reshape
 from tensorflow_probability.python.bijectors.scale_tril import ScaleTriL
 from tensorflow_probability.python.bijectors.sigmoid import Sigmoid
@@ -93,6 +94,7 @@ __all__ = [
     "Permute",
     "PowerTransform",
     "RealNVP",
+    "Reciprocal",
     "Reshape",
     "ScaleTriL",
     "Sigmoid",
