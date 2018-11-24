@@ -32,12 +32,6 @@ __all__ = [
     'MetropolisHastings',
 ]
 
-
-# Cause all warnings to always be triggered.
-# Not having this means subsequent calls wont trigger the warning.
-warnings.simplefilter('always')
-
-
 MetropolisHastingsKernelResults = collections.namedtuple(
     'MetropolisHastingsKernelResults',
     [

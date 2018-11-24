@@ -27,11 +27,6 @@ __all__ = [
 ]
 
 
-# Cause all warnings to always be triggered.
-# Not having this means subsequent calls wont trigger the warning.
-warnings.simplefilter("always")
-
-
 def externalize_variables_as_args(fn,
                                   fn_args=(),
                                   ancestor_variables=None,

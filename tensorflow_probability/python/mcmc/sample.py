@@ -32,10 +32,6 @@ __all__ = [
     "sample_chain",
 ]
 
-# Cause all warnings to always be triggered.
-# Not having this means subsequent calls wont trigger the warning.
-warnings.simplefilter("always")
-
 
 def sample_chain(
     num_results,
