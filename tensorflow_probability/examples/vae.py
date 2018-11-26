@@ -36,7 +36,7 @@ bound (ELBO),
 = -log int dz q(z|x) p(x|z) p(z) / q(z|x)
 <= int dz q(z|x) (-log[ p(x|z) p(z) / q(z|x) ])   # Jensen's Inequality
 =: KL[q(Z|x) || p(x|Z)p(Z)]
-= -E_{Z~q(Z|x)}[log p(x|Z)] - KL[q(Z|x) || p(Z)]
+= -E_{Z~q(Z|x)}[log p(x|Z)] + KL[q(Z|x) || p(Z)]
 ```
 
 -or-
@@ -45,7 +45,7 @@ bound (ELBO),
 -log p(x)
 = KL[q(Z|x) || p(x|Z)p(Z)] - KL[q(Z|x) || p(Z|x)]
 <= KL[q(Z|x) || p(x|Z)p(Z)                        # Positivity of KL
-= -E_{Z~q(Z|x)}[log p(x|Z)] - KL[q(Z|x) || p(Z)]
+= -E_{Z~q(Z|x)}[log p(x|Z)] + KL[q(Z|x) || p(Z)]
 ```
 
 The `-E_{Z~q(Z|x)}[log p(x|Z)]` term is an expected reconstruction loss and
