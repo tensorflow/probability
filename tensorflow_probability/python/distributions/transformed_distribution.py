@@ -21,7 +21,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
-from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow.python.framework import tensor_util
@@ -257,7 +257,7 @@ class TransformedDistribution(distribution_lib.Distribution):
       self._empty = tf.constant([], dtype=tf.int32, name="empty")
 
       if bijector is None:
-        bijector = tfb.Identity(validate_args=validate_args)
+        bijector = identity_bijector.Identity(validate_args=validate_args)
 
       # We will keep track of a static and dynamic version of
       # self._is_{batch,event}_override. This way we can do more prior to graph

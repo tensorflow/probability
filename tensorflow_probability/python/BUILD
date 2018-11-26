@@ -36,6 +36,7 @@ py_library(
         ":monte_carlo",
         ":trainable_distributions",
         ":version",
+        "//tensorflow_probability/python/bijectors",
         "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/edward2",
         "//tensorflow_probability/python/glm",

@@ -19,7 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from tensorflow_probability.python import bijectors
+from tensorflow_probability.python.bijectors import affine_linear_operator as affine_linear_operator_bijector
 from tensorflow_probability.python.distributions import exponential
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
@@ -190,7 +190,7 @@ class VectorExponentialLinearOperator(
           distribution=exponential.Exponential(
               rate=tf.ones([], dtype=scale.dtype),
               allow_nan_stats=allow_nan_stats),
-          bijector=bijectors.AffineLinearOperator(
+          bijector=affine_linear_operator_bijector.AffineLinearOperator(
               shift=loc, scale=scale, validate_args=validate_args),
           batch_shape=batch_shape,
           event_shape=event_shape,

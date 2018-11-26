@@ -65,8 +65,6 @@ from tensorflow_probability.python.bijectors.weibull import Weibull
 
 # pylint: enable=unused-import,line-too-long,g-importing-member
 
-from tensorflow.python.util.all_util import remove_undocumented
-
 __all__ = [
     "AbsoluteValue",
     "Affine",
@@ -111,5 +109,3 @@ __all__ = [
     "masked_dense",
     "real_nvp_default_template"
 ]
-
-remove_undocumented(__name__, __all__)

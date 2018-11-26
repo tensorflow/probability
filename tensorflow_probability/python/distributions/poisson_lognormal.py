@@ -22,7 +22,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
-from tensorflow_probability.python import bijectors
+from tensorflow_probability.python.bijectors import exp as exp_bijector
 from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import normal
@@ -113,7 +113,7 @@ def quadrature_scheme_lognormal_quantiles(
     # Create a LogNormal distribution.
     dist = transformed_distribution.TransformedDistribution(
         distribution=normal.Normal(loc=loc, scale=scale),
-        bijector=bijectors.Exp(),
+        bijector=exp_bijector.Exp(),
         validate_args=validate_args)
     batch_ndims = dist.batch_shape.ndims
     if batch_ndims is None:

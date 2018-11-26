@@ -22,7 +22,8 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
-from tensorflow_probability.python import bijectors
+from tensorflow_probability.python.bijectors import affine_linear_operator as affine_linear_operator_bijector
+from tensorflow_probability.python.bijectors import softmax_centered as softmax_centered_bijector
 from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import normal
@@ -174,7 +175,7 @@ def quadrature_scheme_softmaxnormal_quantiles(
           shape=tf.concat(
               [[-1], tf.ones([batch_ndims], dtype=tf.int32)], axis=0))
       quantiles = dist.quantile(edges)
-      quantiles = bijectors.SoftmaxCentered().forward(quantiles)
+      quantiles = softmax_centered_bijector.SoftmaxCentered().forward(quantiles)
       # Cyclically permute left by one.
       perm = tf.concat([tf.range(1, 1 + batch_ndims), [0]], axis=0)
       quantiles = tf.transpose(quantiles, perm)
@@ -417,7 +418,7 @@ class VectorDiffeomixture(distribution_lib.Distribution):
                   k, scale_.dtype.base_dtype.name, dtype.name))
 
       self._endpoint_affine = [
-          bijectors.AffineLinearOperator(
+          affine_linear_operator_bijector.AffineLinearOperator(
               shift=loc_, scale=scale_,
               validate_args=validate_args,
               name="endpoint_affine_{}".format(k))
@@ -455,7 +456,7 @@ class VectorDiffeomixture(distribution_lib.Distribution):
       self._distribution = distribution
 
       self._interpolated_affine = [
-          bijectors.AffineLinearOperator(
+          affine_linear_operator_bijector.AffineLinearOperator(
               shift=loc_, scale=scale_,
               validate_args=validate_args,
               name="interpolated_affine_{}".format(k))
@@ -885,6 +886,7 @@ def interpolate_scale(grid, scale):
 
 
 def linop_scale(w, op):
+  """Creates weighted `LinOp` from existing `LinOp`."""
   # We assume w > 0. (This assumption only relates to the is_* attributes.)
   with tf.name_scope("linop_scale", values=[w]):
     # TODO(b/35301104): LinearOperatorComposition doesn't combine operators, so

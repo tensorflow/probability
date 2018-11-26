@@ -22,7 +22,8 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
-from tensorflow_probability.python import bijectors
+from tensorflow_probability.python.bijectors import gumbel as gumbel_bijector
+from tensorflow_probability.python.bijectors import invert as invert_bijector
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import distribution_util
@@ -134,7 +135,7 @@ class Gumbel(transformed_distribution.TransformedDistribution):
         loc = tf.identity(loc, name="loc")
         scale = tf.identity(scale, name="scale")
         tf.assert_same_float_dtype([loc, scale])
-        self._gumbel_bijector = bijectors.Gumbel(
+        self._gumbel_bijector = gumbel_bijector.Gumbel(
             loc=loc, scale=scale, validate_args=validate_args)
 
       super(Gumbel, self).__init__(
@@ -145,7 +146,7 @@ class Gumbel(transformed_distribution.TransformedDistribution):
           # The Gumbel bijector encodes the quantile
           # function as the forward, and hence needs to
           # be inverted.
-          bijector=bijectors.Invert(self._gumbel_bijector),
+          bijector=invert_bijector.Invert(self._gumbel_bijector),
           batch_shape=distribution_util.get_broadcast_shape(loc, scale),
           name=name)
 
