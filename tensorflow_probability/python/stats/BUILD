@@ -30,6 +30,7 @@ py_library(
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":quantiles",
         ":sample_stats",
     ],
 )
@@ -48,6 +49,27 @@ py_test(
     name = "sample_stats_test",
     size = "small",
     srcs = ["sample_stats_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "quantiles",
+    srcs = ["quantiles.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "quantiles_test",
+    size = "small",
+    srcs = ["quantiles_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
