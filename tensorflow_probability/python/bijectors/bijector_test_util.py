@@ -21,7 +21,7 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 import tensorflow as tf
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import uniform as uniform_distribution
 
 
 def assert_finite(array):
@@ -92,10 +92,10 @@ def assert_scalar_congruency(bijector,
     lower_y, upper_y = upper_y, lower_y
 
   # Uniform samples from the domain, range.
-  uniform_x_samps = tfd.Uniform(
+  uniform_x_samps = uniform_distribution.Uniform(
       low=lower_x, high=upper_x).sample(
           n, seed=0)
-  uniform_y_samps = tfd.Uniform(
+  uniform_y_samps = uniform_distribution.Uniform(
       low=lower_y, high=upper_y).sample(
           n, seed=1)
 

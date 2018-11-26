@@ -835,7 +835,6 @@ py_library(
         ":distribution",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/bijectors:identity",
         "//tensorflow_probability/python/internal:distribution_util",
     ],
 )

@@ -74,11 +74,16 @@ py_library(
 
 py_library(
     name = "bijector",
-    srcs = ["bijector.py"],
+    srcs = [
+        "bijector.py",
+        "chain.py",
+    ],
     deps = [
         # numpy dep,
         # six dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/distributions:distribution",
+        "//tensorflow_probability/python/distributions:transformed_distribution",
         "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
@@ -442,7 +447,7 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/distributions:uniform",
     ],
 )
 
@@ -455,6 +460,7 @@ py_test(
         # numpy dep,
         # six dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/distributions",
     ],
 )
 

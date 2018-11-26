@@ -124,8 +124,6 @@ from tensorflow.python.ops.distributions.student_t import StudentTWithAbsDfSoftp
 
 # pylint: enable=unused-import,wildcard-import,line-too-long,g-importing-member
 
-from tensorflow.python.util.all_util import remove_undocumented
-
 __all__ = [
     'auto_correlation',
     'Cauchy',
@@ -228,5 +226,3 @@ __all__ = [
     'quadrature_scheme_lognormal_gauss_hermite',
     'quadrature_scheme_lognormal_quantiles',
 ]
-
-remove_undocumented(__name__, __all__)

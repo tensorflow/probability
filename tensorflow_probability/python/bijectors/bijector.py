@@ -636,6 +636,87 @@ class Bijector(object):
     """Returns the string name of this `Bijector`."""
     return self._name
 
+  def __call__(self, value, name=None, **kwargs):
+    """Applies or composes the `Bijector`, depending on input type.
+
+    This is a convenience function which applies the `Bijector` instance in
+    three different ways, depending on the input:
+
+    1. If the input is a `tfd.Distribution` instance, return
+       `tfd.TransformedDistribution(distribution=input, bijector=self)`.
+    2. If the input is a `tfb.Bijector` instance, return
+       `tfb.Chain([self, input])`.
+    3. Otherwise, return `self.forward(input)`
+
+    Args:
+      value: A `tfd.Distribution`, `tfb.Bijector`, or a `Tensor`.
+      name: Python `str` name given to ops created by this function.
+      **kwargs: Additional keyword arguments passed into the created
+        `tfd.TransformedDistribution`, `tfb.Bijector`, or `self.forward`.
+
+    Returns:
+      composition: A `tfd.TransformedDistribution` if the input was a
+        `tfd.Distribution`, a `tfb.Chain` if the input was a `tfb.Bijector`, or
+        a `Tensor` computed by `self.forward`.
+
+    #### Examples
+
+    ```python
+    sigmoid = tfb.Reciprocal()(
+        tfb.AffineScalar(shift=1.)(
+          tfb.Exp()(
+            tfb.AffineScalar(scale=-1.))))
+    # ==> `tfb.Chain([
+    #         tfb.Reciprocal(),
+    #         tfb.AffineScalar(shift=1.),
+    #         tfb.Exp(),
+    #         tfb.AffineScalar(scale=-1.),
+    #      ])`  # ie, `tfb.Sigmoid()`
+
+    log_normal = tfb.Exp()(tfd.Normal(0, 1))
+    # ==> `tfd.TransformedDistribution(tfd.Normal(0, 1), tfb.Exp())`
+
+    tfb.Exp()([-1., 0., 1.])
+    # ==> tf.exp([-1., 0., 1.])
+    ```
+
+    """
+
+    # To avoid circular dependencies and keep the implementation local to the
+    # `Bijector` class, we violate PEP8 guidelines and import here rather than
+    # at the top of the file.
+    from tensorflow_probability.python.bijectors import chain  # pylint: disable=g-import-not-at-top
+    from tensorflow_probability.python.distributions import distribution  # pylint: disable=g-import-not-at-top
+    from tensorflow_probability.python.distributions import transformed_distribution  # pylint: disable=g-import-not-at-top
+
+    if isinstance(value, transformed_distribution.TransformedDistribution):
+      new_kwargs = value.parameters
+      new_kwargs.update(kwargs)
+      new_kwargs["name"] = name or new_kwargs.get("name", None)
+      new_kwargs["bijector"] = self(value.bijector)
+      return transformed_distribution.TransformedDistribution(**new_kwargs)
+
+    if isinstance(value, distribution.Distribution):
+      return transformed_distribution.TransformedDistribution(
+          distribution=value,
+          bijector=self,
+          name=name,
+          **kwargs)
+
+    if isinstance(value, chain.Chain):
+      new_kwargs = kwargs.copy()
+      new_kwargs["bijectors"] = [self] + ([] if value.bijectors is None
+                                          else list(value.bijectors))
+      if "validate_args" not in new_kwargs:
+        new_kwargs["validate_args"] = value.validate_args
+      new_kwargs["name"] = name or value.name
+      return chain.Chain(**new_kwargs)
+
+    if isinstance(value, Bijector):
+      return chain.Chain([self, value], name=name, **kwargs)
+
+    return self._call_forward(value, name=name or "forward", **kwargs)
+
   def _forward_event_shape_tensor(self, input_shape):
     """Subclass implementation for `forward_event_shape_tensor` function."""
     # By default, we assume event_shape is unchanged.
