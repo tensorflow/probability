@@ -30,14 +30,13 @@ __all__ = [
 ]
 
 
-# TODO(langmore) To make equivalent to numpy.percentile:
-#  Make work with 'linear', 'midpoint' interpolation. (linear should be default)
 def percentile(x,
                q,
                axis=None,
                interpolation=None,
                keep_dims=False,
                validate_args=False,
+               preserve_gradients=True,
                name=None):
   """Compute the `q`-th percentile(s) of `x`.
 
@@ -60,6 +59,11 @@ def percentile(x,
   x = [1., 2., 3., 4.]
   tfp.stats.percentile(x, q=30.)
   ==> 2.0
+
+  # Get 30th percentile with 'linear' interpolation.
+  x = [1., 2., 3., 4.]
+  tfp.stats.percentile(x, q=30., interpolation='linear')
+  ==> 1.9
 
   # Get 30th and 70th percentiles with 'lower' interpolation
   x = [1., 2., 3., 4.]
@@ -90,16 +94,24 @@ def percentile(x,
       axis that hold independent samples over which to return the desired
       percentile.  If `None` (the default), treat every dimension as a sample
       dimension, returning a scalar.
-    interpolation : {'lower', 'higher', 'nearest'}.  Default: 'nearest' This
-      optional parameter specifies the interpolation method to
+    interpolation : {'nearest', 'linear', 'lower', 'higher', 'midpoint'}.
+      Default value: 'nearest'.  This specifies the interpolation method to
       use when the desired quantile lies between two data points `i < j`:
+        * linear: i + (j - i) * fraction, where fraction is the fractional part
+          of the index surrounded by i and j.
         * lower: `i`.
         * higher: `j`.
         * nearest: `i` or `j`, whichever is nearest.
+        * midpoint: (i + j) / 2.
+      `linear` and `midpoint` interpolation do not work with integer dtypes.
     keep_dims:  Python `bool`. If `True`, the last dimension is kept with size 1
       If `False`, the last dimension is removed from the output shape.
     validate_args:  Whether to add runtime checks of argument validity. If
       False, and arguments are incorrect, correct behavior is not guaranteed.
+    preserve_gradients:  Python `bool`.  If `True`, ensure that gradient w.r.t
+      the percentile `q` is preserved in the case of linear interpolation.
+      If `False`, the gradient will be (incorrectly) zero when `q` corresponds
+      to a point in `x`.
     name:  A Python string name to give this `Op`.  Default is 'percentile'
 
   Returns:
@@ -109,9 +121,10 @@ def percentile(x,
 
   Raises:
     ValueError:  If argument 'interpolation' is not an allowed type.
+    ValueError:  If interpolation type not compatible with `dtype`.
   """
   name = name or 'percentile'
-  allowed_interpolations = {'lower', 'higher', 'nearest'}
+  allowed_interpolations = {'linear', 'lower', 'higher', 'nearest', 'midpoint'}
 
   if interpolation is None:
     interpolation = 'nearest'
@@ -122,16 +135,21 @@ def percentile(x,
 
   with tf.name_scope(name, values=[x, q]):
     x = tf.convert_to_tensor(x, name='x')
+
+    if interpolation in {'linear', 'midpoint'} and x.dtype.is_integer:
+      raise TypeError('{} interpolation not allowed with dtype {}'.format(
+          interpolation, x.dtype))
+
     # Double is needed here and below, else we get the wrong index if the array
     # is huge along axis.
-    q = tf.to_double(q, name='q')
+    q = tf.cast(q, tf.float64)
     _get_static_ndims(q, expect_ndims_no_more_than=1)
 
     if validate_args:
       q = control_flow_ops.with_dependencies([
           tf.assert_rank_in(q, [0, 1]),
-          tf.assert_greater_equal(q, tf.to_double(0.)),
-          tf.assert_less_equal(q, tf.to_double(100.))
+          tf.assert_greater_equal(q, tf.cast(0., tf.float64)),
+          tf.assert_less_equal(q, tf.cast(100., tf.float64))
       ], q)
 
     if axis is None:
@@ -158,28 +176,59 @@ def percentile(x,
       y = _move_dims_to_flat_end(x, axis, x_ndims)
 
     frac_at_q_or_above = 1. - q / 100.
-    d = tf.to_double(tf.shape(y)[-1])
-
-    if interpolation == 'lower':
-      indices = tf.ceil((d - 1) * frac_at_q_or_above)
-    elif interpolation == 'higher':
-      indices = tf.floor((d - 1) * frac_at_q_or_above)
-    elif interpolation == 'nearest':
-      indices = tf.round((d - 1) * frac_at_q_or_above)
-
-    # If d is gigantic, then we would have d == d - 1, even in double... So
-    # let's use max/min to avoid out of bounds errors.
-    d = tf.shape(y)[-1]
-    # d - 1 will be distinct from d in int32.
-    indices = tf.clip_by_value(tf.to_int32(indices), 0, d - 1)
 
     # Sort everything, not just the top 'k' entries, which allows multiple calls
     # to sort only once (under the hood) and use CSE.
     sorted_y = _sort_tensor(y)
 
-    # Gather the indices along the sorted (last) dimension.
-    # If q is a vector, the last dim of gathered_y indexes different q[i].
-    gathered_y = tf.gather(sorted_y, indices, axis=-1)
+    d = tf.cast(tf.shape(y)[-1], tf.float64)
+
+    def _get_indices(interp_type):
+      """Get values of y at the indices implied by interp_type."""
+      # Note `lower` <--> ceiling.  Confusing, huh?  Due to the fact that
+      # _sort_tensor sorts highest to lowest, tf.ceil corresponds to the higher
+      # index, but the lower value of y!
+      if interp_type == 'lower':
+        indices = tf.ceil((d - 1) * frac_at_q_or_above)
+      elif interp_type == 'higher':
+        indices = tf.floor((d - 1) * frac_at_q_or_above)
+      elif interp_type == 'nearest':
+        indices = tf.round((d - 1) * frac_at_q_or_above)
+      # d - 1 will be distinct from d in int32, but not necessarily double.
+      # So clip to avoid out of bounds errors.
+      return tf.clip_by_value(
+          tf.cast(indices, tf.int32), 0, tf.shape(y)[-1] - 1)
+
+    if interpolation in ['nearest', 'lower', 'higher']:
+      gathered_y = tf.gather(sorted_y, _get_indices(interpolation), axis=-1)
+    elif interpolation == 'midpoint':
+      gathered_y = 0.5 * (
+          tf.gather(sorted_y, _get_indices('lower'), axis=-1) +
+          tf.gather(sorted_y, _get_indices('higher'), axis=-1))
+    elif interpolation == 'linear':
+      # Copy-paste of docstring on interpolation:
+      # linear: i + (j - i) * fraction, where fraction is the fractional part
+      # of the index surrounded by i and j.
+      larger_y_idx = _get_indices('lower')
+      exact_idx = (d - 1) * frac_at_q_or_above
+      if preserve_gradients:
+        # If q cooresponds to a point in x, we will initially have
+        # larger_y_idx == smaller_y_idx.
+        # This results in the gradient w.r.t. fraction being zero (recall `q`
+        # enters only through `fraction`...and see that things cancel).
+        # The fix is to ensure that smaller_y_idx and larger_y_idx are always
+        # separated by exactly 1.
+        smaller_y_idx = tf.maximum(larger_y_idx - 1, 0)
+        larger_y_idx = tf.minimum(smaller_y_idx + 1, tf.shape(y)[-1] - 1)
+        fraction = tf.cast(larger_y_idx, tf.float64) - exact_idx
+      else:
+        smaller_y_idx = _get_indices('higher')
+        fraction = tf.ceil((d - 1) * frac_at_q_or_above) - exact_idx
+
+      fraction = tf.cast(fraction, y.dtype)
+      gathered_y = (
+          tf.gather(sorted_y, larger_y_idx, axis=-1) * (1 - fraction) +
+          tf.gather(sorted_y, smaller_y_idx, axis=-1) * fraction)
 
     if keep_dims:
       if axis is None:

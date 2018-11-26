@@ -76,6 +76,16 @@ class PercentileTestWithLowerInterpolation(tf.test.TestCase):
       self.assertAllClose(expected_percentile, self.evaluate(pct_neg_index))
       self.assertAllClose(expected_percentile, self.evaluate(pct_pos_index))
 
+  def test_simple(self):
+    # Simple test that exposed something the other 1-D tests didn't.
+    x = np.array([1., 2., 4., 50.])
+    q = 10
+    expected_percentile = np.percentile(
+        x, q=q, interpolation=self._interpolation, axis=0)
+    pct = tfp.stats.percentile(
+        x, q=q, interpolation=self._interpolation, axis=[0])
+    self.assertAllClose(expected_percentile, self.evaluate(pct))
+
   def test_two_dim_even_axis_0(self):
     x = np.array([[1., 2., 4., 50.], [1., 2., -4., 5.]]).T
     for q in [0, 10, 25, 49.9, 50, 50.01, 90, 95, 100]:
@@ -175,6 +185,9 @@ class PercentileTestWithLowerInterpolation(tf.test.TestCase):
       self.assertAllClose(expected_percentile, self.evaluate(pct))
 
   def test_with_integer_dtype(self):
+    if self._interpolation in {'linear', 'midpoint'}:
+      self.skipTest('Skipping integer dtype test for interpolation {}'.format(
+          self._interpolation))
     x = [1, 5, 3, 2, 4]
     for q in [0, 10, 25, 49.9, 50, 50.01, 90, 95, 100]:
       expected_percentile = np.percentile(
@@ -183,6 +196,101 @@ class PercentileTestWithLowerInterpolation(tf.test.TestCase):
       self.assertEqual(tf.int32, pct.dtype)
       self.assertAllEqual((), pct.shape)
       self.assertAllClose(expected_percentile, self.evaluate(pct))
+
+
+class PercentileTestWithLinearInterpolation(
+    PercentileTestWithLowerInterpolation):
+
+  _interpolation = 'linear'
+
+  def test_integer_dtype_raises(self):
+    with self.assertRaisesRegexp(TypeError, 'not allowed with dtype'):
+      tfp.stats.percentile(x=[1, 2], q=30, interpolation='linear')
+
+  def test_grads_at_sample_pts_with_no_preserve_gradients(self):
+    dist = tfp.distributions.Normal(np.float64(0), np.float64(1))
+    x = dist.sample(10001, seed=0)
+    # 50th quantile will lie exactly on a data point.
+    # 49.123... will not
+    q = tf.constant(np.array([50, 49.123456789]))  # Percentiles, in [0, 100]
+
+    analytic_pct = dist.quantile(q / 100.)  # divide by 10 to make quantile.
+    sample_pct = tfp.stats.percentile(
+        x, q, interpolation='linear', preserve_gradients=False)
+
+    analytic_pct, d_analytic_pct_dq, sample_pct, d_sample_pct_dq = (
+        self.evaluate([
+            analytic_pct,
+            tf.gradients(analytic_pct, q)[0],
+            sample_pct,
+            tf.gradients(sample_pct, q)[0],
+        ]))
+
+    self.assertAllClose(analytic_pct, sample_pct, atol=0.05)
+
+    # Near the median, the normal PDF is approximately constant C, with
+    # C = 1 / sqrt(2 * pi).  So the cdf is approximately F(x) = x / C.
+    # Thus the quantile function is approximately F^{-1}(y) = C * y.
+    self.assertAllClose(np.sqrt(2 * np.pi) / 100 * np.ones([2]),
+                        d_analytic_pct_dq, atol=1e-4)
+
+    # At the 50th percentile exactly, the sample gradient is exactly zero!
+    # This is due to preserve_gradient == False.
+    self.assertAllEqual(0., d_sample_pct_dq[0])
+
+    # Tolerance at the other point is terrible (2x), but this is a sample
+    # quantile based gradient.
+    self.assertAllClose(
+        d_analytic_pct_dq[1], d_sample_pct_dq[1], atol=0, rtol=2)
+    # The absolute values are close though (but tiny).
+    self.assertAllClose(
+        d_analytic_pct_dq[1], d_sample_pct_dq[1], atol=0.05, rtol=0)
+
+  def test_grads_at_sample_pts_with_yes_preserve_gradients(self):
+    dist = tfp.distributions.Normal(np.float64(0), np.float64(1))
+    x = dist.sample(10001, seed=0)
+    # 50th quantile will lie exactly on a data point.
+    # 49.123... will not
+    q = tf.constant(np.array([50, 49.123456789]))  # Percentiles, in [0, 100]
+
+    analytic_pct = dist.quantile(q / 100.)  # divide by 10 to make quantile.
+    sample_pct = tfp.stats.percentile(
+        x, q, interpolation='linear', preserve_gradients=True)
+
+    analytic_pct, d_analytic_pct_dq, sample_pct, d_sample_pct_dq = (
+        self.evaluate([
+            analytic_pct,
+            tf.gradients(analytic_pct, q)[0],
+            sample_pct,
+            tf.gradients(sample_pct, q)[0],
+        ]))
+
+    self.assertAllClose(analytic_pct, sample_pct, atol=0.05)
+
+    # Near the median, the normal PDF is approximately constant C, with
+    # C = 1 / sqrt(2 * pi).  So the cdf is approximately F(x) = x / C.
+    # Thus the quantile function is approximately F^{-1}(y) = C * y.
+    self.assertAllClose(np.sqrt(2 * np.pi) / 100 * np.ones([2]),
+                        d_analytic_pct_dq, atol=1e-4)
+
+    # At the 50th percentile exactly, the sample gradient not exactly zero!
+    # This is due to preserve_gradient == True.
+    self.assertNotEqual(0., d_sample_pct_dq[0])
+
+    # Tolerance is terrible (2x), but this is a sample quantile based gradient.
+    self.assertAllClose(d_analytic_pct_dq, d_sample_pct_dq, atol=0, rtol=2)
+    # The absolute values are close though (but tiny).
+    self.assertAllClose(d_analytic_pct_dq, d_sample_pct_dq, atol=0.1, rtol=0)
+
+
+class PercentileTestWithMidpointInterpolation(
+    PercentileTestWithLowerInterpolation):
+
+  _interpolation = 'midpoint'
+
+  def test_integer_dtype_raises(self):
+    with self.assertRaisesRegexp(TypeError, 'not allowed with dtype'):
+      tfp.stats.percentile(x=[1, 2], q=30, interpolation='midpoint')
 
 
 class PercentileTestWithHigherInterpolation(
@@ -227,7 +335,8 @@ class PercentileTestWithNearestInterpolation(tf.test.TestCase):
   def test_2d_q_raises_dynamic(self):
     x = [1., 5., 3., 2., 4.]
     q_ph = tf.placeholder_with_default(input=[[0.5]], shape=None)
-    pct = tfp.stats.percentile(x, q=q_ph, validate_args=True)
+    pct = tfp.stats.percentile(x, q=q_ph, validate_args=True,
+                               interpolation=self._interpolation)
     with self.assertRaisesOpError('rank'):
       self.evaluate(pct)
 
@@ -237,7 +346,8 @@ class PercentileTestWithNearestInterpolation(tf.test.TestCase):
     # If float is used, it fails with InvalidArgumentError about an index out of
     # bounds.
     x = tf.linspace(0., 3e7, num=int(3e7))
-    minval = tfp.stats.percentile(x, q=0, validate_args=True)
+    minval = tfp.stats.percentile(x, q=0, validate_args=True,
+                                  interpolation=self._interpolation)
     self.assertAllEqual(0, self.evaluate(minval))
 
 
