@@ -349,6 +349,8 @@ class _AdditiveStateSpaceModelTest(object):
         observation_matrix=self._build_placeholder(np.random.standard_normal(
             batch_shape + [observation_size, latent_size]), dtype=dtype),
         observation_noise=tfd.MultivariateNormalDiag(
+            loc=self._build_placeholder(
+                np.ones(batch_shape + [observation_size]), dtype=dtype),
             scale_diag=self._build_placeholder(
                 np.ones(batch_shape + [observation_size]), dtype=dtype)),
         initial_state_prior=tfd.MultivariateNormalDiag(
