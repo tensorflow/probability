@@ -68,7 +68,7 @@ py_library(
 
 py_test(
     name = "quantiles_test",
-    size = "small",
+    size = "medium",
     srcs = ["quantiles_test.py"],
     deps = [
         # numpy dep,
