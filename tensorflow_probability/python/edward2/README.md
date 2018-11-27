@@ -103,9 +103,9 @@ def logistic_regression_posterior(num_features):
       scale=tfp.trainable_distributions.softplus_and_shift(
           tf.get_variable("intercept_scale", [])),
       name="intercept_posterior")
-  return coeffs, intercept
+  return posterior_coeffs, posterior_intercept
 
-coeffs, intercept = logistic_regression_posterior(num_features)
+posterior_coeffs, posterior_intercept = logistic_regression_posterior(num_features)
 
 # Execute the program, returning a sample
 # (np.ndarray of shape (55,), np.ndarray of shape ()).
