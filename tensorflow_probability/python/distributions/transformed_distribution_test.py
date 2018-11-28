@@ -505,6 +505,40 @@ class ScalarToMultiTest(tf.test.TestCase):
       self.assertAllClose(
           np.exp(actual_mvn_log_prob(x_)), fake_prob_, atol=0., rtol=1e-5)
 
+  def testEmptyEvent(self):
+    # Verify that zero-dimensional multivariate Normal distributions still
+    # return reasonable shapes and a log-prob of 0.0.
+    event_shape = [0]
+    for batch_shape in ([2], []):
+      for shapes_are_dynamic in (True, False):
+        loc = tf.zeros(batch_shape + event_shape)
+        scale_diag = tf.ones(batch_shape + event_shape)
+        if shapes_are_dynamic:
+          loc = tf.placeholder_with_default(loc, shape=None,
+                                            name="dynamic_loc")
+          scale_diag = tf.placeholder_with_default(scale_diag, shape=None,
+                                                   name="dynamic_scale_diag")
+
+        mvn = tfd.MultivariateNormalDiag(loc=loc, scale_diag=scale_diag)
+
+        self.assertAllEqual(self.evaluate(mvn.event_shape_tensor()),
+                            event_shape)
+        self.assertAllEqual(self.evaluate(mvn.batch_shape_tensor()),
+                            batch_shape)
+        if not shapes_are_dynamic:
+          self.assertAllEqual(mvn.event_shape.as_list(),
+                              event_shape)
+          self.assertAllEqual(mvn.batch_shape.as_list(),
+                              batch_shape)
+
+        for sample_shape in ([3], []):
+          sample_ = self.evaluate(mvn.sample(sample_shape))
+          self.assertAllEqual(sample_.shape,
+                              sample_shape + batch_shape + event_shape)
+          self.assertAllEqual(
+              self.evaluate(mvn.log_prob(sample_)),
+              np.zeros(sample_shape + batch_shape))
+
 
 if __name__ == "__main__":
   tf.test.main()
