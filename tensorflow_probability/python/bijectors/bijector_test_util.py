@@ -163,6 +163,7 @@ def assert_bijective_and_finite(bijector,
                                 y,
                                 event_ndims,
                                 eval_func,
+                                inverse_event_ndims=None,
                                 atol=0,
                                 rtol=1e-5):
   """Assert that forward/inverse (along with jacobians) are inverses and finite.
@@ -177,12 +178,16 @@ def assert_bijective_and_finite(bijector,
     event_ndims: Integer describing the number of event dimensions this bijector
       operates on.
     eval_func: Function to evaluate any intermediate results.
+    inverse_event_ndims: Integer describing the number of event dimensions for
+      the bijector codomain. If None, then the value of `event_ndims` is used.
     atol:  Absolute tolerance.
     rtol:  Relative tolerance.
 
   Raises:
     AssertionError:  If tests fail.
   """
+  if inverse_event_ndims is None:
+    inverse_event_ndims = event_ndims
   # These are the incoming points, but people often create a crazy range of
   # values for which these end up being bad, especially in 16bit.
   assert_finite(x)
@@ -203,9 +208,9 @@ def assert_bijective_and_finite(bijector,
   ] = eval_func([
       bijector.inverse(f_x),
       bijector.forward(g_y),
-      bijector.inverse_log_det_jacobian(f_x, event_ndims=event_ndims),
+      bijector.inverse_log_det_jacobian(f_x, event_ndims=inverse_event_ndims),
       bijector.forward_log_det_jacobian(x, event_ndims=event_ndims),
-      bijector.inverse_log_det_jacobian(y, event_ndims=event_ndims),
+      bijector.inverse_log_det_jacobian(y, event_ndims=inverse_event_ndims),
       bijector.forward_log_det_jacobian(g_y, event_ndims=event_ndims),
       f_x,
       g_y,
