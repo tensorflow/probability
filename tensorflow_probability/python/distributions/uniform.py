@@ -185,6 +185,13 @@ class Uniform(distribution.Distribution):
         x < self.low, zeros, (broadcasted_x - self.low) / self.range())
     return tf.where(x >= self.high, ones, result_if_not_big)
 
+  def _quantile(self, value):
+    broadcast_shape = tf.broadcast_dynamic_shape(
+        tf.shape(value), self.batch_shape_tensor())
+    ones = tf.ones(broadcast_shape, dtype=self.dtype)
+    broadcasted_value = value * ones
+    return (1. - broadcasted_value) * self.low + broadcasted_value * self.high
+
   def _entropy(self):
     return tf.log(self.range())
 

@@ -123,6 +123,17 @@ class UniformTest(tf.test.TestCase):
     self.assertAllClose(np.log(_expected_cdf()), self.evaluate(log_cdf))
 
   @tfe.run_test_in_graph_and_eager_modes
+  def testUniformQuantile(self):
+    low = tf.reshape(tf.linspace(0., 1., 6), [2, 1, 3])
+    high = tf.reshape(tf.linspace(1.5, 2.5, 6), [1, 2, 3])
+    uniform = uniform_lib.Uniform(low=low, high=high)
+    expected_quantiles = tf.reshape(tf.linspace(1.01, 1.49, 24), [2, 2, 2, 3])
+    cumulative_densities = uniform.cdf(expected_quantiles)
+    actual_quantiles = uniform.quantile(cumulative_densities)
+    self.assertAllClose(self.evaluate(expected_quantiles),
+                        self.evaluate(actual_quantiles))
+
+  @tfe.run_test_in_graph_and_eager_modes
   def testUniformEntropy(self):
     a_v = np.array([1.0, 1.0, 1.0])
     b_v = np.array([[1.5, 2.0, 3.0]])
