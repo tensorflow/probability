@@ -299,8 +299,8 @@ class Categorical(distribution.Distribution):
                                                            logits=logits)
 
   def _entropy(self):
-    return -tf.reduce_sum(
-        tf.nn.log_softmax(self.logits) * self.probs, axis=-1)
+    entropies = self.probs * tf.log(self.probs)
+    return -tf.reduce_sum(tf.boolean_mask(entropies, tf.is_finite(entropies)), axis=-1)
 
   def _mode(self):
     ret = tf.argmax(self.logits, axis=self._batch_rank)
