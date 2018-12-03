@@ -137,25 +137,25 @@ class EightSchoolsHmcBenchmarkTestHarness(object):
 
   def benchmark_eight_schools_hmc_num_leapfrog_1(self):
     self.report_benchmark(
-        name=self._mode + '_eight_hmc_schools_num_leapfrog_1',
+        name=self._mode + '_eight_schools_hmc_num_leapfrog_1',
         **benchmark_eight_schools_hmc(num_leapfrog_steps=1))
 
   def benchmark_eight_schools_hmc_num_leapfrog_2(self):
     self.report_benchmark(
-        name=self._mode + '_eight_hmc_schools_num_leapfrog_2',
+        name=self._mode + '_eight_schools_hmc_num_leapfrog_2',
         **benchmark_eight_schools_hmc(num_leapfrog_steps=2))
 
   def benchmark_eight_schools_hmc_num_leapfrog_3(self):
     self.report_benchmark(
-        name=self._mode + '_eight_hmc_schools_num_leapfrog_3',
+        name=self._mode + '_eight_schools_hmc_num_leapfrog_3',
         **benchmark_eight_schools_hmc(num_leapfrog_steps=3))
 
   def benchmark_eight_schools_hmc_num_leapfrog_10(self):
     self.report_benchmark(
-        name=self._mode + '_eight_hmc_schools_num_leapfrog_10',
+        name=self._mode + '_eight_schools_hmc_num_leapfrog_10',
         **benchmark_eight_schools_hmc(num_leapfrog_steps=10))
 
   def benchmark_eight_schools_hmc_num_leapfrog_20(self):
     self.report_benchmark(
-        name=self._mode + '_eight_hmc_schools_num_leapfrog_20',
+        name=self._mode + '_eight_schools_hmc_num_leapfrog_20',
         **benchmark_eight_schools_hmc(num_leapfrog_steps=20))
