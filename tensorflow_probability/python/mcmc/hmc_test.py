@@ -861,6 +861,7 @@ class HMCAdaptiveStepSize(tf.test.TestCase):
             num_leapfrog_steps=2,
             step_size=step_size,
             step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy(
+                num_adaptation_steps=None,
                 step_counter=step_counter),
             state_gradients_are_stopped=True,
             seed=_set_seed(252)),
@@ -913,6 +914,7 @@ class HMCAdaptiveStepSize(tf.test.TestCase):
             num_leapfrog_steps=2,
             step_size=step_size,
             step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy(
+                num_adaptation_steps=None,
                 step_counter=step_counter),
             state_gradients_are_stopped=True,
             seed=_set_seed(252)),
@@ -1064,7 +1066,8 @@ class HMCEMAdaptiveStepSize(tf.test.TestCase):
             target_log_prob_fn=unnormalized_posterior_log_prob,
             num_leapfrog_steps=2,
             step_size=step_size,
-            step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy(),
+            step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy(
+                num_adaptation_steps=None),
             state_gradients_are_stopped=True,
             seed=_set_seed(252)),
         parallel_iterations=1)
@@ -1155,7 +1158,8 @@ class HMCEMAdaptiveStepSize(tf.test.TestCase):
             target_log_prob_fn=unnormalized_log_prob,
             num_leapfrog_steps=2,
             step_size=step_size,
-            step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy(),
+            step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy(
+                num_adaptation_steps=None),
             seed=_set_seed(252)),
         parallel_iterations=1)
 
