@@ -1371,6 +1371,7 @@ py_test(
     name = "linear_gaussian_ssm_test",
     size = "large",
     srcs = ["linear_gaussian_ssm_test.py"],
+    shard_count = 4,
     deps = [
         ":linear_gaussian_ssm",
         # numpy dep,

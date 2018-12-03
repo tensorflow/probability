@@ -126,6 +126,7 @@ py_test(
     size = "medium",
     srcs = ["disentangled_vae_test.py"],
     main = "disentangled_vae_test.py",
+    shard_count = 2,
     srcs_version = "PY2AND3",
     deps = [
         ":disentangled_vae",

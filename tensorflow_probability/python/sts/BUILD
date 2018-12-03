@@ -53,6 +53,7 @@ py_test(
     name = "fitting_test",
     size = "large",
     srcs = ["fitting_test.py"],
+    shard_count = 6,
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -141,6 +142,7 @@ py_test(
     name = "sum_test",
     size = "large",
     srcs = ["sum_test.py"],
+    shard_count = 2,
     deps = [
         # numpy dep,
         # tensorflow dep,
