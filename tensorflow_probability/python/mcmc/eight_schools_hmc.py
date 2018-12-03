@@ -84,8 +84,10 @@ def benchmark_eight_schools_hmc(
         treatment_effects, treatment_stddevs,
         avg_effect, avg_stddev, school_effects_standard)
 
-  sample_chain = tf.contrib.eager.defun(tfp.mcmc.sample_chain)
-  executing_eagerly = tf.executing_eagerly()
+  if tf.executing_eagerly():
+    sample_chain = tf.contrib.eager.defun(tfp.mcmc.sample_chain)
+  else:
+    sample_chain = tfp.mcmc.sample_chain
 
   def computation():
     """The benchmark computation."""
@@ -104,14 +106,15 @@ def benchmark_eight_schools_hmc(
 
     return kernel_results.is_accepted
 
-  # warm-up
+  # Let's force evaluation of graph to ensure build time is not part of our time
+  # trial.
   is_accepted_tensor = computation()
-  if not executing_eagerly:
+  if not tf.executing_eagerly():
     session = tf.Session()
     session.run(is_accepted_tensor)
 
   start_time = time.time()
-  if executing_eagerly:
+  if tf.executing_eagerly():
     is_accepted = computation()
   else:
     is_accepted = session.run(is_accepted_tensor)
