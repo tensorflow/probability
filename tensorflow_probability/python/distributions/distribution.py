@@ -118,16 +118,18 @@ def _update_docstring(old_str, append_str):
     return old_str + "\n\n" + append_str
 
 
-def _convert_to_tensor(value, name=None, preferred_dtype=None):
+def _convert_to_tensor(value, name=None, dtype=None, preferred_dtype=None):
   """Converts to tensor avoiding an eager bug that loses float precision."""
   # TODO(b/116672045): Remove this function.
-  if (tf.executing_eagerly() and preferred_dtype is not None and
+  if (tf.executing_eagerly() and
+      preferred_dtype is not None and
+      dtype is None and
       (preferred_dtype.is_integer or preferred_dtype.is_bool)):
     v = tf.convert_to_tensor(value, name=name)
     if v.dtype.is_floating:
       return v
   return tf.convert_to_tensor(
-      value, name=name, preferred_dtype=preferred_dtype)
+      value, name=name, dtype=dtype, preferred_dtype=preferred_dtype)
 
 
 class _DistributionMeta(abc.ABCMeta):
@@ -1076,7 +1078,7 @@ class Distribution(_BaseDistribution):
 
     Denote this distribution (`self`) by `P` and the `other` distribution by
     `Q`. Assuming `P, Q` are absolutely continuous with respect to
-    one another and permit densities `p(x) dr(x)` and `q(x) dr(x)`, (Shanon)
+    one another and permit densities `p(x) dr(x)` and `q(x) dr(x)`, (Shannon)
     cross entropy is defined as:
 
     ```none
@@ -1091,7 +1093,7 @@ class Distribution(_BaseDistribution):
 
     Returns:
       cross_entropy: `self.dtype` `Tensor` with shape `[B1, ..., Bn]`
-        representing `n` different calculations of (Shanon) cross entropy.
+        representing `n` different calculations of (Shannon) cross entropy.
     """
     with self._name_scope(name):
       return self._cross_entropy(other)
@@ -1114,7 +1116,7 @@ class Distribution(_BaseDistribution):
     ```
 
     where `F` denotes the support of the random variable `X ~ p`, `H[., .]`
-    denotes (Shanon) cross entropy, and `H[.]` denotes (Shanon) entropy.
+    denotes (Shannon) cross entropy, and `H[.]` denotes (Shannon) entropy.
 
     Args:
       other: `tfp.distributions.Distribution` instance.

@@ -32,6 +32,7 @@ py_library(
     deps = [
         ":conv_variational",
         ":dense_variational",
+        ":distribution_layer",
         ":util",
     ],
 )
@@ -81,6 +82,29 @@ py_test(
     name = "dense_variational_test",
     size = "small",
     srcs = ["dense_variational_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "distribution_layer",
+    srcs = ["distribution_layer.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/layers/internal",
+    ],
+)
+
+py_test(
+    name = "distribution_layer_test",
+    size = "medium",
+    srcs = ["distribution_layer_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,

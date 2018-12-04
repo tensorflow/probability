@@ -197,6 +197,9 @@ class OneHotCategorical(distribution.Distribution):
   def _entropy(self):
     return -tf.reduce_sum(tf.nn.log_softmax(self.logits) * self.probs, axis=-1)
 
+  def _mean(self):
+    return self.probs
+
   def _mode(self):
     ret = tf.argmax(self.logits, axis=self._batch_rank)
     ret = tf.one_hot(ret, self.event_size, dtype=self.dtype)

@@ -193,7 +193,7 @@ class OneHotCategoricalTest(tf.test.TestCase):
     ] = self.evaluate([
         sample_mean,
         sample_covariance,
-        dist.probs,
+        dist.mean(),
         dist.covariance(),
     ])
     self.assertAllEqual([4, 3, 2], sample_mean.shape)
