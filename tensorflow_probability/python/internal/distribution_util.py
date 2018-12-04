@@ -254,19 +254,23 @@ def make_diag_scale(loc=None,
       raise ValueError("Cannot infer `event_shape` unless `loc` or "
                        "`shape_hint` is specified.")
 
-    if shape_hint is None:
-      shape_hint = loc.shape[-1]
+    num_rows = shape_hint
+    del shape_hint
+    if num_rows is None:
+      num_rows = loc.shape[-1]
+      if num_rows.value is None:
+        num_rows = tf.shape(loc)[-1]
 
     if scale_identity_multiplier is None:
       return tf.linalg.LinearOperatorIdentity(
-          num_rows=shape_hint,
+          num_rows=num_rows,
           dtype=dtype,
           is_self_adjoint=True,
           is_positive_definite=True,
           assert_proper_shapes=validate_args)
 
     return tf.linalg.LinearOperatorScaledIdentity(
-        num_rows=shape_hint,
+        num_rows=num_rows,
         multiplier=_maybe_attach_assertion(scale_identity_multiplier),
         is_non_singular=True,
         is_self_adjoint=True,
