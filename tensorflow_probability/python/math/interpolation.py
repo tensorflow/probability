@@ -260,13 +260,10 @@ def interp_regular_1d_grid(x,
   a shape `y_ref.shape[:axis] + y_ref.shape[axis + 1:]` `Tensor`.
 
   If `rank(x) > 1`, then the output is obtained by effectively flattening `x`,
-  then expanding the result to shape
+  interpolating along `axis`, then expanding the result to shape
   `y_ref.shape[:axis] + x.shape + y_ref.shape[axis + 1:]`.
 
-  If `rank(y_ref) > 1`, then `y_ref` contains `C` reference values of a
-  `rank(y_ref) - 1` rank tensor valued function of one variable.
-  `x_ref` is a `Tensor` of values of that variable (any shape allowed).
-  This is equivalent to `scipy.interpolate.interp1d`.
+  These shape semantics are equivalent to `scipy.interpolate.interp1d`.
 
   Args:
     x: Numeric `Tensor` The x-coordinates of the interpolated output values.
@@ -421,12 +418,11 @@ def batch_interp_regular_1d_grid(x,
       provided, we assume `g(x_ref_i)` is a regular grid between `g(x_ref_min)`
       and `g(x_ref_max)`.
     name:  A name to prepend to created ops.
-      Default value: `"interp_regular_1d_grid"`.
+      Default value: `"batch_interp_regular_1d_grid"`.
 
   Returns:
     y_interp:  Interpolation between members of `y_ref`, at points `x`.
-      `Tensor` of same `dtype` as `x`, and shape
-      `[A1, ..., AN, D, B1, ..., BM]`
+      `Tensor` of same `dtype` as `x`, and shape `[A1, ..., AN, D, B1, ..., BM]`
 
   Raises:
     ValueError:  If `fill_value` is not an allowed string.
@@ -439,11 +435,10 @@ def batch_interp_regular_1d_grid(x,
   ```python
   y_ref = tf.exp(tf.linspace(start=0., stop=10., 20))
 
-  interp_regular_1d_grid(
+  batch_interp_regular_1d_grid(
       x=[6.0, 0.5, 3.3], x_ref_min=0., x_ref_max=1., y_ref=y_ref)
   ==> approx [exp(6.0), exp(0.5), exp(3.3)]
   ```
-
 
   Interpolate a batch of functions of one variable.
 
@@ -473,8 +468,8 @@ def batch_interp_regular_1d_grid(x,
   x_ref = tf.exp(tf.linspace(tf.log(1.), tf.log(100000.), num_pts))
   y_ref = tf.log(x_ref + x_ref**2)
 
-  interp_regular_1d_grid(x=[1.1, 2.2], x_ref_min=1., x_ref_max=100000., y_ref,
-      grid_regularizing_transform=tf.log)
+  batch_interp_regular_1d_grid(x=[1.1, 2.2], x_ref_min=1., x_ref_max=100000.,
+      y_ref, grid_regularizing_transform=tf.log)
   ==> [tf.log(1.1 + 1.1**2), tf.log(2.2 + 2.2**2)]
   ```
 
