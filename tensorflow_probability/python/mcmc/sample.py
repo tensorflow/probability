@@ -102,7 +102,7 @@ def sample_chain(
   ##### Sample from a diagonal-variance Gaussian.
 
   ```python
-  import tensorflow tf
+  import tensorflow as tf
   import tensorflow_probability as tfp
   tfd = tfp.distributions
 
