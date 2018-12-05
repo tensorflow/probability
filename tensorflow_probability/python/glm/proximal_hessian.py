@@ -27,7 +27,6 @@ from __future__ import print_function
 import numpy as np
 
 import tensorflow as tf
-from tensorflow.python.ops import inplace_ops
 
 
 __all__ = [
@@ -506,10 +505,10 @@ def minimize_sparse_one_step(gradient_unregularized_loss,
         tolerance * (1. + tf.norm(x_start, ord=2, axis=-1))**2)
 
     # Reshape update vectors so that the coordinate sweeps happen along the
-    # first dimension. This is so that we can use alias_inplace_add to
-    # make sparse updates along the first axis without copying the Tensor.
-    # TODO(b/118789120): Switch to using tf.scatter_nd_add when inplace updates
-    # are supported.
+    # first dimension. This is so that we can use tensor_scatter_update to make
+    # sparse updates along the first axis without copying the Tensor.
+    # TODO(b/118789120): Switch to something like tf.tensor_scatter_nd_add if
+    # or when it exists.
     update_shape = tf.concat([[dims], batch_shape], axis=-1)
 
     def _loop_cond(iter_, x_update_diff_norm_sq, x_update,
@@ -633,7 +632,7 @@ def minimize_sparse_one_step(gradient_unregularized_loss,
 
         # Update the entire batch at `coord` even if `delta` may be 0 at some
         # batch coordinates. In those cases, adding `delta` is a no-op.
-        x_update = inplace_ops.alias_inplace_add(x_update, coord, delta)
+        x_update = tf.tensor_scatter_add(x_update, [[coord]], [delta])
 
         with tf.control_dependencies([x_update]):
           x_update_diff_norm_sq_ = x_update_diff_norm_sq + delta**2
