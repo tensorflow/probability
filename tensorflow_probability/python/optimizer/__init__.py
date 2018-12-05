@@ -20,6 +20,7 @@ from __future__ import print_function
 
 from tensorflow_probability.python.optimizer import linesearch
 from tensorflow_probability.python.optimizer.bfgs import minimize as bfgs_minimize
+from tensorflow_probability.python.optimizer.lbfgs import minimize as lbfgs_minimize
 from tensorflow_probability.python.optimizer.nelder_mead import minimize as nelder_mead_minimize
 from tensorflow_probability.python.optimizer.nelder_mead import nelder_mead_one_step
 from tensorflow_probability.python.optimizer.sgld import StochasticGradientLangevinDynamics
@@ -30,6 +31,7 @@ from tensorflow.python.util.all_util import remove_undocumented
 
 _allowed_symbols = [
     'bfgs_minimize',
+    'lbfgs_minimize',
     'nelder_mead_minimize',
     'nelder_mead_one_step',
     'linesearch',
