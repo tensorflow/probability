@@ -689,22 +689,17 @@ class Distribution(_BaseDistribution):
     """
     return self._call_sample_n(sample_shape, seed, name)
 
-  def _log_prob(self, value):
-    raise NotImplementedError("log_prob is not implemented: {}".format(
-        type(self).__name__))
-
   def _call_log_prob(self, value, name, **kwargs):
     """Wrapper around _log_prob."""
     with self._name_scope(name, values=[value]):
       value = _convert_to_tensor(
           value, name="value", preferred_dtype=self.dtype)
-      try:
+      if hasattr(self, "_log_prob"):
         return self._log_prob(value, **kwargs)
-      except NotImplementedError as original_exception:
-        try:
-          return tf.log(self._prob(value, **kwargs))
-        except NotImplementedError:
-          raise original_exception
+      if hasattr(self, "_prob"):
+        return tf.log(self._prob(value, **kwargs))
+      raise NotImplementedError("log_prob is not implemented: {}".format(
+          type(self).__name__))
 
   def log_prob(self, value, name="log_prob"):
     """Log probability density/mass function.
@@ -719,22 +714,17 @@ class Distribution(_BaseDistribution):
     """
     return self._call_log_prob(value, name)
 
-  def _prob(self, value):
-    raise NotImplementedError("prob is not implemented: {}".format(
-        type(self).__name__))
-
   def _call_prob(self, value, name, **kwargs):
     """Wrapper around _prob."""
     with self._name_scope(name, values=[value]):
       value = _convert_to_tensor(
           value, name="value", preferred_dtype=self.dtype)
-      try:
+      if hasattr(self, "_prob"):
         return self._prob(value, **kwargs)
-      except NotImplementedError as original_exception:
-        try:
-          return tf.exp(self._log_prob(value, **kwargs))
-        except NotImplementedError:
-          raise original_exception
+      if hasattr(self, "_log_prob"):
+        return tf.exp(self._log_prob(value, **kwargs))
+      raise NotImplementedError("prob is not implemented: {}".format(
+          type(self).__name__))
 
   def prob(self, value, name="prob"):
     """Probability density/mass function.
@@ -749,22 +739,17 @@ class Distribution(_BaseDistribution):
     """
     return self._call_prob(value, name)
 
-  def _log_cdf(self, value):
-    raise NotImplementedError("log_cdf is not implemented: {}".format(
-        type(self).__name__))
-
   def _call_log_cdf(self, value, name, **kwargs):
     """Wrapper around _log_cdf."""
     with self._name_scope(name, values=[value]):
       value = _convert_to_tensor(
           value, name="value", preferred_dtype=self.dtype)
-      try:
+      if hasattr(self, "_log_cdf"):
         return self._log_cdf(value, **kwargs)
-      except NotImplementedError as original_exception:
-        try:
-          return tf.log(self._cdf(value, **kwargs))
-        except NotImplementedError:
-          raise original_exception
+      if hasattr(self, "_cdf"):
+        return tf.log(self._cdf(value, **kwargs))
+      raise NotImplementedError("log_cdf is not implemented: {}".format(
+          type(self).__name__))
 
   def log_cdf(self, value, name="log_cdf"):
     """Log cumulative distribution function.
@@ -789,22 +774,17 @@ class Distribution(_BaseDistribution):
     """
     return self._call_log_cdf(value, name)
 
-  def _cdf(self, value):
-    raise NotImplementedError("cdf is not implemented: {}".format(
-        type(self).__name__))
-
   def _call_cdf(self, value, name, **kwargs):
     """Wrapper around _cdf."""
     with self._name_scope(name, values=[value]):
       value = _convert_to_tensor(
           value, name="value", preferred_dtype=self.dtype)
-      try:
+      if hasattr(self, "_cdf"):
         return self._cdf(value, **kwargs)
-      except NotImplementedError as original_exception:
-        try:
-          return tf.exp(self._log_cdf(value, **kwargs))
-        except NotImplementedError:
-          raise original_exception
+      if hasattr(self, "_log_cdf"):
+        return tf.exp(self._log_cdf(value, **kwargs))
+      raise NotImplementedError("cdf is not implemented: {}".format(
+          type(self).__name__))
 
   def cdf(self, value, name="cdf"):
     """Cumulative distribution function.

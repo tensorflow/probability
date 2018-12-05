@@ -434,6 +434,9 @@ class TransformedDistribution(distribution_lib.Distribution):
     return log_prob
 
   def _prob(self, y):
+    if not hasattr(self.distribution, "_prob"):
+      return tf.exp(self.log_prob(y))
+
     x = self.bijector.inverse(y)
     event_ndims = self._maybe_get_static_event_ndims()
     ildj = self.bijector.inverse_log_det_jacobian(y, event_ndims=event_ndims)

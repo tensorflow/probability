@@ -349,6 +349,30 @@ class DistributionTest(tf.test.TestCase):
         " event_shape=(3,)"
         " dtype=float32>")
 
+  def testUnimplemtnedProbAndLogProbExceptions(self):
+    class TerribleDistribution(tfd.Distribution):
+
+      def __init__(self):
+        super(TerribleDistribution, self).__init__(
+            dtype=tf.float32,
+            reparameterization_type=tfd.NOT_REPARAMETERIZED,
+            validate_args=False,
+            allow_nan_stats=False)
+
+    terrible_distribution = TerribleDistribution()
+    with self.assertRaisesRegexp(
+        NotImplementedError, "prob is not implemented"):
+      terrible_distribution.prob(1.)
+    with self.assertRaisesRegexp(
+        NotImplementedError, "log_prob is not implemented"):
+      terrible_distribution.log_prob(1.)
+    with self.assertRaisesRegexp(
+        NotImplementedError, "cdf is not implemented"):
+      terrible_distribution.cdf(1.)
+    with self.assertRaisesRegexp(
+        NotImplementedError, "log_cdf is not implemented"):
+      terrible_distribution.log_cdf(1.)
+
 
 if __name__ == "__main__":
   tf.test.main()

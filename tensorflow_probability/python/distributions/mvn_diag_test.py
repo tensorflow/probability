@@ -257,6 +257,17 @@ class MultivariateNormalDiagTest(test_case.TestCase):
         np.ones_like(gradients, dtype=np.bool),
         np.isfinite(gradients))
 
+  def testProbForLargeDimIsNotNan(self):
+    # Verifies a fix for GitHub issue #223
+    # (https://github.com/tensorflow/probability/issues/223)
+    loc_ = np.tile([0.], 1000)
+    scale_diag_ = np.tile([.1], 1000)
+    dist_test = tfp.distributions.MultivariateNormalDiag(loc_, scale_diag_)
+
+    x_ = np.tile([1.], 1000)
+    p_ = self.evaluate(dist_test.prob(x_))
+    self.assertFalse(np.isnan(p_))
+
 
 if __name__ == "__main__":
   tf.test.main()
