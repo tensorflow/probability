@@ -68,6 +68,9 @@ def benchmark_text_messages_hmc(
     num_leapfrog_steps=3):
   """Runs HMC on the text-messages unnormalized posterior."""
 
+  if not tf.executing_eagerly():
+    tf.reset_default_graph()
+
   # Build a static, pretend dataset.
   count_data = tf.to_float(
       tf.concat([tfd.Poisson(rate=15.).sample(43),
@@ -88,12 +91,11 @@ def benchmark_text_messages_hmc(
     sample_chain = tfp.mcmc.sample_chain
 
   # Initialize the step_size. (It will be automatically adapted.)
-  with tf.variable_scope(tf.get_variable_scope(), reuse=tf.AUTO_REUSE):
-    step_size = tf.get_variable(
-        name='step_size',
-        initializer=tf.constant(0.05, dtype=tf.float32),
-        trainable=False,
-        use_resource=True)
+  step_size = tf.get_variable(
+      name='step_size',
+      initializer=tf.constant(0.05, dtype=tf.float32),
+      trainable=False,
+      use_resource=True)
 
   def computation():
     """The benchmark computation."""
@@ -120,7 +122,7 @@ def benchmark_text_messages_hmc(
                 num_leapfrog_steps=num_leapfrog_steps,
                 step_size=step_size,
                 step_size_update_fn=
-                tfp.mcmc.make_simple_step_size_update_policy(),
+                tfp.mcmc.make_simple_step_size_update_policy(num_burnin_steps),
                 state_gradients_are_stopped=True),
             bijector=unconstraining_bijectors))
 
