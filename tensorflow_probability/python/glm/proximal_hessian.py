@@ -108,7 +108,7 @@ def _batched_sparse_tensor_dense_matmul(sp_a, b, **kwargs):
   # Note that we avoid inferring the final shape from `sp_a` or `b` because we
   # might have transposed one or both of them.
   return tf.reshape(
-      out, tf.concat([batch_shape, [-1], tf.shape(out)[-1:]], axis=0))
+      out, tf.concat([batch_shape, [-1], _get_shape(out)[-1:]], axis=0))
 
 
 def _sparse_block_diag(sp_a):
