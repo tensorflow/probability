@@ -98,6 +98,37 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
     self.assertAllClose(x_, inverse_y_, rtol=1e-4, atol=0.)
     self.assertAllClose(ildj_, -fldj_, rtol=1e-6, atol=0.)
 
+  def testNonBatchedBijectorWithMLPTransform(self):
+    x_ = np.random.normal(0., 1., (8,)).astype(np.float32)
+    nvp = tfb.RealNVP(
+        num_masked=4, validate_args=True, **self._real_nvp_kwargs)
+    x = tf.constant(x_)
+    forward_x = nvp.forward(x)
+    # Use identity to invalidate cache.
+    inverse_y = nvp.inverse(tf.identity(forward_x))
+    forward_inverse_y = nvp.forward(inverse_y)
+    fldj = nvp.forward_log_det_jacobian(x, event_ndims=1)
+    # Use identity to invalidate cache.
+    ildj = nvp.inverse_log_det_jacobian(tf.identity(forward_x), event_ndims=1)
+    self.evaluate(tf.global_variables_initializer())
+    [
+        forward_x_,
+        inverse_y_,
+        forward_inverse_y_,
+        ildj_,
+        fldj_,
+    ] = self.evaluate([
+        forward_x,
+        inverse_y,
+        forward_inverse_y,
+        ildj,
+        fldj,
+    ])
+    self.assertEqual("real_nvp", nvp.name)
+    self.assertAllClose(forward_x_, forward_inverse_y_, rtol=1e-4, atol=0.)
+    self.assertAllClose(x_, inverse_y_, rtol=1e-4, atol=0.)
+    self.assertAllClose(ildj_, -fldj_, rtol=1e-6, atol=0.)
+
   def testBijectorConditionKwargs(self):
     batch_size = 3
     x_ = np.linspace(-1.0, 1.0, (batch_size * 4 * 2)).astype(

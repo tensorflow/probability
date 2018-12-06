@@ -80,14 +80,16 @@ class MaskedAutoregressiveFlowTest(test_util.VectorDistributionTestHelpers,
             False,
     }
 
-  def testBijector(self):
-    x_ = np.arange(4 * 3 * 2).astype(np.float32).reshape(4, 3, 2)
+  def testNonBatchedBijector(self):
+    x_ = np.arange(np.prod(self.event_shape)).astype(
+        np.float32).reshape(self.event_shape)
     ma = tfb.MaskedAutoregressiveFlow(
         validate_args=True, **self._autoregressive_flow_kwargs)
     x = tf.constant(x_)
     forward_x = ma.forward(x)
     # Use identity to invalidate cache.
     inverse_y = ma.inverse(tf.identity(forward_x))
+    forward_inverse_y = ma.forward(inverse_y)
     fldj = ma.forward_log_det_jacobian(x, event_ndims=len(self.event_shape))
     # Use identity to invalidate cache.
     ildj = ma.inverse_log_det_jacobian(
@@ -96,16 +98,51 @@ class MaskedAutoregressiveFlowTest(test_util.VectorDistributionTestHelpers,
     [
         forward_x_,
         inverse_y_,
+        forward_inverse_y_,
         ildj_,
         fldj_,
     ] = self.evaluate([
         forward_x,
         inverse_y,
+        forward_inverse_y,
         ildj,
         fldj,
     ])
     self.assertEqual("masked_autoregressive_flow", ma.name)
-    self.assertAllClose(forward_x_, forward_x_, rtol=1e-6, atol=0.)
+    self.assertAllClose(forward_x_, forward_inverse_y_, rtol=1e-6, atol=0.)
+    self.assertAllClose(x_, inverse_y_, rtol=1e-5, atol=0.)
+    self.assertAllClose(ildj_, -fldj_, rtol=1e-6, atol=0.)
+
+  def testBatchedBijector(self):
+    x_ = np.arange(4 * np.prod(self.event_shape)).astype(
+        np.float32).reshape([4] + self.event_shape)
+    ma = tfb.MaskedAutoregressiveFlow(
+        validate_args=True, **self._autoregressive_flow_kwargs)
+    x = tf.constant(x_)
+    forward_x = ma.forward(x)
+    # Use identity to invalidate cache.
+    inverse_y = ma.inverse(tf.identity(forward_x))
+    forward_inverse_y = ma.forward(inverse_y)
+    fldj = ma.forward_log_det_jacobian(x, event_ndims=len(self.event_shape))
+    # Use identity to invalidate cache.
+    ildj = ma.inverse_log_det_jacobian(
+        tf.identity(forward_x), event_ndims=len(self.event_shape))
+    self.evaluate(tf.global_variables_initializer())
+    [
+        forward_x_,
+        inverse_y_,
+        forward_inverse_y_,
+        ildj_,
+        fldj_,
+    ] = self.evaluate([
+        forward_x,
+        inverse_y,
+        forward_inverse_y,
+        ildj,
+        fldj,
+    ])
+    self.assertEqual("masked_autoregressive_flow", ma.name)
+    self.assertAllClose(forward_x_, forward_inverse_y_, rtol=1e-6, atol=0.)
     self.assertAllClose(x_, inverse_y_, rtol=1e-5, atol=0.)
     self.assertAllClose(ildj_, -fldj_, rtol=1e-6, atol=0.)
 

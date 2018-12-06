@@ -483,6 +483,8 @@ def masked_autoregressive_default_template(hidden_layers,
       input_shape = (
           np.int32(x.shape.as_list())
           if x.shape.is_fully_defined() else tf.shape(x))
+      if x.shape.rank == 1:
+        x = x[tf.newaxis, ...]
       for i, units in enumerate(hidden_layers):
         x = masked_dense(
             inputs=x,
@@ -509,6 +511,7 @@ def masked_autoregressive_default_template(hidden_layers,
           if log_scale_clip_gradient else _clip_by_value_preserve_grad)
       log_scale = which_clip(log_scale, log_scale_min_clip, log_scale_max_clip)
       return shift, log_scale
+
     return tf.make_template(name, _fn)
 
 
