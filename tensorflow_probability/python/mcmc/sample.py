@@ -144,7 +144,7 @@ def sample_chain(
   where `F` denotes factors.
 
   ```python
-  import tensorflow tf
+  import tensorflow as tf
   import tensorflow_probability as tfp
   tfd = tfp.distributions
 
