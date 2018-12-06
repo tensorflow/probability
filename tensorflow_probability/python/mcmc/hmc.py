@@ -101,6 +101,9 @@ def make_simple_step_size_update_policy(num_adaptation_steps,
     step_counter = tf.get_variable(
         name='step_size_adaptation_step_counter',
         initializer=np.array(-1, dtype=np.int64),
+        # Specify the dtype for variable sharing to work correctly
+        # (b/120599991).
+        dtype=tf.int64,
         trainable=False,
         use_resource=True)
 

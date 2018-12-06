@@ -1176,6 +1176,11 @@ class HMCEMAdaptiveStepSize(tf.test.TestCase):
     # Anything in [0.6, 0.9] is sufficient. https://arxiv.org/abs/1411.6669
     self.assertNear(0.75, kernel_results_.is_accepted.mean(), err=0.05)
 
+  @tfe.run_test_in_graph_and_eager_modes
+  def test_reuse_step_counter(self):
+    for _ in range(2):
+      with tf.variable_scope(tf.get_variable_scope(), reuse=tf.AUTO_REUSE):
+        tfp.mcmc.make_simple_step_size_update_policy(num_adaptation_steps=1)
 
 if __name__ == '__main__':
   tf.test.main()
