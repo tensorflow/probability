@@ -24,7 +24,7 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow.python.ops import control_flow_ops
 
 import functools
-
+import numpy as np
 
 from tensorflow_probability.python import math
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -49,7 +49,7 @@ class MultivariateNormalFullCovariance(distribution.Distribution):
 
   The Multivariate Normal distribution is defined over `R^k` and parameterized
   by a (batch of) length-`k` `loc` vector (aka "mu") and a (batch of) `k x k`
-  `covariance` matrices that are the covariance.
+  `covariance_matrix` matrices that are the covariance.
   This is different than the other multivariate normals, which are parameterized
   by a matrix more akin to the standard deviation.
 
@@ -66,10 +66,10 @@ class MultivariateNormalFullCovariance(distribution.Distribution):
   where:
 
   * `loc` is a vector in `R^k`,
-  * `covariance` is an `R^{k x k}` symmetric positive definite matrix,
+  * `covariance_matrix` is an `R^{k x k}` symmetric positive definite matrix,
   * `Z` denotes the normalization constant.
 
-  Additional leading dimensions (if any) in `loc` and `covariance` allow
+  Additional leading dimensions (if any) in `loc` and `covariance_matrix` allow
   for batch dimensions.
 
   #### Examples
@@ -117,25 +117,25 @@ class MultivariateNormalFullCovariance(distribution.Distribution):
 
   def __init__(self,
                loc=None,
-               covariance=None,
+               covariance_matrix=None,
                validate_args=False,
                allow_nan_stats=True,
                name="MultivariateNormalFullCovariance"):
     """Construct Multivariate Normal distribution on `R^k`.
 
-    The `batch_shape` is the broadcast shape between `loc` and `covariance`
+    The `batch_shape` is the broadcast shape between `loc` and `covariance_matrix`
     arguments.
 
     The `event_shape` is given by last dimension of the matrix implied by
-    `covariance`. The last dimension of `loc` must broadcast with this.
+    `covariance_matrix`. The last dimension of `loc` must broadcast with this.
 
     Additional leading dimensions (if any) will index batches.
 
     Args:
       loc: Floating-point `Tensor`. Has shape `[B1, ..., Bb, k]` where `k` is
         the event size.
-      covariance: Instance of `LinearOperator` with a floating `dtype` and shape
-        `[B1, ..., Bb, k, k]`.
+      covariance_matrix: Instance of `LinearOperator` or `Tensor` with a floating `dtype` and shape
+        `[B1, ..., Bb, k, k]`. If type `Tensor`, is automatically wrapped in `LinearOperatorFullCovariance`.
       validate_args: Python `bool`, default `False`. Whether to validate input
         with asserts. If `validate_args` is `False`, and the inputs are invalid,
         correct behavior is not guaranteed.
@@ -146,31 +146,60 @@ class MultivariateNormalFullCovariance(distribution.Distribution):
       name: The name to give Ops created by the initializer.
 
     Raises:
-      TypeError: if not `covariance.dtype.is_floating`.
-      ValueError: if not `covariance.is_positive_definite`.
-      ValueError: if not `covariance.is_self_adjoint`.
+      TypeError: if not `covariance_matrix.dtype.is_floating`.
+      ValueError: if not `covariance_matrix.is_positive_definite`.
+      ValueError: if not `covariance_matrix.is_self_adjoint`.
     """
 
     parameters = dict(locals())
-    if not covariance.dtype.is_floating:
-      raise TypeError("`covariance` must have floating-point dtype.")
-    if validate_args and not covariance.is_positive_definite:
-      raise ValueError("`covariance` must be positive definite.")
-    if validate_args and not covariance.is_self_adjoint:
-      raise ValueError("`covariance` must be self-adjoint.")
+    if loc is None and covariance_matrix is None:
+      raise ValueError("Must specify one or both of `loc`, `covariance_matrix`.")
+    elif loc is None:
+      dtype = covariance_matrix.dtype
+      loc = tf.zeros(covariance_matrix.shape[-1].value, dtype)
+    elif covariance_matrix is None:
+      dtype = loc.dtype
+      covariance_matrix = tf.linalg.LinearOperatorIdentity(loc.shape[-1], dtype=dtype)
 
-    with tf.name_scope(name, values=[loc] + covariance.graph_parents) as name:
-      dtype = dtype_util.common_dtype([loc, covariance],
+    if isinstance(covariance_matrix, tf.linalg.LinearOperator):
+      if not covariance_matrix.dtype.is_floating:
+        raise TypeError("`covariance_matrix` must have floating-point dtype.")
+      if validate_args and not covariance_matrix.is_positive_definite:
+        raise ValueError("`covariance_matrix` must be positive definite.")
+      if validate_args and not covariance_matrix.is_self_adjoint:
+        raise ValueError("`covariance_matrix` must be self-adjoint.")
+
+    # catch and cast if input is not a LinearOperator
+    else:
+      # check if not symmetric
+      covariance_matrix = tf.convert_to_tensor(
+        covariance_matrix, name="covariance_matrix")
+      if validate_args:
+        covariance_matrix = control_flow_ops.with_dependencies([
+          tf.assert_near(
+              covariance_matrix,
+              tf.matrix_transpose(covariance_matrix),
+              message="Matrix was not symmetric")
+          ], covariance_matrix)
+      # LinearOperator applies cholesky which will fail if not PSD
+      covariance_matrix = tf.linalg.LinearOperatorFullMatrix(covariance_matrix,
+                                                      is_positive_definite=True,
+                                                      is_non_singular=True,
+                                                      is_self_adjoint=True,
+                                                      is_square=True)
+                                    
+    with tf.name_scope(name, values=[loc] + covariance_matrix.graph_parents) as name:
+      dtype = dtype_util.common_dtype([loc, covariance_matrix],
                                       preferred_dtype=tf.float32)
 
       self._loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
-      self._covariance = covariance
+      self._covariance_matrix = covariance_matrix
 
-    super(MultivariateStudentTLinearOperator, self).__init__(
+    super(MultivariateNormalFullCovariance, self).__init__(
         dtype=dtype,
         reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
         parameters=parameters,
-        graph_parents=[self._loc] + self._covariance.graph_parents,
+        graph_parents=[self._loc] + self._covariance_matrix.graph_parents,
         name=name,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats)
@@ -183,8 +212,8 @@ class MultivariateNormalFullCovariance(distribution.Distribution):
     `loc` applies an elementwise shift to the distribution.
 
     ```none
-    X ~ MultivariateT(loc=0, covariance=1)   # Identity covariance, zero shift.
-    Y = tf.cholesky(covariance.to_dense()) @ X + loc
+    X ~ MultivariateNormalFullCovariance(loc=0, covariance=1)   # Identity covariance, zero shift.
+    Y = covariance.cholesky() @ X + loc
     ```
 
     Returns:
@@ -193,38 +222,37 @@ class MultivariateNormalFullCovariance(distribution.Distribution):
     return self._loc
 
   @property
-  def covariance(self):
+  def covariance_matrix(self):
     """The covariance parameter of the distribution.
 
-    `covariance` applies an affine covariance to the distribution.
+    `covariance_matrix` applies an affine covariance to the distribution.
 
     ```none
-    X ~ MultivariateT(loc=0, covariance=1)   # Identity covariance, zero shift.
-    Y = tf.cholesky(covariance.to_dense()) @ X + loc
+    X ~ MultivariateNormalFullCovariance(loc=0, covariance=1)   # Identity covariance, zero shift.
+    Y = covariance.cholesky() @ X + loc
     ```
 
     Returns:
-      The `covariance` `LinearOperator`.
+      The `covariance_matrix` `LinearOperator`.
     """
-    return self._covariance
+    return self._covariance_matrix
 
   def _batch_shape_tensor(self):
     shape_list = [
-        self.scale.batch_shape_tensor(),
-        tf.shape(self.df),
+        self._covariance_matrix.batch_shape_tensor(),
         tf.shape(self.loc)[:-1]
     ]
     return functools.reduce(tf.broadcast_dynamic_shape, shape_list)
 
   def _batch_shape(self):
-    shape_list = [self.scale.batch_shape, self.df.shape, self.loc.shape[:-1]]
+    shape_list = [self._covariance_matrix.batch_shape, self.loc.shape[:-1]]
     return functools.reduce(tf.broadcast_static_shape, shape_list)
 
   def _event_shape_tensor(self):
-    return self.scale.range_dimension_tensor()[tf.newaxis]
+    return self._covariance_matrix.range_dimension_tensor()[tf.newaxis]
 
   def _event_shape(self):
-    return self.scale.range_dimension
+    return self._covariance_matrix.range_dimension
 
   def _sample_shape(self):
     return tf.concat([self.batch_shape_tensor(), self.event_shape_tensor()], -1)
@@ -236,7 +264,10 @@ class MultivariateNormalFullCovariance(distribution.Distribution):
     return _broadcast_to_shape(self.loc, self._sample_shape())
 
   def _variance(self):
-    return self.covariance.diag_part()
+    return self._covariance_matrix.diag_part()
+
+  def _covariance(self):
+    return self._covariance_matrix.to_dense()
 
   def _stddev(self):
     return tf.sqrt(self._variance())
@@ -245,21 +276,17 @@ class MultivariateNormalFullCovariance(distribution.Distribution):
     seed = seed_stream.SeedStream(seed, salt="multivariate normal")
 
     loc = _broadcast_to_shape(self.loc, self._sample_shape())
-    mvn = mvn_linear_operator.MultivariateNormalLinearOperator(
-        loc=tf.zeros_like(loc), scale=self.scale)
-    normal_samp = mvn.sample(n, seed=seed())
-    
-    return (self._loc +
-            tf.transpose(tf.cholesky(self.covariance.to_dense()).matmul(
-              tf.transpose(normal_samp, axis=[-1, -2]), adjoint=True), [-1, -2]))
+    mvn = mvn_linear_operator.MultivariateNormalTriL(
+        loc=self._loc, scale=self._covariance_matrix.cholesky())
+    return mvn.sample(n, seed=seed())
             
   def _log_normalization(self):
     num_dims = tf.cast(self.event_shape_tensor()[0], self.dtype)
-    return (num_dims / 2.) * np.log(2. * np.pi) + 0.5 * self.covariance.log_abs_determinant()
+    return (num_dims / 2.) * np.log(2. * np.pi) + 0.5 * self._covariance_matrix.log_abs_determinant()
 
   def _log_unnormalized_prob(self, value):
     value -= self._loc
-    value = tf.matmul(value[..., tf.newaxis], self.scale.solve(value[..., tf.newaxis]), transpose_a=True)
+    value = tf.matmul(value[..., tf.newaxis], self._covariance_matrix.solve(value[..., tf.newaxis]), transpose_a=True)
     return -1. / 2. * value[..., 0, 0]
 
   def _log_prob(self, value):
@@ -299,12 +326,13 @@ def _kl_brute_force_covariance(a, b, name=None):
   with tf.name_scope(
       name,
       "kl_mvn",
-      values=[a.loc, b.loc] + a.scale.graph_parents + b.scale.graph_parents):
+      values=[a.loc, b.loc] + a.covariance_matrix.graph_parents + b.covariance_matrix.graph_parents):
    
-    L = b.covariance.log_abs_determinant() - a.covariance.log_abs_determinant()
-    T = tf.trace(b.covariance.solve(a.covariance.to_dense()))
-    k = tf.cast(a.covariance.domain_dimension_tensor(), a.dtype)
-    Q = tf.matmul(b.mean() - a.mean(), b.covariance.solve(b.mean() - a.mean()), transpose_a=True)[..., 0, 0] 
+    L = b.covariance_matrix.log_abs_determinant() - a.covariance_matrix.log_abs_determinant()
+    T = tf.trace(b.covariance_matrix.solve(a.covariance_matrix.to_dense()))
+    Q = tf.reduce_sum((b.loc - a.loc) * b.covariance_matrix.solvevec(b.loc - a.loc), axis=[-1])
+    k = tf.cast(a.covariance_matrix.domain_dimension_tensor(), a.dtype)
+     
     kl_div = 0.5 * (L - k + T + Q)
 
     kl_div.set_shape(tf.broadcast_static_shape(a.batch_shape, b.batch_shape))
