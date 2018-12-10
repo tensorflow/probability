@@ -38,7 +38,7 @@ __all__ = [
 
 def _static_value(x):
   """Returns the static value of a `Tensor` or `None`."""
-  return tensor_util.constant_value(tf.convert_to_tensor(x))
+  return tf.contrib.util.constant_value(tf.convert_to_tensor(x))
 
 
 def _logical_and(*args):
@@ -265,8 +265,8 @@ class TransformedDistribution(distribution_lib.Distribution):
       self._is_batch_override = _logical_not(_logical_equal(
           _ndims_from_shape(self._override_batch_shape), self._zero))
       self._is_maybe_batch_override = bool(
-          tensor_util.constant_value(self._override_batch_shape) is None or
-          tensor_util.constant_value(self._override_batch_shape).size != 0)
+          tf.contrib.util.constant_value(self._override_batch_shape) is None or
+          tf.contrib.util.constant_value(self._override_batch_shape).size != 0)
 
       self._override_event_shape = self._maybe_validate_shape_override(
           event_shape, distribution.is_scalar_event(), validate_args,
@@ -274,8 +274,8 @@ class TransformedDistribution(distribution_lib.Distribution):
       self._is_event_override = _logical_not(_logical_equal(
           _ndims_from_shape(self._override_event_shape), self._zero))
       self._is_maybe_event_override = bool(
-          tensor_util.constant_value(self._override_event_shape) is None or
-          tensor_util.constant_value(self._override_event_shape).size != 0)
+          tf.contrib.util.constant_value(self._override_event_shape) is None or
+          tf.contrib.util.constant_value(self._override_event_shape).size != 0)
 
       # To convert a scalar distribution into a multivariate distribution we
       # will draw dims from the sample dims, which are otherwise iid. This is
@@ -571,7 +571,7 @@ class TransformedDistribution(distribution_lib.Distribution):
       raise TypeError("shape override must be an integer")
 
     override_is_scalar = _is_scalar_from_shape(override_shape)
-    if tensor_util.constant_value(override_is_scalar):
+    if tf.contrib.util.constant_value(override_is_scalar):
       return self._empty
 
     dynamic_assertions = []
@@ -594,8 +594,8 @@ class TransformedDistribution(distribution_lib.Distribution):
 
     is_both_nonscalar = _logical_and(_logical_not(base_is_scalar),
                                      _logical_not(override_is_scalar))
-    if tensor_util.constant_value(is_both_nonscalar) is not None:
-      if tensor_util.constant_value(is_both_nonscalar):
+    if tf.contrib.util.constant_value(is_both_nonscalar) is not None:
+      if tf.contrib.util.constant_value(is_both_nonscalar):
         raise ValueError("base distribution not scalar")
     elif validate_args:
       dynamic_assertions += [tf.assert_equal(
@@ -609,7 +609,7 @@ class TransformedDistribution(distribution_lib.Distribution):
 
   def _maybe_rotate_dims(self, x, rotate_right=False):
     """Helper which rolls left event_dims left or right event_dims right."""
-    needs_rotation_const = tensor_util.constant_value(self._needs_rotation)
+    needs_rotation_const = tf.contrib.util.constant_value(self._needs_rotation)
     if needs_rotation_const is not None and not needs_rotation_const:
       return x
     ndims = tf.rank(x)
