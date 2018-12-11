@@ -29,7 +29,7 @@ import numpy as np
 from tensorflow_probability.python import math
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import distribution
-from tensorflow_probability.python.distributions import mvn_linear_operator
+from tensorflow_probability.python.distributions import mvn_tril
 from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
@@ -276,8 +276,8 @@ class MultivariateNormalFullCovariance(distribution.Distribution):
     seed = seed_stream.SeedStream(seed, salt="multivariate normal")
 
     loc = _broadcast_to_shape(self.loc, self._sample_shape())
-    mvn = mvn_linear_operator.MultivariateNormalTriL(
-        loc=self._loc, scale=self._covariance_matrix.cholesky())
+    mvn = mvn_tril.MultivariateNormalTriL(
+      loc=self._loc, scale_tril=self._covariance_matrix.cholesky().to_dense())
     return mvn.sample(n, seed=seed())
             
   def _log_normalization(self):
