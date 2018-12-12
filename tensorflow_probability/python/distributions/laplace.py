@@ -53,7 +53,7 @@ class Laplace(distribution.Distribution):
   Note that the Laplace distribution can be thought of two exponential
   distributions spliced together "back-to-back."
 
-  The Lpalce distribution is a member of the [location-scale family](
+  The Laplace distribution is a member of the [location-scale family](
   https://en.wikipedia.org/wiki/Location-scale_family), i.e., it can be
   constructed as,
 
