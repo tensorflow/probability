@@ -56,6 +56,7 @@ rv_all = [
     'HalfCauchy',
     'HalfNormal',
     'HiddenMarkovModel',
+    'Horseshoe',
     'Independent',
     'InverseGamma',
     'InverseGammaWithSoftplusConcentrationRate',
@@ -280,6 +281,7 @@ Gumbel = _make_random_variable(tfd.Gumbel)
 HalfCauchy = _make_random_variable(tfd.HalfCauchy)
 HalfNormal = _make_random_variable(tfd.HalfNormal)
 HiddenMarkovModel = _make_random_variable(tfd.HiddenMarkovModel)
+Horseshoe = _make_random_variable(tfd.Horseshoe)
 Independent = _make_random_variable(tfd.Independent)
 InverseGamma = _make_random_variable(tfd.InverseGamma)
 InverseGammaWithSoftplusConcentrationRate = _make_random_variable(

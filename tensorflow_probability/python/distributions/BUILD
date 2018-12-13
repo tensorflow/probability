@@ -54,6 +54,7 @@ py_library(
         ":half_cauchy",
         ":half_normal",
         ":hidden_markov_model",
+        ":horseshoe",
         ":independent",
         ":inverse_gamma",
         ":inverse_gaussian",
@@ -388,6 +389,18 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "horseshoe",
+    srcs = ["horseshoe.py"],
+    deps = [
+        ":distribution",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:reparameterization",
     ],
 )
 
@@ -1292,6 +1305,18 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_test(
+    name = "horseshoe_test",
+    size = "medium",
+    srcs = ["horseshoe_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 
