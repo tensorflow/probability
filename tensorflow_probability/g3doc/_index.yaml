@@ -12,6 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
+# Copyright 2018 The TensorFlow Probability Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ============================================================================
 book_path: /probability/_book.yaml
 project_path: /probability/_project.yaml
 description: <!--no description-->
@@ -64,12 +78,15 @@ landing_page:
 
   - classname: devsite-landing-row-cards
     items:
-    - heading: Introducing TensorFlow Probability
+    - heading: "An introduction to probabilistic programming"
+      description: >
+        <em>Bayesian Methods for Hackers</em>, an introductory, hands-on tutorial,
+        is now available with examples in TensorFlow Probability. 
       image_path: /resources/images/tf-logo-card-16x9.png
-      path: https://medium.com/tensorflow/introducing-tensorflow-probability-dca4c304e245
+      path: https://medium.com/tensorflow/an-introduction-to-probabilistic-programming-now-available-in-tensorflow-probability-6dcc003ca29e
       buttons:
       - label: Read on TensorFlow blog
-        path: https://medium.com/tensorflow/introducing-tensorflow-probability-dca4c304e245
+        path: https://medium.com/tensorflow/an-introduction-to-probabilistic-programming-now-available-in-tensorflow-probability-6dcc003ca29e
     - heading: "An Introductory Analysis using TensorFlow Probability"
       image_path: /resources/images/tf-logo-card-16x9.png
       path: https://medium.com/tensorflow/the-trinity-of-errors-in-financial-models-an-introductory-analysis-using-tensorflow-probability-9fdefb4d283d
@@ -84,19 +101,18 @@ landing_page:
         path: https://medium.com/tensorflow/industrial-ai-bhges-physics-based-probabilistic-deep-learning-using-tensorflow-probability-5f215c791863
   - classname: devsite-landing-row-cards
     items:
-    - heading: Probabilistic Machine Learning in TensorFlow
+    - heading: "Probabilistic Machine Learning in TensorFlow"
       youtube_id: BjUkL8DFH5Q
       buttons:
       - label: Watch the video
         path: https://www.youtube.com/watch?v=BjUkL8DFH5Q
-    - heading: TFP Walk-through
-      description: >
-        Watch TFP present at SF Big Analytics (50 min). <a href="https://docs.google.com/presentation/d/1FO28i-ZpP1yw-ZiJtZGnTtBDYhfS5GicgP416Bix9U0/preview" class="external">Slides available</a>
-      youtube_id: CkD4PKwn9Dk
+    - heading: "Introducing TensorFlow Probability"
+      image_path: /resources/images/tf-logo-card-16x9.png
+      path: https://docs.google.com/presentation/d/1BWhNVHzhFfYiFL8ynX1wFmag8YjzvHeqKkd8Z0G8H7Y
       buttons:
-      - label: Watch the video
-        path: https://www.youtube.com/watch?v=CkD4PKwn9Dk
-    - heading: TensorFlow Probability on GitHub
+      - label: View the presentation
+        path: https://docs.google.com/presentation/d/1BWhNVHzhFfYiFL8ynX1wFmag8YjzvHeqKkd8Z0G8H7Y
+    - heading: "TensorFlow Probability on GitHub"
       image_path: /resources/images/github-card-16x9.png
       path: https://github.com/tensorflow/probability
       buttons:
