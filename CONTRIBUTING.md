@@ -32,7 +32,10 @@ repository (with credit to the original author) and closes the pull request.
 
 ## Style
 
-See the [TensorFlow Probability style guide](STYLE_GUIDE.md).
+See the [TensorFlow Probability style guide](STYLE_GUIDE.md).  Running `pylint`
+detects many (but certainly not all) style issues.  TensorFlow Probability
+follows the [TensorFlow pylint
+configuration](https://github.com/tensorflow/tensorflow/blob/master/CONTRIBUTING.md#python-coding-style).
 
 ## Unit tests
 
