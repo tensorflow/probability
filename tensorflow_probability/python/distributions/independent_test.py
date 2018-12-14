@@ -145,6 +145,16 @@ class ProductDistributionTest(tf.test.TestCase):
     self.assertAllClose(sample_entropy_, actual_entropy_, rtol=0.01, atol=0.)
     self.assertAllClose(loc, actual_mode_, rtol=1e-6, atol=0.)
 
+  def test_event_ndims_is_static_when_possible(self):
+    ind = tfd.Independent(
+        distribution=tfd.Normal(
+            loc=tf.placeholder_with_default(input=[2.], shape=None),
+            scale=tf.placeholder_with_default(input=1., shape=None)),
+        reinterpreted_batch_ndims=1)
+    # Even though `event_shape` is not static, event_ndims must equal
+    # `reinterpreted_batch_ndims + distribution.event_shape.ndims`.
+    self.assertEqual(ind.event_shape.ndims, 1)
+
   def testKLRaises(self):
     ind1 = tfd.Independent(
         distribution=tfd.Normal(

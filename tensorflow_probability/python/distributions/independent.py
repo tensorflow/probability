@@ -181,11 +181,16 @@ class Independent(distribution_lib.Distribution):
 
   def _event_shape(self):
     batch_shape = self.distribution.batch_shape
-    if (self._static_reinterpreted_batch_ndims is None
-        or batch_shape.ndims is None):
+    if self._static_reinterpreted_batch_ndims is None:
       return tf.TensorShape(None)
-    d = batch_shape.ndims - self._static_reinterpreted_batch_ndims
-    return batch_shape[d:].concatenate(self.distribution.event_shape)
+
+    if batch_shape.ndims is not None:
+      reinterpreted_batch_shape = batch_shape[
+          batch_shape.ndims - self._static_reinterpreted_batch_ndims:]
+    else:
+      reinterpreted_batch_shape = tf.TensorShape(
+          [None] * int(self._static_reinterpreted_batch_ndims))
+    return reinterpreted_batch_shape.concatenate(self.distribution.event_shape)
 
   def _sample_n(self, n, seed):
     with tf.control_dependencies(self._runtime_assertions):
