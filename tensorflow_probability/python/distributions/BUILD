@@ -1785,6 +1785,7 @@ py_test(
         ":uniform",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability",
     ],
 )
 

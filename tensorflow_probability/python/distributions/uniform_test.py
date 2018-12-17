@@ -23,8 +23,11 @@ import importlib
 # Dependency imports
 import numpy as np
 import tensorflow as tf
+import tensorflow_probability as tfp
 
 from tensorflow_probability.python.distributions import uniform as uniform_lib
+
+tfd = tfp.distributions
 tfe = tf.contrib.eager
 
 
@@ -318,6 +321,56 @@ class UniformTest(tf.test.TestCase):
     self.assertAllClose(1 / 12., self.evaluate(uniform.variance()))
     self.assertAllClose(0., self.evaluate(uniform.entropy()))
 
+  @tfe.run_test_in_graph_and_eager_modes
+  def testUniformUniformKLFinite(self):
+    batch_size = 6
+
+    a_low = -1.0 * np.arange(1, batch_size + 1)
+    a_high = np.array([1.0] * batch_size)
+    b_low = -2.0 * np.arange(1, batch_size + 1)
+    b_high = np.array([2.0] * batch_size)
+    a = uniform_lib.Uniform(low=a_low, high=a_high)
+    b = uniform_lib.Uniform(low=b_low, high=b_high)
+
+    true_kl = np.log(b_high - b_low) - np.log(a_high - a_low)
+
+    kl = tfd.kl_divergence(a, b)
+
+    # This is essentially an approximated integral from the direct definition
+    # of KL divergence.
+    x = a.sample(int(1e4), seed=0)
+    kl_sample = tf.reduce_mean(a.log_prob(x) - b.log_prob(x), 0)
+
+    kl_, kl_sample_ = self.evaluate([kl, kl_sample])
+    self.assertAllEqual(true_kl, kl_)
+    self.assertAllClose(true_kl, kl_sample_, atol=0.0, rtol=1e-1)
+
+    zero_kl = tfd.kl_divergence(a, a)
+    true_zero_kl_, zero_kl_ = self.evaluate([tf.zeros_like(true_kl), zero_kl])
+    self.assertAllEqual(true_zero_kl_, zero_kl_)
+
+  @tfe.run_test_in_graph_and_eager_modes
+  def testUniformUniformKLInfinite(self):
+
+    # This covers three cases:
+    # - a.low < b.low,
+    # - a.high > b.high, and
+    # - both.
+    a_low = np.array([-1.0, 0.0, -1.0])
+    a_high = np.array([1.0, 2.0, 2.0])
+    b_low = np.array([0.0] * 3)
+    b_high = np.array([1.0] * 3)
+    a = uniform_lib.Uniform(low=a_low, high=a_high)
+    b = uniform_lib.Uniform(low=b_low, high=b_high)
+
+    # Since 'a' can be sampled to give points outside the support of 'b',
+    # the KL Divergence is infinite.
+    true_kl = tf.convert_to_tensor(np.array([np.inf] * 3))
+
+    kl = tfd.kl_divergence(a, b)
+
+    true_kl_, kl_ = self.evaluate([true_kl, kl])
+    self.assertAllEqual(true_kl_, kl_)
 
 if __name__ == "__main__":
   tf.test.main()
