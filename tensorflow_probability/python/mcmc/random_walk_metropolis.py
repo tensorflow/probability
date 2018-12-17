@@ -249,7 +249,7 @@ class RandomWalkMetropolis(kernel_base.TransitionKernel):
   # Then the target log-density is defined as follows:
   def target_log_prob(x, y):
     # Stack the input tensors together
-    z = tf.stack([x, y], axis=-1) - true_mean
+    z = tf.stack([x, y], axis=-1)
     return target.log_prob(tf.squeeze(z))
 
   # Initial state of the chain
