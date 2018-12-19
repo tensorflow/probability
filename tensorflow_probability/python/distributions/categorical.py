@@ -198,9 +198,10 @@ class Categorical(distribution.Distribution):
           self._batch_rank = tf.rank(self._logits) - 1
 
       logits_shape = tf.shape(self._logits, name="logits_shape")
-      if logits_shape_static[-1].value is not None:
+      event_size = tensor_shape.dimension_value(logits_shape_static[-1])
+      if event_size is not None:
         self._event_size = tf.convert_to_tensor(
-            logits_shape_static[-1].value,
+            event_size,
             dtype=tf.int32,
             name="event_size")
       else:
