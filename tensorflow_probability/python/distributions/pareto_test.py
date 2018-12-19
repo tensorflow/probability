@@ -312,6 +312,38 @@ class ParetoTest(test_case.TestCase):
         rtol=.05,
         atol=0)
 
+  def testParetoParetoKLFinite(self):
+    a_scale = np.arange(1.0, 5.0)
+    a_concentration = 1.0
+    b_scale = 1.0
+    b_concentration = np.arange(2.0, 10.0, 2)
+
+    a = tfd.Pareto(concentration=a_concentration, scale=a_scale)
+    b = tfd.Pareto(concentration=b_concentration, scale=b_scale)
+
+    true_kl = (b_concentration * (np.log(a_scale) - np.log(b_scale)) +
+               np.log(a_concentration) - np.log(b_concentration) +
+               b_concentration / a_concentration - 1.0)
+    kl = tfd.kl_divergence(a, b)
+
+    x = a.sample(int(1e5), seed=0)
+    kl_sample = tf.reduce_mean(a.log_prob(x) - b.log_prob(x), 0)
+
+    kl_, kl_sample_ = self.evaluate([kl, kl_sample])
+    self.assertAllEqual(true_kl, kl_)
+    self.assertAllClose(true_kl, kl_sample_, atol=0., rtol=1e-2)
+
+    zero_kl = tfd.kl_divergence(a, a)
+    true_zero_kl_, zero_kl_ = self.evaluate([tf.zeros_like(true_kl), zero_kl])
+    self.assertAllEqual(true_zero_kl_, zero_kl_)
+
+  def testParetoParetoKLInfinite(self):
+    a = tfd.Pareto(concentration=1.0, scale=1.0)
+    b = tfd.Pareto(concentration=1.0, scale=2.0)
+
+    kl = tfd.kl_divergence(a, b)
+    kl_ = self.evaluate(kl)
+    self.assertAllEqual(np.inf, kl_)
 
 if __name__ == "__main__":
   tf.test.main()
