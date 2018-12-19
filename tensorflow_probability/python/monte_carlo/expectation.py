@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Monte Carlo integration and helpers."""
+"""Monte Carlo expectation."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -109,7 +109,7 @@ def expectation(f, samples, log_prob=None, use_reparametrization=True,
   # ==> 0.38336259
   # Relative Error: <1%
 
-  # For comparing the gradients, see `monte_carlo_test.py`.
+  # For comparing the gradients, see `expectation_test.py`.
   ```
 
   Note: The above example is for illustration only. To compute approximate

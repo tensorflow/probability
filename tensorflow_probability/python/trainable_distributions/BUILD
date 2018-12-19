@@ -13,7 +13,7 @@
 # limitations under the License.
 # ============================================================================
 # Description:
-#   Methods and objectives for variational inference.
+#   Support for trainable distributions
 
 licenses(["notice"])  # Apache 2.0
 
@@ -26,34 +26,31 @@ package(
 exports_files(["LICENSE"])
 
 py_library(
-    name = "vi",
+    name = "trainable_distributions",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
     deps = [
-        ":csiszar_divergence",
+        ":trainable_distributions_lib",
     ],
 )
 
 py_library(
-    name = "csiszar_divergence",
-    srcs = ["csiszar_divergence.py"],
+    name = "trainable_distributions_lib",
+    srcs = ["trainable_distributions_lib.py"],
     srcs_version = "PY2AND3",
     deps = [
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/distributions",
-        "//tensorflow_probability/python/monte_carlo",
     ],
 )
 
 py_test(
-    name = "csiszar_divergence_test",
-    size = "medium",
-    srcs = ["csiszar_divergence_test.py"],
+    name = "trainable_distributions_lib_test",
+    size = "small",
+    srcs = ["trainable_distributions_lib_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
     ],
 )

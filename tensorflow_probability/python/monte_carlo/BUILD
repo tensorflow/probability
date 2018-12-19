@@ -13,7 +13,7 @@
 # limitations under the License.
 # ============================================================================
 # Description:
-#   Methods and objectives for variational inference.
+#   Support for Monte Carlo expectations
 
 licenses(["notice"])  # Apache 2.0
 
@@ -26,34 +26,31 @@ package(
 exports_files(["LICENSE"])
 
 py_library(
-    name = "vi",
+    name = "monte_carlo",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
     deps = [
-        ":csiszar_divergence",
+        ":expectation",
     ],
 )
 
 py_library(
-    name = "csiszar_divergence",
-    srcs = ["csiszar_divergence.py"],
+    name = "expectation",
+    srcs = ["expectation.py"],
     srcs_version = "PY2AND3",
     deps = [
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/distributions",
-        "//tensorflow_probability/python/monte_carlo",
     ],
 )
 
 py_test(
-    name = "csiszar_divergence_test",
-    size = "medium",
-    srcs = ["csiszar_divergence_test.py"],
+    name = "expectation_test",
+    size = "small",
+    srcs = ["expectation_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
     ],
 )

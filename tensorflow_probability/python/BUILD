@@ -33,8 +33,6 @@ py_library(
     srcs_version = "PY2AND3",
     visibility = ["//tensorflow_probability:__pkg__"],
     deps = [
-        ":monte_carlo",
-        ":trainable_distributions",
         ":version",
         "//tensorflow_probability/python/bijectors",
         "//tensorflow_probability/python/distributions",
@@ -44,10 +42,12 @@ py_library(
         "//tensorflow_probability/python/layers",
         "//tensorflow_probability/python/math",
         "//tensorflow_probability/python/mcmc",
+        "//tensorflow_probability/python/monte_carlo",
         "//tensorflow_probability/python/optimizer",
         "//tensorflow_probability/python/positive_semidefinite_kernels",
         "//tensorflow_probability/python/stats",
         "//tensorflow_probability/python/sts",
+        "//tensorflow_probability/python/trainable_distributions",
         "//tensorflow_probability/python/util",
         "//tensorflow_probability/python/vi",
     ],
@@ -57,46 +57,4 @@ py_library(
     name = "version",
     srcs = ["version.py"],
     srcs_version = "PY2AND3",
-)
-
-py_library(
-    name = "monte_carlo",
-    srcs = ["monte_carlo.py"],
-    srcs_version = "PY2AND3",
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-    ],
-)
-
-py_test(
-    name = "monte_carlo_test",
-    size = "small",
-    srcs = ["monte_carlo_test.py"],
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-    ],
-)
-
-py_library(
-    name = "trainable_distributions",
-    srcs = ["trainable_distributions.py"],
-    srcs_version = "PY2AND3",
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-    ],
-)
-
-py_test(
-    name = "trainable_distributions_test",
-    size = "small",
-    srcs = ["trainable_distributions_test.py"],
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-    ],
 )
