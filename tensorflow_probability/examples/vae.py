@@ -450,12 +450,18 @@ def static_mnist_dataset(directory, split_name):
 
 def build_fake_input_fns(batch_size):
   """Builds fake MNIST-style data for unit testing."""
-  dataset = tf.data.Dataset.from_tensor_slices(
-      np.random.rand(batch_size, *IMAGE_SHAPE).astype("float32")).map(
-          lambda row: (row, 0)).batch(batch_size)
+  random_sample = np.random.rand(batch_size, *IMAGE_SHAPE).astype("float32")
 
-  train_input_fn = lambda: dataset.repeat().make_one_shot_iterator().get_next()
-  eval_input_fn = lambda: dataset.make_one_shot_iterator().get_next()
+  def train_input_fn():
+    dataset = tf.data.Dataset.from_tensor_slices(
+        random_sample).map(lambda row: (row, 0)).batch(batch_size).repeat()
+    return dataset.make_one_shot_iterator().get_next()
+
+  def eval_input_fn():
+    dataset = tf.data.Dataset.from_tensor_slices(
+        random_sample).map(lambda row: (row, 0)).batch(batch_size)
+    return dataset.make_one_shot_iterator().get_next()
+
   return train_input_fn, eval_input_fn
 
 
@@ -463,14 +469,16 @@ def build_input_fns(data_dir, batch_size):
   """Builds an Iterator switching between train and heldout data."""
 
   # Build an iterator over training batches.
-  training_dataset = static_mnist_dataset(data_dir, "train")
-  training_dataset = training_dataset.shuffle(50000).repeat().batch(batch_size)
-  train_input_fn = lambda: training_dataset.make_one_shot_iterator().get_next()
+  def train_input_fn():
+    dataset = static_mnist_dataset(data_dir, "train")
+    dataset = dataset.shuffle(50000).repeat().batch(batch_size)
+    return dataset.make_one_shot_iterator().get_next()
 
   # Build an iterator over the heldout set.
-  eval_dataset = static_mnist_dataset(data_dir, "valid")
-  eval_dataset = eval_dataset.batch(batch_size)
-  eval_input_fn = lambda: eval_dataset.make_one_shot_iterator().get_next()
+  def eval_input_fn():
+    eval_dataset = static_mnist_dataset(data_dir, "valid")
+    eval_dataset = eval_dataset.batch(batch_size)
+    return eval_dataset.make_one_shot_iterator().get_next()
 
   return train_input_fn, eval_input_fn
 

@@ -440,12 +440,19 @@ def build_fake_input_fns(batch_size):
   num_words = 1000
   vocabulary = [str(i) for i in range(num_words)]
 
-  dataset = tf.data.Dataset.from_tensor_slices(
-      np.random.randint(10, size=(batch_size, num_words)).astype(np.float32))
-  dataset = dataset.batch(batch_size)
+  random_sample = np.random.randint(
+      10, size=(batch_size, num_words)).astype(np.float32)
 
-  train_input_fn = lambda: dataset.repeat().make_one_shot_iterator().get_next()
-  eval_input_fn = lambda: dataset.make_one_shot_iterator().get_next()
+  def train_input_fn():
+    dataset = tf.data.Dataset.from_tensor_slices(random_sample)
+    dataset = dataset.batch(batch_size)
+    return dataset.repeat().make_one_shot_iterator().get_next()
+
+  def eval_input_fn():
+    dataset = tf.data.Dataset.from_tensor_slices(random_sample)
+    dataset = dataset.batch(batch_size)
+    return dataset.make_one_shot_iterator().get_next()
+
   return train_input_fn, eval_input_fn, vocabulary
 
 
@@ -472,17 +479,19 @@ def build_input_fns(data_dir, batch_size):
     vocabulary[idx] = word
 
   # Build an iterator over training batches.
-  training_dataset = newsgroups_dataset(data_dir, "train", num_words,
-                                        shuffle_and_repeat=True)
-  # Prefetching makes training about 1.5x faster.
-  training_dataset = training_dataset.batch(batch_size).prefetch(32)
-  train_input_fn = lambda: training_dataset.make_one_shot_iterator().get_next()
+  def train_input_fn():
+    dataset = newsgroups_dataset(
+        data_dir, "train", num_words, shuffle_and_repeat=True)
+    # Prefetching makes training about 1.5x faster.
+    dataset = dataset.batch(batch_size).prefetch(32)
+    return dataset.make_one_shot_iterator().get_next()
 
   # Build an iterator over the heldout set.
-  eval_dataset = newsgroups_dataset(data_dir, "test", num_words,
-                                    shuffle_and_repeat=False)
-  eval_dataset = eval_dataset.batch(batch_size)
-  eval_input_fn = lambda: eval_dataset.make_one_shot_iterator().get_next()
+  def eval_input_fn():
+    dataset = newsgroups_dataset(
+        data_dir, "test", num_words, shuffle_and_repeat=False)
+    dataset = dataset.batch(batch_size)
+    return dataset.make_one_shot_iterator().get_next()
 
   return train_input_fn, eval_input_fn, vocabulary
 
