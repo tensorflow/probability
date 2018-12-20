@@ -39,7 +39,39 @@ Notice that we use `tf.placeholder_with_default` rather than `tf.placeholder`.
 This allows convenient debugging of the executing code yet still lets us
 programmatically hide shape hints.
 
-This idea can be extended as appropriate. For example, in the [`Reshape`
+When implementing this pattern across multiple tests, or for tests that define
+multiple input `Tensors`, factoring out the placeholder creation can help
+avoid boilerplate and improve readability. For example,
+
+```python
+class _DistributionTest(object):
+
+  @tfe.run_test_in_graph_and_eager_modes
+  def testSomething(self):
+    input1 = self._build_tensor([0., 1., 2.])
+    input2 = self._build_tensor(np.random.randn(5, 4))
+
+    ...
+    [...] = self.evaluate([...])
+    ...
+
+  def _build_tensor(self, ndarray, dtype=None):
+    # Enforce parameterized dtype and static/dynamic testing.
+    ndarray = np.asarray(ndarray).astype(
+        dtype if dtype is not None else self.dtype)
+    return tf.placeholder_with_default(
+        input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
+
+class DistributionTest_StaticShape(tf.test.TestCase, _DistributionTest):
+  dtype = np.float32
+  use_static_shape = True
+
+class DistributionTest_DynamicShape(tf.test.TestCase, _DistributionTest):
+  dtype = np.float32
+  use_static_shape = False
+```
+
+These ideas can be extended as appropriate. For example, in the [`Reshape`
 bijector](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/reshape_test.py)
 we tested error-checking paths that, given a static-shape input, will raise
 exceptions at graph construction time, but op errors at runtime in the dynamic
