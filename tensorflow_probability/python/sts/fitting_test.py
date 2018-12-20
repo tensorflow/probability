@@ -66,8 +66,7 @@ class VariationalInferenceTests(tf.test.TestCase):
       self.assertAllEqual(avg_loss.shape, [num_inits] + batch_shape)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
-class HMCTests(tf.test.TestCase):
+class _HMCTests(object):
 
   def _build_model(self, observed_time_series):
     day_of_week = tfp.sts.Seasonal(
@@ -83,15 +82,15 @@ class HMCTests(tf.test.TestCase):
   def test_basic_hmc_example(self):
     batch_shape = [2, 3]
     num_timesteps = 5
-    observed_time_series = np.random.randn(
-        *(batch_shape + [num_timesteps])).astype(np.float32)
+    observed_time_series = self._build_tensor(np.random.randn(
+        *(batch_shape + [num_timesteps])))
     model = self._build_model(observed_time_series)
     samples, kernel_results = tfp.sts.fit_with_hmc(
         model,
         observed_time_series,
-        num_results=10,
-        num_warmup_steps=5,
-        num_variational_steps=5)
+        num_results=4,
+        num_warmup_steps=2,
+        num_variational_steps=2)
 
     self.evaluate(tf.global_variables_initializer())
     samples_, kernel_results_ = self.evaluate((samples, kernel_results))
@@ -108,24 +107,24 @@ class HMCTests(tf.test.TestCase):
     self.assertAllEqual(acceptance_rate.shape, batch_shape)
     for parameter in model.parameters:
       self.assertAllEqual(posterior_means[parameter.name].shape,
-                          parameter.prior.batch_shape.as_list() +
-                          parameter.prior.event_shape.as_list())
+                          self._batch_shape_as_list(parameter.prior) +
+                          self._event_shape_as_list(parameter.prior))
 
   def test_multiple_chains_example(self):
     batch_shape = [2, 3]
     num_timesteps = 5
-    num_results = 10
+    num_results = 6
     num_chains = 4
-    observed_time_series = np.random.randn(
-        *(batch_shape + [num_timesteps])).astype(np.float32)
+    observed_time_series = self._build_tensor(np.random.randn(
+        *(batch_shape + [num_timesteps])))
     model = self._build_model(observed_time_series)
     samples, kernel_results = tfp.sts.fit_with_hmc(
         model,
         observed_time_series,
         num_results=num_results,
         chain_batch_shape=num_chains,
-        num_warmup_steps=5,
-        num_variational_steps=5)
+        num_warmup_steps=2,
+        num_variational_steps=2)
 
     self.evaluate(tf.global_variables_initializer())
     samples_, kernel_results_ = self.evaluate((samples, kernel_results))
@@ -143,15 +142,15 @@ class HMCTests(tf.test.TestCase):
     for parameter, samples_ in zip(model.parameters, combined_samples_):
       self.assertAllEqual(samples_.shape,
                           [num_results * num_chains] +
-                          parameter.prior.batch_shape.as_list() +
-                          parameter.prior.event_shape.as_list())
+                          self._batch_shape_as_list(parameter.prior) +
+                          self._event_shape_as_list(parameter.prior))
 
   def test_chain_batch_shape(self):
     batch_shape = [2, 3]
     num_results = 1
     num_timesteps = 5
-    observed_time_series = np.random.randn(
-        *(batch_shape + [num_timesteps])).astype(np.float32)
+    observed_time_series = self._build_tensor(np.random.randn(
+        *(batch_shape + [num_timesteps])))
     model = self._build_model(observed_time_series)
 
     for i, (shape_in, expected_batch_shape_out) in enumerate(
@@ -166,12 +165,69 @@ class HMCTests(tf.test.TestCase):
             chain_batch_shape=shape_in,
             num_warmup_steps=1,
             num_variational_steps=1)
+
+      if not self.use_static_shape:
+        # The dynamic shapes of `parameter_samples` depend on HMC-internal
+        # variables, so we need to make sure they get initialized.
+        self.evaluate(tf.global_variables_initializer())
       for parameter, parameter_samples in zip(model.parameters, samples):
-        self.assertAllEqual(parameter_samples.shape.as_list(),
+        self.assertAllEqual(self._shape_as_list(parameter_samples),
                             [num_results] +
                             expected_batch_shape_out +
-                            parameter.prior.batch_shape.as_list() +
-                            parameter.prior.event_shape.as_list())
+                            self._batch_shape_as_list(parameter.prior) +
+                            self._event_shape_as_list(parameter.prior))
+
+  def _shape_as_list(self, tensor):
+    if self.use_static_shape:
+      return tensor.shape.as_list()
+    else:
+      return list(self.evaluate(tf.shape(tensor)))
+
+  def _batch_shape_as_list(self, distribution):
+    if self.use_static_shape:
+      return distribution.batch_shape.as_list()
+    else:
+      return list(self.evaluate(distribution.batch_shape_tensor()))
+
+  def _event_shape_as_list(self, distribution):
+    if self.use_static_shape:
+      return distribution.event_shape.as_list()
+    else:
+      return list(self.evaluate(distribution.event_shape_tensor()))
+
+  def _build_tensor(self, ndarray):
+    """Convert a numpy array to a TF placeholder.
+
+    Args:
+      ndarray: any object convertible to a numpy array via `np.asarray()`.
+
+    Returns:
+      placeholder: a TensorFlow `placeholder` with default value given by the
+      provided `ndarray`, dtype given by `self.dtype`, and shape specified
+      statically only if `self.use_static_shape` is `True`.
+    """
+
+    ndarray = np.asarray(ndarray).astype(self.dtype)
+    return tf.placeholder_with_default(
+        input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
+
+
+@tfe.run_all_tests_in_graph_and_eager_modes
+class HMCTestsStatic32(tf.test.TestCase, _HMCTests):
+  dtype = np.float32
+  use_static_shape = True
+
+
+@tfe.run_all_tests_in_graph_and_eager_modes
+class HMCTestsDynamic32(tf.test.TestCase, _HMCTests):
+  dtype = np.float32
+  use_static_shape = False
+
+
+@tfe.run_all_tests_in_graph_and_eager_modes
+class HMCTestsStatic64(tf.test.TestCase, _HMCTests):
+  dtype = np.float64
+  use_static_shape = True
 
 if __name__ == '__main__':
   tf.test.main()

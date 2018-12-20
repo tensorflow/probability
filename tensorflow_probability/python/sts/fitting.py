@@ -107,11 +107,13 @@ def _build_trainable_posterior(param, initial_loc_fn):
   """Built a transformed-normal variational dist over a parameter's support."""
   loc = tf.get_variable(param.name + '_loc',
                         initializer=lambda: initial_loc_fn(param),
+                        dtype=param.prior.dtype,
                         use_resource=True)
-  scale = tf.nn.softplus(
-      tf.get_variable(param.name + '_scale',
-                      initializer=lambda: -4 * tf.ones_like(loc),
-                      use_resource=True))
+  scale = tf.nn.softplus(tf.get_variable(
+      param.name + '_scale',
+      initializer=lambda: -4 * tf.ones_like(initial_loc_fn(param)),
+      dtype=param.prior.dtype,
+      use_resource=True))
 
   q = tfd.Normal(loc=loc, scale=scale)
 
