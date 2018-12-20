@@ -147,15 +147,18 @@ class TransformedDistributionTest(tf.test.TestCase):
     self.assertAllClose(grid, cdf_, rtol=1e-6, atol=0.)
 
   def testCachedSamples(self):
-    exp_forward_only = tfb.Exp()
-    exp_forward_only._inverse = self._make_unimplemented(
-        "inverse")
-    exp_forward_only._inverse_event_shape_tensor = self._make_unimplemented(
-        "inverse_event_shape_tensor ")
-    exp_forward_only._inverse_event_shape = self._make_unimplemented(
-        "inverse_event_shape ")
-    exp_forward_only._inverse_log_det_jacobian = self._make_unimplemented(
-        "inverse_log_det_jacobian ")
+    class ExpForwardOnly(tfb.Bijector):
+
+      def __init__(self):
+        super(ExpForwardOnly, self).__init__(forward_min_event_ndims=0)
+
+      def _forward(self, x):
+        return tf.exp(x)
+
+      def _forward_log_det_jacobian(self, x):
+        return tf.convert_to_tensor(x)
+
+    exp_forward_only = ExpForwardOnly()
 
     mu = 3.0
     sigma = 0.02
@@ -170,15 +173,18 @@ class TransformedDistributionTest(tf.test.TestCase):
     self.assertAllClose(expected_log_pdf, log_pdf_val, rtol=1e-4, atol=0.)
 
   def testCachedSamplesInvert(self):
-    exp_inverse_only = tfb.Exp()
-    exp_inverse_only._forward = self._make_unimplemented(
-        "forward")
-    exp_inverse_only._forward_event_shape_tensor = self._make_unimplemented(
-        "forward_event_shape_tensor ")
-    exp_inverse_only._forward_event_shape = self._make_unimplemented(
-        "forward_event_shape ")
-    exp_inverse_only._forward_log_det_jacobian = self._make_unimplemented(
-        "forward_log_det_jacobian ")
+    class ExpInverseOnly(tfb.Bijector):
+
+      def __init__(self):
+        super(ExpInverseOnly, self).__init__(inverse_min_event_ndims=0)
+
+      def _inverse(self, y):
+        return tf.log(y)
+
+      def _inverse_log_det_jacobian(self, y):
+        return -tf.log(y)
+
+    exp_inverse_only = ExpInverseOnly()
 
     log_forward_only = tfb.Invert(exp_inverse_only)
 

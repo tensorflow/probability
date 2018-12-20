@@ -36,24 +36,23 @@ __all__ = [
 
 
 class _Mapping(
-    collections.namedtuple("_Mapping", ["x", "y", "ildj_map", "kwargs"])):
+    collections.namedtuple("_Mapping", ["x", "y", "ildj", "kwargs"])):
   """Helper class to make it easier to manage caching in `Bijector`."""
 
-  def __new__(cls, x=None, y=None, ildj_map=None, kwargs=None):
+  def __new__(cls, x=None, y=None, ildj=None, kwargs=None):
     """Custom __new__ so namedtuple items have defaults.
 
     Args:
       x: `Tensor`. Forward.
       y: `Tensor`. Inverse.
-      ildj_map: `Dictionary`. This is a mapping from event_ndims to a `Tensor`
-        representing the inverse log det jacobian.
+      ildj: `Tensor`. This is the (un-reduce_sum'ed) inverse log det jacobian.
       kwargs: Python dictionary. Extra args supplied to forward/inverse/etc
         functions.
 
     Returns:
       mapping: New instance of _Mapping.
     """
-    return super(_Mapping, cls).__new__(cls, x, y, ildj_map, kwargs)
+    return super(_Mapping, cls).__new__(cls, x, y, ildj, kwargs)
 
   @property
   def x_key(self):
@@ -65,14 +64,13 @@ class _Mapping(
     """Returns key used for caching X=g^{-1}(Y)."""
     return (self.y,) + self._deep_tuple(tuple(sorted(self.kwargs.items())))
 
-  def merge(self, x=None, y=None, ildj_map=None, kwargs=None, mapping=None):
+  def merge(self, x=None, y=None, ildj=None, kwargs=None, mapping=None):
     """Returns new _Mapping with args merged with self.
 
     Args:
       x: `Tensor`. Forward.
       y: `Tensor`. Inverse.
-      ildj_map: `Dictionary`. This is a mapping from event_ndims to a `Tensor`
-        representing the inverse log det jacobian.
+      ildj: `Tensor`. This is the (un-reduce_sum'ed) inverse log det jacobian.
       kwargs: Python dictionary. Extra args supplied to forward/inverse/etc
         functions.
       mapping: Instance of _Mapping to merge. Can only be specified if no other
@@ -85,29 +83,16 @@ class _Mapping(
       ValueError: if mapping and any other arg is not `None`.
     """
     if mapping is None:
-      mapping = _Mapping(x=x, y=y, ildj_map=ildj_map, kwargs=kwargs)
-    elif any(arg is not None for arg in [x, y, ildj_map, kwargs]):
+      mapping = _Mapping(x=x, y=y, ildj=ildj, kwargs=kwargs)
+    elif any(arg is not None for arg in [x, y, ildj, kwargs]):
       raise ValueError("Cannot simultaneously specify mapping and individual "
                        "arguments.")
 
     return _Mapping(
         x=self._merge(self.x, mapping.x),
         y=self._merge(self.y, mapping.y),
-        ildj_map=self._merge_dicts(self.ildj_map, mapping.ildj_map),
+        ildj=self._merge(self.ildj, mapping.ildj),
         kwargs=self._merge(self.kwargs, mapping.kwargs))
-
-  def _merge_dicts(self, old=None, new=None):
-    """Helper to merge two dictionaries."""
-    old = dict() if old is None else old
-    new = dict() if new is None else new
-    for k, v in six.iteritems(new):
-      val = old.get(k, None)
-      if val is not None and val != v:
-        raise ValueError("Found different value for existing key "
-                         "(key:{} old_value:{} new_value:{}".format(
-                             k, old[k], v))
-      old[k] = v
-    return old
 
   def _merge(self, old, new):
     """Helper to merge which handles merging one value."""
@@ -558,7 +543,7 @@ class Bijector(object):
     self._forward_min_event_ndims = forward_min_event_ndims
     self._inverse_min_event_ndims = inverse_min_event_ndims
     self._is_constant_jacobian = is_constant_jacobian
-    self._constant_ildj_map = {}
+    self._constant_ildj = None
     self._validate_args = validate_args
     self._dtype = dtype
     self._from_y = {}
@@ -875,63 +860,226 @@ class Bijector(object):
     """
     return self._call_inverse(y, name)
 
-  def _inverse_log_det_jacobian(self, y):
-    """Subclass implementation of `inverse_log_det_jacobian` public function.
+  def _has_inverse_log_det_jacobian_def(self):
+    return hasattr(self, "_inverse_log_det_jacobian")
 
-    In particular, this method differs from the public function, in that it
-    does not take `event_ndims`. Thus, this implements the minimal Jacobian
-    determinant calculation (i.e. over `inverse_min_event_ndims`).
+  def _has_forward_log_det_jacobian_def(self):
+    return hasattr(self, "_forward_log_det_jacobian")
+
+  def _check_has_log_det_jacobian_def(self):
+    if not (self._has_inverse_log_det_jacobian_def() or
+            self._has_forward_log_det_jacobian_def()):
+      raise NotImplementedError(
+          "Neither _forward_log_det_jacobian nor _inverse_log_det_jacobian "
+          "is implemented. One or the other is required.")
+
+  def _compute_inverse_log_det_jacobian_with_caching(
+      self, x, y, prefer_inverse_ldj_fn, event_ndims, kwargs):
+    """Compute ILDJ by the best available means, and ensure it is cached.
+
+    Sub-classes of Bijector may implement either `_forward_log_det_jacobian` or
+    `_inverse_log_det_jacobian`, or both, and may prefer one or the other for
+    reasons of computational efficiency and/or numerics. In general, to compute
+    the [I]LDJ, we need one of `x` or `y` and one of `_forward_log_det_jacobian`
+    or `_inverse_log_det_jacobian` (all bijectors implement `forward` and
+    `inverse`, so either of `x` and `y` may always computed from the other).
+
+    This method encapsulates the logic of selecting the best possible method of
+    computing the inverse log det jacobian, and executing it. Possible avenues
+    to obtaining this value are:
+      - recovering it from the cache,
+      - computing it as `-_forward_log_det_jacobian(x)`, where `x` may need to
+        be computed as `inverse(y)`, or
+      - computing it as `_inverse_log_det_jacobian(y)`, where `y` may need to
+        be computed as `forward(x)`.
+
+    To make things more interesting, we may be able to take advantage of the
+    knowledge that the jacobian is constant, for given `event_ndims`, and may
+    even cache that result.
+
+    To make things even more interesting still, we may need to perform an
+    additional `reduce_sum` over the event dims of an input after computing the
+    ILDJ (see `_reduce_jacobian_det_over_event` for the reduction logic). In
+    order to prevent spurious TF graph dependencies on past inputs in cached
+    results, we need to take care to do this reduction after the cache lookups.
+
+    This method takes care of all the above concerns.
 
     Args:
-      y: `Tensor`. The input to the "inverse_log_det_jacobian" evaluation.
+      x: a `Tensor`, the pre-Bijector transform value at whose post-Bijector
+        transform value the ILDJ is to be computed. Can be `None` as long as
+        `y` is not `None`.
+      y: a `Tensor`, a point in the output space of the Bijector's `forward`
+        transformation, at whose value the ILDJ is to be computed. Can be
+        `None` as long as `x` is not `None`.
+      prefer_inverse_ldj_fn: Python `bool`, if `True`, will strictly prefer to
+        use the `_inverse_log_det_jacobian` to compute ILDJ; else, will
+        strictly prefer to use `_forward_log_det_jacobian`.
+      event_ndims: int-like `Tensor`, the number of dims of an event (in the
+        pre- or post-transformed space, as appropriate). These need to be summed
+        over to compute the total ildj.
+      kwargs: dictionary of keyword args that will be passed to calls to
+        `self.forward` or `self.inverse` (if either of those are required), and
+        to `self._compute_unreduced_nonconstant_ildj_with_caching` or
+        `self._compute_unreduced_constant_ildj_with_caching`, as appropriate (
+        those functions use the conditioning kwargs for caching and for
+        their underlying computations).
 
     Returns:
-      inverse_log_det_jacobian: `Tensor`, if this bijector is injective.
-        If not injective, returns the k-tuple containing jacobians for the
-        unique `k` points `(x1, ..., xk)` such that `g(xi) = y`.
+      ildj: a Tensor of ILDJ['s] at the given input (as specified by the args).
+        Also updates the cache as needed.
     """
-    raise NotImplementedError("inverse_log_det_jacobian not implemented.")
+    # Ensure at least one of _inverse/_forward_log_det_jacobian is defined.
+    self._check_has_log_det_jacobian_def()
+
+    # Use inverse_log_det_jacobian if either
+    #   1. it is preferred to *and* we are able, or
+    #   2. forward ldj fn isn't implemented (so we have no choice).
+    use_inverse_ldj_fn = (
+        (prefer_inverse_ldj_fn and self._has_inverse_log_det_jacobian_def()) or
+        not self._has_forward_log_det_jacobian_def())
+
+    if use_inverse_ldj_fn:
+      tensor_to_use = y if y is not None else self.forward(x, **kwargs)
+      min_event_ndims = self.inverse_min_event_ndims
+    else:
+      tensor_to_use = x if x is not None else self.inverse(y, **kwargs)
+      min_event_ndims = self.forward_min_event_ndims
+
+    if self.is_constant_jacobian:
+      unreduced_ildj = self._compute_unreduced_constant_ildj_with_caching(
+          tensor_to_use, use_inverse_ldj_fn, kwargs)
+    else:
+      unreduced_ildj = self._compute_unreduced_nonconstant_ildj_with_caching(
+          x, y, tensor_to_use, use_inverse_ldj_fn, kwargs)
+
+    return self._reduce_jacobian_det_over_event(
+        tf.shape(tensor_to_use),
+        unreduced_ildj,
+        min_event_ndims,
+        event_ndims)
+
+  def _compute_unreduced_nonconstant_ildj_with_caching(
+      self, x, y, tensor_to_use, use_inverse_ldj_fn, kwargs):
+    """Helper for computing ILDJ, with caching, in the non-constant case.
+
+    Does not do the "reduce" step which is necessary in some cases; this is left
+    to the caller.
+
+    Args:
+      x: a `Tensor`, the pre-Bijector transform value at whose post-Bijector
+        transform value the ILDJ is to be computed. Can be `None` as long as
+        `y` is not `None`. This method only uses the value for cache
+        lookup/updating.
+      y: a `Tensor`, a point in the output space of the Bijector's `forward`
+        transformation, at whose value the ILDJ is to be computed. Can be
+        `None` as long as `x` is not `None`. This method only uses the value
+        for cache lookup/updating.
+      tensor_to_use: a `Tensor`, the one to actually pass to the chosen compute
+        function (`_inverse_log_det_jacobian` or `_forward_log_det_jacobian`).
+        It is presumed that the caller has already figured out what input to use
+        (it will either be the x or y value corresponding to the location where
+        we are computing the ILDJ).
+      use_inverse_ldj_fn: Python `bool`, if `True`, will use the
+        `_inverse_log_det_jacobian` to compute ILDJ; else, will use
+        `_forward_log_det_jacobian`.
+      kwargs: dictionary of keyword args that will be passed to calls to to
+        `_inverse_log_det_jacobian` or `_forward_log_det_jacobian`, as well as
+        for lookup/updating of the result in the cache.
+
+    Returns:
+      ildj: the (un-reduce_sum'ed) value of the ILDJ at the specified input
+      location. Also updates the cache as needed.
+    """
+    mapping = self._lookup(x=x, y=y, kwargs=kwargs)
+    if mapping.ildj is not None:
+      return mapping.ildj
+
+    if use_inverse_ldj_fn:
+      ildj = self._inverse_log_det_jacobian(tensor_to_use, **kwargs)
+    else:
+      ildj = -self._forward_log_det_jacobian(tensor_to_use, **kwargs)
+
+    mapping = mapping.merge(x=x, y=y, ildj=ildj)
+    self._cache(mapping)
+    return ildj
+
+  def _compute_unreduced_constant_ildj_with_caching(
+      self, tensor_to_use, use_inverse_ldj_fn, kwargs):
+    """Helper for computing ILDJ, with caching, in the constant-ILDJ case.
+
+    Does not do the "reduce" step which is necessary in some cases; this is left
+    to the caller.
+
+    Args:
+      tensor_to_use: a `Tensor`, to pass to the chosen compute
+        function (`_inverse_log_det_jacobian` or `_forward_log_det_jacobian`).
+        Since we know the ILDJ is input-independent, the actual value is not
+        meaningful, although the shape and dtype may be.
+      use_inverse_ldj_fn: Python `bool`, if `True`, will use the
+        `_inverse_log_det_jacobian` to compute ILDJ; else, will use
+        `_forward_log_det_jacobian`.
+      kwargs: dictionary of keyword args that will be passed to calls to
+        to `_inverse_log_det_jacobian` or `_forward_log_det_jacobian`, as well
+        as for lookup/updating of the result in the cache.
+
+    Returns:
+      ildj: the (un-reduce_sum'ed) value of the ILDJ for the specified input.
+        Also updates the cache as needed.
+    """
+    if self._constant_ildj is not None:
+      return self._constant_ildj
+
+    if use_inverse_ldj_fn:
+      ildj = self._inverse_log_det_jacobian(tensor_to_use, **kwargs)
+    else:
+      ildj = -self._forward_log_det_jacobian(tensor_to_use, **kwargs)
+    self._constant_ildj = ildj
+    return ildj
 
   def _call_inverse_log_det_jacobian(self, y, event_ndims, name, **kwargs):
-    with self._name_scope(name, [y]):
-      if event_ndims in self._constant_ildj_map:
-        return self._constant_ildj_map[event_ndims]
+    """Wraps call to _inverse_log_det_jacobian, allowing extra shared logic.
+
+    Specifically, this method
+      - adds a name scope,
+      - performs validations,
+      - handles the special case of non-injective Bijector (skip caching and
+        reduce_sum over the values at the multiple points in the preimage of `y`
+        under the non-injective transformation)
+
+    so that sub-classes don't have to worry about this stuff.
+
+    Args:
+      y: same as in `inverse_log_det_jacobian`
+      event_ndims: same as in `inverse_log_det_jacobian`
+      name: same as in `inverse_log_det_jacobian`
+      **kwargs: same as in `inverse_log_det_jacobian`
+
+    Returns:
+      ildj: the inverse log det jacobian at `y`. Also updates the cache as
+        needed.
+    """
+    with self._name_scope(name, [y]), tf.control_dependencies(
+        self._check_valid_event_ndims(
+            min_event_ndims=self.inverse_min_event_ndims,
+            event_ndims=event_ndims)):
       y = tf.convert_to_tensor(y, name="y")
       self._maybe_assert_dtype(y)
-      with tf.control_dependencies(
-          self._check_valid_event_ndims(
-              min_event_ndims=self.inverse_min_event_ndims,
-              event_ndims=event_ndims)):
-        if not self._is_injective:  # No caching for non-injective
-          ildjs = self._inverse_log_det_jacobian(y, **kwargs)
-          return tuple(
-              self._reduce_jacobian_det_over_event(
-                  y, ildj, self.inverse_min_event_ndims, event_ndims)
-              for ildj in ildjs)
-        mapping = self._lookup(y=y, kwargs=kwargs)
-        if mapping.ildj_map is not None and event_ndims in mapping.ildj_map:
-          return mapping.ildj_map[event_ndims]
-        try:
-          x = None  # Not needed; leave cache as is.
-          ildj = self._inverse_log_det_jacobian(y, **kwargs)
-          ildj = self._reduce_jacobian_det_over_event(
-              y, ildj, self.inverse_min_event_ndims, event_ndims)
-        except NotImplementedError as original_exception:
-          try:
-            x = (
-                mapping.x if mapping.x is not None else self._inverse(
-                    y, **kwargs))
-            ildj = -self._forward_log_det_jacobian(x, **kwargs)
-            ildj = self._reduce_jacobian_det_over_event(
-                x, ildj, self.forward_min_event_ndims, event_ndims)
-          except NotImplementedError:
-            raise original_exception
 
-        mapping = mapping.merge(x=x, ildj_map={event_ndims: ildj})
-        self._cache(mapping)
-        if self.is_constant_jacobian:
-          self._constant_ildj_map[event_ndims] = ildj
-        return ildj
+      if not self._is_injective:
+        ildjs = self._inverse_log_det_jacobian(y, **kwargs)
+        return tuple(
+            self._reduce_jacobian_det_over_event(
+                tf.shape(y), ildj, self.inverse_min_event_ndims,
+                event_ndims)
+            for ildj in ildjs)
+
+      return self._compute_inverse_log_det_jacobian_with_caching(
+          x=None,
+          y=y,
+          prefer_inverse_ldj_fn=True,
+          event_ndims=event_ndims,
+          kwargs=kwargs)
 
   def inverse_log_det_jacobian(self,
                                y,
@@ -954,7 +1102,7 @@ class Bijector(object):
       name: The name to give this op.
 
     Returns:
-      `Tensor`, if this bijector is injective.
+      ildj: `Tensor`, if this bijector is injective.
         If not injective, returns the tuple of local log det
         Jacobians, `log(det(Dg_i^{-1}(y)))`, where `g_i` is the restriction
         of `g` to the `ith` partition `Di`.
@@ -966,68 +1114,45 @@ class Bijector(object):
     """
     return self._call_inverse_log_det_jacobian(y, event_ndims, name)
 
-  def _forward_log_det_jacobian(self, x):
-    """Subclass implementation of `forward_log_det_jacobian` public function.
+  def _call_forward_log_det_jacobian(self, x, event_ndims, name, **kwargs):
+    """Wraps call to _forward_log_det_jacobian, allowing extra shared logic.
 
-    In particular, this method differs from the public function, in that it
-    does not take `event_ndims`. Thus, this implements the minimal Jacobian
-    determinant calculation (i.e. over `forward_min_event_ndims`).
+    Specifically, this method
+      - adds a name scope,
+      - performs validations,
+      - handles the special case of non-injective Bijector (forward jacobian is
+        ill-defined in this case and we raise an exception)
+
+    so that sub-classes don't have to worry about this stuff.
 
     Args:
-      x: `Tensor`. The input to the "forward_log_det_jacobian" evaluation.
+      x: same as in `forward_log_det_jacobian`
+      event_ndims: same as in `forward_log_det_jacobian`
+      name: same as in `forward_log_det_jacobian`
+      **kwargs: same as in `forward_log_det_jacobian`
 
     Returns:
-      forward_log_det_jacobian: `Tensor`, if this bijector is injective.
-        If not injective, returns the k-tuple containing jacobians for the
-        unique `k` points `(x1, ..., xk)` such that `g(xi) = y`.
+      fldj: the forward log det jacobian at `x`. Also updates the cache as
+      needed.
     """
-
-    raise NotImplementedError("forward_log_det_jacobian not implemented.")
-
-  def _call_forward_log_det_jacobian(self, x, event_ndims, name, **kwargs):
     if not self._is_injective:
       raise NotImplementedError(
           "forward_log_det_jacobian cannot be implemented for non-injective "
           "transforms.")
-    with self._name_scope(name, [x]):
-      with tf.control_dependencies(
-          self._check_valid_event_ndims(
-              min_event_ndims=self.forward_min_event_ndims,
-              event_ndims=event_ndims)):
-        if event_ndims in self._constant_ildj_map:
-          # Need "-1. *" to avoid invalid-unary-operand-type linter warning.
-          return -1. * self._constant_ildj_map[event_ndims]
-        x = tf.convert_to_tensor(x, name="x")
-        self._maybe_assert_dtype(x)
-        if not self._is_injective:
-          fldjs = self._forward_log_det_jacobian(x, **kwargs)  # No caching.
-          return tuple(
-              self._reduce_jacobian_det_over_event(
-                  x, fldj, self.forward_min_event_ndims, event_ndims)
-              for fldj in fldjs)
-        mapping = self._lookup(x=x, kwargs=kwargs)
-        if mapping.ildj_map is not None and event_ndims in mapping.ildj_map:
-          return -mapping.ildj_map[event_ndims]
-        try:
-          y = None  # Not needed; leave cache as is.
-          ildj = -self._forward_log_det_jacobian(x, **kwargs)
-          ildj = self._reduce_jacobian_det_over_event(
-              x, ildj, self.forward_min_event_ndims, event_ndims)
-        except NotImplementedError as original_exception:
-          try:
-            y = (
-                mapping.y if mapping.y is not None else self._forward(
-                    x, **kwargs))
-            ildj = self._inverse_log_det_jacobian(y, **kwargs)
-            ildj = self._reduce_jacobian_det_over_event(
-                y, ildj, self.inverse_min_event_ndims, event_ndims)
-          except NotImplementedError:
-            raise original_exception
-        mapping = mapping.merge(y=y, ildj_map={event_ndims: ildj})
-        self._cache(mapping)
-        if self.is_constant_jacobian:
-          self._constant_ildj_map[event_ndims] = ildj
-        return -ildj
+
+    with self._name_scope(name, [x]), tf.control_dependencies(
+        self._check_valid_event_ndims(
+            min_event_ndims=self.forward_min_event_ndims,
+            event_ndims=event_ndims)):
+      x = tf.convert_to_tensor(x, name="x")
+      self._maybe_assert_dtype(x)
+
+      return -self._compute_inverse_log_det_jacobian_with_caching(
+          x=x,
+          y=None,
+          prefer_inverse_ldj_fn=False,
+          event_ndims=event_ndims,
+          kwargs=kwargs)
 
   def forward_log_det_jacobian(self,
                                x,
@@ -1094,27 +1219,17 @@ class Bijector(object):
       return self._from_y.get(mapping.y_key, mapping)
     return mapping
 
-  def _reduce_jacobian_det_over_event(self, y, ildj, min_event_ndims,
-                                      event_ndims):
+  def _reduce_jacobian_det_over_event(
+      self, shape_tensor, ildj, min_event_ndims, event_ndims):
     """Reduce jacobian over event_ndims - min_event_ndims."""
     # In this case, we need to tile the Jacobian over the event and reduce.
-    y_rank = tf.rank(y)
-    y_shape = tf.shape(y)[y_rank - event_ndims:y_rank - min_event_ndims]
+    rank = tf.size(shape_tensor)
+    shape_tensor = shape_tensor[rank - event_ndims:rank - min_event_ndims]
 
-    ones = tf.ones(y_shape, ildj.dtype)
+    ones = tf.ones(shape_tensor, ildj.dtype)
     reduced_ildj = tf.reduce_sum(
         ones * ildj,
         axis=self._get_event_reduce_dims(min_event_ndims, event_ndims))
-    # The multiplication by ones can change the inferred static shape so we try
-    # to recover as much as possible.
-    event_ndims_ = self._maybe_get_static_event_ndims(event_ndims)
-    if (event_ndims_ is not None and y.shape.ndims is not None and
-        ildj.shape.ndims is not None):
-      y_shape = y.shape[y.shape.ndims - event_ndims_:y.shape.ndims -
-                        min_event_ndims]
-      broadcast_shape = tf.broadcast_static_shape(ildj.shape, y_shape)
-      reduced_ildj.set_shape(broadcast_shape[:broadcast_shape.ndims -
-                                             (event_ndims_ - min_event_ndims)])
 
     return reduced_ildj
 
