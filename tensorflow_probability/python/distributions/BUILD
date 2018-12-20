@@ -387,6 +387,8 @@ py_library(
     name = "hidden_markov_model",
     srcs = ["hidden_markov_model.py"],
     deps = [
+        ":categorical",
+        ":distribution",
         # numpy dep,
         # tensorflow dep,
     ],
@@ -1298,7 +1300,7 @@ py_test(
 
 py_test(
     name = "hidden_markov_model_test",
-    size = "small",
+    size = "medium",
     srcs = ["hidden_markov_model_test.py"],
     deps = [
         # numpy dep,
