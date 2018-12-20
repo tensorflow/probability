@@ -177,6 +177,8 @@ def maybe_expand_trailing_dim(observed_time_series):
 
   with tf.name_scope(
       'maybe_expand_trailing_dim', values=[observed_time_series]):
+    observed_time_series = tf.convert_to_tensor(
+        observed_time_series, name='observed_time_series')
     if (observed_time_series.shape.ndims is not None and
         observed_time_series.shape[-1].value is not None):
       expanded_time_series = (

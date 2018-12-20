@@ -22,11 +22,14 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.sts import LinearRegression
 from tensorflow_probability.python.sts import LocalLinearTrend
 from tensorflow_probability.python.sts import Seasonal
 from tensorflow_probability.python.sts import Sum
+from tensorflow_probability.python.sts.internal import util as sts_util
 
 tfd = tfp.distributions
+tfb = tfp.bijectors
 tfe = tf.contrib.eager
 
 
@@ -259,6 +262,32 @@ class SumTest(tf.test.TestCase, _StsTestHarness):
     return Sum(
         components=[first_component, second_component],
         observed_time_series=observed_time_series)
+
+
+class LinearRegressionTest(tf.test.TestCase, _StsTestHarness):
+
+  def _build_sts(self, observed_time_series=None):
+    max_timesteps = 100
+    num_features = 3
+
+    prior = tfd.Laplace(0., 1.)
+
+    # LinearRegression components don't currently take an `observed_time_series`
+    # argument, so they can't infer a prior batch shape. This means we have to
+    # manually set the batch shape expected by the tests.
+    if observed_time_series is not None:
+      observed_time_series = sts_util.maybe_expand_trailing_dim(
+          observed_time_series)
+      batch_shape = observed_time_series.shape[:-2]
+      prior = tfd.TransformedDistribution(prior, tfb.Identity(),
+                                          event_shape=[num_features],
+                                          batch_shape=batch_shape)
+
+    regression = LinearRegression(
+        design_matrix=tf.random_normal([max_timesteps, num_features]),
+        weights_prior=prior)
+    return Sum(components=[regression],
+               observed_time_series=observed_time_series)
 
 if __name__ == '__main__':
   tf.test.main()
