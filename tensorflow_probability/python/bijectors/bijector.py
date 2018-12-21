@@ -103,7 +103,7 @@ class _Mapping(
     return old
 
   def _deep_tuple(self, x):
-    """Converts lists of lists to tuples of tuples."""
+    """Converts nested `tuple`, `list`, or `dict` to nested `tuple`."""
     if isinstance(x, dict):
       return self._deep_tuple(tuple(sorted(x.items())))
     elif isinstance(x, (list, tuple)):
