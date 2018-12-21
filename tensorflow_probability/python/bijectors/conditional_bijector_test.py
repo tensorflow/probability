@@ -91,55 +91,33 @@ class ConditionalBijectorTest(tf.test.TestCase):
     class ConditionalChain(tfb.ConditionalBijector, tfb.Chain):
       pass
 
-    test_bijector = _TestBijector()
-    passthrough_bijector = _TestPassthroughBijector()
-    chain = ConditionalChain((test_bijector, passthrough_bijector))
+    for name in ["forward", "inverse"]:
+      test_bijector = _TestBijector()
+      passthrough_bijector = _TestPassthroughBijector()
+      chain_components = (test_bijector, passthrough_bijector)
+      if name == "inverse":
+          chain_components = chain_components[::-1]
+      chain = ConditionalChain(chain_components)
 
-    name = "forward"
-    assert not passthrough_bijector._called[name]
-    method = getattr(chain, name)
-    with self.assertRaisesRegexp(ValueError, name + ".*b1.*b2"):
-      method(
-          1.,
-          test_bijector={"arg1": "b1", "arg2": "b2"},
-          test_passthrough_bijector={"arg1": "b1", "arg2": "b2"})
-    assert passthrough_bijector._called[name], name
+      assert not passthrough_bijector._called[name]
+      method = getattr(chain, name)
+      with self.assertRaisesRegexp(ValueError, name + ".*b1.*b2"):
+        method(
+            1.,
+            test_bijector={"arg1": "b1", "arg2": "b2"},
+            test_passthrough_bijector={"arg1": "b1", "arg2": "b2"})
+      assert passthrough_bijector._called[name], name
 
-    name = "forward_log_det_jacobian"
-    assert not passthrough_bijector._called[name]
-    method = getattr(chain, name)
-    with self.assertRaisesRegexp(ValueError, name + ".*b1.*b2"):
-      method(
-          1.,
-          event_ndims=0,
-          test_bijector={"arg1": "b1", "arg2": "b2"},
-          test_passthrough_bijector={"arg1": "b1", "arg2": "b2"})
-    assert passthrough_bijector._called[name], name
-
-    test_bijector = _TestBijector()
-    passthrough_bijector = _TestPassthroughBijector()
-    chain = ConditionalChain((passthrough_bijector, test_bijector))
-
-    name = "inverse"
-    assert not passthrough_bijector._called[name]
-    method = getattr(chain, name)
-    with self.assertRaisesRegexp(ValueError, name + ".*b1.*b2"):
-      method(
-          1.,
-          test_bijector={"arg1": "b1", "arg2": "b2"},
-          test_passthrough_bijector={"arg1": "b1", "arg2": "b2"})
-    assert passthrough_bijector._called[name], name
-
-    name = "inverse_log_det_jacobian"
-    assert not passthrough_bijector._called[name]
-    method = getattr(chain, name)
-    with self.assertRaisesRegexp(ValueError, name + ".*b1.*b2"):
-      method(
-          1.,
-          event_ndims=0,
-          test_bijector={"arg1": "b1", "arg2": "b2"},
-          test_passthrough_bijector={"arg1": "b1", "arg2": "b2"})
-    assert passthrough_bijector._called[name], name
+      ldj_name = name + "_log_det_jacobian"
+      assert not passthrough_bijector._called[ldj_name]
+      method = getattr(chain, ldj_name)
+      with self.assertRaisesRegexp(ValueError, ldj_name + ".*b1.*b2"):
+        method(
+            1.,
+            event_ndims=0,
+            test_bijector={"arg1": "b1", "arg2": "b2"},
+            test_passthrough_bijector={"arg1": "b1", "arg2": "b2"})
+      assert passthrough_bijector._called[ldj_name], ldj_name
 
 
 if __name__ == "__main__":
