@@ -99,17 +99,17 @@ class ConditionalBijectorTest(tf.test.TestCase):
           chain_components = chain_components[::-1]
       chain = ConditionalChain(chain_components)
 
-      assert not passthrough_bijector._called[name]
+      self.assertFalse(passthrough_bijector._called[name])
       method = getattr(chain, name)
       with self.assertRaisesRegexp(ValueError, name + ".*b1.*b2"):
         method(
             1.,
             test_bijector={"arg1": "b1", "arg2": "b2"},
             test_passthrough_bijector={"arg1": "b1", "arg2": "b2"})
-      assert passthrough_bijector._called[name], name
+      self.assertTrue(passthrough_bijector._called[name])
 
       ldj_name = name + "_log_det_jacobian"
-      assert not passthrough_bijector._called[ldj_name]
+      self.assertFalse(passthrough_bijector._called[ldj_name])
       method = getattr(chain, ldj_name)
       with self.assertRaisesRegexp(ValueError, ldj_name + ".*b1.*b2"):
         method(
@@ -117,7 +117,7 @@ class ConditionalBijectorTest(tf.test.TestCase):
             event_ndims=0,
             test_bijector={"arg1": "b1", "arg2": "b2"},
             test_passthrough_bijector={"arg1": "b1", "arg2": "b2"})
-      assert passthrough_bijector._called[ldj_name], ldj_name
+      self.assertTrue(passthrough_bijector._called[ldj_name])
 
 
 if __name__ == "__main__":
