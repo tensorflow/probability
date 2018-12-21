@@ -56,6 +56,7 @@ py_test(
     srcs = ["fitting_test.py"],
     shard_count = 6,
     deps = [
+        # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",

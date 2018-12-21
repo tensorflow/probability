@@ -15,6 +15,8 @@
 """Tests for STS fitting methods."""
 
 # Dependency imports
+from absl.testing import parameterized
+
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
@@ -145,38 +147,6 @@ class _HMCTests(object):
                           self._batch_shape_as_list(parameter.prior) +
                           self._event_shape_as_list(parameter.prior))
 
-  def test_chain_batch_shape(self):
-    batch_shape = [2, 3]
-    num_results = 1
-    num_timesteps = 5
-    observed_time_series = self._build_tensor(np.random.randn(
-        *(batch_shape + [num_timesteps])))
-    model = self._build_model(observed_time_series)
-
-    for i, (shape_in, expected_batch_shape_out) in enumerate(
-        [([], []), (3, [3]), ([3], [3]), ([5, 2], [5, 2])]):
-      # Use variable scope to prevents name conflicts from multiple fits
-      # in the same graph.
-      with tf.variable_scope('case_{}'.format(i), reuse=False):
-        samples, _ = tfp.sts.fit_with_hmc(
-            model,
-            observed_time_series,
-            num_results=num_results,
-            chain_batch_shape=shape_in,
-            num_warmup_steps=1,
-            num_variational_steps=1)
-
-      if not self.use_static_shape:
-        # The dynamic shapes of `parameter_samples` depend on HMC-internal
-        # variables, so we need to make sure they get initialized.
-        self.evaluate(tf.global_variables_initializer())
-      for parameter, parameter_samples in zip(model.parameters, samples):
-        self.assertAllEqual(self._shape_as_list(parameter_samples),
-                            [num_results] +
-                            expected_batch_shape_out +
-                            self._batch_shape_as_list(parameter.prior) +
-                            self._event_shape_as_list(parameter.prior))
-
   def _shape_as_list(self, tensor):
     if self.use_static_shape:
       return tensor.shape.as_list()
@@ -213,18 +183,49 @@ class _HMCTests(object):
 
 
 @tfe.run_all_tests_in_graph_and_eager_modes
-class HMCTestsStatic32(tf.test.TestCase, _HMCTests):
+class HMCTestsStatic32(tf.test.TestCase, parameterized.TestCase, _HMCTests):
   dtype = np.float32
   use_static_shape = True
 
+  # Parameterized tests appear to require that their direct containing class
+  # inherits from `parameterized.TestCase`, so we have to put this test here
+  # rather than the base class. As a bonus, running this test only in the
+  # Static32 case reduces overall test weight.
+  @parameterized.parameters(([], []),
+                            (3, [3]),
+                            ([3], [3]),
+                            ([5, 2], [5, 2]))
+  def test_chain_batch_shape(self, shape_in, expected_batch_shape_out):
+    batch_shape = [2, 3]
+    num_results = 1
+    num_timesteps = 5
+    observed_time_series = self._build_tensor(np.random.randn(
+        *(batch_shape + [num_timesteps])))
+    model = self._build_model(observed_time_series)
+    samples, _ = tfp.sts.fit_with_hmc(
+        model,
+        observed_time_series,
+        num_results=num_results,
+        chain_batch_shape=shape_in,
+        num_warmup_steps=1,
+        num_variational_steps=1)
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+    self.evaluate(tf.global_variables_initializer())
+    for parameter, parameter_samples in zip(model.parameters, samples):
+      self.assertAllEqual(self._shape_as_list(parameter_samples),
+                          [num_results] +
+                          expected_batch_shape_out +
+                          self._batch_shape_as_list(parameter.prior) +
+                          self._event_shape_as_list(parameter.prior))
+
+
+# This test runs in graph mode only to reduce test weight.
 class HMCTestsDynamic32(tf.test.TestCase, _HMCTests):
   dtype = np.float32
   use_static_shape = False
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+# This test runs in graph mode only to reduce test weight.
 class HMCTestsStatic64(tf.test.TestCase, _HMCTests):
   dtype = np.float64
   use_static_shape = True
