@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import collections
+
 import tensorflow as tf
 
 from tensorflow_probability.python import bijectors as tfb
@@ -51,11 +53,7 @@ class _TestBijector(tfb.ConditionalBijector):
 class _TestPassthroughBijector(_TestBijector):
   def __init__(self, *args, **kwargs):
       super(_TestPassthroughBijector, self).__init__(*args, **kwargs)
-      self._called = {
-          name: False for name in
-          ('forward', 'inverse',
-           'inverse_log_det_jacobian', 'forward_log_det_jacobian')
-      }
+      self._called = collections.defaultdict(bool)
 
   def _forward(self, _, arg1, arg2):
     self._called['forward'] = True
