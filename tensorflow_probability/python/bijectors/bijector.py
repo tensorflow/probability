@@ -57,12 +57,12 @@ class _Mapping(
   @property
   def x_key(self):
     """Returns key used for caching Y=g(X)."""
-    return (self.x,) + self._deep_tuple(self.kwargs)
+    return (self.x,) + self._deep_tuple_or_dict(self.kwargs)
 
   @property
   def y_key(self):
     """Returns key used for caching X=g^{-1}(Y)."""
-    return (self.y,) + self._deep_tuple(self.kwargs)
+    return (self.y,) + self._deep_tuple_or_dict(self.kwargs)
 
   def merge(self, x=None, y=None, ildj=None, kwargs=None, mapping=None):
     """Returns new _Mapping with args merged with self.
@@ -102,12 +102,12 @@ class _Mapping(
       raise ValueError("Incompatible values: %s != %s" % (old, new))
     return old
 
-  def _deep_tuple(self, x):
+  def _deep_tuple_or_dict(self, x):
     """Converts lists of lists to tuples of tuples."""
     if isinstance(x, dict):
-      return self._deep_tuple(tuple(sorted(x.items())))
+      return self._deep_tuple_or_dict(tuple(sorted(x.items())))
     elif isinstance(x, (list, tuple)):
-      return tuple(map(self._deep_tuple, x))
+      return tuple(map(self._deep_tuple_or_dict, x))
 
     return x
 
