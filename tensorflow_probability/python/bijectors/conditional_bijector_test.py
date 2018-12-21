@@ -52,23 +52,23 @@ class _TestBijector(tfb.ConditionalBijector):
 
 class _TestPassthroughBijector(_TestBijector):
   def __init__(self, *args, **kwargs):
-      super(_TestPassthroughBijector, self).__init__(*args, **kwargs)
-      self._called = collections.defaultdict(bool)
+    super(_TestPassthroughBijector, self).__init__(*args, **kwargs)
+    self._called = collections.defaultdict(bool)
 
   def _forward(self, _, arg1, arg2):
-    self._called['forward'] = True
+    self._called["forward"] = True
     return _
 
   def _inverse(self, _, arg1, arg2):
-    self._called['inverse'] = True
+    self._called["inverse"] = True
     return _
 
   def _inverse_log_det_jacobian(self, _, arg1, arg2):
-    self._called['inverse_log_det_jacobian'] = True
+    self._called["inverse_log_det_jacobian"] = True
     return _
 
   def _forward_log_det_jacobian(self, _, arg1, arg2):
-    self._called['forward_log_det_jacobian'] = True
+    self._called["forward_log_det_jacobian"] = True
     return _
 
 
