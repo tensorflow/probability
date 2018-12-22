@@ -105,8 +105,9 @@ class EndToEndTest(tf.test.TestCase):
         tfpl.IndependentBernoulli(self.input_shape, tfd.Bernoulli.logits),
     ])
 
-    vae_model = tfk.Model(inputs=encoder_model.input,
-                          outputs=decoder_model(encoder_model.outputs))
+    vae_model = tfk.Model(
+        inputs=encoder_model.inputs,
+        outputs=decoder_model(encoder_model.outputs[0]))
     vae_model.compile(optimizer=tf.train.AdamOptimizer(),
                       loss=lambda x, rv_x: -rv_x.log_prob(x),
                       metrics=[])
@@ -240,8 +241,9 @@ class EndToEndTest(tf.test.TestCase):
         tfpl.IndependentBernoulli(self.input_shape, tfd.Bernoulli.logits),
     ])
 
-    vae_model = tfk.Model(inputs=encoder_model.input,
-                          outputs=decoder_model(encoder_model.outputs))
+    vae_model = tfk.Model(
+        inputs=encoder_model.inputs,
+        outputs=decoder_model(encoder_model.outputs[0]))
     vae_model.compile(optimizer=tf.train.AdamOptimizer(),
                       loss=lambda x, rv_x: -rv_x.log_prob(x),
                       metrics=[])
