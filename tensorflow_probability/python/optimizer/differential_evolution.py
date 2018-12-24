@@ -47,7 +47,6 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
-# Dependency imports
 import numpy as np
 import tensorflow as tf
 
