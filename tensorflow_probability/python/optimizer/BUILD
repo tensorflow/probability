@@ -31,6 +31,7 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         ":bfgs",
+        ":differential_evolution",
         ":lbfgs",
         ":nelder_mead",
         ":sgld",
@@ -145,6 +146,27 @@ py_test(
     name = "nelder_mead_test",
     size = "medium",
     srcs = ["nelder_mead_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "differential_evolution",
+    srcs = ["differential_evolution.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "differential_evolution_test",
+    size = "medium",
+    srcs = ["differential_evolution_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
