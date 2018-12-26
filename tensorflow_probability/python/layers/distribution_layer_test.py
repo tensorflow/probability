@@ -583,5 +583,117 @@ class IndependentBernoulliTest(tf.test.TestCase):
                         atol=0.05, rtol=0.05)
 
 
+@tfe.run_all_tests_in_graph_and_eager_modes
+class _IndependentNormalTest(object):
+
+  def _build_tensor(self, ndarray, dtype=None):
+    # Enforce parameterized dtype and static/dynamic testing.
+    ndarray = np.asarray(ndarray).astype(
+        dtype if dtype is not None else self.dtype)
+    return tf.placeholder_with_default(
+        input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
+
+  def _check_distribution(self, t, x, batch_shape):
+    self.assertIsInstance(x, tfd.Independent)
+    self.assertIsInstance(x.distribution, tfd.Normal)
+    t_back = tf.concat([
+        tf.reshape(x.distribution.loc, tf.concat([batch_shape, [-1]], axis=-1)),
+        tfd.softplus_inverse(tf.reshape(
+            x.distribution.scale, tf.concat([batch_shape, [-1]], axis=-1)))
+    ], -1)
+    [t_, t_back_] = self.evaluate([t, t_back])
+    self.assertAllClose(t_, t_back_, atol=1e-6, rtol=1e-5)
+
+  def test_new(self):
+    batch_shape = self._build_tensor([2], dtype=np.int32)
+    event_shape = self._build_tensor([2, 1, 2], dtype=np.int32)
+    low = self._build_tensor(-3.)
+    high = self._build_tensor(3.)
+    p = tfpl.IndependentNormal.params_size(event_shape)
+
+    t = tfd.Uniform(low, high).sample(tf.concat([batch_shape, [p]], 0), seed=42)
+    x = tfpl.IndependentNormal.new(
+        t, event_shape, validate_args=True)
+    self._check_distribution(t, x, batch_shape)
+
+  def test_layer(self):
+    batch_shape = self._build_tensor([7, 3], dtype=np.int32)
+    event_shape = self._build_tensor([4], dtype=np.int32)
+    low = self._build_tensor(-3.)
+    high = self._build_tensor(3.)
+    p = tfpl.IndependentNormal.params_size(event_shape)
+
+    layer = tfpl.IndependentNormal(event_shape, validate_args=True)
+    t = tfd.Uniform(low, high).sample(tf.concat([batch_shape, [p]], 0), seed=42)
+    x = layer(t)
+    self._check_distribution(t, x, batch_shape)
+
+  def test_keras_sequential_with_unknown_input_size(self):
+    input_shape = [28, 28, 1]
+    encoded_shape = self._build_tensor([2], dtype=np.int32)
+    params_size = tfpl.IndependentNormal.params_size(encoded_shape)
+
+    def reshape(x):
+      return tf.reshape(x, tf.concat([tf.shape(x)[:-1], [-1, params_size]], 0))
+
+    # Test a Sequential model where the input to IndependentNormal does not have
+    # a statically-known shape.
+    encoder = tfk.Sequential([
+        tfkl.InputLayer(input_shape=input_shape, dtype=self.dtype),
+        tfkl.Flatten(),
+        tfkl.Dense(12, activation='relu'),
+        tfkl.Lambda(reshape),
+        # When encoded_shape/params_size are placeholders, the input to the
+        # IndependentNormal has shape (?, ?, ?) or (1, ?, ?), depending on
+        # whether or not encoded_shape's shape is known.
+        tfpl.IndependentNormal(encoded_shape),
+        tfkl.Lambda(lambda x: x + 0.)  # To force conversion to tensor.
+    ])
+
+    x = np.random.randn(*([1] + input_shape)).astype(self.dtype)
+    self.assertEqual((1, 3, 2), encoder.predict_on_batch(x).shape)
+
+    out = encoder(tf.convert_to_tensor(x))
+    if tf.executing_eagerly():
+      self.assertEqual((1, 3, 2), out.shape)
+    elif self.use_static_shape:
+      self.assertEqual([1, None, None], out.shape.as_list())
+    self.assertEqual((1, 3, 2), self.evaluate(out).shape)
+
+
+@tfe.run_all_tests_in_graph_and_eager_modes
+class IndependentNormalTestDynamicShape(tf.test.TestCase,
+                                        _IndependentNormalTest):
+  dtype = np.float32
+  use_static_shape = False
+
+
+@tfe.run_all_tests_in_graph_and_eager_modes
+class IndependentNormalTestStaticShape(tf.test.TestCase,
+                                       _IndependentNormalTest):
+  dtype = np.float64
+  use_static_shape = True
+
+  def test_doc_string(self):
+    input_shape = [28, 28, 1]
+    encoded_shape = [2]
+    encoder = tfk.Sequential([
+        tfkl.InputLayer(input_shape=input_shape, dtype=self.dtype),
+        tfkl.Flatten(),
+        tfkl.Dense(10, activation='relu'),
+        tfkl.Dense(tfpl.IndependentNormal.params_size(encoded_shape)),
+        tfpl.IndependentNormal(encoded_shape),
+        tfkl.Lambda(lambda x: x + 0.)  # To force conversion to tensor.
+    ])
+
+    # Test that we can run the model and get a sample.
+    x = np.random.randn(*([1] + input_shape)).astype(self.dtype)
+    self.assertEqual((1, 2), encoder.predict_on_batch(x).shape)
+
+    out = encoder(tf.convert_to_tensor(x))
+    self.assertEqual((1, 2), out.shape)
+    self.assertEqual((1, 2), self.evaluate(out).shape)
+
+
 if __name__ == '__main__':
   tf.test.main()

@@ -30,6 +30,7 @@ from tensorflow_probability.python.layers.dense_variational import DenseReparame
 from tensorflow_probability.python.layers.distribution_layer import CategoricalMixtureOfOneHotCategorical
 from tensorflow_probability.python.layers.distribution_layer import DistributionLambda
 from tensorflow_probability.python.layers.distribution_layer import IndependentBernoulli
+from tensorflow_probability.python.layers.distribution_layer import IndependentNormal
 from tensorflow_probability.python.layers.distribution_layer import KLDivergenceAddLoss
 from tensorflow_probability.python.layers.distribution_layer import KLDivergenceRegularizer
 from tensorflow_probability.python.layers.distribution_layer import MultivariateNormalTriL
@@ -51,6 +52,7 @@ _allowed_symbols = [
     'DenseReparameterization',
     'DistributionLambda',
     'IndependentBernoulli',
+    'IndependentNormal',
     'KLDivergenceAddLoss',
     'KLDivergenceRegularizer',
     'MultivariateNormalTriL',

@@ -36,6 +36,7 @@ __all__ = [
     'CategoricalMixtureOfOneHotCategorical',
     'DistributionLambda',
     'IndependentBernoulli',
+    'IndependentNormal',
     'KLDivergenceAddLoss',
     'KLDivergenceRegularizer',
     'MultivariateNormalTriL',
@@ -45,6 +46,30 @@ __all__ = [
 
 keras_tf_utils.register_symbolic_tensor_type(
     dtc._TensorCoercible)  # pylint: disable=protected-access
+
+
+def _event_size(event_shape, name=None):
+  """Computes the number of elements in a tensor with shape `event_shape`.
+
+  Args:
+    event_shape: A tensor shape.
+    name: The name to use for the tensor op to compute the number of elements
+      (if such an op needs to be created).
+
+  Returns:
+    event_size: The number of elements in `tensor_shape`.  Returns a numpy int
+    when the number of elements can be computed immediately.  Otherwise, returns
+    a scalar tensor.
+  """
+  with tf.name_scope(name, 'event_size', [event_shape]):
+    event_shape = tf.convert_to_tensor(
+        event_shape, dtype=tf.int32, name='event_shape')
+
+    event_shape_const = tf.contrib.util.constant_value(event_shape)
+    if event_shape_const is not None:
+      return np.prod(event_shape_const)
+    else:
+      return tf.reduce_prod(event_shape)
 
 
 class DistributionLambda(tf.keras.layers.Lambda):
@@ -582,16 +607,10 @@ class IndependentBernoulli(DistributionLambda):
   @staticmethod
   def params_size(event_shape, name=None):
     """The number of `params` needed to create a single distribution."""
-    try:
-      return np.prod(np.array(event_shape, dtype=np.int32))
-    finally:
-      pass   # Fallback to TensorFlow. pylint: disable=lost-exception
     with tf.name_scope(name, 'IndependentBernoulli_params_size', [event_shape]):
-      event_shape = tf.convert_to_tensor(
-          event_shape, dtype=tf.int32, name='event_shape')
-      event_shape_ = tf.contrib.util.constant_value(event_shape)
-      return (tf.reduce_prod(event_shape) if event_shape_ is None
-              else np.prod(event_shape_))
+      event_shape = tf.convert_to_tensor(event_shape, name='event_shape')
+      return _event_size(
+          event_shape, name=name or 'IndependentBernoulli_params_size')
 
 
 def _eval_all_one_hot(fn, dist, name=None):
@@ -608,6 +627,84 @@ def _eval_all_one_hot(fn, dist, name=None):
     # Compute `fn(x)` then cyclically left-transpose one dim.
     perm = tf.pad(tf.range(1, batch_ndims + 1), paddings=[[0, 1]])
     return tf.transpose(fn(dist, x), perm)
+
+
+class IndependentNormal(DistributionLambda):
+  """An independent normal Keras layer.
+
+  ### Example
+
+  ```python
+  tfd = tfp.distributions
+  tfpl = tfp.layers
+  tfk = tf.keras
+  tfkl = tf.keras.layers
+
+  # Create a stochastic encoder -- e.g., for use in a variational auto-encoder.
+  input_shape = [28, 28, 1]
+  encoded_shape = [2]
+  encoder = tfk.Sequential([
+    tfkl.InputLayer(input_shape=input_shape),
+    tfkl.Flatten(),
+    tfkl.Dense(10, activation='relu'),
+    tfkl.Dense(tfpl.IndependentNormal.params_size(encoded_shape)),
+    tfpl.IndependentNormal(encoded_shape)
+  ])
+  ```
+
+  """
+
+  def __init__(self,
+               event_shape,
+               convert_to_tensor_fn=tfd.Distribution.sample,
+               validate_args=False,
+               **kwargs):
+    """Initialize the `IndependentNormal` layer.
+
+    Args:
+      event_shape: `int` vector representing the shape of single draw from this
+        distribution.
+      convert_to_tensor_fn: Python `callable` that takes a `tfp.Distribution`
+        instance and returns a `tf.Tensor`-like object.
+        Default value: `tfd.Distribution.sample`.
+      validate_args: Python `bool`, default `False`. When `True` distribution
+        parameters are checked for validity despite possibly degrading runtime
+        performance. When `False` invalid inputs may silently render incorrect
+        outputs.
+        Default value: `False`.
+      **kwargs: Additional keyword arguments passed to `tf.keras.Layer`.
+    """
+    super(IndependentNormal, self).__init__(
+        lambda t: type(self).new(t, event_shape, validate_args),
+        convert_to_tensor_fn,
+        **kwargs)
+
+  @staticmethod
+  def new(params, event_shape, validate_args=False, name=None):
+    """Create the distribution instance from a `params` vector."""
+    with tf.name_scope(name, 'IndependentNormal', [params, event_shape]):
+      params = tf.convert_to_tensor(params, name='params')
+      event_shape = tf.convert_to_tensor(event_shape, name='event_shape')
+      output_shape = tf.concat([
+          tf.shape(params)[:-1],
+          event_shape,
+      ], axis=0)
+      loc_params, scale_params = tf.split(params, 2, axis=-1)
+      return tfd.Independent(
+          tfd.Normal(
+              loc=tf.reshape(loc_params, output_shape),
+              scale=tf.math.softplus(tf.reshape(scale_params, output_shape)),
+              validate_args=validate_args),
+          reinterpreted_batch_ndims=tf.size(event_shape),
+          validate_args=validate_args)
+
+  @staticmethod
+  def params_size(event_shape, name=None):
+    """The number of `params` needed to create a single distribution."""
+    with tf.name_scope(name, 'IndependentNormal_params_size', [event_shape]):
+      event_shape = tf.convert_to_tensor(event_shape, name='event_shape')
+      return 2 * _event_size(
+          event_shape, name=name or 'IndependentNormal_params_size')
 
 
 class KLDivergenceRegularizer(tf.keras.regularizers.Regularizer):
