@@ -153,6 +153,22 @@ class Reshape(bijector.Bijector):
       event_shape_in = tf.convert_to_tensor(
           event_shape_in, name='event_shape_in', preferred_dtype=tf.int32)
 
+      forward_min_event_ndims = tensor_util.constant_value(
+          tf.size(event_shape_in))
+      if forward_min_event_ndims is None:
+        raise NotImplementedError('Rank of `event_shape_in` currently must be '
+                                  'statically known. Contact '
+                                  '`tfprobability@tensorflow.org` if this is '
+                                  'a problem for your use case.')
+
+      inverse_min_event_ndims = tensor_util.constant_value(
+          tf.size(event_shape_out))
+      if inverse_min_event_ndims is None:
+        raise NotImplementedError('Rank of `event_shape_out` currently must be '
+                                  'statically known. Contact '
+                                  '`tfprobability@tensorflow.org` if this is '
+                                  'a problem for your use case.')
+
       assertions = []
       assertions.extend(self._maybe_check_valid_shape(
           event_shape_out, validate_args))
@@ -164,7 +180,8 @@ class Reshape(bijector.Bijector):
       self._event_shape_out = event_shape_out
 
       super(Reshape, self).__init__(
-          forward_min_event_ndims=0,
+          forward_min_event_ndims=int(forward_min_event_ndims),
+          inverse_min_event_ndims=int(inverse_min_event_ndims),
           is_constant_jacobian=True,
           validate_args=validate_args,
           name=name or 'reshape')

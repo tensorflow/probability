@@ -23,6 +23,7 @@ from tensorflow_probability.python.sts.fitting import fit_with_hmc
 from tensorflow_probability.python.sts.fitting import sample_uniform_initial_state
 from tensorflow_probability.python.sts.local_linear_trend import LocalLinearTrend
 from tensorflow_probability.python.sts.local_linear_trend import LocalLinearTrendStateSpaceModel
+from tensorflow_probability.python.sts.regression import LinearRegression
 from tensorflow_probability.python.sts.seasonal import Seasonal
 from tensorflow_probability.python.sts.seasonal import SeasonalStateSpaceModel
 from tensorflow_probability.python.sts.structural_time_series import StructuralTimeSeries
@@ -33,6 +34,7 @@ from tensorflow.python.util.all_util import remove_undocumented
 
 _allowed_symbols = [
     'AdditiveStateSpaceModel',
+    'LinearRegression',
     'LocalLinearTrend',
     'LocalLinearTrendStateSpaceModel',
     'Seasonal',

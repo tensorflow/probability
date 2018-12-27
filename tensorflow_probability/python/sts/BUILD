@@ -32,6 +32,7 @@ py_library(
     deps = [
         ":fitting",
         ":local_linear_trend",
+        ":regression",
         ":seasonal",
         ":structural_time_series",
         ":sum",
@@ -53,7 +54,9 @@ py_test(
     name = "fitting_test",
     size = "large",
     srcs = ["fitting_test.py"],
+    shard_count = 6,
     deps = [
+        # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
@@ -75,6 +78,28 @@ py_test(
     name = "local_linear_trend_test",
     size = "medium",
     srcs = ["local_linear_trend_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "regression",
+    srcs = ["regression.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/sts/internal",
+    ],
+)
+
+py_test(
+    name = "regression_test",
+    size = "medium",
+    srcs = ["regression_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -141,6 +166,7 @@ py_test(
     name = "sum_test",
     size = "large",
     srcs = ["sum_test.py"],
+    shard_count = 2,
     deps = [
         # numpy dep,
         # tensorflow dep,

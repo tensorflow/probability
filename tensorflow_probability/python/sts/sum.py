@@ -286,21 +286,23 @@ class AdditiveStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
             observation_noise_scale,
             name='observation_noise_scale',
             dtype=dtype)
-        observation_noise = tfd.MultivariateNormalDiag(
-            scale_diag=observation_noise_scale[..., tf.newaxis])
+        def observation_noise_fn(t):
+          return tfd.MultivariateNormalDiag(
+              loc=sum([ssm.get_observation_noise_for_timestep(t).mean()
+                       for ssm in component_ssms]),
+              scale_diag=observation_noise_scale[..., tf.newaxis])
       else:
         def observation_noise_fn(t):
           return sts_util.sum_mvns(
               [ssm.get_observation_noise_for_timestep(t)
                for ssm in component_ssms])
-        observation_noise = observation_noise_fn
 
       super(AdditiveStateSpaceModel, self).__init__(
           num_timesteps=num_timesteps,
           transition_matrix=transition_matrix_fn,
           transition_noise=transition_noise_fn,
           observation_matrix=observation_matrix_fn,
-          observation_noise=observation_noise,
+          observation_noise=observation_noise_fn,
           initial_state_prior=initial_state_prior,
           initial_step=initial_step,
           validate_args=validate_args,

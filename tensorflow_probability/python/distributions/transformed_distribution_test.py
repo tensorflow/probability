@@ -24,10 +24,9 @@ from scipy import stats
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from tensorflow.python.framework import test_util
-
-tfd = tfp.distributions
 tfb = tfp.bijectors
+tfd = tfp.distributions
+tfe = tf.contrib.eager
 
 
 class DummyMatrixTransform(tfb.Bijector):
@@ -59,7 +58,7 @@ class DummyMatrixTransform(tfb.Bijector):
     return tf.matrix_determinant(x)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class TransformedDistributionTest(tf.test.TestCase):
 
   def _cls(self):
@@ -148,15 +147,18 @@ class TransformedDistributionTest(tf.test.TestCase):
     self.assertAllClose(grid, cdf_, rtol=1e-6, atol=0.)
 
   def testCachedSamples(self):
-    exp_forward_only = tfb.Exp()
-    exp_forward_only._inverse = self._make_unimplemented(
-        "inverse")
-    exp_forward_only._inverse_event_shape_tensor = self._make_unimplemented(
-        "inverse_event_shape_tensor ")
-    exp_forward_only._inverse_event_shape = self._make_unimplemented(
-        "inverse_event_shape ")
-    exp_forward_only._inverse_log_det_jacobian = self._make_unimplemented(
-        "inverse_log_det_jacobian ")
+    class ExpForwardOnly(tfb.Bijector):
+
+      def __init__(self):
+        super(ExpForwardOnly, self).__init__(forward_min_event_ndims=0)
+
+      def _forward(self, x):
+        return tf.exp(x)
+
+      def _forward_log_det_jacobian(self, x):
+        return tf.convert_to_tensor(x)
+
+    exp_forward_only = ExpForwardOnly()
 
     mu = 3.0
     sigma = 0.02
@@ -171,15 +173,18 @@ class TransformedDistributionTest(tf.test.TestCase):
     self.assertAllClose(expected_log_pdf, log_pdf_val, rtol=1e-4, atol=0.)
 
   def testCachedSamplesInvert(self):
-    exp_inverse_only = tfb.Exp()
-    exp_inverse_only._forward = self._make_unimplemented(
-        "forward")
-    exp_inverse_only._forward_event_shape_tensor = self._make_unimplemented(
-        "forward_event_shape_tensor ")
-    exp_inverse_only._forward_event_shape = self._make_unimplemented(
-        "forward_event_shape ")
-    exp_inverse_only._forward_log_det_jacobian = self._make_unimplemented(
-        "forward_log_det_jacobian ")
+    class ExpInverseOnly(tfb.Bijector):
+
+      def __init__(self):
+        super(ExpInverseOnly, self).__init__(inverse_min_event_ndims=0)
+
+      def _inverse(self, y):
+        return tf.log(y)
+
+      def _inverse_log_det_jacobian(self, y):
+        return -tf.log(y)
+
+    exp_inverse_only = ExpInverseOnly()
 
     log_forward_only = tfb.Invert(exp_inverse_only)
 
@@ -505,6 +510,40 @@ class ScalarToMultiTest(tf.test.TestCase):
           actual_mvn_log_prob(x_), fake_log_prob_, atol=0., rtol=1e-6)
       self.assertAllClose(
           np.exp(actual_mvn_log_prob(x_)), fake_prob_, atol=0., rtol=1e-5)
+
+  def testEmptyEvent(self):
+    # Verify that zero-dimensional multivariate Normal distributions still
+    # return reasonable shapes and a log-prob of 0.0.
+    event_shape = [0]
+    for batch_shape in ([2], []):
+      for shapes_are_dynamic in (True, False):
+        loc = tf.zeros(batch_shape + event_shape)
+        scale_diag = tf.ones(batch_shape + event_shape)
+        if shapes_are_dynamic:
+          loc = tf.placeholder_with_default(loc, shape=None,
+                                            name="dynamic_loc")
+          scale_diag = tf.placeholder_with_default(scale_diag, shape=None,
+                                                   name="dynamic_scale_diag")
+
+        mvn = tfd.MultivariateNormalDiag(loc=loc, scale_diag=scale_diag)
+
+        self.assertAllEqual(self.evaluate(mvn.event_shape_tensor()),
+                            event_shape)
+        self.assertAllEqual(self.evaluate(mvn.batch_shape_tensor()),
+                            batch_shape)
+        if not shapes_are_dynamic:
+          self.assertAllEqual(mvn.event_shape.as_list(),
+                              event_shape)
+          self.assertAllEqual(mvn.batch_shape.as_list(),
+                              batch_shape)
+
+        for sample_shape in ([3], []):
+          sample_ = self.evaluate(mvn.sample(sample_shape))
+          self.assertAllEqual(sample_.shape,
+                              sample_shape + batch_shape + event_shape)
+          self.assertAllEqual(
+              self.evaluate(mvn.log_prob(sample_)),
+              np.zeros(sample_shape + batch_shape))
 
 
 if __name__ == "__main__":

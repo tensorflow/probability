@@ -32,7 +32,7 @@ from tensorflow_probability.python.distributions import MultivariateNormalDiag
 from tensorflow_probability.python.distributions import Normal
 
 from tensorflow_probability.python.internal import distribution_util
-from tensorflow.python.framework import test_util
+tfe = tf.contrib.eager
 
 
 def try_import(name):  # pylint: disable=invalid-name
@@ -565,7 +565,7 @@ class PadDynamicTest(_PadTest, tf.test.TestCase):
 
 class PickScalarConditionTest(tf.test.TestCase):
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def test_pick_scalar_condition_static(self):
 
     pos = np.exp(np.random.randn(3, 2, 4)).astype(np.float32)
@@ -609,7 +609,7 @@ class PickScalarConditionTest(tf.test.TestCase):
     self.assertAllEqual(neg_, neg)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class TestNonNegativeAxis(tf.test.TestCase):
 
   def test_static_scalar_positive_index(self):
@@ -634,7 +634,7 @@ class TestNonNegativeAxis(tf.test.TestCase):
 
 class TestMoveDimension(tf.test.TestCase):
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def test_move_dimension_static_shape(self):
 
     x = tf.random_normal(shape=[200, 30, 4, 1, 6])
@@ -651,7 +651,7 @@ class TestMoveDimension(tf.test.TestCase):
     x_perm = distribution_util.move_dimension(x, 4, 2)
     self.assertAllEqual(x_perm.shape.as_list(), [200, 30, 6, 4, 1])
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def test_move_dimension_dynamic_shape(self):
 
     x_ = tf.random_normal(shape=[200, 30, 4, 1, 6])
@@ -680,7 +680,7 @@ class TestMoveDimension(tf.test.TestCase):
 
     self.assertAllEqual(x_perm5_, [200, 30, 6, 4, 1])
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def test_move_dimension_dynamic_indices(self):
 
     x_ = tf.random_normal(shape=[200, 30, 4, 1, 6])
@@ -763,7 +763,7 @@ class AssertCloseTest(tf.test.TestCase):
 
 class MaybeGetStaticTest(tf.test.TestCase):
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testGetStaticInt(self):
     x = 2
     self.assertEqual(x, distribution_util.maybe_get_static_value(x))
@@ -771,7 +771,7 @@ class MaybeGetStaticTest(tf.test.TestCase):
         np.array(2.),
         distribution_util.maybe_get_static_value(x, dtype=np.float64))
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testGetStaticNumpyArray(self):
     x = np.array(2, dtype=np.int32)
     self.assertEqual(x, distribution_util.maybe_get_static_value(x))
@@ -779,7 +779,7 @@ class MaybeGetStaticTest(tf.test.TestCase):
         np.array(2.),
         distribution_util.maybe_get_static_value(x, dtype=np.float64))
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testGetStaticConstant(self):
     x = tf.constant(2, dtype=tf.int32)
     self.assertEqual(np.array(2, dtype=np.int32),
@@ -797,7 +797,7 @@ class MaybeGetStaticTest(tf.test.TestCase):
 
 class GetLogitsAndProbsTest(tf.test.TestCase):
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testImproperArguments(self):
     with self.assertRaises(ValueError):
       distribution_util.get_logits_and_probs(logits=None, probs=None)
@@ -805,7 +805,7 @@ class GetLogitsAndProbsTest(tf.test.TestCase):
     with self.assertRaises(ValueError):
       distribution_util.get_logits_and_probs(logits=[0.1], probs=[0.1])
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testLogits(self):
     p = np.array([0.01, 0.2, 0.5, 0.7, .99], dtype=np.float32)
     logits = _logit(p)
@@ -816,7 +816,7 @@ class GetLogitsAndProbsTest(tf.test.TestCase):
     self.assertAllClose(p, self.evaluate(new_p), rtol=1e-5, atol=0.)
     self.assertAllClose(logits, self.evaluate(new_logits), rtol=1e-5, atol=0.)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testLogitsMultidimensional(self):
     p = np.array([0.2, 0.3, 0.5], dtype=np.float32)
     logits = np.log(p)
@@ -827,7 +827,7 @@ class GetLogitsAndProbsTest(tf.test.TestCase):
     self.assertAllClose(self.evaluate(new_p), p)
     self.assertAllClose(self.evaluate(new_logits), logits)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testProbability(self):
     p = np.array([0.01, 0.2, 0.5, 0.7, .99], dtype=np.float32)
 
@@ -837,7 +837,7 @@ class GetLogitsAndProbsTest(tf.test.TestCase):
     self.assertAllClose(_logit(p), self.evaluate(new_logits))
     self.assertAllClose(p, self.evaluate(new_p))
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testProbabilityMultidimensional(self):
     p = np.array([[0.3, 0.4, 0.3], [0.1, 0.5, 0.4]], dtype=np.float32)
 
@@ -847,7 +847,7 @@ class GetLogitsAndProbsTest(tf.test.TestCase):
     self.assertAllClose(np.log(p), self.evaluate(new_logits))
     self.assertAllClose(p, self.evaluate(new_p))
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testProbabilityValidateArgs(self):
     p = [0.01, 0.2, 0.5, 0.7, .99]
     # Component less than 0.
@@ -877,7 +877,7 @@ class GetLogitsAndProbsTest(tf.test.TestCase):
         probs=p3, validate_args=False)
     self.evaluate(prob)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testProbabilityValidateArgsMultidimensional(self):
     p = np.array([[0.3, 0.4, 0.3], [0.1, 0.5, 0.4]], dtype=np.float32)
     # Component less than 0. Still sums to 1.
@@ -978,7 +978,7 @@ class EmbedCheckCategoricalEventShapeTest(tf.test.TestCase):
             param)
         checked_param.eval(feed_dict={param: np.ones([int(2**11+1)])})
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testUnsupportedDtype(self):
     param = tf.convert_to_tensor(
         np.ones([2**11 + 1]).astype(tf.qint16.as_numpy_dtype),
@@ -1030,7 +1030,7 @@ class EmbedCheckIntegerCastingClosedTest(tf.test.TestCase):
         x_checked.eval(feed_dict={x: np.array([1, -1], dtype=np.int32)})
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class LogCombinationsTest(tf.test.TestCase):
 
   def testLogCombinationsBinomial(self):
@@ -1170,7 +1170,7 @@ class RotateTransposeTest(tf.test.TestCase):
       x = np.array(x)
     return np.transpose(x, np.roll(np.arange(len(x.shape)), shift))
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testRollStatic(self):
     if tf.executing_eagerly():
       error_message = r"Attempt to convert a value \(None\)"
@@ -1668,7 +1668,7 @@ class SoftplusTest(tf.test.TestCase):
           np.ones_like(grads).astype(np.bool), np.isfinite(grads))
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class ArgumentsTest(tf.test.TestCase):
 
   def testNoArguments(self):

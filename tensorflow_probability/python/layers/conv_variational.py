@@ -539,6 +539,13 @@ class Conv1DReparameterization(_ConvReparameterization):
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
   distributions.
 
+  Upon being built, this layer adds losses (accessible via the `losses`
+  property) representing the divergences of `kernel` and/or `bias` surrogate
+  posteriors and their respective priors. When doing minibatch stochastic
+  optimization, make sure to scale this loss such that it is applied just once
+  per epoch (e.g. if `kl` is the sum of `losses` for each element of the batch,
+  you should pass `kl / num_examples_per_epoch` to your optimizer).
+
   #### Examples
 
   We illustrate a Bayesian neural network with [variational inference](
@@ -666,6 +673,13 @@ class Conv2DReparameterization(_ConvReparameterization):
   The arguments permit separate specification of the surrogate posterior
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
   distributions.
+
+  Upon being built, this layer adds losses (accessible via the `losses`
+  property) representing the divergences of `kernel` and/or `bias` surrogate
+  posteriors and their respective priors. When doing minibatch stochastic
+  optimization, make sure to scale this loss such that it is applied just once
+  per epoch (e.g. if `kl` is the sum of `losses` for each element of the batch,
+  you should pass `kl / num_examples_per_epoch` to your optimizer).
 
   #### Examples
 
@@ -803,6 +817,13 @@ class Conv3DReparameterization(_ConvReparameterization):
   The arguments permit separate specification of the surrogate posterior
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
   distributions.
+
+  Upon being built, this layer adds losses (accessible via the `losses`
+  property) representing the divergences of `kernel` and/or `bias` surrogate
+  posteriors and their respective priors. When doing minibatch stochastic
+  optimization, make sure to scale this loss such that it is applied just once
+  per epoch (e.g. if `kl` is the sum of `losses` for each element of the batch,
+  you should pass `kl / num_examples_per_epoch` to your optimizer).
 
   #### Examples
 
@@ -1120,6 +1141,13 @@ class Conv1DFlipout(_ConvFlipout):
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
   distributions.
 
+  Upon being built, this layer adds losses (accessible via the `losses`
+  property) representing the divergences of `kernel` and/or `bias` surrogate
+  posteriors and their respective priors. When doing minibatch stochastic
+  optimization, make sure to scale this loss such that it is applied just once
+  per epoch (e.g. if `kl` is the sum of `losses` for each element of the batch,
+  you should pass `kl / num_examples_per_epoch` to your optimizer).
+
   #### Examples
 
   We illustrate a Bayesian neural network with [variational inference](
@@ -1254,6 +1282,13 @@ class Conv2DFlipout(_ConvFlipout):
   The arguments permit separate specification of the surrogate posterior
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
   distributions.
+
+  Upon being built, this layer adds losses (accessible via the `losses`
+  property) representing the divergences of `kernel` and/or `bias` surrogate
+  posteriors and their respective priors. When doing minibatch stochastic
+  optimization, make sure to scale this loss such that it is applied just once
+  per epoch (e.g. if `kl` is the sum of `losses` for each element of the batch,
+  you should pass `kl / num_examples_per_epoch` to your optimizer).
 
   #### Examples
 
@@ -1398,6 +1433,13 @@ class Conv3DFlipout(_ConvFlipout):
   The arguments permit separate specification of the surrogate posterior
   (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
   distributions.
+
+  Upon being built, this layer adds losses (accessible via the `losses`
+  property) representing the divergences of `kernel` and/or `bias` surrogate
+  posteriors and their respective priors. When doing minibatch stochastic
+  optimization, make sure to scale this loss such that it is applied just once
+  per epoch (e.g. if `kl` is the sum of `losses` for each element of the batch,
+  you should pass `kl / num_examples_per_epoch` to your optimizer).
 
   #### Examples
 

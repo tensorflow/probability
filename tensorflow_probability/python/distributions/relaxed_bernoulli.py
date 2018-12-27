@@ -19,7 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from tensorflow_probability.python import bijectors
+from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.distributions import logistic
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
@@ -178,7 +178,7 @@ class RelaxedBernoulli(transformed_distribution.TransformedDistribution):
               validate_args=validate_args,
               allow_nan_stats=allow_nan_stats,
               name=name + "/Logistic"),
-          bijector=bijectors.Sigmoid(validate_args=validate_args),
+          bijector=sigmoid_bijector.Sigmoid(validate_args=validate_args),
           validate_args=validate_args,
           name=name)
     self._parameters = parameters

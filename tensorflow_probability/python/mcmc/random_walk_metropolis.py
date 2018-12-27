@@ -96,7 +96,7 @@ def random_walk_normal_fn(scale=1., name=None):
         raise ValueError('`scale` must broadcast with `state_parts`.')
       seed_stream = distributions.SeedStream(seed, salt='RandomWalkNormalFn')
       next_state_parts = [
-          tf.random_normal(
+          tf.random.normal(
               mean=state_part,
               stddev=scale_part,
               shape=tf.shape(state_part),
@@ -157,7 +157,7 @@ def random_walk_uniform_fn(scale=1., name=None):
         raise ValueError('`scale` must broadcast with `state_parts`.')
       seed_stream = distributions.SeedStream(seed, salt='RandomWalkUniformFn')
       next_state_parts = [
-          tf.random_uniform(
+          tf.random.uniform(
               minval=state_part - scale_part,
               maxval=state_part + scale_part,
               shape=tf.shape(state_part),
@@ -214,9 +214,9 @@ class RandomWalkMetropolis(kernel_base.TransitionKernel):
     num_burnin_steps=500,
     parallel_iterations=1)  # For determinism.
 
-  sample_mean = tf.reduce_mean(samples, axis=0)
+  sample_mean = tf.math.reduce_mean(samples, axis=0)
   sample_std = tf.sqrt(
-      tf.reduce_mean(tf.squared_difference(samples, sample_mean),
+      tf.math.reduce_mean(tf.squared_difference(samples, sample_mean),
                      axis=0))
   with tf.Session() as sess:
     [sample_mean_, sample_std_] = sess.run([sample_mean, sample_std])
@@ -249,7 +249,7 @@ class RandomWalkMetropolis(kernel_base.TransitionKernel):
   # Then the target log-density is defined as follows:
   def target_log_prob(x, y):
     # Stack the input tensors together
-    z = tf.stack([x, y], axis=-1) - true_mean
+    z = tf.stack([x, y], axis=-1)
     return target.log_prob(tf.squeeze(z))
 
   # Initial state of the chain
@@ -269,13 +269,13 @@ class RandomWalkMetropolis(kernel_base.TransitionKernel):
       parallel_iterations=1)
   samples = tf.stack(samples, axis=-1)
 
-  sample_mean = tf.reduce_mean(samples, axis=0)
+  sample_mean = tf.math.reduce_mean(samples, axis=0)
   x = tf.squeeze(samples - sample_mean)
   sample_cov = tf.matmul(tf.transpose(x, [1, 2, 0]),
                          tf.transpose(x, [1, 0, 2])) / num_results
 
-  mean_sample_mean = tf.reduce_mean(sample_mean)
-  mean_sample_cov = tf.reduce_mean(sample_cov, axis=0)
+  mean_sample_mean = tf.math.reduce_mean(sample_mean)
+  mean_sample_cov = tf.math.reduce_mean(sample_cov, axis=0)
   x = tf.reshape(sample_cov - mean_sample_cov, [num_chains, 2 * 2])
   cov_sample_cov = tf.reshape(tf.matmul(x, x, transpose_a=True) / num_chains,
                               shape=[2 * 2, 2 * 2])
@@ -332,9 +332,9 @@ class RandomWalkMetropolis(kernel_base.TransitionKernel):
           seed=42),
       parallel_iterations=1)  # For determinism.
 
-  sample_mean = tf.reduce_mean(samples, axis=0)
+  sample_mean = tf.math.reduce_mean(samples, axis=0)
   sample_std = tf.sqrt(
-      tf.reduce_mean(tf.squared_difference(samples, sample_mean),
+      tf.math.reduce_mean(tf.squared_difference(samples, sample_mean),
                      axis=0))
   with tf.Session() as sess:
     [sample_mean_, sample_std_] = sess.run([sample_mean, sample_std])
@@ -506,9 +506,10 @@ class UncalibratedRandomWalk(kernel_base.TransitionKernel):
                 current_state,
                 previous_kernel_results.target_log_prob]):
       with tf.name_scope('initialize'):
-        current_state_parts = (list(current_state)
-                               if mcmc_util.is_list_like(current_state)
-                               else [current_state])
+        if mcmc_util.is_list_like(current_state):
+          current_state_parts = list(current_state)
+        else:
+          current_state_parts = [current_state]
         current_state_parts = [tf.convert_to_tensor(s, name='current_state')
                                for s in current_state_parts]
 
@@ -547,8 +548,11 @@ def _maybe_call_fn(fn,
                    fn_result=None,
                    description='target_log_prob'):
   """Helper which computes `fn_result` if needed."""
-  fn_arg_list = (list(fn_arg_list) if mcmc_util.is_list_like(fn_arg_list)
-                 else [fn_arg_list])
+  if mcmc_util.is_list_like(fn_arg_list):
+    fn_arg_list = list(fn_arg_list)
+  else:
+    fn_arg_list = [fn_arg_list]
+
   if fn_result is None:
     fn_result = fn(*fn_arg_list)
   if not fn_result.dtype.is_floating:

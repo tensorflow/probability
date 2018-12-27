@@ -181,11 +181,16 @@ class Independent(distribution_lib.Distribution):
 
   def _event_shape(self):
     batch_shape = self.distribution.batch_shape
-    if (self._static_reinterpreted_batch_ndims is None
-        or batch_shape.ndims is None):
+    if self._static_reinterpreted_batch_ndims is None:
       return tf.TensorShape(None)
-    d = batch_shape.ndims - self._static_reinterpreted_batch_ndims
-    return batch_shape[d:].concatenate(self.distribution.event_shape)
+
+    if batch_shape.ndims is not None:
+      reinterpreted_batch_shape = batch_shape[
+          batch_shape.ndims - self._static_reinterpreted_batch_ndims:]
+    else:
+      reinterpreted_batch_shape = tf.TensorShape(
+          [None] * int(self._static_reinterpreted_batch_ndims))
+    return reinterpreted_batch_shape.concatenate(self.distribution.event_shape)
 
   def _sample_n(self, n, seed):
     with tf.control_dependencies(self._runtime_assertions):
@@ -193,31 +198,11 @@ class Independent(distribution_lib.Distribution):
 
   def _log_prob(self, x):
     with tf.control_dependencies(self._runtime_assertions):
-      # We directly call the underlying _log_prob to avoid the fallback logic in
-      # Distribution.log_prob [which falls back to log(Distribution._prob)].
-      # Said fallback logic will also be wrapped around calls to this method.
-      return self._reduce(tf.reduce_sum, self.distribution._log_prob(x))  # pylint:disable=protected-access
-
-  def _prob(self, x):
-    with tf.control_dependencies(self._runtime_assertions):
-      # We directly call the underlying _prob to avoid the fallback logic in
-      # Distribution.prob [which falls back to exp(Distribution._log_prob)].
-      # Said fallback logic will also be wrapped around calls to this method.
-      return self._reduce(tf.reduce_prod, self.distribution._prob(x))  # pylint:disable=protected-access
+      return self._reduce(tf.reduce_sum, self.distribution.log_prob(x))
 
   def _log_cdf(self, x):
     with tf.control_dependencies(self._runtime_assertions):
-      # We directly call the underlying _log_cdf to avoid the fallback logic in
-      # Distribution.log_cdf [which falls back to log(Distribution._cdf)].
-      # Said fallback logic will also be wrapped around calls to this method.
-      return self._reduce(tf.reduce_sum, self.distribution._log_cdf(x))  # pylint:disable=protected-access
-
-  def _cdf(self, x):
-    with tf.control_dependencies(self._runtime_assertions):
-      # We directly call the underlying _cdf to avoid the fallback logic in
-      # Distribution.cdf [which falls back to exp(Distribution._log_cdf)].
-      # Said fallback logic will also be wrapped around calls to this method.
-      return self._reduce(tf.reduce_prod, self.distribution._cdf(x))  # pylint:disable=protected-access
+      return self._reduce(tf.reduce_sum, self.distribution.log_cdf(x))
 
   def _entropy(self):
     with tf.control_dependencies(self._runtime_assertions):

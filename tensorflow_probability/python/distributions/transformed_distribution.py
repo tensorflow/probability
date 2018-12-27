@@ -21,7 +21,6 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow.python.framework import tensor_util
@@ -225,7 +224,7 @@ class TransformedDistribution(distribution_lib.Distribution):
 
   def __init__(self,
                distribution,
-               bijector=None,
+               bijector,
                batch_shape=None,
                event_shape=None,
                validate_args=False,
@@ -236,7 +235,7 @@ class TransformedDistribution(distribution_lib.Distribution):
       distribution: The base distribution instance to transform. Typically an
         instance of `Distribution`.
       bijector: The object responsible for calculating the transformation.
-        Typically an instance of `Bijector`. `None` means `Identity()`.
+        Typically an instance of `Bijector`.
       batch_shape: `integer` vector `Tensor` which overrides `distribution`
         `batch_shape`; valid only if `distribution.is_scalar_batch()`.
       event_shape: `integer` vector `Tensor` which overrides `distribution`
@@ -255,9 +254,6 @@ class TransformedDistribution(distribution_lib.Distribution):
       # For convenience we define some handy constants.
       self._zero = tf.constant(0, dtype=tf.int32, name="zero")
       self._empty = tf.constant([], dtype=tf.int32, name="empty")
-
-      if bijector is None:
-        bijector = tfb.Identity(validate_args=validate_args)
 
       # We will keep track of a static and dynamic version of
       # self._is_{batch,event}_override. This way we can do more prior to graph
@@ -438,6 +434,9 @@ class TransformedDistribution(distribution_lib.Distribution):
     return log_prob
 
   def _prob(self, y):
+    if not hasattr(self.distribution, "_prob"):
+      return tf.exp(self.log_prob(y))
+
     x = self.bijector.inverse(y)
     event_ndims = self._maybe_get_static_event_ndims()
     ildj = self.bijector.inverse_log_det_jacobian(y, event_ndims=event_ndims)
@@ -585,13 +584,13 @@ class TransformedDistribution(distribution_lib.Distribution):
           override_shape, 1,
           message="shape override must be a vector")]
 
-    if tf.contrib.util.constant_value(override_shape) is not None:
-      if any(s <= 0 for s in tf.contrib.util.constant_value(override_shape)):
-        raise ValueError("shape override must have positive elements")
+    if tensor_util.constant_value(override_shape) is not None:
+      if any(s < 0 for s in tensor_util.constant_value(override_shape)):
+        raise ValueError("shape override must have non-negative elements")
     elif validate_args:
-      dynamic_assertions += [tf.assert_positive(
+      dynamic_assertions += [tf.assert_non_negative(
           override_shape,
-          message="shape override must have positive elements")]
+          message="shape override must have non-negative elements")]
 
     is_both_nonscalar = _logical_and(_logical_not(base_is_scalar),
                                      _logical_not(override_is_scalar))

@@ -24,13 +24,13 @@ from scipy.stats import special_ortho_group
 
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow.python.framework import test_util
+tfe = tf.contrib.eager
 
 
 class NelderMeadTest(tf.test.TestCase):
   """Tests for Nelder-Mead optimization algorithm."""
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def test_quadratic_bowl_2d(self):
     """Can minimize a two dimensional quadratic function."""
     minimum = np.array([1.0, 1.0])
@@ -46,7 +46,7 @@ class NelderMeadTest(tf.test.TestCase):
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, minimum, 1e-6)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def test_quadratic_bowl_with_initial_simplex(self):
     """Can minimize a quadratic function with initial simplex."""
     minimum = np.array([1.0, 1.0])
@@ -63,7 +63,7 @@ class NelderMeadTest(tf.test.TestCase):
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, minimum, 1e-6)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def test_quadratic_bowl_with_step_sizes(self):
     """Can minimize a quadratic function with step size specification."""
     minimum = np.array([1.0, 1.0])
@@ -83,7 +83,7 @@ class NelderMeadTest(tf.test.TestCase):
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, minimum, 1e-6)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def test_quadratic_bowl_10d(self):
     """Can minimize a ten dimensional quadratic function."""
     dim = 10
@@ -103,7 +103,7 @@ class NelderMeadTest(tf.test.TestCase):
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, minimum, 1e-6)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def test_quadratic_with_skew(self):
     """Can minimize a general quadratic function."""
     dim = 3
@@ -127,7 +127,7 @@ class NelderMeadTest(tf.test.TestCase):
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, minimum, 1e-6)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def test_quadratic_with_strong_skew(self):
     """Can minimize a strongly skewed quadratic function."""
     np.random.seed(89793)
@@ -149,7 +149,7 @@ class NelderMeadTest(tf.test.TestCase):
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, minimum, 1e-5)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def test_sqrt_quadratic_function(self):
     """Can minimize the square root function."""
     minimum = np.array([0.0, 0.0, 0.0, 0.0])
@@ -165,7 +165,7 @@ class NelderMeadTest(tf.test.TestCase):
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, minimum, 1e-6)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def test_abs_function(self):
     """Can minimize the absolute value function."""
     minimum = np.array([0.0, 0.0, 0.0])
@@ -180,7 +180,7 @@ class NelderMeadTest(tf.test.TestCase):
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, minimum, 1e-5)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def test_rosenbrock_2d(self):
     """Tests Nelder Mead on the Rosenbrock function.
 
@@ -214,7 +214,7 @@ class NelderMeadTest(tf.test.TestCase):
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, [1.0, 1.0], 1e-5)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def test_batch_consistent_with_nonbatch(self):
     """Tests that results with batch evaluate same as non-batch evaluate."""
     def easom(z):
@@ -257,7 +257,7 @@ class NelderMeadTest(tf.test.TestCase):
                          results_non_batch.position,
                          1e-5)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def test_determinism(self):
     """Tests that the results are determinsitic."""
     dim = 5
@@ -305,7 +305,7 @@ class NelderMeadTest(tf.test.TestCase):
                          res2.final_objective_values.reshape([-1]), 1e-5)
     self.assertEqual(res1.num_iterations, res2.num_iterations)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def test_max_iteration_bounds_work(self):
     """Tests that max iteration bound specification works as expected."""
     def beale(coord):

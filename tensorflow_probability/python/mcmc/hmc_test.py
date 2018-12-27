@@ -30,14 +30,13 @@ from tensorflow_probability.python.mcmc.hmc import _compute_log_acceptance_corre
 from tensorflow_probability.python.mcmc.hmc import _leapfrog_integrator_one_step
 from tensorflow_probability.python.mcmc.util import maybe_call_fn_and_grads
 from tensorflow.python.eager import context
-from tensorflow.python.framework import test_util
-
 tfb = tfp.bijectors
 tfd = tfp.distributions
+tfe = tf.contrib.eager
 
 
 # Arguments kept to match counterpart,
-# `@test_util.run_in_graph_and_eager_modes`.
+# `@tfe.run_test_in_graph_and_eager_modes`.
 def run_in_graph_mode_only(__unused__=None, config=None, use_gpu=True):  # pylint: disable=invalid-name,unused-argument
   """Execute the decorated test in graph mode only."""
   assert not __unused__, 'Add () after run_in_graph_mode_only.'
@@ -144,23 +143,23 @@ class HMCTest(tf.test.TestCase):
     x = tf.constant(np.random.rand(50, 10, 2), np.float32)
     self._integrator_conserves_energy(x, independent_chain_ndims)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testIntegratorEnergyConservationNullShape(self):
     self._integrator_conserves_energy_wrapper(0)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testIntegratorEnergyConservation1(self):
     self._integrator_conserves_energy_wrapper(1)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testIntegratorEnergyConservation2(self):
     self._integrator_conserves_energy_wrapper(2)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testIntegratorEnergyConservation3(self):
     self._integrator_conserves_energy_wrapper(3)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testSampleChainSeedReproducibleWorksCorrectly(self):
     num_results = 10
     independent_chain_ndims = 1
@@ -266,19 +265,19 @@ class HMCTest(tf.test.TestCase):
     x = tf.constant(np.random.rand(50, 10, 2), np.float32, name='x')
     self._chain_gets_correct_expectations(x, independent_chain_ndims)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testHMCChainExpectationsNullShape(self):
     self._chain_gets_correct_expectations_wrapper(0)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testHMCChainExpectations1(self):
     self._chain_gets_correct_expectations_wrapper(1)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testHMCChainExpectations2(self):
     self._chain_gets_correct_expectations_wrapper(2)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testKernelResultsUsingTruncatedDistribution(self):
     def log_prob(x):
       return tf.where(
@@ -469,19 +468,19 @@ class HMCTest(tf.test.TestCase):
     x = tf.constant(initial_draws, np.float32)
     self._kernel_leaves_target_invariant(x, independent_chain_ndims)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testKernelLeavesTargetInvariant1(self):
     self._kernel_leaves_target_invariant_wrapper(1)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testKernelLeavesTargetInvariant2(self):
     self._kernel_leaves_target_invariant_wrapper(2)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testKernelLeavesTargetInvariant3(self):
     self._kernel_leaves_target_invariant_wrapper(3)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testNanRejection(self):
     """Tests that an update that yields NaN potentials gets rejected.
 
@@ -574,15 +573,15 @@ class HMCTest(tf.test.TestCase):
     self.assertEqual(dtype, states_.dtype)
     self.assertEqual(dtype, log_accept_ratio_.dtype)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testChainWorksIn64Bit(self):
     self._testChainWorksDtype(np.float64)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testChainWorksIn16Bit(self):
     self._testChainWorksDtype(np.float16)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testChainWorksCorrelatedMultivariate(self):
     dtype = np.float32
     true_mean = dtype([0, 0])
@@ -633,7 +632,7 @@ class HMCTest(tf.test.TestCase):
     self.assertAllClose(true_cov, sample_cov_,
                         atol=0., rtol=0.2)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testUncalibratedHMCPreservesStaticShape(self):
     uncal_hmc = tfp.mcmc.UncalibratedHamiltonianMonteCarlo(
         target_log_prob_fn=lambda x: tf.reduce_sum(-x**2., axis=-1),
@@ -650,7 +649,7 @@ class HMCTest(tf.test.TestCase):
     self.assertAllEqual([3, 2], x1.shape)
     self.assertAllEqual([3], r1.target_log_prob.shape)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testHMCPreservesStaticShape(self):
     hmc = tfp.mcmc.HamiltonianMonteCarlo(
         target_log_prob_fn=lambda x: tf.reduce_sum(-x**2., axis=-1),
@@ -670,7 +669,7 @@ class HMCTest(tf.test.TestCase):
 
 class _LogCorrectionTest(object):
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testHandlesNanFromPotential(self):
     tlp = [1, np.inf, -np.inf, np.nan]
     target_log_prob, proposed_target_log_prob = [
@@ -762,7 +761,7 @@ class LogCorrectionTest64(tf.test.TestCase, _LogCorrectionTest):
 
 class _HMCHandlesLists(object):
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def testStateParts(self):
     cast = lambda x: np.array(x, self.dtype)
     dist_x = tfd.Normal(loc=cast(0), scale=cast(1))
@@ -826,7 +825,7 @@ class HMCAdaptiveStepSize(tf.test.TestCase):
     tf.random.set_random_seed(10014)
     np.random.seed(10014)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def test_multiple_step_sizes(self):
     num_results = 5
     initial_step_sizes = [1e-5, 1e-4]
@@ -835,17 +834,17 @@ class HMCAdaptiveStepSize(tf.test.TestCase):
 
     # TODO(b/111765211): Switch to the following once
     # `get_variable(use_resource=True)` has the same semantics as
-    # `tf.contrib.eager.Variable`.
+    # `tfe.Variable`.
     #   step_size = tf.get_variable(
     #       name='step_size',
     #       initializer=np.array(1e-3, dtype),
     #       use_resource=True,
     #       trainable=False)
-    step_size = [tf.contrib.eager.Variable(
+    step_size = [tfe.Variable(
         initial_value=np.array(initial_step_size, dtype),
         name='step_size',
         trainable=False) for initial_step_size in initial_step_sizes]
-    step_counter = tf.contrib.eager.Variable(
+    step_counter = tfe.Variable(
         name='step_size_adaptation_step_counter1',
         initial_value=np.array(-1, dtype=np.int32),
         trainable=False)
@@ -862,6 +861,7 @@ class HMCAdaptiveStepSize(tf.test.TestCase):
             num_leapfrog_steps=2,
             step_size=step_size,
             step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy(
+                num_adaptation_steps=None,
                 step_counter=step_counter),
             state_gradients_are_stopped=True,
             seed=_set_seed(252)),
@@ -877,7 +877,7 @@ class HMCAdaptiveStepSize(tf.test.TestCase):
     self.assertNear(step_size_[0][0]/step_size_[1][0],
                     step_size_[0][-1]/step_size_[1][-1], err=1e-4)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def test_multiple_step_sizes_different_dtype(self):
     num_results = 5
     initial_step_sizes = [1e-5, 1e-4]
@@ -887,17 +887,17 @@ class HMCAdaptiveStepSize(tf.test.TestCase):
 
     # TODO(b/111765211): Switch to the following once
     # `get_variable(use_resource=True)` has the same semantics as
-    # `tf.contrib.eager.Variable`.
+    # `tfe.Variable`.
     #   step_size = tf.get_variable(
     #       name='step_size',
     #       initializer=np.array(1e-3, dtype),
     #       use_resource=True,
     #       trainable=False)
-    step_size = [tf.contrib.eager.Variable(
+    step_size = [tfe.Variable(
         initial_value=np.array(initial_step_size, dtype),
         name='step_size',
         trainable=False) for initial_step_size in initial_step_sizes]
-    step_counter = tf.contrib.eager.Variable(
+    step_counter = tfe.Variable(
         name='step_size_adaptation_step_counter1',
         initial_value=np.array(-1, dtype=np.int32),
         trainable=False)
@@ -914,6 +914,7 @@ class HMCAdaptiveStepSize(tf.test.TestCase):
             num_leapfrog_steps=2,
             step_size=step_size,
             step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy(
+                num_adaptation_steps=None,
                 step_counter=step_counter),
             state_gradients_are_stopped=True,
             seed=_set_seed(252)),
@@ -929,7 +930,7 @@ class HMCAdaptiveStepSize(tf.test.TestCase):
     self.assertNear(step_size_[0][0]/step_size_[1][0],
                     step_size_[0][-1]/step_size_[1][-1], err=1e-4)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def test_finite_adaptation(self):
 
     # Test that the adaptation runs for the specified number of steps.
@@ -943,17 +944,17 @@ class HMCAdaptiveStepSize(tf.test.TestCase):
 
     # TODO(b/111765211): Switch to the following once
     # `get_variable(use_resource=True)` has the same semantics as
-    # `tf.contrib.eager.Variable`.
+    # `tfe.Variable`.
     #   step_size = tf.get_variable(
     #       name='step_size',
     #       initializer=np.array(1e-3, dtype),
     #       use_resource=True,
     #       trainable=False)
-    step_size = tf.contrib.eager.Variable(
+    step_size = tfe.Variable(
         initial_value=np.array(initial_step_size, dtype),
         name='step_size',
         trainable=False)
-    step_counter = tf.contrib.eager.Variable(
+    step_counter = tfe.Variable(
         name='step_size_adaptation_step_counter2',
         initial_value=np.array(-1, dtype=np.int32),
         trainable=False)
@@ -1065,7 +1066,8 @@ class HMCEMAdaptiveStepSize(tf.test.TestCase):
             target_log_prob_fn=unnormalized_posterior_log_prob,
             num_leapfrog_steps=2,
             step_size=step_size,
-            step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy(),
+            step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy(
+                num_adaptation_steps=None),
             state_gradients_are_stopped=True,
             seed=_set_seed(252)),
         parallel_iterations=1)
@@ -1128,7 +1130,7 @@ class HMCEMAdaptiveStepSize(tf.test.TestCase):
                     weights_prior_estimated_scale_[-5:].mean(),
                     err=0.005)
 
-  @test_util.run_in_graph_and_eager_modes
+  @tfe.run_test_in_graph_and_eager_modes
   def test_step_size_adapts(self):
     dtype = np.float32
 
@@ -1137,13 +1139,13 @@ class HMCEMAdaptiveStepSize(tf.test.TestCase):
 
     # TODO(b/111765211): Switch to the following once
     # `get_variable(use_resource=True)` has the same semantics as
-    # `tf.contrib.eager.Variable`.
+    # `tfe.Variable`.
     #   step_size = tf.get_variable(
     #       name='step_size',
     #       initializer=np.array(0.05, dtype),
     #       use_resource=True,
     #       trainable=False)
-    step_size = tf.contrib.eager.Variable(
+    step_size = tfe.Variable(
         initial_value=np.array(0.05, dtype),
         name='step_size',
         trainable=False)
@@ -1156,7 +1158,8 @@ class HMCEMAdaptiveStepSize(tf.test.TestCase):
             target_log_prob_fn=unnormalized_log_prob,
             num_leapfrog_steps=2,
             step_size=step_size,
-            step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy(),
+            step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy(
+                num_adaptation_steps=None),
             seed=_set_seed(252)),
         parallel_iterations=1)
 
@@ -1173,6 +1176,11 @@ class HMCEMAdaptiveStepSize(tf.test.TestCase):
     # Anything in [0.6, 0.9] is sufficient. https://arxiv.org/abs/1411.6669
     self.assertNear(0.75, kernel_results_.is_accepted.mean(), err=0.05)
 
+  @tfe.run_test_in_graph_and_eager_modes
+  def test_reuse_step_counter(self):
+    for _ in range(2):
+      with tf.variable_scope(tf.get_variable_scope(), reuse=tf.AUTO_REUSE):
+        tfp.mcmc.make_simple_step_size_update_policy(num_adaptation_steps=1)
 
 if __name__ == '__main__':
   tf.test.main()

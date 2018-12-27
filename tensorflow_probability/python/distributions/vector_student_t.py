@@ -19,7 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from tensorflow_probability.python import bijectors
+from tensorflow_probability.python.bijectors import affine as affine_bijector
 from tensorflow_probability.python.distributions import student_t
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
@@ -197,7 +197,7 @@ class _VectorStudentT(transformed_distribution.TransformedDistribution):
         # Here we really only need to collect the affine.batch_shape and decide
         # what we're going to pass in to TransformedDistribution's
         # (override) batch_shape arg.
-        affine = bijectors.Affine(
+        affine = affine_bijector.Affine(
             shift=loc,
             scale_identity_multiplier=scale_identity_multiplier,
             scale_diag=scale_diag,

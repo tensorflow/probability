@@ -29,14 +29,13 @@ from tensorflow_probability.python.mcmc.util import choose
 from tensorflow_probability.python.mcmc.util import is_namedtuple_like
 from tensorflow_probability.python.mcmc.util import maybe_call_fn_and_grads
 from tensorflow_probability.python.mcmc.util import smart_for_loop
-from tensorflow.python.framework import test_util
-
 tfd = tfp.distributions
+tfe = tf.contrib.eager
 
 
 class ChooseTest(tf.test.TestCase):
 
-  @test_util.run_in_graph_and_eager_modes()
+  @tfe.run_test_in_graph_and_eager_modes()
   def test_works_for_nested_namedtuple(self):
     Results = collections.namedtuple('Results', ['field1', 'inner'])  # pylint: disable=invalid-name
     InnerResults = collections.namedtuple('InnerResults', ['fieldA', 'fieldB'])  # pylint: disable=invalid-name
@@ -72,7 +71,7 @@ class ChooseTest(tf.test.TestCase):
             ]))
     self.assertAllClose(expected, chosen_, atol=0., rtol=1e-5)
 
-  @test_util.run_in_graph_and_eager_modes()
+  @tfe.run_test_in_graph_and_eager_modes()
   def test_selects_batch_members_from_list_of_arrays(self):
     # Shape of each array: [2, 3] = [batch_size, event_size]
     # This test verifies that is_accepted selects batch members, despite the
@@ -115,7 +114,7 @@ class IsNamedTupleLikeTest(tf.test.TestCase):
     self.assertFalse(is_namedtuple_like(np.int32()))
 
 
-@tf.contrib.eager.run_all_tests_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class GradientTest(tf.test.TestCase):
 
   def testGradientComputesCorrectly(self):

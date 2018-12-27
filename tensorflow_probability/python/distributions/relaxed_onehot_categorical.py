@@ -21,7 +21,7 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 import tensorflow as tf
-from tensorflow_probability.python import bijectors
+from tensorflow_probability.python.bijectors import exp as exp_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
@@ -393,5 +393,5 @@ class RelaxedOneHotCategorical(
                                        validate_args=validate_args,
                                        allow_nan_stats=allow_nan_stats)
     super(RelaxedOneHotCategorical, self).__init__(dist,
-                                                   bijectors.Exp(),
+                                                   exp_bijector.Exp(),
                                                    name=name)

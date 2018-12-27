@@ -23,7 +23,7 @@ import tensorflow as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import positive_semidefinite_kernels as psd_kernels
 
-from tensorflow.python.framework import test_util
+tfe = tf.contrib.eager
 
 
 class _StudentTProcessTest(object):
@@ -178,12 +178,12 @@ class _StudentTProcessTest(object):
       self.assertAllEqual(self.evaluate(tp2.index_points), index_points_2)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class StudentTProcessStaticTest(_StudentTProcessTest, tf.test.TestCase):
   is_static = True
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class StudentTProcessDynamicTest(_StudentTProcessTest, tf.test.TestCase):
   is_static = False
 

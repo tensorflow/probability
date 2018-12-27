@@ -1,3 +1,19 @@
+#### Copyright 2018 The TensorFlow Authors.
+
+```none
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+https://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+```
+
 # The `joint_log_prob` callable: connecting model building and inference in TFP.
 
 The goal of probabilistic inference is to find a probability distribution
@@ -14,7 +30,7 @@ All `joint_log_prob` functions have the following structure:
 1. The function takes a set of **inputs** representing the values of the random
    variables in the model. These inputs must be convertible to `Tensor`s.
    Typically the function would support computing batches of inputs, i.e., a
-   vector of inputs. (For more information on batches see [Tensorflow
+   vector of inputs. (For more information on batches see [TensorFlow
    Distributions](https://arxiv.org/abs/1711.10604), section 3.3.)
 
 2. Internally the `joint_log_prob` function uses probability distributions to

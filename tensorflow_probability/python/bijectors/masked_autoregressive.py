@@ -33,11 +33,11 @@ __all__ = [
 
 
 class MaskedAutoregressiveFlow(bijector.Bijector):
-  """Affine MaskedAutoregressiveFlow bijector for vector-valued events.
+  """Affine MaskedAutoregressiveFlow bijector.
 
   The affine autoregressive flow [(Papamakarios et al., 2016)][3] provides a
-  relatively simple framework for user-specified (deep) architectures to learn
-  a distribution over vector-valued events. Regarding terminology,
+  relatively simple framework for user-specified (deep) architectures to learn a
+  distribution over continuous events. Regarding terminology,
 
     "Autoregressive models decompose the joint density as a product of
     conditionals, and model each conditional in turn. Normalizing flows
@@ -46,7 +46,10 @@ class MaskedAutoregressiveFlow(bijector.Bijector):
     [(Papamakarios et al., 2016)][3]
 
   In other words, the "autoregressive property" is equivalent to the
-  decomposition, `p(x) = prod{ p(x[i] | x[0:i]) : i=0, ..., d }`. The provided
+  decomposition, `p(x) = prod{ p(x[perm[i]] | x[perm[0:i]]) : i=0, ..., d }`
+  where `perm` is some permutation of `{0, ..., d}`. In the simple case where
+  the permutation is identity this reduces to:
+  `p(x) = prod{ p(x[i] | x[0:i]) : i=0, ..., d }`. The provided
   `shift_and_log_scale_fn`, `masked_autoregressive_default_template`, achieves
   this property by zeroing out weights in its `masked_dense` layers.
 
@@ -89,7 +92,7 @@ class MaskedAutoregressiveFlow(bijector.Bijector):
   ```python
   def forward(x):
     y = zeros_like(x)
-    event_size = x.shape[-1]
+    event_size = x.shape[-event_dims:].num_elements()
     for _ in range(event_size):
       shift, log_scale = shift_and_log_scale_fn(y)
       y = x * tf.exp(log_scale) + shift
@@ -180,6 +183,7 @@ class MaskedAutoregressiveFlow(bijector.Bijector):
                is_constant_jacobian=False,
                validate_args=False,
                unroll_loop=False,
+               event_ndims=1,
                name=None):
     """Creates the MaskedAutoregressiveFlow bijector.
 
@@ -203,27 +207,35 @@ class MaskedAutoregressiveFlow(bijector.Bijector):
         `_forward` should be replaced with a static for loop. Requires that
         the final dimension of `x` be known at graph construction time. Defaults
         to `False`.
+      event_ndims: Python `integer`, the intrinsic dimensionality of this
+        bijector. 1 corresponds to a simple vector autoregressive bijector as
+        implemented by the `masked_autoregressive_default_template`, 2 might be
+        useful for a 2D convolutional `shift_and_log_scale_fn` and so on.
       name: Python `str`, name given to ops managed by this object.
     """
     name = name or "masked_autoregressive_flow"
     self._shift_and_log_scale_fn = shift_and_log_scale_fn
     self._unroll_loop = unroll_loop
+    self._event_ndims = event_ndims
     super(MaskedAutoregressiveFlow, self).__init__(
-        forward_min_event_ndims=1,
+        forward_min_event_ndims=self._event_ndims,
         is_constant_jacobian=is_constant_jacobian,
         validate_args=validate_args,
         name=name)
 
   def _forward(self, x):
+    static_event_size = x.shape.with_rank_at_least(
+        self._event_ndims)[-self._event_ndims:].num_elements()
+
     if self._unroll_loop:
-      event_size = x.shape.with_rank_at_least(1)[-1].value
-      if event_size is None:
+      if not static_event_size:
         raise ValueError(
-            "The final dimension of `x` must be known at graph construction "
-            "time if `unroll_loop=True`. `x.shape: %r`" % x.shape)
+            "The final {} dimensions of `x` must be known at graph "
+            "construction time if `unroll_loop=True`. `x.shape: {!r}`".format(
+                self._event_ndims, x.shape))
       y = tf.zeros_like(x, name="y0")
 
-      for _ in range(event_size):
+      for _ in range(static_event_size):
         shift, log_scale = self._shift_and_log_scale_fn(y)
         # next_y = scale * x + shift
         next_y = x
@@ -234,12 +246,7 @@ class MaskedAutoregressiveFlow(bijector.Bijector):
         y = next_y
       return y
 
-    event_size = tf.shape(x)[-1]
-    # If the event size is available at graph construction time, we can inform
-    # the graph compiler of the maximum number of steps. If not,
-    # static_event_size will be None, and the maximum_iterations argument will
-    # have no effect.
-    static_event_size = x.shape.with_rank_at_least(1)[-1].value
+    event_size = tf.reduce_prod(tf.shape(x)[-self._event_ndims:])
     y0 = tf.zeros_like(x, name="y0")
     # call the template once to ensure creation
     _ = self._shift_and_log_scale_fn(y0)
@@ -257,6 +264,10 @@ class MaskedAutoregressiveFlow(bijector.Bijector):
       if shift is not None:
         y += shift
       return index + 1, y
+    # If the event size is available at graph construction time, we can inform
+    # the graph compiler of the maximum number of steps. If not,
+    # static_event_size will be None, and the maximum_iterations argument will
+    # have no effect.
     _, y = tf.while_loop(
         cond=lambda index, _: index < event_size,
         body=_loop_body,
@@ -277,7 +288,7 @@ class MaskedAutoregressiveFlow(bijector.Bijector):
     _, log_scale = self._shift_and_log_scale_fn(y)
     if log_scale is None:
       return tf.constant(0., dtype=y.dtype, name="ildj")
-    return -tf.reduce_sum(log_scale, axis=-1)
+    return -tf.reduce_sum(log_scale, axis=tf.range(-self._event_ndims, 0))
 
 
 MASK_INCLUSIVE = "inclusive"
@@ -472,6 +483,8 @@ def masked_autoregressive_default_template(hidden_layers,
       input_shape = (
           np.int32(x.shape.as_list())
           if x.shape.is_fully_defined() else tf.shape(x))
+      if x.shape.rank == 1:
+        x = x[tf.newaxis, ...]
       for i, units in enumerate(hidden_layers):
         x = masked_dense(
             inputs=x,
@@ -498,6 +511,7 @@ def masked_autoregressive_default_template(hidden_layers,
           if log_scale_clip_gradient else _clip_by_value_preserve_grad)
       log_scale = which_clip(log_scale, log_scale_min_clip, log_scale_max_clip)
       return shift, log_scale
+
     return tf.make_template(name, _fn)
 
 

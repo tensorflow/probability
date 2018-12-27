@@ -31,10 +31,9 @@ from tensorflow_probability.python.distributions.linear_gaussian_ssm import kalm
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import KalmanFilterState
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import linear_gaussian_update
 
-from tensorflow.python.framework import test_util
-
-tfl = tf.linalg
 tfd = tfp.distributions
+tfe = tf.contrib.eager
+tfl = tf.linalg
 
 
 class _IIDNormalTest(object):
@@ -159,25 +158,25 @@ class _IIDNormalTest(object):
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class IIDNormalTestStatic32(_IIDNormalTest, tf.test.TestCase):
   use_static_shape = True
   dtype = np.float32
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class IIDNormalTestStatic64(_IIDNormalTest, tf.test.TestCase):
   use_static_shape = True
   dtype = np.float64
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class IIDNormalTestDynamic32(_IIDNormalTest, tf.test.TestCase):
   use_static_shape = False
   dtype = np.float32
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class SanityChecks(tf.test.TestCase):
 
   def test_deterministic_system(self):
@@ -328,7 +327,7 @@ class SanityChecks(tf.test.TestCase):
     self.assertAllClose(observation_variances, variance_[..., 0])
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class BatchTest(tf.test.TestCase):
   """Test that methods broadcast batch dimensions for each parameter."""
 
@@ -719,7 +718,7 @@ class _KalmanStepsTest(object):
                         np.diag(self.observation_noise_scale_diag**2))
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class KalmanStepsTestStatic(tf.test.TestCase, _KalmanStepsTest):
 
   use_static_shape = True
@@ -731,7 +730,7 @@ class KalmanStepsTestStatic(tf.test.TestCase, _KalmanStepsTest):
     return tf.convert_to_tensor(tensor)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class KalmanStepsTestDynamic(tf.test.TestCase, _KalmanStepsTest):
 
   use_static_shape = False
@@ -786,7 +785,7 @@ class _AugmentSampleShapeTest(object):
                                 validate_args=True))
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class AugmentSampleShapeTestStatic(tf.test.TestCase, _AugmentSampleShapeTest):
 
   def assertRaisesError(self, msg):
@@ -803,7 +802,7 @@ class AugmentSampleShapeTestStatic(tf.test.TestCase, _AugmentSampleShapeTest):
     return x
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class AugmentSampleShapeTestDynamic(tf.test.TestCase, _AugmentSampleShapeTest):
 
   def assertRaisesError(self, msg):

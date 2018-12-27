@@ -23,6 +23,7 @@ import numpy as np
 
 import tensorflow as tf
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import kullback_leibler
 
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
@@ -230,3 +231,35 @@ class Pareto(distribution.Distribution):
           dims=tf.shape(y),
           value=np.array(alt, dtype=self.dtype.as_numpy_dtype))
     return tf.where(is_invalid, alt, y)
+
+
+@kullback_leibler.RegisterKL(Pareto, Pareto)
+def _kl_pareto_pareto(a, b, name=None):
+  """Calculate the batched KL divergence KL(a || b) with a and b Pareto.
+
+  Args:
+    a: instance of a Pareto distribution object.
+    b: instance of a Pareto distribution object.
+    name: (optional) Name to use for created operations.
+      default is "kl_pareto_pareto".
+
+  Returns:
+    Batchwise KL(a || b)
+  """
+  with tf.name_scope(name, "kl_pareto_pareto",
+                     [a.concentration, b.concentration, a.scale, b.scale]):
+    # Consistent with
+    # http://www.mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 55
+    # Terminology is different from source to source for Pareto distributions.
+    # The 'concentration' parameter corresponds to 'a' in that source, and the
+    # 'scale' parameter corresponds to 'm'.
+    final_batch_shape = distribution_util.get_broadcast_shape(
+        a.concentration, b.concentration, a.scale, b.scale)
+    common_type = dtype_util.common_dtype(
+        [a.concentration, b.concentration, a.scale, b.scale], tf.float32)
+    return tf.where(
+        a.scale >= b.scale,
+        b.concentration * (tf.log(a.scale) - tf.log(b.scale)) +
+        tf.log(a.concentration) - tf.log(b.concentration) +
+        b.concentration / a.concentration - 1.0,
+        tf.broadcast_to(tf.cast(np.inf, common_type), final_batch_shape))

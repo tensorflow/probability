@@ -77,7 +77,7 @@ def _copy_fn(fn):
     TypeError: if `fn` is not a callable.
   """
   if not callable(fn):
-    raise TypeError("fn is not callable: %s" % fn)
+    raise TypeError("fn is not callable: {}".format(fn))
   # The blessed way to copy a function. copy.deepcopy fails to create a
   # non-reference copy. Since:
   #   types.FunctionType == type(lambda: None),
@@ -118,16 +118,18 @@ def _update_docstring(old_str, append_str):
     return old_str + "\n\n" + append_str
 
 
-def _convert_to_tensor(value, name=None, preferred_dtype=None):
+def _convert_to_tensor(value, name=None, dtype=None, preferred_dtype=None):
   """Converts to tensor avoiding an eager bug that loses float precision."""
   # TODO(b/116672045): Remove this function.
-  if (tf.executing_eagerly() and preferred_dtype is not None and
+  if (tf.executing_eagerly() and
+      preferred_dtype is not None and
+      dtype is None and
       (preferred_dtype.is_integer or preferred_dtype.is_bool)):
     v = tf.convert_to_tensor(value, name=name)
     if v.dtype.is_floating:
       return v
   return tf.convert_to_tensor(
-      value, name=name, preferred_dtype=preferred_dtype)
+      value, name=name, dtype=dtype, preferred_dtype=preferred_dtype)
 
 
 class _DistributionMeta(abc.ABCMeta):
@@ -162,23 +164,26 @@ class _DistributionMeta(abc.ABCMeta):
     which_base = [
         base for base in baseclasses
         if base == _BaseDistribution or issubclass(base, Distribution)]
-    base = which_base[0]
-    if base == _BaseDistribution:  # Nothing to be done for Distribution
-      return abc.ABCMeta.__new__(mcs, classname, baseclasses, attrs)
+    base = which_base[0] if which_base else None
+    if base is None or base == _BaseDistribution:
+      # Nothing to be done for Distribution or unrelated subclass.
+      return super(_DistributionMeta, mcs).__new__(
+          mcs, classname, baseclasses, attrs)
     if not issubclass(base, Distribution):
-      raise TypeError("First parent class declared for %s must be "
-                      "Distribution, but saw '%s'" % (classname, base.__name__))
+      raise TypeError("First parent class declared for {} must be "
+                      "Distribution, but saw '{}'".format(
+                          classname, base.__name__))
     for attr in _DISTRIBUTION_PUBLIC_METHOD_WRAPPERS:
-      special_attr = "_%s" % attr
-      class_attr_value = attrs.get(attr, None)
       if attr in attrs:
-        # The method is being overridden, do not update its docstring
+        # The method is being overridden, do not update its docstring.
         continue
+      special_attr = "_{}".format(attr)
+      class_attr_value = attrs.get(attr, None)
       base_attr_value = getattr(base, attr, None)
       if not base_attr_value:
         raise AttributeError(
-            "Internal error: expected base class '%s' to implement method '%s'"
-            % (base.__name__, attr))
+            "Internal error: expected base class '{}' to "
+            "implement method '{}'".format(base.__name__, attr))
       class_special_attr_value = attrs.get(special_attr, None)
       if class_special_attr_value is None:
         # No _special method available, no need to update the docstring.
@@ -191,15 +196,16 @@ class _DistributionMeta(abc.ABCMeta):
       class_attr_docstring = tf_inspect.getdoc(base_attr_value)
       if class_attr_docstring is None:
         raise ValueError(
-            "Expected base class fn to contain a docstring: %s.%s"
-            % (base.__name__, attr))
+            "Expected base class fn to contain a docstring: {}.{}".format(
+                base.__name__, attr))
       class_attr_value.__doc__ = _update_docstring(
           class_attr_value.__doc__,
-          ("Additional documentation from `%s`:\n\n%s"
-           % (classname, class_special_attr_docstring)))
+          "Additional documentation from `{}`:\n\n{}".format(
+              classname, class_special_attr_docstring))
       attrs[attr] = class_attr_value
 
-    return abc.ABCMeta.__new__(mcs, classname, baseclasses, attrs)
+    return super(_DistributionMeta, mcs).__new__(
+        mcs, classname, baseclasses, attrs)
 
 
 @six.add_metaclass(_DistributionMeta)
@@ -683,22 +689,17 @@ class Distribution(_BaseDistribution):
     """
     return self._call_sample_n(sample_shape, seed, name)
 
-  def _log_prob(self, value):
-    raise NotImplementedError("log_prob is not implemented: {}".format(
-        type(self).__name__))
-
   def _call_log_prob(self, value, name, **kwargs):
     """Wrapper around _log_prob."""
     with self._name_scope(name, values=[value]):
       value = _convert_to_tensor(
           value, name="value", preferred_dtype=self.dtype)
-      try:
+      if hasattr(self, "_log_prob"):
         return self._log_prob(value, **kwargs)
-      except NotImplementedError as original_exception:
-        try:
-          return tf.log(self._prob(value, **kwargs))
-        except NotImplementedError:
-          raise original_exception
+      if hasattr(self, "_prob"):
+        return tf.log(self._prob(value, **kwargs))
+      raise NotImplementedError("log_prob is not implemented: {}".format(
+          type(self).__name__))
 
   def log_prob(self, value, name="log_prob"):
     """Log probability density/mass function.
@@ -713,22 +714,17 @@ class Distribution(_BaseDistribution):
     """
     return self._call_log_prob(value, name)
 
-  def _prob(self, value):
-    raise NotImplementedError("prob is not implemented: {}".format(
-        type(self).__name__))
-
   def _call_prob(self, value, name, **kwargs):
     """Wrapper around _prob."""
     with self._name_scope(name, values=[value]):
       value = _convert_to_tensor(
           value, name="value", preferred_dtype=self.dtype)
-      try:
+      if hasattr(self, "_prob"):
         return self._prob(value, **kwargs)
-      except NotImplementedError as original_exception:
-        try:
-          return tf.exp(self._log_prob(value, **kwargs))
-        except NotImplementedError:
-          raise original_exception
+      if hasattr(self, "_log_prob"):
+        return tf.exp(self._log_prob(value, **kwargs))
+      raise NotImplementedError("prob is not implemented: {}".format(
+          type(self).__name__))
 
   def prob(self, value, name="prob"):
     """Probability density/mass function.
@@ -743,22 +739,17 @@ class Distribution(_BaseDistribution):
     """
     return self._call_prob(value, name)
 
-  def _log_cdf(self, value):
-    raise NotImplementedError("log_cdf is not implemented: {}".format(
-        type(self).__name__))
-
   def _call_log_cdf(self, value, name, **kwargs):
     """Wrapper around _log_cdf."""
     with self._name_scope(name, values=[value]):
       value = _convert_to_tensor(
           value, name="value", preferred_dtype=self.dtype)
-      try:
+      if hasattr(self, "_log_cdf"):
         return self._log_cdf(value, **kwargs)
-      except NotImplementedError as original_exception:
-        try:
-          return tf.log(self._cdf(value, **kwargs))
-        except NotImplementedError:
-          raise original_exception
+      if hasattr(self, "_cdf"):
+        return tf.log(self._cdf(value, **kwargs))
+      raise NotImplementedError("log_cdf is not implemented: {}".format(
+          type(self).__name__))
 
   def log_cdf(self, value, name="log_cdf"):
     """Log cumulative distribution function.
@@ -783,22 +774,17 @@ class Distribution(_BaseDistribution):
     """
     return self._call_log_cdf(value, name)
 
-  def _cdf(self, value):
-    raise NotImplementedError("cdf is not implemented: {}".format(
-        type(self).__name__))
-
   def _call_cdf(self, value, name, **kwargs):
     """Wrapper around _cdf."""
     with self._name_scope(name, values=[value]):
       value = _convert_to_tensor(
           value, name="value", preferred_dtype=self.dtype)
-      try:
+      if hasattr(self, "_cdf"):
         return self._cdf(value, **kwargs)
-      except NotImplementedError as original_exception:
-        try:
-          return tf.exp(self._log_cdf(value, **kwargs))
-        except NotImplementedError:
-          raise original_exception
+      if hasattr(self, "_log_cdf"):
+        return tf.exp(self._log_cdf(value, **kwargs))
+      raise NotImplementedError("cdf is not implemented: {}".format(
+          type(self).__name__))
 
   def cdf(self, value, name="cdf"):
     """Cumulative distribution function.
@@ -1072,7 +1058,7 @@ class Distribution(_BaseDistribution):
 
     Denote this distribution (`self`) by `P` and the `other` distribution by
     `Q`. Assuming `P, Q` are absolutely continuous with respect to
-    one another and permit densities `p(x) dr(x)` and `q(x) dr(x)`, (Shanon)
+    one another and permit densities `p(x) dr(x)` and `q(x) dr(x)`, (Shannon)
     cross entropy is defined as:
 
     ```none
@@ -1087,7 +1073,7 @@ class Distribution(_BaseDistribution):
 
     Returns:
       cross_entropy: `self.dtype` `Tensor` with shape `[B1, ..., Bn]`
-        representing `n` different calculations of (Shanon) cross entropy.
+        representing `n` different calculations of (Shannon) cross entropy.
     """
     with self._name_scope(name):
       return self._cross_entropy(other)
@@ -1110,7 +1096,7 @@ class Distribution(_BaseDistribution):
     ```
 
     where `F` denotes the support of the random variable `X ~ p`, `H[., .]`
-    denotes (Shanon) cross entropy, and `H[.]` denotes (Shanon) entropy.
+    denotes (Shannon) cross entropy, and `H[.]` denotes (Shannon) entropy.
 
     Args:
       other: `tfp.distributions.Distribution` instance.

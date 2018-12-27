@@ -54,6 +54,7 @@ py_library(
         ":half_cauchy",
         ":half_normal",
         ":hidden_markov_model",
+        ":horseshoe",
         ":independent",
         ":inverse_gamma",
         ":inverse_gaussian",
@@ -350,7 +351,8 @@ py_library(
         ":uniform",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/bijectors:gumbel",
+        "//tensorflow_probability/python/bijectors:invert",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
     ],
@@ -385,8 +387,22 @@ py_library(
     name = "hidden_markov_model",
     srcs = ["hidden_markov_model.py"],
     deps = [
+        ":categorical",
+        ":distribution",
         # numpy dep,
         # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "horseshoe",
+    srcs = ["horseshoe.py"],
+    deps = [
+        ":distribution",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:reparameterization",
     ],
 )
 
@@ -445,7 +461,7 @@ py_library(
         ":uniform",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/bijectors:kumaraswamy",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
@@ -513,7 +529,7 @@ py_library(
         ":transformed_distribution",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/bijectors:exp",
         "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
@@ -583,7 +599,7 @@ py_library(
         ":normal",
         ":transformed_distribution",
         # tensorflow dep,
-        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/bijectors:affine_linear_operator",
         "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
@@ -712,7 +728,7 @@ py_library(
         ":transformed_distribution",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/bijectors:exp",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
@@ -738,7 +754,7 @@ py_library(
         ":logistic",
         ":transformed_distribution",
         # tensorflow dep,
-        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/bijectors:sigmoid",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
     ],
@@ -752,7 +768,7 @@ py_library(
         ":transformed_distribution",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/bijectors:exp",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
@@ -782,7 +798,9 @@ py_library(
         ":normal",
         ":transformed_distribution",
         # tensorflow dep,
-        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/bijectors:affine_scalar",
+        "//tensorflow_probability/python/bijectors:chain",
+        "//tensorflow_probability/python/bijectors:sinh_arcsinh",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
     ],
@@ -832,7 +850,6 @@ py_library(
         ":distribution",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/bijectors",
         "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
@@ -872,7 +889,8 @@ py_library(
         ":seed_stream",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/bijectors:affine_linear_operator",
+        "//tensorflow_probability/python/bijectors:softmax_centered",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:reparameterization",
     ],
@@ -895,7 +913,7 @@ py_library(
         ":exponential",
         ":transformed_distribution",
         # tensorflow dep,
-        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/bijectors:affine_linear_operator",
         "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
@@ -919,7 +937,7 @@ py_library(
         ":transformed_distribution",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/bijectors:affine_linear_operator",
         "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
@@ -931,7 +949,9 @@ py_library(
         ":normal",
         ":transformed_distribution",
         # tensorflow dep,
-        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/bijectors:affine",
+        "//tensorflow_probability/python/bijectors:chain",
+        "//tensorflow_probability/python/bijectors:sinh_arcsinh",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
     ],
@@ -944,7 +964,7 @@ py_library(
         ":student_t",
         ":transformed_distribution",
         # tensorflow dep,
-        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/bijectors:affine",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
     ],
@@ -1280,13 +1300,25 @@ py_test(
 
 py_test(
     name = "hidden_markov_model_test",
-    size = "small",
+    size = "medium",
     srcs = ["hidden_markov_model_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_test(
+    name = "horseshoe_test",
+    size = "medium",
+    srcs = ["horseshoe_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 
@@ -1358,6 +1390,7 @@ py_test(
         ":laplace",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability",
     ],
 )
 
@@ -1365,6 +1398,7 @@ py_test(
     name = "linear_gaussian_ssm_test",
     size = "large",
     srcs = ["linear_gaussian_ssm_test.py"],
+    shard_count = 4,
     deps = [
         ":linear_gaussian_ssm",
         # numpy dep,
@@ -1753,6 +1787,7 @@ py_test(
         ":uniform",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability",
     ],
 )
 

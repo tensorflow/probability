@@ -23,9 +23,8 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from tensorflow.python.framework import test_util
-
 tfd = tfp.distributions
+tfe = tf.contrib.eager
 
 
 class _BatchReshapeTest(object):
@@ -569,14 +568,14 @@ class _BatchReshapeTest(object):
       self.evaluate(poisson_141_reshaped.log_prob(x_114))
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class BatchReshapeStaticTest(_BatchReshapeTest, tf.test.TestCase):
 
   dtype = np.float32
   is_static_shape = True
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class BatchReshapeDynamicTest(_BatchReshapeTest, tf.test.TestCase):
 
   dtype = np.float64

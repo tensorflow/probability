@@ -25,10 +25,8 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
-from tensorflow.python.framework import test_util
-
-
 tfd = tfp.distributions
+tfe = tf.contrib.eager
 
 
 def _det_ok_mask(x, det_bounds):
@@ -65,7 +63,7 @@ volume_bounds = {
         0.40: (00.4145900446719042, 0.482655106057178)}}
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 @parameterized.parameters(np.float32, np.float64)
 class LKJTest(parameterized.TestCase, tf.test.TestCase):
 

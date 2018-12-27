@@ -21,14 +21,13 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from tensorflow.python.framework import test_util
-
 tfd = tfp.distributions
+tfe = tf.contrib.eager
 
 rng = np.random.RandomState(0)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class DeterministicTest(tf.test.TestCase):
 
   def testShape(self):
@@ -205,6 +204,11 @@ class VectorDeterministicTest(tf.test.TestCase):
     self.assertAllEqual(deterministic.batch_shape, (2, 3))
     self.assertAllEqual(self.evaluate(deterministic.event_shape_tensor()), [4])
     self.assertEqual(deterministic.event_shape, tf.TensorShape([4]))
+
+  def testShapeUknown(self):
+    loc = tf.placeholder(np.float32, shape=[None])
+    deterministic = tfd.VectorDeterministic(loc)
+    self.assertAllEqual(deterministic.event_shape_tensor().shape, [1])
 
   def testInvalidTolRaises(self):
     loc = rng.rand(2, 3, 4).astype(np.float32)

@@ -23,7 +23,7 @@ import tensorflow as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import positive_semidefinite_kernels as psd_kernels
 
-from tensorflow.python.framework import test_util
+tfe = tf.contrib.eager
 
 
 def _np_kernel_matrix_fn(amp, len_scale, x, y):
@@ -320,13 +320,13 @@ class _GaussianProcessRegressionModelTest(object):
       self.assertAllEqual(self.evaluate(gprm2.index_points), index_points_2)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class GaussianProcessRegressionModelStaticTest(
     _GaussianProcessRegressionModelTest, tf.test.TestCase):
   is_static = True
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class GaussianProcessRegressionModelDynamicTest(
     _GaussianProcessRegressionModelTest, tf.test.TestCase):
   is_static = False

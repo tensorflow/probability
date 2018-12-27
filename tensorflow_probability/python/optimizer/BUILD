@@ -31,6 +31,7 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         ":bfgs",
+        ":lbfgs",
         ":nelder_mead",
         ":sgld",
         ":variational_sgd",
@@ -82,6 +83,7 @@ py_library(
     srcs = ["bfgs.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":bfgs_utils",
         # tensorflow dep,
     ],
 )
@@ -95,6 +97,38 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "lbfgs",
+    srcs = ["lbfgs.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":bfgs_utils",
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "lbfgs_test",
+    size = "medium",
+    timeout = "long",
+    srcs = ["lbfgs_test.py"],
+    shard_count = 5,
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "bfgs_utils",
+    srcs = ["bfgs_utils.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
     ],
 )
 

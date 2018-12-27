@@ -25,14 +25,13 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util
 
-from tensorflow.python.framework import test_util as tf_test_util
-
 tfd = tfp.distributions
+tfe = tf.contrib.eager
 
 rng = np.random.RandomState(0)
 
 
-@tf_test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class VectorDiffeomixtureTest(test_util.VectorDistributionTestHelpers,
                               tf.test.TestCase):
   """Tests the VectorDiffeomixture distribution."""

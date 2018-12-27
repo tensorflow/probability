@@ -19,7 +19,9 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from tensorflow_probability.python import bijectors
+from tensorflow_probability.python.bijectors import affine as affine_bijector
+from tensorflow_probability.python.bijectors import chain as chain_bijector
+from tensorflow_probability.python.bijectors import sinh_arcsinh as sinh_arcsinh_bijector
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
@@ -219,22 +221,22 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
       skewness = tf.convert_to_tensor(skewness, dtype=dtype, name="skewness")
       tailweight = tf.convert_to_tensor(
           tailweight, dtype=dtype, name="tailweight")
-      f = bijectors.SinhArcsinh(
+      f = sinh_arcsinh_bijector.SinhArcsinh(
           skewness=skewness, tailweight=tailweight)
       if has_default_skewness:
         f_noskew = f
       else:
-        f_noskew = bijectors.SinhArcsinh(
+        f_noskew = sinh_arcsinh_bijector.SinhArcsinh(
             skewness=skewness.dtype.as_numpy_dtype(0.),
             tailweight=tailweight)
 
       # Make the Affine bijector, Z --> loc + C * Z.
       c = 2 * scale_diag_part / f_noskew.forward(
           tf.convert_to_tensor(2, dtype=dtype))
-      affine = bijectors.Affine(
+      affine = affine_bijector.Affine(
           shift=loc, scale_diag=c, validate_args=validate_args)
 
-      bijector = bijectors.Chain([affine, f])
+      bijector = chain_bijector.Chain([affine, f])
 
       super(VectorSinhArcsinhDiag, self).__init__(
           distribution=distribution,

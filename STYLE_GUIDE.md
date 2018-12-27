@@ -8,9 +8,11 @@ number of errors, and promote consistency.
 
 Follow the [TensorFlow style
 guide](https://www.tensorflow.org/community/style_guide) and [documentation
-guide](https://www.tensorflow.org/community/documentation). Below are additional
-TensorFlow conventions not noted in those guides. (In the future, these noted
-conventions may be moved upstream.)
+guide](https://www.tensorflow.org/community/documentation), and in particular
+the [TensorFlow code
+lint](https://github.com/tensorflow/tensorflow/blob/master/CONTRIBUTING.md#python-coding-style).
+Below are additional TensorFlow conventions not noted in those guides. (In the
+future, these noted conventions may be moved upstream.)
 
 1.  The name is TensorFlow, not Tensorflow.
 1.  Use `name_scope` at the beginning of every Python function.
@@ -30,14 +32,15 @@ conventions may be moved upstream.)
 
     Justification: `__all__` is an explicit enumeration of what's intended to be
     public. It also governs what's imported when using `from foo import *`
-    (although we cannot use star-import w/in Google, users can.) Use ticks for
-    any Python objects, types, or code. E.g., write \`Tensor\` instead of
-    Tensor.
+    (although we do not use star-import w/in Google, users may.)
+
+1.  Use ticks for any Python objects, types, or code. E.g., write \`Tensor\`
+    instead of Tensor.
 
 ## TensorFlow Probability Style
 
 Below are TensorFlow Probability-specific conventions. In the event of conflict,
-it supercedes all previous conventions.
+they supersede all previous conventions.
 
 1.  __Importing submodule aliases.__ Use the Pythonic style `from
     tensorflow_probability import edward2 as ed`. For now, do not use this style
@@ -105,7 +108,7 @@ it supercedes all previous conventions.
 
     *   Definitely use named args for 2nd args onward in docstrings.
 
-1.  Use names which describe semantics not computation or mathematics, e.g.,
+1.  Use names which describe semantics, not computation or mathematics, e.g.,
     avoid `xp1 = x+1` or `tfd.Normal(loc=mu, scale=sigma)`.
 
 1.  Prefer inlining intermediates which are used once.
@@ -118,7 +121,7 @@ it supercedes all previous conventions.
     dependencies.
 
 1.  Use literals, not `tf.constants`. Never use tf.constant in the API
-    (user-side code is ok!). Eg, dont do: `two_pi = tf.constant(2. * np.pi)`.
+    (user-side code is ok!). E.g., don't do: `two_pi = tf.constant(2. * np.pi)`.
 
     *   While using `tf.constant` may reduce graph size, it makes for
         substantially harder to read code.
@@ -190,13 +193,22 @@ it supercedes all previous conventions.
 
     Justification: Both work but only one is self-documenting.
 
-1.  Use `"{}".format()` rather than `"" %` for string formatting.
+1.  Use `'{}'.format()` rather than `'' %` for string formatting.
 
     Justification: [PEP 3101](https://www.python.org/dev/peps/pep-3101/) and
     [Python official
     tutorials](https://docs.python.org/3.2/tutorial/inputoutput.html#old-string-formatting):
     "...this old style of formatting will eventually be removed from the
     language, str.format() should generally be used."
+
+1.  Prefer single quotes ('hello world') to double quotes ("hello world") for
+    single-line string literals. However, when using triple quotes for multiline
+    literals (docstrings, etc.), prefer """ (three double quotes) to '''.
+
+    Justification: single quotes are slightly faster to type. They also avoid
+    the need to escape double-quotes that occur organically in English text
+    (at the cost of needing to escape contractions, which are debatably more
+    common but can also often be avoided).
 
 1.  When calling `tf.convert_to_tensor`, try to specify in advance a
     user-friendly dtype. If multiple `Tensor`s must be compatible, use

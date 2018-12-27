@@ -26,7 +26,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.distributions import student_t
-from tensorflow.python.framework import test_util
+tfe = tf.contrib.eager
 
 
 def try_import(name):  # pylint: disable=invalid-name
@@ -41,7 +41,7 @@ def try_import(name):  # pylint: disable=invalid-name
 stats = try_import("scipy.stats")
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class StudentTTest(tf.test.TestCase):
 
   def testStudentPDFAndLogPDF(self):
@@ -336,18 +336,14 @@ class StudentTTest(tf.test.TestCase):
     student = student_t.StudentT(
         df=df, loc=mu, scale=sigma, allow_nan_stats=True)
     var = self.evaluate(student.variance())
-    ## scipy uses inf for variance when the mean is undefined.  When mean is
-    # undefined we say variance is undefined as well.  So test the first
-    # member of var, making sure it is NaN, then replace with inf and compare
-    # to scipy.
-    self.assertTrue(np.isnan(var[0]))
-    var[0] = np.inf
-
-    if not stats:
-      return
+    # Past versions of scipy differed from our preferred behavior for undefined
+    # variance; newer versions changed this, but in order not to deal with
+    # straddling both versions, we just override our expectation for the
+    # undefined case.
     expected_var = [
         stats.t.var(d, loc=m, scale=s) for (d, m, s) in zip(df, mu, sigma)
     ]
+    expected_var[0] = np.nan
     self.assertAllClose(expected_var, var)
 
   def testVarianceAllowNanStatsFalseGivesCorrectValueForDefinedBatchMembers(

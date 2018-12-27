@@ -28,10 +28,10 @@ from tensorflow_probability.python.distributions import multivariate_student_t a
 from tensorflow_probability.python.distributions import student_t
 from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util
+tfe = tf.contrib.eager
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class MultivariateStudentTTestFloat32StaticShape(
     test_case.TestCase, parameterized.TestCase,
     tfp_test_util.VectorDistributionTestHelpers):

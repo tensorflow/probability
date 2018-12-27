@@ -28,7 +28,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
-from tensorflow.python.framework import test_util
+tfe = tf.contrib.eager
 
 
 def try_import(name):  # pylint: disable=invalid-name
@@ -108,7 +108,7 @@ class _TruncatedNormalTestCase(test_case.TestCase):
     self.assertAllClose(hist_a, hist_b, rtol=rtol, atol=atol)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase,
                                         parameterized.TestCase):
 
@@ -358,7 +358,7 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase,
       self.assertLess(scale_err, 0.01)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 @parameterized.parameters(
     (0.0, 1.0),
     (10.0, 1.0),
@@ -432,7 +432,7 @@ class TruncatedNormalTestCompareWithNormal(_TruncatedNormalTestCase,
 
 
 if stats:
-  @test_util.run_all_in_graph_and_eager_modes
+  @tfe.run_all_tests_in_graph_and_eager_modes
   @parameterized.parameters(
       (0., 1., -1., 1.),
       (1., 1., 0., 2.),

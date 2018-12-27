@@ -17,11 +17,11 @@ upper_tabs:
 - include: /_upper_tabs_left.yaml
 - include: /api_docs/_upper_tabs_api.yaml
 # Dropdown menu
-- name: Ecosystem
-  path: /ecosystem
+- name: Resources
+  path: /resources
   is_default: true
   menu:
-  - include: /ecosystem/_menu_toc.yaml
+  - include: /resources/_menu_toc.yaml
   lower_tabs:
     # Subsite tabs
     other:
@@ -62,7 +62,10 @@ upper_tabs:
       - title: Factorial mixture
         path: https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Factorial_Mixture.ipynb
         status: external
+
     - name: API
       skip_translation: true
       contents:
       - include: /probability/api_docs/python/_toc.yaml
+
+- include: /_upper_tabs_right.yaml

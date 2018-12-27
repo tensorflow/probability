@@ -24,13 +24,13 @@ import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
-from tensorflow.python.framework import test_util
+tfe = tf.contrib.eager
 
 
 rng = np.random.RandomState(42)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class SoftmaxCenteredBijectorTest(tf.test.TestCase):
   """Tests correctness of the Y = g(X) = exp(X) / sum(exp(X)) transformation."""
 

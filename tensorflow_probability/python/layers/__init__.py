@@ -27,13 +27,19 @@ from tensorflow_probability.python.layers.conv_variational import Convolution3DR
 from tensorflow_probability.python.layers.dense_variational import DenseFlipout
 from tensorflow_probability.python.layers.dense_variational import DenseLocalReparameterization
 from tensorflow_probability.python.layers.dense_variational import DenseReparameterization
+from tensorflow_probability.python.layers.distribution_layer import CategoricalMixtureOfOneHotCategorical
+from tensorflow_probability.python.layers.distribution_layer import DistributionLambda
+from tensorflow_probability.python.layers.distribution_layer import IndependentBernoulli
+from tensorflow_probability.python.layers.distribution_layer import KLDivergenceAddLoss
+from tensorflow_probability.python.layers.distribution_layer import KLDivergenceRegularizer
+from tensorflow_probability.python.layers.distribution_layer import MultivariateNormalTriL
+from tensorflow_probability.python.layers.distribution_layer import OneHotCategorical
 from tensorflow_probability.python.layers.util import default_loc_scale_fn
 from tensorflow_probability.python.layers.util import default_mean_field_normal_fn
 from tensorflow_probability.python.layers.util import default_multivariate_normal_fn
 
-from tensorflow.python.util.all_util import remove_undocumented
-
 _allowed_symbols = [
+    'CategoricalMixtureOfOneHotCategorical',
     'Convolution1DFlipout',
     'Convolution1DReparameterization',
     'Convolution2DFlipout',
@@ -43,9 +49,13 @@ _allowed_symbols = [
     'DenseFlipout',
     'DenseLocalReparameterization',
     'DenseReparameterization',
+    'DistributionLambda',
+    'IndependentBernoulli',
+    'KLDivergenceAddLoss',
+    'KLDivergenceRegularizer',
+    'MultivariateNormalTriL',
+    'OneHotCategorical',
     'default_loc_scale_fn',
     'default_mean_field_normal_fn',
     'default_multivariate_normal_fn',
 ]
-
-remove_undocumented(__name__, _allowed_symbols)

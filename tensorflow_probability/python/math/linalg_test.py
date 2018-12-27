@@ -24,7 +24,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from tensorflow.python.framework import test_util
+tfe = tf.contrib.eager
 
 
 class _PinvTest(object):
@@ -87,28 +87,28 @@ class _PinvTest(object):
     self.assertAllEqual(expected_a_pinv_.shape, a_pinv.shape)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class PinvTestDynamic32DefaultRcond(tf.test.TestCase, _PinvTest):
   dtype = np.float32
   use_static_shape = False
   use_default_rcond = True
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class PinvTestStatic64DefaultRcond(tf.test.TestCase, _PinvTest):
   dtype = np.float64
   use_static_shape = True
   use_default_rcond = True
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class PinvTestDynamic32CustomtRcond(tf.test.TestCase, _PinvTest):
   dtype = np.float32
   use_static_shape = False
   use_default_rcond = False
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class PinvTestStatic64CustomRcond(tf.test.TestCase, _PinvTest):
   dtype = np.float64
   use_static_shape = True

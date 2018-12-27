@@ -22,9 +22,8 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import test_util
 
-from tensorflow.python.framework import test_util as tf_test_util
-
 tfd = tfp.distributions
+tfe = tf.contrib.eager
 
 
 class _PoissonLogNormalQuadratureCompoundTest(
@@ -97,7 +96,7 @@ class _PoissonLogNormalQuadratureCompoundTest(
         self.evaluate, pln, rtol=0.1, atol=0.01)
 
 
-@tf_test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class PoissonLogNormalQuadratureCompoundStaticShapeTest(
     _PoissonLogNormalQuadratureCompoundTest, tf.test.TestCase):
 
@@ -106,7 +105,7 @@ class PoissonLogNormalQuadratureCompoundStaticShapeTest(
     return True
 
 
-@tf_test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class PoissonLogNormalQuadratureCompoundDynamicShapeTest(
     _PoissonLogNormalQuadratureCompoundTest, tf.test.TestCase):
 

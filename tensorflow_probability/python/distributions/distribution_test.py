@@ -21,12 +21,11 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from tensorflow.python.framework import test_util
-
 tfd = tfp.distributions
+tfe = tf.contrib.eager
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class DistributionTest(tf.test.TestCase):
 
   def testParamShapesAndFromParams(self):
@@ -349,6 +348,30 @@ class DistributionTest(tf.test.TestCase):
         " batch_shape=(?,)"  # Partially known.
         " event_shape=(3,)"
         " dtype=float32>")
+
+  def testUnimplemtnedProbAndLogProbExceptions(self):
+    class TerribleDistribution(tfd.Distribution):
+
+      def __init__(self):
+        super(TerribleDistribution, self).__init__(
+            dtype=tf.float32,
+            reparameterization_type=tfd.NOT_REPARAMETERIZED,
+            validate_args=False,
+            allow_nan_stats=False)
+
+    terrible_distribution = TerribleDistribution()
+    with self.assertRaisesRegexp(
+        NotImplementedError, "prob is not implemented"):
+      terrible_distribution.prob(1.)
+    with self.assertRaisesRegexp(
+        NotImplementedError, "log_prob is not implemented"):
+      terrible_distribution.log_prob(1.)
+    with self.assertRaisesRegexp(
+        NotImplementedError, "cdf is not implemented"):
+      terrible_distribution.cdf(1.)
+    with self.assertRaisesRegexp(
+        NotImplementedError, "log_cdf is not implemented"):
+      terrible_distribution.log_cdf(1.)
 
 
 if __name__ == "__main__":

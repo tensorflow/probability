@@ -24,7 +24,7 @@ import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
-from tensorflow.python.framework import test_util
+tfe = tf.contrib.eager
 
 
 class _ReshapeBijectorTest(object):
@@ -34,7 +34,6 @@ class _ReshapeBijectorTest(object):
   is implemented by subclasses defined below, returning respectively
    ReshapeBijectorTestStatic: static shapes,
    ReshapeBijectorTestDynamic: shape placeholders of known ndims, and
-   ReshapeBijectorTestDynamicNdims: shape placeholders of unspecified ndims,
   so that each test in this base class is automatically run over all
   three cases. The subclasses also implement assertRaisesError to test
   for either Python exceptions (in the case of static shapes) or
@@ -225,7 +224,7 @@ class _ReshapeBijectorTest(object):
     raise NotImplementedError("Subclass failed to implement `build_shapes`.")
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class ReshapeBijectorTestStatic(tf.test.TestCase, _ReshapeBijectorTest):
 
   def build_shapes(self, shape_in, shape_out):
@@ -271,8 +270,34 @@ class ReshapeBijectorTestStatic(tf.test.TestCase, _ReshapeBijectorTest):
     bijector = tfb.Reshape(
         event_shape_in=[2, 3], event_shape_out=[1, 2, 3], validate_args=True)
     bijector_test_util.assert_bijective_and_finite(
-        bijector, x, y, eval_func=self.evaluate, event_ndims=2, rtol=1e-6,
+        bijector,
+        x,
+        y,
+        eval_func=self.evaluate,
+        event_ndims=2,
+        inverse_event_ndims=3,
+        rtol=1e-6,
         atol=0)
+
+  def testWorksWithChain(self):
+    shape_out = (4,)
+    shape_in = (2, 2)
+    x = np.zeros(shape_in)
+    y = np.zeros(shape_out)
+    bijector = tfb.Chain([
+        tfb.Identity(),
+        tfb.Reshape(event_shape_out=shape_out, event_shape_in=shape_in)
+    ])
+    new_y = self.evaluate(bijector.forward(x))
+    new_x = self.evaluate(bijector.inverse(y))
+    fldj = self.evaluate(
+        bijector.forward_log_det_jacobian(x, event_ndims=len(shape_in)))
+    ildj = self.evaluate(
+        bijector.inverse_log_det_jacobian(y, event_ndims=len(shape_out)))
+    self.assertEqual(shape_out, new_y.shape)
+    self.assertEqual(shape_in, new_x.shape)
+    self.assertEqual((), fldj.shape)
+    self.assertEqual((), ildj.shape)
 
   def testMultipleUnspecifiedDimensionsOpError(self):
     shape_in, shape_out = self.build_shapes([2, 3], [4, -1, -1,])
@@ -357,64 +382,18 @@ class ReshapeBijectorTestDynamic(tf.test.TestCase, _ReshapeBijectorTest):
           validate_args=True)
       self.evaluate(bijector.forward_event_shape_tensor(shape_in))
 
+  def testUnknownShapeRank(self):
+    unknown_shape = tf.placeholder_with_default([2, 2], shape=None)
+    known_shape = [2, 2]
 
-class ReshapeBijectorTestDynamicNdims(tf.test.TestCase, _ReshapeBijectorTest):
+    with self.assertRaisesRegexp(NotImplementedError,
+                                 "must be statically known."):
+      tfb.Reshape(event_shape_out=unknown_shape)
 
-  def build_shapes(self, shape_in, shape_out):
-    shape_in = np.array(shape_in, np.int32)
-    shape_out = np.array(shape_out, np.int32)
-    return (tf.placeholder_with_default(shape_in, shape=None),
-            tf.placeholder_with_default(shape_out, shape=None))
+    with self.assertRaisesRegexp(NotImplementedError,
+                                 "must be statically known."):
+      tfb.Reshape(event_shape_out=known_shape, event_shape_in=unknown_shape)
 
-  def assertRaisesError(self, msg):
-    return self.assertRaisesOpError(msg)
-
-  def testEventShape(self):
-    event_shape_in, event_shape_out = self.build_shapes([2, 3], [6])
-    bijector = tfb.Reshape(
-        event_shape_out=event_shape_out,
-        event_shape_in=event_shape_in,
-        validate_args=True)
-
-    # forward_ and inverse_event_shape can only be totally unknown in this case.
-    self.assertIsNone(
-        bijector.forward_event_shape(tf.TensorShape([4, 2, 3])).ndims)
-    self.assertIsNone(
-        bijector.inverse_event_shape(tf.TensorShape([4, 6])).ndims)
-
-    # Shape is always known for reshaping in eager mode, so we skip these tests.
-    if tf.executing_eagerly():
-      return
-    self.assertIsNone(
-        bijector.forward_event_shape(tf.TensorShape([None, 2, 3])).ndims)
-    self.assertIsNone(
-        bijector.inverse_event_shape(tf.TensorShape([None, 6])).ndims)
-    self.assertIsNone(
-        bijector.forward_event_shape(tf.TensorShape(None)).ndims)
-
-  def testInputOutputMismatchOpError(self):
-    self._testInputOutputMismatchOpError("Input to reshape is a tensor with")
-
-  def testMultipleUnspecifiedDimensionsOpError(self):
-    shape_in, shape_out = self.build_shapes([2, 3], [4, -1, -1,])
-
-    with self.assertRaisesError(
-        "elements must have at most one `-1`."):
-      bijector = tfb.Reshape(
-          event_shape_out=shape_out,
-          event_shape_in=shape_in,
-          validate_args=True)
-      self.evaluate(bijector.forward_event_shape_tensor(shape_in))
-
-  def testInvalidDimensionsOpError(self):
-    shape_in, shape_out = self.build_shapes([2, 3], [1, 2, -2,])
-    with self.assertRaisesError(
-        "elements must be either positive integers or `-1`."):
-      bijector = tfb.Reshape(
-          event_shape_out=shape_out,
-          event_shape_in=shape_in,
-          validate_args=True)
-      self.evaluate(bijector.forward_event_shape_tensor(shape_in))
 
 if __name__ == "__main__":
   tf.test.main()

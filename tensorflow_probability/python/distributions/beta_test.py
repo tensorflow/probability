@@ -24,7 +24,7 @@ import tensorflow as tf
 
 from tensorflow_probability.python.distributions import beta as beta_lib
 from tensorflow_probability.python.distributions import kullback_leibler
-from tensorflow.python.framework import test_util
+tfe = tf.contrib.eager
 
 
 def try_import(name):  # pylint: disable=invalid-name
@@ -40,7 +40,7 @@ special = try_import("scipy.special")
 stats = try_import("scipy.stats")
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class BetaTest(tf.test.TestCase):
 
   def testSimpleShapes(self):

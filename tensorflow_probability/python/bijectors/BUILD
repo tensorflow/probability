@@ -56,6 +56,7 @@ py_library(
         ":permute",
         ":power_transform",
         ":real_nvp",
+        ":reciprocal",
         ":reshape",
         ":scale_tril",
         ":sigmoid",
@@ -73,11 +74,16 @@ py_library(
 
 py_library(
     name = "bijector",
-    srcs = ["bijector.py"],
+    srcs = [
+        "bijector.py",
+        "chain.py",
+    ],
     deps = [
         # numpy dep,
         # six dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/distributions:distribution",
+        "//tensorflow_probability/python/distributions:transformed_distribution",
         "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
@@ -310,6 +316,15 @@ py_library(
 )
 
 py_library(
+    name = "reciprocal",
+    srcs = ["reciprocal.py"],
+    deps = [
+        ":bijector",
+        # tensorflow dep,
+    ],
+)
+
+py_library(
     name = "reshape",
     srcs = ["reshape.py"],
     deps = [
@@ -432,7 +447,7 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/distributions:uniform",
     ],
 )
 
@@ -445,6 +460,7 @@ py_test(
         # numpy dep,
         # six dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/distributions",
     ],
 )
 
@@ -739,6 +755,19 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_test(
+    name = "reciprocal_test",
+    size = "small",
+    srcs = ["reciprocal_test.py"],
+    deps = [
+        ":bijector_test_util",
+        ":bijectors",
+        ":reciprocal",
+        # absl/testing:parameterized dep,
+        # tensorflow dep,
     ],
 )
 

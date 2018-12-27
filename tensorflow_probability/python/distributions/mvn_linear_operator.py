@@ -19,7 +19,8 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from tensorflow_probability.python import bijectors
+
+from tensorflow_probability.python.bijectors import affine_linear_operator as affine_linear_operator_bijector
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import transformed_distribution
@@ -184,7 +185,7 @@ class MultivariateNormalLinearOperator(
         distribution=normal.Normal(
             loc=tf.zeros([], dtype=scale.dtype),
             scale=tf.ones([], dtype=scale.dtype)),
-        bijector=bijectors.AffineLinearOperator(
+        bijector=affine_linear_operator_bijector.AffineLinearOperator(
             shift=loc, scale=scale, validate_args=validate_args),
         batch_shape=batch_shape,
         event_shape=event_shape,

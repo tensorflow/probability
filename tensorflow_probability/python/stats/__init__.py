@@ -19,11 +19,11 @@ from __future__ import print_function
 
 # pylint: disable=unused-import,line-too-long,g-importing-member
 
+from tensorflow_probability.python.stats.quantiles import percentile
 from tensorflow_probability.python.stats.sample_stats import auto_correlation
 from tensorflow_probability.python.stats.sample_stats import cholesky_covariance
 from tensorflow_probability.python.stats.sample_stats import correlation
 from tensorflow_probability.python.stats.sample_stats import covariance
-from tensorflow_probability.python.stats.sample_stats import percentile
 from tensorflow_probability.python.stats.sample_stats import stddev
 from tensorflow_probability.python.stats.sample_stats import variance
 

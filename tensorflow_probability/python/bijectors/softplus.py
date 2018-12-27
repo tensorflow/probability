@@ -82,18 +82,19 @@ class Softplus(bijector.Bijector):
                validate_args=False,
                name="softplus"):
     with tf.name_scope(name, values=[hinge_softness]):
-      if hinge_softness is not None:
+      if hinge_softness is None:
+        self._hinge_softness = None
+      else:
         self._hinge_softness = tf.convert_to_tensor(
             hinge_softness, name="hinge_softness")
-      else:
-        self._hinge_softness = None
-      if validate_args:
-        nonzero_check = tf.assert_none_equal(
-            tf.convert_to_tensor(0, dtype=self.hinge_softness.dtype),
-            self.hinge_softness,
-            message="hinge_softness must be non-zero")
-        self._hinge_softness = control_flow_ops.with_dependencies(
-            [nonzero_check], self.hinge_softness)
+        if validate_args:
+          nonzero_check = tf.assert_none_equal(
+              tf.convert_to_tensor(
+                  0, dtype=self._hinge_softness.dtype.base_dtype),
+              self.hinge_softness,
+              message="hinge_softness must be non-zero")
+          self._hinge_softness = control_flow_ops.with_dependencies(
+              [nonzero_check], self.hinge_softness)
 
     super(Softplus, self).__init__(
         forward_min_event_ndims=0,

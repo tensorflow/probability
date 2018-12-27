@@ -24,9 +24,8 @@ from scipy.special import gamma
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from tensorflow.python.framework import test_util
-
 tfd = tfp.distributions
+tfe = tf.contrib.eager
 
 
 def make_relaxed_categorical(batch_shape, num_classes, dtype=tf.float32):
@@ -36,7 +35,7 @@ def make_relaxed_categorical(batch_shape, num_classes, dtype=tf.float32):
   return tfd.RelaxedOneHotCategorical(temperatures, logits)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class ExpRelaxedOneHotCategoricalTest(tf.test.TestCase):
 
   def testP(self):
@@ -63,7 +62,7 @@ class ExpRelaxedOneHotCategoricalTest(tf.test.TestCase):
     self.assertAllClose(expected_pdf, pdf)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class RelaxedOneHotCategoricalTest(tf.test.TestCase):
 
   def testLogits(self):

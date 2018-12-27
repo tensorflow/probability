@@ -20,8 +20,11 @@ from __future__ import print_function
 
 import math
 
+import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.framework import tensor_shape
@@ -185,6 +188,13 @@ class Uniform(distribution.Distribution):
         x < self.low, zeros, (broadcasted_x - self.low) / self.range())
     return tf.where(x >= self.high, ones, result_if_not_big)
 
+  def _quantile(self, value):
+    broadcast_shape = tf.broadcast_dynamic_shape(
+        tf.shape(value), self.batch_shape_tensor())
+    ones = tf.ones(broadcast_shape, dtype=self.dtype)
+    broadcasted_value = value * ones
+    return (1. - broadcasted_value) * self.low + broadcasted_value * self.high
+
   def _entropy(self):
     return tf.log(self.range())
 
@@ -196,3 +206,37 @@ class Uniform(distribution.Distribution):
 
   def _stddev(self):
     return self.range() / math.sqrt(12.)
+
+
+@kullback_leibler.RegisterKL(Uniform, tf.distributions.Uniform)
+@kullback_leibler.RegisterKL(tf.distributions.Uniform, Uniform)
+@kullback_leibler.RegisterKL(Uniform, Uniform)
+def _kl_uniform_uniform(a, b, name=None):
+  """Calculate the batched KL divergence KL(a || b) with a and b Uniform.
+
+  Note that the KL divergence is infinite if the support of `a` is not a subset
+  of the support of `b`.
+
+  Args:
+    a: instance of a Uniform distribution object.
+    b: instance of a Uniform distribution object.
+    name: (optional) Name to use for created operations.
+      default is "kl_uniform_uniform".
+
+  Returns:
+    Batchwise KL(a || b)
+  """
+  with tf.name_scope(name, "kl_uniform_uniform",
+                     [a.low, b.low, a.high, b.high]):
+    # Consistent with
+    # http://www.mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 60
+    # Watch out for the change in conventions--they use 'a' and 'b' to refer to
+    # lower and upper bounds respectively there.
+    final_batch_shape = distribution_util.get_broadcast_shape(
+        a.low, b.low, a.high, b.high)
+    dtype = dtype_util.common_dtype(
+        [a.low, a.high, b.low, b.high], tf.float32)
+    return tf.where(
+        (b.low <= a.low) & (a.high <= b.high),
+        tf.log(b.high - b.low) - tf.log(a.high - a.low),
+        tf.broadcast_to(dtype.as_numpy_dtype(np.inf), final_batch_shape))

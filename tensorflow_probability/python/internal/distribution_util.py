@@ -41,10 +41,11 @@ def mixture_stddev(mixture_weight_vector, mean_vector, stddev_vector):
 
   Args:
     mixture_weight_vector: A 2D tensor with shape [batch_size, num_components]
-    mean_vector: A 2D tensor of mixture component means. Has shape
-      `[batch_size, num_components]`.
+    mean_vector: A 2D tensor of mixture component means. Has shape `[batch_size,
+      num_components]`.
     stddev_vector: A 2D tensor of mixture component standard deviations. Has
       shape `[batch_size, num_components]`.
+
   Returns:
     A 1D tensor of shape `[batch_size]` representing the standard deviation of
     the mixture distribution with given weights and component means and standard
@@ -76,38 +77,35 @@ def mixture_stddev(mixture_weight_vector, mean_vector, stddev_vector):
   return tf.sqrt(mixture_variance)
 
 
-def make_tril_scale(
-    loc=None,
-    scale_tril=None,
-    scale_diag=None,
-    scale_identity_multiplier=None,
-    shape_hint=None,
-    validate_args=False,
-    assert_positive=False,
-    name=None):
+def make_tril_scale(loc=None,
+                    scale_tril=None,
+                    scale_diag=None,
+                    scale_identity_multiplier=None,
+                    shape_hint=None,
+                    validate_args=False,
+                    assert_positive=False,
+                    name=None):
   """Creates a LinearOperator representing a lower triangular matrix.
 
   Args:
     loc: Floating-point `Tensor`. This is used for inferring shape in the case
       where only `scale_identity_multiplier` is set.
     scale_tril: Floating-point `Tensor` representing the diagonal matrix.
-      `scale_diag` has shape [N1, N2, ...  k, k], which represents a k x k
-      lower triangular matrix.
-      When `None` no `scale_tril` term is added to the LinearOperator.
-      The upper triangular elements above the diagonal are ignored.
+      `scale_diag` has shape [N1, N2, ...  k, k], which represents a k x k lower
+      triangular matrix. When `None` no `scale_tril` term is added to the
+      LinearOperator. The upper triangular elements above the diagonal are
+      ignored.
     scale_diag: Floating-point `Tensor` representing the diagonal matrix.
-      `scale_diag` has shape [N1, N2, ...  k], which represents a k x k
-      diagonal matrix.
-      When `None` no diagonal term is added to the LinearOperator.
+      `scale_diag` has shape [N1, N2, ...  k], which represents a k x k diagonal
+      matrix. When `None` no diagonal term is added to the LinearOperator.
     scale_identity_multiplier: floating point rank 0 `Tensor` representing a
-      scaling done to the identity matrix.
-      When `scale_identity_multiplier = scale_diag = scale_tril = None` then
-      `scale += IdentityMatrix`. Otherwise no scaled-identity-matrix is added
-      to `scale`.
+      scaling done to the identity matrix. When `scale_identity_multiplier =
+      scale_diag = scale_tril = None` then `scale += IdentityMatrix`. Otherwise
+      no scaled-identity-matrix is added to `scale`.
     shape_hint: scalar integer `Tensor` representing a hint at the dimension of
       the identity matrix when only `scale_identity_multiplier` is set.
-    validate_args: Python `bool` indicating whether arguments should be
-      checked for correctness.
+    validate_args: Python `bool` indicating whether arguments should be checked
+      for correctness.
     assert_positive: Python `bool` indicating whether LinearOperator should be
       checked for being positive definite.
     name: Python `str` name given to ops managed by this object.
@@ -253,23 +251,26 @@ def make_diag_scale(loc=None,
           is_positive_definite=assert_positive)
 
     if loc is None and shape_hint is None:
-      raise ValueError(
-          "Cannot infer `event_shape` unless `loc` or "
-          "`shape_hint` is specified.")
+      raise ValueError("Cannot infer `event_shape` unless `loc` or "
+                       "`shape_hint` is specified.")
 
-    if shape_hint is None:
-      shape_hint = loc.shape[-1]
+    num_rows = shape_hint
+    del shape_hint
+    if num_rows is None:
+      num_rows = loc.shape[-1]
+      if num_rows.value is None:
+        num_rows = tf.shape(loc)[-1]
 
     if scale_identity_multiplier is None:
       return tf.linalg.LinearOperatorIdentity(
-          num_rows=shape_hint,
+          num_rows=num_rows,
           dtype=dtype,
           is_self_adjoint=True,
           is_positive_definite=True,
           assert_proper_shapes=validate_args)
 
     return tf.linalg.LinearOperatorScaledIdentity(
-        num_rows=shape_hint,
+        num_rows=num_rows,
         multiplier=_maybe_attach_assertion(scale_identity_multiplier),
         is_non_singular=True,
         is_self_adjoint=True,
@@ -389,8 +390,8 @@ def is_diagonal_scale(scale):
           isinstance(scale, tf.linalg.LinearOperatorDiag))
 
 
-def maybe_check_scalar_distribution(
-    distribution, expected_base_dtype, validate_args):
+def maybe_check_scalar_distribution(distribution, expected_base_dtype,
+                                    validate_args):
   """Helper which checks validity of a scalar `distribution` init arg.
 
   Valid here means:
@@ -402,10 +403,10 @@ def maybe_check_scalar_distribution(
   Args:
     distribution:  `Distribution`-like object.
     expected_base_dtype:  `TensorFlow` `dtype`.
-    validate_args:  Python `bool`.  Whether to do additional checks:
-      (i)  check that reparameterization_type is `FULLY_REPARAMETERIZED`.
-      (ii) add `tf.Assert` ops to the graph to enforce that distribution
-           is scalar in the event that this cannot be determined statically.
+    validate_args:  Python `bool`.  Whether to do additional checks: (i)  check
+      that reparameterization_type is `FULLY_REPARAMETERIZED`. (ii) add
+      `tf.Assert` ops to the graph to enforce that distribution is scalar in the
+      event that this cannot be determined statically.
 
   Returns:
     List of `tf.Assert` ops to run to enforce validity checks that could not
@@ -435,6 +436,7 @@ def maybe_check_scalar_distribution(
                          distribution.reparameterization_type))
   with tf.name_scope(name="check_distribution"):
     assertions = []
+
     def check_is_scalar(is_scalar, name):
       is_scalar_ = static_value(is_scalar)
       if is_scalar_ is not None:
@@ -448,6 +450,7 @@ def maybe_check_scalar_distribution(
                 True,
                 message=("distribution must be scalar; "
                          "distribution.{}=False is not True".format(name))))
+
     check_is_scalar(distribution.is_scalar_event(), "is_scalar_event")
     check_is_scalar(distribution.is_scalar_batch(), "is_scalar_batch")
     return assertions
@@ -484,14 +487,13 @@ def pad_mixture_dimensions(x, mixture_distribution, categorical_distribution,
     s = tf.shape(x)
     x = tf.reshape(
         x,
-        shape=tf.concat(
-            [
-                s[:-1],
-                tf.ones([pad_ndims], dtype=tf.int32),
-                s[-1:],
-                tf.ones([event_ndims], dtype=tf.int32),
-            ],
-            axis=0))
+        shape=tf.concat([
+            s[:-1],
+            tf.ones([pad_ndims], dtype=tf.int32),
+            s[-1:],
+            tf.ones([event_ndims], dtype=tf.int32),
+        ],
+                        axis=0))
     return x
 
 
@@ -518,8 +520,8 @@ def pick_scalar_condition(pred, true_value, false_value, name=None):
   Args:
     pred: Scalar `bool` `Tensor` predicate.
     true_value: `Tensor` to return if `pred` is `True`.
-    false_value: `Tensor` to return if `pred` is `False`. Must have the
-      same shape as `true_value`.
+    false_value: `Tensor` to return if `pred` is `False`. Must have the same
+      shape as `true_value`.
     name: Python `str` name given to ops managed by this object.
 
   Returns:
@@ -528,8 +530,8 @@ def pick_scalar_condition(pred, true_value, false_value, name=None):
       If the condition can be evaluated statically, the result returned is one
       of the input Python values, with no graph side effects.
   """
-  with tf.name_scope(name, "pick_scalar_condition",
-                     values=[pred, true_value, false_value]):
+  with tf.name_scope(
+      name, "pick_scalar_condition", values=[pred, true_value, false_value]):
     pred_ = static_value(pred)
     if pred_ is None:
       return tf.where(pred, true_value, false_value)
@@ -571,10 +573,8 @@ def move_dimension(x, source_idx, dest_idx):
 
   Args:
     x: Tensor of rank `ndims`.
-    source_idx: Integer index into `x.shape` (negative indexing is
-      supported).
-    dest_idx: Integer index into `x.shape` (negative indexing is
-      supported).
+    source_idx: Integer index into `x.shape` (negative indexing is supported).
+    dest_idx: Integer index into `x.shape` (negative indexing is supported).
 
   Returns:
     x_perm: Tensor of rank `ndims`, in which the dimension at original
@@ -598,33 +598,29 @@ def move_dimension(x, source_idx, dest_idx):
   dest_idx = tf.convert_to_tensor(dest_idx, dtype=dtype)
 
   # Handle negative indexing.
-  source_idx = pick_scalar_condition(
-      source_idx < 0, ndims + source_idx, source_idx)
-  dest_idx = pick_scalar_condition(
-      dest_idx < 0, ndims + dest_idx, dest_idx)
+  source_idx = pick_scalar_condition(source_idx < 0, ndims + source_idx,
+                                     source_idx)
+  dest_idx = pick_scalar_condition(dest_idx < 0, ndims + dest_idx, dest_idx)
 
   # Construct the appropriate permutation of dimensions, depending
   # whether the source is before or after the destination.
   def move_left_permutation():
     return prefer_static_value(
-        tf.concat(
-            [
-                tf.range(0, dest_idx, dtype=dtype), [source_idx],
-                tf.range(dest_idx, source_idx, dtype=dtype),
-                tf.range(source_idx + 1, ndims, dtype=dtype)
-            ],
-            axis=0))
+        tf.concat([
+            tf.range(0, dest_idx, dtype=dtype), [source_idx],
+            tf.range(dest_idx, source_idx, dtype=dtype),
+            tf.range(source_idx + 1, ndims, dtype=dtype)
+        ],
+                  axis=0))
 
   def move_right_permutation():
     return prefer_static_value(
-        tf.concat(
-            [
-                tf.range(0, source_idx, dtype=dtype),
-                tf.range(source_idx + 1, dest_idx + 1, dtype=dtype),
-                [source_idx],
-                tf.range(dest_idx + 1, ndims, dtype=dtype)
-            ],
-            axis=0))
+        tf.concat([
+            tf.range(0, source_idx, dtype=dtype),
+            tf.range(source_idx + 1, dest_idx + 1, dtype=dtype), [source_idx],
+            tf.range(dest_idx + 1, ndims, dtype=dtype)
+        ],
+                  axis=0))
 
   def x_permuted():
     return tf.transpose(
@@ -640,9 +636,12 @@ def move_dimension(x, source_idx, dest_idx):
       tf.equal(source_idx, dest_idx), lambda: x, x_permuted)
 
 
-def assert_integer_form(
-    x, data=None, summarize=None, message=None,
-    int_dtype=None, name="assert_integer_form"):
+def assert_integer_form(x,
+                        data=None,
+                        summarize=None,
+                        message=None,
+                        int_dtype=None,
+                        name="assert_integer_form"):
   """Assert that x has integer components (or floats equal to integers).
 
   Args:
@@ -673,14 +672,18 @@ def assert_integer_form(
       except KeyError:
         raise TypeError("Unrecognized type {}".format(x.dtype.name))
     return tf.assert_equal(
-        x, tf.cast(tf.cast(x, int_dtype), x.dtype),
-        data=data, summarize=summarize, message=message, name=name)
+        x,
+        tf.cast(tf.cast(x, int_dtype), x.dtype),
+        data=data,
+        summarize=summarize,
+        message=message,
+        name=name)
 
 
 def assert_symmetric(matrix):
   matrix_t = tf.matrix_transpose(matrix)
-  return control_flow_ops.with_dependencies(
-      [tf.assert_equal(matrix, matrix_t)], matrix)
+  return control_flow_ops.with_dependencies([tf.assert_equal(matrix, matrix_t)],
+                                            matrix)
 
 
 def embed_check_nonnegative_integer_form(
@@ -695,8 +698,8 @@ def embed_check_nonnegative_integer_form(
     if not x.dtype.is_integer:
       assertions += [
           assert_integer_form(
-              x, message="'{}' cannot contain fractional components.".format(
-                  x)),
+              x,
+              message="'{}' cannot contain fractional components.".format(x)),
       ]
     return control_flow_ops.with_dependencies(assertions, x)
 
@@ -718,15 +721,15 @@ def same_dynamic_shape(a, b):
   # static shape inference may break the equality comparison between
   # shape(a) and shape(b) in tf.equal.
   def all_shapes_equal():
-    return tf.reduce_all(tf.equal(
-        tf.concat([tf.shape(a), tf.shape(b)], 0),
-        tf.concat([tf.shape(b), tf.shape(a)], 0)))
+    return tf.reduce_all(
+        tf.equal(
+            tf.concat([tf.shape(a), tf.shape(b)], 0),
+            tf.concat([tf.shape(b), tf.shape(a)], 0)))
 
   # One of the shapes isn't fully defined, so we need to use the dynamic
   # shape.
   return tf.cond(
-      tf.equal(tf.rank(a), tf.rank(b)),
-      all_shapes_equal,
+      tf.equal(tf.rank(a), tf.rank(b)), all_shapes_equal,
       lambda: tf.constant(False))
 
 
@@ -766,13 +769,13 @@ def get_logits_and_probs(logits=None,
   Args:
     logits: Floating-point `Tensor` representing log-odds.
     probs: Floating-point `Tensor` representing probabilities.
-    multidimensional: Python `bool`, default `False`.
-      If `True`, represents whether the last dimension of `logits` or `probs`,
-      a `[N1, N2, ...  k]` dimensional tensor, representing the
-      logit or probability of `shape[-1]` classes.
-    validate_args: Python `bool`, default `False`. When `True`, either assert
-      `0 <= probs <= 1` (if not `multidimensional`) or that the last dimension
-      of `probs` sums to one.
+    multidimensional: Python `bool`, default `False`. If `True`, represents
+      whether the last dimension of `logits` or `probs`, a `[N1, N2, ...  k]`
+      dimensional tensor, representing the logit or probability of `shape[-1]`
+      classes.
+    validate_args: Python `bool`, default `False`. When `True`, either assert `0
+      <= probs <= 1` (if not `multidimensional`) or that the last dimension of
+      `probs` sums to one.
     name: A name for this operation (optional).
     dtype: `tf.DType` to prefer when converting args to `Tensor`s.
 
@@ -819,8 +822,10 @@ def get_logits_and_probs(logits=None,
                   message="probs does not sum to 1.")
           ]
         else:
-          dependencies += [tf.assert_less_equal(
-              probs, one, message="probs has components greater than 1.")]
+          dependencies += [
+              tf.assert_less_equal(
+                  probs, one, message="probs has components greater than 1.")
+          ]
         probs = control_flow_ops.with_dependencies(dependencies, probs)
 
     with tf.name_scope("logits"):
@@ -894,8 +899,7 @@ def _is_integer_like_by_dtype(dt):
 
 
 def embed_check_categorical_event_shape(
-    categorical_param,
-    name="embed_check_categorical_event_shape"):
+    categorical_param, name="embed_check_categorical_event_shape"):
   """Embeds checks that categorical distributions don't have too many classes.
 
   A categorical-type distribution is one which, e.g., returns the class label
@@ -947,8 +951,8 @@ def embed_check_categorical_event_shape(
     # For more details, see:
     # https://en.wikipedia.org/wiki/Floating-point_arithmetic#Internal_representation
     x_dtype = x.dtype.base_dtype
-    max_event_size = (_largest_integer_by_dtype(x_dtype)
-                      if x_dtype.is_floating else 0)
+    max_event_size = (
+        _largest_integer_by_dtype(x_dtype) if x_dtype.is_floating else 0)
     if max_event_size is 0:
       raise TypeError("Unable to validate size of unrecognized dtype "
                       "({}).".format(x_dtype.name))
@@ -963,26 +967,29 @@ def embed_check_categorical_event_shape(
         raise ValueError("A categorical-distribution parameter must have at "
                          "least 2 events.")
       if event_size > max_event_size:
-        raise ValueError(
-            "Number of classes exceeds `dtype` precision, i.e., "
-            "{} implies shape ({}) cannot exceed {}.".format(
-                x_dtype.name, event_size, max_event_size))
+        raise ValueError("Number of classes exceeds `dtype` precision, i.e., "
+                         "{} implies shape ({}) cannot exceed {}.".format(
+                             x_dtype.name, event_size, max_event_size))
       return x
     else:
       event_size = tf.shape(x, name="x_shape")[-1]
       return control_flow_ops.with_dependencies([
           tf.assert_rank_at_least(
-              x, 1, message=("A categorical-distribution parameter must have "
-                             "at least 1 dimension.")),
+              x,
+              1,
+              message=("A categorical-distribution parameter must have "
+                       "at least 1 dimension.")),
           tf.assert_greater_equal(
-              tf.shape(x)[-1], 2,
+              tf.shape(x)[-1],
+              2,
               message=("A categorical-distribution parameter must have at "
                        "least 2 events.")),
           tf.assert_less_equal(
-              event_size, max_event_size,
+              event_size,
+              max_event_size,
               message="Number of classes exceeds `dtype` precision, "
-                      "i.e., {} dtype cannot exceed {} shape.".format(
-                          x_dtype.name, max_event_size)),
+              "i.e., {} dtype cannot exceed {} shape.".format(
+                  x_dtype.name, max_event_size)),
       ], x)
 
 
@@ -1023,19 +1030,18 @@ def embed_check_integer_casting_closed(x,
 
   with tf.name_scope(name, values=[x]):
     x = tf.convert_to_tensor(x, name="x")
-    if (not _is_integer_like_by_dtype(x.dtype)
-        and not x.dtype.is_floating):
+    if (not _is_integer_like_by_dtype(x.dtype) and not x.dtype.is_floating):
       raise TypeError("{}.dtype must be floating- or "
                       "integer-type.".format(x.dtype.name))
-    if (not _is_integer_like_by_dtype(target_dtype)
-        and not target_dtype.is_floating):
+    if (not _is_integer_like_by_dtype(target_dtype) and
+        not target_dtype.is_floating):
       raise TypeError("target_dtype ({}) must be floating- or "
                       "integer-type.".format(target_dtype.name))
-    if (not _is_integer_like_by_dtype(x.dtype)
-        and not _is_integer_like_by_dtype(target_dtype)):
+    if (not _is_integer_like_by_dtype(x.dtype) and
+        not _is_integer_like_by_dtype(target_dtype)):
       raise TypeError("At least one of {}.dtype ({}) and target_dtype ({}) "
-                      "must be integer-type.".format(
-                          x, x.dtype.name, target_dtype.name))
+                      "must be integer-type.".format(x, x.dtype.name,
+                                                     target_dtype.name))
 
     assertions = []
     if assert_positive:
@@ -1044,8 +1050,7 @@ def embed_check_integer_casting_closed(x,
       ]
     elif assert_nonnegative:
       assertions += [
-          tf.assert_non_negative(
-              x, message="Elements must be non-negative."),
+          tf.assert_non_negative(x, message="Elements must be non-negative."),
       ]
 
     if x.dtype.is_floating:
@@ -1053,26 +1058,28 @@ def embed_check_integer_casting_closed(x,
       # Since this check implies the magnitude check below, we need only it.
       assertions += [
           assert_integer_form(
-              x, int_dtype=target_dtype,
+              x,
+              int_dtype=target_dtype,
               message="Elements must be {}-equivalent.".format(
                   target_dtype.name)),
       ]
     else:
-      if (_largest_integer_by_dtype(x.dtype)
-          > _largest_integer_by_dtype(target_dtype)):
+      if (_largest_integer_by_dtype(x.dtype) >
+          _largest_integer_by_dtype(target_dtype)):
         # Cast may lose integer precision.
         assertions += [
             tf.assert_less_equal(
-                x, _largest_integer_by_dtype(target_dtype),
+                x,
+                _largest_integer_by_dtype(target_dtype),
                 message=("Elements cannot exceed {}.".format(
                     _largest_integer_by_dtype(target_dtype)))),
         ]
-      if (not assert_nonnegative and
-          (_smallest_integer_by_dtype(x.dtype)
-           < _smallest_integer_by_dtype(target_dtype))):
+      if (not assert_nonnegative and (_smallest_integer_by_dtype(
+          x.dtype) < _smallest_integer_by_dtype(target_dtype))):
         assertions += [
             tf.assert_greater_equal(
-                x, _smallest_integer_by_dtype(target_dtype),
+                x,
+                _smallest_integer_by_dtype(target_dtype),
                 message=("Elements cannot be smaller than {}.".format(
                     _smallest_integer_by_dtype(target_dtype)))),
         ]
@@ -1158,11 +1165,10 @@ def matrix_diag_transform(matrix, transform=None, name=None):
   Args:
     matrix:  Rank `R` `Tensor`, `R >= 2`, where the last two dimensions are
       equal.
-    transform:  Element-wise function mapping `Tensors` to `Tensors`. To
-      be applied to the diagonal of `matrix`. If `None`, `matrix` is returned
+    transform:  Element-wise function mapping `Tensors` to `Tensors`. To be
+      applied to the diagonal of `matrix`. If `None`, `matrix` is returned
       unchanged. Defaults to `None`.
-    name:  A name to give created ops.
-      Defaults to "matrix_diag_transform".
+    name:  A name to give created ops. Defaults to "matrix_diag_transform".
 
   Returns:
     A `Tensor` with same shape and `dtype` as `matrix`.
@@ -1223,10 +1229,12 @@ def rotate_transpose(x, shift, name="rotate_transpose"):
     shift_value_static = tf.contrib.util.constant_value(shift)
     ndims = x.shape.ndims
     if ndims is not None and shift_value_static is not None:
-      if ndims < 2: return x
+      if ndims < 2:
+        return x
       shift_value_static = np.sign(shift_value_static) * (
           abs(shift_value_static) % ndims)
-      if shift_value_static == 0: return x
+      if shift_value_static == 0:
+        return x
       perm = np.roll(np.arange(ndims), shift_value_static)
       return tf.transpose(x, perm=perm)
     else:
@@ -1244,19 +1252,16 @@ def rotate_transpose(x, shift, name="rotate_transpose"):
       # Finally, we transform shift by modulo length so it can be specified
       # independently from the array upon which it operates (like python).
       ndims = tf.rank(x)
-      shift = tf.where(tf.less(shift, 0),
-                       tf.mod(-shift, ndims),
-                       ndims - tf.mod(shift, ndims))
+      shift = tf.where(
+          tf.less(shift, 0), tf.mod(-shift, ndims),
+          ndims - tf.mod(shift, ndims))
       first = tf.range(0, shift)
       last = tf.range(shift, ndims)
       perm = tf.concat([last, first], 0)
       return tf.transpose(x, perm=perm)
 
 
-def pick_vector(cond,
-                true_vector,
-                false_vector,
-                name="pick_vector"):
+def pick_vector(cond, true_vector, false_vector, name="pick_vector"):
   """Picks possibly different length row `Tensor`s based on condition.
 
   Value `Tensor`s should have exactly one dimension.
@@ -1270,13 +1275,9 @@ def pick_vector(cond,
     true_vector: `Tensor` of one dimension. Returned when cond is `True`.
     false_vector: `Tensor` of one dimension. Returned when cond is `False`.
     name: Python `str`. The name to give this op.
-
-  Example:
-
-  ```python
-  pick_vector(tf.less(0, 5), tf.range(10, 12), tf.range(15, 18))  # [10, 11]
-  pick_vector(tf.less(5, 0), tf.range(10, 12), tf.range(15, 18))  # [15, 16, 17]
-  ```
+  Example:  ```python pick_vector(tf.less(0, 5), tf.range(10, 12), tf.range(15,
+    18))  # [10, 11] pick_vector(tf.less(5, 0), tf.range(10, 12), tf.range(15,
+    18))  # [15, 16, 17] ```
 
   Returns:
     true_or_false_vector: `Tensor`.
@@ -1289,8 +1290,8 @@ def pick_vector(cond,
   with tf.name_scope(name, values=(cond, true_vector, false_vector)):
     cond = tf.convert_to_tensor(cond, name="cond")
     if cond.dtype != tf.bool:
-      raise TypeError("%s.dtype=%s which is not %s" %
-                      (cond, cond.dtype, tf.bool))
+      raise TypeError(
+          "%s.dtype=%s which is not %s" % (cond, cond.dtype, tf.bool))
     cond_value_static = tf.contrib.util.constant_value(cond)
     if cond_value_static is not None:
       return true_vector if cond_value_static else false_vector
@@ -1298,17 +1299,17 @@ def pick_vector(cond,
     false_vector = tf.convert_to_tensor(false_vector, name="false_vector")
     if true_vector.dtype != false_vector.dtype:
       raise TypeError(
-          "%s.dtype=%s does not match %s.dtype=%s"
-          % (true_vector, true_vector.dtype,
-             false_vector, false_vector.dtype))
+          "%s.dtype=%s does not match %s.dtype=%s" %
+          (true_vector, true_vector.dtype, false_vector, false_vector.dtype))
     n = tf.shape(true_vector)[0]
     return tf.slice(
-        tf.concat([true_vector, false_vector], 0),
-        [tf.where(cond, 0, n)], [tf.where(cond, n, -1)])
+        tf.concat([true_vector, false_vector], 0), [tf.where(cond, 0, n)],
+        [tf.where(cond, n, -1)])
 
 
-def prefer_static_broadcast_shape(
-    shape1, shape2, name="prefer_static_broadcast_shape"):
+def prefer_static_broadcast_shape(shape1,
+                                  shape2,
+                                  name="prefer_static_broadcast_shape"):
   """Convenience function which statically broadcasts shape when possible.
 
   Args:
@@ -1321,6 +1322,7 @@ def prefer_static_broadcast_shape(
       statically), or as a `Tensor`.
   """
   with tf.name_scope(name, values=[shape1, shape2]):
+
     def make_shape_tensor(x):
       return tf.convert_to_tensor(x, name="shape", dtype=tf.int32)
 
@@ -1398,7 +1400,7 @@ def gen_new_seed(seed, salt):
 
 
 def fill_triangular(x, upper=False, name=None):
-  """Creates a (batch of) triangular matrix from a vector of inputs.
+  r"""Creates a (batch of) triangular matrix from a vector of inputs.
 
   Created matrix can be lower- or upper-triangular. (It is more efficient to
   create the matrix as upper or lower, rather than transpose.)
@@ -1424,8 +1426,52 @@ def fill_triangular(x, upper=False, name=None):
   #      [0, 0, 4]]
   ```
 
-  For comparison, a pure numpy version of this function can be found in
-  `util_test.py`, function `_fill_triangular`.
+  The key trick is to create an upper triangular matrix by concatenating `x`
+  and a tail of itself, then reshaping.
+
+  Suppose that we are filling the upper triangle of an `n`-by-`n` matrix `M`
+  from a vector `x`. The matrix `M` contains n**2 entries total. The vector `x`
+  contains `n * (n+1) / 2` entries. For concreteness, we'll consider `n = 5`
+  (so `x` has `15` entries and `M` has `25`). We'll concatenate `x` and `x` with
+  the first (`n = 5`) elements removed and reversed:
+
+  ```python
+  x = np.arange(15) + 1
+  xc = np.concatenate([x, x[5:][::-1]])
+  # ==> array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 15, 14, 13,
+  #            12, 11, 10, 9, 8, 7, 6])
+
+  # (We add one to the arange result to disambiguate the zeros below the
+  # diagonal of our upper-triangular matrix from the first entry in `x`.)
+
+  # Now, when reshapedlay this out as a matrix:
+  y = np.reshape(xc, [5, 5])
+  # ==> array([[ 1,  2,  3,  4,  5],
+  #            [ 6,  7,  8,  9, 10],
+  #            [11, 12, 13, 14, 15],
+  #            [15, 14, 13, 12, 11],
+  #            [10,  9,  8,  7,  6]])
+
+  # Finally, zero the elements below the diagonal:
+  y = np.triu(y, k=0)
+  # ==> array([[ 1,  2,  3,  4,  5],
+  #            [ 0,  7,  8,  9, 10],
+  #            [ 0,  0, 13, 14, 15],
+  #            [ 0,  0,  0, 12, 11],
+  #            [ 0,  0,  0,  0,  6]])
+  ```
+
+  From this example we see that the resuting matrix is upper-triangular, and
+  contains all the entries of x, as desired. The rest is details:
+  - If `n` is even, `x` doesn't exactly fill an even number of rows (it fills
+    `n / 2` rows and half of an additional row), but the whole scheme still
+    works.
+  - If we want a lower triangular matrix instead of an upper triangular,
+    we remove the first `n` elements from `x` rather than from the reversed
+    `x`.
+
+  For additional comparisons, a pure numpy version of this function can be found
+  in `distribution_util_test.py`, function `_fill_triangular`.
 
   Args:
     x: `Tensor` representing lower (or upper) triangular elements.
@@ -1457,22 +1503,10 @@ def fill_triangular(x, upper=False, name=None):
       # omit it.  We don't validate n is an integer because this has
       # graph-execution cost; an error will be thrown from the reshape, below.
       n = tf.cast(
-          tf.sqrt(0.25 + tf.cast(2 * m, dtype=tf.float32)),
-          dtype=tf.int32)
+          tf.sqrt(0.25 + tf.cast(2 * m, dtype=tf.float32)), dtype=tf.int32)
       static_final_shape = x.shape.with_rank_at_least(1)[:-1].concatenate(
           [None, None])
-    # We now concatenate the "tail" of `x` to `x` (and reverse one of them).
-    #
-    # We do this based on the insight that the input `x` provides `ceil(n/2)`
-    # rows of an `n x n` matrix, some of which will get zeroed out being on the
-    # wrong side of the diagonal. The first row will not get zeroed out at all,
-    # and we need `floor(n/2)` more rows, so the first is what we omit from
-    # `x_tail`. If we then stack those `ceil(n/2)` rows with the `floor(n/2)`
-    # rows provided by a reversed tail, it is exactly the other set of elements
-    # of the reversed tail which will be zeroed out for being on the wrong side
-    # of the diagonal further up/down the matrix. And, in doing-so, we've filled
-    # the triangular matrix in a clock-wise spiral pattern. Neat!
-    #
+
     # Try it out in numpy:
     #  n = 3
     #  x = np.arange(n * (n + 1) / 2)
@@ -1502,14 +1536,11 @@ def fill_triangular(x, upper=False, name=None):
     else:
       x_list = [x[..., n:], tf.reverse(x, axis=[ndims - 1])]
     new_shape = (
-        static_final_shape.as_list()
-        if static_final_shape.is_fully_defined()
+        static_final_shape.as_list() if static_final_shape.is_fully_defined()
         else tf.concat([tf.shape(x)[:-1], [n, n]], axis=0))
     x = tf.reshape(tf.concat(x_list, axis=-1), new_shape)
     x = tf.matrix_band_part(
-        x,
-        num_lower=(0 if upper else -1),
-        num_upper=(-1 if upper else 0))
+        x, num_lower=(0 if upper else -1), num_upper=(-1 if upper else 0))
     x.set_shape(static_final_shape)
     return x
 
@@ -1571,12 +1602,11 @@ def fill_triangular_inverse(x, upper=False, name=None):
       initial_elements = tf.reverse(x[..., -1, :], axis=[ndims - 2])
       triangular_portion = x[..., :-1, :]
     rotated_triangular_portion = tf.reverse(
-        tf.reverse(triangular_portion, axis=[ndims - 1]),
-        axis=[ndims - 2])
+        tf.reverse(triangular_portion, axis=[ndims - 1]), axis=[ndims - 2])
     consolidated_matrix = triangular_portion + rotated_triangular_portion
     end_sequence = tf.reshape(
-        consolidated_matrix,
-        tf.concat([tf.shape(x)[:-2], [n * (n - 1)]], axis=0))
+        consolidated_matrix, tf.concat([tf.shape(x)[:-2], [n * (n - 1)]],
+                                       axis=0))
     y = tf.concat([initial_elements, end_sequence[..., :m - n]], axis=-1)
     y.set_shape(static_final_shape)
     return y
@@ -1650,13 +1680,12 @@ def tridiag(below=None, diag=None, above=None, name=None):
     return _add(below, diag, above)
 
 
-def reduce_weighted_logsumexp(
-    logx,
-    w=None,
-    axis=None,
-    keep_dims=False,
-    return_sign=False,
-    name=None):
+def reduce_weighted_logsumexp(logx,
+                              w=None,
+                              axis=None,
+                              keep_dims=False,
+                              return_sign=False,
+                              name=None):
   """Computes `log(abs(sum(weight * exp(elements across tensor dimensions))))`.
 
   If all weights `w` are known to be positive, it is more efficient to directly
@@ -1703,9 +1732,9 @@ def reduce_weighted_logsumexp(
   Args:
     logx: The tensor to reduce. Should have numeric type.
     w: The weight tensor. Should have numeric type identical to `logx`.
-    axis: The dimensions to reduce. If `None` (the default),
-      reduces all dimensions. Must be in the range
-      `[-rank(input_tensor), rank(input_tensor))`.
+    axis: The dimensions to reduce. If `None` (the default), reduces all
+      dimensions. Must be in the range `[-rank(input_tensor),
+      rank(input_tensor))`.
     keep_dims: If true, retains reduced dimensions with length 1.
     return_sign: If `True`, returns the sign of the result.
     name: A name for the operation (optional).
@@ -1730,11 +1759,9 @@ def reduce_weighted_logsumexp(
     # this is ok follows from the fact that we're actually free to subtract any
     # value we like, so long as we add it back after taking the `log(sum(...))`.
     max_log_absw_x = tf.where(
-        tf.is_inf(max_log_absw_x),
-        tf.zeros_like(max_log_absw_x),
+        tf.is_inf(max_log_absw_x), tf.zeros_like(max_log_absw_x),
         max_log_absw_x)
-    wx_over_max_absw_x = (
-        tf.sign(w) * tf.exp(log_absw_x - max_log_absw_x))
+    wx_over_max_absw_x = (tf.sign(w) * tf.exp(log_absw_x - max_log_absw_x))
     sum_wx_over_max_absw_x = tf.reduce_sum(
         wx_over_max_absw_x, axis=axis, keepdims=keep_dims)
     if not keep_dims:
@@ -1796,8 +1823,7 @@ def softplus_inverse(x, name=None):
     too_large_value = x
     # This `where` will ultimately be a NOP because we won't select this
     # codepath whenever we used the surrogate `ones_like`.
-    x = tf.where(tf.logical_or(is_too_small, is_too_large),
-                 tf.ones_like(x), x)
+    x = tf.where(tf.logical_or(is_too_small, is_too_large), tf.ones_like(x), x)
     y = x + tf.log(-tf.math.expm1(-x))  # == log(expm1(x))
     return tf.where(is_too_small, too_small_value,
                     tf.where(is_too_large, too_large_value, y))
@@ -1814,15 +1840,17 @@ def dimension_size(x, axis):
   return tf.shape(x)[axis]
 
 
-def process_quadrature_grid_and_probs(
-    quadrature_grid_and_probs, dtype, validate_args, name=None):
+def process_quadrature_grid_and_probs(quadrature_grid_and_probs,
+                                      dtype,
+                                      validate_args,
+                                      name=None):
   """Validates quadrature grid, probs or computes them as necessary.
 
   Args:
     quadrature_grid_and_probs: Python pair of `float`-like `Tensor`s
       representing the sample points and the corresponding (possibly
       normalized) weight.  When `None`, defaults to:
-      `np.polynomial.hermite.hermgauss(deg=8)`.
+        `np.polynomial.hermite.hermgauss(deg=8)`.
     dtype: The expected `dtype` of `grid` and `probs`.
     validate_args: Python `bool`, default `False`. When `True` distribution
       parameters are checked for validity despite possibly degrading runtime
@@ -1852,8 +1880,7 @@ def process_quadrature_grid_and_probs(
 
     grid, probs = tuple(quadrature_grid_and_probs)
     grid = tf.convert_to_tensor(grid, name="grid", dtype=dtype)
-    probs = tf.convert_to_tensor(probs, name="unnormalized_probs",
-                                 dtype=dtype)
+    probs = tf.convert_to_tensor(probs, name="unnormalized_probs", dtype=dtype)
     probs /= tf.norm(probs, ord=1, axis=-1, keepdims=True, name="probs")
 
     def _static_event_size(x):
@@ -1889,13 +1916,13 @@ def pad(x, axis, front=False, back=False, value=0, count=1, name=None):
       (Negative indexing is supported.)
     front: Python `bool`; if `True` the beginning of the `axis` dimension is
       padded with `value`, `count` times. If `False` no front padding is made.
-    back: Python `bool`; if `True` the end of the `axis` dimension is
-      padded with `value`, `count` times. If `False` no end padding is made.
+    back: Python `bool`; if `True` the end of the `axis` dimension is padded
+      with `value`, `count` times. If `False` no end padding is made.
     value: Scalar `int`-like `Tensor` representing the actual value added to the
       front and/or back of the `axis` dimension of `x`.
     count: Scalar `int`-like `Tensor` representing number of elements added to
-      the front and/or back of the `axis` dimension of `x`. E.g., if
-      `front = back = True` then `2 * count` elements are added.
+      the front and/or back of the `axis` dimension of `x`. E.g., if `front =
+      back = True` then `2 * count` elements are added.
     name: Python `str` name prefixed to Ops created by this function.
 
   Returns:
@@ -1914,8 +1941,9 @@ def pad(x, axis, front=False, back=False, value=0, count=1, name=None):
           count.dtype.name))
     if not front and not back:
       raise ValueError("At least one of `front`, `back` must be `True`.")
-    ndims = (x.shape.ndims if x.shape.ndims is not None
-             else tf.rank(x, name="ndims"))
+    ndims = (
+        x.shape.ndims if x.shape.ndims is not None else tf.rank(
+            x, name="ndims"))
     axis = tf.convert_to_tensor(axis, name="axis")
     axis_ = tf.contrib.util.constant_value(axis)
     if axis_ is not None:
@@ -1925,10 +1953,9 @@ def pad(x, axis, front=False, back=False, value=0, count=1, name=None):
       count_ = tf.contrib.util.constant_value(count)
       if axis_ >= 0 or x.shape.ndims is not None:
         head = x.shape[:axis]
-        middle = tf.TensorShape(
-            None if count_ is None
-            else (x.shape[axis] + count_ * (front + back)))
-        tail = x.shape[axis+1:]
+        middle = tf.TensorShape(None if count_ is None else (
+            x.shape[axis] + count_ * (front + back)))
+        tail = x.shape[axis + 1:]
         final_shape = head.concatenate(middle.concatenate(tail))
       else:
         final_shape = None
@@ -1938,8 +1965,7 @@ def pad(x, axis, front=False, back=False, value=0, count=1, name=None):
     x = tf.pad(
         x,
         paddings=tf.one_hot(
-            indices=tf.stack([axis if front else -1,
-                              axis if back else -1]),
+            indices=tf.stack([axis if front else -1, axis if back else -1]),
             depth=ndims,
             axis=0,
             on_value=count,
@@ -2014,8 +2040,8 @@ class AppendDocstring(object):
     Args:
       additional_note: Python string added as additional docstring to public
         version of function.
-      kwargs_dict: Python string/string dictionary representing
-        specific kwargs expanded from the **kwargs input.
+      kwargs_dict: Python string/string dictionary representing specific kwargs
+        expanded from the **kwargs input.
 
     Raises:
       ValueError: if kwargs_dict.key contains whitespace.
@@ -2027,20 +2053,20 @@ class AppendDocstring(object):
       for key in sorted(kwargs_dict.keys()):
         value = kwargs_dict[key]
         if any(x.isspace() for x in key):
-          raise ValueError(
-              "Parameter name \"%s\" contains whitespace." % key)
+          raise ValueError("Parameter name \"%s\" contains whitespace." % key)
         value = value.lstrip()
         if "\n" in value:
           raise ValueError(
               "Parameter description for \"%s\" contains newlines." % key)
         bullets.append("*  `%s`: %s" % (key, value))
-      self._additional_note += ("\n\n##### `kwargs`:\n\n" +
-                                "\n".join(bullets))
+      self._additional_note += ("\n\n##### `kwargs`:\n\n" + "\n".join(bullets))
 
   def __call__(self, fn):
+
     @functools.wraps(fn)
     def _fn(*args, **kwargs):
       return fn(*args, **kwargs)
+
     if _fn.__doc__ is None:
       _fn.__doc__ = self._additional_note
     else:

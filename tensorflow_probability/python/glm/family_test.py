@@ -24,10 +24,9 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from tensorflow.python.framework import test_util
-
-tfd = tfp.distributions
 tfb = tfp.bijectors
+tfd = tfp.distributions
+tfe = tf.contrib.eager
 
 
 def make_lognormal(mean):
@@ -104,7 +103,7 @@ class _GLMTestHarness(object):
                         atol=1e-6, rtol=1e-4)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class BernoulliTest(tf.test.TestCase, _GLMTestHarness):
 
   def setUp(self):
@@ -114,7 +113,7 @@ class BernoulliTest(tf.test.TestCase, _GLMTestHarness):
         lambda mu: tfd.Bernoulli(probs=mu), tf.nn.sigmoid)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class BernoulliNormalCDFTest(tf.test.TestCase, _GLMTestHarness):
 
   def setUp(self):
@@ -129,7 +128,7 @@ class BernoulliNormalCDFTest(tf.test.TestCase, _GLMTestHarness):
         lambda mu: tfd.Bernoulli(probs=mu), normal_cdf)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class GammaExpTest(tf.test.TestCase, _GLMTestHarness):
 
   def setUp(self):
@@ -141,7 +140,7 @@ class GammaExpTest(tf.test.TestCase, _GLMTestHarness):
         tf.exp)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class GammaSoftplusTest(tf.test.TestCase, _GLMTestHarness):
 
   def setUp(self):
@@ -153,7 +152,7 @@ class GammaSoftplusTest(tf.test.TestCase, _GLMTestHarness):
         tf.nn.softplus)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class LogNormalTest(tf.test.TestCase, _GLMTestHarness):
 
   def setUp(self):
@@ -163,7 +162,7 @@ class LogNormalTest(tf.test.TestCase, _GLMTestHarness):
         make_lognormal, tf.exp)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class LogNormalSoftplusTest(tf.test.TestCase, _GLMTestHarness):
 
   def setUp(self):
@@ -173,7 +172,7 @@ class LogNormalSoftplusTest(tf.test.TestCase, _GLMTestHarness):
         make_lognormal, tf.nn.softplus)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class NormalTest(tf.test.TestCase, _GLMTestHarness):
 
   def setUp(self):
@@ -183,7 +182,7 @@ class NormalTest(tf.test.TestCase, _GLMTestHarness):
         lambda mu: tfd.Normal(mu, self.dtype(1)), tf.identity)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class NormalReciprocalTest(tf.test.TestCase, _GLMTestHarness):
 
   def setUp(self):
@@ -193,7 +192,7 @@ class NormalReciprocalTest(tf.test.TestCase, _GLMTestHarness):
         lambda mu: tfd.Normal(mu, self.dtype(1)), tf.reciprocal)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class PoissonTest(tf.test.TestCase, _GLMTestHarness):
 
   def setUp(self):
@@ -203,7 +202,7 @@ class PoissonTest(tf.test.TestCase, _GLMTestHarness):
         lambda mu: tfd.Poisson(rate=mu), tf.exp)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class PoissonSoftplusTest(tf.test.TestCase, _GLMTestHarness):
 
   def setUp(self):

@@ -22,7 +22,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
-from tensorflow_probability.python import bijectors
+from tensorflow_probability.python.bijectors import kumaraswamy as kumaraswamy_bijector
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import distribution_util
@@ -159,7 +159,7 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
             low=tf.zeros([], dtype=concentration1.dtype),
             high=tf.ones([], dtype=concentration1.dtype),
             allow_nan_stats=allow_nan_stats),
-        bijector=bijectors.Kumaraswamy(
+        bijector=kumaraswamy_bijector.Kumaraswamy(
             concentration1=concentration1,
             concentration0=concentration0,
             validate_args=validate_args),

@@ -366,7 +366,7 @@ class VectorDeterministic(_BaseDeterministic):
     return self.loc.shape[:-1]
 
   def _event_shape_tensor(self):
-    return tf.shape(self.loc)[-1]
+    return tf.shape(self.loc)[-1:]
 
   def _event_shape(self):
     return self.loc.shape[-1:]

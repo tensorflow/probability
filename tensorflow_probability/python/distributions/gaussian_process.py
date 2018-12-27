@@ -44,7 +44,7 @@ class GaussianProcess(mvn_linear_operator.MultivariateNormalLinearOperator):
   space. In such cases, the GP may be thought of as a distribution over
   (real- or complex-valued) functions defined over the index set.
 
-  Just as Gaussian distriubtions are fully specified by their first and second
+  Just as Gaussian distributions are fully specified by their first and second
   moments, a Gaussian process can be completely specified by a mean and
   covariance function. Let `S` denote the index set and `K` the space in which
   each indexed random variable takes its values (again, often R or C). The mean

@@ -45,6 +45,7 @@ from tensorflow_probability.python.distributions.gumbel import Gumbel
 from tensorflow_probability.python.distributions.half_cauchy import HalfCauchy
 from tensorflow_probability.python.distributions.half_normal import HalfNormal
 from tensorflow_probability.python.distributions.hidden_markov_model import HiddenMarkovModel
+from tensorflow_probability.python.distributions.horseshoe import Horseshoe
 from tensorflow_probability.python.distributions.independent import Independent
 from tensorflow_probability.python.distributions.internal.moving_stats import assign_log_moving_mean_exp
 from tensorflow_probability.python.distributions.internal.moving_stats import assign_moving_mean_variance
@@ -124,8 +125,6 @@ from tensorflow.python.ops.distributions.student_t import StudentTWithAbsDfSoftp
 
 # pylint: enable=unused-import,wildcard-import,line-too-long,g-importing-member
 
-from tensorflow.python.util.all_util import remove_undocumented
-
 __all__ = [
     'auto_correlation',
     'Cauchy',
@@ -160,6 +159,7 @@ __all__ = [
     'HalfCauchy',
     'HalfNormal',
     'HiddenMarkovModel',
+    'Horseshoe',
     'Independent',
     'InverseGamma',
     'InverseGammaWithSoftplusConcentrationRate',
@@ -228,5 +228,3 @@ __all__ = [
     'quadrature_scheme_lognormal_gauss_hermite',
     'quadrature_scheme_lognormal_quantiles',
 ]
-
-remove_undocumented(__name__, __all__)

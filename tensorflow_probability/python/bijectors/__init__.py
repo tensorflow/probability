@@ -49,6 +49,7 @@ from tensorflow_probability.python.bijectors.permute import Permute
 from tensorflow_probability.python.bijectors.power_transform import PowerTransform
 from tensorflow_probability.python.bijectors.real_nvp import real_nvp_default_template
 from tensorflow_probability.python.bijectors.real_nvp import RealNVP
+from tensorflow_probability.python.bijectors.reciprocal import Reciprocal
 from tensorflow_probability.python.bijectors.reshape import Reshape
 from tensorflow_probability.python.bijectors.scale_tril import ScaleTriL
 from tensorflow_probability.python.bijectors.sigmoid import Sigmoid
@@ -63,8 +64,6 @@ from tensorflow_probability.python.bijectors.transpose import Transpose
 from tensorflow_probability.python.bijectors.weibull import Weibull
 
 # pylint: enable=unused-import,line-too-long,g-importing-member
-
-from tensorflow.python.util.all_util import remove_undocumented
 
 __all__ = [
     "AbsoluteValue",
@@ -93,6 +92,7 @@ __all__ = [
     "Permute",
     "PowerTransform",
     "RealNVP",
+    "Reciprocal",
     "Reshape",
     "ScaleTriL",
     "Sigmoid",
@@ -109,5 +109,3 @@ __all__ = [
     "masked_dense",
     "real_nvp_default_template"
 ]
-
-remove_undocumented(__name__, __all__)

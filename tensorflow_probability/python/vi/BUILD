@@ -41,8 +41,8 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python:monte_carlo",
         "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/monte_carlo",
     ],
 )
 

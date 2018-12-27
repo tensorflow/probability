@@ -24,7 +24,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python import bijectors as tfb
-from tensorflow.python.framework import test_util
+tfe = tf.contrib.eager
 
 
 class _TransposeBijectorTest(object):
@@ -124,12 +124,12 @@ class _TransposeBijectorTest(object):
       tfb.Transpose(rightmost_transposed_ndims=-1, validate_args=True)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class TransposeBijectorDynamicTest(_TransposeBijectorTest, tf.test.TestCase):
   is_static = False
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class TransposeBijectorStaticTest(_TransposeBijectorTest, tf.test.TestCase):
   is_static = True
 

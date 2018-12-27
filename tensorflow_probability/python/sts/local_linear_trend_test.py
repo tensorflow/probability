@@ -24,10 +24,9 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.sts import LocalLinearTrendStateSpaceModel
 
-from tensorflow.python.framework import test_util
-
-tfl = tf.linalg
 tfd = tfp.distributions
+tfe = tf.contrib.eager
+tfl = tf.linalg
 
 
 class _LocalLinearTrendStateSpaceModelTest(object):
@@ -108,21 +107,21 @@ class _LocalLinearTrendStateSpaceModelTest(object):
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class LocalLinearTrendStateSpaceModelTestStaticShape32(
     tf.test.TestCase, _LocalLinearTrendStateSpaceModelTest):
   dtype = np.float32
   use_static_shape = True
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class LocalLinearTrendStateSpaceModelTestDynamicShape32(
     tf.test.TestCase, _LocalLinearTrendStateSpaceModelTest):
   dtype = np.float32
   use_static_shape = False
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@tfe.run_all_tests_in_graph_and_eager_modes
 class LocalLinearTrendStateSpaceModelTestStaticShape64(
     tf.test.TestCase, _LocalLinearTrendStateSpaceModelTest):
   dtype = np.float64
