@@ -525,8 +525,13 @@ class NormalTest(tf.test.TestCase):
     kl_expected = ((mu_a - mu_b)**2 / (2 * sigma_b**2) + 0.5 * (
         (sigma_a**2 / sigma_b**2) - 1 - 2 * np.log(sigma_a / sigma_b)))
 
+    x = n_a.sample(int(1e5), seed=0)
+    kl_sample = tf.reduce_mean(n_a.log_prob(x) - n_b.log_prob(x), axis=0)
+    kl_sample_ = self.evaluate(kl_sample)
+
     self.assertEqual(kl.shape, (batch_size,))
     self.assertAllClose(kl_val, kl_expected)
+    self.assertAllClose(kl_expected, kl_sample_, atol=0.0, rtol=1e-2)
 
 
 if __name__ == "__main__":
