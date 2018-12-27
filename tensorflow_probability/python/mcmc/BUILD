@@ -175,7 +175,7 @@ py_library(
 
 py_test(
     name = "random_walk_metropolis_test",
-    size = "small",
+    size = "medium",
     srcs = ["random_walk_metropolis_test.py"],
     deps = [
         # numpy dep,
