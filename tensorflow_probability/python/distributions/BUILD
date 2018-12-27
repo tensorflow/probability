@@ -1199,6 +1199,7 @@ py_test(
         ":exponential",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability",
     ],
 )
 
