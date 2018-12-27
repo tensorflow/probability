@@ -307,6 +307,32 @@ class HalfNormalTest(test_case.TestCase):
     self.assertAllEqual(self.evaluate(halfnorm.event_shape_tensor()), [])
     self.assertAllEqual(self.evaluate(halfnorm.batch_shape_tensor()), [2])
 
+  def testHalfNormalHalfNormalKL(self):
+    a_scale = np.arange(0.5, 1.6, 0.1)
+    b_scale = np.arange(0.5, 1.6, 0.1)
+
+    # This reshape is intended to expand the number of test cases.
+    a_scale = a_scale.reshape((len(a_scale), 1))
+    b_scale = b_scale.reshape((1, len(b_scale)))
+
+    a = tfd.HalfNormal(scale=a_scale)
+    b = tfd.HalfNormal(scale=b_scale)
+
+    true_kl = (np.log(b_scale) - np.log(a_scale) +
+               (a_scale ** 2 - b_scale ** 2) / (2 * b_scale ** 2))
+
+    kl = tfd.kl_divergence(a, b)
+
+    x = a.sample(int(4e5), seed=0)
+    kl_sample = tf.reduce_mean(a.log_prob(x) - b.log_prob(x), axis=0)
+
+    kl_, kl_sample_ = self.evaluate([kl, kl_sample])
+    self.assertAllEqual(true_kl, kl_)
+    self.assertAllClose(true_kl, kl_sample_, atol=0., rtol=5e-2)
+
+    zero_kl = tfd.kl_divergence(a, a)
+    true_zero_kl_, zero_kl_ = self.evaluate([tf.zeros_like(zero_kl), zero_kl])
+    self.assertAllEqual(true_zero_kl_, zero_kl_)
 
 if __name__ == "__main__":
   tf.test.main()

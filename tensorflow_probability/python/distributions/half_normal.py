@@ -23,6 +23,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import special_math
@@ -169,3 +170,24 @@ class HalfNormal(distribution.Distribution):
 
   def _variance(self):
     return self.scale ** 2.0 * (1.0 - 2.0 / np.pi)
+
+
+@kullback_leibler.RegisterKL(HalfNormal, HalfNormal)
+def _kl_half_normal_half_normal(a, b, name=None):
+  """Calculate the batched KL divergence KL(a || b) with a and b `HalfNormal`.
+
+  Args:
+    a: Instance of a `HalfNormal` distribution object.
+    b: Instance of a `HalfNormal` distribution object.
+    name: (optional) Name to use for created operations.
+      default is "kl_half_normal_half_normal".
+
+  Returns:
+    Batchwise KL(a || b)
+  """
+  with tf.name_scope(name, "kl_half_normal_half_normal",
+                     [a.scale, b.scale]):
+    # Consistent with
+    # http://www.mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 119
+    return (tf.log(b.scale) - tf.log(a.scale) +
+            (a.scale ** 2 - b.scale **2) / (2 * b.scale**2))
