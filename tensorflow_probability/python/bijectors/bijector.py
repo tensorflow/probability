@@ -57,12 +57,12 @@ class _Mapping(
   @property
   def x_key(self):
     """Returns key used for caching Y=g(X)."""
-    return (self.x,) + self._deep_tuple(tuple(sorted(self.kwargs.items())))
+    return (self.x,) + self._deep_tuple(self.kwargs)
 
   @property
   def y_key(self):
     """Returns key used for caching X=g^{-1}(Y)."""
-    return (self.y,) + self._deep_tuple(tuple(sorted(self.kwargs.items())))
+    return (self.y,) + self._deep_tuple(self.kwargs)
 
   def merge(self, x=None, y=None, ildj=None, kwargs=None, mapping=None):
     """Returns new _Mapping with args merged with self.
@@ -103,9 +103,13 @@ class _Mapping(
     return old
 
   def _deep_tuple(self, x):
-    """Converts lists of lists to tuples of tuples."""
-    return (tuple(map(self._deep_tuple, x)) if isinstance(x,
-                                                          (list, tuple)) else x)
+    """Converts nested `tuple`, `list`, or `dict` to nested `tuple`."""
+    if isinstance(x, dict):
+      return self._deep_tuple(tuple(sorted(x.items())))
+    elif isinstance(x, (list, tuple)):
+      return tuple(map(self._deep_tuple, x))
+
+    return x
 
 
 @six.add_metaclass(abc.ABCMeta)
