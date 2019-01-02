@@ -24,6 +24,7 @@ import tensorflow as tf
 
 from tensorflow_probability.python.bijectors import gumbel as gumbel_bijector
 from tensorflow_probability.python.bijectors import invert as invert_bijector
+from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import distribution_util
@@ -38,7 +39,7 @@ class Gumbel(transformed_distribution.TransformedDistribution):
   The probability density function (pdf) of this distribution is,
 
   ```none
-  pdf(x; mu, sigma) = exp(-(x - mu) / sigma - exp(-(x - mu) / sigma))
+  pdf(x; mu, sigma) = exp(-(x - mu) / sigma - exp(-(x - mu) / sigma)) / sigma
   ```
 
   where `loc = mu` and `scale = sigma`.
@@ -179,3 +180,31 @@ class Gumbel(transformed_distribution.TransformedDistribution):
 
   def _mode(self):
     return self.loc * tf.ones_like(self.scale)
+
+
+@kullback_leibler.RegisterKL(Gumbel, Gumbel)
+def _kl_gumbel_gumbel(a, b, name=None):
+  """Calculate the batched KL divergence KL(a || b) with a and b Gumbel.
+
+  Args:
+    a: instance of a Gumbel distribution object.
+    b: instance of a Gumbel distribution object.
+    name: (optional) Name to use for created operations.
+      default is "kl_gumbel_gumbel".
+
+  Returns:
+    Batchwise KL(a || b)
+  """
+  with tf.name_scope(name, "kl_gumbel_gumbel",
+                     [a.loc, b.loc, a.scale, b.scale]):
+    # Consistent with
+    # http://www.mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 64
+    # The paper uses beta to refer to scale and mu to refer to loc.
+    # There is actually an error in the solution as printed; this is based on
+    # the second-to-last step of the derivation. The value as printed would be
+    # off by (a.loc - b.loc) / b.scale.
+    return (tf.log(b.scale) - tf.log(a.scale)
+            + np.euler_gamma * (a.scale / b.scale - 1.)
+            + tf.expm1((b.loc - a.loc)/b.scale +
+                       tf.lgamma(a.scale / b.scale + 1.))
+            + (a.loc - b.loc) / b.scale)

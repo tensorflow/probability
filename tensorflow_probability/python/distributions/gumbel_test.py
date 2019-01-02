@@ -48,7 +48,7 @@ class _GumbelTest(object):
 
   def testInvalidScale(self):
     scale = [-.01, 0., 2.]
-    with self.assertRaisesOpError("Condition x > 0"):
+    with self.assertRaisesOpError('Condition x > 0'):
       gumbel = tfd.Gumbel(loc=0., scale=scale, validate_args=True)
       self.evaluate(gumbel.scale)
 
@@ -225,6 +225,61 @@ class _GumbelTest(object):
         rtol=.03,
         atol=0)
 
+  def testGumbelGumbelKL(self):
+    a_loc = np.arange(-2.0, 3.0, 1.0)
+    a_scale = np.arange(0.5, 2.5, 0.5)
+    b_loc = 2 * np.arange(-2.0, 3.0, 1.0)
+    b_scale = np.arange(0.5, 2.5, 0.5)
+
+    # This reshape is intended to expand the number of test cases.
+    a_loc = a_loc.reshape((len(a_loc), 1, 1, 1))
+    a_scale = a_scale.reshape((1, len(a_scale), 1, 1))
+    b_loc = b_loc.reshape((1, 1, len(b_loc), 1))
+    b_scale = b_scale.reshape((1, 1, 1, len(b_scale)))
+
+    a = tfd.Gumbel(loc=a_loc, scale=a_scale)
+    b = tfd.Gumbel(loc=b_loc, scale=b_scale)
+
+    true_kl = (np.log(b_scale) - np.log(a_scale)
+               + np.euler_gamma * (a_scale / b_scale - 1.)
+               + np.expm1((b_loc - a_loc) / b_scale
+                          + np.vectorize(np.math.lgamma)(a_scale / b_scale
+                                                         + 1.))
+               + (a_loc - b_loc) / b_scale)
+
+    kl = tfd.kl_divergence(a, b)
+
+    x = a.sample(int(1e5), seed=0)
+    kl_sample = tf.reduce_mean(a.log_prob(x) - b.log_prob(x), axis=0)
+
+    # As noted in the Gumbel-Gumbel KL divergence implementation, there is an
+    # error in the reference paper we use to implement our divergence. This
+    # error is a missing summand, (a.loc - b.loc) / b.scale. To ensure that we
+    # are adequately testing this difference in the below tests, we compute the
+    # relative error between kl_sample_ and kl_ and check that it is "much less"
+    # than this missing summand.
+    summand = (a_loc - b_loc) / b_scale
+    relative_error = (tf.abs(kl - kl_sample) /
+                      tf.minimum(tf.abs(kl), tf.abs(kl_sample)))
+    exists_missing_summand_test = tf.reduce_any(summand > 2 * relative_error)
+    exists_missing_summand_test_ = self.evaluate(exists_missing_summand_test)
+    self.assertTrue(exists_missing_summand_test_,
+                    msg=('No test case exists where (a.loc - b.loc) / b.scale '
+                         'is much less than the relative error between kl as '
+                         'computed in closed form, and kl as computed by '
+                         'sampling. Failing to include such a test case makes '
+                         'it difficult to detect regressions where this '
+                         'summand (which is missing in our reference paper) '
+                         'is omitted.'))
+
+    kl_, kl_sample_ = self.evaluate([kl, kl_sample])
+    self.assertAllClose(true_kl, kl_, atol=0.0, rtol=1e-12)
+    self.assertAllClose(true_kl, kl_sample_, atol=0.0, rtol=1e-1)
+
+    zero_kl = tfd.kl_divergence(a, a)
+    true_zero_kl_, zero_kl_ = self.evaluate([tf.zeros_like(zero_kl), zero_kl])
+    self.assertAllEqual(true_zero_kl_, zero_kl_)
+
 
 @tfe.run_all_tests_in_graph_and_eager_modes
 class GumbelTestStaticShape(test_case.TestCase, _GumbelTest):
@@ -244,5 +299,5 @@ class GumbelTestDynamicShape(test_case.TestCase, _GumbelTest):
   _use_static_shape = False
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()
