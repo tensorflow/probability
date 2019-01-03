@@ -35,8 +35,9 @@ __all__ = [
 
 # Cause all warnings to always be triggered.
 # Not having this means subsequent calls wont trigger the warning.
-warnings.simplefilter('always')
-
+warnings.filterwarnings('always',
+                        module='tensorflow_probability.*metropolis_hastings',
+                        append=True)  # Don't override user-set filters.
 
 MetropolisHastingsKernelResults = collections.namedtuple(
     'MetropolisHastingsKernelResults',

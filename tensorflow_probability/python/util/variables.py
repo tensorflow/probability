@@ -29,7 +29,9 @@ __all__ = [
 
 # Cause all warnings to always be triggered.
 # Not having this means subsequent calls wont trigger the warning.
-warnings.simplefilter("always")
+warnings.filterwarnings("always",
+                        module="tensorflow_probability.*variables",
+                        append=True)  # Don't override user-set filters.
 
 
 def externalize_variables_as_args(fn,
