@@ -115,8 +115,8 @@ class DistributionLambda(tf.keras.layers.Lambda):
 
     Args:
       make_distribution_fn: Python `callable` that takes previous layer outputs
-        and returns a `tfp.Distribution` instance.
-      convert_to_tensor_fn: Python `callable` that takes a `tfp.Distribution`
+        and returns a `tfd.Distribution` instance.
+      convert_to_tensor_fn: Python `callable` that takes a `tfd.Distribution`
         instance and returns a `tf.Tensor`-like object. For examples, see
         `class` docstring.
         Default value: `tfd.Distribution.sample`.
@@ -239,7 +239,7 @@ class MultivariateNormalTriL(DistributionLambda):
     Args:
       event_size: Scalar `int` representing the size of single draw from this
         distribution.
-      convert_to_tensor_fn: Python `callable` that takes a `tfp.Distribution`
+      convert_to_tensor_fn: Python `callable` that takes a `tfd.Distribution`
         instance and returns a `tf.Tensor`-like object. For examples, see
         `class` docstring.
         Default value: `tfd.Distribution.sample`.
@@ -339,7 +339,7 @@ class OneHotCategorical(DistributionLambda):
     Args:
       event_size: Scalar `int` representing the size of single draw from this
         distribution.
-      convert_to_tensor_fn: Python `callable` that takes a `tfp.Distribution`
+      convert_to_tensor_fn: Python `callable` that takes a `tfd.Distribution`
         instance and returns a `tf.Tensor`-like object. For examples, see
         `class` docstring.
         Default value: `tfd.Distribution.sample`.
@@ -443,7 +443,7 @@ class CategoricalMixtureOfOneHotCategorical(DistributionLambda):
       num_components: Scalar `int` representing the number of mixture
         components. Must be at least 1. (If `num_components=1`, it's more
         efficient to use the `OneHotCategorical` layer.)
-      convert_to_tensor_fn: Python `callable` that takes a `tfp.Distribution`
+      convert_to_tensor_fn: Python `callable` that takes a `tfd.Distribution`
         instance and returns a `tf.Tensor`-like object. For examples, see
         `class` docstring.
         Default value: `tfd.Distribution.sample`.
@@ -566,7 +566,7 @@ class IndependentBernoulli(DistributionLambda):
     Args:
       event_shape: `int` vector representing the size of single draw from this
         distribution.
-      convert_to_tensor_fn: Python `callable` that takes a `tfp.Distribution`
+      convert_to_tensor_fn: Python `callable` that takes a `tfd.Distribution`
         instance and returns a `tf.Tensor`-like object. For examples, see
         `class` docstring.
         Default value: `tfd.Distribution.sample`.
@@ -664,7 +664,7 @@ class IndependentNormal(DistributionLambda):
     Args:
       event_shape: `int` vector representing the shape of single draw from this
         distribution.
-      convert_to_tensor_fn: Python `callable` that takes a `tfp.Distribution`
+      convert_to_tensor_fn: Python `callable` that takes a `tfd.Distribution`
         instance and returns a `tf.Tensor`-like object.
         Default value: `tfd.Distribution.sample`.
       validate_args: Python `bool`, default `False`. When `True` distribution
