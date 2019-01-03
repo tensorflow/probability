@@ -31,7 +31,7 @@ tfe = tf.contrib.eager
 tfl = tf.linalg
 
 
-class _AdditiveStateSpaceModelTest(object):
+class _AdditiveStateSpaceModelTest(tf.test.TestCase):
 
   def test_identity(self):
 
@@ -290,7 +290,7 @@ class _AdditiveStateSpaceModelTest(object):
     # Both additive SSMs define the same model, so they should give the same
     # log_probs.
     y = self.evaluate(broadcast_additive_ssm.sample(seed=42))
-    self.assertAllEqual(self.evaluate(broadcast_additive_ssm.log_prob(y)),
+    self.assertAllClose(self.evaluate(broadcast_additive_ssm.log_prob(y)),
                         self.evaluate(manual_additive_ssm.log_prob(y)))
 
   def test_mismatched_observation_size_error(self):
@@ -359,14 +359,12 @@ class _AdditiveStateSpaceModelTest(object):
 
 
 @tfe.run_all_tests_in_graph_and_eager_modes
-class AdditiveStateSpaceModelTestStaticShape32(
-    tf.test.TestCase, _AdditiveStateSpaceModelTest):
+class AdditiveStateSpaceModelTestStaticShape32(_AdditiveStateSpaceModelTest):
   dtype = np.float32
   use_static_shape = True
 
 
-class AdditiveStateSpaceModelTestDynamicShape32(
-    tf.test.TestCase, _AdditiveStateSpaceModelTest):
+class AdditiveStateSpaceModelTestDynamicShape32(_AdditiveStateSpaceModelTest):
   dtype = np.float32
   use_static_shape = False
 
@@ -390,10 +388,11 @@ class AdditiveStateSpaceModelTestDynamicShape32(
 
 
 @tfe.run_all_tests_in_graph_and_eager_modes
-class AdditiveStateSpaceModelTestStaticShape64(
-    tf.test.TestCase, _AdditiveStateSpaceModelTest):
+class AdditiveStateSpaceModelTestStaticShape64(_AdditiveStateSpaceModelTest):
   dtype = np.float64
   use_static_shape = True
+
+del _AdditiveStateSpaceModelTest  # Don't run tests for the base class.
 
 if __name__ == '__main__':
   tf.test.main()
