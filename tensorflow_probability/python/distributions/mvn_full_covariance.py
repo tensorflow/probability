@@ -99,7 +99,7 @@ class MultivariateNormalFullCovariance(mvn_tril.MultivariateNormalTriL):
   covariance_matrix = ...  # shape: [2, 3, 3], symmetric, positive definite.
   mvn = tfd.MultivariateNormalFullCovariance(
       loc=mu,
-      covariance=covariance_matrix)
+      covariance_matrix=covariance_matrix)
 
   # Compute the pdf of two `R^3` observations; return a length-2 vector.
   x = [[-0.9, 0, 0.1],
