@@ -342,6 +342,10 @@ class DenseReparameterization(_DenseVariational):
   per epoch (e.g. if `kl` is the sum of `losses` for each element of the batch,
   you should pass `kl / num_examples_per_epoch` to your optimizer).
 
+  You can access the `kernel` and/or `bias` posterior and prior distributions
+  after the layer is built via the `kernel_posterior`, `kernel_prior`,
+  `bias_posterior` and `bias_prior` properties.
+
   #### Examples
 
   We illustrate a Bayesian neural network with [variational inference](
@@ -457,6 +461,10 @@ class DenseLocalReparameterization(_DenseVariational):
   optimization, make sure to scale this loss such that it is applied just once
   per epoch (e.g. if `kl` is the sum of `losses` for each element of the batch,
   you should pass `kl / num_examples_per_epoch` to your optimizer).
+
+  You can access the `kernel` and/or `bias` posterior and prior distributions
+  after the layer is built via the `kernel_posterior`, `kernel_prior`,
+  `bias_posterior` and `bias_prior` properties.
 
   #### Examples
 
