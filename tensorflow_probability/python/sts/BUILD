@@ -31,6 +31,7 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         ":fitting",
+        ":forecast",
         ":local_linear_trend",
         ":regression",
         ":seasonal",
@@ -57,6 +58,29 @@ py_test(
     shard_count = 6,
     deps = [
         # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "forecast",
+    srcs = ["forecast.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/sts/internal",
+    ],
+)
+
+py_test(
+    name = "forecast_test",
+    size = "large",
+    srcs = ["forecast_test.py"],
+    shard_count = 6,
+    deps = [
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
