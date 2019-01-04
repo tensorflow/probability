@@ -1074,9 +1074,11 @@ class _ConvFlipout(_ConvVariational):
         inputs, self.kernel_posterior.distribution.loc)
 
     input_shape = tf.shape(inputs)
-    output_shape = tf.shape(outputs)
     batch_shape = tf.expand_dims(input_shape[0], 0)
-    channels = input_shape[-1]
+    if self.data_format == 'channels_first':
+      channels = input_shape[1]
+    else:
+      channels = input_shape[-1]
 
     seed_stream = tfd.SeedStream(self.seed, salt='ConvFlipout')
 
@@ -1090,16 +1092,15 @@ class _ConvFlipout(_ConvVariational):
                    tf.expand_dims(self.filters, 0)], 0),
         dtype=inputs.dtype,
         seed=seed_stream())
-    for _ in range(self.rank):
-      sign_input = tf.expand_dims(sign_input, 1)  # 2D ex: (B, 1, 1, C)
-      sign_output = tf.expand_dims(sign_output, 1)
 
-    sign_input = tf.tile(  # tile for element-wise op broadcasting
-        sign_input,
-        [1] + [input_shape[i + 1] for i in range(self.rank)] + [1])
-    sign_output = tf.tile(
-        sign_output,
-        [1] + [output_shape[i + 1] for i in range(self.rank)] + [1])
+    if self.data_format == 'channels_first':
+      for _ in range(self.rank):
+        sign_input = tf.expand_dims(sign_input, -1)  # 2D ex: (B, C, 1, 1)
+        sign_output = tf.expand_dims(sign_output, -1)
+    else:
+      for _ in range(self.rank):
+        sign_input = tf.expand_dims(sign_input, 1)  # 2D ex: (B, 1, 1, C)
+        sign_output = tf.expand_dims(sign_output, 1)
 
     perturbed_inputs = self._convolution_op(
         inputs * sign_input, self.kernel_posterior_affine_tensor) * sign_output
