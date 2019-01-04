@@ -26,6 +26,7 @@ from tensorflow_probability.python.distributions.beta import Beta
 from tensorflow_probability.python.distributions.binomial import Binomial
 from tensorflow_probability.python.distributions.categorical import Categorical
 from tensorflow_probability.python.distributions.cauchy import Cauchy
+from tensorflow_probability.python.distributions.chi import Chi
 from tensorflow_probability.python.distributions.chi2 import Chi2
 from tensorflow_probability.python.distributions.chi2 import Chi2WithAbsDf
 from tensorflow_probability.python.distributions.conditional_distribution import ConditionalDistribution
@@ -141,6 +142,7 @@ __all__ = [
     'Binomial',
     'BetaWithSoftplusConcentration',
     'Categorical',
+    'Chi',
     'Chi2',
     'Chi2WithAbsDf',
     'Deterministic',

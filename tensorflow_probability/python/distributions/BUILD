@@ -37,6 +37,7 @@ py_library(
         ":binomial",
         ":categorical",
         ":cauchy",
+        ":chi",
         ":chi2",
         ":conditional_distribution",
         ":conditional_transformed_distribution",
@@ -187,6 +188,21 @@ py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
+    ],
+)
+
+py_library(
+    name = "chi",
+    srcs = ["chi.py"],
+    deps = [
+        ":chi2",
+        ":kullback_leibler",
+        ":transformed_distribution",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:invert",
+        "//tensorflow_probability/python/bijectors:square",
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -1104,6 +1120,17 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_case",
+    ],
+)
+
+py_test(
+    name = "chi_test",
+    srcs = ["chi_test.py"],
+    deps = [
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
     ],
 )
 
