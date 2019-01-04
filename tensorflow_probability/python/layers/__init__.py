@@ -33,6 +33,7 @@ from tensorflow_probability.python.layers.distribution_layer import IndependentB
 from tensorflow_probability.python.layers.distribution_layer import IndependentNormal
 from tensorflow_probability.python.layers.distribution_layer import KLDivergenceAddLoss
 from tensorflow_probability.python.layers.distribution_layer import KLDivergenceRegularizer
+from tensorflow_probability.python.layers.distribution_layer import MixtureSameFamily
 from tensorflow_probability.python.layers.distribution_layer import MultivariateNormalTriL
 from tensorflow_probability.python.layers.distribution_layer import OneHotCategorical
 from tensorflow_probability.python.layers.util import default_loc_scale_fn
@@ -55,6 +56,7 @@ _allowed_symbols = [
     'IndependentNormal',
     'KLDivergenceAddLoss',
     'KLDivergenceRegularizer',
+    'MixtureSameFamily',
     'MultivariateNormalTriL',
     'OneHotCategorical',
     'default_loc_scale_fn',

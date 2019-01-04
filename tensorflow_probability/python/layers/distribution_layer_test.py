@@ -695,5 +695,113 @@ class IndependentNormalTestStaticShape(tf.test.TestCase,
     self.assertEqual((1, 2), self.evaluate(out).shape)
 
 
+@tfe.run_all_tests_in_graph_and_eager_modes
+class _MixtureSameFamilyTest(object):
+
+  def _build_tensor(self, ndarray, dtype=None):
+    # Enforce parameterized dtype and static/dynamic testing.
+    ndarray = np.asarray(ndarray).astype(
+        dtype if dtype is not None else self.dtype)
+    return tf.placeholder_with_default(
+        input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
+
+  def _check_distribution(self, t, x, batch_shape):
+    self.assertIsInstance(x, tfd.MixtureSameFamily)
+    self.assertIsInstance(x.mixture_distribution, tfd.Categorical)
+    self.assertIsInstance(x.components_distribution, tfd.MultivariateNormalTriL)
+
+    shape = tf.concat([batch_shape, [-1]], axis=0)
+    batch_and_n_shape = tf.concat(
+        [tf.shape(x.mixture_distribution.logits), [-1]], axis=0)
+    cd = x.components_distribution
+    t_back = tf.concat([
+        x.mixture_distribution.logits,
+        tf.reshape(tf.concat([
+            tf.reshape(cd.loc, batch_and_n_shape),
+            tf.reshape(tfb.ScaleTriL().inverse(cd.scale.to_dense()),
+                       batch_and_n_shape),
+        ], axis=-1), shape),
+    ], axis=-1)
+    [t_, t_back_] = self.evaluate([t, t_back])
+    self.assertAllClose(t_, t_back_, atol=1e-6, rtol=1e-5)
+
+  def test_new(self):
+    n = self._build_tensor(4, dtype=np.int32)
+    batch_shape = self._build_tensor([4, 2], dtype=np.int32)
+    event_size = self._build_tensor(3, dtype=np.int32)
+    low = self._build_tensor(-3.)
+    high = self._build_tensor(3.)
+    cps = tfpl.MultivariateNormalTriL.params_size(event_size)
+    p = tfpl.MixtureSameFamily.params_size(n, cps)
+
+    t = tfd.Uniform(low, high).sample(tf.concat([batch_shape, [p]], 0), seed=42)
+    normal = tfpl.MultivariateNormalTriL(event_size, validate_args=True)
+    x = tfpl.MixtureSameFamily.new(t, n, normal, validate_args=True)
+    self._check_distribution(t, x, batch_shape)
+
+  def test_layer(self):
+    n = self._build_tensor(3, dtype=np.int32)
+    batch_shape = self._build_tensor([7, 3], dtype=np.int32)
+    event_size = self._build_tensor(4, dtype=np.int32)
+    low = self._build_tensor(-3.)
+    high = self._build_tensor(3.)
+    cps = tfpl.MultivariateNormalTriL.params_size(event_size)
+    p = tfpl.MixtureSameFamily.params_size(n, cps)
+
+    normal = tfpl.MultivariateNormalTriL(event_size, validate_args=True)
+    layer = tfpl.MixtureSameFamily(n, normal, validate_args=True)
+    t = tfd.Uniform(low, high).sample(tf.concat([batch_shape, [p]], 0), seed=42)
+    x = layer(t)
+    self._check_distribution(t, x, batch_shape)
+
+  def test_doc_string(self):
+    # Load data (graph of a cardioid).
+    n = 2000
+    t = tfd.Uniform(low=-np.pi, high=np.pi).sample([n, 1])
+    r = 2 * (1 - tf.cos(t))
+    x = r * tf.sin(t) + tfd.Normal(loc=0., scale=0.1).sample([n, 1])
+    y = r * tf.cos(t) + tfd.Normal(loc=0., scale=0.1).sample([n, 1])
+
+    # Model the distribution of y given x with a Mixture Density Network.
+    event_shape = self._build_tensor([1], dtype=np.int32)
+    num_components = self._build_tensor(5, dtype=np.int32)
+    params_size = tfpl.MixtureSameFamily.params_size(
+        num_components, tfpl.IndependentNormal.params_size(event_shape))
+    model = tfk.Sequential([
+        tfkl.Dense(12, activation='relu'),
+        # NOTE: We must hard-code 15 below, instead of using `params_size`,
+        # because the first argument to `tfkl.Dense` must be an integer (and
+        # not, e.g., a placeholder tensor).
+        tfkl.Dense(15, activation=None),
+        tfpl.MixtureSameFamily(num_components,
+                               tfpl.IndependentNormal(event_shape)),
+    ])
+
+    # Fit.
+    batch_size = 100
+    model.compile(optimizer=tf.train.AdamOptimizer(learning_rate=0.02),
+                  loss=lambda y, model: -model.log_prob(y))
+    model.fit(x, y,
+              batch_size=batch_size,
+              epochs=1,
+              steps_per_epoch=n // batch_size)
+
+    self.assertEqual(15, self.evaluate(tf.convert_to_tensor(params_size)))
+
+
+@tfe.run_all_tests_in_graph_and_eager_modes
+class MixtureSameFamilyTestDynamicShape(tf.test.TestCase,
+                                        _MixtureSameFamilyTest):
+  dtype = np.float32
+  use_static_shape = False
+
+
+@tfe.run_all_tests_in_graph_and_eager_modes
+class MixtureSameFamilyTestStaticShape(tf.test.TestCase,
+                                       _MixtureSameFamilyTest):
+  dtype = np.float32
+  use_static_shape = True
+
+
 if __name__ == '__main__':
   tf.test.main()

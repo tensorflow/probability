@@ -28,6 +28,7 @@ import tensorflow as tf
 # `tfd.Distribution`. We import `bijectors` the same way, for consistency.
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.layers.internal import distribution_tensor_coercible as dtc
 from tensorflow.python.keras.utils import tf_utils as keras_tf_utils
 
@@ -39,6 +40,7 @@ __all__ = [
     'IndependentNormal',
     'KLDivergenceAddLoss',
     'KLDivergenceRegularizer',
+    'MixtureSameFamily',
     'MultivariateNormalTriL',
     'OneHotCategorical',
 ]
@@ -912,3 +914,131 @@ def _make_kl_divergence_fn(
       return tf.reduce_mean(kl)
 
   return _fn
+
+
+class MixtureSameFamily(DistributionLambda):
+  """A mixture (same-family) Keras layer.
+
+  ### Example
+
+  ```python
+  tfd = tfp.distributions
+  tfpl = tfp.layers
+  tfk = tf.keras
+  tfkl = tf.keras.layers
+
+  # Load data -- graph of a [cardioid](https://en.wikipedia.org/wiki/Cardioid).
+  n = 2000
+  t = tfd.Uniform(low=-np.pi, high=np.pi).sample([n, 1]))
+  r = 2 * (1 - tf.cos(t))
+  x = r * tf.sin(t) + tfd.Normal(loc=0., scale=0.1).sample([n, 1])
+  y = r * tf.cos(t) + tfd.Normal(loc=0., scale=0.1).sample([n, 1])
+
+  # Model the distribution of y given x with a Mixture Density Network.
+  event_shape = [1]
+  num_components = 5
+  params_size = tfpl.MixtureSameFamily.params_size(
+      num_components,
+      component_params_size=tfpl.IndependentNormal.params_size(event_shape))
+  model = tfk.Sequential([
+    tfkl.Dense(12, activation='relu'),
+    tfkl.Dense(params_size, activation=None),
+    tfpl.MixtureSameFamily(num_components, tfpl.IndependentNormal(event_shape)),
+  ])
+
+  # Fit.
+  batch_size = 100
+  model.compile(optimizer=tf.train.AdamOptimizer(learning_rate=0.02),
+                loss=lambda y, model: -model.log_prob(y))
+  model.fit(x, y,
+            batch_size=batch_size,
+            epochs=20,
+            steps_per_epoch=n // batch_size)
+  ```
+
+
+  """
+
+  def __init__(self,
+               num_components,
+               component_layer,
+               convert_to_tensor_fn=tfd.Distribution.sample,
+               validate_args=False,
+               **kwargs):
+    """Initialize the `MixtureSameFamily` distribution layer.
+
+    Args:
+      num_components: Number of component distributions in the mixture
+        distribution.
+      component_layer: Python `callable` that, given a tensor of shape
+        `batch_shape + [num_components, component_params_size]`, returns a
+        `tfd.Distribution`-like instance that implements the component
+        distribution (with batch shape `batch_shape + [num_components]`) --
+        e.g., a TFP distribution layer.
+      convert_to_tensor_fn: Python `callable` that takes a `tfd.Distribution`
+        instance and returns a `tf.Tensor`-like object.
+        Default value: `tfd.Distribution.sample`.
+      validate_args: Python `bool`, default `False`. When `True` distribution
+        parameters are checked for validity despite possibly degrading runtime
+        performance. When `False` invalid inputs may silently render incorrect
+        outputs.
+        Default value: `False`.
+      **kwargs: Additional keyword arguments passed to `tf.keras.Layer`.
+    """
+    super(MixtureSameFamily, self).__init__(
+        lambda t: type(self).new(  # pylint: disable=g-long-lambda
+            t, num_components, component_layer, validate_args),
+        convert_to_tensor_fn,
+        **kwargs)
+
+  @staticmethod
+  def new(params, num_components, component_layer,
+          validate_args=False, name=None, **kwargs):
+    """Create the distribution instance from a `params` vector."""
+    with tf.name_scope(name, 'MixtureSameFamily',
+                       [params, num_components, component_layer]):
+      params = tf.convert_to_tensor(params, name='params')
+      num_components = tf.convert_to_tensor(
+          num_components, name='num_components', preferred_dtype=tf.int32)
+
+      components_dist = component_layer(tf.reshape(
+          params[..., num_components:],
+          tf.concat([tf.shape(params)[:-1], [num_components, -1]], axis=0)))
+      mixture_dist = tfd.Categorical(logits=params[..., :num_components])
+      return tfd.MixtureSameFamily(
+          mixture_dist,
+          components_dist,
+          # TODO(b/120154797): Change following to `validate_args=True` after
+          # fixing: "ValueError: `mixture_distribution` must have scalar
+          # `event_dim`s." assertion in MixtureSameFamily.
+          validate_args=False,
+          **kwargs)
+
+  @staticmethod
+  def params_size(num_components, component_params_size, name=None):
+    """Number of `params` needed to create a `MixtureSameFamily` distribution.
+
+    Arguments:
+      num_components: Number of component distributions in the mixture
+        distribution.
+      component_params_size: Number of parameters needed to create a single
+        component distribution.
+      name: The name to use for the op to compute the number of parameters
+        (if such an op needs to be created).
+
+    Returns:
+     params_size: The number of parameters needed to create the mixture
+       distribution.
+    """
+    with tf.name_scope(name, 'MixtureSameFamily_params_size',
+                       [num_components, component_params_size]):
+      num_components = tf.convert_to_tensor(
+          num_components, name='num_components', preferred_dtype=tf.int32)
+      component_params_size = tf.convert_to_tensor(
+          component_params_size, name='component_params_size')
+
+      num_components = dist_util.prefer_static_value(num_components)
+      component_params_size = dist_util.prefer_static_value(
+          component_params_size)
+
+      return num_components + num_components * component_params_size
