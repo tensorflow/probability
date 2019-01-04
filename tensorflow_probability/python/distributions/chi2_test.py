@@ -20,6 +20,7 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
+from scipy import special
 from scipy import stats
 import tensorflow as tf
 import tensorflow_probability as tfp
@@ -100,19 +101,17 @@ class Chi2Test(tf.test.TestCase):
 
     # Consistent with
     # http://www.mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 110
-    # Evaluating this in numpy is complicated by the fact that there is no
-    # native implementation of the digamma function.
-    true_kl = (tf.lgamma(b_df / 2.0) - tf.lgamma(a_df / 2.0) +
-               (a_df - b_df) / 2.0 * tf.digamma(a_df / 2.0))
+    true_kl = (special.gammaln(b_df / 2.0) - special.gammaln(a_df / 2.0) +
+               (a_df - b_df) / 2.0 * special.digamma(a_df / 2.0))
 
     kl = tfd.kl_divergence(a, b)
 
     x = a.sample(int(1e5), seed=0)
     kl_sample = tf.reduce_mean(a.log_prob(x) - b.log_prob(x), axis=0)
 
-    true_kl_, kl_, kl_sample_ = self.evaluate([true_kl, kl, kl_sample])
-    self.assertAllClose(true_kl_, kl_, atol=0., rtol=1e-14)
-    self.assertAllClose(true_kl_, kl_sample_, atol=0., rtol=5e-2)
+    kl_, kl_sample_ = self.evaluate([kl, kl_sample])
+    self.assertAllClose(true_kl, kl_, atol=0., rtol=5e-13)
+    self.assertAllClose(true_kl, kl_sample_, atol=0., rtol=5e-2)
 
     zero_kl = tfd.kl_divergence(a, a)
     true_zero_kl_, zero_kl_ = self.evaluate([tf.zeros_like(zero_kl), zero_kl])

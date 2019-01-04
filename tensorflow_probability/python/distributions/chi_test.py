@@ -20,9 +20,8 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
+from scipy import special
 from scipy import stats
-from scipy.special import digamma as scipy_digamma
-from scipy.special import gammaln as scipy_gammaln
 import tensorflow as tf
 import tensorflow_probability as tfp
 
@@ -99,8 +98,8 @@ class ChiTest(tf.test.TestCase):
     a = tfd.Chi(df=a_df)
     b = tfd.Chi(df=b_df)
 
-    true_kl = (0.5 * scipy_digamma(0.5 * a_df) * (a_df - b_df) +
-               scipy_gammaln(0.5 * b_df) - scipy_gammaln(0.5 * a_df))
+    true_kl = (0.5 * special.digamma(0.5 * a_df) * (a_df - b_df) +
+               special.gammaln(0.5 * b_df) - special.gammaln(0.5 * a_df))
 
     kl = tfd.kl_divergence(a, b)
 
