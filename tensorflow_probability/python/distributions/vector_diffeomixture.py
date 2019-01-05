@@ -785,10 +785,11 @@ def maybe_check_quadrature_param(param, name, validate_args):
 
     # TODO(jvdillon): Remove once we support k-mixtures.
     if param.shape.with_rank_at_least(1)[-1] is not None:
-      if param.shape[-1].value != 1:
+      if tf.dimension_value(param.shape[-1]) != 1:
         raise NotImplementedError("Currently only bimixtures are supported; "
                                   "{}.shape[-1]={} is not 1.".format(
-                                      name, param.shape[-1].value))
+                                      name,
+                                      tf.dimension_value(param.shape[-1])))
     elif validate_args:
       assertions.append(
           tf.assert_equal(

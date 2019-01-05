@@ -207,7 +207,7 @@ class MultivariateNormalTriL(DistributionLambda):
   y = tf.matmul(x, scale_tril) + eps
 
   # Create model.
-  d = y.shape[-1].value
+  d = tf.dimension_value(y.shape[-1])
   model = tfk.Sequential([
       tfkl.Dense(tfpl.MultivariateNormalTriL.params_size(d)),
       tfpl.MultivariateNormalTriL(d),
@@ -305,7 +305,7 @@ class OneHotCategorical(DistributionLambda):
       dtype=tf.float32).sample()
 
   # Create model.
-  d = y.shape[-1].value
+  d = tf.dimension_value(y.shape[-1])
   model = tfk.Sequential([
       tfk.layers.Dense(tfpl.OneHotCategorical.params_size(d) - 1),
       tfk.layers.Lambda(lambda x: tf.pad(x, paddings=[[0, 0], [1, 0]])),
@@ -408,7 +408,7 @@ class CategoricalMixtureOfOneHotCategorical(DistributionLambda):
       dtype=tf.float32).sample()
 
   # Create model.
-  d = y.shape[-1].value
+  d = tf.dimension_value(y.shape[-1])
   k = 2
   model = tfk.Sequential([
       tfkl.Dense(tfpl.CategoricalMixtureOfOneHotCategorical.params_size(d, k)),

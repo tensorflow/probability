@@ -558,10 +558,10 @@ class GaussianProcessRegressionModel(
       return True
     ndims = self.kernel.feature_ndims
     if (self.observation_index_points.shape[-ndims:].is_fully_defined() and
-        self.observation_index_points.shape[-ndims].value == 0):
+        tf.dimension_value(self.observation_index_points.shape[-ndims]) == 0):
       return True
     if (self.observations.shape[-ndims:].is_fully_defined() and
-        self.observations.shape[-ndims].value == 0):
+        tf.dimension_value(self.observations.shape[-ndims]) == 0):
       return True
     return False
 

@@ -617,8 +617,8 @@ def calculate_linear_predictor(model_matrix, model_coefficients, offset=None,
 
 def num_cols(x):
   """Returns number of cols in a given `Tensor`."""
-  if x.shape.ndims is not None and x.shape[-1].value is not None:
-    return x.shape[-1].value
+  if tf.dimension_value(x.shape[-1]) is not None:
+    return tf.dimension_value(x.shape[-1])
   return tf.shape(x)[-1]
 
 

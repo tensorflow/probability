@@ -343,7 +343,7 @@ class MultivariateNormalTriLTest(tf.test.TestCase):
     true_bias = np.array([0, 0, np.log(scale_noise), 0, np.log(scale_noise)])
 
     # Create model.
-    d = y.shape[-1].value
+    d = tf.dimension_value(y.shape[-1])
     model = tf.keras.Sequential([
         tf.keras.layers.Dense(
             tfpl.MultivariateNormalTriL.params_size(d),
@@ -404,7 +404,7 @@ class OneHotCategoricalTest(tf.test.TestCase):
         dtype=tf.float32).sample()
 
     # Create model.
-    d = y.shape[-1].value
+    d = tf.dimension_value(y.shape[-1])
     model = tf.keras.Sequential([
         tf.keras.layers.Dense(tfpl.OneHotCategorical.params_size(d) - 1),
         tf.keras.layers.Lambda(_vec_pad),
@@ -480,7 +480,7 @@ class CategoricalMixtureOfOneHotCategoricalTest(tf.test.TestCase):
         dtype=tf.float32).sample()
 
     # Create model.
-    d = y.shape[-1].value
+    d = tf.dimension_value(y.shape[-1])
     k = 2
     p = tfpl.CategoricalMixtureOfOneHotCategorical.params_size(d, k)
     model = tf.keras.Sequential([

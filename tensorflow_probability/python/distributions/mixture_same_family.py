@@ -135,7 +135,7 @@ class MixtureSameFamily(distribution.Distribution):
 
       s = components_distribution.event_shape_tensor()
       if s.shape.with_rank_at_least(1)[0].value is not None:
-        self._event_ndims = s.shape[0].value
+        self._event_ndims = tf.dimension_value(s.shape[0])
       else:
         self._event_ndims = tf.shape(s)[0]
 

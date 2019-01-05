@@ -95,7 +95,7 @@ def pad_batch_dimension_for_multiple_chains(observed_time_series,
         chain_batch_shape))
   if chain_batch_shape.shape.ndims == 0:  # expand int `k` to `[k]`.
     chain_batch_shape = chain_batch_shape[tf.newaxis]
-  chain_batch_ndims = chain_batch_shape.shape[0].value
+  chain_batch_ndims = tf.dimension_value(chain_batch_shape.shape[0])
 
   for _ in range(chain_batch_ndims):
     observed_time_series = tf.expand_dims(

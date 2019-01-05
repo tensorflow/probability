@@ -122,8 +122,8 @@ def pinv(a, rcond=None, validate_args=False, name=None):
 
     if rcond is None:
       def get_dim_size(dim):
-        if a.shape.ndims is not None and a.shape[dim].value is not None:
-          return a.shape[dim].value
+        if tf.dimension_value(a.shape[dim]) is not None:
+          return tf.dimension_value(a.shape[dim])
         return tf.shape(a)[dim]
       num_rows = get_dim_size(-2)
       num_cols = get_dim_size(-1)

@@ -1224,8 +1224,7 @@ class Distribution(_BaseDistribution):
     if static_shape.ndims is not None:
       return static_shape.ndims == 0
     shape = dynamic_shape_fn()
-    if (shape.shape.ndims is not None and
-        shape.shape[0].value is not None):
+    if tf.dimension_value(shape.shape[0]) is not None:
       # If the static_shape is correctly written then we should never execute
       # this branch. We keep it just in case there's some unimagined corner
       # case.

@@ -69,7 +69,7 @@ class SampleChainTest(tf.test.TestCase):
           parallel_iterations=1)
       self.assertAllEqual(dict(target_calls=2), counter)
       states = tf.stack(states, axis=-1)
-      self.assertEqual(num_results, states.shape[0].value)
+      self.assertEqual(num_results, tf.dimension_value(states.shape[0]))
       sample_mean = tf.reduce_mean(states, axis=0)
       x = states - sample_mean
       sample_cov = tf.matmul(x, x, transpose_a=True) / dtype(num_results)

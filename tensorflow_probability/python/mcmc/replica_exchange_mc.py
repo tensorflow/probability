@@ -269,7 +269,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
     self._parameters = dict(
         target_log_prob_fn=target_log_prob_fn,
         inverse_temperatures=inverse_temperatures,
-        num_replica=inverse_temperatures.shape[0].value,
+        num_replica=tf.dimension_value(inverse_temperatures.shape[0]),
         exchange_proposed_fn=exchange_proposed_fn,
         seed=seed,
         name=name)

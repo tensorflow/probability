@@ -997,7 +997,7 @@ def linear_gaussian_update(
 
   # If observations are scalar, we can avoid some matrix ops.
   observation_size_is_static_and_scalar = (
-      observation_matrix.shape[-2].value == 1)
+      tf.dimension_value(observation_matrix.shape[-2]) == 1)
 
   # Push the predicted mean for the latent state through the
   # observation model

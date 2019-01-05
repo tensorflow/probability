@@ -185,10 +185,10 @@ def _sparse_or_dense_matmul_onehot(sparse_or_dense_matrix, col_index):
 
 def _one_hot_like(x, indices, on_value=None):
   output_dtype = x.dtype.base_dtype
-  if (x.shape.ndims is None or x.shape[-1].value is None):
+  if tf.dimension_value(x.shape[-1]) is None:
     depth = tf.shape(x)[-1]
   else:
-    depth = x.shape[-1].value
+    depth = tf.dimension_value(x.shape[-1])
   if on_value is not None:
     on_value = tf.cast(on_value, output_dtype)
   return tf.one_hot(indices, depth=depth, on_value=on_value, dtype=output_dtype)

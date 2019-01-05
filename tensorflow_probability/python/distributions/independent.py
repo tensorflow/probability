@@ -152,7 +152,7 @@ class Independent(distribution_lib.Distribution):
     with tf.control_dependencies(self._runtime_assertions):
       batch_shape = self.distribution.batch_shape_tensor()
       batch_ndims = (
-          batch_shape.shape[0].value
+          tf.dimension_value(batch_shape.shape[0])  # pylint: disable=g-long-ternary
           if batch_shape.shape.with_rank_at_least(1)[0].value else
           tf.shape(batch_shape)[0])
       return batch_shape[:batch_ndims - self.reinterpreted_batch_ndims]
@@ -169,9 +169,9 @@ class Independent(distribution_lib.Distribution):
     with tf.control_dependencies(self._runtime_assertions):
       batch_shape = self.distribution.batch_shape_tensor()
       batch_ndims = (
-          batch_shape.shape[0].value
-          if batch_shape.shape.with_rank_at_least(1)[0].value else
-          tf.shape(batch_shape)[0])
+          tf.dimension_value(batch_shape.shape[0])  # pylint: disable=g-long-ternary
+          if tf.dimension_value(batch_shape.shape.with_rank_at_least(1)[0])
+          else tf.shape(batch_shape)[0])
       return tf.concat(
           [
               batch_shape[batch_ndims - self.reinterpreted_batch_ndims:],
@@ -238,9 +238,10 @@ class Independent(distribution_lib.Distribution):
     elif validate_args:
       batch_shape = distribution.batch_shape_tensor()
       batch_ndims = (
-          batch_shape.shape[0].value
-          if batch_shape.shape.with_rank_at_least(1)[0].value is not None else
-          tf.shape(batch_shape)[0])
+          tf.dimension_value(batch_shape.shape[0])  # pylint: disable=g-long-ternary
+          if (tf.dimension_value(batch_shape.shape.with_rank_at_least(1)[0])
+              is not None)
+          else tf.shape(batch_shape)[0])
       assertions.append(
           tf.assert_less_equal(
               reinterpreted_batch_ndims,

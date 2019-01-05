@@ -169,7 +169,7 @@ class LinearRegression(StructuralTimeSeries):
                                  name='design_matrix'),
             name='design_matrix_linop')
 
-      if design_matrix.shape[-1].value is not None:
+      if tf.dimension_value(design_matrix.shape[-1]) is not None:
         num_features = design_matrix.shape[-1]
       else:
         num_features = design_matrix.shape_tensor()[-1]
@@ -241,4 +241,3 @@ class LinearRegression(StructuralTimeSeries):
         observation_noise=observation_noise_fn,
         initial_state_prior=initial_state_prior,
         initial_step=initial_step)
-

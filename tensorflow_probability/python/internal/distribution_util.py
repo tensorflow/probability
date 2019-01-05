@@ -317,7 +317,7 @@ def shapes_from_loc_and_scale(loc, scale, name="shapes_from_loc_and_scale"):
 
     # Static check that event shapes match.
     if loc is not None:
-      loc_event_size = loc.shape[-1].value
+      loc_event_size = tf.dimension_value(loc.shape[-1])
       if loc_event_size is not None and event_size_const is not None:
         if loc_event_size != 1 and loc_event_size != event_size_const:
           raise ValueError(
@@ -1490,7 +1490,7 @@ def fill_triangular(x, upper=False, name=None):
     x = tf.convert_to_tensor(x, name="x")
     if x.shape.with_rank_at_least(1)[-1].value is not None:
       # Formula derived by solving for n: m = n(n+1)/2.
-      m = np.int32(x.shape[-1].value)
+      m = np.int32(tf.dimension_value(x.shape[-1]))
       n = np.sqrt(0.25 + 2. * m) - 0.5
       if n != np.floor(n):
         raise ValueError("Input right-most shape ({}) does not "
@@ -1586,7 +1586,7 @@ def fill_triangular_inverse(x, upper=False, name=None):
   with tf.name_scope(name, "fill_triangular_inverse", values=[x]):
     x = tf.convert_to_tensor(x, name="x")
     if x.shape.with_rank_at_least(2)[-1].value is not None:
-      n = np.int32(x.shape[-1].value)
+      n = np.int32(tf.dimension_value(x.shape[-1]))
       m = np.int32((n * (n + 1)) // 2)
       static_final_shape = x.shape[:-2].concatenate([m])
     else:

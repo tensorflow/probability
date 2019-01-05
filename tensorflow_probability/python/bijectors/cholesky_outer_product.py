@@ -158,11 +158,11 @@ class CholeskyOuterProduct(bijector.Bijector):
           [is_matrix, is_square, is_positive_definite], x)
 
     # Create a vector equal to: [p, p-1, ..., 2, 1].
-    if x.shape.ndims is None or x.shape[-1].value is None:
+    if tf.dimension_value(x.shape[-1]) is None:
       p_int = tf.shape(x)[-1]
       p_float = tf.cast(p_int, dtype=x.dtype)
     else:
-      p_int = x.shape[-1].value
+      p_int = tf.dimension_value(x.shape[-1])
       p_float = np.array(p_int, dtype=x.dtype.as_numpy_dtype)
     exponents = tf.linspace(p_float, 1., p_int)
 
