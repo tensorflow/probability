@@ -242,7 +242,7 @@ class HalfCauchy(distribution.Distribution):
       x = x + tf.zeros_like(loc)
       # Substitute out-of-support values in x with values that are in the
       # support of the distribution before applying f.
-      y = f(tf.where(x < loc, self._inv_z(0.5), x))
+      y = f(tf.where(x < loc, self._inv_z(0.5) + tf.zeros_like(x), x))
       if default_value == 0.:
         default_value = tf.zeros_like(y)
       elif default_value == 1.:

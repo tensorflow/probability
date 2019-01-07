@@ -169,6 +169,28 @@ class _HalfCauchyTest(object):
           self.evaluate(tfp_res),
           scipy_f(x_, loc_, scale_))
 
+  def testHalfCauchyPdfBroadcast(self):
+    loc_ = [-1, 0., 1.1]
+    loc = self._create_placeholder_with_default(loc_, name="loc")
+    scale_ = [0.1]
+    scale = self._create_placeholder_with_default(scale_, name="scale")
+    half_cauchy = tfd.HalfCauchy(loc, scale)
+    x_ = [[2.], [3.1], [4.], [5.], [6.], [7.]]
+    x = self._create_placeholder_with_default(x_, name="x")
+    for tfp_f, scipy_f in [
+        (half_cauchy.prob, stats.halfcauchy.pdf),
+        (half_cauchy.log_prob, stats.halfcauchy.logpdf)]:
+      tfp_res = tfp_f(x)
+      if self.use_static_shape or tf.executing_eagerly():
+        expected_shape = tf.TensorShape((6, 3))
+      else:
+        expected_shape = tf.TensorShape(None)
+      self.assertEqual(tfp_res.shape, expected_shape)
+      self.assertAllEqual(self.evaluate(tf.shape(tfp_res)), (6, 3))
+      self.assertAllClose(
+          self.evaluate(tfp_res),
+          scipy_f(x_, loc_, scale_))
+
   def testHalfCauchyCdf(self):
     batch_size = 6
     loc_ = 2.
@@ -228,6 +250,28 @@ class _HalfCauchyTest(object):
         expected_shape = tf.TensorShape(None)
       self.assertEqual(tfp_res.shape, expected_shape)
       self.assertAllEqual(self.evaluate(tf.shape(tfp_res)), (batch_size, 3))
+      self.assertAllClose(
+          self.evaluate(tfp_res),
+          scipy_f(x_, loc_, scale_))
+
+  def testHalfCauchyCdfBroadcast(self):
+    loc_ = [-1, 0., 1.1]
+    loc = self._create_placeholder_with_default(loc_, name="loc")
+    scale_ = [0.1]
+    scale = self._create_placeholder_with_default(scale_, name="scale")
+    half_cauchy = tfd.HalfCauchy(loc, scale)
+    x_ = [[2.], [3.1], [4.], [5.], [6.], [7.]]
+    x = self._create_placeholder_with_default(x_, name="x")
+    for tfp_f, scipy_f in [
+        (half_cauchy.cdf, stats.halfcauchy.cdf),
+        (half_cauchy.log_cdf, stats.halfcauchy.logcdf)]:
+      tfp_res = tfp_f(x)
+      if self.use_static_shape or tf.executing_eagerly():
+        expected_shape = tf.TensorShape((6, 3))
+      else:
+        expected_shape = tf.TensorShape(None)
+      self.assertEqual(tfp_res.shape, expected_shape)
+      self.assertAllEqual(self.evaluate(tf.shape(tfp_res)), (6, 3))
       self.assertAllClose(
           self.evaluate(tfp_res),
           scipy_f(x_, loc_, scale_))
