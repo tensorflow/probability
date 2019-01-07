@@ -332,7 +332,7 @@ def forecast(model,
     # from the leftmost to the rightmost side of the model's batch shape.
     # TODO(b/120245392): enhance `MixtureSameFamily` to reduce along an
     # arbitrary axis, and eliminate `move_dimension` calls here.
-    parameter_samples = model._maybe_build_param_map(parameter_samples)  # pylint: disable=protected-access
+    parameter_samples = model._canonicalize_param_vals_as_map(parameter_samples)  # pylint: disable=protected-access
     parameter_samples_with_reordered_batch_dimension = {
         param.name: dist_util.move_dimension(
             parameter_samples[param.name],

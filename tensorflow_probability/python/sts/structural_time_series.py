@@ -108,7 +108,7 @@ class StructuralTimeSeries(object):
           batch_shape, param.prior.batch_shape_tensor())
     return batch_shape
 
-  def _maybe_build_param_map(self, param_vals):
+  def _canonicalize_param_vals_as_map(self, param_vals):
     """If given an ordered list of parameter values, build a name:value map.
 
     This is a utility method that allows parameter values to be specified as
@@ -154,7 +154,7 @@ class StructuralTimeSeries(object):
     """
     return self._make_state_space_model(
         num_timesteps=num_timesteps,
-        param_map=self._maybe_build_param_map(param_vals),
+        param_map=self._canonicalize_param_vals_as_map(param_vals),
         initial_state_prior=initial_state_prior,
         initial_step=initial_step)
 
