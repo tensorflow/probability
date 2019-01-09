@@ -351,5 +351,27 @@ class PercentileTestWithNearestInterpolation(tf.test.TestCase):
     self.assertAllEqual(0, self.evaluate(minval))
 
 
+@tfe.run_all_tests_in_graph_and_eager_modes
+class QuantilesTest(tf.test.TestCase):
+  """Test for quantiles. Most functionality tested implicitly via percentile."""
+
+  def test_quartiles_of_vector(self):
+    x = tf.linspace(0., 1000., 10000)
+    cut_points = tfp.stats.quantiles(x, num_quantiles=4)
+    self.assertAllEqual((5,), cut_points.shape)
+    cut_points_ = self.evaluate(cut_points)
+    self.assertAllClose([0., 250., 500., 750., 1000.], cut_points_, rtol=0.002)
+
+  def test_deciles_of_rank_3_tensor(self):
+    x = rng.rand(3, 100000, 2)
+    cut_points = tfp.stats.quantiles(x, num_quantiles=10, axis=1)
+    self.assertAllEqual((11, 3, 2), cut_points.shape)
+    cut_points_ = self.evaluate(cut_points)
+
+    # cut_points_[:, i, j] should all be about the same.
+    self.assertAllClose(np.linspace(0, 1, 11), cut_points_[:, 0, 0], atol=0.03)
+    self.assertAllClose(np.linspace(0, 1, 11), cut_points_[:, 1, 1], atol=0.03)
+
+
 if __name__ == '__main__':
   tf.test.main()
