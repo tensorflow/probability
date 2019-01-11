@@ -169,10 +169,10 @@ class GaussianProcess(mvn_linear_operator.MultivariateNormalLinearOperator):
       amplitude=tf.get_variable('amplitude', np.float32),
       length_scale=tf.get_variable('length_scale', np.float32))
 
-  gp = tfp.GaussianProcess(kernel, observed_index_points)
+  gp = tfd.GaussianProcess(kernel, observed_index_points)
   neg_log_likelihood = -gp.log_prob(observed_values)
 
-  optimize = tf.train.AdamOptimize().minimize(neg_log_likelihood)
+  optimize = tf.train.AdamOptimizer().minimize(neg_log_likelihood)
 
   with tf.Session() as sess:
     sess.run(tf.global_variables_initializer())
