@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python.bijectors import bijector
 
@@ -58,4 +59,15 @@ class Tanh(bijector.Bijector):
     return -tf.log1p(-tf.square(y))
 
   def _forward_log_det_jacobian(self, x):
-    return tf.log1p(-tf.square(tf.tanh(x)))
+    #  This formula is mathematically equivalent to
+    #  `tf.log1p(-tf.square(tf.tanh(x)))`, however this code is more numerically
+    #  stable.
+
+    #  Derivation:
+    #    log(1 - tanh(x)^2)
+    #    = log(sech(x)^2)
+    #    = 2 * log(sech(x))
+    #    = 2 * log(2e^-x / (e^-2x + 1))
+    #    = 2 * (log(2) - x - log(e^-2x + 1))
+    #    = 2 * (log(2) - x - softplus(-2x))
+    return 2. * (np.log(2.) - x - tf.nn.softplus(-2. * x))
