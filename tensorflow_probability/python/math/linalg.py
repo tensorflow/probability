@@ -28,6 +28,7 @@ import tensorflow as tf
 
 
 __all__ = [
+    'lu_inverse',
     'pinv',
 ]
 
@@ -164,3 +165,104 @@ def pinv(a, rcond=None, validate_args=False, name=None):
       a_pinv.set_shape(a.shape[:-2].concatenate([a.shape[-1], a.shape[-2]]))
 
     return a_pinv
+
+
+def lu_inverse(lower_upper, perm, validate_args=False, name=None):
+  """The inverse LU decomposition, `X == tfp.math.lu_inverse(*tf.linalg.lu(X))`.
+
+  Args:
+    lower_upper: `lu` as returned by `tf.linalg.lu`, i.e., if
+      `matmul(P, matmul(L, U)) = X` then `lower_upper = L + U`.
+    perm: `p` as returned by `tf.linag.lu`, i.e., if
+      `matmul(P, matmul(L, U)) = X` then `perm = argmax(P)`.
+    validate_args: Python `bool` indicating whether arguments should be checked
+      for correctness.
+    name: Python `str` name given to ops managed by this object.
+
+  Returns:
+    x: The original input to `tf.linalg.lu`, i.e., `x` as in,
+      `lu_inverse(*tf.linalg.lu(x))`.
+
+  #### Examples
+
+  ```python
+  import numpy as np
+  import tensorflow as tf
+  import tensorflow_probability as tfp
+
+  x = [[[3., 4], [1, 2]],
+       [[7., 8], [3, 4]]]
+  x_reconstructed = tfp.math.lu_inverse(*tf.linalg.lu(x))
+  tf.assert_near(x, x_reconstructed)
+  # ==> True
+  ```
+
+  """
+  with tf.name_scope(name, 'lu_inverse', [lower_upper, perm]):
+    lower_upper = tf.convert_to_tensor(
+        lower_upper, preferred_dtype=tf.float32, name='lower_upper')
+    perm = tf.convert_to_tensor(
+        perm, preferred_dtype=tf.int32, name='perm')
+
+    assertions = _lu_inverse_assertions(lower_upper, perm, validate_args)
+    if assertions:
+      with tf.control_dependencies(assertions):
+        lower_upper = tf.identity(lower_upper)
+        perm = tf.identity(perm)
+
+    shape = tf.shape(lower_upper)
+
+    lower = tf.linalg.set_diag(
+        tf.matrix_band_part(lower_upper, num_lower=-1, num_upper=0),
+        tf.ones(shape[:-1], dtype=lower_upper.dtype))
+    upper = tf.matrix_band_part(lower_upper, num_lower=0, num_upper=-1)
+    x = tf.matmul(lower, upper)
+
+    if lower_upper.shape.ndims is None or lower_upper.shape.ndims != 2:
+      # We either don't know the batch rank or there are >0 batch dims.
+      batch_size = tf.reduce_prod(shape[:-2])
+      d = shape[-1]
+      x = tf.reshape(x, [batch_size, d, d])
+      perm = tf.reshape(perm, [batch_size, d])
+      perm = tf.map_fn(tf.invert_permutation, perm)
+      batch_indices = tf.broadcast_to(
+          tf.range(batch_size)[:, tf.newaxis],
+          [batch_size, d])
+      x = tf.gather_nd(x, tf.stack([batch_indices, perm], axis=-1))
+      x = tf.reshape(x, shape)
+    else:
+      x = tf.gather(x, tf.invert_permutation(perm))
+
+    x.set_shape(lower_upper.shape)
+    return x
+
+
+def _lu_inverse_assertions(lower_upper, perm, validate_args):
+  """Returns list of assertions related to `lu_inverse` assumptions."""
+  assertions = []
+
+  message = 'Input `lower_upper` must have at least 2 dimensions.'
+  if lower_upper.shape.ndims is not None:
+    if lower_upper.shape.ndims < 2:
+      raise ValueError(message)
+  elif validate_args:
+    assertions.append(
+        tf.assert_rank_at_least(lower_upper, rank=2, message=message))
+
+  message = '`rank(lower_upper)` must equal `rank(perm) + 1`'
+  if lower_upper.shape.ndims is not None and perm.shape.ndims is not None:
+    if lower_upper.shape.ndims != perm.shape.ndims + 1:
+      raise ValueError(message)
+  elif validate_args:
+    assertions.append(
+        tf.assert_rank(lower_upper, rank=tf.rank(perm) + 1, message=message))
+
+  message = '`lower_upper` must be square.'
+  if lower_upper.shape[:-2].is_fully_defined():
+    if lower_upper.shape[-2] != lower_upper.shape[-1]:
+      raise ValueError(message)
+  elif validate_args:
+    m, n = tf.split(tf.shape(lower_upper)[-2:], num_or_size_splits=2)
+    assertions.append(tf.assert_equal(m, n, message=message))
+
+  return assertions

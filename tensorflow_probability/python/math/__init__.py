@@ -22,6 +22,7 @@ from tensorflow_probability.python.math.custom_gradient import custom_gradient
 from tensorflow_probability.python.math.diag_jacobian import diag_jacobian
 from tensorflow_probability.python.math.interpolation import batch_interp_regular_1d_grid
 from tensorflow_probability.python.math.interpolation import interp_regular_1d_grid
+from tensorflow_probability.python.math.linalg import lu_inverse
 from tensorflow_probability.python.math.linalg import pinv
 from tensorflow_probability.python.math.numeric import log1psquare
 from tensorflow_probability.python.math.random_ops import random_rademacher
@@ -31,11 +32,12 @@ from tensorflow_probability.python.math.root_search import secant_root
 from tensorflow.python.util.all_util import remove_undocumented
 
 _allowed_symbols = [
+    'batch_interp_regular_1d_grid',
     'custom_gradient',
     'diag_jacobian',
-    'batch_interp_regular_1d_grid',
     'interp_regular_1d_grid',
     'log1psquare',
+    'lu_inverse',
     'pinv',
     'random_rademacher',
     'random_rayleigh',
