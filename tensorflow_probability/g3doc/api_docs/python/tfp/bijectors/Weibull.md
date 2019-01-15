@@ -36,9 +36,9 @@ random variable with the
 
 ```none
 Y ~ Weibull(scale, concentration)
-pdf(y; scale, concentration, y >= 0) = (scale / concentration) * (
-  scale / concentration) ** (concentration - 1) * exp(
-    -(y / scale) ** concentration)
+pdf(y; scale, concentration, y >= 0) =
+    (concentration / scale) * (y / scale)**(concentration - 1) *
+    exp(-(y / scale)**concentration)
 ```
 
 <h2 id="__init__"><code>__init__</code></h2>

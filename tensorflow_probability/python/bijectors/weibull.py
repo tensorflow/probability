@@ -38,9 +38,9 @@ class Weibull(bijector.Bijector):
 
   ```none
   Y ~ Weibull(scale, concentration)
-  pdf(y; scale, concentration, y >= 0) = (scale / concentration) * (
-    scale / concentration) ** (concentration - 1) * exp(
-      -(y / scale) ** concentration)
+  pdf(y; scale, concentration, y >= 0) =
+      (concentration / scale) * (y / scale)**(concentration - 1) *
+      exp(-(y / scale)**concentration)
   ```
   """
 
@@ -114,7 +114,7 @@ class Weibull(bijector.Bijector):
     x = self._maybe_assert_valid_x(x)
     return (-(x / self.scale)**self.concentration +
             tf.math.xlogy(self.concentration - 1, x) + tf.log(
-                self.concentration) + -self.concentration * tf.log(self.scale))
+                self.concentration) - self.concentration * tf.log(self.scale))
 
   def _maybe_assert_valid_x(self, x):
     if not self.validate_args:
