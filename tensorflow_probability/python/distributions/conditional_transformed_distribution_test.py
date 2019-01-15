@@ -77,7 +77,9 @@ class ConditionalTransformedDistributionTest(
                 conditional_normal.sample(5, bijector_kwargs={"z": z}))), z)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+# TODO(b/122840816): Should these tests also run in eager mode?  Tests in
+# `transformed_distribution_test.ScalarToMultiTest` are not currently run in
+# eager mode.
 class ConditionalScalarToMultiTest(
     transformed_distribution_test.ScalarToMultiTest):
 

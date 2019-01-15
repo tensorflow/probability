@@ -30,6 +30,7 @@ tfd = tfp.distributions
 rng = np.random.RandomState(0)
 
 
+@tfe.run_all_tests_in_graph_and_eager_modes
 class _AutoCorrelationTest(object):
 
   @property
@@ -175,6 +176,11 @@ class _AutoCorrelationTest(object):
       self.assertLess(np.abs(rxx_[1:]).mean(), 0.02)
 
   def test_step_function_sequence(self):
+    if tf.executing_eagerly() and not self.use_static_shape:
+      # TODO(b/122840816): Modify this test so that it runs in eager mode with
+      # dynamic shapes, or document that this is the intended behavior.
+      return
+
     # x jumps to new random value every 10 steps.  So correlation length = 10.
     x = (rng.randint(-10, 10, size=(1000, 1))
          * np.ones((1, 10))).ravel().astype(self.dtype)
@@ -411,12 +417,14 @@ class PercentileTestWithLowerInterpolation(tf.test.TestCase):
       self.assertAllClose(expected_percentile, self.evaluate(pct))
 
 
+@tfe.run_all_tests_in_graph_and_eager_modes
 class PercentileTestWithHigherInterpolation(
     PercentileTestWithLowerInterpolation):
 
   _interpolation = "higher"
 
 
+@tfe.run_all_tests_in_graph_and_eager_modes
 class PercentileTestWithNearestInterpolation(tf.test.TestCase):
   """Test separately because np.round and tf.round make different choices."""
 
@@ -453,9 +461,13 @@ class PercentileTestWithNearestInterpolation(tf.test.TestCase):
   def test_2d_q_raises_dynamic(self):
     x = [1., 5., 3., 2., 4.]
     q_ph = tf.placeholder_with_default(input=[[0.5]], shape=None)
-    pct = tfd.percentile(x, q=q_ph, validate_args=True)
-    with self.assertRaisesOpError("rank"):
-      self.evaluate(pct)
+    if tf.executing_eagerly():
+      with self.assertRaisesRegexp(ValueError, "Expected.*ndims"):
+        pct = tfd.percentile(x, q=q_ph, validate_args=True)
+    else:
+      pct = tfd.percentile(x, q=q_ph, validate_args=True)
+      with self.assertRaisesOpError("rank"):
+        self.evaluate(pct)
 
   def test_finds_max_of_long_array(self):
     # d - 1 == d in float32 and d = 3e7.

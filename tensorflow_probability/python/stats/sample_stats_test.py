@@ -29,6 +29,7 @@ tfe = tf.contrib.eager
 rng = np.random.RandomState(0)
 
 
+@tfe.run_all_tests_in_graph_and_eager_modes
 class _AutoCorrelationTest(object):
 
   @property
@@ -172,6 +173,11 @@ class _AutoCorrelationTest(object):
       self.assertLess(np.abs(rxx_[1:]).mean(), 0.02)
 
   def test_step_function_sequence(self):
+    if tf.executing_eagerly() and not self.use_static_shape:
+      # TODO(b/122840816): Modify this test so that it runs in eager mode with
+      # dynamic shapes, or document that this is the intended behavior.
+      return
+
     # x jumps to new random value every 10 steps.  So correlation length = 10.
     x = (rng.randint(-10, 10, size=(1000, 1)) * np.ones(
         (1, 10))).ravel().astype(self.dtype)

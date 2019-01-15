@@ -36,6 +36,7 @@ tfe = tf.contrib.eager
 tfl = tf.linalg
 
 
+@tfe.run_all_tests_in_graph_and_eager_modes
 class _IIDNormalTest(object):
 
   def setUp(self):
@@ -472,6 +473,7 @@ class BatchTest(tf.test.TestCase):
     self._sanity_check_shapes(model, batch_shape, event_shape)
 
 
+@tfe.run_all_tests_in_graph_and_eager_modes
 class _KalmanStepsTest(object):
 
   def setUp(self):
@@ -634,9 +636,10 @@ class _KalmanStepsTest(object):
          x_observed_tensor)
 
     # Ensure we take the scalar-optimized path when shape is static.
-    self.assertIsInstance(predictive_dist,
-                          (tfd.Independent if self.use_static_shape
-                           else tfd.MultivariateNormalTriL))
+    if self.use_static_shape or tf.executing_eagerly():
+      self.assertIsInstance(predictive_dist, tfd.Independent)
+    else:
+      self.assertIsInstance(predictive_dist, tfd.MultivariateNormalTriL)
     self.assertAllEqual(
         self.evaluate(predictive_dist.event_shape_tensor()), [1])
     self.assertAllEqual(
@@ -743,6 +746,7 @@ class KalmanStepsTestDynamic(tf.test.TestCase, _KalmanStepsTest):
                                        shape=None)
 
 
+@tfe.run_all_tests_in_graph_and_eager_modes
 class _AugmentSampleShapeTest(object):
 
   def testAugmentsShape(self):
@@ -806,7 +810,10 @@ class AugmentSampleShapeTestStatic(tf.test.TestCase, _AugmentSampleShapeTest):
 class AugmentSampleShapeTestDynamic(tf.test.TestCase, _AugmentSampleShapeTest):
 
   def assertRaisesError(self, msg):
-    return self.assertRaisesOpError(msg)
+    if tf.executing_eagerly():
+      return self.assertRaisesRegexp(Exception, msg)
+    else:
+      return self.assertRaisesOpError(msg)
 
   def build_inputs(self, full_batch_shape, partial_batch_shape):
     full_batch_shape = tf.placeholder_with_default(
