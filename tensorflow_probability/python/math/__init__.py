@@ -23,6 +23,7 @@ from tensorflow_probability.python.math.diag_jacobian import diag_jacobian
 from tensorflow_probability.python.math.interpolation import batch_interp_regular_1d_grid
 from tensorflow_probability.python.math.interpolation import interp_regular_1d_grid
 from tensorflow_probability.python.math.linalg import lu_inverse
+from tensorflow_probability.python.math.linalg import matrix_inverse_lu
 from tensorflow_probability.python.math.linalg import pinv
 from tensorflow_probability.python.math.numeric import log1psquare
 from tensorflow_probability.python.math.random_ops import random_rademacher
@@ -38,6 +39,7 @@ _allowed_symbols = [
     'interp_regular_1d_grid',
     'log1psquare',
     'lu_inverse',
+    'matrix_inverse_lu',
     'pinv',
     'random_rademacher',
     'random_rayleigh',

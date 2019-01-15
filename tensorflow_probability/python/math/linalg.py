@@ -29,6 +29,7 @@ import tensorflow as tf
 
 __all__ = [
     'lu_inverse',
+    'matrix_inverse_lu',
     'pinv',
 ]
 
@@ -167,6 +168,93 @@ def pinv(a, rcond=None, validate_args=False, name=None):
     return a_pinv
 
 
+def matrix_inverse_lu(lower_upper, perm, validate_args=False, name=None):
+  """Computes a matrix inverse given the matrix's LU decomposition.
+
+  This op is conceptually identical to,
+
+  ````python
+  inv_X = tf.matrix_inverse(*tf.linalg.lu(X))
+  tf.assert_near(tf.matrix_inverse(X), inv_X)
+  # ==> True
+  ```
+
+  Note: this function does not verify the implied matrix is actually invertible
+  nor is this condition checked even when `validate_args=True`.
+
+  Args:
+    lower_upper: `lu` as returned by `tf.linalg.lu`, i.e., if
+      `matmul(P, matmul(L, U)) = X` then `lower_upper = L + U`.
+    perm: `p` as returned by `tf.linag.lu`, i.e., if
+      `matmul(P, matmul(L, U)) = X` then `perm = argmax(P)`.
+    validate_args: Python `bool` indicating whether arguments should be checked
+      for correctness. Note: this function does not verify the implied matrix is
+      actually invertible, even when `validate_args=True`.
+      Default value: `False` (i.e., don't validate arguments).
+    name: Python `str` name given to ops managed by this object.
+      Default value: `None` (i.e., "matrix_inverse_lu").
+
+  Returns:
+    inv_x: The matrix_inv, i.e.,
+      `tf.matrix_inverse(tfp.math.lu_inverse(lu, perm))`.
+
+  #### Examples
+
+  ```python
+  import numpy as np
+  import tensorflow as tf
+  import tensorflow_probability as tfp
+
+  x = [[[3., 4], [1, 2]],
+       [[7., 8], [3, 4]]]
+  inv_x = tfp.math.matrix_inverse_lu(*tf.linalg.lu(x))
+  tf.assert_near(tf.matrix_inverse(x), inv_x)
+  # ==> True
+  ```
+
+  """
+
+  with tf.name_scope(name, 'matrix_inverse_lu', [lower_upper, perm]):
+    lower_upper = tf.convert_to_tensor(
+        lower_upper, preferred_dtype=tf.float32, name='lower_upper')
+    perm = tf.convert_to_tensor(
+        perm, preferred_dtype=tf.int32, name='perm')
+
+    assertions = _lu_inverse_assertions(lower_upper, perm, validate_args)
+    if assertions:
+      with tf.control_dependencies(assertions):
+        lower_upper = tf.identity(lower_upper)
+        perm = tf.identity(perm)
+
+    shape = tf.shape(lower_upper)
+
+    d = shape[-1]
+    lower = tf.linalg.set_diag(
+        tf.matrix_band_part(lower_upper, num_lower=-1, num_upper=0),
+        tf.ones(shape[:-1], dtype=lower_upper.dtype))
+    eye = tf.eye(d, batch_shape=shape[:-2], dtype=lower_upper.dtype)
+    x = tf.linalg.triangular_solve(
+        lower_upper,  # Only upper is accessed.
+        rhs=tf.linalg.triangular_solve(lower, rhs=eye),
+        lower=False)
+
+    if lower_upper.shape.ndims is None or lower_upper.shape.ndims != 2:
+      # We either don't know the batch rank or there are >0 batch dims.
+      batch_size = tf.reduce_prod(shape[:-2])
+      x = tf.reshape(x, [batch_size, d, d])
+      perm = tf.reshape(perm, [batch_size, d])
+      batch_indices = tf.broadcast_to(
+          tf.range(batch_size)[:, tf.newaxis],
+          [batch_size, d])
+      x = tf.gather_nd(x, tf.stack([batch_indices, perm], axis=-1))
+      x = tf.reshape(x, shape)
+    else:
+      x = tf.gather(x, perm, axis=-1)
+
+    x.set_shape(lower_upper.shape)
+    return x
+
+
 def lu_inverse(lower_upper, perm, validate_args=False, name=None):
   """The inverse LU decomposition, `X == tfp.math.lu_inverse(*tf.linalg.lu(X))`.
 
@@ -177,7 +265,9 @@ def lu_inverse(lower_upper, perm, validate_args=False, name=None):
       `matmul(P, matmul(L, U)) = X` then `perm = argmax(P)`.
     validate_args: Python `bool` indicating whether arguments should be checked
       for correctness.
+      Default value: `False` (i.e., don't validate arguments).
     name: Python `str` name given to ops managed by this object.
+      Default value: `None` (i.e., "lu_inverse").
 
   Returns:
     x: The original input to `tf.linalg.lu`, i.e., `x` as in,

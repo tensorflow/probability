@@ -169,5 +169,51 @@ class LUInverseDynamic(tf.test.TestCase, _LUInverse):
   use_static_shape = False
 
 
+class _MatrixInverseLU(object):
+  dtype = np.float32
+  use_static_shape = True
+
+  def test_non_batch(self):
+    x_ = np.array(
+        [[3, 4], [1, 2]],
+        dtype=self.dtype)
+    x = tf.placeholder_with_default(
+        x_, shape=x_.shape if self.use_static_shape else None)
+
+    y = tfp.math.matrix_inverse_lu(*tf.linalg.lu(x), validate_args=True)
+    y_ = self.evaluate(y)
+
+    if self.use_static_shape:
+      self.assertAllEqual(x_.shape, y.shape)
+    self.assertAllClose(np.linalg.inv(x_), y_, atol=0., rtol=1e-3)
+
+  def test_batch(self):
+    x_ = np.array(
+        [
+            [[3, 4], [1, 2]],
+            [[7, 8], [3, 4]],
+        ],
+        dtype=self.dtype)
+    x = tf.placeholder_with_default(
+        x_, shape=x_.shape if self.use_static_shape else None)
+
+    y = tfp.math.matrix_inverse_lu(*tf.linalg.lu(x), validate_args=True)
+    y_ = self.evaluate(y)
+
+    if self.use_static_shape:
+      self.assertAllEqual(x_.shape, y.shape)
+    self.assertAllClose(np.linalg.inv(x_), y_, atol=0., rtol=1e-3)
+
+
+@tfe.run_all_tests_in_graph_and_eager_modes
+class MatrixInverseLUStatic(tf.test.TestCase, _MatrixInverseLU):
+  use_static_shape = True
+
+
+@tfe.run_all_tests_in_graph_and_eager_modes
+class MatrixInverseLUDynamic(tf.test.TestCase, _MatrixInverseLU):
+  use_static_shape = False
+
+
 if __name__ == '__main__':
   tf.test.main()
