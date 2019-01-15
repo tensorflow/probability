@@ -1154,25 +1154,7 @@ class Distribution(_BaseDistribution):
     else:
       prod = np.prod(x_static_val, dtype=x.dtype.as_numpy_dtype())
 
-    ndims = x.shape.ndims  # != sample_ndims
-    if ndims is None:
-      # Maybe expand_dims.
-      ndims = tf.rank(x)
-      expanded_shape = util.pick_vector(
-          tf.equal(ndims, 0),
-          np.array([1], dtype=np.int32), tf.shape(x))
-      x = tf.reshape(x, expanded_shape)
-    elif ndims == 0:
-      # Definitely expand_dims.
-      if x_static_val is not None:
-        x = tf.convert_to_tensor(
-            np.array([x_static_val], dtype=x.dtype.as_numpy_dtype()),
-            name=name)
-      else:
-        x = tf.reshape(x, [1])
-    elif ndims != 1:
-      raise ValueError("Input is neither scalar nor vector.")
-
+    x = util.expand_to_vector(x, tensor_name=name)
     return x, prod
 
   def _set_sample_static_shape(self, x, sample_shape):

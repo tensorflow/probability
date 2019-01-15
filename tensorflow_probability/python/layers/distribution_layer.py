@@ -558,7 +558,7 @@ class IndependentBernoulli(DistributionLambda):
   """
 
   def __init__(self,
-               event_shape,
+               event_shape=(),
                convert_to_tensor_fn=tfd.Distribution.sample,
                sample_dtype=None,
                validate_args=False,
@@ -566,8 +566,8 @@ class IndependentBernoulli(DistributionLambda):
     """Initialize the `IndependentBernoulli` layer.
 
     Args:
-      event_shape: `int` vector representing the size of single draw from this
-        distribution.
+      event_shape: integer vector `Tensor` representing the shape of single
+        draw from this distribution.
       convert_to_tensor_fn: Python `callable` that takes a `tfd.Distribution`
         instance and returns a `tf.Tensor`-like object. For examples, see
         `class` docstring.
@@ -587,9 +587,14 @@ class IndependentBernoulli(DistributionLambda):
         **kwargs)
 
   @staticmethod
-  def new(params, event_shape, dtype=None, validate_args=False, name=None):
+  def new(params, event_shape=(), dtype=None, validate_args=False, name=None):
     """Create the distribution instance from a `params` vector."""
     with tf.name_scope(name, 'IndependentBernoulli', [params, event_shape]):
+      params = tf.convert_to_tensor(params, name='params')
+      event_shape = dist_util.expand_to_vector(
+          tf.convert_to_tensor(
+              event_shape, name='event_shape', preferred_dtype=tf.int32),
+          tensor_name='event_shape')
       new_shape = tf.concat([
           tf.shape(params)[:-1],
           event_shape,
@@ -607,10 +612,11 @@ class IndependentBernoulli(DistributionLambda):
       return dist
 
   @staticmethod
-  def params_size(event_shape, name=None):
+  def params_size(event_shape=(), name=None):
     """The number of `params` needed to create a single distribution."""
     with tf.name_scope(name, 'IndependentBernoulli_params_size', [event_shape]):
-      event_shape = tf.convert_to_tensor(event_shape, name='event_shape')
+      event_shape = tf.convert_to_tensor(
+          event_shape, name='event_shape', preferred_dtype=tf.int32)
       return _event_size(
           event_shape, name=name or 'IndependentBernoulli_params_size')
 
@@ -644,7 +650,7 @@ class IndependentNormal(DistributionLambda):
 
   # Create a stochastic encoder -- e.g., for use in a variational auto-encoder.
   input_shape = [28, 28, 1]
-  encoded_shape = [2]
+  encoded_shape = 2
   encoder = tfk.Sequential([
     tfkl.InputLayer(input_shape=input_shape),
     tfkl.Flatten(),
@@ -657,15 +663,15 @@ class IndependentNormal(DistributionLambda):
   """
 
   def __init__(self,
-               event_shape,
+               event_shape=(),
                convert_to_tensor_fn=tfd.Distribution.sample,
                validate_args=False,
                **kwargs):
     """Initialize the `IndependentNormal` layer.
 
     Args:
-      event_shape: `int` vector representing the shape of single draw from this
-        distribution.
+      event_shape: integer vector `Tensor` representing the shape of single
+        draw from this distribution.
       convert_to_tensor_fn: Python `callable` that takes a `tfd.Distribution`
         instance and returns a `tf.Tensor`-like object.
         Default value: `tfd.Distribution.sample`.
@@ -682,11 +688,14 @@ class IndependentNormal(DistributionLambda):
         **kwargs)
 
   @staticmethod
-  def new(params, event_shape, validate_args=False, name=None):
+  def new(params, event_shape=(), validate_args=False, name=None):
     """Create the distribution instance from a `params` vector."""
     with tf.name_scope(name, 'IndependentNormal', [params, event_shape]):
       params = tf.convert_to_tensor(params, name='params')
-      event_shape = tf.convert_to_tensor(event_shape, name='event_shape')
+      event_shape = dist_util.expand_to_vector(
+          tf.convert_to_tensor(
+              event_shape, name='event_shape', preferred_dtype=tf.int32),
+          tensor_name='event_shape')
       output_shape = tf.concat([
           tf.shape(params)[:-1],
           event_shape,
@@ -701,10 +710,11 @@ class IndependentNormal(DistributionLambda):
           validate_args=validate_args)
 
   @staticmethod
-  def params_size(event_shape, name=None):
+  def params_size(event_shape=(), name=None):
     """The number of `params` needed to create a single distribution."""
     with tf.name_scope(name, 'IndependentNormal_params_size', [event_shape]):
-      event_shape = tf.convert_to_tensor(event_shape, name='event_shape')
+      event_shape = tf.convert_to_tensor(
+          event_shape, name='event_shape', preferred_dtype=tf.int32)
       return 2 * _event_size(
           event_shape, name=name or 'IndependentNormal_params_size')
 

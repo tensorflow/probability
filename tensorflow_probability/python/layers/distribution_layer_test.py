@@ -618,12 +618,11 @@ class _IndependentNormalTest(object):
 
   def test_layer(self):
     batch_shape = self._build_tensor([7, 3], dtype=np.int32)
-    event_shape = self._build_tensor([4], dtype=np.int32)
     low = self._build_tensor(-3.)
     high = self._build_tensor(3.)
-    p = tfpl.IndependentNormal.params_size(event_shape)
+    p = tfpl.IndependentNormal.params_size()
 
-    layer = tfpl.IndependentNormal(event_shape, validate_args=True)
+    layer = tfpl.IndependentNormal(validate_args=True)
     t = tfd.Uniform(low, high).sample(tf.concat([batch_shape, [p]], 0), seed=42)
     x = layer(t)
     self._check_distribution(t, x, batch_shape)
@@ -676,7 +675,7 @@ class IndependentNormalTestStaticShape(tf.test.TestCase,
 
   def test_doc_string(self):
     input_shape = [28, 28, 1]
-    encoded_shape = [2]
+    encoded_shape = 2
     encoder = tfk.Sequential([
         tfkl.InputLayer(input_shape=input_shape, dtype=self.dtype),
         tfkl.Flatten(),

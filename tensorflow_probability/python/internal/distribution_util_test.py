@@ -1726,5 +1726,104 @@ class ArgumentsTest(tf.test.TestCase):
                      foo(1, 2, 3, *[1, 2, 3], unicorn=None))
 
 
+@tfe.run_all_tests_in_graph_and_eager_modes
+class ExpandToVectorTest(tf.test.TestCase):
+
+  def _check_static(self, expected, actual, dtype=np.int32):
+    const_actual = tf.contrib.util.constant_value(actual)
+    self.assertAllEqual(expected, const_actual)
+    self.assertEqual(dtype, const_actual.dtype)
+
+  def _check(self, expected, actual, expected_dtype=np.int32):
+    self.assertAllEqual(expected, actual)
+    self.assertEquals(expected_dtype, actual.dtype)
+
+  def test_expand_to_vector_on_literals(self):
+    self._check_static([1], distribution_util.expand_to_vector(1))
+    self._check_static(
+        [3.5], distribution_util.expand_to_vector(3.5), dtype=np.float32)
+
+    self._check_static([3], distribution_util.expand_to_vector((3,)))
+    self._check_static([0, 0], distribution_util.expand_to_vector((0, 0)))
+    self._check_static(
+        [1.25, 2.75, 3.0],
+        distribution_util.expand_to_vector((1.25, 2.75, 3.0)),
+        dtype=np.float32)
+
+    self._check_static([3], distribution_util.expand_to_vector([3,]))
+    self._check_static([0, 0], distribution_util.expand_to_vector([0, 0]))
+    self._check_static(
+        [1.25, 2.75, 3.0],
+        distribution_util.expand_to_vector([1.25, 2.75, 3.0]),
+        dtype=np.float32)
+
+    # Empty lists and tuples are converted to `tf.float32`.
+    self._check_static(
+        [], distribution_util.expand_to_vector(()), dtype=np.float32)
+    self._check_static(
+        [], distribution_util.expand_to_vector([]), dtype=np.float32)
+
+    # Test for error on input with rank >= 2.
+    with self.assertRaises(ValueError):
+      distribution_util.expand_to_vector([[1, 2], [3, 4]])
+
+  def test_expand_to_vector_on_constants(self):
+    # Helper to construct a const Tensor and call expand_to_tensor on it.
+    def _expand_tensor(x, dtype=tf.int32):
+      return distribution_util.expand_to_vector(
+          tf.convert_to_tensor(x, dtype=dtype), op_name="test")
+
+    self._check_static([], _expand_tensor([]))
+    self._check_static([], _expand_tensor(()))
+
+    self._check_static([17], _expand_tensor(17))
+    self._check_static([1.125], _expand_tensor(1.125, np.float32), np.float32)
+
+    self._check_static([314], _expand_tensor([314]))
+    self._check_static(
+        [3.75, 0], _expand_tensor([3.75, 0], np.float64), np.float64)
+    self._check_static([1, 2, 3], _expand_tensor([1, 2, 3], np.int64), np.int64)
+
+    # Test for error on input with rank >= 2.
+    with self.assertRaises(ValueError):
+      _expand_tensor([[[]]], tf.float32)
+
+  def test_expand_to_vector_on_tensors(self):
+    # Helper to construct a placeholder and call expand_to_tensor on it.
+    def _expand_tensor(x, shape=None, dtype=np.int32, validate_args=False):
+      return distribution_util.expand_to_vector(
+          tf.placeholder_with_default(np.array(x, dtype=dtype), shape=shape),
+          tensor_name="name_for_tensor",
+          validate_args=validate_args)
+
+    for dtype in [np.int64, np.float32, np.float64, np.int64]:
+
+      self._check([], _expand_tensor([], shape=[0], dtype=dtype), dtype)
+      self._check([], _expand_tensor([], shape=[None], dtype=dtype), dtype)
+      self._check([], _expand_tensor([], shape=None, dtype=dtype), dtype)
+
+      self._check([7], _expand_tensor(7, shape=[], dtype=dtype), dtype)
+
+      self._check(
+          [1, 2, 3], _expand_tensor([1, 2, 3], shape=[3], dtype=dtype), dtype)
+      self._check(
+          [1, 2, 3],
+          _expand_tensor([1, 2, 3], shape=[None], dtype=dtype), dtype)
+      self._check(
+          [1, 2, 3], _expand_tensor([1, 2, 3], shape=None, dtype=dtype), dtype)
+
+    # Test for error on input with rank >= 2.
+    with self.assertRaises(ValueError):
+      _expand_tensor([[1, 2]], shape=[1, 2])
+    with self.assertRaises(ValueError):
+      _expand_tensor([[1, 2]], shape=[None, None])
+    if tf.executing_eagerly():
+      with self.assertRaises(ValueError):
+        _expand_tensor([[1, 2]], shape=None)
+    else:
+      with self.assertRaises(tf.errors.InvalidArgumentError):
+        self.evaluate(_expand_tensor([[1, 2]], shape=None, validate_args=True))
+
+
 if __name__ == "__main__":
   tf.test.main()
