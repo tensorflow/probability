@@ -414,8 +414,7 @@ class Distribution(_BaseDistribution):
     Args:
       value: A dictionary of parameters to assign to the `_parameters` property.
     """
-    if "self" in value:
-      del value["self"]
+    value.pop("self", None)
     self._parameter_dict = value
 
   @classmethod
