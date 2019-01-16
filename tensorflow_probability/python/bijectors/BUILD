@@ -16,6 +16,8 @@
 #   Contains ops for bijectors.
 #   APIs here are meant to evolve over time.
 
+# [internal] load python3.bzl
+
 licenses(["notice"])  # Apache 2.0
 
 package(

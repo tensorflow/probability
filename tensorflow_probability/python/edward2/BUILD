@@ -15,6 +15,8 @@
 # Description:
 #   Edward2 probabilistic programming language.
 
+# [internal] load python3.bzl
+
 package(
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
