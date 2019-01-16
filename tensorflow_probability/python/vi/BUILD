@@ -15,6 +15,8 @@
 # Description:
 #   Methods and objectives for variational inference.
 
+# [internal] load python3.bzl
+
 licenses(["notice"])  # Apache 2.0
 
 package(

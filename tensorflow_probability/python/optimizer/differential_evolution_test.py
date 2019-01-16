@@ -89,7 +89,7 @@ class DifferentialEvolutionTest(tf.test.TestCase):
   def test_quadratic_with_skew(self):
     """Can minimize a general quadratic function."""
     dim = 3
-    np.random.seed(26535)
+    np.random.seed(26537)
     minimum = np.random.randn(dim)
     principal_values = np.diag(np.exp(np.random.randn(dim)))
     rotation = special_ortho_group.rvs(dim)

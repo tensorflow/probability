@@ -15,6 +15,8 @@
 # Description:
 #   Framework for Bayesian structural time series models
 
+# [internal] load python3.bzl
+
 licenses(["notice"])  # Apache 2.0
 
 package(

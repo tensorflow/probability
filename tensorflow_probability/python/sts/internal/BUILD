@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
+# [internal] load python3.bzl
+
 licenses(["notice"])  # Apache 2.0
 
 package(

@@ -15,6 +15,8 @@
 # Description:
 #   TensorFlow Probability general math functions.
 
+# [internal] load python3.bzl
+
 package(
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
