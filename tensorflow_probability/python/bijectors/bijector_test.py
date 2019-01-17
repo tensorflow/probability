@@ -19,6 +19,8 @@ from __future__ import division
 from __future__ import print_function
 
 import functools
+import weakref
+
 # Dependency imports
 import numpy as np
 
@@ -204,6 +206,10 @@ class BijectorCachingTest(tf.test.TestCase):
     # Call forward and forward_log_det_jacobian one-by-one (not together).
     y = forward_only_bijector.forward(x)
     _ = forward_only_bijector.forward_log_det_jacobian(x, event_ndims=0)
+    if tf.executing_eagerly():
+      self.assertIsNot(y, forward_only_bijector.forward(x))
+    else:
+      self.assertIs(y, forward_only_bijector.forward(x))
 
     # Now, everything should be cached if the argument is y, so these are ok.
     forward_only_bijector.inverse(y)
@@ -223,10 +229,26 @@ class BijectorCachingTest(tf.test.TestCase):
     # Call inverse and inverse_log_det_jacobian one-by-one (not together).
     x = inverse_only_bijector.inverse(y)
     _ = inverse_only_bijector.inverse_log_det_jacobian(y, event_ndims=0)
+    if tf.executing_eagerly():
+      self.assertIsNot(x, inverse_only_bijector.inverse(y))
+    else:
+      self.assertIs(x, inverse_only_bijector.inverse(y))
 
     # Now, everything should be cached if the argument is x.
     inverse_only_bijector.forward(x)
     inverse_only_bijector.forward_log_det_jacobian(x, event_ndims=0)
+
+  def testCachingGarbageCollection(self):
+    bijector = ForwardOnlyBijector()
+    refs = []
+    niters = 3
+    for _ in range(niters):
+      y = bijector.forward(tf.zeros([10]))
+      refs.append(weakref.ref(y))
+
+    # We tolerate leaking tensor references in graph mode only.
+    expected_live = 1 if tf.executing_eagerly() else niters
+    self.assertEqual(expected_live, sum(ref() is not None for ref in refs))
 
 
 @tfe.run_all_tests_in_graph_and_eager_modes

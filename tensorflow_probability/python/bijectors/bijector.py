@@ -22,6 +22,7 @@ import abc
 import collections
 import contextlib
 import re
+import weakref
 
 # Dependency imports
 import numpy as np
@@ -43,8 +44,8 @@ class _Mapping(
     """Custom __new__ so namedtuple items have defaults.
 
     Args:
-      x: `Tensor`. Forward.
-      y: `Tensor`. Inverse.
+      x: `Tensor` or None. Input to forward; output of inverse.
+      y: `Tensor` or None. Input to inverse; output of forward.
       ildj: `Tensor`. This is the (un-reduce_sum'ed) inverse log det jacobian.
       kwargs: Python dictionary. Extra args supplied to forward/inverse/etc
         functions.
@@ -55,21 +56,16 @@ class _Mapping(
     return super(_Mapping, cls).__new__(cls, x, y, ildj, kwargs)
 
   @property
-  def x_key(self):
-    """Returns key used for caching Y=g(X)."""
-    return (self.x,) + self._deep_tuple(self.kwargs)
-
-  @property
-  def y_key(self):
-    """Returns key used for caching X=g^{-1}(Y)."""
-    return (self.y,) + self._deep_tuple(self.kwargs)
+  def subkey(self):
+    """Returns subkey used for caching (nested under either `x` or `y`)."""
+    return self._deep_tuple(self.kwargs)
 
   def merge(self, x=None, y=None, ildj=None, kwargs=None, mapping=None):
     """Returns new _Mapping with args merged with self.
 
     Args:
-      x: `Tensor`. Forward.
-      y: `Tensor`. Inverse.
+      x: `Tensor` or None. Input to forward; output of inverse.
+      y: `Tensor` or None. Input to inverse; output of forward.
       ildj: `Tensor`. This is the (un-reduce_sum'ed) inverse log det jacobian.
       kwargs: Python dictionary. Extra args supplied to forward/inverse/etc
         functions.
@@ -92,15 +88,25 @@ class _Mapping(
         x=self._merge(self.x, mapping.x),
         y=self._merge(self.y, mapping.y),
         ildj=self._merge(self.ildj, mapping.ildj),
-        kwargs=self._merge(self.kwargs, mapping.kwargs))
+        kwargs=self._merge(self.kwargs, mapping.kwargs, use_equals=True))
 
-  def _merge(self, old, new):
+  def remove(self, field):
+    """To support weak referencing, removes cache key from the cache value."""
+    return _Mapping(
+        x=None if field == "x" else self.x,
+        y=None if field == "y" else self.y,
+        ildj=self.ildj,
+        kwargs=self.kwargs)
+
+  def _merge(self, old, new, use_equals=False):
     """Helper to merge which handles merging one value."""
     if old is None:
       return new
-    elif new is not None and old != new:
-      raise ValueError("Incompatible values: %s != %s" % (old, new))
-    return old
+    if new is None:
+      return old
+    if (old == new) if use_equals else (old is new):
+      return old
+    raise ValueError("Incompatible values: %s != %s" % (old, new))
 
   def _deep_tuple(self, x):
     """Converts nested `tuple`, `list`, or `dict` to nested `tuple`."""
@@ -550,8 +556,8 @@ class Bijector(object):
     self._constant_ildj = None
     self._validate_args = validate_args
     self._dtype = dtype
-    self._from_y = {}
-    self._from_x = {}
+    self._from_y = weakref.WeakKeyDictionary()
+    self._from_x = weakref.WeakKeyDictionary()
     if name:
       self._name = name
     else:
@@ -808,7 +814,13 @@ class Bijector(object):
       if mapping.y is not None:
         return mapping.y
       mapping = mapping.merge(y=self._forward(x, **kwargs))
-      self._cache(mapping)
+      # It's most important to cache the y->x mapping, because computing
+      # inverse(forward(y)) may be numerically unstable / lossy. Caching the
+      # x->y mapping only saves work. Since python doesn't support ephemerons,
+      # we cannot be simultaneously weak-keyed on both x and y, so we choose y.
+      self._cache_by_y(mapping)
+      if not tf.executing_eagerly():
+        self._cache_by_x(mapping)
       return mapping.y
 
   def forward(self, x, name="forward"):
@@ -842,7 +854,13 @@ class Bijector(object):
       if mapping.x is not None:
         return mapping.x
       mapping = mapping.merge(x=self._inverse(y, **kwargs))
-      self._cache(mapping)
+      # It's most important to cache the x->y mapping, because computing
+      # forward(inverse(y)) may be numerically unstable / lossy. Caching the
+      # y->x mapping only saves work. Since python doesn't support ephemerons,
+      # we cannot be simultaneously weak-keyed on both x and y, so we choose x.
+      self._cache_by_x(mapping)
+      if not tf.executing_eagerly():
+        self._cache_by_y(mapping)
       return mapping.x
 
   def inverse(self, y, name="inverse"):
@@ -1005,7 +1023,7 @@ class Bijector(object):
       ildj = -self._forward_log_det_jacobian(tensor_to_use, **kwargs)
 
     mapping = mapping.merge(x=x, y=y, ildj=ildj)
-    self._cache(mapping)
+    self._cache_update(mapping)
     return ildj
 
   def _compute_unreduced_constant_ildj_with_caching(
@@ -1200,27 +1218,45 @@ class Bijector(object):
       raise TypeError(
           "Input had dtype %s but expected %s." % (x.dtype, self.dtype))
 
-  def _cache(self, mapping):
-    """Helper which stores mapping info in forward/inverse dicts."""
+  def _cache_by_x(self, mapping):
+    """Helper which stores new mapping info in the forward dict."""
     # Merging from lookup is an added check that we're not overwriting anything
     # which is not None.
     mapping = mapping.merge(
         mapping=self._lookup(mapping.x, mapping.y, mapping.kwargs))
-    if mapping.x is None and mapping.y is None:
-      raise ValueError("Caching expects at least one of (x,y) to be known, "
-                       "i.e., not None.")
-    self._from_x[mapping.x_key] = mapping
-    self._from_y[mapping.y_key] = mapping
+    if mapping.x is None:
+      raise ValueError("Caching expects x to be known, i.e., not None.")
+    self._from_x.setdefault(mapping.x, {})[mapping.subkey] = mapping.remove("x")
+
+  def _cache_by_y(self, mapping):
+    """Helper which stores new mapping info in the inverse dict."""
+    # Merging from lookup is an added check that we're not overwriting anything
+    # which is not None.
+    mapping = mapping.merge(
+        mapping=self._lookup(mapping.x, mapping.y, mapping.kwargs))
+    if mapping.y is None:
+      raise ValueError("Caching expects y to be known, i.e., not None.")
+    self._from_y.setdefault(mapping.y, {})[mapping.subkey] = mapping.remove("y")
+
+  def _cache_update(self, mapping):
+    """Helper which updates only those cached entries that already exist."""
+    if (mapping.x is not None and
+        mapping.subkey in self._from_x.get(mapping.x, {})):
+      self._cache_by_x(mapping)
+    if (mapping.y is not None and
+        mapping.subkey in self._from_y.get(mapping.y, {})):
+      self._cache_by_y(mapping)
 
   def _lookup(self, x=None, y=None, kwargs=None):
     """Helper which retrieves mapping info from forward/inverse dicts."""
     mapping = _Mapping(x=x, y=y, kwargs=kwargs)
-    # Since _cache requires both x,y to be set, we only need to do one cache
-    # lookup since the mapping is always in both or neither.
-    if mapping.x is not None:
-      return self._from_x.get(mapping.x_key, mapping)
-    if mapping.y is not None:
-      return self._from_y.get(mapping.y_key, mapping)
+    subkey = mapping.subkey
+    if x is not None:
+      # We removed x at caching time. Add it back if we lookup successfully.
+      mapping = self._from_x.get(x, {}).get(subkey, mapping).merge(x=x)
+    if y is not None:
+      # We removed y at caching time. Add it back if we lookup successfully.
+      mapping = self._from_y.get(y, {}).get(subkey, mapping).merge(y=y)
     return mapping
 
   def _reduce_jacobian_det_over_event(
