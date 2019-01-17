@@ -30,12 +30,29 @@ from GitHub in that we pull and submit the change into an internal version
 control system. This system automatically pushes a git commit to the GitHub
 repository (with credit to the original author) and closes the pull request.
 
+## Continuous Integration
+
+We use [Travis CI](https://travis-ci.org/tensorflow/probability) to do automated
+style checking and run unit-tests (discussed in more detail below). A build
+will be triggered when you open a pull request, or update the pull request by
+adding a commit, rebasing etc.
+
+We test against TensorFlow nightly on Python 2.7 and 3.6. We shard our tests
+across several build jobs (identified by the `SHARD` environment variable).
+Linting, in particular, is only done on the first shard, so look at that shard's
+logs for lint errors if any.
+
+All pull-requests will need to pass the automated lint and unit-tests before
+being merged. As Travis-CI tests can take a bit of time, see the following
+sections on how to run the lint checks and unit-tests locally while you're
+developing your change.
+
 ## Style
 
 See the [TensorFlow Probability style guide](STYLE_GUIDE.md).  Running `pylint`
 detects many (but certainly not all) style issues.  TensorFlow Probability
-follows the [TensorFlow pylint
-configuration](https://github.com/tensorflow/tensorflow/blob/master/CONTRIBUTING.md#python-coding-style).
+follows a custom [pylint
+configuration](https://github.com/tensorflow/probability/blob/master/testing/pylintrc).
 
 ## Unit tests
 
