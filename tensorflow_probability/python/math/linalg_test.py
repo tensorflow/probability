@@ -134,7 +134,7 @@ class _LUInverse(object):
     x = tf.placeholder_with_default(
         x_, shape=x_.shape if self.use_static_shape else None)
 
-    y = tfp.math.lu_inverse(*tf.linalg.lu(x), validate_args=True)
+    y = tfp.math.lu_reconstruct(*tf.linalg.lu(x), validate_args=True)
     y_ = self.evaluate(y)
 
     if self.use_static_shape:
@@ -151,7 +151,7 @@ class _LUInverse(object):
     x = tf.placeholder_with_default(
         x_, shape=x_.shape if self.use_static_shape else None)
 
-    y = tfp.math.lu_inverse(*tf.linalg.lu(x), validate_args=True)
+    y = tfp.math.lu_reconstruct(*tf.linalg.lu(x), validate_args=True)
     y_ = self.evaluate(y)
 
     if self.use_static_shape:
@@ -180,7 +180,7 @@ class _MatrixInverseLU(object):
     x = tf.placeholder_with_default(
         x_, shape=x_.shape if self.use_static_shape else None)
 
-    y = tfp.math.matrix_inverse_lu(*tf.linalg.lu(x), validate_args=True)
+    y = tfp.math.lu_matrix_inverse(*tf.linalg.lu(x), validate_args=True)
     y_ = self.evaluate(y)
 
     if self.use_static_shape:
@@ -197,7 +197,7 @@ class _MatrixInverseLU(object):
     x = tf.placeholder_with_default(
         x_, shape=x_.shape if self.use_static_shape else None)
 
-    y = tfp.math.matrix_inverse_lu(*tf.linalg.lu(x), validate_args=True)
+    y = tfp.math.lu_matrix_inverse(*tf.linalg.lu(x), validate_args=True)
     y_ = self.evaluate(y)
 
     if self.use_static_shape:
