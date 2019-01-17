@@ -178,10 +178,10 @@ class GaussianProcess(mvn_linear_operator.MultivariateNormalLinearOperator):
     sess.run(tf.global_variables_initializer())
 
     for i in range(1000):
-      _, nll_ = sess.run([optimize, nll])
+      _, neg_log_likelihood_ = sess.run([optimize, neg_log_likelihood])
       if i % 100 == 0:
-        print("Step {}: NLL = {}".format(i, nll_))
-    print("Final NLL = {}".format(nll_))
+        print("Step {}: NLL = {}".format(i, neg_log_likelihood_))
+    print("Final NLL = {}".format(neg_log_likelihood_))
   ```
 
   """
