@@ -37,6 +37,7 @@ from tensorflow_probability.python.edward2.interceptor import interceptable
 from tensorflow_probability.python.edward2.interceptor import interception
 from tensorflow_probability.python.edward2.interceptor import tape
 from tensorflow_probability.python.edward2.program_transformations import make_log_joint_fn
+from tensorflow_probability.python.edward2.program_transformations import make_value_setter
 from tensorflow_probability.python.edward2.random_variable import RandomVariable
 # pylint: enable=wildcard-import
 
@@ -49,6 +50,7 @@ _allowed_symbols = rv_all + [
     "get_next_interceptor",
     "interceptable",
     "make_log_joint_fn",
+    "make_value_setter",
     "tape",
 ]
 

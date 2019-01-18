@@ -194,6 +194,43 @@ class ProgramTransformationsTest(tf.test.TestCase):
     with self.assertRaises(KeyError):
       _ = log_joint(loc=loc_value, x=x_value)
 
+  @tfe.run_test_in_graph_and_eager_modes
+  def testMakeValueSetterSetsValues(self):
+    def normal_with_unknown_mean():
+      loc = ed.Normal(loc=0., scale=1., name="loc")
+      x = ed.Normal(loc=loc, scale=0.5, name="x")
+      return loc, x
+
+    loc_value, x_value = 3., 4.
+    with ed.interception(ed.make_value_setter(loc=loc_value, x=x_value)):
+      loc_rv, x_rv = normal_with_unknown_mean()
+    self.assertAllEqual(self.evaluate((loc_rv, x_rv)), (loc_value, x_value))
+
+  @tfe.run_test_in_graph_and_eager_modes
+  def testMakeValueSetterWorksWithPartialAssignment(self):
+    def normal_with_unknown_mean():
+      loc = ed.Normal(loc=0., scale=1., name="loc")
+      x = ed.Normal(loc=loc, scale=0.5, name="x")
+      return x
+
+    # Setting only the latents produces the posterior predictive distribution.
+    loc_value = 3.
+    with ed.interception(ed.make_value_setter(loc=loc_value)):
+      x_predictive = normal_with_unknown_mean()
+    self.assertAllEqual(self.evaluate(x_predictive.distribution.mean()),
+                        loc_value)
+
+    # Setting observed values allows calling the log joint as a fn of latents.
+    x_value = 4.
+    def model_with_observed_x():
+      with ed.interception(ed.make_value_setter(x=x_value)):
+        normal_with_unknown_mean()
+    observed_log_joint_fn = ed.make_log_joint_fn(model_with_observed_x)
+
+    expected_joint_log_prob = (tfd.Normal(0., 1.).log_prob(loc_value) +
+                               tfd.Normal(loc_value, 0.5).log_prob(x_value))
+    self.assertEqual(self.evaluate(expected_joint_log_prob),
+                     self.evaluate(observed_log_joint_fn(loc=loc_value)))
 
 if __name__ == "__main__":
   tf.test.main()
