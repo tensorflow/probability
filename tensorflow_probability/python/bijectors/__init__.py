@@ -43,6 +43,7 @@ from tensorflow_probability.python.bijectors.masked_autoregressive import masked
 from tensorflow_probability.python.bijectors.masked_autoregressive import masked_dense
 from tensorflow_probability.python.bijectors.masked_autoregressive import MaskedAutoregressiveFlow
 from tensorflow_probability.python.bijectors.matrix_inverse_tril import MatrixInverseTriL
+from tensorflow_probability.python.bijectors.matveclu import MatvecLU
 from tensorflow_probability.python.bijectors.normal_cdf import NormalCDF
 from tensorflow_probability.python.bijectors.ordered import Ordered
 from tensorflow_probability.python.bijectors.permute import Permute
@@ -87,6 +88,7 @@ __all__ = [
     "Kumaraswamy",
     "MaskedAutoregressiveFlow",
     "MatrixInverseTriL",
+    "MatvecLU",
     "NormalCDF",
     "Ordered",
     "Permute",

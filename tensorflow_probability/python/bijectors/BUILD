@@ -53,6 +53,7 @@ py_library(
         ":kumaraswamy",
         ":masked_autoregressive",
         ":matrix_inverse_tril",
+        ":matveclu",
         ":normal_cdf",
         ":ordered",
         ":permute",
@@ -173,6 +174,16 @@ py_library(
     deps = [
         ":bijector",
         "//tensorflow_probability/python/internal:distribution_util",
+    ],
+)
+
+py_library(
+    name = "matveclu",
+    srcs = ["matveclu.py"],
+    deps = [
+        ":bijector",
+        # tensorflow dep,
+        "//tensorflow_probability/python/math:linalg",
     ],
 )
 
@@ -566,6 +577,17 @@ py_test(
     srcs = ["conditional_bijector_test.py"],
     deps = [
         ":bijectors",
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "matveclu_test",
+    size = "small",
+    srcs = ["matveclu_test.py"],
+    deps = [
+        ":bijectors",
+        # numpy dep,
         # tensorflow dep,
     ],
 )
