@@ -496,7 +496,7 @@ class CategoricalMixtureOfOneHotCategoricalTest(tf.test.TestCase):
     model.fit(x, y,
               batch_size=batch_size,
               epochs=1,
-              steps_per_epoch=n // batch_size,
+              steps_per_epoch=1,  # Usually `n // batch_size`.
               shuffle=True)
 
     yhat = model(x)
@@ -512,40 +512,82 @@ class CategoricalMixtureOfOneHotCategoricalTest(tf.test.TestCase):
 
 
 @tfe.run_all_tests_in_graph_and_eager_modes
-class IndependentBernoulliTest(tf.test.TestCase):
+class _IndependentLayerTest(object):
+  """Base class for testing independent distribution layers.
 
-  def _check_distribution(self, t, x):
+  Instances of subclasses must set:
+    self.layer_class: The independent distribution layer class.
+    self.dist_class: The underlying `tfd.Distribution` class.
+    self.dtype: The data type for the parameters passed to the layer.
+    self.use_static_shape: Whether or not test tensor inputs should have
+      statically-known shapes.
+  """
+
+  def _distribution_to_params(self, distribution, batch_shape):
+    """Given a self.layer_class instance, return a tensor of its parameters."""
+    raise NotImplementedError
+
+  def _build_tensor(self, ndarray, dtype=None):
+    # Enforce parameterized dtype and static/dynamic testing.
+    ndarray = np.asarray(ndarray).astype(
+        dtype if dtype is not None else self.dtype)
+    return tf.placeholder_with_default(
+        input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
+
+  def _check_distribution(self, t, x, batch_shape):
     self.assertIsInstance(x, tfd.Independent)
-    self.assertIsInstance(x.distribution, tfd.Bernoulli)
-    t_back = tf.reshape(x.distribution.logits, shape=[2, 3, -1])
-    [
-        t_, t_back_,
-        x_logits_, x_dist_logits_,
-        x_probs_, x_dist_probs_,
-    ] = self.evaluate([
-        t, t_back,
-        x._logits, x.distribution.logits,
-        x._probs, x.distribution.probs,
-    ])
+    self.assertIsInstance(x.distribution, self.dist_class)
+    t_back = self._distribution_to_params(x.distribution, batch_shape)
+    [t_, t_back_] = self.evaluate([t, t_back])
     self.assertAllClose(t_, t_back_, atol=1e-6, rtol=1e-5)
-    self.assertAllClose(x_logits_, x_dist_logits_, atol=1e-6, rtol=1e-5)
-    self.assertAllClose(x_probs_, x_dist_probs_, atol=1e-6, rtol=1e-5)
 
   def test_new(self):
-    event_shape = [2, 3, 1]
-    p = tfpl.IndependentBernoulli.params_size(event_shape)
-    t = tfd.Normal(0, 1).sample([2, 3, p], seed=42)
-    x = tfpl.IndependentBernoulli.new(
-        t, event_shape, validate_args=True)
-    self._check_distribution(t, x)
+    batch_shape = self._build_tensor([2], dtype=np.int32)
+    event_shape = self._build_tensor([2, 1, 2], dtype=np.int32)
+    p = self.layer_class.params_size(event_shape)
+
+    low = self._build_tensor(-3.)
+    high = self._build_tensor(3.)
+    t = tfd.Uniform(low, high).sample(tf.concat([batch_shape, [p]], 0), seed=42)
+
+    x = self.layer_class.new(t, event_shape, validate_args=True)
+    self._check_distribution(t, x, batch_shape)
 
   def test_layer(self):
-    event_shape = [2, 3, 1]
-    p = tfpl.IndependentBernoulli.params_size(event_shape)
-    layer = tfpl.IndependentBernoulli(event_shape, validate_args=True)
-    t = tfd.Normal(0, 1).sample([2, 3, p], seed=42)
+    batch_shape = self._build_tensor([5, 5], dtype=np.int32)
+    p = self.layer_class.params_size()
+
+    low = self._build_tensor(-3.)
+    high = self._build_tensor(3.)
+    t = tfd.Uniform(low, high).sample(tf.concat([batch_shape, [p]], 0), seed=42)
+
+    layer = self.layer_class(validate_args=True)
     x = layer(t)
-    self._check_distribution(t, x)
+    self._check_distribution(t, x, batch_shape)
+
+
+@tfe.run_all_tests_in_graph_and_eager_modes
+class _IndependentBernoulliTest(_IndependentLayerTest):
+  layer_class = tfpl.IndependentBernoulli
+  dist_class = tfd.Bernoulli
+
+  def _distribution_to_params(self, distribution, batch_shape):
+    return tf.reshape(distribution.logits,
+                      tf.concat([batch_shape, [-1]], axis=-1))
+
+
+@tfe.run_all_tests_in_graph_and_eager_modes
+class IndependentBernoulliTestDynamicShape(tf.test.TestCase,
+                                           _IndependentBernoulliTest):
+  dtype = np.float64
+  use_static_shape = False
+
+
+@tfe.run_all_tests_in_graph_and_eager_modes
+class IndependentBernoulliTestStaticShape(tf.test.TestCase,
+                                          _IndependentBernoulliTest):
+  dtype = np.float32
+  use_static_shape = True
 
   def test_doc_string(self):
     # Load data.
@@ -584,48 +626,16 @@ class IndependentBernoulliTest(tf.test.TestCase):
 
 
 @tfe.run_all_tests_in_graph_and_eager_modes
-class _IndependentNormalTest(object):
+class _IndependentNormalTest(_IndependentLayerTest):
+  layer_class = tfpl.IndependentNormal
+  dist_class = tfd.Normal
 
-  def _build_tensor(self, ndarray, dtype=None):
-    # Enforce parameterized dtype and static/dynamic testing.
-    ndarray = np.asarray(ndarray).astype(
-        dtype if dtype is not None else self.dtype)
-    return tf.placeholder_with_default(
-        input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
-
-  def _check_distribution(self, t, x, batch_shape):
-    self.assertIsInstance(x, tfd.Independent)
-    self.assertIsInstance(x.distribution, tfd.Normal)
-    t_back = tf.concat([
-        tf.reshape(x.distribution.loc, tf.concat([batch_shape, [-1]], axis=-1)),
+  def _distribution_to_params(self, distribution, batch_shape):
+    return tf.concat([
+        tf.reshape(distribution.loc, tf.concat([batch_shape, [-1]], axis=-1)),
         tfd.softplus_inverse(tf.reshape(
-            x.distribution.scale, tf.concat([batch_shape, [-1]], axis=-1)))
+            distribution.scale, tf.concat([batch_shape, [-1]], axis=-1)))
     ], -1)
-    [t_, t_back_] = self.evaluate([t, t_back])
-    self.assertAllClose(t_, t_back_, atol=1e-6, rtol=1e-5)
-
-  def test_new(self):
-    batch_shape = self._build_tensor([2], dtype=np.int32)
-    event_shape = self._build_tensor([2, 1, 2], dtype=np.int32)
-    low = self._build_tensor(-3.)
-    high = self._build_tensor(3.)
-    p = tfpl.IndependentNormal.params_size(event_shape)
-
-    t = tfd.Uniform(low, high).sample(tf.concat([batch_shape, [p]], 0), seed=42)
-    x = tfpl.IndependentNormal.new(
-        t, event_shape, validate_args=True)
-    self._check_distribution(t, x, batch_shape)
-
-  def test_layer(self):
-    batch_shape = self._build_tensor([7, 3], dtype=np.int32)
-    low = self._build_tensor(-3.)
-    high = self._build_tensor(3.)
-    p = tfpl.IndependentNormal.params_size()
-
-    layer = tfpl.IndependentNormal(validate_args=True)
-    t = tfd.Uniform(low, high).sample(tf.concat([batch_shape, [p]], 0), seed=42)
-    x = layer(t)
-    self._check_distribution(t, x, batch_shape)
 
   def test_keras_sequential_with_unknown_input_size(self):
     input_shape = [28, 28, 1]
@@ -783,7 +793,7 @@ class _MixtureSameFamilyTest(object):
     model.fit(x, y,
               batch_size=batch_size,
               epochs=1,
-              steps_per_epoch=n // batch_size)
+              steps_per_epoch=1)  # Usually `n // batch_size`.
 
     self.assertEqual(15, self.evaluate(tf.convert_to_tensor(params_size)))
 
