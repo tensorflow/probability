@@ -58,7 +58,7 @@ __Layer 3: Probabilistic Inference__
 * Optimizers ([`tfp.optimizer`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/optimizer)):
   Stochastic optimization methods, extending TensorFlow Optimizers. Includes
   [Stochastic Gradient Langevin Dynamics](http://www.icml-2011.org/papers/398_icmlpaper.pdf).
-* Monte Carlo ([`tfp.monte_carlo`](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/monte_carlo.py)):
+* Monte Carlo ([`tfp.monte_carlo`](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/monte_carlo)):
   Tools for computing Monte Carlo expectations.
 
 TensorFlow Probability is under active development. Interfaces may change at any
