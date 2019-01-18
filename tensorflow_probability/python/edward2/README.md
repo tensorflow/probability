@@ -115,7 +115,7 @@ with tf.Session() as sess:
       [posterior_coeffs, posterior_intercept])
 ```
 
-Note the use of [`tfp.trainable_distributions`](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/trainable_distributions.py)
+Note the use of [`tfp.trainable_distributions`](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/trainable_distributions)
 in the above example. It provides utilities for distributions with parameters
 that live in a constrained space (like the scale of a normal).
 
