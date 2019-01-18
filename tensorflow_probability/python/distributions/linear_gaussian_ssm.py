@@ -456,6 +456,99 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
           graph_parents=[],
           name=name)
 
+  def backward_smoothing_pass(self,
+                              filtered_means,
+                              filtered_covs,
+                              predicted_means,
+                              predicted_covs):
+    """Run the backward pass in Kalman smoother.
+
+    The backward smoothing is using Rauch, Tung and Striebel smoother as
+    as discussed in section 18.3.2 of Kevin P. Murphy, 2012, Machine Learning:
+    A Probabilistic Perspective, The MIT Press. The inputs are returned by
+    `forward_filter` function.
+
+    Args:
+      filtered_means: Means of the per-timestep filtered marginal
+        distributions p(z_t | x_{:t}), as a Tensor of shape
+        `sample_shape(x) + batch_shape + [num_timesteps, latent_size]`.
+      filtered_covs: Covariances of the per-timestep filtered marginal
+        distributions p(z_t | x_{:t}), as a Tensor of shape
+        `batch_shape + [num_timesteps, latent_size, latent_size]`.
+      predicted_means: Means of the per-timestep predictive
+         distributions over latent states, p(z_{t+1} | x_{:t}), as a
+         Tensor of shape `sample_shape(x) + batch_shape +
+         [num_timesteps, latent_size]`.
+      predicted_covs: Covariances of the per-timestep predictive
+         distributions over latent states, p(z_{t+1} | x_{:t}), as a
+         Tensor of shape `batch_shape + [num_timesteps, latent_size,
+         latent_size]`.
+
+    Returns:
+      posterior_means: Means of the smoothed marginal distributions
+        p(z_t | x_{1:T}), as a Tensor of shape
+        `sample_shape(x) + batch_shape + [num_timesteps, latent_size]`,
+        which is of the same shape as filtered_means.
+      posterior_covs: Covariances of the smoothed marginal distributions
+        p(z_t | x_{1:T}), as a Tensor of shape
+        `batch_shape + [num_timesteps, latent_size, latent_size]`.
+        which is of the same shape as filtered_covs.
+    """
+    with tf.name_scope("backward_pass",
+                       values=[filtered_means,
+                               filtered_covs,
+                               predicted_means,
+                               predicted_covs]):
+      filtered_means = tf.convert_to_tensor(filtered_means,
+                                            name="filtered_means")
+      filtered_covs = tf.convert_to_tensor(filtered_covs,
+                                           name="filtered_covs")
+      predicted_means = tf.convert_to_tensor(predicted_means,
+                                             name="predicted_means")
+      predicted_covs = tf.convert_to_tensor(predicted_covs,
+                                            name="predicted_covs")
+
+      # To scan over time dimension, we need to move 'num_timesteps' from the
+      # event shape to the initial dimension of the tensor.
+      filtered_means = util.move_dimension(filtered_means, -2, 0)
+      filtered_covs = util.move_dimension(filtered_covs, -3, 0)
+      predicted_means = util.move_dimension(predicted_means, -2, 0)
+      predicted_covs = util.move_dimension(predicted_covs, -3, 0)
+
+      # The means are assumed to be vectors. Adding a dummy index to
+      # ensure the `matmul` op working smoothly.
+      filtered_means = filtered_means[..., tf.newaxis]
+      predicted_means = predicted_means[..., tf.newaxis]
+
+      initial_backward_mean = predicted_means[-1, ...]
+      initial_backward_cov = predicted_covs[-1, ...]
+
+      num_timesteps = tf.shape(filtered_means)[0]
+      initial_state = BackwardPassState(
+          backward_mean=initial_backward_mean,
+          backward_cov=initial_backward_cov,
+          timestep=self.initial_step + num_timesteps - 1)
+
+      update_step_fn = build_backward_pass_step(
+          self.get_transition_matrix_for_timestep)
+
+      # For backward pass, it scans the `elems` from last to first.
+      posterior_states = tf.scan(update_step_fn,
+                                 elems=(filtered_means,
+                                        filtered_covs,
+                                        predicted_means,
+                                        predicted_covs),
+                                 initializer=initial_state,
+                                 reverse=True)
+
+      # Move the time dimension back into the event shape.
+      posterior_means = util.move_dimension(
+          posterior_states.backward_mean[..., 0], 0, -2)
+      posterior_covs = util.move_dimension(
+          posterior_states.backward_cov, 0, -3)
+
+      return (posterior_means, posterior_covs)
+
   def _batch_shape_tensor(self):
     # We assume the batch shapes of parameters don't change over time,
     # so use the initial step as a prototype.
@@ -746,6 +839,59 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
               predicted_means, predicted_covs,
               observation_means, observation_covs)
 
+  def posterior_marginals(self, x):
+    """Run a Kalman smoother to return posterior mean and cov.
+
+    Note that the returned values `smoothed_means` depend on the observed
+    time series `x`, while the `smoothed_covs` are independent
+    of the observed series; i.e., they depend only on the model itself.
+    This means that the mean values have shape `concat([sample_shape(x),
+    batch_shape, [num_timesteps, {latent/observation}_size]])`,
+    while the covariances have shape `concat[(batch_shape, [num_timesteps,
+    {latent/observation}_size, {latent/observation}_size]])`, which
+    does not depend on the sample shape.
+
+    This function only performs smoothing. If the user wants the
+    intermediate values, which are returned by filtering pass `forward_filter`,
+    one could get it by:
+    ```
+    (log_likelihoods,
+     filtered_means, filtered_covs,
+     predicted_means, predicted_covs,
+     observation_means, observation_covs) = model.forward_filter(x)
+    smoothed_means, smoothed_covs = model.backward_smoothing_pass(x)
+    ```
+    where `x` is an observation sequence.
+
+    Args:
+      x: a float-type `Tensor` with rightmost dimensions
+        `[num_timesteps, observation_size]` matching
+        `self.event_shape`. Additional dimensions must match or be
+        broadcastable to `self.batch_shape`; any further dimensions
+        are interpreted as a sample shape.
+
+    Returns:
+      smoothed_means: Means of the per-timestep smoothed
+         distributions over latent states, p(x_{t} | x_{:T}), as a
+         Tensor of shape `sample_shape(x) + batch_shape +
+         [num_timesteps, observation_size]`.
+      smoothed_covs: Covariances of the per-timestep smoothed
+         distributions over latent states, p(x_{t} | x_{:T}), as a
+         Tensor of shape `batch_shape + [num_timesteps,
+         observation_size, observation_size]`.
+    """
+
+    with tf.name_scope("smooth", values=[x]):
+      x = tf.convert_to_tensor(x, name="x")
+      (_, filtered_means, filtered_covs,
+       predicted_means, predicted_covs, _, _) = self.forward_filter(x)
+
+      (smoothed_means, smoothed_covs) = self.backward_smoothing_pass(
+          filtered_means, filtered_covs,
+          predicted_means, predicted_covs)
+
+      return (smoothed_means, smoothed_covs)
+
   def _mean(self):
     _, observation_mean = self._joint_mean()
     return observation_mean
@@ -870,6 +1016,126 @@ KalmanFilterState = collections.namedtuple("KalmanFilterState", [
     "predicted_mean", "predicted_cov",
     "observation_mean", "observation_cov",
     "log_marginal_likelihood", "timestep"])
+
+
+BackwardPassState = collections.namedtuple("BackwardPassState", [
+    "backward_mean", "backward_cov", "timestep"])
+
+
+def build_backward_pass_step(get_transition_matrix_for_timestep):
+  """Build a callable that perform one step for backward smoothing.
+
+  Args:
+    get_transition_matrix_for_timestep: callable taking a timestep
+      as an integer `Tensor` argument, and returning a `LinearOperator`
+      of shape `[latent_size, latent_size]`.
+
+  Returns:
+    backward_pass_step: a callable that updates a BackwardPassState
+      from timestep `t` to `t-1`.
+  """
+
+  def backward_pass_step(state,
+                         filtered_parameters):
+    """Run a single step of backward smoothing."""
+
+    (filtered_mean, filtered_cov,
+     predicted_mean, predicted_cov) = filtered_parameters
+    transition_matrix = get_transition_matrix_for_timestep(state.timestep)
+
+    next_posterior_mean = state.backward_mean
+    next_posterior_cov = state.backward_cov
+
+    posterior_mean, posterior_cov = backward_smoothing_update(
+        filtered_mean,
+        filtered_cov,
+        predicted_mean,
+        predicted_cov,
+        next_posterior_mean,
+        next_posterior_cov,
+        transition_matrix)
+
+    return BackwardPassState(backward_mean=posterior_mean,
+                             backward_cov=posterior_cov,
+                             timestep=state.timestep-1)
+
+  return backward_pass_step
+
+
+def backward_smoothing_update(filtered_mean,
+                              filtered_cov,
+                              predicted_mean,
+                              predicted_cov,
+                              next_posterior_mean,
+                              next_posterior_cov,
+                              transition_matrix):
+  """Backward update for a Kalman smoother.
+
+  Give the `filtered_mean` mu(t | t), `filtered_cov` sigma(t | t),
+  `predicted_mean` mu(t+1 | t) and `predicted_cov` sigma(t+1 | t),
+  as returns from the `forward_filter` function, as well as
+  `next_posterior_mean` mu(t+1 | 1:T) and `next_posterior_cov` sigma(t+1 | 1:T),
+  if the `transition_matrix` of states from time t to time t+1
+  is given as A(t+1), the 1 step backward smoothed distribution parameter
+  could be calculated as:
+  p(z(t) | Obs(1:T)) = N( mu(t | 1:T), sigma(t | 1:T)),
+  mu(t | 1:T) = mu(t | t) + J(t) * (mu(t+1 | 1:T) - mu(t+1 | t)),
+  sigma(t | 1:T) = sigma(t | t)
+                   + J(t) * (sigma(t+1 | 1:T) - sigma(t+1 | t) * J(t)',
+  J(t) = sigma(t | t) * A(t+1)' / sigma(t+1 | t),
+  where all the multiplications are matrix multiplication, and `/` is
+  the matrix inverse. J(t) is the backward Kalman gain matrix.
+
+  The algorithm can be intialized from mu(T | 1:T) and sigma(T | 1:T),
+  which are the last step parameters returned by forward_filter.
+
+
+  Args:
+    filtered_mean: `Tensor` with event shape `[latent_size, 1]` and
+      batch shape `B`, containing mu(t | t).
+    filtered_cov: `Tensor` with event shape `[latent_size, latent_size]` and
+      batch shape `B`, containing sigma(t | t).
+    predicted_mean: `Tensor` with event shape `[latent_size, 1]` and
+      batch shape `B`, containing mu(t+1 | t).
+    predicted_cov: `Tensor` with event shape `[latent_size, latent_size]` and
+      batch shape `B`, containing sigma(t+1 | t).
+    next_posterior_mean: `Tensor` with event shape `[latent_size, 1]` and
+      batch shape `B`, containing mu(t+1 | 1:T).
+    next_posterior_cov: `Tensor` with event shape `[latent_size, latent_size]`
+      and batch shape `B`, containing sigma(t+1 | 1:T).
+    transition_matrix: `LinearOperator` with shape
+      `[latent_size, latent_size]` and batch shape broadcastable
+      to `B`.
+
+  Returns:
+    posterior_mean: `Tensor` with event shape `[latent_size, 1]` and
+      batch shape `B`, containing mu(t | 1:T).
+    posterior_cov: `Tensor` with event shape `[latent_size, latent_size]` and
+      batch shape `B`, containing sigma(t | 1:T).
+  """
+  # Compute backward Kalman gain:
+  # J = F * T' * P^{-1}
+  # Since both F(iltered) and P(redictive) are cov matrices,
+  # thus self-adjoint, we can take the transpose.
+  # computation:
+  #      = (P^{-1} * T * F)'
+  #      = (P^{-1} * tmp_gain_cov) '
+  #      = (P \ tmp_gain_cov)'
+  tmp_gain_cov = transition_matrix.matmul(filtered_cov)
+  predicted_cov_chol = tf.cholesky(predicted_cov)
+  gain_transpose = tf.cholesky_solve(predicted_cov_chol, tmp_gain_cov)
+
+  posterior_mean = (filtered_mean +
+                    _matmul(gain_transpose,
+                            next_posterior_mean - predicted_mean,
+                            adjoint_a=True))
+  posterior_cov = (
+      filtered_cov +
+      _matmul(gain_transpose,
+              _matmul(next_posterior_cov - predicted_cov, gain_transpose),
+              adjoint_a=True))
+
+  return (posterior_mean, posterior_cov)
 
 
 def build_kalman_filter_step(get_transition_matrix_for_timestep,
