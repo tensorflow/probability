@@ -123,7 +123,7 @@ def make_tensor_hiding_attributes(value, hide_shape, hide_value=True):
   return tf.placeholder_with_default(input=value, shape=shape)
 
 
-class _LUInverse(object):
+class _LUReconstruct(object):
   dtype = np.float32
   use_static_shape = True
 
@@ -160,23 +160,21 @@ class _LUInverse(object):
 
 
 @tfe.run_all_tests_in_graph_and_eager_modes
-class LUInverseStatic(tf.test.TestCase, _LUInverse):
+class LUReconstructStatic(tf.test.TestCase, _LUReconstruct):
   use_static_shape = True
 
 
 @tfe.run_all_tests_in_graph_and_eager_modes
-class LUInverseDynamic(tf.test.TestCase, _LUInverse):
+class LUReconstructDynamic(tf.test.TestCase, _LUReconstruct):
   use_static_shape = False
 
 
-class _MatrixInverseLU(object):
+class _LUMatrixInverse(object):
   dtype = np.float32
   use_static_shape = True
 
   def test_non_batch(self):
-    x_ = np.array(
-        [[3, 4], [1, 2]],
-        dtype=self.dtype)
+    x_ = np.array([[1, 2], [3, 4]], dtype=self.dtype)
     x = tf.placeholder_with_default(
         x_, shape=x_.shape if self.use_static_shape else None)
 
@@ -190,8 +188,12 @@ class _MatrixInverseLU(object):
   def test_batch(self):
     x_ = np.array(
         [
-            [[3, 4], [1, 2]],
-            [[7, 8], [3, 4]],
+            [[1, 2],
+             [3, 4]],
+            [[7, 8],
+             [3, 4]],
+            [[0.25, 0.5],
+             [0.75, -2.]],
         ],
         dtype=self.dtype)
     x = tf.placeholder_with_default(
@@ -206,12 +208,77 @@ class _MatrixInverseLU(object):
 
 
 @tfe.run_all_tests_in_graph_and_eager_modes
-class MatrixInverseLUStatic(tf.test.TestCase, _MatrixInverseLU):
+class LUMatrixInverseStatic(tf.test.TestCase, _LUMatrixInverse):
   use_static_shape = True
 
 
 @tfe.run_all_tests_in_graph_and_eager_modes
-class MatrixInverseLUDynamic(tf.test.TestCase, _MatrixInverseLU):
+class LUMatrixInverseDynamic(tf.test.TestCase, _LUMatrixInverse):
+  use_static_shape = False
+
+
+class _LUSolve(object):
+  dtype = np.float32
+  use_static_shape = True
+
+  def test_non_batch(self):
+    x_ = np.array(
+        [[1, 2],
+         [3, 4]],
+        dtype=self.dtype)
+    x = tf.placeholder_with_default(
+        x_, shape=x_.shape if self.use_static_shape else None)
+    rhs_ = np.array([[1, 1]], dtype=self.dtype).T
+    rhs = tf.placeholder_with_default(
+        rhs_, shape=rhs_.shape if self.use_static_shape else None)
+
+    lower_upper, perm = tf.linalg.lu(x)
+    y = tfp.math.lu_solve(lower_upper, perm, rhs, validate_args=True)
+    y_, perm_ = self.evaluate([y, perm])
+
+    self.assertAllEqual([1, 0], perm_)
+    expected_ = np.linalg.solve(x_, rhs_)
+    if self.use_static_shape:
+      self.assertAllEqual(expected_.shape, y.shape)
+    self.assertAllClose(expected_, y_, atol=0., rtol=1e-3)
+
+  def test_batch_broadcast(self):
+    x_ = np.array(
+        [
+            [[1, 2],
+             [3, 4]],
+            [[7, 8],
+             [3, 4]],
+            [[0.25, 0.5],
+             [0.75, -2.]],
+        ],
+        dtype=self.dtype)
+    x = tf.placeholder_with_default(
+        x_, shape=x_.shape if self.use_static_shape else None)
+    rhs_ = np.array([[1, 1]], dtype=self.dtype).T
+    rhs = tf.placeholder_with_default(
+        rhs_, shape=rhs_.shape if self.use_static_shape else None)
+
+    lower_upper, perm = tf.linalg.lu(x)
+    y = tfp.math.lu_solve(lower_upper, perm, rhs, validate_args=True)
+    y_, perm_ = self.evaluate([y, perm])
+
+    self.assertAllEqual([[1, 0],
+                         [0, 1],
+                         [1, 0]], perm_)
+    expected_ = np.linalg.solve(x_, rhs_[np.newaxis])
+    if self.use_static_shape:
+      self.assertAllEqual(expected_.shape, y.shape)
+    self.assertAllClose(expected_, y_, atol=0., rtol=1e-3)
+
+
+@tfe.run_all_tests_in_graph_and_eager_modes
+class LUSolveStatic(tf.test.TestCase, _LUSolve):
+  use_static_shape = True
+
+
+@tfe.run_all_tests_in_graph_and_eager_modes
+class LUSolveDynamic(tf.test.TestCase, _LUSolve):
   use_static_shape = False
 
 
