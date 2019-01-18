@@ -136,5 +136,11 @@ class UtilTest(tf.test.TestCase):
         self.evaluate(tf.gradients(safe_sqrt, xs)[0]),
         rtol=1e-10)
 
+  def testSqrtWithFiniteGradsWithDynamicShape(self):
+    x = tf.placeholder_with_default([1.], shape=[None])
+    self.assertAllEqual(
+        self.evaluate(tf.gradients(tf.sqrt(x), x)),
+        self.evaluate(tf.gradients(util.sqrt_with_finite_grads(x), x)))
+
 if __name__ == '__main__':
   tf.test.main()

@@ -147,7 +147,7 @@ def sqrt_with_finite_grads(x, name=None):
       large_float_like_x = np.sqrt(np.finfo(x.dtype.as_numpy_dtype()).max)
       safe_grads = tf.where(
           tf.equal(x, 0),
-          tf.fill(x.shape, large_float_like_x),
+          tf.fill(tf.shape(x), large_float_like_x),
           0.5 * tf.rsqrt(x))
       return grad_ys * safe_grads
     return tf.sqrt(x), grad
