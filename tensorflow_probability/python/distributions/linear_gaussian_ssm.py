@@ -284,7 +284,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
     """Initialize a `LinearGaussianStateSpaceModel.
 
     Args:
-      num_timesteps: Python `int` total number of timesteps.
+      num_timesteps: Integer `Tensor` total number of timesteps.
       transition_matrix: A transition operator, represented by a Tensor or
         LinearOperator of shape `[latent_size, latent_size]`, or by a
         callable taking as argument a scalar integer Tensor `t` and
@@ -334,7 +334,8 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
                                      initial_state_prior,
                                      initial_step]) as name:
 
-      self.num_timesteps = num_timesteps
+      self.num_timesteps = tf.convert_to_tensor(
+          num_timesteps, name="num_timesteps")
       self.initial_state_prior = initial_state_prior
       self.initial_step = initial_step
       self.final_step = self.initial_step + self.num_timesteps

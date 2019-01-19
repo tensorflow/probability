@@ -40,9 +40,6 @@ class _ReshapeBijectorTest(object):
   TensorFlow op errors (dynamic shapes).
   """
 
-  def setUp(self):
-    self._rng = np.random.RandomState(42)
-
   def testBijector(self):
     """Do a basic sanity check of forward, inverse, jacobian."""
     expected_x = np.random.randn(4, 3, 2)
@@ -329,12 +326,13 @@ class ReshapeBijectorTestDynamic(tf.test.TestCase, _ReshapeBijectorTest):
             tf.placeholder_with_default(shape_out, shape=[len(shape_out)]))
 
   def assertRaisesError(self, msg):
+    if tf.executing_eagerly():
+      return self.assertRaisesRegexp(Exception, msg)
     return self.assertRaisesOpError(msg)
 
   def testEventShape(self):
     # Shape is always known for reshaping in eager mode, so we skip these tests.
-    if tf.executing_eagerly():
-      return
+    if tf.executing_eagerly(): return
 
     event_shape_in, event_shape_out = self.build_shapes([2, 3], [6])
     bijector = tfb.Reshape(
@@ -362,8 +360,7 @@ class ReshapeBijectorTestDynamic(tf.test.TestCase, _ReshapeBijectorTest):
     self._testInputOutputMismatchOpError("Input to reshape is a tensor with")
 
   def testMultipleUnspecifiedDimensionsOpError(self):
-    with self.assertRaisesError(
-        "elements must have at most one `-1`."):
+    with self.assertRaisesError("must have at most one `-1`."):
       shape_in, shape_out = self.build_shapes([2, 3], [4, -1, -1,])
       bijector = tfb.Reshape(
           event_shape_out=shape_out,
@@ -383,6 +380,7 @@ class ReshapeBijectorTestDynamic(tf.test.TestCase, _ReshapeBijectorTest):
       self.evaluate(bijector.forward_event_shape_tensor(shape_in))
 
   def testUnknownShapeRank(self):
+    if tf.executing_eagerly(): return
     unknown_shape = tf.placeholder_with_default([2, 2], shape=None)
     known_shape = [2, 2]
 

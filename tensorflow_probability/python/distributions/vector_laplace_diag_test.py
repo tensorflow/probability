@@ -32,6 +32,7 @@ class VectorLaplaceDiagTest(tf.test.TestCase):
   """Well tested because this is a simple override of the base class."""
 
   def setUp(self):
+    super(VectorLaplaceDiagTest, self).setUp()
     self._rng = np.random.RandomState(42)
 
   def testScalarParams(self):

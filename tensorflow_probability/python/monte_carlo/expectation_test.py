@@ -69,15 +69,17 @@ class ExpectationTest(tf.test.TestCase):
 
   def test_works_correctly(self):
     x = tf.constant([-1e6, -100, -10, -1, 1, 10, 100, 1e6])
-    p = tfd.Normal(loc=x, scale=1.)
 
     # We use the prefex "efx" to mean "E_p[f(X)]".
     f = lambda u: u
-    efx_true = x
-    samples = p.sample(int(1e5), seed=1)
-    efx_reparam = tfp.monte_carlo.expectation(f, samples, p.log_prob)
-    efx_score = tfp.monte_carlo.expectation(f, samples, p.log_prob,
-                                            use_reparametrization=False)
+    with tf.GradientTape(persistent=True) as tape:
+      tape.watch(x)
+      p = tfd.Normal(loc=x, scale=1.)
+      efx_true = x
+      samples = p.sample(int(1e5), seed=1)
+      efx_reparam = tfp.monte_carlo.expectation(f, samples, p.log_prob)
+      efx_score = tfp.monte_carlo.expectation(f, samples, p.log_prob,
+                                              use_reparametrization=False)
 
     [
         efx_true_,
@@ -90,9 +92,9 @@ class ExpectationTest(tf.test.TestCase):
         efx_true,
         efx_reparam,
         efx_score,
-        tf.gradients(efx_true, x)[0],
-        tf.gradients(efx_reparam, x)[0],
-        tf.gradients(efx_score, x)[0],
+        tape.gradient(efx_true, x),
+        tape.gradient(efx_reparam, x),
+        tape.gradient(efx_score, x),
     ])
 
     self.assertAllEqual(np.ones_like(efx_true_grad_), efx_true_grad_)
@@ -117,15 +119,18 @@ class ExpectationTest(tf.test.TestCase):
     num_draws = int(1e5)
     mu_p = tf.constant(0.)
     mu_q = tf.constant(1.)
-    p = tfd.Normal(loc=mu_p, scale=1.)
-    q = tfd.Normal(loc=mu_q, scale=2.)
-    exact_kl_normal_normal = tfd.kl_divergence(p, q)
-    approx_kl_normal_normal = tfp.monte_carlo.expectation(
-        f=lambda x: p.log_prob(x) - q.log_prob(x),
-        samples=p.sample(num_draws, seed=42),
-        log_prob=p.log_prob,
-        use_reparametrization=(p.reparameterization_type ==
-                               tfd.FULLY_REPARAMETERIZED))
+    with tf.GradientTape(persistent=True) as tape:
+      tape.watch(mu_p)
+      tape.watch(mu_q)
+      p = tfd.Normal(loc=mu_p, scale=1.)
+      q = tfd.Normal(loc=mu_q, scale=2.)
+      exact_kl_normal_normal = tfd.kl_divergence(p, q)
+      approx_kl_normal_normal = tfp.monte_carlo.expectation(
+          f=lambda x: p.log_prob(x) - q.log_prob(x),
+          samples=p.sample(num_draws, seed=42),
+          log_prob=p.log_prob,
+          use_reparametrization=(p.reparameterization_type ==
+                                 tfd.FULLY_REPARAMETERIZED))
     [exact_kl_normal_normal_, approx_kl_normal_normal_] = self.evaluate([
         exact_kl_normal_normal, approx_kl_normal_normal])
     self.assertEqual(
@@ -135,8 +140,8 @@ class ExpectationTest(tf.test.TestCase):
                         rtol=0.01, atol=0.)
 
     # Compare gradients. (Not present in `docstring`.)
-    gradp = lambda fp: tf.gradients(fp, mu_p)[0]
-    gradq = lambda fq: tf.gradients(fq, mu_q)[0]
+    gradp = lambda fp: tape.gradient(fp, mu_p)
+    gradq = lambda fq: tape.gradient(fq, mu_q)
     [
         gradp_exact_kl_normal_normal_,
         gradq_exact_kl_normal_normal_,
@@ -159,15 +164,18 @@ class ExpectationTest(tf.test.TestCase):
     num_draws = int(1e5)
     probs_p = tf.constant(0.4)
     probs_q = tf.constant(0.7)
-    p = tfd.Bernoulli(probs=probs_p)
-    q = tfd.Bernoulli(probs=probs_q)
-    exact_kl_bernoulli_bernoulli = tfp.monte_carlo.expectation(
-        f=lambda x: p.log_prob(x) - q.log_prob(x),
-        samples=p.sample(num_draws, seed=42),
-        log_prob=p.log_prob,
-        use_reparametrization=(
-            p.reparameterization_type == tfd.FULLY_REPARAMETERIZED))
-    approx_kl_bernoulli_bernoulli = tfd.kl_divergence(p, q)
+    with tf.GradientTape(persistent=True) as tape:
+      tape.watch(probs_p)
+      tape.watch(probs_q)
+      p = tfd.Bernoulli(probs=probs_p)
+      q = tfd.Bernoulli(probs=probs_q)
+      exact_kl_bernoulli_bernoulli = tfp.monte_carlo.expectation(
+          f=lambda x: p.log_prob(x) - q.log_prob(x),
+          samples=p.sample(num_draws, seed=42),
+          log_prob=p.log_prob,
+          use_reparametrization=(
+              p.reparameterization_type == tfd.FULLY_REPARAMETERIZED))
+      approx_kl_bernoulli_bernoulli = tfd.kl_divergence(p, q)
     [
         exact_kl_bernoulli_bernoulli_,
         approx_kl_bernoulli_bernoulli_,
@@ -185,8 +193,8 @@ class ExpectationTest(tf.test.TestCase):
     print(exact_kl_bernoulli_bernoulli_, approx_kl_bernoulli_bernoulli_)
 
     # Compare gradients. (Not present in `docstring`.)
-    gradp = lambda fp: tf.gradients(fp, probs_p)[0]
-    gradq = lambda fq: tf.gradients(fq, probs_q)[0]
+    gradp = lambda fp: tape.gradient(fp, probs_p)
+    gradq = lambda fq: tape.gradient(fq, probs_q)
     [
         gradp_exact_kl_bernoulli_bernoulli_,
         gradq_exact_kl_bernoulli_bernoulli_,

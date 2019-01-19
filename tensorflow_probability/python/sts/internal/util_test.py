@@ -142,9 +142,9 @@ class MultivariateNormalUtilsTest(tf.test.TestCase):
                                       mvn3.covariance()))
 
 
+@tfe.run_all_tests_in_graph_and_eager_modes
 class UtilityTests(tf.test.TestCase):
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_broadcast_batch_shape_static(self):
 
     batch_shapes = ([2], [3, 2], [1, 2])
@@ -156,6 +156,7 @@ class UtilityTests(tf.test.TestCase):
 
   def test_broadcast_batch_shape_dynamic(self):
     # Run in graph mode only, since eager mode always takes the static path
+    if tf.executing_eagerly(): return
 
     batch_shapes = ([2], [3, 2], [1, 2])
     distributions = [tfd.Normal(
@@ -165,11 +166,9 @@ class UtilityTests(tf.test.TestCase):
             input=tf.ones(batch_shape), shape=None))
                      for batch_shape in batch_shapes]
 
-    self.assertAllEqual(self.evaluate(
-        sts_util.broadcast_batch_shape(distributions)),
-                        [3, 2])
+    self.assertAllEqual(
+        [3, 2], self.evaluate(sts_util.broadcast_batch_shape(distributions)))
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_maybe_expand_trailing_dim(self):
 
     # static inputs

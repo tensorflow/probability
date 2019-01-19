@@ -1034,7 +1034,7 @@ def csiszar_vimco_helper(logu, name=None):
   with tf.name_scope(name, "csiszar_vimco_helper", [logu]):
     logu = tf.convert_to_tensor(logu, name="logu")
 
-    n = logu.shape.with_rank_at_least(1)[0].value
+    n = tf.dimension_value(logu.shape.with_rank_at_least(1)[0])
     if n is None:
       n = tf.shape(logu)[0]
       log_n = tf.log(tf.cast(n, dtype=logu.dtype))

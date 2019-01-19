@@ -128,7 +128,7 @@ class _DenseVariational(tf.keras.layers.Layer):
 
   def build(self, input_shape):
     input_shape = tf.TensorShape(input_shape)
-    in_size = input_shape.with_rank_at_least(2)[-1].value
+    in_size = tf.dimension_value(input_shape.with_rank_at_least(2)[-1])
     if in_size is None:
       raise ValueError('The last dimension of the inputs to `Dense` '
                        'should be defined. Found `None`.')
@@ -206,7 +206,7 @@ class _DenseVariational(tf.keras.layers.Layer):
     """
     input_shape = tf.TensorShape(input_shape)
     input_shape = input_shape.with_rank_at_least(2)
-    if input_shape[-1].value is None:
+    if tf.dimension_value(input_shape[-1]) is None:
       raise ValueError(
           'The innermost dimension of `input_shape` must be defined, '
           'but saw: {}'.format(input_shape))

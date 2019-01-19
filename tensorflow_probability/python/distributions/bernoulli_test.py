@@ -148,19 +148,14 @@ class BernoulliTest(tf.test.TestCase):
       self.assertAllClose(self.evaluate(dist.log_prob(x)), np.log(expected_pmf))
 
   def testPmfCorrectBroadcastDynamicShape(self):
-    with self.cached_session():
-      p = tf.placeholder(dtype=tf.float32)
-      dist = bernoulli.Bernoulli(probs=p)
-      event1 = [1, 0, 1]
-      event2 = [[1, 0, 1]]
-      self.assertAllClose(
-          dist.prob(event1).eval({
-              p: [0.2, 0.3, 0.4]
-          }), [0.2, 0.7, 0.4])
-      self.assertAllClose(
-          dist.prob(event2).eval({
-              p: [0.2, 0.3, 0.4]
-          }), [[0.2, 0.7, 0.4]])
+    p = tf.placeholder_with_default([0.2, 0.3, 0.4], shape=None)
+    dist = bernoulli.Bernoulli(probs=p)
+    event1 = [1, 0, 1]
+    event2 = [[1, 0, 1]]
+    self.assertAllClose(
+        [0.2, 0.7, 0.4], self.evaluate(dist.prob(event1)))
+    self.assertAllClose(
+        [[0.2, 0.7, 0.4]], self.evaluate(dist.prob(event2)))
 
   @tfe.run_test_in_graph_and_eager_modes
   def testPmfInvalid(self):
@@ -190,35 +185,30 @@ class BernoulliTest(tf.test.TestCase):
             bernoulli.Bernoulli(probs=p, validate_args=False).log_prob(samps)))
 
   def testBroadcasting(self):
-    with self.cached_session():
-      p = tf.placeholder(tf.float32)
-      dist = bernoulli.Bernoulli(probs=p)
-      self.assertAllClose(np.log(0.5), dist.log_prob(1).eval({p: 0.5}))
-      self.assertAllClose(
-          np.log([0.5, 0.5, 0.5]), dist.log_prob([1, 1, 1]).eval({
-              p: 0.5
-          }))
-      self.assertAllClose(
-          np.log([0.5, 0.5, 0.5]), dist.log_prob(1).eval({
-              p: [0.5, 0.5, 0.5]
-          }))
+    probs = lambda p: tf.placeholder_with_default(p, shape=None)
+    dist = lambda p: bernoulli.Bernoulli(probs=probs(p))
+    self.assertAllClose(np.log(0.5), self.evaluate(dist(0.5).log_prob(1)))
+    self.assertAllClose(
+        np.log([0.5, 0.5, 0.5]), self.evaluate(dist(0.5).log_prob([1, 1, 1])))
+    self.assertAllClose(np.log([0.5, 0.5, 0.5]),
+                        self.evaluate(dist([0.5, 0.5, 0.5]).log_prob(1)))
 
   def testPmfShapes(self):
-    with self.cached_session():
-      p = tf.placeholder(tf.float32, shape=[None, 1])
-      dist = bernoulli.Bernoulli(probs=p)
-      self.assertEqual(2, len(dist.log_prob(1).eval({p: [[0.5], [0.5]]}).shape))
+    probs = lambda p: tf.placeholder_with_default(p, shape=None)
+    dist = lambda p: bernoulli.Bernoulli(probs=probs(p))
+    self.assertEqual(
+        2, len(self.evaluate(dist([[0.5], [0.5]]).log_prob(1)).shape))
 
-      dist = bernoulli.Bernoulli(probs=0.5)
-      self.assertEqual(2, len(self.evaluate(dist.log_prob([[1], [1]])).shape))
+    dist = bernoulli.Bernoulli(probs=0.5)
+    self.assertEqual(2, len(self.evaluate(dist.log_prob([[1], [1]])).shape))
 
-      dist = bernoulli.Bernoulli(probs=0.5)
-      self.assertEqual((), dist.log_prob(1).shape)
-      self.assertEqual((1), dist.log_prob([1]).shape)
-      self.assertEqual((2, 1), dist.log_prob([[1], [1]]).shape)
+    dist = bernoulli.Bernoulli(probs=0.5)
+    self.assertEqual((), dist.log_prob(1).shape)
+    self.assertEqual((1), dist.log_prob([1]).shape)
+    self.assertEqual((2, 1), dist.log_prob([[1], [1]]).shape)
 
-      dist = bernoulli.Bernoulli(probs=[[0.5], [0.5]])
-      self.assertEqual((2, 1), dist.log_prob(1).shape)
+    dist = bernoulli.Bernoulli(probs=[[0.5], [0.5]])
+    self.assertEqual((2, 1), dist.log_prob(1).shape)
 
   @tfe.run_test_in_graph_and_eager_modes
   def testBoundaryConditions(self):
@@ -273,18 +263,20 @@ class BernoulliTest(tf.test.TestCase):
     self.assertIsNone(grad_p)
 
   def testSampleActsLikeSampleN(self):
-    with self.cached_session() as sess:
-      p = [0.2, 0.6]
-      dist = bernoulli.Bernoulli(probs=p)
-      n = 1000
-      seed = 42
-      self.assertAllEqual(
-          self.evaluate(dist.sample(n, seed)),
-          self.evaluate(dist.sample(n, seed)))
-      n = tf.placeholder(tf.int32)
-      sample1, sample2 = sess.run([dist.sample(n, seed), dist.sample(n, seed)],
-                                  feed_dict={n: 1000})
-      self.assertAllEqual(sample1, sample2)
+    p = [0.2, 0.6]
+    dist = bernoulli.Bernoulli(probs=p)
+    n = 1000
+    seed = 42
+    self.assertAllEqual(
+        self.evaluate(dist.sample(n, seed)),
+        self.evaluate(dist.sample(n, seed)))
+    n = tf.placeholder_with_default(np.int32(1000), shape=None)
+    if tf.executing_eagerly(): tf.set_random_seed(42)
+    sample1 = dist.sample(n, None if tf.executing_eagerly() else 42)
+    if tf.executing_eagerly(): tf.set_random_seed(42)
+    sample2 = dist.sample(n, None if tf.executing_eagerly() else 42)
+    sample1, sample2 = self.evaluate([sample1, sample2])
+    self.assertAllEqual(sample1, sample2)
 
   @tfe.run_test_in_graph_and_eager_modes
   def testMean(self):

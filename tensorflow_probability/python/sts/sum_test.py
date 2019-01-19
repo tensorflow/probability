@@ -384,7 +384,7 @@ class AdditiveStateSpaceModelTestDynamicShape32(_AdditiveStateSpaceModelTest):
 
     additive_ssm = AdditiveStateSpaceModel([dynamic_timesteps_component,
                                             static_timesteps_component])
-    self.assertEqual(additive_ssm.num_timesteps, num_timesteps)
+    self.assertEqual(num_timesteps, self.evaluate(additive_ssm.num_timesteps))
 
 
 @tfe.run_all_tests_in_graph_and_eager_modes

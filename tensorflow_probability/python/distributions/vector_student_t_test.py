@@ -74,6 +74,7 @@ class _FakeVectorStudentT(object):
 class VectorStudentTTest(tf.test.TestCase):
 
   def setUp(self):
+    super(VectorStudentTTest, self).setUp()
     self._rng = np.random.RandomState(42)
 
   def testProbStaticScalar(self):

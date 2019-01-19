@@ -370,7 +370,7 @@ def masked_dense(inputs,
        Conference on Machine Learning_, 2015. https://arxiv.org/abs/1502.03509
   """
   # TODO(b/67594795): Better support of dynamic shape.
-  input_depth = inputs.shape.with_rank_at_least(1)[-1].value
+  input_depth = tf.dimension_value(inputs.shape.with_rank_at_least(1)[-1])
   if input_depth is None:
     raise NotImplementedError(
         "Rightmost dimension must be known prior to graph execution.")
@@ -476,7 +476,7 @@ def masked_autoregressive_default_template(hidden_layers,
     def _fn(x):
       """MADE parameterized via `masked_autoregressive_default_template`."""
       # TODO(b/67594795): Better support of dynamic shape.
-      input_depth = x.shape.with_rank_at_least(1)[-1].value
+      input_depth = tf.dimension_value(x.shape.with_rank_at_least(1)[-1])
       if input_depth is None:
         raise NotImplementedError(
             "Rightmost dimension must be known prior to graph execution.")

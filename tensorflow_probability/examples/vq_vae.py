@@ -281,10 +281,11 @@ def add_ema_control_dependencies(vector_quantizer,
       decay, zero_debias=False)
 
   # Add small value to avoid dividing by zero.
-  updated_ema_count += 1e-5
-  updated_ema_means /= tf.expand_dims(updated_ema_count, axis=-1)
+  perturbed_ema_count = updated_ema_count + 1e-5
   with tf.control_dependencies([commitment_loss]):
-    update_means = tf.assign(vector_quantizer.codebook, updated_ema_means)
+    update_means = tf.assign(
+        vector_quantizer.codebook,
+        updated_ema_means / perturbed_ema_count[..., tf.newaxis])
     with tf.control_dependencies([update_means]):
       return tf.identity(commitment_loss)
 

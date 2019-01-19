@@ -97,7 +97,9 @@ class SoftmaxCentered(bijector.Bijector):
 
     # Set shape hints.
     if x.shape.ndims is not None:
-      shape = x.shape[:-1].concatenate(x.shape[-1] + 1)
+      last_dim = tf.dimension_value(x.shape[-1])
+      shape = x.shape[:-1].concatenate(
+          None if last_dim is None else last_dim + 1)
       y.shape.assert_is_compatible_with(shape)
       y.set_shape(shape)
 
@@ -122,7 +124,9 @@ class SoftmaxCentered(bijector.Bijector):
 
     # Set shape hints.
     if y.shape.ndims is not None:
-      shape = y.shape[:-1].concatenate(y.shape[-1] - 1)
+      last_dim = tf.dimension_value(y.shape[-1])
+      shape = y.shape[:-1].concatenate(
+          None if last_dim is None else last_dim - 1)
       x.shape.assert_is_compatible_with(shape)
       x.set_shape(shape)
 

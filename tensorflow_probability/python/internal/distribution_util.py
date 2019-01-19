@@ -257,8 +257,8 @@ def make_diag_scale(loc=None,
     num_rows = shape_hint
     del shape_hint
     if num_rows is None:
-      num_rows = loc.shape[-1]
-      if num_rows.value is None:
+      num_rows = tf.dimension_value(loc.shape[-1])
+      if num_rows is None:
         num_rows = tf.shape(loc)[-1]
 
     if scale_identity_multiplier is None:
@@ -961,8 +961,8 @@ def embed_check_categorical_event_shape(
     except ValueError:
       raise ValueError("A categorical-distribution parameter must have "
                        "at least 1 dimension.")
-    if x_shape_static[-1].value is not None:
-      event_size = x_shape_static[-1].value
+    event_size = tf.dimension_value(x_shape_static[-1])
+    if event_size is not None:
       if event_size < 2:
         raise ValueError("A categorical-distribution parameter must have at "
                          "least 2 events.")
@@ -1488,9 +1488,10 @@ def fill_triangular(x, upper=False, name=None):
 
   with tf.name_scope(name, "fill_triangular", values=[x]):
     x = tf.convert_to_tensor(x, name="x")
-    if x.shape.with_rank_at_least(1)[-1].value is not None:
+    m = tf.dimension_value(x.shape.with_rank_at_least(1)[-1])
+    if m is not None:
       # Formula derived by solving for n: m = n(n+1)/2.
-      m = np.int32(tf.dimension_value(x.shape[-1]))
+      m = np.int32(m)
       n = np.sqrt(0.25 + 2. * m) - 0.5
       if n != np.floor(n):
         raise ValueError("Input right-most shape ({}) does not "
@@ -1585,8 +1586,9 @@ def fill_triangular_inverse(x, upper=False, name=None):
 
   with tf.name_scope(name, "fill_triangular_inverse", values=[x]):
     x = tf.convert_to_tensor(x, name="x")
-    if x.shape.with_rank_at_least(2)[-1].value is not None:
-      n = np.int32(tf.dimension_value(x.shape[-1]))
+    n = tf.dimension_value(x.shape.with_rank_at_least(2)[-1])
+    if n is not None:
+      n = np.int32(n)
       m = np.int32((n * (n + 1)) // 2)
       static_final_shape = x.shape[:-2].concatenate([m])
     else:
@@ -1834,7 +1836,7 @@ def dimension_size(x, axis):
   """Returns the size of a specific dimension."""
   # Since tf.gather isn't "constant-in, constant-out", we must first check the
   # static shape or fallback to dynamic shape.
-  s = x.shape.with_rank_at_least(np.abs(axis))[axis].value
+  s = tf.dimension_value(x.shape.with_rank_at_least(np.abs(axis))[axis])
   if s is not None:
     return s
   return tf.shape(x)[axis]
@@ -1885,7 +1887,7 @@ def process_quadrature_grid_and_probs(quadrature_grid_and_probs,
 
     def _static_event_size(x):
       """Returns the static size of a specific dimension or `None`."""
-      return x.shape.with_rank_at_least(1)[-1].value
+      return tf.dimension_value(x.shape.with_rank_at_least(1)[-1])
 
     m, n = _static_event_size(probs), _static_event_size(grid)
     if m is not None and n is not None:
@@ -1953,8 +1955,11 @@ def pad(x, axis, front=False, back=False, value=0, count=1, name=None):
       count_ = tf.contrib.util.constant_value(count)
       if axis_ >= 0 or x.shape.ndims is not None:
         head = x.shape[:axis]
-        middle = tf.TensorShape(None if count_ is None else (
-            x.shape[axis] + count_ * (front + back)))
+        mid_dim_value = tf.dimension_value(x.shape[axis])
+        if count_ is None or mid_dim_value is None:
+          middle = tf.TensorShape(None)
+        else:
+          middle = tf.TensorShape(mid_dim_value + count_ * (front + back))
         tail = x.shape[axis + 1:]
         final_shape = head.concatenate(middle.concatenate(tail))
       else:

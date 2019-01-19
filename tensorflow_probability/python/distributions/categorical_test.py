@@ -39,42 +39,41 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
   def testP(self):
     p = [0.2, 0.8]
     dist = categorical.Categorical(probs=p)
-    with self.cached_session():
-      self.assertAllClose(p, dist.probs.eval())
-      self.assertAllEqual([2], dist.logits.shape)
+    self.assertAllClose(p, self.evaluate(dist.probs))
+    self.assertAllEqual([2], dist.logits.shape)
 
   def testLogits(self):
     p = np.array([0.2, 0.8], dtype=np.float32)
     logits = np.log(p) - 50.
     dist = categorical.Categorical(logits=logits)
-    with self.cached_session():
-      self.assertAllEqual([2], dist.probs.shape)
-      self.assertAllEqual([2], dist.logits.shape)
-      self.assertAllClose(dist.probs.eval(), p)
-      self.assertAllClose(dist.logits.eval(), logits)
+    self.assertAllEqual([2], dist.probs.shape)
+    self.assertAllEqual([2], dist.logits.shape)
+    self.assertAllClose(p, self.evaluate(dist.probs))
+    self.assertAllClose(logits, self.evaluate(dist.logits))
 
   def testShapes(self):
-    with self.cached_session():
-      for batch_shape in ([], [1], [2, 3, 4]):
-        dist = make_categorical(batch_shape, 10)
-        self.assertAllEqual(batch_shape, dist.batch_shape)
-        self.assertAllEqual(batch_shape, dist.batch_shape_tensor().eval())
-        self.assertAllEqual([], dist.event_shape)
-        self.assertAllEqual([], dist.event_shape_tensor().eval())
-        self.assertEqual(10, dist.event_size.eval())
-        # event_size is available as a constant because the shape is
-        # known at graph build time.
-        self.assertEqual(10, tf.contrib.util.constant_value(dist.event_size))
+    for batch_shape in ([], [1], [2, 3, 4]):
+      dist = make_categorical(batch_shape, 10)
+      self.assertAllEqual(batch_shape, dist.batch_shape)
+      self.assertAllEqual(batch_shape,
+                          self.evaluate(dist.batch_shape_tensor()))
+      self.assertAllEqual([], dist.event_shape)
+      self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
+      self.assertEqual(10, self.evaluate(dist.event_size))
+      # event_size is available as a constant because the shape is
+      # known at graph build time.
+      self.assertEqual(10, tf.contrib.util.constant_value(dist.event_size))
 
-      for batch_shape in ([], [1], [2, 3, 4]):
-        dist = make_categorical(
-            batch_shape, tf.constant(
-                10, dtype=tf.int32))
-        self.assertAllEqual(len(batch_shape), dist.batch_shape.ndims)
-        self.assertAllEqual(batch_shape, dist.batch_shape_tensor().eval())
-        self.assertAllEqual([], dist.event_shape)
-        self.assertAllEqual([], dist.event_shape_tensor().eval())
-        self.assertEqual(10, dist.event_size.eval())
+    for batch_shape in ([], [1], [2, 3, 4]):
+      dist = make_categorical(
+          batch_shape, tf.constant(
+              10, dtype=tf.int32))
+      self.assertAllEqual(len(batch_shape), dist.batch_shape.ndims)
+      self.assertAllEqual(batch_shape,
+                          self.evaluate(dist.batch_shape_tensor()))
+      self.assertAllEqual([], dist.event_shape)
+      self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
+      self.assertEqual(10, self.evaluate(dist.event_size))
 
   def testDtype(self):
     dist = make_categorical([], 5, dtype=tf.int32)
@@ -100,66 +99,53 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
       self.assertEqual(dist.dtype, dist.sample(5).dtype)
 
   def testUnknownShape(self):
-    with self.cached_session():
-      logits = tf.placeholder(dtype=tf.float32)
-      dist = categorical.Categorical(logits)
-      sample = dist.sample()
-      # Will sample class 1.
-      sample_value = sample.eval(feed_dict={logits: [-1000.0, 1000.0]})
-      self.assertEqual(1, sample_value)
+    logits = lambda l: tf.placeholder_with_default(np.float32(l), shape=None)
+    sample = lambda l: categorical.Categorical(logits=logits(l)).sample()
+    # Will sample class 1.
+    sample_value = self.evaluate(sample([-1000.0, 1000.0]))
+    self.assertEqual(1, sample_value)
 
-      # Batch entry 0 will sample class 1, batch entry 1 will sample class 0.
-      sample_value_batch = sample.eval(
-          feed_dict={logits: [[-1000.0, 1000.0], [1000.0, -1000.0]]})
-      self.assertAllEqual([1, 0], sample_value_batch)
+    # Batch entry 0 will sample class 1, batch entry 1 will sample class 0.
+    sample_value_batch = self.evaluate(
+        sample([[-1000.0, 1000.0], [1000.0, -1000.0]]))
+    self.assertAllEqual([1, 0], sample_value_batch)
 
   def testPMFWithBatch(self):
     histograms = [[0.2, 0.8], [0.6, 0.4]]
     dist = categorical.Categorical(tf.log(histograms) - 50.)
-    with self.cached_session():
-      self.assertAllClose(dist.prob([0, 1]).eval(), [0.2, 0.4])
+    self.assertAllClose([0.2, 0.4], self.evaluate(dist.prob([0, 1])))
 
   def testPMFNoBatch(self):
     histograms = [0.2, 0.8]
     dist = categorical.Categorical(tf.log(histograms) - 50.)
-    with self.cached_session():
-      self.assertAllClose(dist.prob(0).eval(), 0.2)
+    self.assertAllClose(0.2, self.evaluate(dist.prob(0)))
 
   def testCDFWithDynamicEventShapeKnownNdims(self):
     """Test that dynamically-sized events with unknown shape work."""
     batch_size = 2
-    histograms = tf.placeholder(dtype=tf.float32,
-                                shape=(batch_size, None))
-    event = tf.placeholder(dtype=tf.float32, shape=(batch_size,))
-    dist = categorical.Categorical(probs=histograms)
-    cdf_op = dist.cdf(event)
+    make_ph = tf.placeholder_with_default
+    histograms = lambda h: make_ph(np.float32(h), shape=(batch_size, None))
+    event = lambda e: make_ph(np.float32(e), shape=(batch_size,))
+    dist = lambda h: categorical.Categorical(probs=histograms(h))
+    cdf_op = lambda h, e: dist(h).cdf(event(e))
 
-    # Feed values into the placeholder with different shapes
+    # Feed values in with different shapes...
     # three classes.
     event_feed_one = [0, 1]
     histograms_feed_one = [[0.5, 0.3, 0.2], [1.0, 0.0, 0.0]]
     expected_cdf_one = [0.0, 1.0]
-    feed_dict_one = {
-        histograms: histograms_feed_one,
-        event: event_feed_one
-    }
 
     # six classes.
     event_feed_two = [2, 5]
     histograms_feed_two = [[0.9, 0.0, 0.0, 0.0, 0.0, 0.1],
                            [0.15, 0.2, 0.05, 0.35, 0.13, 0.12]]
     expected_cdf_two = [0.9, 0.88]
-    feed_dict_two = {
-        histograms: histograms_feed_two,
-        event: event_feed_two
-    }
 
-    with self.cached_session() as sess:
-      actual_cdf_one = sess.run(cdf_op, feed_dict=feed_dict_one)
-      actual_cdf_two = sess.run(cdf_op, feed_dict=feed_dict_two)
+    actual_cdf_one = self.evaluate(cdf_op(histograms_feed_one, event_feed_one))
+    actual_cdf_two = self.evaluate(cdf_op(histograms_feed_two, event_feed_two))
 
-    self.assertAllClose(actual_cdf_one, expected_cdf_one)
-    self.assertAllClose(actual_cdf_two, expected_cdf_two)
+    self.assertAllClose(expected_cdf_one, actual_cdf_one)
+    self.assertAllClose(expected_cdf_two, actual_cdf_two)
 
   @parameterized.named_parameters(
       ("test1", [0, 1], [[0.5, 0.3, 0.2], [1.0, 0.0, 0.0]], [0.0, 1.0]),
@@ -184,8 +170,7 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
     dist = categorical.Categorical(probs=histograms)
     cdf_op = dist.cdf(event)
 
-    with self.cached_session():
-      self.assertAllClose(cdf_op.eval(), expected_cdf)
+    self.assertAllClose(expected_cdf, self.evaluate(cdf_op))
 
   def testCDFNoBatch(self):
     histogram = [0.1, 0.2, 0.3, 0.4]
@@ -194,8 +179,7 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
     dist = categorical.Categorical(probs=histogram)
     cdf_op = dist.cdf(event)
 
-    with self.cached_session():
-      self.assertAlmostEqual(cdf_op.eval(), expected_cdf)
+    self.assertAlmostEqual(expected_cdf, self.evaluate(cdf_op))
 
   def testCDFBroadcasting(self):
     # shape: [batch=2, n_bins=3]
@@ -220,8 +204,7 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
     expected_cdf_result[2, 0] = 0.3
     expected_cdf_result[2, 1] = 0.75
 
-    with self.cached_session():
-      self.assertAllClose(dist.cdf(devent).eval(), expected_cdf_result)
+    self.assertAllClose(expected_cdf_result, self.evaluate(dist.cdf(devent)))
 
   def testBroadcastWithBatchParamsAndBiggerEvent(self):
     ## The parameters have a single batch dimension, and the event has two.
@@ -278,8 +261,7 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
         "norm_log_cdf": norm.log_cdf(real_event_tf),
     }
 
-    with self.cached_session() as sess:
-      run_result = sess.run(to_run)
+    run_result = self.evaluate(to_run)
 
     self.assertAllEqual(run_result["cat_prob"].shape,
                         run_result["norm_prob"].shape)
@@ -293,29 +275,28 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
   def testLogPMF(self):
     logits = np.log([[0.2, 0.8], [0.6, 0.4]]) - 50.
     dist = categorical.Categorical(logits)
-    with self.cached_session():
-      self.assertAllClose(dist.log_prob([0, 1]).eval(), np.log([0.2, 0.4]))
-      self.assertAllClose(dist.log_prob([0.0, 1.0]).eval(), np.log([0.2, 0.4]))
+    self.assertAllClose(np.log([0.2, 0.4]),
+                        self.evaluate(dist.log_prob([0, 1])))
+    self.assertAllClose(np.log([0.2, 0.4]),
+                        self.evaluate(dist.log_prob([0.0, 1.0])))
 
   def testEntropyNoBatch(self):
     logits = np.log([0.2, 0.8]) - 50.
     dist = categorical.Categorical(logits)
-    with self.cached_session():
-      self.assertAllClose(dist.entropy().eval(),
-                          -(0.2 * np.log(0.2) + 0.8 * np.log(0.8)))
+    self.assertAllClose(-(0.2 * np.log(0.2) + 0.8 * np.log(0.8)),
+                        self.evaluate(dist.entropy()))
 
   def testEntropyWithBatch(self):
     logits = np.log([[0.2, 0.8], [0.6, 0.4]]) - 50.
     dist = categorical.Categorical(logits)
-    with self.cached_session():
-      self.assertAllClose(dist.entropy().eval(), [
-          -(0.2 * np.log(0.2) + 0.8 * np.log(0.8)),
-          -(0.6 * np.log(0.6) + 0.4 * np.log(0.4))
-      ])
+    self.assertAllClose([-(0.2 * np.log(0.2) + 0.8 * np.log(0.8)),
+                         -(0.6 * np.log(0.6) + 0.4 * np.log(0.4))],
+                        self.evaluate(dist.entropy()))
 
   def testEntropyGradient(self):
-    with self.cached_session() as sess:
+    with tf.GradientTape(persistent=True) as tape:
       logits = tf.constant([[1., 2., 3.], [2., 5., 1.]])
+      tape.watch(logits)
 
       probabilities = tf.nn.softmax(logits)
       log_probabilities = tf.nn.log_softmax(logits)
@@ -325,49 +306,44 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
       categorical_distribution = categorical.Categorical(probs=probabilities)
       categorical_entropy = categorical_distribution.entropy()
 
-      # works
-      true_entropy_g = tf.gradients(true_entropy, [logits])
-      categorical_entropy_g = tf.gradients(
-          categorical_entropy, [logits])
+    # works
+    true_entropy_g = tape.gradient(true_entropy, logits)
+    categorical_entropy_g = tape.gradient(categorical_entropy, logits)
 
-      res = sess.run({"true_entropy": true_entropy,
-                      "categorical_entropy": categorical_entropy,
-                      "true_entropy_g": true_entropy_g,
-                      "categorical_entropy_g": categorical_entropy_g})
-      self.assertAllClose(res["true_entropy"],
-                          res["categorical_entropy"])
-      self.assertAllClose(res["true_entropy_g"],
-                          res["categorical_entropy_g"])
+    res = self.evaluate({"true_entropy": true_entropy,
+                         "categorical_entropy": categorical_entropy,
+                         "true_entropy_g": true_entropy_g,
+                         "categorical_entropy_g": categorical_entropy_g})
+    self.assertAllClose(res["true_entropy"],
+                        res["categorical_entropy"])
+    self.assertAllClose(res["true_entropy_g"],
+                        res["categorical_entropy_g"])
 
   def testSample(self):
-    with self.cached_session():
-      histograms = [[[0.2, 0.8], [0.4, 0.6]]]
-      dist = categorical.Categorical(tf.log(histograms) - 50.)
-      n = 10000
-      samples = dist.sample(n, seed=123)
-      samples.set_shape([n, 1, 2])
-      self.assertEqual(samples.dtype, tf.int32)
-      sample_values = samples.eval()
-      self.assertFalse(np.any(sample_values < 0))
-      self.assertFalse(np.any(sample_values > 1))
-      self.assertAllClose(
-          [[0.2, 0.4]], np.mean(
-              sample_values == 0, axis=0), atol=1e-2)
-      self.assertAllClose(
-          [[0.8, 0.6]], np.mean(
-              sample_values == 1, axis=0), atol=1e-2)
+    histograms = [[[0.2, 0.8], [0.4, 0.6]]]
+    dist = categorical.Categorical(tf.log(histograms) - 50.)
+    n = 10000
+    samples = dist.sample(n, seed=123)
+    samples.set_shape([n, 1, 2])
+    self.assertEqual(samples.dtype, tf.int32)
+    sample_values = self.evaluate(samples)
+    self.assertFalse(np.any(sample_values < 0))
+    self.assertFalse(np.any(sample_values > 1))
+    self.assertAllClose(
+        [[0.2, 0.4]], np.mean(sample_values == 0, axis=0), atol=1e-2)
+    self.assertAllClose(
+        [[0.8, 0.6]], np.mean(sample_values == 1, axis=0), atol=1e-2)
 
   def testSampleWithSampleShape(self):
-    with self.cached_session():
-      histograms = [[[0.2, 0.8], [0.4, 0.6]]]
-      dist = categorical.Categorical(tf.log(histograms) - 50.)
-      samples = dist.sample((100, 100), seed=123)
-      prob = dist.prob(samples)
-      prob_val = prob.eval()
-      self.assertAllClose(
-          [0.2**2 + 0.8**2], [prob_val[:, :, :, 0].mean()], atol=1e-2)
-      self.assertAllClose(
-          [0.4**2 + 0.6**2], [prob_val[:, :, :, 1].mean()], atol=1e-2)
+    histograms = [[[0.2, 0.8], [0.4, 0.6]]]
+    dist = categorical.Categorical(tf.log(histograms) - 50.)
+    samples = dist.sample((100, 100), seed=123)
+    prob = dist.prob(samples)
+    prob_val = self.evaluate(prob)
+    self.assertAllClose(
+        [0.2**2 + 0.8**2], [prob_val[:, :, :, 0].mean()], atol=1e-2)
+    self.assertAllClose(
+        [0.4**2 + 0.6**2], [prob_val[:, :, :, 1].mean()], atol=1e-2)
 
   def testNotReparameterized(self):
     p = tf.constant([0.3, 0.3, 0.4])
@@ -379,46 +355,44 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
     self.assertIsNone(grad_p)
 
   def testLogPMFBroadcasting(self):
-    with self.cached_session():
-      # 1 x 2 x 2
-      histograms = [[[0.2, 0.8], [0.4, 0.6]]]
-      dist = categorical.Categorical(tf.log(histograms) - 50.)
+    # 1 x 2 x 2
+    histograms = [[[0.2, 0.8], [0.4, 0.6]]]
+    dist = categorical.Categorical(tf.log(histograms) - 50.)
 
-      prob = dist.prob(1)
-      self.assertAllClose([[0.8, 0.6]], prob.eval())
+    prob = dist.prob(1)
+    self.assertAllClose([[0.8, 0.6]], self.evaluate(prob))
 
-      prob = dist.prob([1])
-      self.assertAllClose([[0.8, 0.6]], prob.eval())
+    prob = dist.prob([1])
+    self.assertAllClose([[0.8, 0.6]], self.evaluate(prob))
 
-      prob = dist.prob([0, 1])
-      self.assertAllClose([[0.2, 0.6]], prob.eval())
+    prob = dist.prob([0, 1])
+    self.assertAllClose([[0.2, 0.6]], self.evaluate(prob))
 
-      prob = dist.prob([[0, 1]])
-      self.assertAllClose([[0.2, 0.6]], prob.eval())
+    prob = dist.prob([[0, 1]])
+    self.assertAllClose([[0.2, 0.6]], self.evaluate(prob))
 
-      prob = dist.prob([[[0, 1]]])
-      self.assertAllClose([[[0.2, 0.6]]], prob.eval())
+    prob = dist.prob([[[0, 1]]])
+    self.assertAllClose([[[0.2, 0.6]]], self.evaluate(prob))
 
-      prob = dist.prob([[1, 0], [0, 1]])
-      self.assertAllClose([[0.8, 0.4], [0.2, 0.6]], prob.eval())
+    prob = dist.prob([[1, 0], [0, 1]])
+    self.assertAllClose([[0.8, 0.4], [0.2, 0.6]], self.evaluate(prob))
 
-      prob = dist.prob([[[1, 1], [1, 0]], [[1, 0], [0, 1]]])
-      self.assertAllClose([[[0.8, 0.6], [0.8, 0.4]], [[0.8, 0.4], [0.2, 0.6]]],
-                          prob.eval())
+    prob = dist.prob([[[1, 1], [1, 0]], [[1, 0], [0, 1]]])
+    self.assertAllClose([[[0.8, 0.6], [0.8, 0.4]], [[0.8, 0.4], [0.2, 0.6]]],
+                        self.evaluate(prob))
 
   def testLogPMFShape(self):
-    with self.cached_session():
-      # shape [1, 2, 2]
-      histograms = [[[0.2, 0.8], [0.4, 0.6]]]
-      dist = categorical.Categorical(tf.log(histograms))
+    # shape [1, 2, 2]
+    histograms = [[[0.2, 0.8], [0.4, 0.6]]]
+    dist = categorical.Categorical(tf.log(histograms))
 
-      log_prob = dist.log_prob([0, 1])
-      self.assertEqual(2, log_prob.shape.ndims)
-      self.assertAllEqual([1, 2], log_prob.shape)
+    log_prob = dist.log_prob([0, 1])
+    self.assertEqual(2, log_prob.shape.ndims)
+    self.assertAllEqual([1, 2], log_prob.shape)
 
-      log_prob = dist.log_prob([[[1, 1], [1, 0]], [[1, 0], [0, 1]]])
-      self.assertEqual(3, log_prob.shape.ndims)
-      self.assertAllEqual([2, 2, 2], log_prob.shape)
+    log_prob = dist.log_prob([[[1, 1], [1, 0]], [[1, 0], [0, 1]]])
+    self.assertEqual(3, log_prob.shape.ndims)
+    self.assertAllEqual([2, 2, 2], log_prob.shape)
 
   def testLogPMFShapeNoBatch(self):
     histograms = [0.2, 0.8]
@@ -433,10 +407,9 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
     self.assertAllEqual([2, 2, 2], log_prob.shape)
 
   def testMode(self):
-    with self.cached_session():
-      histograms = [[[0.2, 0.8], [0.6, 0.4]]]
-      dist = categorical.Categorical(tf.log(histograms) - 50.)
-      self.assertAllEqual(dist.mode().eval(), [[1, 0]])
+    histograms = [[[0.2, 0.8], [0.6, 0.4]]]
+    dist = categorical.Categorical(tf.log(histograms) - 50.)
+    self.assertAllEqual([[1, 0]], self.evaluate(dist.mode()))
 
   def testCategoricalCategoricalKL(self):
 
@@ -444,28 +417,27 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
       exp_logits = np.exp(logits)
       return exp_logits / exp_logits.sum(axis=-1, keepdims=True)
 
-    with self.cached_session() as sess:
-      for categories in [2, 4]:
-        for batch_size in [1, 10]:
-          a_logits = np.random.randn(batch_size, categories)
-          b_logits = np.random.randn(batch_size, categories)
+    for categories in [2, 4]:
+      for batch_size in [1, 10]:
+        a_logits = np.random.randn(batch_size, categories)
+        b_logits = np.random.randn(batch_size, categories)
 
-          a = categorical.Categorical(logits=a_logits)
-          b = categorical.Categorical(logits=b_logits)
+        a = categorical.Categorical(logits=a_logits)
+        b = categorical.Categorical(logits=b_logits)
 
-          kl = kullback_leibler.kl_divergence(a, b)
-          kl_val = sess.run(kl)
-          # Make sure KL(a||a) is 0
-          kl_same = sess.run(kullback_leibler.kl_divergence(a, a))
+        kl = kullback_leibler.kl_divergence(a, b)
+        kl_val = self.evaluate(kl)
+        # Make sure KL(a||a) is 0
+        kl_same = self.evaluate(kullback_leibler.kl_divergence(a, a))
 
-          prob_a = np_softmax(a_logits)
-          prob_b = np_softmax(b_logits)
-          kl_expected = np.sum(prob_a * (np.log(prob_a) - np.log(prob_b)),
-                               axis=-1)
+        prob_a = np_softmax(a_logits)
+        prob_b = np_softmax(b_logits)
+        kl_expected = np.sum(prob_a * (np.log(prob_a) - np.log(prob_b)),
+                             axis=-1)
 
-          self.assertEqual(kl.shape, (batch_size,))
-          self.assertAllClose(kl_val, kl_expected)
-          self.assertAllClose(kl_same, np.zeros_like(kl_expected))
+        self.assertEqual(kl.shape, (batch_size,))
+        self.assertAllClose(kl_val, kl_expected)
+        self.assertAllClose(kl_same, np.zeros_like(kl_expected))
 
 
 if __name__ == "__main__":

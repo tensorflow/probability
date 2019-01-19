@@ -167,7 +167,7 @@ class RealNVP(conditional_bijector.ConditionalBijector):
 
   def _cache_input_depth(self, x):
     if self._input_depth is None:
-      self._input_depth = x.shape.with_rank_at_least(1)[-1].value
+      self._input_depth = tf.dimension_value(x.shape.with_rank_at_least(1)[-1])
       if self._input_depth is None:
         raise NotImplementedError(
             "Rightmost dimension must be known prior to graph execution.")

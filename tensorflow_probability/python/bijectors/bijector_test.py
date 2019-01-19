@@ -379,6 +379,7 @@ class BijectorCompositionTest(tf.test.TestCase):
 class BijectorLDJCachingTest(tf.test.TestCase):
 
   def testShapeCachingIssue(self):
+    if tf.executing_eagerly(): return
     # Exercise the scenario outlined in
     # https://github.com/tensorflow/probability/issues/253 (originally reported
     # internally as b/119756336).

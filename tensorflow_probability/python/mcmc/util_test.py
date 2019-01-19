@@ -175,7 +175,8 @@ class SmartForLoopTest(tf.test.TestCase):
     self.assertAllClose([11], self.evaluate(result))
 
   def test_tf_while_loop(self):
-    n = tf.placeholder_with_default(input=np.int64(10), shape=())
+    iters = 10
+    n = tf.placeholder_with_default(input=np.int64(iters), shape=())
     counter = collections.Counter()
     def body(x):
       counter['body_calls'] += 1
@@ -183,7 +184,8 @@ class SmartForLoopTest(tf.test.TestCase):
 
     result = smart_for_loop(
         loop_num_iter=n, body_fn=body, initial_loop_vars=[tf.constant(1)])
-    self.assertEqual(1, counter['body_calls'])
+    self.assertEqual(iters if tf.executing_eagerly() else 1,
+                     counter['body_calls'])
     self.assertAllClose([11], self.evaluate(result))
 
 

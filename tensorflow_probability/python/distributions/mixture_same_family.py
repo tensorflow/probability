@@ -134,9 +134,8 @@ class MixtureSameFamily(distribution.Distribution):
       self._runtime_assertions = []
 
       s = components_distribution.event_shape_tensor()
-      if s.shape.with_rank_at_least(1)[0].value is not None:
-        self._event_ndims = tf.dimension_value(s.shape[0])
-      else:
+      self._event_ndims = tf.dimension_value(s.shape[0])
+      if self._event_ndims is None:
         self._event_ndims = tf.shape(s)[0]
 
       if not mixture_distribution.dtype.is_integer:
@@ -174,8 +173,10 @@ class MixtureSameFamily(distribution.Distribution):
                     "`mixture_distribution.batch_shape` is not "
                     "compatible with `components_distribution.batch_shape`"))]
 
-      km = mixture_distribution.logits.shape.with_rank_at_least(1)[-1].value
-      kc = components_distribution.batch_shape.with_rank_at_least(1)[-1].value
+      km = tf.dimension_value(
+          mixture_distribution.logits.shape.with_rank_at_least(1)[-1])
+      kc = tf.dimension_value(
+          components_distribution.batch_shape.with_rank_at_least(1)[-1])
       if km is not None and kc is not None and km != kc:
         raise ValueError("`mixture_distribution components` ({}) does not "
                          "equal `components_distribution.batch_shape[-1]` "
