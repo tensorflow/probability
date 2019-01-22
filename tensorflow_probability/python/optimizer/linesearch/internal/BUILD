@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Line search optimization methods
+# Internal implementation details of line search optimization methods
 
 # [internal] load python3.bzl
 
@@ -27,17 +27,16 @@ licenses(["notice"])  # Apache 2.0
 exports_files(["LICENSE"])
 
 py_library(
-    name = "linesearch",
+    name = "internal",
     srcs = ["__init__.py"],
     deps = [
-        ":hager_zhang",
-        "//tensorflow_probability/python/optimizer/linesearch/internal",
+        ":hager_zhang_lib",
     ],
 )
 
 py_library(
-    name = "hager_zhang",
-    srcs = ["hager_zhang.py"],
+    name = "hager_zhang_lib",
+    srcs = ["hager_zhang_lib.py"],
     srcs_version = "PY2AND3",
     deps = [
         # tensorflow dep,
@@ -45,13 +44,11 @@ py_library(
 )
 
 py_test(
-    name = "hager_zhang_test",
-    size = "medium",
-    srcs = ["hager_zhang_test.py"],
-    shard_count = 5,
+    name = "hager_zhang_lib_test",
+    srcs = ["hager_zhang_lib_test.py"],
     deps = [
+        ":hager_zhang_lib",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
     ],
 )
