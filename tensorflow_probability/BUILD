@@ -31,14 +31,3 @@ py_library(
         "//tensorflow_probability/python",
     ],
 )
-
-filegroup(
-    name = "copybara_deps",
-    srcs = [
-        "leakr_badwords.dic",
-    ],
-    visibility = [
-        # tensorflow_gan:__subpackages__ dep,
-        "//tensorflow_probability:__subpackages__",
-    ],
-)
