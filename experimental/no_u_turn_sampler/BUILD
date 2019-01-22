@@ -29,6 +29,13 @@ py_binary(
     name = "logistic_regression",
     srcs = ["logistic_regression.py"],
     srcs_version = "PY2AND3",
+    deps = [":logistic_regression_lib"],
+)
+
+py_library(
+    name = "logistic_regression_lib",
+    srcs = ["logistic_regression.py"],
+    srcs_version = "PY2AND3",
     deps = [
         ":no_u_turn_sampler",
         # matplotlib dep,
@@ -51,7 +58,7 @@ py_test(
     srcs_version = "PY2AND3",
     tags = ["nozapfhahn"],
     deps = [
-        ":logistic_regression",
+        ":logistic_regression_lib",
     ],
 )
 
