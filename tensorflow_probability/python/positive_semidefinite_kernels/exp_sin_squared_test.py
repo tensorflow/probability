@@ -97,16 +97,17 @@ class ExpSinSquaredTest(tf.test.TestCase, parameterized.TestCase):
     #              `- from broadcasting kernel params
 
   def testValidateArgs(self):
-    k = psd_kernels.ExpSinSquared(
-        amplitude=-1., length_scale=-1., period=-1., validate_args=True)
     with self.assertRaises(tf.errors.InvalidArgumentError):
+      k = psd_kernels.ExpSinSquared(
+          amplitude=-1., length_scale=-1., period=-1., validate_args=True)
       self.evaluate(k.amplitude)
 
-    with self.assertRaises(tf.errors.InvalidArgumentError):
-      self.evaluate(k.length_scale)
+    if not tf.executing_eagerly():
+      with self.assertRaises(tf.errors.InvalidArgumentError):
+        self.evaluate(k.length_scale)
 
-    with self.assertRaises(tf.errors.InvalidArgumentError):
-      self.evaluate(k.period)
+      with self.assertRaises(tf.errors.InvalidArgumentError):
+        self.evaluate(k.period)
 
     # But `None`'s are ok
     k = psd_kernels.ExpSinSquared(

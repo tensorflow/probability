@@ -1110,6 +1110,14 @@ class Distribution(_BaseDistribution):
       return self._kl_divergence(other)
 
   def __str__(self):
+    maybe_batch_shape = ""
+    if self.batch_shape.ndims is not None:
+      maybe_batch_shape = ", batch_shape={}".format(
+          self.batch_shape).replace("None", "?")
+    maybe_event_shape = ""
+    if self.event_shape.ndims is not None:
+      maybe_event_shape = ", event_shape={}".format(
+          self.event_shape).replace("None", "?")
     return ("tfp.distributions.{type_name}("
             "\"{self_name}\""
             "{maybe_batch_shape}"
@@ -1117,12 +1125,8 @@ class Distribution(_BaseDistribution):
             ", dtype={dtype})".format(
                 type_name=type(self).__name__,
                 self_name=self.name,
-                maybe_batch_shape=(", batch_shape={}".format(self.batch_shape)
-                                   if self.batch_shape.ndims is not None
-                                   else ""),
-                maybe_event_shape=(", event_shape={}".format(self.event_shape)
-                                   if self.event_shape.ndims is not None
-                                   else ""),
+                maybe_batch_shape=maybe_batch_shape,
+                maybe_event_shape=maybe_event_shape,
                 dtype=self.dtype.name))
 
   def __repr__(self):
@@ -1133,8 +1137,8 @@ class Distribution(_BaseDistribution):
             " dtype={dtype}>".format(
                 type_name=type(self).__name__,
                 self_name=self.name,
-                batch_shape=self.batch_shape,
-                event_shape=self.event_shape,
+                batch_shape=str(self.batch_shape).replace("None", "?"),
+                event_shape=str(self.event_shape).replace("None", "?"),
                 dtype=self.dtype.name))
 
   @contextlib.contextmanager

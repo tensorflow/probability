@@ -242,7 +242,8 @@ class TransformedTransitionKernelTest(tf.test.TestCase):
         num_burnin_steps=200,
         num_steps_between_results=1,
         parallel_iterations=1)
-    self.assertAllEqual(dict(target_calls=2), counter)
+    if not tf.executing_eagerly():
+      self.assertAllEqual(dict(target_calls=2), counter)
     states = tf.stack(states, axis=-1)
     self.assertEqual(num_results, tf.dimension_value(states.shape[0]))
     sample_mean = tf.reduce_mean(states, axis=0)

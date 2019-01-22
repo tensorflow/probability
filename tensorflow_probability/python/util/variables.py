@@ -22,18 +22,21 @@ import warnings
 
 import tensorflow as tf
 
+from tensorflow.python.util import deprecation
+
 __all__ = [
     "externalize_variables_as_args",
 ]
 
-
 # Cause all warnings to always be triggered.
 # Not having this means subsequent calls wont trigger the warning.
-warnings.filterwarnings("always",
-                        module="tensorflow_probability.*variables",
-                        append=True)  # Don't override user-set filters.
+warnings.filterwarnings(
+    "always", module="tensorflow_probability.*variables",
+    append=True)  # Don't override user-set filters.
 
 
+@deprecation.deprecated("2019-02-28", "`externalize_variables_as_args` will "
+                        "not be supported with TF 2.0")
 def externalize_variables_as_args(fn,
                                   fn_args=(),
                                   ancestor_variables=None,
@@ -109,8 +112,10 @@ def externalize_variables_as_args(fn,
     ValueError: if `assert_variable_override` is `True` and `Variable` is
       requested but not overridden.
   """
+
   def _make_bypassing_custom_getter_fn(new_var_dict):
     """Return dict value rather than what would otherwise be dict key."""
+
     def _custom_getter(getter, *args, **kwargs):
       v = getter(*args, **kwargs)
       new_v = new_var_dict.get(v, None)
@@ -121,6 +126,7 @@ def externalize_variables_as_args(fn,
         warnings.warn(msg)
         return v
       return new_v
+
     return _custom_getter
 
   with tf.name_scope(name, "externalize_variables_as_args"):
@@ -130,24 +136,26 @@ def externalize_variables_as_args(fn,
       y = fn(*fn_args)  # Side-effect: adds trainable vars.
       if possible_ancestor_vars is None:
         possible_ancestor_vars = (
-            tf.trainable_variables() +
-            tf.get_collection(tf.GraphKeys.TRAINABLE_RESOURCE_VARIABLES))
+            tf.trainable_variables() + tf.get_collection(
+                tf.GraphKeys.TRAINABLE_RESOURCE_VARIABLES))
       # TODO(b/72873296): Add a dedicated op for identifying ancestors.
-      ancestors = [v for g, v
-                   in zip(tf.gradients(y, possible_ancestor_vars),
-                          possible_ancestor_vars)
-                   if g is not None]
+      ancestors = [
+          v for g, v in zip(
+              tf.gradients(y, possible_ancestor_vars), possible_ancestor_vars)
+          if g is not None
+      ]
       ancestor_variables = sorted(ancestors, key=lambda v: v.name)
   n = len(fn_args)
+
   def _fn(*args):
     with tf.name_scope("wrapped_fn"):
       vars_dict = dict(
-          (k, tf.convert_to_tensor(
-              v, dtype=k.dtype.base_dtype, name=k.op.name))
+          (k, tf.convert_to_tensor(v, dtype=k.dtype.base_dtype, name=k.op.name))
           for k, v in zip(ancestor_variables, args[n:]))
       with tf.variable_scope(
           tf.get_variable_scope(),
           reuse=True,
           custom_getter=_make_bypassing_custom_getter_fn(vars_dict)):
         return fn(*args[:n])
+
   return _fn, ancestor_variables

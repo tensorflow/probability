@@ -158,7 +158,7 @@ def quadrature_scheme_softmaxnormal_quantiles(
     def _get_final_shape(qs):
       """Helper to build `TensorShape`."""
       bs = dist.batch_shape.with_rank_at_least(1)
-      num_components = bs[-1].value
+      num_components = tf.dimension_value(bs[-1])
       if num_components is not None:
         num_components += 1
       tail = tf.TensorShape([num_components, qs])
@@ -750,7 +750,7 @@ class VectorDiffeomixture(distribution_lib.Distribution):
 
   def _expand_mix_distribution_probs(self):
     p = self.mixture_distribution.probs  # [B, deg]
-    deg = p.shape.with_rank_at_least(1)[-1].value
+    deg = tf.dimension_value(p.shape.with_rank_at_least(1)[-1])
     if deg is None:
       deg = tf.shape(p)[-1]
     event_ndims = self.event_shape.ndims
@@ -847,7 +847,7 @@ def interpolate_loc(grid, loc):
   if len(loc) != 2:
     raise NotImplementedError("Currently only bimixtures are supported; "
                               "len(scale)={} is not 2.".format(len(loc)))
-  deg = grid.shape.with_rank_at_least(1)[-1].value
+  deg = tf.dimension_value(grid.shape.with_rank_at_least(1)[-1])
   if deg is None:
     raise ValueError("Num quadrature grid points must be known prior "
                      "to graph execution.")
@@ -875,7 +875,7 @@ def interpolate_scale(grid, scale):
   if len(scale) != 2:
     raise NotImplementedError("Currently only bimixtures are supported; "
                               "len(scale)={} is not 2.".format(len(scale)))
-  deg = grid.shape.with_rank_at_least(1)[-1].value
+  deg = tf.dimension_value(grid.shape.with_rank_at_least(1)[-1])
   if deg is None:
     raise ValueError("Num quadrature grid points must be known prior "
                      "to graph execution.")

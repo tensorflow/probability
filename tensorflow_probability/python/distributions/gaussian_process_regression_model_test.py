@@ -99,7 +99,7 @@ class _GaussianProcessRegressionModelTest(object):
       self.assertIsNone(samples.shape.ndims)
       self.assertIsNone(gprm.batch_shape.ndims)
       self.assertEqual(gprm.event_shape.ndims, 1)
-      self.assertIsNone(gprm.event_shape.dims[0].value)
+      self.assertIsNone(tf.dimension_value(gprm.event_shape.dims[0]))
 
   def testMeanVarianceAndCovariance(self):
     amp = np.float64(.5)

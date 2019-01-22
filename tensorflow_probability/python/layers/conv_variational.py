@@ -173,10 +173,10 @@ class _ConvVariational(tf.keras.layers.Layer):
       channel_axis = 1
     else:
       channel_axis = -1
-    if input_shape[channel_axis].value is None:
+    input_dim = tf.dimension_value(input_shape[channel_axis])
+    if input_dim is None:
       raise ValueError('The channel dimension of the inputs '
                        'should be defined. Found `None`.')
-    input_dim = input_shape[channel_axis].value
     kernel_shape = self.kernel_size + (input_dim, self.filters)
 
     # If self.dtype is None, build weights using the default dtype.

@@ -206,20 +206,22 @@ class VectorDeterministicTest(tf.test.TestCase):
     self.assertEqual(deterministic.event_shape, tf.TensorShape([4]))
 
   def testShapeUknown(self):
-    loc = tf.placeholder(np.float32, shape=[None])
+    loc = tf.placeholder_with_default(np.float32([0]), shape=[None])
     deterministic = tfd.VectorDeterministic(loc)
     self.assertAllEqual(deterministic.event_shape_tensor().shape, [1])
 
   def testInvalidTolRaises(self):
     loc = rng.rand(2, 3, 4).astype(np.float32)
-    deterministic = tfd.VectorDeterministic(loc, atol=-1, validate_args=True)
-    with self.assertRaisesOpError("Condition x >= 0"):
+    with self.assertRaisesRegexp((ValueError, tf.errors.InvalidArgumentError),
+                                 "Condition x >= 0"):
+      deterministic = tfd.VectorDeterministic(loc, atol=-1, validate_args=True)
       self.evaluate(deterministic.prob(loc))
 
   def testInvalidXRaises(self):
     loc = rng.rand(2, 3, 4).astype(np.float32)
-    deterministic = tfd.VectorDeterministic(loc, atol=-1, validate_args=True)
-    with self.assertRaisesRegexp(ValueError, "must have rank at least 1"):
+    with self.assertRaisesRegexp((ValueError, tf.errors.InvalidArgumentError),
+                                 "must have rank at least 1"):
+      deterministic = tfd.VectorDeterministic(loc, atol=-1, validate_args=True)
       self.evaluate(deterministic.prob(0.))
 
   def testProbVectorDeterministicWithNoBatchDims(self):

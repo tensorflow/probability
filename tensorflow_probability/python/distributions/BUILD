@@ -1589,6 +1589,7 @@ py_test(
         ":normal",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 

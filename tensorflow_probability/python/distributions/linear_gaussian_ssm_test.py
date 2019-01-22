@@ -499,7 +499,7 @@ class BatchTest(tf.test.TestCase):
 @tfe.run_all_tests_in_graph_and_eager_modes
 class KalmanSmootherTest(tf.test.TestCase):
 
-  def setUp(self):
+  def build_kf(self):
     # Define a simple model with 3D latents and 2D observations.
 
     self.transition_matrix = np.array(
@@ -519,7 +519,7 @@ class KalmanSmootherTest(tf.test.TestCase):
         loc=np.zeros(shape=[3,], dtype=np.float32),
         scale_diag=np.ones(shape=[3,], dtype=np.float32))
 
-    self.kf = tfd.LinearGaussianStateSpaceModel(
+    return tfd.LinearGaussianStateSpaceModel(
         num_timesteps=5,
         transition_matrix=self.transition_matrix,
         transition_noise=self.transition_noise,
@@ -537,8 +537,9 @@ class KalmanSmootherTest(tf.test.TestCase):
           [-0.46593086, 0.23341251]]],
         dtype=np.float32)
 
-    (_, filtered_means, filtered_covs, _, _, _, _) = self.kf.forward_filter(obs)
-    (smoothed_means, smoothed_covs) = self.kf.posterior_marginals(obs)
+    kf = self.build_kf()
+    _, filtered_means, filtered_covs, _, _, _, _ = kf.forward_filter(obs)
+    smoothed_means, smoothed_covs = kf.posterior_marginals(obs)
 
     # Numbers are checked against results from well-tested open source package.
     # In order to replicate the numbers below, one could run the following

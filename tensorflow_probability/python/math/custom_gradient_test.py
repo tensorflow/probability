@@ -51,8 +51,8 @@ class CustomGradientTest(tf.test.TestCase):
     with tf.GradientTape() as tape:
       tape.watch(x)
       fx = tfp.math.custom_gradient(f(x), g(x), x)
-    gx = tf.gradients(fx, x)[0]
-    [fx_, gx_] = self.evaluate([fx, gx])
+    gx = tape.gradient(fx, x)
+    fx_, gx_ = self.evaluate([fx, gx])
 
     self.assertAllClose(f(x_), fx_)
     self.assertAllClose(g(x_), gx_)
@@ -79,6 +79,7 @@ class CustomGradientTest(tf.test.TestCase):
       z = tf.stack([x, y])
       fz = tfp.math.custom_gradient(f(z), g(z), z)
     gz = tape.gradient(fz, tf.trainable_variables())
+    print(tf.trainable_variables(), gz)
     [z_, fz_, gx_, gy_] = self.evaluate([z, fz, gz[0], gz[1]])
 
     self.assertEqual(f(z_), fz_)

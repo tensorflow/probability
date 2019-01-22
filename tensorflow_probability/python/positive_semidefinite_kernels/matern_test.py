@@ -52,12 +52,13 @@ class _MaternTestCase(parameterized.TestCase, tf.test.TestCase):
     self.assertAllEqual([3, 1, 2], self.evaluate(k.batch_shape_tensor()))
 
   def testValidateArgs(self):
-    k = self._kernel_type(amplitude=-1., length_scale=-1., validate_args=True)
     with self.assertRaises(tf.errors.InvalidArgumentError):
+      k = self._kernel_type(amplitude=-1., length_scale=-1., validate_args=True)
       self.evaluate(k.amplitude)
 
-    with self.assertRaises(tf.errors.InvalidArgumentError):
-      self.evaluate(k.length_scale)
+    if not tf.executing_eagerly():
+      with self.assertRaises(tf.errors.InvalidArgumentError):
+        self.evaluate(k.length_scale)
 
     # But `None`'s are ok
     k = self._kernel_type(amplitude=None, length_scale=None, validate_args=True)
@@ -130,12 +131,15 @@ class _MaternTestCase(parameterized.TestCase, tf.test.TestCase):
     k = self._kernel_type()
     x = tf.constant(np.arange(3 * 5, dtype=np.float32).reshape(3, 5))
 
-    kernel_values = k.apply(x, x)
-    grads = [tf.gradients(kernel_values[i], x)[0] for i in range(3)]
+    with tf.GradientTape(persistent=True) as tape:
+      tape.watch(x)
+      kernel_values = k.apply(x, x)
+      kernel_val_slices = [kernel_values[i] for i in range(3)]
+    grads = [tape.gradient(kvs, x) for kvs in kernel_val_slices]
 
     self.assertAllEqual(
-        [self.evaluate(grad) for grad in grads],
-        [np.zeros(grad.shape.as_list(), np.float32) for grad in grads])
+        [np.zeros(grad.shape.as_list(), np.float32) for grad in grads],
+        self.evaluate(grads))
 
 
 class MaternOneHalfTest(_MaternTestCase):

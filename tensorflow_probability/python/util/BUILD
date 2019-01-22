@@ -76,6 +76,7 @@ py_test(
     name = "variables_test",
     size = "small",
     srcs = ["variables_test.py"],
+    tags = ["notf2"],
     deps = [
         # numpy dep,
         # tensorflow dep,

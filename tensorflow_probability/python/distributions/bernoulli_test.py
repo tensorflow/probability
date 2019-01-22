@@ -262,19 +262,21 @@ class BernoulliTest(tf.test.TestCase):
     grad_p = tape.gradient(samples, p)
     self.assertIsNone(grad_p)
 
-  def testSampleActsLikeSampleN(self):
+  def testSampleDeterministicScalarVsVector(self):
     p = [0.2, 0.6]
     dist = bernoulli.Bernoulli(probs=p)
     n = 1000
-    seed = 42
+    def _maybe_seed():
+      if tf.executing_eagerly():
+        tf.set_random_seed(42)
+        return None
+      return 42
     self.assertAllEqual(
-        self.evaluate(dist.sample(n, seed)),
-        self.evaluate(dist.sample(n, seed)))
+        self.evaluate(dist.sample(n, _maybe_seed())),
+        self.evaluate(dist.sample([n], _maybe_seed())))
     n = tf.placeholder_with_default(np.int32(1000), shape=None)
-    if tf.executing_eagerly(): tf.set_random_seed(42)
-    sample1 = dist.sample(n, None if tf.executing_eagerly() else 42)
-    if tf.executing_eagerly(): tf.set_random_seed(42)
-    sample2 = dist.sample(n, None if tf.executing_eagerly() else 42)
+    sample1 = dist.sample(n, _maybe_seed())
+    sample2 = dist.sample([n], _maybe_seed())
     sample1, sample2 = self.evaluate([sample1, sample2])
     self.assertAllEqual(sample1, sample2)
 

@@ -44,41 +44,42 @@ class SampleChainTest(tf.test.TestCase):
                       [0.5, 1]])
     num_results = 3000
     counter = collections.Counter()
-    with self.cached_session(graph=tf.Graph()) as sess:
-      def target_log_prob(x, y):
-        counter['target_calls'] += 1
-        # Corresponds to unnormalized MVN.
-        # z = matmul(inv(chol(true_cov)), [x, y] - true_mean)
-        z = tf.stack([x, y], axis=-1) - true_mean
-        z = tf.squeeze(
-            tf.linalg.triangular_solve(
-                np.linalg.cholesky(true_cov),
-                z[..., tf.newaxis]),
-            axis=-1)
-        return -0.5 * tf.reduce_sum(z**2., axis=-1)
-      states, _ = tfp.mcmc.sample_chain(
-          num_results=num_results,
-          current_state=[dtype(-2), dtype(2)],
-          kernel=tfp.mcmc.HamiltonianMonteCarlo(
-              target_log_prob_fn=target_log_prob,
-              step_size=[0.5, 0.5],
-              num_leapfrog_steps=2,
-              seed=54),
-          num_burnin_steps=200,
-          num_steps_between_results=1,
-          parallel_iterations=1)
+    def target_log_prob(x, y):
+      counter['target_calls'] += 1
+      # Corresponds to unnormalized MVN.
+      # z = matmul(inv(chol(true_cov)), [x, y] - true_mean)
+      z = tf.stack([x, y], axis=-1) - true_mean
+      z = tf.squeeze(
+          tf.linalg.triangular_solve(
+              np.linalg.cholesky(true_cov),
+              z[..., tf.newaxis]),
+          axis=-1)
+      return -0.5 * tf.reduce_sum(z**2., axis=-1)
+    if tf.executing_eagerly():
+      tf.set_random_seed(54)
+    states, _ = tfp.mcmc.sample_chain(
+        num_results=num_results,
+        current_state=[dtype(-2), dtype(2)],
+        kernel=tfp.mcmc.HamiltonianMonteCarlo(
+            target_log_prob_fn=target_log_prob,
+            step_size=[0.5, 0.5],
+            num_leapfrog_steps=2,
+            seed=None if tf.executing_eagerly() else 54),
+        num_burnin_steps=200,
+        num_steps_between_results=1,
+        parallel_iterations=1)
+    if not tf.executing_eagerly():
       self.assertAllEqual(dict(target_calls=2), counter)
-      states = tf.stack(states, axis=-1)
-      self.assertEqual(num_results, tf.dimension_value(states.shape[0]))
-      sample_mean = tf.reduce_mean(states, axis=0)
-      x = states - sample_mean
-      sample_cov = tf.matmul(x, x, transpose_a=True) / dtype(num_results)
-      [sample_mean_, sample_cov_] = sess.run([
-          sample_mean, sample_cov])
-      self.assertAllClose(true_mean, sample_mean_,
-                          atol=0.05, rtol=0.)
-      self.assertAllClose(true_cov, sample_cov_,
-                          atol=0., rtol=0.1)
+    states = tf.stack(states, axis=-1)
+    self.assertEqual(num_results, tf.dimension_value(states.shape[0]))
+    sample_mean = tf.reduce_mean(states, axis=0)
+    x = states - sample_mean
+    sample_cov = tf.matmul(x, x, transpose_a=True) / dtype(num_results)
+    sample_mean_, sample_cov_ = self.evaluate([sample_mean, sample_cov])
+    self.assertAllClose(true_mean, sample_mean_,
+                        atol=0.05, rtol=0.)
+    self.assertAllClose(true_cov, sample_cov_,
+                        atol=0., rtol=0.1)
 
 
 if __name__ == '__main__':

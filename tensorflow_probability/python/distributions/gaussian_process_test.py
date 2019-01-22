@@ -75,7 +75,7 @@ class _GaussianProcessTest(object):
       self.assertIsNone(samples.shape.ndims)
       self.assertIsNone(gp.batch_shape.ndims)
       self.assertEqual(gp.event_shape.ndims, 1)
-      self.assertIsNone(gp.event_shape.dims[0].value)
+      self.assertIsNone(tf.dimension_value(gp.event_shape.dims[0]))
 
   def testVarianceAndCovarianceMatrix(self):
     amp = np.float64(.5)

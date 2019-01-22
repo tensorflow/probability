@@ -136,7 +136,7 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
       vmf: A `tfp.distributions.VonMisesFisher` instance.
       atol: Absolute difference tolerable.
     """
-    dim = vmf.event_shape[-1].value
+    dim = tf.dimension_value(vmf.event_shape[-1])
     nsamples = 10
     # Sample some random points uniformly over the hypersphere using numpy.
     sample_shape = [nsamples] + vmf.batch_shape.as_list() + [dim]
@@ -181,7 +181,7 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
       vmf: A `VonMisesFisher` distribution instance.
       rtol: Relative difference tolerable.
     """
-    dim = vmf.event_shape[-1].value
+    dim = tf.dimension_value(vmf.event_shape[-1])
     nsamples = 50000
     samples = vmf.sample(sample_shape=[nsamples])
     samples = tf.check_numerics(samples, 'samples')
@@ -238,7 +238,7 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
           rtol=rtol)
 
   def _verifyCovariance(self, vmf):
-    dim = vmf.event_shape[-1].value
+    dim = tf.dimension_value(vmf.event_shape[-1])
     nsamples = 10000
     samples = vmf.sample(nsamples)
     samples = tf.check_numerics(samples, 'samples')

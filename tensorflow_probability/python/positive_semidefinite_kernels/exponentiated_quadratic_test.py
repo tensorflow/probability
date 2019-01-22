@@ -87,12 +87,13 @@ class ExponentiatedQuadraticTest(tf.test.TestCase, parameterized.TestCase):
     #               `- from broadcasting kernel params
 
   def testValidateArgs(self):
-    k = psd_kernels.ExponentiatedQuadratic(-1., -1., validate_args=True)
     with self.assertRaises(tf.errors.InvalidArgumentError):
+      k = psd_kernels.ExponentiatedQuadratic(-1., -1., validate_args=True)
       self.evaluate(k.amplitude)
 
-    with self.assertRaises(tf.errors.InvalidArgumentError):
-      self.evaluate(k.length_scale)
+    if not tf.executing_eagerly():
+      with self.assertRaises(tf.errors.InvalidArgumentError):
+        self.evaluate(k.length_scale)
 
     # But `None`'s are ok
     k = psd_kernels.ExponentiatedQuadratic(None, None, validate_args=True)

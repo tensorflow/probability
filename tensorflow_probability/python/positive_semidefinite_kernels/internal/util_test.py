@@ -35,6 +35,7 @@ class UtilTest(tf.test.TestCase):
         [3, 1, 1, 1])
 
   def testPadShapeRightWithOnesDynamicShape(self):
+    if tf.executing_eagerly(): return
     # Test partially unknown shape
     x = tf.placeholder_with_default(np.ones([3], np.float32), [None])
     expanded = util.pad_shape_right_with_ones(x, 3)
@@ -76,13 +77,13 @@ class UtilTest(tf.test.TestCase):
                                     shape=[5, 4, None, None])
     self.assertAllEqual(
         util.sum_rightmost_ndims_preserving_shape(x, ndims=1).shape.as_list(),
-        [5, 4, None])
+        [5, 4, 3 if tf.executing_eagerly() else None])
 
   def testSumRightmostNdimsPreservingShapeDynamicRank(self):
+    if tf.executing_eagerly(): return
     x = tf.placeholder_with_default(np.ones((5, 4, 3, 2)), shape=None)
     self.assertIsNone(
-        util.sum_rightmost_ndims_preserving_shape(x, ndims=2).shape.ndims,
-        None)
+        util.sum_rightmost_ndims_preserving_shape(x, ndims=2).shape.ndims)
     self.assertAllEqual(
         self.evaluate(
             util.sum_rightmost_ndims_preserving_shape(x, ndims=2)).shape,
@@ -98,19 +99,23 @@ class UtilTest(tf.test.TestCase):
   def testSqrtWithFiniteGradsHasCorrectGradients(self):
     self.assertTrue(np.isnan(self.evaluate(util.sqrt_with_finite_grads(-1.))))
     xs = tf.constant(np.linspace(1e-10, 10., 100))
-    tf_sqrt = tf.sqrt(xs)
-    safe_sqrt = util.sqrt_with_finite_grads(xs)
+    with tf.GradientTape(persistent=True) as tape:
+      tape.watch(xs)
+      tf_sqrt = tf.sqrt(xs)
+      safe_sqrt = util.sqrt_with_finite_grads(xs)
 
     self.assertAllEqual(
-        self.evaluate(tf.gradients(tf_sqrt, xs)[0]),
-        self.evaluate(tf.gradients(safe_sqrt, xs)[0]))
+        self.evaluate(tape.gradient(tf_sqrt, xs)),
+        self.evaluate(tape.gradient(safe_sqrt, xs)))
 
     zero = tf.constant(0.)
-    tf_sqrt = tf.sqrt(zero)
-    safe_sqrt = util.sqrt_with_finite_grads(zero)
+    with tf.GradientTape(persistent=True) as tape:
+      tape.watch(zero)
+      tf_sqrt = tf.sqrt(zero)
+      safe_sqrt = util.sqrt_with_finite_grads(zero)
     self.assertNotEqual(
-        self.evaluate(tf.gradients(tf_sqrt, zero)[0]),
-        self.evaluate(tf.gradients(safe_sqrt, zero)[0]))
+        self.evaluate(tape.gradient(tf_sqrt, zero)),
+        self.evaluate(tape.gradient(safe_sqrt, zero)))
 
   def testSqrtWithFiniteGradsBackpropsCorrectly(self):
     # Part of implementing a tf.custom_gradient is correctly handling the
@@ -128,19 +133,25 @@ class UtilTest(tf.test.TestCase):
 
     # We only test away from zero, since we know the values don't match there.
     xs = tf.constant(np.linspace(1e-10, 10., 100))
-    tf_sqrt = f(tf.sqrt(h(xs)))
-    safe_sqrt = f(g(h(xs)))
+    with tf.GradientTape(persistent=True) as tape:
+      tape.watch(xs)
+      tf_sqrt = f(tf.sqrt(h(xs)))
+      safe_sqrt = f(g(h(xs)))
 
     self.assertAllClose(
-        self.evaluate(tf.gradients(tf_sqrt, xs)[0]),
-        self.evaluate(tf.gradients(safe_sqrt, xs)[0]),
+        self.evaluate(tape.gradient(tf_sqrt, xs)),
+        self.evaluate(tape.gradient(safe_sqrt, xs)),
         rtol=1e-10)
 
   def testSqrtWithFiniteGradsWithDynamicShape(self):
     x = tf.placeholder_with_default([1.], shape=[None])
+    with tf.GradientTape(persistent=True) as tape:
+      tape.watch(x)
+      tf_sqrt = tf.sqrt(x)
+      safe_sqrt = util.sqrt_with_finite_grads(x)
     self.assertAllEqual(
-        self.evaluate(tf.gradients(tf.sqrt(x), x)),
-        self.evaluate(tf.gradients(util.sqrt_with_finite_grads(x), x)))
+        self.evaluate(tape.gradient(tf_sqrt, x)),
+        self.evaluate(tape.gradient(safe_sqrt, x)))
 
 if __name__ == '__main__':
   tf.test.main()

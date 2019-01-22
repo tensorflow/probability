@@ -80,7 +80,7 @@ class _StudentTProcessTest(object):
       self.assertIsNone(samples.shape.ndims)
       self.assertIsNone(tp.batch_shape.ndims)
       self.assertEqual(tp.event_shape.ndims, 1)
-      self.assertIsNone(tp.event_shape.dims[0].value)
+      self.assertIsNone(tf.dimension_value(tp.event_shape.dims[0]))
 
   def testVarianceAndCovarianceMatrix(self):
     df = np.float64(4.)

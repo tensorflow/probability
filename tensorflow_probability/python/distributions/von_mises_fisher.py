@@ -180,9 +180,10 @@ class VonMisesFisher(distribution.Distribution):
               1., tf.linalg.norm(mean_direction, axis=-1),
               message='`mean_direction` must be unit-length')
       ] if validate_args else []
-      if mean_direction.shape.with_rank_at_least(1)[-1].value is not None:
-        if mean_direction.shape.with_rank_at_least(1)[-1].value > 5:
-          raise ValueError('vMF ndims > 5 is not currently supported')
+      static_event_dim = tf.dimension_value(
+          mean_direction.shape.with_rank_at_least(1)[-1])
+      if static_event_dim is not None and static_event_dim > 5:
+        raise ValueError('vMF ndims > 5 is not currently supported')
       elif validate_args:
         assertions += [tf.assert_less_equal(
             tf.shape(mean_direction)[-1], 5,
@@ -195,7 +196,7 @@ class VonMisesFisher(distribution.Distribution):
       # concentration is only for event_dim==3, via an inversion sampler.
       reparameterization_type = (
           reparameterization.FULLY_REPARAMETERIZED
-          if mean_direction.shape.with_rank_at_least(1)[-1].value == 3 else
+          if static_event_dim == 3 else
           reparameterization.NOT_REPARAMETERIZED)
       super(VonMisesFisher, self).__init__(
           dtype=self._concentration.dtype,
@@ -245,7 +246,7 @@ class VonMisesFisher(distribution.Distribution):
 
   def _log_normalization(self):
     """Computes the log-normalizer of the distribution."""
-    event_dim = self.event_shape[0].value
+    event_dim = tf.dimension_value(self.event_shape[0])
     if event_dim is None:
       raise ValueError('vMF _log_normalizer currently only supports '
                        'statically known event shape')
@@ -288,7 +289,7 @@ class VonMisesFisher(distribution.Distribution):
 
   def _mean(self):
     # Derivation: https://sachinruk.github.io/blog/von-Mises-Fisher/
-    event_dim = self.event_shape[0].value
+    event_dim = tf.dimension_value(self.event_shape[0])
     if event_dim is None:
       raise ValueError('event shape must be statically known for _bessel_ive')
     safe_conc = tf.where(self.concentration > 0,
@@ -302,7 +303,7 @@ class VonMisesFisher(distribution.Distribution):
 
   def _covariance(self):
     # Derivation: https://sachinruk.github.io/blog/von-Mises-Fisher/
-    event_dim = self.event_shape[0].value
+    event_dim = tf.dimension_value(self.event_shape[0])
     if event_dim is None:
       raise ValueError('event shape must be statically known for _bessel_ive')
     # TODO(bjp): Enable this; numerically unstable.
@@ -327,7 +328,8 @@ class VonMisesFisher(distribution.Distribution):
 
   def _rotate(self, samples):
     """Applies a Householder rotation to `samples`."""
-    event_dim = self.event_shape[0].value or self._event_shape_tensor()[0]
+    event_dim = (tf.dimension_value(self.event_shape[0]) or
+                 self._event_shape_tensor()[0])
     basis = tf.concat([[1.], tf.zeros([event_dim - 1], dtype=self.dtype)],
                       axis=0),
     u = tf.nn.l2_normalize(basis - self.mean_direction, axis=-1)
@@ -377,7 +379,8 @@ class VonMisesFisher(distribution.Distribution):
     # circle where x = \hat{x} intersects the unit sphere. We pick a point on
     # that circle, then rotate to the desired mean direction from a basis of
     # (1, 0, 0).
-    event_dim = self.event_shape[0].value or self._event_shape_tensor()[0]
+    event_dim = (tf.dimension_value(self.event_shape[0]) or
+                 self._event_shape_tensor()[0])
 
     sample_batch_shape = tf.concat([[n], self._batch_shape_tensor()], axis=0)
     dim = tf.cast(event_dim - 1, self.dtype)
