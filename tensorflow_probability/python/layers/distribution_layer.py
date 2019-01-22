@@ -37,7 +37,9 @@ __all__ = [
     'CategoricalMixtureOfOneHotCategorical',
     'DistributionLambda',
     'IndependentBernoulli',
+    'IndependentLogistic',
     'IndependentNormal',
+    'IndependentPoisson',
     'KLDivergenceAddLoss',
     'KLDivergenceRegularizer',
     'MixtureSameFamily',
@@ -637,6 +639,88 @@ def _eval_all_one_hot(fn, dist, name=None):
     return tf.transpose(fn(dist, x), perm)
 
 
+class IndependentLogistic(DistributionLambda):
+  """An independent logistic Keras layer.
+
+  ### Example
+
+  ```python
+  tfd = tfp.distributions
+  tfpl = tfp.layers
+  tfk = tf.keras
+  tfkl = tf.keras.layers
+
+  # Create a stochastic encoder -- e.g., for use in a variational auto-encoder.
+  input_shape = [28, 28, 1]
+  encoded_shape = 2
+  encoder = tfk.Sequential([
+    tfkl.InputLayer(input_shape=input_shape),
+    tfkl.Flatten(),
+    tfkl.Dense(10, activation='relu'),
+    tfkl.Dense(tfpl.IndependentLogistic.params_size(encoded_shape)),
+    tfpl.IndependentLogistic(encoded_shape)
+  ])
+  ```
+
+  """
+
+  def __init__(self,
+               event_shape=(),
+               convert_to_tensor_fn=tfd.Distribution.sample,
+               validate_args=False,
+               **kwargs):
+    """Initialize the `IndependentLogistic` layer.
+
+    Args:
+      event_shape: integer vector `Tensor` representing the shape of single
+        draw from this distribution.
+      convert_to_tensor_fn: Python `callable` that takes a `tfd.Distribution`
+        instance and returns a `tf.Tensor`-like object.
+        Default value: `tfd.Distribution.sample`.
+      validate_args: Python `bool`, default `False`. When `True` distribution
+        parameters are checked for validity despite possibly degrading runtime
+        performance. When `False` invalid inputs may silently render incorrect
+        outputs.
+        Default value: `False`.
+      **kwargs: Additional keyword arguments passed to `tf.keras.Layer`.
+    """
+    super(IndependentLogistic, self).__init__(
+        lambda t: type(self).new(t, event_shape, validate_args),
+        convert_to_tensor_fn,
+        **kwargs)
+
+  @staticmethod
+  def new(params, event_shape=(), validate_args=False, name=None):
+    """Create the distribution instance from a `params` vector."""
+    with tf.name_scope(name, 'IndependentLogistic', [params, event_shape]):
+      params = tf.convert_to_tensor(params, name='params')
+      event_shape = dist_util.expand_to_vector(
+          tf.convert_to_tensor(
+              event_shape, name='event_shape', preferred_dtype=tf.int32),
+          tensor_name='event_shape')
+      output_shape = tf.concat([
+          tf.shape(params)[:-1],
+          event_shape,
+      ], axis=0)
+      loc_params, scale_params = tf.split(params, 2, axis=-1)
+      return tfd.Independent(
+          tfd.Logistic(
+              loc=tf.reshape(loc_params, output_shape),
+              scale=tf.math.softplus(tf.reshape(scale_params, output_shape)),
+              validate_args=validate_args),
+          reinterpreted_batch_ndims=tf.size(event_shape),
+          validate_args=validate_args)
+
+  @staticmethod
+  def params_size(event_shape=(), name=None):
+    """The number of `params` needed to create a single distribution."""
+    with tf.name_scope(name, 'IndependentLogistic_params_size', [event_shape]):
+      event_shape = tf.convert_to_tensor(
+          event_shape, name='event_shape', preferred_dtype=tf.int32)
+      return 2 * _event_size(
+          event_shape, name=name or 'IndependentLogistic_params_size')
+
+
 class IndependentNormal(DistributionLambda):
   """An independent normal Keras layer.
 
@@ -717,6 +801,101 @@ class IndependentNormal(DistributionLambda):
           event_shape, name='event_shape', preferred_dtype=tf.int32)
       return 2 * _event_size(
           event_shape, name=name or 'IndependentNormal_params_size')
+
+
+class IndependentPoisson(DistributionLambda):
+  """An independent Poisson Keras layer.
+
+  ### Example
+
+  ```python
+  tfd = tfp.distributions
+  tfpl = tfp.layers
+  tfk = tf.keras
+  tfkl = tf.keras.layers
+
+  # Create example data.
+  n = 2000
+  d = 4
+  x = tfd.Uniform(low=1., high=10.).sample([n, d])
+  w = [[3.14], [2.72], [-1.62], [0.577]]
+  log_rate = tf.matmul(x, w) - 0.141
+  y = tfd.Poisson(log_rate=log_rate).sample()
+
+  # Poisson regression model.
+  model = tfk.Sequential([
+      tfkl.Dense(tfpl.IndependentPoisson.params_size(1)),
+      tfpl.IndependentPoisson(1)
+  ])
+
+  # Fit.
+  model.compile(optimizer=tf.train.AdamOptimizer(learning_rate=0.05),
+                loss=lambda y, model: -model.log_prob(y),
+                metrics=[])
+  batch_size = 50
+  model.fit(x, y,
+            batch_size=batch_size,
+            epochs=20,
+            steps_per_epoch=n // batch_size,
+            verbose=True,
+            shuffle=True)
+  print(model.get_weights())
+  ```
+
+  """
+
+  def __init__(self,
+               event_shape=(),
+               convert_to_tensor_fn=tfd.Distribution.sample,
+               validate_args=False,
+               **kwargs):
+    """Initialize the `IndependentPoisson` layer.
+
+    Args:
+      event_shape: integer vector `Tensor` representing the shape of single
+        draw from this distribution.
+      convert_to_tensor_fn: Python `callable` that takes a `tfd.Distribution`
+        instance and returns a `tf.Tensor`-like object.
+        Default value: `tfd.Distribution.sample`.
+      validate_args: Python `bool`, default `False`. When `True` distribution
+        parameters are checked for validity despite possibly degrading runtime
+        performance. When `False` invalid inputs may silently render incorrect
+        outputs.
+        Default value: `False`.
+      **kwargs: Additional keyword arguments passed to `tf.keras.Layer`.
+    """
+    super(IndependentPoisson, self).__init__(
+        lambda t: type(self).new(t, event_shape, validate_args),
+        convert_to_tensor_fn,
+        **kwargs)
+
+  @staticmethod
+  def new(params, event_shape=(), validate_args=False, name=None):
+    """Create the distribution instance from a `params` vector."""
+    with tf.name_scope(name, 'IndependentPoisson', [params, event_shape]):
+      params = tf.convert_to_tensor(params, name='params')
+      event_shape = dist_util.expand_to_vector(
+          tf.convert_to_tensor(
+              event_shape, name='event_shape', preferred_dtype=tf.int32),
+          tensor_name='event_shape')
+      output_shape = tf.concat([
+          tf.shape(params)[:-1],
+          event_shape,
+      ], axis=0)
+      return tfd.Independent(
+          tfd.Poisson(log_rate=tf.reshape(params, output_shape),
+                      validate_args=validate_args),
+          reinterpreted_batch_ndims=tf.size(event_shape),
+          validate_args=validate_args)
+
+  @staticmethod
+  def params_size(event_shape=(), name=None):
+    """The number of `params` needed to create a single distribution."""
+    with tf.name_scope(name, 'IndependentPoisson_params_size', [event_shape]):
+      event_shape = tf.convert_to_tensor(
+          event_shape, name='event_shape', preferred_dtype=tf.int32)
+      return _event_size(
+          event_shape, name=name or 'IndependentPoisson_params_size')
 
 
 class KLDivergenceRegularizer(tf.keras.regularizers.Regularizer):

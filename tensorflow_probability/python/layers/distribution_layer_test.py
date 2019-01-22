@@ -626,6 +626,53 @@ class IndependentBernoulliTestStaticShape(tf.test.TestCase,
 
 
 @tfe.run_all_tests_in_graph_and_eager_modes
+class _IndependentLogisticTest(_IndependentLayerTest):
+  layer_class = tfpl.IndependentLogistic
+  dist_class = tfd.Logistic
+
+  def _distribution_to_params(self, distribution, batch_shape):
+    return tf.concat([
+        tf.reshape(distribution.loc, tf.concat([batch_shape, [-1]], axis=-1)),
+        tfd.softplus_inverse(tf.reshape(
+            distribution.scale, tf.concat([batch_shape, [-1]], axis=-1)))
+    ], -1)
+
+
+@tfe.run_all_tests_in_graph_and_eager_modes
+class IndependentLogisticTestDynamicShape(tf.test.TestCase,
+                                          _IndependentLogisticTest):
+  dtype = np.float32
+  use_static_shape = False
+
+
+@tfe.run_all_tests_in_graph_and_eager_modes
+class IndependentLogisticTestStaticShape(tf.test.TestCase,
+                                         _IndependentLogisticTest):
+  dtype = np.float64
+  use_static_shape = True
+
+  def test_doc_string(self):
+    input_shape = [28, 28, 1]
+    encoded_shape = 2
+    encoder = tfk.Sequential([
+        tfkl.InputLayer(input_shape=input_shape, dtype=self.dtype),
+        tfkl.Flatten(),
+        tfkl.Dense(10, activation='relu'),
+        tfkl.Dense(tfpl.IndependentLogistic.params_size(encoded_shape)),
+        tfpl.IndependentLogistic(encoded_shape),
+        tfkl.Lambda(lambda x: x + 0.)  # To force conversion to tensor.
+    ])
+
+    # Test that we can run the model and get a sample.
+    x = np.random.randn(*([1] + input_shape)).astype(self.dtype)
+    self.assertEqual((1, 2), encoder.predict_on_batch(x).shape)
+
+    out = encoder(tf.convert_to_tensor(x))
+    self.assertEqual((1, 2), out.shape)
+    self.assertEqual((1, 2), self.evaluate(out).shape)
+
+
+@tfe.run_all_tests_in_graph_and_eager_modes
 class _IndependentNormalTest(_IndependentLayerTest):
   layer_class = tfpl.IndependentNormal
   dist_class = tfd.Normal
@@ -702,6 +749,58 @@ class IndependentNormalTestStaticShape(tf.test.TestCase,
     out = encoder(tf.convert_to_tensor(x))
     self.assertEqual((1, 2), out.shape)
     self.assertEqual((1, 2), self.evaluate(out).shape)
+
+
+@tfe.run_all_tests_in_graph_and_eager_modes
+class _IndependentPoissonTest(_IndependentLayerTest):
+  layer_class = tfpl.IndependentPoisson
+  dist_class = tfd.Poisson
+
+  def _distribution_to_params(self, distribution, batch_shape):
+    return tf.reshape(distribution.log_rate,
+                      tf.concat([batch_shape, [-1]], axis=-1))
+
+
+@tfe.run_all_tests_in_graph_and_eager_modes
+class IndependentPoissonTestDynamicShape(tf.test.TestCase,
+                                         _IndependentPoissonTest):
+  dtype = np.float32
+  use_static_shape = False
+
+
+@tfe.run_all_tests_in_graph_and_eager_modes
+class IndependentPoissonTestStaticShape(tf.test.TestCase,
+                                        _IndependentPoissonTest):
+  dtype = np.float64
+  use_static_shape = True
+
+  def test_doc_string(self):
+    # Create example data.
+    n = 2000
+    d = 4
+    x = tfd.Uniform(low=1., high=10.).sample([n, d], seed=42)
+    w = [[0.314], [0.272], [-0.162], [0.058]]
+    log_rate = tf.matmul(x, w) - 0.141
+    y = tfd.Poisson(log_rate=log_rate).sample()
+
+    # Poisson regression.
+    model = tfk.Sequential([
+        tfkl.Dense(tfpl.IndependentPoisson.params_size(1)),
+        tfpl.IndependentPoisson(1)
+    ])
+
+    # Fit.
+    model.compile(optimizer=tf.train.AdamOptimizer(learning_rate=0.05),
+                  loss=lambda y, model: -model.log_prob(y),
+                  metrics=[])
+    batch_size = 50
+
+    model.fit(x, y,
+              batch_size=batch_size,
+              epochs=1,
+              steps_per_epoch=1,  # Usually `n // batch_size`.
+              verbose=True,
+              shuffle=True)
 
 
 @tfe.run_all_tests_in_graph_and_eager_modes
