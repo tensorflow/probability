@@ -14,7 +14,7 @@
 # limitations under the License.
 # ============================================================================
 
-set -v  # print commands as they're executed
+set -v  # print commands as they are executed
 set -e  # fail and exit on any command erroring
 
 # Make sure the environment variables are set.

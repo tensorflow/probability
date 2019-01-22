@@ -14,7 +14,7 @@
 # limitations under the License.
 # ============================================================================
 
-set -v  # print commands as they're executed
+set -v  # print commands as they are executed
 set -e  # fail and exit on any command erroring
 
 # Make sure the environment variables are set.
@@ -27,7 +27,7 @@ fi
 pip install "${TF_VERSION}"
 
 # Some tests use methods from these libraries so we install them although
-# they're not official dependencies of the TFP library. pylint is used for
+# they are not official dependencies of the TFP library. pylint is used for
 # linting.
 pip install scipy hypothesis matplotlib pylint
 
