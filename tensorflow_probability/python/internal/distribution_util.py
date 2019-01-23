@@ -321,8 +321,8 @@ def shapes_from_loc_and_scale(loc, scale, name="shapes_from_loc_and_scale"):
       if loc_event_size is not None and event_size_const is not None:
         if loc_event_size != 1 and loc_event_size != event_size_const:
           raise ValueError(
-              "Event size of 'scale' (%d) could not be broadcast up to that of "
-              "'loc' (%d)." % (loc_event_size, event_size_const))
+              "Event size of 'scale' ({0}) could not be broadcast up to that "
+              "of 'loc' ({1}).".format(event_size_const, loc_event_size))
 
     # Get batch shape.
     batch_shape = scale.batch_shape_tensor()
