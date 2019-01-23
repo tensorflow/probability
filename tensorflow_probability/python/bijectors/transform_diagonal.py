@@ -59,6 +59,7 @@ class TransformDiagonal(bijector.Bijector):
         forward_min_event_ndims=2,
         inverse_min_event_ndims=2,
         validate_args=validate_args,
+        dtype=diag_bijector.dtype,
         name=name)
 
   def _forward(self, x):

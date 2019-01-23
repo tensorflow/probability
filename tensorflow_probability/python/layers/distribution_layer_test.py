@@ -822,12 +822,14 @@ class _MixtureSameFamilyTest(object):
     batch_and_n_shape = tf.concat(
         [tf.shape(x.mixture_distribution.logits), [-1]], axis=0)
     cd = x.components_distribution
+    scale_tril = tfb.ScaleTriL(diag_shift=np.array(1e-5, self.dtype))
     t_back = tf.concat([
         x.mixture_distribution.logits,
         tf.reshape(tf.concat([
             tf.reshape(cd.loc, batch_and_n_shape),
-            tf.reshape(tfb.ScaleTriL().inverse(cd.scale.to_dense()),
-                       batch_and_n_shape),
+            tf.reshape(
+                scale_tril.inverse(cd.scale.to_dense()),
+                batch_and_n_shape),
         ], axis=-1), shape),
     ], axis=-1)
     [t_, t_back_] = self.evaluate([t, t_back])
@@ -907,7 +909,7 @@ class MixtureSameFamilyTestDynamicShape(tf.test.TestCase,
 @tfe.run_all_tests_in_graph_and_eager_modes
 class MixtureSameFamilyTestStaticShape(tf.test.TestCase,
                                        _MixtureSameFamilyTest):
-  dtype = np.float32
+  dtype = np.float64
   use_static_shape = True
 
 

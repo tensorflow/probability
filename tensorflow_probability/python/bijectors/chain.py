@@ -164,11 +164,9 @@ class Chain(bijector.Bijector):
             "Invert is not implemented for non-injective bijector ({})".format(
                 a_bijector.name))
 
-    dtype = list(set([b.dtype for b in bijectors]))
-    if len(dtype) > 2:
+    dtype = list(set([b.dtype for b in bijectors if b.dtype is not None]))
+    if len(dtype) > 1:
       raise ValueError("incompatible dtypes: %s" % dtype)
-    elif len(dtype) == 2:
-      dtype = dtype[1] if dtype[0] is None else dtype[0]
     elif len(dtype) == 1:
       dtype = dtype[0]
     else:
