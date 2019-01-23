@@ -118,30 +118,27 @@ class RationalQuadratic(psd_kernel.PositiveSemidefiniteKernel):
       if amplitude is not None:
         amplitude = tf.convert_to_tensor(
             amplitude, name="amplitude", dtype=dtype)
-        with tf.control_dependencies([
-            tf.assert_positive(self._amplitude)] if validate_args else []):
-          self._amplitude = tf.identity(self._amplitude)
+      self._amplitude = _validate_arg_if_not_none(
+          amplitude, tf.assert_positive, validate_args)
 
       if scale_mixture_rate is not None:
-        self._scale_mixture_rate = tf.convert_to_tensor(
+        scale_mixture_rate = tf.convert_to_tensor(
             scale_mixture_rate, name="scale_mixture_rate", dtype=dtype)
-        with tf.control_dependencies([
-            tf.assert_positive(
-                self._scale_mixture_rate)] if validate_args else []):
-          self._scale_mixture_rate = tf.identity(self._scale_mixture_rate)
+      self._scale_mixture_rate = _validate_arg_if_not_none(
+          scale_mixture_rate, tf.assert_positive, validate_args)
 
       if length_scale is not None:
-        self._length_scale = tf.convert_to_tensor(
+        length_scale = tf.convert_to_tensor(
             length_scale, name="length_scale", dtype=dtype)
-        with tf.control_dependencies([
-            tf.assert_positive(self._length_scale)] if validate_args else []):
-          self._length_scale = tf.identity(self._length_scale)
+      self._length_scale = _validate_arg_if_not_none(
+          length_scale, tf.assert_positive, validate_args)
 
     super(RationalQuadratic, self).__init__(feature_ndims, name)
 
   def _apply(self, x1, x2, param_expansion_ndims=0):
     difference = util.sum_rightmost_ndims_preserving_shape(
         tf.squared_difference(x1, x2), ndims=self.feature_ndims)
+    difference /= 2
 
     if self.length_scale is not None:
       length_scale = util.pad_shape_right_with_ones(
@@ -165,17 +162,17 @@ class RationalQuadratic(psd_kernel.PositiveSemidefiniteKernel):
   @property
   def amplitude(self):
     """Amplitude parameter."""
-    return self.amplitude
+    return self._amplitude
 
   @property
   def length_scale(self):
     """Length scale parameter."""
-    return self.length_scale
+    return self._length_scale
 
   @property
   def scale_mixture_rate(self):
     """scale_mixture_rate parameter."""
-    return self.scale_mixture_rate
+    return self._scale_mixture_rate
 
   def _batch_shape(self):
     shape_list = [
@@ -187,10 +184,7 @@ class RationalQuadratic(psd_kernel.PositiveSemidefiniteKernel):
     ]
     if not shape_list:
       return tensor_shape.scalar()
-    if len(shape_list) == 1:
-      return shape_list[0]
-    return functools.reduce(
-        tf.broadcast_static_shape, shape_list)
+    return functools.reduce(tf.broadcast_static_shape, shape_list)
 
   def _batch_shape_tensor(self):
     shape_list = [
@@ -202,9 +196,4 @@ class RationalQuadratic(psd_kernel.PositiveSemidefiniteKernel):
     ]
     if not shape_list:
       return tf.constant([], dtype=tf.int32)
-    if len(shape_list) == 1:
-      return shape_list[0]
-    return functools.reduce(
-        tf.broadcast_dynamic_shape, shape_list)
-
-
+    return functools.reduce(tf.broadcast_dynamic_shape, shape_list)
