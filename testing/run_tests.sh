@@ -14,7 +14,7 @@
 # limitations under the License.
 # ============================================================================
 
-set -v  # print commands as they are executed
+set -x  # print commands as they are executed
 set -e  # fail and exit on any command erroring
 
 # Make sure the environment variables are set.
@@ -28,8 +28,14 @@ if [ -z "${NUM_SHARDS}" ]; then
   exit -1
 fi
 
+call_with_log_folding() {
+  local command=$1
+  echo "travis_fold:start:$command"
+  $command
+  echo "travis_fold:end:$command"
+}
+
 install_bazel() {
-  echo 'travis_fold:start:install_bazel'
   # Install Bazel for tests. Based on instructions at
   # https://docs.bazel.build/versions/master/install-ubuntu.html#install-on-ubuntu
   # (We skip the openjdk8 install step, since travis lets us have that by
@@ -41,26 +47,23 @@ install_bazel() {
   curl https://bazel.build/bazel-release.pub.gpg | sudo apt-key add -
 
   # Update apt and install bazel (use -qq to minimize log cruft)
-  sudo apt-get update -qq
-  sudo apt-get install bazel -qq
-  echo 'travis_fold:end:install_bazel'
+  sudo apt-get update
+  sudo apt-get install bazel
 }
 
 install_python_packages() {
-  echo 'travis_fold:start:install_python_packages'
   # NB: tf-nightly pulls in other deps, like numpy, absl, and six, transitively.
   # Some tests use methods from the additional libraries below, so we install
   # them although they're not official dependencies of the TFP library.
-  pip install --quiet tf-nightly scipy hypothesis matplotlib
+  pip install tf-nightly scipy hypothesis matplotlib
 
   # Upgrade numpy to the latest to address issues that happen when testing with
   # Python 3 (https://github.com/tensorflow/tensorflow/issues/16488).
-  pip install --quiet -U numpy
-  echo 'travis_fold:end:install_python_packages'
+  pip install -U numpy
 }
 
-install_bazel
-install_python_packages
+call_with_log_folding install_bazel
+call_with_log_folding install_python_packages
 
 # Get a shard of tests.
 shard_tests=$(bazel query 'tests(//tensorflow_probability/...)' |
