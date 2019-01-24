@@ -45,18 +45,17 @@ install_bazel() {
 }
 
 install_python_packages() {
-  # Some tests use methods from these libraries so we install them although
-  # they're not official dependencies of the TFP library. pylint is used for
-  # linting.
-  # NB: tensorflow pulls in our other deps, like numpy and six, transitively.
+  # NB: tf-nightly pulls in other deps, like numpy, absl, and six, transitively.
+  # Some tests use methods from the additional libraries below, so we install
+  # them although they're not official dependencies of the TFP library.
   pip install --quiet tf-nightly scipy hypothesis matplotlib
 
   # Upgrade numpy to the latest to address issues that happen when testing with
   # Python 3 (https://github.com/tensorflow/tensorflow/issues/16488).
-  pip install -U numpy
+  pip install --quiet -U numpy
 }
 
-# Do these in parallel
+# Do these in parallel. `wait` waits for both background jobs to complete.
 install_bazel &
 install_python_packages &
 wait
@@ -66,6 +65,9 @@ shard_tests=$(bazel query 'tests(//tensorflow_probability/...)' |
   awk -v n=${NUM_SHARDS} -v s=${SHARD} 'NR%n == s' )
 
 # Run tests. Notes on less obvious options:
+#   --notest_keep_going -- stop running tests as soon as anything fails. This is
+#     to minimize load on Travis, where we share a limited number of concurrent
+#     jobs with a bunch of other TensorFlow projects.
 #   --build_tests_only -- only build test targets and dependencies, instead of
 #     everything captured by "//tensorflow_probability/..." (this *doesn't* mean
 #     "build the tests but don't run them" which is how it sounds)
