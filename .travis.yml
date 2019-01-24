@@ -17,21 +17,34 @@ language: python
 git:
   depth: 20
   quiet: true
+
+# Specify that the lint build stage should run first; if it fails, the test
+# build stage won't run.
+stages:
+  - lint
+  - test
+
+# This creates the lint stage, which only runs the linter. The relevant travis
+# feature is "Build stages" (https://docs.travis-ci.com/user/build-stages/).
+# Unfortunately it doesn't support matrix expansion, so we define the test
+# stage the "old-fashioned" way down below this section.
+jobs:
+  include:
+    - stage: lint
+      script: ./testing/run_lints.sh
+
+# The below implicitly run under a build stage called "Test". The full matrix
+# of python versions x SHARD will be expanded and run in parallel.
 python:
   - "2.7"
   - "3.6"
 env:
   global:
-    # We only test against the nightly version of TensorFlow.
-    - TF_VERSION="tf-nightly"
     - NUM_SHARDS=2
   matrix:
-    # We shard our tests to avoid timeouts. Additionally, only shard 0 runs the
-    # lints.
+    # We shard our tests to avoid timeouts. The run_tests.sh script uses the
+    # $NUM_SHARDS and $SHARD environment variables to select a partition of the
+    # set of all tests.
     - SHARD=0
     - SHARD=1
-install:
-  - ./testing/install.sh
-script:
-  - ./testing/run_lints.sh
-  - ./testing/run_tests.sh
+script: ./testing/run_tests.sh
