@@ -29,6 +29,7 @@ if [ -z "${NUM_SHARDS}" ]; then
 fi
 
 install_bazel() {
+  echo 'travis_fold:start:install_bazel'
   # Install Bazel for tests. Based on instructions at
   # https://docs.bazel.build/versions/master/install-ubuntu.html#install-on-ubuntu
   # (We skip the openjdk8 install step, since travis lets us have that by
@@ -42,9 +43,11 @@ install_bazel() {
   # Update apt and install bazel (use -qq to minimize log cruft)
   sudo apt-get update -qq
   sudo apt-get install bazel -qq
+  echo 'travis_fold:end:install_bazel'
 }
 
 install_python_packages() {
+  echo 'travis_fold:start:install_python_packages'
   # NB: tf-nightly pulls in other deps, like numpy, absl, and six, transitively.
   # Some tests use methods from the additional libraries below, so we install
   # them although they're not official dependencies of the TFP library.
@@ -53,12 +56,11 @@ install_python_packages() {
   # Upgrade numpy to the latest to address issues that happen when testing with
   # Python 3 (https://github.com/tensorflow/tensorflow/issues/16488).
   pip install --quiet -U numpy
+  echo 'travis_fold:end:install_python_packages'
 }
 
-# Do these in parallel. `wait` waits for both background jobs to complete.
-install_bazel &
-install_python_packages &
-wait
+install_bazel
+install_python_packages
 
 # Get a shard of tests.
 shard_tests=$(bazel query 'tests(//tensorflow_probability/...)' |
@@ -68,9 +70,6 @@ shard_tests=$(bazel query 'tests(//tensorflow_probability/...)' |
 #   --notest_keep_going -- stop running tests as soon as anything fails. This is
 #     to minimize load on Travis, where we share a limited number of concurrent
 #     jobs with a bunch of other TensorFlow projects.
-#   --build_tests_only -- only build test targets and dependencies, instead of
-#     everything captured by "//tensorflow_probability/..." (this *doesn't* mean
-#     "build the tests but don't run them" which is how it sounds)
 #   --test_timeout -- comma separated values correspond to various test sizes
 #     (short, moderate, long or eternal)
 #   --test_tag_filters -- skip tests whose 'tags' arg (if present) includes any
@@ -85,7 +84,6 @@ echo "${shard_tests}" \
     --notest_keep_going \
     --test_tag_filters=-gpu,-requires-gpu-sm35 \
     --test_timeout 300,450,1200,3600 \
-    --build_tests_only \
     --action_env=PATH \
     --action_env=LD_LIBRARY_PATH \
     --test_output=errors
