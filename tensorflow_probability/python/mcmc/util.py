@@ -278,8 +278,7 @@ def smart_for_loop(loop_num_iter, body_fn, initial_loop_vars,
       name, 'smart_for_loop', [loop_num_iter, initial_loop_vars]):
     loop_num_iter_ = tf.contrib.util.constant_value(tf.convert_to_tensor(
         loop_num_iter, dtype=tf.int64, name='loop_num_iter'))
-    if (loop_num_iter_ is None or tf.contrib.eager.executing_eagerly() or
-        control_flow_util.GraphOrParentsInXlaContext(tf.get_default_graph())):
+    if loop_num_iter_ is None or tf.contrib.eager.executing_eagerly():
       return tf.while_loop(
           cond=lambda i, *args: i < loop_num_iter,
           body=lambda i, *args: [i + 1] + list(body_fn(*args)),
