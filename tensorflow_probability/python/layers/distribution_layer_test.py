@@ -899,11 +899,13 @@ class _MixtureSameFamilyTest(object):
     self.assertEqual(15, self.evaluate(tf.convert_to_tensor(params_size)))
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
-class MixtureSameFamilyTestDynamicShape(tf.test.TestCase,
-                                        _MixtureSameFamilyTest):
-  dtype = np.float32
-  use_static_shape = False
+# Disable dynamic shape tests; unsupported in TF 1.13 (keras didn't handle
+# dynamic shapes correctly at the time 1.13 release branch was cut).
+#@tfe.run_all_tests_in_graph_and_eager_modes
+#class MixtureSameFamilyTestDynamicShape(tf.test.TestCase,
+#                                        _MixtureSameFamilyTest):
+#  dtype = np.float32
+#  use_static_shape = False
 
 
 @tfe.run_all_tests_in_graph_and_eager_modes
