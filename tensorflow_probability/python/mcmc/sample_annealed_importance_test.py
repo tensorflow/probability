@@ -106,14 +106,14 @@ class SampleAnnealedImportanceTest(tf.test.TestCase):
         + tf.lgamma(self._shape_param))
     log_true_normalizer *= tf.cast(event_size, log_true_normalizer.dtype)
 
+    ais_weights_size = tf.cast(tf.size(ais_weights), ais_weights.dtype)
     log_estimated_normalizer = (tf.reduce_logsumexp(ais_weights)
-                                - np.log(num_steps))
+                                - tf.log(ais_weights_size))
 
     ratio_estimate_true = tf.exp(ais_weights - log_true_normalizer)
-    ais_weights_size = tf.size(ais_weights)
     standard_error = tf.sqrt(
         _compute_sample_variance(ratio_estimate_true)
-        / tf.cast(ais_weights_size, ratio_estimate_true.dtype))
+        / ais_weights_size)
 
     [
         ratio_estimate_true_,
