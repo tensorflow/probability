@@ -148,6 +148,7 @@ py_test(
     name = "seasonal_test",
     size = "medium",
     srcs = ["seasonal_test.py"],
+    shard_count = 6,
     deps = [
         # numpy dep,
         # tensorflow dep,
