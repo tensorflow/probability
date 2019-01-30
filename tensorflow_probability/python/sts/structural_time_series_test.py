@@ -26,6 +26,7 @@ from tensorflow_probability.python.sts import LinearRegression
 from tensorflow_probability.python.sts import LocalLevel
 from tensorflow_probability.python.sts import LocalLinearTrend
 from tensorflow_probability.python.sts import Seasonal
+from tensorflow_probability.python.sts import SemiLocalLinearTrend
 from tensorflow_probability.python.sts import Sum
 from tensorflow_probability.python.sts.internal import util as sts_util
 
@@ -257,6 +258,12 @@ class SeasonalWithMultipleStepsAndNoiseTest(tf.test.TestCase, _StsTestHarness):
                                    name='day_of_week')
     return tfp.sts.Sum(components=[day_of_week],
                        observed_time_series=observed_time_series)
+
+
+class SemiLocalLinearTrendTest(tf.test.TestCase, _StsTestHarness):
+
+  def _build_sts(self, observed_time_series=None):
+    return SemiLocalLinearTrend(observed_time_series=observed_time_series)
 
 
 class SumTest(tf.test.TestCase, _StsTestHarness):
