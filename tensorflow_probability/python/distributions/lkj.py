@@ -92,6 +92,7 @@ class LKJ(distribution.Distribution):
   def __init__(self,
                dimension,
                concentration,
+               input_output_cholesky=False,
                validate_args=False,
                allow_nan_stats=True,
                name='LKJ'):
@@ -103,6 +104,16 @@ class LKJ(distribution.Distribution):
       concentration: `float` or `double` `Tensor`. The positive concentration
         parameter of the LKJ distributions. The pdf of a sample matrix `X` is
         proportional to `det(X) ** (concentration - 1)`.
+      input_output_cholesky: Python `bool`. If `True`, functions whose input or
+        output have the semantics of samples assume inputs are in Cholesky form
+        and return outputs in Cholesky form. In particular, if this flag is
+        `True`, input to `log_prob` is presumed of Cholesky form and output from
+        `sample` is of Cholesky form.  Setting this argument to `True` is purely
+        a computational optimization and does not change the underlying
+        distribution. Additionally, validation checks which are only defined on
+        the multiplied-out form are omitted, even if `validate_args` is `True`.
+        Default value: `False` (i.e., input/output does not have Cholesky
+        semantics).
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -120,6 +131,7 @@ class LKJ(distribution.Distribution):
       raise ValueError(
           'There are no negative-dimension correlation matrices.')
     parameters = dict(locals())
+    self._input_output_cholesky = input_output_cholesky
     with tf.name_scope(name, values=[dimension, concentration]):
       concentration = tf.convert_to_tensor(
           concentration,
@@ -151,6 +163,11 @@ class LKJ(distribution.Distribution):
   def concentration(self):
     """Concentration parameter."""
     return self._concentration
+
+  @property
+  def input_output_cholesky(self):
+    """Boolean indicating if `Tensor` input/outputs are Cholesky factorized."""
+    return self._input_output_cholesky
 
   def _batch_shape_tensor(self):
     return tf.shape(self.concentration)
@@ -270,6 +287,9 @@ class LKJ(distribution.Distribution):
         chol_result = tf.concat(
             [chol_result, new_row[..., tf.newaxis, :]], axis=-2)
 
+      if self.input_output_cholesky:
+        return chol_result
+
       result = tf.matmul(chol_result, chol_result, transpose_b=True)
       # The diagonal for a correlation matrix should always be ones. Due to
       # numerical instability the matmul might not achieve that, so manually set
@@ -303,7 +323,7 @@ class LKJ(distribution.Distribution):
     return x
 
   def _validate_correlationness(self, x):
-    if not self.validate_args:
+    if not self.validate_args or self.input_output_cholesky:
       return x
     checks = [
         tf.assert_less_equal(
@@ -367,7 +387,10 @@ class LKJ(distribution.Distribution):
       # an error. More care must be taken, as due to numerical stability issues,
       # self_adjoint_eigvals can return slightly negative eigenvalues even for
       # a PSD matrix.
-      _, logdet = tf.linalg.slogdet(x)
+      if self.input_output_cholesky:
+        logdet = 2.0 * tf.reduce_sum(tf.log(tf.matrix_diag_part(x)), axis=[-1])
+      else:
+        _, logdet = tf.linalg.slogdet(x)
       answer = (self.concentration - 1.) * logdet
       return answer
 
