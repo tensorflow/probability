@@ -39,14 +39,14 @@ def _ensure_tf_install():  # pylint: disable=g-statement-before-imports
   try:
     import tensorflow as tf
   except ImportError:
-    # Re-raise with more informative error message.
-    raise ImportError(
-        "Failed to import TensorFlow. Please note that TensorFlow is not "
-        "installed by default when you install TensorFlow Probability. This is "
-        "so that users can decide whether to install the GPU-enabled "
-        "TensorFlow package. To use TensorFlow Probability, please install the "
-        "most recent version of TensorFlow, by following instructions at "
-        "https://tensorflow.org/install.")
+    # Print more informative error message, then reraise.
+    print("\n\nFailed to import TensorFlow. Please note that TensorFlow is not "
+          "installed by default when you install TensorFlow Probability. This "
+          "is so that users can decide whether to install the GPU-enabled "
+          "TensorFlow package. To use TensorFlow Probability, please install "
+          "the most recent version of TensorFlow, by following instructions at "
+          "https://tensorflow.org/install.\n\n")
+    raise
 
   import distutils.version
 
