@@ -19,6 +19,7 @@ from __future__ import print_function
 
 # pylint: disable=unused-import,line-too-long,g-importing-member
 
+from tensorflow_probability.python.stats.quantiles import find_bins
 from tensorflow_probability.python.stats.quantiles import percentile
 from tensorflow_probability.python.stats.quantiles import quantiles
 from tensorflow_probability.python.stats.sample_stats import auto_correlation
@@ -37,6 +38,7 @@ __all__ = [
     'cholesky_covariance',
     'correlation',
     'covariance',
+    'find_bins',
     'percentile',
     'quantiles',
     'stddev',

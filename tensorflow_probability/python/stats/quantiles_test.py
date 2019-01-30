@@ -28,6 +28,113 @@ rng = np.random.RandomState(0)
 
 
 @tfe.run_all_tests_in_graph_and_eager_modes
+class FindBinsTest(tf.test.TestCase):
+
+  def test_1d_array_no_extend_lower_and_upper_dtype_int64(self):
+    x = [-1., 0., 4., 5., 10., 20.]
+    edges = [0., 5., 10.]
+    bins = tfp.stats.find_bins(x, edges, dtype=tf.int64)
+    self.assertDTypeEqual(bins, np.int64)
+    self.assertAllEqual((6,), bins.shape)
+    bins_ = self.evaluate(bins)
+    self.assertAllEqual([-1, 0, 0, 1, 1, 2], bins_)
+
+  def test_1d_array_extend_lower_and_upper(self):
+    x = [-1., 0., 4., 5., 10., 20.]
+    edges = [0., 5., 10.]
+    bins = tfp.stats.find_bins(
+        x, edges, extend_lower_interval=True, extend_upper_interval=True)
+    self.assertDTypeEqual(bins, np.float32)
+    self.assertAllEqual((6,), bins.shape)
+    bins_ = self.evaluate(bins)
+    self.assertAllEqual([0, 0, 0, 1, 1, 1], bins_)
+
+  def test_1d_array_no_extend_lower_and_upper(self):
+    x = [-1., 0., 4., 5., 10., 20.]
+    edges = [0., 5., 10.]
+    bins = tfp.stats.find_bins(
+        x, edges, extend_lower_interval=False, extend_upper_interval=False)
+    self.assertDTypeEqual(bins, np.float32)
+    self.assertAllEqual((6,), bins.shape)
+    bins_ = self.evaluate(bins)
+    self.assertAllEqual([np.nan, 0, 0, 1, 1, np.nan], bins_)
+
+  def test_x_is_2d_array_dtype_int32(self):
+    x = [[0., 8., 60.],
+         [10., 20., 3.]]
+    edges = [[0., 5., 10.],
+             [5., 7., 11.],
+             [10., 50., 100.]]
+
+    # The intervals for the first column are
+    #  [0, 5), [5, 10]
+    # and for the second column
+    #  [5, 7), [7, 50]
+    # and for the third column
+    #  [10, 11), [11, 100]
+    expected_bins = [[0, 1, 1],
+                     [1, 1, -1]]
+
+    bins = tfp.stats.find_bins(x, edges, dtype=tf.int32)
+    self.assertDTypeEqual(bins, np.int32)
+    self.assertAllEqual((2, 3), bins.shape)
+    bins_ = self.evaluate(bins)
+    self.assertAllEqual(expected_bins, bins_)
+
+  def test_3d_array_has_expected_bins(self):
+    x = np.linspace(0., 1000, 1000, dtype=np.float32).reshape(10, 10, 10)
+    edges = [0., 500., 1000.]
+    bins = tfp.stats.find_bins(x, edges)
+    self.assertAllEqual(x.shape, bins.shape)
+    self.assertDTypeEqual(bins, np.float32)
+    flat_bins_ = np.ravel(self.evaluate(bins))
+
+    # Demonstrate that x crosses the 500 threshold at index 500
+    self.assertLess(x.ravel()[499], 500)
+    self.assertGreater(x.ravel()[500], 500)
+    self.assertAllEqual(np.zeros((500,)), flat_bins_[:500])
+    self.assertAllEqual(np.ones((500,)), flat_bins_[500:])
+
+  def test_large_random_array_has_expected_bin_fractions(self):
+    x = rng.rand(100, 99, 98)
+    edges = np.linspace(0., 1., 11)  # Deciles
+    edges = edges.reshape(11, 1, 1) + np.zeros((99, 98))
+    bins = tfp.stats.find_bins(x, edges)
+
+    self.assertAllEqual(x.shape, bins.shape)
+    self.assertDTypeEqual(bins, np.float64)
+    bins_ = self.evaluate(bins)
+    self.assertAllClose((bins_ == 0).mean(), 0.1, rtol=0.05)
+    self.assertAllClose((bins_ == 1).mean(), 0.1, rtol=0.05)
+    self.assertAllClose((bins_ == 2).mean(), 0.1, rtol=0.05)
+
+    mask = (0.3 <= x) & (x < 0.4)
+    self.assertAllEqual(3. * np.ones((mask.sum(),)), bins_[mask])
+
+  def test_large_random_array_has_expected_bin_fractions_with_broadcast(self):
+    x = rng.rand(100, 99, 98)
+    # rank(edges) < rank(x), so it will broadcast.
+    edges = np.linspace(0., 1., 11)  # Deciles
+    bins = tfp.stats.find_bins(x, edges)
+
+    self.assertAllEqual(x.shape, bins.shape)
+    self.assertDTypeEqual(bins, np.float64)
+    bins_ = self.evaluate(bins)
+    self.assertAllClose((bins_ == 0).mean(), 0.1, rtol=0.05)
+    self.assertAllClose((bins_ == 1).mean(), 0.1, rtol=0.05)
+    self.assertAllClose((bins_ == 2).mean(), 0.1, rtol=0.05)
+
+    mask = (0.3 <= x) & (x < 0.4)
+    self.assertAllEqual(3. * np.ones((mask.sum(),)), bins_[mask])
+
+  def test_too_few_edges_raises(self):
+    x = [1., 2., 3., 4.]
+    edges = [2.]
+    with self.assertRaisesRegexp(ValueError, '1 or more bin'):
+      tfp.stats.find_bins(x, edges)
+
+
+@tfe.run_all_tests_in_graph_and_eager_modes
 class PercentileTestWithLowerInterpolation(tf.test.TestCase):
 
   _interpolation = 'lower'
