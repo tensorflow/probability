@@ -409,7 +409,8 @@ class SemiLocalLinearTrend(StructuralTimeSeries):
             loc=0., scale=tf.ones_like(observed_initial))
       if initial_level_prior is None:
         initial_level_prior = tfd.Normal(
-            loc=observed_initial, scale=observed_initial + observed_stddev)
+            loc=observed_initial,
+            scale=tf.abs(observed_initial) + observed_stddev)
       if initial_slope_prior is None:
         initial_slope_prior = tfd.Normal(loc=0., scale=observed_stddev)
 

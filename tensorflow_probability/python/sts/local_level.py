@@ -255,7 +255,8 @@ class LocalLevel(StructuralTimeSeries):
       if initial_level_prior is None:
         self._initial_state_prior = tfd.MultivariateNormalDiag(
             loc=observed_initial[..., tf.newaxis],
-            scale_diag=(observed_initial + observed_stddev)[..., tf.newaxis],
+            scale_diag=(
+                tf.abs(observed_initial) + observed_stddev)[..., tf.newaxis],
             name='initial_level_prior')
       else:
         self._initial_state_prior = tfd.MultivariateNormalDiag(
