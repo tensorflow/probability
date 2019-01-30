@@ -300,7 +300,7 @@ class LocalLinearTrend(StructuralTimeSeries):
       if initial_level_prior is None:
         initial_level_prior = tfd.Normal(
             loc=observed_initial,
-            scale=observed_stddev,
+            scale=observed_initial + observed_stddev,
             name='initial_level_prior')
       if initial_slope_prior is None:
         initial_slope_prior = tfd.Normal(

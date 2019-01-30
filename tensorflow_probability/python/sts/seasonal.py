@@ -394,8 +394,9 @@ class Seasonal(StructuralTimeSeries):
         drift_scale_prior = tfd.LogNormal(loc=tf.log(.01 * observed_stddev),
                                           scale=3.)
       if initial_effect_prior is None:
-        initial_effect_prior = tfd.Normal(loc=observed_initial,
-                                          scale=observed_stddev)
+        initial_effect_prior = tfd.Normal(
+            loc=observed_initial,
+            scale=observed_initial + observed_stddev)
 
       self._num_seasons = num_seasons
       self._num_steps_per_season = num_steps_per_season
