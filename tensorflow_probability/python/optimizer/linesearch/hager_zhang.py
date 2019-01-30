@@ -45,39 +45,11 @@ __all__ = [
 _FnDFn = hzl.FnDFn
 
 
-# Valuetype to hold information for the floating point precision data.
-_FloatInfo = collections.namedtuple('_FloatInfo', ['eps', 'nextfloat'])
-
-
 def _machine_eps(dtype):
   """Returns the machine epsilon for the supplied dtype."""
   if isinstance(dtype, tf.DType):
     dtype = dtype.as_numpy_dtype()
   return np.finfo(dtype).eps
-
-
-def _next_after(x):
-  """Computes the next larger floating point number.
-
-  Tensorflow analogue of the function np.nextafter.
-  Ideally, this function should have a native C++ kernel in TF core but until
-  that is done, we are forced to use this implementation.
-
-  Args:
-    x: `Tensor` of real dtype and any shape. The value for which to compute
-      the next floating point number.
-
-  Returns:
-    A tuple containing the following attributes:
-      eps: The floating point resolution at `x`. A tensor of same shape and
-        dtype as the input `x`.
-      nextfloat: `Tensor` of the same dtype and shape as `x`. The smallest
-        value `y` which is greater than `x` for that dtype.
-  """
-  cond = lambda epsilon: ~tf.equal(x + epsilon / 2, x)
-  body = lambda epsilon: epsilon / 2
-  epsilon = tf.while_loop(cond, body, (tf.ones_like(x),))
-  return _FloatInfo(eps=epsilon, nextfloat=x + epsilon)
 
 
 HagerZhangLineSearchResult = collections.namedtuple(
@@ -606,8 +578,7 @@ def _line_search_after_bracketing(
 
   def _loop_cond(iteration, found_wolfe, failed, evals, val_left, val_right):  # pylint:disable=unused-argument
     """Loop condition."""
-    eps = _next_after(val_right.x).eps
-    interval_shrunk = (val_right.x - val_left.x) <= eps
+    interval_shrunk = tf.math.nextafter(val_left.x, val_right.x) >= val_right.x
     found_wolfe = tf.convert_to_tensor(found_wolfe)
     return  ((iteration < max_iterations) &
              ~(found_wolfe | failed | interval_shrunk))
@@ -654,8 +625,8 @@ def _line_search_after_bracketing(
       def _sufficient_shrinkage_fn():
         """Action to perform if secant2 shrank the interval sufficiently."""
         func_is_flat = (
-            (_next_after(val_left.f).nextfloat >= val_right.f) &
-            (_next_after(secant2_result.left.f).nextfloat >=
+            (tf.math.nextafter(val_left.f, val_right.f) >= val_right.f) &
+            (tf.math.nextafter(secant2_result.left.f, secant2_result.right.f) >=
              secant2_result.right.f))
         is_flat_retval = _LineSearchInnerResult(
             iteration=iteration,
