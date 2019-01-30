@@ -36,6 +36,7 @@ py_library(
         ":differential_evolution",
         ":lbfgs",
         ":nelder_mead",
+        ":proximal_hessian_sparse",
         ":sgld",
         ":variational_sgd",
         "//tensorflow_probability/python/optimizer/linesearch",
@@ -169,6 +170,26 @@ py_test(
     name = "differential_evolution_test",
     size = "medium",
     srcs = ["differential_evolution_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "proximal_hessian_sparse",
+    srcs = ["proximal_hessian_sparse.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "proximal_hessian_sparse_test",
+    size = "medium",
+    srcs = ["proximal_hessian_sparse_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,

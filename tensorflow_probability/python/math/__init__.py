@@ -26,7 +26,10 @@ from tensorflow_probability.python.math.linalg import lu_matrix_inverse
 from tensorflow_probability.python.math.linalg import lu_reconstruct
 from tensorflow_probability.python.math.linalg import lu_solve
 from tensorflow_probability.python.math.linalg import pinv
+from tensorflow_probability.python.math.linalg import sparse_or_dense_matmul
+from tensorflow_probability.python.math.linalg import sparse_or_dense_matvecmul
 from tensorflow_probability.python.math.numeric import log1psquare
+from tensorflow_probability.python.math.numeric import soft_threshold
 from tensorflow_probability.python.math.random_ops import random_rademacher
 from tensorflow_probability.python.math.random_ops import random_rayleigh
 from tensorflow_probability.python.math.root_search import secant_root
@@ -39,10 +42,13 @@ _allowed_symbols = [
     'diag_jacobian',
     'interp_regular_1d_grid',
     'log1psquare',
+    'soft_threshold',
     'lu_matrix_inverse',
     'lu_reconstruct',
     'lu_solve',
     'pinv',
+    'sparse_or_dense_matvecmul',
+    'sparse_or_dense_matmul',
     'random_rademacher',
     'random_rayleigh',
     'secant_root',

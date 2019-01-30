@@ -27,7 +27,7 @@ tfe = tf.contrib.eager
 
 
 @tfe.run_all_tests_in_graph_and_eager_modes
-class NumericTest(test_case.TestCase, parameterized.TestCase):
+class Log1pSquareTest(test_case.TestCase, parameterized.TestCase):
 
   # Expected values computed using arbitrary precision.
   # pyformat: disable
@@ -51,6 +51,38 @@ class NumericTest(test_case.TestCase, parameterized.TestCase):
     with tf.GradientTape() as tape:
       tape.watch(x)
       y = numeric.log1psquare(x)
+    dy_dx = tape.gradient(y, x)
+
+    y, dy_dx = self.evaluate([y, dy_dx])
+
+    self.assertAllClose(expected_y, y)
+    self.assertAllClose(expected_dy_dx, dy_dx)
+
+
+@tfe.run_all_tests_in_graph_and_eager_modes
+class SoftThresholdTest(test_case.TestCase, parameterized.TestCase):
+
+  # Expected values computed using arbitrary precision.
+  # pyformat: disable
+  # pylint: disable=bad-whitespace
+  @parameterized.parameters(
+      # x   threshold  expected_y  expected_dy_dx
+      (5., 5., 0., 1.),
+      (2., 5., 0., 0.),
+      (-2., 5., 0., 0.),
+      (3., 2.5, 0.5, 1.),
+      (-3., 2.5, -0.5, 1.),
+      (-1., 1., 0., 1.),
+      (-6., 5., -1., 1.),
+      (0., 0., 0., 0.),
+  )
+  # pylint: enable=bad-whitespace
+  # pyformat: enable
+  def test_soft_threshold(self, x, threshold, expected_y, expected_dy_dx):
+    x = tf.convert_to_tensor(x)
+    with tf.GradientTape() as tape:
+      tape.watch(x)
+      y = numeric.soft_threshold(x, threshold)
     dy_dx = tape.gradient(y, x)
 
     y, dy_dx = self.evaluate([y, dy_dx])

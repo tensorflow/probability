@@ -24,6 +24,8 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow.contrib.layers.python.ops import sparse_ops
+
 tfe = tf.contrib.eager
 
 
@@ -280,6 +282,127 @@ class LUSolveStatic(tf.test.TestCase, _LUSolve):
 @tfe.run_all_tests_in_graph_and_eager_modes
 class LUSolveDynamic(tf.test.TestCase, _LUSolve):
   use_static_shape = False
+
+
+class _SparseOrDenseMatmul(object):
+  dtype = np.float32
+  use_static_shape = True
+  use_sparse_tensor = False
+
+  def _make_placeholder(self, x):
+    return tf.placeholder_with_default(
+        input=x, shape=(x.shape if self.use_static_shape else None))
+
+  def _make_sparse_placeholder(self, x):
+    indices_placeholder = self._make_placeholder(x.indices)
+    values_placeholder = self._make_placeholder(x.values)
+
+    if self.use_static_shape:
+      dense_shape_placeholder = x.dense_shape
+    else:
+      dense_shape_placeholder = self._make_placeholder(x.dense_shape)
+
+    return tf.SparseTensor(
+        indices=indices_placeholder,
+        values=values_placeholder,
+        dense_shape=dense_shape_placeholder)
+
+  def verify_sparse_dense_matmul(self, x_, y_):
+    if self.use_sparse_tensor:
+      x = self._make_sparse_placeholder(sparse_ops.dense_to_sparse_tensor(x_))
+    else:
+      x = self._make_placeholder(x_)
+
+    y = self._make_placeholder(y_)
+
+    z = tfp.math.sparse_or_dense_matmul(x, y)
+    z_ = self.evaluate(z)
+
+    if self.use_static_shape:
+      batch_shape = x_.shape[:-2]
+      self.assertAllEqual(z_.shape, batch_shape + (x_.shape[-2], y_.shape[-1]))
+
+    self.assertAllClose(z_, np.matmul(x_, y_), atol=0., rtol=1e-3)
+
+  def verify_sparse_dense_matvecmul(self, x_, y_):
+    if self.use_sparse_tensor:
+      x = self._make_sparse_placeholder(sparse_ops.dense_to_sparse_tensor(x_))
+    else:
+      x = self._make_placeholder(x_)
+
+    y = self._make_placeholder(y_)
+
+    z = tfp.math.sparse_or_dense_matvecmul(x, y)
+    z_ = self.evaluate(z)
+
+    if self.use_static_shape:
+      batch_shape = x_.shape[:-2]
+      self.assertAllEqual(z_.shape, batch_shape + (x_.shape[-2],))
+
+    self.assertAllClose(
+        z_[..., np.newaxis],
+        np.matmul(x_, y_[..., np.newaxis]),
+        atol=0.,
+        rtol=1e-3)
+
+  def test_non_batch_matmul(self):
+    x_ = np.array([[3, 4, 0], [1, 0, 3]], dtype=self.dtype)
+    y_ = np.array([[1, 0], [9, 0], [3, 1]], dtype=self.dtype)
+    self.verify_sparse_dense_matmul(x_, y_)
+
+  def test_non_batch_matvecmul(self):
+    x_ = np.array([[3, 0, 5], [0, 2, 3]], dtype=self.dtype)
+    y_ = np.array([1, 0, 9], dtype=self.dtype)
+    self.verify_sparse_dense_matvecmul(x_, y_)
+
+  def test_batch_matmul(self):
+    x_ = np.array([
+        [[3, 4, 0], [1, 0, 3]],
+        [[6, 0, 0], [0, 0, 0]],
+    ],
+                  dtype=self.dtype)
+    y_ = np.array([
+        [[1, 0], [9, 0], [3, 1]],
+        [[2, 2], [5, 6], [0, 1]],
+    ],
+                  dtype=self.dtype)
+    self.verify_sparse_dense_matmul(x_, y_)
+
+  def test_batch_matvecmul(self):
+    x_ = np.array([
+        [[3, 0, 5], [0, 2, 3]],
+        [[1, 1, 0], [6, 0, 0]],
+    ],
+                  dtype=self.dtype)
+
+    y_ = np.array([
+        [1, 0, 9],
+        [0, 0, 2],
+    ], dtype=self.dtype)
+
+    self.verify_sparse_dense_matvecmul(x_, y_)
+
+
+@tfe.run_all_tests_in_graph_and_eager_modes
+class SparseOrDenseMatmulStatic(tf.test.TestCase, _SparseOrDenseMatmul):
+  use_static_shape = True
+
+
+@tfe.run_all_tests_in_graph_and_eager_modes
+class SparseOrDenseMatmulDynamic(tf.test.TestCase, _SparseOrDenseMatmul):
+  use_static_shape = False
+
+
+@tfe.run_all_tests_in_graph_and_eager_modes
+class SparseOrDenseMatmulStaticSparse(tf.test.TestCase, _SparseOrDenseMatmul):
+  use_static_shape = True
+  use_sparse_tensor = True
+
+
+@tfe.run_all_tests_in_graph_and_eager_modes
+class SparseOrDenseMatmulDynamicSparse(tf.test.TestCase, _SparseOrDenseMatmul):
+  use_static_shape = False
+  use_sparse_tensor = True
 
 
 if __name__ == '__main__':

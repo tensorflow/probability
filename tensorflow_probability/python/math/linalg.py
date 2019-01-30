@@ -34,6 +34,8 @@ __all__ = [
     'lu_reconstruct',
     'lu_solve',
     'pinv',
+    'sparse_or_dense_matmul',
+    'sparse_or_dense_matvecmul',
 ]
 
 
@@ -459,3 +461,162 @@ def _lu_solve_assertions(lower_upper, perm, rhs, validate_args):
                         message=message))
 
   return assertions
+
+
+def sparse_or_dense_matmul(sparse_or_dense_a,
+                           dense_b,
+                           validate_args=False,
+                           name=None,
+                           **kwargs):
+  """Returns (batched) matmul of a SparseTensor (or Tensor) with a Tensor.
+
+  Args:
+    sparse_or_dense_a: `SparseTensor` or `Tensor` representing a (batch of)
+      matrices.
+    dense_b: `Tensor` representing a (batch of) matrices, with the same batch
+      shape as `sparse_or_dense_a`. The shape must be compatible with the shape
+      of `sparse_or_dense_a` and kwargs.
+    validate_args: When `True`, additional assertions might be embedded in the
+      graph.
+      Default value: `False` (i.e., no graph assertions are added).
+    name: Python `str` prefixed to ops created by this function.
+      Default value: "sparse_or_dense_matmul".
+    **kwargs: Keyword arguments to `tf.sparse_tensor_dense_matmul` or
+      `tf.matmul`.
+
+  Returns:
+    product: A dense (batch of) matrix-shaped Tensor of the same batch shape and
+    dtype as `sparse_or_dense_a` and `dense_b`. If `sparse_or_dense_a` or
+    `dense_b` is adjointed through `kwargs` then the shape is adjusted
+    accordingly.
+  """
+  with tf.name_scope(name, 'sparse_or_dense_matmul',
+                     [sparse_or_dense_a, dense_b]):
+    dense_b = tf.convert_to_tensor(
+        dense_b, preferred_dtype=tf.float32, name='dense_b')
+
+    if validate_args:
+      assert_a_rank_at_least_2 = tf.assert_rank_at_least(
+          sparse_or_dense_a,
+          rank=2,
+          message='Input `sparse_or_dense_a` must have at least 2 dimensions.')
+      assert_b_rank_at_least_2 = tf.assert_rank_at_least(
+          dense_b,
+          rank=2,
+          message='Input `dense_b` must have at least 2 dimensions.')
+      with tf.control_dependencies(
+          [assert_a_rank_at_least_2, assert_b_rank_at_least_2]):
+        sparse_or_dense_a = tf.identity(sparse_or_dense_a)
+        dense_b = tf.identity(dense_b)
+
+    if isinstance(sparse_or_dense_a, (tf.SparseTensor, tf.SparseTensorValue)):
+      return _sparse_tensor_dense_matmul(sparse_or_dense_a, dense_b, **kwargs)
+    else:
+      return tf.matmul(sparse_or_dense_a, dense_b, **kwargs)
+
+
+def sparse_or_dense_matvecmul(sparse_or_dense_matrix,
+                              dense_vector,
+                              validate_args=False,
+                              name=None,
+                              **kwargs):
+  """Returns (batched) matmul of a (sparse) matrix with a column vector.
+
+  Args:
+    sparse_or_dense_matrix: `SparseTensor` or `Tensor` representing a (batch of)
+      matrices.
+    dense_vector: `Tensor` representing a (batch of) vectors, with the same
+      batch shape as `sparse_or_dense_matrix`. The shape must be compatible with
+      the shape of `sparse_or_dense_matrix` and kwargs.
+    validate_args: When `True`, additional assertions might be embedded in the
+      graph.
+      Default value: `False` (i.e., no graph assertions are added).
+    name: Python `str` prefixed to ops created by this function.
+      Default value: "sparse_or_dense_matvecmul".
+    **kwargs: Keyword arguments to `tf.sparse_tensor_dense_matmul` or
+      `tf.matmul`.
+
+  Returns:
+    product: A dense (batch of) vector-shaped Tensor of the same batch shape and
+    dtype as `sparse_or_dense_matrix` and `dense_vector`.
+  """
+  with tf.name_scope(name, 'sparse_or_dense_matvecmul',
+                     [sparse_or_dense_matrix, dense_vector]):
+    dense_vector = tf.convert_to_tensor(
+        dense_vector, preferred_dtype=tf.float32, name='dense_vector')
+    return tf.squeeze(
+        sparse_or_dense_matmul(
+            sparse_or_dense_matrix,
+            dense_vector[..., tf.newaxis],
+            validate_args=validate_args,
+            **kwargs),
+        axis=[-1])
+
+
+def _get_shape(x, out_type=tf.int32):
+  # Return the shape of a Tensor or a SparseTensor as an np.array if its shape
+  # is known statically. Otherwise return a Tensor representing the shape.
+  if x.shape.is_fully_defined():
+    return np.array(x.shape.as_list(), dtype=out_type.as_numpy_dtype)
+  return tf.shape(x, out_type=out_type)
+
+
+def _sparse_tensor_dense_matmul(sp_a, b, **kwargs):
+  """Returns (batched) matmul of a SparseTensor with a Tensor.
+
+  Args:
+    sp_a: `SparseTensor` representing a (batch of) matrices.
+    b: `Tensor` representing a (batch of) matrices, with the same batch shape of
+      `sp_a`. The shape must be compatible with the shape of `sp_a` and kwargs.
+    **kwargs: Keyword arguments to `tf.sparse_tensor_dense_matmul`.
+
+  Returns:
+    product: A dense (batch of) matrix-shaped Tensor of the same batch shape and
+    dtype as `sp_a` and `b`. If `sp_a` or `b` is adjointed through `kwargs` then
+    the shape is adjusted accordingly.
+  """
+  batch_shape = _get_shape(sp_a)[:-2]
+
+  # Reshape the SparseTensor into a rank 3 SparseTensors, with the
+  # batch shape flattened to a single dimension. If the batch rank is 0, then
+  # we add a batch dimension of rank 1.
+  sp_a = tf.sparse_reshape(sp_a, tf.concat([[-1], _get_shape(sp_a)[-2:]],
+                                           axis=0))
+  # Reshape b to stack the batch dimension along the rows.
+  b = tf.reshape(b, tf.concat([[-1], _get_shape(b)[-1:]], axis=0))
+
+  # Convert the SparseTensor to a matrix in block diagonal form with blocks of
+  # matrices [M, N]. This allow us to use tf.sparse_tensor_dense_matmul which
+  # only accepts rank 2 (Sparse)Tensors.
+  out = tf.sparse_tensor_dense_matmul(_sparse_block_diag(sp_a), b, **kwargs)
+
+  # Finally retrieve the original batch shape from the resulting rank 2 Tensor.
+  # Note that we avoid inferring the final shape from `sp_a` or `b` because we
+  # might have transposed one or both of them.
+  return tf.reshape(
+      out,
+      tf.concat([batch_shape, [-1], _get_shape(out)[-1:]], axis=0))
+
+
+def _sparse_block_diag(sp_a):
+  """Returns a block diagonal rank 2 SparseTensor from a batch of SparseTensors.
+
+  Args:
+    sp_a: A rank 3 `SparseTensor` representing a batch of matrices.
+
+  Returns:
+    sp_block_diag_a: matrix-shaped, `float` `SparseTensor` with the same dtype
+    as `sparse_or_matrix`, of shape [B * M, B * N] where `sp_a` has shape
+    [B, M, N]. Each [M, N] batch of `sp_a` is lined up along the diagonal.
+  """
+  # Construct the matrix [[M, N], [1, 0], [0, 1]] which would map the index
+  # (b, i, j) to (Mb + i, Nb + j). This effectively creates a block-diagonal
+  # matrix of dense shape [B * M, B * N].
+  # Note that this transformation doesn't increase the number of non-zero
+  # entries in the SparseTensor.
+  sp_a_shape = tf.convert_to_tensor(_get_shape(sp_a, tf.int64))
+  ind_mat = tf.concat([[sp_a_shape[-2:]], tf.eye(2, dtype=tf.int64)], axis=0)
+  indices = tf.matmul(sp_a.indices, ind_mat)
+  dense_shape = sp_a_shape[0] * sp_a_shape[1:]
+  return tf.SparseTensor(
+      indices=indices, values=sp_a.values, dense_shape=dense_shape)
