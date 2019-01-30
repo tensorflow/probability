@@ -255,7 +255,7 @@ class MaskedAutoregressiveFlow(bijector.Bijector):
       # Set caching device to avoid re-getting the tf.Variable for every while
       # loop iteration.
       with tf.variable_scope(tf.get_variable_scope()) as vs:
-        if vs.caching_device is None:
+        if vs.caching_device is None and not tf.executing_eagerly():
           vs.set_caching_device(lambda op: op.device)
         shift, log_scale = self._shift_and_log_scale_fn(y0)
       y = x
