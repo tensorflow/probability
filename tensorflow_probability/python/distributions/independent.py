@@ -45,7 +45,7 @@ class Independent(distribution_lib.Distribution):
   E]`-shaped events. It operates by reinterpreting the rightmost batch dims as
   part of the event dimensions. The `reinterpreted_batch_ndims` parameter
   controls the number of batch dims which are absorbed as event dims;
-  `reinterpreted_batch_ndims < len(batch_shape)`.  For example, the `log_prob`
+  `reinterpreted_batch_ndims <= len(batch_shape)`.  For example, the `log_prob`
   function entails a `reduce_sum` over the rightmost `reinterpreted_batch_ndims`
   after calling the base distribution's `log_prob`.  In other words, since the
   batch dimension(s) index independent distributions, the resultant multivariate
