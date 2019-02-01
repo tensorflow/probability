@@ -463,7 +463,7 @@ def _bracket_and_search(
       right: Instance of _FnDFn. The position and the associated value and
         derivative at the updated right end point of the interval.
   """
-  bracket_result = _bracket(
+  bracket_result = hzl.bracket(
       value_and_gradients_function,
       val_0,
       val_c,
@@ -473,7 +473,7 @@ def _bracket_and_search(
 
   # If the bracketing failed, or we have already exhausted all the allowed
   # iterations, we return an error.
-  failed = (~tf.convert_to_tensor(bracket_result.bracketed) |
+  failed = (bracket_result.failed |
             tf.greater_equal(bracket_result.iteration, max_iterations))
 
   def _bracketing_failed_fn():
@@ -1271,151 +1271,6 @@ def _update(value_and_gradients_function,
       ],
       default=_default_fn,
       exclusive=False)
-
-
-_BracketResult = collections.namedtuple('_BracketResult', [
-    'iteration',  # Number of iterations taken to bracket.
-    'bracketed',  # Boolean indicating whether bracketing succeeded.
-    'failed',     # Boolean indicating whether objective evaluation failed.
-    'num_evals',  # The total number of objective evaluations performed.
-    'left',       # The left end point (instance of _FnDFn).
-    'right'       # The right end point (instance of _FnDFn).
-])
-
-
-def _bracket(value_and_gradients_function,
-             val_0,
-             val_c,
-             f_lim,
-             max_iterations,
-             expansion_param=5.0):
-  """Brackets the minimum given an initial starting point.
-
-  Applies the Hager Zhang bracketing algorithm to find an interval containing
-  a region with points satisfying Wolfe conditions. Uses the supplied initial
-  step size 'c' to find such an interval. The only condition on 'c' is that
-  it should be positive. For more details see steps B0-B3 in
-  [Hager and Zhang (2006)][2].
-
-  Args:
-    value_and_gradients_function: A Python callable that accepts a real scalar
-      tensor and returns a tuple containing the value of the function and
-      its derivative at that point.
-    val_0: Instance of _FnDFn. The function and derivative value at 0.
-    val_c: Instance of _FnDFn. The value and derivative of the function
-      evaluated at the initial trial point (labelled 'c' above).
-    f_lim: Scalar `Tensor` of real dtype. The function value threshold for
-      the approximate Wolfe conditions to be checked.
-    max_iterations: Int32 scalar `Tensor`. The maximum number of iterations
-      permitted.
-    expansion_param: Scalar positive `Tensor` of real dtype. Must be greater
-      than `1.`. Used to expand the initial interval in case it does not bracket
-      a minimum.
-
-  Returns:
-    A namedtuple with the following fields.
-    iterations: An int32 scalar `Tensor`. The number of iterations performed.
-      Bounded above by `max_iterations` parameter.
-    bracketed: A boolean scalar `Tensor`. True if the minimum has been
-      bracketed by the returned interval.
-    failed: A boolean scalar `Tensor`. True if the an error was encountered
-      while bracketing.
-    num_evals: An int32 scalar `Tensor`. The number of times the objective was
-      evaluated.
-    left: Instance of _FnDFn. The position and the associated value and
-      derivative at the updated left end point of the interval found.
-    right: Instance of _FnDFn. The position and the associated value and
-      derivative at the updated right end point of the interval found.
-  """
-  def _cond(iteration, bracketed, failed, *ignored_args):  # pylint:disable=unused-argument
-    """Loop cond."""
-    retval = tf.logical_not(bracketed | failed | (iteration >= max_iterations))
-    return retval
-
-  def _body(iteration, bracketed, failed, evals, val_left, val_right):  # pylint:disable=unused-argument
-    """Loop body to find the bracketing interval."""
-    iteration += 1
-
-    def _not_finite_fn():
-      return _BracketResult(iteration=iteration,
-                            bracketed=False,
-                            failed=True,
-                            num_evals=evals,
-                            left=val_left,
-                            right=val_right)
-
-    # Check that the function or gradient are finite and quit if they aren't.
-    not_finite = ~hzl.is_finite(val_left, val_right)
-
-    case0 = (not_finite, _not_finite_fn)
-
-    def _right_pt_found_fn():
-      return _BracketResult(iteration=iteration,
-                            bracketed=True,
-                            failed=False,
-                            num_evals=evals,
-                            left=val_left,
-                            right=val_right)
-
-    # If the right point has an increasing derivative, then [left, right]
-    # encloses a minimum and we are done.
-    case1 = ((val_right.df >= 0), _right_pt_found_fn)
-
-    # This case applies if the point has negative derivative (i.e. it is almost
-    # suitable as a left endpoint.
-    def _case2_fn():
-      """Case 2."""
-      bisection_result = hzl.bisect(
-          value_and_gradients_function,
-          val_0,
-          val_right,
-          f_lim)
-      return _BracketResult(
-          iteration=iteration,
-          bracketed=True,
-          failed=bisection_result.failed,
-          num_evals=evals + bisection_result.num_evals,
-          left=bisection_result.left,
-          right=bisection_result.right)
-
-    case2 = (val_right.f > f_lim), _case2_fn
-
-    def _default_fn():
-      """Expansion."""
-      next_right = expansion_param * val_right.x
-      f_next_right, df_next_right = value_and_gradients_function(next_right)
-      val_next_right = _FnDFn(x=next_right, f=f_next_right, df=df_next_right)
-      failed = ~hzl.is_finite(val_next_right)
-      return _BracketResult(
-          iteration=iteration,
-          bracketed=False,
-          failed=failed,
-          num_evals=evals + 1,
-          left=val_right,
-          right=val_next_right)
-
-    return tf.contrib.framework.smart_case(
-        [
-            case0,
-            case1,
-            case2
-        ],
-        default=_default_fn,
-        exclusive=False)
-
-  initial_vars = _BracketResult(
-      iteration=tf.convert_to_tensor(0),
-      bracketed=False,
-      failed=False,
-      num_evals=0,
-      left=val_0,
-      right=val_c)
-
-  return tf.while_loop(
-      _cond,
-      _body,
-      initial_vars,
-      parallel_iterations=1)
 
 
 def _prepare_args(value_and_gradients_function,

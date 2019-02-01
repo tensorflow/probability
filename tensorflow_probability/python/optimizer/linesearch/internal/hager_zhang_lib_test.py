@@ -67,8 +67,71 @@ def test_function_x_y_dy(x, y, dy, eps=0.1):
 class HagerZhangLibTest(tf.test.TestCase):
 
   @tfe.run_test_in_graph_and_eager_modes
+  def test_bracket_simple(self):
+    """Tests that bracketing works on a 1 variable scalar valued function."""
+    # Example crafted to require one expansion during bracketing, and then
+    # some bisection; same as case (d) in test_bracket_batching below.
+    wolfe_threshold = 1e-6
+    x = tf.constant([0.0, 1.0, 5.0])
+    y = tf.constant([1.0, 0.9, 1.1])
+    dy = tf.constant([-0.8, -0.7, -0.8])
+    fun = test_function_x_y_dy(x, y, dy)
+
+    val_a = hzl._apply(fun, 0.0)  # Value at zero.
+    val_b = hzl._apply(fun, 1.0)  # Value at initial step.
+    f_lim = val_a.f + (wolfe_threshold * tf.abs(val_a.f))
+
+    result = self.evaluate(
+        hzl.bracket(fun, val_a, val_b, f_lim, max_iterations=5))
+
+    self.assertEqual(result.iteration, 1)  # One expansion.
+    self.assertEqual(result.num_evals, 2)  # Once bracketing, once bisecting.
+    self.assertEqual(result.left.x, 0.0)
+    self.assertEqual(result.right.x, 2.5)
+    self.assertLess(result.left.df, 0)  # Opposite slopes.
+    self.assertGreaterEqual(result.right.df, 0)
+
+  @tfe.run_test_in_graph_and_eager_modes
+  def test_bracket_batching(self):
+    """Tests that bracketing works in batching mode."""
+    wolfe_threshold = 1e-6
+    # We build an example function with 4 batches, each for one of the
+    # following cases:
+    # - a) Minimum bracketed from the beginning.
+    # - b) Minimum bracketed after one expansion.
+    # - c) Needs bisect from the beginning.
+    # - d) Needs one round of expansion and then bisect.
+    x = tf.constant([0.0, 1.0, 5.0])
+    y = tf.constant([[1.0, 1.2, 1.1],
+                     [1.0, 0.9, 1.2],
+                     [1.0, 1.1, 1.2],
+                     [1.0, 0.9, 1.1]])
+    dy = tf.constant([[-0.8, 0.6, -0.8],
+                      [-0.8, -0.7, 0.6],
+                      [-0.8, -0.7, -0.8],
+                      [-0.8, -0.7, -0.8]])
+    fun = test_function_x_y_dy(x, y, dy, eps=0.1)
+
+    val_a = hzl._apply(fun, tf.zeros(4))  # Values at zero.
+    val_b = hzl._apply(fun, tf.ones(4))  # Values at initial step.
+    f_lim = val_a.f + (wolfe_threshold * tf.abs(val_a.f))
+
+    expected_left = np.array([0.0, 1.0, 0.0, 0.0])
+    expected_right = np.array([1.0, 5.0, 0.5, 2.5])
+
+    result = self.evaluate(hzl.bracket(fun, val_a, val_b, f_lim,
+                                       max_iterations=5))
+    self.assertEqual(result.num_evals, 2)  # Once bracketing, once bisecting.
+    self.assertTrue(np.all(result.stopped))
+    self.assertTrue(np.all(~result.failed))
+    self.assertTrue(np.all(result.left.df < 0))  # Opposite slopes.
+    self.assertTrue(np.all(result.right.df >= 0))
+    self.assertArrayNear(result.left.x, expected_left, 1e-5)
+    self.assertArrayNear(result.right.x, expected_right, 1e-5)
+
+  @tfe.run_test_in_graph_and_eager_modes
   def test_bisect_simple(self):
-    """Tests that _bisect works on a 1 variable scalar valued function."""
+    """Tests that bisect works on a 1 variable scalar valued function."""
     wolfe_threshold = 1e-6
     x = tf.constant([0.0, 0.5, 1.0])
     y = tf.constant([1.0, 0.6, 1.2])
@@ -84,7 +147,7 @@ class HagerZhangLibTest(tf.test.TestCase):
 
   @tfe.run_test_in_graph_and_eager_modes
   def test_bisect_batching(self):
-    """Tests that _bisect works in batching mode."""
+    """Tests that bisect works in batching mode."""
     wolfe_threshold = 1e-6
     # Let's build our example function with 4 batches, each evaluating a
     # different poly. They all have negative slopes both on 0.0 and 1.0,

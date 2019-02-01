@@ -46,12 +46,13 @@ def _apply(value_and_gradients_function, x):
   return FnDFn(x=x, f=f, df=df)
 
 
-_BisectionResult = collections.namedtuple('_BisectionResult', [
-    'stopped',    # Boolean indicating whether bisection terminated gracefully.
+_IntermediateResult = collections.namedtuple('_IntermediateResult', [
+    'iteration',  # Number of iterations taken to bracket.
+    'stopped',    # Boolean indicating whether bracketing/bisection terminated.
     'failed',     # Boolean indicating whether objective evaluation failed.
     'num_evals',  # The total number of objective evaluations performed.
-    'left',       # The left end point (instance of _FnDFn).
-    'right'       # The right end point (instance of _FnDFn).
+    'left',       # The left end point (instance of FnDFn).
+    'right'       # The right end point (instance of FnDFn).
 ])
 
 
@@ -59,6 +60,115 @@ def _val_where(cond, tval, fval):
   """Like tf.where but works on namedtuple's."""
   cls = type(tval)
   return cls(*(tf.where(cond, t, f) for t, f in zip(tval, fval)))
+
+
+def bracket(value_and_gradients_function,
+            val_0,
+            val_c,
+            f_lim,
+            max_iterations,
+            expansion_param=5.0):
+  """Brackets the minimum given an initial starting point.
+
+  Applies the Hager Zhang bracketing algorithm to find an interval containing
+  a region with points satisfying Wolfe conditions. Uses the supplied initial
+  step size 'c' to find such an interval. The only condition on 'c' is that
+  it should be positive. For more details see steps B0-B3 in
+  [Hager and Zhang (2006)][2].
+
+  Args:
+    value_and_gradients_function: A Python callable that accepts a real scalar
+      tensor and returns a tuple containing the value of the function and
+      its derivative at that point.
+      Alternatively, the function may represent the batching of `n` such line
+      functions (e.g. projecting a single multivariate objective function along
+      `n` distinct directions at once) accepting n points as input, i.e. a
+      tensor of shape [n], and return a tuple of two tensors of shape [n], the
+      function values and the corresponding derivatives at the input points.
+    val_0: Instance of `FnDFn`. The function and derivative value at 0.
+    val_c: Instance of `FnDFn`. The value and derivative of the function
+      evaluated at the initial trial point (labelled 'c' above).
+    f_lim: Scalar `Tensor` of real dtype. The function value threshold for
+      the approximate Wolfe conditions to be checked.
+    max_iterations: Int32 scalar `Tensor`. The maximum number of iterations
+      permitted. The limit applies equally to all batch members.
+    expansion_param: Scalar positive `Tensor` of real dtype. Must be greater
+      than `1.`. Used to expand the initial interval in case it does not bracket
+      a minimum.
+
+  Returns:
+    A namedtuple with the following fields.
+      iteration: An int32 scalar `Tensor`. The number of iterations performed.
+        Bounded above by `max_iterations` parameter.
+      stopped: A boolean `Tensor` of shape [n]. True for those batch members
+        where the algorithm terminated before reaching `max_iterations`.
+      failed: A boolean `Tensor` of shape [n]. True for those batch members
+        where an error was encountered during bracketing.
+      num_evals: An int32 scalar `Tensor`. The number of times the objective
+        function was evaluated.
+      left: Instance of `FnDFn`. The position and the associated value and
+        derivative at the updated left end point of the interval found.
+      right: Instance of `FnDFn`. The position and the associated value and
+        derivative at the updated right end point of the interval found.
+  """
+  # Fail if either of the initial points are not finite.
+  failed = ~is_finite(val_0, val_c)
+
+  # If the slope at `c` is positive, step B1 in [2], then the given initial
+  # points already bracket a minimum.
+  bracketed = val_c.df >= 0
+
+  # Bisection is needed, step B2, if `c` almost works as left point but the
+  # objective value is too high.
+  needs_bisect = (val_c.df < 0) & (val_c.f > f_lim)
+
+  # In these three cases bracketing is already `stopped` and there is no need
+  # to perform further evaluations. Otherwise the bracketing loop is needed to
+  # expand the interval, step B3, until the conditions are met.
+  initial_args = _IntermediateResult(
+      iteration=tf.convert_to_tensor(0),
+      stopped=failed | bracketed | needs_bisect,
+      failed=failed,
+      num_evals=tf.convert_to_tensor(0),
+      left=val_0,
+      right=val_c)
+
+  def _loop_cond(curr):
+    return (curr.iteration < max_iterations) & ~tf.reduce_all(curr.stopped)
+
+  def _loop_body(curr):
+    """Main body of bracketing loop."""
+    # The loop maintains the invariant that curr.stopped is true if we have
+    # either: failed, successfully bracketed, or not yet bracketed but needs
+    # bisect. On the only remaining case, step B3 in [2]. case we need to
+    # expand and update the left/right values appropriately.
+    new_right = _apply(value_and_gradients_function,
+                       expansion_param * curr.right.x)
+    left = _val_where(curr.stopped, curr.left, curr.right)
+    right = _val_where(curr.stopped, curr.right, new_right)
+
+    # Updated the failed, bracketed, and needs_bisect conditions.
+    failed = curr.failed | ~is_finite(right)
+    bracketed = right.df >= 0
+    needs_bisect = (right.df < 0) & (right.f > f_lim)
+    return [_IntermediateResult(
+        iteration=curr.iteration + 1,
+        stopped=failed | bracketed | needs_bisect,
+        failed=failed,
+        num_evals=curr.num_evals + 1,
+        left=left,
+        right=right)]
+
+  bracket_result = tf.while_loop(_loop_cond, _loop_body, [initial_args])[0]
+
+  # For entries where bisect is still needed, mark them as not yet stopped,
+  # reset the left point to 0, and run `_bisect` on them.
+  needs_bisect = (
+      (bracket_result.right.df < 0) & (bracket_result.right.f > f_lim))
+  stopped = bracket_result.failed | ~needs_bisect
+  left = _val_where(stopped, bracket_result.left, val_0)
+  bisect_args = bracket_result._replace(stopped=stopped, left=left)
+  return _bisect(value_and_gradients_function, bisect_args, f_lim)
 
 
 def bisect(value_and_gradients_function,
@@ -93,9 +203,10 @@ def bisect(value_and_gradients_function,
 
   Returns:
     A namedtuple containing the following fields:
-      stopped: A scalar boolean tensor. Indicates whether the bisection
-        loop terminated normally (i.e. by finding an interval that satisfies
-        the opposite slope conditions).
+      iteration: An int32 scalar `Tensor`. The number of iterations performed.
+        Bounded above by `max_iterations` parameter.
+      stopped: A boolean scalar `Tensor`. True if the bisect algorithm
+        terminated.
       failed: A scalar boolean tensor. Indicates whether the objective function
         failed to produce a finite value.
       num_evals: A scalar int32 tensor. The number of value and gradients
@@ -105,14 +216,27 @@ def bisect(value_and_gradients_function,
       final_right: Instance of _FnDFn. The value and derivative of the function
         evaluated at the right end point of the bracketing interval found.
   """
+  failed = ~is_finite(initial_left, initial_right)
+  needs_bisect = (initial_right.df < 0) & (initial_right.f > f_lim)
+  bisect_args = _IntermediateResult(
+      iteration=tf.convert_to_tensor(0),
+      stopped=failed | ~needs_bisect,
+      failed=failed,
+      num_evals=tf.convert_to_tensor(0),
+      left=initial_left,
+      right=initial_right)
+  return _bisect(value_and_gradients_function, bisect_args, f_lim)
 
+
+def _bisect(value_and_gradients_function, initial_args, f_lim):
+  """Actual implementation of bisect given initial_args in a _BracketResult."""
   def _loop_cond(curr):
-    return ~tf.reduce_all(curr.stopped | curr.failed)
+    # TODO(b/112524024): Also take into account max_iterations.
+    return ~tf.reduce_all(curr.stopped)
 
   def _loop_body(curr):
     """Narrow down interval to satisfy opposite slope conditions."""
     mid = _apply(value_and_gradients_function, (curr.left.x + curr.right.x) / 2)
-    num_evals = tf.convert_to_tensor(curr.num_evals) + 1
 
     # Fail if function values at mid point are no longer finite; or left/right
     # points are so close to it that we can't distinguish them any more.
@@ -132,23 +256,21 @@ def bisect(value_and_gradients_function,
     right = _val_where(to_update & ~update_left, mid, curr.right)
 
     # We're done when the right end point has a positive slope.
-    stopped = curr.stopped | (right.df >= 0)
+    stopped = curr.stopped | failed | (right.df >= 0)
 
-    return [_BisectionResult(stopped, failed, num_evals, left, right)]
+    return [_IntermediateResult(
+        iteration=curr.iteration,
+        stopped=stopped,
+        failed=failed,
+        num_evals=curr.num_evals + 1,
+        left=left,
+        right=right)]
 
   # The interval needs updating if the right end point has a negative slope and
   # the value of the function at that point is too high. It is not a valid left
   # end point but along with the current left end point, it encloses another
   # minima. The loop above tries to narrow the interval so that it satisfies the
   # opposite slope conditions.
-  needs_update = (initial_right.df < 0) & (initial_right.f > f_lim)
-  initial_args = _BisectionResult(
-      stopped=~needs_update,
-      failed=tf.zeros_like(needs_update),  # i.e. all False.
-      num_evals=0,
-      left=initial_left,
-      right=initial_right)
-
   return tf.while_loop(_loop_cond, _loop_body, [initial_args])[0]
 
 
