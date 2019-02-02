@@ -25,18 +25,20 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.distributions import empirical
 from tensorflow_probability.python.internal import test_util
-from tensorflow.python.framework import test_util as tf_test_util
 
 tfd = tfp.distributions
+tfe = tf.contrib.eager
+
 
 def entropy(probs):
   probs = np.array(probs)
-  return np.sum(- probs * np.log(probs))
+  return np.sum(-probs * np.log(probs))
 
 def random_samples(shape):
   return np.random.uniform(size=list(shape))
 
 
+@tfe.run_all_tests_in_graph_and_eager_modes
 class EmpiricalScalarTest(test_util.VectorDistributionTestHelpers):
 
   def testSamples(self):
@@ -89,16 +91,16 @@ class EmpiricalScalarTest(test_util.VectorDistributionTestHelpers):
                           np.log(expected_cdf))
 
   def testCdfWithBatch(self):
-    sample = [[0, 0, 1, 2], [0, 1, 1, 2]]
+    sample = [[0, 0, 1, 2], [0, 10, 20, 40]]
     events = [
         [0],
-        [0, 1],
-        [[0, 1], [1, 2]]
+        [0, 10],
+        [[0, 1], [10, 20]]
     ]
     expected_cdfs = [
         [0.5, 0.25],
-        [0.5, 0.75],
-        [[0.5, 0.75], [0.75, 1]]
+        [0.5, 0.5],
+        [[0.5, 0.25], [1, 0.75]]
     ]
 
     for event, expected_cdf in zip(events, expected_cdfs):
@@ -133,18 +135,20 @@ class EmpiricalScalarTest(test_util.VectorDistributionTestHelpers):
       dist = empirical.Empirical(samples=input_ph)
       self.assertAllClose(self.evaluate(dist.prob(event)),
                           expected_pmf)
+      self.assertAllClose(self.evaluate(dist.log_prob(event)),
+                          np.log(expected_pmf))
 
   def testPmfWithBatch(self):
-    sample = [[0, 0, 1, 2], [0, 1, 1, 2]]
+    sample = [[0, 0, 1, 2], [0, 10, 20, 40]]
     events = [
         [0],
-        [0, 1],
-        [[0, 1], [1, 2]]
+        [0, 10],
+        [[0, 1], [10, 20]]
     ]
     expected_pmfs = [
         [0.5, 0.25],
-        [0.5, 0.5],
-        [[0.5, 0.5], [0.25, 0.25]]
+        [0.5, 0.25],
+        [[0.5, 0], [0, 0.25]]
     ]
 
     for event, expected_pmf in zip(events, expected_pmfs):
@@ -155,17 +159,8 @@ class EmpiricalScalarTest(test_util.VectorDistributionTestHelpers):
       dist = empirical.Empirical(samples=input_ph)
       self.assertAllClose(self.evaluate(dist.prob(event)),
                           expected_pmf)
-
-  def testPmfInvalid(self):
-    dist = empirical.Empirical(samples=random_samples([2, 2]),
-                               validate_args=True)
-    invalid_events = [
-        [],
-        [0, 0, 1]
-    ]
-    for event in invalid_events:
-      with self.assertRaises(ValueError):
-        self.evaluate(dist.prob(event))
+      self.assertAllClose(self.evaluate(dist.log_prob(event)),
+                          np.log(expected_pmf))
 
   def testEntropy(self):
     samples = [
@@ -202,9 +197,12 @@ class EmpiricalScalarTest(test_util.VectorDistributionTestHelpers):
                           dist.batch_shape_tensor())
 
       n = 1000
-      seed = 42
-      self.assertAllEqual(self.evaluate(dist.sample(n, seed)),
-                          self.evaluate(dist.sample(n, seed)))
+      seed = tf.set_random_seed(42) if tf.executing_eagerly() else 42
+      samples1 = dist.sample(n, seed)
+      seed = tf.set_random_seed(42) if tf.executing_eagerly() else 42
+      samples2 = dist.sample(n, seed)
+      self.assertAllEqual(
+          self.evaluate(samples1), self.evaluate(samples2))
 
   def testMean(self):
     samples = [
@@ -270,6 +268,7 @@ class EmpiricalScalarTest(test_util.VectorDistributionTestHelpers):
                           np.sqrt(expected_variance))
 
 
+@tfe.run_all_tests_in_graph_and_eager_modes
 class EmpiricalVectorTest(test_util.VectorDistributionTestHelpers):
 
   def testSamples(self):
@@ -310,11 +309,9 @@ class EmpiricalVectorTest(test_util.VectorDistributionTestHelpers):
          [[1, 1], [1, 2]]]
     ]
     expected_cdfs = [
-        [0.75, 0.75],
-        [[0.75, 0.75],
-         [1, 1]],
-        [[[0.75, 0.25], [0.75, 0.75]],
-         [[1., 0.75], [1., 1.]]]
+        0.75,
+        [0.75, 1],
+        [[0.25, 0.75], [0.75, 1]]
     ]
 
     for event, expected_cdf in zip(events, expected_cdfs):
@@ -330,20 +327,21 @@ class EmpiricalVectorTest(test_util.VectorDistributionTestHelpers):
 
   def testCdfWithBatch(self):
     sample = [[[0, 0], [0, 1], [0, 1], [1, 1]],
-              [[0, 1], [2, 2], [2, 2], [2, 2]]]
+              [[0, 10], [10, 10], [10, 20], [20, 20]]]
     events = [
         [0, 1],
-        [[0, 0], [2, 2]],
-        [[[0, 0], [0, 1]],
-         [[0, 1], [2, 2]]]
+        [[0, 1], [10, 10]],
+        [[[0, 0], [0, 10]],
+         [[0, 1], [10, 20]]],
+        [[0], [10]],
+        [[[0, 1]], [[10, 20]]]
     ]
     expected_cdfs = [
-        [[0.75, 1.],
-         [0.25, 0.25]],
-        [[0.75, 0.25],
-         [1., 1.]],
-        [[[0.75, 0.25], [0.25, 0.25]],
-         [[0.75, 1.], [1., 1.]]]
+        [0.75, 0],
+        [0.75, 0.5],
+        [[0.25, 0.25], [0.75, 0.75]],
+        [0.25, 0.5],
+        [[0.75, 0], [1, 0.75]]
     ]
 
     for event, expected_cdf in zip(events, expected_cdfs):
@@ -354,6 +352,8 @@ class EmpiricalVectorTest(test_util.VectorDistributionTestHelpers):
       dist = empirical.Empirical(samples=input_ph, event_ndims=1)
       self.assertAllClose(self.evaluate(dist.cdf(event)),
                           expected_cdf)
+      self.assertAllClose(self.evaluate(dist.log_cdf(event)),
+                          np.log(expected_cdf))
 
   def testPmfNoBatch(self):
     sample = [[0, 0], [0, 1], [0, 1], [1, 2]]
@@ -377,20 +377,27 @@ class EmpiricalVectorTest(test_util.VectorDistributionTestHelpers):
       dist = empirical.Empirical(samples=input_ph, event_ndims=1)
       self.assertAllClose(self.evaluate(dist.prob(event)),
                           expected_pmf)
+      self.assertAllClose(self.evaluate(dist.log_prob(event)),
+                          np.log(expected_pmf))
 
   def testPmfWithBatch(self):
     sample = [[[0, 0], [0, 1], [0, 1], [1, 1]],
-              [[0, 1], [2, 2], [2, 2], [2, 2]]]
+              [[0, 10], [10, 10], [10, 20], [20, 20]]]
     events = [
         [0, 1],
-        [[0, 0], [2, 2]],
-        [[[0, 0], [0, 1]],
-         [[0, 1], [2, 2]]]
+        [[0, 1], [10, 10]],
+        [[[0, 0], [0, 10]],
+         [[0, 1], [10, 20]]],
+        [[0], [10]],
+        [[[0, 1]], [[10, 20]]]
+
     ]
     expected_pmfs = [
+        [0.5, 0],
         [0.5, 0.25],
-        [0.25, 0.75],
-        [[0.25, 0.25], [0.5, 0.75]]
+        [[0.25, 0.25], [0.5, 0.25]],
+        [0.25, 0.25],
+        [[0.5, 0], [0, 0.25]]
     ]
 
     for event, expected_pmf in zip(events, expected_pmfs):
@@ -410,7 +417,7 @@ class EmpiricalVectorTest(test_util.VectorDistributionTestHelpers):
       input_ph = tf.placeholder_with_default(
           input=input_,
           shape=samples_shape if self.static_shape else None)
-      dist = empirical.Empirical(samples=input_ph)
+      dist = empirical.Empirical(samples=input_ph, event_ndims=1)
       expected_shape = tf.concat(
           [dist.batch_shape_tensor(), dist.event_shape_tensor()],
           axis=0)
@@ -418,9 +425,12 @@ class EmpiricalVectorTest(test_util.VectorDistributionTestHelpers):
                           expected_shape)
 
       n = 1000
-      seed = 42
-      self.assertAllEqual(self.evaluate(dist.sample(n, seed)),
-                          self.evaluate(dist.sample(n, seed)))
+      seed = tf.set_random_seed(42) if tf.executing_eagerly() else 42
+      samples1 = dist.sample(n, seed)
+      seed = tf.set_random_seed(42) if tf.executing_eagerly() else 42
+      samples2 = dist.sample(n, seed)
+      self.assertAllEqual(
+          self.evaluate(samples1), self.evaluate(samples2))
 
   def testMean(self):
     samples = [
@@ -502,6 +512,7 @@ class EmpiricalVectorTest(test_util.VectorDistributionTestHelpers):
                           np.sqrt(expected_variance))
 
 
+@tfe.run_all_tests_in_graph_and_eager_modes
 class EmpiricalNdTest(test_util.VectorDistributionTestHelpers):
 
   def testSamples(self):
@@ -541,13 +552,12 @@ class EmpiricalNdTest(test_util.VectorDistributionTestHelpers):
               [[1, 2], [2, 4]]]
     events = [
         [[0, 0], [1, 1]],
-        [[[0, 1], [1, 2]],
+        [[[0, 0], [1, 2]],
          [[0, 2], [2, 4]]]
     ]
     expected_cdfs = [
-        [[0.75, 0.5], [0.75, 0.25]],
-        [[[0.75, 0.75], [0.75, 0.75]],
-         [[0.75, 1], [1, 1]]]
+        0.25,
+        [0.5, 0.75]
     ]
 
     for event, expected_cdf in zip(events, expected_cdfs):
@@ -584,6 +594,8 @@ class EmpiricalNdTest(test_util.VectorDistributionTestHelpers):
       dist = empirical.Empirical(samples=input_ph, event_ndims=2)
       self.assertAllClose(self.evaluate(dist.prob(event)),
                           expected_pmf)
+      self.assertAllClose(self.evaluate(dist.log_prob(event)),
+                          np.log(expected_pmf))
 
   def testSampleN(self):
     for samples_shape in ([2, 2, 4], [4, 2, 2, 4]):
@@ -591,7 +603,7 @@ class EmpiricalNdTest(test_util.VectorDistributionTestHelpers):
       input_ph = tf.placeholder_with_default(
           input=input_,
           shape=samples_shape if self.static_shape else None)
-      dist = empirical.Empirical(samples=input_ph)
+      dist = empirical.Empirical(samples=input_ph, event_ndims=2)
       expected_shape = tf.concat(
           [dist.batch_shape_tensor(), dist.event_shape_tensor()],
           axis=0)
@@ -599,9 +611,12 @@ class EmpiricalNdTest(test_util.VectorDistributionTestHelpers):
                           expected_shape)
 
       n = 1000
-      seed = 42
-      self.assertAllEqual(self.evaluate(dist.sample(n, seed)),
-                          self.evaluate(dist.sample(n, seed)))
+      seed = tf.set_random_seed(42) if tf.executing_eagerly() else 42
+      samples1 = dist.sample(n, seed)
+      seed = tf.set_random_seed(42) if tf.executing_eagerly() else 42
+      samples2 = dist.sample(n, seed)
+      self.assertAllEqual(
+          self.evaluate(samples1), self.evaluate(samples2))
 
   def testMean(self):
     sample = [[[0, 0], [0, 1]],
@@ -665,28 +680,33 @@ class EmpiricalNdTest(test_util.VectorDistributionTestHelpers):
                         np.sqrt(expected_variance))
 
 
-@tf_test_util.run_all_in_graph_and_eager_modes
-class EmpiricalScalarStaticShapeTest(EmpiricalScalarTest, tf.test.TestCase):
+class EmpiricalScalarStaticShapeTest(
+    EmpiricalScalarTest, tf.test.TestCase):
   static_shape = True
 
-@tf_test_util.run_all_in_graph_and_eager_modes
-class EmpiricalScalarDynamicShapeTest(EmpiricalScalarTest, tf.test.TestCase):
+
+class EmpiricalScalarDynamicShapeTest(
+    EmpiricalScalarTest, tf.test.TestCase):
   static_shape = False
 
-@tf_test_util.run_all_in_graph_and_eager_modes
-class EmpiricalVectorStaticShapeTest(EmpiricalVectorTest, tf.test.TestCase):
+
+class EmpiricalVectorStaticShapeTest(
+    EmpiricalVectorTest, tf.test.TestCase):
   static_shape = True
 
-@tf_test_util.run_all_in_graph_and_eager_modes
-class EmpiricalVectorDynamicShapeTest(EmpiricalVectorTest, tf.test.TestCase):
+
+class EmpiricalVectorDynamicShapeTest(
+    EmpiricalVectorTest, tf.test.TestCase):
   static_shape = False
 
-@tf_test_util.run_all_in_graph_and_eager_modes
-class EmpiricalNdStaticShapeTest(EmpiricalNdTest, tf.test.TestCase):
+
+class EmpiricalNdStaticShapeTest(
+    EmpiricalNdTest, tf.test.TestCase):
   static_shape = True
-#
-@tf_test_util.run_all_in_graph_and_eager_modes
-class EmpiricalNdDynamicShapeTest(EmpiricalNdTest, tf.test.TestCase):
+
+
+class EmpiricalNdDynamicShapeTest(
+    EmpiricalNdTest, tf.test.TestCase):
   static_shape = False
 
 
