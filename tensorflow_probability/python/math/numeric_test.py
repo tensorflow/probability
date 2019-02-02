@@ -18,7 +18,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+# Dependency imports
 from absl.testing import parameterized
+import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.internal import test_case
@@ -89,6 +91,42 @@ class SoftThresholdTest(test_case.TestCase, parameterized.TestCase):
 
     self.assertAllClose(expected_y, y)
     self.assertAllClose(expected_dy_dx, dy_dx)
+
+
+@tfe.run_all_tests_in_graph_and_eager_modes
+class ClipByValuePreserveGrad32(test_case.TestCase, parameterized.TestCase):
+
+  dtype = tf.float32
+
+  # pyformat: disable
+  # pylint: disable=bad-whitespace
+  @parameterized.parameters(
+      # x    lo,   hi,    expected_y
+      ( 0.,  -3.,   4.,   0.),
+      (-5.,  -3.,   4.,  -3.),
+      ( 5.,  -3.,   4.,   4.),
+      ([[-4., -2], [2, 5]], -3., 4., [[-3., -2], [2, 4]]),
+  )
+  # pylint: enable=bad-whitespace
+  # pyformat: enable
+  def test_clip_by_value_preserve_grad(self, x, lo, hi, expected_y):
+    expected_dy_dx = np.ones_like(x)
+    x = tf.convert_to_tensor(x, dtype=self.dtype)
+    with tf.GradientTape() as tape:
+      tape.watch(x)
+      y = numeric.clip_by_value_preserve_gradient(x, lo, hi)
+    dy_dx = tape.gradient(y, x)
+
+    y, dy_dx = self.evaluate([y, dy_dx])
+
+    self.assertAllClose(expected_y, y)
+    self.assertAllClose(expected_dy_dx, dy_dx)
+
+
+@tfe.run_all_tests_in_graph_and_eager_modes
+class ClipByValuePreserveGrad64(ClipByValuePreserveGrad32):
+
+  dtype = tf.float64
 
 
 if __name__ == '__main__':

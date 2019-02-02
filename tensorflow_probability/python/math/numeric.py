@@ -131,3 +131,39 @@ def soft_threshold(x, threshold, name=None):
     x = tf.convert_to_tensor(x, name='x')
     threshold = tf.convert_to_tensor(threshold, name='threshold')
     return tf.sign(x) * tf.maximum(tf.abs(x) - threshold, 0.)
+
+
+def clip_by_value_preserve_gradient(t, clip_value_min, clip_value_max,
+                                    name=None):
+  """Clips values to a specified min and max while leaving gradient unaltered.
+
+  Like `tf.clip_by_value`, this function returns a tensor of the same type and
+  shape as input `t` but with values clamped to be no smaller than to
+  `clip_value_min` and no larger than `clip_value_max`. Unlike
+  `tf.clip_by_value`, the gradient is unaffected by this op, i.e.,
+
+  ```python
+  tf.gradients(tfp.math.clip_by_value_preserve_gradient(x), x)[0]
+  # ==> ones_like(x)
+  ```
+
+  Note: `clip_value_min` needs to be smaller or equal to `clip_value_max` for
+  correct results.
+
+  Args:
+    t: A `Tensor`.
+    clip_value_min: A scalar `Tensor`, or a `Tensor` with the same shape
+      as `t`. The minimum value to clip by.
+    clip_value_max: A scalar `Tensor`, or a `Tensor` with the same shape
+      as `t`. The maximum value to clip by.
+    name: A name for the operation (optional).
+      Default value: `'clip_by_value_preserve_gradient'`.
+
+  Returns:
+    clipped_t: A clipped `Tensor`.
+  """
+  with tf.name_scope(name, 'clip_by_value_preserve_gradient',
+                     [t, clip_value_min, clip_value_max]):
+    t = tf.convert_to_tensor(t, name='t')
+    clip_t = tf.clip_by_value(t, clip_value_min, clip_value_max)
+    return t + tf.stop_gradient(clip_t - t)

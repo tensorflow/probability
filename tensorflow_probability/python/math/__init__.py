@@ -28,6 +28,7 @@ from tensorflow_probability.python.math.linalg import lu_solve
 from tensorflow_probability.python.math.linalg import pinv
 from tensorflow_probability.python.math.linalg import sparse_or_dense_matmul
 from tensorflow_probability.python.math.linalg import sparse_or_dense_matvecmul
+from tensorflow_probability.python.math.numeric import clip_by_value_preserve_gradient
 from tensorflow_probability.python.math.numeric import log1psquare
 from tensorflow_probability.python.math.numeric import soft_threshold
 from tensorflow_probability.python.math.random_ops import random_rademacher
@@ -38,6 +39,7 @@ from tensorflow.python.util.all_util import remove_undocumented
 
 _allowed_symbols = [
     'batch_interp_regular_1d_grid',
+    'clip_by_value_preserve_gradient',
     'custom_gradient',
     'diag_jacobian',
     'interp_regular_1d_grid',

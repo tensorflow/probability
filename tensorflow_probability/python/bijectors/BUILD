@@ -269,6 +269,7 @@ py_library(
         ":bijector",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/math:numeric",
     ],
 )
 

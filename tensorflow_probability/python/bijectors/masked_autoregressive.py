@@ -23,6 +23,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.math.numeric import clip_by_value_preserve_gradient
 
 
 __all__ = [
@@ -508,16 +509,8 @@ def masked_autoregressive_default_template(hidden_layers,
       shift, log_scale = tf.unstack(x, num=2, axis=-1)
       which_clip = (
           tf.clip_by_value
-          if log_scale_clip_gradient else _clip_by_value_preserve_grad)
+          if log_scale_clip_gradient else clip_by_value_preserve_gradient)
       log_scale = which_clip(log_scale, log_scale_min_clip, log_scale_max_clip)
       return shift, log_scale
 
     return tf.make_template(name, _fn)
-
-
-def _clip_by_value_preserve_grad(x, clip_value_min, clip_value_max, name=None):
-  """Clips input while leaving gradient unaltered."""
-  with tf.name_scope(name, "clip_by_value_preserve_grad",
-                     [x, clip_value_min, clip_value_max]):
-    clip_x = tf.clip_by_value(x, clip_value_min, clip_value_max)
-    return x + tf.stop_gradient(clip_x - x)
