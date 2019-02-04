@@ -22,23 +22,37 @@ import numpy as np
 import tensorflow as tf
 
 
-def log1psquare(x):
-  """A numerically stable implementation of log(1 + x**2)."""
-  # We use the following identity:
-  #
-  # log(1 + x**2) = 2 log(|x|) + log(1 / x**2 + 1)
-  #
-  # Where the last term is 0 up to the numerical precision when 1 / x**2 is
-  # small enough compared to machine epsilon.
-  is_small = tf.abs(x) * np.sqrt(np.finfo(x.dtype.as_numpy_dtype).eps) <= 1.
-  ones = tf.ones_like(x)
+def log1psquare(x, name=None):
+  """Numerically stable calculation of `log(1 + x**2)` for small or large `|x|`.
 
-  # Also mask out the large/small x's, so the gradients are propagated
-  # correctly.
-  small_x = tf.where(is_small, x, ones)
-  large_x = tf.where(is_small, ones, x)
+  For sufficiently large `x` we use the following observation:
 
-  return tf.where(is_small, tf.log1p(small_x**2.), 2. * tf.log(tf.abs(large_x)))
+  ```none
+  log(1 + x**2) =   2 log(|x|) + log(1 + 1 / x**2)
+                --> 2 log(|x|)  as x --> inf
+  ```
+
+  Numerically, `log(1 + 1 / x**2)` is `0` when `1 / x**2` is small relative to
+  machine epsilon.
+
+  Args:
+    x: Float `Tensor` input.
+    name: Python string indicating the name of the TensorFlow operation.
+      Default value: `'log1psquare'`.
+
+  Returns:
+    log1psq: Float `Tensor` representing `log(1. + x**2.)`.
+  """
+  with tf.name_scope(name, 'log1psquare', [x]):
+    x = tf.convert_to_tensor(x, preferred_dtype=tf.float32, name='x')
+    dtype = x.dtype.as_numpy_dtype
+
+    eps = np.finfo(dtype).eps.astype(np.float64)
+    is_large = tf.abs(x) > (eps**-0.5).astype(dtype)
+
+    # Mask out small x's so the gradient correctly propagates.
+    abs_large_x = tf.where(is_large, tf.abs(x), tf.ones_like(x))
+    return tf.where(is_large, 2. * tf.log(abs_large_x), tf.log1p(tf.square(x)))
 
 
 def soft_threshold(x, threshold, name=None):
@@ -109,8 +123,8 @@ def soft_threshold(x, threshold, name=None):
     threshold: nonnegative scalar, `float` `Tensor` representing the radius of
       the interval on which each coordinate of SoftThreshold takes the value
       zero.  Denoted `gamma` above.
-    name: Python string indicating the name of the TensorFlow operation. Default
-      name is `"soft_threshold"`.
+    name: Python string indicating the name of the TensorFlow operation.
+      Default value: `'soft_threshold'`.
 
   Returns:
     softthreshold: `float` `Tensor` with the same shape and dtype as `x`,
@@ -129,7 +143,7 @@ def soft_threshold(x, threshold, name=None):
   # https://math.stackexchange.com/questions/471339/derivation-of-soft-thresholding-operator
   with tf.name_scope(name, 'soft_threshold', [x, threshold]):
     x = tf.convert_to_tensor(x, name='x')
-    threshold = tf.convert_to_tensor(threshold, name='threshold')
+    threshold = tf.convert_to_tensor(threshold, dtype=x.dtype, name='threshold')
     return tf.sign(x) * tf.maximum(tf.abs(x) - threshold, 0.)
 
 

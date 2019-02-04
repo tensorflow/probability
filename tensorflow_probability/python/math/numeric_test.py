@@ -29,7 +29,9 @@ tfe = tf.contrib.eager
 
 
 @tfe.run_all_tests_in_graph_and_eager_modes
-class Log1pSquareTest(test_case.TestCase, parameterized.TestCase):
+class Log1pSquareTest32(test_case.TestCase, parameterized.TestCase):
+
+  dtype = tf.float32
 
   # Expected values computed using arbitrary precision.
   # pyformat: disable
@@ -49,7 +51,7 @@ class Log1pSquareTest(test_case.TestCase, parameterized.TestCase):
   # pylint: enable=bad-whitespace
   # pyformat: enable
   def test_log1psquare(self, x, expected_y, expected_dy_dx):
-    x = tf.convert_to_tensor(x)
+    x = tf.convert_to_tensor(x, dtype=self.dtype)
     with tf.GradientTape() as tape:
       tape.watch(x)
       y = numeric.log1psquare(x)
@@ -59,6 +61,11 @@ class Log1pSquareTest(test_case.TestCase, parameterized.TestCase):
 
     self.assertAllClose(expected_y, y)
     self.assertAllClose(expected_dy_dx, dy_dx)
+
+
+@tfe.run_all_tests_in_graph_and_eager_modes
+class Log1pSquareTest64(Log1pSquareTest32):
+  dtype = tf.float64
 
 
 @tfe.run_all_tests_in_graph_and_eager_modes
