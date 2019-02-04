@@ -42,6 +42,8 @@ __all__ = [
     'IndependentPoisson',
     'KLDivergenceAddLoss',
     'KLDivergenceRegularizer',
+    'MixtureLogistic',
+    'MixtureNormal',
     'MixtureSameFamily',
     'MultivariateNormalTriL',
     'OneHotCategorical',
@@ -475,21 +477,15 @@ class CategoricalMixtureOfOneHotCategorical(DistributionLambda):
     """Create the distribution instance from a `params` vector."""
     with tf.name_scope(name, 'CategoricalMixtureOfOneHotCategorical',
                        [params, event_size, num_components]):
-      components_shape = tf.concat(
-          [tf.shape(params)[:-1], [num_components, event_size]], axis=0)
-      dist = tfd.MixtureSameFamily(
-          mixture_distribution=tfd.Categorical(
-              logits=params[..., :num_components],
-              validate_args=validate_args),
-          components_distribution=tfd.OneHotCategorical(
-              logits=tf.reshape(params[..., num_components:],
-                                components_shape),
-              dtype=dtype or params.dtype.base_dtype,
-              validate_args=False),  # So we can eval on simplex interior.
-          # TODO(b/120154797): Change following to `validate_args=True` after
-          # fixing: "ValueError: `mixture_distribution` must have scalar
-          # `event_dim`s." assertion in MixtureSameFamily.
-          validate_args=False)
+      dist = MixtureSameFamily.new(
+          params,
+          num_components,
+          OneHotCategorical(
+              event_size,
+              validate_args=False,  # So we can eval on simplex interior.
+              name=name),
+          validate_args=validate_args,
+          name=name)
       # pylint: disable=protected-access
       dist._mean = functools.partial(
           _eval_all_one_hot, tfd.Distribution.prob, dist)
@@ -504,7 +500,10 @@ class CategoricalMixtureOfOneHotCategorical(DistributionLambda):
     with tf.name_scope(
         name, 'CategoricalMixtureOfOneHotCategorical_params_size',
         [event_size, num_components]):
-      return num_components * (1 + event_size)
+      return MixtureSameFamily.params_size(
+          num_components,
+          OneHotCategorical.params_size(event_size, name=name),
+          name=name)
 
 
 class IndependentBernoulli(DistributionLambda):
@@ -1148,7 +1147,6 @@ class MixtureSameFamily(DistributionLambda):
             steps_per_epoch=n // batch_size)
   ```
 
-
   """
 
   def __init__(self,
@@ -1185,7 +1183,7 @@ class MixtureSameFamily(DistributionLambda):
 
   @staticmethod
   def new(params, num_components, component_layer,
-          validate_args=False, name=None, **kwargs):
+          validate_args=False, name=None):
     """Create the distribution instance from a `params` vector."""
     with tf.name_scope(name, 'MixtureSameFamily',
                        [params, num_components, component_layer]):
@@ -1203,8 +1201,7 @@ class MixtureSameFamily(DistributionLambda):
           # TODO(b/120154797): Change following to `validate_args=True` after
           # fixing: "ValueError: `mixture_distribution` must have scalar
           # `event_dim`s." assertion in MixtureSameFamily.
-          validate_args=False,
-          **kwargs)
+          validate_args=False)
 
   @staticmethod
   def params_size(num_components, component_params_size, name=None):
@@ -1234,3 +1231,180 @@ class MixtureSameFamily(DistributionLambda):
           component_params_size)
 
       return num_components + num_components * component_params_size
+
+
+class MixtureNormal(DistributionLambda):
+  """A mixture distribution Keras layer, with independent normal components.
+
+  ### Example
+
+  ```python
+  tfd = tfp.distributions
+  tfpl = tfp.layers
+  tfk = tf.keras
+  tfkl = tf.keras.layers
+
+  # Load data -- graph of a [cardioid](https://en.wikipedia.org/wiki/Cardioid).
+  n = 2000
+  t = tfd.Uniform(low=-np.pi, high=np.pi).sample([n, 1]))
+  r = 2 * (1 - tf.cos(t))
+  x = r * tf.sin(t) + tfd.Normal(loc=0., scale=0.1).sample([n, 1])
+  y = r * tf.cos(t) + tfd.Normal(loc=0., scale=0.1).sample([n, 1])
+
+  # Model the distribution of y given x with a Mixture Density Network.
+  event_shape = [1]
+  num_components = 5
+  params_size = tfpl.MixtureNormal.params_size(num_components, event_shape)
+  model = tfk.Sequential([
+    tfkl.Dense(12, activation='relu'),
+    tfkl.Dense(params_size, activation=None),
+    tfpl.MixtureNormal(num_components, event_shape)
+  ])
+
+  # Fit.
+  batch_size = 100
+  model.compile(optimizer=tf.train.AdamOptimizer(learning_rate=0.02),
+                loss=lambda y, model: -model.log_prob(y))
+  model.fit(x, y,
+            batch_size=batch_size,
+            epochs=20,
+            steps_per_epoch=n // batch_size)
+  ```
+
+  """
+
+  def __init__(self,
+               num_components,
+               event_shape=(),
+               convert_to_tensor_fn=tfd.Distribution.sample,
+               validate_args=False,
+               **kwargs):
+    """Initialize the `MixtureNormal` distribution layer.
+
+    Args:
+      num_components: Number of component distributions in the mixture
+        distribution.
+      event_shape: integer vector `Tensor` representing the shape of single
+        draw from this distribution.
+      convert_to_tensor_fn: Python `callable` that takes a `tfd.Distribution`
+        instance and returns a `tf.Tensor`-like object.
+        Default value: `tfd.Distribution.sample`.
+      validate_args: Python `bool`, default `False`. When `True` distribution
+        parameters are checked for validity despite possibly degrading runtime
+        performance. When `False` invalid inputs may silently render incorrect
+        outputs.
+        Default value: `False`.
+      **kwargs: Additional keyword arguments passed to `tf.keras.Layer`.
+    """
+    super(MixtureNormal, self).__init__(
+        lambda t: type(self).new(t, num_components, event_shape, validate_args),
+        convert_to_tensor_fn,
+        **kwargs)
+
+  @staticmethod
+  def new(params, num_components, event_shape=(),
+          validate_args=False, name=None):
+    """Create the distribution instance from a `params` vector."""
+    return MixtureSameFamily.new(
+        params,
+        num_components,
+        IndependentNormal(event_shape, validate_args=validate_args, name=name),
+        validate_args=validate_args,
+        name=name)
+
+  @staticmethod
+  def params_size(num_components, event_shape=(), name=None):
+    """The number of `params` needed to create a single distribution."""
+    return MixtureSameFamily.params_size(
+        num_components,
+        IndependentNormal.params_size(event_shape, name=name),
+        name=name)
+
+
+class MixtureLogistic(DistributionLambda):
+  """A mixture distribution Keras layer, with independent logistic components.
+
+  ### Example
+
+  ```python
+  tfd = tfp.distributions
+  tfpl = tfp.layers
+  tfk = tf.keras
+  tfkl = tf.keras.layers
+
+  # Load data -- graph of a [cardioid](https://en.wikipedia.org/wiki/Cardioid).
+  n = 2000
+  t = tfd.Uniform(low=-np.pi, high=np.pi).sample([n, 1]))
+  r = 2 * (1 - tf.cos(t))
+  x = r * tf.sin(t) + tfd.Normal(loc=0., scale=0.1).sample([n, 1])
+  y = r * tf.cos(t) + tfd.Normal(loc=0., scale=0.1).sample([n, 1])
+
+  # Model the distribution of y given x with a Mixture Density Network.
+  event_shape = [1]
+  num_components = 5
+  params_size = tfpl.MixtureLogistic.params_size(num_components, event_shape)
+  model = tfk.Sequential([
+    tfkl.Dense(12, activation='relu'),
+    tfkl.Dense(params_size, activation=None),
+    tfpl.MixtureLogistic(num_components, event_shape)
+  ])
+
+  # Fit.
+  batch_size = 100
+  model.compile(optimizer=tf.train.AdamOptimizer(learning_rate=0.02),
+                loss=lambda y, model: -model.log_prob(y))
+  model.fit(x, y,
+            batch_size=batch_size,
+            epochs=20,
+            steps_per_epoch=n // batch_size)
+  ```
+
+  """
+
+  def __init__(self,
+               num_components,
+               event_shape=(),
+               convert_to_tensor_fn=tfd.Distribution.sample,
+               validate_args=False,
+               **kwargs):
+    """Initialize the `MixtureLogistic` distribution layer.
+
+    Args:
+      num_components: Number of component distributions in the mixture
+        distribution.
+      event_shape: integer vector `Tensor` representing the shape of single
+        draw from this distribution.
+      convert_to_tensor_fn: Python `callable` that takes a `tfd.Distribution`
+        instance and returns a `tf.Tensor`-like object.
+        Default value: `tfd.Distribution.sample`.
+      validate_args: Python `bool`, default `False`. When `True` distribution
+        parameters are checked for validity despite possibly degrading runtime
+        performance. When `False` invalid inputs may silently render incorrect
+        outputs.
+        Default value: `False`.
+      **kwargs: Additional keyword arguments passed to `tf.keras.Layer`.
+    """
+    super(MixtureLogistic, self).__init__(
+        lambda t: type(self).new(t, num_components, event_shape, validate_args),
+        convert_to_tensor_fn,
+        **kwargs)
+
+  @staticmethod
+  def new(params, num_components, event_shape=(),
+          validate_args=False, name=None):
+    """Create the distribution instance from a `params` vector."""
+    return MixtureSameFamily.new(
+        params,
+        num_components,
+        IndependentLogistic(
+            event_shape, validate_args=validate_args, name=name),
+        validate_args=validate_args,
+        name=name)
+
+  @staticmethod
+  def params_size(num_components, event_shape=(), name=None):
+    """The number of `params` needed to create a single distribution."""
+    return MixtureSameFamily.params_size(
+        num_components,
+        IndependentLogistic.params_size(event_shape, name=name),
+        name=name)

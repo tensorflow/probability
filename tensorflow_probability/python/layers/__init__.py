@@ -35,6 +35,8 @@ from tensorflow_probability.python.layers.distribution_layer import IndependentN
 from tensorflow_probability.python.layers.distribution_layer import IndependentPoisson
 from tensorflow_probability.python.layers.distribution_layer import KLDivergenceAddLoss
 from tensorflow_probability.python.layers.distribution_layer import KLDivergenceRegularizer
+from tensorflow_probability.python.layers.distribution_layer import MixtureLogistic
+from tensorflow_probability.python.layers.distribution_layer import MixtureNormal
 from tensorflow_probability.python.layers.distribution_layer import MixtureSameFamily
 from tensorflow_probability.python.layers.distribution_layer import MultivariateNormalTriL
 from tensorflow_probability.python.layers.distribution_layer import OneHotCategorical
@@ -60,6 +62,8 @@ _allowed_symbols = [
     'IndependentPoisson',
     'KLDivergenceAddLoss',
     'KLDivergenceRegularizer',
+    'MixtureLogistic',
+    'MixtureNormal',
     'MixtureSameFamily',
     'MultivariateNormalTriL',
     'OneHotCategorical',
