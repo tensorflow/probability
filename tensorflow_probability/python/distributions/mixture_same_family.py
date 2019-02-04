@@ -23,8 +23,12 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.internal import distribution_util as distribution_utils
 from tensorflow_probability.python.internal import reparameterization
+
+from tensorflow.python.ops import array_ops  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.ops.parallel_for import gradients  # pylint: disable=g-direct-tensorflow-import
 
 
 class MixtureSameFamily(distribution.Distribution):
@@ -95,6 +99,7 @@ class MixtureSameFamily(distribution.Distribution):
   def __init__(self,
                mixture_distribution,
                components_distribution,
+               reparameterize=False,
                validate_args=False,
                allow_nan_stats=True,
                name="MixtureSameFamily"):
@@ -108,6 +113,19 @@ class MixtureSameFamily(distribution.Distribution):
         `batch_shape` matching `components_distribution.batch_shape[:-1]`.
       components_distribution: `tfp.distributions.Distribution`-like instance.
         Right-most batch dimension indexes components.
+      reparameterize: Python `bool`, default `False`. Whether to reparameterize
+        samples of the distribution using implicit reparameterization gradients
+        [(Figurnov et al., 2018)][1]. The gradients for the mixture logits are
+        equivalent to the ones described by [(Graves, 2016)][2]. The gradients
+        for the components parameters are also computed using implicit
+        reparameterization (as opposed to ancestral sampling), meaning that
+        all components are updated every step.
+        Only works when:
+          (1) components_distribution is fully reparameterized;
+          (2) components_distribution is either a scalar distribution or
+          fully factorized (tfd.Independent applied to a scalar distribution);
+          (3) batch shape has a known rank.
+        Experimental, may be slow and produce infs/NaNs.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -126,6 +144,15 @@ class MixtureSameFamily(distribution.Distribution):
         the former is neither scalar nor equal to the latter.
       ValueError: if `mixture_distribution` categories does not equal
         `components_distribution` rightmost batch shape.
+
+    #### References
+
+    [1]: Michael Figurnov, Shakir Mohamed and Andriy Mnih. Implicit
+         reparameterization gradients. In _Neural Information Processing
+         Systems_, 2018. https://arxiv.org/abs/1805.08498
+
+    [2]: Alex Graves. Stochastic Backpropagation through Mixture Density
+         Distributions. _arXiv_, 2016. https://arxiv.org/abs/1607.05690
     """
     parameters = dict(locals())
     with tf.name_scope(name) as name:
@@ -137,6 +164,7 @@ class MixtureSameFamily(distribution.Distribution):
       self._event_ndims = tf.dimension_value(s.shape[0])
       if self._event_ndims is None:
         self._event_ndims = tf.shape(s)[0]
+      self._event_size = tf.reduce_prod(s)
 
       if not mixture_distribution.dtype.is_integer:
         raise ValueError(
@@ -195,9 +223,21 @@ class MixtureSameFamily(distribution.Distribution):
 
       self._num_components = km
 
+      self._reparameterize = reparameterize
+      if reparameterize:
+        # Note: tfd.Independent passes through the reparametrization type hence
+        # we do not need separate logic for Independent.
+        if (self._components_distribution.reparameterization_type !=
+            reparameterization.FULLY_REPARAMETERIZED):
+          raise ValueError("Cannot reparameterize a mixture of "
+                           "non-reparameterized components.")
+        reparameterization_type = reparameterization.FULLY_REPARAMETERIZED
+      else:
+        reparameterization_type = reparameterization.NOT_REPARAMETERIZED
+
       super(MixtureSameFamily, self).__init__(
           dtype=self._components_distribution.dtype,
-          reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
+          reparameterization_type=reparameterization_type,
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
           parameters=parameters,
@@ -241,7 +281,10 @@ class MixtureSameFamily(distribution.Distribution):
       mask = distribution_utils.pad_mixture_dimensions(
           mask, self, self.mixture_distribution,
           self._event_ndims)                         # [n, B, k, [1]*e]
-      return tf.reduce_sum(x * mask, axis=-1 - self._event_ndims)  # [n, B, E]
+      x = tf.reduce_sum(x * mask, axis=-1 - self._event_ndims)  # [n, B, E]
+      if self._reparameterize:
+        x = self._reparameterize_sample(x)
+      return x
 
   def _log_prob(self, x):
     with tf.control_dependencies(self._runtime_assertions):
@@ -314,8 +357,179 @@ class MixtureSameFamily(distribution.Distribution):
       x = tf.reshape(x, shape=tf.concat([shape[:d], [1], shape[d:]], axis=0))
       return x
 
+  def _reparameterize_sample(self, x):
+    """Adds reparameterization (pathwise) gradients to samples of the mixture.
+
+    Implicit reparameterization gradients are
+       dx/dphi = -(d transform(x, phi) / dx)^-1 * d transform(x, phi) / dphi,
+    where transform(x, phi) is distributional transform that removes all
+    parameters from samples x.
+
+    We implement them by replacing x with
+      -stop_gradient(d transform(x, phi) / dx)^-1 * transform(x, phi)]
+    for the backward pass (gradient computation).
+    The derivative of this quantity w.r.t. phi is then the implicit
+    reparameterization gradient.
+    Note that this replaces the gradients w.r.t. both the mixture
+    distribution parameters and components distributions parameters.
+
+    Limitations:
+      1. Fundamental: components must be fully reparameterized.
+      2. Distributional transform is currently only implemented for
+        factorized components.
+      3. Distributional transform currently only works for known rank of the
+        batch tensor.
+
+    Arguments:
+      x: Sample of mixture distribution
+
+    Returns:
+      Tensor with same value as x, but with reparameterization gradients
+    """
+    # Remove the existing gradients of x wrt parameters of the components.
+    x = tf.stop_gradient(x)
+
+    x_2d_shape = [-1, self._event_size]  # [S*prod(B), prod(E)]
+
+    # Perform distributional transform of x in [S, B, E] shape,
+    # but have Jacobian of size [S*prod(B), prod(E), prod(E)].
+    def reshaped_distributional_transform(x_2d):
+      return tf.reshape(
+          self._distributional_transform(
+              tf.reshape(x_2d, tf.shape(x))),
+          x_2d_shape)
+
+    # transform_2d: [S*prod(B), prod(E)]
+    # jacobian: [S*prod(B), prod(E), prod(E)]
+    transform_2d, jacobian = _value_and_batch_jacobian(
+        reshaped_distributional_transform, tf.reshape(x, x_2d_shape))
+
+    # We only provide the first derivative; the second derivative computed by
+    # autodiff would be incorrect, so we raise an error if it is requested.
+    transform_2d = _prevent_2nd_derivative(transform_2d)
+
+    # Compute [- stop_gradient(jacobian)^-1 * transform] by solving a linear
+    # system. The Jacobian is lower triangular because the distributional
+    # transform for i-th event dimension does not depend on the next
+    # dimensions.
+    surrogate_x_2d = -tf.linalg.triangular_solve(
+        tf.stop_gradient(jacobian), tf.expand_dims(transform_2d, axis=-1),
+        lower=True)  # [S*prod(B), prod(E), 1]
+    surrogate_x = tf.reshape(surrogate_x_2d, tf.shape(x))
+
+    # Replace gradients of x with gradients of surrogate_x, but keep the value.
+    return x + (surrogate_x - tf.stop_gradient(surrogate_x))
+
+  def _distributional_transform(self, x):
+    """Performs distributional transform of the mixture samples.
+
+    Distributional transform removes the parameters from samples of a
+    multivariate distribution by applying conditional CDFs:
+      (F(x_1), F(x_2 | x1_), ..., F(x_d | x_1, ..., x_d-1))
+    (the indexing is over the "flattened" event dimensions).
+    The result is a sample of product of Uniform[0, 1] distributions.
+
+    We assume that the components are factorized, so the conditional CDFs become
+      F(x_i | x_1, ..., x_i-1) = sum_k w_i^k F_k (x_i),
+    where w_i^k is the posterior mixture weight: for i > 0
+      w_i^k = w_k prob_k(x_1, ..., x_i-1) / sum_k' w_k' prob_k'(x_1, ..., x_i-1)
+    and w_0^k = w_k is the mixture probability of the k-th component.
+
+    Arguments:
+      x: Sample of mixture distribution
+
+    Returns:
+      Result of the distributional transform
+    """
+
+    if x.shape.ndims is None:
+      # tf.nn.softmax raises an error when applied to inputs of undefined rank.
+      raise ValueError("Distributional transform does not support inputs of "
+                       "undefined rank.")
+
+    # Obtain factorized components distribution and assert that it's
+    # a scalar distribution.
+    if isinstance(self._components_distribution, independent.Independent):
+      univariate_components = self._components_distribution.distribution
+    else:
+      univariate_components = self._components_distribution
+
+    with tf.control_dependencies([
+        tf.assert_equal(
+            univariate_components.is_scalar_event(), True,
+            message="`univariate_components` must have scalar event")]):
+      x_padded = self._pad_sample_dims(x)  # [S, B, 1, E]
+      log_prob_x = univariate_components.log_prob(x_padded)  # [S, B, k, E]
+      cdf_x = univariate_components.cdf(x_padded)  # [S, B, k, E]
+
+      # log prob_k (x_1, ..., x_i-1)
+      cumsum_log_prob_x = tf.reshape(
+          tf.math.cumsum(
+              # [S*prod(B)*k, prod(E)]
+              tf.reshape(log_prob_x, [-1, self._event_size]),
+              exclusive=True,
+              axis=-1),
+          tf.shape(log_prob_x))  # [S, B, k, E]
+
+      logits_mix_prob = distribution_utils.pad_mixture_dimensions(
+          self.mixture_distribution.logits, self, self.mixture_distribution,
+          self._event_ndims)  # [B, k, 1]
+
+      # Logits of the posterior weights: log w_k + log prob_k (x_1, ..., x_i-1)
+      log_posterior_weights_x = logits_mix_prob + cumsum_log_prob_x
+
+      component_axis = x.shape.ndims - self._event_ndims
+      posterior_weights_x = tf.nn.softmax(log_posterior_weights_x,
+                                          axis=component_axis)
+      return tf.reduce_sum(
+          posterior_weights_x * cdf_x, axis=component_axis)
+
 
 def _outer_squared_difference(x, y):
   """Convenience function analogous to tf.squared_difference."""
   z = x - y
   return z[..., tf.newaxis, :] * z[..., tf.newaxis]
+
+
+def _value_and_batch_jacobian(f, x):
+  """Enables uniform interface to value and batch jacobian calculation.
+
+  Works in both eager and graph modes.
+
+  Arguments:
+    f: The scalar function to evaluate.
+    x: The value at which to compute the value and the batch jacobian.
+
+  Returns:
+    A tuple (f(x), J(x)), where J(x) is the batch jacobian.
+  """
+  if tf.executing_eagerly():
+    with tf.GradientTape() as tape:
+      tape.watch(x)
+      value = f(x)
+    batch_jacobian = tape.batch_jacobian(value, x)
+  else:
+    value = f(x)
+    batch_jacobian = gradients.batch_jacobian(value, x)
+  return value, batch_jacobian
+
+
+@tf.custom_gradient
+def _prevent_2nd_derivative(x):
+  """Disables computation of the second derivatives for a tensor.
+
+  NB: you need to apply a non-identity function to the output tensor for the
+  exception to be raised.
+
+  Arguments:
+    x: A tensor.
+
+  Returns:
+    A tensor with the same value and the same derivative as x, but that raises
+    LookupError when trying to compute the second derivatives.
+  """
+  def grad(dy):
+    return array_ops.prevent_gradient(
+        dy, message="Second derivative is not implemented.")
+
+  return tf.identity(x), grad

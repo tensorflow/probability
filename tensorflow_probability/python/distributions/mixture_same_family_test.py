@@ -23,6 +23,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util
 tfd = tfp.distributions
 tfe = tf.contrib.eager
@@ -132,6 +133,134 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
     cov_, var_ = self.evaluate([gm.covariance(), gm.variance()])
     self.assertAllClose(cov_.diagonal(), var_, atol=0.)
 
+  def testReparameterizationOfNonReparameterizedComponents(self):
+    with self.assertRaises(ValueError):
+      tfd.MixtureSameFamily(
+          mixture_distribution=tfd.Categorical(
+              logits=self._build_tensor([-0.3, 0.4])),
+          components_distribution=tfd.Bernoulli(
+              logits=self._build_tensor([0.1, -0.1])),
+          reparameterize=True)
+
+  def testSecondGradientIsDisabled(self):
+    if not self.use_static_shape:
+      return
+
+    # Testing using GradientTape in both eager and graph modes.
+    # GradientTape does not support some control flow ops in graph mode, which
+    # is not a problem here as this code does not use any control flow.
+    logits = self._build_tensor([[0.1, 0.5]])
+    with tf.GradientTape() as g:
+      g.watch(logits)
+      with tf.GradientTape() as gg:
+        gg.watch(logits)
+        mixture = tfd.MixtureSameFamily(
+            mixture_distribution=tfd.Categorical(
+                logits=logits),
+            components_distribution=tfd.Normal(
+                loc=self._build_tensor([[0.4, 0.25]]),
+                scale=self._build_tensor([[0.1, 0.5]])),
+            reparameterize=True)
+
+        sample = mixture.sample()
+      grad = gg.gradient(sample, logits)
+
+    with self.assertRaises(LookupError):
+      g.gradient(grad, logits)
+
+  def _testMixtureReparameterizationGradients(
+      self, mixture_func, parameters, function, num_samples):
+    assert function in ["mean", "variance"]
+
+    if not self.use_static_shape:
+      return
+
+    def sample_estimate(*parameters):
+      mixture = mixture_func(*parameters)
+      values = mixture.sample(num_samples)
+      if function == "variance":
+        values = tf.squared_difference(values, mixture.mean())
+      return tf.reduce_mean(values, axis=0)
+
+    def exact(*parameters):
+      mixture = mixture_func(*parameters)
+      # Normal mean does not depend on the scale, so add 0 * variance
+      # to avoid None gradients. Also do the same for variance, just in case.
+      if function == "variance":
+        return mixture.variance() + 0 * mixture.mean()
+      elif function == "mean":
+        return mixture.mean() + 0 * mixture.variance()
+
+    actual = self.compute_gradients(sample_estimate, parameters)
+    expected = self.compute_gradients(exact, parameters)
+    self.assertAllClose(actual, expected, atol=0.1, rtol=0.2)
+
+  def testReparameterizationGradientsNormalScalarComponents(self):
+    def mixture_func(logits, loc, scale):
+      return tfd.MixtureSameFamily(
+          mixture_distribution=tfd.Categorical(logits=logits),
+          components_distribution=tfd.Normal(loc=loc, scale=scale),
+          reparameterize=True)
+
+    for function in ["mean", "variance"]:
+      self._testMixtureReparameterizationGradients(
+          mixture_func,
+          [self._build_tensor([[0.1, 0.5]]),  # logits
+           self._build_tensor([[0.4, 0.25]]),  # loc
+           self._build_tensor([[0.1, 0.5]])],  # scale
+          function,
+          num_samples=10000)
+
+  def testReparameterizationGradientsNormalVectorComponents(self):
+    def mixture_func(logits, loc, scale):
+      return tfd.MixtureSameFamily(
+          mixture_distribution=tfd.Categorical(logits=logits),
+          components_distribution=tfd.Independent(
+              tfd.Normal(loc=loc, scale=scale), reinterpreted_batch_ndims=1),
+          reparameterize=True)
+
+    for function in ["mean", "variance"]:
+      self._testMixtureReparameterizationGradients(
+          mixture_func,
+          [self._build_tensor([0.5, -0.2, 0.1]),  # logits
+           self._build_tensor([[-1., 1], [0.5, -1], [-1., 0.5]]),  # mean
+           self._build_tensor([[0.1, 0.5], [0.3, 0.5], [0.2, 0.3]])],  # scale
+          function,
+          num_samples=10000)
+
+  def testReparameterizationGradientsNormalMatrixComponents(self):
+    def mixture_func(logits, loc, scale):
+      return tfd.MixtureSameFamily(
+          mixture_distribution=tfd.Categorical(logits=logits),
+          components_distribution=tfd.Independent(
+              tfd.Normal(loc=loc, scale=scale), reinterpreted_batch_ndims=2),
+          reparameterize=True)
+
+    for function in ["mean", "variance"]:
+      self._testMixtureReparameterizationGradients(
+          mixture_func,
+          [self._build_tensor([0.7, 0.2, 0.1]),  # logits
+           self._build_tensor([[[-1., 1]], [[0.5, -1]], [[-1., 0.5]]]),  # mean
+           # scale
+           self._build_tensor([[[0.1, 0.5]], [[0.3, 0.5]], [[0.2, 0.3]]])],
+          function,
+          num_samples=50000)
+
+  def testReparameterizationGradientsExponentialScalarComponents(self):
+    def mixture_func(logits, rate):
+      return tfd.MixtureSameFamily(
+          mixture_distribution=tfd.Categorical(logits=logits),
+          components_distribution=tfd.Exponential(rate=rate),
+          reparameterize=True)
+
+    for function in ["mean", "variance"]:
+      self._testMixtureReparameterizationGradients(
+          mixture_func,
+          [self._build_tensor([0.7, 0.2, 0.1]),  # logits
+           self._build_tensor([1., 0.5, 1.])],  # rate
+          function,
+          num_samples=10000)
+
   def _shape(self, x):
     if self.use_static_shape:
       return x.shape.as_list()
@@ -172,7 +301,7 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
 @tfe.run_all_tests_in_graph_and_eager_modes
 class MixtureSameFamilyTestStatic32(
     _MixtureSameFamilyTest,
-    tf.test.TestCase):
+    test_case.TestCase):
   use_static_shape = True
   dtype = np.float32
 
@@ -180,7 +309,7 @@ class MixtureSameFamilyTestStatic32(
 @tfe.run_all_tests_in_graph_and_eager_modes
 class MixtureSameFamilyTestDynamic32(
     _MixtureSameFamilyTest,
-    tf.test.TestCase):
+    test_case.TestCase):
   use_static_shape = False
   dtype = np.float32
 
@@ -188,7 +317,7 @@ class MixtureSameFamilyTestDynamic32(
 @tfe.run_all_tests_in_graph_and_eager_modes
 class MixtureSameFamilyTestStatic64(
     _MixtureSameFamilyTest,
-    tf.test.TestCase):
+    test_case.TestCase):
   use_static_shape = True
   dtype = np.float64
 

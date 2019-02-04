@@ -447,7 +447,7 @@ class CategoricalMixtureOfOneHotCategoricalTest(tf.test.TestCase):
     ])
     self.assertAllClose(t_, t_back_, atol=1e-6, rtol=1e-5)
     self.assertAllClose(x_mean_, np.exp(x_log_mean_), atol=1e-6, rtol=1e-5)
-    self.assertAllClose(sample_mean_, x_mean_, atol=1e-6, rtol=0.1)
+    self.assertAllClose(sample_mean_, x_mean_, atol=1e-3, rtol=0.1)
 
   def test_new(self):
     k = 2  # num components

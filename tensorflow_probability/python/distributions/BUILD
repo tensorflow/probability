@@ -1474,12 +1474,12 @@ py_test(
 
 py_test(
     name = "mixture_same_family_test",
-    size = "small",
     srcs = ["mixture_same_family_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
