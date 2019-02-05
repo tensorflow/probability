@@ -46,6 +46,7 @@ class MultinomialTest(tf.test.TestCase):
       self.assertAllEqual([3, 2], dist.batch_shape_tensor().eval())
       self.assertEqual(tf.TensorShape([2]), dist.event_shape)
       self.assertEqual(tf.TensorShape([3, 2]), dist.batch_shape)
+      self.assertEqual(tf.TensorShape([17, 3, 2, 2]), dist.sample(17).shape)
 
   def testN(self):
     p = [[0.1, 0.2, 0.7], [0.2, 0.3, 0.5]]

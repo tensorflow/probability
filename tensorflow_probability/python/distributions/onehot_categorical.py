@@ -169,7 +169,7 @@ class OneHotCategorical(distribution.Distribution):
       logits_2d = logits
     else:
       logits_2d = tf.reshape(logits, [-1, self.event_size])
-    samples = tf.multinomial(logits_2d, n, seed=seed)
+    samples = tf.random.categorical(logits_2d, n, seed=seed)
     samples = tf.transpose(samples)
     samples = tf.one_hot(samples, self.event_size, dtype=self.dtype)
     ret = tf.reshape(samples, sample_shape)

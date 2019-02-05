@@ -49,6 +49,7 @@ class DirichletMultinomialTest(tf.test.TestCase):
       self.assertAllEqual([3, 2], dist.batch_shape_tensor().eval())
       self.assertEqual(tf.TensorShape([2]), dist.event_shape)
       self.assertEqual(tf.TensorShape([3, 2]), dist.batch_shape)
+      self.assertEqual(tf.TensorShape([3, 2, 2]), dist.sample().shape)
 
   def testNproperty(self):
     alpha = [[1., 2, 3]]
@@ -292,8 +293,8 @@ class DirichletMultinomialTest(tf.test.TestCase):
 
     # Shape [4, 3]
     alpha = np.array(4 * [alpha_v], dtype=np.float32)
-    # Shape [4, 1]
-    ns = np.array([[2.], [3.], [4.], [5.]], dtype=np.float32)
+    # Shape [4]
+    ns = np.array([2., 3., 4., 5.], dtype=np.float32)
 
     variance_entry = lambda a, a_sum: a / a_sum * (1 - a / a_sum)
     covariance_entry = lambda a, b, a_sum: -a * b / a_sum**2
@@ -315,21 +316,21 @@ class DirichletMultinomialTest(tf.test.TestCase):
         dtype=np.float32)
 
     with self.cached_session():
-      # ns is shape [4, 1], and alpha is shape [4, 3].
+      # ns is shape [4], and alpha is shape [4, 3].
       dist = ds.DirichletMultinomial(ns, alpha)
       covariance = dist.covariance()
       expected_covariance = shared_matrix * (
-          ns * (ns + alpha_0) / (1 + alpha_0))[..., tf.newaxis]
+          ns * (ns + alpha_0) / (1 + alpha_0))[..., tf.newaxis, tf.newaxis]
 
       self.assertEqual([4, 3, 3], covariance.shape)
       self.assertAllClose(expected_covariance, covariance.eval())
 
   def testCovarianceMultidimensional(self):
-    alpha = np.random.rand(3, 5, 4).astype(np.float32)
+    alpha = np.random.rand(3, 1, 4).astype(np.float32)
     alpha2 = np.random.rand(6, 3, 3).astype(np.float32)
 
-    ns = np.random.randint(low=1, high=11, size=[3, 5, 1]).astype(np.float32)
-    ns2 = np.random.randint(low=1, high=11, size=[6, 1, 1]).astype(np.float32)
+    ns = np.random.randint(low=1, high=11, size=[3, 5]).astype(np.float32)
+    ns2 = np.random.randint(low=1, high=11, size=[6, 1]).astype(np.float32)
 
     with self.cached_session():
       dist = ds.DirichletMultinomial(ns, alpha)

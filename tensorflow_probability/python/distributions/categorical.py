@@ -259,8 +259,8 @@ class Categorical(distribution.Distribution):
     else:
       logits_2d = tf.reshape(self.logits, [-1, self.event_size])
     sample_dtype = tf.int64 if self.dtype.size > 4 else tf.int32
-    draws = tf.multinomial(
-        logits_2d, n, seed=seed, output_dtype=sample_dtype)
+    draws = tf.random.categorical(
+        logits_2d, n, dtype=sample_dtype, seed=seed)
     draws = tf.reshape(
         tf.transpose(draws),
         tf.concat([[n], self.batch_shape_tensor()], 0))

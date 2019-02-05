@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import multinomial
 from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
@@ -185,17 +186,19 @@ class DirichletMultinomial(distribution.Distribution):
         more of the statistic's batch members are undefined.
       name: Python `str` name prefixed to Ops created by this class.
     """
+    # Broadcasting works because:
+    # * The broadcasting convention is to prepend dimensions of size [1], and
+    #   we use the last dimension for the distribution, whereas
+    #   the batch dimensions are the leading dimensions, which forces the
+    #   distribution dimension to be defined explicitly (i.e. it cannot be
+    #   created automatically by prepending). This forces enough explicitness.
+    # * All calls involving `counts` eventually require a broadcast between
+    #  `counts` and concentration.
+    # * We broadcast explicitly to include the effect of `counts` on
+    #   `concentration` for calls that do not involve `counts`.
     parameters = dict(locals())
     with tf.name_scope(name, values=[total_count, concentration]) as name:
       dtype = dtype_util.common_dtype([total_count, concentration], tf.float32)
-      # Broadcasting works because:
-      # * The broadcasting convention is to prepend dimensions of size [1], and
-      #   we use the last dimension for the distribution, whereas
-      #   the batch dimensions are the leading dimensions, which forces the
-      #   distribution dimension to be defined explicitly (i.e. it cannot be
-      #   created automatically by prepending). This forces enough explicitness.
-      # * All calls involving `counts` eventually require a broadcast between
-      #  `counts` and concentration.
       self._total_count = tf.convert_to_tensor(
           total_count, name="total_count", dtype=dtype)
       if validate_args:
@@ -206,6 +209,8 @@ class DirichletMultinomial(distribution.Distribution):
           tf.convert_to_tensor(
               concentration, name="concentration", dtype=dtype), validate_args)
       self._total_concentration = tf.reduce_sum(self._concentration, -1)
+      self._broadcasted_concentration = tf.ones_like(
+          self._total_count[..., tf.newaxis]) * self._concentration
     super(DirichletMultinomial, self).__init__(
         dtype=dtype,
         validate_args=validate_args,
@@ -231,37 +236,32 @@ class DirichletMultinomial(distribution.Distribution):
     return self._total_concentration
 
   def _batch_shape_tensor(self):
-    return tf.shape(self.total_concentration)
+    return tf.shape(self._broadcasted_concentration)[:-1]
 
   def _batch_shape(self):
-    return self.total_concentration.shape
+    return self._broadcasted_concentration.shape.with_rank_at_least(1)[:-1]
 
   def _event_shape_tensor(self):
+    # Event shape depends only on concentration, not total_count.
     return tf.shape(self.concentration)[-1:]
 
   def _event_shape(self):
-    # Event shape depends only on total_concentration, not "n".
+    # Event shape depends only on concentration, not total_count.
     return self.concentration.shape.with_rank_at_least(1)[-1:]
 
   def _sample_n(self, n, seed=None):
     seed = seed_stream.SeedStream(seed, "dirichlet_multinomial")
     n_draws = tf.cast(self.total_count, dtype=tf.int32)
     k = self.event_shape_tensor()[0]
-    unnormalized_logits = tf.reshape(
-        tf.log(tf.random_gamma(
-            shape=[n],
-            alpha=self.concentration,
-            dtype=self.dtype,
-            seed=seed())),
-        shape=[-1, k])
-    draws = tf.multinomial(
-        logits=unnormalized_logits,
-        num_samples=n_draws,
-        seed=seed())
-    x = tf.reduce_sum(tf.one_hot(draws, depth=k), -2)
+    unnormalized_logits = tf.log(tf.random_gamma(
+        shape=[n],
+        alpha=self._broadcasted_concentration,
+        dtype=self.dtype,
+        seed=seed()))
+    x = multinomial.draw_sample(
+        1, k, unnormalized_logits, n_draws, self.dtype, seed())
     final_shape = tf.concat([[n], self.batch_shape_tensor(), [k]], 0)
-    x = tf.reshape(x, final_shape)
-    return tf.cast(x, self.dtype)
+    return tf.reshape(x, final_shape)
 
   @distribution_util.AppendDocstring(_dirichlet_multinomial_sample_note)
   def _log_prob(self, counts):
@@ -277,8 +277,9 @@ class DirichletMultinomial(distribution.Distribution):
     return tf.exp(self._log_prob(counts))
 
   def _mean(self):
-    return self.total_count * (self.concentration /
-                               self.total_concentration[..., tf.newaxis])
+    scaled_concentration = (self.concentration /
+                            self.total_concentration[..., tf.newaxis])
+    return self.total_count[..., tf.newaxis] * scaled_concentration
 
   @distribution_util.AppendDocstring(
       """The covariance for each batch member is defined as the following:
@@ -308,14 +309,14 @@ class DirichletMultinomial(distribution.Distribution):
   def _variance(self):
     scale = self._variance_scale_term()
     x = scale * self._mean()
-    return x * (self.total_count * scale - x)
+    return x * (self.total_count[..., tf.newaxis] * scale - x)
 
   def _variance_scale_term(self):
     """Helper to `_covariance` and `_variance` which computes a shared scale."""
-    # We must take care to expand back the last dim whenever we use the
-    # total_concentration.
+    # Expand back the last dim so the shape of _variance_scale_term matches the
+    # shape of self.concentration.
     c0 = self.total_concentration[..., tf.newaxis]
-    return tf.sqrt((1. + c0 / self.total_count) / (1. + c0))
+    return tf.sqrt((1. + c0 / self.total_count[..., tf.newaxis]) / (1. + c0))
 
   def _maybe_assert_valid_concentration(self, concentration, validate_args):
     """Checks the validity of the concentration parameter."""

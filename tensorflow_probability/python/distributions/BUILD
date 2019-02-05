@@ -270,6 +270,7 @@ py_library(
     srcs = ["dirichlet_multinomial.py"],
     deps = [
         ":distribution",
+        ":multinomial",
         ":seed_stream",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
