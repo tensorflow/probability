@@ -93,7 +93,7 @@ class ScaleTriL(chain.Chain):
         value forces the output diagonal entries to be positive, but
         prevents inverting the transformation for matrices with
         diagonal entries less than this value.
-        Default value: `1e-5` (i.e., no shift is applied).
+        Default value: `1e-5`.
       validate_args: Python `bool` indicating whether arguments should be
         checked for correctness.
         Default value: `False` (i.e., arguments are not validated).
