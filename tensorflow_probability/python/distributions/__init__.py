@@ -53,6 +53,7 @@ from tensorflow_probability.python.distributions.internal.moving_stats import as
 from tensorflow_probability.python.distributions.internal.moving_stats import moving_mean_variance
 from tensorflow_probability.python.distributions.inverse_gamma import InverseGamma
 from tensorflow_probability.python.distributions.inverse_gamma import InverseGammaWithSoftplusConcentrationRate
+from tensorflow_probability.python.distributions.inverse_gamma import InverseGammaWithSoftplusConcentrationScale
 from tensorflow_probability.python.distributions.inverse_gaussian import InverseGaussian
 from tensorflow_probability.python.distributions.kullback_leibler import kl_divergence
 from tensorflow_probability.python.distributions.kullback_leibler import RegisterKL
@@ -165,6 +166,7 @@ __all__ = [
     'Independent',
     'InverseGamma',
     'InverseGammaWithSoftplusConcentrationRate',
+    'InverseGammaWithSoftplusConcentrationScale',
     'Kumaraswamy',
     'LinearGaussianStateSpaceModel',
     'Laplace',
