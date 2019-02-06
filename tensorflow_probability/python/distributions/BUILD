@@ -47,6 +47,7 @@ py_library(
         ":dirichlet",
         ":dirichlet_multinomial",
         ":distribution",
+        ":empirical",
         ":exponential",
         ":gamma",
         ":gamma_gamma",
@@ -288,6 +289,16 @@ py_library(
         # six dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
+    ],
+)
+
+py_library(
+    name = "empirical",
+    srcs = ["empirical.py"],
+    deps = [
+        ":distribution",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:reparameterization",
     ],
 )
 
@@ -1220,6 +1231,17 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+    ],
+)
+
+py_test(
+    name = "empirical_test",
+    srcs = ["empirical_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
