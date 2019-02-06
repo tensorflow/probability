@@ -26,6 +26,7 @@ from tensorflow_probability.python.bijectors.affine_linear_operator import Affin
 from tensorflow_probability.python.bijectors.affine_scalar import AffineScalar
 from tensorflow_probability.python.bijectors.batch_normalization import BatchNormalization
 from tensorflow_probability.python.bijectors.bijector import Bijector
+from tensorflow_probability.python.bijectors.blockwise import Blockwise
 from tensorflow_probability.python.bijectors.chain import Chain
 from tensorflow_probability.python.bijectors.cholesky_outer_product import CholeskyOuterProduct
 from tensorflow_probability.python.bijectors.cholesky_to_inv_cholesky import CholeskyToInvCholesky
@@ -73,6 +74,7 @@ __all__ = [
     "AffineScalar",
     "BatchNormalization",
     "Bijector",
+    "Blockwise",
     "Chain",
     "CholeskyOuterProduct",
     "CholeskyToInvCholesky",

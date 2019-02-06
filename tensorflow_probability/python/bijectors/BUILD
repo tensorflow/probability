@@ -38,6 +38,7 @@ py_library(
         ":affine_scalar",
         ":batch_normalization",
         ":bijector",
+        ":blockwise",
         ":chain",
         ":cholesky_outer_product",
         ":cholesky_to_inv_cholesky",
@@ -132,6 +133,15 @@ py_library(
 py_library(
     name = "batch_normalization",
     srcs = ["batch_normalization.py"],
+    deps = [
+        ":bijector",
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "blockwise",
+    srcs = ["blockwise.py"],
     deps = [
         ":bijector",
         # tensorflow dep,
@@ -567,6 +577,19 @@ py_test(
     srcs = ["cholesky_to_inv_cholesky_test.py"],
     deps = [
         ":bijectors",
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "blockwise_test",
+    size = "small",
+    srcs = ["blockwise_test.py"],
+    deps = [
+        ":bijector_test_util",
+        ":bijectors",
+        # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
     ],
