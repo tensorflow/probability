@@ -24,6 +24,7 @@ import tensorflow as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util as distribution_utils
 from tensorflow_probability.python.internal import reparameterization
 
@@ -270,11 +271,12 @@ class MixtureSameFamily(distribution.Distribution):
 
   def _sample_n(self, n, seed):
     with tf.control_dependencies(self._runtime_assertions):
-      x = self.components_distribution.sample(n)             # [n, B, k, E]
+      seed = seed_stream.SeedStream(seed, salt="MixtureSameFamily")
+      x = self.components_distribution.sample(n, seed=seed())  # [n, B, k, E]
       # TODO(jvdillon): Consider using tf.gather (by way of index unrolling).
       npdt = x.dtype.as_numpy_dtype
       mask = tf.one_hot(
-          indices=self.mixture_distribution.sample(n),  # [n, B]
+          indices=self.mixture_distribution.sample(n, seed=seed()),  # [n, B]
           depth=self._num_components,  # == k
           on_value=np.ones([], dtype=npdt),
           off_value=np.zeros([], dtype=npdt))  # [n, B, k]

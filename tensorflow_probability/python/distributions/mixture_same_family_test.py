@@ -261,6 +261,14 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
           function,
           num_samples=10000)
 
+  def testDeterministicSampling(self):
+    dist = tfd.MixtureSameFamily(
+        mixture_distribution=tfd.Categorical(logits=[0., 0.]),
+        components_distribution=tfd.Normal(loc=[0., 200.], scale=[1., 1.]))
+    sample_1 = self.evaluate(dist.sample([100], seed=1))
+    sample_2 = self.evaluate(dist.sample([100], seed=1))
+    self.assertAllClose(sample_1, sample_2)
+
   def _shape(self, x):
     if self.use_static_shape:
       return x.shape.as_list()

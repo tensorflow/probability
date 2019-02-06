@@ -572,6 +572,7 @@ py_library(
     srcs = ["mixture_same_family.py"],
     deps = [
         ":distribution",
+        ":seed_stream",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
