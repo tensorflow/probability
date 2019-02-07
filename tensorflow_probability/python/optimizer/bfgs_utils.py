@@ -18,10 +18,16 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import collections
 import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.optimizer import linesearch
+
+# A namedtuple to hold a function value, directional derivative and the
+# full gradient. To be used with the linesearch method.
+ValueAndGradient = collections.namedtuple('ValueAndGradient',
+                                          ['f', 'df', 'full_gradient'])
 
 
 def get_initial_state_args(value_and_gradients_function,
@@ -129,9 +135,10 @@ def line_search_step(state, value_and_gradients_function, search_direction,
 
   def _do_update_position():
     return _update_position(
-        value_and_gradients_function,
         state_after_ls,
         search_direction * ls_result.left_pt,
+        ls_result.full_result.f,
+        ls_result.full_result.full_gradient,  # Extract gradient
         grad_tolerance, f_relative_tolerance, x_tolerance)
 
   return tf.contrib.framework.smart_cond(
@@ -200,19 +207,21 @@ def _restrict_along_direction(value_and_gradients_function,
   def _restricted_func(t):
     pt = position + t * direction
     objective_value, gradient = value_and_gradients_function(pt)
-    return objective_value, tf.reduce_sum(gradient * direction)
+    return ValueAndGradient(f=objective_value,
+                            df=tf.reduce_sum(gradient * direction),
+                            full_gradient=gradient)
   return _restricted_func
 
 
-def _update_position(value_and_gradients_function,
-                     state,
+def _update_position(state,
                      position_delta,
+                     next_objective,
+                     next_gradient,
                      grad_tolerance,
                      f_relative_tolerance,
                      x_tolerance):
   """Updates the state advancing its position by a given position_delta."""
   next_position = state.position + position_delta
-  next_objective, next_gradient = value_and_gradients_function(next_position)
   converged = _check_convergence(state.position,
                                  next_position,
                                  state.objective_value,
@@ -225,7 +234,7 @@ def _update_position(value_and_gradients_function,
       state,
       converged=converged,
       failed=~_is_finite(next_objective, next_gradient),
-      num_objective_evaluations=state.num_objective_evaluations + 1,
+      num_objective_evaluations=state.num_objective_evaluations,
       position=next_position,
       objective_value=next_objective,
       objective_gradient=next_gradient)

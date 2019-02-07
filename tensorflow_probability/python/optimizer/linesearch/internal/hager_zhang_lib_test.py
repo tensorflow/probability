@@ -18,12 +18,16 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import collections
 import numpy as np
-
 import tensorflow as tf
 from tensorflow_probability.python.optimizer.linesearch.internal import hager_zhang_lib as hzl
 
 tfe = tf.contrib.eager
+
+
+# Define value and gradient namedtuple
+ValueAndGradient = collections.namedtuple('ValueAndGradient', ['f', 'df'])
 
 
 def test_function_x_y(x, y):
@@ -50,7 +54,7 @@ def test_function_x_y(x, y):
     with tf.GradientTape() as g:
       g.watch(t)
       p = tf.contrib.image.interpolate_spline(x, y, t, 2)
-    return tf.squeeze(p), tf.squeeze(g.gradient(p, t))
+    return ValueAndGradient(f=tf.squeeze(p), df=tf.squeeze(g.gradient(p, t)))
 
   return f
 

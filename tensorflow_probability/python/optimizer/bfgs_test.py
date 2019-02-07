@@ -252,10 +252,10 @@ class BfgsTest(tf.test.TestCase):
 
     starts_and_targets = [
         # Start Point, Target Minimum, Num evaluations expected.
-        [(1, 1), (3, 2), 39],
-        [(-2, 2), (-2.805118, 3.131312), 31],
-        [(-1, -1), (-3.779310, -3.283186), 38],
-        [(1, -2), (3.584428, -1.848126), 35]
+        [(1, 1), (3, 2), 30],
+        [(-2, 2), (-2.805118, 3.131312), 23],
+        [(-1, -1), (-3.779310, -3.283186), 29],
+        [(1, -2), (3.584428, -1.848126), 28]
     ]
     dtype = "float64"
     for start, expected_minima, expected_evals in starts_and_targets:
@@ -300,7 +300,7 @@ class BfgsTest(tf.test.TestCase):
         neg_log_likelihood, initial_position=start, tolerance=1e-6))
     expected_minima = np.array(
         [-0.020460034354, 0.171708568111, 0.021200423717], dtype="float64")
-    expected_evals = 27
+    expected_evals = 19
     self.assertArrayNear(results.position, expected_minima, 1e-6)
     self.assertEqual(results.num_objective_evaluations, expected_evals)
 

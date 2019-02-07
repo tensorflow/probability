@@ -204,10 +204,10 @@ class LBfgsTest(tf.test.TestCase):
 
     starts_and_targets = [
         # Start Point, Target Minimum, Num evaluations expected.
-        [(1, 1), (3, 2), 39],
-        [(-2, 2), (-2.805118, 3.131312), 23],
-        [(-1, -1), (-3.779310, -3.283186), 38],
-        [(1, -2), (3.584428, -1.848126), 33]
+        [(1, 1), (3, 2), 31],
+        [(-2, 2), (-2.805118, 3.131312), 17],
+        [(-1, -1), (-3.779310, -3.283186), 29],
+        [(1, -2), (3.584428, -1.848126), 26]
     ]
     dtype = 'float64'
     for start, expected_minima, expected_evals in starts_and_targets:

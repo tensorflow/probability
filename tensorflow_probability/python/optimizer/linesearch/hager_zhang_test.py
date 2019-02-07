@@ -18,8 +18,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import numpy as np
+import collections
 
+import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 tfe = tf.contrib.eager
@@ -37,13 +38,16 @@ def _is_approx_wolfe(_, f_x, df_x, f_0, df_0, delta, sigma, epsilon):
   curvature_cond = (df_x >= sigma * df_0)
   return (f_x <= flim) & decrease_cond & curvature_cond
 
+# Define value and gradient namedtuple
+ValueAndGradient = collections.namedtuple('ValueAndGradient', ['f', 'df'])
+
 
 class HagerZhangTest(tf.test.TestCase):
   """Tests for Hager Zhang line search algorithm."""
 
   @tfe.run_test_in_graph_and_eager_modes
   def test_quadratic(self):
-    fdf = lambda x: ((x-1.3)**2, 2*(x-1.3))
+    fdf = lambda x: ValueAndGradient(f=(x-1.3)**2, df=2*(x-1.3))
 
     # Case 1: The starting value is close to 0 and doesn't bracket the min.
     close_start, far_start = tf.constant(0.1), tf.constant(7.0)
@@ -80,7 +84,7 @@ class HagerZhangTest(tf.test.TestCase):
       val = (0.988 * x**5 - 4.96 * x**4 + 4.978 * x**3
              + 5.015 * x**2 - 6.043 * x - 1)
       dval = 4.94 * x**4 - 19.84 * x**3 + 14.934 * x**2 + 10.03 * x - 6.043
-      return val, dval
+      return ValueAndGradient(val, dval)
 
     starts = (tf.constant(0.1), tf.constant(1.5), tf.constant(2.0),
               tf.constant(4.0))
@@ -133,7 +137,7 @@ class HagerZhangTest(tf.test.TestCase):
       """Value and derivative of Rosenbrock projected along a descent dirn."""
       coord = x0 + t * dirn
       ft, df = rosenbrock(coord)
-      return ft, tf.reduce_sum(df * dirn)
+      return ValueAndGradient(ft, tf.reduce_sum(df * dirn))
     results = self.evaluate(tfp.optimizer.linesearch.hager_zhang(
         fdf, initial_step_size=1.0))
     self.assertTrue(results.converged)
@@ -154,7 +158,7 @@ class HagerZhangTest(tf.test.TestCase):
         _val_and_grad_fn.num_calls += 1
         f = x * x - 2 * x + 1
         df = 2 * (x - 1)
-        return f, df
+        return ValueAndGradient(f, df)
 
       _val_and_grad_fn.num_calls = 0
       return _val_and_grad_fn
@@ -177,7 +181,7 @@ class HagerZhangTest(tf.test.TestCase):
         with tf.control_dependencies([inc]):
           f = x * x - 2 * x + 1
           df = 2 * (x - 1)
-          return f, df
+          return ValueAndGradient(f, df)
       return _fdf, eval_count
 
     for start in starts:
@@ -205,7 +209,7 @@ class HagerZhangTest(tf.test.TestCase):
       shift = dtype(0.99999999255000149)
       fv = dtype(1) - dtype(2) * (x + shift) + (x + shift) ** 2
       dfv = - dtype(2) + dtype(2) * (x + shift)
-      return fv, dfv
+      return ValueAndGradient(fv, dfv)
 
     start = tf.constant(dtype(1e-8))
     results = self.evaluate(
@@ -236,8 +240,8 @@ class HagerZhangTest(tf.test.TestCase):
   @tfe.run_test_in_graph_and_eager_modes
   def test_determinism(self):
     """Tests that the results are determinsitic."""
-    def fdf(x):
-      return (x - 1.8)**2, 2 * (x - 1.8)
+    fdf = lambda x: ValueAndGradient(f=(x - 1.8)**2, df=2 * (x - 1.8))
+
     def get_results():
       start = tf.constant(0.9)
       results = tfp.optimizer.linesearch.hager_zhang(
@@ -261,8 +265,8 @@ class HagerZhangTest(tf.test.TestCase):
     def rastrigin(x, use_np=False):
       z = x - 0.25
       sin, cos = (np.sin, np.cos) if use_np else (tf.sin, tf.cos)
-      return (10.0 + z*z - 10 * cos(2*np.pi*z),
-              2 * z + 10 * 2 * np.pi * sin(2*np.pi*z))
+      return ValueAndGradient(f=(10.0 + z*z - 10 * cos(2*np.pi*z)),
+                              df=(2 * z + 10 * 2 * np.pi * sin(2*np.pi*z)))
 
     start = tf.constant(0.1, dtype=tf.float64)
     results = self.evaluate(
@@ -275,9 +279,10 @@ class HagerZhangTest(tf.test.TestCase):
     self.assertTrue(results.converged)
     x = results.left_pt
     actual_f, actual_df = rastrigin(x, use_np=True)
-    self.assertAlmostEqual(actual_f, results.objective_at_left_pt)
-    self.assertAlmostEqual(actual_df, results.grad_objective_at_left_pt)
+    actual = ValueAndGradient(actual_f, actual_df)
+    self.assertAlmostEqual(actual.f, results.objective_at_left_pt)
+    self.assertAlmostEqual(actual.df, results.grad_objective_at_left_pt)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()
