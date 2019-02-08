@@ -241,7 +241,37 @@ class TransformedDistributionTest(tf.test.TestCase):
     y = normal.sample()
     self.evaluate(normal.log_prob(y))
     self.evaluate(normal.prob(y))
+    self.evaluate(normal.mean())
     self.evaluate(normal.entropy())
+
+  def testMean(self):
+    shift = np.array([[-1, 0, 1], [-1, -2, -3]], dtype=np.float32)
+    diag = np.array([[1, 2, 3], [2, 3, 2]], dtype=np.float32)
+    fake_mvn = self._cls()(
+        tfd.MultivariateNormalDiag(
+            loc=tf.zeros_like(shift),
+            scale_diag=tf.ones_like(diag),
+            validate_args=True),
+        tfb.AffineLinearOperator(
+            shift,
+            scale=tf.linalg.LinearOperatorDiag(diag, is_non_singular=True),
+            validate_args=True),
+        validate_args=True)
+    self.assertAllClose(shift, self.evaluate(fake_mvn.mean()))
+
+  def testMeanShapeOverride(self):
+    shift = np.array([[-1, 0, 1], [-1, -2, -3]], dtype=np.float32)
+    diag = np.array([[1, 2, 3], [2, 3, 2]], dtype=np.float32)
+    fake_mvn = self._cls()(
+        tfd.Normal(loc=0.0, scale=1.0),
+        tfb.AffineLinearOperator(
+            shift,
+            scale=tf.linalg.LinearOperatorDiag(diag, is_non_singular=True),
+            validate_args=True),
+        batch_shape=[2],
+        event_shape=[3],
+        validate_args=True)
+    self.assertAllClose(shift, self.evaluate(fake_mvn.mean()))
 
   def testEntropy(self):
     shift = np.array([[-1, 0, 1], [-1, -2, -3]], dtype=np.float32)
@@ -360,6 +390,7 @@ class ScalarToMultiTest(tf.test.TestCase):
           fake_batch_shape_,
           fake_log_prob_,
           fake_prob_,
+          fake_mean_,
           fake_entropy_,
       ] = self.evaluate([
           sample_mean,
@@ -369,6 +400,7 @@ class ScalarToMultiTest(tf.test.TestCase):
           fake_mvn.batch_shape_tensor(),
           fake_mvn.log_prob(x),
           fake_mvn.prob(x),
+          fake_mvn.mean(),
           fake_mvn.entropy(),
       ])
 
@@ -383,6 +415,7 @@ class ScalarToMultiTest(tf.test.TestCase):
           actual_mvn_log_prob(x_), fake_log_prob_, atol=0., rtol=1e-6)
       self.assertAllClose(
           np.exp(actual_mvn_log_prob(x_)), fake_prob_, atol=0., rtol=1e-5)
+      self.assertAllClose(actual_mean, fake_mean_, atol=0., rtol=1e-6)
       self.assertAllClose(actual_mvn_entropy, fake_entropy_, atol=0., rtol=1e-6)
 
   def testScalarBatchScalarEvent(self):

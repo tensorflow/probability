@@ -515,6 +515,35 @@ class TransformedDistribution(distribution_lib.Distribution):
     inv_cdf = self.distribution.quantile(value)
     return self.bijector.forward(inv_cdf)
 
+  def _mean(self):
+    if not self.bijector.is_constant_jacobian:
+      raise NotImplementedError("mean is not implemented for non-affine "
+                                "bijectors")
+
+    x = self.distribution.mean()
+
+    if self._is_maybe_batch_override or self._is_maybe_event_override:
+      # A batch (respectively event) shape override is only allowed if the batch
+      # (event) shape of the base distribution is [], so concatenating all the
+      # shapes does the right thing.
+      new_shape = tf.concat([
+          _ones_like(self._override_batch_shape),
+          self.distribution.batch_shape_tensor(),
+          _ones_like(self._override_event_shape),
+          self.distribution.event_shape_tensor(),
+      ], 0)
+      x = tf.reshape(x, new_shape)
+      new_shape = tf.concat(
+          [self.batch_shape_tensor(),
+           self.event_shape_tensor()], 0)
+      x = tf.broadcast_to(x, new_shape)
+
+    y = self.bijector.forward(x)
+
+    sample_shape = tf.convert_to_tensor([], dtype=tf.int32, name="sample_shape")
+    y = self._set_sample_static_shape(y, sample_shape)
+    return y
+
   def _entropy(self):
     if not self.bijector.is_constant_jacobian:
       raise NotImplementedError("entropy is not implemented")
