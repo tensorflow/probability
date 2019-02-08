@@ -112,7 +112,6 @@ import tensorflow_probability as tfp
 from tensorflow_probability.examples import sprites_dataset
 
 tfd = tfp.distributions
-tfe = tf.contrib.eager
 
 flags.DEFINE_integer(
     "batch_size",
@@ -200,11 +199,11 @@ class LearnableMultivariateNormalDiag(tf.keras.Model):
     super(LearnableMultivariateNormalDiag, self).__init__()
     with tf.name_scope(self._name):
       self.dimensions = dimensions
-      self._mean = tfe.Variable(
+      self._mean = tf.contrib.eager.Variable(
           tf.random_normal([dimensions], stddev=0.1), name="mean")
       # Initialize the std dev such that it will be close to 1 after a softplus
       # function.
-      self._untransformed_stddev = tfe.Variable(
+      self._untransformed_stddev = tf.contrib.eager.Variable(
           tf.random_normal([dimensions], mean=0.55, stddev=0.1),
           name="untransformed_stddev")
 

@@ -21,8 +21,6 @@ from __future__ import print_function
 # Dependency imports
 import tensorflow as tf
 
-tfe = tf.contrib.eager
-
 __all__ = [
     'diag_jacobian',
 ]
@@ -73,8 +71,8 @@ def diag_jacobian(xs,
     state = [tf.ones(sample_shape + [2], dtype=dtype),
              tf.ones(sample_shape + [1], dtype=dtype)]
     fn_val = target_fn(*state)
-    grad_fn = tfe.gradients_function(target_fn)
-    if tfe.executing_eagerly():
+    grad_fn = tf.contrib.eager.gradients_function(target_fn)
+    if tf.executing_eagerly():
       grads = grad_fn(*state)
     else:
       grads = tf.gradients(fn_val, state)
@@ -133,7 +131,7 @@ def diag_jacobian(xs,
     # Convert input `xs` to a list
     xs = list(xs) if _is_list_like(xs) else [xs]
     xs = [tf.convert_to_tensor(x) for x in xs]
-    if not tfe.executing_eagerly():
+    if not tf.executing_eagerly():
       if ys is None:
         if fn is None:
           raise ValueError('Both `ys` and `fn` can not be `None`')
@@ -222,7 +220,7 @@ def diag_jacobian(xs,
 
         def loop_body(j):
           """Loop function to compute gradients of the each direction."""
-          res = tfe.gradients_function(fn_slice(i, j))(*xs)[i]  # pylint: disable=cell-var-from-loop
+          res = tf.contrib.eager.gradients_function(fn_slice(i, j))(*xs)[i]  # pylint: disable=cell-var-from-loop
           if res is None:
             res = tf.zeros(tf.concat([sample_shape, [1]], -1),
                            dtype=x.dtype)  # pylint: disable=cell-var-from-loop

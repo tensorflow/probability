@@ -24,8 +24,6 @@ import tensorflow as tf
 
 from tensorflow.python.ops import control_flow_util
 
-tfe = tf.contrib.eager
-
 __all__ = [
     'choose',
     'is_list_like',
@@ -200,16 +198,16 @@ def _value_and_gradients(fn, fn_arg_list, result=None, grads=None, name=None):
         # Compute the block diagonal of Jacobian.
         # TODO(b/79158574): Guard this calculation by an arg which explicitly
         # requests block diagonal Jacobian calculation.
-        def make_fn_slice(i):
+        def fn_slice(i):
           """Needed to prevent `cell-var-from-loop` pylint warning."""
           return lambda *args: fn(*args)[i]
         grads = [
             # TODO(b/122349743): Should this use value_and_gradients_fn?
-            tfe.gradients_function(make_fn_slice(i))(*fn_arg_list)[i]
+            tf.contrib.eager.gradients_function(fn_slice(i))(*fn_arg_list)[i]
             for i in range(len(result))
         ]
       else:
-        grads = tfe.gradients_function(fn)(*fn_arg_list)
+        grads = tf.contrib.eager.gradients_function(fn)(*fn_arg_list)
     else:
       if is_list_like(result) and len(result) == len(fn_arg_list):
         # Compute the block diagonal of Jacobian.

@@ -34,8 +34,6 @@ import tensorflow as tf
 from tensorflow_probability import edward2 as ed
 from tensorflow_probability.opensource.experimental import no_u_turn_sampler
 
-tfe = tf.contrib.eager
-
 flags.DEFINE_integer("max_steps",
                      default=5,
                      help="Number of training steps to run.")
@@ -106,7 +104,7 @@ def main(argv):
   tf.gfile.MakeDirs(FLAGS.model_dir)
 
   tf.enable_eager_execution()
-  print("Number of available GPUs", tfe.num_gpus())
+  print("Number of available GPUs", tf.contrib.eager.num_gpus())
 
   if FLAGS.fake_data:
     features = tf.random_normal([20, 55])

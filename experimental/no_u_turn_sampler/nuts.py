@@ -39,7 +39,6 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 tfd = tfp.distributions
-tfe = tf.contrib.eager
 
 __all__ = [
     "kernel",
@@ -92,7 +91,7 @@ def kernel(target_log_prob_fn,
     with tf.name_scope("initialize"):
       current_state = [tf.convert_to_tensor(s) for s in current_state]
       step_size = [tf.convert_to_tensor(s) for s in step_size]
-      value_and_gradients_fn = tfe.value_and_gradients_function(
+      value_and_gradients_fn = tf.contrib.eager.value_and_gradients_function(
           target_log_prob_fn)
       value_and_gradients_fn = _embed_no_none_gradient_check(
           value_and_gradients_fn)

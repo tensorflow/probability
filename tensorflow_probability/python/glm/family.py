@@ -26,8 +26,6 @@ from tensorflow_probability.python import bijectors
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import dtype_util
 
-tfe = tf.contrib.eager
-
 
 __all__ = [
     'Bernoulli',
@@ -235,11 +233,11 @@ class CustomExponentialFamily(
     if fn is None:
       # Interpret `None` as the identity function.
       return arg, tf.ones_like(arg)
-    if tfe.executing_eagerly():
+    if tf.executing_eagerly():
       # Not having the lambda sanitzer means we'd get an `IndexError` whenever
       # the user supplied function has default args.
       fn1 = lambda r: fn(r)  # pylint: disable=unnecessary-lambda
-      v, g = tfe.value_and_gradients_function(fn1)(arg)
+      v, g = tf.contrib.eager.value_and_gradients_function(fn1)(arg)
     else:
       v = fn(arg)
       g = tf.gradients(v, [arg])
