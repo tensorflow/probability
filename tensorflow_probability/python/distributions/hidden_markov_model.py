@@ -16,7 +16,6 @@
 
 from __future__ import absolute_import
 from __future__ import division
-from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python.distributions import categorical
@@ -653,7 +652,7 @@ class HiddenMarkovModel(distribution.Distribution):
 
         with tf.control_dependencies([tf.assert_equal(
             observation_tensor_shape[-1], self._num_steps,
-            message="Last dimension of `observation` must match `num_steps`"
+            message="Last dimension of `observations` must match `num_steps`"
                     "of `HiddenMarkovModel`")]):
           observation_batch_shape = observation_tensor_shape[
               :-1 - self._underlying_event_rank]
@@ -661,7 +660,7 @@ class HiddenMarkovModel(distribution.Distribution):
               -1 - self._underlying_event_rank:]
 
           working_shape = tf.broadcast_dynamic_shape(observation_batch_shape,
-                                                     self.batch_shape)
+                                                     self.batch_shape_tensor())
           log_init = tf.broadcast_to(self._log_init,
                                      tf.concat([working_shape,
                                                 [self._num_states]],
