@@ -28,6 +28,7 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.ops import control_flow_ops
+from tensorflow.python.util import deprecation
 
 
 __all__ = [
@@ -115,7 +116,7 @@ class InverseGamma(distribution.Distribution):
 
   """
 
-  @tf.contrib.framework.deprecated_args(
+  @deprecation.deprecated_args(
       "2019-05-08", "The `rate` parameter is deprecated. Use `scale` instead."
       "The `rate` parameter was always interpreted as a `scale` parameter, "
       "but erroneously misnamed.", "rate")
@@ -193,7 +194,7 @@ class InverseGamma(distribution.Distribution):
     return self._concentration
 
   @property
-  @tf.contrib.framework.deprecated(
+  @deprecation.deprecated(
       "2019-05-08", "The `rate` parameter is deprecated. Use `scale` instead."
       "The `rate` parameter was always interpreted as a `scale`parameter, but "
       "erroneously misnamed.")
@@ -314,8 +315,8 @@ class InverseGamma(distribution.Distribution):
 class InverseGammaWithSoftplusConcentrationScale(InverseGamma):
   """`InverseGamma` with softplus of `concentration` and `scale`."""
 
-  @tf.contrib.framework.deprecated_args(
-      "2019-05-08", "The `rate` parameter is deprecated. Use `scale` instead."
+  @deprecation.deprecated_args(
+      "2019-05-08", "The `rate` parameter is deprecation. Use `scale` instead."
       "The `rate` parameter was always interpreted as a `scale`parameter, but "
       "erroneously misnamed.", "rate")
   def __init__(self,
@@ -343,7 +344,7 @@ class InverseGammaWithSoftplusConcentrationScale(InverseGamma):
     self._parameters = parameters
 
 
-_rate_deprecator = tf.contrib.framework.deprecated(
+_rate_deprecator = deprecation.deprecated(
     "2019-05-08",
     "InverseGammaWithSoftplusConcentrationRate is deprecated, use "
     "InverseGammaWithSoftplusConcentrationScale instead.",

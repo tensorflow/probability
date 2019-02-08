@@ -19,8 +19,8 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import tensorflow as tf
 from tensorflow_probability.python import stats
+from tensorflow.python.util import deprecation
 
 __all__ = [
     "auto_correlation",
@@ -28,7 +28,7 @@ __all__ = [
 ]
 
 
-auto_correlation_deprecator = tf.contrib.framework.deprecated(
+auto_correlation_deprecator = deprecation.deprecated(
     "2018-10-01",
     "auto_correlation is moved to the `stats` namespace.  Access it via: "
     "`tfp.stats.auto_correlation`.",
@@ -36,7 +36,7 @@ auto_correlation_deprecator = tf.contrib.framework.deprecated(
 auto_correlation = auto_correlation_deprecator(stats.auto_correlation)
 
 
-percentile_deprecator = tf.contrib.framework.deprecated(
+percentile_deprecator = deprecation.deprecated(
     "2018-10-01",
     "percentile is moved to the `stats` namespace.  Access it via: "
     "`tfp.stats.percentile`.",
