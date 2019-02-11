@@ -368,11 +368,11 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
       print('iter:{:>2}  loss:{: 9.3f}  scale:{:.3f}  '
             'step_size:{:.4f}  avg_acceptance_ratio:{:.4f}').format(
                 iter_, loss_, weights_prior_estimated_scale_[iter_],
-                step_size_, avg_acceptance_ratio_))
+                step_size_, avg_acceptance_ratio_)
 
   # Should converge to ~0.24.
   import matplotlib.pyplot as plt
-  plot.plot(weights_prior_estimated_scale_)
+  plt.plot(weights_prior_estimated_scale_)
   plt.ylabel('weights_prior_estimated_scale')
   plt.xlabel('iteration')
   ```
@@ -715,7 +715,7 @@ def _leapfrog_integrator_one_step(
   %matplotlib inline
   import numpy as np
   import tensorflow as tf
-  from tensorflow_probability.python.mcmc.hmc import _leapfrog_integrator
+  from tensorflow_probability.python.mcmc.hmc import _leapfrog_integrator_one_step  # pylint: disable=line-too-long
   tfd = tfp.distributions
 
   dims = 10
