@@ -135,6 +135,7 @@ __all__ = [
     'min_discrepancy_of_true_cdfs_detectable_by_dkwm',
     'min_num_samples_for_dkwm_cdf_test',
     'kolmogorov_smirnov_distance',
+    'empirical_cdfs',
     'true_mean_confidence_interval_by_dkwm',
     'assert_true_mean_equal_by_dkwm',
     'min_discrepancy_of_true_means_detectable_by_dkwm',
@@ -424,6 +425,8 @@ def kolmogorov_smirnov_distance(
     # - In high_empirical_cdfs, the last sample in a run of equal samples will
     #   have the correct cdf value, and the others will be too low.
     # However, this is OK, because those errors do not change the maximums.
+    # Could defensively use `empirical_cdfs` here, but those rely on the
+    # relatively more expensive `searchsorted` operation.
     n = tf.cast(tf.shape(samples)[-1], dtype=cdfs.dtype)
     low_empirical_cdfs = tf.range(n, dtype=cdfs.dtype) / n
     high_empirical_cdfs = tf.range(1, n+1, dtype=cdfs.dtype) / n
@@ -451,6 +454,49 @@ def _batch_sort_vector(x, ascending=True, name=None):
       y, _ = tf.nn.top_k(x, k=n, sorted=True)
     y.set_shape(x.shape)
     return y
+
+
+def empirical_cdfs(samples, continuity='right', dtype=tf.float32):
+  """Evaluates the empirical CDF on a batch of potentially repeated samples.
+
+  This is non-trivial because
+  - If the samples can repeat, their (sorted) position does not uniquely
+    determine their CDF value: the empirical CDF of the index-1 element of
+    [0, 0.5, 0.5, 1] is 0.5, not 0.25.
+  - However, samples repeating _across batch members_ must not affect each
+    other.
+
+  Note: Returns results parallel to `samples`, i.e., the values of the empirical
+  CDF at those points.  In principle, it would also be reasonable to compact
+  the empirical CDF to only mention each unique sample once, but that would
+  produce a ragged result across batches.
+
+  Note: The sample dimension is _last_, and the samples must be _sorted_ within
+  each batch.
+
+  Args:
+    samples: Tensor of shape `batch + [num_samples]` of samples.  The samples
+      must be in ascending order within each batch member.
+    continuity: Whether to return a conventional, right-continuous CDF
+      (`continuity = 'right'`, default) or a left-continuous CDF (`continuity =
+      'left'`).  The value at each point `x` will be `F_n(X <= x)` or
+      `F_n(X < x)`, respectively.  The difference between the right-continuous
+      and left-continuous CDFs is the empirical pmf, i.e., how many times each
+      sample occurs in its batch.
+    dtype: dtype at which to evaluate the desired empirical CDFs.
+
+  Returns:
+    cdf: Tensor parallel to `samples`.  For each x in samples, gives the (right-
+      or left-continuous, per the `continuity` argument) cdf at that position.
+      If `samples` contains duplicates, `cdf` will give each the same value.
+  """
+  if continuity not in ['left', 'right']:
+    msg = 'Continuity value must be "left" or "right", got {}.'.format(
+        continuity)
+    raise ValueError(msg)
+  n = tf.cast(tf.shape(samples)[-1], dtype=dtype)
+  indexes = tf.searchsorted(samples, samples, side=continuity)
+  return tf.cast(indexes, dtype=dtype) / n
 
 
 def _do_maximum_mean(samples, envelope, high, name=None):

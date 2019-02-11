@@ -93,6 +93,28 @@ class StatisticalTestingTest(tf.test.TestCase):
       self.evaluate(st.assert_true_cdf_equal_by_dkwm(
           samples, lambda x: x, false_fail_rate=1e-6))
 
+  def test_empirical_cdfs_with_duplicates(self, dtype):
+    del dtype
+    # A batch of sorted samples with nontrivial repetition.
+    # There are repetitions across batch members, which should not
+    # confuse the CDF computation.
+    # Shape: [batch_size, num_samples]
+    samples = [[1, 1, 2, 2],
+               [1, 2, 3, 4],
+               [1, 3, 3, 3]]
+    expected_low_cdf_values = [[0, 0, 0.5, 0.5],
+                               [0, 0.25, 0.5, 0.75],
+                               [0, 0.25, 0.25, 0.25]]
+    low_empirical_cdfs = self.evaluate(
+        st.empirical_cdfs(samples, continuity='left'))
+    self.assertAllEqual(expected_low_cdf_values, low_empirical_cdfs)
+    expected_high_cdf_values = [[0.5, 0.5, 1, 1],
+                                [0.25, 0.5, 0.75, 1],
+                                [0.25, 1, 1, 1]]
+    high_empirical_cdfs = self.evaluate(
+        st.empirical_cdfs(samples, continuity='right'))
+    self.assertAllEqual(expected_high_cdf_values, high_empirical_cdfs)
+
   def test_dkwm_cdf_one_sample_batch_discrete_assertion(self, dtype):
     rng = np.random.RandomState(seed=0)
     num_samples = 13000
