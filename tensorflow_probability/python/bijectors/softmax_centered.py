@@ -159,7 +159,7 @@ class SoftmaxCentered(bijector.Bijector):
     #   log_normalization = 1 + reduce_sum(exp(logits))
     #   -log_normalization + reduce_sum(logits - log_normalization)
     log_normalization = tf.nn.softplus(
-        tf.reduce_logsumexp(x, axis=-1, keep_dims=True))
+        tf.reduce_logsumexp(x, axis=-1, keepdims=True))
     return tf.squeeze(
         (-log_normalization + tf.reduce_sum(
             x - log_normalization, axis=-1, keepdims=True)),

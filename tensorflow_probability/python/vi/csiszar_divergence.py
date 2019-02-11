@@ -1080,7 +1080,7 @@ def csiszar_vimco_helper(logu, name=None):
         tf.where(is_positive_and_largest,
                  tf.fill(tf.shape(logu), -inf),
                  logu),
-        axis=0, keep_dims=True)
+        axis=0, keepdims=True)
     log_lomsum_u = tf.tile(
         log_lomsum_u,
         multiples=1 + tf.pad([n-1], [[0, tf.rank(logu)-1]]))
