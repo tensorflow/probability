@@ -208,7 +208,6 @@ class _GumbelTest(object):
         atol=0)
 
   def testGumbelSampleMultidimensionalVar(self):
-    # TODO(b/122670222): This test can fail with different seed/n values.
     batch_size = 6
     loc = np.array([[2.0, 4.0, 5.0]] * batch_size, dtype=self._dtype)
     scale = np.array([1.0, 0.8, 0.5], dtype=self._dtype)
@@ -218,7 +217,7 @@ class _GumbelTest(object):
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale))
 
-    samples = gumbel.sample(n, seed=12345)
+    samples = gumbel.sample(n, seed=123456)
     sample_values = self.evaluate(samples)
     self.assertAllClose(
         stats.gumbel_r.var(loc=loc, scale=scale),
@@ -250,7 +249,7 @@ class _GumbelTest(object):
 
     kl = tfd.kl_divergence(a, b)
 
-    x = a.sample(int(1e5), seed=0)
+    x = a.sample(int(1e5), seed=4342)
     kl_sample = tf.reduce_mean(
         input_tensor=a.log_prob(x) - b.log_prob(x), axis=0)
 

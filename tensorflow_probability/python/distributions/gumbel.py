@@ -139,9 +139,13 @@ class Gumbel(transformed_distribution.TransformedDistribution):
         self._gumbel_bijector = gumbel_bijector.Gumbel(
             loc=loc, scale=scale, validate_args=validate_args)
 
+      # Because the uniform sampler generates samples in `[0, 1)` this would
+      # cause samples to lie in `(inf, -inf]` instead of `(inf, -inf)`. To fix
+      # this, we use `np.finfo(self.dtype.as_numpy_dtype.tiny`
+      # because it is the smallest, positive, "normal" number.
       super(Gumbel, self).__init__(
           distribution=uniform.Uniform(
-              low=tf.zeros([], dtype=loc.dtype),
+              low=np.finfo(dtype.as_numpy_dtype).tiny,
               high=tf.ones([], dtype=loc.dtype),
               allow_nan_stats=allow_nan_stats),
           # The Gumbel bijector encodes the quantile
@@ -171,6 +175,10 @@ class Gumbel(transformed_distribution.TransformedDistribution):
     # Use broadcasting rules to calculate the full broadcast sigma.
     scale = self.scale * tf.ones_like(self.loc)
     return 1. + tf.math.log(scale) + np.euler_gamma
+
+  def _log_prob(self, x):
+    z = (x - self.loc) / self.scale
+    return -(z + tf.exp(-z)) - tf.log(self.scale)
 
   def _mean(self):
     return self.loc + self.scale * np.euler_gamma
