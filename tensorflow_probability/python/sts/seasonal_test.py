@@ -214,7 +214,7 @@ class _SeasonalStateSpaceModelTest(object):
     """
 
     ndarray = np.asarray(ndarray).astype(self.dtype)
-    return tf.placeholder_with_default(
+    return tf.compat.v1.placeholder_with_default(
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 

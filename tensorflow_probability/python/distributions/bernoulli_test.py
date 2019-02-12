@@ -34,7 +34,7 @@ def try_import(name):  # pylint: disable=invalid-name
   try:
     module = importlib.import_module(name)
   except ImportError as e:
-    tf.logging.warning("Could not import %s: %s" % (name, str(e)))
+    tf.compat.v1.logging.warning("Could not import %s: %s" % (name, str(e)))
   return module
 
 
@@ -148,7 +148,7 @@ class BernoulliTest(tf.test.TestCase):
       self.assertAllClose(self.evaluate(dist.log_prob(x)), np.log(expected_pmf))
 
   def testPmfCorrectBroadcastDynamicShape(self):
-    p = tf.placeholder_with_default([0.2, 0.3, 0.4], shape=None)
+    p = tf.compat.v1.placeholder_with_default([0.2, 0.3, 0.4], shape=None)
     dist = bernoulli.Bernoulli(probs=p)
     event1 = [1, 0, 1]
     event2 = [[1, 0, 1]]
@@ -185,7 +185,7 @@ class BernoulliTest(tf.test.TestCase):
             bernoulli.Bernoulli(probs=p, validate_args=False).log_prob(samps)))
 
   def testBroadcasting(self):
-    probs = lambda p: tf.placeholder_with_default(p, shape=None)
+    probs = lambda p: tf.compat.v1.placeholder_with_default(p, shape=None)
     dist = lambda p: bernoulli.Bernoulli(probs=probs(p))
     self.assertAllClose(np.log(0.5), self.evaluate(dist(0.5).log_prob(1)))
     self.assertAllClose(
@@ -194,7 +194,7 @@ class BernoulliTest(tf.test.TestCase):
                         self.evaluate(dist([0.5, 0.5, 0.5]).log_prob(1)))
 
   def testPmfShapes(self):
-    probs = lambda p: tf.placeholder_with_default(p, shape=None)
+    probs = lambda p: tf.compat.v1.placeholder_with_default(p, shape=None)
     dist = lambda p: bernoulli.Bernoulli(probs=probs(p))
     self.assertEqual(
         2, len(self.evaluate(dist([[0.5], [0.5]]).log_prob(1)).shape))
@@ -268,13 +268,13 @@ class BernoulliTest(tf.test.TestCase):
     n = 1000
     def _maybe_seed():
       if tf.executing_eagerly():
-        tf.set_random_seed(42)
+        tf.compat.v1.set_random_seed(42)
         return None
       return 42
     self.assertAllEqual(
         self.evaluate(dist.sample(n, _maybe_seed())),
         self.evaluate(dist.sample([n], _maybe_seed())))
-    n = tf.placeholder_with_default(np.int32(1000), shape=None)
+    n = tf.compat.v1.placeholder_with_default(np.int32(1000), shape=None)
     sample1 = dist.sample(n, _maybe_seed())
     sample2 = dist.sample([n], _maybe_seed())
     sample1, sample2 = self.evaluate([sample1, sample2])

@@ -96,7 +96,7 @@ class AffineLinearOperator(bijector.Bijector):
       dtype = tf.float32
 
       if shift is not None:
-        shift = tf.convert_to_tensor(shift, name="shift")
+        shift = tf.convert_to_tensor(value=shift, name="shift")
         graph_parents += [shift]
         dtype = shift.dtype.base_dtype
       self._shift = shift

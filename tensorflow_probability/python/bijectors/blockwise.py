@@ -101,7 +101,7 @@ class Blockwise(bijector_base.Bijector):
       if block_sizes is None:
         block_sizes = tf.ones(len(bijectors), dtype=tf.int32)
       self._block_sizes = tf.convert_to_tensor(
-          block_sizes, name='block_sizes', preferred_dtype=tf.int32)
+          value=block_sizes, name='block_sizes', dtype_hint=tf.int32)
 
       self._block_sizes = _validate_block_sizes(self._block_sizes, bijectors,
                                                 validate_args)
@@ -160,8 +160,9 @@ def _validate_block_sizes(block_sizes, bijectors, validate_args):
     message = ('`block_sizes` must be `None`, or a vector of the same length '
                'as `bijectors`.')
     with tf.control_dependencies([
-        tf.assert_equal(tf.size(block_sizes), len(bijectors), message=message),
-        tf.assert_equal(tf.rank(block_sizes), 1)
+        tf.compat.v1.assert_equal(
+            tf.size(input=block_sizes), len(bijectors), message=message),
+        tf.compat.v1.assert_equal(tf.rank(block_sizes), 1)
     ]):
       return tf.identity(block_sizes)
   else:

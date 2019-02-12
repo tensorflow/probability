@@ -50,7 +50,7 @@ FnDFn = collections.namedtuple(
 
 def _apply(value_and_gradients_function, x):
   """Evaluate the objective function and returns an `FnDFn` instance."""
-  x = tf.convert_to_tensor(x)
+  x = tf.convert_to_tensor(value=x)
   full_result = value_and_gradients_function(x)
   f, df = full_result.f, full_result.df
   return FnDFn(x=x, f=f, df=df, full_result=full_result)
@@ -141,15 +141,16 @@ def bracket(value_and_gradients_function,
   # to perform further evaluations. Otherwise the bracketing loop is needed to
   # expand the interval, step B3, until the conditions are met.
   initial_args = _IntermediateResult(
-      iteration=tf.convert_to_tensor(0),
+      iteration=tf.convert_to_tensor(value=0),
       stopped=failed | bracketed | needs_bisect,
       failed=failed,
-      num_evals=tf.convert_to_tensor(0),
+      num_evals=tf.convert_to_tensor(value=0),
       left=val_0,
       right=val_c)
 
   def _loop_cond(curr):
-    return (curr.iteration < max_iterations) & ~tf.reduce_all(curr.stopped)
+    return (curr.iteration <
+            max_iterations) & ~tf.reduce_all(input_tensor=curr.stopped)
 
   def _loop_body(curr):
     """Main body of bracketing loop."""
@@ -174,7 +175,8 @@ def bracket(value_and_gradients_function,
         left=left,
         right=right)]
 
-  bracket_result = tf.while_loop(_loop_cond, _loop_body, [initial_args])[0]
+  bracket_result = tf.while_loop(
+      cond=_loop_cond, body=_loop_body, loop_vars=[initial_args])[0]
 
   # For entries where bisect is still needed, mark them as not yet stopped,
   # reset the left point to 0, and run `_bisect` on them.
@@ -228,10 +230,10 @@ def bisect(value_and_gradients_function,
   failed = ~is_finite(initial_left, initial_right)
   needs_bisect = (initial_right.df < 0) & (initial_right.f > f_lim)
   bisect_args = _IntermediateResult(
-      iteration=tf.convert_to_tensor(0),
+      iteration=tf.convert_to_tensor(value=0),
       stopped=failed | ~needs_bisect,
       failed=failed,
-      num_evals=tf.convert_to_tensor(0),
+      num_evals=tf.convert_to_tensor(value=0),
       left=initial_left,
       right=initial_right)
   return _bisect(value_and_gradients_function, bisect_args, f_lim)
@@ -241,7 +243,7 @@ def _bisect(value_and_gradients_function, initial_args, f_lim):
   """Actual implementation of bisect given initial_args in a _BracketResult."""
   def _loop_cond(curr):
     # TODO(b/112524024): Also take into account max_iterations.
-    return ~tf.reduce_all(curr.stopped)
+    return ~tf.reduce_all(input_tensor=curr.stopped)
 
   def _loop_body(curr):
     """Narrow down interval to satisfy opposite slope conditions."""
@@ -280,7 +282,8 @@ def _bisect(value_and_gradients_function, initial_args, f_lim):
   # end point but along with the current left end point, it encloses another
   # minima. The loop above tries to narrow the interval so that it satisfies the
   # opposite slope conditions.
-  return tf.while_loop(_loop_cond, _loop_body, [initial_args])[0]
+  return tf.while_loop(
+      cond=_loop_cond, body=_loop_body, loop_vars=[initial_args])[0]
 
 
 def is_finite(val_1, val_2=None):
@@ -294,7 +297,8 @@ def is_finite(val_1, val_2=None):
     is_finite: Scalar boolean `Tensor` indicating whether the function value
       and the gradient in `val_1` (and optionally) in `val_2` are all finite.
   """
-  val_1_finite = tf.is_finite(val_1.f) & tf.is_finite(val_1.df)
+  val_1_finite = tf.math.is_finite(val_1.f) & tf.math.is_finite(val_1.df)
   if val_2 is not None:
-    return val_1_finite & tf.is_finite(val_2.f) & tf.is_finite(val_2.df)
+    return val_1_finite & tf.math.is_finite(val_2.f) & tf.math.is_finite(
+        val_2.df)
   return val_1_finite

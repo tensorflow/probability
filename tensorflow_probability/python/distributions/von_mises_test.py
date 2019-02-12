@@ -33,7 +33,7 @@ class _VonMisesTest(object):
 
   def make_tensor(self, x):
     x = tf.cast(x, self.dtype)
-    return tf.placeholder_with_default(
+    return tf.compat.v1.placeholder_with_default(
         input=x, shape=x.shape if self.use_static_shape else None)
 
   def testVonMisesShape(self):
@@ -65,7 +65,7 @@ class _VonMisesTest(object):
     try:
       from scipy import stats  # pylint:disable=g-import-not-at-top
     except ImportError:
-      tf.logging.warn("Skipping scipy-dependent tests")
+      tf.compat.v1.logging.warn("Skipping scipy-dependent tests")
       return
     expected_log_prob = stats.vonmises.logpdf(x, concentrations_v, loc=locs_v)
     log_prob = von_mises.log_prob(self.make_tensor(x))
@@ -88,7 +88,7 @@ class _VonMisesTest(object):
     try:
       from scipy import stats  # pylint:disable=g-import-not-at-top
     except ImportError:
-      tf.logging.warn("Skipping scipy-dependent tests")
+      tf.compat.v1.logging.warn("Skipping scipy-dependent tests")
       return
     expected_prob = stats.vonmises.pdf(x, concentrations_v, loc=locs_v)
     self.assertAllClose(expected_prob, self.evaluate(prob))
@@ -110,7 +110,7 @@ class _VonMisesTest(object):
     try:
       from scipy import stats  # pylint:disable=g-import-not-at-top
     except ImportError:
-      tf.logging.warn("Skipping scipy-dependent tests")
+      tf.compat.v1.logging.warn("Skipping scipy-dependent tests")
       return
     expected_cdf = stats.vonmises.cdf(x, concentrations_v, loc=locs_v)
     self.assertAllClose(expected_cdf, self.evaluate(cdf), atol=1e-4, rtol=1e-4)
@@ -138,13 +138,14 @@ class _VonMisesTest(object):
       cdf = von_mises.cdf(x)
 
       self.assertLess(
-          tf.test.compute_gradient_error(x, x.shape, cdf, cdf.shape), 1e-3)
-      self.assertLess(
-          tf.test.compute_gradient_error(locs, locs.shape, cdf, cdf.shape),
+          tf.compat.v1.test.compute_gradient_error(x, x.shape, cdf, cdf.shape),
           1e-3)
       self.assertLess(
-          tf.test.compute_gradient_error(concentrations, concentrations.shape,
-                                         cdf, cdf.shape), 1e-3)
+          tf.compat.v1.test.compute_gradient_error(locs, locs.shape, cdf,
+                                                   cdf.shape), 1e-3)
+      self.assertLess(
+          tf.compat.v1.test.compute_gradient_error(
+              concentrations, concentrations.shape, cdf, cdf.shape), 1e-3)
 
   def testVonMisesCdfGradientSimple(self):
     # This is a simple finite difference test that also works in the Eager mode.
@@ -183,7 +184,7 @@ class _VonMisesTest(object):
     try:
       from scipy import stats  # pylint:disable=g-import-not-at-top
     except ImportError:
-      tf.logging.warn("Skipping scipy-dependent tests")
+      tf.compat.v1.logging.warn("Skipping scipy-dependent tests")
       return
     expected_entropy = stats.vonmises.entropy(concentrations_v, loc=locs_v)
     self.assertAllClose(expected_entropy, self.evaluate(von_mises.entropy()))
@@ -208,7 +209,7 @@ class _VonMisesTest(object):
     try:
       from scipy import special  # pylint:disable=g-import-not-at-top
     except ImportError:
-      tf.logging.warn("Skipping scipy-dependent tests")
+      tf.compat.v1.logging.warn("Skipping scipy-dependent tests")
       return
     expected_vars = 1.0 - special.i1(concentrations_v) / special.i0(
         concentrations_v)
@@ -222,7 +223,7 @@ class _VonMisesTest(object):
     try:
       from scipy import special  # pylint:disable=g-import-not-at-top
     except ImportError:
-      tf.logging.warn("Skipping scipy-dependent tests")
+      tf.compat.v1.logging.warn("Skipping scipy-dependent tests")
       return
     expected_stddevs = (np.sqrt(1.0 - special.i1(concentrations_v)
                                 / special.i0(concentrations_v))
@@ -247,7 +248,8 @@ class _VonMisesTest(object):
 
     kl_actual = tfd.kl_divergence(d1, d2)
     x = d1.sample(int(1e5), seed=0)
-    kl_sample = tf.reduce_mean(d1.log_prob(x) - d2.log_prob(x), 0)
+    kl_sample = tf.reduce_mean(
+        input_tensor=d1.log_prob(x) - d2.log_prob(x), axis=0)
     kl_same = tfd.kl_divergence(d1, d1)
 
     [kl_actual_val, kl_sample_val,
@@ -271,11 +273,13 @@ class _VonMisesTest(object):
 
     expected_mean = von_mises.mean()
     actual_mean = tf.atan2(
-        tf.reduce_mean(tf.sin(samples), 0), tf.reduce_mean(tf.cos(samples), 0))
+        tf.reduce_mean(input_tensor=tf.sin(samples), axis=0),
+        tf.reduce_mean(input_tensor=tf.cos(samples), axis=0))
 
     expected_variance = von_mises.variance()
     standardized_samples = samples - tf.expand_dims(von_mises.mean(), 0)
-    actual_variance = 1. - tf.reduce_mean(tf.cos(standardized_samples), axis=0)
+    actual_variance = 1. - tf.reduce_mean(
+        input_tensor=tf.cos(standardized_samples), axis=0)
 
     [
         expected_mean_val, expected_variance_val, actual_mean_val,
@@ -296,7 +300,8 @@ class _VonMisesTest(object):
     # so only checking the variance.
     expected_variance = 1.
     standardized_samples = samples - tf.expand_dims(von_mises.mean(), 0)
-    actual_variance = 1. - tf.reduce_mean(tf.cos(standardized_samples), axis=0)
+    actual_variance = 1. - tf.reduce_mean(
+        input_tensor=tf.cos(standardized_samples), axis=0)
 
     self.assertAllClose(
         expected_variance, self.evaluate(actual_variance), rtol=0.1)
@@ -315,7 +320,7 @@ class _VonMisesTest(object):
     try:
       from scipy import stats  # pylint:disable=g-import-not-at-top
     except ImportError:
-      tf.logging.warn("Skipping scipy-dependent tests")
+      tf.compat.v1.logging.warn("Skipping scipy-dependent tests")
       return
 
     fails = 0
@@ -338,7 +343,7 @@ class _VonMisesTest(object):
     try:
       from scipy import stats  # pylint:disable=g-import-not-at-top
     except ImportError:
-      tf.logging.warn("Skipping scipy-dependent tests")
+      tf.compat.v1.logging.warn("Skipping scipy-dependent tests")
       return
 
     fails = 0
@@ -363,7 +368,7 @@ class _VonMisesTest(object):
     def loss(loc, concentration):
       von_mises = tfd.VonMises(loc, concentration)
       samples = von_mises.sample(n, seed=137)
-      return tf.reduce_mean(samples, axis=0)
+      return tf.reduce_mean(input_tensor=samples, axis=0)
 
     grad_loc, grad_concentration = self.compute_gradients(
         loss, [loc, concentration], self.make_tensor(grad_ys))
@@ -380,7 +385,7 @@ class _VonMisesTest(object):
     def loss(loc, concentration):
       von_mises = tfd.VonMises(loc, concentration)
       samples = von_mises.sample(n, seed=137)
-      return tf.reduce_mean(1. - tf.cos(samples - loc), axis=0)
+      return tf.reduce_mean(input_tensor=1. - tf.cos(samples - loc), axis=0)
 
     grad_loc, grad_concentration = self.compute_gradients(
         loss, [loc, concentration])

@@ -54,9 +54,9 @@ class VariationalInferenceTests(tf.test.TestCase):
          observed_time_series=observed_time_series,
          init_batch_shape=num_inits)
 
-    train_op = tf.train.AdamOptimizer(0.1).minimize(variational_loss)
+    train_op = tf.compat.v1.train.AdamOptimizer(0.1).minimize(variational_loss)
     with self.test_session() as sess:
-      sess.run(tf.global_variables_initializer())
+      sess.run(tf.compat.v1.global_variables_initializer())
 
       for _ in range(5):  # don't actually run to completion
         _, _ = sess.run((train_op, variational_loss))
@@ -94,7 +94,7 @@ class _HMCTests(object):
         num_warmup_steps=2,
         num_variational_steps=2)
 
-    self.evaluate(tf.global_variables_initializer())
+    self.evaluate(tf.compat.v1.global_variables_initializer())
     samples_, kernel_results_ = self.evaluate((samples, kernel_results))
 
     acceptance_rate = np.mean(
@@ -128,7 +128,7 @@ class _HMCTests(object):
         num_warmup_steps=2,
         num_variational_steps=2)
 
-    self.evaluate(tf.global_variables_initializer())
+    self.evaluate(tf.compat.v1.global_variables_initializer())
     samples_, kernel_results_ = self.evaluate((samples, kernel_results))
 
     acceptance_rate = np.mean(
@@ -151,7 +151,7 @@ class _HMCTests(object):
     if self.use_static_shape:
       return tensor.shape.as_list()
     else:
-      return list(self.evaluate(tf.shape(tensor)))
+      return list(self.evaluate(tf.shape(input=tensor)))
 
   def _batch_shape_as_list(self, distribution):
     if self.use_static_shape:
@@ -178,7 +178,7 @@ class _HMCTests(object):
     """
 
     ndarray = np.asarray(ndarray).astype(self.dtype)
-    return tf.placeholder_with_default(
+    return tf.compat.v1.placeholder_with_default(
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
@@ -210,7 +210,7 @@ class HMCTestsStatic32(tf.test.TestCase, parameterized.TestCase, _HMCTests):
         num_warmup_steps=1,
         num_variational_steps=1)
 
-    self.evaluate(tf.global_variables_initializer())
+    self.evaluate(tf.compat.v1.global_variables_initializer())
     for parameter, parameter_samples in zip(model.parameters, samples):
       self.assertAllEqual(self._shape_as_list(parameter_samples),
                           [num_results] +

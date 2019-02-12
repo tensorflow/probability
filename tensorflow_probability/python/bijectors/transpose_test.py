@@ -49,9 +49,9 @@ class _TransposeBijectorTest(object):
       actual_y = tf.constant(actual_y_)
       perm = tf.constant(perm_)
     else:
-      actual_x = tf.placeholder_with_default(actual_x_, shape=None)
-      actual_y = tf.placeholder_with_default(actual_y_, shape=None)
-      perm = tf.placeholder_with_default(perm_, shape=[3])
+      actual_x = tf.compat.v1.placeholder_with_default(actual_x_, shape=None)
+      actual_y = tf.compat.v1.placeholder_with_default(actual_y_, shape=None)
+      perm = tf.compat.v1.placeholder_with_default(perm_, shape=[3])
 
     bijector = tfb.Transpose(perm=perm, validate_args=True)
     y = bijector.forward(actual_x)
@@ -86,8 +86,8 @@ class _TransposeBijectorTest(object):
       actual_y = tf.constant(actual_y_)
       rightmost_transposed_ndims = tf.constant(rightmost_transposed_ndims_)
     else:
-      actual_x = tf.placeholder_with_default(actual_x_, shape=None)
-      actual_y = tf.placeholder_with_default(actual_y_, shape=None)
+      actual_x = tf.compat.v1.placeholder_with_default(actual_x_, shape=None)
+      actual_y = tf.compat.v1.placeholder_with_default(actual_y_, shape=None)
       rightmost_transposed_ndims = tf.constant(rightmost_transposed_ndims_)
 
     bijector = tfb.Transpose(
@@ -114,7 +114,7 @@ class _TransposeBijectorTest(object):
     else:
       with self.assertRaisesOpError(msg):
         bijector = tfb.Transpose(
-            perm=tf.placeholder_with_default([1, 2], shape=[2]),
+            perm=tf.compat.v1.placeholder_with_default([1, 2], shape=[2]),
             validate_args=True)
         self.evaluate(bijector.forward([[0, 1]]))
 

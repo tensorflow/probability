@@ -265,7 +265,8 @@ class PercentileTestWithLowerInterpolation(tf.test.TestCase):
 
   def test_four_dimensional_input_x_static_ndims_but_dynamic_sizes(self):
     x = rng.rand(2, 3, 4, 5)
-    x_ph = tf.placeholder_with_default(input=x, shape=[None, None, None, None])
+    x_ph = tf.compat.v1.placeholder_with_default(
+        input=x, shape=[None, None, None, None])
     for axis in [None, 0, 1, -2, (0,), (-1,), (-1, 1), (3, 1), (-3, 0)]:
       expected_percentile = np.percentile(
           x, q=0.77, interpolation=self._interpolation, axis=axis)
@@ -275,7 +276,8 @@ class PercentileTestWithLowerInterpolation(tf.test.TestCase):
 
   def test_four_dimensional_input_and_keepdims_x_static_ndims_dynamic_sz(self):
     x = rng.rand(2, 3, 4, 5)
-    x_ph = tf.placeholder_with_default(input=x, shape=[None, None, None, None])
+    x_ph = tf.compat.v1.placeholder_with_default(
+        input=x, shape=[None, None, None, None])
     for axis in [None, 0, 1, -2, (0,), (-1,), (-1, 1), (3, 1), (-3, 0)]:
       expected_percentile = np.percentile(
           x,
@@ -445,7 +447,7 @@ class PercentileTestWithNearestInterpolation(tf.test.TestCase):
   def test_2d_q_raises_dynamic(self):
     if tf.executing_eagerly(): return
     x = [1., 5., 3., 2., 4.]
-    q_ph = tf.placeholder_with_default(input=[[0.5]], shape=None)
+    q_ph = tf.compat.v1.placeholder_with_default(input=[[0.5]], shape=None)
     pct = tfp.stats.percentile(x, q=q_ph, validate_args=True,
                                interpolation=self._interpolation)
     with self.assertRaisesOpError('rank'):

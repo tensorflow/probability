@@ -33,19 +33,20 @@ class BlockwiseBijectorTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.parameters((False, []), (True, []), (False, [2]), (True, [2]))
   def testExplicitBlocks(self, dynamic_shape, batch_shape):
-    block_sizes = tf.convert_to_tensor([2, 1, 3])
-    block_sizes = tf.placeholder_with_default(
+    block_sizes = tf.convert_to_tensor(value=[2, 1, 3])
+    block_sizes = tf.compat.v1.placeholder_with_default(
         block_sizes, shape=None if dynamic_shape else block_sizes.shape)
     exp = tfb.Exp()
     sp = tfb.Softplus()
     aff = tfb.Affine(scale_diag=[2., 3., 4.])
     blockwise = tfb.Blockwise(bijectors=[exp, sp, aff], block_sizes=block_sizes)
 
-    x = tf.to_float([0.1, 0.2, 0.3, 0.4, 0.5, 0.6])
+    x = tf.cast([0.1, 0.2, 0.3, 0.4, 0.5, 0.6], dtype=tf.float32)
     for s in batch_shape:
       x = tf.expand_dims(x, 0)
       x = tf.tile(x, [s] + [1] * (x.shape.ndims - 1))
-    x = tf.placeholder_with_default(x, shape=None if dynamic_shape else x.shape)
+    x = tf.compat.v1.placeholder_with_default(
+        x, shape=None if dynamic_shape else x.shape)
 
     # Identity to break the caching.
     blockwise_y = tf.identity(blockwise.forward(x))
@@ -59,12 +60,14 @@ class BlockwiseBijectorTest(tf.test.TestCase, parameterized.TestCase):
       self.assertEqual(blockwise_fldj.shape, batch_shape + [])
       self.assertEqual(blockwise_x.shape, batch_shape + [6])
       self.assertEqual(blockwise_ildj.shape, batch_shape + [])
-    self.assertAllEqual(self.evaluate(tf.shape(blockwise_y)), batch_shape + [6])
     self.assertAllEqual(
-        self.evaluate(tf.shape(blockwise_fldj)), batch_shape + [])
-    self.assertAllEqual(self.evaluate(tf.shape(blockwise_x)), batch_shape + [6])
+        self.evaluate(tf.shape(input=blockwise_y)), batch_shape + [6])
     self.assertAllEqual(
-        self.evaluate(tf.shape(blockwise_ildj)), batch_shape + [])
+        self.evaluate(tf.shape(input=blockwise_fldj)), batch_shape + [])
+    self.assertAllEqual(
+        self.evaluate(tf.shape(input=blockwise_x)), batch_shape + [6])
+    self.assertAllEqual(
+        self.evaluate(tf.shape(input=blockwise_ildj)), batch_shape + [])
 
     expl_y = tf.concat([
         exp.forward(x[..., :2]),
@@ -100,8 +103,8 @@ class BlockwiseBijectorTest(tf.test.TestCase, parameterized.TestCase):
     aff = tfb.Affine(scale_diag=[2., 3., 4.])
     blockwise = tfb.Blockwise(bijectors=[exp, sp, aff], block_sizes=[2, 1, 3])
 
-    x = tf.to_float([0.1, 0.2, 0.3, 0.4, 0.5, 0.6])
-    x = tf.placeholder_with_default(x, shape=x.shape)
+    x = tf.cast([0.1, 0.2, 0.3, 0.4, 0.5, 0.6], dtype=tf.float32)
+    x = tf.compat.v1.placeholder_with_default(x, shape=x.shape)
     # Identity to break the caching.
     blockwise_y = tf.identity(blockwise.forward(x))
 
@@ -158,13 +161,13 @@ class BlockwiseBijectorTest(tf.test.TestCase, parameterized.TestCase):
     if tfe.executing_eagerly():
       return
     with self.assertRaises(tf.errors.InvalidArgumentError):
-      block_sizes = tf.placeholder_with_default([1, 2], shape=None)
+      block_sizes = tf.compat.v1.placeholder_with_default([1, 2], shape=None)
       blockwise = tfb.Blockwise(
           bijectors=[tfb.Exp()], block_sizes=block_sizes, validate_args=True)
       self.evaluate(blockwise.block_sizes)
 
     with self.assertRaises(tf.errors.InvalidArgumentError):
-      block_sizes = tf.placeholder_with_default([[1]], shape=None)
+      block_sizes = tf.compat.v1.placeholder_with_default([[1]], shape=None)
       blockwise = tfb.Blockwise(
           bijectors=[tfb.Exp()], block_sizes=block_sizes, validate_args=True)
       self.evaluate(blockwise.block_sizes)

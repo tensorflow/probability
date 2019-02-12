@@ -106,7 +106,7 @@ class ScaleTriL(chain.Chain):
 
       if diag_shift is not None:
         diag_shift = tf.convert_to_tensor(
-            diag_shift, dtype=diag_bijector.dtype, name="diag_shift")
+            value=diag_shift, dtype=diag_bijector.dtype, name="diag_shift")
         diag_bijector = chain.Chain([
             affine_scalar.AffineScalar(shift=diag_shift),
             diag_bijector

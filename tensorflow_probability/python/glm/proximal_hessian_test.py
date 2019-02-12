@@ -63,7 +63,8 @@ class _ProximalHessianTest(object):
 
     radius = np.sqrt(2.)
     model_coefficients *= (
-        radius / tf.linalg.norm(model_coefficients, axis=-1)[..., tf.newaxis])
+        radius /
+        tf.linalg.norm(tensor=model_coefficients, axis=-1)[..., tf.newaxis])
 
     mask = tfd.Bernoulli(probs=0.5, dtype=tf.bool).sample(batch_shape + [d])
     model_coefficients = tf.where(mask, model_coefficients,
@@ -71,7 +72,7 @@ class _ProximalHessianTest(object):
     model_matrix = tfd.Normal(
         loc=np.array(0, dtype), scale=np.array(1, dtype)).sample(
             batch_shape + [n, d], seed=seed())
-    scale = tf.convert_to_tensor(scale, dtype)
+    scale = tf.convert_to_tensor(value=scale, dtype=dtype)
     linear_response = tf.matmul(model_matrix,
                                 model_coefficients[..., tf.newaxis])[..., 0]
 
@@ -89,7 +90,7 @@ class _ProximalHessianTest(object):
     return self.evaluate([model_matrix, response, model_coefficients, mask])
 
   def _make_placeholder(self, x):
-    return tf.placeholder_with_default(
+    return tf.compat.v1.placeholder_with_default(
         input=x, shape=(x.shape if self.use_static_shape else None))
 
   def _adjust_dtype_and_shape_hints(self, x):
@@ -160,7 +161,8 @@ class _ProximalHessianTest(object):
         model_matrix=x_,
         response=y_,
         model=model,
-        model_coefficients_start=tf.convert_to_tensor(model_coefficients_1_),
+        model_coefficients_start=tf.convert_to_tensor(
+            value=model_coefficients_1_),
         l1_regularizer=800.,
         l2_regularizer=None,
         maximum_full_sweeps=1,
@@ -170,7 +172,8 @@ class _ProximalHessianTest(object):
 
     def _joint_log_prob(model_coefficients_):
       predicted_linear_response_ = tf.linalg.matvec(x_, model_coefficients_)
-      return tf.reduce_sum(model.log_prob(y_, predicted_linear_response_))
+      return tf.reduce_sum(
+          input_tensor=model.log_prob(y_, predicted_linear_response_))
 
     self.assertAllGreater(
         _joint_log_prob(model_coefficients_2_) -

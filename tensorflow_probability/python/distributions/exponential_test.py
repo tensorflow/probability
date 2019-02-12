@@ -36,7 +36,7 @@ def try_import(name):  # pylint: disable=invalid-name
   try:
     module = importlib.import_module(name)
   except ImportError as e:
-    tf.logging.warning("Could not import %s: %s" % (name, str(e)))
+    tf.compat.v1.logging.warning("Could not import %s: %s" % (name, str(e)))
   return module
 
 
@@ -200,7 +200,8 @@ class ExponentialTest(tf.test.TestCase):
     kl = tfd.kl_divergence(a, b)
 
     x = a.sample(int(4e5), seed=0)
-    kl_sample = tf.reduce_mean(a.log_prob(x) - b.log_prob(x), axis=0)
+    kl_sample = tf.reduce_mean(
+        input_tensor=a.log_prob(x) - b.log_prob(x), axis=0)
 
     kl_, kl_sample_ = self.evaluate([kl, kl_sample])
     self.assertAllClose(true_kl, kl_, atol=0., rtol=1e-12)

@@ -131,7 +131,7 @@ class _SemiLocalLinearTrendStateSpaceModelTest(object):
     # The variance in latent `slope` should converge to the stationary
     # distribution of an AR1 process:
     latent_covs, _ = semilocal_ssm._joint_covariances()
-    actual_slope_variances = tf.matrix_diag_part(latent_covs)[:, 1]
+    actual_slope_variances = tf.linalg.diag_part(latent_covs)[:, 1]
     converged_slope_variance = actual_slope_variances[-1]
     self.assertAllClose(self.evaluate(converged_slope_variance),
                         stationary_slope_variance, atol=1e-4)
@@ -164,7 +164,7 @@ class _SemiLocalLinearTrendStateSpaceModelTest(object):
     if self.use_static_shape:
       y_batch_shape = y.shape.as_list()[:-2]
     else:
-      y_batch_shape = self.evaluate(tf.shape(y))[:-2]
+      y_batch_shape = self.evaluate(tf.shape(input=y))[:-2]
     self.assertAllEqual(y_batch_shape, batch_shape)
 
   def _build_placeholder(self, ndarray):
@@ -180,7 +180,7 @@ class _SemiLocalLinearTrendStateSpaceModelTest(object):
     """
 
     ndarray = np.asarray(ndarray).astype(self.dtype)
-    return tf.placeholder_with_default(
+    return tf.compat.v1.placeholder_with_default(
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 

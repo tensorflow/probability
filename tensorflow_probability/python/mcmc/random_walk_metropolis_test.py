@@ -30,9 +30,11 @@ tfe = tf.contrib.eager
 
 
 def _reduce_variance(x, axis=None, keepdims=False):
-  sample_mean = tf.math.reduce_mean(x, axis, keepdims=True)
+  sample_mean = tf.math.reduce_mean(input_tensor=x, axis=axis, keepdims=True)
   return tf.math.reduce_mean(
-      tf.math.squared_difference(x, sample_mean), axis, keepdims)
+      input_tensor=tf.math.squared_difference(x, sample_mean),
+      axis=axis,
+      keepdims=keepdims)
 
 
 class RWMTest(tf.test.TestCase):
@@ -54,10 +56,11 @@ class RWMTest(tf.test.TestCase):
         num_burnin_steps=500,
         parallel_iterations=1)  # For determinism.
 
-    sample_mean = tf.math.reduce_mean(samples, axis=0)
+    sample_mean = tf.math.reduce_mean(input_tensor=samples, axis=0)
     sample_std = tf.math.sqrt(
-        tf.math.reduce_mean(tf.math.squared_difference(samples, sample_mean),
-                            axis=0))
+        tf.math.reduce_mean(
+            input_tensor=tf.math.squared_difference(samples, sample_mean),
+            axis=0))
     [sample_mean_, sample_std_] = self.evaluate([sample_mean, sample_std])
 
     self.assertAllClose(sample_mean_, 0., atol=0.1, rtol=0.1)
@@ -78,10 +81,11 @@ class RWMTest(tf.test.TestCase):
         num_burnin_steps=500,
         parallel_iterations=1)  # For determinism.
 
-    sample_mean = tf.math.reduce_mean(samples, axis=0)
+    sample_mean = tf.math.reduce_mean(input_tensor=samples, axis=0)
     sample_std = tf.math.sqrt(
-        tf.math.reduce_mean(tf.math.squared_difference(samples, sample_mean),
-                            axis=0))
+        tf.math.reduce_mean(
+            input_tensor=tf.math.squared_difference(samples, sample_mean),
+            axis=0))
 
     [sample_mean_, sample_std_] = self.evaluate([sample_mean, sample_std])
 
@@ -118,10 +122,11 @@ class RWMTest(tf.test.TestCase):
             seed=42),
         parallel_iterations=1)  # For determinism.
 
-    sample_mean = tf.math.reduce_mean(samples, axis=0)
+    sample_mean = tf.math.reduce_mean(input_tensor=samples, axis=0)
     sample_std = tf.math.sqrt(
-        tf.math.reduce_mean(tf.math.squared_difference(samples, sample_mean),
-                            axis=0))
+        tf.math.reduce_mean(
+            input_tensor=tf.math.squared_difference(samples, sample_mean),
+            axis=0))
     [sample_mean_, sample_std_] = self.evaluate([sample_mean, sample_std])
 
     self.assertAllClose(sample_mean_, 0., atol=0.2, rtol=0.2)
@@ -163,10 +168,10 @@ class RWMTest(tf.test.TestCase):
         parallel_iterations=1)
 
     states = tf.stack(states, axis=-1)
-    sample_mean = tf.math.reduce_mean(states, axis=[0, 1])
+    sample_mean = tf.math.reduce_mean(input_tensor=states, axis=[0, 1])
     x = states - sample_mean
     sample_cov = tf.math.reduce_mean(
-        tf.linalg.matmul(x, x, transpose_a=True), [0, 1])
+        input_tensor=tf.linalg.matmul(x, x, transpose_a=True), axis=[0, 1])
     [sample_mean_, sample_cov_] = self.evaluate([
         sample_mean, sample_cov])
 

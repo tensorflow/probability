@@ -65,8 +65,9 @@ class LogNormal(transformed_distribution.TransformedDistribution):
       dtype = dtype_util.common_dtype([loc, scale], tf.float32)
       super(LogNormal, self).__init__(
           distribution=normal.Normal(
-              loc=tf.convert_to_tensor(loc, name="loc", dtype=dtype),
-              scale=tf.convert_to_tensor(scale, name="scale", dtype=dtype)),
+              loc=tf.convert_to_tensor(value=loc, name="loc", dtype=dtype),
+              scale=tf.convert_to_tensor(
+                  value=scale, name="scale", dtype=dtype)),
           bijector=exp_bijector.Exp(),
           validate_args=validate_args,
           name=name)
@@ -94,5 +95,4 @@ class LogNormal(transformed_distribution.TransformedDistribution):
 
   def _entropy(self):
     return (self.distribution.mean() + 0.5 +
-            tf.log(self.distribution.stddev()) +
-            0.5 * np.log(2 * np.pi))
+            tf.math.log(self.distribution.stddev()) + 0.5 * np.log(2 * np.pi))

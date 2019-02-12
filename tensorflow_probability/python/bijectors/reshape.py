@@ -32,7 +32,7 @@ __all__ = [
 
 
 def _ndims_from_shape(shape):
-  return tf.shape(shape)[0]
+  return tf.shape(input=shape)[0]
 
 
 class Reshape(bijector.Bijector):
@@ -149,12 +149,12 @@ class Reshape(bijector.Bijector):
         name, 'reshape', values=[event_shape_out, event_shape_in]):
 
       event_shape_out = tf.convert_to_tensor(
-          event_shape_out, name='event_shape_out', preferred_dtype=tf.int32)
+          value=event_shape_out, name='event_shape_out', dtype_hint=tf.int32)
       event_shape_in = tf.convert_to_tensor(
-          event_shape_in, name='event_shape_in', preferred_dtype=tf.int32)
+          value=event_shape_in, name='event_shape_in', dtype_hint=tf.int32)
 
       forward_min_event_ndims = tensor_util.constant_value(
-          tf.size(event_shape_in))
+          tf.size(input=event_shape_in))
       if forward_min_event_ndims is None:
         raise NotImplementedError('Rank of `event_shape_in` currently must be '
                                   'statically known. Contact '
@@ -162,7 +162,7 @@ class Reshape(bijector.Bijector):
                                   'a problem for your use case.')
 
       inverse_min_event_ndims = tensor_util.constant_value(
-          tf.size(event_shape_out))
+          tf.size(input=event_shape_out))
       if inverse_min_event_ndims is None:
         raise NotImplementedError('Rank of `event_shape_out` currently must be '
                                   'statically known. Contact '
@@ -195,19 +195,19 @@ class Reshape(bijector.Bijector):
     assertions = []
 
     ndims = tf.rank(shape)
-    ndims_ = tf.contrib.util.constant_value(ndims)
+    ndims_ = tf.get_static_value(ndims)
     if ndims_ is not None and ndims_ > 1:
       raise ValueError('`{}` rank ({}) should be <= 1.'.format(
           shape, ndims_))
     elif validate_args:
       assertions.append(
-          tf.assert_less_equal(
+          tf.compat.v1.assert_less_equal(
               ndims, 1, message='`{}` rank should be <= 1.'.format(shape)))
 
     # Note, we might be inclined to use tensor_util.constant_value_as_shape
     # here, but that method coerces negative values into `None`s, rendering the
     # checks we do below impossible.
-    shape_tensor_ = tf.contrib.util.constant_value(shape)
+    shape_tensor_ = tf.get_static_value(shape)
     if shape_tensor_ is not None:
       es = np.int32(shape_tensor_)
       if sum(es == -1) > 1:
@@ -221,12 +221,13 @@ class Reshape(bijector.Bijector):
             .format(shape, es))
     elif validate_args:
       assertions.extend([
-          tf.assert_less_equal(
-              tf.reduce_sum(tf.cast(tf.equal(shape, -1), tf.int32)),
+          tf.compat.v1.assert_less_equal(
+              tf.reduce_sum(
+                  input_tensor=tf.cast(tf.equal(shape, -1), tf.int32)),
               1,
-              message='`{}` elements must have at most one `-1`.'
-              .format(shape)),
-          tf.assert_greater_equal(
+              message='`{}` elements must have at most one `-1`.'.format(
+                  shape)),
+          tf.compat.v1.assert_greater_equal(
               shape,
               -1,
               message='`{}` elements must be either positive integers or `-1`.'
@@ -248,13 +249,17 @@ class Reshape(bijector.Bijector):
     # is rank-1 and `tf.boolean_mask` will check this as a precondition.
     mask = reference_event_shape >= 0
     mask.set_shape([reference_event_shape.shape.num_elements()])
-    explicitly_known_event_shape_dims = tf.boolean_mask(event_shape, mask)
+    explicitly_known_event_shape_dims = tf.boolean_mask(
+        tensor=event_shape, mask=mask)
     explicitly_known_reference_event_shape_dims = tf.boolean_mask(
-        reference_event_shape, mask)
-    return [tf.assert_equal(
-        explicitly_known_event_shape_dims,
-        explicitly_known_reference_event_shape_dims,
-        message='Input `event_shape` does not match `reference_event_shape`.')]
+        tensor=reference_event_shape, mask=mask)
+    return [
+        tf.compat.v1.assert_equal(
+            explicitly_known_event_shape_dims,
+            explicitly_known_reference_event_shape_dims,
+            message='Input `event_shape` does not match `reference_event_shape`.'
+        )
+    ]
 
   def _forward(self, x):
     with tf.control_dependencies(self._assertions):
@@ -333,7 +338,7 @@ class Reshape(bijector.Bijector):
 
     # Compute the new shape as a `Tensor`.
     new_shape = self._replace_event_shape_in_shape_tensor(
-        tf.shape(x), event_shape_in, event_shape_out)
+        tf.shape(input=x), event_shape_in, event_shape_out)
 
     return new_shape_, new_shape
 
@@ -376,7 +381,7 @@ class Reshape(bijector.Bijector):
       #
       # If `event_shape_in` is not statically known, we can only add runtime
       # validations to the graph (if enabled).
-      event_shape_in_ = tf.contrib.util.constant_value(event_shape_in)
+      event_shape_in_ = tf.get_static_value(event_shape_in)
       if event_shape_in_ is not None:
         # Check that `event_shape_` and `event_shape_in` are compatible in
         # the sense that they have equal entries in any position that isn't a
@@ -420,7 +425,7 @@ class Reshape(bijector.Bijector):
           tensorshape, event_shape_in, event_shape_out)
       if shape_out_.is_fully_defined():
         shape_out = tf.convert_to_tensor(
-            shape_out_.as_list(), preferred_dtype=tf.int32)
+            value=shape_out_.as_list(), dtype_hint=tf.int32)
         return shape_out
 
     # If not possible statically, use fully dynamic reshaping.

@@ -32,7 +32,7 @@ def try_import(name):  # pylint: disable=invalid-name
   try:
     module = importlib.import_module(name)
   except ImportError as e:
-    tf.logging.warning("Could not import %s: %s" % (name, str(e)))
+    tf.compat.v1.logging.warning("Could not import %s: %s" % (name, str(e)))
   return module
 
 
@@ -363,7 +363,8 @@ class GammaTest(tf.test.TestCase):
     g0 = gamma_lib.Gamma(concentration=alpha0, rate=beta0)
     g1 = gamma_lib.Gamma(concentration=alpha1, rate=beta1)
     x = g0.sample(int(1e4), seed=0)
-    kl_sample = tf.reduce_mean(g0.log_prob(x) - g1.log_prob(x), 0)
+    kl_sample = tf.reduce_mean(
+        input_tensor=g0.log_prob(x) - g1.log_prob(x), axis=0)
     kl_actual = kullback_leibler.kl_divergence(g0, g1)
 
     # Execute graph.

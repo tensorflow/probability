@@ -61,12 +61,11 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers,
       training: Boolean of whether bijector runs in training or inference mode.
     """
     x_ = np.arange(5 * 4 * 2).astype(np.float32).reshape(input_shape)
-    x = tf.placeholder_with_default(
-        x_,
-        input_shape if 0 in event_dims else (None,) + input_shape[1:])
+    x = tf.compat.v1.placeholder_with_default(
+        x_, input_shape if 0 in event_dims else (None,) + input_shape[1:])
     # When training, memorize the exact mean of the last
     # minibatch that it normalized (instead of moving average assignment).
-    layer = tf.layers.BatchNormalization(
+    layer = tf.compat.v1.layers.BatchNormalization(
         axis=event_dims, momentum=0., epsilon=0.)
     batch_norm = tfb.BatchNormalization(
         batchnorm_layer=layer, training=training)
@@ -81,7 +80,7 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers,
       # Use identity to invalidate cache.
       ildj = batch_norm.inverse_log_det_jacobian(
           tf.identity(denorm_x), event_ndims=len(event_dims))
-    self.evaluate(tf.global_variables_initializer())
+    self.evaluate(tf.compat.v1.global_variables_initializer())
     # Update variables.
     norm_x_ = self.evaluate(norm_x)
     [
@@ -138,7 +137,7 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers,
 
   def testMaximumLikelihoodTraining(self):
     # Test Maximum Likelihood training with default bijector.
-    training = tf.placeholder_with_default(True, (), "training")
+    training = tf.compat.v1.placeholder_with_default(True, (), "training")
     base_dist = distributions.MultivariateNormalDiag(loc=[0., 0.])
     batch_norm = tfb.BatchNormalization(training=training)
     dist = distributions.TransformedDistribution(
@@ -147,12 +146,12 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers,
     target_dist = distributions.MultivariateNormalDiag(loc=[1., 2.])
     target_samples = target_dist.sample(200)
     dist_samples = dist.sample(3000)
-    loss = -tf.reduce_mean(dist.log_prob(target_samples))
+    loss = -tf.reduce_mean(input_tensor=dist.log_prob(target_samples))
     with tf.control_dependencies(batch_norm.batchnorm.updates):
-      train_op = tf.train.AdamOptimizer(1e-2).minimize(loss)
+      train_op = tf.compat.v1.train.AdamOptimizer(1e-2).minimize(loss)
       moving_mean = tf.identity(batch_norm.batchnorm.moving_mean)
       moving_var = tf.identity(batch_norm.batchnorm.moving_variance)
-    self.evaluate(tf.global_variables_initializer())
+    self.evaluate(tf.compat.v1.global_variables_initializer())
     for _ in range(3000):
       self.evaluate(train_op)
     [
@@ -172,8 +171,8 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers,
       ("2d_event_ndims", (10, 4), [-1], False),
       ("1d_event_ndims", 2, [-1], False))
   def testLogProb(self, event_shape, event_dims, training):
-    training = tf.placeholder_with_default(training, (), "training")
-    layer = tf.layers.BatchNormalization(axis=event_dims, epsilon=0.)
+    training = tf.compat.v1.placeholder_with_default(training, (), "training")
+    layer = tf.compat.v1.layers.BatchNormalization(axis=event_dims, epsilon=0.)
     batch_norm = tfb.BatchNormalization(batchnorm_layer=layer,
                                         training=training)
     base_dist = distributions.MultivariateNormalDiag(
@@ -193,7 +192,7 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers,
     # to the identity transformation.
     base_log_prob = base_dist.log_prob(samples)
     dist_log_prob = dist.log_prob(samples)
-    self.evaluate(tf.global_variables_initializer())
+    self.evaluate(tf.compat.v1.global_variables_initializer())
     base_log_prob_, dist_log_prob_ = self.evaluate(
         [base_log_prob, dist_log_prob])
     self.assertAllClose(base_log_prob_, dist_log_prob_)
@@ -201,8 +200,8 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers,
   def testMutuallyConsistent(self):
     # BatchNorm bijector is only mutually consistent when training=False.
     dims = 4
-    training = tf.placeholder_with_default(False, (), "training")
-    layer = tf.layers.BatchNormalization(epsilon=0.)
+    training = tf.compat.v1.placeholder_with_default(False, (), "training")
+    layer = tf.compat.v1.layers.BatchNormalization(epsilon=0.)
     batch_norm = tfb.BatchNormalization(batchnorm_layer=layer,
                                         training=training)
     dist = distributions.TransformedDistribution(
@@ -221,8 +220,8 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers,
   def testInvertMutuallyConsistent(self):
     # BatchNorm bijector is only mutually consistent when training=False.
     dims = 4
-    training = tf.placeholder_with_default(False, (), "training")
-    layer = tf.layers.BatchNormalization(epsilon=0.)
+    training = tf.compat.v1.placeholder_with_default(False, (), "training")
+    layer = tf.compat.v1.layers.BatchNormalization(epsilon=0.)
     batch_norm = tfb.Invert(
         tfb.BatchNormalization(batchnorm_layer=layer, training=training))
     dist = distributions.TransformedDistribution(

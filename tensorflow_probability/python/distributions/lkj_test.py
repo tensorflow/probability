@@ -31,7 +31,8 @@ tfe = tf.contrib.eager
 
 def _det_ok_mask(x, det_bounds, input_output_cholesky=False):
   if input_output_cholesky:
-    logdet = 2.0 * tf.reduce_sum(tf.log(tf.matrix_diag_part(x)), axis=[-1])
+    logdet = 2.0 * tf.reduce_sum(
+        input_tensor=tf.math.log(tf.linalg.diag_part(x)), axis=[-1])
   else:
     _, logdet = tf.linalg.slogdet(x)
 
@@ -131,11 +132,13 @@ class LKJTest(parameterized.TestCase, tf.test.TestCase):
     chk1 = st.assert_true_mean_equal_by_dkwm(
         importance_weights, low=0., high=importance_maxima + high_tolerance,
         expected=means, false_fail_rate=1e-6)
-    chk2 = tf.assert_less(
+    chk2 = tf.compat.v1.assert_less(
         st.min_discrepancy_of_true_means_detectable_by_dkwm(
-            num_samples, low=0., high=importance_maxima + high_tolerance,
-            false_fail_rate=1e-6, false_pass_rate=1e-6),
-        dtype(target_discrepancy))
+            num_samples,
+            low=0.,
+            high=importance_maxima + high_tolerance,
+            false_fail_rate=1e-6,
+            false_pass_rate=1e-6), dtype(target_discrepancy))
     self.evaluate([chk1, chk2])
 
   def testSampleConsistentLogProb2(self, dtype):
@@ -237,14 +240,13 @@ class LKJTest(parameterized.TestCase, tf.test.TestCase):
         expected_low=lows,
         expected_high=highs,
         false_fail_rate=false_fail_rate)
-    check2 = tf.assert_less(
+    check2 = tf.compat.v1.assert_less(
         st.min_discrepancy_of_true_means_detectable_by_dkwm(
             num_samples,
             low=0.,
             high=importance_maxima + high_tolerance,
             false_fail_rate=false_fail_rate,
-            false_pass_rate=false_fail_rate),
-        dtype(target_discrepancy))
+            false_pass_rate=false_fail_rate), dtype(target_discrepancy))
     self.evaluate([check1, check2])
 
   def testSampleConsistentLogProbInterval3(self, dtype):
@@ -337,9 +339,11 @@ class LKJTest(parameterized.TestCase, tf.test.TestCase):
         samples=results, low=-1., high=1.,
         expected=mean,
         false_fail_rate=1e-6)
-    check2 = tf.assert_less(
+    check2 = tf.compat.v1.assert_less(
         st.min_discrepancy_of_true_means_detectable_by_dkwm(
-            num_samples, low=-1., high=1.,
+            num_samples,
+            low=-1.,
+            high=1.,
             # Smaller false fail rate because of different batch sizes between
             # these two checks.
             false_fail_rate=1e-7,
@@ -357,7 +361,7 @@ class LKJTestGraphOnly(tf.test.TestCase):
     with self.assertRaisesOpError('dimension mismatch'):
       self.evaluate(
           testee_lkj.log_prob(
-              tf.placeholder_with_default(tf.eye(4), shape=None)))
+              tf.compat.v1.placeholder_with_default(tf.eye(4), shape=None)))
 
 
 if __name__ == '__main__':

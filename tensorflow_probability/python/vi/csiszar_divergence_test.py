@@ -32,8 +32,7 @@ tfe = tf.contrib.eager
 def tridiag(d, diag_value, offdiag_value):
   """d x d matrix with given value on diag, and one super/sub diag."""
   diag_mat = tf.eye(d) * (diag_value - offdiag_value)
-  three_bands = tf.matrix_band_part(
-      tf.fill([d, d], offdiag_value), 1, 1)
+  three_bands = tf.linalg.band_part(tf.fill([d, d], offdiag_value), 1, 1)
   return diag_mat + three_bands
 
 
@@ -902,7 +901,7 @@ class CsiszarVIMCOTest(test_case.TestCase):
     logu = p.log_prob(x) - q.log_prob(x)
     f_log_sum_u = f(tfp.vi.csiszar_vimco_helper(logu)[0])
 
-    grad_sum = lambda fs: tf.gradients(fs, s)[0]
+    grad_sum = lambda fs: tf.gradients(ys=fs, xs=s)[0]
 
     def jacobian(x):
       # Warning: this function is slow and may not even finish if prod(shape)

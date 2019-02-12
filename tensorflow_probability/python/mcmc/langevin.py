@@ -439,7 +439,7 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
         target_log_prob_fn=target_log_prob_fn,
         step_size=step_size,
         volatility_fn=volatility_fn,
-        compute_acceptance=tf.convert_to_tensor(compute_acceptance),
+        compute_acceptance=tf.convert_to_tensor(value=compute_acceptance),
         seed=seed,
         parallel_iterations=parallel_iterations,
         name=name)
@@ -515,10 +515,11 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
 
         random_draw_parts = []
         for s in current_state_parts:
-          random_draw_parts.append(tf.random_normal(
-              shape=tf.shape(s),
-              dtype=s.dtype.base_dtype,
-              seed=self._seed_stream()))
+          random_draw_parts.append(
+              tf.random.normal(
+                  shape=tf.shape(input=s),
+                  dtype=s.dtype.base_dtype,
+                  seed=self._seed_stream()))
 
       # Number of independent chains run by the algorithm.
       independent_chain_ndims = distribution_util.prefer_static_rank(
@@ -565,9 +566,9 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
       log_acceptance_correction_skip = tf.zeros_like(next_target_log_prob)
 
       log_acceptance_correction = tf.cond(
-          self.compute_acceptance,
-          lambda: log_acceptance_correction_compute,
-          lambda: log_acceptance_correction_skip)
+          pred=self.compute_acceptance,
+          true_fn=lambda: log_acceptance_correction_compute,
+          false_fn=lambda: log_acceptance_correction_skip)
 
       return [
           maybe_flatten(next_state_parts),
@@ -591,7 +592,9 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
                           if mcmc_util.is_list_like(init_state)
                           else [init_state])
 
-      init_state_parts = [tf.convert_to_tensor(x) for x in init_state_parts]
+      init_state_parts = [
+          tf.convert_to_tensor(value=x) for x in init_state_parts
+      ]
       init_volatility = self.volatility_fn(*init_state_parts)  # pylint: disable=not-callable
 
       [
@@ -844,26 +847,28 @@ def _compute_log_acceptance_correction(current_state_parts,
       proposed_volatility *= tf.sqrt(step_size)
       # Compute part of `q(proposed_state | current_state)`
       proposed_energy = (
-          tf.reduce_sum(mcmc_util.safe_sum(
-              [tf.log(current_volatility), 0.5 * (proposed_energy**2)]),
-                        axis=axis))
+          tf.reduce_sum(
+              input_tensor=mcmc_util.safe_sum(
+                  [tf.math.log(current_volatility),
+                   0.5 * (proposed_energy**2)]),
+              axis=axis))
       proposed_log_density_parts.append(-proposed_energy)
 
       # Compute part of `q(current_state | proposed_state)`
       dual_energy = (state_diff + proposed_drift) / proposed_volatility
       dual_energy = (
           tf.reduce_sum(
-              mcmc_util.safe_sum(
-                  [tf.log(proposed_volatility), 0.5 * (dual_energy**2)]),
+              input_tensor=mcmc_util.safe_sum(
+                  [tf.math.log(proposed_volatility), 0.5 * (dual_energy**2)]),
               axis=axis))
       dual_log_density_parts.append(-dual_energy)
 
     # Compute `q(proposed_state | current_state)`
     proposed_log_density_reduce = tf.reduce_sum(
-        tf.stack(proposed_log_density_parts, axis=-1), axis=-1)
+        input_tensor=tf.stack(proposed_log_density_parts, axis=-1), axis=-1)
     # Compute `q(current_state | proposed_state)`
     dual_log_density_reduce = tf.reduce_sum(
-        tf.stack(dual_log_density_parts, axis=-1), axis=-1)
+        input_tensor=tf.stack(dual_log_density_parts, axis=-1), axis=-1)
 
     return mcmc_util.safe_sum([dual_log_density_reduce,
                                -proposed_log_density_reduce])
@@ -965,8 +970,9 @@ def _prepare_args(target_log_prob_fn,
                 else [step_size])
   step_sizes = [
       tf.convert_to_tensor(
-          s, name='step_size', dtype=target_log_prob.dtype)
-      for s in step_sizes]
+          value=s, name='step_size', dtype=target_log_prob.dtype)
+      for s in step_sizes
+  ]
   if len(step_sizes) == 1:
     step_sizes *= len(state_parts)
   if len(state_parts) != len(step_sizes):

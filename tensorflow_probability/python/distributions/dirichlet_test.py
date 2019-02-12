@@ -32,7 +32,7 @@ def try_import(name):  # pylint: disable=invalid-name
   try:
     module = importlib.import_module(name)
   except ImportError as e:
-    tf.logging.warning("Could not import %s: %s" % (name, str(e)))
+    tf.compat.v1.logging.warning("Could not import %s: %s" % (name, str(e)))
   return module
 
 
@@ -163,11 +163,12 @@ class DirichletTest(tf.test.TestCase):
                       [2.5, 4, 0.01]], dtype=np.float32)
     dist = dirichlet_lib.Dirichlet(alpha)  # batch_shape=[2], event_shape=[3]
     x = dist.sample(int(250e3), seed=1)
-    sample_mean = tf.reduce_mean(x, 0)
+    sample_mean = tf.reduce_mean(input_tensor=x, axis=0)
     x_centered = x - sample_mean[None, ...]
-    sample_cov = tf.reduce_mean(tf.matmul(
-        x_centered[..., None], x_centered[..., None, :]), 0)
-    sample_var = tf.matrix_diag_part(sample_cov)
+    sample_cov = tf.reduce_mean(
+        input_tensor=tf.matmul(x_centered[..., None], x_centered[..., None, :]),
+        axis=0)
+    sample_var = tf.linalg.diag_part(sample_cov)
     sample_stddev = tf.sqrt(sample_var)
 
     [
@@ -274,7 +275,8 @@ class DirichletTest(tf.test.TestCase):
     d1 = dirichlet_lib.Dirichlet(conc1)
     d2 = dirichlet_lib.Dirichlet(conc2)
     x = d1.sample(int(1e4), seed=0)
-    kl_sample = tf.reduce_mean(d1.log_prob(x) - d2.log_prob(x), 0)
+    kl_sample = tf.reduce_mean(
+        input_tensor=d1.log_prob(x) - d2.log_prob(x), axis=0)
     kl_actual = kullback_leibler.kl_divergence(d1, d2)
 
     kl_sample_val = self.evaluate(kl_sample)

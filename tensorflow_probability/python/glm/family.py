@@ -126,7 +126,7 @@ class ExponentialFamily(object):
     """
     with self._name_scope(name, 'call', [predicted_linear_response]):
       predicted_linear_response = tf.convert_to_tensor(
-          predicted_linear_response, name='predicted_linear_response')
+          value=predicted_linear_response, name='predicted_linear_response')
       return self._call(predicted_linear_response)
 
   def _log_prob(self, response, predicted_linear_response):
@@ -154,9 +154,9 @@ class ExponentialFamily(object):
         name, 'log_prob', [response, predicted_linear_response]):
       dtype = dtype_util.common_dtype([response, predicted_linear_response])
       response = tf.convert_to_tensor(
-          response, dtype=dtype, name='response')
+          value=response, dtype=dtype, name='response')
       predicted_linear_response = tf.convert_to_tensor(
-          predicted_linear_response, name='predicted_linear_response')
+          value=predicted_linear_response, name='predicted_linear_response')
       return self._log_prob(response, predicted_linear_response)
 
   def __str__(self):
@@ -240,7 +240,7 @@ class CustomExponentialFamily(
       v, g = tf.contrib.eager.value_and_gradients_function(fn1)(arg)
     else:
       v = fn(arg)
-      g = tf.gradients(v, [arg])
+      g = tf.gradients(ys=v, xs=[arg])
     return v, g[0]
 
 
@@ -358,7 +358,7 @@ class LogNormal(ExponentialFamily):
 
   def _log_prob(self, y, r):
     dtype = r.dtype.as_numpy_dtype
-    log_y = tf.log(y)
+    log_y = tf.math.log(y)
     s2 = np.log(2.).astype(dtype)
     return -log_y + tfd.Normal(
         loc=r - 0.5 * s2,
@@ -380,10 +380,10 @@ class LogNormalSoftplus(ExponentialFamily):
 
   def _log_prob(self, y, r):
     dtype = r.dtype.as_numpy_dtype
-    log_y = tf.log(y)
+    log_y = tf.math.log(y)
     s2 = np.log(2.).astype(dtype)
     return tfd.Normal(
-        loc=tf.log(tf.nn.softplus(r)) - 0.5 * s2,
+        loc=tf.math.log(tf.nn.softplus(r)) - 0.5 * s2,
         scale=np.sqrt(s2)).log_prob(log_y) - log_y
 
 

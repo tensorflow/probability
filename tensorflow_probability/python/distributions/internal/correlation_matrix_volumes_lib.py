@@ -67,7 +67,7 @@ def try_import(name):  # pylint: disable=invalid-name
   try:
     module = importlib.import_module(name)
   except ImportError as e:
-    tf.logging.warning("Could not import %s: %s" % (name, str(e)))
+    tf.compat.v1.logging.warning("Could not import %s: %s" % (name, str(e)))
   return module
 
 optimize = try_import("scipy.optimize")
@@ -99,9 +99,9 @@ def _psd_mask(x):
   # factorization can complete and 'look' like everything is fine
   # (e.g., O(1) entries and a diagonal of all ones) but the matrix can
   # have an exponential condition number.
-  eigenvalues, _ = tf.self_adjoint_eig(x)
+  eigenvalues, _ = tf.linalg.eigh(x)
   return tf.cast(
-      tf.reduce_min(eigenvalues, axis=-1) >= 0, dtype=x.dtype)
+      tf.reduce_min(input_tensor=eigenvalues, axis=-1) >= 0, dtype=x.dtype)
 
 
 def _det_large_enough_mask(x, det_bounds):
@@ -127,8 +127,7 @@ def _det_large_enough_mask(x, det_bounds):
   # Cholesky is roughly half the cost of Gaussian Elimination with
   # Partial Pivoting. But this is less of an impact than the switch in
   # _psd_mask.
-  return tf.cast(
-      tf.matrix_determinant(x) > det_bounds, dtype=x.dtype)
+  return tf.cast(tf.linalg.det(x) > det_bounds, dtype=x.dtype)
 
 
 def _uniform_correlation_like_matrix(num_rows, batch_shape, dtype, seed):
@@ -163,11 +162,11 @@ def _uniform_correlation_like_matrix(num_rows, batch_shape, dtype, seed):
   # `matrix_band_part`.
   unifs = uniform.Uniform(-ones, ones).sample(batch_shape, seed=seed)
   tril = util.fill_triangular(unifs)
-  symmetric = tril + tf.matrix_transpose(tril)
+  symmetric = tril + tf.linalg.transpose(tril)
   diagonal_ones = tf.ones(
       shape=util.pad(batch_shape, axis=0, back=True, value=num_rows),
       dtype=dtype)
-  return tf.matrix_set_diag(symmetric, diagonal_ones)
+  return tf.linalg.set_diag(symmetric, diagonal_ones)
 
 
 def correlation_matrix_volume_rejection_samples(
@@ -319,7 +318,7 @@ def compute_true_volumes(
       tuple giving the confidence interval.
   """
   bounds = {}
-  with tf.Session() as sess:
+  with tf.compat.v1.Session() as sess:
     rej_weights, _ = correlation_matrix_volume_rejection_samples(
         det_bounds, dim, [num_samples, len(det_bounds)], np.float32, seed=seed)
     rej_weights = sess.run(rej_weights)

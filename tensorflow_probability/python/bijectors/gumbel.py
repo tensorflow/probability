@@ -64,12 +64,12 @@ class Gumbel(bijector.Bijector):
     self._name = name
     self._validate_args = validate_args
     with self._name_scope("init", values=[loc, scale]):
-      self._loc = tf.convert_to_tensor(loc, name="loc")
-      self._scale = tf.convert_to_tensor(scale, name="scale")
-      tf.assert_same_float_dtype([self._loc, self._scale])
+      self._loc = tf.convert_to_tensor(value=loc, name="loc")
+      self._scale = tf.convert_to_tensor(value=scale, name="scale")
+      tf.debugging.assert_same_float_dtype([self._loc, self._scale])
       if validate_args:
         self._scale = control_flow_ops.with_dependencies([
-            tf.assert_positive(
+            tf.compat.v1.assert_positive(
                 self._scale, message="Argument scale was not positive")
         ], self._scale)
 
@@ -94,22 +94,22 @@ class Gumbel(bijector.Bijector):
 
   def _inverse(self, y):
     y = self._maybe_assert_valid_y(y)
-    return self.loc - self.scale * tf.log(-tf.log(y))
+    return self.loc - self.scale * tf.math.log(-tf.math.log(y))
 
   def _inverse_log_det_jacobian(self, y):
     y = self._maybe_assert_valid_y(y)
-    return tf.log(self.scale / (-tf.log(y) * y))
+    return tf.math.log(self.scale / (-tf.math.log(y) * y))
 
   def _forward_log_det_jacobian(self, x):
     z = (x - self.loc) / self.scale
-    return -z - tf.exp(-z) - tf.log(self.scale)
+    return -z - tf.exp(-z) - tf.math.log(self.scale)
 
   def _maybe_assert_valid_y(self, y):
     if not self.validate_args:
       return y
-    is_positive = tf.assert_non_negative(
+    is_positive = tf.compat.v1.assert_non_negative(
         y, message="Inverse transformation input must be greater than 0.")
-    less_than_one = tf.assert_less_equal(
+    less_than_one = tf.compat.v1.assert_less_equal(
         y,
         tf.constant(1., y.dtype),
         message="Inverse transformation input must be less than or equal to 1.")

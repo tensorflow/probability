@@ -231,11 +231,11 @@ class StructuralTimeSeries(object):
     """
 
     with tf.name_scope('joint_log_prob', values=[observed_time_series]):
-      observed_time_series = tf.convert_to_tensor(observed_time_series)
+      observed_time_series = tf.convert_to_tensor(value=observed_time_series)
       observed_time_series = sts_util.maybe_expand_trailing_dim(
           observed_time_series)
       num_timesteps = distribution_util.prefer_static_value(
-          tf.shape(observed_time_series))[-2]
+          tf.shape(input=observed_time_series))[-2]
 
       def log_joint_fn(*param_vals):
         """Generated log-density function."""
@@ -259,7 +259,7 @@ class StructuralTimeSeries(object):
         sample_ndims = tf.maximum(0,
                                   tf.rank(observation_lp) - tf.rank(param_lp))
         observation_lp = tf.reduce_sum(
-            observation_lp, axis=tf.range(sample_ndims))
+            input_tensor=observation_lp, axis=tf.range(sample_ndims))
 
         return param_lp + observation_lp
 

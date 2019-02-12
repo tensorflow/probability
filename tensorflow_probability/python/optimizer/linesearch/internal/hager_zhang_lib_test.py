@@ -48,7 +48,7 @@ def test_function_x_y(x, y):
   x = tf.reshape(tf.tile(x, [b]), (b, n, 1))  # Repeat x on all batches.
 
   def f(t):
-    t = tf.convert_to_tensor(t)
+    t = tf.convert_to_tensor(value=t)
     while len(t.shape) < 3:
       t = tf.expand_dims(t, axis=-1)
     with tf.GradientTape() as g:

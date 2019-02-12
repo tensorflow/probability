@@ -34,7 +34,7 @@ def try_import(name):  # pylint: disable=invalid-name
   try:
     module = importlib.import_module(name)
   except ImportError as e:
-    tf.logging.warning("Could not import %s: %s" % (name, str(e)))
+    tf.compat.v1.logging.warning("Could not import %s: %s" % (name, str(e)))
   return module
 
 
@@ -175,11 +175,11 @@ class StudentTTest(tf.test.TestCase):
     sigma = tf.constant(math.sqrt(10.))
     n = tf.constant(100)
 
-    tf.set_random_seed(654321)
+    tf.compat.v1.set_random_seed(654321)
     student = student_t.StudentT(df=df, loc=mu, scale=sigma, name="student_t1")
     samples1 = self.evaluate(student.sample(n, seed=123456))
 
-    tf.set_random_seed(654321)
+    tf.compat.v1.set_random_seed(654321)
     student2 = student_t.StudentT(df=df, loc=mu, scale=sigma, name="student_t2")
     samples2 = self.evaluate(student2.sample(n, seed=123456))
 

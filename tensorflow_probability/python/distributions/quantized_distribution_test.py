@@ -318,7 +318,7 @@ class QuantizedDistributionTest(test_case.TestCase):
     for dtype in [np.float32, np.float64]:
       mu = tf.Variable(0., name="mu", dtype=dtype)
       sigma = tf.Variable(1., name="sigma", dtype=dtype)
-      self.evaluate(tf.global_variables_initializer())
+      self.evaluate(tf.compat.v1.global_variables_initializer())
       grads = self.compute_gradients(
           quantized_log_prob(dtype), args=[mu, sigma])
       self._assert_all_finite(
@@ -328,7 +328,7 @@ class QuantizedDistributionTest(test_case.TestCase):
 
   def testProbAndGradGivesFiniteResultsForCommonEvents(self):
     def quantized_log_prob(mu, sigma):
-      x = tf.ceil(4 * rng.rand(100).astype(np.float32) - 2)
+      x = tf.math.ceil(4 * rng.rand(100).astype(np.float32) - 2)
 
       qdist = tfd.QuantizedDistribution(
           distribution=tfd.Normal(loc=mu, scale=sigma))
@@ -337,7 +337,7 @@ class QuantizedDistributionTest(test_case.TestCase):
     mu = tf.Variable(0.0, name="mu")
     sigma = tf.Variable(1.0, name="sigma")
 
-    self.evaluate(tf.global_variables_initializer())
+    self.evaluate(tf.compat.v1.global_variables_initializer())
     grads = self.compute_gradients(
         quantized_log_prob, args=[mu, sigma])
     self._assert_all_finite(
@@ -356,7 +356,7 @@ class QuantizedDistributionTest(test_case.TestCase):
       self.evaluate(qdist.sample())
 
   def testCutoffsMustBeIntegerValuedIfValidateArgsTrue(self):
-    low = tf.placeholder_with_default(input=1.5, shape=[])
+    low = tf.compat.v1.placeholder_with_default(input=1.5, shape=[])
     with self.assertRaisesOpError("has non-integer components"):
       qdist = tfd.QuantizedDistribution(
           distribution=tfd.Normal(loc=0., scale=1.),

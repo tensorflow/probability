@@ -136,24 +136,25 @@ def externalize_variables_as_args(fn,
       y = fn(*fn_args)  # Side-effect: adds trainable vars.
       if possible_ancestor_vars is None:
         possible_ancestor_vars = (
-            tf.trainable_variables() + tf.get_collection(
-                tf.GraphKeys.TRAINABLE_RESOURCE_VARIABLES))
+            tf.compat.v1.trainable_variables() + tf.compat.v1.get_collection(
+                tf.compat.v1.GraphKeys.TRAINABLE_RESOURCE_VARIABLES))
       # TODO(b/72873296): Add a dedicated op for identifying ancestors.
       ancestors = [
           v for g, v in zip(
-              tf.gradients(y, possible_ancestor_vars), possible_ancestor_vars)
-          if g is not None
+              tf.gradients(ys=y, xs=possible_ancestor_vars),
+              possible_ancestor_vars) if g is not None
       ]
       ancestor_variables = sorted(ancestors, key=lambda v: v.name)
   n = len(fn_args)
 
   def _fn(*args):
     with tf.name_scope("wrapped_fn"):
-      vars_dict = dict(
-          (k, tf.convert_to_tensor(v, dtype=k.dtype.base_dtype, name=k.op.name))
-          for k, v in zip(ancestor_variables, args[n:]))
-      with tf.variable_scope(
-          tf.get_variable_scope(),
+      vars_dict = dict((k,
+                        tf.convert_to_tensor(
+                            value=v, dtype=k.dtype.base_dtype, name=k.op.name))
+                       for k, v in zip(ancestor_variables, args[n:]))
+      with tf.compat.v1.variable_scope(
+          tf.compat.v1.get_variable_scope(),
           reuse=True,
           custom_getter=_make_bypassing_custom_getter_fn(vars_dict)):
         return fn(*args[:n])

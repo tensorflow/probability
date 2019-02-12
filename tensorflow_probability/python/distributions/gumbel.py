@@ -129,13 +129,13 @@ class Gumbel(transformed_distribution.TransformedDistribution):
     """
     with tf.name_scope(name, values=[loc, scale]) as name:
       dtype = dtype_util.common_dtype([loc, scale], preferred_dtype=tf.float32)
-      loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
-      scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
-      with tf.control_dependencies([tf.assert_positive(scale)]
-                                   if validate_args else []):
+      loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
+      scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
+      with tf.control_dependencies(
+          [tf.compat.v1.assert_positive(scale)] if validate_args else []):
         loc = tf.identity(loc, name="loc")
         scale = tf.identity(scale, name="scale")
-        tf.assert_same_float_dtype([loc, scale])
+        tf.debugging.assert_same_float_dtype([loc, scale])
         self._gumbel_bijector = gumbel_bijector.Gumbel(
             loc=loc, scale=scale, validate_args=validate_args)
 
@@ -155,7 +155,7 @@ class Gumbel(transformed_distribution.TransformedDistribution):
   def _param_shapes(sample_shape):
     return dict(
         zip(("loc", "scale"),
-            ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 2)))
+            ([tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)] * 2)))
 
   @property
   def loc(self):
@@ -170,7 +170,7 @@ class Gumbel(transformed_distribution.TransformedDistribution):
   def _entropy(self):
     # Use broadcasting rules to calculate the full broadcast sigma.
     scale = self.scale * tf.ones_like(self.loc)
-    return 1. + tf.log(scale) + np.euler_gamma
+    return 1. + tf.math.log(scale) + np.euler_gamma
 
   def _mean(self):
     return self.loc + self.scale * np.euler_gamma
@@ -203,8 +203,8 @@ def _kl_gumbel_gumbel(a, b, name=None):
     # There is actually an error in the solution as printed; this is based on
     # the second-to-last step of the derivation. The value as printed would be
     # off by (a.loc - b.loc) / b.scale.
-    return (tf.log(b.scale) - tf.log(a.scale)
-            + np.euler_gamma * (a.scale / b.scale - 1.)
-            + tf.expm1((b.loc - a.loc)/b.scale +
-                       tf.lgamma(a.scale / b.scale + 1.))
-            + (a.loc - b.loc) / b.scale)
+    return (tf.math.log(b.scale) - tf.math.log(a.scale) + np.euler_gamma *
+            (a.scale / b.scale - 1.) +
+            tf.math.expm1((b.loc - a.loc) / b.scale +
+                          tf.math.lgamma(a.scale / b.scale + 1.)) +
+            (a.loc - b.loc) / b.scale)

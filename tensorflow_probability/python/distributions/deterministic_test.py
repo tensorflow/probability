@@ -150,11 +150,11 @@ class DeterministicTest(tf.test.TestCase):
           self.evaluate(sample))
 
   def testSampleDynamicWithBatchDims(self):
-    loc = tf.placeholder_with_default(input=[0., 0], shape=[2])
+    loc = tf.compat.v1.placeholder_with_default(input=[0., 0], shape=[2])
 
     deterministic = tfd.Deterministic(loc)
     for sample_shape_ in [(), (4,)]:
-      sample_shape = tf.placeholder_with_default(
+      sample_shape = tf.compat.v1.placeholder_with_default(
           input=np.array(sample_shape_, dtype=np.int32), shape=None)
       sample_ = self.evaluate(deterministic.sample(sample_shape))
       self.assertAllClose(
@@ -206,7 +206,7 @@ class VectorDeterministicTest(tf.test.TestCase):
     self.assertEqual(deterministic.event_shape, tf.TensorShape([4]))
 
   def testShapeUknown(self):
-    loc = tf.placeholder_with_default(np.float32([0]), shape=[None])
+    loc = tf.compat.v1.placeholder_with_default(np.float32([0]), shape=[None])
     deterministic = tfd.VectorDeterministic(loc)
     self.assertAllEqual(deterministic.event_shape_tensor().shape, [1])
 
@@ -293,11 +293,12 @@ class VectorDeterministicTest(tf.test.TestCase):
           self.evaluate(sample))
 
   def testSampleDynamicWithBatchDims(self):
-    loc = tf.placeholder_with_default(input=[[0.], [0.]], shape=[2, 1])
+    loc = tf.compat.v1.placeholder_with_default(
+        input=[[0.], [0.]], shape=[2, 1])
 
     deterministic = tfd.VectorDeterministic(loc)
     for sample_shape_ in [(), (4,)]:
-      sample_shape = tf.placeholder_with_default(
+      sample_shape = tf.compat.v1.placeholder_with_default(
           input=np.array(sample_shape_, dtype=np.int32), shape=None)
       sample_ = self.evaluate(deterministic.sample(sample_shape))
       self.assertAllClose(

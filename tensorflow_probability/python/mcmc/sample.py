@@ -203,23 +203,22 @@ def sample_chain(
       name, "mcmc_sample_chain",
       [num_results, num_burnin_steps, num_steps_between_results]):
     num_results = tf.convert_to_tensor(
-        num_results,
-        dtype=tf.int32,
-        name="num_results")
+        value=num_results, dtype=tf.int32, name="num_results")
     num_burnin_steps = tf.convert_to_tensor(
-        num_burnin_steps,
-        dtype=tf.int64,
-        name="num_burnin_steps")
+        value=num_burnin_steps, dtype=tf.int64, name="num_burnin_steps")
     num_steps_between_results = tf.convert_to_tensor(
-        num_steps_between_results,
+        value=num_steps_between_results,
         dtype=tf.int64,
         name="num_steps_between_results")
 
     if mcmc_util.is_list_like(current_state):
-      current_state = [tf.convert_to_tensor(s, name="current_state")
-                       for s in current_state]
+      current_state = [
+          tf.convert_to_tensor(value=s, name="current_state")
+          for s in current_state
+      ]
     else:
-      current_state = tf.convert_to_tensor(current_state, name="current_state")
+      current_state = tf.convert_to_tensor(
+          value=current_state, name="current_state")
 
     def _scan_body(args_list, num_steps):
       """Closure which implements `tf.scan` body."""

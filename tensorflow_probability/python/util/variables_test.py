@@ -28,14 +28,14 @@ import tensorflow_probability as tfp
 
 
 def test_fn(x):
-  x = tf.convert_to_tensor(x, name='x')
+  x = tf.convert_to_tensor(value=x, name='x')
   dtype = x.dtype.as_numpy_dtype
   s = x.shape.as_list()
-  z = tf.get_variable(
+  z = tf.compat.v1.get_variable(
       name='z',
       dtype=dtype,
       initializer=np.arange(np.prod(s)).reshape(s).astype(dtype))
-  y = tf.get_variable(
+  y = tf.compat.v1.get_variable(
       name='y',
       dtype=dtype,
       initializer=np.arange(np.prod(s)).reshape(s).astype(dtype)**2)
@@ -50,14 +50,14 @@ class _WrapCallableTest(object):
       wrapped_fn, vars_args = tfp.util.externalize_variables_as_args(
           test_fn, [x])
 
-      tf.get_variable_scope().reuse_variables()
+      tf.compat.v1.get_variable_scope().reuse_variables()
 
       result = wrapped_fn(self.dtype(2), [3, 4, 5], 0.5)
 
-      y_actual = tf.get_variable('y', dtype=self.dtype)
-      z_actual = tf.get_variable('z', dtype=self.dtype)
+      y_actual = tf.compat.v1.get_variable('y', dtype=self.dtype)
+      z_actual = tf.compat.v1.get_variable('z', dtype=self.dtype)
 
-      tf.global_variables_initializer().run()
+      tf.compat.v1.global_variables_initializer().run()
       result_ = self.evaluate(result)
 
       self.assertEqual(self.dtype, result_.dtype)
@@ -69,16 +69,16 @@ class _WrapCallableTest(object):
       x = tf.constant(self.dtype([0.1, 0.2]))
 
       _ = test_fn(self.dtype([0., 0.]))   # Needed to create vars.
-      tf.get_variable_scope().reuse_variables()
+      tf.compat.v1.get_variable_scope().reuse_variables()
 
-      y_actual = tf.get_variable('y', dtype=self.dtype)
+      y_actual = tf.compat.v1.get_variable('y', dtype=self.dtype)
 
       wrapped_fn, vars_args = tfp.util.externalize_variables_as_args(
           test_fn, [x], possible_ancestor_vars=[y_actual])
 
       result = wrapped_fn(self.dtype([2, 3]), 0.5)  # x, y
 
-      tf.global_variables_initializer().run()
+      tf.compat.v1.global_variables_initializer().run()
       result_ = self.evaluate(result)
 
       self.assertEqual(self.dtype, result_.dtype)
@@ -90,7 +90,7 @@ class _WrapCallableTest(object):
       x = tf.constant(self.dtype([0.1, 0.2]))
       wrapped_fn, _ = tfp.util.externalize_variables_as_args(
           test_fn, [x], possible_ancestor_vars=[])
-      tf.get_variable_scope().reuse_variables()
+      tf.compat.v1.get_variable_scope().reuse_variables()
       with warnings.catch_warnings(record=True) as w:
         wrapped_fn(self.dtype(2))
       w = sorted(w, key=lambda w: str(w.message))
@@ -110,7 +110,7 @@ class _WrapCallableTest(object):
           [x],
           possible_ancestor_vars=[],
           assert_variable_override=True)
-      tf.get_variable_scope().reuse_variables()
+      tf.compat.v1.get_variable_scope().reuse_variables()
       with self.assertRaisesRegexp(ValueError, 'not found'):
         wrapped_fn(self.dtype(2))
 

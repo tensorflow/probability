@@ -33,8 +33,8 @@ class InlineBijectorTest(tf.test.TestCase):
     exp = tfb.Exp()
     inline = tfb.Inline(
         forward_fn=tf.exp,
-        inverse_fn=tf.log,
-        inverse_log_det_jacobian_fn=lambda y: -tf.log(y),
+        inverse_fn=tf.math.log,
+        inverse_log_det_jacobian_fn=lambda y: -tf.math.log(y),
         forward_log_det_jacobian_fn=lambda x: x,
         forward_min_event_ndims=0,
         name="exp")

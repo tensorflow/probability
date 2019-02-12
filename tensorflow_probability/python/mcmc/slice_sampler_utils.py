@@ -63,7 +63,7 @@ def _left_doubling_increments(batch_shape, max_doublings, step_size, seed=None,
   with tf.name_scope(name, 'left_doubling_increments',
                      [batch_shape, max_doublings, step_size]):
 
-    step_size = tf.convert_to_tensor(step_size)
+    step_size = tf.convert_to_tensor(value=step_size)
     dtype = step_size.dtype.base_dtype
     # Output shape of the left increments tensor.
     output_shape = tf.concat(([max_doublings + 1], batch_shape), axis=0)
@@ -115,14 +115,14 @@ def _find_best_interval_idx(x, name=None):
   """
   with tf.name_scope(name, 'find_best_interval_idx', [x]):
     # Returns max_doublings + 1. Positive int32.
-    k = tf.shape(x)[0]
+    k = tf.shape(input=x)[0]
     dtype = x.dtype.base_dtype
     # Factors by which to multiply the flag. Corresponds to (2 * k - i) above.
     mults = tf.range(2 * k, k, -1, dtype=dtype)[:, tf.newaxis]
     # Factors by which to shift the flag. Corresponds to i above. Ensures the
     # widest bounds are selected if there are no bounds outside the slice.
     shifts = tf.range(k, dtype=dtype)[:, tf.newaxis]
-    indices = tf.argmax(mults * x + shifts, axis=0, output_type=dtype)
+    indices = tf.argmax(input=mults * x + shifts, axis=0, output_type=dtype)
     return indices
 
 
@@ -177,14 +177,11 @@ def slice_bounds_by_doubling(x_initial,
   with tf.name_scope(name, 'slice_bounds_by_doubling',
                      [x_initial, log_slice_heights, max_doublings, step_size]):
     seed_gen = distributions.SeedStream(seed, salt='slice_bounds_by_doubling')
-    x_initial = tf.convert_to_tensor(x_initial)
-    batch_shape = tf.shape(x_initial)
+    x_initial = tf.convert_to_tensor(value=x_initial)
+    batch_shape = tf.shape(input=x_initial)
     dtype = step_size.dtype.base_dtype
-    left_endpoints = x_initial + step_size * tf.random_uniform(batch_shape,
-                                                               minval=-1.0,
-                                                               maxval=0.0,
-                                                               dtype=dtype,
-                                                               seed=seed_gen())
+    left_endpoints = x_initial + step_size * tf.random.uniform(
+        batch_shape, minval=-1.0, maxval=0.0, dtype=dtype, seed=seed_gen())
 
     # Compute the increments by which we need to step the upper and lower bounds
     # part of the doubling procedure.
@@ -204,12 +201,15 @@ def slice_bounds_by_doubling(x_initial,
 
     both_ok_f = tf.reshape(both_ok, [max_doublings + 1, -1])
 
-    best_interval_idx = _find_best_interval_idx(tf.to_int32(both_ok_f))
+    best_interval_idx = _find_best_interval_idx(
+        tf.cast(both_ok_f, dtype=tf.int32))
 
     # Formats the above index as required to use with gather_nd.
-    point_index_gather = tf.stack([best_interval_idx,
-                                   tf.range(tf.size(best_interval_idx))],
-                                  axis=1, name='point_index_gather')
+    point_index_gather = tf.stack(
+        [best_interval_idx,
+         tf.range(tf.size(input=best_interval_idx))],
+        axis=1,
+        name='point_index_gather')
     left_ep_f = tf.reshape(left_endpoints, [max_doublings + 1, -1])
     right_ep_f = tf.reshape(right_endpoints, [max_doublings + 1, -1])
     # The x values of the uppper and lower bounds of the slices for each chain.
@@ -217,7 +217,7 @@ def slice_bounds_by_doubling(x_initial,
                               batch_shape)
     upper_bounds = tf.reshape(tf.gather_nd(right_ep_f, point_index_gather),
                               batch_shape)
-    both_ok = tf.reduce_any(both_ok, axis=0)
+    both_ok = tf.reduce_any(input_tensor=both_ok, axis=0)
     return upper_bounds, lower_bounds, both_ok
 
 
@@ -267,7 +267,8 @@ def _test_acceptance(x_initial, target_log_prob, decided, log_slice_heights,
     # value (step_size) or if the point has already been rejected.
     def cond(_, decided, *ignored_args):  # pylint: disable=unused-argument
       # Continue until all the points have been decided.
-      return ~tf.reduce_all(decided)
+      return ~tf.reduce_all(input_tensor=decided)
+
     acceptable = tf.ones_like(x_initial, dtype=tf.bool)
     def body(acceptable, decided, left, right, d):
       """Checks reversibility as described on P717 of Neal 2003."""
@@ -292,9 +293,10 @@ def _test_acceptance(x_initial, target_log_prob, decided, log_slice_heights,
                       now_decided)
       return (next_acceptable, next_decided, next_left, next_right, next_d)
 
-    return tf.while_loop(cond, body=body, loop_vars=(acceptable, decided,
-                                                     lower_bounds,
-                                                     upper_bounds, d))[0]
+    return tf.while_loop(
+        cond=cond,
+        body=body,
+        loop_vars=(acceptable, decided, lower_bounds, upper_bounds, d))[0]
 
 
 def _sample_with_shrinkage(x_initial, target_log_prob, log_slice_heights,
@@ -340,14 +342,14 @@ def _sample_with_shrinkage(x_initial, target_log_prob, log_slice_heights,
     seed_gen = distributions.SeedStream(seed, salt='_sample_with_shrinkage')
     # Keeps track of whether an acceptable sample has been found for the chain.
     found = tf.zeros_like(x_initial, dtype=tf.bool)
-    cond = lambda found, *ignored_args: ~tf.reduce_all(found)
+    cond = lambda found, *ignored_args: ~tf.reduce_all(input_tensor=found)
     x_next = tf.identity(x_initial)
-    x_initial_shape = tf.shape(x_initial)
+    x_initial_shape = tf.shape(input=x_initial)
     x_initial_dtype = x_initial.dtype.base_dtype
     def _body(found, left, right, x_next):
       """Iterates until every chain has found a suitable next state."""
-      proportions = tf.random_uniform(x_initial_shape, dtype=x_initial_dtype,
-                                      seed=seed_gen())
+      proportions = tf.random.uniform(
+          x_initial_shape, dtype=x_initial_dtype, seed=seed_gen())
       x_proposed = tf.where(~found, left + proportions * (right - left), x_next)
       accept_res = _test_acceptance(x_initial, target_log_prob=target_log_prob,
                                     decided=found,
@@ -366,8 +368,10 @@ def _sample_with_shrinkage(x_initial, target_log_prob, log_slice_heights,
       next_right = tf.where(x_proposed >= x_initial, x_proposed, right)
       return next_found, next_left, next_right, x_proposed
 
-    return tf.while_loop(cond, body=_body, loop_vars=(found, lower_bounds,
-                                                      upper_bounds, x_next))[-1]
+    return tf.while_loop(
+        cond=cond,
+        body=_body,
+        loop_vars=(found, lower_bounds, upper_bounds, x_next))[-1]
 
 
 def slice_sampler_one_dim(target_log_prob, x_initial, step_size=0.01,
@@ -405,12 +409,12 @@ def slice_sampler_one_dim(target_log_prob, x_initial, step_size=0.01,
   """
   with tf.name_scope(name, 'slice_sampler_one_dim',
                      [x_initial, step_size, max_doublings]):
-    x_initial = tf.convert_to_tensor(x_initial)
+    x_initial = tf.convert_to_tensor(value=x_initial)
     # Obtain the input dtype of the array.
     dtype = x_initial.dtype.base_dtype
     # Select the height of the slice. Tensor of shape x_initial.shape.
-    log_slice_heights = target_log_prob(x_initial) - tf.random_gamma(
-        tf.shape(x_initial), alpha=1, dtype=dtype, seed=seed)
+    log_slice_heights = target_log_prob(x_initial) - tf.random.gamma(
+        tf.shape(input=x_initial), alpha=1, dtype=dtype, seed=seed)
     # Given the above x and slice heights, compute the bounds of the slice for
     # each chain.
     upper_bounds, lower_bounds, bounds_satisfied = slice_bounds_by_doubling(

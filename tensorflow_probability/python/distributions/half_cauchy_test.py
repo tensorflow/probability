@@ -31,8 +31,8 @@ tfe = tf.contrib.eager
 class _HalfCauchyTest(object):
 
   def _create_placeholder_with_default(self, default, name=None):
-    default_ = tf.convert_to_tensor(default, dtype=self.dtype)
-    return tf.placeholder_with_default(
+    default_ = tf.convert_to_tensor(value=default, dtype=self.dtype)
+    return tf.compat.v1.placeholder_with_default(
         input=default_,
         shape=default_.shape if self.use_static_shape else None,
         name=name)
@@ -45,7 +45,8 @@ class _HalfCauchyTest(object):
     loc = tf.zeros(loc_shape)
     scale = tf.ones(scale_shape)
     self.assertAllEqual(
-        expected, self.evaluate(tf.shape(tfd.HalfCauchy(loc, scale).sample())))
+        expected,
+        self.evaluate(tf.shape(input=tfd.HalfCauchy(loc, scale).sample())))
 
   def _test_param_static_shapes(self, sample_shape, expected):
     param_shapes = tfd.HalfCauchy.param_static_shapes(sample_shape)
@@ -125,7 +126,7 @@ class _HalfCauchyTest(object):
       else:
         expected_shape = tf.TensorShape(None)
       self.assertEqual(tfp_res.shape, expected_shape)
-      self.assertAllEqual(self.evaluate(tf.shape(tfp_res)), (batch_size,))
+      self.assertAllEqual(self.evaluate(tf.shape(input=tfp_res)), (batch_size,))
       self.assertAllClose(
           self.evaluate(tfp_res),
           scipy_f(x_, loc_, scale_))
@@ -164,7 +165,8 @@ class _HalfCauchyTest(object):
       else:
         expected_shape = tf.TensorShape(None)
       self.assertEqual(tfp_res.shape, expected_shape)
-      self.assertAllEqual(self.evaluate(tf.shape(tfp_res)), (batch_size, 3))
+      self.assertAllEqual(
+          self.evaluate(tf.shape(input=tfp_res)), (batch_size, 3))
       self.assertAllClose(
           self.evaluate(tfp_res),
           scipy_f(x_, loc_, scale_))
@@ -186,7 +188,7 @@ class _HalfCauchyTest(object):
       else:
         expected_shape = tf.TensorShape(None)
       self.assertEqual(tfp_res.shape, expected_shape)
-      self.assertAllEqual(self.evaluate(tf.shape(tfp_res)), (6, 3))
+      self.assertAllEqual(self.evaluate(tf.shape(input=tfp_res)), (6, 3))
       self.assertAllClose(
           self.evaluate(tfp_res),
           scipy_f(x_, loc_, scale_))
@@ -210,7 +212,7 @@ class _HalfCauchyTest(object):
       else:
         expected_shape = tf.TensorShape(None)
       self.assertEqual(tfp_res.shape, expected_shape)
-      self.assertAllEqual(self.evaluate(tf.shape(tfp_res)), (batch_size,))
+      self.assertAllEqual(self.evaluate(tf.shape(input=tfp_res)), (batch_size,))
       self.assertAllClose(
           self.evaluate(tfp_res),
           scipy_f(x_, loc_, scale_))
@@ -249,7 +251,8 @@ class _HalfCauchyTest(object):
       else:
         expected_shape = tf.TensorShape(None)
       self.assertEqual(tfp_res.shape, expected_shape)
-      self.assertAllEqual(self.evaluate(tf.shape(tfp_res)), (batch_size, 3))
+      self.assertAllEqual(
+          self.evaluate(tf.shape(input=tfp_res)), (batch_size, 3))
       self.assertAllClose(
           self.evaluate(tfp_res),
           scipy_f(x_, loc_, scale_))
@@ -271,7 +274,7 @@ class _HalfCauchyTest(object):
       else:
         expected_shape = tf.TensorShape(None)
       self.assertEqual(tfp_res.shape, expected_shape)
-      self.assertAllEqual(self.evaluate(tf.shape(tfp_res)), (6, 3))
+      self.assertAllEqual(self.evaluate(tf.shape(input=tfp_res)), (6, 3))
       self.assertAllClose(
           self.evaluate(tfp_res),
           scipy_f(x_, loc_, scale_))
@@ -325,7 +328,7 @@ class _HalfCauchyTest(object):
     else:
       expected_shape = tf.TensorShape(None)
     self.assertEqual(entropy.shape, expected_shape)
-    self.assertAllEqual(self.evaluate(tf.shape(entropy)), (batch_size,))
+    self.assertAllEqual(self.evaluate(tf.shape(input=entropy)), (batch_size,))
     self.assertAllClose(
         self.evaluate(entropy),
         [stats.halfcauchy.entropy(loc_, scale_)] * batch_size)
@@ -346,7 +349,7 @@ class _HalfCauchyTest(object):
     else:
       expected_shape = tf.TensorShape(None)
     self.assertEqual(quantile.shape, expected_shape)
-    self.assertAllEqual(self.evaluate(tf.shape(quantile)), (batch_size,))
+    self.assertAllEqual(self.evaluate(tf.shape(input=quantile)), (batch_size,))
     self.assertAllClose(
         self.evaluate(quantile),
         stats.halfcauchy.ppf(p_, loc_, scale_))
@@ -382,7 +385,7 @@ class _HalfCauchyTest(object):
     scale = self._create_placeholder_with_default(
         [scale_] * batch_size, name="scale")
     n_ = [int(1e5), 2]
-    n = tf.convert_to_tensor(n_, dtype=tf.int32, name="n")
+    n = tf.convert_to_tensor(value=n_, dtype=tf.int32, name="n")
     half_cauchy = tfd.HalfCauchy(loc=loc, scale=scale)
     samples = half_cauchy.sample(n)
     sample_values = self.evaluate(samples)

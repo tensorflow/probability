@@ -77,7 +77,7 @@ class VectorLaplaceDiagTest(tf.test.TestCase):
     diag = [1., -2]
     dist = tfd.VectorLaplaceDiag(mu, diag, validate_args=True)
     samps = self.evaluate(dist.sample(int(1e4), seed=0))
-    cov_mat = 2. * self.evaluate(tf.matrix_diag(diag))**2
+    cov_mat = 2. * self.evaluate(tf.linalg.diag(diag))**2
 
     self.assertAllClose(mu, samps.mean(axis=0), atol=0., rtol=0.05)
     self.assertAllClose(cov_mat, np.cov(samps.T), atol=0.05, rtol=0.05)
@@ -104,7 +104,7 @@ class VectorLaplaceDiagTest(tf.test.TestCase):
 
     n = int(1e4)
     samps = self.evaluate(dist.sample(n, seed=0))
-    cov_mat = 2. * self.evaluate(tf.matrix_diag(diag))**2
+    cov_mat = 2. * self.evaluate(tf.linalg.diag(diag))**2
     sample_cov = np.matmul(
         samps.transpose([1, 2, 0]), samps.transpose([1, 0, 2])) / n
 

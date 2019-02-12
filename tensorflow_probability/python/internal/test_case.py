@@ -75,5 +75,5 @@ class TestCase(tf.test.TestCase):
         grads = grad_fn(*args)
     else:
       res = f(*args)
-      grads = tf.gradients(res, args, grad_ys=grad_ys)
+      grads = tf.gradients(ys=res, xs=args, grad_ys=grad_ys)
     return self.evaluate(grads)

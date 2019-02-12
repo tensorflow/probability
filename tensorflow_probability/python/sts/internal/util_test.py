@@ -159,12 +159,14 @@ class UtilityTests(tf.test.TestCase):
     if tf.executing_eagerly(): return
 
     batch_shapes = ([2], [3, 2], [1, 2])
-    distributions = [tfd.Normal(
-        loc=tf.placeholder_with_default(
-            input=tf.zeros(batch_shape), shape=None),
-        scale=tf.placeholder_with_default(
-            input=tf.ones(batch_shape), shape=None))
-                     for batch_shape in batch_shapes]
+    distributions = [
+        tfd.Normal(
+            loc=tf.compat.v1.placeholder_with_default(
+                input=tf.zeros(batch_shape), shape=None),
+            scale=tf.compat.v1.placeholder_with_default(
+                input=tf.ones(batch_shape), shape=None))
+        for batch_shape in batch_shapes
+    ]
 
     self.assertAllEqual(
         [3, 2], self.evaluate(sts_util.broadcast_batch_shape(distributions)))
@@ -193,7 +195,7 @@ class UtilityTests(tf.test.TestCase):
     ]:
       shape_out = self.evaluate(
           sts_util.maybe_expand_trailing_dim(
-              tf.placeholder_with_default(
+              tf.compat.v1.placeholder_with_default(
                   input=tf.zeros(shape_in), shape=static_shape))).shape
       self.assertAllEqual(shape_out, expected_shape_out)
 

@@ -91,9 +91,9 @@ class _LinearRegressionTest(object):
             "observation_noise_scale": observation_noise_scale_prior.mode()})
 
     loss = -learnable_ssm.log_prob(predicted_time_series)
-    train_op = tf.train.AdamOptimizer(0.1).minimize(loss)
+    train_op = tf.compat.v1.train.AdamOptimizer(0.1).minimize(loss)
     with self.test_session() as sess:
-      sess.run(tf.global_variables_initializer())
+      sess.run(tf.compat.v1.global_variables_initializer())
       for _ in range(80):
         _ = sess.run(train_op)
       self.assertAllClose(*sess.run((true_weights, learnable_weights)),
@@ -142,7 +142,7 @@ class _LinearRegressionTest(object):
     """
 
     ndarray = np.asarray(ndarray).astype(self.dtype)
-    return tf.placeholder_with_default(
+    return tf.compat.v1.placeholder_with_default(
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 

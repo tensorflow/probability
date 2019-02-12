@@ -158,7 +158,7 @@ class GeneratedRandomVariablesTest(parameterized.TestCase, tf.test.TestCase):
 
   def testValueUnknownShape(self):
     # should not raise error
-    ed.Bernoulli(probs=0.5, value=tf.placeholder(tf.int32))
+    ed.Bernoulli(probs=0.5, value=tf.compat.v1.placeholder(tf.int32))
 
   @tfe.run_test_in_graph_and_eager_modes
   def testAsRandomVariable(self):

@@ -98,7 +98,7 @@ def make_simple_step_size_update_policy(num_adaptation_steps,
       `step_size_var, kernel_results` and returns updated step size(s).
   """
   if step_counter is None and num_adaptation_steps is not None:
-    step_counter = tf.get_variable(
+    step_counter = tf.compat.v1.get_variable(
         name='step_size_adaptation_step_counter',
         initializer=np.array(-1, dtype=np.int64),
         # Specify the dtype for variable sharing to work correctly
@@ -125,13 +125,15 @@ def make_simple_step_size_update_policy(num_adaptation_steps,
       if mcmc_util.is_list_like(step_size_var):
         return [tf.identity(ss) for ss in step_size_var]
       return tf.identity(step_size_var)
-    log_n = tf.log(tf.cast(tf.size(kernel_results.log_accept_ratio),
-                           kernel_results.log_accept_ratio.dtype))
+    log_n = tf.math.log(
+        tf.cast(
+            tf.size(input=kernel_results.log_accept_ratio),
+            kernel_results.log_accept_ratio.dtype))
     log_mean_accept_ratio = tf.reduce_logsumexp(
-        tf.minimum(kernel_results.log_accept_ratio, 0.)) - log_n
+        input_tensor=tf.minimum(kernel_results.log_accept_ratio, 0.)) - log_n
     adjustment = tf.where(
         log_mean_accept_ratio < tf.cast(
-            tf.log(target_rate), log_mean_accept_ratio.dtype),
+            tf.math.log(target_rate), log_mean_accept_ratio.dtype),
         -decrement_multiplier / (1. + decrement_multiplier),
         increment_multiplier)
 
@@ -148,9 +150,10 @@ def make_simple_step_size_update_policy(num_adaptation_steps,
       return build_assign_op()
     else:
       with tf.control_dependencies([step_counter.assign_add(1)]):
-        return tf.cond(step_counter < num_adaptation_steps,
-                       build_assign_op,
-                       lambda: step_size_var)
+        return tf.cond(
+            pred=step_counter < num_adaptation_steps,
+            true_fn=build_assign_op,
+            false_fn=lambda: step_size_var)
 
   return step_size_simple_update_fn
 
@@ -618,10 +621,11 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
 
       current_momentum_parts = []
       for x in current_state_parts:
-        current_momentum_parts.append(tf.random_normal(
-            shape=tf.shape(x),
-            dtype=x.dtype.base_dtype,
-            seed=self._seed_stream()))
+        current_momentum_parts.append(
+            tf.random.normal(
+                shape=tf.shape(input=x),
+                dtype=x.dtype.base_dtype,
+                seed=self._seed_stream()))
 
       def _leapfrog_one_step(*args):
         """Closure representing computation done during each leapfrog step."""
@@ -636,7 +640,9 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
             state_gradients_are_stopped=self.state_gradients_are_stopped)
 
       num_leapfrog_steps = tf.convert_to_tensor(
-          self.num_leapfrog_steps, dtype=tf.int64, name='num_leapfrog_steps')
+          value=self.num_leapfrog_steps,
+          dtype=tf.int64,
+          name='num_leapfrog_steps')
 
       [
           next_momentum_parts,
@@ -680,7 +686,7 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
       if self.state_gradients_are_stopped:
         init_state = [tf.stop_gradient(x) for x in init_state]
       else:
-        init_state = [tf.convert_to_tensor(x) for x in init_state]
+        init_state = [tf.convert_to_tensor(value=x) for x in init_state]
       [
           init_target_log_prob,
           init_grads_target_log_prob,
@@ -1012,9 +1018,11 @@ def _compute_log_acceptance_correction(current_momentums,
       log_current_kinetic.append(_log_sum_sq(current_momentum, axis))
       log_proposed_kinetic.append(_log_sum_sq(proposed_momentum, axis))
     current_kinetic = 0.5 * tf.exp(
-        tf.reduce_logsumexp(tf.stack(log_current_kinetic, axis=-1), axis=-1))
+        tf.reduce_logsumexp(
+            input_tensor=tf.stack(log_current_kinetic, axis=-1), axis=-1))
     proposed_kinetic = 0.5 * tf.exp(
-        tf.reduce_logsumexp(tf.stack(log_proposed_kinetic, axis=-1), axis=-1))
+        tf.reduce_logsumexp(
+            input_tensor=tf.stack(log_proposed_kinetic, axis=-1), axis=-1))
     return mcmc_util.safe_sum([current_kinetic, -proposed_kinetic])
 
 
@@ -1027,8 +1035,9 @@ def _prepare_args(target_log_prob_fn,
                   state_gradients_are_stopped=False):
   """Helper which processes input args to meet list-like assumptions."""
   state_parts = list(state) if mcmc_util.is_list_like(state) else [state]
-  state_parts = [tf.convert_to_tensor(s, name='current_state')
-                 for s in state_parts]
+  state_parts = [
+      tf.convert_to_tensor(value=s, name='current_state') for s in state_parts
+  ]
   if state_gradients_are_stopped:
     state_parts = [tf.stop_gradient(x) for x in state_parts]
   target_log_prob, grads_target_log_prob = mcmc_util.maybe_call_fn_and_grads(
@@ -1040,8 +1049,9 @@ def _prepare_args(target_log_prob_fn,
                 else [step_size])
   step_sizes = [
       tf.convert_to_tensor(
-          s, name='step_size', dtype=target_log_prob.dtype)
-      for s in step_sizes]
+          value=s, name='step_size', dtype=target_log_prob.dtype)
+      for s in step_sizes
+  ]
   if len(step_sizes) == 1:
     step_sizes *= len(state_parts)
   if len(state_parts) != len(step_sizes):
@@ -1059,4 +1069,5 @@ def _prepare_args(target_log_prob_fn,
 
 def _log_sum_sq(x, axis=None):
   """Computes log(sum(x**2))."""
-  return tf.reduce_logsumexp(2. * tf.log(tf.abs(x)), axis)
+  return tf.reduce_logsumexp(
+      input_tensor=2. * tf.math.log(tf.abs(x)), axis=axis)

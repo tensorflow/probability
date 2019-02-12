@@ -117,27 +117,27 @@ class RationalQuadratic(psd_kernel.PositiveSemidefiniteKernel):
 
       if amplitude is not None:
         amplitude = tf.convert_to_tensor(
-            amplitude, name="amplitude", dtype=dtype)
+            value=amplitude, name="amplitude", dtype=dtype)
       self._amplitude = _validate_arg_if_not_none(
-          amplitude, tf.assert_positive, validate_args)
+          amplitude, tf.compat.v1.assert_positive, validate_args)
 
       if scale_mixture_rate is not None:
         scale_mixture_rate = tf.convert_to_tensor(
-            scale_mixture_rate, name="scale_mixture_rate", dtype=dtype)
+            value=scale_mixture_rate, name="scale_mixture_rate", dtype=dtype)
       self._scale_mixture_rate = _validate_arg_if_not_none(
-          scale_mixture_rate, tf.assert_positive, validate_args)
+          scale_mixture_rate, tf.compat.v1.assert_positive, validate_args)
 
       if length_scale is not None:
         length_scale = tf.convert_to_tensor(
-            length_scale, name="length_scale", dtype=dtype)
+            value=length_scale, name="length_scale", dtype=dtype)
       self._length_scale = _validate_arg_if_not_none(
-          length_scale, tf.assert_positive, validate_args)
+          length_scale, tf.compat.v1.assert_positive, validate_args)
 
     super(RationalQuadratic, self).__init__(feature_ndims, name)
 
   def _apply(self, x1, x2, param_expansion_ndims=0):
     difference = util.sum_rightmost_ndims_preserving_shape(
-        tf.squared_difference(x1, x2), ndims=self.feature_ndims)
+        tf.math.squared_difference(x1, x2), ndims=self.feature_ndims)
     difference /= 2
 
     if self.length_scale is not None:
@@ -188,11 +188,9 @@ class RationalQuadratic(psd_kernel.PositiveSemidefiniteKernel):
 
   def _batch_shape_tensor(self):
     shape_list = [
-        tf.shape(x) for x in [
-            self.amplitude,
-            self.scale_mixture_rate,
-            self.length_scale
-        ] if x is not None
+        tf.shape(input=x)
+        for x in [self.amplitude, self.scale_mixture_rate, self.length_scale]
+        if x is not None
     ]
     if not shape_list:
       return tf.constant([], dtype=tf.int32)

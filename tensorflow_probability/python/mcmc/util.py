@@ -68,21 +68,22 @@ def _choose_base_case(is_accepted,
     """Helper to expand `is_accepted` like the shape of some input arg."""
     with tf.name_scope('expand_is_accepted_like'):
       expand_shape = tf.concat([
-          tf.shape(is_accepted),
-          tf.ones([tf.rank(x) - tf.rank(is_accepted)],
-                  dtype=tf.int32),
-      ], axis=0)
+          tf.shape(input=is_accepted),
+          tf.ones([tf.rank(x) - tf.rank(is_accepted)], dtype=tf.int32),
+      ],
+                               axis=0)
       multiples = tf.concat([
           tf.ones([tf.rank(is_accepted)], dtype=tf.int32),
-          tf.shape(x)[tf.rank(is_accepted):],
-      ], axis=0)
+          tf.shape(input=x)[tf.rank(is_accepted):],
+      ],
+                            axis=0)
       m = tf.tile(tf.reshape(is_accepted, expand_shape),
                   multiples)
       m.set_shape(m.shape.merge_with(x.shape))
       return m
   def _where(accepted, rejected):
-    accepted = tf.convert_to_tensor(accepted, name='accepted')
-    rejected = tf.convert_to_tensor(rejected, name='rejected')
+    accepted = tf.convert_to_tensor(value=accepted, name='accepted')
+    rejected = tf.convert_to_tensor(value=rejected, name='rejected')
     r = tf.where(_expand_is_accepted_like(accepted), accepted, rejected)
     r.set_shape(r.shape.merge_with(accepted.shape.merge_with(rejected.shape)))
     return r
@@ -147,15 +148,16 @@ def safe_sum(x, alt_value=-np.inf, name=None):
     # always False, i.e., we're implicitly capturing NaN and explicitly
     # capturing +/- Inf.
     is_sum_determinate = (
-        tf.reduce_all(tf.is_finite(x) | (x >= 0.), axis=-1) &
-        tf.reduce_all(tf.is_finite(x) | (x <= 0.), axis=-1))
+        tf.reduce_all(input_tensor=tf.math.is_finite(x) | (x >= 0.), axis=-1)
+        & tf.reduce_all(input_tensor=tf.math.is_finite(x) | (x <= 0.), axis=-1))
     is_sum_determinate = tf.tile(
         is_sum_determinate[..., tf.newaxis],
         multiples=tf.concat([tf.ones(tf.rank(x) - 1, dtype=tf.int64), [n]],
                             axis=0))
     alt_value = np.array(alt_value, x.dtype.as_numpy_dtype)
-    x = tf.where(is_sum_determinate, x, tf.fill(tf.shape(x), value=alt_value))
-    x = tf.reduce_sum(x, axis=-1)
+    x = tf.where(is_sum_determinate, x,
+                 tf.fill(tf.shape(input=x), value=alt_value))
+    x = tf.reduce_sum(input_tensor=x, axis=-1)
     x.set_shape(x.shape.merge_with(in_shape))
     return x
 
@@ -172,7 +174,8 @@ def _value_and_gradients(fn, fn_arg_list, result=None, grads=None, name=None):
   """Helper to `maybe_call_fn_and_grads`."""
   with tf.name_scope(name, 'value_and_gradients', [fn_arg_list, result, grads]):
     def _convert_to_tensor(x, name):
-      ctt = lambda x_: x_ if x_ is None else tf.convert_to_tensor(x_, name=name)
+      ctt = lambda x_: x_ if x_ is None else tf.convert_to_tensor(
+          value=x_, name=name)
       return [ctt(x_) for x_ in x] if is_list_like(x) else ctt(x)
 
     fn_arg_list = (list(fn_arg_list) if is_list_like(fn_arg_list)
@@ -213,10 +216,12 @@ def _value_and_gradients(fn, fn_arg_list, result=None, grads=None, name=None):
         # Compute the block diagonal of Jacobian.
         # TODO(b/79158574): Guard this calculation by an arg which explicitly
         # requests block diagonal Jacobian calculation.
-        grads = [tf.gradients(result[i], fn_arg_list[i])[0]
-                 for i in range(len(result))]
+        grads = [
+            tf.gradients(ys=result[i], xs=fn_arg_list[i])[0]
+            for i in range(len(result))
+        ]
       else:
-        grads = tf.gradients(result, fn_arg_list)
+        grads = tf.gradients(ys=result, xs=fn_arg_list)
 
     return result, grads
 
@@ -274,10 +279,12 @@ def smart_for_loop(loop_num_iter, body_fn, initial_loop_vars,
   """
   with tf.name_scope(
       name, 'smart_for_loop', [loop_num_iter, initial_loop_vars]):
-    loop_num_iter_ = tf.contrib.util.constant_value(tf.convert_to_tensor(
-        loop_num_iter, dtype=tf.int64, name='loop_num_iter'))
+    loop_num_iter_ = tf.get_static_value(
+        tf.convert_to_tensor(
+            value=loop_num_iter, dtype=tf.int64, name='loop_num_iter'))
     if (loop_num_iter_ is None or tf.contrib.eager.executing_eagerly() or
-        control_flow_util.GraphOrParentsInXlaContext(tf.get_default_graph())):
+        control_flow_util.GraphOrParentsInXlaContext(
+            tf.compat.v1.get_default_graph())):
       return tf.while_loop(
           cond=lambda i, *args: i < loop_num_iter,
           body=lambda i, *args: [i + 1] + list(body_fn(*args)),

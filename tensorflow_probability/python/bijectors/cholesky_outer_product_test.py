@@ -73,7 +73,8 @@ class CholeskyOuterProductBijectorTest(tf.test.TestCase):
 
   def testNoBatchDynamicJacobian(self):
     bijector = tfb.CholeskyOuterProduct()
-    x = tf.placeholder_with_default(np.eye(2, dtype=np.float32), shape=None)
+    x = tf.compat.v1.placeholder_with_default(
+        np.eye(2, dtype=np.float32), shape=None)
 
     log_det_jacobian = bijector.forward_log_det_jacobian(x, event_ndims=2)
 
@@ -95,8 +96,8 @@ class CholeskyOuterProductBijectorTest(tf.test.TestCase):
   def testNoBatchDeferred(self):
     x_ = np.array([[1., 0], [2, 1]])  # np.linalg.cholesky(y)
     y_ = np.array([[1., 2], [2, 5]])  # np.matmul(x, x.T)
-    x = tf.placeholder_with_default(x_, shape=None)
-    y = tf.placeholder_with_default(y_, shape=None)
+    x = tf.compat.v1.placeholder_with_default(x_, shape=None)
+    y = tf.compat.v1.placeholder_with_default(y_, shape=None)
     y_actual = tfb.CholeskyOuterProduct().forward(x=x)
     x_actual = tfb.CholeskyOuterProduct().inverse(y=y)
     [y_actual_, x_actual_] = self.evaluate([y_actual, x_actual])
@@ -133,8 +134,8 @@ class CholeskyOuterProductBijectorTest(tf.test.TestCase):
                     [2, 5]],
                    [[9., 3],
                     [3, 5]]])  # np.matmul(x, x.T)
-    x = tf.placeholder_with_default(x_, shape=None)
-    y = tf.placeholder_with_default(y_, shape=None)
+    x = tf.compat.v1.placeholder_with_default(x_, shape=None)
+    y = tf.compat.v1.placeholder_with_default(y_, shape=None)
     y_actual = tfb.CholeskyOuterProduct().forward(x)
     x_actual = tfb.CholeskyOuterProduct().inverse(y)
     [y_actual_, x_actual_] = self.evaluate([y_actual, x_actual])

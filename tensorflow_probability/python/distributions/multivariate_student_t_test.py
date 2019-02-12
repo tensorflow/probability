@@ -41,7 +41,7 @@ class MultivariateStudentTTestFloat32StaticShape(
   def _input(self, value):
     """Helper to create inputs with varied dtypes an static shapes."""
     value = tf.cast(value, self.dtype)
-    return tf.placeholder_with_default(
+    return tf.compat.v1.placeholder_with_default(
         value, shape=value.shape if self.use_static_shape else None)
 
   # pyformat: disable
@@ -301,11 +301,11 @@ class MultivariateStudentTTestFloat32StaticShape(
         [[2., -1.],
          [-1., 2.]]))
     # pyformat: enable
-    tf.set_random_seed(2)
+    tf.compat.v1.set_random_seed(2)
     dist1 = mvt.MultivariateStudentTLinearOperator(
         loc=[1., 2.], df=5., scale=scale)
     samples1 = self.evaluate(dist1.sample(100, seed=1))
-    tf.set_random_seed(2)
+    tf.compat.v1.set_random_seed(2)
     dist2 = mvt.MultivariateStudentTLinearOperator(
         loc=[1., 2.], df=5., scale=scale)
     samples2 = self.evaluate(dist2.sample(100, seed=1))
@@ -354,8 +354,8 @@ class MultivariateStudentTTestFloat32StaticShape(
     x, y = tf.meshgrid(spacings, spacings)
     points = tf.concat([x[..., tf.newaxis], y[..., tf.newaxis]], -1)
     log_probs = dist.log_prob(points)
-    normalization = tf.exp(
-        tf.reduce_logsumexp(log_probs)) * (spacings[1] - spacings[0])**2
+    normalization = tf.exp(tf.reduce_logsumexp(
+        input_tensor=log_probs)) * (spacings[1] - spacings[0])**2
     self.assertAllClose(1., self.evaluate(normalization), atol=1e-3)
 
     mode_log_prob = dist.log_prob(dist.mode())

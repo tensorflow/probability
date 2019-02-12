@@ -30,8 +30,8 @@ __all__ = [
 
 
 def _add_diagonal_shift(matrix, shift):
-  diag_plus_shift = tf.matrix_diag_part(matrix) + shift
-  return tf.matrix_set_diag(matrix, diag_plus_shift)
+  diag_plus_shift = tf.linalg.diag_part(matrix) + shift
+  return tf.linalg.set_diag(matrix, diag_plus_shift)
 
 
 class GaussianProcessRegressionModel(
@@ -412,23 +412,25 @@ class GaussianProcessRegressionModel(
           observation_noise_variance, predictive_noise_variance, jitter
       ], tf.float32)
       index_points = tf.convert_to_tensor(
-          index_points, name='index_points', dtype=dtype)
-      observation_index_points = (
-          None if observation_index_points is None else
-          tf.convert_to_tensor(observation_index_points,
-                               dtype=dtype,
-                               name='observation_index_points'))
-      observations = (None if observations is None else
-                      tf.convert_to_tensor(
-                          observations, dtype=dtype, name='observations'))
+          value=index_points, name='index_points', dtype=dtype)
+      observation_index_points = (None if observation_index_points is None else
+                                  tf.convert_to_tensor(
+                                      value=observation_index_points,
+                                      dtype=dtype,
+                                      name='observation_index_points'))
+      observations = (None if observations is None else tf.convert_to_tensor(
+          value=observations, dtype=dtype, name='observations'))
       observation_noise_variance = tf.convert_to_tensor(
-          observation_noise_variance, dtype=dtype,
+          value=observation_noise_variance,
+          dtype=dtype,
           name='observation_noise_variance')
       predictive_noise_variance = (
-          observation_noise_variance if predictive_noise_variance is None
-          else tf.convert_to_tensor(predictive_noise_variance, dtype=dtype,
-                                    name='predictive_noise_variance'))
-      jitter = tf.convert_to_tensor(jitter, dtype=dtype, name='jitter')
+          observation_noise_variance
+          if predictive_noise_variance is None else tf.convert_to_tensor(
+              value=predictive_noise_variance,
+              dtype=dtype,
+              name='predictive_noise_variance'))
+      jitter = tf.convert_to_tensor(value=jitter, dtype=dtype, name='jitter')
 
       if (observation_index_points is None) != (observations is None):
         raise ValueError(
@@ -558,10 +560,11 @@ class GaussianProcessRegressionModel(
       return True
     ndims = self.kernel.feature_ndims
     if (self.observation_index_points.shape[-ndims:].is_fully_defined() and
-        tf.dimension_value(self.observation_index_points.shape[-ndims]) == 0):
+        tf.compat.dimension_value(
+            self.observation_index_points.shape[-ndims]) == 0):
       return True
     if (self.observations.shape[-ndims:].is_fully_defined() and
-        tf.dimension_value(self.observations.shape[-ndims]) == 0):
+        tf.compat.dimension_value(self.observations.shape[-ndims]) == 0):
       return True
     return False
 

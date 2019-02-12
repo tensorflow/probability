@@ -79,7 +79,7 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
     fldj = nvp.forward_log_det_jacobian(x, event_ndims=1)
     # Use identity to invalidate cache.
     ildj = nvp.inverse_log_det_jacobian(tf.identity(forward_x), event_ndims=1)
-    self.evaluate(tf.global_variables_initializer())
+    self.evaluate(tf.compat.v1.global_variables_initializer())
     [
         forward_x_,
         inverse_y_,
@@ -110,7 +110,7 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
     fldj = nvp.forward_log_det_jacobian(x, event_ndims=1)
     # Use identity to invalidate cache.
     ildj = nvp.inverse_log_det_jacobian(tf.identity(forward_x), event_ndims=1)
-    self.evaluate(tf.global_variables_initializer())
+    self.evaluate(tf.compat.v1.global_variables_initializer())
     [
         forward_x_,
         inverse_y_,
@@ -135,19 +135,17 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
         np.float32).reshape((batch_size, 4 * 2))
 
     conditions = {
-        "a": tf.random_normal((batch_size, 4), dtype=tf.float32),
-        "b": tf.random_normal((batch_size, 2), dtype=tf.float32),
+        "a": tf.random.normal((batch_size, 4), dtype=tf.float32),
+        "b": tf.random.normal((batch_size, 2), dtype=tf.float32),
     }
 
     def _condition_shift_and_log_scale_fn(x0, output_units, a, b):
       x = tf.concat((x0, a, b), axis=-1)
-      out = tf.layers.dense(
-          inputs=x,
-          units=2 * output_units)
+      out = tf.compat.v1.layers.dense(inputs=x, units=2 * output_units)
       shift, log_scale = tf.split(out, 2, axis=-1)
       return shift, log_scale
 
-    condition_shift_and_log_scale_fn = tf.make_template(
+    condition_shift_and_log_scale_fn = tf.compat.v1.make_template(
         "real_nvp_condition_template", _condition_shift_and_log_scale_fn)
 
     nvp = tfb.RealNVP(
@@ -166,7 +164,7 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
     # Use identity to invalidate cache.
     ildj = nvp.inverse_log_det_jacobian(
         tf.identity(forward_x), event_ndims=1, **conditions)
-    self.evaluate(tf.global_variables_initializer())
+    self.evaluate(tf.compat.v1.global_variables_initializer())
     [
         forward_x_,
         inverse_y_,

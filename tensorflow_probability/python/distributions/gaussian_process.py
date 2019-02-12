@@ -30,8 +30,8 @@ __all__ = [
 
 
 def _add_diagonal_shift(matrix, shift):
-  return tf.matrix_set_diag(
-      matrix, tf.matrix_diag_part(matrix) + shift, name='add_diagonal_shift')
+  return tf.linalg.set_diag(
+      matrix, tf.linalg.diag_part(matrix) + shift, name='add_diagonal_shift')
 
 
 class GaussianProcess(mvn_linear_operator.MultivariateNormalLinearOperator):
@@ -245,10 +245,10 @@ class GaussianProcess(mvn_linear_operator.MultivariateNormalLinearOperator):
       dtype = dtype_util.common_dtype(
           [index_points, observation_noise_variance, jitter], tf.float32)
       index_points = tf.convert_to_tensor(
-          index_points, dtype=dtype, name='index_points')
-      jitter = tf.convert_to_tensor(jitter, dtype=dtype, name='jitter')
+          value=index_points, dtype=dtype, name='index_points')
+      jitter = tf.convert_to_tensor(value=jitter, dtype=dtype, name='jitter')
       observation_noise_variance = tf.convert_to_tensor(
-          observation_noise_variance,
+          value=observation_noise_variance,
           dtype=dtype,
           name='observation_noise_variance')
 

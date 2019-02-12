@@ -32,7 +32,7 @@ def try_import(name):  # pylint: disable=invalid-name
   try:
     module = importlib.import_module(name)
   except ImportError as e:
-    tf.logging.warning("Could not import %s: %s" % (name, str(e)))
+    tf.compat.v1.logging.warning("Could not import %s: %s" % (name, str(e)))
   return module
 
 
@@ -355,13 +355,14 @@ class LaplaceTest(tf.test.TestCase):
 
     distance = tf.abs(a_loc - b_loc)
     ratio = a_scale / b_scale
-    true_kl = (-tf.log(ratio) - 1 + distance / b_scale +
+    true_kl = (-tf.math.log(ratio) - 1 + distance / b_scale +
                ratio * tf.exp(-distance / a_scale))
 
     kl = tfd.kl_divergence(a, b)
 
     x = a.sample(int(1e4), seed=0)
-    kl_sample = tf.reduce_mean(a.log_prob(x) - b.log_prob(x), 0)
+    kl_sample = tf.reduce_mean(
+        input_tensor=a.log_prob(x) - b.log_prob(x), axis=0)
 
     true_kl_, kl_, kl_sample_ = self.evaluate([true_kl, kl, kl_sample])
     self.assertAllEqual(true_kl_, kl_)

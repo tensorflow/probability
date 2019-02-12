@@ -85,8 +85,8 @@ class Geometric(distribution.Distribution):
       self._logits, self._probs = distribution_util.get_logits_and_probs(
           logits, probs, validate_args=validate_args, name=name)
 
-      with tf.control_dependencies([tf.assert_positive(self._probs)]
-                                   if validate_args else []):
+      with tf.control_dependencies(
+          [tf.compat.v1.assert_positive(self._probs)] if validate_args else []):
         self._probs = tf.identity(self._probs, name="probs")
 
     super(Geometric, self).__init__(
@@ -109,7 +109,7 @@ class Geometric(distribution.Distribution):
     return self._probs
 
   def _batch_shape_tensor(self):
-    return tf.shape(self._probs)
+    return tf.shape(input=self._probs)
 
   def _batch_shape(self):
     return self.probs.shape
@@ -128,14 +128,14 @@ class Geometric(distribution.Distribution):
     # numbers x, y have the reasonable property that, `x + y >= max(x, y)`. In
     # this case, a subnormal number (i.e., np.nextafter) can cause us to sample
     # 0.
-    sampled = tf.random_uniform(
-        tf.concat([[n], tf.shape(self._probs)], 0),
+    sampled = tf.random.uniform(
+        tf.concat([[n], tf.shape(input=self._probs)], 0),
         minval=np.finfo(self.dtype.as_numpy_dtype).tiny,
         maxval=1.,
         seed=seed,
         dtype=self.dtype)
 
-    return tf.floor(tf.log(sampled) / tf.log1p(-self.probs))
+    return tf.floor(tf.math.log(sampled) / tf.math.log1p(-self.probs))
 
   def _cdf(self, x):
     if self.validate_args:
@@ -146,7 +146,7 @@ class Geometric(distribution.Distribution):
       x = tf.floor(x)
     x *= tf.ones_like(self.probs)
     return tf.where(x < 0., tf.zeros_like(x), -tf.math.expm1(
-        (1. + x) * tf.log1p(-self.probs)))
+        (1. + x) * tf.math.log1p(-self.probs)))
 
   def _log_prob(self, x):
     if self.validate_args:
@@ -157,13 +157,13 @@ class Geometric(distribution.Distribution):
     x *= tf.ones_like(self.probs)
     probs = self.probs * tf.ones_like(x)
     safe_domain = tf.where(tf.equal(x, 0.), tf.zeros_like(probs), probs)
-    return x * tf.log1p(-safe_domain) + tf.log(probs)
+    return x * tf.math.log1p(-safe_domain) + tf.math.log(probs)
 
   def _entropy(self):
     probs = self._probs
     if self.validate_args:
       probs = control_flow_ops.with_dependencies([
-          tf.assert_less(
+          tf.compat.v1.assert_less(
               probs,
               tf.constant(1., probs.dtype),
               message="Entropy is undefined when logits = inf or probs = 1.")

@@ -52,10 +52,10 @@ class DummyMatrixTransform(tfb.Bijector):
 
   # Note: These jacobians don't make sense.
   def _forward_log_det_jacobian(self, x):
-    return -tf.matrix_determinant(x)
+    return -tf.linalg.det(x)
 
   def _inverse_log_det_jacobian(self, x):
-    return tf.matrix_determinant(x)
+    return tf.linalg.det(x)
 
 
 @tfe.run_all_tests_in_graph_and_eager_modes
@@ -156,7 +156,7 @@ class TransformedDistributionTest(tf.test.TestCase):
         return tf.exp(x)
 
       def _forward_log_det_jacobian(self, x):
-        return tf.convert_to_tensor(x)
+        return tf.convert_to_tensor(value=x)
 
     exp_forward_only = ExpForwardOnly()
 
@@ -179,10 +179,10 @@ class TransformedDistributionTest(tf.test.TestCase):
         super(ExpInverseOnly, self).__init__(inverse_min_event_ndims=0)
 
       def _inverse(self, y):
-        return tf.log(y)
+        return tf.math.log(y)
 
       def _inverse_log_det_jacobian(self, y):
-        return -tf.log(y)
+        return -tf.math.log(y)
 
     exp_inverse_only = ExpInverseOnly()
 
@@ -215,9 +215,9 @@ class TransformedDistributionTest(tf.test.TestCase):
             np.log(y), axis=-1))
     self.assertAllClose(expected_log_pdf,
                         self.evaluate(multi_logit_normal.log_prob(y)))
-    self.assertAllClose([1, 2, 3, 2],
-                        self.evaluate(
-                            tf.shape(multi_logit_normal.sample([1, 2, 3]))))
+    self.assertAllClose(
+        [1, 2, 3, 2],
+        self.evaluate(tf.shape(input=multi_logit_normal.sample([1, 2, 3]))))
     self.assertAllEqual([2], multi_logit_normal.event_shape)
     self.assertAllEqual([2],
                         self.evaluate(multi_logit_normal.event_shape_tensor()))
@@ -326,9 +326,9 @@ class ScalarToMultiTest(tf.test.TestCase):
     # batch_shape agnostic and only care about event_ndims.
     # In the case of `Affine`, if we got it wrong then it would fire an
     # exception due to incompatible dimensions.
-    batch_shape_pl = tf.placeholder_with_default(
+    batch_shape_pl = tf.compat.v1.placeholder_with_default(
         input=np.int32(batch_shape), shape=None, name="dynamic_batch_shape")
-    event_shape_pl = tf.placeholder_with_default(
+    event_shape_pl = tf.compat.v1.placeholder_with_default(
         input=np.int32(event_shape), shape=None, name="dynamic_event_shape")
     fake_mvn_dynamic = self._cls()(
         distribution=base_distribution_class(
@@ -378,8 +378,8 @@ class ScalarToMultiTest(tf.test.TestCase):
       # Ensure sample works by checking first, second moments.
       y = fake_mvn.sample(int(num_samples), seed=0)
       x = y[0:5, ...]
-      sample_mean = tf.reduce_mean(y, 0)
-      centered_y = tf.transpose(y - sample_mean, [1, 2, 0])
+      sample_mean = tf.reduce_mean(input_tensor=y, axis=0)
+      centered_y = tf.transpose(a=y - sample_mean, perm=[1, 2, 0])
       sample_cov = tf.matmul(
           centered_y, centered_y, transpose_b=True) / num_samples
       [
@@ -482,9 +482,9 @@ class ScalarToMultiTest(tf.test.TestCase):
   def testMatrixEvent(self):
     batch_shape = [2]
     event_shape = [2, 3, 3]
-    batch_shape_pl = tf.placeholder_with_default(
+    batch_shape_pl = tf.compat.v1.placeholder_with_default(
         input=np.int32(batch_shape), shape=None, name="dynamic_batch_shape")
-    event_shape_pl = tf.placeholder_with_default(
+    event_shape_pl = tf.compat.v1.placeholder_with_default(
         input=np.int32(event_shape), shape=None, name="dynamic_event_shape")
 
     scale = 2.
@@ -553,10 +553,10 @@ class ScalarToMultiTest(tf.test.TestCase):
         loc = tf.zeros(batch_shape + event_shape)
         scale_diag = tf.ones(batch_shape + event_shape)
         if shapes_are_dynamic:
-          loc = tf.placeholder_with_default(loc, shape=None,
-                                            name="dynamic_loc")
-          scale_diag = tf.placeholder_with_default(scale_diag, shape=None,
-                                                   name="dynamic_scale_diag")
+          loc = tf.compat.v1.placeholder_with_default(
+              loc, shape=None, name="dynamic_loc")
+          scale_diag = tf.compat.v1.placeholder_with_default(
+              scale_diag, shape=None, name="dynamic_scale_diag")
 
         mvn = tfd.MultivariateNormalDiag(loc=loc, scale_diag=scale_diag)
 

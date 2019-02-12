@@ -95,11 +95,11 @@ class CPUConvolution(nn_ops.Convolution):
   def __call__(self, inp, filter_):
     if self._standardize_to_channels_last:
       order = channels_first_to_last(list(range(self._rank)))
-      inp = tf.transpose(inp, order)
+      inp = tf.transpose(a=inp, perm=order)
     ret = super(CPUConvolution, self).__call__(inp, filter_)
     if self._standardize_to_channels_last:
       order = channels_last_to_first(list(range(self._rank)))
-      ret = tf.transpose(ret, order)
+      ret = tf.transpose(a=ret, perm=order)
     return ret
 
 
@@ -180,7 +180,7 @@ class ConvVariational(object):
   def maybe_transpose_inputs(self, inputs):
     if self.data_format == 'channels_first':
       order = channels_last_to_first(list(range(inputs.shape.rank)))
-      return tf.transpose(inputs, order)
+      return tf.transpose(a=inputs, perm=order)
     else:
       return inputs
 
@@ -196,7 +196,7 @@ class ConvVariational(object):
 
       dist = tfd.Normal(loc=tf.zeros(shape, dtype),
                         scale=dtype.as_numpy_dtype(1))
-      batch_ndims = tf.size(dist.batch_shape_tensor())
+      batch_ndims = tf.size(input=dist.batch_shape_tensor())
       return tfd.Independent(dist, reinterpreted_batch_ndims=batch_ndims)
 
     if layer_class in (tfp.layers.Convolution1DReparameterization,
@@ -231,13 +231,13 @@ class ConvVariational(object):
           filters=2, kernel_size=3, data_format=self.data_format)
       if layer_class in (tfp.layers.Convolution1DReparameterization,
                          tfp.layers.Convolution1DFlipout):
-        inputs = tf.random_uniform([2, 3, 1], seed=1)
+        inputs = tf.random.uniform([2, 3, 1], seed=1)
       elif layer_class in (tfp.layers.Convolution2DReparameterization,
                            tfp.layers.Convolution2DFlipout):
-        inputs = tf.random_uniform([2, 3, 3, 1], seed=1)
+        inputs = tf.random.uniform([2, 3, 3, 1], seed=1)
       elif layer_class in (tfp.layers.Convolution3DReparameterization,
                            tfp.layers.Convolution3DFlipout):
-        inputs = tf.random_uniform([2, 3, 3, 3, 1], seed=1)
+        inputs = tf.random.uniform([2, 3, 3, 3, 1], seed=1)
       inputs = self.maybe_transpose_inputs(inputs)
 
       # No keys.
@@ -263,13 +263,13 @@ class ConvVariational(object):
           data_format=self.data_format)
       if layer_class in (tfp.layers.Convolution1DReparameterization,
                          tfp.layers.Convolution1DFlipout):
-        inputs = tf.random_uniform([2, 3, 1], seed=1)
+        inputs = tf.random.uniform([2, 3, 1], seed=1)
       elif layer_class in (tfp.layers.Convolution2DReparameterization,
                            tfp.layers.Convolution2DFlipout):
-        inputs = tf.random_uniform([2, 3, 3, 1], seed=1)
+        inputs = tf.random.uniform([2, 3, 3, 1], seed=1)
       elif layer_class in (tfp.layers.Convolution3DReparameterization,
                            tfp.layers.Convolution3DFlipout):
-        inputs = tf.random_uniform([2, 3, 3, 3, 1], seed=1)
+        inputs = tf.random.uniform([2, 3, 3, 3, 1], seed=1)
       inputs = self.maybe_transpose_inputs(inputs)
 
       # No keys.
@@ -292,42 +292,41 @@ class ConvVariational(object):
     seed = Counter()
     if layer_class in (tfp.layers.Convolution1DReparameterization,
                        tfp.layers.Convolution1DFlipout):
-      inputs = tf.random_uniform(
-          [batch_size, width, channels], seed=seed())
+      inputs = tf.random.uniform([batch_size, width, channels], seed=seed())
       kernel_size = (2,)
     elif layer_class in (tfp.layers.Convolution2DReparameterization,
                          tfp.layers.Convolution2DFlipout):
-      inputs = tf.random_uniform(
-          [batch_size, height, width, channels], seed=seed())
+      inputs = tf.random.uniform([batch_size, height, width, channels],
+                                 seed=seed())
       kernel_size = (2, 2)
     elif layer_class in (tfp.layers.Convolution3DReparameterization,
                          tfp.layers.Convolution3DFlipout):
-      inputs = tf.random_uniform(
-          [batch_size, depth, height, width, channels], seed=seed())
+      inputs = tf.random.uniform([batch_size, depth, height, width, channels],
+                                 seed=seed())
       kernel_size = (2, 2, 2)
     inputs = self.maybe_transpose_inputs(inputs)
 
     kernel_shape = kernel_size + (channels, filters)
     kernel_posterior = MockDistribution(
-        loc=tf.random_uniform(kernel_shape, seed=seed()),
-        scale=tf.random_uniform(kernel_shape, seed=seed()),
-        result_log_prob=tf.random_uniform(kernel_shape, seed=seed()),
-        result_sample=tf.random_uniform(kernel_shape, seed=seed()))
+        loc=tf.random.uniform(kernel_shape, seed=seed()),
+        scale=tf.random.uniform(kernel_shape, seed=seed()),
+        result_log_prob=tf.random.uniform(kernel_shape, seed=seed()),
+        result_sample=tf.random.uniform(kernel_shape, seed=seed()))
     kernel_prior = MockDistribution(
-        result_log_prob=tf.random_uniform(kernel_shape, seed=seed()),
-        result_sample=tf.random_uniform(kernel_shape, seed=seed()))
+        result_log_prob=tf.random.uniform(kernel_shape, seed=seed()),
+        result_sample=tf.random.uniform(kernel_shape, seed=seed()))
     kernel_divergence = MockKLDivergence(
-        result=tf.random_uniform([], seed=seed()))
+        result=tf.random.uniform([], seed=seed()))
 
     bias_size = (filters,)
     bias_posterior = MockDistribution(
-        result_log_prob=tf.random_uniform(bias_size, seed=seed()),
-        result_sample=tf.random_uniform(bias_size, seed=seed()))
+        result_log_prob=tf.random.uniform(bias_size, seed=seed()),
+        result_sample=tf.random.uniform(bias_size, seed=seed()))
     bias_prior = MockDistribution(
-        result_log_prob=tf.random_uniform(bias_size, seed=seed()),
-        result_sample=tf.random_uniform(bias_size, seed=seed()))
+        result_log_prob=tf.random.uniform(bias_size, seed=seed()),
+        result_sample=tf.random.uniform(bias_size, seed=seed()))
     bias_divergence = MockKLDivergence(
-        result=tf.random_uniform([], seed=seed()))
+        result=tf.random.uniform([], seed=seed()))
 
     layer = layer_class(
         filters=filters,
@@ -441,7 +440,7 @@ class ConvVariational(object):
       expected_outputs = convolution_op(
           inputs, kernel_posterior.distribution.loc)
 
-      input_shape = tf.shape(inputs)
+      input_shape = tf.shape(input=inputs)
       batch_shape = tf.expand_dims(input_shape[0], 0)
       if self.data_format == 'channels_first':
         channels = input_shape[1]
@@ -451,17 +450,15 @@ class ConvVariational(object):
 
       seed_stream = tfd.SeedStream(layer.seed, salt='ConvFlipout')
 
-      sign_input = tf.random_uniform(
-          tf.concat([batch_shape,
-                     tf.expand_dims(channels, 0)], 0),
+      sign_input = tf.random.uniform(
+          tf.concat([batch_shape, tf.expand_dims(channels, 0)], 0),
           minval=0,
           maxval=2,
           dtype=tf.int32,
           seed=seed_stream())
       sign_input = tf.cast(2 * sign_input - 1, inputs.dtype)
-      sign_output = tf.random_uniform(
-          tf.concat([batch_shape,
-                     tf.expand_dims(filters, 0)], 0),
+      sign_output = tf.random.uniform(
+          tf.concat([batch_shape, tf.expand_dims(filters, 0)], 0),
           minval=0,
           maxval=2,
           dtype=tf.int32,
@@ -532,18 +529,17 @@ class ConvVariational(object):
       seed = Counter()
       if layer_class in (tfp.layers.Convolution1DReparameterization,
                          tfp.layers.Convolution1DFlipout):
-        inputs = tf.random_uniform(
-            [batch_size, width, channels], seed=seed())
+        inputs = tf.random.uniform([batch_size, width, channels], seed=seed())
         kernel_size = (2,)
       elif layer_class in (tfp.layers.Convolution2DReparameterization,
                            tfp.layers.Convolution2DFlipout):
-        inputs = tf.random_uniform(
-            [batch_size, height, width, channels], seed=seed())
+        inputs = tf.random.uniform([batch_size, height, width, channels],
+                                   seed=seed())
         kernel_size = (2, 2)
       elif layer_class in (tfp.layers.Convolution3DReparameterization,
                            tfp.layers.Convolution3DFlipout):
-        inputs = tf.random_uniform(
-            [batch_size, depth, height, width, channels], seed=seed())
+        inputs = tf.random.uniform([batch_size, depth, height, width, channels],
+                                   seed=seed())
         kernel_size = (2, 2, 2)
       inputs = self.maybe_transpose_inputs(inputs)
 
@@ -551,23 +547,15 @@ class ConvVariational(object):
       bias_size = (filters,)
 
       kernel_posterior = MockDistribution(
-          loc=tf.random_uniform(
-              kernel_shape, seed=seed()),
-          scale=tf.random_uniform(
-              kernel_shape, seed=seed()),
-          result_log_prob=tf.random_uniform(
-              kernel_shape, seed=seed()),
-          result_sample=tf.random_uniform(
-              kernel_shape, seed=seed()))
+          loc=tf.random.uniform(kernel_shape, seed=seed()),
+          scale=tf.random.uniform(kernel_shape, seed=seed()),
+          result_log_prob=tf.random.uniform(kernel_shape, seed=seed()),
+          result_sample=tf.random.uniform(kernel_shape, seed=seed()))
       bias_posterior = MockDistribution(
-          loc=tf.random_uniform(
-              bias_size, seed=seed()),
-          scale=tf.random_uniform(
-              bias_size, seed=seed()),
-          result_log_prob=tf.random_uniform(
-              bias_size, seed=seed()),
-          result_sample=tf.random_uniform(
-              bias_size, seed=seed()))
+          loc=tf.random.uniform(bias_size, seed=seed()),
+          scale=tf.random.uniform(bias_size, seed=seed()),
+          result_log_prob=tf.random.uniform(bias_size, seed=seed()),
+          result_sample=tf.random.uniform(bias_size, seed=seed()))
       layer_one = layer_class(
           filters=filters,
           kernel_size=kernel_size,
@@ -606,13 +594,13 @@ class ConvVariational(object):
     with self.cached_session() as sess:
       if layer_class in (tfp.layers.Convolution1DReparameterization,
                          tfp.layers.Convolution1DFlipout):
-        inputs = tf.random_uniform([2, 3, 1])
+        inputs = tf.random.uniform([2, 3, 1])
       elif layer_class in (tfp.layers.Convolution2DReparameterization,
                            tfp.layers.Convolution2DFlipout):
-        inputs = tf.random_uniform([2, 3, 3, 1])
+        inputs = tf.random.uniform([2, 3, 3, 1])
       elif layer_class in (tfp.layers.Convolution3DReparameterization,
                            tfp.layers.Convolution3DFlipout):
-        inputs = tf.random_uniform([2, 3, 3, 3, 1])
+        inputs = tf.random.uniform([2, 3, 3, 3, 1])
       inputs = self.maybe_transpose_inputs(inputs)
 
       net = tf.keras.Sequential([
@@ -621,7 +609,7 @@ class ConvVariational(object):
       output = net(inputs)
 
       # Verify that the network runs without errors
-      sess.run(tf.global_variables_initializer())
+      sess.run(tf.compat.v1.global_variables_initializer())
       sess.run(output)
 
   def testKerasLayerConvolution1DReparameterization(self):

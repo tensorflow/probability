@@ -29,7 +29,7 @@ def _prefer_static_event_ndims(distribution):
   if distribution.event_shape.ndims is not None:
     return distribution.event_shape.ndims
   else:
-    return tf.size(distribution.event_shape_tensor())
+    return tf.size(input=distribution.event_shape_tensor())
 
 
 def one_step_predictive(model, observed_time_series, parameter_samples):
@@ -145,15 +145,15 @@ def one_step_predictive(model, observed_time_series, parameter_samples):
   with tf.name_scope('one_step_predictive',
                      values=[observed_time_series,
                              parameter_samples]):
-    observed_time_series = tf.convert_to_tensor(observed_time_series,
-                                                name='observed_time_series')
+    observed_time_series = tf.convert_to_tensor(
+        value=observed_time_series, name='observed_time_series')
     observed_time_series = sts_util.maybe_expand_trailing_dim(
         observed_time_series)
 
     # Run filtering over the training timesteps to extract the
     # predictive means and variances.
     num_timesteps = dist_util.prefer_static_value(
-        tf.shape(observed_time_series))[-2]
+        tf.shape(input=observed_time_series))[-2]
     lgssm = model.make_state_space_model(
         num_timesteps=num_timesteps, param_vals=parameter_samples)
     (_, _, _, _, _, observation_means, observation_covs
@@ -182,7 +182,7 @@ def one_step_predictive(model, observed_time_series, parameter_samples):
         reinterpreted_batch_ndims=1)
 
     num_posterior_draws = dist_util.prefer_static_value(
-        tf.shape(observation_means))[0]
+        tf.shape(input=observation_means))[0]
     return tfd.MixtureSameFamily(
         mixture_distribution=tfd.Categorical(
             logits=tf.zeros([num_posterior_draws],
@@ -309,8 +309,8 @@ def forecast(model,
                      values=[observed_time_series,
                              parameter_samples,
                              num_steps_forecast]):
-    observed_time_series = tf.convert_to_tensor(observed_time_series,
-                                                name='observed_time_series')
+    observed_time_series = tf.convert_to_tensor(
+        value=observed_time_series, name='observed_time_series')
     observed_time_series = sts_util.maybe_expand_trailing_dim(
         observed_time_series)
 
@@ -320,7 +320,7 @@ def forecast(model,
     # This is the prior for the forecast model ("today's prior
     # is yesterday's posterior").
     num_observed_steps = dist_util.prefer_static_value(
-        tf.shape(observed_time_series))[-2]
+        tf.shape(input=observed_time_series))[-2]
     observed_data_ssm = model.make_state_space_model(
         num_timesteps=num_observed_steps, param_vals=parameter_samples)
     (_, _, _, predictive_means, predictive_covs, _, _

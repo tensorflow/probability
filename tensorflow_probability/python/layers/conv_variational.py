@@ -157,7 +157,7 @@ class _ConvVariational(tf.keras.layers.Layer):
     self.dilation_rate = tf_layers_util.normalize_tuple(
         dilation_rate, rank, 'dilation_rate')
     self.activation = tf.keras.activations.get(activation)
-    self.input_spec = tf.layers.InputSpec(ndim=self.rank + 2)
+    self.input_spec = tf.keras.layers.InputSpec(ndim=self.rank + 2)
     self.kernel_posterior_fn = kernel_posterior_fn
     self.kernel_posterior_tensor_fn = kernel_posterior_tensor_fn
     self.kernel_prior_fn = kernel_prior_fn
@@ -173,7 +173,7 @@ class _ConvVariational(tf.keras.layers.Layer):
       channel_axis = 1
     else:
       channel_axis = -1
-    input_dim = tf.dimension_value(input_shape[channel_axis])
+    input_dim = tf.compat.dimension_value(input_shape[channel_axis])
     if input_dim is None:
       raise ValueError('The channel dimension of the inputs '
                        'should be defined. Found `None`.')
@@ -210,8 +210,8 @@ class _ConvVariational(tf.keras.layers.Layer):
           self.trainable, self.add_variable)
     self._built_bias_divergence = False
 
-    self.input_spec = tf.layers.InputSpec(ndim=self.rank + 2,
-                                          axes={channel_axis: input_dim})
+    self.input_spec = tf.keras.layers.InputSpec(
+        ndim=self.rank + 2, axes={channel_axis: input_dim})
     self._convolution_op = nn_ops.Convolution(
         input_shape,
         filter_shape=tf.TensorShape(kernel_shape),
@@ -224,7 +224,7 @@ class _ConvVariational(tf.keras.layers.Layer):
     self.built = True
 
   def call(self, inputs):
-    inputs = tf.convert_to_tensor(inputs, dtype=self.dtype)
+    inputs = tf.convert_to_tensor(value=inputs, dtype=self.dtype)
 
     outputs = self._apply_variational_kernel(inputs)
     outputs = self._apply_variational_bias(outputs)
@@ -1073,7 +1073,7 @@ class _ConvFlipout(_ConvVariational):
     outputs = self._convolution_op(
         inputs, self.kernel_posterior.distribution.loc)
 
-    input_shape = tf.shape(inputs)
+    input_shape = tf.shape(input=inputs)
     batch_shape = tf.expand_dims(input_shape[0], 0)
     if self.data_format == 'channels_first':
       channels = input_shape[1]

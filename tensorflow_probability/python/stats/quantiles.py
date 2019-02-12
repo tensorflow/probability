@@ -107,8 +107,8 @@ def find_bins(x,
   with tf.name_scope(name, default_name='find_bins', values=[x, edges]):
     in_type = dtype_util.common_dtype([x, edges],
                                       preferred_dtype=tf.float32)
-    edges = tf.convert_to_tensor(edges, name='edges', dtype=in_type)
-    x = tf.convert_to_tensor(x, name='x', dtype=in_type)
+    edges = tf.convert_to_tensor(value=edges, name='edges', dtype=in_type)
+    x = tf.convert_to_tensor(value=x, name='x', dtype=in_type)
 
     if edges.shape[0].value is not None and edges.shape[0].value < 2:
       raise ValueError(
@@ -118,7 +118,7 @@ def find_bins(x,
     flattening_x = edges.shape.ndims == 1 and x.shape.ndims > 1
 
     if flattening_x:
-      x_orig_shape = tf.shape(x)
+      x_orig_shape = tf.shape(input=x)
       x = tf.reshape(x, [-1])
 
     if dtype is None:
@@ -145,23 +145,19 @@ def find_bins(x,
         dtype)
 
     # In above example, we want [0, 0, 1, 1], so correct this here.
-    bins = tf.clip_by_value(almost_output - 1,
-                            tf.cast(0, dtype),
-                            tf.cast(tf.shape(edges)[0] - 2, dtype))
+    bins = tf.clip_by_value(almost_output - 1, tf.cast(0, dtype),
+                            tf.cast(tf.shape(input=edges)[0] - 2, dtype))
 
     if not extend_lower_interval:
       low_fill = np.nan if dtype.is_floating else -1
-      bins = tf.where(
-          x < tf.expand_dims(edges[0], 0),
-          tf.fill(tf.shape(x), tf.cast(low_fill, dtype)),
-          bins)
+      bins = tf.where(x < tf.expand_dims(edges[0], 0),
+                      tf.fill(tf.shape(input=x), tf.cast(low_fill, dtype)),
+                      bins)
 
     if not extend_upper_interval:
-      up_fill = np.nan if dtype.is_floating else tf.shape(edges)[0] - 1
-      bins = tf.where(
-          x > tf.expand_dims(edges[-1], 0),
-          tf.fill(tf.shape(x), tf.cast(up_fill, dtype)),
-          bins)
+      up_fill = np.nan if dtype.is_floating else tf.shape(input=edges)[0] - 1
+      bins = tf.where(x > tf.expand_dims(edges[-1], 0),
+                      tf.fill(tf.shape(input=x), tf.cast(up_fill, dtype)), bins)
 
     if flattening_x:
       bins = tf.reshape(bins, x_orig_shape)
@@ -275,7 +271,7 @@ def percentile(x,
                        (allowed_interpolations, interpolation))
 
   with tf.name_scope(name, values=[x, q]):
-    x = tf.convert_to_tensor(x, name='x')
+    x = tf.convert_to_tensor(value=x, name='x')
 
     if interpolation in {'linear', 'midpoint'} and x.dtype.is_integer:
       raise TypeError('{} interpolation not allowed with dtype {}'.format(
@@ -288,9 +284,9 @@ def percentile(x,
 
     if validate_args:
       q = control_flow_ops.with_dependencies([
-          tf.assert_rank_in(q, [0, 1]),
-          tf.assert_greater_equal(q, tf.cast(0., tf.float64)),
-          tf.assert_less_equal(q, tf.cast(100., tf.float64))
+          tf.compat.v1.assert_rank_in(q, [0, 1]),
+          tf.compat.v1.assert_greater_equal(q, tf.cast(0., tf.float64)),
+          tf.compat.v1.assert_less_equal(q, tf.cast(100., tf.float64))
       ], q)
 
     # Move `axis` dims of `x` to the rightmost, call it `y`.
@@ -308,7 +304,7 @@ def percentile(x,
     # to sort only once (under the hood) and use CSE.
     sorted_y = _sort_tensor(y)
 
-    d = tf.cast(tf.shape(y)[-1], tf.float64)
+    d = tf.cast(tf.shape(input=y)[-1], tf.float64)
 
     def _get_indices(interp_type):
       """Get values of y at the indices implied by interp_type."""
@@ -316,7 +312,7 @@ def percentile(x,
       # _sort_tensor sorts highest to lowest, tf.ceil corresponds to the higher
       # index, but the lower value of y!
       if interp_type == 'lower':
-        indices = tf.ceil((d - 1) * frac_at_q_or_above)
+        indices = tf.math.ceil((d - 1) * frac_at_q_or_above)
       elif interp_type == 'higher':
         indices = tf.floor((d - 1) * frac_at_q_or_above)
       elif interp_type == 'nearest':
@@ -324,7 +320,8 @@ def percentile(x,
       # d - 1 will be distinct from d in int32, but not necessarily double.
       # So clip to avoid out of bounds errors.
       return tf.clip_by_value(
-          tf.cast(indices, tf.int32), 0, tf.shape(y)[-1] - 1)
+          tf.cast(indices, tf.int32), 0,
+          tf.shape(input=y)[-1] - 1)
 
     if interpolation in ['nearest', 'lower', 'higher']:
       gathered_y = tf.gather(sorted_y, _get_indices(interpolation), axis=-1)
@@ -346,11 +343,11 @@ def percentile(x,
         # The fix is to ensure that smaller_y_idx and larger_y_idx are always
         # separated by exactly 1.
         smaller_y_idx = tf.maximum(larger_y_idx - 1, 0)
-        larger_y_idx = tf.minimum(smaller_y_idx + 1, tf.shape(y)[-1] - 1)
+        larger_y_idx = tf.minimum(smaller_y_idx + 1, tf.shape(input=y)[-1] - 1)
         fraction = tf.cast(larger_y_idx, tf.float64) - exact_idx
       else:
         smaller_y_idx = _get_indices('higher')
-        fraction = tf.ceil((d - 1) * frac_at_q_or_above) - exact_idx
+        fraction = tf.math.ceil((d - 1) * frac_at_q_or_above) - exact_idx
 
       fraction = tf.cast(fraction, y.dtype)
       gathered_y = (
@@ -453,12 +450,12 @@ def quantiles(x,
 
   """
   with tf.name_scope(name, 'quantiles', values=[x, num_quantiles, axis]):
-    x = tf.convert_to_tensor(x, name='x')
+    x = tf.convert_to_tensor(value=x, name='x')
     return percentile(
         x,
         q=tf.linspace(
-            tf.convert_to_tensor(0, dtype=x.dtype),
-            tf.convert_to_tensor(100, dtype=x.dtype),
+            tf.convert_to_tensor(value=0, dtype=x.dtype),
+            tf.convert_to_tensor(value=100, dtype=x.dtype),
             num=num_quantiles + 1),
         axis=axis,
         interpolation=interpolation,
@@ -497,7 +494,7 @@ def _get_static_ndims(x,
   """
   ndims = x.shape.ndims
   if ndims is None:
-    shape_const = tf.contrib.util.constant_value(tf.shape(x))
+    shape_const = tf.get_static_value(tf.shape(input=x))
     if shape_const is not None:
       ndims = shape_const.ndim
 
@@ -576,7 +573,7 @@ def _make_static_axis_non_negative_list(axis, ndims):
   """
   axis = distribution_util.make_non_negative_axis(axis, ndims)
 
-  axis_const = tf.contrib.util.constant_value(axis)
+  axis_const = tf.get_static_value(axis)
   if axis_const is None:
     raise ValueError(
         'Expected argument `axis` to be statically available.  Found: %s' %
@@ -606,7 +603,7 @@ def _move_dims_to_flat_end(x, axis, x_ndims):
   # front_dims = [0, 2] in example above.
   front_dims = sorted(set(range(x_ndims)).difference(axis))
   # x_permed.shape = [a, c, b, d]
-  x_permed = tf.transpose(x, perm=front_dims + list(axis))
+  x_permed = tf.transpose(a=x, perm=front_dims + list(axis))
 
   if x.shape.is_fully_defined():
     x_shape = x.shape.as_list()
@@ -615,7 +612,7 @@ def _move_dims_to_flat_end(x, axis, x_ndims):
     end_shape = [np.prod([x_shape[i] for i in axis])]
     full_shape = front_shape + end_shape
   else:
-    front_shape = tf.shape(x_permed)[:x_ndims - len(axis)]
+    front_shape = tf.shape(input=x_permed)[:x_ndims - len(axis)]
     end_shape = [-1]
     full_shape = tf.concat([front_shape, end_shape], axis=0)
   return tf.reshape(x_permed, shape=full_shape)
@@ -623,6 +620,6 @@ def _move_dims_to_flat_end(x, axis, x_ndims):
 
 def _sort_tensor(tensor):
   """Use `top_k` to sort a `Tensor` along the last dimension."""
-  sorted_, _ = tf.nn.top_k(tensor, k=tf.shape(tensor)[-1])
+  sorted_, _ = tf.nn.top_k(tensor, k=tf.shape(input=tensor)[-1])
   sorted_.set_shape(tensor.shape)
   return sorted_

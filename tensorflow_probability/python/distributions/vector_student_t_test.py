@@ -153,9 +153,11 @@ class VectorStudentTTest(tf.test.TestCase):
     expected_mst = _FakeVectorStudentT(
         df=df, loc=loc, scale_tril=scale_tril)
 
-    df_pl = tf.placeholder_with_default(input=df, shape=df.shape, name="df")
-    loc_pl = tf.placeholder_with_default(input=loc, shape=loc.shape, name="loc")
-    scale_diag_pl = tf.placeholder_with_default(
+    df_pl = tf.compat.v1.placeholder_with_default(
+        input=df, shape=df.shape, name="df")
+    loc_pl = tf.compat.v1.placeholder_with_default(
+        input=loc, shape=loc.shape, name="loc")
+    scale_diag_pl = tf.compat.v1.placeholder_with_default(
         input=scale_diag, shape=scale_diag.shape, name="scale_diag")
     actual_mst = _VectorStudentT(
         df=df_pl, loc=loc_pl, scale_diag=scale_diag_pl, validate_args=True)
@@ -225,9 +227,11 @@ class VectorStudentTTest(tf.test.TestCase):
         loc=loc,
         scale_tril=scale_tril)
 
-    df_pl = tf.placeholder_with_default(input=df, shape=df.shape, name="df")
-    loc_pl = tf.placeholder_with_default(input=loc, shape=loc.shape, name="loc")
-    scale_diag_pl = tf.placeholder_with_default(
+    df_pl = tf.compat.v1.placeholder_with_default(
+        input=df, shape=df.shape, name="df")
+    loc_pl = tf.compat.v1.placeholder_with_default(
+        input=loc, shape=loc.shape, name="loc")
+    scale_diag_pl = tf.compat.v1.placeholder_with_default(
         input=scale_diag, shape=scale_diag.shape, name="scale_diag")
     actual_mst = _VectorStudentT(
         df=df_pl, loc=loc_pl, scale_diag=scale_diag_pl, validate_args=True)
@@ -284,9 +288,11 @@ class VectorStudentTTest(tf.test.TestCase):
         loc=np.tile(loc[tf.newaxis, :], reps=[len(df), 1]),
         scale_tril=np.tile(scale_tril[tf.newaxis, :, :], reps=[len(df), 1, 1]))
 
-    df_pl = tf.placeholder_with_default(input=df, shape=df.shape, name="df")
-    loc_pl = tf.placeholder_with_default(input=loc, shape=loc.shape, name="loc")
-    scale_diag_pl = tf.placeholder_with_default(
+    df_pl = tf.compat.v1.placeholder_with_default(
+        input=df, shape=df.shape, name="df")
+    loc_pl = tf.compat.v1.placeholder_with_default(
+        input=loc, shape=loc.shape, name="loc")
+    scale_diag_pl = tf.compat.v1.placeholder_with_default(
         input=scale_diag, shape=scale_diag.shape, name="scale_diag")
     actual_mst = _VectorStudentT(
         df=df_pl, loc=loc_pl, scale_diag=scale_diag_pl, validate_args=True)

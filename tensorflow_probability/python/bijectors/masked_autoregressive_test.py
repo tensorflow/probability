@@ -33,11 +33,11 @@ tfe = tf.contrib.eager
 def masked_autoregressive_2d_template(base_template, event_shape):
 
   def wrapper(x):
-    x_flat = tf.reshape(x, tf.concat([tf.shape(x)[:-len(event_shape)], [-1]],
-                                     -1))
+    x_flat = tf.reshape(
+        x, tf.concat([tf.shape(input=x)[:-len(event_shape)], [-1]], -1))
     x_shift, x_log_scale = base_template(x_flat)
-    return tf.reshape(x_shift, tf.shape(x)), tf.reshape(x_log_scale,
-                                                        tf.shape(x))
+    return tf.reshape(x_shift, tf.shape(input=x)), tf.reshape(
+        x_log_scale, tf.shape(input=x))
 
   return wrapper
 
@@ -98,7 +98,7 @@ class MaskedAutoregressiveFlowTest(test_util.VectorDistributionTestHelpers,
     # Use identity to invalidate cache.
     ildj = ma.inverse_log_det_jacobian(
         tf.identity(forward_x), event_ndims=len(self.event_shape))
-    self.evaluate(tf.global_variables_initializer())
+    self.evaluate(tf.compat.v1.global_variables_initializer())
     [
         forward_x_,
         inverse_y_,
@@ -131,7 +131,7 @@ class MaskedAutoregressiveFlowTest(test_util.VectorDistributionTestHelpers,
     # Use identity to invalidate cache.
     ildj = ma.inverse_log_det_jacobian(
         tf.identity(forward_x), event_ndims=len(self.event_shape))
-    self.evaluate(tf.global_variables_initializer())
+    self.evaluate(tf.compat.v1.global_variables_initializer())
     [
         forward_x_,
         inverse_y_,

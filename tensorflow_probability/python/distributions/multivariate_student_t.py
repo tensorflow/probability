@@ -157,10 +157,11 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
                                       preferred_dtype=tf.float32)
 
       with tf.control_dependencies(
-          [tf.assert_positive(df, message="`df` must be positive."
-                             )] if validate_args else []):
-        self._df = tf.identity(tf.convert_to_tensor(df, dtype=dtype), name="df")
-      self._loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
+          [tf.compat.v1.assert_positive(df, message="`df` must be positive."
+                                       )] if validate_args else []):
+        self._df = tf.identity(
+            tf.convert_to_tensor(value=df, dtype=dtype), name="df")
+      self._loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
       self._scale = scale
 
     super(MultivariateStudentTLinearOperator, self).__init__(
@@ -222,8 +223,8 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
   def _batch_shape_tensor(self):
     shape_list = [
         self.scale.batch_shape_tensor(),
-        tf.shape(self.df),
-        tf.shape(self.loc)[:-1]
+        tf.shape(input=self.df),
+        tf.shape(input=self.loc)[:-1]
     ]
     return functools.reduce(tf.broadcast_dynamic_shape, shape_list)
 
@@ -256,13 +257,13 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
     chi2_samp = chi2.sample(n, seed=seed())
 
     return (self._loc +
-            normal_samp * tf.rsqrt(chi2_samp / self._df)[..., tf.newaxis])
+            normal_samp * tf.math.rsqrt(chi2_samp / self._df)[..., tf.newaxis])
 
   def _log_normalization(self):
     num_dims = tf.cast(self.event_shape_tensor()[0], self.dtype)
-    return (tf.lgamma(
-        self.df / 2.) + num_dims / 2. * (tf.log(self.df) + np.log(np.pi)) +
-            self.scale.log_abs_determinant() - tf.lgamma(
+    return (tf.math.lgamma(self.df / 2.) + num_dims / 2. *
+            (tf.math.log(self.df) + np.log(np.pi)) +
+            self.scale.log_abs_determinant() - tf.math.lgamma(
                 (num_dims + self.df) / 2.))
 
   def _log_unnormalized_prob(self, value):
@@ -270,7 +271,7 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
     value = self.scale.solve(value[..., tf.newaxis])
 
     num_dims = tf.cast(self.event_shape_tensor()[0], self.dtype)
-    mahalanobis = tf.norm(value, axis=[-1, -2])
+    mahalanobis = tf.norm(tensor=value, axis=[-1, -2])
     return -(num_dims + self.df) / 2. * math.log1psquare(
         mahalanobis / tf.sqrt(self.df))
 
@@ -283,14 +284,15 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
       rather than returning `NaN`.""")
   def _mean(self):
     mean = _broadcast_to_shape(self.loc, self._sample_shape())
-    df = _broadcast_to_shape(self.df[..., tf.newaxis], tf.shape(mean))
+    df = _broadcast_to_shape(self.df[..., tf.newaxis], tf.shape(input=mean))
 
     if self.allow_nan_stats:
       nan = np.array(np.nan, dtype=self.dtype.as_numpy_dtype())
-      return tf.where(df > 1., mean, tf.fill(tf.shape(mean), nan, name="nan"))
+      return tf.where(df > 1., mean,
+                      tf.fill(tf.shape(input=mean), nan, name="nan"))
     else:
       with tf.control_dependencies([
-          tf.assert_less(
+          tf.compat.v1.assert_less(
               tf.cast(1., self.dtype),
               df,
               message="mean not defined for components of df <= 1"),
@@ -305,10 +307,11 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
     """Helper to compute stddev, covariance and variance."""
     df = tf.reshape(
         self.df,
-        tf.concat(
-            [tf.shape(self.df),
-             tf.ones([statistic_ndims], dtype=tf.int32)], -1))
-    df = _broadcast_to_shape(df, tf.shape(statistic))
+        tf.concat([
+            tf.shape(input=self.df),
+            tf.ones([statistic_ndims], dtype=tf.int32)
+        ], -1))
+    df = _broadcast_to_shape(df, tf.shape(input=statistic))
     # We need to put the tf.where inside the outer tf.where to ensure we never
     # hit a NaN in the gradient.
     denom = tf.where(df > 2., df - 2., tf.ones_like(df))
@@ -316,15 +319,15 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
     # When 1 < df <= 2, stddev/variance are infinite.
     inf = np.array(np.inf, dtype=self.dtype.as_numpy_dtype())
     result_where_defined = tf.where(
-        df > 2., statistic, tf.fill(tf.shape(statistic), inf, name="inf"))
+        df > 2., statistic, tf.fill(tf.shape(input=statistic), inf, name="inf"))
 
     if self.allow_nan_stats:
       nan = np.array(np.nan, dtype=self.dtype.as_numpy_dtype())
       return tf.where(df > 1., result_where_defined,
-                      tf.fill(tf.shape(statistic), nan, name="nan"))
+                      tf.fill(tf.shape(input=statistic), nan, name="nan"))
     else:
       with tf.control_dependencies([
-          tf.assert_less(
+          tf.compat.v1.assert_less(
               tf.cast(1., self.dtype),
               df,
               message=statistic_name +
@@ -345,7 +348,7 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
       rather than returning `NaN`.""")
   def _covariance(self):
     if distribution_util.is_diagonal_scale(self.scale):
-      mvn_cov = tf.matrix_diag(tf.square(self.scale.diag_part()))
+      mvn_cov = tf.linalg.diag(tf.square(self.scale.diag_part()))
     else:
       mvn_cov = self.scale.matmul(self.scale.to_dense(), adjoint_arg=True)
 
@@ -370,9 +373,9 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
       mvn_var = tf.square(self.scale.diag_part())
     elif (isinstance(self.scale, tf.linalg.LinearOperatorLowRankUpdate) and
           self.scale.is_self_adjoint):
-      mvn_var = tf.matrix_diag_part(self.scale.matmul(self.scale.to_dense()))
+      mvn_var = tf.linalg.diag_part(self.scale.matmul(self.scale.to_dense()))
     else:
-      mvn_var = tf.matrix_diag_part(
+      mvn_var = tf.linalg.diag_part(
           self.scale.matmul(self.scale.to_dense(), adjoint_arg=True))
 
     mvn_var = _broadcast_to_shape(mvn_var, self._sample_shape())
@@ -393,10 +396,10 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
     elif (isinstance(self.scale, tf.linalg.LinearOperatorLowRankUpdate) and
           self.scale.is_self_adjoint):
       mvn_std = tf.sqrt(
-          tf.matrix_diag_part(self.scale.matmul(self.scale.to_dense())))
+          tf.linalg.diag_part(self.scale.matmul(self.scale.to_dense())))
     else:
       mvn_std = tf.sqrt(
-          tf.matrix_diag_part(
+          tf.linalg.diag_part(
               self.scale.matmul(self.scale.to_dense(), adjoint_arg=True)))
 
     mvn_std = _broadcast_to_shape(mvn_std, self._sample_shape())
@@ -407,12 +410,13 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
     num_dims = tf.cast(self.event_shape_tensor()[0], self.dtype)
 
     def _lbeta(concentration0, concentration1):
-      return (tf.lgamma(concentration1) + tf.lgamma(concentration0) -
-              tf.lgamma(concentration0 + concentration1))
+      return (tf.math.lgamma(concentration1) + tf.math.lgamma(concentration0) -
+              tf.math.lgamma(concentration0 + concentration1))
 
     shape_factor = self._scale.log_abs_determinant()
-    beta_factor = num_dims / 2. * (tf.log(df) + np.log(np.pi)) - tf.lgamma(
-        num_dims / 2.) + _lbeta(num_dims / 2., df / 2.)
+    beta_factor = num_dims / 2. * (
+        tf.math.log(df) + np.log(np.pi)) - tf.math.lgamma(
+            num_dims / 2.) + _lbeta(num_dims / 2., df / 2.)
     digamma_factor = (num_dims + df) / 2. * (
-        tf.digamma((num_dims + df) / 2.) - tf.digamma(df / 2.))
+        tf.math.digamma((num_dims + df) / 2.) - tf.math.digamma(df / 2.))
     return shape_factor + beta_factor + digamma_factor

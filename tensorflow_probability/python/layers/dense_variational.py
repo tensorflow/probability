@@ -116,7 +116,7 @@ class _DenseVariational(tf.keras.layers.Layer):
         **kwargs)
     self.units = units
     self.activation = tf.keras.activations.get(activation)
-    self.input_spec = tf.layers.InputSpec(min_ndim=2)
+    self.input_spec = tf.keras.layers.InputSpec(min_ndim=2)
     self.kernel_posterior_fn = kernel_posterior_fn
     self.kernel_posterior_tensor_fn = kernel_posterior_tensor_fn
     self.kernel_prior_fn = kernel_prior_fn
@@ -128,11 +128,11 @@ class _DenseVariational(tf.keras.layers.Layer):
 
   def build(self, input_shape):
     input_shape = tf.TensorShape(input_shape)
-    in_size = tf.dimension_value(input_shape.with_rank_at_least(2)[-1])
+    in_size = tf.compat.dimension_value(input_shape.with_rank_at_least(2)[-1])
     if in_size is None:
       raise ValueError('The last dimension of the inputs to `Dense` '
                        'should be defined. Found `None`.')
-    self._input_spec = tf.layers.InputSpec(min_ndim=2, axes={-1: in_size})
+    self._input_spec = tf.keras.layers.InputSpec(min_ndim=2, axes={-1: in_size})
 
     # If self.dtype is None, build weights using the default dtype.
     dtype = tf.as_dtype(self.dtype or tf.keras.backend.floatx())
@@ -168,7 +168,7 @@ class _DenseVariational(tf.keras.layers.Layer):
     self.built = True
 
   def call(self, inputs):
-    inputs = tf.convert_to_tensor(inputs, dtype=self.dtype)
+    inputs = tf.convert_to_tensor(value=inputs, dtype=self.dtype)
 
     outputs = self._apply_variational_kernel(inputs)
     outputs = self._apply_variational_bias(outputs)
@@ -206,7 +206,7 @@ class _DenseVariational(tf.keras.layers.Layer):
     """
     input_shape = tf.TensorShape(input_shape)
     input_shape = input_shape.with_rank_at_least(2)
-    if tf.dimension_value(input_shape[-1]) is None:
+    if tf.compat.dimension_value(input_shape[-1]) is None:
       raise ValueError(
           'The innermost dimension of `input_shape` must be defined, '
           'but saw: {}'.format(input_shape))
@@ -689,7 +689,7 @@ class DenseFlipout(_DenseVariational):
         self.kernel_posterior_tensor_fn(self.kernel_posterior_affine))
     self.kernel_posterior_tensor = None
 
-    input_shape = tf.shape(inputs)
+    input_shape = tf.shape(input=inputs)
     batch_shape = input_shape[:-1]
 
     seed_stream = tfd.SeedStream(self.seed, salt='DenseFlipout')

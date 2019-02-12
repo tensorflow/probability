@@ -32,10 +32,10 @@ def trainable_lu_factorization(
   with tf.name_scope(name, 'trainable_lu_factorization',
                      [event_size, batch_shape]):
     event_size = tf.convert_to_tensor(
-        event_size, preferred_dtype=tf.int32, name='event_size')
+        value=event_size, dtype_hint=tf.int32, name='event_size')
     batch_shape = tf.convert_to_tensor(
-        batch_shape, preferred_dtype=event_size.dtype, name='batch_shape')
-    random_matrix = tf.random_uniform(
+        value=batch_shape, dtype_hint=event_size.dtype, name='batch_shape')
+    random_matrix = tf.random.uniform(
         shape=tf.concat([batch_shape, [event_size, event_size]], axis=0),
         dtype=dtype,
         seed=seed)
@@ -57,9 +57,9 @@ class MatvecLUTest(tf.test.TestCase):
     conv1x1 = tfb.MatvecLU(*trainable_lu_factorization(channels, seed=42),
                            validate_args=True)
 
-    self.evaluate(tf.global_variables_initializer())
+    self.evaluate(tf.compat.v1.global_variables_initializer())
 
-    x = tf.random_uniform(shape=[2, 28, 28, channels])
+    x = tf.random.uniform(shape=[2, 28, 28, channels])
 
     fwd = conv1x1.forward(x)
     rev_fwd = conv1x1.inverse(fwd)
@@ -93,8 +93,8 @@ class MatvecLUTest(tf.test.TestCase):
                            permutation=permutation,
                            validate_args=True)
 
-    channels = tf.dimension_value(lower_upper.shape[-1])
-    x = tf.random_uniform(shape=[2, 28, 28, channels])
+    channels = tf.compat.dimension_value(lower_upper.shape[-1])
+    x = tf.random.uniform(shape=[2, 28, 28, channels])
 
     fwd = conv1x1.forward(x)
     rev_fwd = conv1x1.inverse(fwd)

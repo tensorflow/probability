@@ -34,7 +34,7 @@ def try_import(name):  # pylint: disable=invalid-name
   try:
     module = importlib.import_module(name)
   except ImportError as e:
-    tf.logging.warning("Could not import %s: %s" % (name, str(e)))
+    tf.compat.v1.logging.warning("Could not import %s: %s" % (name, str(e)))
   return module
 
 
@@ -66,7 +66,7 @@ def _value_and_gradient(fn, *args):
     v, g = tfe.value_and_gradients_function(fn)(args)
   else:
     v = fn(*args)
-    g = tf.gradients(v, args)
+    g = tf.gradients(ys=v, xs=args)
   return v, g
 
 
@@ -103,7 +103,7 @@ class NdtriTest(tf.test.TestCase):
       if not special:
         return
 
-      p = tf.placeholder(np.float32)
+      p = tf.compat.v1.placeholder(np.float32)
       p_ = np.linspace(0., 1.0, 50).astype(np.float32)
 
       x = special_math.ndtri(p)
@@ -277,7 +277,7 @@ class NdtrGradientTest(tf.test.TestCase):
 
   def _test_grad_accuracy(self, dtype, grid_spec, error_spec):
     raw_grid = _make_grid(dtype, grid_spec)
-    grid = tf.convert_to_tensor(raw_grid)
+    grid = tf.convert_to_tensor(value=raw_grid)
     with self.cached_session():
       fn = sm.log_ndtr if self._use_log else sm.ndtr
 
@@ -287,8 +287,9 @@ class NdtrGradientTest(tf.test.TestCase):
       # diagonal to be nonzero.
       # TODO(b/31131137): Replace tf.test.compute_gradient with our own custom
       # gradient evaluation to ensure we correctly handle small function delta.
-      grad_eval, _ = tf.test.compute_gradient(grid, grid_spec.shape, fn(grid),
-                                              grid_spec.shape)
+      grad_eval, _ = tf.compat.v1.test.compute_gradient(grid, grid_spec.shape,
+                                                        fn(grid),
+                                                        grid_spec.shape)
       grad_eval = np.diag(grad_eval)
 
       # Check for NaN separately in order to get informative failures.
@@ -300,7 +301,7 @@ class NdtrGradientTest(tf.test.TestCase):
       # Do the same checks but explicitly compute the gradient.
       # (We did this because we're not sure if we trust
       # tf.test.compute_gradient.)
-      grad_eval = tf.gradients(fn(grid), grid)[0].eval()
+      grad_eval = tf.gradients(ys=fn(grid), xs=grid)[0].eval()
       self.assert_all_false(np.isnan(grad_eval))
       if self._use_log:
         g = np.reshape(grad_eval, [-1])
@@ -435,10 +436,10 @@ class LogCDFLaplaceTest(tf.test.TestCase):
       # fine, but test to -200 anyways.
       grid = _make_grid(
           np.float32, GridSpec(min=-200, max=80, shape=[20, 100]))
-      grid = tf.convert_to_tensor(grid)
+      grid = tf.convert_to_tensor(value=grid)
 
       actual = sm.log_cdf_laplace(grid)
-      grad = tf.gradients(actual, grid)[0]
+      grad = tf.gradients(ys=actual, xs=grid)[0]
 
       actual_, grad_ = sess.run([actual, grad])
 
@@ -454,10 +455,10 @@ class LogCDFLaplaceTest(tf.test.TestCase):
       # fine, but test to -200 anyways.
       grid = _make_grid(
           np.float64, GridSpec(min=-200, max=700, shape=[20, 100]))
-      grid = tf.convert_to_tensor(grid)
+      grid = tf.convert_to_tensor(value=grid)
 
       actual = sm.log_cdf_laplace(grid)
-      grad = tf.gradients(actual, grid)[0]
+      grad = tf.gradients(ys=actual, xs=grid)[0]
 
       actual_, grad_ = sess.run([actual, grad])
 

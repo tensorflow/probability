@@ -32,7 +32,7 @@ def _set_seed(seed):
   """Helper which uses graph seed if using TFE."""
   # TODO(b/68017812): Deprecate once TFE supports seed.
   if tf.executing_eagerly():
-    tf.set_random_seed(seed)
+    tf.compat.v1.set_random_seed(seed)
     return None
   return seed
 
@@ -284,9 +284,11 @@ class REMCTest(tf.test.TestCase):
         parallel_iterations=1)  # For determinism.
     self.assertAllEqual((2000, 2), samples.shape)
 
-    sample_mean = tf.reduce_mean(samples, axis=0)
+    sample_mean = tf.reduce_mean(input_tensor=samples, axis=0)
     sample_std = tf.sqrt(
-        tf.reduce_mean(tf.squared_difference(samples, sample_mean), axis=0))
+        tf.reduce_mean(
+            input_tensor=tf.math.squared_difference(samples, sample_mean),
+            axis=0))
     [sample_mean_, sample_std_] = self.evaluate([sample_mean, sample_std])
 
     self.assertAllClose(sample_mean_, [0., 0.], atol=0.3, rtol=0.3)
@@ -299,7 +301,8 @@ class REMCTest(tf.test.TestCase):
     true_mean = dtype([0, 0])
     true_cov = dtype([[1, 0.5], [0.5, 1]])
     # Use LinearOperatorLowerTriangular to get broadcasting ability.
-    linop = tf.linalg.LinearOperatorLowerTriangular(tf.cholesky(true_cov))
+    linop = tf.linalg.LinearOperatorLowerTriangular(
+        tf.linalg.cholesky(true_cov))
     num_results = 1000
 
     def target_log_prob(x, y):
@@ -307,7 +310,7 @@ class REMCTest(tf.test.TestCase):
       # z = matmul(inv(chol(true_cov)), [x, y] - true_mean)
       xy = tf.stack([x, y], axis=-1) - true_mean
       z = linop.solvevec(xy)
-      return -0.5 * tf.reduce_sum(z**2., axis=-1)
+      return -0.5 * tf.reduce_sum(input_tensor=z**2., axis=-1)
 
     def make_kernel_fn(target_log_prob_fn, seed):
       return tfp.mcmc.HamiltonianMonteCarlo(
@@ -333,8 +336,8 @@ class REMCTest(tf.test.TestCase):
     self.assertAllEqual((num_results,), states[1].shape)
 
     states = tf.stack(states, axis=-1)
-    self.assertEqual(num_results, tf.dimension_value(states.shape[0]))
-    sample_mean = tf.reduce_mean(states, axis=0)
+    self.assertEqual(num_results, tf.compat.dimension_value(states.shape[0]))
+    sample_mean = tf.reduce_mean(input_tensor=states, axis=0)
     x = states - sample_mean
     sample_cov = tf.matmul(x, x, transpose_a=True) / dtype(num_results)
     sample_mean_, sample_cov_ = self.evaluate([sample_mean, sample_cov])
@@ -396,7 +399,8 @@ class REMCTest(tf.test.TestCase):
     true_mean = dtype([0, 0])
     true_cov = dtype([[1, 0.5], [0.5, 1]])
     # Use LinearOperatorLowerTriangular to get broadcasting ability.
-    linop = tf.linalg.LinearOperatorLowerTriangular(tf.cholesky(true_cov))
+    linop = tf.linalg.LinearOperatorLowerTriangular(
+        tf.linalg.cholesky(true_cov))
     num_results = 4000
 
     def target_log_prob(x, y):
@@ -404,7 +408,7 @@ class REMCTest(tf.test.TestCase):
       # z = matmul(inv(chol(true_cov)), [x, y] - true_mean)
       xy = tf.stack([x, y], axis=-1) - true_mean
       z = linop.solvevec(xy)
-      return -0.5 * tf.reduce_sum(z**2., axis=-1)
+      return -0.5 * tf.reduce_sum(input_tensor=z**2., axis=-1)
 
     def make_kernel_fn(target_log_prob_fn, seed):
       return tfp.mcmc.HamiltonianMonteCarlo(
@@ -456,7 +460,7 @@ class REMCTest(tf.test.TestCase):
       tfp.mcmc.ReplicaExchangeMC(
           target_log_prob_fn=target.log_prob,
           inverse_temperatures=10.**tf.linspace(
-              0., -2., tf.random_uniform([], maxval=10, dtype=tf.int32)),
+              0., -2., tf.random.uniform([], maxval=10, dtype=tf.int32)),
           make_kernel_fn=make_kernel_fn,
           seed=_set_seed(13))
 

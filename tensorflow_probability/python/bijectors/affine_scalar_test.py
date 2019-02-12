@@ -44,7 +44,7 @@ class AffineScalarBijectorTest(tf.test.TestCase):
 
     def dynamic_run(fun, x_value, **kwargs):
       x_value = np.array(x_value, dtype=np.float32)
-      x = tf.placeholder_with_default(x_value, shape=None)
+      x = tf.compat.v1.placeholder_with_default(x_value, shape=None)
       return self.evaluate(fun(x, **kwargs))
 
     for run in (static_run, dynamic_run):
@@ -64,7 +64,7 @@ class AffineScalarBijectorTest(tf.test.TestCase):
 
     def dynamic_run(fun, x_value, **kwargs):
       x_value = np.array(x_value, dtype=np.float64)
-      x = tf.placeholder_with_default(x_value, shape=None)
+      x = tf.compat.v1.placeholder_with_default(x_value, shape=None)
       return self.evaluate(fun(x, **kwargs))
 
     for run in (static_run, dynamic_run):
@@ -85,7 +85,7 @@ class AffineScalarBijectorTest(tf.test.TestCase):
 
     def dynamic_run(fun, x_value, **kwargs):
       x_value = np.array(x_value)
-      x = tf.placeholder_with_default(x_value, shape=None)
+      x = tf.compat.v1.placeholder_with_default(x_value, shape=None)
       return self.evaluate(fun(x, **kwargs))
 
     for run in (static_run, dynamic_run):
@@ -106,7 +106,7 @@ class AffineScalarBijectorTest(tf.test.TestCase):
 
     def dynamic_run(fun, x_value, **kwargs):
       x_value = np.array(x_value, dtype=np.float32)
-      x = tf.placeholder_with_default(x_value, shape=None)
+      x = tf.compat.v1.placeholder_with_default(x_value, shape=None)
       return self.evaluate(fun(x, **kwargs))
 
     for run in (static_run, dynamic_run):
@@ -127,7 +127,7 @@ class AffineScalarBijectorTest(tf.test.TestCase):
 
     def dynamic_run(fun, x_value, **kwargs):
       x_value = np.array(x_value, dtype=np.float32)
-      x = tf.placeholder_with_default(x_value, shape=None)
+      x = tf.compat.v1.placeholder_with_default(x_value, shape=None)
       return self.evaluate(fun(x, **kwargs))
 
     for run in (static_run, dynamic_run):

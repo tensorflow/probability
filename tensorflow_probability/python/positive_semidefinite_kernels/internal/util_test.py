@@ -37,13 +37,13 @@ class UtilTest(tf.test.TestCase):
   def testPadShapeRightWithOnesDynamicShape(self):
     if tf.executing_eagerly(): return
     # Test partially unknown shape
-    x = tf.placeholder_with_default(np.ones([3], np.float32), [None])
+    x = tf.compat.v1.placeholder_with_default(np.ones([3], np.float32), [None])
     expanded = util.pad_shape_right_with_ones(x, 3)
     self.assertAllEqual(expanded.shape.as_list(), [None, 1, 1, 1])
     self.assertAllEqual(self.evaluate(expanded).shape, [3, 1, 1, 1])
 
     # Test totally unknown shape
-    x = tf.placeholder_with_default(np.ones([3], np.float32), None)
+    x = tf.compat.v1.placeholder_with_default(np.ones([3], np.float32), None)
     expanded = util.pad_shape_right_with_ones(x, 3)
     self.assertIsNone(expanded.shape.ndims)
     self.assertAllEqual(self.evaluate(expanded).shape, [3, 1, 1, 1])
@@ -73,15 +73,15 @@ class UtilTest(tf.test.TestCase):
         util.sum_rightmost_ndims_preserving_shape(x, ndims=2).shape,
         [5, 4])
 
-    x = tf.placeholder_with_default(np.ones((5, 4, 3, 2)),
-                                    shape=[5, 4, None, None])
+    x = tf.compat.v1.placeholder_with_default(
+        np.ones((5, 4, 3, 2)), shape=[5, 4, None, None])
     self.assertAllEqual(
         util.sum_rightmost_ndims_preserving_shape(x, ndims=1).shape.as_list(),
         [5, 4, 3 if tf.executing_eagerly() else None])
 
   def testSumRightmostNdimsPreservingShapeDynamicRank(self):
     if tf.executing_eagerly(): return
-    x = tf.placeholder_with_default(np.ones((5, 4, 3, 2)), shape=None)
+    x = tf.compat.v1.placeholder_with_default(np.ones((5, 4, 3, 2)), shape=None)
     self.assertIsNone(
         util.sum_rightmost_ndims_preserving_shape(x, ndims=2).shape.ndims)
     self.assertAllEqual(
@@ -144,7 +144,7 @@ class UtilTest(tf.test.TestCase):
         rtol=1e-10)
 
   def testSqrtWithFiniteGradsWithDynamicShape(self):
-    x = tf.placeholder_with_default([1.], shape=[None])
+    x = tf.compat.v1.placeholder_with_default([1.], shape=[None])
     with tf.GradientTape(persistent=True) as tape:
       tape.watch(x)
       tf_sqrt = tf.sqrt(x)

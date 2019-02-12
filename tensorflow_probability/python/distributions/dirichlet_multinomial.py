@@ -200,15 +200,17 @@ class DirichletMultinomial(distribution.Distribution):
     with tf.name_scope(name, values=[total_count, concentration]) as name:
       dtype = dtype_util.common_dtype([total_count, concentration], tf.float32)
       self._total_count = tf.convert_to_tensor(
-          total_count, name="total_count", dtype=dtype)
+          value=total_count, name="total_count", dtype=dtype)
       if validate_args:
         self._total_count = (
             distribution_util.embed_check_nonnegative_integer_form(
                 self._total_count))
       self._concentration = self._maybe_assert_valid_concentration(
           tf.convert_to_tensor(
-              concentration, name="concentration", dtype=dtype), validate_args)
-      self._total_concentration = tf.reduce_sum(self._concentration, -1)
+              value=concentration, name="concentration", dtype=dtype),
+          validate_args)
+      self._total_concentration = tf.reduce_sum(
+          input_tensor=self._concentration, axis=-1)
       self._broadcasted_concentration = tf.ones_like(
           self._total_count[..., tf.newaxis]) * self._concentration
     super(DirichletMultinomial, self).__init__(
@@ -236,14 +238,14 @@ class DirichletMultinomial(distribution.Distribution):
     return self._total_concentration
 
   def _batch_shape_tensor(self):
-    return tf.shape(self._broadcasted_concentration)[:-1]
+    return tf.shape(input=self._broadcasted_concentration)[:-1]
 
   def _batch_shape(self):
     return self._broadcasted_concentration.shape.with_rank_at_least(1)[:-1]
 
   def _event_shape_tensor(self):
     # Event shape depends only on concentration, not total_count.
-    return tf.shape(self.concentration)[-1:]
+    return tf.shape(input=self.concentration)[-1:]
 
   def _event_shape(self):
     # Event shape depends only on concentration, not total_count.
@@ -253,11 +255,12 @@ class DirichletMultinomial(distribution.Distribution):
     seed = seed_stream.SeedStream(seed, "dirichlet_multinomial")
     n_draws = tf.cast(self.total_count, dtype=tf.int32)
     k = self.event_shape_tensor()[0]
-    unnormalized_logits = tf.log(tf.random_gamma(
-        shape=[n],
-        alpha=self._broadcasted_concentration,
-        dtype=self.dtype,
-        seed=seed()))
+    unnormalized_logits = tf.math.log(
+        tf.random.gamma(
+            shape=[n],
+            alpha=self._broadcasted_concentration,
+            dtype=self.dtype,
+            seed=seed()))
     x = multinomial.draw_sample(
         1, k, unnormalized_logits, n_draws, self.dtype, seed())
     final_shape = tf.concat([[n], self.batch_shape_tensor(), [k]], 0)
@@ -267,8 +270,8 @@ class DirichletMultinomial(distribution.Distribution):
   def _log_prob(self, counts):
     counts = self._maybe_assert_valid_sample(counts)
     ordered_prob = (
-        tf.lbeta(self.concentration + counts)
-        - tf.lbeta(self.concentration))
+        tf.math.lbeta(self.concentration + counts) -
+        tf.math.lbeta(self.concentration))
     return ordered_prob + distribution_util.log_combinations(
         self.total_count, counts)
 
@@ -301,9 +304,8 @@ class DirichletMultinomial(distribution.Distribution):
       """)
   def _covariance(self):
     x = self._variance_scale_term() * self._mean()
-    return tf.matrix_set_diag(
-        -tf.matmul(x[..., tf.newaxis],
-                   x[..., tf.newaxis, :]),  # outer prod
+    return tf.linalg.set_diag(
+        -tf.matmul(x[..., tf.newaxis], x[..., tf.newaxis, :]),  # outer prod
         self._variance())
 
   def _variance(self):
@@ -325,9 +327,8 @@ class DirichletMultinomial(distribution.Distribution):
     concentration = distribution_util.embed_check_categorical_event_shape(
         concentration)
     return control_flow_ops.with_dependencies([
-        tf.assert_positive(
-            concentration,
-            message="Concentration parameter must be positive."),
+        tf.compat.v1.assert_positive(
+            concentration, message="Concentration parameter must be positive."),
     ], concentration)
 
   def _maybe_assert_valid_sample(self, counts):
@@ -336,7 +337,8 @@ class DirichletMultinomial(distribution.Distribution):
       return counts
     counts = distribution_util.embed_check_nonnegative_integer_form(counts)
     return control_flow_ops.with_dependencies([
-        tf.assert_equal(
-            self.total_count, tf.reduce_sum(counts, -1),
+        tf.compat.v1.assert_equal(
+            self.total_count,
+            tf.reduce_sum(input_tensor=counts, axis=-1),
             message="counts last-dimension must sum to `self.total_count`"),
     ], counts)

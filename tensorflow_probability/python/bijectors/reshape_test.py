@@ -322,8 +322,10 @@ class ReshapeBijectorTestDynamic(tf.test.TestCase, _ReshapeBijectorTest):
   def build_shapes(self, shape_in, shape_out):
     shape_in = np.array(shape_in, np.int32)
     shape_out = np.array(shape_out, np.int32)
-    return (tf.placeholder_with_default(shape_in, shape=[len(shape_in)]),
-            tf.placeholder_with_default(shape_out, shape=[len(shape_out)]))
+    return (tf.compat.v1.placeholder_with_default(
+        shape_in, shape=[len(shape_in)]),
+            tf.compat.v1.placeholder_with_default(
+                shape_out, shape=[len(shape_out)]))
 
   def assertRaisesError(self, msg):
     if tf.executing_eagerly():
@@ -381,7 +383,7 @@ class ReshapeBijectorTestDynamic(tf.test.TestCase, _ReshapeBijectorTest):
 
   def testUnknownShapeRank(self):
     if tf.executing_eagerly(): return
-    unknown_shape = tf.placeholder_with_default([2, 2], shape=None)
+    unknown_shape = tf.compat.v1.placeholder_with_default([2, 2], shape=None)
     known_shape = [2, 2]
 
     with self.assertRaisesRegexp(NotImplementedError,

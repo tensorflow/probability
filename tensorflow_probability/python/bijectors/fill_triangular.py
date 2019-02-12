@@ -93,7 +93,8 @@ class FillTriangular(bijector.Bijector):
     return tf.zeros_like(y[..., 0, 0])
 
   def _forward_event_shape(self, input_shape):
-    batch_shape, d = input_shape[:-1], tf.dimension_value(input_shape[-1])
+    batch_shape, d = input_shape[:-1], tf.compat.dimension_value(
+        input_shape[-1])
     if d is None:
       n = None
     else:
@@ -102,8 +103,8 @@ class FillTriangular(bijector.Bijector):
 
   def _inverse_event_shape(self, output_shape):
     batch_shape, n1, n2 = (output_shape[:-2],
-                           tf.dimension_value(output_shape[-2]),
-                           tf.dimension_value(output_shape[-1]))
+                           tf.compat.dimension_value(output_shape[-2]),
+                           tf.compat.dimension_value(output_shape[-1]))
     if n1 is None or n2 is None:
       m = None
     elif n1 != n2:
@@ -120,7 +121,7 @@ class FillTriangular(bijector.Bijector):
   def _inverse_event_shape_tensor(self, output_shape_tensor):
     batch_shape, n = output_shape_tensor[:-2], output_shape_tensor[-1]
     if self.validate_args:
-      is_square_matrix = tf.assert_equal(
+      is_square_matrix = tf.compat.v1.assert_equal(
           n, output_shape_tensor[-2], message="Matrix must be square.")
       with tf.control_dependencies([is_square_matrix]):
         n = tf.identity(n)
@@ -137,11 +138,11 @@ def vector_size_to_square_matrix_size(d, validate_args, name=None):
     return int(n)
   else:
     with tf.name_scope(name, "vector_size_to_square_matrix_size", [d]) as name:
-      n = (-1. + tf.sqrt(1 + 8. * tf.to_float(d))) / 2.
+      n = (-1. + tf.sqrt(1 + 8. * tf.cast(d, dtype=tf.float32))) / 2.
       if validate_args:
         with tf.control_dependencies([
-            tf.assert_equal(
-                tf.to_float(tf.to_int32(n)),
+            tf.compat.v1.assert_equal(
+                tf.cast(tf.cast(n, dtype=tf.int32), dtype=tf.float32),
                 n,
                 message="Vector length is not a triangular number")
         ]):

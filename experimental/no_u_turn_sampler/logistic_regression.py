@@ -97,18 +97,18 @@ def covertype():
 
 def main(argv):
   del argv  # unused
-  if tf.gfile.Exists(FLAGS.model_dir):
-    tf.logging.warning(
+  if tf.io.gfile.exists(FLAGS.model_dir):
+    tf.compat.v1.logging.warning(
         "Warning: deleting old log directory at {}".format(FLAGS.model_dir))
-    tf.gfile.DeleteRecursively(FLAGS.model_dir)
-  tf.gfile.MakeDirs(FLAGS.model_dir)
+    tf.io.gfile.rmtree(FLAGS.model_dir)
+  tf.io.gfile.makedirs(FLAGS.model_dir)
 
-  tf.enable_eager_execution()
+  tf.compat.v1.enable_eager_execution()
   print("Number of available GPUs", tf.contrib.eager.num_gpus())
 
   if FLAGS.fake_data:
-    features = tf.random_normal([20, 55])
-    labels = tf.random_uniform([20], minval=0, maxval=2, dtype=tf.int32)
+    features = tf.random.normal([20, 55])
+    labels = tf.random.uniform([20], minval=0, maxval=2, dtype=tf.int32)
   else:
     features, labels = covertype()
   print("Data set size", features.shape[0])
@@ -167,4 +167,4 @@ def main(argv):
   plt.close()
 
 if __name__ == "__main__":
-  tf.app.run()
+  tf.compat.v1.app.run()

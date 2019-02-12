@@ -47,7 +47,7 @@ class RandomVariableTest(parameterized.TestCase, tf.test.TestCase):
   def testConstructor(self):
     x = ed.RandomVariable(tfd.Poisson(rate=tf.ones([2, 5])),
                           value=tf.ones([2, 5]))
-    x_sample, x_value = self.evaluate([tf.convert_to_tensor(x), x.value])
+    x_sample, x_value = self.evaluate([tf.convert_to_tensor(value=x), x.value])
     self.assertAllEqual(x_sample, x_value)
     with self.assertRaises(ValueError):
       _ = ed.RandomVariable(tfd.Bernoulli(probs=0.5),
@@ -65,7 +65,7 @@ class RandomVariableTest(parameterized.TestCase, tf.test.TestCase):
       df = tfe.gradients_function(f)
       (z,) = df(x)
     else:
-      (z,) = tf.gradients(y, x)
+      (z,) = tf.gradients(ys=y, xs=x)
     self.assertEqual(self.evaluate(z), 2.)
 
   @tfe.run_test_in_graph_and_eager_modes
@@ -78,8 +78,8 @@ class RandomVariableTest(parameterized.TestCase, tf.test.TestCase):
       d2f = tfe.gradients_function(lambda x: df(x)[0])
       (z,) = d2f(x)
     else:
-      (z,) = tf.gradients(y, x)
-      (z,) = tf.gradients(z, x)
+      (z,) = tf.gradients(ys=y, xs=x)
+      (z,) = tf.gradients(ys=z, xs=x)
     self.assertEqual(self.evaluate(z), 4.0)
 
   @tfe.run_test_in_graph_and_eager_modes
@@ -334,12 +334,12 @@ class RandomVariableTest(parameterized.TestCase, tf.test.TestCase):
   def testConvertToTensor(self):
     x = ed.RandomVariable(tfd.Normal(0.0, 0.1))
     with self.assertRaises(ValueError):
-      _ = tf.convert_to_tensor(x, dtype=tf.int32)
+      _ = tf.convert_to_tensor(value=x, dtype=tf.int32)
 
   def testSessionEval(self):
     with self.cached_session() as sess:
       x = ed.RandomVariable(tfd.Normal(0.0, 0.1))
-      x_ph = tf.placeholder(tf.float32, [])
+      x_ph = tf.compat.v1.placeholder(tf.float32, [])
       y = ed.RandomVariable(tfd.Normal(x_ph, 0.1))
       self.assertLess(x.eval(), 5.0)
       self.assertLess(x.eval(sess), 5.0)
@@ -352,7 +352,7 @@ class RandomVariableTest(parameterized.TestCase, tf.test.TestCase):
   def testSessionRun(self):
     with self.cached_session() as sess:
       x = ed.RandomVariable(tfd.Normal(0.0, 0.1))
-      x_ph = tf.placeholder(tf.float32, [])
+      x_ph = tf.compat.v1.placeholder(tf.float32, [])
       y = ed.RandomVariable(tfd.Normal(x_ph, 0.1))
       self.assertLess(sess.run(x), 5.0)
       self.assertLess(sess.run(x, feed_dict={x_ph: 100.0}), 5.0)

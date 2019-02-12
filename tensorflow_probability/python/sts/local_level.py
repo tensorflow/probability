@@ -152,9 +152,11 @@ class LocalLevelStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
       dtype = initial_state_prior.dtype
 
       level_scale = tf.convert_to_tensor(
-          level_scale, name='level_scale', dtype=dtype)
+          value=level_scale, name='level_scale', dtype=dtype)
       observation_noise_scale = tf.convert_to_tensor(
-          observation_noise_scale, name='observation_noise_scale', dtype=dtype)
+          value=observation_noise_scale,
+          name='observation_noise_scale',
+          dtype=dtype)
 
       self._level_scale = level_scale
       self._observation_noise_scale = observation_noise_scale
@@ -238,18 +240,21 @@ class LocalLevel(StructuralTimeSeries):
       if level_scale_prior is None or initial_level_prior is None:
         if observed_time_series is not None:
           observed_time_series = tf.convert_to_tensor(
-              observed_time_series, dtype=dtype, name='observed_time_series')
+              value=observed_time_series,
+              dtype=dtype,
+              name='observed_time_series')
           observed_stddev, observed_initial = (
               sts_util.empirical_statistics(observed_time_series))
         else:
-          observed_stddev, observed_initial = (
-              tf.convert_to_tensor(1., dtype), tf.convert_to_tensor(0., dtype))
+          observed_stddev, observed_initial = (tf.convert_to_tensor(
+              value=1., dtype=dtype), tf.convert_to_tensor(
+                  value=0., dtype=dtype))
 
       # Heuristic default priors. Overriding these may dramatically
       # change inference performance and results.
       if level_scale_prior is None:
         level_scale_prior = tfd.LogNormal(
-            loc=tf.log(.05 * observed_stddev),
+            loc=tf.math.log(.05 * observed_stddev),
             scale=3.,
             name='level_scale_prior')
       if initial_level_prior is None:

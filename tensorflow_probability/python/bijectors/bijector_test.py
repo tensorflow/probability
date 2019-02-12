@@ -103,7 +103,7 @@ class ForwardOnlyBijector(tfb.Bijector):
     return 2 * x
 
   def _forward_log_det_jacobian(self, _):
-    return tf.log(2.)
+    return tf.math.log(2.)
 
 
 class InverseOnlyBijector(tfb.Bijector):
@@ -119,7 +119,7 @@ class InverseOnlyBijector(tfb.Bijector):
     return y / 2.
 
   def _inverse_log_det_jacobian(self, _):
-    return -tf.log(2.)
+    return -tf.math.log(2.)
 
 
 class ExpOnlyJacobian(tfb.Bijector):
@@ -133,10 +133,10 @@ class ExpOnlyJacobian(tfb.Bijector):
         name="exp")
 
   def _inverse_log_det_jacobian(self, y):
-    return -tf.log(y)
+    return -tf.math.log(y)
 
   def _forward_log_det_jacobian(self, x):
-    return tf.log(x)
+    return tf.math.log(x)
 
 
 class ConstantJacobian(tfb.Bijector):
@@ -179,12 +179,12 @@ class BijectorTestEventNdims(tf.test.TestCase):
   def testBijectorDynamicEventNdims(self):
     with self.assertRaisesError("Expected scalar"):
       bij = ExpOnlyJacobian(validate_args=True)
-      event_ndims = tf.placeholder_with_default((1, 2), shape=None)
+      event_ndims = tf.compat.v1.placeholder_with_default((1, 2), shape=None)
       self.evaluate(
           bij.forward_log_det_jacobian(1., event_ndims=event_ndims))
     with self.assertRaisesError("Expected scalar"):
       bij = ExpOnlyJacobian(validate_args=True)
-      event_ndims = tf.placeholder_with_default((1, 2), shape=None)
+      event_ndims = tf.compat.v1.placeholder_with_default((1, 2), shape=None)
       self.evaluate(
           bij.inverse_log_det_jacobian(1., event_ndims=event_ndims))
 
@@ -315,8 +315,8 @@ class BijectorReduceEventDimsTest(tf.test.TestCase):
 
   def testHandlesNonStaticEventNdims(self):
     x_ = [[[1., 2.], [3., 4.]]]
-    x = tf.placeholder_with_default(x_, shape=None)
-    event_ndims = tf.placeholder_with_default(1, shape=None)
+    x = tf.compat.v1.placeholder_with_default(x_, shape=None)
+    event_ndims = tf.compat.v1.placeholder_with_default(1, shape=None)
     bij = ExpOnlyJacobian(forward_min_event_ndims=1)
     bij.inverse_log_det_jacobian(x, event_ndims=event_ndims)
     ildj = self.evaluate(
@@ -383,8 +383,8 @@ class BijectorLDJCachingTest(tf.test.TestCase):
     # Exercise the scenario outlined in
     # https://github.com/tensorflow/probability/issues/253 (originally reported
     # internally as b/119756336).
-    x1 = tf.placeholder(tf.float32, shape=[None, 2], name="x1")
-    x2 = tf.placeholder(tf.float32, shape=[None, 2], name="x2")
+    x1 = tf.compat.v1.placeholder(tf.float32, shape=[None, 2], name="x1")
+    x2 = tf.compat.v1.placeholder(tf.float32, shape=[None, 2], name="x2")
 
     bij = ConstantJacobian()
 

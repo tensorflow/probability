@@ -134,7 +134,7 @@ class MetropolisHastingsTest(tf.test.TestCase):
   def testCorrectlyWorksWithoutCorrection(self):
     current_state_ = [self.dtype([1, 2]),
                       self.dtype([3, 4])]
-    current_state = [tf.convert_to_tensor(s) for s in current_state_]
+    current_state = [tf.convert_to_tensor(value=s) for s in current_state_]
     expected_inner_init_kernel_results = InnerKernelResultsWithoutCorrection(
         target_log_prob=self.dtype([
             +100.,
@@ -228,7 +228,7 @@ class MetropolisHastingsTest(tf.test.TestCase):
   def testCorrectlyWorksWithCorrection(self):
     current_state_ = [self.dtype([1, 2]),
                       self.dtype([3, 4])]
-    current_state = [tf.convert_to_tensor(s) for s in current_state_]
+    current_state = [tf.convert_to_tensor(value=s) for s in current_state_]
 
     expected_inner_init_kernel_results = InnerKernelResultsWithCorrection(
         log_acceptance_correction=self.dtype([+300., -300.]),
@@ -322,7 +322,7 @@ class MetropolisHastingsTest(tf.test.TestCase):
   def testWarnings(self):
     current_state_ = [self.dtype([1, 2]),
                       self.dtype([3, 4])]
-    current_state = [tf.convert_to_tensor(s) for s in current_state_]
+    current_state = [tf.convert_to_tensor(value=s) for s in current_state_]
     expected_inner_init_kernel_results = InnerKernelResultsWithoutCorrection(
         target_log_prob=self.dtype([100., -100.]),
         grads_target_log_prob=[

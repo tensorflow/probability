@@ -132,7 +132,7 @@ def ndtr(x, name="ndtr"):
   """
 
   with tf.name_scope(name, values=[x]):
-    x = tf.convert_to_tensor(x, name="x")
+    x = tf.convert_to_tensor(value=x, name="x")
     if x.dtype.as_numpy_dtype not in [np.float32, np.float64]:
       raise TypeError(
           "x.dtype=%s is not handled, see docstring for supported types."
@@ -147,7 +147,7 @@ def _ndtr(x):
   w = x * half_sqrt_2
   z = tf.abs(w)
   y = tf.where(
-      tf.less(z, half_sqrt_2), 1. + tf.erf(w),
+      tf.less(z, half_sqrt_2), 1. + tf.math.erf(w),
       tf.where(tf.greater(w, 0.), 2. - tf.math.erfc(z), tf.math.erfc(z)))
   return 0.5 * y
 
@@ -173,7 +173,7 @@ def ndtri(p, name="ndtri"):
   """
 
   with tf.name_scope(name, values=[p]):
-    p = tf.convert_to_tensor(p, name="p")
+    p = tf.convert_to_tensor(value=p, name="p")
     if p.dtype.as_numpy_dtype not in [np.float32, np.float64]:
       raise TypeError(
           "p.dtype=%s is not handled, see docstring for supported types."
@@ -251,7 +251,7 @@ def _ndtri(p):
   # number that doesn't result in NaNs is fine.
   sanitized_mcp = tf.where(
       maybe_complement_p <= 0.,
-      tf.fill(tf.shape(p), np.array(0.5, p.dtype.as_numpy_dtype)),
+      tf.fill(tf.shape(input=p), np.array(0.5, p.dtype.as_numpy_dtype)),
       maybe_complement_p)
 
   # Compute x for p > exp(-2): x/sqrt(2pi) = w + w**3 P0(w**2)/Q0(w**2).
@@ -264,8 +264,8 @@ def _ndtri(p):
   # Compute x for p <= exp(-2): x = z - log(z)/z - (1/z) P(1/z) / Q(1/z),
   # where z = sqrt(-2. * log(p)), and P/Q are chosen between two different
   # arrays based on whether p < exp(-32).
-  z = tf.sqrt(-2. * tf.log(sanitized_mcp))
-  first_term = z - tf.log(z) / z
+  z = tf.sqrt(-2. * tf.math.log(sanitized_mcp))
+  first_term = z - tf.math.log(z) / z
   second_term_small_p = (
       _create_polynomial(1. / z, p2) /
       _create_polynomial(1. / z, q2) / z)
@@ -280,7 +280,7 @@ def _ndtri(p):
 
   x = tf.where(p > 1. - np.exp(-2.), x, -x)
   infinity_scalar = tf.constant(np.inf, dtype=p.dtype)
-  infinity = tf.fill(tf.shape(p), infinity_scalar)
+  infinity = tf.fill(tf.shape(input=p), infinity_scalar)
   x_nan_replaced = tf.where(
       p <= 0.0, -infinity, tf.where(p >= 1.0, infinity, x))
   return x_nan_replaced
@@ -344,7 +344,7 @@ def log_ndtr(x, series_order=3, name="log_ndtr"):
     raise ValueError("series_order must be <= 30.")
 
   with tf.name_scope(name, values=[x]):
-    x = tf.convert_to_tensor(x, name="x")
+    x = tf.convert_to_tensor(value=x, name="x")
 
     if x.dtype.as_numpy_dtype == np.float64:
       lower_segment = LOGNDTR_FLOAT64_LOWER
@@ -374,7 +374,7 @@ def log_ndtr(x, series_order=3, name="log_ndtr"):
         -_ndtr(-x),  # log(1-x) ~= -x, x << 1
         tf.where(
             tf.greater(x, lower_segment),
-            tf.log(_ndtr(tf.maximum(x, lower_segment))),
+            tf.math.log(_ndtr(tf.maximum(x, lower_segment))),
             _log_ndtr_lower(tf.minimum(x, lower_segment), series_order)))
 
 
@@ -382,8 +382,8 @@ def _log_ndtr_lower(x, series_order):
   """Asymptotic expansion version of `Log[cdf(x)]`, appropriate for `x<<-1`."""
   x_2 = tf.square(x)
   # Log of the term multiplying (1 + sum)
-  log_scale = -0.5 * x_2 - tf.log(-x) - 0.5 * np.log(2. * np.pi)
-  return log_scale + tf.log(_log_ndtr_asymptotic_series(x, series_order))
+  log_scale = -0.5 * x_2 - tf.math.log(-x) - 0.5 * np.log(2. * np.pi)
+  return log_scale + tf.math.log(_log_ndtr_asymptotic_series(x, series_order))
 
 
 def _log_ndtr_asymptotic_series(x, series_order):
@@ -420,7 +420,7 @@ def erfinv(x, name="erfinv"):
   """
 
   with tf.name_scope(name, values=[x]):
-    x = tf.convert_to_tensor(x, name="x")
+    x = tf.convert_to_tensor(value=x, name="x")
     if x.dtype.as_numpy_dtype not in [np.float32, np.float64]:
       raise TypeError(
           "x.dtype=%s is not handled, see docstring for supported types."
@@ -463,7 +463,7 @@ def log_cdf_laplace(x, name="log_cdf_laplace"):
   """
 
   with tf.name_scope(name, values=[x]):
-    x = tf.convert_to_tensor(x, name="x")
+    x = tf.convert_to_tensor(value=x, name="x")
 
     # For x < 0, L(x) = 0.5 * exp{x} exactly, so Log[L(x)] = log(0.5) + x.
     lower_solution = -np.log(2.) + x
@@ -476,6 +476,6 @@ def log_cdf_laplace(x, name="log_cdf_laplace"):
 
     # log1p(z) = log(1 + z) approx z for |z| << 1. This approxmation is used
     # internally by log1p, rather than being done explicitly here.
-    upper_solution = tf.log1p(-0.5 * safe_exp_neg_x)
+    upper_solution = tf.math.log1p(-0.5 * safe_exp_neg_x)
 
     return tf.where(x < 0., lower_solution, upper_solution)

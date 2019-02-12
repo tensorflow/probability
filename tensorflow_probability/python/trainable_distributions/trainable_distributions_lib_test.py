@@ -42,12 +42,12 @@ class TestMVNTriL(tf.test.TestCase):
     x = tf.constant(x_)
     mvn = tfp.trainable_distributions.multivariate_normal_tril(x, dims=mvn_size)
     scale = mvn.scale.to_dense()
-    scale_upper = tf.matrix_set_diag(
-        tf.matrix_band_part(scale, num_lower=0, num_upper=-1),
+    scale_upper = tf.linalg.set_diag(
+        tf.linalg.band_part(scale, num_lower=0, num_upper=-1),
         tf.zeros(np.concatenate([batch_shape, [mvn_size]]), scale.dtype))
-    scale_diag = tf.matrix_diag_part(scale)
+    scale_diag = tf.linalg.diag_part(scale)
 
-    self.evaluate(tf.global_variables_initializer())
+    self.evaluate(tf.compat.v1.global_variables_initializer())
     [
         batch_shape_,
         event_shape_,
@@ -83,13 +83,13 @@ class TestMVNTriL(tf.test.TestCase):
         loc_fn=tf.zeros_like,
         scale_fn=lambda x: tfd.fill_triangular(tf.ones_like(x)))
     scale = mvn.scale.to_dense()
-    expected_scale = tf.matrix_band_part(
-        tf.ones(np.concatenate([batch_shape, [mvn_size, mvn_size]]),
-                scale.dtype),
+    expected_scale = tf.linalg.band_part(
+        tf.ones(
+            np.concatenate([batch_shape, [mvn_size, mvn_size]]), scale.dtype),
         num_lower=-1,
         num_upper=0)
 
-    self.evaluate(tf.global_variables_initializer())
+    self.evaluate(tf.compat.v1.global_variables_initializer())
     [
         batch_shape_,
         event_shape_,
@@ -128,7 +128,7 @@ class TestBernoulli(tf.test.TestCase):
     x = tf.constant(x_)
     bernoulli = tfp.trainable_distributions.bernoulli(x)
 
-    self.evaluate(tf.global_variables_initializer())
+    self.evaluate(tf.compat.v1.global_variables_initializer())
     [
         batch_shape_,
         event_shape_,
@@ -151,7 +151,8 @@ class TestBernoulli(tf.test.TestCase):
     x = tf.constant(x_)
     bernoulli = tfp.trainable_distributions.bernoulli(
         x,
-        layer_fn=lambda x, _: tf.reduce_sum(x, axis=-1, keepdims=True))
+        layer_fn=lambda x, _: tf.reduce_sum(
+            input_tensor=x, axis=-1, keepdims=True))
 
     [
         batch_shape_,
@@ -186,7 +187,7 @@ class TestNormal(tf.test.TestCase):
     x = tf.constant(x_)
     normal = tfp.trainable_distributions.normal(x)
 
-    self.evaluate(tf.global_variables_initializer())
+    self.evaluate(tf.compat.v1.global_variables_initializer())
     [
         batch_shape_,
         event_shape_,
@@ -209,7 +210,8 @@ class TestNormal(tf.test.TestCase):
     x = tf.constant(x_)
     normal = tfp.trainable_distributions.normal(
         x,
-        layer_fn=lambda x, _: tf.reduce_sum(x, axis=-1, keepdims=True))
+        layer_fn=lambda x, _: tf.reduce_sum(
+            input_tensor=x, axis=-1, keepdims=True))
 
     [
         batch_shape_,
@@ -244,7 +246,7 @@ class TestPoisson(tf.test.TestCase):
     x = tf.constant(x_)
     poisson = tfp.trainable_distributions.poisson(x)
 
-    self.evaluate(tf.global_variables_initializer())
+    self.evaluate(tf.compat.v1.global_variables_initializer())
     [
         batch_shape_,
         event_shape_,
@@ -267,7 +269,8 @@ class TestPoisson(tf.test.TestCase):
     x = tf.constant(x_)
     poisson = tfp.trainable_distributions.poisson(
         x,
-        layer_fn=lambda x, _: tf.reduce_sum(x, axis=-1, keepdims=True))
+        layer_fn=lambda x, _: tf.reduce_sum(
+            input_tensor=x, axis=-1, keepdims=True))
 
     [
         batch_shape_,

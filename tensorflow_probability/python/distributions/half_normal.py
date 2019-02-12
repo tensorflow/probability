@@ -105,11 +105,11 @@ class HalfNormal(distribution.Distribution):
     parameters = dict(locals())
     with tf.name_scope(name, values=[scale]) as name:
       scale = tf.convert_to_tensor(
-          scale,
+          value=scale,
           name="scale",
           dtype=dtype_util.common_dtype([scale], preferred_dtype=tf.float32))
-      with tf.control_dependencies([tf.assert_positive(scale)]
-                                   if validate_args else []):
+      with tf.control_dependencies(
+          [tf.compat.v1.assert_positive(scale)] if validate_args else []):
         self._scale = tf.identity(scale, name="scale")
     super(HalfNormal, self).__init__(
         dtype=self._scale.dtype,
@@ -122,7 +122,7 @@ class HalfNormal(distribution.Distribution):
 
   @staticmethod
   def _param_shapes(sample_shape):
-    return {"scale": tf.convert_to_tensor(sample_shape, dtype=tf.int32)}
+    return {"scale": tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)}
 
   @property
   def scale(self):
@@ -130,7 +130,7 @@ class HalfNormal(distribution.Distribution):
     return self._scale
 
   def _batch_shape_tensor(self):
-    return tf.shape(self.scale)
+    return tf.shape(input=self.scale)
 
   def _batch_shape(self):
     return self.scale.shape
@@ -143,7 +143,7 @@ class HalfNormal(distribution.Distribution):
 
   def _sample_n(self, n, seed=None):
     shape = tf.concat([[n], self.batch_shape_tensor()], 0)
-    sampled = tf.random_normal(
+    sampled = tf.random.normal(
         shape=shape, mean=0., stddev=1., dtype=self.dtype, seed=seed)
     return tf.abs(sampled * self.scale)
 
@@ -154,10 +154,10 @@ class HalfNormal(distribution.Distribution):
 
   def _cdf(self, x):
     truncated_x = tf.nn.relu(x)
-    return tf.erf(truncated_x / self.scale / np.sqrt(2.0))
+    return tf.math.erf(truncated_x / self.scale / np.sqrt(2.0))
 
   def _entropy(self):
-    return 0.5 * tf.log(np.pi * self.scale**2.0 / 2.0) + 0.5
+    return 0.5 * tf.math.log(np.pi * self.scale**2.0 / 2.0) + 0.5
 
   def _mean(self):
     return self.scale * np.sqrt(2.0) / np.sqrt(np.pi)
@@ -189,5 +189,5 @@ def _kl_half_normal_half_normal(a, b, name=None):
                      [a.scale, b.scale]):
     # Consistent with
     # http://www.mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 119
-    return (tf.log(b.scale) - tf.log(a.scale) +
-            (a.scale ** 2 - b.scale **2) / (2 * b.scale**2))
+    return (tf.math.log(b.scale) - tf.math.log(a.scale) +
+            (a.scale**2 - b.scale**2) / (2 * b.scale**2))

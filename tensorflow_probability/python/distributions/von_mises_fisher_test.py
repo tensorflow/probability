@@ -42,7 +42,7 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
       try:
         from scipy import special  # pylint:disable=g-import-not-at-top
       except ImportError:
-        tf.logging.warn('Skipping scipy-dependent tests')
+        tf.compat.v1.logging.warn('Skipping scipy-dependent tests')
         return
       self.assertAllClose(special.ive(v, z), _bessel_ive(v, z))
 
@@ -67,7 +67,7 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
     sample_dir = (
         sample_mean / np.linalg.norm(sample_mean, axis=-1, keepdims=True))
     inner_product = self.evaluate(
-        tf.reduce_sum(sample_dir * vmf.mean_direction, axis=-1))
+        tf.reduce_sum(input_tensor=sample_dir * vmf.mean_direction, axis=-1))
     # All except the 0-concentration distribution should have >0 inner product
     # with the mean direction of the distribution.
     self.assertAllGreater(inner_product[1:], 0.1)
@@ -107,7 +107,7 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
     sample_dir = (
         sample_mean / np.linalg.norm(sample_mean, axis=-1, keepdims=True))
     inner_product = self.evaluate(
-        tf.reduce_sum(sample_dir * vmf.mean_direction, axis=-1))
+        tf.reduce_sum(input_tensor=sample_dir * vmf.mean_direction, axis=-1))
     # All except the 0-concentration distribution should have >0 inner product
     # with the mean direction of the distribution.
     self.assertAllGreater(inner_product[1:], 0.1)
@@ -136,7 +136,7 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
       vmf: A `tfp.distributions.VonMisesFisher` instance.
       atol: Absolute difference tolerable.
     """
-    dim = tf.dimension_value(vmf.event_shape[-1])
+    dim = tf.compat.dimension_value(vmf.event_shape[-1])
     nsamples = 10
     # Sample some random points uniformly over the hypersphere using numpy.
     sample_shape = [nsamples] + vmf.batch_shape.as_list() + [dim]
@@ -145,15 +145,15 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
     uniforms = uniforms.astype(vmf.dtype.as_numpy_dtype)
     # Concatenate in some sampled points from the distribution under test.
     samples = tf.concat([uniforms, vmf.sample(sample_shape=[nsamples])], axis=0)
-    samples = tf.check_numerics(samples, 'samples')
+    samples = tf.debugging.check_numerics(samples, 'samples')
     samples = self.evaluate(samples)
     log_prob = vmf.log_prob(samples)
-    log_prob = tf.check_numerics(log_prob, 'log_prob')
+    log_prob = tf.debugging.check_numerics(log_prob, 'log_prob')
     try:
       from scipy.special import gammaln  # pylint: disable=g-import-not-at-top
       from scipy.special import ive  # pylint: disable=g-import-not-at-top
     except ImportError:
-      tf.logging.warn('Unable to use scipy in tests')
+      tf.compat.v1.logging.warn('Unable to use scipy in tests')
       return
     conc = self.evaluate(vmf.concentration)
     mean_dir = self.evaluate(vmf.mean_direction)
@@ -181,22 +181,21 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
       vmf: A `VonMisesFisher` distribution instance.
       rtol: Relative difference tolerable.
     """
-    dim = tf.dimension_value(vmf.event_shape[-1])
+    dim = tf.compat.dimension_value(vmf.event_shape[-1])
     nsamples = 50000
     samples = vmf.sample(sample_shape=[nsamples])
-    samples = tf.check_numerics(samples, 'samples')
+    samples = tf.debugging.check_numerics(samples, 'samples')
     log_prob = vmf.log_prob(samples)
-    log_prob = tf.check_numerics(log_prob, 'log_prob')
+    log_prob = tf.debugging.check_numerics(log_prob, 'log_prob')
     log_importance = -log_prob
     sphere_surface_area_estimate, samples, importance, conc = self.evaluate([
-        tf.exp(tf.reduce_logsumexp(log_importance, axis=0) -
-               tf.log(tf.to_float(nsamples))),
-        samples,
-        tf.exp(log_importance),
-        vmf.concentration
+        tf.exp(
+            tf.reduce_logsumexp(input_tensor=log_importance, axis=0) -
+            tf.math.log(tf.cast(nsamples, dtype=tf.float32))), samples,
+        tf.exp(log_importance), vmf.concentration
     ])
     true_sphere_surface_area = 2 * (np.pi)**(dim / 2) * self.evaluate(
-        tf.exp(-tf.lgamma(dim / 2)))
+        tf.exp(-tf.math.lgamma(dim / 2)))
     # Broadcast to correct size
     true_sphere_surface_area += np.zeros_like(sphere_surface_area_estimate)
     # Highly concentrated distributions do not get enough coverage to provide
@@ -226,8 +225,8 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
       h = (1 - dotprod_thresh)
       self.assertGreaterEqual(h.min(), 0)  # h must be >= 0 for the eqn below
       true_sphere_cap_surface_area = (
-          0.5 * true_sphere_surface_area * self.evaluate(
-              tf.betainc((dim - 1) / 2, 0.5, 2 * h - h**2)))
+          0.5 * true_sphere_surface_area *
+          self.evaluate(tf.math.betainc((dim - 1) / 2, 0.5, 2 * h - h**2)))
       if dim == 3:  # For 3-d we have a simpler form we can double-check.
         self.assertAllClose(2 * np.pi * h, true_sphere_cap_surface_area)
 
@@ -238,10 +237,10 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
           rtol=rtol)
 
   def _verifyCovariance(self, vmf):
-    dim = tf.dimension_value(vmf.event_shape[-1])
+    dim = tf.compat.dimension_value(vmf.event_shape[-1])
     nsamples = 10000
     samples = vmf.sample(nsamples)
-    samples = tf.check_numerics(samples, 'samples')
+    samples = tf.debugging.check_numerics(samples, 'samples')
     cov = vmf.covariance()
     samples, cov = self.evaluate([samples, cov])
     batched_samples = np.reshape(samples, [nsamples, -1, dim])

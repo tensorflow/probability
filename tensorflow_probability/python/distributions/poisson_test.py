@@ -77,12 +77,12 @@ class PoissonTest(test_case.TestCase):
     poisson = self._make_poisson(rate=lam,
                                  interpolate_nondiscrete=True)
 
-    expected_continuous_log_pmf = (x * poisson.log_rate - tf.lgamma(1. + x)
-                                   - poisson.rate)
+    expected_continuous_log_pmf = (
+        x * poisson.log_rate - tf.math.lgamma(1. + x) - poisson.rate)
     neg_inf = tf.fill(
-        tf.shape(expected_continuous_log_pmf),
-        value=np.array(-np.inf,
-                       dtype=expected_continuous_log_pmf.dtype.as_numpy_dtype))
+        tf.shape(input=expected_continuous_log_pmf),
+        value=np.array(
+            -np.inf, dtype=expected_continuous_log_pmf.dtype.as_numpy_dtype))
     expected_continuous_log_pmf = tf.where(x >= 0.,
                                            expected_continuous_log_pmf,
                                            neg_inf)
@@ -169,11 +169,11 @@ class PoissonTest(test_case.TestCase):
         [-3., -0.5, 0., 2., 2.2, 3., 3.1, 4., 5., 5.5, 6., 7.]).astype(
             np.float32)
 
-    expected_continuous_cdf = tf.igammac(1. + x, lam)
+    expected_continuous_cdf = tf.math.igammac(1. + x, lam)
     expected_continuous_cdf = tf.where(x >= 0.,
                                        expected_continuous_cdf,
                                        tf.zeros_like(expected_continuous_cdf))
-    expected_continuous_log_cdf = tf.log(expected_continuous_cdf)
+    expected_continuous_log_cdf = tf.math.log(expected_continuous_cdf)
 
     poisson = self._make_poisson(rate=lam, interpolate_nondiscrete=True)
     log_cdf = poisson.log_cdf(x)
@@ -308,9 +308,10 @@ class PoissonLogRateTest(PoissonTest):
                     rate,
                     validate_args=False,
                     interpolate_nondiscrete=True):
-    return tfd.Poisson(log_rate=tf.log(rate),
-                       validate_args=validate_args,
-                       interpolate_nondiscrete=interpolate_nondiscrete)
+    return tfd.Poisson(
+        log_rate=tf.math.log(rate),
+        validate_args=validate_args,
+        interpolate_nondiscrete=interpolate_nondiscrete)
 
   def testInvalidLam(self):
     # No need to worry about the non-negativity of `rate` when using the

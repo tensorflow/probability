@@ -570,7 +570,7 @@ class Bijector(object):
       self._name = camel_to_snake(type(self).__name__.lstrip("_"))
 
     for i, t in enumerate(self._graph_parents):
-      if t is None or not tf.contrib.framework.is_tensor(t):
+      if t is None or not tf.is_tensor(t):
         raise ValueError("Graph parent item %d is not a Tensor; %s." % (i, t))
 
   @property
@@ -733,7 +733,7 @@ class Bijector(object):
     """
     with self._name_scope(name, [input_shape]):
       input_shape = tf.convert_to_tensor(
-          input_shape, dtype=tf.int32, name="input_shape")
+          value=input_shape, dtype=tf.int32, name="input_shape")
       return self._forward_event_shape_tensor(input_shape)
 
   def _forward_event_shape(self, input_shape):
@@ -777,7 +777,7 @@ class Bijector(object):
     """
     with self._name_scope(name, [output_shape]):
       output_shape = tf.convert_to_tensor(
-          output_shape, dtype=tf.int32, name="output_shape")
+          value=output_shape, dtype=tf.int32, name="output_shape")
       return self._inverse_event_shape_tensor(output_shape)
 
   def _inverse_event_shape(self, output_shape):
@@ -806,7 +806,7 @@ class Bijector(object):
 
   def _call_forward(self, x, name, **kwargs):
     with self._name_scope(name, [x]):
-      x = tf.convert_to_tensor(x, name="x")
+      x = tf.convert_to_tensor(value=x, name="x")
       self._maybe_assert_dtype(x)
       if not self._is_injective:  # No caching for non-injective
         return self._forward(x, **kwargs)
@@ -846,7 +846,7 @@ class Bijector(object):
 
   def _call_inverse(self, y, name, **kwargs):
     with self._name_scope(name, [y]):
-      y = tf.convert_to_tensor(y, name="y")
+      y = tf.convert_to_tensor(value=y, name="y")
       self._maybe_assert_dtype(y)
       if not self._is_injective:  # No caching for non-injective
         return self._inverse(y, **kwargs)
@@ -976,9 +976,7 @@ class Bijector(object):
           x, y, tensor_to_use, use_inverse_ldj_fn, kwargs)
 
     return self._reduce_jacobian_det_over_event(
-        tf.shape(tensor_to_use),
-        unreduced_ildj,
-        min_event_ndims,
+        tf.shape(input=tensor_to_use), unreduced_ildj, min_event_ndims,
         event_ndims)
 
   def _compute_unreduced_nonconstant_ildj_with_caching(
@@ -1085,15 +1083,15 @@ class Bijector(object):
         self._check_valid_event_ndims(
             min_event_ndims=self.inverse_min_event_ndims,
             event_ndims=event_ndims)):
-      y = tf.convert_to_tensor(y, name="y")
+      y = tf.convert_to_tensor(value=y, name="y")
       self._maybe_assert_dtype(y)
 
       if not self._is_injective:
         ildjs = self._inverse_log_det_jacobian(y, **kwargs)
         return tuple(
             self._reduce_jacobian_det_over_event(
-                tf.shape(y), ildj, self.inverse_min_event_ndims,
-                event_ndims)
+                tf.shape(
+                    input=y), ildj, self.inverse_min_event_ndims, event_ndims)
             for ildj in ildjs)
 
       return self._compute_inverse_log_det_jacobian_with_caching(
@@ -1166,7 +1164,7 @@ class Bijector(object):
         self._check_valid_event_ndims(
             min_event_ndims=self.forward_min_event_ndims,
             event_ndims=event_ndims)):
-      x = tf.convert_to_tensor(x, name="x")
+      x = tf.convert_to_tensor(value=x, name="x")
       self._maybe_assert_dtype(x)
 
       return -self._compute_inverse_log_det_jacobian_with_caching(
@@ -1263,12 +1261,12 @@ class Bijector(object):
       self, shape_tensor, ildj, min_event_ndims, event_ndims):
     """Reduce jacobian over event_ndims - min_event_ndims."""
     # In this case, we need to tile the Jacobian over the event and reduce.
-    rank = tf.size(shape_tensor)
+    rank = tf.size(input=shape_tensor)
     shape_tensor = shape_tensor[rank - event_ndims:rank - min_event_ndims]
 
     ones = tf.ones(shape_tensor, ildj.dtype)
     reduced_ildj = tf.reduce_sum(
-        ones * ildj,
+        input_tensor=ones * ildj,
         axis=self._get_event_reduce_dims(min_event_ndims, event_ndims))
 
     return reduced_ildj
@@ -1285,8 +1283,8 @@ class Bijector(object):
 
   def _check_valid_event_ndims(self, min_event_ndims, event_ndims):
     """Check whether event_ndims is atleast min_event_ndims."""
-    event_ndims = tf.convert_to_tensor(event_ndims, name="event_ndims")
-    event_ndims_ = tf.contrib.util.constant_value(event_ndims)
+    event_ndims = tf.convert_to_tensor(value=event_ndims, name="event_ndims")
+    event_ndims_ = tf.get_static_value(event_ndims)
     assertions = []
 
     if not event_ndims.dtype.is_integer:
@@ -1302,7 +1300,9 @@ class Bijector(object):
                          "min_event_ndims ({})".format(event_ndims_,
                                                        min_event_ndims))
     elif self.validate_args:
-      assertions += [tf.assert_greater_equal(event_ndims, min_event_ndims)]
+      assertions += [
+          tf.compat.v1.assert_greater_equal(event_ndims, min_event_ndims)
+      ]
 
     if event_ndims.shape.is_fully_defined():
       if event_ndims.shape.ndims != 0:
@@ -1310,7 +1310,9 @@ class Bijector(object):
             event_ndims.shape.ndims))
 
     elif self.validate_args:
-      assertions += [tf.assert_rank(event_ndims, 0, message="Expected scalar.")]
+      assertions += [
+          tf.compat.v1.assert_rank(event_ndims, 0, message="Expected scalar.")
+      ]
     return assertions
 
   def _maybe_get_static_event_ndims(self, event_ndims):

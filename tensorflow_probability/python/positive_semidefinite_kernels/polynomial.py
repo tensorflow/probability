@@ -50,7 +50,7 @@ def _maybe_shape_static(tensor):
 def _maybe_shape_dynamic(tensor):
   if tensor is None:
     return []
-  return tf.shape(tensor)
+  return tf.shape(input=tensor)
 
 
 class Polynomial(psd_kernel.PositiveSemidefiniteKernel):
@@ -128,26 +128,25 @@ class Polynomial(psd_kernel.PositiveSemidefiniteKernel):
           [bias_variance, slope_variance, shift, exponent], tf.float32)
       if bias_variance is not None:
         bias_variance = tf.convert_to_tensor(
-            bias_variance, name='bias_variance', dtype=dtype)
+            value=bias_variance, name='bias_variance', dtype=dtype)
       self._bias_variance = _validate_arg_if_not_none(
-          bias_variance, tf.assert_positive, validate_args)
+          bias_variance, tf.compat.v1.assert_positive, validate_args)
       if slope_variance is not None:
         slope_variance = tf.convert_to_tensor(
-            slope_variance, name='slope_variance', dtype=dtype)
+            value=slope_variance, name='slope_variance', dtype=dtype)
       self._slope_variance = _validate_arg_if_not_none(
-          slope_variance, tf.assert_positive, validate_args)
+          slope_variance, tf.compat.v1.assert_positive, validate_args)
       if shift is not None:
-        shift = tf.convert_to_tensor(
-            shift, name='shift', dtype=dtype)
+        shift = tf.convert_to_tensor(value=shift, name='shift', dtype=dtype)
       self._shift = shift
       if exponent is not None:
         exponent = tf.convert_to_tensor(
-            exponent, name='exponent', dtype=dtype)
+            value=exponent, name='exponent', dtype=dtype)
       self._exponent = _validate_arg_if_not_none(
-          exponent, tf.assert_positive, validate_args)
-      tf.assert_same_float_dtype(
-          [self._bias_variance, self._slope_variance, self._shift,
-           self._exponent])
+          exponent, tf.compat.v1.assert_positive, validate_args)
+      tf.debugging.assert_same_float_dtype([
+          self._bias_variance, self._slope_variance, self._shift, self._exponent
+      ])
     super(Polynomial, self).__init__(
         feature_ndims, dtype=dtype, name=name)
 

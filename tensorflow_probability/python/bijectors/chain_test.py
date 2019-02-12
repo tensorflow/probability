@@ -183,7 +183,7 @@ class ChainBijectorTest(tf.test.TestCase):
 
   def testChainIldjWithPlaceholder(self):
     chain = tfb.Chain((tfb.Exp(), tfb.Exp()))
-    samples = tf.placeholder_with_default(
+    samples = tf.compat.v1.placeholder_with_default(
         np.zeros([2, 10], np.float32), shape=None)
     ildj = chain.inverse_log_det_jacobian(samples, event_ndims=0)
     self.assertTrue(ildj is not None)

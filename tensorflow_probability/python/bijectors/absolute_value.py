@@ -89,8 +89,10 @@ class AbsoluteValue(bijector.Bijector):
 
   def _inverse(self, y):
     if self.validate_args:
-      y = control_flow_ops.with_dependencies(
-          [tf.assert_non_negative(y, message="Argument y was negative")], y)
+      y = control_flow_ops.with_dependencies([
+          tf.compat.v1.assert_non_negative(
+              y, message="Argument y was negative")
+      ], y)
     return -y, y
 
   def _inverse_log_det_jacobian(self, y):
@@ -99,8 +101,10 @@ class AbsoluteValue(bijector.Bijector):
     # so Log|DF^{-1}(y)| = Log[1, 1] = [0, 0].
     zeros = tf.constant(0., dtype=y.dtype)
     if self.validate_args:
-      zeros = control_flow_ops.with_dependencies(
-          [tf.assert_non_negative(y, message="Argument y was negative")], zeros)
+      zeros = control_flow_ops.with_dependencies([
+          tf.compat.v1.assert_non_negative(
+              y, message="Argument y was negative")
+      ], zeros)
     return zeros, zeros
 
   @property

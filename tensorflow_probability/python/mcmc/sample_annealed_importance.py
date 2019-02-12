@@ -193,15 +193,15 @@ def sample_annealed_importance_chain(
       name, "sample_annealed_importance_chain",
       [num_steps, current_state]):
     num_steps = tf.convert_to_tensor(
-        num_steps,
-        dtype=tf.int32,
-        name="num_steps")
+        value=num_steps, dtype=tf.int32, name="num_steps")
     if mcmc_util.is_list_like(current_state):
-      current_state = [tf.convert_to_tensor(s, name="current_state")
-                       for s in current_state]
+      current_state = [
+          tf.convert_to_tensor(value=s, name="current_state")
+          for s in current_state
+      ]
     else:
       current_state = tf.convert_to_tensor(
-          current_state, name="current_state")
+          value=current_state, name="current_state")
 
     def _make_convex_combined_log_prob_fn(iter_):
       def _fn(*args):
@@ -238,7 +238,7 @@ def sample_annealed_importance_chain(
 
       convex_combined_log_prob = inner_results.accepted_results.target_log_prob
       dtype = convex_combined_log_prob.dtype.as_numpy_dtype
-      shape = tf.shape(convex_combined_log_prob)
+      shape = tf.shape(input=convex_combined_log_prob)
       proposal_log_prob = tf.fill(shape, dtype(np.nan),
                                   name="bootstrap_proposal_log_prob")
       target_log_prob = tf.fill(shape, dtype(np.nan),
@@ -255,8 +255,8 @@ def sample_annealed_importance_chain(
 
     ais_weights = tf.zeros(
         shape=tf.broadcast_dynamic_shape(
-            tf.shape(inner_results.proposed_results.target_log_prob),
-            tf.shape(inner_results.accepted_results.target_log_prob)),
+            tf.shape(input=inner_results.proposed_results.target_log_prob),
+            tf.shape(input=inner_results.accepted_results.target_log_prob)),
         dtype=inner_results.proposed_results.target_log_prob.dtype.base_dtype)
 
     [_, ais_weights, current_state, kernel_results] = tf.while_loop(

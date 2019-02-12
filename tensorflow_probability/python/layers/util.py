@@ -38,8 +38,8 @@ __all__ = [
 
 def default_loc_scale_fn(
     is_singular=False,
-    loc_initializer=tf.random_normal_initializer(stddev=0.1),
-    untransformed_scale_initializer=tf.random_normal_initializer(
+    loc_initializer=tf.compat.v1.initializers.random_normal(stddev=0.1),
+    untransformed_scale_initializer=tf.compat.v1.initializers.random_normal(
         mean=-3., stddev=0.1),
     loc_regularizer=None,
     untransformed_scale_regularizer=None,
@@ -118,8 +118,8 @@ def default_loc_scale_fn(
 
 def default_mean_field_normal_fn(
     is_singular=False,
-    loc_initializer=tf.random_normal_initializer(stddev=0.1),
-    untransformed_scale_initializer=tf.random_normal_initializer(
+    loc_initializer=tf.compat.v1.initializers.random_normal(stddev=0.1),
+    untransformed_scale_initializer=tf.compat.v1.initializers.random_normal(
         mean=-3., stddev=0.1),
     loc_regularizer=None,
     untransformed_scale_regularizer=None,
@@ -188,7 +188,7 @@ def default_mean_field_normal_fn(
       dist = tfd.Deterministic(loc=loc)
     else:
       dist = tfd.Normal(loc=loc, scale=scale)
-    batch_ndims = tf.size(dist.batch_shape_tensor())
+    batch_ndims = tf.size(input=dist.batch_shape_tensor())
     return tfd.Independent(dist, reinterpreted_batch_ndims=batch_ndims)
   return _fn
 
@@ -212,7 +212,7 @@ def default_multivariate_normal_fn(dtype, shape, name, trainable,
   """
   del name, trainable, add_variable_fn   # unused
   dist = tfd.Normal(loc=tf.zeros(shape, dtype), scale=dtype.as_numpy_dtype(1))
-  batch_ndims = tf.size(dist.batch_shape_tensor())
+  batch_ndims = tf.size(input=dist.batch_shape_tensor())
   return tfd.Independent(dist, reinterpreted_batch_ndims=batch_ndims)
 
 

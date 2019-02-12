@@ -40,7 +40,7 @@ def try_import(name):  # pylint: disable=invalid-name
   try:
     module = importlib.import_module(name)
   except ImportError as e:
-    tf.logging.warning("Could not import %s: %s" % (name, str(e)))
+    tf.compat.v1.logging.warning("Could not import %s: %s" % (name, str(e)))
   return module
 
 
@@ -252,7 +252,7 @@ class ShapesFromLocAndScaleTest(tf.test.TestCase):
 
   def test_static_loc_dynamic_scale(self):
     loc = tf.constant(np.zeros((2, 3)))
-    diag = tf.placeholder(tf.float64)
+    diag = tf.compat.v1.placeholder(tf.float64)
     scale = tf.linalg.LinearOperatorDiag(diag)
     with self.cached_session() as sess:
       batch_shape, event_shape = sess.run(
@@ -262,7 +262,7 @@ class ShapesFromLocAndScaleTest(tf.test.TestCase):
       self.assertAllEqual([3], event_shape)
 
   def test_dynamic_loc_static_scale(self):
-    loc = tf.placeholder(tf.float64)
+    loc = tf.compat.v1.placeholder(tf.float64)
     diag = tf.constant(np.ones((5, 2, 3)))
     scale = tf.linalg.LinearOperatorDiag(diag)
     with self.cached_session():
@@ -276,8 +276,8 @@ class ShapesFromLocAndScaleTest(tf.test.TestCase):
       self.assertAllEqual([3], event_shape)
 
   def test_dynamic_loc_dynamic_scale(self):
-    loc = tf.placeholder(tf.float64)
-    diag = tf.placeholder(tf.float64)
+    loc = tf.compat.v1.placeholder(tf.float64)
+    diag = tf.compat.v1.placeholder(tf.float64)
     scale = tf.linalg.LinearOperatorDiag(diag)
     with self.cached_session() as sess:
       batch_shape, event_shape = sess.run(
@@ -297,7 +297,7 @@ class ShapesFromLocAndScaleTest(tf.test.TestCase):
 
   def test_none_loc_dynamic_scale(self):
     loc = None
-    diag = tf.placeholder(tf.float64)
+    diag = tf.compat.v1.placeholder(tf.float64)
     scale = tf.linalg.LinearOperatorDiag(diag)
     with self.cached_session() as sess:
       batch_shape, event_shape = sess.run(
@@ -318,7 +318,7 @@ class GetBroadcastShapeTest(tf.test.TestCase):
 
   def test_with_some_dynamic_shapes_works(self):
     x = tf.ones((2, 1, 3))
-    y = tf.placeholder(x.dtype)
+    y = tf.compat.v1.placeholder(x.dtype)
     z = tf.ones(())
     with self.cached_session() as sess:
       bcast_shape = sess.run(
@@ -458,16 +458,14 @@ class _PadTest(object):
     value_ = np.float32(0.25)
     count_ = np.int32(2)
     with self.cached_session() as sess:
-      x = tf.placeholder_with_default(
+      x = tf.compat.v1.placeholder_with_default(
           x_, shape=x_.shape if self.is_static_shape else None)
       value = (
-          tf.constant(value_)
-          if self.is_static_shape else tf.placeholder_with_default(
-              value_, shape=None))
+          tf.constant(value_) if self.is_static_shape else
+          tf.compat.v1.placeholder_with_default(value_, shape=None))
       count = (
-          tf.constant(count_)
-          if self.is_static_shape else tf.placeholder_with_default(
-              count_, shape=None))
+          tf.constant(count_) if self.is_static_shape else
+          tf.compat.v1.placeholder_with_default(count_, shape=None))
 
       x0_front = distribution_util.pad(
           x, axis=-2, value=value, count=count, front=True)
@@ -509,16 +507,14 @@ class _PadTest(object):
     value_ = np.float32(0.25)
     count_ = np.int32(2)
     with self.cached_session() as sess:
-      x = tf.placeholder_with_default(
+      x = tf.compat.v1.placeholder_with_default(
           x_, shape=x_.shape if self.is_static_shape else None)
       value = (
-          tf.constant(value_)
-          if self.is_static_shape else tf.placeholder_with_default(
-              value_, shape=None))
+          tf.constant(value_) if self.is_static_shape else
+          tf.compat.v1.placeholder_with_default(value_, shape=None))
       count = (
-          tf.constant(count_)
-          if self.is_static_shape else tf.placeholder_with_default(
-              count_, shape=None))
+          tf.constant(count_) if self.is_static_shape else
+          tf.compat.v1.placeholder_with_default(count_, shape=None))
 
       x1_front = distribution_util.pad(
           x, axis=1, value=value, count=count, front=True)
@@ -589,8 +585,9 @@ class PickScalarConditionTest(tf.test.TestCase):
     neg = -np.exp(np.random.randn(3, 2, 4)).astype(np.float32)
 
     # TF dynamic cond
-    dynamic_true = tf.placeholder_with_default(input=True, shape=None)
-    dynamic_false = tf.placeholder_with_default(input=False, shape=None)
+    dynamic_true = tf.compat.v1.placeholder_with_default(input=True, shape=None)
+    dynamic_false = tf.compat.v1.placeholder_with_default(
+        input=False, shape=None)
     pos_ = self.evaluate(distribution_util.pick_scalar_condition(
         dynamic_true, pos, neg))
     neg_ = self.evaluate(distribution_util.pick_scalar_condition(
@@ -599,8 +596,8 @@ class PickScalarConditionTest(tf.test.TestCase):
     self.assertAllEqual(neg_, neg)
 
     # TF dynamic everything
-    pos_dynamic = tf.placeholder_with_default(input=pos, shape=None)
-    neg_dynamic = tf.placeholder_with_default(input=neg, shape=None)
+    pos_dynamic = tf.compat.v1.placeholder_with_default(input=pos, shape=None)
+    neg_dynamic = tf.compat.v1.placeholder_with_default(input=neg, shape=None)
     pos_ = self.evaluate(distribution_util.pick_scalar_condition(
         dynamic_true, pos_dynamic, neg_dynamic))
     neg_ = self.evaluate(distribution_util.pick_scalar_condition(
@@ -627,7 +624,7 @@ class TestNonNegativeAxis(tf.test.TestCase):
 
   def test_dynamic_vector_index(self):
     positive_axis = distribution_util.make_non_negative_axis(
-        axis=tf.placeholder_with_default(input=[0, -2], shape=None),
+        axis=tf.compat.v1.placeholder_with_default(input=[0, -2], shape=None),
         rank=4)
     self.assertAllEqual([0, 2], self.evaluate(positive_axis))
 
@@ -637,7 +634,7 @@ class TestMoveDimension(tf.test.TestCase):
   @tfe.run_test_in_graph_and_eager_modes
   def test_move_dimension_static_shape(self):
 
-    x = tf.random_normal(shape=[200, 30, 4, 1, 6])
+    x = tf.random.normal(shape=[200, 30, 4, 1, 6])
 
     x_perm = distribution_util.move_dimension(x, 1, 1)
     self.assertAllEqual(x_perm.shape.as_list(), [200, 30, 4, 1, 6])
@@ -654,8 +651,8 @@ class TestMoveDimension(tf.test.TestCase):
   @tfe.run_test_in_graph_and_eager_modes
   def test_move_dimension_dynamic_shape(self):
 
-    x_ = tf.random_normal(shape=[200, 30, 4, 1, 6])
-    x = tf.placeholder_with_default(input=x_, shape=None)
+    x_ = tf.random.normal(shape=[200, 30, 4, 1, 6])
+    x = tf.compat.v1.placeholder_with_default(input=x_, shape=None)
 
     x_perm1 = distribution_util.move_dimension(x, 1, 1)
     x_perm2 = distribution_util.move_dimension(x, 0, 3)
@@ -663,12 +660,13 @@ class TestMoveDimension(tf.test.TestCase):
     x_perm4 = distribution_util.move_dimension(x, 4, 2)
     x_perm5 = distribution_util.move_dimension(x, -1, 2)
 
-    x_perm1_, x_perm2_, x_perm3_, x_perm4_, x_perm5_ = self.evaluate(
-        [tf.shape(x_perm1),
-         tf.shape(x_perm2),
-         tf.shape(x_perm3),
-         tf.shape(x_perm4),
-         tf.shape(x_perm5)])
+    x_perm1_, x_perm2_, x_perm3_, x_perm4_, x_perm5_ = self.evaluate([
+        tf.shape(input=x_perm1),
+        tf.shape(input=x_perm2),
+        tf.shape(input=x_perm3),
+        tf.shape(input=x_perm4),
+        tf.shape(input=x_perm5)
+    ])
 
     self.assertAllEqual(x_perm1_, [200, 30, 4, 1, 6])
 
@@ -683,40 +681,36 @@ class TestMoveDimension(tf.test.TestCase):
   @tfe.run_test_in_graph_and_eager_modes
   def test_move_dimension_dynamic_indices(self):
 
-    x_ = tf.random_normal(shape=[200, 30, 4, 1, 6])
-    x = tf.placeholder_with_default(input=x_, shape=None)
+    x_ = tf.random.normal(shape=[200, 30, 4, 1, 6])
+    x = tf.compat.v1.placeholder_with_default(input=x_, shape=None)
 
     x_perm1 = distribution_util.move_dimension(
-        x,
-        tf.placeholder_with_default(input=1, shape=[]),
-        tf.placeholder_with_default(input=1, shape=[]))
+        x, tf.compat.v1.placeholder_with_default(input=1, shape=[]),
+        tf.compat.v1.placeholder_with_default(input=1, shape=[]))
 
     x_perm2 = distribution_util.move_dimension(
-        x,
-        tf.placeholder_with_default(input=0, shape=[]),
-        tf.placeholder_with_default(input=3, shape=[]))
+        x, tf.compat.v1.placeholder_with_default(input=0, shape=[]),
+        tf.compat.v1.placeholder_with_default(input=3, shape=[]))
 
     x_perm3 = distribution_util.move_dimension(
-        x,
-        tf.placeholder_with_default(input=0, shape=[]),
-        tf.placeholder_with_default(input=-2, shape=[]))
+        x, tf.compat.v1.placeholder_with_default(input=0, shape=[]),
+        tf.compat.v1.placeholder_with_default(input=-2, shape=[]))
 
     x_perm4 = distribution_util.move_dimension(
-        x,
-        tf.placeholder_with_default(input=4, shape=[]),
-        tf.placeholder_with_default(input=2, shape=[]))
+        x, tf.compat.v1.placeholder_with_default(input=4, shape=[]),
+        tf.compat.v1.placeholder_with_default(input=2, shape=[]))
 
     x_perm5 = distribution_util.move_dimension(
-        x,
-        tf.placeholder_with_default(input=-1, shape=[]),
-        tf.placeholder_with_default(input=2, shape=[]))
+        x, tf.compat.v1.placeholder_with_default(input=-1, shape=[]),
+        tf.compat.v1.placeholder_with_default(input=2, shape=[]))
 
-    x_perm1_, x_perm2_, x_perm3_, x_perm4_, x_perm5_ = self.evaluate(
-        [tf.shape(x_perm1),
-         tf.shape(x_perm2),
-         tf.shape(x_perm3),
-         tf.shape(x_perm4),
-         tf.shape(x_perm5)])
+    x_perm1_, x_perm2_, x_perm3_, x_perm4_, x_perm5_ = self.evaluate([
+        tf.shape(input=x_perm1),
+        tf.shape(input=x_perm2),
+        tf.shape(input=x_perm3),
+        tf.shape(input=x_perm4),
+        tf.shape(input=x_perm5)
+    ])
 
     self.assertAllEqual(x_perm1_, [200, 30, 4, 1, 6])
 
@@ -733,12 +727,12 @@ class AssertCloseTest(tf.test.TestCase):
 
   def testAssertIntegerForm(self):
     # This should only be detected as an integer.
-    x = tf.placeholder(tf.float32)
-    y = tf.placeholder(tf.float32)
+    x = tf.compat.v1.placeholder(tf.float32)
+    y = tf.compat.v1.placeholder(tf.float32)
     # First component isn't less than float32.eps = 1e-7
-    z = tf.placeholder(tf.float32)
+    z = tf.compat.v1.placeholder(tf.float32)
     # This shouldn"t be detected as an integer.
-    w = tf.placeholder(tf.float32)
+    w = tf.compat.v1.placeholder(tf.float32)
     feed_dict = {x: [1., 5, 10, 15, 20], y: [1.1, 5, 10, 15, 20],
                  z: [1.0001, 5, 10, 15, 20], w: [1e-8, 5, 10, 15, 20]}
     with self.cached_session():
@@ -789,7 +783,7 @@ class MaybeGetStaticTest(tf.test.TestCase):
         distribution_util.maybe_get_static_value(x, dtype=np.float64))
 
   def testGetStaticPlaceholder(self):
-    x = tf.placeholder(dtype=tf.int32, shape=[1])
+    x = tf.compat.v1.placeholder(dtype=tf.int32, shape=[1])
     self.assertEqual(None, distribution_util.maybe_get_static_value(x))
     self.assertEqual(
         None, distribution_util.maybe_get_static_value(x, dtype=np.float64))
@@ -928,7 +922,7 @@ class GetLogitsAndProbsTest(tf.test.TestCase):
 
       with self.assertRaisesOpError(
           "Number of classes exceeds `dtype` precision"):
-        p = tf.placeholder(dtype=tf.float16)
+        p = tf.compat.v1.placeholder(dtype=tf.float16)
         _, prob = distribution_util.get_logits_and_probs(
             probs=p, multidimensional=True, validate_args=True)
         prob.eval(feed_dict={p: np.ones([int(2**11+1)])})
@@ -942,7 +936,7 @@ class GetLogitsAndProbsTest(tf.test.TestCase):
 
       with self.assertRaisesOpError(
           "Number of classes exceeds `dtype` precision"):
-        l = tf.placeholder(dtype=tf.float16)
+        l = tf.compat.v1.placeholder(dtype=tf.float16)
         logit, _ = distribution_util.get_logits_and_probs(
             logits=l, multidimensional=True, validate_args=True)
         logit.eval(feed_dict={l: np.ones([int(2**11+1)])})
@@ -959,7 +953,7 @@ class EmbedCheckCategoricalEventShapeTest(tf.test.TestCase):
 
       with self.assertRaisesOpError(
           "must have at least 2 events"):
-        param = tf.placeholder(dtype=tf.float16)
+        param = tf.compat.v1.placeholder(dtype=tf.float16)
         checked_param = distribution_util.embed_check_categorical_event_shape(
             param)
         checked_param.eval(feed_dict={param: np.ones([1])})
@@ -973,7 +967,7 @@ class EmbedCheckCategoricalEventShapeTest(tf.test.TestCase):
 
       with self.assertRaisesOpError(
           "Number of classes exceeds `dtype` precision"):
-        param = tf.placeholder(dtype=tf.float16)
+        param = tf.compat.v1.placeholder(dtype=tf.float16)
         checked_param = distribution_util.embed_check_categorical_event_shape(
             param)
         checked_param.eval(feed_dict={param: np.ones([int(2**11+1)])})
@@ -981,7 +975,7 @@ class EmbedCheckCategoricalEventShapeTest(tf.test.TestCase):
   @tfe.run_test_in_graph_and_eager_modes
   def testUnsupportedDtype(self):
     param = tf.convert_to_tensor(
-        np.ones([2**11 + 1]).astype(tf.qint16.as_numpy_dtype),
+        value=np.ones([2**11 + 1]).astype(tf.qint16.as_numpy_dtype),
         dtype=tf.qint16)
     with self.assertRaises(TypeError):
       distribution_util.embed_check_categorical_event_shape(param)
@@ -992,7 +986,7 @@ class EmbedCheckIntegerCastingClosedTest(tf.test.TestCase):
   def testCorrectlyAssertsNonnegative(self):
     with self.cached_session():
       with self.assertRaisesOpError("Elements must be non-negative"):
-        x = tf.placeholder(dtype=tf.float16)
+        x = tf.compat.v1.placeholder(dtype=tf.float16)
         x_checked = distribution_util.embed_check_integer_casting_closed(
             x, target_dtype=tf.int16)
         x_checked.eval(feed_dict={x: np.array([1, -1], dtype=np.float16)})
@@ -1000,7 +994,7 @@ class EmbedCheckIntegerCastingClosedTest(tf.test.TestCase):
   def testCorrectlyAssertsPositive(self):
     with self.cached_session():
       with self.assertRaisesOpError("Elements must be positive"):
-        x = tf.placeholder(dtype=tf.float16)
+        x = tf.compat.v1.placeholder(dtype=tf.float16)
         x_checked = distribution_util.embed_check_integer_casting_closed(
             x, target_dtype=tf.int16, assert_positive=True)
         x_checked.eval(feed_dict={x: np.array([1, 0], dtype=np.float16)})
@@ -1008,7 +1002,7 @@ class EmbedCheckIntegerCastingClosedTest(tf.test.TestCase):
   def testCorrectlyAssersIntegerForm(self):
     with self.cached_session():
       with self.assertRaisesOpError("Elements must be int16-equivalent."):
-        x = tf.placeholder(dtype=tf.float16)
+        x = tf.compat.v1.placeholder(dtype=tf.float16)
         x_checked = distribution_util.embed_check_integer_casting_closed(
             x, target_dtype=tf.int16)
         x_checked.eval(feed_dict={x: np.array([1, 1.5], dtype=np.float16)})
@@ -1016,7 +1010,7 @@ class EmbedCheckIntegerCastingClosedTest(tf.test.TestCase):
   def testCorrectlyAssertsLargestPossibleInteger(self):
     with self.cached_session():
       with self.assertRaisesOpError("Elements cannot exceed 32767."):
-        x = tf.placeholder(dtype=tf.int32)
+        x = tf.compat.v1.placeholder(dtype=tf.int32)
         x_checked = distribution_util.embed_check_integer_casting_closed(
             x, target_dtype=tf.int16)
         x_checked.eval(feed_dict={x: np.array([1, 2**15], dtype=np.int32)})
@@ -1024,7 +1018,7 @@ class EmbedCheckIntegerCastingClosedTest(tf.test.TestCase):
   def testCorrectlyAssertsSmallestPossibleInteger(self):
     with self.cached_session():
       with self.assertRaisesOpError("Elements cannot be smaller than 0."):
-        x = tf.placeholder(dtype=tf.int32)
+        x = tf.compat.v1.placeholder(dtype=tf.int32)
         x_checked = distribution_util.embed_check_integer_casting_closed(
             x, target_dtype=tf.uint16, assert_nonnegative=False)
         x_checked.eval(feed_dict={x: np.array([1, -1], dtype=np.int32)})
@@ -1064,16 +1058,16 @@ class DynamicShapeTest(tf.test.TestCase):
   def testSameDynamicShape(self):
     with self.cached_session():
       scalar = tf.constant(2.0)
-      scalar1 = tf.placeholder(dtype=tf.float32)
+      scalar1 = tf.compat.v1.placeholder(dtype=tf.float32)
 
       vector = [0.3, 0.4, 0.5]
-      vector1 = tf.placeholder(dtype=tf.float32, shape=[None])
-      vector2 = tf.placeholder(dtype=tf.float32, shape=[None])
+      vector1 = tf.compat.v1.placeholder(dtype=tf.float32, shape=[None])
+      vector2 = tf.compat.v1.placeholder(dtype=tf.float32, shape=[None])
 
       multidimensional = [[0.3, 0.4], [0.2, 0.6]]
-      multidimensional1 = tf.placeholder(
+      multidimensional1 = tf.compat.v1.placeholder(
           dtype=tf.float32, shape=[None, None])
-      multidimensional2 = tf.placeholder(
+      multidimensional2 = tf.compat.v1.placeholder(
           dtype=tf.float32, shape=[None, None])
 
       # Scalar
@@ -1187,8 +1181,8 @@ class RotateTransposeTest(tf.test.TestCase):
 
   def testRollDynamic(self):
     with self.cached_session() as sess:
-      x = tf.placeholder(tf.float32)
-      shift = tf.placeholder(tf.int32)
+      x = tf.compat.v1.placeholder(tf.float32)
+      shift = tf.compat.v1.placeholder(tf.int32)
       for x_value in (np.ones(
           1, dtype=x.dtype.as_numpy_dtype()), np.ones(
               (2, 1), dtype=x.dtype.as_numpy_dtype()), np.ones(
@@ -1240,19 +1234,19 @@ class PreferStaticRankTest(tf.test.TestCase):
     self.assertEqual(0, rank)
 
   def testDynamicRankEndsUpBeingNonEmpty(self):
-    x = tf.placeholder(np.float64, shape=None)
+    x = tf.compat.v1.placeholder(np.float64, shape=None)
     rank = distribution_util.prefer_static_rank(x)
     with self.cached_session():
       self.assertAllEqual(2, rank.eval(feed_dict={x: np.zeros((2, 3))}))
 
   def testDynamicRankEndsUpBeingEmpty(self):
-    x = tf.placeholder(np.int32, shape=None)
+    x = tf.compat.v1.placeholder(np.int32, shape=None)
     rank = distribution_util.prefer_static_rank(x)
     with self.cached_session():
       self.assertAllEqual(1, rank.eval(feed_dict={x: []}))
 
   def testDynamicRankEndsUpBeingScalar(self):
-    x = tf.placeholder(np.int32, shape=None)
+    x = tf.compat.v1.placeholder(np.int32, shape=None)
     rank = distribution_util.prefer_static_rank(x)
     with self.cached_session():
       self.assertAllEqual(0, rank.eval(feed_dict={x: 1}))
@@ -1279,19 +1273,19 @@ class PreferStaticShapeTest(tf.test.TestCase):
     self.assertAllEqual(np.array([]), shape)
 
   def testDynamicShapeEndsUpBeingNonEmpty(self):
-    x = tf.placeholder(np.float64, shape=None)
+    x = tf.compat.v1.placeholder(np.float64, shape=None)
     shape = distribution_util.prefer_static_shape(x)
     with self.cached_session():
       self.assertAllEqual((2, 3), shape.eval(feed_dict={x: np.zeros((2, 3))}))
 
   def testDynamicShapeEndsUpBeingEmpty(self):
-    x = tf.placeholder(np.int32, shape=None)
+    x = tf.compat.v1.placeholder(np.int32, shape=None)
     shape = distribution_util.prefer_static_shape(x)
     with self.cached_session():
       self.assertAllEqual(np.array([0]), shape.eval(feed_dict={x: []}))
 
   def testDynamicShapeEndsUpBeingScalar(self):
-    x = tf.placeholder(np.int32, shape=None)
+    x = tf.compat.v1.placeholder(np.int32, shape=None)
     shape = distribution_util.prefer_static_shape(x)
     with self.cached_session():
       self.assertAllEqual(np.array([]), shape.eval(feed_dict={x: 1}))
@@ -1318,20 +1312,20 @@ class PreferStaticValueTest(tf.test.TestCase):
     self.assertAllEqual(np.array(1.), value)
 
   def testDynamicValueEndsUpBeingNonEmpty(self):
-    x = tf.placeholder(np.float64, shape=None)
+    x = tf.compat.v1.placeholder(np.float64, shape=None)
     value = distribution_util.prefer_static_value(x)
     with self.cached_session():
       self.assertAllEqual(np.zeros((2, 3)),
                           value.eval(feed_dict={x: np.zeros((2, 3))}))
 
   def testDynamicValueEndsUpBeingEmpty(self):
-    x = tf.placeholder(np.int32, shape=None)
+    x = tf.compat.v1.placeholder(np.int32, shape=None)
     value = distribution_util.prefer_static_value(x)
     with self.cached_session():
       self.assertAllEqual(np.array([]), value.eval(feed_dict={x: []}))
 
   def testDynamicValueEndsUpBeingScalar(self):
-    x = tf.placeholder(np.int32, shape=None)
+    x = tf.compat.v1.placeholder(np.int32, shape=None)
     value = distribution_util.prefer_static_value(x)
     with self.cached_session():
       self.assertAllEqual(np.array(1), value.eval(feed_dict={x: 1}))
@@ -1367,7 +1361,7 @@ class FillTriangularTest(tf.test.TestCase):
     x_ = np.asarray(x_)
     with self.cached_session() as sess:
       static_shape = None if use_deferred_shape else x_.shape
-      x_pl = tf.placeholder_with_default(x_, shape=static_shape)
+      x_pl = tf.compat.v1.placeholder_with_default(x_, shape=static_shape)
       # Add `zeros_like(x)` such that x's value and gradient are identical. We
       # do this so we can ensure each gradient value is mapped to the right
       # gradient location.  (Not doing this means the gradient wrt `x` is simple
@@ -1379,7 +1373,7 @@ class FillTriangularTest(tf.test.TestCase):
                          - tf.stop_gradient(x_pl * (x_pl - 1.)))
       x = x_pl + zeros_like_x_pl
       actual = distribution_util.fill_triangular(x, **kwargs)
-      grad_actual = tf.gradients(actual, x_pl)[0]
+      grad_actual = tf.gradients(ys=actual, xs=x_pl)[0]
       [actual_, grad_actual_] = sess.run([actual, grad_actual],
                                          feed_dict={x_pl: x_})
     expected = self._fill_triangular(x_, **kwargs)
@@ -1437,7 +1431,7 @@ class FillTriangularInverseTest(FillTriangularTest):
     x_ = np.asarray(x_)
     with self.cached_session() as sess:
       static_shape = None if use_deferred_shape else x_.shape
-      x_pl = tf.placeholder_with_default(x_, shape=static_shape)
+      x_pl = tf.compat.v1.placeholder_with_default(x_, shape=static_shape)
       zeros_like_x_pl = (x_pl * tf.stop_gradient(x_pl - 1.)
                          - tf.stop_gradient(x_pl * (x_pl - 1.)))
       x = x_pl + zeros_like_x_pl
@@ -1472,11 +1466,11 @@ class ReduceWeightedLogSumExp(tf.test.TestCase):
                       [-5, 0, 5]])
     with self.cached_session() as sess:
       logx = tf.constant(logx_)
-      expected = tf.reduce_logsumexp(logx, axis=-1)
-      grad_expected = tf.gradients(expected, logx)[0]
+      expected = tf.reduce_logsumexp(input_tensor=logx, axis=-1)
+      grad_expected = tf.gradients(ys=expected, xs=logx)[0]
       actual, actual_sgn = distribution_util.reduce_weighted_logsumexp(
           logx, axis=-1, return_sign=True)
-      grad_actual = tf.gradients(actual, logx)[0]
+      grad_actual = tf.gradients(ys=actual, xs=logx)[0]
       [actual_, actual_sgn_, grad_actual_,
        expected_, grad_expected_] = sess.run([
            actual, actual_sgn, grad_actual,
@@ -1642,9 +1636,9 @@ class SoftplusTest(tf.test.TestCase):
           [[-0.9, -0.7, -0.5, -0.3, -0.1], [0.1, 0.3, 0.5, 0.7, 0.9]],
           dtype=np.float32,
           order="F")
-      err = tf.test.compute_gradient_error(
+      err = tf.compat.v1.test.compute_gradient_error(
           x, [2, 5], y, [2, 5], x_init_value=x_init)
-    tf.logging.vlog(2, "softplus (float) gradient err = ", err)
+    tf.compat.v1.logging.vlog(2, "softplus (float) gradient err = ", err)
     self.assertLess(err, 1e-4)
 
   def testInverseSoftplusGradientNeverNan(self):
@@ -1652,7 +1646,7 @@ class SoftplusTest(tf.test.TestCase):
       # Note that this range contains both zero and inf.
       x = tf.constant(np.logspace(-8, 6).astype(np.float16))
       y = distribution_util.softplus_inverse(x)
-      grads = self.evaluate(tf.gradients(y, x)[0])
+      grads = self.evaluate(tf.gradients(ys=y, xs=x)[0])
       # Equivalent to `assertAllFalse` (if it existed).
       self.assertAllEqual(np.zeros_like(grads).astype(np.bool), np.isnan(grads))
 
@@ -1662,7 +1656,7 @@ class SoftplusTest(tf.test.TestCase):
       # gradient and its approximations should be finite as well.
       x = tf.constant(np.logspace(-4.8, 4.5).astype(np.float16))
       y = distribution_util.softplus_inverse(x)
-      grads = self.evaluate(tf.gradients(y, x)[0])
+      grads = self.evaluate(tf.gradients(ys=y, xs=x)[0])
       # Equivalent to `assertAllTrue` (if it existed).
       self.assertAllEqual(
           np.ones_like(grads).astype(np.bool), np.isfinite(grads))
@@ -1730,7 +1724,7 @@ class ArgumentsTest(tf.test.TestCase):
 class ExpandToVectorTest(tf.test.TestCase):
 
   def _check_static(self, expected, actual, dtype=np.int32):
-    const_actual = tf.contrib.util.constant_value(actual)
+    const_actual = tf.get_static_value(actual)
     self.assertAllEqual(expected, const_actual)
     self.assertEqual(dtype, const_actual.dtype)
 
@@ -1771,7 +1765,7 @@ class ExpandToVectorTest(tf.test.TestCase):
     # Helper to construct a const Tensor and call expand_to_tensor on it.
     def _expand_tensor(x, dtype=tf.int32):
       return distribution_util.expand_to_vector(
-          tf.convert_to_tensor(x, dtype=dtype), op_name="test")
+          tf.convert_to_tensor(value=x, dtype=dtype), op_name="test")
 
     self._check_static([], _expand_tensor([]))
     self._check_static([], _expand_tensor(()))
@@ -1792,7 +1786,8 @@ class ExpandToVectorTest(tf.test.TestCase):
     # Helper to construct a placeholder and call expand_to_tensor on it.
     def _expand_tensor(x, shape=None, dtype=np.int32, validate_args=False):
       return distribution_util.expand_to_vector(
-          tf.placeholder_with_default(np.array(x, dtype=dtype), shape=shape),
+          tf.compat.v1.placeholder_with_default(
+              np.array(x, dtype=dtype), shape=shape),
           tensor_name="name_for_tensor",
           validate_args=validate_args)
 

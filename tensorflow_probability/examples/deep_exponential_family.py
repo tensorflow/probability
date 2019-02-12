@@ -117,8 +117,9 @@ def deep_exponential_family(data_size, feature_size, units, shape):
 
 def trainable_positive_deterministic(shape, min_loc=1e-3, name=None):
   """Learnable Deterministic distribution over positive reals."""
-  with tf.variable_scope(None, default_name="trainable_positive_deterministic"):
-    unconstrained_loc = tf.get_variable("unconstrained_loc", shape)
+  with tf.compat.v1.variable_scope(
+      None, default_name="trainable_positive_deterministic"):
+    unconstrained_loc = tf.compat.v1.get_variable("unconstrained_loc", shape)
     loc = tf.maximum(tf.nn.softplus(unconstrained_loc), min_loc)
     rv = ed.Deterministic(loc=loc, name=name)
     return rv
@@ -126,13 +127,16 @@ def trainable_positive_deterministic(shape, min_loc=1e-3, name=None):
 
 def trainable_gamma(shape, min_concentration=1e-3, min_scale=1e-5, name=None):
   """Learnable Gamma via concentration and scale parameterization."""
-  with tf.variable_scope(None, default_name="trainable_gamma"):
-    unconstrained_concentration = tf.get_variable(
-        "unconstrained_concentration", shape,
-        initializer=tf.random_normal_initializer(mean=0.5, stddev=0.1))
-    unconstrained_scale = tf.get_variable(
-        "unconstrained_scale", shape,
-        initializer=tf.random_normal_initializer(stddev=0.1))
+  with tf.compat.v1.variable_scope(None, default_name="trainable_gamma"):
+    unconstrained_concentration = tf.compat.v1.get_variable(
+        "unconstrained_concentration",
+        shape,
+        initializer=tf.compat.v1.initializers.random_normal(
+            mean=0.5, stddev=0.1))
+    unconstrained_scale = tf.compat.v1.get_variable(
+        "unconstrained_scale",
+        shape,
+        initializer=tf.compat.v1.initializers.random_normal(stddev=0.1))
     concentration = tf.maximum(tf.nn.softplus(unconstrained_concentration),
                                min_concentration)
     rate = tf.maximum(1. / tf.nn.softplus(unconstrained_scale), 1. / min_scale)
@@ -198,8 +202,8 @@ def load_nips2011_papers(path):
   if not os.path.exists(filepath):
     url = ("https://archive.ics.uci.edu/ml/machine-learning-databases/"
            "00371/NIPS_1987-2015.csv")
-    if not tf.gfile.Exists(path):
-      tf.gfile.MakeDirs(path)
+    if not tf.io.gfile.exists(path):
+      tf.io.gfile.makedirs(path)
     print("Downloading %s to %s" % (url, filepath))
     urllib.request.urlretrieve(url, filepath)
 
@@ -233,11 +237,11 @@ def main(argv):
   if len(FLAGS.layer_sizes) != 3:
     raise NotImplementedError("Specifying fewer or more than 3 layers is not "
                               "currently available.")
-  if tf.gfile.Exists(FLAGS.model_dir):
-    tf.logging.warning(
+  if tf.io.gfile.exists(FLAGS.model_dir):
+    tf.compat.v1.logging.warning(
         "Warning: deleting old log directory at {}".format(FLAGS.model_dir))
-    tf.gfile.DeleteRecursively(FLAGS.model_dir)
-  tf.gfile.MakeDirs(FLAGS.model_dir)
+    tf.io.gfile.rmtree(FLAGS.model_dir)
+  tf.io.gfile.makedirs(FLAGS.model_dir)
 
   if FLAGS.fake_data:
     bag_of_words = np.random.poisson(1., size=[10, 25])
@@ -246,7 +250,7 @@ def main(argv):
     bag_of_words, words = load_nips2011_papers(FLAGS.data_dir)
 
   total_count = np.sum(bag_of_words)
-  bag_of_words = tf.to_float(bag_of_words)
+  bag_of_words = tf.cast(bag_of_words, dtype=tf.float32)
   data_size, feature_size = bag_of_words.shape
 
   # Compute expected log-likelihood. First, sample from the variational
@@ -265,29 +269,30 @@ def main(argv):
                                                      FLAGS.shape)
 
   log_likelihood = posterior_predictive.distribution.log_prob(bag_of_words)
-  log_likelihood = tf.reduce_sum(log_likelihood)
-  tf.summary.scalar("log_likelihood", log_likelihood)
+  log_likelihood = tf.reduce_sum(input_tensor=log_likelihood)
+  tf.compat.v1.summary.scalar("log_likelihood", log_likelihood)
 
   # Compute analytic KL-divergence between variational and prior distributions.
   kl = 0.
   for rv_name, variational_rv in [("z0", qz0), ("z1", qz1), ("z2", qz2),
                                   ("w0", qw0), ("w1", qw1), ("w2", qw2)]:
-    kl += tf.reduce_sum(variational_rv.distribution.kl_divergence(
-        model_tape[rv_name].distribution))
+    kl += tf.reduce_sum(
+        input_tensor=variational_rv.distribution.kl_divergence(
+            model_tape[rv_name].distribution))
 
-  tf.summary.scalar("kl", kl)
+  tf.compat.v1.summary.scalar("kl", kl)
 
   elbo = log_likelihood - kl
-  tf.summary.scalar("elbo", elbo)
-  optimizer = tf.train.AdamOptimizer(FLAGS.learning_rate)
+  tf.compat.v1.summary.scalar("elbo", elbo)
+  optimizer = tf.compat.v1.train.AdamOptimizer(FLAGS.learning_rate)
   train_op = optimizer.minimize(-elbo)
 
-  sess = tf.Session()
-  summary = tf.summary.merge_all()
-  summary_writer = tf.summary.FileWriter(FLAGS.model_dir, sess.graph)
+  sess = tf.compat.v1.Session()
+  summary = tf.compat.v1.summary.merge_all()
+  summary_writer = tf.compat.v1.summary.FileWriter(FLAGS.model_dir, sess.graph)
   start_time = time.time()
 
-  sess.run(tf.global_variables_initializer())
+  sess.run(tf.compat.v1.global_variables_initializer())
   for step in range(FLAGS.max_steps):
     start_time = time.time()
     _, elbo_value = sess.run([train_op, elbo])
@@ -315,4 +320,4 @@ def main(argv):
         print("Topic {}: {}".format(k, top_words))
 
 if __name__ == "__main__":
-  tf.app.run()
+  tf.compat.v1.app.run()

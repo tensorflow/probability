@@ -86,11 +86,11 @@ class Softplus(bijector.Bijector):
         self._hinge_softness = None
       else:
         self._hinge_softness = tf.convert_to_tensor(
-            hinge_softness, name="hinge_softness")
+            value=hinge_softness, name="hinge_softness")
         if validate_args:
-          nonzero_check = tf.assert_none_equal(
+          nonzero_check = tf.compat.v1.assert_none_equal(
               tf.convert_to_tensor(
-                  0, dtype=self._hinge_softness.dtype.base_dtype),
+                  value=0, dtype=self._hinge_softness.dtype.base_dtype),
               self.hinge_softness,
               message="hinge_softness must be non-zero")
           self._hinge_softness = control_flow_ops.with_dependencies(
@@ -126,7 +126,7 @@ class Softplus(bijector.Bijector):
     # 1 - exp{-Y} approx Y.
     if self.hinge_softness is not None:
       y /= tf.cast(self.hinge_softness, y.dtype)
-    return -tf.log(-tf.math.expm1(-y))
+    return -tf.math.log(-tf.math.expm1(-y))
 
   def _forward_log_det_jacobian(self, x):
     if self.hinge_softness is not None:

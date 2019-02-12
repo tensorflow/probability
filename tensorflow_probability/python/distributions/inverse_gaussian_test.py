@@ -38,7 +38,7 @@ class _InverseGaussianTest(object):
 
   def make_tensor(self, x):
     x = tf.cast(x, self.dtype)
-    return tf.placeholder_with_default(
+    return tf.compat.v1.placeholder_with_default(
         input=x, shape=x.shape if self.use_static_shape else None)
 
   def testInverseGaussianShape(self):

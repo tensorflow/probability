@@ -52,10 +52,11 @@ class SinhArcsinhTest(tf.test.TestCase):
         norm_samps.std(axis=0), sasnorm_samps.std(axis=0), atol=0.1)
 
   def test_broadcast_params_dynamic(self):
-    loc = tf.placeholder_with_default(input=rng.rand(5), shape=None)
-    scale = tf.placeholder_with_default(
+    loc = tf.compat.v1.placeholder_with_default(input=rng.rand(5), shape=None)
+    scale = tf.compat.v1.placeholder_with_default(
         input=np.float64(rng.rand()), shape=None)
-    skewness = tf.placeholder_with_default(input=rng.rand(5), shape=None)
+    skewness = tf.compat.v1.placeholder_with_default(
+        input=rng.rand(5), shape=None)
     sasnorm = tfd.SinhArcsinh(
         loc=loc, scale=scale, skewness=skewness, validate_args=True)
 

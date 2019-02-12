@@ -111,8 +111,8 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
     x = gm.sample(10, seed=42)
     actual_log_cdf = gm.log_cdf(x)
     expected_log_cdf = tf.reduce_logsumexp(
-        (gm.mixture_distribution.logits + gm.components_distribution.log_cdf(
-            x[..., tf.newaxis])),
+        input_tensor=(gm.mixture_distribution.logits +
+                      gm.components_distribution.log_cdf(x[..., tf.newaxis])),
         axis=1)
     actual_log_cdf_, expected_log_cdf_ = self.evaluate(
         [actual_log_cdf, expected_log_cdf])
@@ -179,8 +179,8 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
       mixture = mixture_func(*parameters)
       values = mixture.sample(num_samples)
       if function == "variance":
-        values = tf.squared_difference(values, mixture.mean())
-      return tf.reduce_mean(values, axis=0)
+        values = tf.math.squared_difference(values, mixture.mean())
+      return tf.reduce_mean(input_tensor=values, axis=0)
 
     def exact(*parameters):
       mixture = mixture_func(*parameters)
@@ -273,7 +273,7 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
     if self.use_static_shape:
       return x.shape.as_list()
     else:
-      return self.evaluate(tf.shape(x))
+      return self.evaluate(tf.shape(input=x))
 
   def _build_mvndiag_mixture(self, probs, loc, scale_identity_multiplier):
     components_distribution = tfd.MultivariateNormalDiag(
@@ -300,10 +300,9 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
     ndarray = np.asarray(ndarray).astype(
         dtype if dtype is not None else self.dtype)
     if self.use_static_shape:
-      return tf.convert_to_tensor(ndarray)
+      return tf.convert_to_tensor(value=ndarray)
     else:
-      return tf.placeholder_with_default(
-          input=ndarray, shape=None)
+      return tf.compat.v1.placeholder_with_default(input=ndarray, shape=None)
 
 
 @tfe.run_all_tests_in_graph_and_eager_modes

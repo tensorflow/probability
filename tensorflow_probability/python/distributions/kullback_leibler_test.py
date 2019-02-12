@@ -166,13 +166,13 @@ class KLTest(tf.test.TestCase):
   def testBackwardsCompatibilityAliases(self):
     # Each element is a tuple(classes), tuple(args).
     aliases = [
-        ((bernoulli.Bernoulli, tf.distributions.Bernoulli), (1.,)),
-        ((beta.Beta, tf.distributions.Beta), (1., 1.)),
-        ((categorical.Categorical, tf.distributions.Categorical), ([1.0,
-                                                                    1.0],)),
-        ((dirichlet.Dirichlet, tf.distributions.Dirichlet), ([1.0],)),
-        ((gamma.Gamma, tf.distributions.Gamma), (1.0, 1.0)),
-        ((normal.Normal, tf.distributions.Normal), (1.0, 1.0)),
+        ((bernoulli.Bernoulli, tf.compat.v1.distributions.Bernoulli), (1.,)),
+        ((beta.Beta, tf.compat.v1.distributions.Beta), (1., 1.)),
+        ((categorical.Categorical, tf.compat.v1.distributions.Categorical),
+         ([1.0, 1.0],)),
+        ((dirichlet.Dirichlet, tf.compat.v1.distributions.Dirichlet), ([1.0],)),
+        ((gamma.Gamma, tf.compat.v1.distributions.Gamma), (1.0, 1.0)),
+        ((normal.Normal, tf.compat.v1.distributions.Normal), (1.0, 1.0)),
     ]
 
     for dists, args in aliases:
@@ -180,20 +180,20 @@ class KLTest(tf.test.TestCase):
         d0 = class0(*args)
         d1 = class1(*args)
         kullback_leibler.kl_divergence(d0, d1)
-        tf.distributions.kl_divergence(d0, d1)
+        tf.compat.v1.distributions.kl_divergence(d0, d1)
 
   def testBackwardsCompatibilityDeterministic(self):
     tfp_normal = normal.Normal(0.0, 1.0)
-    tf_normal = tf.distributions.Normal(0.0, 1.0)
+    tf_normal = tf.compat.v1.distributions.Normal(0.0, 1.0)
     tfp_deterministic = deterministic.Deterministic(0.0)
 
     kullback_leibler.kl_divergence(tfp_deterministic, tf_normal)
-    tf.distributions.kl_divergence(tfp_deterministic, tf_normal)
+    tf.compat.v1.distributions.kl_divergence(tfp_deterministic, tf_normal)
     kullback_leibler.kl_divergence(tfp_deterministic, tfp_normal)
-    tf.distributions.kl_divergence(tfp_deterministic, tfp_normal)
+    tf.compat.v1.distributions.kl_divergence(tfp_deterministic, tfp_normal)
 
   def testBackwardsCompatibilityFallback(self):
-    tf_normal = tf.distributions.Normal(0.0, 1.0)
+    tf_normal = tf.compat.v1.distributions.Normal(0.0, 1.0)
     kullback_leibler.kl_divergence(tf_normal, tf_normal)
 
 

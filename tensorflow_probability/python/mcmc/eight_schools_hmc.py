@@ -110,7 +110,7 @@ def benchmark_eight_schools_hmc(
   # trial.
   is_accepted_tensor = computation()
   if not tf.executing_eagerly():
-    session = tf.Session()
+    session = tf.compat.v1.Session()
     session.run(is_accepted_tensor)
 
   start_time = time.time()

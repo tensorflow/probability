@@ -36,7 +36,7 @@ def try_import(name):  # pylint: disable=invalid-name
   try:
     module = importlib.import_module(name)
   except ImportError as e:
-    tf.logging.warning("Could not import %s: %s" % (name, str(e)))
+    tf.compat.v1.logging.warning("Could not import %s: %s" % (name, str(e)))
   return module
 
 
@@ -245,12 +245,12 @@ class UniformTest(tf.test.TestCase):
 
     no_nans = tf.constant(1.0)
     nans = tf.constant(0.0) / tf.constant(0.0)
-    self.assertTrue(self.evaluate(tf.is_nan(nans)))
+    self.assertTrue(self.evaluate(tf.math.is_nan(nans)))
     with_nans = tf.stack([no_nans, nans])
 
     pdf = uniform.prob(with_nans)
 
-    is_nan = self.evaluate(tf.is_nan(pdf))
+    is_nan = self.evaluate(tf.math.is_nan(pdf))
     self.assertFalse(is_nan[0])
     self.assertTrue(is_nan[1])
 
@@ -261,7 +261,7 @@ class UniformTest(tf.test.TestCase):
     uniform = uniform_lib.Uniform(a, b)
     self.assertTrue(
         self.evaluate(
-            tf.reduce_all(uniform.prob(uniform.sample(10)) > 0)))
+            tf.reduce_all(input_tensor=uniform.prob(uniform.sample(10)) > 0)))
 
   @tfe.run_test_in_graph_and_eager_modes
   def testUniformBroadcasting(self):
@@ -339,7 +339,8 @@ class UniformTest(tf.test.TestCase):
     # This is essentially an approximated integral from the direct definition
     # of KL divergence.
     x = a.sample(int(1e4), seed=0)
-    kl_sample = tf.reduce_mean(a.log_prob(x) - b.log_prob(x), 0)
+    kl_sample = tf.reduce_mean(
+        input_tensor=a.log_prob(x) - b.log_prob(x), axis=0)
 
     kl_, kl_sample_ = self.evaluate([kl, kl_sample])
     self.assertAllEqual(true_kl, kl_)
@@ -365,7 +366,7 @@ class UniformTest(tf.test.TestCase):
 
     # Since 'a' can be sampled to give points outside the support of 'b',
     # the KL Divergence is infinite.
-    true_kl = tf.convert_to_tensor(np.array([np.inf] * 3))
+    true_kl = tf.convert_to_tensor(value=np.array([np.inf] * 3))
 
     kl = tfd.kl_divergence(a, b)
 

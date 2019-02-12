@@ -109,7 +109,7 @@ def pinv(a, rcond=None, validate_args=False, name=None):
        Inc., 1980, pp. 139-142.
   """
   with tf.name_scope(name, 'pinv', [a, rcond]):
-    a = tf.convert_to_tensor(a, name='a')
+    a = tf.convert_to_tensor(value=a, name='a')
 
     if not a.dtype.is_floating:
       raise TypeError('Input `a` must have `float`-like `dtype` '
@@ -119,9 +119,8 @@ def pinv(a, rcond=None, validate_args=False, name=None):
         raise ValueError('Input `a` must have at least 2 dimensions '
                          '(saw: {}).'.format(a.shape.ndims))
     elif validate_args:
-      assert_rank_at_least_2 = tf.assert_rank_at_least(
-          a, rank=2,
-          message='Input `a` must have at least 2 dimensions.')
+      assert_rank_at_least_2 = tf.compat.v1.assert_rank_at_least(
+          a, rank=2, message='Input `a` must have at least 2 dimensions.')
       with tf.control_dependencies([assert_rank_at_least_2]):
         a = tf.identity(a)
 
@@ -129,9 +128,10 @@ def pinv(a, rcond=None, validate_args=False, name=None):
 
     if rcond is None:
       def get_dim_size(dim):
-        if tf.dimension_value(a.shape[dim]) is not None:
-          return tf.dimension_value(a.shape[dim])
-        return tf.shape(a)[dim]
+        if tf.compat.dimension_value(a.shape[dim]) is not None:
+          return tf.compat.dimension_value(a.shape[dim])
+        return tf.shape(input=a)[dim]
+
       num_rows = get_dim_size(-2)
       num_cols = get_dim_size(-1)
       if isinstance(num_rows, int) and isinstance(num_cols, int):
@@ -140,7 +140,7 @@ def pinv(a, rcond=None, validate_args=False, name=None):
         max_rows_cols = tf.cast(tf.maximum(num_rows, num_cols), dtype)
       rcond = 10. * max_rows_cols * np.finfo(dtype).eps
 
-    rcond = tf.convert_to_tensor(rcond, dtype=dtype, name='rcond')
+    rcond = tf.convert_to_tensor(value=rcond, dtype=dtype, name='rcond')
 
     # Calculate pseudo inverse via SVD.
     # Note: if a is symmetric then u == v. (We might observe additional
@@ -153,11 +153,10 @@ def pinv(a, rcond=None, validate_args=False, name=None):
 
     # Saturate small singular values to inf. This has the effect of make
     # `1. / s = 0.` while not resulting in `NaN` gradients.
-    cutoff = rcond * tf.reduce_max(singular_values, axis=-1)
+    cutoff = rcond * tf.reduce_max(input_tensor=singular_values, axis=-1)
     singular_values = tf.where(
-        singular_values > cutoff[..., tf.newaxis],
-        singular_values,
-        tf.fill(tf.shape(singular_values), np.array(np.inf, dtype)))
+        singular_values > cutoff[..., tf.newaxis], singular_values,
+        tf.fill(tf.shape(input=singular_values), np.array(np.inf, dtype)))
 
     # Although `a == tf.matmul(u, s * v, transpose_b=True)` we swap
     # `u` and `v` here so that `tf.matmul(pinv(A), A) = tf.eye()`, i.e.,
@@ -219,11 +218,10 @@ def lu_solve(lower_upper, perm, rhs,
 
   with tf.name_scope(name, 'lu_solve', [lower_upper, perm, rhs]):
     lower_upper = tf.convert_to_tensor(
-        lower_upper, preferred_dtype=tf.float32, name='lower_upper')
-    perm = tf.convert_to_tensor(
-        perm, preferred_dtype=tf.int32, name='perm')
+        value=lower_upper, dtype_hint=tf.float32, name='lower_upper')
+    perm = tf.convert_to_tensor(value=perm, dtype_hint=tf.int32, name='perm')
     rhs = tf.convert_to_tensor(
-        rhs, preferred_dtype=lower_upper.dtype, name='rhs')
+        value=rhs, dtype_hint=lower_upper.dtype, name='rhs')
 
     assertions = _lu_solve_assertions(lower_upper, perm, rhs, validate_args)
     if assertions:
@@ -238,9 +236,10 @@ def lu_solve(lower_upper, perm, rhs,
     else:
       # Either rhs or perm have non-scalar batch_shape or we can't determine
       # this information statically.
-      rhs_shape = tf.shape(rhs)
+      rhs_shape = tf.shape(input=rhs)
       broadcast_batch_shape = tf.broadcast_dynamic_shape(
-          rhs_shape[:-2], tf.shape(perm)[:-1])
+          rhs_shape[:-2],
+          tf.shape(input=perm)[:-1])
       d, m = rhs_shape[-2], rhs_shape[-1]
       rhs_broadcast_shape = tf.concat([broadcast_batch_shape, [d, m]], axis=0)
 
@@ -251,7 +250,7 @@ def lu_solve(lower_upper, perm, rhs,
       # Tile out perm and add batch indices.
       broadcast_perm = tf.broadcast_to(perm, rhs_broadcast_shape[:-1])
       broadcast_perm = tf.reshape(broadcast_perm, [-1, d])
-      broadcast_batch_size = tf.reduce_prod(broadcast_batch_shape)
+      broadcast_batch_size = tf.reduce_prod(input_tensor=broadcast_batch_shape)
       broadcast_batch_indices = tf.broadcast_to(
           tf.range(broadcast_batch_size)[:, tf.newaxis],
           [broadcast_batch_size, d])
@@ -262,8 +261,8 @@ def lu_solve(lower_upper, perm, rhs,
       permuted_rhs = tf.reshape(permuted_rhs, rhs_broadcast_shape)
 
     lower = tf.linalg.set_diag(
-        tf.matrix_band_part(lower_upper, num_lower=-1, num_upper=0),
-        tf.ones(tf.shape(lower_upper)[:-1], dtype=lower_upper.dtype))
+        tf.linalg.band_part(lower_upper, num_lower=-1, num_upper=0),
+        tf.ones(tf.shape(input=lower_upper)[:-1], dtype=lower_upper.dtype))
     return linear_operator_util.matrix_triangular_solve_with_broadcast(
         lower_upper,  # Only upper is accessed.
         linear_operator_util.matrix_triangular_solve_with_broadcast(
@@ -319,15 +318,14 @@ def lu_matrix_inverse(lower_upper, perm, validate_args=False, name=None):
 
   with tf.name_scope(name, 'lu_matrix_inverse', [lower_upper, perm]):
     lower_upper = tf.convert_to_tensor(
-        lower_upper, preferred_dtype=tf.float32, name='lower_upper')
-    perm = tf.convert_to_tensor(
-        perm, preferred_dtype=tf.int32, name='perm')
+        value=lower_upper, dtype_hint=tf.float32, name='lower_upper')
+    perm = tf.convert_to_tensor(value=perm, dtype_hint=tf.int32, name='perm')
     assertions = _lu_reconstruct_assertions(lower_upper, perm, validate_args)
     if assertions:
       with tf.control_dependencies(assertions):
         lower_upper = tf.identity(lower_upper)
         perm = tf.identity(perm)
-    shape = tf.shape(lower_upper)
+    shape = tf.shape(input=lower_upper)
     return lu_solve(
         lower_upper, perm,
         rhs=tf.eye(shape[-1], batch_shape=shape[:-2], dtype=lower_upper.dtype),
@@ -369,9 +367,8 @@ def lu_reconstruct(lower_upper, perm, validate_args=False, name=None):
   """
   with tf.name_scope(name, 'lu_reconstruct', [lower_upper, perm]):
     lower_upper = tf.convert_to_tensor(
-        lower_upper, preferred_dtype=tf.float32, name='lower_upper')
-    perm = tf.convert_to_tensor(
-        perm, preferred_dtype=tf.int32, name='perm')
+        value=lower_upper, dtype_hint=tf.float32, name='lower_upper')
+    perm = tf.convert_to_tensor(value=perm, dtype_hint=tf.int32, name='perm')
 
     assertions = _lu_reconstruct_assertions(lower_upper, perm, validate_args)
     if assertions:
@@ -379,28 +376,28 @@ def lu_reconstruct(lower_upper, perm, validate_args=False, name=None):
         lower_upper = tf.identity(lower_upper)
         perm = tf.identity(perm)
 
-    shape = tf.shape(lower_upper)
+    shape = tf.shape(input=lower_upper)
 
     lower = tf.linalg.set_diag(
-        tf.matrix_band_part(lower_upper, num_lower=-1, num_upper=0),
+        tf.linalg.band_part(lower_upper, num_lower=-1, num_upper=0),
         tf.ones(shape[:-1], dtype=lower_upper.dtype))
-    upper = tf.matrix_band_part(lower_upper, num_lower=0, num_upper=-1)
+    upper = tf.linalg.band_part(lower_upper, num_lower=0, num_upper=-1)
     x = tf.matmul(lower, upper)
 
     if lower_upper.shape.ndims is None or lower_upper.shape.ndims != 2:
       # We either don't know the batch rank or there are >0 batch dims.
-      batch_size = tf.reduce_prod(shape[:-2])
+      batch_size = tf.reduce_prod(input_tensor=shape[:-2])
       d = shape[-1]
       x = tf.reshape(x, [batch_size, d, d])
       perm = tf.reshape(perm, [batch_size, d])
-      perm = tf.map_fn(tf.invert_permutation, perm)
+      perm = tf.map_fn(tf.math.invert_permutation, perm)
       batch_indices = tf.broadcast_to(
           tf.range(batch_size)[:, tf.newaxis],
           [batch_size, d])
       x = tf.gather_nd(x, tf.stack([batch_indices, perm], axis=-1))
       x = tf.reshape(x, shape)
     else:
-      x = tf.gather(x, tf.invert_permutation(perm))
+      x = tf.gather(x, tf.math.invert_permutation(perm))
 
     x.set_shape(lower_upper.shape)
     return x
@@ -416,7 +413,7 @@ def _lu_reconstruct_assertions(lower_upper, perm, validate_args):
       raise ValueError(message)
   elif validate_args:
     assertions.append(
-        tf.assert_rank_at_least(lower_upper, rank=2, message=message))
+        tf.compat.v1.assert_rank_at_least(lower_upper, rank=2, message=message))
 
   message = '`rank(lower_upper)` must equal `rank(perm) + 1`'
   if lower_upper.shape.ndims is not None and perm.shape.ndims is not None:
@@ -424,15 +421,16 @@ def _lu_reconstruct_assertions(lower_upper, perm, validate_args):
       raise ValueError(message)
   elif validate_args:
     assertions.append(
-        tf.assert_rank(lower_upper, rank=tf.rank(perm) + 1, message=message))
+        tf.compat.v1.assert_rank(
+            lower_upper, rank=tf.rank(perm) + 1, message=message))
 
   message = '`lower_upper` must be square.'
   if lower_upper.shape[:-2].is_fully_defined():
     if lower_upper.shape[-2] != lower_upper.shape[-1]:
       raise ValueError(message)
   elif validate_args:
-    m, n = tf.split(tf.shape(lower_upper)[-2:], num_or_size_splits=2)
-    assertions.append(tf.assert_equal(m, n, message=message))
+    m, n = tf.split(tf.shape(input=lower_upper)[-2:], num_or_size_splits=2)
+    assertions.append(tf.compat.v1.assert_equal(m, n, message=message))
 
   return assertions
 
@@ -447,18 +445,19 @@ def _lu_solve_assertions(lower_upper, perm, rhs, validate_args):
       raise ValueError(message)
   elif validate_args:
     assertions.append(
-        tf.assert_rank_at_least(rhs, rank=2, message=message))
+        tf.compat.v1.assert_rank_at_least(rhs, rank=2, message=message))
 
   message = '`lower_upper.shape[-1]` must equal `rhs.shape[-1]`.'
-  if (tf.dimension_value(lower_upper.shape[-1]) is not None and
-      tf.dimension_value(rhs.shape[-2]) is not None):
+  if (tf.compat.dimension_value(lower_upper.shape[-1]) is not None and
+      tf.compat.dimension_value(rhs.shape[-2]) is not None):
     if lower_upper.shape[-1] != rhs.shape[-2]:
       raise ValueError(message)
   elif validate_args:
     assertions.append(
-        tf.assert_equal(tf.shape(lower_upper)[-1],
-                        tf.shape(rhs)[-2],
-                        message=message))
+        tf.compat.v1.assert_equal(
+            tf.shape(input=lower_upper)[-1],
+            tf.shape(input=rhs)[-2],
+            message=message))
 
   return assertions
 
@@ -493,14 +492,14 @@ def sparse_or_dense_matmul(sparse_or_dense_a,
   with tf.name_scope(name, 'sparse_or_dense_matmul',
                      [sparse_or_dense_a, dense_b]):
     dense_b = tf.convert_to_tensor(
-        dense_b, preferred_dtype=tf.float32, name='dense_b')
+        value=dense_b, dtype_hint=tf.float32, name='dense_b')
 
     if validate_args:
-      assert_a_rank_at_least_2 = tf.assert_rank_at_least(
+      assert_a_rank_at_least_2 = tf.compat.v1.assert_rank_at_least(
           sparse_or_dense_a,
           rank=2,
           message='Input `sparse_or_dense_a` must have at least 2 dimensions.')
-      assert_b_rank_at_least_2 = tf.assert_rank_at_least(
+      assert_b_rank_at_least_2 = tf.compat.v1.assert_rank_at_least(
           dense_b,
           rank=2,
           message='Input `dense_b` must have at least 2 dimensions.')
@@ -509,7 +508,8 @@ def sparse_or_dense_matmul(sparse_or_dense_a,
         sparse_or_dense_a = tf.identity(sparse_or_dense_a)
         dense_b = tf.identity(dense_b)
 
-    if isinstance(sparse_or_dense_a, (tf.SparseTensor, tf.SparseTensorValue)):
+    if isinstance(sparse_or_dense_a,
+                  (tf.SparseTensor, tf.compat.v1.SparseTensorValue)):
       return _sparse_tensor_dense_matmul(sparse_or_dense_a, dense_b, **kwargs)
     else:
       return tf.matmul(sparse_or_dense_a, dense_b, **kwargs)
@@ -543,7 +543,7 @@ def sparse_or_dense_matvecmul(sparse_or_dense_matrix,
   with tf.name_scope(name, 'sparse_or_dense_matvecmul',
                      [sparse_or_dense_matrix, dense_vector]):
     dense_vector = tf.convert_to_tensor(
-        dense_vector, preferred_dtype=tf.float32, name='dense_vector')
+        value=dense_vector, dtype_hint=tf.float32, name='dense_vector')
     return tf.squeeze(
         sparse_or_dense_matmul(
             sparse_or_dense_matrix,
@@ -558,7 +558,7 @@ def _get_shape(x, out_type=tf.int32):
   # is known statically. Otherwise return a Tensor representing the shape.
   if x.shape.is_fully_defined():
     return np.array(x.shape.as_list(), dtype=out_type.as_numpy_dtype)
-  return tf.shape(x, out_type=out_type)
+  return tf.shape(input=x, out_type=out_type)
 
 
 def _sparse_tensor_dense_matmul(sp_a, b, **kwargs):
@@ -580,7 +580,7 @@ def _sparse_tensor_dense_matmul(sp_a, b, **kwargs):
   # Reshape the SparseTensor into a rank 3 SparseTensors, with the
   # batch shape flattened to a single dimension. If the batch rank is 0, then
   # we add a batch dimension of rank 1.
-  sp_a = tf.sparse_reshape(sp_a, tf.concat([[-1], _get_shape(sp_a)[-2:]],
+  sp_a = tf.sparse.reshape(sp_a, tf.concat([[-1], _get_shape(sp_a)[-2:]],
                                            axis=0))
   # Reshape b to stack the batch dimension along the rows.
   b = tf.reshape(b, tf.concat([[-1], _get_shape(b)[-1:]], axis=0))
@@ -588,7 +588,7 @@ def _sparse_tensor_dense_matmul(sp_a, b, **kwargs):
   # Convert the SparseTensor to a matrix in block diagonal form with blocks of
   # matrices [M, N]. This allow us to use tf.sparse_tensor_dense_matmul which
   # only accepts rank 2 (Sparse)Tensors.
-  out = tf.sparse_tensor_dense_matmul(_sparse_block_diag(sp_a), b, **kwargs)
+  out = tf.sparse.sparse_dense_matmul(_sparse_block_diag(sp_a), b, **kwargs)
 
   # Finally retrieve the original batch shape from the resulting rank 2 Tensor.
   # Note that we avoid inferring the final shape from `sp_a` or `b` because we
@@ -614,7 +614,7 @@ def _sparse_block_diag(sp_a):
   # matrix of dense shape [B * M, B * N].
   # Note that this transformation doesn't increase the number of non-zero
   # entries in the SparseTensor.
-  sp_a_shape = tf.convert_to_tensor(_get_shape(sp_a, tf.int64))
+  sp_a_shape = tf.convert_to_tensor(value=_get_shape(sp_a, tf.int64))
   ind_mat = tf.concat([[sp_a_shape[-2:]], tf.eye(2, dtype=tf.int64)], axis=0)
   indices = tf.matmul(sp_a.indices, ind_mat)
   dense_shape = sp_a_shape[0] * sp_a_shape[1:]

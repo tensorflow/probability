@@ -111,7 +111,7 @@ class DenseVariational(tf.test.TestCase):
       tfd = tfp.distributions  # pylint: disable=redefined-outer-name
 
       dist = tfd.Normal(loc=tf.zeros(shape, dtype), scale=tf.ones(shape, dtype))
-      batch_ndims = tf.size(dist.batch_shape_tensor())
+      batch_ndims = tf.size(input=dist.batch_shape_tensor())
       return tfd.Independent(dist, reinterpreted_batch_ndims=batch_ndims)
 
     kwargs = {'units': 3,
@@ -133,7 +133,7 @@ class DenseVariational(tf.test.TestCase):
   def _testKLPenaltyKernel(self, layer_class):
     with self.cached_session():
       layer = layer_class(units=2)
-      inputs = tf.random_uniform([2, 3], seed=1)
+      inputs = tf.random.uniform([2, 3], seed=1)
 
       # No keys.
       input_dependent_losses = layer.get_losses_for(inputs=None)
@@ -154,7 +154,7 @@ class DenseVariational(tf.test.TestCase):
           units=2,
           bias_posterior_fn=tfp.layers.default_mean_field_normal_fn(),
           bias_prior_fn=tfp.layers.default_multivariate_normal_fn)
-      inputs = tf.random_uniform([2, 3], seed=1)
+      inputs = tf.random.uniform([2, 3], seed=1)
 
       # No keys.
       input_dependent_losses = layer.get_losses_for(inputs=None)
@@ -173,29 +173,29 @@ class DenseVariational(tf.test.TestCase):
   def _testDenseSetUp(self, layer_class, batch_size, in_size, out_size,
                       **kwargs):
     seed = Counter()
-    inputs = tf.random_uniform([batch_size, in_size], seed=seed())
+    inputs = tf.random.uniform([batch_size, in_size], seed=seed())
 
     kernel_size = [in_size, out_size]
     kernel_posterior = MockDistribution(
-        loc=tf.random_uniform(kernel_size, seed=seed()),
-        scale=tf.random_uniform(kernel_size, seed=seed()),
-        result_log_prob=tf.random_uniform(kernel_size, seed=seed()),
-        result_sample=tf.random_uniform(kernel_size, seed=seed()))
+        loc=tf.random.uniform(kernel_size, seed=seed()),
+        scale=tf.random.uniform(kernel_size, seed=seed()),
+        result_log_prob=tf.random.uniform(kernel_size, seed=seed()),
+        result_sample=tf.random.uniform(kernel_size, seed=seed()))
     kernel_prior = MockDistribution(
-        result_log_prob=tf.random_uniform(kernel_size, seed=seed()),
-        result_sample=tf.random_uniform(kernel_size, seed=seed()))
+        result_log_prob=tf.random.uniform(kernel_size, seed=seed()),
+        result_sample=tf.random.uniform(kernel_size, seed=seed()))
     kernel_divergence = MockKLDivergence(
-        result=tf.random_uniform([], seed=seed()))
+        result=tf.random.uniform([], seed=seed()))
 
     bias_size = [out_size]
     bias_posterior = MockDistribution(
-        result_log_prob=tf.random_uniform(bias_size, seed=seed()),
-        result_sample=tf.random_uniform(bias_size, seed=seed()))
+        result_log_prob=tf.random.uniform(bias_size, seed=seed()),
+        result_sample=tf.random.uniform(bias_size, seed=seed()))
     bias_prior = MockDistribution(
-        result_log_prob=tf.random_uniform(bias_size, seed=seed()),
-        result_sample=tf.random_uniform(bias_size, seed=seed()))
+        result_log_prob=tf.random.uniform(bias_size, seed=seed()),
+        result_sample=tf.random.uniform(bias_size, seed=seed()))
     bias_divergence = MockKLDivergence(
-        result=tf.random_uniform([], seed=seed()))
+        result=tf.random.uniform([], seed=seed()))
 
     layer = layer_class(
         units=out_size,
@@ -386,19 +386,17 @@ class DenseVariational(tf.test.TestCase):
 
       stream = tfd.SeedStream(layer.seed, salt='DenseFlipout')
 
-      sign_input = tf.random_uniform(
-          [batch_size, in_size],
-          minval=0,
-          maxval=2,
-          dtype=tf.int32,
-          seed=stream())
+      sign_input = tf.random.uniform([batch_size, in_size],
+                                     minval=0,
+                                     maxval=2,
+                                     dtype=tf.int32,
+                                     seed=stream())
       sign_input = tf.cast(2 * sign_input - 1, inputs.dtype)
-      sign_output = tf.random_uniform(
-          [batch_size, out_size],
-          minval=0,
-          maxval=2,
-          dtype=tf.int32,
-          seed=stream())
+      sign_output = tf.random.uniform([batch_size, out_size],
+                                      minval=0,
+                                      maxval=2,
+                                      dtype=tf.int32,
+                                      seed=stream())
       sign_output = tf.cast(2 * sign_output - 1, inputs.dtype)
       perturbed_inputs = tf.matmul(
           inputs * sign_input, expected_kernel_posterior_affine_tensor)
@@ -457,26 +455,18 @@ class DenseVariational(tf.test.TestCase):
     batch_size, in_size, out_size = 2, 3, 4
     with self.cached_session() as sess:
       seed = Counter()
-      inputs = tf.random_uniform([batch_size, in_size], seed=seed())
+      inputs = tf.random.uniform([batch_size, in_size], seed=seed())
 
       kernel_posterior = MockDistribution(
-          loc=tf.random_uniform(
-              [in_size, out_size], seed=seed()),
-          scale=tf.random_uniform(
-              [in_size, out_size], seed=seed()),
-          result_log_prob=tf.random_uniform(
-              [in_size, out_size], seed=seed()),
-          result_sample=tf.random_uniform(
-              [in_size, out_size], seed=seed()))
+          loc=tf.random.uniform([in_size, out_size], seed=seed()),
+          scale=tf.random.uniform([in_size, out_size], seed=seed()),
+          result_log_prob=tf.random.uniform([in_size, out_size], seed=seed()),
+          result_sample=tf.random.uniform([in_size, out_size], seed=seed()))
       bias_posterior = MockDistribution(
-          loc=tf.random_uniform(
-              [out_size], seed=seed()),
-          scale=tf.random_uniform(
-              [out_size], seed=seed()),
-          result_log_prob=tf.random_uniform(
-              [out_size], seed=seed()),
-          result_sample=tf.random_uniform(
-              [out_size], seed=seed()))
+          loc=tf.random.uniform([out_size], seed=seed()),
+          scale=tf.random.uniform([out_size], seed=seed()),
+          result_log_prob=tf.random.uniform([out_size], seed=seed()),
+          result_sample=tf.random.uniform([out_size], seed=seed()))
       layer_one = tfp.layers.DenseFlipout(
           units=out_size,
           kernel_posterior_fn=lambda *args: kernel_posterior,
@@ -506,7 +496,7 @@ class DenseVariational(tf.test.TestCase):
 
   def testDenseLayersInSequential(self):
     batch_size, in_size, out_size = 2, 3, 4
-    inputs = tf.random_uniform([batch_size, in_size])
+    inputs = tf.random.uniform([batch_size, in_size])
     net = tf.keras.Sequential([
         tfp.layers.DenseReparameterization(6, activation=tf.nn.relu),
         tfp.layers.DenseFlipout(6, activation=tf.nn.relu),
@@ -515,7 +505,7 @@ class DenseVariational(tf.test.TestCase):
     outputs = net(inputs)
 
     with self.cached_session() as sess:
-      sess.run(tf.global_variables_initializer())
+      sess.run(tf.compat.v1.global_variables_initializer())
       outputs_ = sess.run(outputs)
 
     self.assertAllEqual(outputs_.shape, [batch_size, out_size])

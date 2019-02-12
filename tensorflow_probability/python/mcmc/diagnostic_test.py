@@ -45,7 +45,7 @@ class _EffectiveSampleSizeTest(object):
                                                    rtol=1e-2,
                                                    filter_threshold=None,
                                                    filter_beyond_lag=None):
-    x = tf.placeholder_with_default(
+    x = tf.compat.v1.placeholder_with_default(
         input=x_, shape=x_.shape if self.use_static_shape else None)
     ess = tfp.mcmc.effective_sample_size(
         x,
@@ -185,7 +185,7 @@ class _EffectiveSampleSizeTest(object):
     x_ = (iid_x_ * np.ones((500, 10)).astype(np.float32)).reshape((5000,))
     with self.cached_session() as sess:
       with spectral_ops_test_util.fft_kernel_label_map():
-        x = tf.placeholder_with_default(
+        x = tf.compat.v1.placeholder_with_default(
             input=x_, shape=x_.shape if self.use_static_shape else None)
 
         ess_none_none = tfp.mcmc.effective_sample_size(
@@ -212,7 +212,7 @@ class _EffectiveSampleSizeTest(object):
     x_ = (iid_x_ * np.ones((500, 10)).astype(np.float32)).reshape((5000,))
     with self.cached_session() as sess:
       with spectral_ops_test_util.fft_kernel_label_map():
-        x = tf.placeholder_with_default(
+        x = tf.compat.v1.placeholder_with_default(
             input=x_, shape=x_.shape if self.use_static_shape else None)
 
         ess_1_9 = tfp.mcmc.effective_sample_size(
@@ -285,7 +285,7 @@ class _PotentialScaleReductionTest(object):
     sample_ndims = 1
     independent_chain_ndims = len(independent_chain_shape)
     with self.cached_session():
-      state = tf.placeholder_with_default(
+      state = tf.compat.v1.placeholder_with_default(
           input=state_, shape=state_.shape if self.use_static_shape else None)
 
       rhat = tfp.mcmc.potential_scale_reduction(
@@ -388,7 +388,7 @@ class _ReduceVarianceTest(object):
   def check_versus_numpy(self, x_, axis, biased, keepdims):
     with self.cached_session():
       x_ = np.asarray(x_)
-      x = tf.placeholder_with_default(
+      x = tf.compat.v1.placeholder_with_default(
           input=x_, shape=x_.shape if self.use_static_shape else None)
       var = _reduce_variance(
           x, axis=axis, biased=biased, keepdims=keepdims)

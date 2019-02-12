@@ -45,7 +45,7 @@ class TestKernel(kernels_lib.PositiveSemidefiniteKernel):
   """
 
   def __init__(self, multiplier, feature_ndims=1):
-    self._multiplier = tf.convert_to_tensor(multiplier)
+    self._multiplier = tf.convert_to_tensor(value=multiplier)
     super(TestKernel, self).__init__(feature_ndims=feature_ndims,
                                      dtype=self._multiplier.dtype.base_dtype)
 
@@ -53,27 +53,27 @@ class TestKernel(kernels_lib.PositiveSemidefiniteKernel):
     return self._multiplier.shape
 
   def _batch_shape_tensor(self):
-    return tf.shape(self._multiplier)
+    return tf.shape(input=self._multiplier)
 
   def _apply(self, x1, x2, param_expansion_ndims=0):
-    x1 = tf.convert_to_tensor(x1)
-    x2 = tf.convert_to_tensor(x2)
+    x1 = tf.convert_to_tensor(value=x1)
+    x2 = tf.convert_to_tensor(value=x2)
 
     multiplier = kernels_util.pad_shape_right_with_ones(
         self._multiplier, param_expansion_ndims)
 
-    return multiplier * tf.reduce_sum(x1 + x2, axis=-1)
+    return multiplier * tf.reduce_sum(input_tensor=x1 + x2, axis=-1)
 
 
 class PositiveSemidefiniteKernelTest(tf.test.TestCase, parameterized.TestCase):
   """Test the abstract base class behaviors."""
 
   def setUp(self):
-    self.x = tf.placeholder_with_default(
+    self.x = tf.compat.v1.placeholder_with_default(
         [[1., 1., 1.], [2., 2., 2.], [3., 3., 3.]], shape=[3, 3])
-    self.y = tf.placeholder_with_default(
+    self.y = tf.compat.v1.placeholder_with_default(
         [[4., 4., 4.], [5., 5., 5.], [6., 6., 6.]], shape=[3, 3])
-    self.z = tf.placeholder_with_default(
+    self.z = tf.compat.v1.placeholder_with_default(
         [[4., 4., 4.], [5., 5., 5.], [6., 6., 6.], [7., 7., 7.]], shape=[4, 3])
 
     self.batch_x = tf.stack([self.x] * 5)
@@ -87,15 +87,16 @@ class PositiveSemidefiniteKernelTest(tf.test.TestCase, parameterized.TestCase):
     self.params_21 = [[1.], [2.]]
 
     # Kernel params with dynamic shapes
-    self.params_2_dynamic = tf.placeholder_with_default([1., 2.], shape=None)
-    self.params_21_dynamic = tf.placeholder_with_default(
-        [[1.], [2.]], shape=None)
+    self.params_2_dynamic = tf.compat.v1.placeholder_with_default([1., 2.],
+                                                                  shape=None)
+    self.params_21_dynamic = tf.compat.v1.placeholder_with_default([[1.], [2.]],
+                                                                   shape=None)
 
   def testStr(self):
-    k32_batch_unk = TestKernel(tf.placeholder(tf.float32))
-    k32_batch2 = TestKernel(tf.to_float([123., 456.]))
-    k64_batch2x1 = TestKernel(tf.to_double([[123.], [456.]]))
-    k_fdim3 = TestKernel(tf.to_float(123.), feature_ndims=3)
+    k32_batch_unk = TestKernel(tf.compat.v1.placeholder(tf.float32))
+    k32_batch2 = TestKernel(tf.cast([123., 456.], dtype=tf.float32))
+    k64_batch2x1 = TestKernel(tf.cast([[123.], [456.]], dtype=tf.float64))
+    k_fdim3 = TestKernel(tf.cast(123., dtype=tf.float32), feature_ndims=3)
     self.assertEqual(
         'tfp.positive_semidefinite_kernels.TestKernel('
         '"TestKernel", feature_ndims=1, dtype=float32)',
@@ -114,10 +115,10 @@ class PositiveSemidefiniteKernelTest(tf.test.TestCase, parameterized.TestCase):
         str(k_fdim3))
 
   def testRepr(self):
-    k32_batch_unk = TestKernel(tf.placeholder(tf.float32))
-    k32_batch2 = TestKernel(tf.to_float([123., 456.]))
-    k64_batch2x1 = TestKernel(tf.to_double([[123.], [456.]]))
-    k_fdim3 = TestKernel(tf.to_float(123.), feature_ndims=3)
+    k32_batch_unk = TestKernel(tf.compat.v1.placeholder(tf.float32))
+    k32_batch2 = TestKernel(tf.cast([123., 456.], dtype=tf.float32))
+    k64_batch2x1 = TestKernel(tf.cast([[123.], [456.]], dtype=tf.float64))
+    k_fdim3 = TestKernel(tf.cast(123., dtype=tf.float32), feature_ndims=3)
     self.assertEqual(
         '<tfp.positive_semidefinite_kernels.TestKernel '
         '\'TestKernel\' batch_shape=<unknown> feature_ndims=1 dtype=float32>',
@@ -171,9 +172,9 @@ class PositiveSemidefiniteKernelTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       ('Dynamic-shape [2] kernel',
-       tf.placeholder_with_default([1., 2.], shape=None), [2]),
+       tf.compat.v1.placeholder_with_default([1., 2.], shape=None), [2]),
       ('Dynamic-shape [2, 1] kernel',
-       tf.placeholder_with_default([[1.], [2.]], shape=None), [2, 1]))
+       tf.compat.v1.placeholder_with_default([[1.], [2.]], shape=None), [2, 1]))
   def testDynamicBatchShape(self, params, shape):
     k = TestKernel(params)
     self.assertIsNone(k.batch_shape.ndims)
@@ -324,4 +325,3 @@ class PositiveSemidefiniteKernelTest(tf.test.TestCase, parameterized.TestCase):
 
 if __name__ == '__main__':
   tf.test.main()
-

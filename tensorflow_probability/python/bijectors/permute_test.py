@@ -42,7 +42,7 @@ class PermuteBijectorTest(tf.test.TestCase):
     expected_x = np.random.randn(4, 2, 3)
     expected_y = expected_x[..., expected_permutation]
 
-    permutation_ph = tf.placeholder_with_default(
+    permutation_ph = tf.compat.v1.placeholder_with_default(
         expected_permutation, shape=None)
     bijector = tfb.Permute(permutation=permutation_ph, validate_args=True)
     [
@@ -67,7 +67,7 @@ class PermuteBijectorTest(tf.test.TestCase):
 
   def testRaisesOpError(self):
     with self.assertRaisesError("Permutation over `d` must contain"):
-      permutation = tf.placeholder_with_default([1, 2], shape=None)
+      permutation = tf.compat.v1.placeholder_with_default([1, 2], shape=None)
       bijector = tfb.Permute(permutation=permutation, validate_args=True)
       self.evaluate(bijector.inverse([1.]))
 

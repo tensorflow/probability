@@ -147,7 +147,7 @@ class GammaGammaTest(tf.test.TestCase):
     self.assertAllClose(self.evaluate(gg.mean()), expected_mean)
 
   def testGammaGammaSample(self):
-    with tf.Session():
+    with tf.compat.v1.Session():
       alpha_v = 2.0
       alpha0_v = 3.0
       beta0_v = 5.0

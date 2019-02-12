@@ -54,7 +54,7 @@ def softplus_and_shift(x, shift=1e-5, name=None):
     scale: (Batch of) scalars`with `x.dtype` and `x.shape`.
   """
   with tf.name_scope(name, 'softplus_and_shift', [x, shift]):
-    x = tf.convert_to_tensor(x, name='x')
+    x = tf.convert_to_tensor(value=x, name='x')
     y = tf.nn.softplus(x)
     if shift is not None:
       y += shift
@@ -82,20 +82,19 @@ def tril_with_diag_softplus_and_shift(x, diag_shift=1e-5, name=None):
   """
   with tf.name_scope(name, 'tril_with_diag_softplus_and_shift',
                      [x, diag_shift]):
-    x = tf.convert_to_tensor(x, name='x')
+    x = tf.convert_to_tensor(value=x, name='x')
     x = tfd.fill_triangular(x)
-    diag = softplus_and_shift(tf.matrix_diag_part(x), diag_shift)
-    x = tf.matrix_set_diag(x, diag)
+    diag = softplus_and_shift(tf.linalg.diag_part(x), diag_shift)
+    x = tf.linalg.set_diag(x, diag)
     return x
 
 
-def multivariate_normal_tril(
-    x,
-    dims,
-    layer_fn=tf.layers.dense,
-    loc_fn=lambda x: x,
-    scale_fn=tril_with_diag_softplus_and_shift,
-    name=None):
+def multivariate_normal_tril(x,
+                             dims,
+                             layer_fn=tf.compat.v1.layers.dense,
+                             loc_fn=lambda x: x,
+                             scale_fn=tril_with_diag_softplus_and_shift,
+                             name=None):
   """Constructs a trainable `tfd.MultivariateNormalTriL` distribution.
 
   This function creates a MultivariateNormal (MVN) with lower-triangular scale
@@ -191,14 +190,14 @@ def multivariate_normal_tril(
     mvntril: An instance of `tfd.MultivariateNormalTriL`.
   """
   with tf.name_scope(name, 'multivariate_normal_tril', [x, dims]):
-    x = tf.convert_to_tensor(x, name='x')
+    x = tf.convert_to_tensor(value=x, name='x')
     x = layer_fn(x, dims + dims * (dims + 1) // 2)
     return tfd.MultivariateNormalTriL(
         loc=loc_fn(x[..., :dims]),
         scale_tril=scale_fn(x[..., dims:]))
 
 
-def bernoulli(x, layer_fn=tf.layers.dense, name=None):
+def bernoulli(x, layer_fn=tf.compat.v1.layers.dense, name=None):
   """Constructs a trainable `tfd.Bernoulli` distribution.
 
   This function creates a Bernoulli distribution parameterized by logits.
@@ -277,17 +276,16 @@ def bernoulli(x, layer_fn=tf.layers.dense, name=None):
     bernoulli: An instance of `tfd.Bernoulli`.
   """
   with tf.name_scope(name, 'bernoulli', [x]):
-    x = tf.convert_to_tensor(x, name='x')
+    x = tf.convert_to_tensor(value=x, name='x')
     logits = tf.squeeze(layer_fn(x, 1), axis=-1)
     return tfd.Bernoulli(logits=logits)
 
 
-def normal(
-    x,
-    layer_fn=tf.layers.dense,
-    loc_fn=lambda x: x,
-    scale_fn=1.,
-    name=None):
+def normal(x,
+           layer_fn=tf.compat.v1.layers.dense,
+           loc_fn=lambda x: x,
+           scale_fn=1.,
+           name=None):
   """Constructs a trainable `tfd.Normal` distribution.
 
 
@@ -377,7 +375,7 @@ def normal(
     normal: An instance of `tfd.Normal`.
   """
   with tf.name_scope(name, 'normal', [x]):
-    x = tf.convert_to_tensor(x, name='x')
+    x = tf.convert_to_tensor(value=x, name='x')
     if callable(scale_fn):
       y = layer_fn(x, 2)
       loc = loc_fn(y[..., 0])
@@ -389,11 +387,10 @@ def normal(
     return tfd.Normal(loc=loc, scale=scale)
 
 
-def poisson(
-    x,
-    layer_fn=tf.layers.dense,
-    log_rate_fn=lambda x: x,
-    name=None):
+def poisson(x,
+            layer_fn=tf.compat.v1.layers.dense,
+            log_rate_fn=lambda x: x,
+            name=None):
   """Constructs a trainable `tfd.Poisson` distribution.
 
   This function creates a Poisson distribution parameterized by log rate.
@@ -476,6 +473,6 @@ def poisson(
     poisson: An instance of `tfd.Poisson`.
   """
   with tf.name_scope(name, 'poisson', [x]):
-    x = tf.convert_to_tensor(x, name='x')
+    x = tf.convert_to_tensor(value=x, name='x')
     log_rate = log_rate_fn(tf.squeeze(layer_fn(x, 1), axis=-1))
     return tfd.Poisson(log_rate=log_rate)

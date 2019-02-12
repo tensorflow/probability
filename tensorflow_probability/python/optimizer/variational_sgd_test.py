@@ -40,7 +40,7 @@ class VariationalSGDTest(tf.test.TestCase):
             burnin_max_learning_rate=3.0,
             use_single_learning_rate=True).apply_gradients(
                 zip([grads0, grads1], [var0, var1]))
-        tf.global_variables_initializer().run()
+        tf.compat.v1.global_variables_initializer().run()
         # Fetch params to validate initial values
         self.assertAllCloseAccordingToType([1.1, 2.1], self.evaluate(var0))
         self.assertAllCloseAccordingToType([3.0, 4.0], self.evaluate(var1))
@@ -82,7 +82,7 @@ class VariationalSGDTest(tf.test.TestCase):
             preconditioner_decay_rate=decay_rate)
         sgd_op2 = optimizer2.apply_gradients(
             zip([gradsa, gradsb], [vara, varb]))
-        tf.global_variables_initializer().run()
+        tf.compat.v1.global_variables_initializer().run()
         # Fetch params to validate initial values
         self.assertAllCloseAccordingToType([1.1, 2.1], self.evaluate(var0))
         self.assertAllCloseAccordingToType([3.0, 4.0], self.evaluate(var1))
@@ -128,7 +128,7 @@ class VariationalSGDTest(tf.test.TestCase):
             burnin=0,
             preconditioner_decay_rate=decay_rate).apply_gradients(
                 zip([grads0, grads1], [var0, var1]))
-        tf.global_variables_initializer().run()
+        tf.compat.v1.global_variables_initializer().run()
         # Fetch params to validate initial values
         self.assertAllCloseAccordingToType([1.1, 2.1], self.evaluate(var0))
         self.assertAllCloseAccordingToType([3.0, 4.0], self.evaluate(var1))
@@ -159,7 +159,7 @@ class VariationalSGDTest(tf.test.TestCase):
             burnin=0,
             preconditioner_decay_rate=decay_rate)
         sgd_op = optimizer.apply_gradients(zip([grads0, grads1], [var0, var1]))
-        tf.global_variables_initializer().run()
+        tf.compat.v1.global_variables_initializer().run()
         # Fetch params to validate initial values
         self.assertAllCloseAccordingToType([1.1, 2.1], self.evaluate(var0))
         self.assertAllCloseAccordingToType([3.0, 4.0], self.evaluate(var1))
@@ -190,7 +190,7 @@ class VariationalSGDTest(tf.test.TestCase):
         values = [1.0, 3.0]
         vars_ = [tf.Variable([v], dtype=dtype) for v in values]
         grads_and_vars = opt.compute_gradients(vars_[0] + vars_[1], vars_)
-        tf.global_variables_initializer().run()
+        tf.compat.v1.global_variables_initializer().run()
         for grad, _ in grads_and_vars:
           self.assertAllCloseAccordingToType([1.0], self.evaluate(grad))
 
@@ -213,7 +213,7 @@ class VariationalSGDTest(tf.test.TestCase):
             preconditioner_decay_rate=decay_rate)
         sgd_op = sgd_optimizer.apply_gradients(
             zip([grads0, grads1], [var0, var1]), global_step=global_step)
-        tf.global_variables_initializer().run()
+        tf.compat.v1.global_variables_initializer().run()
         # Fetch params to validate initial values
         self.assertAllCloseAccordingToType([1.1, 2.1], self.evaluate(var0))
         self.assertAllCloseAccordingToType([3.0, 4.0], self.evaluate(var1))
@@ -250,7 +250,7 @@ class VariationalSGDTest(tf.test.TestCase):
             burnin=0,
             preconditioner_decay_rate=decay_rate).apply_gradients(
                 zip([grads0, grads1], [var0, var1]))
-        tf.global_variables_initializer().run()
+        tf.compat.v1.global_variables_initializer().run()
         # Fetch params to validate initial values
         self.assertAllCloseAccordingToType([[1.1], [2.1]], self.evaluate(var0))
         self.assertAllCloseAccordingToType([[3.0], [4.0]], self.evaluate(var1))

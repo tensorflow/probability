@@ -99,10 +99,11 @@ def random_walk_normal_fn(scale=1., name=None):
           tf.random.normal(
               mean=state_part,
               stddev=scale_part,
-              shape=tf.shape(state_part),
+              shape=tf.shape(input=state_part),
               dtype=state_part.dtype.base_dtype,
-              seed=seed_stream()
-          ) for scale_part, state_part in zip(scales, state_parts)]
+              seed=seed_stream())
+          for scale_part, state_part in zip(scales, state_parts)
+      ]
 
       return next_state_parts
   return _fn
@@ -160,10 +161,11 @@ def random_walk_uniform_fn(scale=1., name=None):
           tf.random.uniform(
               minval=state_part - scale_part,
               maxval=state_part + scale_part,
-              shape=tf.shape(state_part),
+              shape=tf.shape(input=state_part),
               dtype=state_part.dtype.base_dtype,
-              seed=seed_stream()
-          ) for scale_part, state_part in zip(scales, state_parts)]
+              seed=seed_stream())
+          for scale_part, state_part in zip(scales, state_parts)
+      ]
       return next_state_parts
   return _fn
 
@@ -510,8 +512,10 @@ class UncalibratedRandomWalk(kernel_base.TransitionKernel):
           current_state_parts = list(current_state)
         else:
           current_state_parts = [current_state]
-        current_state_parts = [tf.convert_to_tensor(s, name='current_state')
-                               for s in current_state_parts]
+        current_state_parts = [
+            tf.convert_to_tensor(value=s, name='current_state')
+            for s in current_state_parts
+        ]
 
       next_state_parts = self.new_state_fn(current_state_parts,  # pylint: disable=not-callable
                                            self._seed_stream())
@@ -525,7 +529,7 @@ class UncalibratedRandomWalk(kernel_base.TransitionKernel):
           maybe_flatten(next_state_parts),
           UncalibratedRandomWalkResults(
               log_acceptance_correction=tf.zeros(
-                  shape=tf.shape(next_target_log_prob),
+                  shape=tf.shape(input=next_target_log_prob),
                   dtype=next_target_log_prob.dtype.base_dtype),
               target_log_prob=next_target_log_prob,
           ),
@@ -536,7 +540,7 @@ class UncalibratedRandomWalk(kernel_base.TransitionKernel):
     with tf.name_scope(self.name, 'rwm_bootstrap_results', [init_state]):
       if not mcmc_util.is_list_like(init_state):
         init_state = [init_state]
-      init_state = [tf.convert_to_tensor(x) for x in init_state]
+      init_state = [tf.convert_to_tensor(value=x) for x in init_state]
       init_target_log_prob = self.target_log_prob_fn(*init_state)  # pylint:disable=not-callable
       return UncalibratedRandomWalkResults(
           log_acceptance_correction=tf.zeros_like(init_target_log_prob),

@@ -32,7 +32,7 @@ class SampleChainTest(tf.test.TestCase):
     self._shape_param = 5.
     self._rate_param = 10.
 
-    tf.random.set_random_seed(10003)
+    tf.compat.v1.random.set_random_seed(10003)
     np.random.seed(10003)
 
   # TODO(b/74154679): Create Fake TransitionKernel and not rely on HMC tests.
@@ -54,9 +54,10 @@ class SampleChainTest(tf.test.TestCase):
               np.linalg.cholesky(true_cov),
               z[..., tf.newaxis]),
           axis=-1)
-      return -0.5 * tf.reduce_sum(z**2., axis=-1)
+      return -0.5 * tf.reduce_sum(input_tensor=z**2., axis=-1)
+
     if tf.executing_eagerly():
-      tf.set_random_seed(54)
+      tf.compat.v1.set_random_seed(54)
     states, _ = tfp.mcmc.sample_chain(
         num_results=num_results,
         current_state=[dtype(-2), dtype(2)],
@@ -71,8 +72,8 @@ class SampleChainTest(tf.test.TestCase):
     if not tf.executing_eagerly():
       self.assertAllEqual(dict(target_calls=2), counter)
     states = tf.stack(states, axis=-1)
-    self.assertEqual(num_results, tf.dimension_value(states.shape[0]))
-    sample_mean = tf.reduce_mean(states, axis=0)
+    self.assertEqual(num_results, tf.compat.dimension_value(states.shape[0]))
+    sample_mean = tf.reduce_mean(input_tensor=states, axis=0)
     x = states - sample_mean
     sample_cov = tf.matmul(x, x, transpose_a=True) / dtype(num_results)
     sample_mean_, sample_cov_ = self.evaluate([sample_mean, sample_cov])

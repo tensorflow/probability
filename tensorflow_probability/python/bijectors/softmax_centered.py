@@ -84,7 +84,7 @@ class SoftmaxCentered(bijector.Bijector):
   def _inverse_event_shape_tensor(self, output_shape):
     if self.validate_args:
       # It is not possible for a negative shape so we need only check <= 1.
-      is_greater_one = tf.assert_greater(
+      is_greater_one = tf.compat.v1.assert_greater(
           output_shape[-1], 1, message="Need last dimension greater than 1.")
       output_shape = control_flow_ops.with_dependencies(
           [is_greater_one], output_shape)
@@ -97,7 +97,7 @@ class SoftmaxCentered(bijector.Bijector):
 
     # Set shape hints.
     if x.shape.ndims is not None:
-      last_dim = tf.dimension_value(x.shape[-1])
+      last_dim = tf.compat.dimension_value(x.shape[-1])
       shape = x.shape[:-1].concatenate(
           None if last_dim is None else last_dim + 1)
       y.shape.assert_is_compatible_with(shape)
@@ -117,14 +117,14 @@ class SoftmaxCentered(bijector.Bijector):
 
     # Do this first to make sure CSE catches that it'll happen again in
     # _inverse_log_det_jacobian.
-    x = tf.log(y)
+    x = tf.math.log(y)
 
     log_normalization = (-x[..., -1])[..., tf.newaxis]
     x = x[..., :-1] + log_normalization
 
     # Set shape hints.
     if y.shape.ndims is not None:
-      last_dim = tf.dimension_value(y.shape[-1])
+      last_dim = tf.compat.dimension_value(y.shape[-1])
       shape = y.shape[:-1].concatenate(
           None if last_dim is None else last_dim - 1)
       x.shape.assert_is_compatible_with(shape)
@@ -149,7 +149,7 @@ class SoftmaxCentered(bijector.Bijector):
     #       or by noting that det{ dX/dY } = 1 / det{ dY/dX } from Bijector
     #       docstring "Tip".
     # (2) - https://en.wikipedia.org/wiki/Matrix_determinant_lemma
-    return -tf.reduce_sum(tf.log(y), axis=-1)
+    return -tf.reduce_sum(input_tensor=tf.math.log(y), axis=-1)
 
   def _forward_log_det_jacobian(self, x):
     # This code is similar to tf.nn.log_softmax but different because we have
@@ -159,8 +159,7 @@ class SoftmaxCentered(bijector.Bijector):
     #   log_normalization = 1 + reduce_sum(exp(logits))
     #   -log_normalization + reduce_sum(logits - log_normalization)
     log_normalization = tf.nn.softplus(
-        tf.reduce_logsumexp(x, axis=-1, keepdims=True))
-    return tf.squeeze(
-        (-log_normalization + tf.reduce_sum(
-            x - log_normalization, axis=-1, keepdims=True)),
-        axis=-1)
+        tf.reduce_logsumexp(input_tensor=x, axis=-1, keepdims=True))
+    return tf.squeeze((-log_normalization + tf.reduce_sum(
+        input_tensor=x - log_normalization, axis=-1, keepdims=True)),
+                      axis=-1)

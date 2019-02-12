@@ -86,11 +86,11 @@ class Chi2(gamma.Gamma):
     # through to the parent class results in unnecessary asserts.
     with tf.name_scope(name, values=[df]) as name:
       df = tf.convert_to_tensor(
-          df,
+          value=df,
           name="df",
           dtype=dtype_util.common_dtype([df], preferred_dtype=tf.float32))
       with tf.control_dependencies([
-          tf.assert_positive(df),
+          tf.compat.v1.assert_positive(df),
       ] if validate_args else []):
         self._df = tf.identity(df, name="df")
 
@@ -104,7 +104,7 @@ class Chi2(gamma.Gamma):
 
   @staticmethod
   def _param_shapes(sample_shape):
-    return {"df": tf.convert_to_tensor(sample_shape, dtype=tf.int32)}
+    return {"df": tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)}
 
   @property
   def df(self):

@@ -113,7 +113,7 @@ def assert_scalar_congruency(bijector,
       bijector.inverse_log_det_jacobian(uniform_y_samps, event_ndims=0))
   # E[|dx/dy|] under Uniform[lower_y, upper_y]
   # = \int_{y(a)}^{y(b)} |dx/dy| dP(u), where dP(u) is the uniform measure
-  expectation_of_dy_dx_under_uniform = tf.reduce_mean(dy_dx)
+  expectation_of_dy_dx_under_uniform = tf.reduce_mean(input_tensor=dy_dx)
   # dy = dP(u) * (upper_y - lower_y)
   change_measure_dy_dx = (
       (upper_y - lower_y) * expectation_of_dy_dx_under_uniform)

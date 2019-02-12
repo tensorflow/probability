@@ -78,7 +78,7 @@ class GeometricTest(tf.test.TestCase):
   def testGeometricLogPmf_validate_args(self):
     batch_size = 6
     probs = tf.constant([.9] * batch_size)
-    x = tf.placeholder_with_default(
+    x = tf.compat.v1.placeholder_with_default(
         input=[2.5, 3.2, 4.3, 5.1, 6., 7.], shape=[6])
     geom = tfd.Geometric(probs=probs, validate_args=True)
 

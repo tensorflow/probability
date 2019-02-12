@@ -35,8 +35,10 @@ class _HiddenMarkovModelTest(test_util.VectorDistributionTestHelpers,
 
   @staticmethod
   def make_placeholders(constants):
-    return [tf.placeholder_with_default(constant, shape=None)
-            for constant in constants]
+    return [
+        tf.compat.v1.placeholder_with_default(constant, shape=None)
+        for constant in constants
+    ]
 
   def test_non_agreeing_states(self):
     initial_prob_data = tf.constant([0.6, 0.4], dtype=self.dtype)
@@ -199,7 +201,7 @@ class _HiddenMarkovModelTest(test_util.VectorDistributionTestHelpers,
                                   num_steps=1)
 
     x = model._sample_n(1)
-    x_shape = self.evaluate(tf.shape(x))
+    x_shape = self.evaluate(tf.shape(input=x))
 
     self.assertAllEqual(x_shape, [1, 1])
 
@@ -243,7 +245,7 @@ class _HiddenMarkovModelTest(test_util.VectorDistributionTestHelpers,
                                   num_steps=1)
 
     x = model.mean()
-    x_shape = self.evaluate(tf.shape(x))
+    x_shape = self.evaluate(tf.shape(input=x))
 
     self.assertAllEqual(x_shape, [1])
 
@@ -316,7 +318,7 @@ class _HiddenMarkovModelTest(test_util.VectorDistributionTestHelpers,
                                   num_steps=7)
 
     x = model.mean()
-    x_shape = self.evaluate(tf.shape(x))
+    x_shape = self.evaluate(tf.shape(input=x))
 
     self.assertAllEqual(x_shape, [3, 7, 2])
 
@@ -422,7 +424,8 @@ class _HiddenMarkovModelTest(test_util.VectorDistributionTestHelpers,
                       [0.1327, 0.1796, 0.6925, 0.1796, 0.1327]]
 
     probs = tf.identity(results)
-    expected_probs = tf.broadcast_to(tf.transpose(expected_probs), [4, 2, 5, 2])
+    expected_probs = tf.broadcast_to(
+        tf.transpose(a=expected_probs), [4, 2, 5, 2])
 
     self.assertAllClose(probs, expected_probs, rtol=1e-3, atol=0.0)
 
@@ -436,4 +439,3 @@ class HiddenMarkovModelTestFloat64(tf.test.TestCase, _HiddenMarkovModelTest):
 
 if __name__ == "__main__":
   tf.test.main()
-

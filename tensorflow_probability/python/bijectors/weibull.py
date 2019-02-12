@@ -66,17 +66,17 @@ class Weibull(bijector.Bijector):
     self._name = name
     self._validate_args = validate_args
     with self._name_scope("init", values=[scale, concentration]):
-      self._scale = tf.convert_to_tensor(scale, name="scale")
+      self._scale = tf.convert_to_tensor(value=scale, name="scale")
       self._concentration = tf.convert_to_tensor(
-          concentration, name="concentration")
-      tf.assert_same_float_dtype([self._scale, self._concentration])
+          value=concentration, name="concentration")
+      tf.debugging.assert_same_float_dtype([self._scale, self._concentration])
       if validate_args:
         self._scale = control_flow_ops.with_dependencies([
-            tf.assert_positive(
+            tf.compat.v1.assert_positive(
                 self._scale, message="Argument scale was not positive")
         ], self._scale)
         self._concentration = control_flow_ops.with_dependencies([
-            tf.assert_positive(
+            tf.compat.v1.assert_positive(
                 self._concentration,
                 message="Argument concentration was not positive")
         ], self._concentration)
@@ -102,33 +102,34 @@ class Weibull(bijector.Bijector):
 
   def _inverse(self, y):
     y = self._maybe_assert_valid_y(y)
-    return self.scale * (-tf.log1p(-y))**(1 / self.concentration)
+    return self.scale * (-tf.math.log1p(-y))**(1 / self.concentration)
 
   def _inverse_log_det_jacobian(self, y):
     y = self._maybe_assert_valid_y(y)
-    return (-tf.log1p(-y) + tf.math.xlogy(
-        1 / self.concentration - 1, -tf.log1p(-y))
-            + tf.log(self.scale / self.concentration))
+    return (-tf.math.log1p(-y) +
+            tf.math.xlogy(1 / self.concentration - 1, -tf.math.log1p(-y)) +
+            tf.math.log(self.scale / self.concentration))
 
   def _forward_log_det_jacobian(self, x):
     x = self._maybe_assert_valid_x(x)
     return (-(x / self.scale)**self.concentration +
-            tf.math.xlogy(self.concentration - 1, x) + tf.log(
-                self.concentration) - self.concentration * tf.log(self.scale))
+            tf.math.xlogy(self.concentration - 1, x) +
+            tf.math.log(self.concentration) -
+            self.concentration * tf.math.log(self.scale))
 
   def _maybe_assert_valid_x(self, x):
     if not self.validate_args:
       return x
-    is_valid = tf.assert_non_negative(
+    is_valid = tf.compat.v1.assert_non_negative(
         x, message="Forward transformation input must be at least 0.")
     return control_flow_ops.with_dependencies([is_valid], x)
 
   def _maybe_assert_valid_y(self, y):
     if not self.validate_args:
       return y
-    is_positive = tf.assert_non_negative(
+    is_positive = tf.compat.v1.assert_non_negative(
         y, message="Inverse transformation input must be greater than 0.")
-    less_than_one = tf.assert_less_equal(
+    less_than_one = tf.compat.v1.assert_less_equal(
         y,
         tf.constant(1., y.dtype),
         message="Inverse transformation input must be less than or equal to 1.")

@@ -78,15 +78,17 @@ def _interp_regular_1d_grid_impl(x,
 
     dtype = dtype_util.common_dtype([x, x_ref_min, x_ref_max, y_ref],
                                     preferred_dtype=tf.float32)
-    x = tf.convert_to_tensor(x, name='x', dtype=dtype)
+    x = tf.convert_to_tensor(value=x, name='x', dtype=dtype)
 
-    x_ref_min = tf.convert_to_tensor(x_ref_min, name='x_ref_min', dtype=dtype)
-    x_ref_max = tf.convert_to_tensor(x_ref_max, name='x_ref_max', dtype=dtype)
+    x_ref_min = tf.convert_to_tensor(
+        value=x_ref_min, name='x_ref_min', dtype=dtype)
+    x_ref_max = tf.convert_to_tensor(
+        value=x_ref_max, name='x_ref_max', dtype=dtype)
     if not batch_y_ref:
       _assert_ndims_statically(x_ref_min, expect_ndims=0)
       _assert_ndims_statically(x_ref_max, expect_ndims=0)
 
-    y_ref = tf.convert_to_tensor(y_ref, name='y_ref', dtype=dtype)
+    y_ref = tf.convert_to_tensor(value=y_ref, name='y_ref', dtype=dtype)
 
     if batch_y_ref:
       # If we're batching,
@@ -98,11 +100,11 @@ def _interp_regular_1d_grid_impl(x,
       x_ref_min = x_ref_min[..., tf.newaxis]
       x_ref_max = x_ref_max[..., tf.newaxis]
 
-    axis = tf.convert_to_tensor(axis, name='axis', dtype=tf.int32)
+    axis = tf.convert_to_tensor(value=axis, name='axis', dtype=tf.int32)
     axis = distribution_util.make_non_negative_axis(axis, tf.rank(y_ref))
     _assert_ndims_statically(axis, expect_ndims=0)
 
-    ny = tf.cast(tf.shape(y_ref)[axis], dtype)
+    ny = tf.cast(tf.shape(input=y_ref)[axis], dtype)
 
     # Map [x_ref_min, x_ref_max] to [0, ny - 1].
     # This is the (fractional) index of x.
@@ -116,7 +118,7 @@ def _interp_regular_1d_grid_impl(x,
     # Wherever x is NaN, x_idx_unclipped will be NaN as well.
     # Keep track of the nan indices here (so we can impute NaN later).
     # Also eliminate any NaN indices, since there is not NaN in 32bit.
-    nan_idx = tf.is_nan(x_idx_unclipped)
+    nan_idx = tf.math.is_nan(x_idx_unclipped)
     x_idx_unclipped = tf.where(nan_idx, tf.zeros_like(x_idx_unclipped),
                                x_idx_unclipped)
 
@@ -135,8 +137,8 @@ def _interp_regular_1d_grid_impl(x,
     idx_below = tf.maximum(idx_above - 1, 0)
 
     # These are the values of y_ref corresponding to above/below indices.
-    idx_below_int32 = tf.to_int32(idx_below)
-    idx_above_int32 = tf.to_int32(idx_above)
+    idx_below_int32 = tf.cast(idx_below, dtype=tf.int32)
+    idx_above_int32 = tf.cast(idx_above, dtype=tf.int32)
     if batch_y_ref:
       # If y_ref.shape ~ [A1,...,AN, C, B1,...,BN],
       # and x.shape, x_ref_min/max.shape ~ [A1,...,AN, D]
@@ -174,7 +176,8 @@ def _interp_regular_1d_grid_impl(x,
     # Now begins a long excursion to fill values outside [x_min, x_max].
 
     # Re-insert NaN wherever x was NaN.
-    y = tf.where(nan_idx, tf.fill(tf.shape(y), tf.constant(np.nan, y.dtype)), y)
+    y = tf.where(nan_idx,
+                 tf.fill(tf.shape(input=y), tf.constant(np.nan, y.dtype)), y)
 
     if not need_separate_fills:
       if fill_value == 'constant_extension':
@@ -198,9 +201,9 @@ def _interp_regular_1d_grid_impl(x,
           # member of x.  An easy way to do that is to gather using
           # indices = zeros/ones(x.shape).
           y_0 = tf.gather(
-              y_ref, tf.zeros(tf.shape(x), dtype=tf.int32), axis=axis)
+              y_ref, tf.zeros(tf.shape(input=x), dtype=tf.int32), axis=axis)
           y_1 = tf.gather(
-              y_ref, tf.ones(tf.shape(x), dtype=tf.int32), axis=axis)
+              y_ref, tf.ones(tf.shape(input=x), dtype=tf.int32), axis=axis)
         x_delta = (x_ref_max - x_ref_min) / (ny - 1)
         x_factor = expand_x_fn((x - x_ref_min) / x_delta, broadcast=True)
         y = tf.where(x_idx_unclipped < 0, y_0 + x_factor * (y_1 - y_0), y)
@@ -211,13 +214,15 @@ def _interp_regular_1d_grid_impl(x,
       if fill_value_above == 'constant_extension':
         pass  # Already handled by the clipping that created x_idx_unclipped.
       elif fill_value_above == 'extrapolate':
-        ny_int32 = tf.shape(y_ref)[axis]
+        ny_int32 = tf.shape(input=y_ref)[axis]
         if batch_y_ref:
-          y_n1 = tf.gather(y_ref, [tf.shape(y_ref)[axis] - 1], axis=axis)
-          y_n2 = tf.gather(y_ref, [tf.shape(y_ref)[axis] - 2], axis=axis)
+          y_n1 = tf.gather(y_ref, [tf.shape(input=y_ref)[axis] - 1], axis=axis)
+          y_n2 = tf.gather(y_ref, [tf.shape(input=y_ref)[axis] - 2], axis=axis)
         else:
-          y_n1 = tf.gather(y_ref, tf.fill(tf.shape(x), ny_int32 - 1), axis=axis)
-          y_n2 = tf.gather(y_ref, tf.fill(tf.shape(x), ny_int32 - 2), axis=axis)
+          y_n1 = tf.gather(
+              y_ref, tf.fill(tf.shape(input=x), ny_int32 - 1), axis=axis)
+          y_n2 = tf.gather(
+              y_ref, tf.fill(tf.shape(input=x), ny_int32 - 2), axis=axis)
         x_delta = (x_ref_max - x_ref_min) / (ny - 1)
         x_factor = expand_x_fn((x - x_ref_max) / x_delta, broadcast=True)
         y = tf.where(x_idx_unclipped > ny - 1,
@@ -504,7 +509,7 @@ def _make_expand_x_fn_for_non_batch_interpolation(y_ref, axis):
   #   y_ref.shape[:axis] + x.shape + y_ref.shape[axis+1:]
 
   # Recall we made axis non-negative
-  y_ref_shape = tf.shape(y_ref)
+  y_ref_shape = tf.shape(input=y_ref)
   y_ref_shape_left = y_ref_shape[:axis]
   y_ref_shape_right = y_ref_shape[axis + 1:]
 
@@ -513,16 +518,18 @@ def _make_expand_x_fn_for_non_batch_interpolation(y_ref, axis):
     # Assume out_shape = A + x.shape + B, and rank(A) = axis.
     # Expand with singletons with same rank as A, B.
     expanded_shape = tf.pad(
-        tf.shape(x),
-        paddings=[[axis, tf.size(y_ref_shape_right)]], constant_values=1)
+        tensor=tf.shape(input=x),
+        paddings=[[axis, tf.size(input=y_ref_shape_right)]],
+        constant_values=1)
     x_expanded = tf.reshape(x, expanded_shape)
 
     if broadcast:
       out_shape = tf.concat((
           y_ref_shape_left,
-          tf.shape(x),
+          tf.shape(input=x),
           y_ref_shape_right,
-      ), axis=0)
+      ),
+                            axis=0)
       if x.dtype.is_bool:
         x_expanded = x_expanded | tf.cast(tf.zeros(out_shape), tf.bool)
       else:
@@ -540,24 +547,26 @@ def _make_expand_x_fn_for_batch_interpolation(y_ref, axis):
   #   x.shape[-1:] +  y_ref.shape[axis+1:]
 
   # Recall we made axis non-negative
-  y_ref_shape = tf.shape(y_ref)
+  y_ref_shape = tf.shape(input=y_ref)
   y_ref_shape_left = y_ref_shape[:axis]
   y_ref_shape_right = y_ref_shape[axis + 1:]
 
   def expand_right_dims(x, broadcast=False):
     """Expand x so it can bcast w/ tensors of output shape."""
     expanded_shape_left = tf.broadcast_dynamic_shape(
-        tf.shape(x)[:-1], tf.ones([tf.size(y_ref_shape_left)], dtype=tf.int32))
+        tf.shape(input=x)[:-1],
+        tf.ones([tf.size(input=y_ref_shape_left)], dtype=tf.int32))
     expanded_shape = tf.concat(
-        (expanded_shape_left, tf.shape(x)[-1:],
-         tf.ones([tf.size(y_ref_shape_right)], dtype=tf.int32)),
+        (expanded_shape_left, tf.shape(input=x)[-1:],
+         tf.ones([tf.size(input=y_ref_shape_right)], dtype=tf.int32)),
         axis=0)
     x_expanded = tf.reshape(x, expanded_shape)
     if broadcast:
       broadcast_shape_left = tf.broadcast_dynamic_shape(
-          tf.shape(x)[:-1], y_ref_shape_left)
+          tf.shape(input=x)[:-1], y_ref_shape_left)
       broadcast_shape = tf.concat(
-          (broadcast_shape_left, tf.shape(x)[-1:], y_ref_shape_right), axis=0)
+          (broadcast_shape_left, tf.shape(input=x)[-1:], y_ref_shape_right),
+          axis=0)
       if x.dtype.is_bool:
         x_expanded = x_expanded | tf.cast(tf.zeros(broadcast_shape), tf.bool)
       else:
@@ -583,12 +592,12 @@ def _batch_gather_with_broadcast(params, indices, axis):
 
   # leading_bcast_shape is the broadcast of [A1,...,AN] and [a1,...,aN].
   leading_bcast_shape = tf.broadcast_dynamic_shape(
-      tf.shape(params)[:axis],
-      tf.shape(indices)[:-1])
+      tf.shape(input=params)[:axis],
+      tf.shape(input=indices)[:-1])
   params += tf.zeros(
-      tf.concat((leading_bcast_shape, tf.shape(params)[axis:]), axis=0),
+      tf.concat((leading_bcast_shape, tf.shape(input=params)[axis:]), axis=0),
       dtype=params.dtype)
   indices += tf.zeros(
-      tf.concat((leading_bcast_shape, tf.shape(indices)[-1:]), axis=0),
+      tf.concat((leading_bcast_shape, tf.shape(input=indices)[-1:]), axis=0),
       dtype=indices.dtype)
-  return tf.batch_gather(params, indices)
+  return tf.compat.v1.batch_gather(params, indices)

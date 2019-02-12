@@ -298,15 +298,16 @@ def hager_zhang(value_and_gradients_function,
         grad_objective_at_zero,
         threshold_use_approximate_wolfe_condition)
 
-    valid_inputs = (hzl.is_finite(val_0) & (val_0.df < 0) &
-                    tf.is_finite(val_c_input.x) & (val_c_input.x > 0))
+    valid_inputs = (
+        hzl.is_finite(val_0) & (val_0.df < 0) & tf.math.is_finite(val_c_input.x)
+        & (val_c_input.x > 0))
 
     def _invalid_inputs_fn():
       return HagerZhangLineSearchResult(
-          converged=tf.convert_to_tensor(False, name='converged'),
-          failed=tf.convert_to_tensor(True, name='failed'),
+          converged=tf.convert_to_tensor(value=False, name='converged'),
+          failed=tf.convert_to_tensor(value=True, name='failed'),
           func_evals=prepare_evals,
-          iterations=tf.convert_to_tensor(0),
+          iterations=tf.convert_to_tensor(value=0),
           left_pt=val_0.x,
           objective_at_left_pt=val_0.f,
           grad_objective_at_left_pt=val_0.df,
@@ -319,8 +320,8 @@ def hager_zhang(value_and_gradients_function,
       """Performs bracketing and line search if inputs are valid."""
       # If the value or the gradient at the supplied step is not finite,
       # we attempt to repair it.
-      step_size_too_large = ~(tf.is_finite(val_c_input.df) &
-                              tf.is_finite(val_c_input.f))
+      step_size_too_large = ~(
+          tf.math.is_finite(val_c_input.df) & tf.math.is_finite(val_c_input.f))
 
       def _is_too_large_fn():
         return _fix_step_size(value_and_gradients_function,
@@ -337,10 +338,10 @@ def hager_zhang(value_and_gradients_function,
       def _failure_fn():
         # If c is still not good, just return 0.
         return HagerZhangLineSearchResult(
-            converged=tf.convert_to_tensor(True, name='converged'),
-            failed=tf.convert_to_tensor(False, name='failed'),
+            converged=tf.convert_to_tensor(value=True, name='converged'),
+            failed=tf.convert_to_tensor(value=False, name='failed'),
             func_evals=prepare_evals + fix_evals,
-            iterations=tf.convert_to_tensor(0),
+            iterations=tf.convert_to_tensor(value=0),
             left_pt=val_0.x,
             objective_at_left_pt=val_0.f,
             grad_objective_at_left_pt=val_0.df,
@@ -360,10 +361,11 @@ def hager_zhang(value_and_gradients_function,
             expansion_param=expansion_param,
             sufficient_decrease_param=sufficient_decrease_param,
             curvature_param=curvature_param)
-        converged = tf.convert_to_tensor(result.found_wolfe, name='converged')
+        converged = tf.convert_to_tensor(
+            value=result.found_wolfe, name='converged')
         return HagerZhangLineSearchResult(
             converged=converged,
-            failed=tf.convert_to_tensor(result.failed, name='failed'),
+            failed=tf.convert_to_tensor(value=result.failed, name='failed'),
             func_evals=result.num_evals + prepare_evals + fix_evals,
             iterations=result.iteration,
             left_pt=result.left.x,
@@ -392,7 +394,7 @@ def _fix_step_size(value_and_gradients_function,
   # it takes to reduce 1 to 0 in the given dtype.
   iter_max = np.ceil(-np.log2(_machine_eps(val_c_input.x.dtype)))
   def _cond(i, c, f_c, df_c, fdf_c):  # pylint: disable=unused-argument
-    return (i < iter_max) & ~(tf.is_finite(f_c) & tf.is_finite(df_c))
+    return (i < iter_max) & ~(tf.math.is_finite(f_c) & tf.math.is_finite(df_c))
 
   def _body(i, c, f_c, df_c, fdf_c):  # pylint: disable=unused-argument
     next_c = c * step_size_shrink_param
@@ -600,7 +602,7 @@ def _line_search_after_bracketing(
   def _loop_cond(iteration, found_wolfe, failed, evals, val_left, val_right):  # pylint:disable=unused-argument
     """Loop condition."""
     interval_shrunk = tf.math.nextafter(val_left.x, val_right.x) >= val_right.x
-    found_wolfe = tf.convert_to_tensor(found_wolfe)
+    found_wolfe = tf.convert_to_tensor(value=found_wolfe)
     return  ((iteration < max_iterations) &
              ~(found_wolfe | failed | interval_shrunk))
 
@@ -703,8 +705,8 @@ def _line_search_after_bracketing(
       right=initial_right)
 
   raw_results = tf.while_loop(
-      _loop_cond,
-      _loop_body,
+      cond=_loop_cond,
+      body=_loop_body,
       loop_vars=initial_args,
       parallel_iterations=1)
   # Check if we terminated because of interval being shrunk in which case
@@ -712,7 +714,7 @@ def _line_search_after_bracketing(
   effective_wolfe = (
       raw_results.found_wolfe |  # Found Wolfe, or
       (
-          ~tf.convert_to_tensor(raw_results.failed, name='failed')
+          ~tf.convert_to_tensor(value=raw_results.failed, name='failed')
           &  # We didn't fail and didn't exceed the iterations.
           (raw_results.iteration < max_iterations)))
   return _LineSearchInnerResult(
@@ -1010,7 +1012,7 @@ def _secant2_inner(value_and_gradients_function,
                           val_c,
                           f_lim)
 
-  update_worked = ~tf.convert_to_tensor(update_result.failed)
+  update_worked = ~tf.convert_to_tensor(value=update_result.failed)
 
   def _failed_fn():
     return _Secant2Result(
@@ -1367,11 +1369,11 @@ def _prepare_args(value_and_gradients_function,
     eval_count: Scalar int32 `Tensor`. The number of target function
       evaluations made by this function.
   """
-  eval_count = tf.convert_to_tensor(0)
+  eval_count = tf.convert_to_tensor(value=0)
   if initial_step_size is not None:
-    initial_step_size = tf.convert_to_tensor(initial_step_size)
+    initial_step_size = tf.convert_to_tensor(value=initial_step_size)
   else:
-    initial_step_size = tf.convert_to_tensor(1.0, dtype=tf.float32)
+    initial_step_size = tf.convert_to_tensor(value=1.0, dtype=tf.float32)
   if (objective_at_initial_step_size is None or
       grad_objective_at_initial_step_size is None):
     res_at_initial_step_size = value_and_gradients_function(initial_step_size)
@@ -1389,10 +1391,10 @@ def _prepare_args(value_and_gradients_function,
   x_0 = tf.zeros_like(initial_step_size)
   res_at_x_0 = value_and_gradients_function(x_0)
   if objective_at_zero is not None:
-    objective_at_zero = tf.convert_to_tensor(objective_at_zero)
+    objective_at_zero = tf.convert_to_tensor(value=objective_at_zero)
 
   if grad_objective_at_zero is not None:
-    grad_objective_at_zero = tf.convert_to_tensor(grad_objective_at_zero)
+    grad_objective_at_zero = tf.convert_to_tensor(value=grad_objective_at_zero)
 
   if objective_at_zero is None or grad_objective_at_zero is None:
     (
@@ -1413,7 +1415,7 @@ def _prepare_args(value_and_gradients_function,
 
 def _to_str(x):
   """Converts a bool tensor to a string with True/False values."""
-  x = tf.convert_to_tensor(x)
+  x = tf.convert_to_tensor(value=x)
   if x.dtype == tf.bool:
     return tf.where(x, tf.fill(x.shape, 'True'), tf.fill(x.shape, 'False'))
   return x
@@ -1434,4 +1436,4 @@ def _print(pass_through_tensor, values):
         flat_values.append(_to_str(v))
       continue
     flat_values.append(_to_str(value))
-  return tf.Print(pass_through_tensor, flat_values)
+  return tf.compat.v1.Print(pass_through_tensor, flat_values)

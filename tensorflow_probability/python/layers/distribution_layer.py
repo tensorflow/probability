@@ -69,13 +69,13 @@ def _event_size(event_shape, name=None):
   """
   with tf.name_scope(name, 'event_size', [event_shape]):
     event_shape = tf.convert_to_tensor(
-        event_shape, dtype=tf.int32, name='event_shape')
+        value=event_shape, dtype=tf.int32, name='event_shape')
 
-    event_shape_const = tf.contrib.util.constant_value(event_shape)
+    event_shape_const = tf.get_static_value(event_shape)
     if event_shape_const is not None:
       return np.prod(event_shape_const)
     else:
-      return tf.reduce_prod(event_shape)
+      return tf.reduce_prod(input_tensor=event_shape)
 
 
 class DistributionLambda(tf.keras.layers.Lambda):
@@ -145,7 +145,7 @@ class DistributionLambda(tf.keras.layers.Lambda):
       distribution = dtc._TensorCoercible(  # pylint: disable=protected-access
           distribution=make_distribution_fn(*fargs, **fkwargs),
           convert_to_tensor_fn=convert_to_tensor_fn)
-      value = tf.convert_to_tensor(distribution)
+      value = tf.convert_to_tensor(value=distribution)
       # TODO(b/120153609): Keras is incorrectly presuming everything is a
       # `tf.Tensor`. Closing this bug entails ensuring Keras only accesses
       # `tf.Tensor` properties after calling `tf.convert_to_tensor`.
@@ -265,7 +265,7 @@ class MultivariateNormalTriL(DistributionLambda):
   def new(params, event_size, validate_args=False, name=None):
     """Create the distribution instance from a `params` vector."""
     with tf.name_scope(name, 'MultivariateNormalTriL', [params, event_size]):
-      params = tf.convert_to_tensor(params, name='params')
+      params = tf.convert_to_tensor(value=params, name='params')
       scale_tril = tfb.ScaleTriL(
           diag_shift=np.array(1e-5, params.dtype.as_numpy_dtype()),
           validate_args=validate_args)
@@ -594,20 +594,21 @@ class IndependentBernoulli(DistributionLambda):
   def new(params, event_shape=(), dtype=None, validate_args=False, name=None):
     """Create the distribution instance from a `params` vector."""
     with tf.name_scope(name, 'IndependentBernoulli', [params, event_shape]):
-      params = tf.convert_to_tensor(params, name='params')
+      params = tf.convert_to_tensor(value=params, name='params')
       event_shape = dist_util.expand_to_vector(
           tf.convert_to_tensor(
-              event_shape, name='event_shape', preferred_dtype=tf.int32),
+              value=event_shape, name='event_shape', dtype_hint=tf.int32),
           tensor_name='event_shape')
       new_shape = tf.concat([
-          tf.shape(params)[:-1],
+          tf.shape(input=params)[:-1],
           event_shape,
       ], axis=0)
       dist = tfd.Independent(
-          tfd.Bernoulli(logits=tf.reshape(params, new_shape),
-                        dtype=dtype or params.dtype.base_dtype,
-                        validate_args=validate_args),
-          reinterpreted_batch_ndims=tf.size(event_shape),
+          tfd.Bernoulli(
+              logits=tf.reshape(params, new_shape),
+              dtype=dtype or params.dtype.base_dtype,
+              validate_args=validate_args),
+          reinterpreted_batch_ndims=tf.size(input=event_shape),
           validate_args=validate_args)
       dist._logits = dist.distribution._logits  # pylint: disable=protected-access
       dist._probs = dist.distribution._probs  # pylint: disable=protected-access
@@ -620,7 +621,7 @@ class IndependentBernoulli(DistributionLambda):
     """The number of `params` needed to create a single distribution."""
     with tf.name_scope(name, 'IndependentBernoulli_params_size', [event_shape]):
       event_shape = tf.convert_to_tensor(
-          event_shape, name='event_shape', preferred_dtype=tf.int32)
+          value=event_shape, name='event_shape', dtype_hint=tf.int32)
       return _event_size(
           event_shape, name=name or 'IndependentBernoulli_params_size')
 
@@ -629,16 +630,17 @@ def _eval_all_one_hot(fn, dist, name=None):
   """OneHotCategorical helper computing probs, cdf, etc over its support."""
   with tf.name_scope(name, 'eval_all_one_hot'):
     event_size = dist.event_shape_tensor()[-1]
-    batch_ndims = tf.size(dist.batch_shape_tensor())
+    batch_ndims = tf.size(input=dist.batch_shape_tensor())
     # Reshape `eye(d)` to: `[d] + [1]*batch_ndims + [d]`.
     x = tf.reshape(
         tf.eye(event_size, dtype=dist.dtype),
-        shape=tf.pad(tf.ones(batch_ndims, tf.int32),
-                     paddings=[[1, 1]],
-                     constant_values=event_size))
+        shape=tf.pad(
+            tensor=tf.ones(batch_ndims, tf.int32),
+            paddings=[[1, 1]],
+            constant_values=event_size))
     # Compute `fn(x)` then cyclically left-transpose one dim.
-    perm = tf.pad(tf.range(1, batch_ndims + 1), paddings=[[0, 1]])
-    return tf.transpose(fn(dist, x), perm)
+    perm = tf.pad(tensor=tf.range(1, batch_ndims + 1), paddings=[[0, 1]])
+    return tf.transpose(a=fn(dist, x), perm=perm)
 
 
 class IndependentLogistic(DistributionLambda):
@@ -695,22 +697,23 @@ class IndependentLogistic(DistributionLambda):
   def new(params, event_shape=(), validate_args=False, name=None):
     """Create the distribution instance from a `params` vector."""
     with tf.name_scope(name, 'IndependentLogistic', [params, event_shape]):
-      params = tf.convert_to_tensor(params, name='params')
+      params = tf.convert_to_tensor(value=params, name='params')
       event_shape = dist_util.expand_to_vector(
           tf.convert_to_tensor(
-              event_shape, name='event_shape', preferred_dtype=tf.int32),
+              value=event_shape, name='event_shape', dtype_hint=tf.int32),
           tensor_name='event_shape')
       output_shape = tf.concat([
-          tf.shape(params)[:-1],
+          tf.shape(input=params)[:-1],
           event_shape,
-      ], axis=0)
+      ],
+                               axis=0)
       loc_params, scale_params = tf.split(params, 2, axis=-1)
       return tfd.Independent(
           tfd.Logistic(
               loc=tf.reshape(loc_params, output_shape),
               scale=tf.math.softplus(tf.reshape(scale_params, output_shape)),
               validate_args=validate_args),
-          reinterpreted_batch_ndims=tf.size(event_shape),
+          reinterpreted_batch_ndims=tf.size(input=event_shape),
           validate_args=validate_args)
 
   @staticmethod
@@ -718,7 +721,7 @@ class IndependentLogistic(DistributionLambda):
     """The number of `params` needed to create a single distribution."""
     with tf.name_scope(name, 'IndependentLogistic_params_size', [event_shape]):
       event_shape = tf.convert_to_tensor(
-          event_shape, name='event_shape', preferred_dtype=tf.int32)
+          value=event_shape, name='event_shape', dtype_hint=tf.int32)
       return 2 * _event_size(
           event_shape, name=name or 'IndependentLogistic_params_size')
 
@@ -777,22 +780,23 @@ class IndependentNormal(DistributionLambda):
   def new(params, event_shape=(), validate_args=False, name=None):
     """Create the distribution instance from a `params` vector."""
     with tf.name_scope(name, 'IndependentNormal', [params, event_shape]):
-      params = tf.convert_to_tensor(params, name='params')
+      params = tf.convert_to_tensor(value=params, name='params')
       event_shape = dist_util.expand_to_vector(
           tf.convert_to_tensor(
-              event_shape, name='event_shape', preferred_dtype=tf.int32),
+              value=event_shape, name='event_shape', dtype_hint=tf.int32),
           tensor_name='event_shape')
       output_shape = tf.concat([
-          tf.shape(params)[:-1],
+          tf.shape(input=params)[:-1],
           event_shape,
-      ], axis=0)
+      ],
+                               axis=0)
       loc_params, scale_params = tf.split(params, 2, axis=-1)
       return tfd.Independent(
           tfd.Normal(
               loc=tf.reshape(loc_params, output_shape),
               scale=tf.math.softplus(tf.reshape(scale_params, output_shape)),
               validate_args=validate_args),
-          reinterpreted_batch_ndims=tf.size(event_shape),
+          reinterpreted_batch_ndims=tf.size(input=event_shape),
           validate_args=validate_args)
 
   @staticmethod
@@ -800,7 +804,7 @@ class IndependentNormal(DistributionLambda):
     """The number of `params` needed to create a single distribution."""
     with tf.name_scope(name, 'IndependentNormal_params_size', [event_shape]):
       event_shape = tf.convert_to_tensor(
-          event_shape, name='event_shape', preferred_dtype=tf.int32)
+          value=event_shape, name='event_shape', dtype_hint=tf.int32)
       return 2 * _event_size(
           event_shape, name=name or 'IndependentNormal_params_size')
 
@@ -875,19 +879,21 @@ class IndependentPoisson(DistributionLambda):
   def new(params, event_shape=(), validate_args=False, name=None):
     """Create the distribution instance from a `params` vector."""
     with tf.name_scope(name, 'IndependentPoisson', [params, event_shape]):
-      params = tf.convert_to_tensor(params, name='params')
+      params = tf.convert_to_tensor(value=params, name='params')
       event_shape = dist_util.expand_to_vector(
           tf.convert_to_tensor(
-              event_shape, name='event_shape', preferred_dtype=tf.int32),
+              value=event_shape, name='event_shape', dtype_hint=tf.int32),
           tensor_name='event_shape')
       output_shape = tf.concat([
-          tf.shape(params)[:-1],
+          tf.shape(input=params)[:-1],
           event_shape,
-      ], axis=0)
+      ],
+                               axis=0)
       return tfd.Independent(
-          tfd.Poisson(log_rate=tf.reshape(params, output_shape),
-                      validate_args=validate_args),
-          reinterpreted_batch_ndims=tf.size(event_shape),
+          tfd.Poisson(
+              log_rate=tf.reshape(params, output_shape),
+              validate_args=validate_args),
+          reinterpreted_batch_ndims=tf.size(input=event_shape),
           validate_args=validate_args)
 
   @staticmethod
@@ -895,7 +901,7 @@ class IndependentPoisson(DistributionLambda):
     """The number of `params` needed to create a single distribution."""
     with tf.name_scope(name, 'IndependentPoisson_params_size', [event_shape]):
       event_shape = tf.convert_to_tensor(
-          event_shape, name='event_shape', preferred_dtype=tf.int32)
+          value=event_shape, name='event_shape', dtype_hint=tf.int32)
       return _event_size(
           event_shape, name=name or 'IndependentPoisson_params_size')
 
@@ -1084,7 +1090,7 @@ def _make_kl_divergence_fn(
     def kl_divergence_fn(distribution_a, distribution_b):
       z = test_points_fn(distribution_a)
       return tf.reduce_mean(
-          distribution_a.log_prob(z) - distribution_b.log_prob(z),
+          input_tensor=distribution_a.log_prob(z) - distribution_b.log_prob(z),
           axis=test_points_reduce_axis)
 
   # Closure over: distribution_b, kl_divergence_fn, weight.
@@ -1102,7 +1108,7 @@ def _make_kl_divergence_fn(
       # Losses appended with the model.add_loss and are expected to be a single
       # scalar, unlike model.loss, which is expected to be the loss per sample.
       # Therefore, we reduce over all dimensions, regardless of the shape.
-      return tf.reduce_mean(kl)
+      return tf.reduce_mean(input_tensor=kl)
 
   return _fn
 
@@ -1187,13 +1193,15 @@ class MixtureSameFamily(DistributionLambda):
     """Create the distribution instance from a `params` vector."""
     with tf.name_scope(name, 'MixtureSameFamily',
                        [params, num_components, component_layer]):
-      params = tf.convert_to_tensor(params, name='params')
+      params = tf.convert_to_tensor(value=params, name='params')
       num_components = tf.convert_to_tensor(
-          num_components, name='num_components', preferred_dtype=tf.int32)
+          value=num_components, name='num_components', dtype_hint=tf.int32)
 
-      components_dist = component_layer(tf.reshape(
-          params[..., num_components:],
-          tf.concat([tf.shape(params)[:-1], [num_components, -1]], axis=0)))
+      components_dist = component_layer(
+          tf.reshape(
+              params[..., num_components:],
+              tf.concat([tf.shape(input=params)[:-1], [num_components, -1]],
+                        axis=0)))
       mixture_dist = tfd.Categorical(logits=params[..., :num_components])
       return tfd.MixtureSameFamily(
           mixture_dist,
@@ -1222,9 +1230,9 @@ class MixtureSameFamily(DistributionLambda):
     with tf.name_scope(name, 'MixtureSameFamily_params_size',
                        [num_components, component_params_size]):
       num_components = tf.convert_to_tensor(
-          num_components, name='num_components', preferred_dtype=tf.int32)
+          value=num_components, name='num_components', dtype_hint=tf.int32)
       component_params_size = tf.convert_to_tensor(
-          component_params_size, name='component_params_size')
+          value=component_params_size, name='component_params_size')
 
       num_components = dist_util.prefer_static_value(num_components)
       component_params_size = dist_util.prefer_static_value(

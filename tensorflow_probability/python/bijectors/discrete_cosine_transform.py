@@ -71,10 +71,10 @@ class DiscreteCosineTransform(bijector.Bijector):
         name=name)
 
   def _forward(self, x):
-    return tf.spectral.dct(x, type=self._dct_type, norm='ortho')
+    return tf.signal.dct(x, type=self._dct_type, norm='ortho')
 
   def _inverse(self, y):
-    return tf.spectral.idct(y, type=self._dct_type, norm='ortho')
+    return tf.signal.idct(y, type=self._dct_type, norm='ortho')
 
   def _inverse_log_det_jacobian(self, y):
     return tf.constant(0., dtype=y.dtype.base_dtype)

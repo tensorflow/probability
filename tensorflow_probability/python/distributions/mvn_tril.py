@@ -183,7 +183,7 @@ class MultivariateNormalTriL(
 
     def _convert_to_tensor(x, name, dtype):
       return None if x is None else tf.convert_to_tensor(
-          x, name=name, dtype=dtype)
+          value=x, name=name, dtype=dtype)
 
     if loc is None and scale_tril is None:
       raise ValueError("Must specify one or both of `loc`, `scale_tril`.")

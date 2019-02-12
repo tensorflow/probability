@@ -44,7 +44,7 @@ def broadcast_batch_shape(distributions):
     batch_shape = tf.broadcast_dynamic_shape(batch_shape,
                                              distribution.batch_shape_tensor())
 
-  return tf.convert_to_tensor(batch_shape)
+  return tf.convert_to_tensor(value=batch_shape)
 
 
 def factored_joint_mvn(distributions):
@@ -82,7 +82,7 @@ def factored_joint_mvn(distributions):
     # We don't have direct numerical access to the `scales`, which are arbitrary
     # linear operators, but `LinearOperatorBlockDiag` appears to do the right
     # thing without further intervention.
-    dtype = tf.assert_same_float_dtype(distributions)
+    dtype = tf.debugging.assert_same_float_dtype(distributions)
     broadcast_ones = tf.ones(broadcast_batch_shape(distributions),
                              dtype=dtype)[..., tf.newaxis]
     return MultivariateNormalLinearOperator(
@@ -146,10 +146,10 @@ def empirical_statistics(observed_time_series):
 
   with tf.name_scope('empirical_statistics', values=[observed_time_series]):
     observed_time_series = tf.convert_to_tensor(
-        observed_time_series, name='observed_time_series')
+        value=observed_time_series, name='observed_time_series')
     observed_time_series = maybe_expand_trailing_dim(observed_time_series)
     _, observed_variance = tf.nn.moments(
-        tf.squeeze(observed_time_series, -1), axes=-1)
+        x=tf.squeeze(observed_time_series, -1), axes=-1)
     observed_stddev = tf.sqrt(observed_variance)
     observed_initial = observed_time_series[..., 0, 0]
     return observed_stddev, observed_initial
@@ -178,15 +178,15 @@ def maybe_expand_trailing_dim(observed_time_series):
   with tf.name_scope(
       'maybe_expand_trailing_dim', values=[observed_time_series]):
     observed_time_series = tf.convert_to_tensor(
-        observed_time_series, name='observed_time_series')
+        value=observed_time_series, name='observed_time_series')
     if (observed_time_series.shape.ndims is not None and
-        tf.dimension_value(observed_time_series.shape[-1]) is not None):
+        tf.compat.dimension_value(observed_time_series.shape[-1]) is not None):
       expanded_time_series = (
           observed_time_series if observed_time_series.shape[-1] == 1 else
           observed_time_series[..., tf.newaxis])
     else:
       expanded_time_series = tf.cond(
-          tf.equal(tf.shape(observed_time_series)[-1], 1),
-          lambda: observed_time_series,
-          lambda: observed_time_series[..., tf.newaxis])
+          pred=tf.equal(tf.shape(input=observed_time_series)[-1], 1),
+          true_fn=lambda: observed_time_series,
+          false_fn=lambda: observed_time_series[..., tf.newaxis])
     return expanded_time_series

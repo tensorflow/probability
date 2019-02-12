@@ -85,14 +85,14 @@ class AffineScalar(bijector.Bijector):
       self._scale = scale
 
       if self._shift is not None:
-        self._shift = tf.convert_to_tensor(shift, name="shift")
+        self._shift = tf.convert_to_tensor(value=shift, name="shift")
 
       if self._scale is not None:
-        self._scale = tf.convert_to_tensor(scale, name="scale")
+        self._scale = tf.convert_to_tensor(value=scale, name="scale")
         if validate_args:
           self._scale = control_flow_ops.with_dependencies([
-              tf.assert_none_equal(self._scale,
-                                   tf.zeros([], dtype=self._scale.dtype))
+              tf.compat.v1.assert_none_equal(
+                  self._scale, tf.zeros([], dtype=self._scale.dtype))
           ], self._scale)
 
       dtype = dtype_util.common_dtype([self._shift, self._scale])
@@ -137,4 +137,4 @@ class AffineScalar(bijector.Bijector):
     if self.scale is None:
       return tf.constant(0., dtype=x.dtype.base_dtype)
 
-    return tf.log(tf.abs(self.scale))
+    return tf.math.log(tf.abs(self.scale))

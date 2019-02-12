@@ -44,7 +44,7 @@ def _broadcast_cat_event_and_params(event, params, base_dtype):
   if not shape_known_statically or params.shape[:-1] != event.shape:
     params *= tf.ones_like(event[..., tf.newaxis],
                            dtype=params.dtype)
-    params_shape = tf.shape(params)[:-1]
+    params_shape = tf.shape(input=params)[:-1]
     event *= tf.ones(params_shape, dtype=event.dtype)
     if params.shape.ndims is not None:
       event.set_shape(tf.TensorShape(params.shape[:-1]))
@@ -190,20 +190,18 @@ class Categorical(distribution.Distribution):
       logits_shape_static = self._logits.shape.with_rank_at_least(1)
       if logits_shape_static.ndims is not None:
         self._batch_rank = tf.convert_to_tensor(
-            logits_shape_static.ndims - 1,
+            value=logits_shape_static.ndims - 1,
             dtype=tf.int32,
             name="batch_rank")
       else:
         with tf.name_scope(name="batch_rank"):
           self._batch_rank = tf.rank(self._logits) - 1
 
-      logits_shape = tf.shape(self._logits, name="logits_shape")
+      logits_shape = tf.shape(input=self._logits, name="logits_shape")
       event_size = tensor_shape.dimension_value(logits_shape_static[-1])
       if event_size is not None:
         self._event_size = tf.convert_to_tensor(
-            event_size,
-            dtype=tf.int32,
-            name="event_size")
+            value=event_size, dtype=tf.int32, name="event_size")
       else:
         with tf.name_scope(name="event_size"):
           self._event_size = logits_shape[self._batch_rank]
@@ -262,12 +260,11 @@ class Categorical(distribution.Distribution):
     draws = tf.random.categorical(
         logits_2d, n, dtype=sample_dtype, seed=seed)
     draws = tf.reshape(
-        tf.transpose(draws),
-        tf.concat([[n], self.batch_shape_tensor()], 0))
+        tf.transpose(a=draws), tf.concat([[n], self.batch_shape_tensor()], 0))
     return tf.cast(draws, self.dtype)
 
   def _cdf(self, k):
-    k = tf.convert_to_tensor(k, name="k")
+    k = tf.convert_to_tensor(value=k, name="k")
     if self.validate_args:
       k = util.embed_check_integer_casting_closed(
           k, target_dtype=tf.int32)
@@ -284,12 +281,12 @@ class Categorical(distribution.Distribution):
         tf.sequence_mask(batch_flattened_k, self._event_size),
         batch_flattened_probs,
         tf.zeros_like(batch_flattened_probs))
-    batch_flattened_cdf = tf.reduce_sum(to_sum_over, axis=-1)
+    batch_flattened_cdf = tf.reduce_sum(input_tensor=to_sum_over, axis=-1)
     # Reshape back to the shape of the argument.
-    return tf.reshape(batch_flattened_cdf, tf.shape(k))
+    return tf.reshape(batch_flattened_cdf, tf.shape(input=k))
 
   def _log_prob(self, k):
-    k = tf.convert_to_tensor(k, name="k")
+    k = tf.convert_to_tensor(value=k, name="k")
     if self.validate_args:
       k = util.embed_check_integer_casting_closed(
           k, target_dtype=tf.int32)
@@ -301,18 +298,20 @@ class Categorical(distribution.Distribution):
 
   def _entropy(self):
     return -tf.reduce_sum(
-        tf.nn.log_softmax(self.logits) * self.probs, axis=-1)
+        input_tensor=tf.nn.log_softmax(self.logits) * self.probs, axis=-1)
 
   def _mode(self):
-    ret = tf.argmax(self.logits, axis=self._batch_rank)
+    ret = tf.argmax(input=self.logits, axis=self._batch_rank)
     ret = tf.cast(ret, self.dtype)
     ret.set_shape(self.batch_shape)
     return ret
 
 
 # TODO(b/117098119): Remove tf.distribution references once they're gone.
-@kullback_leibler.RegisterKL(Categorical, tf.distributions.Categorical)
-@kullback_leibler.RegisterKL(tf.distributions.Categorical, Categorical)
+@kullback_leibler.RegisterKL(Categorical,
+                             tf.compat.v1.distributions.Categorical)
+@kullback_leibler.RegisterKL(tf.compat.v1.distributions.Categorical,
+                             Categorical)
 @kullback_leibler.RegisterKL(Categorical, Categorical)
 def _kl_categorical_categorical(a, b, name=None):
   """Calculate the batched KL divergence KL(a || b) with a and b Categorical.
@@ -331,5 +330,5 @@ def _kl_categorical_categorical(a, b, name=None):
     # sum(probs log(probs / (1 - probs)))
     delta_log_probs1 = (tf.nn.log_softmax(a.logits) -
                         tf.nn.log_softmax(b.logits))
-    return tf.reduce_sum(tf.nn.softmax(a.logits) * delta_log_probs1,
-                         axis=-1)
+    return tf.reduce_sum(
+        input_tensor=tf.nn.softmax(a.logits) * delta_log_probs1, axis=-1)

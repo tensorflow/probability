@@ -34,7 +34,7 @@ def try_import(name):  # pylint: disable=invalid-name
   try:
     module = importlib.import_module(name)
   except ImportError as e:
-    tf.logging.warning("Could not import %s: %s" % (name, str(e)))
+    tf.compat.v1.logging.warning("Could not import %s: %s" % (name, str(e)))
   return module
 
 
@@ -62,7 +62,8 @@ class CauchyTest(test_case.TestCase):
     loc = tf.zeros(loc_shape)
     scale = tf.ones(scale_shape)
     self.assertAllEqual(
-        expected, self.evaluate(tf.shape(tfd.Cauchy(loc, scale).sample())))
+        expected, self.evaluate(
+            tf.shape(input=tfd.Cauchy(loc, scale).sample())))
 
   def _testParamStaticShapes(self, sample_shape, expected):
     param_shapes = tfd.Cauchy.param_static_shapes(sample_shape)
@@ -217,7 +218,7 @@ class CauchyTest(test_case.TestCase):
           return getattr(tfd.Cauchy(loc=loc, scale=scale), name)(x)
         return cauchy
 
-      self.evaluate(tf.global_variables_initializer())
+      self.evaluate(tf.compat.v1.global_variables_initializer())
       for func_name in [
           "cdf", "log_cdf", "survival_function",
           "log_survival_function", "log_prob", "prob"
@@ -418,8 +419,8 @@ class CauchyTest(test_case.TestCase):
   def testCauchyShapeWithPlaceholders(self):
     if tf.executing_eagerly():
       return
-    loc = tf.placeholder_with_default(input=5., shape=[])
-    scale = tf.placeholder_with_default(input=[1., 2], shape=None)
+    loc = tf.compat.v1.placeholder_with_default(input=5., shape=[])
+    scale = tf.compat.v1.placeholder_with_default(input=[1., 2], shape=None)
     cauchy = tfd.Cauchy(loc=loc, scale=scale)
 
     # get_batch_shape should return an "<unknown>" tensor.

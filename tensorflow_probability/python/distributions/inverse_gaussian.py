@@ -103,15 +103,16 @@ class InverseGaussian(distribution.Distribution):
     with tf.name_scope(name, values=[loc, concentration]):
       dtype = dtype_util.common_dtype([loc, concentration],
                                       preferred_dtype=tf.float32)
-      loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
+      loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
       concentration = tf.convert_to_tensor(
-          concentration, name="concentration", dtype=dtype)
-      with tf.control_dependencies(
-          [tf.assert_positive(loc),
-           tf.assert_positive(concentration)] if validate_args else []):
+          value=concentration, name="concentration", dtype=dtype)
+      with tf.control_dependencies([
+          tf.compat.v1.assert_positive(loc),
+          tf.compat.v1.assert_positive(concentration)
+      ] if validate_args else []):
         self._loc = tf.identity(loc, name="loc")
         self._concentration = tf.identity(concentration, name="concentration")
-      tf.assert_same_float_dtype([self._loc, self._concentration])
+      tf.debugging.assert_same_float_dtype([self._loc, self._concentration])
     super(InverseGaussian, self).__init__(
         dtype=self._loc.dtype,
         reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
@@ -133,7 +134,7 @@ class InverseGaussian(distribution.Distribution):
 
   def _batch_shape_tensor(self):
     return tf.broadcast_dynamic_shape(
-        tf.shape(self.loc), tf.shape(self.concentration))
+        tf.shape(input=self.loc), tf.shape(input=self.concentration))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(
@@ -147,9 +148,9 @@ class InverseGaussian(distribution.Distribution):
     # https://www.jstor.org/stable/2683801
     seed = seed_stream.SeedStream(seed, "inverse_gaussian")
     shape = tf.concat([[n], self.batch_shape_tensor()], axis=0)
-    sampled_chi2 = (tf.random_normal(
-        shape, mean=0., stddev=1., seed=seed(), dtype=self.dtype)) ** 2.
-    sampled_uniform = tf.random_uniform(
+    sampled_chi2 = (tf.random.normal(
+        shape, mean=0., stddev=1., seed=seed(), dtype=self.dtype))**2.
+    sampled_uniform = tf.random.uniform(
         shape, minval=0., maxval=1., seed=seed(), dtype=self.dtype)
     sampled = (
         self.loc + self.loc ** 2. * sampled_chi2 / (2. * self.concentration) -
@@ -163,23 +164,20 @@ class InverseGaussian(distribution.Distribution):
 
   def _log_prob(self, x):
     with tf.control_dependencies([
-        tf.assert_greater(
-            x, tf.cast(0., x.dtype.base_dtype),
-            message="x must be positive."
-        )] if self.validate_args else []):
+        tf.compat.v1.assert_greater(
+            x, tf.cast(0., x.dtype.base_dtype), message="x must be positive.")
+    ] if self.validate_args else []):
 
-      return (0.5 * (tf.log(self.concentration) -
-                     np.log(2. * np.pi) -
-                     3. * tf.log(x))  +
-              (-self.concentration * (x - self.loc) ** 2.) /
-              (2. * self.loc ** 2. * x))
+      return (0.5 * (tf.math.log(self.concentration) - np.log(2. * np.pi) -
+                     3. * tf.math.log(x)) + (-self.concentration *
+                                             (x - self.loc)**2.) /
+              (2. * self.loc**2. * x))
 
   def _cdf(self, x):
     with tf.control_dependencies([
-        tf.assert_greater(
-            x, tf.cast(0., x.dtype.base_dtype),
-            message="x must be positive."
-        )] if self.validate_args else []):
+        tf.compat.v1.assert_greater(
+            x, tf.cast(0., x.dtype.base_dtype), message="x must be positive.")
+    ] if self.validate_args else []):
 
       return (
           special_math.ndtr(

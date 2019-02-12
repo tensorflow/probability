@@ -106,7 +106,7 @@ class MultinomialTest(tf.test.TestCase):
       with self.assertRaisesOpError("counts must sum to `self.total_count`"):
         multinom.prob([2., 3, 2]).eval()
       # Counts are non-integers.
-      x = tf.placeholder(tf.float32)
+      x = tf.compat.v1.placeholder(tf.float32)
       with self.assertRaisesOpError(
           "cannot contain fractional components."):
         multinom.prob(x).eval(feed_dict={x: [1.0, 2.5, 1.5]})
@@ -253,12 +253,13 @@ class MultinomialTest(tf.test.TestCase):
       # batch_shape=[3, 2], event_shape=[3]
       dist = multinomial.Multinomial(n, theta)
       x = dist.sample(int(1000e3), seed=1)
-      sample_mean = tf.reduce_mean(x, 0)
+      sample_mean = tf.reduce_mean(input_tensor=x, axis=0)
       x_centered = x - sample_mean[tf.newaxis, ...]
-      sample_cov = tf.reduce_mean(tf.matmul(
-          x_centered[..., tf.newaxis],
-          x_centered[..., tf.newaxis, :]), 0)
-      sample_var = tf.matrix_diag_part(sample_cov)
+      sample_cov = tf.reduce_mean(
+          input_tensor=tf.matmul(x_centered[..., tf.newaxis],
+                                 x_centered[..., tf.newaxis, :]),
+          axis=0)
+      sample_var = tf.linalg.diag_part(sample_cov)
       sample_stddev = tf.sqrt(sample_var)
       [
           sample_mean_,
@@ -288,12 +289,12 @@ class MultinomialTest(tf.test.TestCase):
     with self.cached_session() as sess:
       dist = multinomial.Multinomial(
           total_count=[7., 6., 5.],
-          logits=tf.log(2. * self._rng.rand(4, 3, 2).astype(np.float32)))
+          logits=tf.math.log(2. * self._rng.rand(4, 3, 2).astype(np.float32)))
       n = int(3e4)
       x = dist.sample(n, seed=0)
-      sample_mean = tf.reduce_mean(x, 0)
+      sample_mean = tf.reduce_mean(input_tensor=x, axis=0)
       # Cyclically rotate event dims left.
-      x_centered = tf.transpose(x - sample_mean, [1, 2, 3, 0])
+      x_centered = tf.transpose(a=x - sample_mean, perm=[1, 2, 3, 0])
       sample_covariance = tf.matmul(
           x_centered, x_centered, adjoint_b=True) / n
       [
@@ -317,10 +318,10 @@ class MultinomialTest(tf.test.TestCase):
     with self.cached_session() as sess:
       dist = multinomial.Multinomial(
           total_count=5.,
-          logits=tf.log(2. * self._rng.rand(4).astype(np.float32)))
+          logits=tf.math.log(2. * self._rng.rand(4).astype(np.float32)))
       n = int(5e3)
       x = dist.sample(n, seed=0)
-      sample_mean = tf.reduce_mean(x, 0)
+      sample_mean = tf.reduce_mean(input_tensor=x, axis=0)
       x_centered = x - sample_mean  # Already transposed to [n, 2].
       sample_covariance = tf.matmul(
           x_centered, x_centered, adjoint_a=True) / n

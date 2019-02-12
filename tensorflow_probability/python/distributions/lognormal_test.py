@@ -80,7 +80,8 @@ class LogNormalTest(tf.test.TestCase):
     x = np.array([1e-4, 1.0, 2.0], dtype=np.float32)
 
     cdf = dist.cdf(x)
-    analytical_cdf = .5 + .5 * tf.erf((np.log(x) - loc) / (scale * np.sqrt(2)))
+    analytical_cdf = .5 + .5 * tf.math.erf(
+        (np.log(x) - loc) / (scale * np.sqrt(2)))
     self.assertAllClose(self.evaluate(cdf),
                         self.evaluate(analytical_cdf))
 

@@ -36,7 +36,7 @@ def try_import(name):  # pylint: disable=invalid-name
   try:
     module = importlib.import_module(name)
   except ImportError as e:
-    tf.logging.warning("Could not import %s: %s" % (name, str(e)))
+    tf.compat.v1.logging.warning("Could not import %s: %s" % (name, str(e)))
   return module
 
 stats = try_import("scipy.stats")
@@ -57,7 +57,7 @@ class NormalTest(test_case.TestCase):
     sigma = tf.ones(sigma_shape)
     self.assertAllEqual(
         expected,
-        self.evaluate(tf.shape(normal_lib.Normal(mu, sigma).sample())))
+        self.evaluate(tf.shape(input=normal_lib.Normal(mu, sigma).sample())))
 
   def _testParamStaticShapes(self, sample_shape, expected):
     param_shapes = normal_lib.Normal.param_static_shapes(sample_shape)
@@ -464,8 +464,9 @@ class NormalTest(test_case.TestCase):
     self.assertEqual(normal.event_shape, tf.TensorShape([]))
 
   def testNormalShapeWithPlaceholders(self):
-    mu = tf.placeholder_with_default(np.float32(5), shape=None)
-    sigma = tf.placeholder_with_default(np.float32([1.0, 2.0]), shape=None)
+    mu = tf.compat.v1.placeholder_with_default(np.float32(5), shape=None)
+    sigma = tf.compat.v1.placeholder_with_default(
+        np.float32([1.0, 2.0]), shape=None)
     normal = normal_lib.Normal(loc=mu, scale=sigma)
 
     # get_batch_shape should return an "<unknown>" tensor (graph mode only).
@@ -492,7 +493,8 @@ class NormalTest(test_case.TestCase):
         (sigma_a**2 / sigma_b**2) - 1 - 2 * np.log(sigma_a / sigma_b)))
 
     x = n_a.sample(int(1e5), seed=0)
-    kl_sample = tf.reduce_mean(n_a.log_prob(x) - n_b.log_prob(x), axis=0)
+    kl_sample = tf.reduce_mean(
+        input_tensor=n_a.log_prob(x) - n_b.log_prob(x), axis=0)
     kl_sample_ = self.evaluate(kl_sample)
 
     self.assertEqual(kl.shape, (batch_size,))

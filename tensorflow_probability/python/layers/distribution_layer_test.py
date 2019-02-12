@@ -34,16 +34,17 @@ tfpl = tfp.layers
 
 def _logit_avg_expit(t):
   """Computes `logit(mean(expit(t)))` in a numerically stable manner."""
-  log_avg_prob = (tf.reduce_logsumexp(-tf.nn.softplus(-t), axis=0) -
-                  tf.log(tf.cast(tf.shape(t)[0], t.dtype)))
-  return log_avg_prob - tf.log1p(-tf.exp(log_avg_prob))
+  log_avg_prob = (
+      tf.reduce_logsumexp(input_tensor=-tf.nn.softplus(-t), axis=0) -
+      tf.math.log(tf.cast(tf.shape(input=t)[0], t.dtype)))
+  return log_avg_prob - tf.math.log1p(-tf.exp(log_avg_prob))
 
 
 def _vec_pad(x, value=0):
   """Prepends a column of zeros to a matrix."""
   paddings = tf.concat(
       [tf.zeros([tf.rank(x) - 1, 2], dtype=tf.int32), [[1, 0]]], axis=0)
-  return tf.pad(x, paddings=paddings, constant_values=value)
+  return tf.pad(tensor=x, paddings=paddings, constant_values=value)
 
 
 @tfe.run_all_tests_in_graph_and_eager_modes
@@ -108,16 +109,17 @@ class EndToEndTest(tf.test.TestCase):
     vae_model = tfk.Model(
         inputs=encoder_model.inputs,
         outputs=decoder_model(encoder_model.outputs[0]))
-    vae_model.compile(optimizer=tf.train.AdamOptimizer(),
-                      loss=lambda x, rv_x: -rv_x.log_prob(x),
-                      metrics=[])
+    vae_model.compile(
+        optimizer=tf.compat.v1.train.AdamOptimizer(),
+        loss=lambda x, rv_x: -rv_x.log_prob(x),
+        metrics=[])
     vae_model.fit(self.x, self.x,
                   batch_size=25,
                   epochs=1,
                   verbose=True,
                   validation_data=(self.x_test, self.x_test),
                   shuffle=True)
-    yhat = vae_model(tf.convert_to_tensor(self.x_test))
+    yhat = vae_model(tf.convert_to_tensor(value=self.x_test))
     self.assertIsInstance(yhat, tfd.Independent)
     self.assertIsInstance(yhat.distribution, tfd.Bernoulli)
 
@@ -147,16 +149,17 @@ class EndToEndTest(tf.test.TestCase):
     decoded = functools.reduce(lambda x, f: f(x), decoder_model, encoded)
 
     vae_model = tfk.Model(inputs=images, outputs=decoded)
-    vae_model.compile(optimizer=tf.train.AdamOptimizer(),
-                      loss=lambda x, rv_x: -rv_x.log_prob(x),
-                      metrics=[])
+    vae_model.compile(
+        optimizer=tf.compat.v1.train.AdamOptimizer(),
+        loss=lambda x, rv_x: -rv_x.log_prob(x),
+        metrics=[])
     vae_model.fit(self.x, self.x,
                   batch_size=25,
                   epochs=1,
                   verbose=True,
                   validation_data=(self.x_test, self.x_test),
                   shuffle=True)
-    yhat = vae_model(tf.convert_to_tensor(self.x_test))
+    yhat = vae_model(tf.convert_to_tensor(value=self.x_test))
     self.assertIsInstance(yhat, tfd.Independent)
     self.assertIsInstance(yhat.distribution, tfd.Bernoulli)
 
@@ -204,14 +207,15 @@ class EndToEndTest(tf.test.TestCase):
     decoded = decoder(encoded)
 
     vae_model = tfk.Model(inputs=images, outputs=decoded)
-    vae_model.compile(optimizer=tf.train.AdamOptimizer(),
-                      loss=lambda x, rv_x: -rv_x.log_prob(x),
-                      metrics=[])
+    vae_model.compile(
+        optimizer=tf.compat.v1.train.AdamOptimizer(),
+        loss=lambda x, rv_x: -rv_x.log_prob(x),
+        metrics=[])
     vae_model.fit(self.x, self.x,
                   batch_size=25,
                   epochs=1,
                   validation_data=(self.x_test, self.x_test))
-    yhat = vae_model(tf.convert_to_tensor(self.x_test))
+    yhat = vae_model(tf.convert_to_tensor(value=self.x_test))
     self.assertIsInstance(yhat, tfd.Independent)
     self.assertIsInstance(yhat.distribution, tfd.Bernoulli)
 
@@ -244,15 +248,16 @@ class EndToEndTest(tf.test.TestCase):
     vae_model = tfk.Model(
         inputs=encoder_model.inputs,
         outputs=decoder_model(encoder_model.outputs[0]))
-    vae_model.compile(optimizer=tf.train.AdamOptimizer(),
-                      loss=lambda x, rv_x: -rv_x.log_prob(x),
-                      metrics=[])
+    vae_model.compile(
+        optimizer=tf.compat.v1.train.AdamOptimizer(),
+        loss=lambda x, rv_x: -rv_x.log_prob(x),
+        metrics=[])
     vae_model.fit(self.x, self.x,
                   batch_size=25,
                   epochs=1,
                   steps_per_epoch=1,  # Usually `n // batch_size`.
                   validation_data=(self.x_test, self.x_test))
-    yhat = vae_model(tf.convert_to_tensor(self.x_test))
+    yhat = vae_model(tf.convert_to_tensor(value=self.x_test))
     self.assertIsInstance(yhat, tfd.Independent)
     self.assertIsInstance(yhat.distribution, tfd.Bernoulli)
 
@@ -293,9 +298,10 @@ class KLDivergenceAddLoss(tf.test.TestCase):
     self.assertAllClose([scale_tril], scale_tril_, atol=0., rtol=1e-5)
     self.assertNear(actual_kl_, approx_kl_, err=0.15)
 
-    model.compile(optimizer=tf.train.AdamOptimizer(),
-                  loss=lambda x, dist: -dist.log_prob(x[0, :event_size]),
-                  metrics=[])
+    model.compile(
+        optimizer=tf.compat.v1.train.AdamOptimizer(),
+        loss=lambda x, dist: -dist.log_prob(x[0, :event_size]),
+        metrics=[])
     model.fit(x, x,
               batch_size=25,
               epochs=1,
@@ -343,7 +349,7 @@ class MultivariateNormalTriLTest(tf.test.TestCase):
     true_bias = np.array([0, 0, np.log(scale_noise), 0, np.log(scale_noise)])
 
     # Create model.
-    d = tf.dimension_value(y.shape[-1])
+    d = tf.compat.dimension_value(y.shape[-1])
     model = tf.keras.Sequential([
         tf.keras.layers.Dense(
             tfpl.MultivariateNormalTriL.params_size(d),
@@ -353,9 +359,10 @@ class MultivariateNormalTriLTest(tf.test.TestCase):
     ])
 
     # Fit.
-    model.compile(optimizer=tf.train.AdamOptimizer(),
-                  loss=lambda y, model: -model.log_prob(y),
-                  metrics=[])
+    model.compile(
+        optimizer=tf.compat.v1.train.AdamOptimizer(),
+        loss=lambda y, model: -model.log_prob(y),
+        metrics=[])
     batch_size = 100
     model.fit(x, y,
               batch_size=batch_size,
@@ -404,7 +411,7 @@ class OneHotCategoricalTest(tf.test.TestCase):
         dtype=tf.float32).sample()
 
     # Create model.
-    d = tf.dimension_value(y.shape[-1])
+    d = tf.compat.dimension_value(y.shape[-1])
     model = tf.keras.Sequential([
         tf.keras.layers.Dense(tfpl.OneHotCategorical.params_size(d) - 1),
         tf.keras.layers.Lambda(_vec_pad),
@@ -412,9 +419,10 @@ class OneHotCategoricalTest(tf.test.TestCase):
     ])
 
     # Fit.
-    model.compile(optimizer=tf.train.AdamOptimizer(learning_rate=0.5),
-                  loss=lambda y, model: -model.log_prob(y),
-                  metrics=[])
+    model.compile(
+        optimizer=tf.compat.v1.train.AdamOptimizer(learning_rate=0.5),
+        loss=lambda y, model: -model.log_prob(y),
+        metrics=[])
     batch_size = 100
     model.fit(x, y,
               batch_size=batch_size,
@@ -437,13 +445,17 @@ class CategoricalMixtureOfOneHotCategoricalTest(tf.test.TestCase):
         tf.reshape(x.components_distribution.logits, shape=[2, 3, -1]),
     ], axis=-1)
     [
-        t_, t_back_,
-        x_mean_, x_log_mean_,
+        t_,
+        t_back_,
+        x_mean_,
+        x_log_mean_,
         sample_mean_,
     ] = self.evaluate([
-        t, t_back,
-        x.mean(), x.log_mean(),
-        tf.reduce_mean(x.sample(int(10e3), seed=42), axis=0),
+        t,
+        t_back,
+        x.mean(),
+        x.log_mean(),
+        tf.reduce_mean(input_tensor=x.sample(int(10e3), seed=42), axis=0),
     ])
     self.assertAllClose(t_, t_back_, atol=1e-6, rtol=1e-5)
     self.assertAllClose(x_mean_, np.exp(x_log_mean_), atol=1e-6, rtol=1e-5)
@@ -480,7 +492,7 @@ class CategoricalMixtureOfOneHotCategoricalTest(tf.test.TestCase):
         dtype=tf.float32).sample()
 
     # Create model.
-    d = tf.dimension_value(y.shape[-1])
+    d = tf.compat.dimension_value(y.shape[-1])
     k = 2
     p = tfpl.CategoricalMixtureOfOneHotCategorical.params_size(d, k)
     model = tf.keras.Sequential([
@@ -489,9 +501,10 @@ class CategoricalMixtureOfOneHotCategoricalTest(tf.test.TestCase):
     ])
 
     # Fit.
-    model.compile(optimizer=tf.train.AdamOptimizer(learning_rate=0.5),
-                  loss=lambda y, model: -model.log_prob(y),
-                  metrics=[])
+    model.compile(
+        optimizer=tf.compat.v1.train.AdamOptimizer(learning_rate=0.5),
+        loss=lambda y, model: -model.log_prob(y),
+        metrics=[])
     batch_size = 100
     model.fit(x, y,
               batch_size=batch_size,
@@ -531,7 +544,7 @@ class _IndependentLayerTest(object):
     # Enforce parameterized dtype and static/dynamic testing.
     ndarray = np.asarray(ndarray).astype(
         dtype if dtype is not None else self.dtype)
-    return tf.placeholder_with_default(
+    return tf.compat.v1.placeholder_with_default(
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
   def _check_distribution(self, t, x, batch_shape):
@@ -610,9 +623,10 @@ class IndependentBernoulliTestStaticShape(tf.test.TestCase,
     ])
 
     # Fit.
-    model.compile(optimizer=tf.train.AdamOptimizer(learning_rate=0.5),
-                  loss=lambda y, model: -model.log_prob(y),
-                  metrics=[])
+    model.compile(
+        optimizer=tf.compat.v1.train.AdamOptimizer(learning_rate=0.5),
+        loss=lambda y, model: -model.log_prob(y),
+        metrics=[])
     batch_size = 100
     model.fit(x, y,
               batch_size=batch_size,
@@ -667,7 +681,7 @@ class IndependentLogisticTestStaticShape(tf.test.TestCase,
     x = np.random.randn(*([1] + input_shape)).astype(self.dtype)
     self.assertEqual((1, 2), encoder.predict_on_batch(x).shape)
 
-    out = encoder(tf.convert_to_tensor(x))
+    out = encoder(tf.convert_to_tensor(value=x))
     self.assertEqual((1, 2), out.shape)
     self.assertEqual((1, 2), self.evaluate(out).shape)
 
@@ -690,7 +704,8 @@ class _IndependentNormalTest(_IndependentLayerTest):
     params_size = tfpl.IndependentNormal.params_size(encoded_shape)
 
     def reshape(x):
-      return tf.reshape(x, tf.concat([tf.shape(x)[:-1], [-1, params_size]], 0))
+      return tf.reshape(
+          x, tf.concat([tf.shape(input=x)[:-1], [-1, params_size]], 0))
 
     # Test a Sequential model where the input to IndependentNormal does not have
     # a statically-known shape.
@@ -709,7 +724,7 @@ class _IndependentNormalTest(_IndependentLayerTest):
     x = np.random.randn(*([1] + input_shape)).astype(self.dtype)
     self.assertEqual((1, 3, 2), encoder.predict_on_batch(x).shape)
 
-    out = encoder(tf.convert_to_tensor(x))
+    out = encoder(tf.convert_to_tensor(value=x))
     if tf.executing_eagerly():
       self.assertEqual((1, 3, 2), out.shape)
     elif self.use_static_shape:
@@ -746,7 +761,7 @@ class IndependentNormalTestStaticShape(tf.test.TestCase,
     x = np.random.randn(*([1] + input_shape)).astype(self.dtype)
     self.assertEqual((1, 2), encoder.predict_on_batch(x).shape)
 
-    out = encoder(tf.convert_to_tensor(x))
+    out = encoder(tf.convert_to_tensor(value=x))
     self.assertEqual((1, 2), out.shape)
     self.assertEqual((1, 2), self.evaluate(out).shape)
 
@@ -790,9 +805,10 @@ class IndependentPoissonTestStaticShape(tf.test.TestCase,
     ])
 
     # Fit.
-    model.compile(optimizer=tf.train.AdamOptimizer(learning_rate=0.05),
-                  loss=lambda y, model: -model.log_prob(y),
-                  metrics=[])
+    model.compile(
+        optimizer=tf.compat.v1.train.AdamOptimizer(learning_rate=0.05),
+        loss=lambda y, model: -model.log_prob(y),
+        metrics=[])
     batch_size = 50
 
     model.fit(x, y,
@@ -823,7 +839,7 @@ class _MixtureLayerTest(object):
     # Enforce parameterized dtype and static/dynamic testing.
     ndarray = np.asarray(ndarray).astype(
         dtype if dtype is not None else self.dtype)
-    return tf.placeholder_with_default(
+    return tf.compat.v1.placeholder_with_default(
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
   def _check_distribution(self, t, x, batch_shape):
@@ -874,7 +890,8 @@ class _MixtureLogisticTest(_MixtureLayerTest):
     """Given a self.layer_class instance, return a tensor of its parameters."""
     params_shape = tf.concat([batch_shape, [-1]], axis=0)
     batch_and_n_shape = tf.concat(
-        [tf.shape(distribution.mixture_distribution.logits), [-1]], axis=0)
+        [tf.shape(input=distribution.mixture_distribution.logits), [-1]],
+        axis=0)
     cd = distribution.components_distribution.distribution
     return tf.concat([
         distribution.mixture_distribution.logits,
@@ -907,14 +924,15 @@ class _MixtureLogisticTest(_MixtureLayerTest):
 
     # Fit.
     batch_size = 100
-    model.compile(optimizer=tf.train.AdamOptimizer(learning_rate=0.02),
-                  loss=lambda y, model: -model.log_prob(y))
+    model.compile(
+        optimizer=tf.compat.v1.train.AdamOptimizer(learning_rate=0.02),
+        loss=lambda y, model: -model.log_prob(y))
     model.fit(x, y,
               batch_size=batch_size,
               epochs=1,
               steps_per_epoch=n // batch_size)
 
-    self.assertEqual(15, self.evaluate(tf.convert_to_tensor(params_size)))
+    self.assertEqual(15, self.evaluate(tf.convert_to_tensor(value=params_size)))
 
 
 @tfe.run_all_tests_in_graph_and_eager_modes
@@ -940,7 +958,8 @@ class _MixtureNormalTest(_MixtureLayerTest):
     """Given a self.layer_class instance, return a tensor of its parameters."""
     params_shape = tf.concat([batch_shape, [-1]], axis=0)
     batch_and_n_shape = tf.concat(
-        [tf.shape(distribution.mixture_distribution.logits), [-1]], axis=0)
+        [tf.shape(input=distribution.mixture_distribution.logits), [-1]],
+        axis=0)
     cd = distribution.components_distribution.distribution
     return tf.concat([
         distribution.mixture_distribution.logits,
@@ -973,14 +992,15 @@ class _MixtureNormalTest(_MixtureLayerTest):
 
     # Fit.
     batch_size = 100
-    model.compile(optimizer=tf.train.AdamOptimizer(learning_rate=0.02),
-                  loss=lambda y, model: -model.log_prob(y))
+    model.compile(
+        optimizer=tf.compat.v1.train.AdamOptimizer(learning_rate=0.02),
+        loss=lambda y, model: -model.log_prob(y))
     model.fit(x, y,
               batch_size=batch_size,
               epochs=1,
               steps_per_epoch=n // batch_size)
 
-    self.assertEqual(15, self.evaluate(tf.convert_to_tensor(params_size)))
+    self.assertEqual(15, self.evaluate(tf.convert_to_tensor(value=params_size)))
 
 
 @tfe.run_all_tests_in_graph_and_eager_modes
@@ -1004,7 +1024,7 @@ class _MixtureSameFamilyTest(object):
     # Enforce parameterized dtype and static/dynamic testing.
     ndarray = np.asarray(ndarray).astype(
         dtype if dtype is not None else self.dtype)
-    return tf.placeholder_with_default(
+    return tf.compat.v1.placeholder_with_default(
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
   def _check_distribution(self, t, x, batch_shape):
@@ -1014,7 +1034,7 @@ class _MixtureSameFamilyTest(object):
 
     shape = tf.concat([batch_shape, [-1]], axis=0)
     batch_and_n_shape = tf.concat(
-        [tf.shape(x.mixture_distribution.logits), [-1]], axis=0)
+        [tf.shape(input=x.mixture_distribution.logits), [-1]], axis=0)
     cd = x.components_distribution
     scale_tril = tfb.ScaleTriL(diag_shift=np.array(1e-5, self.dtype))
     t_back = tf.concat([
@@ -1083,14 +1103,15 @@ class _MixtureSameFamilyTest(object):
 
     # Fit.
     batch_size = 100
-    model.compile(optimizer=tf.train.AdamOptimizer(learning_rate=0.02),
-                  loss=lambda y, model: -model.log_prob(y))
+    model.compile(
+        optimizer=tf.compat.v1.train.AdamOptimizer(learning_rate=0.02),
+        loss=lambda y, model: -model.log_prob(y))
     model.fit(x, y,
               batch_size=batch_size,
               epochs=1,
               steps_per_epoch=1)  # Usually `n // batch_size`.
 
-    self.assertEqual(15, self.evaluate(tf.convert_to_tensor(params_size)))
+    self.assertEqual(15, self.evaluate(tf.convert_to_tensor(value=params_size)))
 
 
 @tfe.run_all_tests_in_graph_and_eager_modes

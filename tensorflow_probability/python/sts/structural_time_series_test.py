@@ -97,7 +97,7 @@ class _StructuralTimeSeriesTests(object):
       dtype = self.dtype
 
     ndarray = np.asarray(ndarray).astype(dtype)
-    return tf.placeholder_with_default(
+    return tf.compat.v1.placeholder_with_default(
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
@@ -298,7 +298,7 @@ class LinearRegressionTest(tf.test.TestCase, _StsTestHarness):
                                           batch_shape=batch_shape)
 
     regression = LinearRegression(
-        design_matrix=tf.random_normal([max_timesteps, num_features]),
+        design_matrix=tf.random.normal([max_timesteps, num_features]),
         weights_prior=prior)
     return Sum(components=[regression],
                observed_time_series=observed_time_series)

@@ -124,10 +124,10 @@ class Transpose(bijector.Bijector):
                          '`rightmost_transposed_ndims` and `perm`.')
       if rightmost_transposed_ndims is not None:
         rightmost_transposed_ndims = tf.convert_to_tensor(
-            rightmost_transposed_ndims,
+            value=rightmost_transposed_ndims,
             dtype=np.int32,
             name='rightmost_transposed_ndims')
-        rightmost_transposed_ndims_ = tf.contrib.util.constant_value(
+        rightmost_transposed_ndims_ = tf.get_static_value(
             rightmost_transposed_ndims)
         with tf.control_dependencies(_maybe_validate_rightmost_transposed_ndims(
             rightmost_transposed_ndims, validate_args)):
@@ -138,10 +138,10 @@ class Transpose(bijector.Bijector):
             delta=-1,
             name='perm')
       else:  # perm is not None:
-        perm = tf.convert_to_tensor(perm, dtype=np.int32, name='perm')
+        perm = tf.convert_to_tensor(value=perm, dtype=np.int32, name='perm')
         rightmost_transposed_ndims = tf.size(
-            perm, name='rightmost_transposed_ndims')
-        rightmost_transposed_ndims_ = tf.contrib.util.constant_value(
+            input=perm, name='rightmost_transposed_ndims')
+        rightmost_transposed_ndims_ = tf.get_static_value(
             rightmost_transposed_ndims)
         with tf.control_dependencies(_maybe_validate_perm(perm, validate_args)):
           perm = tf.identity(perm)
@@ -176,7 +176,7 @@ class Transpose(bijector.Bijector):
     return self._transpose(x, self.perm)
 
   def _inverse(self, y):
-    return self._transpose(y, tf.contrib.framework.argsort(self.perm))
+    return self._transpose(y, tf.argsort(self.perm))
 
   def _inverse_log_det_jacobian(self, y):
     return tf.constant(0, dtype=y.dtype)
@@ -190,7 +190,7 @@ class Transpose(bijector.Bijector):
         tf.range(sample_batch_ndims),
         sample_batch_ndims + perm,
     ], axis=0)
-    return tf.transpose(x, perm)
+    return tf.transpose(a=x, perm=perm)
 
 
 def _maybe_validate_rightmost_transposed_ndims(
@@ -208,9 +208,9 @@ def _maybe_validate_rightmost_transposed_ndims(
                          'saw rank: {}.'.format(
                              rightmost_transposed_ndims.shape.ndims))
     elif validate_args:
-      assertions += [tf.assert_rank(rightmost_transposed_ndims, 0)]
+      assertions += [tf.compat.v1.assert_rank(rightmost_transposed_ndims, 0)]
 
-    rightmost_transposed_ndims_ = tf.contrib.util.constant_value(
+    rightmost_transposed_ndims_ = tf.get_static_value(
         rightmost_transposed_ndims)
     msg = '`rightmost_transposed_ndims` must be non-negative.'
     if rightmost_transposed_ndims_ is not None:
@@ -218,8 +218,10 @@ def _maybe_validate_rightmost_transposed_ndims(
         raise ValueError(msg[:-1] + ', saw: {}.'.format(
             rightmost_transposed_ndims_))
     elif validate_args:
-      assertions += [tf.assert_non_negative(
-          rightmost_transposed_ndims, message=msg)]
+      assertions += [
+          tf.compat.v1.assert_non_negative(
+              rightmost_transposed_ndims, message=msg)
+      ]
 
     return assertions
 
@@ -237,17 +239,17 @@ def _maybe_validate_perm(perm, validate_args, name=None):
         raise ValueError(
             msg[:-1] + ', saw rank: {}.'.format(perm.shape.ndims))
     elif validate_args:
-      assertions += [tf.assert_rank(perm, 1, message=msg)]
+      assertions += [tf.compat.v1.assert_rank(perm, 1, message=msg)]
 
-    perm_ = tf.contrib.util.constant_value(perm)
+    perm_ = tf.get_static_value(perm)
     msg = '`perm` must be a valid permutation vector.'
     if perm_ is not None:
       if not np.all(np.arange(np.size(perm_)) == np.sort(perm_)):
         raise ValueError(msg[:-1] + ', saw: {}.'.format(perm_))
     elif validate_args:
-      assertions += [tf.assert_equal(
-          tf.contrib.framework.sort(perm),
-          tf.range(tf.size(perm)),
-          message=msg)]
+      assertions += [
+          tf.compat.v1.assert_equal(
+              tf.sort(perm), tf.range(tf.size(input=perm)), message=msg)
+      ]
 
     return assertions

@@ -130,7 +130,7 @@ def diag_jacobian(xs,
     jacobians_diag_res = []
     # Convert input `xs` to a list
     xs = list(xs) if _is_list_like(xs) else [xs]
-    xs = [tf.convert_to_tensor(x) for x in xs]
+    xs = [tf.convert_to_tensor(value=x) for x in xs]
     if not tf.executing_eagerly():
       if ys is None:
         if fn is None:
@@ -148,8 +148,9 @@ def diag_jacobian(xs,
         y_ = tf.reshape(y, tf.concat([sample_shape, [-1]], -1))
 
         # Declare an iterator and tensor array loop variables for the gradients.
-        n = tf.size(x) / tf.to_int32(tf.reduce_prod(sample_shape))
-        n = tf.to_int32(n)
+        n = tf.size(input=x) / tf.cast(
+            tf.reduce_prod(input_tensor=sample_shape), dtype=tf.int32)
+        n = tf.cast(n, dtype=tf.int32)
         loop_vars = [
             0,
             tf.TensorArray(x.dtype, n)
@@ -158,7 +159,7 @@ def diag_jacobian(xs,
         def loop_body(j):
           """Loop function to compute gradients of the each direction."""
           # Gradient along direction `j`.
-          res = tf.gradients(y_[..., j], x)[0]  # pylint: disable=cell-var-from-loop
+          res = tf.gradients(ys=y_[..., j], xs=x)[0]  # pylint: disable=cell-var-from-loop
           if res is None:
             # Return zero, if the gradient is `None`.
             res = tf.zeros(tf.concat([sample_shape, [1]], -1),
@@ -174,16 +175,15 @@ def diag_jacobian(xs,
         # Iterate over all elements of the gradient and compute second order
         # derivatives.
         _, jacobian_diag_res = tf.while_loop(
-            lambda j, _: j < n,  # pylint: disable=cell-var-from-loop
-            lambda j, result: (j + 1, result.write(j, loop_body(j))),
-            loop_vars,
-            parallel_iterations=parallel_iterations
-        )
+            cond=lambda j, _: j < n,  # pylint: disable=cell-var-from-loop
+            body=lambda j, result: (j + 1, result.write(j, loop_body(j))),
+            loop_vars=loop_vars,
+            parallel_iterations=parallel_iterations)
 
-        shape_x = tf.shape(x)
+        shape_x = tf.shape(input=x)
         # Stack gradients together and move flattened `event_shape` to the
         # zero position
-        reshaped_jacobian_diag = tf.transpose(jacobian_diag_res.stack())
+        reshaped_jacobian_diag = tf.transpose(a=jacobian_diag_res.stack())
         # Reshape to the original tensor
         reshaped_jacobian_diag = tf.reshape(reshaped_jacobian_diag, shape_x)
         jacobians_diag_res.append(reshaped_jacobian_diag)
@@ -211,8 +211,9 @@ def diag_jacobian(xs,
 
       for i, x in enumerate(xs):
         # Declare an iterator and tensor array loop variables for the gradients.
-        n = tf.size(x) / tf.to_int32(tf.reduce_prod(sample_shape))
-        n = tf.to_int32(n)
+        n = tf.size(input=x) / tf.cast(
+            tf.reduce_prod(input_tensor=sample_shape), dtype=tf.int32)
+        n = tf.cast(n, dtype=tf.int32)
         loop_vars = [
             0,
             tf.TensorArray(x.dtype, n)
@@ -232,16 +233,15 @@ def diag_jacobian(xs,
         # Iterate over all elements of the gradient and compute second order
         # derivatives.
         _, jacobian_diag_res = tf.while_loop(
-            lambda j, _: j < n,
-            lambda j, result: (j + 1, result.write(j, loop_body(j))),
-            loop_vars,
-            parallel_iterations=parallel_iterations
-        )
+            cond=lambda j, _: j < n,
+            body=lambda j, result: (j + 1, result.write(j, loop_body(j))),
+            loop_vars=loop_vars,
+            parallel_iterations=parallel_iterations)
 
-        shape_x = tf.shape(x)
+        shape_x = tf.shape(input=x)
         # Stack gradients together and move flattened `event_shape` to the
         # zero position
-        reshaped_jacobian_diag = tf.transpose(jacobian_diag_res.stack())
+        reshaped_jacobian_diag = tf.transpose(a=jacobian_diag_res.stack())
         # Reshape to the original tensor
         reshaped_jacobian_diag = tf.reshape(reshaped_jacobian_diag, shape_x)
         jacobians_diag_res.append(reshaped_jacobian_diag)

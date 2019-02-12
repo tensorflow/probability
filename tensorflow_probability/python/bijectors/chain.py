@@ -224,7 +224,7 @@ class Chain(bijector.Bijector):
     return y
 
   def _inverse_log_det_jacobian(self, y, **kwargs):
-    y = tf.convert_to_tensor(y, name="y")
+    y = tf.convert_to_tensor(value=y, name="y")
     ildj = tf.cast(0., dtype=y.dtype.base_dtype)
 
     if not self.bijectors:
@@ -236,7 +236,7 @@ class Chain(bijector.Bijector):
     if _use_static_shape(y, event_ndims):
       event_shape = y.shape[y.shape.ndims - event_ndims:]
     else:
-      event_shape = tf.shape(y)[tf.rank(y) - event_ndims:]
+      event_shape = tf.shape(input=y)[tf.rank(y) - event_ndims:]
 
     for b in self.bijectors:
       ildj += b.inverse_log_det_jacobian(
@@ -248,7 +248,7 @@ class Chain(bijector.Bijector):
             event_shape.ndims)
       else:
         event_shape = b.inverse_event_shape_tensor(event_shape)
-        event_ndims = tf.size(event_shape)
+        event_ndims = tf.size(input=event_shape)
         event_ndims_ = self._maybe_get_static_event_ndims(event_ndims)
         if event_ndims_ is not None:
           event_ndims = event_ndims_
@@ -262,7 +262,7 @@ class Chain(bijector.Bijector):
     return x
 
   def _forward_log_det_jacobian(self, x, **kwargs):
-    x = tf.convert_to_tensor(x, name="x")
+    x = tf.convert_to_tensor(value=x, name="x")
 
     fldj = tf.cast(0., dtype=x.dtype.base_dtype)
 
@@ -275,7 +275,7 @@ class Chain(bijector.Bijector):
     if _use_static_shape(x, event_ndims):
       event_shape = x.shape[x.shape.ndims - event_ndims:]
     else:
-      event_shape = tf.shape(x)[tf.rank(x) - event_ndims:]
+      event_shape = tf.shape(input=x)[tf.rank(x) - event_ndims:]
 
     for b in reversed(self.bijectors):
       fldj += b.forward_log_det_jacobian(
@@ -285,7 +285,7 @@ class Chain(bijector.Bijector):
         event_ndims = self._maybe_get_static_event_ndims(event_shape.ndims)
       else:
         event_shape = b.forward_event_shape_tensor(event_shape)
-        event_ndims = tf.size(event_shape)
+        event_ndims = tf.size(input=event_shape)
         event_ndims_ = self._maybe_get_static_event_ndims(event_ndims)
         if event_ndims_ is not None:
           event_ndims = event_ndims_

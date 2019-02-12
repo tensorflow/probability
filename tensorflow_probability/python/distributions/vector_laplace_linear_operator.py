@@ -199,7 +199,7 @@ class VectorLaplaceLinearOperator(
       # Since expand_dims doesn't preserve constant-ness, we obtain the
       # non-dynamic value if possible.
       loc = loc if loc is None else tf.convert_to_tensor(
-          loc, name="loc", dtype=scale.dtype)
+          value=loc, name="loc", dtype=scale.dtype)
       batch_shape, event_shape = distribution_util.shapes_from_loc_and_scale(
           loc, scale)
 
@@ -262,7 +262,7 @@ class VectorLaplaceLinearOperator(
     # Since E[wi wj] = 0 if i != j, and 2 if i == j, we have
     #   Cov(X) = 2 LL^T
     if distribution_util.is_diagonal_scale(self.scale):
-      return 2. * tf.matrix_diag(tf.square(self.scale.diag_part()))
+      return 2. * tf.linalg.diag(tf.square(self.scale.diag_part()))
     else:
       return 2. * self.scale.matmul(self.scale.to_dense(), adjoint_arg=True)
 
@@ -271,9 +271,9 @@ class VectorLaplaceLinearOperator(
       return 2. * tf.square(self.scale.diag_part())
     elif (isinstance(self.scale, tf.linalg.LinearOperatorLowRankUpdate) and
           self.scale.is_self_adjoint):
-      return tf.matrix_diag_part(2. * self.scale.matmul(self.scale.to_dense()))
+      return tf.linalg.diag_part(2. * self.scale.matmul(self.scale.to_dense()))
     else:
-      return 2. * tf.matrix_diag_part(
+      return 2. * tf.linalg.diag_part(
           self.scale.matmul(self.scale.to_dense(), adjoint_arg=True))
 
   def _stddev(self):
@@ -282,10 +282,10 @@ class VectorLaplaceLinearOperator(
     elif (isinstance(self.scale, tf.linalg.LinearOperatorLowRankUpdate) and
           self.scale.is_self_adjoint):
       return np.sqrt(2) * tf.sqrt(
-          tf.matrix_diag_part(self.scale.matmul(self.scale.to_dense())))
+          tf.linalg.diag_part(self.scale.matmul(self.scale.to_dense())))
     else:
       return np.sqrt(2) * tf.sqrt(
-          tf.matrix_diag_part(
+          tf.linalg.diag_part(
               self.scale.matmul(self.scale.to_dense(), adjoint_arg=True)))
 
   def _mode(self):

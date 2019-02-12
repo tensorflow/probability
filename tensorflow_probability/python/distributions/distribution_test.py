@@ -46,14 +46,14 @@ class DistributionTest(tf.test.TestCase):
     for cls in classes:
       for sample_shape in sample_shapes:
         param_shapes = cls.param_shapes(sample_shape)
-        params = dict([(name, tf.random_normal(shape))
+        params = dict([(name, tf.random.normal(shape))
                        for name, shape in param_shapes.items()])
         dist = cls(**params)
-        self.assertAllEqual(sample_shape, self.evaluate(
-            tf.shape(dist.sample())))
+        self.assertAllEqual(sample_shape,
+                            self.evaluate(tf.shape(input=dist.sample())))
         dist_copy = dist.copy()
         self.assertAllEqual(sample_shape,
-                            self.evaluate(tf.shape(dist_copy.sample())))
+                            self.evaluate(tf.shape(input=dist_copy.sample())))
         self.assertEqual(dist.parameters, dist_copy.parameters)
 
   def testCopyExtraArgs(self):
@@ -78,36 +78,38 @@ class DistributionTest(tf.test.TestCase):
     sigma = 2.
 
     normal = tfd.Normal(mu, sigma, validate_args=True)
-    self.assertTrue(tf.contrib.util.constant_value(normal.is_scalar_event()))
-    self.assertTrue(tf.contrib.util.constant_value(normal.is_scalar_batch()))
+    self.assertTrue(tf.get_static_value(normal.is_scalar_event()))
+    self.assertTrue(tf.get_static_value(normal.is_scalar_batch()))
 
     normal = tfd.Normal([mu], [sigma], validate_args=True)
-    self.assertTrue(tf.contrib.util.constant_value(normal.is_scalar_event()))
-    self.assertFalse(tf.contrib.util.constant_value(normal.is_scalar_batch()))
+    self.assertTrue(tf.get_static_value(normal.is_scalar_event()))
+    self.assertFalse(tf.get_static_value(normal.is_scalar_batch()))
 
     mvn = tfd.MultivariateNormalDiag([mu], [sigma], validate_args=True)
-    self.assertFalse(tf.contrib.util.constant_value(mvn.is_scalar_event()))
-    self.assertTrue(tf.contrib.util.constant_value(mvn.is_scalar_batch()))
+    self.assertFalse(tf.get_static_value(mvn.is_scalar_event()))
+    self.assertTrue(tf.get_static_value(mvn.is_scalar_batch()))
 
     mvn = tfd.MultivariateNormalDiag([[mu]], [[sigma]], validate_args=True)
-    self.assertFalse(tf.contrib.util.constant_value(mvn.is_scalar_event()))
-    self.assertFalse(tf.contrib.util.constant_value(mvn.is_scalar_batch()))
+    self.assertFalse(tf.get_static_value(mvn.is_scalar_event()))
+    self.assertFalse(tf.get_static_value(mvn.is_scalar_batch()))
 
     # We now test every codepath within the underlying is_scalar_helper
     # function.
 
     # Test case 1, 2.
-    x = tf.placeholder_with_default(input=1, shape=[])
+    x = tf.compat.v1.placeholder_with_default(input=1, shape=[])
     # None would fire an exception were it actually executed.
     self.assertTrue(normal._is_scalar_helper(x.shape, lambda: None))
     self.assertTrue(
-        normal._is_scalar_helper(tf.TensorShape(None), lambda: tf.shape(x)))
+        normal._is_scalar_helper(
+            tf.TensorShape(None), lambda: tf.shape(input=x)))
 
-    x = tf.placeholder_with_default(input=[1], shape=[1])
+    x = tf.compat.v1.placeholder_with_default(input=[1], shape=[1])
     # None would fire an exception were it actually executed.
     self.assertFalse(normal._is_scalar_helper(x.shape, lambda: None))
     self.assertFalse(
-        normal._is_scalar_helper(tf.TensorShape(None), lambda: tf.shape(x)))
+        normal._is_scalar_helper(
+            tf.TensorShape(None), lambda: tf.shape(input=x)))
 
     # There's no notion of partially known shapes in eager mode, so exit
     # early.
@@ -115,12 +117,12 @@ class DistributionTest(tf.test.TestCase):
       return
 
     # Test case 3.
-    x = tf.placeholder_with_default(input=1, shape=None)
-    is_scalar = normal._is_scalar_helper(x.shape, lambda: tf.shape(x))
+    x = tf.compat.v1.placeholder_with_default(input=1, shape=None)
+    is_scalar = normal._is_scalar_helper(x.shape, lambda: tf.shape(input=x))
     self.assertTrue(self.evaluate(is_scalar))
 
-    x = tf.placeholder_with_default(input=[1], shape=None)
-    is_scalar = normal._is_scalar_helper(x.shape, lambda: tf.shape(x))
+    x = tf.compat.v1.placeholder_with_default(input=[1], shape=None)
+    is_scalar = normal._is_scalar_helper(x.shape, lambda: tf.shape(input=x))
     self.assertFalse(self.evaluate(is_scalar))
 
   def _GetFakeDistribution(self):
@@ -154,42 +156,42 @@ class DistributionTest(tf.test.TestCase):
     fake_distribution = self._GetFakeDistribution()
 
     # Make a new session since we're playing with static shapes. [And below.]
-    x = tf.placeholder_with_default(
+    x = tf.compat.v1.placeholder_with_default(
         input=np.ones((6, 7, 2, 3, 5), dtype=np.float32), shape=None)
     dist = fake_distribution(batch_shape=[2, 3], event_shape=[5])
-    sample_shape = tf.convert_to_tensor([6, 7], dtype=tf.int32)
+    sample_shape = tf.convert_to_tensor(value=[6, 7], dtype=tf.int32)
     y = dist._set_sample_static_shape(x, sample_shape)
     # We use as_list since TensorShape comparison does not work correctly for
     # unknown values, ie, Dimension(None).
     self.assertAllEqual([6, 7, 2, 3, 5], y.shape.as_list())
 
-    x = tf.placeholder_with_default(
+    x = tf.compat.v1.placeholder_with_default(
         input=np.ones((6, 7, 2, 3, 5), dtype=np.float32), shape=None)
     dist = fake_distribution(batch_shape=[None, 3], event_shape=[5])
-    sample_shape = tf.convert_to_tensor([6, 7], dtype=tf.int32)
+    sample_shape = tf.convert_to_tensor(value=[6, 7], dtype=tf.int32)
     y = dist._set_sample_static_shape(x, sample_shape)
     self.assertAllEqual([6, 7, None, 3, 5], y.shape.as_list())
 
-    x = tf.placeholder_with_default(
+    x = tf.compat.v1.placeholder_with_default(
         input=np.ones((6, 7, 2, 3, 5), dtype=np.float32), shape=None)
     dist = fake_distribution(batch_shape=[None, 3], event_shape=[None])
-    sample_shape = tf.convert_to_tensor([6, 7], dtype=tf.int32)
+    sample_shape = tf.convert_to_tensor(value=[6, 7], dtype=tf.int32)
     y = dist._set_sample_static_shape(x, sample_shape)
     self.assertAllEqual([6, 7, None, 3, None], y.shape.as_list())
 
-    x = tf.placeholder_with_default(
+    x = tf.compat.v1.placeholder_with_default(
         input=np.ones((6, 7, 2, 3, 5), dtype=np.float32), shape=None)
     dist = fake_distribution(batch_shape=None, event_shape=None)
-    sample_shape = tf.convert_to_tensor([6, 7], dtype=tf.int32)
+    sample_shape = tf.convert_to_tensor(value=[6, 7], dtype=tf.int32)
     y = dist._set_sample_static_shape(x, sample_shape)
     self.assertTrue(y.shape.ndims is None)
 
-    x = tf.placeholder_with_default(
+    x = tf.compat.v1.placeholder_with_default(
         input=np.ones((6, 7, 2, 3, 5), dtype=np.float32), shape=None)
     dist = fake_distribution(batch_shape=[None, 3], event_shape=None)
     # There's no notion of partially known shapes in eager mode, so exit
     # early.
-    sample_shape = tf.convert_to_tensor([6, 7], dtype=tf.int32)
+    sample_shape = tf.convert_to_tensor(value=[6, 7], dtype=tf.int32)
     y = dist._set_sample_static_shape(x, sample_shape)
     self.assertTrue(y.shape.ndims is None)
 
@@ -246,8 +248,8 @@ class DistributionTest(tf.test.TestCase):
     if tf.executing_eagerly():
       return
 
-    exp = tfd.Exponential(rate=tf.placeholder_with_default(
-        input=1., shape=None))
+    exp = tfd.Exponential(
+        rate=tf.compat.v1.placeholder_with_default(input=1., shape=None))
     self.assertEqual(
         str(exp),
         "tfp.distributions.Exponential(\"Exponential/\", "
@@ -272,7 +274,7 @@ class DistributionTest(tf.test.TestCase):
       return
 
     mvn_dynamic = tfd.MultivariateNormalDiag(
-        loc=tf.placeholder_with_default(
+        loc=tf.compat.v1.placeholder_with_default(
             input=np.ones((3, 3), dtype=np.float32), shape=[None, 3]),
         name="MVN2")
     self.assertEqual(
@@ -311,8 +313,8 @@ class DistributionTest(tf.test.TestCase):
     if tf.executing_eagerly():
       return
 
-    exp = tfd.Exponential(rate=tf.placeholder_with_default(
-        input=1., shape=None))
+    exp = tfd.Exponential(
+        rate=tf.compat.v1.placeholder_with_default(input=1., shape=None))
     self.assertEqual(
         repr(exp),
         "<tfp.distributions.Exponential"
@@ -338,7 +340,7 @@ class DistributionTest(tf.test.TestCase):
       return
 
     mvn_dynamic = tfd.MultivariateNormalDiag(
-        loc=tf.placeholder_with_default(
+        loc=tf.compat.v1.placeholder_with_default(
             input=np.ones((3, 3), dtype=np.float32), shape=[None, 3]),
         name="MVN2")
     self.assertEqual(

@@ -33,7 +33,7 @@ class _GumbelTest(object):
 
   def make_tensor(self, x):
     x = tf.cast(x, self._dtype)
-    return tf.placeholder_with_default(
+    return tf.compat.v1.placeholder_with_default(
         input=x, shape=x.shape if self._use_static_shape else None)
 
   def testGumbelShape(self):
@@ -251,7 +251,8 @@ class _GumbelTest(object):
     kl = tfd.kl_divergence(a, b)
 
     x = a.sample(int(1e5), seed=0)
-    kl_sample = tf.reduce_mean(a.log_prob(x) - b.log_prob(x), axis=0)
+    kl_sample = tf.reduce_mean(
+        input_tensor=a.log_prob(x) - b.log_prob(x), axis=0)
 
     # As noted in the Gumbel-Gumbel KL divergence implementation, there is an
     # error in the reference paper we use to implement our divergence. This
@@ -262,7 +263,8 @@ class _GumbelTest(object):
     summand = (a_loc - b_loc) / b_scale
     relative_error = (tf.abs(kl - kl_sample) /
                       tf.minimum(tf.abs(kl), tf.abs(kl_sample)))
-    exists_missing_summand_test = tf.reduce_any(summand > 2 * relative_error)
+    exists_missing_summand_test = tf.reduce_any(
+        input_tensor=summand > 2 * relative_error)
     exists_missing_summand_test_ = self.evaluate(exists_missing_summand_test)
     self.assertTrue(exists_missing_summand_test_,
                     msg=('No test case exists where (a.loc - b.loc) / b.scale '

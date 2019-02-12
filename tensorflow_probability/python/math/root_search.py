@@ -187,22 +187,22 @@ def secant_root(objective_fn,
     raise ValueError('stopping_policy_fn must be callable')
 
   position = tf.convert_to_tensor(
-      initial_position,
+      value=initial_position,
       name='position',
   )
   value_at_position = tf.convert_to_tensor(
-      value_at_position or objective_fn(position),
+      value=value_at_position or objective_fn(position),
       name='value_at_position',
       dtype=position.dtype.base_dtype)
 
   zero = tf.zeros_like(position)
   position_tolerance = tf.convert_to_tensor(
-      position_tolerance, name='position_tolerance', dtype=position.dtype)
+      value=position_tolerance, name='position_tolerance', dtype=position.dtype)
   value_tolerance = tf.convert_to_tensor(
-      value_tolerance, name='value_tolerance', dtype=position.dtype)
+      value=value_tolerance, name='value_tolerance', dtype=position.dtype)
 
   num_iterations = tf.zeros_like(position, dtype=tf.int32)
-  max_iterations = tf.convert_to_tensor(max_iterations, dtype=tf.int32)
+  max_iterations = tf.convert_to_tensor(value=max_iterations, dtype=tf.int32)
   max_iterations = tf.broadcast_to(
       max_iterations, name='max_iterations', shape=position.shape)
 
@@ -238,7 +238,7 @@ def secant_root(objective_fn,
     """
     del position, value_at_position, num_iterations, step  # Unused
     return ~tf.convert_to_tensor(
-        stopping_policy_fn(finished), name='should_stop', dtype=tf.bool)
+        value=stopping_policy_fn(finished), name='should_stop', dtype=tf.bool)
 
   # For each point in `position`, the search is stopped if either:
   # (1) A root has been found
@@ -297,17 +297,20 @@ def secant_root(objective_fn,
     if validate_args:
       assertions += [
           tf.Assert(
-              tf.reduce_all(position_tolerance > zero), [position_tolerance]),
-          tf.Assert(tf.reduce_all(value_tolerance > zero), [value_tolerance]),
+              tf.reduce_all(input_tensor=position_tolerance > zero),
+              [position_tolerance]),
           tf.Assert(
-              tf.reduce_all(max_iterations >= num_iterations),
+              tf.reduce_all(input_tensor=value_tolerance > zero),
+              [value_tolerance]),
+          tf.Assert(
+              tf.reduce_all(input_tensor=max_iterations >= num_iterations),
               [max_iterations]),
       ]
 
     with tf.control_dependencies(assertions):
       root, value_at_root, num_iterations, _, _ = tf.while_loop(
-          _should_continue,
-          _body,
+          cond=_should_continue,
+          body=_body,
           loop_vars=[
               position, value_at_position, num_iterations, step, finished
           ])

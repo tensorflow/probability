@@ -52,7 +52,7 @@ class BfgsTest(tf.test.TestCase):
 
     @_make_val_and_grad_fn
     def quadratic(x):
-      return tf.reduce_sum(scales * (x - minimum) ** 2)
+      return tf.reduce_sum(input_tensor=scales * (x - minimum)**2)
 
     start = tf.constant([0.6, 0.8])
     results = self.evaluate(tfp.optimizer.bfgs_minimize(
@@ -71,7 +71,7 @@ class BfgsTest(tf.test.TestCase):
 
     @_make_val_and_grad_fn
     def quadratic(x):
-      return tf.reduce_sum(scales * (x - minimum) ** 2)
+      return tf.reduce_sum(input_tensor=scales * (x - minimum)**2)
 
     start = tf.constant([0.6, 0.8])
     test_inv_hessian = tf.constant([[2.0, 1.0], [1.0, 2.0]],
@@ -93,7 +93,7 @@ class BfgsTest(tf.test.TestCase):
 
     @_make_val_and_grad_fn
     def quadratic(x):
-      return tf.reduce_sum(scales * (x - minimum) ** 2)
+      return tf.reduce_sum(input_tensor=scales * (x - minimum)**2)
 
     start = tf.constant([0.6, 0.8])
     bad_inv_hessian = tf.constant([[-2.0, 1.0], [1.0, -2.0]],
@@ -111,7 +111,7 @@ class BfgsTest(tf.test.TestCase):
 
     @_make_val_and_grad_fn
     def quadratic(x):
-      return tf.reduce_sum(scales * (x - minimum) ** 2)
+      return tf.reduce_sum(input_tensor=scales * (x - minimum)**2)
 
     start = tf.constant([0.6, 0.8])
     bad_inv_hessian = tf.constant([[2.0, 0.0], [1.0, 2.0]],
@@ -131,7 +131,7 @@ class BfgsTest(tf.test.TestCase):
 
     @_make_val_and_grad_fn
     def quadratic(x):
-      return tf.reduce_sum(scales * (x - minimum) ** 2)
+      return tf.reduce_sum(input_tensor=scales * (x - minimum)**2)
 
     start = tf.ones_like(minimum)
     results = self.evaluate(tfp.optimizer.bfgs_minimize(
@@ -156,7 +156,7 @@ class BfgsTest(tf.test.TestCase):
     def quadratic(x):
       y = x - minimum
       yp = tf.tensordot(hessian, y, axes=[1, 0])
-      return tf.reduce_sum(y * yp) / 2
+      return tf.reduce_sum(input_tensor=y * yp) / 2
 
     start = tf.ones_like(minimum)
     results = self.evaluate(tfp.optimizer.bfgs_minimize(
@@ -180,7 +180,7 @@ class BfgsTest(tf.test.TestCase):
     def quadratic(x):
       y = x - minimum
       yp = tf.tensordot(hessian, y, axes=[1, 0])
-      return tf.reduce_sum(y * yp) / 2
+      return tf.reduce_sum(input_tensor=y * yp) / 2
 
     start = tf.ones_like(minimum)
     results = self.evaluate(tfp.optimizer.bfgs_minimize(
@@ -279,8 +279,8 @@ class BfgsTest(tf.test.TestCase):
     s = 0.01 * np.sum(x, 0)
     p = 1. / (1 + np.exp(-s))
     y = np.random.geometric(p)
-    x_data = tf.convert_to_tensor(x, dtype=dtype)
-    y_data = tf.expand_dims(tf.convert_to_tensor(y, dtype=dtype), -1)
+    x_data = tf.convert_to_tensor(value=x, dtype=dtype)
+    y_data = tf.expand_dims(tf.convert_to_tensor(value=y, dtype=dtype), -1)
 
     @_make_val_and_grad_fn
     def neg_log_likelihood(state):
@@ -288,10 +288,13 @@ class BfgsTest(tf.test.TestCase):
       linear_part = tf.matmul(state_ext, x_data)
       linear_part_ex = tf.stack([tf.zeros_like(linear_part),
                                  linear_part], axis=0)
-      term1 = tf.squeeze(tf.matmul(
-          tf.reduce_logsumexp(linear_part_ex, axis=0), y_data), -1)
-      term2 = (0.5 * tf.reduce_sum(state_ext * state_ext, -1) -
-               tf.reduce_sum(linear_part, -1))
+      term1 = tf.squeeze(
+          tf.matmul(
+              tf.reduce_logsumexp(input_tensor=linear_part_ex, axis=0), y_data),
+          -1)
+      term2 = (
+          0.5 * tf.reduce_sum(input_tensor=state_ext * state_ext, axis=-1) -
+          tf.reduce_sum(input_tensor=linear_part, axis=-1))
       return  tf.squeeze(term1 + term2)
 
     start = tf.ones(shape=[dim], dtype=dtype)
@@ -330,7 +333,8 @@ class BfgsTest(tf.test.TestCase):
           gradient: A `Tensor` of shape [2] containing the gradient of the
             function along the two axes.
       """
-      return tf.reduce_sum(x**2 - 10.0 * tf.cos(2 * np.pi * x)) + 10.0 * dim
+      return tf.reduce_sum(input_tensor=x**2 -
+                           10.0 * tf.cos(2 * np.pi * x)) + 10.0 * dim
 
     start_position = np.random.rand(dim) * 2.0 * 5.12 - 5.12
 
@@ -359,11 +363,11 @@ class BfgsTest(tf.test.TestCase):
 
     @_make_val_and_grad_fn
     def quadratic(x):
-      return tf.reduce_sum(scales * (x - minimum) ** 2)
+      return tf.reduce_sum(input_tensor=scales * (x - minimum)**2)
 
     # Test with a vector of unknown dimension, and a fully unknown shape.
     for shape in ([None], None):
-      start = tf.placeholder(tf.float32, shape=shape)
+      start = tf.compat.v1.placeholder(tf.float32, shape=shape)
       bfgs_op = tfp.optimizer.bfgs_minimize(
           quadratic, initial_position=start, tolerance=1e-8)
       self.assertFalse(bfgs_op.position.shape.is_fully_defined())

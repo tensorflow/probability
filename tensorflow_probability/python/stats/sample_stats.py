@@ -108,7 +108,7 @@ def auto_correlation(x,
   # based version of estimating RXX.
   # Note that this is a special case of the Wiener-Khinchin Theorem.
   with tf.name_scope(name, values=[x]):
-    x = tf.convert_to_tensor(x, name='x')
+    x = tf.convert_to_tensor(value=x, name='x')
 
     # Rotate dimensions of x in order to put axis at the rightmost dim.
     # FFT op requires this.
@@ -122,7 +122,8 @@ def auto_correlation(x,
     x_rotated = util.rotate_transpose(x, shift)
 
     if center:
-      x_rotated -= tf.reduce_mean(x_rotated, axis=-1, keepdims=True)
+      x_rotated -= tf.reduce_mean(
+          input_tensor=x_rotated, axis=-1, keepdims=True)
 
     # x_len = N / 2 from above explanation.  The length of x along axis.
     # Get a value for x_len that works in all cases.
@@ -134,7 +135,8 @@ def auto_correlation(x,
     # 2**(ceil(Log_2(2 * x_len))).  Note: Log_2(X) = Log_e(X) / Log_e(2).
     x_len_float64 = tf.cast(x_len, np.float64)
     target_length = tf.pow(
-        np.float64(2.), tf.ceil(tf.log(x_len_float64 * 2) / np.log(2.)))
+        np.float64(2.), tf.math.ceil(
+            tf.math.log(x_len_float64 * 2) / np.log(2.)))
     pad_length = tf.cast(target_length - x_len_float64, np.int32)
 
     # We should have:
@@ -151,11 +153,11 @@ def auto_correlation(x,
                                  dtype.real_dtype.as_numpy_dtype(0.))
 
     # Autocorrelation is IFFT of power-spectral density (up to some scaling).
-    fft_x_rotated_pad = tf.fft(x_rotated_pad)
-    spectral_density = fft_x_rotated_pad * tf.conj(fft_x_rotated_pad)
+    fft_x_rotated_pad = tf.signal.fft(x_rotated_pad)
+    spectral_density = fft_x_rotated_pad * tf.math.conj(fft_x_rotated_pad)
     # shifted_product is R[m] from above detailed explanation.
     # It is the inner product sum_n X[n] * Conj(X[n - m]).
-    shifted_product = tf.ifft(spectral_density)
+    shifted_product = tf.signal.ifft(spectral_density)
 
     # Cast back to real-valued if x was real to begin with.
     shifted_product = tf.cast(shifted_product, dtype)
@@ -170,8 +172,8 @@ def auto_correlation(x,
     if max_lags is None:
       max_lags = x_len - 1
     else:
-      max_lags = tf.convert_to_tensor(max_lags, name='max_lags')
-      max_lags_ = tf.contrib.util.constant_value(max_lags)
+      max_lags = tf.convert_to_tensor(value=max_lags, name='max_lags')
+      max_lags_ = tf.get_static_value(max_lags)
       if max_lags_ is None or not know_static_shape:
         know_static_shape = False
         max_lags = tf.minimum(x_len - 1, max_lags)
@@ -272,10 +274,10 @@ def cholesky_covariance(x, sample_axis=0, keepdims=False, name=None):
       lower triangular matrices (the Cholesky factors).
   """
   with tf.name_scope(name, 'cholesky_covariance', values=[x, sample_axis]):
-    sample_axis = tf.convert_to_tensor(sample_axis, dtype=tf.int32)
+    sample_axis = tf.convert_to_tensor(value=sample_axis, dtype=tf.int32)
     cov = covariance(
         x, sample_axis=sample_axis, event_axis=-1, keepdims=keepdims)
-    return tf.cholesky(cov)
+    return tf.linalg.cholesky(cov)
 
 
 def covariance(x,
@@ -340,21 +342,22 @@ def covariance(x,
 
   with tf.name_scope(
       name, 'covariance', values=[x, y, event_axis, sample_axis]):
-    x = tf.convert_to_tensor(x, name='x')
+    x = tf.convert_to_tensor(value=x, name='x')
     # Covariance *only* uses the centered versions of x (and y).
-    x -= tf.reduce_mean(x, axis=sample_axis, keepdims=True)
+    x -= tf.reduce_mean(input_tensor=x, axis=sample_axis, keepdims=True)
 
     if y is None:
       y = x
     else:
-      y = tf.convert_to_tensor(y, name='y', dtype=x.dtype)
+      y = tf.convert_to_tensor(value=y, name='y', dtype=x.dtype)
       # If x and y have different shape, sample_axis and event_axis will likely
       # be wrong for one of them!
       x.shape.assert_is_compatible_with(y.shape)
-      y -= tf.reduce_mean(y, axis=sample_axis, keepdims=True)
+      y -= tf.reduce_mean(input_tensor=y, axis=sample_axis, keepdims=True)
 
     if event_axis is None:
-      return tf.reduce_mean(x * tf.conj(y), axis=sample_axis, keepdims=keepdims)
+      return tf.reduce_mean(
+          input_tensor=x * tf.math.conj(y), axis=sample_axis, keepdims=keepdims)
 
     if sample_axis is None:
       raise ValueError(
@@ -377,29 +380,30 @@ def covariance(x,
           sorted(
               set(range(x.shape.ndims)).difference(sample_axis + event_axis)))
     else:
-      batch_axis, _ = tf.setdiff1d(
+      batch_axis, _ = tf.compat.v1.setdiff1d(
           tf.range(0, tf.rank(x)), tf.concat((sample_axis, event_axis), 0))
 
     event_axis = tf.convert_to_tensor(
-        event_axis, name='event_axis', dtype=tf.int32)
+        value=event_axis, name='event_axis', dtype=tf.int32)
     sample_axis = tf.convert_to_tensor(
-        sample_axis, name='sample_axis', dtype=tf.int32)
+        value=sample_axis, name='sample_axis', dtype=tf.int32)
     batch_axis = tf.convert_to_tensor(
-        batch_axis, name='batch_axis', dtype=tf.int32)
+        value=batch_axis, name='batch_axis', dtype=tf.int32)
 
     # Permute x/y until shape = B + E + S
     perm_for_xy = tf.concat((batch_axis, event_axis, sample_axis), 0)
-    x_permed = tf.transpose(x, perm=perm_for_xy)
-    y_permed = tf.transpose(y, perm=perm_for_xy)
+    x_permed = tf.transpose(a=x, perm=perm_for_xy)
+    y_permed = tf.transpose(a=y, perm=perm_for_xy)
 
-    batch_ndims = tf.size(batch_axis)
-    batch_shape = tf.shape(x_permed)[:batch_ndims]
-    event_ndims = tf.size(event_axis)
-    event_shape = tf.shape(x_permed)[batch_ndims:batch_ndims + event_ndims]
-    sample_shape = tf.shape(x_permed)[batch_ndims + event_ndims:]
-    sample_ndims = tf.size(sample_shape)
-    n_samples = tf.reduce_prod(sample_shape)
-    n_events = tf.reduce_prod(event_shape)
+    batch_ndims = tf.size(input=batch_axis)
+    batch_shape = tf.shape(input=x_permed)[:batch_ndims]
+    event_ndims = tf.size(input=event_axis)
+    event_shape = tf.shape(input=x_permed)[batch_ndims:batch_ndims +
+                                           event_ndims]
+    sample_shape = tf.shape(input=x_permed)[batch_ndims + event_ndims:]
+    sample_ndims = tf.size(input=sample_shape)
+    n_samples = tf.reduce_prod(input_tensor=sample_shape)
+    n_events = tf.reduce_prod(input_tensor=event_shape)
 
     # Flatten sample_axis into one long dim.
     x_permed_flat = tf.reshape(
@@ -435,7 +439,7 @@ def covariance(x,
     # Permuting by the argsort inverts the permutation, making
     # cov.shape have ones in the position where there were samples, and
     # [n_events * n_events] in the event position.
-    cov = tf.transpose(cov, perm=tf.invert_permutation(perm_for_xy))
+    cov = tf.transpose(a=cov, perm=tf.math.invert_permutation(perm_for_xy))
 
     # Now expand event_shape**2 into event_shape + event_shape.
     # We here use (for the first time) the fact that we require event_axis to be
@@ -444,8 +448,8 @@ def covariance(x,
     e_len = 1 + event_axis[-1] - event_axis[0]
     cov = tf.reshape(
         cov,
-        tf.concat((tf.shape(cov)[:e_start], event_shape, event_shape,
-                   tf.shape(cov)[e_start + e_len:]), 0))
+        tf.concat((tf.shape(input=cov)[:e_start], event_shape, event_shape,
+                   tf.shape(input=cov)[e_start + e_len:]), 0))
 
     # tf.squeeze requires python ints for axis, not Tensor.  This is enough to
     # require our axis args to be constants.
@@ -640,8 +644,8 @@ def _is_list_like(x):
 
 def _make_list_or_1d_tensor(values):
   """Return a list (preferred) or 1d Tensor from values, if values.ndims < 2."""
-  values = tf.convert_to_tensor(values, name='values')
-  values_ = tf.contrib.util.constant_value(values)
+  values = tf.convert_to_tensor(value=values, name='values')
+  values_ = tf.get_static_value(values)
 
   # Static didn't work.
   if values_ is None:
@@ -660,8 +664,8 @@ def _make_positive_axis(axis, ndims):
   """Rectify possibly negatively axis. Prefer return Python list."""
   axis = _make_list_or_1d_tensor(axis)
 
-  ndims = tf.convert_to_tensor(ndims, name='ndims', dtype=tf.int32)
-  ndims_ = tf.contrib.util.constant_value(ndims)
+  ndims = tf.convert_to_tensor(value=ndims, name='ndims', dtype=tf.int32)
+  ndims_ = tf.get_static_value(ndims)
 
   if _is_list_like(axis) and ndims_ is not None:
     # Static case
@@ -672,7 +676,7 @@ def _make_positive_axis(axis, ndims):
       positive_axis.append(a)
   else:
     # Dynamic case
-    axis = tf.convert_to_tensor(axis, name='axis', dtype=tf.int32)
+    axis = tf.convert_to_tensor(value=axis, name='axis', dtype=tf.int32)
     positive_axis = tf.where(axis >= 0, axis, axis + ndims)
 
   return positive_axis
@@ -680,10 +684,10 @@ def _make_positive_axis(axis, ndims):
 
 def _squeeze(x, axis):
   """A version of squeeze that works with dynamic axis."""
-  x = tf.convert_to_tensor(x, name='x')
+  x = tf.convert_to_tensor(value=x, name='x')
   if axis is None:
     return tf.squeeze(x, axis=None)
-  axis = tf.convert_to_tensor(axis, name='axis', dtype=tf.int32)
+  axis = tf.convert_to_tensor(value=axis, name='axis', dtype=tf.int32)
   axis += tf.zeros([1], dtype=axis.dtype)  # Make axis at least 1d.
-  keep_axis, _ = tf.setdiff1d(tf.range(0, tf.rank(x)), axis)
-  return tf.reshape(x, tf.gather(tf.shape(x), keep_axis))
+  keep_axis, _ = tf.compat.v1.setdiff1d(tf.range(0, tf.rank(x)), axis)
+  return tf.reshape(x, tf.gather(tf.shape(input=x), keep_axis))

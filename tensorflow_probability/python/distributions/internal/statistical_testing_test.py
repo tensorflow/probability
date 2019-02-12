@@ -338,7 +338,7 @@ class StatisticalTestingTest(tf.test.TestCase):
     samples = rng.uniform(size=n).astype(dtype=dtype)
 
     # Compute the answer in TF using the code under test
-    envelope_t = tf.convert_to_tensor(envelope, dtype=dtype)
+    envelope_t = tf.convert_to_tensor(value=envelope, dtype=dtype)
     max_mean = st._do_maximum_mean(samples, envelope_t, 1)
     max_mean = self.evaluate(max_mean)
 

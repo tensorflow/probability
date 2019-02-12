@@ -179,20 +179,16 @@ class SemiLocalLinearTrendStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
 
       dtype = initial_state_prior.dtype
 
-      level_scale = tf.convert_to_tensor(level_scale,
-                                         dtype=dtype,
-                                         name='level_scale')
-      slope_mean = tf.convert_to_tensor(slope_mean,
-                                        dtype=dtype,
-                                        name='slope_mean')
-      slope_scale = tf.convert_to_tensor(slope_scale,
-                                         dtype=dtype,
-                                         name='slope_scale')
-      autoregressive_coef = tf.convert_to_tensor(autoregressive_coef,
-                                                 dtype=dtype,
-                                                 name='autoregressive_coef')
+      level_scale = tf.convert_to_tensor(
+          value=level_scale, dtype=dtype, name='level_scale')
+      slope_mean = tf.convert_to_tensor(
+          value=slope_mean, dtype=dtype, name='slope_mean')
+      slope_scale = tf.convert_to_tensor(
+          value=slope_scale, dtype=dtype, name='slope_scale')
+      autoregressive_coef = tf.convert_to_tensor(
+          value=autoregressive_coef, dtype=dtype, name='autoregressive_coef')
       observation_noise_scale = tf.convert_to_tensor(
-          observation_noise_scale,
+          value=observation_noise_scale,
           dtype=dtype,
           name='observation_noise_scale')
 
@@ -396,14 +392,14 @@ class SemiLocalLinearTrend(StructuralTimeSeries):
       # Heuristic default priors. Overriding these may dramatically
       # change inference performance and results.
       if level_scale_prior is None:
-        level_scale_prior = tfd.LogNormal(loc=tf.log(.01 * observed_stddev),
-                                          scale=2.)
+        level_scale_prior = tfd.LogNormal(
+            loc=tf.math.log(.01 * observed_stddev), scale=2.)
       if slope_mean_prior is None:
         slope_mean_prior = tfd.Normal(loc=0.,
                                       scale=observed_stddev)
       if slope_scale_prior is None:
-        slope_scale_prior = tfd.LogNormal(loc=tf.log(.01 * observed_stddev),
-                                          scale=2.)
+        slope_scale_prior = tfd.LogNormal(
+            loc=tf.math.log(.01 * observed_stddev), scale=2.)
       if autoregressive_coef_prior is None:
         autoregressive_coef_prior = tfd.Normal(
             loc=0., scale=tf.ones_like(observed_initial))

@@ -50,9 +50,8 @@ class _PinvTest(object):
                      [.4, .2, .25],
                      [.5, .25, .35]])
     a_ = np.stack([a_ + 1., a_], axis=0)  # Batch of matrices.
-    a = tf.placeholder_with_default(
-        input=a_,
-        shape=a_.shape if self.use_static_shape else None)
+    a = tf.compat.v1.placeholder_with_default(
+        input=a_, shape=a_.shape if self.use_static_shape else None)
     if self.use_default_rcond:
       rcond = None
     else:
@@ -71,9 +70,8 @@ class _PinvTest(object):
                      [.4, .2, .25, 2.],
                      [.5, .25, .35, 3.]])
     a_ = np.stack([a_ + 0.5, a_], axis=0)  # Batch of matrices.
-    a = tf.placeholder_with_default(
-        input=a_,
-        shape=a_.shape if self.use_static_shape else None)
+    a = tf.compat.v1.placeholder_with_default(
+        input=a_, shape=a_.shape if self.use_static_shape else None)
     if self.use_default_rcond:
       rcond = None
     else:
@@ -119,10 +117,10 @@ class PinvTestStatic64CustomRcond(tf.test.TestCase, _PinvTest):
 
 def make_tensor_hiding_attributes(value, hide_shape, hide_value=True):
   if not hide_value:
-    return tf.convert_to_tensor(value)
+    return tf.convert_to_tensor(value=value)
 
   shape = None if hide_shape else getattr(value, 'shape', None)
-  return tf.placeholder_with_default(input=value, shape=shape)
+  return tf.compat.v1.placeholder_with_default(input=value, shape=shape)
 
 
 class _LUReconstruct(object):
@@ -133,7 +131,7 @@ class _LUReconstruct(object):
     x_ = np.array(
         [[3, 4], [1, 2]],
         dtype=self.dtype)
-    x = tf.placeholder_with_default(
+    x = tf.compat.v1.placeholder_with_default(
         x_, shape=x_.shape if self.use_static_shape else None)
 
     y = tfp.math.lu_reconstruct(*tf.linalg.lu(x), validate_args=True)
@@ -150,7 +148,7 @@ class _LUReconstruct(object):
             [[7, 8], [3, 4]],
         ],
         dtype=self.dtype)
-    x = tf.placeholder_with_default(
+    x = tf.compat.v1.placeholder_with_default(
         x_, shape=x_.shape if self.use_static_shape else None)
 
     y = tfp.math.lu_reconstruct(*tf.linalg.lu(x), validate_args=True)
@@ -177,7 +175,7 @@ class _LUMatrixInverse(object):
 
   def test_non_batch(self):
     x_ = np.array([[1, 2], [3, 4]], dtype=self.dtype)
-    x = tf.placeholder_with_default(
+    x = tf.compat.v1.placeholder_with_default(
         x_, shape=x_.shape if self.use_static_shape else None)
 
     y = tfp.math.lu_matrix_inverse(*tf.linalg.lu(x), validate_args=True)
@@ -198,7 +196,7 @@ class _LUMatrixInverse(object):
              [0.75, -2.]],
         ],
         dtype=self.dtype)
-    x = tf.placeholder_with_default(
+    x = tf.compat.v1.placeholder_with_default(
         x_, shape=x_.shape if self.use_static_shape else None)
 
     y = tfp.math.lu_matrix_inverse(*tf.linalg.lu(x), validate_args=True)
@@ -228,10 +226,10 @@ class _LUSolve(object):
         [[1, 2],
          [3, 4]],
         dtype=self.dtype)
-    x = tf.placeholder_with_default(
+    x = tf.compat.v1.placeholder_with_default(
         x_, shape=x_.shape if self.use_static_shape else None)
     rhs_ = np.array([[1, 1]], dtype=self.dtype).T
-    rhs = tf.placeholder_with_default(
+    rhs = tf.compat.v1.placeholder_with_default(
         rhs_, shape=rhs_.shape if self.use_static_shape else None)
 
     lower_upper, perm = tf.linalg.lu(x)
@@ -255,10 +253,10 @@ class _LUSolve(object):
              [0.75, -2.]],
         ],
         dtype=self.dtype)
-    x = tf.placeholder_with_default(
+    x = tf.compat.v1.placeholder_with_default(
         x_, shape=x_.shape if self.use_static_shape else None)
     rhs_ = np.array([[1, 1]], dtype=self.dtype).T
-    rhs = tf.placeholder_with_default(
+    rhs = tf.compat.v1.placeholder_with_default(
         rhs_, shape=rhs_.shape if self.use_static_shape else None)
 
     lower_upper, perm = tf.linalg.lu(x)
@@ -290,7 +288,7 @@ class _SparseOrDenseMatmul(object):
   use_sparse_tensor = False
 
   def _make_placeholder(self, x):
-    return tf.placeholder_with_default(
+    return tf.compat.v1.placeholder_with_default(
         input=x, shape=(x.shape if self.use_static_shape else None))
 
   def _make_sparse_placeholder(self, x):

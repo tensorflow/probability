@@ -54,10 +54,10 @@ class JacobianTest(tf.test.TestCase):
     if tfe.executing_eagerly():
       grads = grad_fn(*state)
     else:
-      grads = tf.gradients(fn_val, state)
+      grads = tf.gradients(ys=fn_val, xs=state)
 
     _, diag_jacobian_shape_passed = tfp.math.diag_jacobian(
-        xs=state, ys=grads, fn=grad_fn, sample_shape=tf.shape(fn_val))
+        xs=state, ys=grads, fn=grad_fn, sample_shape=tf.shape(input=fn_val))
     _, diag_jacobian_shape_none = tfp.math.diag_jacobian(
         xs=state, ys=grads, fn=grad_fn)
 
@@ -103,10 +103,10 @@ class JacobianTest(tf.test.TestCase):
     if tfe.executing_eagerly():
       grads = grad_fn(state)
     else:
-      grads = tf.gradients(fn_val, state)
+      grads = tf.gradients(ys=fn_val, xs=state)
 
     _, diag_jacobian_shape_passed = tfp.math.diag_jacobian(
-        xs=state, ys=grads, fn=grad_fn, sample_shape=tf.shape(fn_val))
+        xs=state, ys=grads, fn=grad_fn, sample_shape=tf.shape(input=fn_val))
     _, diag_jacobian_shape_none = tfp.math.diag_jacobian(
         xs=state, ys=grads, fn=grad_fn)
 

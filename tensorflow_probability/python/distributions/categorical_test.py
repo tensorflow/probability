@@ -29,7 +29,7 @@ from tensorflow_probability.python.distributions import normal
 
 
 def make_categorical(batch_shape, num_classes, dtype=tf.int32):
-  logits = tf.random_uniform(
+  logits = tf.random.uniform(
       list(batch_shape) + [num_classes], -10, 10, dtype=tf.float32) - 50.
   return categorical.Categorical(logits, dtype=dtype)
 
@@ -62,7 +62,7 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
       self.assertEqual(10, self.evaluate(dist.event_size))
       # event_size is available as a constant because the shape is
       # known at graph build time.
-      self.assertEqual(10, tf.contrib.util.constant_value(dist.event_size))
+      self.assertEqual(10, tf.get_static_value(dist.event_size))
 
     for batch_shape in ([], [1], [2, 3, 4]):
       dist = make_categorical(
@@ -99,7 +99,8 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
       self.assertEqual(dist.dtype, dist.sample(5).dtype)
 
   def testUnknownShape(self):
-    logits = lambda l: tf.placeholder_with_default(np.float32(l), shape=None)
+    logits = lambda l: tf.compat.v1.placeholder_with_default(
+        np.float32(l), shape=None)
     sample = lambda l: categorical.Categorical(logits=logits(l)).sample()
     # Will sample class 1.
     sample_value = self.evaluate(sample([-1000.0, 1000.0]))
@@ -112,18 +113,18 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
 
   def testPMFWithBatch(self):
     histograms = [[0.2, 0.8], [0.6, 0.4]]
-    dist = categorical.Categorical(tf.log(histograms) - 50.)
+    dist = categorical.Categorical(tf.math.log(histograms) - 50.)
     self.assertAllClose([0.2, 0.4], self.evaluate(dist.prob([0, 1])))
 
   def testPMFNoBatch(self):
     histograms = [0.2, 0.8]
-    dist = categorical.Categorical(tf.log(histograms) - 50.)
+    dist = categorical.Categorical(tf.math.log(histograms) - 50.)
     self.assertAllClose(0.2, self.evaluate(dist.prob(0)))
 
   def testCDFWithDynamicEventShapeKnownNdims(self):
     """Test that dynamically-sized events with unknown shape work."""
     batch_size = 2
-    make_ph = tf.placeholder_with_default
+    make_ph = tf.compat.v1.placeholder_with_default
     histograms = lambda h: make_ph(np.float32(h), shape=(batch_size, None))
     event = lambda e: make_ph(np.float32(e), shape=(batch_size,))
     dist = lambda h: categorical.Categorical(probs=histograms(h))
@@ -154,8 +155,9 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
   def testCDFWithDynamicEventShapeUnknownNdims(
       self, events, histograms, expected_cdf):
     """Test that dynamically-sized events with unknown shape work."""
-    event_ph = tf.placeholder_with_default(events, shape=None)
-    histograms_ph = tf.placeholder_with_default(histograms, shape=None)
+    event_ph = tf.compat.v1.placeholder_with_default(events, shape=None)
+    histograms_ph = tf.compat.v1.placeholder_with_default(
+        histograms, shape=None)
     dist = categorical.Categorical(probs=histograms_ph)
     cdf_op = dist.cdf(event_ph)
 
@@ -300,8 +302,8 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
 
       probabilities = tf.nn.softmax(logits)
       log_probabilities = tf.nn.log_softmax(logits)
-      true_entropy = - tf.reduce_sum(
-          probabilities * log_probabilities, axis=-1)
+      true_entropy = -tf.reduce_sum(
+          input_tensor=probabilities * log_probabilities, axis=-1)
 
       categorical_distribution = categorical.Categorical(probs=probabilities)
       categorical_entropy = categorical_distribution.entropy()
@@ -321,7 +323,7 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
 
   def testSample(self):
     histograms = [[[0.2, 0.8], [0.4, 0.6]]]
-    dist = categorical.Categorical(tf.log(histograms) - 50.)
+    dist = categorical.Categorical(tf.math.log(histograms) - 50.)
     n = 10000
     samples = dist.sample(n, seed=123)
     samples.set_shape([n, 1, 2])
@@ -336,7 +338,7 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
 
   def testSampleWithSampleShape(self):
     histograms = [[[0.2, 0.8], [0.4, 0.6]]]
-    dist = categorical.Categorical(tf.log(histograms) - 50.)
+    dist = categorical.Categorical(tf.math.log(histograms) - 50.)
     samples = dist.sample((100, 100), seed=123)
     prob = dist.prob(samples)
     prob_val = self.evaluate(prob)
@@ -357,7 +359,7 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
   def testLogPMFBroadcasting(self):
     # 1 x 2 x 2
     histograms = [[[0.2, 0.8], [0.4, 0.6]]]
-    dist = categorical.Categorical(tf.log(histograms) - 50.)
+    dist = categorical.Categorical(tf.math.log(histograms) - 50.)
 
     prob = dist.prob(1)
     self.assertAllClose([[0.8, 0.6]], self.evaluate(prob))
@@ -384,7 +386,7 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
   def testLogPMFShape(self):
     # shape [1, 2, 2]
     histograms = [[[0.2, 0.8], [0.4, 0.6]]]
-    dist = categorical.Categorical(tf.log(histograms))
+    dist = categorical.Categorical(tf.math.log(histograms))
 
     log_prob = dist.log_prob([0, 1])
     self.assertEqual(2, log_prob.shape.ndims)
@@ -396,7 +398,7 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
 
   def testLogPMFShapeNoBatch(self):
     histograms = [0.2, 0.8]
-    dist = categorical.Categorical(tf.log(histograms))
+    dist = categorical.Categorical(tf.math.log(histograms))
 
     log_prob = dist.log_prob(0)
     self.assertEqual(0, log_prob.shape.ndims)
@@ -408,7 +410,7 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
 
   def testMode(self):
     histograms = [[[0.2, 0.8], [0.6, 0.4]]]
-    dist = categorical.Categorical(tf.log(histograms) - 50.)
+    dist = categorical.Categorical(tf.math.log(histograms) - 50.)
     self.assertAllEqual([[1, 0]], self.evaluate(dist.mode()))
 
   def testCategoricalCategoricalKL(self):

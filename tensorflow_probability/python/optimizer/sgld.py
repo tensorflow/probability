@@ -30,7 +30,7 @@ __all__ = [
 ]
 
 
-class StochasticGradientLangevinDynamics(tf.train.Optimizer):
+class StochasticGradientLangevinDynamics(tf.compat.v1.train.Optimizer):
   """An optimizer module for stochastic gradient Langevin dynamics.
 
   This implements the preconditioned Stochastic Gradient Langevin Dynamics
@@ -165,54 +165,53 @@ class StochasticGradientLangevinDynamics(tf.train.Optimizer):
         raise NotImplementedError('Eager execution currently not supported for '
                                   ' SGLD optimizer.')
       if variable_scope is None:
-        var_scope_name = tf.get_default_graph().unique_name(
+        var_scope_name = tf.compat.v1.get_default_graph().unique_name(
             name or default_name)
-        with tf.variable_scope(var_scope_name) as scope:
+        with tf.compat.v1.variable_scope(var_scope_name) as scope:
           self._variable_scope = scope
       else:
         self._variable_scope = variable_scope
 
       self._preconditioner_decay_rate = tf.convert_to_tensor(
-          preconditioner_decay_rate, name='preconditioner_decay_rate')
-      self._data_size = tf.convert_to_tensor(
-          data_size, name='data_size')
-      self._burnin = tf.convert_to_tensor(burnin, name='burnin')
+          value=preconditioner_decay_rate, name='preconditioner_decay_rate')
+      self._data_size = tf.convert_to_tensor(value=data_size, name='data_size')
+      self._burnin = tf.convert_to_tensor(value=burnin, name='burnin')
       self._diagonal_bias = tf.convert_to_tensor(
-          diagonal_bias, name='diagonal_bias')
+          value=diagonal_bias, name='diagonal_bias')
       self._learning_rate = tf.convert_to_tensor(
-          learning_rate, name='learning_rate')
+          value=learning_rate, name='learning_rate')
       self._parallel_iterations = parallel_iterations
 
-      with tf.variable_scope(self._variable_scope):
-        self._counter = tf.get_variable(
+      with tf.compat.v1.variable_scope(self._variable_scope):
+        self._counter = tf.compat.v1.get_variable(
             'counter', initializer=0, trainable=False)
 
       self._preconditioner_decay_rate = control_flow_ops.with_dependencies([
-          tf.assert_non_negative(
+          tf.compat.v1.assert_non_negative(
               self._preconditioner_decay_rate,
               message='`preconditioner_decay_rate` must be non-negative'),
-          tf.assert_less_equal(
+          tf.compat.v1.assert_less_equal(
               self._preconditioner_decay_rate,
               1.,
               message='`preconditioner_decay_rate` must be at most 1.'),
       ], self._preconditioner_decay_rate)
 
       self._data_size = control_flow_ops.with_dependencies([
-          tf.assert_greater(
+          tf.compat.v1.assert_greater(
               self._data_size,
               0,
               message='`data_size` must be greater than zero')
       ], self._data_size)
 
       self._burnin = control_flow_ops.with_dependencies([
-          tf.assert_non_negative(
+          tf.compat.v1.assert_non_negative(
               self._burnin, message='`burnin` must be non-negative'),
-          tf.assert_integer(
+          tf.compat.v1.assert_integer(
               self._burnin, message='`burnin` must be an integer')
       ], self._burnin)
 
       self._diagonal_bias = control_flow_ops.with_dependencies([
-          tf.assert_non_negative(
+          tf.compat.v1.assert_non_negative(
               self._diagonal_bias,
               message='`diagonal_bias` must be non-negative')
       ], self._diagonal_bias)
@@ -222,19 +221,23 @@ class StochasticGradientLangevinDynamics(tf.train.Optimizer):
 
   def _create_slots(self, var_list):
     for v in var_list:
-      init_rms = tf.ones_initializer(dtype=v.dtype)
+      init_rms = tf.compat.v1.initializers.ones(dtype=v.dtype)
       self._get_or_make_slot_with_initializer(v, init_rms, v.shape,
                                               v.dtype, 'rms', self._name)
 
   def _prepare(self):
     # We need to put the conversion and check here because a user will likely
     # want to decay the learning rate dynamically.
-    self._learning_rate_tensor = control_flow_ops.with_dependencies([
-        tf.assert_non_negative(
-            self._learning_rate, message='`learning_rate` must be non-negative')
-    ], tf.convert_to_tensor(self._learning_rate, name='learning_rate_tensor'))
+    self._learning_rate_tensor = control_flow_ops.with_dependencies(
+        [
+            tf.compat.v1.assert_non_negative(
+                self._learning_rate,
+                message='`learning_rate` must be non-negative')
+        ],
+        tf.convert_to_tensor(
+            value=self._learning_rate, name='learning_rate_tensor'))
     self._decay_tensor = tf.convert_to_tensor(
-        self._preconditioner_decay_rate, name='preconditioner_decay_rate')
+        value=self._preconditioner_decay_rate, name='preconditioner_decay_rate')
 
     super(StochasticGradientLangevinDynamics, self)._prepare()
 
@@ -270,14 +273,14 @@ class StochasticGradientLangevinDynamics(tf.train.Optimizer):
     # preconditioned Langevin dynamics
     stddev = tf.where(
         tf.squeeze(self._counter > self._burnin),
-        tf.cast(tf.rsqrt(self._learning_rate), grad.dtype),
+        tf.cast(tf.math.rsqrt(self._learning_rate), grad.dtype),
         tf.zeros([], grad.dtype))
     # Keep an exponentially weighted moving average of squared gradients.
     # Not thread safe
     decay_tensor = tf.cast(self._decay_tensor, grad.dtype)
     new_mom = decay_tensor * mom + (1. - decay_tensor) * tf.square(grad)
-    preconditioner = tf.rsqrt(
-        new_mom + tf.cast(self._diagonal_bias, grad.dtype))
+    preconditioner = tf.math.rsqrt(new_mom +
+                                   tf.cast(self._diagonal_bias, grad.dtype))
 
     # Compute gradients of the preconsitionaer
     _, preconditioner_grads = diag_jacobian(
@@ -289,10 +292,8 @@ class StochasticGradientLangevinDynamics(tf.train.Optimizer):
                   tf.cast(self._data_size, grad.dtype)
                   - preconditioner_grads[0])
     stddev *= tf.sqrt(preconditioner)
-    result_shape = tf.broadcast_dynamic_shape(tf.shape(mean),
-                                              tf.shape(stddev))
-    with tf.control_dependencies([tf.assign(mom, new_mom)]):
-      return tf.random_normal(shape=result_shape,
-                              mean=mean,
-                              stddev=stddev,
-                              dtype=grad.dtype)
+    result_shape = tf.broadcast_dynamic_shape(
+        tf.shape(input=mean), tf.shape(input=stddev))
+    with tf.control_dependencies([tf.compat.v1.assign(mom, new_mom)]):
+      return tf.random.normal(
+          shape=result_shape, mean=mean, stddev=stddev, dtype=grad.dtype)

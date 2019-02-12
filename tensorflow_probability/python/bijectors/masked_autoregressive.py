@@ -247,7 +247,8 @@ class MaskedAutoregressiveFlow(bijector.Bijector):
         y = next_y
       return y
 
-    event_size = tf.reduce_prod(tf.shape(x)[-self._event_ndims:])
+    event_size = tf.reduce_prod(
+        input_tensor=tf.shape(input=x)[-self._event_ndims:])
     y0 = tf.zeros_like(x, name="y0")
     # call the template once to ensure creation
     _ = self._shift_and_log_scale_fn(y0)
@@ -255,7 +256,7 @@ class MaskedAutoregressiveFlow(bijector.Bijector):
       """While-loop body for autoregression calculation."""
       # Set caching device to avoid re-getting the tf.Variable for every while
       # loop iteration.
-      with tf.variable_scope(tf.get_variable_scope()) as vs:
+      with tf.compat.v1.variable_scope(tf.compat.v1.get_variable_scope()) as vs:
         if vs.caching_device is None and not tf.executing_eagerly():
           vs.set_caching_device(lambda op: op.device)
         shift, log_scale = self._shift_and_log_scale_fn(y0)
@@ -289,7 +290,8 @@ class MaskedAutoregressiveFlow(bijector.Bijector):
     _, log_scale = self._shift_and_log_scale_fn(y)
     if log_scale is None:
       return tf.constant(0., dtype=y.dtype, name="ildj")
-    return -tf.reduce_sum(log_scale, axis=tf.range(-self._event_ndims, 0))
+    return -tf.reduce_sum(
+        input_tensor=log_scale, axis=tf.range(-self._event_ndims, 0))
 
 
 MASK_INCLUSIVE = "inclusive"
@@ -371,7 +373,8 @@ def masked_dense(inputs,
        Conference on Machine Learning_, 2015. https://arxiv.org/abs/1502.03509
   """
   # TODO(b/67594795): Better support of dynamic shape.
-  input_depth = tf.dimension_value(inputs.shape.with_rank_at_least(1)[-1])
+  input_depth = tf.compat.dimension_value(
+      inputs.shape.with_rank_at_least(1)[-1])
   if input_depth is None:
     raise NotImplementedError(
         "Rightmost dimension must be known prior to graph execution.")
@@ -380,13 +383,13 @@ def masked_dense(inputs,
                    MASK_EXCLUSIVE if exclusive else MASK_INCLUSIVE).T
 
   if kernel_initializer is None:
-    kernel_initializer = tf.glorot_normal_initializer()
+    kernel_initializer = tf.compat.v1.glorot_normal_initializer()
 
   def masked_initializer(shape, dtype=None, partition_info=None):
     return mask * kernel_initializer(shape, dtype, partition_info)
 
   with tf.name_scope(name, "masked_dense", [inputs, units, num_blocks]):
-    layer = tf.layers.Dense(
+    layer = tf.compat.v1.layers.Dense(
         units,
         kernel_initializer=masked_initializer,
         kernel_constraint=lambda x: mask * x,
@@ -477,13 +480,13 @@ def masked_autoregressive_default_template(hidden_layers,
     def _fn(x):
       """MADE parameterized via `masked_autoregressive_default_template`."""
       # TODO(b/67594795): Better support of dynamic shape.
-      input_depth = tf.dimension_value(x.shape.with_rank_at_least(1)[-1])
+      input_depth = tf.compat.dimension_value(x.shape.with_rank_at_least(1)[-1])
       if input_depth is None:
         raise NotImplementedError(
             "Rightmost dimension must be known prior to graph execution.")
       input_shape = (
           np.int32(x.shape.as_list())
-          if x.shape.is_fully_defined() else tf.shape(x))
+          if x.shape.is_fully_defined() else tf.shape(input=x))
       if x.shape.rank == 1:
         x = x[tf.newaxis, ...]
       for i, units in enumerate(hidden_layers):
@@ -513,4 +516,4 @@ def masked_autoregressive_default_template(hidden_layers,
       log_scale = which_clip(log_scale, log_scale_min_clip, log_scale_max_clip)
       return shift, log_scale
 
-    return tf.make_template(name, _fn)
+    return tf.compat.v1.make_template(name, _fn)

@@ -32,7 +32,7 @@ tfe = tf.contrib.eager
 class _ProximalHessianTest(object):
 
   def _make_placeholder(self, x):
-    return tf.placeholder_with_default(
+    return tf.compat.v1.placeholder_with_default(
         input=x, shape=(x.shape if self.use_static_shape else None))
 
   def _adjust_dtype_and_shape_hints(self, x):
@@ -190,7 +190,7 @@ class _ProximalHessianTest(object):
 
     def _grad_and_hessian_unregularized_loss_fn(x):
       grad = 2 * (x - a)
-      hessian_outer = tf.diag(tf.ones_like(a))
+      hessian_outer = tf.linalg.tensor_diag(tf.ones_like(a))
       hessian_middle = 2. * tf.ones_like(a)
       return grad, hessian_outer, hessian_middle
 

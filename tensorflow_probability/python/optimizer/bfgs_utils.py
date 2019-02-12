@@ -68,9 +68,9 @@ def get_initial_state_args(value_and_gradients_function,
     f0, df0 = value_and_gradients_function(initial_position)
   return dict(
       converged=_check_within_tolerance(df0, grad_tolerance),
-      failed=tf.convert_to_tensor(False),
-      num_iterations=tf.convert_to_tensor(0),
-      num_objective_evaluations=tf.convert_to_tensor(1),
+      failed=tf.convert_to_tensor(value=False),
+      num_iterations=tf.convert_to_tensor(value=0),
+      num_objective_evaluations=tf.convert_to_tensor(value=1),
       position=initial_position,
       objective_value=f0,
       objective_gradient=df0)
@@ -118,11 +118,11 @@ def line_search_step(state, value_and_gradients_function, search_direction,
   dtype = state.position.dtype.base_dtype
   line_search_value_grad_func = _restrict_along_direction(
       value_and_gradients_function, state.position, search_direction)
-  derivative_at_start_pt = tf.reduce_sum(state.objective_gradient *
+  derivative_at_start_pt = tf.reduce_sum(input_tensor=state.objective_gradient *
                                          search_direction)
   ls_result = linesearch.hager_zhang(
       line_search_value_grad_func,
-      initial_step_size=tf.convert_to_tensor(1, dtype=dtype),
+      initial_step_size=tf.convert_to_tensor(value=1, dtype=dtype),
       objective_at_zero=state.objective_value,
       grad_objective_at_zero=derivative_at_start_pt)
 
@@ -207,9 +207,11 @@ def _restrict_along_direction(value_and_gradients_function,
   def _restricted_func(t):
     pt = position + t * direction
     objective_value, gradient = value_and_gradients_function(pt)
-    return ValueAndGradient(f=objective_value,
-                            df=tf.reduce_sum(gradient * direction),
-                            full_gradient=gradient)
+    return ValueAndGradient(
+        f=objective_value,
+        df=tf.reduce_sum(input_tensor=gradient * direction),
+        full_gradient=gradient)
+
   return _restricted_func
 
 
@@ -242,7 +244,7 @@ def _update_position(state,
 
 def _check_within_tolerance(value, tolerance):
   """Checks whether the given value is below the supplied tolerance."""
-  return tf.norm(value, ord=np.inf) <= tolerance
+  return tf.norm(tensor=value, ord=np.inf) <= tolerance
 
 
 def _check_convergence(current_position,
@@ -274,7 +276,7 @@ def _is_finite(arg1, *args):
     is_finite: Scalar boolean `Tensor` indicating whether all the supplied
       tensors are finite.
   """
-  finite = tf.reduce_all(tf.is_finite(arg1))
+  finite = tf.reduce_all(input_tensor=tf.math.is_finite(arg1))
   for arg in args:
-    finite = finite & tf.reduce_all(tf.is_finite(arg))
+    finite = finite & tf.reduce_all(input_tensor=tf.math.is_finite(arg))
   return finite

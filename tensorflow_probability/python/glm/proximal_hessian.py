@@ -89,11 +89,12 @@ def _grad_neg_log_likelihood_and_fim(model_matrix, linear_response, response,
   mean, variance, grad_mean = model(linear_response)
 
   is_valid = (
-      tf.is_finite(grad_mean) & tf.not_equal(grad_mean, 0.) &
-      tf.is_finite(variance) & (variance > 0.))
+      tf.math.is_finite(grad_mean) & tf.not_equal(grad_mean, 0.)
+      & tf.math.is_finite(variance) & (variance > 0.))
 
   def _mask_if_invalid(x, mask):
-    mask = tf.fill(tf.shape(x), value=np.array(mask, x.dtype.as_numpy_dtype))
+    mask = tf.fill(
+        tf.shape(input=x), value=np.array(mask, x.dtype.as_numpy_dtype))
     return tf.where(is_valid, x, mask)
 
   # TODO(b/111923449): Link to derivation once it's available.
@@ -521,9 +522,9 @@ def _fit_sparse_exact_hessian(  # pylint: disable = missing-docstring
 
     def _grad_and_hessian_loss_fn(x):
       loss = _neg_log_likelihood(x)
-      grad_loss = tf.gradients(loss, [x])[0]
-      hessian_loss = tf.hessians(loss, [x])[0]
-      hessian_chol = tf.cholesky(hessian_loss)
+      grad_loss = tf.gradients(ys=loss, xs=[x])[0]
+      hessian_loss = tf.hessians(ys=loss, xs=[x])[0]
+      hessian_chol = tf.linalg.cholesky(hessian_loss)
       return grad_loss, hessian_chol, tf.ones_like(grad_loss)
 
     return tfp.optimizer.proximal_hessian_sparse_minimize(

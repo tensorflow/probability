@@ -137,7 +137,8 @@ class HagerZhangTest(tf.test.TestCase):
       """Value and derivative of Rosenbrock projected along a descent dirn."""
       coord = x0 + t * dirn
       ft, df = rosenbrock(coord)
-      return ValueAndGradient(ft, tf.reduce_sum(df * dirn))
+      return ValueAndGradient(ft, tf.reduce_sum(input_tensor=df * dirn))
+
     results = self.evaluate(tfp.optimizer.linesearch.hager_zhang(
         fdf, initial_step_size=1.0))
     self.assertTrue(results.converged)
@@ -177,7 +178,7 @@ class HagerZhangTest(tf.test.TestCase):
         # Enabling locking is critical here. Otherwise, there are race
         # conditions between various call sites which causes some of the
         # invocations to be missed.
-        inc = tf.assign_add(eval_count, 1, use_locking=True)
+        inc = tf.compat.v1.assign_add(eval_count, 1, use_locking=True)
         with tf.control_dependencies([inc]):
           f = x * x - 2 * x + 1
           df = 2 * (x - 1)
@@ -188,7 +189,7 @@ class HagerZhangTest(tf.test.TestCase):
       fdf, counter = get_fn()
       results = tfp.optimizer.linesearch.hager_zhang(
           fdf, initial_step_size=tf.constant(start))
-      init = tf.global_variables_initializer()
+      init = tf.compat.v1.global_variables_initializer()
       with self.cached_session() as session:
         session.run(init)
         results = session.run(results)

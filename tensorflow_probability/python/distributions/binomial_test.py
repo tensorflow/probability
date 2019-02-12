@@ -93,7 +93,8 @@ class BinomialTest(tf.test.TestCase):
     self.evaluate(binom.prob([3., 1, 2]))
     self.evaluate(binom.cdf([2., 3, 2]))
     self.evaluate(binom.cdf([3., 1, 2]))
-    placeholder = tf.placeholder_with_default(input=[1.0, 2.5, 1.5], shape=[3])
+    placeholder = tf.compat.v1.placeholder_with_default(
+        input=[1.0, 2.5, 1.5], shape=[3])
     # Both equality and integer checking fail.
     with self.assertRaisesOpError("cannot contain fractional components."):
       self.evaluate(binom.prob(placeholder))

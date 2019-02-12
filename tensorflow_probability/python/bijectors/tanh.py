@@ -56,7 +56,7 @@ class Tanh(bijector.Bijector):
     return tf.atanh(y)
 
   def _inverse_log_det_jacobian(self, y):
-    return -tf.log1p(-tf.square(y))
+    return -tf.math.log1p(-tf.square(y))
 
   def _forward_log_det_jacobian(self, x):
     #  This formula is mathematically equivalent to

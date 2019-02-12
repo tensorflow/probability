@@ -44,7 +44,7 @@ class _AutoCorrelationTest(object):
   def test_constant_sequence_axis_0_max_lags_none_center_false(self):
     x_ = np.array([[0., 0., 0.],
                    [1., 1., 1.]]).astype(self.dtype)
-    x_ph = tf.placeholder_with_default(
+    x_ph = tf.compat.v1.placeholder_with_default(
         input=x_, shape=x_.shape if self.use_static_shape else None)
     with spectral_ops_test_util.fft_kernel_label_map():
       # Setting normalize = True means we divide by zero.
@@ -58,7 +58,7 @@ class _AutoCorrelationTest(object):
   def test_constant_sequence_axis_0_max_lags_none_center_true(self):
     x_ = np.array([[0., 0., 0.],
                    [1., 1., 1.]]).astype(self.dtype)
-    x_ph = tf.placeholder_with_default(
+    x_ph = tf.compat.v1.placeholder_with_default(
         input=x_, shape=x_.shape if self.use_static_shape else None)
     with spectral_ops_test_util.fft_kernel_label_map():
       # Setting normalize = True means we divide by zero.
@@ -90,7 +90,7 @@ class _AutoCorrelationTest(object):
     if normalize:
       rxx /= np.take(rxx, [0], axis=axis)
 
-    x_ph = tf.placeholder_with_default(
+    x_ph = tf.compat.v1.placeholder_with_default(
         x, shape=x.shape if self.use_static_shape else None)
     with spectral_ops_test_util.fft_kernel_label_map():
       auto_corr = tfd.auto_correlation(
@@ -159,7 +159,7 @@ class _AutoCorrelationTest(object):
   def test_long_orthonormal_sequence_has_corr_length_0(self):
     l = 10000
     x = rng.randn(l).astype(self.dtype)
-    x_ph = tf.placeholder_with_default(
+    x_ph = tf.compat.v1.placeholder_with_default(
         x, shape=(l,) if self.use_static_shape else None)
     with spectral_ops_test_util.fft_kernel_label_map():
       rxx = tfd.auto_correlation(
@@ -184,7 +184,7 @@ class _AutoCorrelationTest(object):
     # x jumps to new random value every 10 steps.  So correlation length = 10.
     x = (rng.randint(-10, 10, size=(1000, 1))
          * np.ones((1, 10))).ravel().astype(self.dtype)
-    x_ph = tf.placeholder_with_default(
+    x_ph = tf.compat.v1.placeholder_with_default(
         x, shape=(1000 * 10,) if self.use_static_shape else None)
     with spectral_ops_test_util.fft_kernel_label_map():
       rxx = tfd.auto_correlation(
@@ -204,7 +204,7 @@ class _AutoCorrelationTest(object):
   def test_normalization(self):
     l = 10000
     x = 3 * rng.randn(l).astype(self.dtype)
-    x_ph = tf.placeholder_with_default(
+    x_ph = tf.compat.v1.placeholder_with_default(
         x, shape=(l,) if self.use_static_shape else None)
     with spectral_ops_test_util.fft_kernel_label_map():
       rxx = tfd.auto_correlation(
@@ -380,7 +380,8 @@ class PercentileTestWithLowerInterpolation(tf.test.TestCase):
 
   def test_four_dimensional_input_x_static_ndims_but_dynamic_sizes(self):
     x = rng.rand(2, 3, 4, 5)
-    x_ph = tf.placeholder_with_default(input=x, shape=[None, None, None, None])
+    x_ph = tf.compat.v1.placeholder_with_default(
+        input=x, shape=[None, None, None, None])
     for axis in [None, 0, 1, -2, (0,), (-1,), (-1, 1), (3, 1), (-3, 0)]:
       expected_percentile = np.percentile(
           x, q=0.77, interpolation=self._interpolation, axis=axis)
@@ -390,7 +391,8 @@ class PercentileTestWithLowerInterpolation(tf.test.TestCase):
 
   def test_four_dimensional_input_and_keepdims_x_static_ndims_dynamic_sz(self):
     x = rng.rand(2, 3, 4, 5)
-    x_ph = tf.placeholder_with_default(input=x, shape=[None, None, None, None])
+    x_ph = tf.compat.v1.placeholder_with_default(
+        input=x, shape=[None, None, None, None])
     for axis in [None, 0, 1, -2, (0,), (-1,), (-1, 1), (3, 1), (-3, 0)]:
       expected_percentile = np.percentile(
           x,
@@ -460,7 +462,7 @@ class PercentileTestWithNearestInterpolation(tf.test.TestCase):
 
   def test_2d_q_raises_dynamic(self):
     x = [1., 5., 3., 2., 4.]
-    q_ph = tf.placeholder_with_default(input=[[0.5]], shape=None)
+    q_ph = tf.compat.v1.placeholder_with_default(input=[[0.5]], shape=None)
     if tf.executing_eagerly():
       with self.assertRaisesRegexp(ValueError, "Expected.*ndims"):
         pct = tfd.percentile(x, q=q_ph, validate_args=True)

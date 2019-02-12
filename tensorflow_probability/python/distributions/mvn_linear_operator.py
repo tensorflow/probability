@@ -177,7 +177,7 @@ class MultivariateNormalLinearOperator(
       # Since expand_dims doesn't preserve constant-ness, we obtain the
       # non-dynamic value if possible.
       loc = loc if loc is None else tf.convert_to_tensor(
-          loc, name="loc", dtype=scale.dtype)
+          value=loc, name="loc", dtype=scale.dtype)
       batch_shape, event_shape = distribution_util.shapes_from_loc_and_scale(
           loc, scale)
 
@@ -232,7 +232,7 @@ class MultivariateNormalLinearOperator(
 
   def _covariance(self):
     if distribution_util.is_diagonal_scale(self.scale):
-      return tf.matrix_diag(tf.square(self.scale.diag_part()))
+      return tf.linalg.diag(tf.square(self.scale.diag_part()))
     else:
       return self.scale.matmul(self.scale.to_dense(), adjoint_arg=True)
 
@@ -241,9 +241,9 @@ class MultivariateNormalLinearOperator(
       return tf.square(self.scale.diag_part())
     elif (isinstance(self.scale, tf.linalg.LinearOperatorLowRankUpdate) and
           self.scale.is_self_adjoint):
-      return tf.matrix_diag_part(self.scale.matmul(self.scale.to_dense()))
+      return tf.linalg.diag_part(self.scale.matmul(self.scale.to_dense()))
     else:
-      return tf.matrix_diag_part(
+      return tf.linalg.diag_part(
           self.scale.matmul(self.scale.to_dense(), adjoint_arg=True))
 
   def _stddev(self):
@@ -252,10 +252,10 @@ class MultivariateNormalLinearOperator(
     elif (isinstance(self.scale, tf.linalg.LinearOperatorLowRankUpdate) and
           self.scale.is_self_adjoint):
       return tf.sqrt(
-          tf.matrix_diag_part(self.scale.matmul(self.scale.to_dense())))
+          tf.linalg.diag_part(self.scale.matmul(self.scale.to_dense())))
     else:
       return tf.sqrt(
-          tf.matrix_diag_part(
+          tf.linalg.diag_part(
               self.scale.matmul(self.scale.to_dense(), adjoint_arg=True)))
 
   def _mode(self):
@@ -298,7 +298,7 @@ def _kl_brute_force(a, b, name=None):
     # The gradient of KL[p,q] is not defined when p==q. The culprit is
     # tf.norm, i.e., we cannot use the commented out code.
     # return tf.square(tf.norm(x, ord="fro", axis=[-2, -1]))
-    return tf.reduce_sum(tf.square(x), axis=[-2, -1])
+    return tf.reduce_sum(input_tensor=tf.square(x), axis=[-2, -1])
 
   # TODO(b/35041439): See also b/35040945. Remove this function once LinOp
   # supports something like:

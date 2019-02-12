@@ -124,7 +124,7 @@ class GradientTest(tf.test.TestCase):
 
     fn_args = [dtype(3), dtype(3)]
     # Convert function input to a list of tensors
-    fn_args = [tf.convert_to_tensor(arg) for arg in fn_args]
+    fn_args = [tf.convert_to_tensor(value=arg) for arg in fn_args]
     fn_result, grads = maybe_call_fn_and_grads(fn, fn_args)
     fn_result_, grads_ = self.evaluate([fn_result, grads])
     self.assertNear(18., fn_result_, err=1e-5)
@@ -147,7 +147,7 @@ class GradientTest(tf.test.TestCase):
     fn_args = [dtype(3), dtype(3)]
     # Convert function input to a list of tensors
     fn_args = [
-        tf.convert_to_tensor(arg, name='arg{}'.format(i))
+        tf.convert_to_tensor(value=arg, name='arg{}'.format(i))
         for i, arg in enumerate(fn_args)
     ]
     if tf.executing_eagerly():
@@ -176,7 +176,7 @@ class SmartForLoopTest(tf.test.TestCase):
 
   def test_tf_while_loop(self):
     iters = 10
-    n = tf.placeholder_with_default(input=np.int64(iters), shape=())
+    n = tf.compat.v1.placeholder_with_default(input=np.int64(iters), shape=())
     counter = collections.Counter()
     def body(x):
       counter['body_calls'] += 1

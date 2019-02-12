@@ -90,7 +90,7 @@ class _ForecastTest(object):
     onestep_dist = tfp.sts.one_step_predictive(model, observed_time_series,
                                                parameter_samples=prior_samples)
 
-    self.evaluate(tf.global_variables_initializer())
+    self.evaluate(tf.compat.v1.global_variables_initializer())
     if self.use_static_shape:
       self.assertAllEqual(onestep_dist.batch_shape.as_list(), batch_shape)
     else:
@@ -162,7 +162,7 @@ class _ForecastTest(object):
     sample_shape = [10]
     forecast_samples = forecast_dist.sample(sample_shape)[..., 0]
 
-    self.evaluate(tf.global_variables_initializer())
+    self.evaluate(tf.compat.v1.global_variables_initializer())
     forecast_mean_, forecast_scale_, forecast_samples_ = self.evaluate(
         (forecast_mean, forecast_scale, forecast_samples))
     self.assertAllEqual(forecast_mean_.shape,
@@ -187,7 +187,7 @@ class _ForecastTest(object):
                                      parameter_samples=prior_samples,
                                      num_steps_forecast=num_steps_forecast)
 
-    self.evaluate(tf.global_variables_initializer())
+    self.evaluate(tf.compat.v1.global_variables_initializer())
     if self.use_static_shape:
       self.assertAllEqual(forecast_dist.batch_shape.as_list(), batch_shape)
     else:
@@ -211,7 +211,7 @@ class _ForecastTest(object):
     """
 
     ndarray = np.asarray(ndarray).astype(self.dtype)
-    return tf.placeholder_with_default(
+    return tf.compat.v1.placeholder_with_default(
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 

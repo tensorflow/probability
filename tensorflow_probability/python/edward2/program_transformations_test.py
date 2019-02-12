@@ -38,12 +38,14 @@ class ProgramTransformationsTest(tf.test.TestCase):
       return x
 
     def true_log_joint(loc, x):
-      log_prob = tf.reduce_sum(tfd.Normal(loc=0., scale=1.).log_prob(loc))
-      log_prob += tf.reduce_sum(tfd.Normal(loc=loc, scale=0.5).log_prob(x))
+      log_prob = tf.reduce_sum(
+          input_tensor=tfd.Normal(loc=0., scale=1.).log_prob(loc))
+      log_prob += tf.reduce_sum(
+          input_tensor=tfd.Normal(loc=loc, scale=0.5).log_prob(x))
       return log_prob
 
     loc_value = 0.3
-    x_value = tf.random_normal([5])
+    x_value = tf.random.normal([5])
 
     log_joint = ed.make_log_joint_fn(normal_with_unknown_mean)
     actual_log_prob = true_log_joint(loc_value, x_value)
@@ -62,27 +64,28 @@ class ProgramTransformationsTest(tf.test.TestCase):
   def testMakeLogJointFnConditional(self):
     """Test `make_log_joint_fn` on conditional Edward program."""
     def linear_regression(features, prior_precision):
-      w = ed.Normal(loc=0.,
-                    scale=tf.rsqrt(prior_precision),
-                    sample_shape=features.shape[1],
-                    name="w")
+      w = ed.Normal(
+          loc=0.,
+          scale=tf.math.rsqrt(prior_precision),
+          sample_shape=features.shape[1],
+          name="w")
       y = ed.Normal(loc=tf.tensordot(features, w, [[1], [0]]),
                     scale=1.,
                     name="y")
       return y
 
-    features = tf.random_normal([3, 2])
+    features = tf.random.normal([3, 2])
     prior_precision = 0.5
-    w_value = tf.random_normal([2])
-    y_value = tf.random_normal([3])
+    w_value = tf.random.normal([2])
+    y_value = tf.random.normal([3])
 
     def true_log_joint(features, prior_precision, w, y):
-      log_prob = tf.reduce_sum(tfd.Normal(
-          loc=0.,
-          scale=tf.rsqrt(prior_precision)).log_prob(w))
-      log_prob += tf.reduce_sum(tfd.Normal(
-          loc=tf.tensordot(features, w, [[1], [0]]),
-          scale=1.).log_prob(y))
+      log_prob = tf.reduce_sum(
+          input_tensor=tfd.Normal(loc=0., scale=tf.math.rsqrt(
+              prior_precision)).log_prob(w))
+      log_prob += tf.reduce_sum(
+          input_tensor=tfd.Normal(
+              loc=tf.tensordot(features, w, [[1], [0]]), scale=1.).log_prob(y))
       return log_prob
 
     log_joint = ed.make_log_joint_fn(linear_regression)
@@ -121,18 +124,21 @@ class ProgramTransformationsTest(tf.test.TestCase):
       return x
 
     def true_log_joint(loc, flip, x):
-      log_prob = tf.reduce_sum(tfd.Normal(loc=0., scale=1.).log_prob(loc))
-      log_prob += tf.reduce_sum(tfd.Bernoulli(probs=0.5).log_prob(flip))
+      log_prob = tf.reduce_sum(
+          input_tensor=tfd.Normal(loc=0., scale=1.).log_prob(loc))
+      log_prob += tf.reduce_sum(
+          input_tensor=tfd.Bernoulli(probs=0.5).log_prob(flip))
       if tf.equal(flip, 1):
-        log_prob += tf.reduce_sum(tfd.Normal(loc=loc, scale=0.5).log_prob(x))
+        log_prob += tf.reduce_sum(
+            input_tensor=tfd.Normal(loc=loc, scale=0.5).log_prob(x))
       else:
         log_prob += tf.reduce_sum(
-            tfd.Poisson(rate=tf.nn.softplus(loc)).log_prob(x))
+            input_tensor=tfd.Poisson(rate=tf.nn.softplus(loc)).log_prob(x))
       return log_prob
 
     loc_value = 0.3
     flip_value = tf.constant(1)
-    x_value = tf.random_normal([5])
+    x_value = tf.random.normal([5])
 
     log_joint = ed.make_log_joint_fn(mixture_of_real_and_int)
     actual_log_prob = true_log_joint(loc_value, flip_value, x_value)
@@ -144,7 +150,7 @@ class ProgramTransformationsTest(tf.test.TestCase):
 
     loc_value = 1.2
     flip_value = tf.constant(0)
-    x_value = tf.random_normal([3])
+    x_value = tf.random.normal([3])
 
     actual_log_prob = true_log_joint(loc_value, flip_value, x_value)
     expected_log_prob = log_joint(loc=loc_value, flip=flip_value, x=x_value)
@@ -156,24 +162,26 @@ class ProgramTransformationsTest(tf.test.TestCase):
   def testMakeLogJointFnTemplate(self):
     """Test `make_log_joint_fn` on program returned by tf.make_template."""
     def variational():
-      loc = tf.get_variable("loc", [])
+      loc = tf.compat.v1.get_variable("loc", [])
       qz = ed.Normal(loc=loc, scale=0.5, name="qz")
       return qz
 
     def true_log_joint(loc, qz):
-      log_prob = tf.reduce_sum(tfd.Normal(loc=loc, scale=0.5).log_prob(qz))
+      log_prob = tf.reduce_sum(
+          input_tensor=tfd.Normal(loc=loc, scale=0.5).log_prob(qz))
       return log_prob
 
     qz_value = 1.23
-    variational_template = tf.make_template("variational", variational)
+    variational_template = tf.compat.v1.make_template("variational",
+                                                      variational)
 
     log_joint = ed.make_log_joint_fn(variational_template)
     expected_log_prob = log_joint(qz=qz_value)
-    loc = tf.trainable_variables("variational")[0]
+    loc = tf.compat.v1.trainable_variables("variational")[0]
     actual_log_prob = true_log_joint(loc, qz_value)
 
     with self.cached_session() as sess:
-      sess.run(tf.initialize_all_variables())
+      sess.run(tf.compat.v1.initialize_all_variables())
       actual_log_prob_, expected_log_prob_ = sess.run(
           [actual_log_prob, expected_log_prob])
       self.assertEqual(actual_log_prob_, expected_log_prob_)
@@ -187,7 +195,7 @@ class ProgramTransformationsTest(tf.test.TestCase):
       return x
 
     loc_value = 0.3
-    x_value = tf.random_normal([5])
+    x_value = tf.random.normal([5])
 
     log_joint = ed.make_log_joint_fn(normal_with_unknown_mean)
 

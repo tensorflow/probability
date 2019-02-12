@@ -37,7 +37,7 @@ class MultivariateNormalLinearOperatorTest(tf.test.TestCase):
   def _random_tril_matrix(self, shape):
     mat = self.rng.rand(*shape)
     chol = tfd.matrix_diag_transform(mat, transform=tf.nn.softplus)
-    return tf.matrix_band_part(chol, -1, 0)
+    return tf.linalg.band_part(chol, -1, 0)
 
   def _random_loc_and_scale(self, batch_shape, event_shape):
     # This ensures covariance is positive def.

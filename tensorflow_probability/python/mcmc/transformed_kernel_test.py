@@ -36,7 +36,7 @@ FakeInnerKernelResults = collections.namedtuple(
 
 def _maybe_seed(seed):
   if tf.executing_eagerly():
-    tf.set_random_seed(seed)
+    tf.compat.v1.set_random_seed(seed)
     return None
   return seed
 
@@ -91,11 +91,10 @@ class TransformedTransitionKernelTest(tf.test.TestCase):
         num_burnin_steps=200,
         num_steps_between_results=1,
         parallel_iterations=1)
-    self.assertEqual(num_results, tf.dimension_value(states.shape[0]))
-    sample_mean = tf.reduce_mean(states, axis=0)
+    self.assertEqual(num_results, tf.compat.dimension_value(states.shape[0]))
+    sample_mean = tf.reduce_mean(input_tensor=states, axis=0)
     sample_var = tf.reduce_mean(
-        tf.squared_difference(states, sample_mean),
-        axis=0)
+        input_tensor=tf.math.squared_difference(states, sample_mean), axis=0)
     [
         sample_mean_,
         sample_var_,
@@ -137,11 +136,10 @@ class TransformedTransitionKernelTest(tf.test.TestCase):
         num_burnin_steps=200,
         num_steps_between_results=1,
         parallel_iterations=1)
-    self.assertEqual(num_results, tf.dimension_value(states.shape[0]))
-    sample_mean = tf.reduce_mean(states, axis=0)
+    self.assertEqual(num_results, tf.compat.dimension_value(states.shape[0]))
+    sample_mean = tf.reduce_mean(input_tensor=states, axis=0)
     sample_var = tf.reduce_mean(
-        tf.squared_difference(states, sample_mean),
-        axis=0)
+        input_tensor=tf.math.squared_difference(states, sample_mean), axis=0)
     [
         sample_mean_,
         sample_var_,
@@ -180,11 +178,10 @@ class TransformedTransitionKernelTest(tf.test.TestCase):
         num_burnin_steps=200,
         num_steps_between_results=1,
         parallel_iterations=1)
-    self.assertEqual(num_results, tf.dimension_value(states.shape[0]))
-    sample_mean = tf.reduce_mean(states, axis=0)
+    self.assertEqual(num_results, tf.compat.dimension_value(states.shape[0]))
+    sample_mean = tf.reduce_mean(input_tensor=states, axis=0)
     sample_var = tf.reduce_mean(
-        tf.squared_difference(states, sample_mean),
-        axis=0)
+        input_tensor=tf.math.squared_difference(states, sample_mean), axis=0)
     [
         sample_mean_,
         sample_var_,
@@ -217,7 +214,7 @@ class TransformedTransitionKernelTest(tf.test.TestCase):
               np.linalg.cholesky(true_cov),
               z[..., tf.newaxis]),
           axis=-1)
-      return -0.5 * tf.reduce_sum(z**2., axis=-1)
+      return -0.5 * tf.reduce_sum(input_tensor=z**2., axis=-1)
 
     transformed_hmc = tfp.mcmc.TransformedTransitionKernel(
         inner_kernel=tfp.mcmc.HamiltonianMonteCarlo(
@@ -245,8 +242,8 @@ class TransformedTransitionKernelTest(tf.test.TestCase):
     if not tf.executing_eagerly():
       self.assertAllEqual(dict(target_calls=2), counter)
     states = tf.stack(states, axis=-1)
-    self.assertEqual(num_results, tf.dimension_value(states.shape[0]))
-    sample_mean = tf.reduce_mean(states, axis=0)
+    self.assertEqual(num_results, tf.compat.dimension_value(states.shape[0]))
+    sample_mean = tf.reduce_mean(input_tensor=states, axis=0)
     x = states - sample_mean
     sample_cov = tf.matmul(x, x, transpose_a=True) / self.dtype(num_results)
     [sample_mean_, sample_cov_, is_accepted_] = self.evaluate([

@@ -36,7 +36,7 @@ def try_import(name):  # pylint: disable=invalid-name
   try:
     module = importlib.import_module(name)
   except ImportError as e:
-    tf.logging.warning("Could not import %s: %s" % (name, str(e)))
+    tf.compat.v1.logging.warning("Could not import %s: %s" % (name, str(e)))
   return module
 
 stats = try_import("scipy.stats")
@@ -135,8 +135,8 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase,
     low = tf.zeros(tn_param_shapes["low"])
     sample_shape = self.evaluate(
         tf.shape(
-            tfd.TruncatedNormal(loc=loc, scale=scale, low=low,
-                                high=high).sample()))
+            input=tfd.TruncatedNormal(loc=loc, scale=scale, low=low,
+                                      high=high).sample()))
     self.assertAllEqual(desired_shape, sample_shape)
 
   def testParamShapes(self):
@@ -152,10 +152,10 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase,
   def testShapeWithPlaceholders(self):
     if tf.executing_eagerly():
       return
-    loc = tf.placeholder_with_default(input=5., shape=None)
-    scale = tf.placeholder_with_default(input=[1., 2], shape=None)
-    ub = tf.placeholder_with_default(input=[10., 11.], shape=None)
-    lb = tf.placeholder_with_default(input=[-1.], shape=None)
+    loc = tf.compat.v1.placeholder_with_default(input=5., shape=None)
+    scale = tf.compat.v1.placeholder_with_default(input=[1., 2], shape=None)
+    ub = tf.compat.v1.placeholder_with_default(input=[10., 11.], shape=None)
+    lb = tf.compat.v1.placeholder_with_default(input=[-1.], shape=None)
     dist = tfd.TruncatedNormal(loc, scale, lb, ub)
 
     self.assertEqual(dist.batch_shape, tf.TensorShape(None))
@@ -164,7 +164,7 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase,
     self.assertAllEqual(self.evaluate(dist.batch_shape_tensor()), [2])
     self.assertAllEqual(self.evaluate(dist.sample(5)).shape, [5, 2])
 
-    ub = tf.placeholder_with_default(input=[[5., 11.]], shape=None)
+    ub = tf.compat.v1.placeholder_with_default(input=[[5., 11.]], shape=None)
     dist = tfd.TruncatedNormal(loc, scale, lb, ub)
     self.assertAllEqual(self.evaluate(dist.sample(5)).shape, [5, 1, 2])
 
@@ -258,28 +258,29 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase,
                                high=high)
 
     n = int(2e5)
-    self.evaluate(tf.global_variables_initializer())
-    empirical_abs_mean = tf.reduce_mean(tf.abs(dist.sample(n, seed=6)))
+    self.evaluate(tf.compat.v1.global_variables_initializer())
+    empirical_abs_mean = tf.reduce_mean(
+        input_tensor=tf.abs(dist.sample(n, seed=6)))
 
-    loc_err = tf.test.compute_gradient_error(
+    loc_err = tf.compat.v1.test.compute_gradient_error(
         loc,
         loc.shape,
         empirical_abs_mean, [1],
         x_init_value=self.evaluate(loc),
         delta=0.1)
-    scale_err = tf.test.compute_gradient_error(
+    scale_err = tf.compat.v1.test.compute_gradient_error(
         scale,
         scale.shape,
         empirical_abs_mean, [1],
         x_init_value=self.evaluate(scale),
         delta=0.1)
-    low_err = tf.test.compute_gradient_error(
+    low_err = tf.compat.v1.test.compute_gradient_error(
         low,
         low.shape,
         empirical_abs_mean, [1],
         x_init_value=self.evaluate(low),
         delta=0.1)
-    high_err = tf.test.compute_gradient_error(
+    high_err = tf.compat.v1.test.compute_gradient_error(
         high,
         high.shape,
         empirical_abs_mean, [1],
@@ -295,7 +296,8 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase,
     def samples_sum(loc):
       dist = tfp.distributions.TruncatedNormal(
           loc=loc, scale=1., low=-1., high=1.)
-      return tf.reduce_sum(dist.sample(100))
+      return tf.reduce_sum(input_tensor=dist.sample(100))
+
     loc = tf.constant([0., 1.])
     dy_loc = self.compute_gradients(
         samples_sum, args=[loc])[0]
@@ -319,12 +321,12 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase,
                                low=low,
                                high=high)
     x = np.array([-1.0, 0.01, 0.1, 1., 4.9]).astype(dtype)
-    self.evaluate(tf.global_variables_initializer())
+    self.evaluate(tf.compat.v1.global_variables_initializer())
     func = getattr(dist, fn_name)
-    mean_value = tf.reduce_mean(func(x))
-    loc_err = tf.test.compute_gradient_error(
+    mean_value = tf.reduce_mean(input_tensor=func(x))
+    loc_err = tf.compat.v1.test.compute_gradient_error(
         loc, loc.shape, mean_value, [1], x_init_value=self.evaluate(loc))
-    scale_err = tf.test.compute_gradient_error(
+    scale_err = tf.compat.v1.test.compute_gradient_error(
         scale, scale.shape, mean_value, [1], x_init_value=self.evaluate(scale))
     self.assertLess(loc_err, 1e-2)
     self.assertLess(scale_err, 1e-2)
@@ -345,15 +347,15 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase,
     dist = tfd.TruncatedNormal(loc=loc, scale=scale,
                                low=low,
                                high=high)
-    self.evaluate(tf.global_variables_initializer())
+    self.evaluate(tf.compat.v1.global_variables_initializer())
     func = getattr(dist, fn_name)
     v = func()
-    loc_err = tf.test.compute_gradient_error(
+    loc_err = tf.compat.v1.test.compute_gradient_error(
         loc, loc.shape, v, [1], x_init_value=self.evaluate(loc))
     self.assertLess(loc_err, 0.005)
 
     if fn_name not in ["mode"]:
-      scale_err = tf.test.compute_gradient_error(
+      scale_err = tf.compat.v1.test.compute_gradient_error(
           scale, scale.shape, v, [1], x_init_value=self.evaluate(scale))
       self.assertLess(scale_err, 0.01)
 

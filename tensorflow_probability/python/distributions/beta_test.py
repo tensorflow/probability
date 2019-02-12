@@ -32,7 +32,7 @@ def try_import(name):  # pylint: disable=invalid-name
   try:
     module = importlib.import_module(name)
   except ImportError as e:
-    tf.logging.warning("Could not import %s: %s" % (name, str(e)))
+    tf.compat.v1.logging.warning("Could not import %s: %s" % (name, str(e)))
   return module
 
 
@@ -277,12 +277,12 @@ class BetaTest(tf.test.TestCase):
     b_val = 2.
     n_val = 100
 
-    tf.set_random_seed(654321)
+    tf.compat.v1.set_random_seed(654321)
     beta1 = beta_lib.Beta(
         concentration1=a_val, concentration0=b_val, name="beta1")
     samples1 = self.evaluate(beta1.sample(n_val, seed=123456))
 
-    tf.set_random_seed(654321)
+    tf.compat.v1.set_random_seed(654321)
     beta2 = beta_lib.Beta(
         concentration1=a_val, concentration0=b_val, name="beta2")
     samples2 = self.evaluate(beta2.sample(n_val, seed=123456))

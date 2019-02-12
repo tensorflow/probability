@@ -54,10 +54,10 @@ def pad_shape_right_with_ones(x, ndims):
         .format(ndims))
   if ndims == 0:
     return x
-  x = tf.convert_to_tensor(x)
+  x = tf.convert_to_tensor(value=x)
   original_shape = x.shape
   new_shape = distribution_util.pad(
-      tf.shape(x), axis=0, back=True, value=1, count=ndims)
+      tf.shape(input=x), axis=0, back=True, value=1, count=ndims)
   x = tf.reshape(x, new_shape)
   x.set_shape(original_shape.concatenate([1]*ndims))
   return x
@@ -76,12 +76,12 @@ def sum_rightmost_ndims_preserving_shape(x, ndims):
     have statically known shape. Otherwise, the resulting shape will only be
     known at runtime.
   """
-  x = tf.convert_to_tensor(x)
+  x = tf.convert_to_tensor(value=x)
   if x.shape.ndims is not None:
     axes = tf.range(x.shape.ndims - ndims, x.shape.ndims)
   else:
     axes = tf.range(tf.rank(x) - ndims, tf.rank(x))
-  return tf.reduce_sum(x, axis=axes)
+  return tf.reduce_sum(input_tensor=x, axis=axes)
 
 
 @tf.custom_gradient
@@ -140,14 +140,13 @@ def sqrt_with_finite_grads(x, name=None):
   potential overflow when combining this value with others downstream.
   """
   with tf.name_scope(name, 'sqrt_with_finite_grads', [x]):
-    x = tf.convert_to_tensor(x, name='x')
+    x = tf.convert_to_tensor(value=x, name='x')
     if not x.dtype.is_floating:
       raise TypeError('Input `x` must be floating type.')
     def grad(grad_ys):
       large_float_like_x = np.sqrt(np.finfo(x.dtype.as_numpy_dtype()).max)
       safe_grads = tf.where(
-          tf.equal(x, 0),
-          tf.fill(tf.shape(x), large_float_like_x),
-          0.5 * tf.rsqrt(x))
+          tf.equal(x, 0), tf.fill(tf.shape(input=x), large_float_like_x),
+          0.5 * tf.math.rsqrt(x))
       return grad_ys * safe_grads
     return tf.sqrt(x), grad

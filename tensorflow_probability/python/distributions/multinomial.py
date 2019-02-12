@@ -179,7 +179,7 @@ class Multinomial(distribution.Distribution):
     with tf.name_scope(name, values=[total_count, logits, probs]) as name:
       dtype = dtype_util.common_dtype([total_count, logits, probs], tf.float32)
       self._total_count = tf.convert_to_tensor(
-          total_count, name="total_count", dtype=dtype)
+          value=total_count, name="total_count", dtype=dtype)
       if validate_args:
         self._total_count = (
             distribution_util.embed_check_nonnegative_integer_form(
@@ -217,13 +217,13 @@ class Multinomial(distribution.Distribution):
     return self._probs
 
   def _batch_shape_tensor(self):
-    return tf.shape(self._mean_val)[:-1]
+    return tf.shape(input=self._mean_val)[:-1]
 
   def _batch_shape(self):
     return self._mean_val.shape.with_rank_at_least(1)[:-1]
 
   def _event_shape_tensor(self):
-    return tf.shape(self._mean_val)[-1:]
+    return tf.shape(input=self._mean_val)[-1:]
 
   def _event_shape(self):
     return self._mean_val.shape.with_rank_at_least(1)[-1:]
@@ -240,7 +240,8 @@ class Multinomial(distribution.Distribution):
 
   def _log_unnormalized_prob(self, counts):
     counts = self._maybe_assert_valid_sample(counts)
-    return tf.reduce_sum(counts * tf.nn.log_softmax(self.logits), -1)
+    return tf.reduce_sum(
+        input_tensor=counts * tf.nn.log_softmax(self.logits), axis=-1)
 
   def _log_normalization(self, counts):
     counts = self._maybe_assert_valid_sample(counts)
@@ -252,7 +253,7 @@ class Multinomial(distribution.Distribution):
   def _covariance(self):
     p = self.probs * tf.ones_like(
         self.total_count)[..., tf.newaxis]
-    return tf.matrix_set_diag(
+    return tf.linalg.set_diag(
         -tf.matmul(self._mean_val[..., tf.newaxis],
                    p[..., tf.newaxis, :]),  # outer product
         self._variance())
@@ -268,8 +269,9 @@ class Multinomial(distribution.Distribution):
       return counts
     counts = distribution_util.embed_check_nonnegative_integer_form(counts)
     return control_flow_ops.with_dependencies([
-        tf.assert_equal(
-            self.total_count, tf.reduce_sum(counts, -1),
+        tf.compat.v1.assert_equal(
+            self.total_count,
+            tf.reduce_sum(input_tensor=counts, axis=-1),
             message="counts must sum to `self.total_count`"),
     ], counts)
 
@@ -332,7 +334,7 @@ def draw_sample(num_samples, num_classes, logits, num_trials, dtype, seed):
       x = tf.reshape(x, shape=[num_samples, -1])  # [num_samples, num_trials]
       x = tf.one_hot(
           x, depth=num_classes)  # [num_samples, num_trials, num_classes]
-      x = tf.reduce_sum(x, axis=-2)  # [num_samples, num_classes]
+      x = tf.reduce_sum(input_tensor=x, axis=-2)  # [num_samples, num_classes]
       return x
 
     x = tf.map_fn(
@@ -340,9 +342,10 @@ def draw_sample(num_samples, num_classes, logits, num_trials, dtype, seed):
         dtype=dtype)  # [B1B2...Bm, num_samples, num_classes]
 
     # reshape the results to proper shape
-    x = tf.transpose(x, perm=[1, 0, 2])
-    final_shape = tf.concat(
-        [[num_samples], tf.shape(num_trials), [num_classes]], axis=0)
+    x = tf.transpose(a=x, perm=[1, 0, 2])
+    final_shape = tf.concat([[num_samples],
+                             tf.shape(input=num_trials), [num_classes]],
+                            axis=0)
     x = tf.reshape(x, final_shape)
 
     return x

@@ -32,9 +32,9 @@ class _PoissonLogNormalQuadratureCompoundTest(
 
   def testSampleProbConsistent(self):
     pln = tfd.PoissonLogNormalQuadratureCompound(
-        loc=tf.placeholder_with_default(
+        loc=tf.compat.v1.placeholder_with_default(
             -2., shape=[] if self.static_shape else None),
-        scale=tf.placeholder_with_default(
+        scale=tf.compat.v1.placeholder_with_default(
             1.1, shape=[] if self.static_shape else None),
         quadrature_size=10,
         validate_args=True)
@@ -43,9 +43,9 @@ class _PoissonLogNormalQuadratureCompoundTest(
 
   def testMeanVariance(self):
     pln = tfd.PoissonLogNormalQuadratureCompound(
-        loc=tf.placeholder_with_default(
+        loc=tf.compat.v1.placeholder_with_default(
             0., shape=[] if self.static_shape else None),
-        scale=tf.placeholder_with_default(
+        scale=tf.compat.v1.placeholder_with_default(
             1., shape=[] if self.static_shape else None),
         quadrature_size=10,
         validate_args=True)
@@ -53,9 +53,9 @@ class _PoissonLogNormalQuadratureCompoundTest(
 
   def testSampleProbConsistentBroadcastScalar(self):
     pln = tfd.PoissonLogNormalQuadratureCompound(
-        loc=tf.placeholder_with_default(
+        loc=tf.compat.v1.placeholder_with_default(
             [0., -0.5], shape=[2] if self.static_shape else None),
-        scale=tf.placeholder_with_default(
+        scale=tf.compat.v1.placeholder_with_default(
             1., shape=[] if self.static_shape else None),
         quadrature_size=10,
         validate_args=True)
@@ -64,9 +64,9 @@ class _PoissonLogNormalQuadratureCompoundTest(
 
   def testMeanVarianceBroadcastScalar(self):
     pln = tfd.PoissonLogNormalQuadratureCompound(
-        loc=tf.placeholder_with_default(
+        loc=tf.compat.v1.placeholder_with_default(
             [0., -0.5], shape=[2] if self.static_shape else None),
-        scale=tf.placeholder_with_default(
+        scale=tf.compat.v1.placeholder_with_default(
             1., shape=[] if self.static_shape else None),
         quadrature_size=10,
         validate_args=True)
@@ -75,9 +75,9 @@ class _PoissonLogNormalQuadratureCompoundTest(
 
   def testSampleProbConsistentBroadcastBoth(self):
     pln = tfd.PoissonLogNormalQuadratureCompound(
-        loc=tf.placeholder_with_default(
+        loc=tf.compat.v1.placeholder_with_default(
             [[0.], [-0.5]], shape=[2, 1] if self.static_shape else None),
-        scale=tf.placeholder_with_default(
+        scale=tf.compat.v1.placeholder_with_default(
             [[1., 0.9]], shape=[1, 2] if self.static_shape else None),
         quadrature_size=10,
         validate_args=True)
@@ -86,9 +86,9 @@ class _PoissonLogNormalQuadratureCompoundTest(
 
   def testMeanVarianceBroadcastBoth(self):
     pln = tfd.PoissonLogNormalQuadratureCompound(
-        loc=tf.placeholder_with_default(
+        loc=tf.compat.v1.placeholder_with_default(
             [[0.], [-0.5]], shape=[2, 1] if self.static_shape else None),
-        scale=tf.placeholder_with_default(
+        scale=tf.compat.v1.placeholder_with_default(
             [[1., 0.9]], shape=[1, 2] if self.static_shape else None),
         quadrature_size=10,
         validate_args=True)

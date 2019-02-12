@@ -122,13 +122,19 @@ class VectorQuantizer(object):
   def __init__(self, num_codes, code_size):
     self.num_codes = num_codes
     self.code_size = code_size
-    self.codebook = tf.get_variable(
-        "codebook", [num_codes, code_size], dtype=tf.float32,)
-    self.ema_count = tf.get_variable(
-        name="ema_count", shape=[num_codes],
-        initializer=tf.constant_initializer(0), trainable=False)
-    self.ema_means = tf.get_variable(
-        name="ema_means", initializer=self.codebook.initialized_value(),
+    self.codebook = tf.compat.v1.get_variable(
+        "codebook",
+        [num_codes, code_size],
+        dtype=tf.float32,
+    )
+    self.ema_count = tf.compat.v1.get_variable(
+        name="ema_count",
+        shape=[num_codes],
+        initializer=tf.compat.v1.initializers.constant(0),
+        trainable=False)
+    self.ema_means = tf.compat.v1.get_variable(
+        name="ema_means",
+        initializer=self.codebook.initialized_value(),
         trainable=False)
 
   def __call__(self, codes):
@@ -146,13 +152,13 @@ class VectorQuantizer(object):
         codebook entry for each code in the batch.
     """
     distances = tf.norm(
-        tf.expand_dims(codes, 2) -
+        tensor=tf.expand_dims(codes, 2) -
         tf.reshape(self.codebook, [1, 1, self.num_codes, self.code_size]),
         axis=3)
-    assignments = tf.argmin(distances, 2)
+    assignments = tf.argmin(input=distances, axis=2)
     one_hot_assignments = tf.one_hot(assignments, depth=self.num_codes)
     nearest_codebook_entries = tf.reduce_sum(
-        tf.expand_dims(one_hot_assignments, -1) *
+        input_tensor=tf.expand_dims(one_hot_assignments, -1) *
         tf.reshape(self.codebook, [1, 1, self.num_codes, self.code_size]),
         axis=2)
     return nearest_codebook_entries, one_hot_assignments
@@ -272,18 +278,23 @@ def add_ema_control_dependencies(vector_quantizer,
   """
   # Use an exponential moving average to update the codebook.
   updated_ema_count = moving_averages.assign_moving_average(
-      vector_quantizer.ema_count, tf.reduce_sum(
-          one_hot_assignments, axis=[0, 1]), decay, zero_debias=False)
+      vector_quantizer.ema_count,
+      tf.reduce_sum(input_tensor=one_hot_assignments, axis=[0, 1]),
+      decay,
+      zero_debias=False)
   updated_ema_means = moving_averages.assign_moving_average(
-      vector_quantizer.ema_means, tf.reduce_sum(
-          tf.expand_dims(codes, 2) *
-          tf.expand_dims(one_hot_assignments, 3), axis=[0, 1]),
-      decay, zero_debias=False)
+      vector_quantizer.ema_means,
+      tf.reduce_sum(
+          input_tensor=tf.expand_dims(codes, 2) *
+          tf.expand_dims(one_hot_assignments, 3),
+          axis=[0, 1]),
+      decay,
+      zero_debias=False)
 
   # Add small value to avoid dividing by zero.
   perturbed_ema_count = updated_ema_count + 1e-5
   with tf.control_dependencies([commitment_loss]):
-    update_means = tf.assign(
+    update_means = tf.compat.v1.assign(
         vector_quantizer.codebook,
         updated_ema_means / perturbed_ema_count[..., tf.newaxis])
     with tf.control_dependencies([update_means]):
@@ -365,10 +376,10 @@ def build_fake_data(num_examples=10):
 def download(directory, filename):
   """Downloads a file."""
   filepath = os.path.join(directory, filename)
-  if tf.gfile.Exists(filepath):
+  if tf.io.gfile.exists(filepath):
     return filepath
-  if not tf.gfile.Exists(directory):
-    tf.gfile.MakeDirs(directory)
+  if not tf.io.gfile.exists(directory):
+    tf.io.gfile.makedirs(directory)
   url = os.path.join(BERNOULLI_PATH, filename)
   print("Downloading %s to %s" % (url, filepath))
   urllib.request.urlretrieve(url, filepath)
@@ -382,9 +393,9 @@ def load_bernoulli_mnist_dataset(directory, split_name):
   str_to_arr = lambda string: np.array([c == b"1" for c in string.split()])
 
   def _parser(s):
-    booltensor = tf.py_func(str_to_arr, [s], tf.bool)
+    booltensor = tf.compat.v1.py_func(str_to_arr, [s], tf.bool)
     reshaped = tf.reshape(booltensor, [28, 28, 1])
-    return tf.to_float(reshaped), tf.constant(0, tf.int32)
+    return tf.cast(reshaped, dtype=tf.float32), tf.constant(0, tf.int32)
 
   return dataset.map(_parser)
 
@@ -409,18 +420,18 @@ def build_input_pipeline(data_dir, batch_size, heldout_size, mnist_type):
     raise ValueError("Unknown MNIST type.")
 
   training_batches = training_dataset.repeat().batch(batch_size)
-  training_iterator = training_batches.make_one_shot_iterator()
+  training_iterator = tf.compat.v1.data.make_one_shot_iterator(training_batches)
 
   # Build a iterator over the heldout set with batch_size=heldout_size,
   # i.e., return the entire heldout set as a constant.
   heldout_frozen = (heldout_dataset.take(heldout_size).
                     repeat().batch(heldout_size))
-  heldout_iterator = heldout_frozen.make_one_shot_iterator()
+  heldout_iterator = tf.compat.v1.data.make_one_shot_iterator(heldout_frozen)
 
   # Combine these into a feedable iterator that can switch between training
   # and validation inputs.
-  handle = tf.placeholder(tf.string, shape=[])
-  feedable_iterator = tf.data.Iterator.from_string_handle(
+  handle = tf.compat.v1.placeholder(tf.string, shape=[])
+  feedable_iterator = tf.compat.v1.data.Iterator.from_string_handle(
       handle, training_batches.output_types, training_batches.output_shapes)
   images, labels = feedable_iterator.get_next()
   # Reshape as a pixel image and binarize pixels.
@@ -434,10 +445,11 @@ def build_input_pipeline(data_dir, batch_size, heldout_size, mnist_type):
 def main(argv):
   del argv  # unused
   FLAGS.activation = getattr(tf.nn, FLAGS.activation)
-  if tf.gfile.Exists(FLAGS.model_dir):
-    tf.logging.warn("Deleting old log directory at {}".format(FLAGS.model_dir))
-    tf.gfile.DeleteRecursively(FLAGS.model_dir)
-  tf.gfile.MakeDirs(FLAGS.model_dir)
+  if tf.io.gfile.exists(FLAGS.model_dir):
+    tf.compat.v1.logging.warn("Deleting old log directory at {}".format(
+        FLAGS.model_dir))
+    tf.io.gfile.rmtree(FLAGS.model_dir)
+  tf.io.gfile.makedirs(FLAGS.model_dir)
 
   with tf.Graph().as_default():
     # TODO(b/113163167): Speed up and tune hyperparameters for Bernoulli MNIST.
@@ -463,9 +475,11 @@ def main(argv):
     decoder_distribution = decoder(codes_straight_through)
     reconstructed_images = decoder_distribution.mean()
 
-    reconstruction_loss = -tf.reduce_mean(decoder_distribution.log_prob(images))
+    reconstruction_loss = -tf.reduce_mean(
+        input_tensor=decoder_distribution.log_prob(images))
     commitment_loss = tf.reduce_mean(
-        tf.square(codes - tf.stop_gradient(nearest_codebook_entries)))
+        input_tensor=tf.square(codes -
+                               tf.stop_gradient(nearest_codebook_entries)))
     commitment_loss = add_ema_control_dependencies(
         vector_quantizer,
         one_hot_assignments,
@@ -474,22 +488,25 @@ def main(argv):
         FLAGS.decay)
     prior_dist = tfd.Multinomial(
         total_count=1.0, logits=tf.zeros([FLAGS.latent_size, FLAGS.num_codes]))
-    prior_loss = -tf.reduce_mean(tf.reduce_sum(
-        prior_dist.log_prob(one_hot_assignments), 1))
+    prior_loss = -tf.reduce_mean(
+        input_tensor=tf.reduce_sum(
+            input_tensor=prior_dist.log_prob(one_hot_assignments), axis=1))
 
     loss = reconstruction_loss + FLAGS.beta * commitment_loss + prior_loss
     # Upper bound marginal negative log-likelihood as prior loss +
     # reconstruction loss.
     marginal_nll = prior_loss + reconstruction_loss
 
-    tf.summary.scalar("losses/total_loss", loss)
-    tf.summary.scalar("losses/reconstruction_loss", reconstruction_loss)
-    tf.summary.scalar("losses/prior_loss", prior_loss)
-    tf.summary.scalar("losses/commitment_loss", FLAGS.beta * commitment_loss)
+    tf.compat.v1.summary.scalar("losses/total_loss", loss)
+    tf.compat.v1.summary.scalar("losses/reconstruction_loss",
+                                reconstruction_loss)
+    tf.compat.v1.summary.scalar("losses/prior_loss", prior_loss)
+    tf.compat.v1.summary.scalar("losses/commitment_loss",
+                                FLAGS.beta * commitment_loss)
 
     # Decode samples from a uniform prior for visualization.
     prior_samples = tf.reduce_sum(
-        tf.expand_dims(prior_dist.sample(10), -1) *
+        input_tensor=tf.expand_dims(prior_dist.sample(10), -1) *
         tf.reshape(vector_quantizer.codebook,
                    [1, 1, FLAGS.num_codes, FLAGS.code_size]),
         axis=2)
@@ -497,14 +514,15 @@ def main(argv):
     random_images = decoded_distribution_given_random_prior.mean()
 
     # Perform inference by minimizing the loss function.
-    optimizer = tf.train.AdamOptimizer(FLAGS.learning_rate)
+    optimizer = tf.compat.v1.train.AdamOptimizer(FLAGS.learning_rate)
     train_op = optimizer.minimize(loss)
 
-    summary = tf.summary.merge_all()
-    init = tf.global_variables_initializer()
-    saver = tf.train.Saver()
-    with tf.Session() as sess:
-      summary_writer = tf.summary.FileWriter(FLAGS.model_dir, sess.graph)
+    summary = tf.compat.v1.summary.merge_all()
+    init = tf.compat.v1.global_variables_initializer()
+    saver = tf.compat.v1.train.Saver()
+    with tf.compat.v1.Session() as sess:
+      summary_writer = tf.compat.v1.summary.FileWriter(FLAGS.model_dir,
+                                                       sess.graph)
       sess.run(init)
 
       # Run the training loop.
@@ -553,4 +571,4 @@ def main(argv):
                              prefix="step{:05d}_validation".format(step))
 
 if __name__ == "__main__":
-  tf.app.run()
+  tf.compat.v1.app.run()

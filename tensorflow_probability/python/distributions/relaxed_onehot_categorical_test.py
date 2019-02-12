@@ -29,9 +29,9 @@ tfe = tf.contrib.eager
 
 
 def make_relaxed_categorical(batch_shape, num_classes, dtype=tf.float32):
-  logits = tf.random_uniform(
+  logits = tf.random.uniform(
       list(batch_shape) + [num_classes], -10, 10, dtype=dtype) - 50.
-  temperatures = tf.random_uniform(list(batch_shape), 0.1, 10, dtype=tf.float32)
+  temperatures = tf.random.uniform(list(batch_shape), 0.1, 10, dtype=tf.float32)
   return tfd.RelaxedOneHotCategorical(temperatures, logits)
 
 
@@ -139,7 +139,8 @@ class RelaxedOneHotCategoricalTest(tf.test.TestCase):
       self.assertAllEqual([10], self.evaluate(dist.event_shape_tensor()))
 
   def testUnknownShape(self):
-    logits_pl = tf.placeholder_with_default(input=[.3, .1, .4], shape=None)
+    logits_pl = tf.compat.v1.placeholder_with_default(
+        input=[.3, .1, .4], shape=None)
     temperature = 1.0
     dist = tfd.ExpRelaxedOneHotCategorical(temperature, logits_pl)
     self.assertAllEqual([3], self.evaluate(dist.sample()).shape)
@@ -148,7 +149,7 @@ class RelaxedOneHotCategoricalTest(tf.test.TestCase):
   def testDTypes(self):
     # check that sampling and log_prob work for a range of dtypes
     for dtype in (tf.float16, tf.float32, tf.float64):
-      logits = tf.random_uniform(shape=[3, 3], dtype=dtype)
+      logits = tf.random.uniform(shape=[3, 3], dtype=dtype)
       dist = tfd.RelaxedOneHotCategorical(temperature=0.5, logits=logits)
       dist.log_prob(dist.sample())
 

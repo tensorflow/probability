@@ -84,16 +84,16 @@ class CholeskyOuterProduct(bijector.Bijector):
 
   def _forward(self, x):
     if self.validate_args:
-      is_matrix = tf.assert_rank_at_least(x, 2)
-      shape = tf.shape(x)
-      is_square = tf.assert_equal(shape[-2], shape[-1])
+      is_matrix = tf.compat.v1.assert_rank_at_least(x, 2)
+      shape = tf.shape(input=x)
+      is_square = tf.compat.v1.assert_equal(shape[-2], shape[-1])
       x = control_flow_ops.with_dependencies([is_matrix, is_square], x)
     # For safety, explicitly zero-out the upper triangular part.
-    x = tf.matrix_band_part(x, -1, 0)
+    x = tf.linalg.band_part(x, -1, 0)
     return tf.matmul(x, x, adjoint_b=True)
 
   def _inverse(self, y):
-    return tf.cholesky(y)
+    return tf.linalg.cholesky(y)
 
   def _forward_log_det_jacobian(self, x):
     # Let Y be a symmetric, positive definite matrix and write:
@@ -136,7 +136,7 @@ class CholeskyOuterProduct(bijector.Bijector):
     # Since there is a 2 X[j,j] term for every lower-triangular element of X we
     # conclude:
     #   |Jac(d vec[Y]/d vec[X])| = 2^p prod_{j=0}^{p-1} X[j,j]^{p-j}.
-    diag = tf.matrix_diag_part(x)
+    diag = tf.linalg.diag_part(x)
 
     # We now ensure diag is columnar. Eg, if `diag = [1, 2, 3]` then the output
     # is `[[1], [2], [3]]` and if `diag = [[1, 2, 3], [4, 5, 6]]` then the
@@ -144,30 +144,30 @@ class CholeskyOuterProduct(bijector.Bijector):
     diag = self._make_columnar(diag)
 
     if self.validate_args:
-      is_matrix = tf.assert_rank_at_least(
+      is_matrix = tf.compat.v1.assert_rank_at_least(
           x, 2, message="Input must be a (batch of) matrix.")
-      shape = tf.shape(x)
-      is_square = tf.assert_equal(
+      shape = tf.shape(input=x)
+      is_square = tf.compat.v1.assert_equal(
           shape[-2],
           shape[-1],
           message="Input must be a (batch of) square matrix.")
       # Assuming lower-triangular means we only need check diag>0.
-      is_positive_definite = tf.assert_positive(
+      is_positive_definite = tf.compat.v1.assert_positive(
           diag, message="Input must be positive definite.")
       x = control_flow_ops.with_dependencies(
           [is_matrix, is_square, is_positive_definite], x)
 
     # Create a vector equal to: [p, p-1, ..., 2, 1].
-    if tf.dimension_value(x.shape[-1]) is None:
-      p_int = tf.shape(x)[-1]
+    if tf.compat.dimension_value(x.shape[-1]) is None:
+      p_int = tf.shape(input=x)[-1]
       p_float = tf.cast(p_int, dtype=x.dtype)
     else:
-      p_int = tf.dimension_value(x.shape[-1])
+      p_int = tf.compat.dimension_value(x.shape[-1])
       p_float = np.array(p_int, dtype=x.dtype.as_numpy_dtype)
     exponents = tf.linspace(p_float, 1., p_int)
 
     sum_weighted_log_diag = tf.squeeze(
-        tf.matmul(tf.log(diag), exponents[..., tf.newaxis]), axis=-1)
+        tf.matmul(tf.math.log(diag), exponents[..., tf.newaxis]), axis=-1)
     fldj = p_float * np.log(2.) + sum_weighted_log_diag
 
     # We finally need to undo adding an extra column in non-scalar cases
@@ -177,7 +177,7 @@ class CholeskyOuterProduct(bijector.Bijector):
         fldj = tf.squeeze(fldj, axis=-1)
       return fldj
 
-    shape = tf.shape(fldj)
+    shape = tf.shape(input=fldj)
     maybe_squeeze_shape = tf.concat([
         shape[:-1],
         distribution_util.pick_vector(
@@ -205,7 +205,7 @@ class CholeskyOuterProduct(bijector.Bijector):
       if x.shape.ndims == 1:
         x = x[tf.newaxis, :]
       return x
-    shape = tf.shape(x)
+    shape = tf.shape(input=x)
     maybe_expanded_shape = tf.concat([
         shape[:-1],
         distribution_util.pick_vector(
