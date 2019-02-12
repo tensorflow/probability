@@ -725,6 +725,7 @@ py_test(
 py_test(
     name = "masked_autoregressive_test",
     size = "small",
+    timeout = "moderate",
     srcs = ["masked_autoregressive_test.py"],
     deps = [
         ":bijectors",
