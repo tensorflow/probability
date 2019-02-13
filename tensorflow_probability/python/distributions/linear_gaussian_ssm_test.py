@@ -34,6 +34,8 @@ from tensorflow_probability.python.distributions.linear_gaussian_ssm import kalm
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import KalmanFilterState
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import linear_gaussian_update
 
+from tensorflow_probability.python.internal import test_case as tfp_test_case
+
 tfd = tfp.distributions
 tfe = tf.contrib.eager
 tfl = tf.linalg
@@ -496,6 +498,204 @@ class BatchTest(tf.test.TestCase):
                                      observation_noise_batch_shape=batch_shape)
     self._sanity_check_shapes(model, batch_shape, event_shape,
                               num_timesteps, latent_size)
+
+
+class MissingObservationsTests(tfp_test_case.TestCase):
+
+  def setUp(self):
+    super(MissingObservationsTests, self).setUp()
+
+    # Define a simple random-walk model.
+    self.num_timesteps = 8
+    self.transition_matrix = np.array([[1.]], dtype=np.float32)
+    self.transition_noise = tfd.MultivariateNormalDiag(
+        scale_diag=np.array([1.], dtype=np.float32))
+    self.observation_matrix = np.array([[1.]], dtype=np.float32)
+    self.observation_noise = tfd.MultivariateNormalDiag(
+        scale_diag=np.array([0.5], dtype=np.float32))
+    self.initial_state_prior = tfd.MultivariateNormalDiag(
+        loc=np.zeros(shape=[1], dtype=np.float32),
+        scale_diag=np.ones(shape=[1], dtype=np.float32))
+    self.model = tfd.LinearGaussianStateSpaceModel(
+        num_timesteps=self.num_timesteps,
+        transition_matrix=self.transition_matrix,
+        transition_noise=self.transition_noise,
+        observation_matrix=self.observation_matrix,
+        observation_noise=self.observation_noise,
+        initial_state_prior=self.initial_state_prior,
+        initial_step=0)
+
+  @tfe.run_test_in_graph_and_eager_modes
+  def testForwardFilterWithMask(self):
+
+    observed_time_series = np.array(
+        [1.0, 2.0, -1000., 0.4, np.nan, 1000., 4.2, np.inf]).astype(np.float32)
+    observed_time_series = observed_time_series[..., np.newaxis]
+    observation_mask = np.array(
+        [False, False, True, False, True, True, False, True]).astype(np.bool)
+
+    # In a random walk, skipping a timestep just adds variance, so we can
+    # construct a model of the four 'unmasked' timesteps by directly collapsing
+    # out the masked timesteps. We test that the filtering distributions and
+    # likelihoods from the masked model match those from the collapsed
+    # model at observed timesteps.
+    collapsed_transition_variances = tf.constant([1., 2., 3., 2.],
+                                                 dtype=np.float32)
+
+    def collapsed_transition_noise_model(t):
+      return tfd.MultivariateNormalDiag(
+          scale_diag=[tf.sqrt(collapsed_transition_variances[t])])
+
+    collapsed_model = tfd.LinearGaussianStateSpaceModel(
+        num_timesteps=4,
+        transition_matrix=self.transition_matrix,
+        transition_noise=collapsed_transition_noise_model,
+        observation_matrix=self.observation_matrix,
+        observation_noise=self.observation_noise,
+        initial_state_prior=self.initial_state_prior,
+        initial_step=0)
+
+    (log_likelihoods_, filtered_means_, filtered_covs_, predicted_means_,
+     predicted_covs_, observation_means_, observation_covs_) = self.evaluate(
+         self.model.forward_filter(
+             x=observed_time_series, mask=observation_mask))
+
+    (log_likelihoods_collapsed_, filtered_means_collapsed_,
+     filtered_covs_collapsed_, predicted_means_collapsed_,
+     predicted_covs_collapsed_, observation_means_collapsed_,
+     observation_covs_collapsed_) = self.evaluate(
+         collapsed_model.forward_filter(
+             x=observed_time_series[~observation_mask]))
+
+    self.assertAllClose(log_likelihoods_[~observation_mask],
+                        log_likelihoods_collapsed_)
+    self.assertAllEqual(log_likelihoods_[observation_mask],
+                        np.zeros(log_likelihoods_[observation_mask].shape))
+    self.assertAllClose(filtered_means_[~observation_mask],
+                        filtered_means_collapsed_)
+    self.assertAllClose(filtered_covs_[~observation_mask],
+                        filtered_covs_collapsed_)
+
+    # Check the predictive distributions over latents at the final timestep.
+    # We don't bother checking the other timesteps because the collapsing
+    # makes it nontrivial to compute which ones should match up.
+    self.assertAllClose(predicted_means_[-1],
+                        predicted_means_collapsed_[-1])
+    self.assertAllClose(predicted_covs_[-1],
+                        predicted_covs_collapsed_[-1])
+
+    self.assertAllClose(observation_means_[~observation_mask],
+                        observation_means_collapsed_)
+    self.assertAllClose(observation_covs_[~observation_mask],
+                        observation_covs_collapsed_)
+
+    # Also test that auxiliary methods `log_prob` and `posterior_marginals`
+    # pass the mask through correctly.
+    lp_, lp_collapsed_ = self.evaluate((
+        self.model.log_prob(observed_time_series, mask=observation_mask),
+        collapsed_model.log_prob(observed_time_series[~observation_mask])))
+    self.assertAllClose(lp_, lp_collapsed_)
+
+    ((posterior_means_, posterior_covs_),
+     (posterior_means_collapsed_, posterior_covs_collapsed_)) = self.evaluate((
+         self.model.posterior_marginals(
+             observed_time_series, mask=observation_mask),
+         collapsed_model.posterior_marginals(
+             observed_time_series[~observation_mask])))
+    self.assertAllClose(posterior_means_[~observation_mask],
+                        posterior_means_collapsed_)
+    self.assertAllClose(posterior_covs_[~observation_mask],
+                        posterior_covs_collapsed_)
+
+  def testGradientsOfMaskedNaNsAreFinite(self):
+    observed_time_series = np.array(  # contains a (masked) NaN.
+        [1.0, 2.0, -1000., 0.4, np.nan, 1000., 4.2, np.inf]).astype(np.float32)
+    observed_time_series = observed_time_series[..., np.newaxis]
+    observation_mask = np.array(
+        [False, False, True, False, True, True, False, True]).astype(np.bool)
+
+    # Check that we've avoided the NaN-gradient gotcha described in
+    # https://github.com/tensorflow/tensorflow/issues/2540.
+    log_likelihoods, _, _, _, _, _, _ = self.model.forward_filter(
+        x=observed_time_series, mask=observation_mask)
+    lp = tf.reduce_sum(log_likelihoods)
+    grads_ = self.evaluate(tf.gradients(lp, self.transition_noise.scale.diag))
+    self.assertAllFinite(grads_)
+
+  @tfe.run_test_in_graph_and_eager_modes
+  def testMaskWhenModelHasBatchShape(self):
+    # When the inputs (x, mask) have shape *smaller* than the model's batch
+    # shape, they should be broadcast up so we return a result for each
+    # model in the batch.
+    num_timesteps = 8
+    batch_shape = [4, 3]
+    batch_model = tfd.LinearGaussianStateSpaceModel(
+        num_timesteps=num_timesteps,
+        transition_matrix=self.transition_matrix,
+        transition_noise=self.transition_noise,
+        observation_matrix=self.observation_matrix,
+        observation_noise=self.observation_noise,
+        initial_state_prior=tfd.MultivariateNormalDiag(
+            scale_diag=np.random.randn(*(
+                batch_shape + [1])).astype(np.float32)),
+        initial_step=0)
+
+    mask = np.random.randn(num_timesteps) > 0
+    observed_time_series = np.random.randn(num_timesteps, 1).astype(np.float32)
+    observed_time_series[mask[..., np.newaxis]] = np.inf
+
+    (log_likelihoods, filtered_means, filtered_covs, _, _, _,
+     _) = batch_model.forward_filter(
+         x=observed_time_series, mask=mask)
+    # Test that shapes are as expected, and are statically inferred.
+    self.assertAllEqual(filtered_means.shape.as_list(),
+                        batch_shape + [num_timesteps, 1])
+    self.assertAllEqual(filtered_covs.shape.as_list(),
+                        batch_shape + [num_timesteps, 1, 1])
+
+    (log_likelihoods_, filtered_means_, filtered_covs_) = self.evaluate(
+        (log_likelihoods, filtered_means, filtered_covs))
+    self.assertTrue(np.all(np.isfinite(log_likelihoods_)))
+    self.assertTrue(np.all(np.isfinite(filtered_means_)))
+    self.assertTrue(np.all(np.isfinite(filtered_covs_)))
+
+  @tfe.run_test_in_graph_and_eager_modes
+  def testMaskWhenTimeSeriesHasSampleShape(self):
+    # When the inputs (x, mask) have shape *larger* than the model's batch
+    # shape, we return means with a sample dimension for every sample dimension
+    # in the observed time series `x`, and covariances with a sample dimension
+    # for every sample dimension in the mask.
+    sample_shape = [5, 2]
+    mask_sample_shape = [2]
+
+    mask = np.random.randn(*np.concatenate(
+        [mask_sample_shape, [self.num_timesteps]], axis=0)) > 0
+    observed_time_series = np.random.randn(*np.concatenate(
+        [sample_shape, [self.num_timesteps, 1]], axis=0)).astype(
+            np.float32)
+    observed_time_series[:, mask[..., np.newaxis]] = np.inf
+
+    (log_likelihoods, filtered_means, filtered_covs, _, _, _,
+     _) = self.model.forward_filter(
+         x=observed_time_series, mask=mask)
+    self.assertAllEqual(filtered_means.shape.as_list(),
+                        sample_shape + [self.num_timesteps, 1])
+    self.assertAllEqual(filtered_covs.shape.as_list(),
+                        mask_sample_shape + [self.num_timesteps, 1, 1])
+
+    (log_likelihoods_, filtered_means_, filtered_covs_) = self.evaluate(
+        (log_likelihoods, filtered_means, filtered_covs))
+    self.assertTrue(np.all(np.isfinite(log_likelihoods_)))
+    self.assertTrue(np.all(np.isfinite(filtered_means_)))
+    self.assertTrue(np.all(np.isfinite(filtered_covs_)))
+
+    big_mask = np.random.randn(*np.concatenate(
+        [[1, 2, 3], sample_shape, [self.num_timesteps]], axis=0)) > 0
+    with self.assertRaisesRegexp(ValueError,
+                                 "mask cannot have higher rank than x"):
+      (log_likelihoods, filtered_means, filtered_covs, _, _, _,
+       _) = self.model.forward_filter(
+           x=observed_time_series, mask=big_mask)
 
 
 @tfe.run_all_tests_in_graph_and_eager_modes

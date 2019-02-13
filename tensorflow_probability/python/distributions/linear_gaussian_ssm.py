@@ -674,13 +674,39 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
 
     return latents, observations
 
-  def _log_prob(self, x):
-    log_likelihoods, _, _, _, _, _, _ = self.forward_filter(x)
+  # Stub reimplementation of log_prob so we can modify the docstring to include
+  # the mask.
+  @util.AppendDocstring(kwargs_dict={
+      "mask":
+      "optional bool-type `Tensor` with rightmost dimension "
+      "`[num_timesteps]`; `True` values specify that the value of `x` "
+      "at that timestep is masked, i.e., not conditioned on. Additional "
+      "dimensions must match or be broadcastable to `self.batch_shape`; any "
+      "further dimensions must match or be broadcastable to the sample "
+      "shape of `x`. Default value: `None`."})
+  def log_prob(self, value, mask=None, name="log_prob"):
+    return self._call_log_prob(value, name=name, mask=mask)
+
+  # Stub reimplementation of prob so we can modify the docstring to include the
+  # mask.
+  @util.AppendDocstring(kwargs_dict={
+      "mask":
+      "optional bool-type `Tensor` with rightmost dimension "
+      "`[num_timesteps]`; `True` values specify that the value of `x` "
+      "at that timestep is masked, i.e., not conditioned on. Additional "
+      "dimensions must match or be broadcastable to `self.batch_shape`; any "
+      "further dimensions must match or be broadcastable to the sample "
+      "shape of `x`. Default value: `None`."})
+  def prob(self, value, mask=None, name="prob"):
+    return self._call_prob(value, name=name, mask=mask)
+
+  def _log_prob(self, x, mask=None):
+    log_likelihoods, _, _, _, _, _, _ = self.forward_filter(x, mask=mask)
 
     # Sum over timesteps to compute the log marginal likelihood.
     return tf.reduce_sum(input_tensor=log_likelihoods, axis=-1)
 
-  def forward_filter(self, x):
+  def forward_filter(self, x, mask=None):
     """Run a Kalman filter over a provided sequence of outputs.
 
     Note that the returned values `filtered_means`, `predicted_means`, and
@@ -698,6 +724,13 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
         `self.event_shape`. Additional dimensions must match or be
         broadcastable to `self.batch_shape`; any further dimensions
         are interpreted as a sample shape.
+      mask: optional bool-type `Tensor` with rightmost dimension
+        `[num_timesteps]`; `True` values specify that the value of `x`
+        at that timestep is masked, i.e., not conditioned on. Additional
+        dimensions must match or be broadcastable to `self.batch_shape`; any
+        further dimensions must match or be broadcastable to the sample
+        shape of `x`.
+        Default value: `None`.
 
     Returns:
       log_likelihoods: Per-timestep log marginal likelihoods `log
@@ -708,37 +741,63 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
         `sample_shape(x) + batch_shape + [num_timesteps, latent_size]`.
       filtered_covs: Covariances of the per-timestep filtered marginal
          distributions p(z_t | x_{:t}), as a Tensor of shape
-        `batch_shape + [num_timesteps, latent_size, latent_size]`.
+        `sample_shape(mask) + batch_shape + [num_timesteps, latent_size,
+        latent_size]`. Note that the covariances depend only on the model and
+        the mask, not on the data, so this may have fewer dimensions than
+        `filtered_means`.
       predicted_means: Means of the per-timestep predictive
          distributions over latent states, p(z_{t+1} | x_{:t}), as a
          Tensor of shape `sample_shape(x) + batch_shape +
          [num_timesteps, latent_size]`.
       predicted_covs: Covariances of the per-timestep predictive
          distributions over latent states, p(z_{t+1} | x_{:t}), as a
-         Tensor of shape `batch_shape + [num_timesteps, latent_size,
-         latent_size]`.
+         Tensor of shape `sample_shape(mask) + batch_shape +
+         [num_timesteps, latent_size, latent_size]`. Note that the covariances
+         depend only on the model and the mask, not on the data, so this may
+         have fewer dimensions than `predicted_means`.
       observation_means: Means of the per-timestep predictive
          distributions over observations, p(x_{t} | x_{:t-1}), as a
          Tensor of shape `sample_shape(x) + batch_shape +
          [num_timesteps, observation_size]`.
       observation_covs: Covariances of the per-timestep predictive
          distributions over observations, p(x_{t} | x_{:t-1}), as a
-         Tensor of shape `batch_shape + [num_timesteps,
-         observation_size, observation_size]`.
+         Tensor of shape `sample_shape(mask) + batch_shape + [num_timesteps,
+         observation_size, observation_size]`. Note that the covariances depend
+         only on the model and the mask, not on the data, so this may have fewer
+         dimensions than `observation_means`.
     """
 
     with tf.name_scope("forward_filter", values=[x]):
       x = tf.convert_to_tensor(value=x, name="x")
+      if mask is not None:
+        mask = tf.convert_to_tensor(
+            value=mask, name="mask", preferred_dtype=tf.bool)
 
       # Check event shape statically if possible
-      check_shape_op = _check_equal_shape("x", x.shape[-2:],
-                                          tf.shape(input=x)[-2:],
-                                          self.event_shape,
-                                          self.event_shape_tensor())
+      check_x_shape_op = _check_equal_shape(
+          "x", x.shape[-2:], tf.shape(input=x)[-2:],
+          self.event_shape, self.event_shape_tensor())
+      check_mask_dims_op = None
+      check_mask_shape_op = None
+      if mask is not None:
+        if mask.shape.ndims > x.shape.ndims:
+          raise ValueError(
+              "mask cannot have higher rank than x! ({} vs {})"
+              .format(mask.shape.ndims, x.shape.ndims))
+        check_mask_dims_op = tf.assert_greater_equal(
+            tf.rank(x), tf.rank(mask),
+            message=("mask cannot have higher rank than x!"))
+        check_mask_shape_op = _check_equal_shape(
+            "mask", mask.shape[-1:], tf.shape(input=mask)[-1:],
+            self.event_shape[-2:-1], self.event_shape_tensor()[-2:-1])
       if self.validate_args:
-        runtime_assertions = (self.runtime_assertions
-                              if check_shape_op is None
-                              else self.runtime_assertions + [check_shape_op])
+        runtime_assertions = self.runtime_assertions
+        if check_x_shape_op is not None:
+          runtime_assertions += [check_x_shape_op]
+        if check_mask_shape_op is not None:
+          runtime_assertions += [check_mask_shape_op]
+        if check_mask_dims_op is not None:
+          runtime_assertions += [check_mask_dims_op]
         with tf.control_dependencies(runtime_assertions):
           x = tf.identity(x)
 
@@ -754,13 +813,34 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
         sample_and_batch_shape = tf.broadcast_dynamic_shape(
             tf.shape(input=x)[:-2], self.batch_shape_tensor())
 
+      # Get the full output shape for covariances. The posterior variances
+      # in a LGSSM depend only on the model params (batch shape) and on the
+      # missingness pattern (mask shape), so in general this may be smaller
+      # than the full `sample_and_batch_shape`.
+      if mask is None:
+        mask_sample_and_batch_shape = self.batch_shape_tensor()
+      else:
+        if (self.batch_shape.is_fully_defined()
+            and mask.shape.is_fully_defined()):
+          mask_sample_and_batch_shape = tf.broadcast_static_shape(
+              mask.shape[:-1], self.batch_shape)
+        else:
+          mask_sample_and_batch_shape = tf.broadcast_dynamic_shape(
+              tf.shape(input=mask)[:-1], self.batch_shape_tensor())
+
       # To scan over timesteps we need to move `num_timsteps` from the
       # event shape to the initial dimension of the tensor.
       x = util.move_dimension(x, -2, 0)
+      if mask is not None:
+        mask = util.move_dimension(mask, -1, 0)
 
       # Observations are assumed to be vectors, but we add a dummy
       # extra dimension to allow us to use `matmul` throughout.
       x = x[..., tf.newaxis]
+      if mask is not None:
+        # Align mask.shape with x.shape, including a unit dimension to broadcast
+        # against `observation_size`.
+        mask = mask[..., tf.newaxis, tf.newaxis]
 
       # Initialize filtering distribution from the prior. The mean in
       # a Kalman filter depends on data, so should match the full
@@ -772,7 +852,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
                      [self.latent_size, 1]], axis=0))
       prior_cov = _broadcast_to_shape(
           self.initial_state_prior.covariance(),
-          tf.concat([self.batch_shape_tensor(),
+          tf.concat([mask_sample_and_batch_shape,
                      [self.latent_size, self.latent_size]], axis=0))
 
       initial_observation_matrix = (
@@ -806,7 +886,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
           self.get_observation_noise_for_timestep)
 
       filter_states = tf.scan(update_step_fn,
-                              elems=x,
+                              elems=x if mask is None else (x, mask),
                               initializer=initial_state)
 
       log_likelihoods = util.move_dimension(
@@ -840,7 +920,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
               predicted_means, predicted_covs,
               observation_means, observation_covs)
 
-  def posterior_marginals(self, x):
+  def posterior_marginals(self, x, mask=None):
     """Run a Kalman smoother to return posterior mean and cov.
 
     Note that the returned values `smoothed_means` depend on the observed
@@ -870,6 +950,13 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
         `self.event_shape`. Additional dimensions must match or be
         broadcastable to `self.batch_shape`; any further dimensions
         are interpreted as a sample shape.
+      mask: optional bool-type `Tensor` with rightmost dimension
+        `[num_timesteps]`; `True` values specify that the value of `x`
+        at that timestep is masked, i.e., not conditioned on. Additional
+        dimensions must match or be broadcastable to `self.batch_shape`; any
+        further dimensions must match or be broadcastable to the sample
+        shape of `x`.
+        Default value: `None`.
 
     Returns:
       smoothed_means: Means of the per-timestep smoothed
@@ -878,14 +965,17 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
          [num_timesteps, observation_size]`.
       smoothed_covs: Covariances of the per-timestep smoothed
          distributions over latent states, p(x_{t} | x_{:T}), as a
-         Tensor of shape `batch_shape + [num_timesteps,
-         observation_size, observation_size]`.
+         Tensor of shape `sample_shape(mask) + batch_shape + [num_timesteps,
+         observation_size, observation_size]`. Note that the covariances depend
+         only on the model and the mask, not on the data, so this may have fewer
+         dimensions than `filtered_means`.
     """
 
     with tf.name_scope("smooth", values=[x]):
       x = tf.convert_to_tensor(value=x, name="x")
       (_, filtered_means, filtered_covs,
-       predicted_means, predicted_covs, _, _) = self.forward_filter(x)
+       predicted_means, predicted_covs, _, _) = self.forward_filter(
+           x, mask=mask)
 
       (smoothed_means, smoothed_covs) = self.backward_smoothing_pass(
           filtered_means, filtered_covs,
@@ -1166,19 +1256,52 @@ def build_kalman_filter_step(get_transition_matrix_for_timestep,
       from timestep `t-1` to `t`.
   """
 
-  def kalman_filter_step(state, x_t):
+  def kalman_filter_step(state, elems_t):
     """Run a single step of Kalman filtering.
 
     Args:
       state: A `KalmanFilterState` object representing the previous
         filter state at time `t-1`.
-      x_t: A `Tensor` with event shape `[observation_size, 1]`,
-        representing the vector observed at time `t`.
+      elems_t: A tuple of Tensors `(x_t, mask_t)`, or a `Tensor` `x_t`.
+        `x_t` is a `Tensor` with rightmost shape dimensions
+        `[observation_size, 1]` representing the vector observed at time `t`,
+        and `mask_t` is a `Tensor` with rightmost dimensions`[1, 1]`
+        representing the observation mask at time `t`. Both `x_t` and `mask_t`
+        may have batch dimensions, which must be compatible with the batch
+        dimensions of `state.predicted_mean` and `state.predictived_cov`
+        respectively. If `mask_t` is not provided, it is assumed to be `None`.
 
     Returns:
       new_state: A `KalmanFilterState` object representing the new
         filter state at time `t`.
     """
+
+    if isinstance(elems_t, tuple):
+      x_t, mask_t = elems_t
+    else:
+      x_t = elems_t
+      mask_t = None
+
+    observation_matrix = get_observation_matrix_for_timestep(state.timestep)
+    observation_noise = get_observation_noise_for_timestep(state.timestep)
+    if mask_t is not None:
+      # Before running the update, fill in masked observations using the prior
+      # expectation. The precise filled value shouldn't matter since updates
+      # from masked elements will not be selected below, but we need to ensure
+      # that any results we incidently compute on masked values are at least
+      # finite (not inf or NaN) so that they don't screw up gradient propagation
+      # through `tf.where`, as described in
+      #  https://github.com/tensorflow/tensorflow/issues/2540.
+      # We fill with the prior expectation because any fixed value such as zero
+      # might be arbitrarily unlikely under the prior, leading to overflow in
+      # the updates, but the prior expectation should always be a
+      # 'reasonable' observation.
+      x_expected = _propagate_mean(state.predicted_mean,
+                                   observation_matrix,
+                                   observation_noise) * tf.ones_like(x_t)
+      x_t = tf.where(tf.broadcast_to(mask_t, tf.shape(x_expected)),
+                     x_expected,
+                     tf.broadcast_to(x_t, tf.shape(x_expected)))
 
     # Given predicted mean u_{t|t-1} and covariance P_{t|t-1} from the
     # previous step, incorporate the observation x_t, producing the
@@ -1187,13 +1310,25 @@ def build_kalman_filter_step(get_transition_matrix_for_timestep,
      filtered_cov,
      observation_dist) = linear_gaussian_update(
          state.predicted_mean, state.predicted_cov,
-         get_observation_matrix_for_timestep(state.timestep),
-         get_observation_noise_for_timestep(state.timestep),
+         observation_matrix, observation_noise,
          x_t)
 
     # Compute the marginal likelihood p(x_{t} | x_{:t-1}) for this
     # observation.
     log_marginal_likelihood = observation_dist.log_prob(x_t[..., 0])
+
+    if mask_t is not None:
+      filtered_mean = tf.where(
+          tf.broadcast_to(mask_t, tf.shape(input=filtered_mean)),
+          state.predicted_mean, filtered_mean)
+      filtered_cov = tf.where(
+          tf.broadcast_to(mask_t, tf.shape(input=filtered_cov)),
+          state.predicted_cov, filtered_cov)
+      log_marginal_likelihood = tf.where(
+          tf.broadcast_to(mask_t[..., 0, 0],
+                          tf.shape(input=log_marginal_likelihood)),
+          tf.zeros_like(log_marginal_likelihood),
+          log_marginal_likelihood)
 
     # Run the filtered posterior through the transition
     # model to predict the next time step:
