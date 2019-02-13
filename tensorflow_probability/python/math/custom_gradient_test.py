@@ -58,18 +58,8 @@ class CustomGradientTest(tf.test.TestCase):
     self.assertAllClose(g(x_), gx_)
 
   def test_works_correctly_vector_of_vars(self):
-    x = tf.compat.v1.get_variable(
-        name='x',
-        shape=[],
-        dtype=tf.float32,
-        initializer=tf.compat.v1.initializers.constant(2),
-        use_resource=True)
-    y = tf.compat.v1.get_variable(
-        name='y',
-        shape=[],
-        dtype=tf.float32,
-        initializer=tf.compat.v1.initializers.constant(3),
-        use_resource=True)
+    x = tf.compat.v2.Variable(2, name='x', dtype=tf.float32)
+    y = tf.compat.v2.Variable(3, name='y', dtype=tf.float32)
     self.evaluate(tf.compat.v1.global_variables_initializer())
 
     f = lambda z: z[0] * z[1]
@@ -78,8 +68,7 @@ class CustomGradientTest(tf.test.TestCase):
     with tf.GradientTape() as tape:
       z = tf.stack([x, y])
       fz = tfp.math.custom_gradient(f(z), g(z), z)
-    gz = tape.gradient(fz, tf.compat.v1.trainable_variables())
-    print(tf.compat.v1.trainable_variables(), gz)
+    gz = tape.gradient(fz, [x, y])
     [z_, fz_, gx_, gy_] = self.evaluate([z, fz, gz[0], gz[1]])
 
     self.assertEqual(f(z_), fz_)
@@ -89,18 +78,8 @@ class CustomGradientTest(tf.test.TestCase):
   def test_works_correctly_side_vars(self):
     x_ = np.float32(2.1)  # Adding extra tenth to force imprecision.
     y_ = np.float32(3.1)
-    x = tf.compat.v1.get_variable(
-        name='x',
-        shape=[],
-        dtype=tf.float32,
-        initializer=tf.compat.v1.initializers.constant(x_),
-        use_resource=True)
-    y = tf.compat.v1.get_variable(
-        name='y',
-        shape=[],
-        dtype=tf.float32,
-        initializer=tf.compat.v1.initializers.constant(y_),
-        use_resource=True)
+    x = tf.compat.v2.Variable(x_, name='x')
+    y = tf.compat.v2.Variable(y_, name='y')
     self.evaluate(tf.compat.v1.global_variables_initializer())
 
     f = lambda x: x * y
@@ -108,7 +87,7 @@ class CustomGradientTest(tf.test.TestCase):
 
     with tf.GradientTape() as tape:
       fx = tfp.math.custom_gradient(f(x), g(x), x)
-    gx = tape.gradient(fx, tf.compat.v1.trainable_variables())
+    gx = tape.gradient(fx, [x, y])
     [x_, fx_, gx_] = self.evaluate([x, fx, gx[0]])
     gy_ = gx[1]
 
@@ -119,18 +98,8 @@ class CustomGradientTest(tf.test.TestCase):
   def test_works_correctly_fx_gx_manually_stopped(self):
     x_ = np.float32(2.1)  # Adding extra tenth to force imprecision.
     y_ = np.float32(3.1)
-    x = tf.compat.v1.get_variable(
-        name='x',
-        shape=[],
-        dtype=tf.float32,
-        initializer=tf.compat.v1.initializers.constant(x_),
-        use_resource=True)
-    y = tf.compat.v1.get_variable(
-        name='y',
-        shape=[],
-        dtype=tf.float32,
-        initializer=tf.compat.v1.initializers.constant(y_),
-        use_resource=True)
+    x = tf.compat.v2.Variable(x_, name='x')
+    y = tf.compat.v2.Variable(y_, name='y')
     self.evaluate([tf.compat.v1.global_variables_initializer()])
 
     stop = tf.stop_gradient  # For readability.
@@ -144,7 +113,7 @@ class CustomGradientTest(tf.test.TestCase):
       fx = tfp.math.custom_gradient(f(x), g(x), x + stop(y),
                                     fx_gx_manually_stopped=True)
 
-    gx = tape.gradient(fx, tf.compat.v1.trainable_variables())
+    gx = tape.gradient(fx, [x, y])
     [x_, fx_, gx_, gy_] = self.evaluate([x, fx, gx[0], gx[1]])
 
     self.assertEqual(x_ * y_, fx_)
