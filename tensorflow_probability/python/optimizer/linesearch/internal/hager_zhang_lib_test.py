@@ -71,6 +71,102 @@ def test_function_x_y_dy(x, y, dy, eps=0.1):
 class HagerZhangLibTest(tf.test.TestCase):
 
   @tfe.run_test_in_graph_and_eager_modes
+  def test_update_simple(self):
+    """Tests that update works on a single line function."""
+    # Example where trial point works as new left end point.
+    wolfe_threshold = 1e-6
+    x = tf.constant([0.0, 0.6, 1.0])
+    y = tf.constant([1.0, 0.9, 1.2])
+    dy = tf.constant([-0.8, -0.7, 0.6])
+    fun = test_function_x_y_dy(x, y, dy, eps=0.1)
+
+    val_a = hzl._apply(fun, 0.0)
+    val_b = hzl._apply(fun, 1.0)
+    val_trial = hzl._apply(fun, 0.6)
+    f_lim = val_a.f + (wolfe_threshold * tf.abs(val_a.f))
+
+    result = self.evaluate(hzl.update(fun, val_a, val_b, val_trial, f_lim))
+    self.assertEqual(result.num_evals, 0)  # No extra evaluations needed.
+    self.assertTrue(result.stopped)
+    self.assertTrue(~result.failed)
+    self.assertAlmostEqual(result.left.x, 0.6)
+    self.assertAlmostEqual(result.right.x, 1.0)
+    self.assertLess(result.left.df, 0)  # Opposite slopes.
+    self.assertGreaterEqual(result.right.df, 0)
+
+  @tfe.run_test_in_graph_and_eager_modes
+  def test_update_batching(self):
+    """Tests that update function works in batching mode."""
+    wolfe_threshold = 1e-6
+    # We build an example function with 4 batches, each for one of the
+    # following cases:
+    # - a) Trial point has positive slope, so works as right end point.
+    # - b) Trial point has negative slope and value is not too large,
+    #      so works as left end point.
+    # - c) Trial point has negative slope but the value is too high,
+    #      bisect is used to squeeze the interval.
+    # - d) Trial point is outside of the (a, b) interval.
+    x = tf.constant([0.0, 0.6, 1.0])
+    y = tf.constant([[1.0, 1.2, 1.1],
+                     [1.0, 0.9, 1.2],
+                     [1.0, 1.1, 1.2],
+                     [1.0, 1.1, 1.2]])
+    dy = tf.constant([[-0.8, 0.6, 0.6],
+                      [-0.8, -0.7, 0.6],
+                      [-0.8, -0.7, 0.6],
+                      [-0.8, -0.7, 0.6]])
+    fun = test_function_x_y_dy(x, y, dy, eps=0.1)
+
+    val_a = hzl._apply(fun, tf.zeros(4))  # Values at zero.
+    val_b = hzl._apply(fun, tf.ones(4))  # Values at initial step.
+    val_trial = hzl._apply(fun, [0.6, 0.6, 0.6, 1.5])
+    f_lim = val_a.f + (wolfe_threshold * tf.abs(val_a.f))
+
+    expected_left = np.array([0.0, 0.6, 0.0, 0.0])
+    expected_right = np.array([0.6, 1.0, 0.3, 1.0])
+
+    result = self.evaluate(hzl.update(fun, val_a, val_b, val_trial, f_lim))
+    self.assertEqual(result.num_evals, 1)  # Had to do bisect once.
+    self.assertTrue(np.all(result.stopped))
+    self.assertTrue(np.all(~result.failed))
+    self.assertTrue(np.all(result.left.df < 0))  # Opposite slopes.
+    self.assertTrue(np.all(result.right.df >= 0))
+    self.assertArrayNear(result.left.x, expected_left, 1e-5)
+    self.assertArrayNear(result.right.x, expected_right, 1e-5)
+
+  @tfe.run_test_in_graph_and_eager_modes
+  def test_update_batching_vs_mapping(self):
+    """Tests that update function works in batching mode."""
+    wolfe_threshold = 1e-6
+    x = tf.constant([0.0, 0.6, 1.0])
+    ys = tf.constant([[1.0, 1.2, 1.1],
+                      [1.0, 0.9, 1.2]])
+    dys = tf.constant([[-0.8, 0.6, 0.6],
+                       [-0.8, -0.7, 0.6]])
+
+    # Create each individual and batched functions.
+    fun1 = test_function_x_y_dy(x, ys[0], dys[0])
+    fun2 = test_function_x_y_dy(x, ys[1], dys[1])
+    funs = test_function_x_y_dy(x, ys, dys)
+
+    def eval_update(fun, p=lambda x: x):
+      val_a = hzl._apply(fun, p(0.0))
+      val_b = hzl._apply(fun, p(1.0))
+      val_trial = hzl._apply(fun, p(0.6))
+      f_lim = val_a.f + (wolfe_threshold * tf.abs(val_a.f))
+      return self.evaluate(hzl.update(fun, val_a, val_b, val_trial, f_lim))
+
+    result1 = eval_update(fun1)
+    result2 = eval_update(fun2)
+    results = eval_update(funs, p=lambda x: [x, x])
+
+    # Both batching/non-batching versions get the same result.
+    self.assertEqual(result1.left.x, results.left.x[0])
+    self.assertEqual(result1.right.x, results.right.x[0])
+    self.assertEqual(result2.left.x, results.left.x[1])
+    self.assertEqual(result2.right.x, results.right.x[1])
+
+  @tfe.run_test_in_graph_and_eager_modes
   def test_bracket_simple(self):
     """Tests that bracketing works on a 1 variable scalar valued function."""
     # Example crafted to require one expansion during bracketing, and then
