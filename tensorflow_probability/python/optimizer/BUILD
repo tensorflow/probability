@@ -99,7 +99,6 @@ py_test(
     size = "medium",
     timeout = "long",
     srcs = ["bfgs_test.py"],
-    tags = ["tf2-broken"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -123,7 +122,6 @@ py_test(
     timeout = "long",
     srcs = ["lbfgs_test.py"],
     shard_count = 5,
-    tags = ["tf2-broken"],
     deps = [
         # numpy dep,
         # tensorflow dep,

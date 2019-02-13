@@ -24,18 +24,17 @@ from scipy.stats import special_ortho_group
 
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow.python.framework import test_util
-
-
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 def _make_val_and_grad_fn(value_fn):
-  raw_fn = tfe.value_and_gradients_function(value_fn)
   @functools.wraps(value_fn)
   def val_and_grad(x):
-    fv = raw_fn(x)
-    return fv[0], fv[1][0]
+    with tf.GradientTape() as tape:
+      tape.watch(x)
+      fv = value_fn(x)
+      grad = tape.gradient(fv, x)
+      return fv, grad
   return val_and_grad
 
 
@@ -43,10 +42,10 @@ def _norm(x):
   return np.linalg.norm(x, np.inf)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class LBfgsTest(tf.test.TestCase):
   """Tests for LBFGS optimization algorithm."""
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_quadratic_bowl_2d(self):
     """Can minimize a two dimensional quadratic function."""
     minimum = np.array([1.0, 1.0])
@@ -63,7 +62,6 @@ class LBfgsTest(tf.test.TestCase):
     self.assertTrue(_norm(results.objective_gradient) <= 1e-8)
     self.assertArrayNear(results.position, minimum, 1e-5)
 
-  @test_util.run_in_graph_and_eager_modes
   def test_high_dims_quadratic_bowl_trivial(self):
     """Can minimize a high-dimensional trivial bowl (sphere)."""
     ndims = 100
@@ -82,7 +80,6 @@ class LBfgsTest(tf.test.TestCase):
     self.assertTrue(_norm(results.objective_gradient) <= 1e-8)
     self.assertArrayNear(results.position, minimum, 1e-5)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_quadratic_bowl_40d(self):
     """Can minimize a high-dimensional quadratic function."""
     dim = 40
@@ -101,7 +98,6 @@ class LBfgsTest(tf.test.TestCase):
     self.assertTrue(_norm(results.objective_gradient) <= 1e-8)
     self.assertArrayNear(results.position, minimum, 1e-5)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_quadratic_with_skew(self):
     """Can minimize a general quadratic function."""
     dim = 50
@@ -124,7 +120,6 @@ class LBfgsTest(tf.test.TestCase):
     self.assertTrue(_norm(results.objective_gradient) <= 1e-8)
     self.assertArrayNear(results.position, minimum, 1e-5)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_quadratic_with_strong_skew(self):
     """Can minimize a strongly skewed quadratic function."""
     np.random.seed(89793)
@@ -146,7 +141,6 @@ class LBfgsTest(tf.test.TestCase):
     self.assertTrue(_norm(results.objective_gradient) <= 1e-8)
     self.assertArrayNear(results.position, minimum, 1e-5)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_rosenbrock_2d(self):
     """Tests L-BFGS on the Rosenbrock function.
 
@@ -220,7 +214,6 @@ class LBfgsTest(tf.test.TestCase):
                            1e-5)
       self.assertEqual(results.num_objective_evaluations, expected_evals)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_data_fitting(self):
     """Tests MLE estimation for a simple geometric GLM."""
     n, dim = 100, 30
@@ -307,6 +300,7 @@ class LBfgsTest(tf.test.TestCase):
 
   def test_dynamic_shapes(self):
     """Can build an lbfgs_op with dynamic shapes in graph mode."""
+    if tf.executing_eagerly(): return
     ndims = 60
     minimum = np.ones([ndims], dtype='float64')
     scales = np.arange(ndims, dtype='float64') + minimum

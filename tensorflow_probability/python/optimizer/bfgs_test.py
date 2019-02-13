@@ -25,15 +25,17 @@ from scipy.stats import special_ortho_group
 
 import tensorflow as tf
 import tensorflow_probability as tfp
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 def _make_val_and_grad_fn(value_fn):
-  raw_fn = tfe.value_and_gradients_function(value_fn)
   @functools.wraps(value_fn)
   def val_and_grad(x):
-    fv = raw_fn(x)
-    return fv[0], fv[1][0]
+    with tf.GradientTape() as tape:
+      tape.watch(x)
+      fv = value_fn(x)
+      grad = tape.gradient(fv, x)
+      return fv, grad
   return val_and_grad
 
 
@@ -41,10 +43,10 @@ def _norm(x):
   return np.linalg.norm(x, np.inf)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class BfgsTest(tf.test.TestCase):
   """Tests for BFGS optimization algorithm."""
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_quadratic_bowl_2d(self):
     """Can minimize a two dimensional quadratic function."""
     minimum = np.array([1.0, 1.0])
@@ -63,7 +65,6 @@ class BfgsTest(tf.test.TestCase):
     self.assertTrue(final_gradient_norm <= 1e-8)
     self.assertArrayNear(results.position, minimum, 1e-5)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_inverse_hessian_spec(self):
     """Checks that specifying the 'initial_inverse_hessian_estimate' works."""
     minimum = np.array([1.0, 1.0], dtype=np.float32)
@@ -85,7 +86,6 @@ class BfgsTest(tf.test.TestCase):
     self.assertTrue(final_gradient_norm <= 1e-8)
     self.assertArrayNear(results.position, minimum, 1e-5)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_bad_inverse_hessian_spec(self):
     """Checks that specifying a non-positive definite inverse hessian fails."""
     minimum = np.array([1.0, 1.0], dtype=np.float32)
@@ -103,7 +103,6 @@ class BfgsTest(tf.test.TestCase):
           quadratic, initial_position=start, tolerance=1e-8,
           initial_inverse_hessian_estimate=bad_inv_hessian))
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_asymmetric_inverse_hessian_spec(self):
     """Checks that specifying a asymmetric inverse hessian fails."""
     minimum = np.array([1.0, 1.0], dtype=np.float32)
@@ -121,7 +120,6 @@ class BfgsTest(tf.test.TestCase):
           quadratic, initial_position=start, tolerance=1e-8,
           initial_inverse_hessian_estimate=bad_inv_hessian))
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_quadratic_bowl_10d(self):
     """Can minimize a ten dimensional quadratic function."""
     dim = 10
@@ -142,7 +140,6 @@ class BfgsTest(tf.test.TestCase):
     self.assertTrue(final_gradient_norm <= 1e-8)
     self.assertArrayNear(results.position, minimum, 1e-5)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_quadratic_with_skew(self):
     """Can minimize a general quadratic function."""
     dim = 3
@@ -167,7 +164,6 @@ class BfgsTest(tf.test.TestCase):
     self.assertTrue(final_gradient_norm <= 1e-8)
     self.assertArrayNear(results.position, minimum, 1e-5)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_quadratic_with_strong_skew(self):
     """Can minimize a strongly skewed quadratic function."""
     np.random.seed(89793)
@@ -192,7 +188,6 @@ class BfgsTest(tf.test.TestCase):
     self.assertTrue(final_gradient_norm <= 1e-8)
     self.assertArrayNear(results.position, minimum, 1e-5)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_rosenbrock_2d(self):
     """Tests BFGS on the Rosenbrock function.
 
@@ -269,7 +264,6 @@ class BfgsTest(tf.test.TestCase):
                            1e-5)
       self.assertEqual(results.num_objective_evaluations, expected_evals)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_data_fitting(self):
     """Tests MLE estimation for a simple geometric GLM."""
     n, dim = 100, 3
@@ -358,6 +352,7 @@ class BfgsTest(tf.test.TestCase):
 
   def test_dynamic_shapes(self):
     """Can build a bfgs_op with dynamic shapes in graph mode."""
+    if tf.executing_eagerly(): return
     minimum = np.array([1.0, 1.0])
     scales = np.array([2.0, 3.0])
 
