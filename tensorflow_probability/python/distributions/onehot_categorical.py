@@ -191,8 +191,7 @@ class OneHotCategorical(distribution.Distribution):
     logits_2d = tf.reshape(logits, [-1, self.event_size])
     x_2d = tf.reshape(x, [-1, self.event_size])
     ret = -tf.nn.softmax_cross_entropy_with_logits(
-        labels=tf.stop_gradient(
-            tf.stop_gradient(tf.stop_gradient(tf.stop_gradient(x_2d)))),
+        labels=tf.stop_gradient(x_2d),
         logits=logits_2d)
     # Reshape back to user-supplied batch and sample dims prior to 2D reshape.
     ret = tf.reshape(ret, logits_shape)
