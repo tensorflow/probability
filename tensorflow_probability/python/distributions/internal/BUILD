@@ -49,7 +49,10 @@ py_test(
     name = "moving_stats_test",
     size = "small",
     srcs = ["moving_stats_test.py"],
-    tags = ["nomsan"],  # disable to avoid false positives from scipy.
+    tags = [
+        "nomsan",  # disable to avoid false positives from scipy.
+        "tf2-broken",
+    ],
     deps = [
         ":moving_stats",
         # numpy dep,

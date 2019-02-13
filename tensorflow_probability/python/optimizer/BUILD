@@ -56,6 +56,7 @@ py_test(
     name = "sgld_test",
     size = "medium",
     srcs = ["sgld_test.py"],
+    tags = ["tf2-broken"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -76,6 +77,7 @@ py_test(
     name = "variational_sgd_test",
     size = "medium",
     srcs = ["variational_sgd_test.py"],
+    tags = ["tf2-broken"],
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",
@@ -97,6 +99,7 @@ py_test(
     size = "medium",
     timeout = "long",
     srcs = ["bfgs_test.py"],
+    tags = ["tf2-broken"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -120,6 +123,7 @@ py_test(
     timeout = "long",
     srcs = ["lbfgs_test.py"],
     shard_count = 5,
+    tags = ["tf2-broken"],
     deps = [
         # numpy dep,
         # tensorflow dep,

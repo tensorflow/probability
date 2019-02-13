@@ -538,6 +538,7 @@ py_test(
     name = "batch_normalization_test",
     size = "medium",
     srcs = ["batch_normalization_test.py"],
+    tags = ["tf2-broken"],
     deps = [
         ":bijectors",
         # absl/testing:parameterized dep,
@@ -727,6 +728,7 @@ py_test(
     size = "small",
     timeout = "moderate",
     srcs = ["masked_autoregressive_test.py"],
+    tags = ["tf2-broken"],
     deps = [
         ":bijectors",
         ":masked_autoregressive",
@@ -798,6 +800,7 @@ py_test(
     name = "real_nvp_test",
     size = "small",
     srcs = ["real_nvp_test.py"],
+    tags = ["tf2-broken"],
     deps = [
         ":bijectors",
         # numpy dep,

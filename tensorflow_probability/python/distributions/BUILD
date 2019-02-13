@@ -1182,7 +1182,10 @@ py_test(
         "conditional_transformed_distribution_test.py",
         "transformed_distribution_test.py",
     ],
-    tags = ["no_pip"],
+    tags = [
+        "no_pip",
+        "tf2-broken",
+    ],
     deps = [
         # numpy dep,
         # scipy dep,
@@ -1195,6 +1198,7 @@ py_test(
     name = "deterministic_test",
     size = "small",
     srcs = ["deterministic_test.py"],
+    tags = ["tf2-broken"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -1205,6 +1209,7 @@ py_test(
 py_test(
     name = "dirichlet_multinomial_test",
     srcs = ["dirichlet_multinomial_test.py"],
+    tags = ["tf2-broken"],
     deps = [
         ":dirichlet_multinomial",
         # numpy dep,
@@ -1414,6 +1419,7 @@ py_test(
 py_test(
     name = "kullback_leibler_test",
     srcs = ["kullback_leibler_test.py"],
+    tags = ["tf2-broken"],
     deps = [
         ":bernoulli",
         ":beta",
@@ -1488,6 +1494,7 @@ py_test(
     name = "mixture_test",
     size = "medium",
     srcs = ["mixture_test.py"],
+    tags = ["tf2-broken"],
     deps = [
         # numpy dep,
         # scipy dep,
@@ -1499,6 +1506,7 @@ py_test(
 py_test(
     name = "mixture_same_family_test",
     srcs = ["mixture_same_family_test.py"],
+    tags = ["tf2-broken"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -1511,6 +1519,7 @@ py_test(
 py_test(
     name = "multinomial_test",
     srcs = ["multinomial_test.py"],
+    tags = ["tf2-broken"],
     deps = [
         ":multinomial",
         # numpy dep,
@@ -1743,6 +1752,7 @@ py_test(
     srcs = [
         "lkj_test.py",
     ],
+    tags = ["tf2-broken"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -1813,6 +1823,7 @@ py_test(
     name = "transformed_distribution_test",
     size = "medium",
     srcs = ["transformed_distribution_test.py"],
+    tags = ["tf2-broken"],
     deps = [
         # numpy dep,
         # scipy dep,
@@ -1826,6 +1837,7 @@ py_test(
     size = "large",
     srcs = ["truncated_normal_test.py"],
     shard_count = 10,
+    tags = ["tf2-broken"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
