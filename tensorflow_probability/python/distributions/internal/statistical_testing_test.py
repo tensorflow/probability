@@ -26,10 +26,16 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
+# pylint: disable=g-error-prone-assert-raises
+# This file is testing new assertions, which must of necessity appear in
+# assertRaises blocks to check that they do, in fact, raise when their terms are
+# violated.
 
 
-@parameterized.parameters(np.float32, np.float64)
-class StatisticalTestingTest(tf.test.TestCase):
+@test_util.run_all_in_graph_and_eager_modes
+class StatisticalTestingTest(tf.test.TestCase, parameterized.TestCase):
 
   def assert_design_soundness(self, dtype, min_num_samples, min_discrepancy):
     thresholds = [1e-5, 1e-2, 1.1e-1, 0.9, 1., 1.02, 2., 10., 1e2, 1e5, 1e10]
@@ -57,11 +63,13 @@ class StatisticalTestingTest(tf.test.TestCase):
           msg='false_pass_rate({}), false_fail_rate({})'.format(
               false_pass_rate, false_fail_rate))
 
+  @parameterized.parameters(np.float32, np.float64)
   def test_dkwm_design_cdf_one_sample_soundness(self, dtype):
     self.assert_design_soundness(
         dtype, st.min_num_samples_for_dkwm_cdf_test,
         st.min_discrepancy_of_true_cdfs_detectable_by_dkwm)
 
+  @parameterized.parameters(np.float32, np.float64)
   def test_dkwm_cdf_one_sample_assertion(self, dtype):
     rng = np.random.RandomState(seed=0)
     num_samples = 13000
@@ -93,8 +101,7 @@ class StatisticalTestingTest(tf.test.TestCase):
       self.evaluate(st.assert_true_cdf_equal_by_dkwm(
           samples, lambda x: x, false_fail_rate=1e-6))
 
-  def test_empirical_cdfs_with_duplicates(self, dtype):
-    del dtype
+  def test_empirical_cdfs_with_duplicates(self):
     # A batch of sorted samples with nontrivial repetition.
     # There are repetitions across batch members, which should not
     # confuse the CDF computation.
@@ -115,6 +122,7 @@ class StatisticalTestingTest(tf.test.TestCase):
         st.empirical_cdfs(samples, continuity='right'))
     self.assertAllEqual(expected_high_cdf_values, high_empirical_cdfs)
 
+  @parameterized.parameters(np.float32, np.float64)
   def test_dkwm_cdf_one_sample_batch_discrete_assertion(self, dtype):
     rng = np.random.RandomState(seed=0)
     num_samples = 13000
@@ -143,6 +151,7 @@ class StatisticalTestingTest(tf.test.TestCase):
         false_fail_rate=1e-6, false_pass_rate=1e-6)
     self.evaluate(d < 0.05)
 
+  @parameterized.parameters(np.float32, np.float64)
   def test_dkwm_design_mean_one_sample_soundness(self, dtype):
     self.assert_design_soundness(
         dtype,
@@ -152,6 +161,7 @@ class StatisticalTestingTest(tf.test.TestCase):
             st.min_discrepancy_of_true_means_detectable_by_dkwm,
             low=0., high=1.))
 
+  @parameterized.parameters(np.float32, np.float64)
   def test_dkwm_design_mean_two_sample_soundness(self, dtype):
     thresholds = [1e-5, 1e-2, 1.1e-1, 0.9, 1., 1.02, 2., 10., 1e2, 1e5, 1e10]
     rates = [1e-6, 1e-3, 1e-2, 1.1e-1, 0.2, 0.5, 0.7, 1.]
@@ -190,6 +200,7 @@ class StatisticalTestingTest(tf.test.TestCase):
           msg='false_pass_rate({}), false_fail_rate({})'.format(
               false_pass_rate, false_fail_rate))
 
+  @parameterized.parameters(np.float32, np.float64)
   def test_true_mean_confidence_interval_by_dkwm_one_sample(self, dtype):
     rng = np.random.RandomState(seed=0)
 
@@ -212,6 +223,7 @@ class StatisticalTestingTest(tf.test.TestCase):
     self.assertGreater(high, 0.5)
     self.assertLess(high, 0.6)
 
+  @parameterized.parameters(np.float32, np.float64)
   def test_dkwm_mean_one_sample_assertion(self, dtype):
     rng = np.random.RandomState(seed=0)
     num_samples = 5000
@@ -234,6 +246,7 @@ class StatisticalTestingTest(tf.test.TestCase):
       self.evaluate(st.assert_true_mean_equal_by_dkwm(
           samples, 0., 1., 0.6, false_fail_rate=1e-6))
 
+  @parameterized.parameters(np.float32, np.float64)
   def test_dkwm_mean_in_interval_one_sample_assertion(self, dtype):
     rng = np.random.RandomState(seed=0)
     num_samples = 5000
@@ -259,6 +272,7 @@ class StatisticalTestingTest(tf.test.TestCase):
           samples, 0., 1.,
           expected_low=0.6, expected_high=0.8, false_fail_rate=1e-6))
 
+  @parameterized.parameters(np.float32, np.float64)
   def test_dkwm_mean_two_sample_assertion(self, dtype):
     rng = np.random.RandomState(seed=0)
     num_samples = 4000
@@ -278,6 +292,7 @@ class StatisticalTestingTest(tf.test.TestCase):
     self.evaluate(st.assert_true_mean_equal_by_dkwm_two_sample(
         samples1, 0., 1., samples2, 0., 1., false_fail_rate=1e-6))
 
+  @parameterized.parameters(np.float32, np.float64)
   def test_dkwm_mean_two_sample_assertion_beta_2_1_false(self, dtype):
     rng = np.random.RandomState(seed=0)
     num_samples = 4000
@@ -295,6 +310,7 @@ class StatisticalTestingTest(tf.test.TestCase):
           beta_high_samples, 0., 1.,
           false_fail_rate=1e-6))
 
+  @parameterized.parameters(np.float32, np.float64)
   def test_dkwm_mean_two_sample_assertion_beta_1_2_false(self, dtype):
     rng = np.random.RandomState(seed=0)
     num_samples = 4000
@@ -312,6 +328,7 @@ class StatisticalTestingTest(tf.test.TestCase):
           beta_low_samples, 0., 1.,
           false_fail_rate=1e-6))
 
+  @parameterized.parameters(np.float32, np.float64)
   def test_dkwm_argument_validity_checking(self, dtype):
     rng = np.random.RandomState(seed=0)
     samples = rng.uniform(
@@ -331,6 +348,7 @@ class StatisticalTestingTest(tf.test.TestCase):
         samples, [[0., 1.]], [[1., 2.]], error_rate=0.5)
     _ = self.evaluate(op)
 
+  @parameterized.parameters(np.float32, np.float64)
   def test_do_maximum_mean(self, dtype):
     n = 117
     envelope = 0.02  # > 2 / n, but < 3 / n
