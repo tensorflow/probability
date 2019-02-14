@@ -51,7 +51,6 @@ py_test(
     name = "positive_semidefinite_kernel_test",
     size = "small",
     srcs = ["positive_semidefinite_kernel_test.py"],
-    tags = ["tf2-broken"],
     deps = [
         # absl/testing:parameterized dep,
         # tensorflow dep,
@@ -142,7 +141,6 @@ py_library(
 py_test(
     name = "rational_quadratic_test",
     srcs = ["rational_quadratic_test.py"],
-    tags = ["tf2-broken"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,

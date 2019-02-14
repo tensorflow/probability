@@ -118,18 +118,28 @@ class RationalQuadraticTest(tf.test.TestCase, parameterized.TestCase):
     #               `- from broadcasting kernel params
 
   def testValidateArgs(self):
-    k = psd_kernels.RationalQuadratic(
-        amplitude=-1.,
-        length_scale=-1.,
-        scale_mixture_rate=-1.,
-        validate_args=True)
     with self.assertRaises(tf.errors.InvalidArgumentError):
+      k = psd_kernels.RationalQuadratic(
+          amplitude=-1.,
+          length_scale=1.,
+          scale_mixture_rate=1.,
+          validate_args=True)
       self.evaluate(k.amplitude)
 
     with self.assertRaises(tf.errors.InvalidArgumentError):
+      k = psd_kernels.RationalQuadratic(
+          amplitude=1.,
+          length_scale=-1.,
+          scale_mixture_rate=1.,
+          validate_args=True)
       self.evaluate(k.length_scale)
 
     with self.assertRaises(tf.errors.InvalidArgumentError):
+      k = psd_kernels.RationalQuadratic(
+          amplitude=1.,
+          length_scale=1.,
+          scale_mixture_rate=-1.,
+          validate_args=True)
       self.evaluate(k.scale_mixture_rate)
 
     # But `None`'s are ok
