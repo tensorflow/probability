@@ -21,6 +21,7 @@ from __future__ import print_function
 import inspect
 from absl.testing import parameterized
 import numpy as np
+import six
 import tensorflow as tf
 
 from tensorflow_probability import distributions as tfd
@@ -187,6 +188,12 @@ class GeneratedRandomVariablesTest(parameterized.TestCase, tf.test.TestCase):
       log_joint_scoped = ed.make_log_joint_fn(model_scoped)
       self.assertEqual(self.evaluate(log_joint_builtin(x=7.)),
                        self.evaluate(log_joint_scoped(x=7.)))
+
+  def testAllDistributionsAreRVs(self):
+    for (dist_name, dist_class)  in six.iteritems(tfd.__dict__):
+      if inspect.isclass(dist_class) and issubclass(
+          dist_class, tfd.Distribution):
+        self.assertIn(dist_name, ed.__dict__)
 
 if __name__ == "__main__":
   tf.test.main()
