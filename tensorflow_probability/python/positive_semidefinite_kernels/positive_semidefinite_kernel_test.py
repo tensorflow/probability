@@ -26,6 +26,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.positive_semidefinite_kernels.internal import util as kernels_util
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 kernels_lib = tfp.positive_semidefinite_kernels
 
@@ -65,6 +66,7 @@ class TestKernel(kernels_lib.PositiveSemidefiniteKernel):
     return multiplier * tf.reduce_sum(input_tensor=x1 + x2, axis=-1)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class PositiveSemidefiniteKernelTest(tf.test.TestCase, parameterized.TestCase):
   """Test the abstract base class behaviors."""
 
@@ -92,17 +94,19 @@ class PositiveSemidefiniteKernelTest(tf.test.TestCase, parameterized.TestCase):
     self.params_21_dynamic = tf.compat.v1.placeholder_with_default([[1.], [2.]],
                                                                    shape=None)
 
-  def testStr(self):
+  def testStrUnknownBatchShape(self):
+    if tf.executing_eagerly(): return
     k32_batch_unk = TestKernel(tf.compat.v1.placeholder_with_default(
         [2., 3], shape=None))
+    self.assertEqual(
+        'tfp.positive_semidefinite_kernels.TestKernel('
+        '"TestKernel", feature_ndims=1, dtype=float32)',
+        str(k32_batch_unk))
+
+  def testStr(self):
     k32_batch2 = TestKernel(tf.cast([123., 456.], dtype=tf.float32))
     k64_batch2x1 = TestKernel(tf.cast([[123.], [456.]], dtype=tf.float64))
     k_fdim3 = TestKernel(tf.cast(123., dtype=tf.float32), feature_ndims=3)
-    if not tf.executing_eagerly():
-      self.assertEqual(
-          'tfp.positive_semidefinite_kernels.TestKernel('
-          '"TestKernel", feature_ndims=1, dtype=float32)',
-          str(k32_batch_unk))
     self.assertEqual(
         'tfp.positive_semidefinite_kernels.TestKernel('
         '"TestKernel", batch_shape=(2,), feature_ndims=1, dtype=float32)',
@@ -116,17 +120,19 @@ class PositiveSemidefiniteKernelTest(tf.test.TestCase, parameterized.TestCase):
         '"TestKernel", batch_shape=(), feature_ndims=3, dtype=float32)',
         str(k_fdim3))
 
-  def testRepr(self):
+  def testReprUnknownBatchShape(self):
+    if tf.executing_eagerly(): return
     k32_batch_unk = TestKernel(tf.compat.v1.placeholder_with_default(
         [2., 3], shape=None))
+    self.assertEqual(
+        '<tfp.positive_semidefinite_kernels.TestKernel '
+        '\'TestKernel\' batch_shape=<unknown> feature_ndims=1 dtype=float32>',
+        repr(k32_batch_unk))
+
+  def testRepr(self):
     k32_batch2 = TestKernel(tf.cast([123., 456.], dtype=tf.float32))
     k64_batch2x1 = TestKernel(tf.cast([[123.], [456.]], dtype=tf.float64))
     k_fdim3 = TestKernel(tf.cast(123., dtype=tf.float32), feature_ndims=3)
-    if not tf.executing_eagerly():
-      self.assertEqual(
-          '<tfp.positive_semidefinite_kernels.TestKernel '
-          '\'TestKernel\' batch_shape=<unknown> feature_ndims=1 dtype=float32>',
-          repr(k32_batch_unk))
     self.assertEqual(
         '<tfp.positive_semidefinite_kernels.TestKernel '
         '\'TestKernel\' batch_shape=(2,) feature_ndims=1 dtype=float32>',
@@ -175,12 +181,11 @@ class PositiveSemidefiniteKernelTest(tf.test.TestCase, parameterized.TestCase):
     self.assertAllEqual(self.evaluate(k.batch_shape_tensor()), shape)
 
   @parameterized.named_parameters(
-      ('Dynamic-shape [2] kernel',
-       tf.compat.v1.placeholder_with_default([1., 2.], shape=None), [2]),
-      ('Dynamic-shape [2, 1] kernel',
-       tf.compat.v1.placeholder_with_default([[1.], [2.]], shape=None), [2, 1]))
+      ('Dynamic-shape [2] kernel', [1., 2.], [2]),
+      ('Dynamic-shape [2, 1] kernel', [[1.], [2.]], [2, 1]))
   def testDynamicBatchShape(self, params, shape):
-    k = TestKernel(params)
+    tensor_params = tf.compat.v1.placeholder_with_default(params, shape=None)
+    k = TestKernel(tensor_params)
     self.assertAllEqual(self.evaluate(k.batch_shape_tensor()), shape)
 
   def testApplyOutputWithStaticShapes(self):
