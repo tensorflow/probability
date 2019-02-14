@@ -24,6 +24,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.keras import testing_utils
 
 tfd = tfp.distributions
@@ -98,6 +99,7 @@ class MockKLDivergence(object):
     return self.result
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class DenseVariational(tf.test.TestCase):
 
   def _testKerasLayer(self, layer_class):
@@ -309,12 +311,14 @@ class DenseVariational(tf.test.TestCase):
   def testDenseLocalReparameterization(self):
     batch_size, in_size, out_size = 2, 3, 4
     with self.cached_session() as sess:
+      tf.set_random_seed(9068)
       (kernel_posterior, kernel_prior, kernel_divergence,
        bias_posterior, bias_prior, bias_divergence, layer, inputs,
        outputs, kl_penalty) = self._testDenseSetUp(
            tfp.layers.DenseLocalReparameterization,
            batch_size, in_size, out_size)
 
+      tf.set_random_seed(9068)
       expected_kernel_posterior_affine = tfd.Normal(
           loc=tf.matmul(inputs, kernel_posterior.result_loc),
           scale=tf.matmul(
@@ -372,12 +376,14 @@ class DenseVariational(tf.test.TestCase):
   def testDenseFlipout(self):
     batch_size, in_size, out_size = 2, 3, 4
     with self.cached_session() as sess:
+      tf.set_random_seed(9069)
       (kernel_posterior, kernel_prior, kernel_divergence,
        bias_posterior, bias_prior, bias_divergence, layer, inputs,
        outputs, kl_penalty) = self._testDenseSetUp(
            tfp.layers.DenseFlipout,
            batch_size, in_size, out_size, seed=44)
 
+      tf.set_random_seed(9069)
       expected_kernel_posterior_affine = tfd.Normal(
           loc=tf.zeros_like(kernel_posterior.result_loc),
           scale=kernel_posterior.result_scale)

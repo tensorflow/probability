@@ -58,7 +58,6 @@ py_test(
     name = "conv_variational_test",
     size = "medium",
     srcs = ["conv_variational_test.py"],
-    tags = ["tf2-broken"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -85,7 +84,6 @@ py_test(
     name = "dense_variational_test",
     size = "small",
     srcs = ["dense_variational_test.py"],
-    tags = ["tf2-broken"],
     deps = [
         # numpy dep,
         # tensorflow dep,

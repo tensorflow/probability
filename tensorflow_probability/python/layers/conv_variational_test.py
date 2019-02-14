@@ -24,6 +24,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.keras import testing_utils
 from tensorflow.python.layers import utils as tf_layers_util
 from tensorflow.python.ops import nn_ops
@@ -175,6 +176,7 @@ class MockKLDivergence(object):
     return self.result
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class ConvVariational(object):
 
   def maybe_transpose_inputs(self, inputs):
@@ -328,6 +330,7 @@ class ConvVariational(object):
     bias_divergence = MockKLDivergence(
         result=tf.random.uniform([], seed=seed()))
 
+    tf.set_random_seed(5995)
     layer = layer_class(
         filters=filters,
         kernel_size=kernel_size,
@@ -423,6 +426,8 @@ class ConvVariational(object):
            layer_class, batch_size,
            depth=depth, height=height, width=width, channels=channels,
            filters=filters, seed=44)
+
+      tf.set_random_seed(5995)
 
       convolution_op = nn_ops.Convolution(
           tf.TensorShape(inputs.shape),
@@ -706,10 +711,12 @@ class ConvVariational(object):
     self._testLayerInSequential(tfp.layers.Convolution3DFlipout)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class ConvVariationalTestChannelsFirst(tf.test.TestCase, ConvVariational):
   data_format = 'channels_first'
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class ConvVariationalTestChannelsLast(tf.test.TestCase, ConvVariational):
   data_format = 'channels_last'
 
