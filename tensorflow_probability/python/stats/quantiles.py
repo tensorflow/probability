@@ -110,8 +110,8 @@ def find_bins(x,
     edges = tf.convert_to_tensor(value=edges, name='edges', dtype=in_type)
     x = tf.convert_to_tensor(value=x, name='x', dtype=in_type)
 
-    if (tf.dimension_value(edges.shape[0]) is not None and
-        tf.dimension_value(edges.shape[0]) < 2):
+    if (tf.compat.dimension_value(edges.shape[0]) is not None and
+        tf.compat.dimension_value(edges.shape[0]) < 2):
       raise ValueError(
           'First dimension of `edges` must have length > 1 to index 1 or '
           'more bin. Found: {}'.format(edges.shape))
