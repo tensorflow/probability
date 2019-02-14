@@ -25,11 +25,11 @@ import tensorflow_probability as tfp
 from tensorflow_probability.python.sts import LocalLevelStateSpaceModel
 
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 tfl = tf.linalg
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class _LocalLevelStateSpaceModelTest(object):
 
   def test_logprob(self):
@@ -100,21 +100,21 @@ class _LocalLevelStateSpaceModelTest(object):
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class LocalLevelStateSpaceModelTestStaticShape32(
     tf.test.TestCase, _LocalLevelStateSpaceModelTest):
   dtype = np.float32
   use_static_shape = True
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class LocalLevelStateSpaceModelTestDynamicShape32(
     tf.test.TestCase, _LocalLevelStateSpaceModelTest):
   dtype = np.float32
   use_static_shape = False
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class LocalLevelStateSpaceModelTestStaticShape64(
     tf.test.TestCase, _LocalLevelStateSpaceModelTest):
   dtype = np.float64

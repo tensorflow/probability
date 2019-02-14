@@ -28,7 +28,7 @@ import tensorflow_probability as tfp
 from tensorflow_probability.python.distributions import exponential as exponential_lib
 
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 def try_import(name):  # pylint: disable=invalid-name
@@ -43,7 +43,7 @@ def try_import(name):  # pylint: disable=invalid-name
 stats = try_import("scipy.stats")
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class ExponentialTest(tf.test.TestCase):
 
   def testExponentialLogPDF(self):

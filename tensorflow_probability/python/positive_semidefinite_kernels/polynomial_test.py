@@ -25,10 +25,10 @@ import numpy as np
 
 import tensorflow as tf
 from tensorflow_probability import positive_semidefinite_kernels as psd_kernels
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class PolynomialTest(tf.test.TestCase, parameterized.TestCase):
   """Test the Polynomial kernel."""
 
@@ -262,7 +262,7 @@ class PolynomialTest(tf.test.TestCase, parameterized.TestCase):
     )
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class LinearTest(tf.test.TestCase, parameterized.TestCase):
   """Test the Linear kernel."""
 

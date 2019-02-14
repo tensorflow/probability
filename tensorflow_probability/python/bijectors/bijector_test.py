@@ -29,10 +29,10 @@ import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class BaseBijectorTest(tf.test.TestCase):
   """Tests properties of the Bijector base-class."""
 
@@ -156,7 +156,7 @@ class ConstantJacobian(tfb.Bijector):
     return tf.constant(-2., x.dtype)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class BijectorTestEventNdims(tf.test.TestCase):
 
   def assertRaisesError(self, msg):
@@ -189,7 +189,7 @@ class BijectorTestEventNdims(tf.test.TestCase):
           bij.inverse_log_det_jacobian(1., event_ndims=event_ndims))
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class BijectorCachingTest(tf.test.TestCase):
 
   def testCachingOfForwardResults(self):
@@ -251,7 +251,7 @@ class BijectorCachingTest(tf.test.TestCase):
     self.assertEqual(expected_live, sum(ref() is not None for ref in refs))
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class BijectorReduceEventDimsTest(tf.test.TestCase):
   """Test reducing of event dims."""
 
@@ -324,7 +324,7 @@ class BijectorReduceEventDimsTest(tf.test.TestCase):
     self.assertAllClose(-np.log(x_), ildj)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class BijectorCompositionTest(tf.test.TestCase):
 
   def testComposeFromChainBijector(self):

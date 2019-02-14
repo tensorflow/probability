@@ -28,7 +28,7 @@ from tensorflow_probability.python.layers.internal import distribution_tensor_co
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 dtc = distribution_tensor_coercible
 
 
@@ -60,7 +60,7 @@ class Normal(tfd.Normal):
     return super(Normal, self).__add__(x)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class DistributionTensorConversionTest(
     tf.test.TestCase, parameterized.TestCase):
 

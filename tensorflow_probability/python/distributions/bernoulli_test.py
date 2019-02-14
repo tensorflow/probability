@@ -26,7 +26,7 @@ import tensorflow as tf
 
 from tensorflow_probability.python.distributions import bernoulli
 from tensorflow_probability.python.distributions import kullback_leibler
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 def try_import(name):  # pylint: disable=invalid-name
@@ -52,15 +52,14 @@ def entropy(p):
   return -q * np.log(q) - p * np.log(p)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class BernoulliTest(tf.test.TestCase):
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testP(self):
     p = [0.2, 0.4]
     dist = bernoulli.Bernoulli(probs=p)
     self.assertAllClose(p, self.evaluate(dist.probs))
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testLogits(self):
     logits = [-42., 42.]
     dist = bernoulli.Bernoulli(logits=logits)
@@ -75,7 +74,6 @@ class BernoulliTest(tf.test.TestCase):
     dist = bernoulli.Bernoulli(probs=p)
     self.assertAllClose(special.logit(p), self.evaluate(dist.logits))
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testInvalidP(self):
     invalid_ps = [1.01, 2.]
     for p in invalid_ps:
@@ -94,7 +92,6 @@ class BernoulliTest(tf.test.TestCase):
       dist = bernoulli.Bernoulli(probs=p)
       self.assertEqual(p, self.evaluate(dist.probs))  # Should not fail
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testShapes(self):
     for batch_shape in ([], [1], [2, 3, 4]):
       dist = make_bernoulli(batch_shape)
@@ -103,7 +100,6 @@ class BernoulliTest(tf.test.TestCase):
       self.assertAllEqual([], dist.event_shape.as_list())
       self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testDtype(self):
     dist = make_bernoulli([])
     self.assertEqual(dist.dtype, tf.int32)
@@ -123,7 +119,6 @@ class BernoulliTest(tf.test.TestCase):
     self.assertEqual(dist64.dtype, dist64.sample(5).dtype)
     self.assertEqual(dist64.dtype, dist64.mode().dtype)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def _testPmf(self, **kwargs):
     dist = bernoulli.Bernoulli(**kwargs)
     # pylint: disable=bad-continuation
@@ -157,7 +152,6 @@ class BernoulliTest(tf.test.TestCase):
     self.assertAllClose(
         [[0.2, 0.7, 0.4]], self.evaluate(dist.prob(event2)))
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testPmfInvalid(self):
     p = [0.1, 0.2, 0.7]
     dist = bernoulli.Bernoulli(probs=p, validate_args=True)
@@ -166,7 +160,6 @@ class BernoulliTest(tf.test.TestCase):
     with self.assertRaisesOpError("Elements cannot exceed 1."):
       self.evaluate(dist.prob([2, 0, 1]))
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testPmfWithP(self):
     p = [[0.2, 0.4], [0.3, 0.6]]
     self._testPmf(probs=p)
@@ -174,7 +167,6 @@ class BernoulliTest(tf.test.TestCase):
       return
     self._testPmf(logits=special.logit(p))
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testPmfWithFloatArgReturnsXEntropy(self):
     p = [[0.2], [0.4], [0.3], [0.6]]
     samps = [0, 0.1, 0.8]
@@ -210,19 +202,16 @@ class BernoulliTest(tf.test.TestCase):
     dist = bernoulli.Bernoulli(probs=[[0.5], [0.5]])
     self.assertEqual((2, 1), dist.log_prob(1).shape)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testBoundaryConditions(self):
     dist = bernoulli.Bernoulli(probs=1.0)
     self.assertAllClose(np.nan, self.evaluate(dist.log_prob(0)))
     self.assertAllClose([np.nan], [self.evaluate(dist.log_prob(1))])
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testEntropyNoBatch(self):
     p = 0.2
     dist = bernoulli.Bernoulli(probs=p)
     self.assertAllClose(self.evaluate(dist.entropy()), entropy(p))
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testEntropyWithBatch(self):
     p = [[0.1, 0.7], [0.2, 0.6]]
     dist = bernoulli.Bernoulli(probs=p, validate_args=False)
@@ -231,7 +220,6 @@ class BernoulliTest(tf.test.TestCase):
         [[entropy(0.1), entropy(0.7)], [entropy(0.2),
                                         entropy(0.6)]])
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testSampleN(self):
     p = [0.2, 0.6]
     dist = bernoulli.Bernoulli(probs=p)
@@ -252,7 +240,6 @@ class BernoulliTest(tf.test.TestCase):
     dist = bernoulli.Bernoulli(np.log([.2, .4]))
     self.assertAllEqual((1, 2), dist.sample(1, seed=42).shape.as_list())
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testNotReparameterized(self):
     p = tf.constant([0.2, 0.6])
     with tf.GradientTape() as tape:
@@ -280,13 +267,11 @@ class BernoulliTest(tf.test.TestCase):
     sample1, sample2 = self.evaluate([sample1, sample2])
     self.assertAllEqual(sample1, sample2)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testMean(self):
     p = np.array([[0.2, 0.7], [0.5, 0.4]], dtype=np.float32)
     dist = bernoulli.Bernoulli(probs=p)
     self.assertAllEqual(self.evaluate(dist.mean()), p)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testVarianceAndStd(self):
     var = lambda p: p * (1. - p)
     p = [[0.2, 0.7], [0.5, 0.4]]
@@ -301,7 +286,6 @@ class BernoulliTest(tf.test.TestCase):
                   [np.sqrt(var(0.5)), np.sqrt(var(0.4))]],
                  dtype=np.float32))
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testBernoulliBernoulliKL(self):
     batch_size = 6
     a_p = np.array([0.5] * batch_size, dtype=np.float32)

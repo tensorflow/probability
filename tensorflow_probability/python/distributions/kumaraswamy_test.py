@@ -23,7 +23,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 def try_import(name):  # pylint: disable=invalid-name
@@ -72,7 +72,7 @@ def _kumaraswamy_pdf(a, b, x):
   return a * b * x ** (a - 1) * (1 - x ** a) ** (b - 1)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class KumaraswamyTest(tf.test.TestCase):
 
   def testSimpleShapes(self):

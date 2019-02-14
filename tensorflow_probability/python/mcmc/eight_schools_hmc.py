@@ -85,7 +85,7 @@ def benchmark_eight_schools_hmc(
         avg_effect, avg_stddev, school_effects_standard)
 
   if tf.executing_eagerly():
-    sample_chain = tf.contrib.eager.defun(tfp.mcmc.sample_chain)
+    sample_chain = tf.function(tfp.mcmc.sample_chain)
   else:
     sample_chain = tfp.mcmc.sample_chain
 

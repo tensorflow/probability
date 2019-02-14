@@ -24,7 +24,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 def trainable_lu_factorization(
@@ -49,7 +49,7 @@ def trainable_lu_factorization(
     return lower_upper, permutation
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class MatvecLUTest(tf.test.TestCase):
 
   def test_invertible_from_trainable_lu_factorization(self):

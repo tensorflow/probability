@@ -24,10 +24,10 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class JacobianTest(tf.test.TestCase):
 
   def testJacobianDiagonal3DListInput(self):
@@ -50,8 +50,8 @@ class JacobianTest(tf.test.TestCase):
     state = [tf.ones(sample_shape + [2], dtype=dtype),
              tf.ones(sample_shape + [1], dtype=dtype)]
     fn_val = target_fn(*state)
-    grad_fn = tfe.gradients_function(target_fn)
-    if tfe.executing_eagerly():
+    grad_fn = tf.contrib.eager.gradients_function(target_fn)
+    if tf.executing_eagerly():
       grads = grad_fn(*state)
     else:
       grads = tf.gradients(ys=fn_val, xs=state)
@@ -99,8 +99,8 @@ class JacobianTest(tf.test.TestCase):
 
     state = [tf.ones(sample_shape + [2, 2], dtype=dtype)]
     fn_val = target_fn(*state)
-    grad_fn = tfe.gradients_function(target_fn)
-    if tfe.executing_eagerly():
+    grad_fn = tf.contrib.eager.gradients_function(target_fn)
+    if tf.executing_eagerly():
       grads = grad_fn(state)
     else:
       grads = tf.gradients(ys=fn_val, xs=state)

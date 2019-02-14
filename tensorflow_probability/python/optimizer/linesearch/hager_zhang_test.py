@@ -23,7 +23,7 @@ import collections
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 def _is_exact_wolfe(x, f_x, df_x, f_0, df_0, delta, sigma):
@@ -42,10 +42,10 @@ def _is_approx_wolfe(_, f_x, df_x, f_0, df_0, delta, sigma, epsilon):
 ValueAndGradient = collections.namedtuple('ValueAndGradient', ['f', 'df'])
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class HagerZhangTest(tf.test.TestCase):
   """Tests for Hager Zhang line search algorithm."""
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_quadratic(self):
     fdf = lambda x: ValueAndGradient(f=(x-1.3)**2, df=2*(x-1.3))
 
@@ -76,7 +76,6 @@ class HagerZhangTest(tf.test.TestCase):
                                     0.1,
                                     0.9))
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_multiple_minima(self):
     # This function has two minima in the direction of positive x.
     # The first is around x=0.46 and the second around 2.65.
@@ -102,7 +101,6 @@ class HagerZhangTest(tf.test.TestCase):
                                       0.1,
                                       0.9))
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_rosenbrock(self):
     """Tests one pass of line search on the Rosenbrock function.
 
@@ -143,7 +141,6 @@ class HagerZhangTest(tf.test.TestCase):
         fdf, initial_step_size=1.0))
     self.assertTrue(results.converged)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_eval_count(self):
     """Tests that the evaluation count is reported correctly."""
     if tf.executing_eagerly():
@@ -197,7 +194,6 @@ class HagerZhangTest(tf.test.TestCase):
         self.assertTrue(results.converged)
         self.assertEqual(actual_evals, results.func_evals)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_approx_wolfe(self):
     """Tests appropriate usage of approximate Wolfe conditions."""
     # The approximate Wolfe conditions only kick in when we are very close to
@@ -238,7 +234,6 @@ class HagerZhangTest(tf.test.TestCase):
                                      0.9,
                                      1e-6))
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_determinism(self):
     """Tests that the results are determinsitic."""
     fdf = lambda x: ValueAndGradient(f=(x - 1.8)**2, df=2 * (x - 1.8))
@@ -260,7 +255,6 @@ class HagerZhangTest(tf.test.TestCase):
     self.assertEqual(res1.func_evals, res1.func_evals)
     self.assertEqual(res1.left_pt, res2.left_pt)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_consistency(self):
     """Tests that the results are consistent."""
     def rastrigin(x, use_np=False):

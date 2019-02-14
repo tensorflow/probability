@@ -23,13 +23,13 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 # In all tests that follow, we use scipy.stats.nbinom, which
 # represents a Negative Binomial distribution, with success and failure
 # probabilities flipped.
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class NegativeBinomialTest(tf.test.TestCase):
 
   def testNegativeBinomialShape(self):

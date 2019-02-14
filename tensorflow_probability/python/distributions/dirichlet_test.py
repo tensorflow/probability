@@ -24,7 +24,7 @@ import tensorflow as tf
 
 from tensorflow_probability.python.distributions import dirichlet as dirichlet_lib
 from tensorflow_probability.python.distributions import kullback_leibler
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 def try_import(name):  # pylint: disable=invalid-name
@@ -40,7 +40,7 @@ special = try_import("scipy.special")
 stats = try_import("scipy.stats")
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class DirichletTest(tf.test.TestCase):
 
   def testSimpleShapes(self):

@@ -24,12 +24,12 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
+class _MixtureSameFamilyTest(tfp_test_util.VectorDistributionTestHelpers):
 
   def testSampleAndLogProbUnivariateShapes(self):
     gm = tfd.MixtureSameFamily(
@@ -310,7 +310,7 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
       return tf.compat.v1.placeholder_with_default(input=ndarray, shape=None)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class MixtureSameFamilyTestStatic32(
     _MixtureSameFamilyTest,
     test_case.TestCase):
@@ -318,7 +318,7 @@ class MixtureSameFamilyTestStatic32(
   dtype = np.float32
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class MixtureSameFamilyTestDynamic32(
     _MixtureSameFamilyTest,
     test_case.TestCase):
@@ -326,7 +326,7 @@ class MixtureSameFamilyTestDynamic32(
   dtype = np.float32
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class MixtureSameFamilyTestStatic64(
     _MixtureSameFamilyTest,
     test_case.TestCase):

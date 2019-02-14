@@ -28,7 +28,7 @@ import tensorflow as tf
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import normal as normal_lib
 from tensorflow_probability.python.internal import test_case
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 def try_import(name):  # pylint: disable=invalid-name
@@ -42,7 +42,7 @@ def try_import(name):  # pylint: disable=invalid-name
 stats = try_import("scipy.stats")
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class NormalTest(test_case.TestCase):
 
   def setUp(self):
@@ -504,7 +504,7 @@ class NormalTest(test_case.TestCase):
 
 class NormalEagerGCTest(tf.test.TestCase):
 
-  @tfe.run_test_in_graph_and_eager_modes(assert_no_eager_garbage=True)
+  @test_util.run_in_graph_and_eager_modes(assert_no_eager_garbage=True)
   def testNormalMeanAndMode(self):
     # Mu will be broadcast to [7, 7, 7].
     mu = [7.]

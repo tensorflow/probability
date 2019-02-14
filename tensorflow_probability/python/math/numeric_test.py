@@ -25,10 +25,10 @@ import tensorflow as tf
 
 from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.math import numeric
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class Log1pSquareTest32(test_case.TestCase, parameterized.TestCase):
 
   dtype = tf.float32
@@ -63,12 +63,12 @@ class Log1pSquareTest32(test_case.TestCase, parameterized.TestCase):
     self.assertAllClose(expected_dy_dx, dy_dx)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class Log1pSquareTest64(Log1pSquareTest32):
   dtype = tf.float64
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class SoftThresholdTest(test_case.TestCase, parameterized.TestCase):
 
   # Expected values computed using arbitrary precision.
@@ -100,7 +100,7 @@ class SoftThresholdTest(test_case.TestCase, parameterized.TestCase):
     self.assertAllClose(expected_dy_dx, dy_dx)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class ClipByValuePreserveGrad32(test_case.TestCase, parameterized.TestCase):
 
   dtype = tf.float32
@@ -130,7 +130,7 @@ class ClipByValuePreserveGrad32(test_case.TestCase, parameterized.TestCase):
     self.assertAllClose(expected_dy_dx, dy_dx)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class ClipByValuePreserveGrad64(ClipByValuePreserveGrad32):
 
   dtype = tf.float64

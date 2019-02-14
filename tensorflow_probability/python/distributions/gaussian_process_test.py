@@ -23,7 +23,7 @@ import tensorflow as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import positive_semidefinite_kernels as psd_kernels
 
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 class _GaussianProcessTest(object):
@@ -165,12 +165,12 @@ class _GaussianProcessTest(object):
       self.assertAllEqual(self.evaluate(gp2.index_points), index_points_2)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class GaussianProcessStaticTest(_GaussianProcessTest, tf.test.TestCase):
   is_static = True
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class GaussianProcessDynamicTest(_GaussianProcessTest, tf.test.TestCase):
   is_static = False
 

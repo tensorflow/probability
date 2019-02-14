@@ -23,14 +23,14 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 from tensorflow.python.ops import spectral_ops_test_util
 
-tfe = tf.contrib.eager
 tfd = tfp.distributions
 rng = np.random.RandomState(0)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class _AutoCorrelationTest(object):
 
   @property
@@ -223,7 +223,7 @@ class _AutoCorrelationTest(object):
       self.assertLess(np.abs(rxx_[1:]).mean(), 0.02)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class AutoCorrelationTestStaticShapeFloat32(tf.test.TestCase,
                                             _AutoCorrelationTest):
 
@@ -236,7 +236,7 @@ class AutoCorrelationTestStaticShapeFloat32(tf.test.TestCase,
     return True
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class AutoCorrelationTestStaticShapeComplex64(tf.test.TestCase,
                                               _AutoCorrelationTest):
 
@@ -249,7 +249,7 @@ class AutoCorrelationTestStaticShapeComplex64(tf.test.TestCase,
     return True
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class AutoCorrelationTestDynamicShapeFloat32(tf.test.TestCase,
                                              _AutoCorrelationTest):
 
@@ -262,7 +262,7 @@ class AutoCorrelationTestDynamicShapeFloat32(tf.test.TestCase,
     return False
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class PercentileTestWithLowerInterpolation(tf.test.TestCase):
 
   _interpolation = "lower"
@@ -419,14 +419,14 @@ class PercentileTestWithLowerInterpolation(tf.test.TestCase):
       self.assertAllClose(expected_percentile, self.evaluate(pct))
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class PercentileTestWithHigherInterpolation(
     PercentileTestWithLowerInterpolation):
 
   _interpolation = "higher"
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class PercentileTestWithNearestInterpolation(tf.test.TestCase):
   """Test separately because np.round and tf.round make different choices."""
 

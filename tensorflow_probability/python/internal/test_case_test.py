@@ -23,10 +23,9 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.internal import test_case
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
 class _TestCaseTest(object):
 
   def setUp(self):
@@ -139,10 +138,12 @@ class _TestCaseTest(object):
     self.assertAllClose(dfdy, expected_dfdy, atol=0., rtol=1e-4)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class TestCaseTestFloat32(test_case.TestCase, _TestCaseTest):
   dtype = tf.float32
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class TestCaseTestFloat64(test_case.TestCase, _TestCaseTest):
   dtype = tf.float64
 

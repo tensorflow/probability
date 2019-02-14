@@ -23,13 +23,13 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.distributions.von_mises_fisher import _bessel_ive
-from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
-class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
+@test_util.run_all_in_graph_and_eager_modes
+class VonMisesFisherTest(tfp_test_util.VectorDistributionTestHelpers,
                          tf.test.TestCase):
 
   def testBesselIve(self):

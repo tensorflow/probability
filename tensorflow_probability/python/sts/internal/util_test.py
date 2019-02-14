@@ -24,10 +24,10 @@ import tensorflow as tf
 from tensorflow_probability import distributions as tfd
 from tensorflow_probability.python.sts.internal import util as sts_util
 
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class MultivariateNormalUtilsTest(tf.test.TestCase):
 
   def test_factored_joint_mvn_diag_full(self):
@@ -142,7 +142,7 @@ class MultivariateNormalUtilsTest(tf.test.TestCase):
                                       mvn3.covariance()))
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class UtilityTests(tf.test.TestCase):
 
   def test_broadcast_batch_shape_static(self):

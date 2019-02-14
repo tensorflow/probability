@@ -23,11 +23,11 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 rng = np.random.RandomState(0)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class FindBinsTest(tf.test.TestCase):
 
   def test_1d_array_no_extend_lower_and_upper_dtype_int64(self):
@@ -134,7 +134,7 @@ class FindBinsTest(tf.test.TestCase):
       tfp.stats.find_bins(x, edges)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class PercentileTestWithLowerInterpolation(tf.test.TestCase):
 
   _interpolation = 'lower'
@@ -464,7 +464,7 @@ class PercentileTestWithNearestInterpolation(tf.test.TestCase):
     self.assertAllEqual(0, self.evaluate(minval))
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class QuantilesTest(tf.test.TestCase):
   """Test for quantiles. Most functionality tested implicitly via percentile."""
 

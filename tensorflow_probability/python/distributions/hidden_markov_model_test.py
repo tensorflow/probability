@@ -22,16 +22,17 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 # pylint: disable=no-member
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
-class _HiddenMarkovModelTest(test_util.VectorDistributionTestHelpers,
-                             test_util.DiscreteScalarDistributionTestHelpers):
+@test_util.run_all_in_graph_and_eager_modes
+class _HiddenMarkovModelTest(
+    tfp_test_util.VectorDistributionTestHelpers,
+    tfp_test_util.DiscreteScalarDistributionTestHelpers):
 
   @staticmethod
   def make_placeholders(constants):

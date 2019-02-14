@@ -20,14 +20,14 @@ from __future__ import print_function
 
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 class _PoissonLogNormalQuadratureCompoundTest(
-    test_util.DiscreteScalarDistributionTestHelpers):
+    tfp_test_util.DiscreteScalarDistributionTestHelpers):
   """Tests the PoissonLogNormalQuadratureCompoundTest distribution."""
 
   def testSampleProbConsistent(self):
@@ -96,7 +96,7 @@ class _PoissonLogNormalQuadratureCompoundTest(
         self.evaluate, pln, rtol=0.1, atol=0.01)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class PoissonLogNormalQuadratureCompoundStaticShapeTest(
     _PoissonLogNormalQuadratureCompoundTest, tf.test.TestCase):
 
@@ -105,7 +105,7 @@ class PoissonLogNormalQuadratureCompoundStaticShapeTest(
     return True
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class PoissonLogNormalQuadratureCompoundDynamicShapeTest(
     _PoissonLogNormalQuadratureCompoundTest, tf.test.TestCase):
 

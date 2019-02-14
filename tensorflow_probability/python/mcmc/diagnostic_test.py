@@ -20,12 +20,13 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-
 import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.mcmc.diagnostic import _reduce_variance
-from tensorflow.python.ops import spectral_ops_test_util
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.ops import spectral_ops_test_util  # pylint: disable=g-direct-tensorflow-import
+
 
 rng = np.random.RandomState(42)
 
@@ -431,6 +432,7 @@ class _ReduceVarianceTest(object):
         x_=rng.randn(2, 3, 4, 5), axis=1, biased=False, keepdims=False)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class ReduceVarianceTestStaticShape(tf.test.TestCase, _ReduceVarianceTest):
 
   @property
@@ -438,6 +440,7 @@ class ReduceVarianceTestStaticShape(tf.test.TestCase, _ReduceVarianceTest):
     return True
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class ReduceVarianceTestDynamicShape(tf.test.TestCase, _ReduceVarianceTest):
 
   @property

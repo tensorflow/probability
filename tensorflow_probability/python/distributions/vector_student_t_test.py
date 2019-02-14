@@ -26,7 +26,7 @@ import tensorflow as tf
 
 from tensorflow_probability.python.distributions.vector_student_t import _VectorStudentT
 
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 class _FakeVectorStudentT(object):
@@ -70,7 +70,7 @@ class _FakeVectorStudentT(object):
     return np.exp(self.log_prob(x))
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class VectorStudentTTest(tf.test.TestCase):
 
   def setUp(self):

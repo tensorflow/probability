@@ -22,15 +22,15 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 rng = np.random.RandomState(123)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
-class VectorSinhArcsinhDiagTest(test_util.VectorDistributionTestHelpers,
+@test_util.run_all_in_graph_and_eager_modes
+class VectorSinhArcsinhDiagTest(tfp_test_util.VectorDistributionTestHelpers,
                                 tf.test.TestCase):
 
   def test_default_is_same_as_normal(self):

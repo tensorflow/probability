@@ -24,7 +24,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 class _RandomRademacher(object):
@@ -47,13 +47,13 @@ class _RandomRademacher(object):
         atol=0.05, rtol=0.)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class RandomRademacherDynamic32(tf.test.TestCase, _RandomRademacher):
   dtype = np.float32
   use_static_shape = False
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class RandomRademacherDynamic64(tf.test.TestCase, _RandomRademacher):
   dtype = np.float64
   use_static_shape = True
@@ -92,13 +92,13 @@ class _RandomRayleigh(object):
                         atol=0.05, rtol=0.)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class RandomRayleighDynamic32(tf.test.TestCase, _RandomRayleigh):
   dtype = np.float32
   use_static_shape = False
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class RandomRayleighDynamic64(tf.test.TestCase, _RandomRayleigh):
   dtype = np.float64
   use_static_shape = True

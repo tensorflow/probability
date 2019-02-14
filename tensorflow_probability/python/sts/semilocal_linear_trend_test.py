@@ -26,10 +26,10 @@ from tensorflow_probability.python.sts import LocalLinearTrendStateSpaceModel
 from tensorflow_probability.python.sts import SemiLocalLinearTrendStateSpaceModel
 
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class _SemiLocalLinearTrendStateSpaceModelTest(object):
 
   def test_logprob(self):
@@ -184,21 +184,21 @@ class _SemiLocalLinearTrendStateSpaceModelTest(object):
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class SemiLocalLinearTrendStateSpaceModelTestStaticShape32(
     tf.test.TestCase, _SemiLocalLinearTrendStateSpaceModelTest):
   dtype = np.float32
   use_static_shape = True
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class SemiLocalLinearTrendStateSpaceModelTestDynamicShape32(
     tf.test.TestCase, _SemiLocalLinearTrendStateSpaceModelTest):
   dtype = np.float32
   use_static_shape = False
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class SemiLocalLinearTrendStateSpaceModelTestStaticShape64(
     tf.test.TestCase, _SemiLocalLinearTrendStateSpaceModelTest):
   dtype = np.float64

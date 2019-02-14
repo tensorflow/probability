@@ -25,9 +25,9 @@ from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 
 from tensorflow_probability.python.bijectors.masked_autoregressive import _gen_mask
-from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 def masked_autoregressive_2d_template(base_template, event_shape):
@@ -42,7 +42,7 @@ def masked_autoregressive_2d_template(base_template, event_shape):
   return wrapper
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class GenMaskTest(tf.test.TestCase):
 
   def test346Exclusive(self):
@@ -68,8 +68,8 @@ class GenMaskTest(tf.test.TestCase):
     self.assertAllEqual(expected_mask, mask)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
-class MaskedAutoregressiveFlowTest(test_util.VectorDistributionTestHelpers,
+@test_util.run_all_in_graph_and_eager_modes
+class MaskedAutoregressiveFlowTest(tfp_test_util.VectorDistributionTestHelpers,
                                    tf.test.TestCase):
 
   event_shape = [4]
@@ -193,7 +193,7 @@ class MaskedAutoregressiveFlowTest(test_util.VectorDistributionTestHelpers,
         rtol=0.02)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class MaskedAutoregressiveFlowShiftOnlyTest(MaskedAutoregressiveFlowTest):
 
   @property
@@ -207,7 +207,7 @@ class MaskedAutoregressiveFlowShiftOnlyTest(MaskedAutoregressiveFlowTest):
     }
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class MaskedAutoregressiveFlowUnrollLoopTest(MaskedAutoregressiveFlowTest):
 
   @property
@@ -223,7 +223,7 @@ class MaskedAutoregressiveFlowUnrollLoopTest(MaskedAutoregressiveFlowTest):
     }
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class MaskedAutoregressive2DTest(MaskedAutoregressiveFlowTest):
   event_shape = [3, 2]
 

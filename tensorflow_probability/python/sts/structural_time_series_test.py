@@ -32,7 +32,7 @@ from tensorflow_probability.python.sts.internal import util as sts_util
 
 tfd = tfp.distributions
 tfb = tfp.bijectors
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 class _StructuralTimeSeriesTests(object):
@@ -101,21 +101,21 @@ class _StructuralTimeSeriesTests(object):
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class StructuralTimeSeriesTestsStaticShape32(
     _StructuralTimeSeriesTests, tf.test.TestCase):
   dtype = np.float32
   use_static_shape = True
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class StructuralTimeSeriesTestsDynamicShape32(
     _StructuralTimeSeriesTests, tf.test.TestCase):
   dtype = np.float32
   use_static_shape = False
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class StructuralTimeSeriesTestsStaticShape64(
     _StructuralTimeSeriesTests, tf.test.TestCase):
   dtype = np.float64
@@ -127,7 +127,6 @@ class _StsTestHarness(object):
   def setUp(self):
     np.random.seed(142)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_state_space_model(self):
     model = self._build_sts()
 
@@ -151,7 +150,6 @@ class _StsTestHarness(object):
     # Verify the model has the correct latent size.
     self.assertEqual(ssm.latent_size, model.latent_size)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_log_joint(self):
     model = self._build_sts()
 
@@ -185,7 +183,6 @@ class _StsTestHarness(object):
     lp = self.evaluate(log_joint_fn(*batch_shaped_parameters))
     self.assertEqual(tf.TensorShape(full_batch_shape), lp.shape)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_prior_sample(self):
     model = self._build_sts()
     ys, param_samples = model.prior_sample(
@@ -197,7 +194,6 @@ class _StsTestHarness(object):
           2,
       ] + param.prior.batch_shape.as_list() + param.prior.event_shape.as_list())
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_default_priors_follow_batch_shapes(self):
     num_timesteps = 3
     time_series_sample_shape = [4, 2]
@@ -222,18 +218,21 @@ class _StsTestHarness(object):
     self.assertEqual(ssm.batch_shape, time_series_sample_shape)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class LocalLevelTest(tf.test.TestCase, _StsTestHarness):
 
   def _build_sts(self, observed_time_series=None):
     return LocalLevel(observed_time_series=observed_time_series)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class LocalLinearTrendTest(tf.test.TestCase, _StsTestHarness):
 
   def _build_sts(self, observed_time_series=None):
     return LocalLinearTrend(observed_time_series=observed_time_series)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class SeasonalTest(tf.test.TestCase, _StsTestHarness):
 
   def _build_sts(self, observed_time_series=None):
@@ -249,6 +248,7 @@ class SeasonalTest(tf.test.TestCase, _StsTestHarness):
                     observed_time_series=observed_time_series)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class SeasonalWithMultipleStepsAndNoiseTest(tf.test.TestCase, _StsTestHarness):
 
   def _build_sts(self, observed_time_series=None):
@@ -260,12 +260,14 @@ class SeasonalWithMultipleStepsAndNoiseTest(tf.test.TestCase, _StsTestHarness):
                        observed_time_series=observed_time_series)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class SemiLocalLinearTrendTest(tf.test.TestCase, _StsTestHarness):
 
   def _build_sts(self, observed_time_series=None):
     return SemiLocalLinearTrend(observed_time_series=observed_time_series)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class SumTest(tf.test.TestCase, _StsTestHarness):
 
   def _build_sts(self, observed_time_series=None):
@@ -278,6 +280,7 @@ class SumTest(tf.test.TestCase, _StsTestHarness):
         observed_time_series=observed_time_series)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class LinearRegressionTest(tf.test.TestCase, _StsTestHarness):
 
   def _build_sts(self, observed_time_series=None):
@@ -302,6 +305,7 @@ class LinearRegressionTest(tf.test.TestCase, _StsTestHarness):
         weights_prior=prior)
     return Sum(components=[regression],
                observed_time_series=observed_time_series)
+
 
 if __name__ == '__main__':
   tf.test.main()

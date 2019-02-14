@@ -21,14 +21,18 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 import tensorflow as tf
+
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_util
-tfe = tf.contrib.eager
+from tensorflow_probability.python.internal import test_util as tfp_test_util
+
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
-class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
+@test_util.run_all_in_graph_and_eager_modes
+class RealNVPTest(
+    tfp_test_util.VectorDistributionTestHelpers,
+    tf.test.TestCase):
 
   @property
   def _real_nvp_kwargs(self):
@@ -221,7 +225,7 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
         rtol=0.1)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class NICETest(RealNVPTest):
 
   @property
@@ -234,7 +238,7 @@ class NICETest(RealNVPTest):
     }
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class RealNVPConstantShiftScaleTest(RealNVPTest):
 
   @property

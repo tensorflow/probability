@@ -24,13 +24,13 @@ from scipy.stats import special_ortho_group
 
 import tensorflow as tf
 import tensorflow_probability as tfp
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class DifferentialEvolutionTest(tf.test.TestCase):
   """Tests for Differential Evolution optimization algorithm."""
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_quadratic_bowl_2d(self):
     """Can minimize a two dimensional quadratic function."""
     minimum = np.array([1.0, 1.0])
@@ -47,7 +47,6 @@ class DifferentialEvolutionTest(tf.test.TestCase):
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, minimum, 1e-6)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_quadratic_bowl_with_initial_simplex(self):
     """Can minimize a quadratic function with initial simplex."""
     minimum = np.array([1.0, 1.0])
@@ -64,7 +63,6 @@ class DifferentialEvolutionTest(tf.test.TestCase):
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, minimum, 1e-6)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_quadratic_bowl_10d(self):
     """Can minimize a ten dimensional quadratic function."""
     dim = 10
@@ -85,7 +83,6 @@ class DifferentialEvolutionTest(tf.test.TestCase):
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, minimum, 1e-6)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_quadratic_with_skew(self):
     """Can minimize a general quadratic function."""
     dim = 3
@@ -113,7 +110,6 @@ class DifferentialEvolutionTest(tf.test.TestCase):
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, minimum, 1e-6)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_quadratic_with_strong_skew(self):
     """Can minimize a strongly skewed quadratic function."""
     np.random.seed(89793)
@@ -139,7 +135,6 @@ class DifferentialEvolutionTest(tf.test.TestCase):
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, minimum, 1e-5)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_sqrt_quadratic_function(self):
     """Can minimize the square root function."""
     minimum = np.array([0.0, 0.0, 0.0, 0.0])
@@ -156,7 +151,6 @@ class DifferentialEvolutionTest(tf.test.TestCase):
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, minimum, 1e-6)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_abs_function(self):
     """Can minimize the absolute value function."""
     minimum = np.array([0.0, 0.0, 0.0])
@@ -173,7 +167,6 @@ class DifferentialEvolutionTest(tf.test.TestCase):
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, minimum, 1e-5)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_rosenbrock_2d(self):
     """Tests Differential Evolution on the Rosenbrock function.
 
@@ -208,7 +201,6 @@ class DifferentialEvolutionTest(tf.test.TestCase):
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, [1.0, 1.0], 1e-5)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_docstring_example(self):
     """Tests that results with batch evaluate same as non-batch evaluate."""
     def easom(z):

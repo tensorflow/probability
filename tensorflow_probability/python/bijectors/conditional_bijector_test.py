@@ -21,7 +21,7 @@ from __future__ import print_function
 import tensorflow as tf
 
 from tensorflow_probability.python import bijectors as tfb
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 class _TestBijector(tfb.ConditionalBijector):
@@ -48,7 +48,7 @@ class _TestBijector(tfb.ConditionalBijector):
     raise ValueError("forward_log_det_jacobian", arg1, arg2)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class ConditionalBijectorTest(tf.test.TestCase):
 
   def testConditionalBijector(self):

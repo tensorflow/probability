@@ -24,7 +24,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 def try_import(name):  # pylint: disable=invalid-name
@@ -39,7 +39,7 @@ def try_import(name):  # pylint: disable=invalid-name
 stats = try_import("scipy.stats")
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class LaplaceTest(tf.test.TestCase):
 
   def testLaplaceShape(self):
@@ -340,7 +340,6 @@ class LaplaceTest(tf.test.TestCase):
           loc=loc_v, scale=scale_v, validate_args=True)
       self.evaluate(laplace.mean())
 
-  @tfe.run_test_in_graph_and_eager_modes()
   def testLaplaceLaplaceKL(self):
     batch_size = 6
     event_size = 3

@@ -23,7 +23,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python.optimizer.linesearch.internal import hager_zhang_lib as hzl
 
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 # Define value and gradient namedtuple
@@ -68,9 +68,9 @@ def test_function_x_y_dy(x, y, dy, eps=0.1):
   return test_function_x_y(tf.concat([x1, x2], -1), tf.concat([y1, y2], -1))
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class HagerZhangLibTest(tf.test.TestCase):
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_update_simple(self):
     """Tests that update works on a single line function."""
     # Example where trial point works as new left end point.
@@ -94,7 +94,6 @@ class HagerZhangLibTest(tf.test.TestCase):
     self.assertLess(result.left.df, 0)  # Opposite slopes.
     self.assertGreaterEqual(result.right.df, 0)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_update_batching(self):
     """Tests that update function works in batching mode."""
     wolfe_threshold = 1e-6
@@ -134,7 +133,6 @@ class HagerZhangLibTest(tf.test.TestCase):
     self.assertArrayNear(result.left.x, expected_left, 1e-5)
     self.assertArrayNear(result.right.x, expected_right, 1e-5)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_update_batching_vs_mapping(self):
     """Tests that update function works in batching mode."""
     wolfe_threshold = 1e-6
@@ -166,7 +164,6 @@ class HagerZhangLibTest(tf.test.TestCase):
     self.assertEqual(result2.left.x, results.left.x[1])
     self.assertEqual(result2.right.x, results.right.x[1])
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_bracket_simple(self):
     """Tests that bracketing works on a 1 variable scalar valued function."""
     # Example crafted to require one expansion during bracketing, and then
@@ -191,7 +188,6 @@ class HagerZhangLibTest(tf.test.TestCase):
     self.assertLess(result.left.df, 0)  # Opposite slopes.
     self.assertGreaterEqual(result.right.df, 0)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_bracket_batching(self):
     """Tests that bracketing works in batching mode."""
     wolfe_threshold = 1e-6
@@ -229,7 +225,6 @@ class HagerZhangLibTest(tf.test.TestCase):
     self.assertArrayNear(result.left.x, expected_left, 1e-5)
     self.assertArrayNear(result.right.x, expected_right, 1e-5)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_bisect_simple(self):
     """Tests that bisect works on a 1 variable scalar valued function."""
     wolfe_threshold = 1e-6
@@ -245,7 +240,6 @@ class HagerZhangLibTest(tf.test.TestCase):
     result = self.evaluate(hzl.bisect(fun, val_a, val_b, f_lim))
     self.assertEqual(result.right.x, 0.5)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_bisect_batching(self):
     """Tests that bisect works in batching mode."""
     wolfe_threshold = 1e-6

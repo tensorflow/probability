@@ -26,7 +26,7 @@ import tensorflow_probability as tfp
 
 from tensorflow.contrib.layers.python.ops import sparse_ops
 
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 class _PinvTest(object):
@@ -87,28 +87,28 @@ class _PinvTest(object):
     self.assertAllEqual(expected_a_pinv_.shape, a_pinv.shape)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class PinvTestDynamic32DefaultRcond(tf.test.TestCase, _PinvTest):
   dtype = np.float32
   use_static_shape = False
   use_default_rcond = True
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class PinvTestStatic64DefaultRcond(tf.test.TestCase, _PinvTest):
   dtype = np.float64
   use_static_shape = True
   use_default_rcond = True
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class PinvTestDynamic32CustomtRcond(tf.test.TestCase, _PinvTest):
   dtype = np.float32
   use_static_shape = False
   use_default_rcond = False
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class PinvTestStatic64CustomRcond(tf.test.TestCase, _PinvTest):
   dtype = np.float64
   use_static_shape = True
@@ -159,12 +159,12 @@ class _LUReconstruct(object):
     self.assertAllClose(x_, y_, atol=0., rtol=1e-3)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class LUReconstructStatic(tf.test.TestCase, _LUReconstruct):
   use_static_shape = True
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class LUReconstructDynamic(tf.test.TestCase, _LUReconstruct):
   use_static_shape = False
 
@@ -207,12 +207,12 @@ class _LUMatrixInverse(object):
     self.assertAllClose(np.linalg.inv(x_), y_, atol=0., rtol=1e-3)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class LUMatrixInverseStatic(tf.test.TestCase, _LUMatrixInverse):
   use_static_shape = True
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class LUMatrixInverseDynamic(tf.test.TestCase, _LUMatrixInverse):
   use_static_shape = False
 
@@ -272,12 +272,12 @@ class _LUSolve(object):
     self.assertAllClose(expected_, y_, atol=0., rtol=1e-3)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class LUSolveStatic(tf.test.TestCase, _LUSolve):
   use_static_shape = True
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class LUSolveDynamic(tf.test.TestCase, _LUSolve):
   use_static_shape = False
 
@@ -381,23 +381,23 @@ class _SparseOrDenseMatmul(object):
     self.verify_sparse_dense_matvecmul(x_, y_)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class SparseOrDenseMatmulStatic(tf.test.TestCase, _SparseOrDenseMatmul):
   use_static_shape = True
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class SparseOrDenseMatmulDynamic(tf.test.TestCase, _SparseOrDenseMatmul):
   use_static_shape = False
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class SparseOrDenseMatmulStaticSparse(tf.test.TestCase, _SparseOrDenseMatmul):
   use_static_shape = True
   use_sparse_tensor = True
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class SparseOrDenseMatmulDynamicSparse(tf.test.TestCase, _SparseOrDenseMatmul):
   use_static_shape = False
   use_sparse_tensor = True

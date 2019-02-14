@@ -24,10 +24,10 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class PoissonTest(test_case.TestCase):
 
   def _make_poisson(self,
@@ -301,7 +301,7 @@ class PoissonTest(test_case.TestCase):
         sample_values.var(axis=0), stats.poisson.var(lam_v), rtol=.03, atol=0)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class PoissonLogRateTest(PoissonTest):
 
   def _make_poisson(self,

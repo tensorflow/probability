@@ -24,12 +24,12 @@ import tensorflow_probability as tfp
 from tensorflow_probability import edward2 as ed
 
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class ProgramTransformationsTest(tf.test.TestCase):
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testMakeLogJointFnUnconditional(self):
     """Test `make_log_joint_fn` on unconditional Edward program."""
     def normal_with_unknown_mean():
@@ -60,7 +60,6 @@ class ProgramTransformationsTest(tf.test.TestCase):
         [actual_log_prob, expected_log_prob])
     self.assertEqual(actual_log_prob_, expected_log_prob_)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testMakeLogJointFnConditional(self):
     """Test `make_log_joint_fn` on conditional Edward program."""
     def linear_regression(features, prior_precision):
@@ -101,7 +100,6 @@ class ProgramTransformationsTest(tf.test.TestCase):
         [actual_log_prob, expected_log_prob])
     self.assertEqual(actual_log_prob_, expected_log_prob_)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testMakeLogJointFnDynamic(self):
     """Test `make_log_joint_fn` on Edward program with stochastic control flow.
 
@@ -186,7 +184,6 @@ class ProgramTransformationsTest(tf.test.TestCase):
           [actual_log_prob, expected_log_prob])
       self.assertEqual(actual_log_prob_, expected_log_prob_)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testMakeLogJointFnError(self):
     """Test `make_log_joint_fn` raises errors when `name`(s) not supplied."""
     def normal_with_unknown_mean():
@@ -202,7 +199,6 @@ class ProgramTransformationsTest(tf.test.TestCase):
     with self.assertRaises(KeyError):
       _ = log_joint(loc=loc_value, x=x_value)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testMakeValueSetterSetsValues(self):
     def normal_with_unknown_mean():
       loc = ed.Normal(loc=0., scale=1., name="loc")
@@ -214,7 +210,6 @@ class ProgramTransformationsTest(tf.test.TestCase):
       loc_rv, x_rv = normal_with_unknown_mean()
     self.assertAllEqual(self.evaluate((loc_rv, x_rv)), (loc_value, x_value))
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testMakeValueSetterWorksWithPartialAssignment(self):
     def normal_with_unknown_mean():
       loc = ed.Normal(loc=0., scale=1., name="loc")

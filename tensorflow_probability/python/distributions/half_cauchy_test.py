@@ -19,15 +19,17 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 from scipy import stats
+
 import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
+
 tfd = tfp.distributions
-tfe = tf.contrib.eager
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
 class _HalfCauchyTest(object):
 
   def _create_placeholder_with_default(self, default, name=None):
@@ -490,21 +492,25 @@ class _HalfCauchyTest(object):
         self.assertAllFinite(grad)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class HalfCauchyTestStaticShapeFloat32(test_case.TestCase, _HalfCauchyTest):
   dtype = np.float32
   use_static_shape = True
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class HalfCauchyTestDynamicShapeFloat32(test_case.TestCase, _HalfCauchyTest):
   dtype = np.float32
   use_static_shape = False
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class HalfCauchyTestStaticShapeFloat64(test_case.TestCase, _HalfCauchyTest):
   dtype = np.float64
   use_static_shape = True
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class HalfCauchyTestDynamicShapeFloat64(test_case.TestCase, _HalfCauchyTest):
   dtype = np.float64
   use_static_shape = False

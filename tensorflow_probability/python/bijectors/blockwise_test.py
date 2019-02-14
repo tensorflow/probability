@@ -25,10 +25,10 @@ import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
 
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class BlockwiseBijectorTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.parameters((False, []), (True, []), (False, [2]), (True, [2]))
@@ -158,8 +158,7 @@ class BlockwiseBijectorTest(tf.test.TestCase, parameterized.TestCase):
       tfb.Blockwise(bijectors=[tfb.Exp()], block_sizes=[1, 2])
 
   def testRaisesBadBlocksDynamic(self):
-    if tfe.executing_eagerly():
-      return
+    if tf.executing_eagerly(): return
     with self.assertRaises(tf.errors.InvalidArgumentError):
       block_sizes = tf.compat.v1.placeholder_with_default([1, 2], shape=None)
       blockwise = tfb.Blockwise(
