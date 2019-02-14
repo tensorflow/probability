@@ -25,8 +25,8 @@ import tensorflow as tf
 
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.ops import control_flow_ops
-from tensorflow.python.util import tf_inspect
+from tensorflow.python.ops import control_flow_ops  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
 
 def _convert_to_tensor(x, name, dtype=None):
@@ -311,41 +311,40 @@ def shapes_from_loc_and_scale(loc, scale, name="shapes_from_loc_and_scale"):
   with tf.name_scope(name, values=[loc] + scale.graph_parents):
     # Get event shape.
     event_size = scale.range_dimension_tensor()
-    event_size_const = tf.get_static_value(event_size)
-    if event_size_const is not None:
-      event_shape = event_size_const.reshape([1])
-    else:
-      event_shape = event_size[tf.newaxis]
+    event_size_ = tf.get_static_value(event_size)
+    loc_event_size_ = (None if loc is None
+                       else tf.compat.dimension_value(loc.shape[-1]))
 
-    # Static check that event shapes match.
-    if loc is not None:
-      loc_event_size = tf.compat.dimension_value(loc.shape[-1])
-      if loc_event_size is not None and event_size_const is not None:
-        if loc_event_size != 1 and loc_event_size != event_size_const:
-          raise ValueError(
-              "Event size of 'scale' ({0}) could not be broadcast up to that "
-              "of 'loc' ({1}).".format(event_size_const, loc_event_size))
+    if event_size_ is not None and loc_event_size_ is not None:
+      # Static check that event shapes match.
+      if loc_event_size_ != 1 and loc_event_size_ != event_size_:
+        raise ValueError(
+            "Event size of 'scale' ({}) could not be broadcast up to that "
+            "of 'loc' ({}).".format(event_size_, loc_event_size_))
+    elif loc_event_size_ is not None and loc_event_size_ != 1:
+      event_size_ = loc_event_size_
+
+    if event_size_ is None:
+      event_shape = event_size[tf.newaxis]
+    else:
+      event_shape = tf.convert_to_tensor(
+          np.reshape(event_size_, [1]), dtype=tf.int32, name="event_shape")
 
     # Get batch shape.
     batch_shape = scale.batch_shape_tensor()
-    if loc is None:
-      batch_shape_const = tf.get_static_value(batch_shape)
-      batch_shape = (
-          batch_shape_const if batch_shape_const is not None else batch_shape)
-    else:
+    if loc is not None:
       loc_batch_shape = loc.shape.with_rank_at_least(1)[:-1]
-      if (loc.shape.ndims is None or
-          not loc_batch_shape.is_fully_defined()):
+      if loc.shape.ndims is None or not loc_batch_shape.is_fully_defined():
         loc_batch_shape = tf.shape(input=loc)[:-1]
       else:
         loc_batch_shape = tf.convert_to_tensor(
-            value=loc_batch_shape, name="loc_batch_shape")
+            value=loc_batch_shape, dtype=tf.int32, name="loc_batch_shape")
       # This is defined in the core util module.
-      # pylint: disable=undefined-variable
-      batch_shape = prefer_static_broadcast_shape(batch_shape, loc_batch_shape)
-      # pylint: enable=undefined-variable
+      batch_shape = prefer_static_broadcast_shape(batch_shape, loc_batch_shape)  # pylint: disable=undefined-variable
+      batch_shape = tf.convert_to_tensor(
+          batch_shape, dtype=tf.int32, name="batch_shape")
 
-  return batch_shape, event_shape
+    return batch_shape, event_shape
 
 
 def get_broadcast_shape(*tensors):
@@ -440,7 +439,7 @@ def maybe_check_scalar_distribution(distribution, expected_base_dtype,
     assertions = []
 
     def check_is_scalar(is_scalar, name):
-      is_scalar_ = static_value(is_scalar)
+      is_scalar_ = tf.get_static_value(is_scalar)
       if is_scalar_ is not None:
         if not is_scalar_:
           raise ValueError("distribution must be scalar; "
@@ -534,7 +533,11 @@ def pick_scalar_condition(pred, true_value, false_value, name=None):
   """
   with tf.name_scope(
       name, "pick_scalar_condition", values=[pred, true_value, false_value]):
-    pred_ = static_value(pred)
+    pred = tf.convert_to_tensor(
+        value=pred, preferred_dtype=tf.bool, name="pred")
+    true_value = tf.convert_to_tensor(value=true_value, name="true_value")
+    false_value = tf.convert_to_tensor(value=false_value, name="false_value")
+    pred_ = tf.get_static_value(pred)
     if pred_ is None:
       return tf.where(pred, true_value, false_value)
     return true_value if pred_ else false_value
@@ -1292,19 +1295,22 @@ def pick_vector(cond, true_vector, false_vector, name="pick_vector"):
       `true_vector.dtype != false_vector.dtype`
   """
   with tf.name_scope(name, values=(cond, true_vector, false_vector)):
-    cond = tf.convert_to_tensor(value=cond, name="cond")
+    cond = tf.convert_to_tensor(
+        value=cond, preferred_dtype=tf.bool, name="cond")
     if cond.dtype != tf.bool:
       raise TypeError(
-          "%s.dtype=%s which is not %s" % (cond, cond.dtype, tf.bool))
-    cond_value_static = tf.get_static_value(cond)
-    if cond_value_static is not None:
-      return true_vector if cond_value_static else false_vector
+          "{}.dtype={} which is not {}".format(cond, cond.dtype, tf.bool))
+
     true_vector = tf.convert_to_tensor(value=true_vector, name="true_vector")
     false_vector = tf.convert_to_tensor(value=false_vector, name="false_vector")
     if true_vector.dtype != false_vector.dtype:
       raise TypeError(
-          "%s.dtype=%s does not match %s.dtype=%s" %
-          (true_vector, true_vector.dtype, false_vector, false_vector.dtype))
+          "{}.dtype={} does not match {}.dtype={}".format(
+              true_vector, true_vector.dtype, false_vector, false_vector.dtype))
+
+    cond_value_static = tf.get_static_value(cond)
+    if cond_value_static is not None:
+      return true_vector if cond_value_static else false_vector
     n = tf.shape(input=true_vector)[0]
     return tf.slice(
         tf.concat([true_vector, false_vector], 0), [tf.where(cond, 0, n)],

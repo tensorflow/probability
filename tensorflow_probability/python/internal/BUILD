@@ -72,7 +72,6 @@ py_test(
     name = "distribution_util_test",
     size = "small",
     srcs = ["distribution_util_test.py"],
-    tags = ["tf2-broken"],
     deps = [
         ":distribution_util",
         # numpy dep,
