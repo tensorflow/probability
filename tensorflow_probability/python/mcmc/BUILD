@@ -88,8 +88,8 @@ py_test(
     srcs = ["hmc_test.py"],
     shard_count = 6,
     tags = [
+        # TODO(b/80193238): Re-enable.
         "notap",
-        "tf2-broken",
     ],
     deps = [
         # numpy dep,

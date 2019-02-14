@@ -263,8 +263,9 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
   def make_training_data(num_samples, dims, sigma):
     dt = np.asarray(sigma).dtype
     zeros = tf.zeros(dims, dtype=dt)
-    x = tf.transpose(tfd.MultivariateNormalDiag(loc=zeros).sample(
-        num_samples, seed=1))  # [d, n]
+    x = tf.transpose(
+        a=tfd.MultivariateNormalDiag(loc=zeros).sample(num_samples,
+                                                       seed=1))  # [d, n]
     w = tfd.MultivariateNormalDiag(
         loc=zeros,
         scale_identity_multiplier=sigma).sample([1], seed=2)  # [1, d]
@@ -273,20 +274,18 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
     y = tf.matmul(w, x) + noise  # [1, n]
     return y[0], x, w[0]
 
-  def make_weights_prior(dims, dtype):
+  def make_weights_prior(dims, log_sigma):
     return tfd.MultivariateNormalDiag(
-        loc=tf.zeros([dims], dtype=dtype),
-        scale_identity_multiplier=tf.exp(tf.get_variable(
-            name='log_sigma',
-            initializer=np.array(0, dtype),
-            use_resource=True)))
+        loc=tf.zeros([dims], dtype=log_sigma.dtype),
+        scale_identity_multiplier=tf.exp(log_sigma))
 
   def make_response_likelihood(w, x):
     w_shape = tf.pad(
-        tf.shape(w),
+        tensor=tf.shape(input=w),
         paddings=[[tf.where(tf.rank(w) > 1, 0, 1), 0]],
         constant_values=1)
-    y_shape = tf.concat([tf.shape(w)[:-1], [tf.shape(x)[-1]]], axis=0)
+    y_shape = tf.concat([tf.shape(input=w)[:-1], [tf.shape(input=x)[-1]]],
+                        axis=0)
     w_expand = tf.reshape(w, w_shape)
     return tfd.Normal(
         loc=tf.reshape(tf.matmul(w_expand, x), y_shape),
@@ -298,80 +297,80 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
   dims = 10
 
   weights_prior_true_scale = np.array(0.3, dtype)
-  with tf.Session() as sess:
-    y, x, true_weights = sess.run(
-        make_training_data(num_samples, dims, weights_prior_true_scale))
+  y, x, _ = self.make_training_data(
+      num_samples, dims, weights_prior_true_scale))
 
-  prior = make_weights_prior(dims, dtype)
-  def unnormalized_posterior_log_prob(w):
-    likelihood = make_response_likelihood(w, x)
-    return (prior.log_prob(w)
-            + tf.reduce_sum(likelihood.log_prob(y), axis=-1))  # [m]
+  step_size = tf.compat.v2.Variable(
+      name='step_size', initial_value=np.array(0.05, dtype), trainable=False)
 
-  weights_chain_start = tf.placeholder(dtype, shape=[dims])
+  log_sigma = tf.compat.v2.Variable(
+      name='log_sigma', initial_value=np.array(0, dtype))
 
-  step_size = tf.get_variable(
-      name='step_size',
-      initializer=np.array(0.05, dtype),
-      use_resource=True,
-      trainable=False)
+  optimizer = tf.compat.v2.optimizers.SGD(learning_rate=0.01)
 
-  num_results = 2
-  weights, kernel_results = tfp.mcmc.sample_chain(
-      num_results=num_results,
-      num_burnin_steps=0,
-      current_state=weights_chain_start,
-      kernel=tfp.mcmc.HamiltonianMonteCarlo(
-          target_log_prob_fn=unnormalized_posterior_log_prob,
-          num_leapfrog_steps=2,
-          step_size=step_size,
-          step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy(
-            num_adaptation_steps=None),
-          state_gradients_are_stopped=True))
+  def mcem_iter(weights_chain_start):
+    with tf.GradientTape() as tape:
+      prior = self.make_weights_prior(dims, log_sigma)
 
-  avg_acceptance_ratio = tf.reduce_mean(
-      tf.exp(tf.minimum(kernel_results.log_accept_ratio, 0.)))
+      def unnormalized_posterior_log_prob(w):
+        likelihood = self.make_response_likelihood(w, x)
+        return (
+            prior.log_prob(w) +
+            tf.reduce_sum(
+                input_tensor=likelihood.log_prob(y), axis=-1))  # [m]
 
-  # We do an optimization step to propagate `log_sigma` after two HMC steps to
-  # propagate `weights`.
-  loss = -tf.reduce_mean(kernel_results.accepted_results.target_log_prob)
-  optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.01)
-  train_op = optimizer.minimize(loss)
+      num_results = 2
+      weights, kernel_results = tfp.mcmc.sample_chain(
+          num_results=num_results,
+          num_burnin_steps=0,
+          current_state=weights_chain_start,
+          kernel=tfp.mcmc.HamiltonianMonteCarlo(
+              target_log_prob_fn=unnormalized_posterior_log_prob,
+              num_leapfrog_steps=2,
+              step_size=step_size,
+              step_size_update_fn=(
+                  tfp.mcmc.make_simple_step_size_update_policy(
+                      num_adaptation_steps=None)),
+              state_gradients_are_stopped=True,
+          ),
+          parallel_iterations=1)
 
-  with tf.variable_scope(tf.get_variable_scope(), reuse=True):
-    weights_prior_estimated_scale = tf.exp(
-        tf.get_variable(name='log_sigma', dtype=dtype))
+      # We do an optimization step to propagate `log_sigma` after two HMC
+      # steps to propagate `weights`.
+      loss = -tf.reduce_mean(
+          input_tensor=kernel_results.accepted_results.target_log_prob)
 
-  init_op = tf.global_variables_initializer()
+    avg_acceptance_ratio = tf.reduce_mean(
+        input_tensor=tf.exp(tf.minimum(kernel_results.log_accept_ratio, 0.)))
+
+    train_op = optimizer.apply_gradients(
+        [[tape.gradient(loss, log_sigma), log_sigma]])
+
+    weights_prior_estimated_scale = tf.exp(log_sigma)
+    return (train_op, weights_prior_estimated_scale, weights[-1], loss,
+            step_size, avg_acceptance_ratio)
 
   num_iters = int(40)
 
   weights_prior_estimated_scale_ = np.zeros(num_iters, dtype)
   weights_ = np.zeros([num_iters + 1, dims], dtype)
+  loss_ = np.zeros([num_iters], dtype)
   weights_[0] = np.random.randn(dims).astype(dtype)
 
-  with tf.Session() as sess:
-    init_op.run()
-    for iter_ in range(num_iters):
-      [
-          _,
-          weights_prior_estimated_scale_[iter_],
-          weights_[iter_ + 1],
-          loss_,
-          step_size_,
-          avg_acceptance_ratio_,
-      ] = sess.run([
-          train_op,
-          weights_prior_estimated_scale,
-          weights[-1],
-          loss,
-          step_size,
-          avg_acceptance_ratio,
-      ], feed_dict={weights_chain_start: weights_[iter_]})
-      print('iter:{:>2}  loss:{: 9.3f}  scale:{:.3f}  '
+  for iter_ in range(num_iters):
+    [
+        _,
+        weights_prior_estimated_scale_[iter_],
+        weights_[iter_ + 1],
+        loss_[iter_],
+        step_size_,
+        avg_acceptance_ratio_,
+    ] = mcem_iter(weights_[iter_])
+    tf.compat.v1.logging.vlog(
+        1, ('iter:{:>2}  loss:{: 9.3f}  scale:{:.3f}  '
             'step_size:{:.4f}  avg_acceptance_ratio:{:.4f}').format(
-                iter_, loss_, weights_prior_estimated_scale_[iter_],
-                step_size_, avg_acceptance_ratio_)
+                iter_, loss_[iter_], weights_prior_estimated_scale_[iter_],
+                step_size_, avg_acceptance_ratio_))
 
   # Should converge to ~0.24.
   import matplotlib.pyplot as plt

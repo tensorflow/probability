@@ -29,7 +29,8 @@ import tensorflow_probability as tfp
 from tensorflow_probability.python.mcmc.hmc import _compute_log_acceptance_correction
 from tensorflow_probability.python.mcmc.hmc import _leapfrog_integrator_one_step
 from tensorflow_probability.python.mcmc.util import maybe_call_fn_and_grads
-from tensorflow.python.eager import context
+from tensorflow.python.eager import context  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 tfb = tfp.bijectors
 tfd = tfp.distributions
 tfe = tf.contrib.eager
@@ -66,6 +67,7 @@ def _reduce_variance(x, axis=None, keepdims=False):
       keepdims=keepdims)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class HMCTest(tf.test.TestCase):
 
   def setUp(self):
@@ -148,23 +150,18 @@ class HMCTest(tf.test.TestCase):
     x = tf.constant(np.random.rand(50, 10, 2), np.float32)
     self._integrator_conserves_energy(x, independent_chain_ndims)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testIntegratorEnergyConservationNullShape(self):
     self._integrator_conserves_energy_wrapper(0)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testIntegratorEnergyConservation1(self):
     self._integrator_conserves_energy_wrapper(1)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testIntegratorEnergyConservation2(self):
     self._integrator_conserves_energy_wrapper(2)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testIntegratorEnergyConservation3(self):
     self._integrator_conserves_energy_wrapper(3)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testSampleChainSeedReproducibleWorksCorrectly(self):
     num_results = 10
     independent_chain_ndims = 1
@@ -269,19 +266,15 @@ class HMCTest(tf.test.TestCase):
     x = tf.constant(np.random.rand(50, 10, 2), np.float32, name='x')
     self._chain_gets_correct_expectations(x, independent_chain_ndims)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testHMCChainExpectationsNullShape(self):
     self._chain_gets_correct_expectations_wrapper(0)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testHMCChainExpectations1(self):
     self._chain_gets_correct_expectations_wrapper(1)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testHMCChainExpectations2(self):
     self._chain_gets_correct_expectations_wrapper(2)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testKernelResultsUsingTruncatedDistribution(self):
     def log_prob(x):
       return tf.where(
@@ -474,19 +467,15 @@ class HMCTest(tf.test.TestCase):
     x = tf.constant(initial_draws, np.float32)
     self._kernel_leaves_target_invariant(x, independent_chain_ndims)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testKernelLeavesTargetInvariant1(self):
     self._kernel_leaves_target_invariant_wrapper(1)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testKernelLeavesTargetInvariant2(self):
     self._kernel_leaves_target_invariant_wrapper(2)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testKernelLeavesTargetInvariant3(self):
     self._kernel_leaves_target_invariant_wrapper(3)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testNanRejection(self):
     """Tests that an update that yields NaN potentials gets rejected.
 
@@ -524,9 +513,9 @@ class HMCTest(tf.test.TestCase):
     self.assertAllEqual(initial_x_, updated_x_)
     self.assertEqual(acceptance_probs, 0.)
 
-  @run_in_graph_mode_only()
   def testNanFromGradsDontPropagate(self):
     """Test that update with NaN gradients does not cause NaN in results."""
+    if tf.executing_eagerly(): return
     def _nan_log_prob_with_nan_gradient(x):
       return np.nan * tf.reduce_sum(input_tensor=x)
 
@@ -581,15 +570,12 @@ class HMCTest(tf.test.TestCase):
     self.assertEqual(dtype, states_.dtype)
     self.assertEqual(dtype, log_accept_ratio_.dtype)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testChainWorksIn64Bit(self):
     self._testChainWorksDtype(np.float64)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testChainWorksIn16Bit(self):
     self._testChainWorksDtype(np.float16)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testChainWorksCorrelatedMultivariate(self):
     dtype = np.float32
     true_mean = dtype([0, 0])
@@ -641,7 +627,6 @@ class HMCTest(tf.test.TestCase):
     self.assertAllClose(true_cov, sample_cov_,
                         atol=0., rtol=0.2)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testUncalibratedHMCPreservesStaticShape(self):
     uncal_hmc = tfp.mcmc.UncalibratedHamiltonianMonteCarlo(
         target_log_prob_fn=lambda x: tf.reduce_sum(
@@ -659,7 +644,6 @@ class HMCTest(tf.test.TestCase):
     self.assertAllEqual([3, 2], x1.shape)
     self.assertAllEqual([3], r1.target_log_prob.shape)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testHMCPreservesStaticShape(self):
     hmc = tfp.mcmc.HamiltonianMonteCarlo(
         target_log_prob_fn=lambda x: tf.reduce_sum(
@@ -680,7 +664,6 @@ class HMCTest(tf.test.TestCase):
 
 class _LogCorrectionTest(object):
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testHandlesNanFromPotential(self):
     tlp = [1, np.inf, -np.inf, np.nan]
     target_log_prob, proposed_target_log_prob = [
@@ -722,8 +705,8 @@ class _LogCorrectionTest(object):
         np.ones_like(actual_grads_target_log_prob_).astype(np.bool),
         np.isfinite(actual_grads_target_log_prob_))
 
-  @run_in_graph_mode_only()
   def testHandlesNanFromKinetic(self):
+    if tf.executing_eagerly(): return
     x = [1, np.inf, -np.inf, np.nan]
     momentums, proposed_momentums = [
         [np.reshape(self.dtype(x), [-1, 1])]
@@ -759,21 +742,23 @@ class _LogCorrectionTest(object):
     self.assertAllEqual(np.ones_like(g).astype(np.bool), np.isnan(g))
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class LogCorrectionTest16(tf.test.TestCase, _LogCorrectionTest):
   dtype = np.float16
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class LogCorrectionTest32(tf.test.TestCase, _LogCorrectionTest):
   dtype = np.float32
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class LogCorrectionTest64(tf.test.TestCase, _LogCorrectionTest):
   dtype = np.float64
 
 
 class _HMCHandlesLists(object):
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testStateParts(self):
     cast = lambda x: np.array(x, self.dtype)
     dist_x = tfd.Normal(loc=cast(0), scale=cast(1))
@@ -823,21 +808,23 @@ class _HMCHandlesLists(object):
     self.assertAllClose(expected_vars_, actual_vars_, atol=0., rtol=0.5)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class HMCHandlesLists32(_HMCHandlesLists, tf.test.TestCase):
   dtype = np.float32
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class HMCHandlesLists64(_HMCHandlesLists, tf.test.TestCase):
   dtype = np.float64
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class HMCAdaptiveStepSize(tf.test.TestCase):
 
   def setUp(self):
     tf.compat.v1.random.set_random_seed(10014)
     np.random.seed(10014)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_multiple_step_sizes(self):
     num_results = 5
     initial_step_sizes = [1e-5, 1e-4]
@@ -890,7 +877,6 @@ class HMCAdaptiveStepSize(tf.test.TestCase):
     self.assertNear(step_size_[0][0]/step_size_[1][0],
                     step_size_[0][-1]/step_size_[1][-1], err=1e-4)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_multiple_step_sizes_different_dtype(self):
     num_results = 5
     initial_step_sizes = [1e-5, 1e-4]
@@ -1028,14 +1014,10 @@ class HMCEMAdaptiveStepSize(tf.test.TestCase):
     y = tf.matmul(w, x) + noise  # [1, n]
     return y[0], x, w[0]
 
-  def make_weights_prior(self, dims, dtype):
+  def make_weights_prior(self, dims, log_sigma):
     return tfd.MultivariateNormalDiag(
-        loc=tf.zeros([dims], dtype=dtype),
-        scale_identity_multiplier=tf.exp(
-            tf.compat.v1.get_variable(
-                name='log_sigma',
-                initializer=np.array(0, dtype),
-                use_resource=True)))
+        loc=tf.zeros([dims], dtype=log_sigma.dtype),
+        scale_identity_multiplier=tf.exp(log_sigma))
 
   def make_response_likelihood(self, w, x):
     w_shape = tf.pad(
@@ -1056,56 +1038,65 @@ class HMCEMAdaptiveStepSize(tf.test.TestCase):
     dims = 10
 
     weights_prior_true_scale = np.array(0.3, dtype)
-    with tf.compat.v1.Session() as sess:
-      y, x, _ = sess.run(
-          self.make_training_data(num_samples, dims, weights_prior_true_scale))
+    y, x, _ = self.evaluate(
+        self.make_training_data(num_samples, dims, weights_prior_true_scale))
 
-    prior = self.make_weights_prior(dims, dtype)
-    def unnormalized_posterior_log_prob(w):
-      likelihood = self.make_response_likelihood(w, x)
-      return (
-          prior.log_prob(w) +
-          tf.reduce_sum(input_tensor=likelihood.log_prob(y), axis=-1))  # [m]
+    step_size = tf.compat.v2.Variable(
+        name='step_size', initial_value=np.array(0.05, dtype), trainable=False)
 
-    weights_chain_start = tf.compat.v1.placeholder(dtype, shape=[dims])
+    log_sigma = tf.compat.v2.Variable(
+        name='log_sigma', initial_value=np.array(0, dtype))
 
-    step_size = tf.compat.v1.get_variable(
-        name='step_size',
-        initializer=np.array(0.05, dtype),
-        use_resource=True,
-        trainable=False)
+    optimizer = tf.compat.v2.optimizers.SGD(learning_rate=0.01)
 
-    num_results = 2
-    weights, kernel_results = tfp.mcmc.sample_chain(
-        num_results=num_results,
-        num_burnin_steps=0,
-        current_state=weights_chain_start,
-        kernel=tfp.mcmc.HamiltonianMonteCarlo(
-            target_log_prob_fn=unnormalized_posterior_log_prob,
-            num_leapfrog_steps=2,
-            step_size=step_size,
-            step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy(
-                num_adaptation_steps=None),
-            state_gradients_are_stopped=True,
-            seed=_set_seed(252)),
-        parallel_iterations=1)
+    def mcem_iter(weights_chain_start):
+      with tf.GradientTape() as tape:
+        prior = self.make_weights_prior(dims, log_sigma)
 
-    avg_acceptance_ratio = tf.reduce_mean(
-        input_tensor=tf.exp(tf.minimum(kernel_results.log_accept_ratio, 0.)))
+        def unnormalized_posterior_log_prob(w):
+          likelihood = self.make_response_likelihood(w, x)
+          return (
+              prior.log_prob(w) +
+              tf.reduce_sum(
+                  input_tensor=likelihood.log_prob(y), axis=-1))  # [m]
 
-    # We do an optimization step to propagate `log_sigma` after two HMC steps to
-    # propagate `weights`.
-    loss = -tf.reduce_mean(
-        input_tensor=kernel_results.accepted_results.target_log_prob)
-    optimizer = tf.compat.v1.train.GradientDescentOptimizer(learning_rate=0.01)
-    train_op = optimizer.minimize(loss)
+        num_results = 2
+        weights, kernel_results = tfp.mcmc.sample_chain(
+            num_results=num_results,
+            num_burnin_steps=0,
+            current_state=weights_chain_start,
+            kernel=tfp.mcmc.HamiltonianMonteCarlo(
+                target_log_prob_fn=unnormalized_posterior_log_prob,
+                num_leapfrog_steps=2,
+                step_size=step_size,
+                step_size_update_fn=(
+                    tfp.mcmc.make_simple_step_size_update_policy(
+                        num_adaptation_steps=None)),
+                state_gradients_are_stopped=True,
+            ),
+            parallel_iterations=1)
 
-    with tf.compat.v1.variable_scope(
-        tf.compat.v1.get_variable_scope(), reuse=True):
-      weights_prior_estimated_scale = tf.exp(
-          tf.compat.v1.get_variable(name='log_sigma', dtype=dtype))
+        # We do an optimization step to propagate `log_sigma` after two HMC
+        # steps to propagate `weights`.
+        # TODO(b/75979076): Need to re-evaluate log_prob due to GradientTape not
+        # working with raw graph-mode while_loop.
+        loss = -tf.reduce_mean(
+            input_tensor=unnormalized_posterior_log_prob(weights))
 
-    init_op = tf.compat.v1.global_variables_initializer()
+      avg_acceptance_ratio = tf.reduce_mean(
+          input_tensor=tf.exp(tf.minimum(kernel_results.log_accept_ratio, 0.)))
+
+      train_op = optimizer.apply_gradients(
+          [[tape.gradient(loss, log_sigma), log_sigma]])
+
+      weights_prior_estimated_scale = tf.exp(log_sigma)
+      return (train_op, weights_prior_estimated_scale, weights[-1], loss,
+              step_size, avg_acceptance_ratio)
+
+    if not tf.executing_eagerly():
+      # To create the variables.
+      mcem_iter(np.zeros(dims, dtype))
+    self.evaluate(tf.compat.v1.global_variables_initializer())
 
     num_iters = int(40)
 
@@ -1114,35 +1105,26 @@ class HMCEMAdaptiveStepSize(tf.test.TestCase):
     loss_ = np.zeros([num_iters], dtype)
     weights_[0] = np.random.randn(dims).astype(dtype)
 
-    with tf.compat.v1.Session() as sess:
-      init_op.run()
-      for iter_ in range(num_iters):
-        [
-            _,
-            weights_prior_estimated_scale_[iter_],
-            weights_[iter_ + 1],
-            loss_[iter_],
-            step_size_,
-            avg_acceptance_ratio_,
-        ] = sess.run([
-            train_op,
-            weights_prior_estimated_scale,
-            weights[-1],
-            loss,
-            step_size,
-            avg_acceptance_ratio,
-        ], feed_dict={weights_chain_start: weights_[iter_]})
-        # Enable using bazel flags:
-        # `--test_arg="--logtostderr" --test_arg="--vmodule=hmc_test=2"`,
-        # E.g.,
-        # bazel test --test_output=streamed -c opt :hmc_test \
-        # --test_filter=HMCEMAdaptiveStepSize \
-        # --test_arg="--logtostderr" --test_arg="--vmodule=hmc_test=2"
-        tf.compat.v1.logging.vlog(
-            1, ('iter:{:>2}  loss:{: 9.3f}  scale:{:.3f}  '
-                'step_size:{:.4f}  avg_acceptance_ratio:{:.4f}').format(
-                    iter_, loss_[iter_], weights_prior_estimated_scale_[iter_],
-                    step_size_, avg_acceptance_ratio_))
+    for iter_ in range(num_iters):
+      [
+          _,
+          weights_prior_estimated_scale_[iter_],
+          weights_[iter_ + 1],
+          loss_[iter_],
+          step_size_,
+          avg_acceptance_ratio_,
+      ] = self.evaluate(mcem_iter(weights_[iter_]))
+      # Enable using bazel flags:
+      # `--test_arg="--logtostderr" --test_arg="--vmodule=hmc_test=2"`,
+      # E.g.,
+      # bazel test --test_output=streamed -c opt :hmc_test \
+      # --test_filter=HMCEMAdaptiveStepSize \
+      # --test_arg="--logtostderr" --test_arg="--vmodule=hmc_test=2"
+      tf.compat.v1.logging.vlog(
+          1, ('iter:{:>2}  loss:{: 9.3f}  scale:{:.3f}  '
+              'step_size:{:.4f}  avg_acceptance_ratio:{:.4f}').format(
+                  iter_, loss_[iter_], weights_prior_estimated_scale_[iter_],
+                  step_size_, avg_acceptance_ratio_))
 
     # Loss had better decrease....
     self.assertGreater(loss_[:10].mean(), loss_[-10:].mean())
@@ -1150,7 +1132,7 @@ class HMCEMAdaptiveStepSize(tf.test.TestCase):
                     weights_prior_estimated_scale_[-5:].mean(),
                     err=0.005)
 
-  @tfe.run_test_in_graph_and_eager_modes
+  @test_util.run_in_graph_and_eager_modes
   def test_step_size_adapts(self):
     dtype = np.float32
 
@@ -1196,7 +1178,7 @@ class HMCEMAdaptiveStepSize(tf.test.TestCase):
     # Anything in [0.6, 0.9] is sufficient. https://arxiv.org/abs/1411.6669
     self.assertNear(0.75, kernel_results_.is_accepted.mean(), err=0.05)
 
-  @tfe.run_test_in_graph_and_eager_modes
+  @test_util.run_in_graph_and_eager_modes
   def test_reuse_step_counter(self):
     for _ in range(2):
       with tf.compat.v1.variable_scope(
