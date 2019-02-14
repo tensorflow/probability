@@ -54,7 +54,6 @@ py_test(
     name = "generated_random_variables_test",
     size = "small",
     srcs = ["generated_random_variables_test.py"],
-    tags = ["tf2-broken"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -113,7 +112,6 @@ py_test(
     name = "random_variable_test",
     size = "small",
     srcs = ["random_variable_test.py"],
-    tags = ["tf2-broken"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,

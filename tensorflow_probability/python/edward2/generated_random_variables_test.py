@@ -157,6 +157,7 @@ class GeneratedRandomVariablesTest(parameterized.TestCase, tf.test.TestCase):
           ed.Normal, np.zeros([10, 3]), loc=[0.5, 0.5], scale=[1.0, 1.0])
 
   def testValueUnknownShape(self):
+    if tf.executing_eagerly(): return
     # should not raise error
     ed.Bernoulli(probs=0.5, value=tf.compat.v1.placeholder(tf.int32))
 
