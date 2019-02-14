@@ -770,8 +770,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
     with tf.name_scope("forward_filter", values=[x]):
       x = tf.convert_to_tensor(value=x, name="x")
       if mask is not None:
-        mask = tf.convert_to_tensor(
-            value=mask, name="mask", preferred_dtype=tf.bool)
+        mask = tf.convert_to_tensor(value=mask, name="mask", dtype_hint=tf.bool)
 
       # Check event shape statically if possible
       check_x_shape_op = _check_equal_shape(
@@ -784,8 +783,9 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
           raise ValueError(
               "mask cannot have higher rank than x! ({} vs {})"
               .format(mask.shape.ndims, x.shape.ndims))
-        check_mask_dims_op = tf.assert_greater_equal(
-            tf.rank(x), tf.rank(mask),
+        check_mask_dims_op = tf.compat.v1.assert_greater_equal(
+            tf.rank(x),
+            tf.rank(mask),
             message=("mask cannot have higher rank than x!"))
         check_mask_shape_op = _check_equal_shape(
             "mask", mask.shape[-1:], tf.shape(input=mask)[-1:],
@@ -1299,9 +1299,9 @@ def build_kalman_filter_step(get_transition_matrix_for_timestep,
       x_expected = _propagate_mean(state.predicted_mean,
                                    observation_matrix,
                                    observation_noise) * tf.ones_like(x_t)
-      x_t = tf.where(tf.broadcast_to(mask_t, tf.shape(x_expected)),
-                     x_expected,
-                     tf.broadcast_to(x_t, tf.shape(x_expected)))
+      x_t = tf.where(
+          tf.broadcast_to(mask_t, tf.shape(input=x_expected)), x_expected,
+          tf.broadcast_to(x_t, tf.shape(input=x_expected)))
 
     # Given predicted mean u_{t|t-1} and covariance P_{t|t-1} from the
     # previous step, incorporate the observation x_t, producing the

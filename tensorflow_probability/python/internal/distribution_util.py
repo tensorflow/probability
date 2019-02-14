@@ -328,7 +328,9 @@ def shapes_from_loc_and_scale(loc, scale, name="shapes_from_loc_and_scale"):
       event_shape = event_size[tf.newaxis]
     else:
       event_shape = tf.convert_to_tensor(
-          np.reshape(event_size_, [1]), dtype=tf.int32, name="event_shape")
+          value=np.reshape(event_size_, [1]),
+          dtype=tf.int32,
+          name="event_shape")
 
     # Get batch shape.
     batch_shape = scale.batch_shape_tensor()
@@ -342,7 +344,7 @@ def shapes_from_loc_and_scale(loc, scale, name="shapes_from_loc_and_scale"):
       # This is defined in the core util module.
       batch_shape = prefer_static_broadcast_shape(batch_shape, loc_batch_shape)  # pylint: disable=undefined-variable
       batch_shape = tf.convert_to_tensor(
-          batch_shape, dtype=tf.int32, name="batch_shape")
+          value=batch_shape, dtype=tf.int32, name="batch_shape")
 
     return batch_shape, event_shape
 
@@ -534,7 +536,7 @@ def pick_scalar_condition(pred, true_value, false_value, name=None):
   with tf.name_scope(
       name, "pick_scalar_condition", values=[pred, true_value, false_value]):
     pred = tf.convert_to_tensor(
-        value=pred, preferred_dtype=tf.bool, name="pred")
+        value=pred, dtype_hint=tf.bool, name="pred")
     true_value = tf.convert_to_tensor(value=true_value, name="true_value")
     false_value = tf.convert_to_tensor(value=false_value, name="false_value")
     pred_ = tf.get_static_value(pred)
@@ -1296,7 +1298,7 @@ def pick_vector(cond, true_vector, false_vector, name="pick_vector"):
   """
   with tf.name_scope(name, values=(cond, true_vector, false_vector)):
     cond = tf.convert_to_tensor(
-        value=cond, preferred_dtype=tf.bool, name="cond")
+        value=cond, dtype_hint=tf.bool, name="cond")
     if cond.dtype != tf.bool:
       raise TypeError(
           "{}.dtype={} which is not {}".format(cond, cond.dtype, tf.bool))

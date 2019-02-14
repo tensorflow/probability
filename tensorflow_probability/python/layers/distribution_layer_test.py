@@ -907,9 +907,9 @@ class _MixtureLogisticTest(_MixtureLayerTest):
     n = 2000
     t = self.evaluate(tfd.Uniform(low=-np.pi, high=np.pi).sample([n, 1]))
     r = 2 * (1 - tf.cos(t))
-    x = tf.convert_to_tensor(self.evaluate(
+    x = tf.convert_to_tensor(value=self.evaluate(
         r * tf.sin(t) + tfd.Normal(loc=0., scale=0.1).sample([n, 1])))
-    y = tf.convert_to_tensor(self.evaluate(
+    y = tf.convert_to_tensor(value=self.evaluate(
         r * tf.cos(t) + tfd.Normal(loc=0., scale=0.1).sample([n, 1])))
 
     # Model the distribution of y given x with a Mixture Density Network.
@@ -977,9 +977,9 @@ class _MixtureNormalTest(_MixtureLayerTest):
     n = 2000
     t = self.evaluate(tfd.Uniform(low=-np.pi, high=np.pi).sample([n, 1]))
     r = 2 * (1 - tf.cos(t))
-    x = tf.convert_to_tensor(self.evaluate(
+    x = tf.convert_to_tensor(value=self.evaluate(
         r * tf.sin(t) + tfd.Normal(loc=0., scale=0.1).sample([n, 1])))
-    y = tf.convert_to_tensor(self.evaluate(
+    y = tf.convert_to_tensor(value=self.evaluate(
         r * tf.cos(t) + tfd.Normal(loc=0., scale=0.1).sample([n, 1])))
 
     # Model the distribution of y given x with a Mixture Density Network.
@@ -1088,9 +1088,9 @@ class _MixtureSameFamilyTest(object):
     n = 2000
     t = self.evaluate(tfd.Uniform(low=-np.pi, high=np.pi).sample([n, 1]))
     r = 2 * (1 - tf.cos(t))
-    x = tf.convert_to_tensor(self.evaluate(
+    x = tf.convert_to_tensor(value=self.evaluate(
         r * tf.sin(t) + tfd.Normal(loc=0., scale=0.1).sample([n, 1])))
-    y = tf.convert_to_tensor(self.evaluate(
+    y = tf.convert_to_tensor(value=self.evaluate(
         r * tf.cos(t) + tfd.Normal(loc=0., scale=0.1).sample([n, 1])))
 
     # Model the distribution of y given x with a Mixture Density Network.

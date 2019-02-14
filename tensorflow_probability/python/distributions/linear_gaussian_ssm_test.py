@@ -618,8 +618,9 @@ class MissingObservationsTests(tfp_test_case.TestCase):
     # https://github.com/tensorflow/tensorflow/issues/2540.
     log_likelihoods, _, _, _, _, _, _ = self.model.forward_filter(
         x=observed_time_series, mask=observation_mask)
-    lp = tf.reduce_sum(log_likelihoods)
-    grads_ = self.evaluate(tf.gradients(lp, self.transition_noise.scale.diag))
+    lp = tf.reduce_sum(input_tensor=log_likelihoods)
+    grads_ = self.evaluate(
+        tf.gradients(ys=lp, xs=self.transition_noise.scale.diag))
     self.assertAllFinite(grads_)
 
   @tfe.run_test_in_graph_and_eager_modes

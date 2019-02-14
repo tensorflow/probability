@@ -189,10 +189,10 @@ def update(value_and_gradients_function, val_left, val_right, val_trial, f_lim):
   right = _val_where(within_range & ~valid_left, val_trial, val_right)
 
   bisect_args = _IntermediateResult(
-      iteration=tf.convert_to_tensor(0),
+      iteration=tf.convert_to_tensor(value=0),
       stopped=~needs_bisect,
       failed=tf.zeros_like(within_range),  # i.e. all false.
-      num_evals=tf.convert_to_tensor(0),
+      num_evals=tf.convert_to_tensor(value=0),
       left=left,
       right=right)
   return _bisect(value_and_gradients_function, bisect_args, f_lim)

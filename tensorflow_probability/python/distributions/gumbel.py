@@ -178,7 +178,7 @@ class Gumbel(transformed_distribution.TransformedDistribution):
 
   def _log_prob(self, x):
     z = (x - self.loc) / self.scale
-    return -(z + tf.exp(-z)) - tf.log(self.scale)
+    return -(z + tf.exp(-z)) - tf.math.log(self.scale)
 
   def _mean(self):
     return self.loc + self.scale * np.euler_gamma
