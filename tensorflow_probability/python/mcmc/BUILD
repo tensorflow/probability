@@ -308,6 +308,7 @@ py_test(
     name = "transformed_kernel_test",
     size = "medium",
     srcs = ["transformed_kernel_test.py"],
+    tags = ["tf2-broken"],
     deps = [
         # numpy dep,
         # tensorflow dep,

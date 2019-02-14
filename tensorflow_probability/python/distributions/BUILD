@@ -1458,6 +1458,7 @@ py_test(
     size = "large",
     srcs = ["linear_gaussian_ssm_test.py"],
     shard_count = 4,
+    tags = ["tf2-broken"],
     deps = [
         ":linear_gaussian_ssm",
         # numpy dep,
@@ -1903,6 +1904,7 @@ py_test(
     name = "von_mises_fisher_test",
     size = "medium",
     srcs = ["von_mises_fisher_test.py"],
+    tags = ["tf2-broken"],
     deps = [
         ":von_mises_fisher",
         # numpy dep,
