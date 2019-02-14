@@ -221,7 +221,7 @@ class VectorDeterministicTest(tf.test.TestCase):
     loc = rng.rand(2, 3, 4).astype(np.float32)
     with self.assertRaisesRegexp((ValueError, tf.errors.InvalidArgumentError),
                                  "must have rank at least 1"):
-      deterministic = tfd.VectorDeterministic(loc, atol=-1, validate_args=True)
+      deterministic = tfd.VectorDeterministic(loc, atol=1, validate_args=True)
       self.evaluate(deterministic.prob(0.))
 
   def testProbVectorDeterministicWithNoBatchDims(self):

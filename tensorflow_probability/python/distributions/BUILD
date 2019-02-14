@@ -1185,7 +1185,6 @@ py_test(
     ],
     tags = [
         "no_pip",
-        "tf2-broken",
     ],
     deps = [
         # numpy dep,
@@ -1199,7 +1198,6 @@ py_test(
     name = "deterministic_test",
     size = "small",
     srcs = ["deterministic_test.py"],
-    tags = ["tf2-broken"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -1210,6 +1208,7 @@ py_test(
 py_test(
     name = "dirichlet_multinomial_test",
     srcs = ["dirichlet_multinomial_test.py"],
+    shard_count = 4,
     tags = ["tf2-broken"],
     deps = [
         ":dirichlet_multinomial",
@@ -1420,7 +1419,6 @@ py_test(
 py_test(
     name = "kullback_leibler_test",
     srcs = ["kullback_leibler_test.py"],
-    tags = ["tf2-broken"],
     deps = [
         ":bernoulli",
         ":beta",
@@ -1507,7 +1505,6 @@ py_test(
 py_test(
     name = "mixture_same_family_test",
     srcs = ["mixture_same_family_test.py"],
-    tags = ["tf2-broken"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -1520,7 +1517,6 @@ py_test(
 py_test(
     name = "multinomial_test",
     srcs = ["multinomial_test.py"],
-    tags = ["tf2-broken"],
     deps = [
         ":multinomial",
         # numpy dep,
@@ -1753,7 +1749,6 @@ py_test(
     srcs = [
         "lkj_test.py",
     ],
-    tags = ["tf2-broken"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -1824,7 +1819,6 @@ py_test(
     name = "transformed_distribution_test",
     size = "medium",
     srcs = ["transformed_distribution_test.py"],
-    tags = ["tf2-broken"],
     deps = [
         # numpy dep,
         # scipy dep,

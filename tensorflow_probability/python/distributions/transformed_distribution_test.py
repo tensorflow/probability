@@ -81,10 +81,9 @@ class TransformedDistributionTest(tf.test.TestCase):
     # sample
     sample = log_normal.sample(100000, seed=235)
     self.assertAllEqual([], log_normal.event_shape)
-    with self.cached_session():
-      self.assertAllEqual([], self.evaluate(log_normal.event_shape_tensor()))
-      self.assertAllClose(
-          sp_dist.mean(), np.mean(self.evaluate(sample)), atol=0.0, rtol=0.05)
+    self.assertAllEqual([], self.evaluate(log_normal.event_shape_tensor()))
+    self.assertAllClose(
+        sp_dist.mean(), np.mean(self.evaluate(sample)), atol=0.0, rtol=0.05)
 
     # pdf, log_pdf, cdf, etc...
     # The mean of the lognormal is around 148.
@@ -97,9 +96,8 @@ class TransformedDistributionTest(tf.test.TestCase):
                  [log_normal.log_survival_function, sp_dist.logsf]]:
       actual = func[0](test_vals)
       expected = func[1](test_vals)
-      with self.cached_session():
-        self.assertAllClose(
-            expected, self.evaluate(actual), atol=0, rtol=0.01)
+      self.assertAllClose(
+          expected, self.evaluate(actual), atol=0, rtol=0.01)
 
   def testNonInjectiveTransformedDistribution(self):
     mu = 1.
@@ -112,28 +110,27 @@ class TransformedDistributionTest(tf.test.TestCase):
     # sample
     sample = abs_normal.sample(100000, seed=235)
     self.assertAllEqual([], abs_normal.event_shape)
-    with self.cached_session():
-      sample_ = self.evaluate(sample)
-      self.assertAllEqual([], self.evaluate(abs_normal.event_shape_tensor()))
+    sample_ = self.evaluate(sample)
+    self.assertAllEqual([], self.evaluate(abs_normal.event_shape_tensor()))
 
-      # Abs > 0, duh!
-      np.testing.assert_array_less(0, sample_)
+    # Abs > 0, duh!
+    np.testing.assert_array_less(0, sample_)
 
-      # Let X ~ Normal(mu, sigma), Y := |X|, then
-      # P[Y < 0.77] = P[-0.77 < X < 0.77]
-      self.assertAllClose(
-          sp_normal.cdf(0.77) - sp_normal.cdf(-0.77),
-          (sample_ < 0.77).mean(), rtol=0.01)
+    # Let X ~ Normal(mu, sigma), Y := |X|, then
+    # P[Y < 0.77] = P[-0.77 < X < 0.77]
+    self.assertAllClose(
+        sp_normal.cdf(0.77) - sp_normal.cdf(-0.77),
+        (sample_ < 0.77).mean(), rtol=0.01)
 
-      # p_Y(y) = p_X(-y) + p_X(y),
-      self.assertAllClose(
-          sp_normal.pdf(1.13) + sp_normal.pdf(-1.13),
-          self.evaluate(abs_normal.prob(1.13)))
+    # p_Y(y) = p_X(-y) + p_X(y),
+    self.assertAllClose(
+        sp_normal.pdf(1.13) + sp_normal.pdf(-1.13),
+        self.evaluate(abs_normal.prob(1.13)))
 
-      # Log[p_Y(y)] = Log[p_X(-y) + p_X(y)]
-      self.assertAllClose(
-          np.log(sp_normal.pdf(2.13) + sp_normal.pdf(-2.13)),
-          self.evaluate(abs_normal.log_prob(2.13)))
+    # Log[p_Y(y)] = Log[p_X(-y) + p_X(y)]
+    self.assertAllClose(
+        np.log(sp_normal.pdf(2.13) + sp_normal.pdf(-2.13)),
+        self.evaluate(abs_normal.log_prob(2.13)))
 
   def testQuantile(self):
     logit_normal = self._cls()(
@@ -362,8 +359,9 @@ class ScalarToMultiTest(tf.test.TestCase):
     self.assertAllEqual([3], fake_mvn_static.event_shape)
     self.assertAllEqual([2], fake_mvn_static.batch_shape)
 
-    self.assertAllEqual(tf.TensorShape(None), fake_mvn_dynamic.event_shape)
-    self.assertAllEqual(tf.TensorShape(None), fake_mvn_dynamic.batch_shape)
+    if not tf.executing_eagerly():
+      self.assertAllEqual(tf.TensorShape(None), fake_mvn_dynamic.event_shape)
+      self.assertAllEqual(tf.TensorShape(None), fake_mvn_dynamic.batch_shape)
 
     x = self.evaluate(fake_mvn_static.sample(5, seed=0))
     for unsupported_fn in (fake_mvn_static.log_cdf, fake_mvn_static.cdf,
@@ -373,7 +371,7 @@ class ScalarToMultiTest(tf.test.TestCase):
                                    not_implemented_message):
         unsupported_fn(x)
 
-    num_samples = 5e3
+    num_samples = 7e3
     for fake_mvn in [fake_mvn_static, fake_mvn_dynamic]:
       # Ensure sample works by checking first, second moments.
       y = fake_mvn.sample(int(num_samples), seed=0)
@@ -513,8 +511,9 @@ class ScalarToMultiTest(tf.test.TestCase):
     self.assertAllEqual([2, 3, 3], fake_mvn_static.event_shape)
     self.assertAllEqual([2], fake_mvn_static.batch_shape)
 
-    self.assertAllEqual(tf.TensorShape(None), fake_mvn_dynamic.event_shape)
-    self.assertAllEqual(tf.TensorShape(None), fake_mvn_dynamic.batch_shape)
+    if not tf.executing_eagerly():
+      self.assertAllEqual(tf.TensorShape(None), fake_mvn_dynamic.event_shape)
+      self.assertAllEqual(tf.TensorShape(None), fake_mvn_dynamic.batch_shape)
 
     num_samples = 5e3
     for fake_mvn in [fake_mvn_static, fake_mvn_dynamic]:

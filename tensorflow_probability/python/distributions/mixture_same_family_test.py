@@ -177,7 +177,7 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
 
     def sample_estimate(*parameters):
       mixture = mixture_func(*parameters)
-      values = mixture.sample(num_samples)
+      values = mixture.sample(num_samples, seed=8791)
       if function == "variance":
         values = tf.math.squared_difference(values, mixture.mean())
       return tf.reduce_mean(input_tensor=values, axis=0)
@@ -226,7 +226,7 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
            self._build_tensor([[-1., 1], [0.5, -1], [-1., 0.5]]),  # mean
            self._build_tensor([[0.1, 0.5], [0.3, 0.5], [0.2, 0.3]])],  # scale
           function,
-          num_samples=10000)
+          num_samples=20000)
 
   def testReparameterizationGradientsNormalMatrixComponents(self):
     def mixture_func(logits, loc, scale):
@@ -262,6 +262,11 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
           num_samples=10000)
 
   def testDeterministicSampling(self):
+    # Note that we are not guaranteed to return the same
+    # answer when executing eagerly, because sampling with the same seed is not
+    # idempotent.
+    if tf.executing_eagerly():
+      return
     dist = tfd.MixtureSameFamily(
         mixture_distribution=tfd.Categorical(logits=[0., 0.]),
         components_distribution=tfd.Normal(loc=[0., 200.], scale=[1., 1.]))

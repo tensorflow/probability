@@ -165,9 +165,10 @@ class _HorseshoeTest(object):
     horseshoe = tfd.Horseshoe(scale=scale)
     x = self._test_param(np.linspace(.1, 10.1, 11).reshape((-1, 1)))
     horseshoe_log_pdf = self.evaluate(horseshoe.log_prob(x))
-    num_mc_samples = 1000000
+    num_mc_samples = int(1.5e6)
     sigmas = tf.reshape(scale, [-1, 1]) * tfd.HalfCauchy(
-        self.dtype(0.), self.dtype(1.)).sample(num_mc_samples)
+        self.dtype(0.), self.dtype(1.)).sample(
+            num_mc_samples, seed=23145)
     monte_carlo_horseshoe = tfd.MixtureSameFamily(
         tfd.Categorical(logits=self._test_param(np.zeros(num_mc_samples))),
         tfd.Normal(self.dtype(0.), sigmas))

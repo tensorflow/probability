@@ -356,6 +356,8 @@ class LKJTest(parameterized.TestCase, tf.test.TestCase):
 class LKJTestGraphOnly(tf.test.TestCase):
 
   def testDimensionGuardDynamicShape(self):
+    if tf.executing_eagerly():
+      return
     testee_lkj = tfd.LKJ(
         dimension=3, concentration=[1., 4.], validate_args=True)
     with self.assertRaisesOpError('dimension mismatch'):
