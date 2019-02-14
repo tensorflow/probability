@@ -800,7 +800,6 @@ py_test(
     name = "real_nvp_test",
     size = "small",
     srcs = ["real_nvp_test.py"],
-    tags = ["tf2-broken"],
     deps = [
         ":bijectors",
         # numpy dep,

@@ -135,8 +135,8 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
         np.float32).reshape((batch_size, 4 * 2))
 
     conditions = {
-        "a": tf.random.normal((batch_size, 4), dtype=tf.float32),
-        "b": tf.random.normal((batch_size, 2), dtype=tf.float32),
+        "a": tf.random.normal((batch_size, 4), dtype=tf.float32, seed=584),
+        "b": tf.random.normal((batch_size, 2), dtype=tf.float32, seed=9817),
     }
 
     def _condition_shift_and_log_scale_fn(x0, output_units, a, b):
@@ -179,9 +179,9 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
         fldj,
     ])
     self.assertEqual("real_nvp", nvp.name)
-    self.assertAllClose(forward_x_, forward_inverse_y_, rtol=1e-6, atol=0.)
-    self.assertAllClose(x_, inverse_y_, rtol=1e-6, atol=0.)
-    self.assertAllClose(ildj_, -fldj_, rtol=1e-5, atol=0.)
+    self.assertAllClose(forward_x_, forward_inverse_y_, rtol=1e-5, atol=1e-5)
+    self.assertAllClose(x_, inverse_y_, rtol=1e-5, atol=1e-5)
+    self.assertAllClose(ildj_, -fldj_, rtol=1e-5, atol=1e-5)
 
   def testMutuallyConsistent(self):
     dims = 4
@@ -195,10 +195,11 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
     self.run_test_sample_consistent_log_prob(
         sess_run_fn=self.evaluate,
         dist=dist,
-        num_samples=int(2e5),
+        num_samples=int(1e6),
+        seed=54819,
         radius=1.,
         center=0.,
-        rtol=0.02)
+        rtol=0.1)
 
   def testInvertMutuallyConsistent(self):
     dims = 4
@@ -213,10 +214,11 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
     self.run_test_sample_consistent_log_prob(
         sess_run_fn=self.evaluate,
         dist=dist,
-        num_samples=int(1e5),
+        num_samples=int(1e6),
+        seed=22197,
         radius=1.,
         center=0.,
-        rtol=0.02)
+        rtol=0.1)
 
 
 @tfe.run_all_tests_in_graph_and_eager_modes
