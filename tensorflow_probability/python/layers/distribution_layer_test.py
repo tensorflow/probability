@@ -24,7 +24,8 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
 tfk = tf.keras
 tfkl = tf.keras.layers
 tfb = tfp.bijectors
@@ -47,7 +48,7 @@ def _vec_pad(x, value=0):
   return tf.pad(tensor=x, paddings=paddings, constant_values=value)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class EndToEndTest(tf.test.TestCase):
   """Test tfp.layers work in all three Keras APIs.
 
@@ -262,7 +263,7 @@ class EndToEndTest(tf.test.TestCase):
     self.assertIsInstance(yhat.distribution, tfd.Bernoulli)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class KLDivergenceAddLoss(tf.test.TestCase):
 
   def test_approx_kl(self):
@@ -308,7 +309,7 @@ class KLDivergenceAddLoss(tf.test.TestCase):
               steps_per_epoch=1)  # Usually `n // batch_size`.
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class MultivariateNormalTriLTest(tf.test.TestCase):
 
   def _check_distribution(self, t, x):
@@ -338,9 +339,10 @@ class MultivariateNormalTriLTest(tf.test.TestCase):
     scale_tril = np.array([[1.6180, 0.],
                            [-2.7183, 3.1416]]).astype(np.float32)
     scale_noise = 0.01
-    x = tfd.Normal(loc=0, scale=1).sample([n, 2])
+    x = self.evaluate(tfd.Normal(loc=0, scale=1).sample([n, 2]))
     eps = tfd.Normal(loc=0, scale=scale_noise).sample([n, 2])
-    y = tf.matmul(x, scale_tril) + eps
+    y = self.evaluate(tf.matmul(x, scale_tril) + eps)
+    d = y.shape[-1]
 
     # To save testing time, let's encode the answer (i.e., _cheat_). Note: in
     # writing this test we verified the correct answer is achieved with random
@@ -349,7 +351,6 @@ class MultivariateNormalTriLTest(tf.test.TestCase):
     true_bias = np.array([0, 0, np.log(scale_noise), 0, np.log(scale_noise)])
 
     # Create model.
-    d = tf.compat.dimension_value(y.shape[-1])
     model = tf.keras.Sequential([
         tf.keras.layers.Dense(
             tfpl.MultivariateNormalTriL.params_size(d),
@@ -374,7 +375,7 @@ class MultivariateNormalTriLTest(tf.test.TestCase):
                         atol=1e-2, rtol=1e-3)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class OneHotCategoricalTest(tf.test.TestCase):
 
   def _check_distribution(self, t, x):
@@ -403,15 +404,15 @@ class OneHotCategoricalTest(tf.test.TestCase):
     # Load data.
     n = int(1e4)
     scale_noise = 0.01
-    x = tfd.Normal(loc=0, scale=1).sample([n, 2])
+    x = self.evaluate(tfd.Normal(loc=0, scale=1).sample([n, 2]))
     eps = tfd.Normal(loc=0, scale=scale_noise).sample([n, 1])
-    y = tfd.OneHotCategorical(
+    y = self.evaluate(tfd.OneHotCategorical(
         logits=_vec_pad(
             0.3142 + 1.6180 * x[..., :1] - 2.7183 * x[..., 1:] + eps),
-        dtype=tf.float32).sample()
+        dtype=tf.float32).sample())
+    d = y.shape[-1]
 
     # Create model.
-    d = tf.compat.dimension_value(y.shape[-1])
     model = tf.keras.Sequential([
         tf.keras.layers.Dense(tfpl.OneHotCategorical.params_size(d) - 1),
         tf.keras.layers.Lambda(_vec_pad),
@@ -433,7 +434,7 @@ class OneHotCategoricalTest(tf.test.TestCase):
                         atol=0, rtol=0.1)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class CategoricalMixtureOfOneHotCategoricalTest(tf.test.TestCase):
 
   def _check_distribution(self, t, x):
@@ -484,15 +485,15 @@ class CategoricalMixtureOfOneHotCategoricalTest(tf.test.TestCase):
     # Load data.
     n = int(1e3)
     scale_noise = 0.01
-    x = tfd.Normal(loc=0, scale=1).sample([n, 2])
+    x = self.evaluate(tfd.Normal(loc=0, scale=1).sample([n, 2]))
     eps = tfd.Normal(loc=0, scale=scale_noise).sample([n, 1])
-    y = tfd.OneHotCategorical(
+    y = self.evaluate(tfd.OneHotCategorical(
         logits=_vec_pad(
             0.3142 + 1.6180 * x[..., :1] - 2.7183 * x[..., 1:] + eps),
-        dtype=tf.float32).sample()
+        dtype=tf.float32).sample())
+    d = y.shape[-1]
 
     # Create model.
-    d = tf.compat.dimension_value(y.shape[-1])
     k = 2
     p = tfpl.CategoricalMixtureOfOneHotCategorical.params_size(d, k)
     model = tf.keras.Sequential([
@@ -524,7 +525,7 @@ class CategoricalMixtureOfOneHotCategoricalTest(tf.test.TestCase):
     # strictly need--is another end-to-end test.)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class _IndependentLayerTest(object):
   """Base class for testing independent distribution layers.
 
@@ -579,7 +580,7 @@ class _IndependentLayerTest(object):
     self._check_distribution(t, x, batch_shape)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class _IndependentBernoulliTest(_IndependentLayerTest):
   layer_class = tfpl.IndependentBernoulli
   dist_class = tfd.Bernoulli
@@ -589,14 +590,14 @@ class _IndependentBernoulliTest(_IndependentLayerTest):
                       tf.concat([batch_shape, [-1]], axis=-1))
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class IndependentBernoulliTestDynamicShape(tf.test.TestCase,
                                            _IndependentBernoulliTest):
   dtype = np.float64
   use_static_shape = False
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class IndependentBernoulliTestStaticShape(tf.test.TestCase,
                                           _IndependentBernoulliTest):
   dtype = np.float32
@@ -608,14 +609,14 @@ class IndependentBernoulliTestStaticShape(tf.test.TestCase,
     scale_tril = np.array([[1.6180, 0.],
                            [-2.7183, 3.1416]]).astype(np.float32)
     scale_noise = 0.01
-    x = tfd.Normal(loc=0, scale=1).sample([n, 2])
+    x = self.evaluate(tfd.Normal(loc=0, scale=1).sample([n, 2]))
     eps = tfd.Normal(loc=0, scale=scale_noise).sample([n, 2])
-    y = tfd.Bernoulli(logits=tf.reshape(
-        tf.matmul(x, scale_tril) + eps,
-        shape=[n, 1, 2, 1])).sample()
+    y = self.evaluate(tfd.Bernoulli(
+        logits=tf.reshape(tf.matmul(x, scale_tril) + eps,
+                          shape=[n, 1, 2, 1])).sample())
+    event_shape = y.shape[1:]
 
     # Create model.
-    event_shape = y.shape[1:].as_list()
     model = tf.keras.Sequential([
         tf.keras.layers.Dense(
             tfpl.IndependentBernoulli.params_size(event_shape)),
@@ -634,12 +635,12 @@ class IndependentBernoulliTestStaticShape(tf.test.TestCase,
               steps_per_epoch=n // batch_size,
               shuffle=True)
     self.assertAllClose(scale_tril, model.get_weights()[0],
-                        atol=0.05, rtol=0.05)
+                        atol=0.15, rtol=0.15)
     self.assertAllClose([0., 0.], model.get_weights()[1],
-                        atol=0.05, rtol=0.05)
+                        atol=0.15, rtol=0.15)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class _IndependentLogisticTest(_IndependentLayerTest):
   layer_class = tfpl.IndependentLogistic
   dist_class = tfd.Logistic
@@ -652,14 +653,14 @@ class _IndependentLogisticTest(_IndependentLayerTest):
     ], -1)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class IndependentLogisticTestDynamicShape(tf.test.TestCase,
                                           _IndependentLogisticTest):
   dtype = np.float32
   use_static_shape = False
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class IndependentLogisticTestStaticShape(tf.test.TestCase,
                                          _IndependentLogisticTest):
   dtype = np.float64
@@ -686,7 +687,7 @@ class IndependentLogisticTestStaticShape(tf.test.TestCase,
     self.assertEqual((1, 2), self.evaluate(out).shape)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class _IndependentNormalTest(_IndependentLayerTest):
   layer_class = tfpl.IndependentNormal
   dist_class = tfd.Normal
@@ -732,14 +733,14 @@ class _IndependentNormalTest(_IndependentLayerTest):
     self.assertEqual((1, 3, 2), self.evaluate(out).shape)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class IndependentNormalTestDynamicShape(tf.test.TestCase,
                                         _IndependentNormalTest):
   dtype = np.float32
   use_static_shape = False
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class IndependentNormalTestStaticShape(tf.test.TestCase,
                                        _IndependentNormalTest):
   dtype = np.float64
@@ -766,7 +767,7 @@ class IndependentNormalTestStaticShape(tf.test.TestCase,
     self.assertEqual((1, 2), self.evaluate(out).shape)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class _IndependentPoissonTest(_IndependentLayerTest):
   layer_class = tfpl.IndependentPoisson
   dist_class = tfd.Poisson
@@ -776,14 +777,14 @@ class _IndependentPoissonTest(_IndependentLayerTest):
                       tf.concat([batch_shape, [-1]], axis=-1))
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class IndependentPoissonTestDynamicShape(tf.test.TestCase,
                                          _IndependentPoissonTest):
   dtype = np.float32
   use_static_shape = False
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class IndependentPoissonTestStaticShape(tf.test.TestCase,
                                         _IndependentPoissonTest):
   dtype = np.float64
@@ -793,10 +794,10 @@ class IndependentPoissonTestStaticShape(tf.test.TestCase,
     # Create example data.
     n = 2000
     d = 4
-    x = tfd.Uniform(low=1., high=10.).sample([n, d], seed=42)
+    x = self.evaluate(tfd.Uniform(low=1., high=10.).sample([n, d], seed=42))
     w = [[0.314], [0.272], [-0.162], [0.058]]
     log_rate = tf.matmul(x, w) - 0.141
-    y = tfd.Poisson(log_rate=log_rate).sample()
+    y = self.evaluate(tfd.Poisson(log_rate=log_rate).sample())
 
     # Poisson regression.
     model = tfk.Sequential([
@@ -819,7 +820,7 @@ class IndependentPoissonTestStaticShape(tf.test.TestCase,
               shuffle=True)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class _MixtureLayerTest(object):
   """Base class for testing mixture (same-family) distribution layers.
 
@@ -881,7 +882,7 @@ class _MixtureLayerTest(object):
     self._check_distribution(t, x, batch_shape)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class _MixtureLogisticTest(_MixtureLayerTest):
   layer_class = tfpl.MixtureLogistic
   dist_class = tfd.Logistic
@@ -904,10 +905,12 @@ class _MixtureLogisticTest(_MixtureLayerTest):
   def test_doc_string(self):
     # Load data (graph of a cardioid).
     n = 2000
-    t = tfd.Uniform(low=-np.pi, high=np.pi).sample([n, 1])
+    t = self.evaluate(tfd.Uniform(low=-np.pi, high=np.pi).sample([n, 1]))
     r = 2 * (1 - tf.cos(t))
-    x = r * tf.sin(t) + tfd.Normal(loc=0., scale=0.1).sample([n, 1])
-    y = r * tf.cos(t) + tfd.Normal(loc=0., scale=0.1).sample([n, 1])
+    x = tf.convert_to_tensor(self.evaluate(
+        r * tf.sin(t) + tfd.Normal(loc=0., scale=0.1).sample([n, 1])))
+    y = tf.convert_to_tensor(self.evaluate(
+        r * tf.cos(t) + tfd.Normal(loc=0., scale=0.1).sample([n, 1])))
 
     # Model the distribution of y given x with a Mixture Density Network.
     event_shape = self._build_tensor([1], dtype=np.int32)
@@ -935,21 +938,21 @@ class _MixtureLogisticTest(_MixtureLayerTest):
     self.assertEqual(15, self.evaluate(tf.convert_to_tensor(value=params_size)))
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class MixtureLogisticTestDynamicShape(tf.test.TestCase,
                                       _MixtureLogisticTest):
   dtype = np.float64
   use_static_shape = False
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class MixtureLogisticTestStaticShape(tf.test.TestCase,
                                      _MixtureLogisticTest):
   dtype = np.float32
   use_static_shape = True
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class _MixtureNormalTest(_MixtureLayerTest):
   layer_class = tfpl.MixtureNormal
   dist_class = tfd.Normal
@@ -972,10 +975,12 @@ class _MixtureNormalTest(_MixtureLayerTest):
   def test_doc_string(self):
     # Load data (graph of a cardioid).
     n = 2000
-    t = tfd.Uniform(low=-np.pi, high=np.pi).sample([n, 1])
+    t = self.evaluate(tfd.Uniform(low=-np.pi, high=np.pi).sample([n, 1]))
     r = 2 * (1 - tf.cos(t))
-    x = r * tf.sin(t) + tfd.Normal(loc=0., scale=0.1).sample([n, 1])
-    y = r * tf.cos(t) + tfd.Normal(loc=0., scale=0.1).sample([n, 1])
+    x = tf.convert_to_tensor(self.evaluate(
+        r * tf.sin(t) + tfd.Normal(loc=0., scale=0.1).sample([n, 1])))
+    y = tf.convert_to_tensor(self.evaluate(
+        r * tf.cos(t) + tfd.Normal(loc=0., scale=0.1).sample([n, 1])))
 
     # Model the distribution of y given x with a Mixture Density Network.
     event_shape = self._build_tensor([1], dtype=np.int32)
@@ -1003,21 +1008,21 @@ class _MixtureNormalTest(_MixtureLayerTest):
     self.assertEqual(15, self.evaluate(tf.convert_to_tensor(value=params_size)))
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class MixtureNormalTestDynamicShape(tf.test.TestCase,
                                     _MixtureNormalTest):
   dtype = np.float32
   use_static_shape = False
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class MixtureNormalTestStaticShape(tf.test.TestCase,
                                    _MixtureNormalTest):
   dtype = np.float64
   use_static_shape = True
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class _MixtureSameFamilyTest(object):
 
   def _build_tensor(self, ndarray, dtype=None):
@@ -1081,10 +1086,12 @@ class _MixtureSameFamilyTest(object):
   def test_doc_string(self):
     # Load data (graph of a cardioid).
     n = 2000
-    t = tfd.Uniform(low=-np.pi, high=np.pi).sample([n, 1])
+    t = self.evaluate(tfd.Uniform(low=-np.pi, high=np.pi).sample([n, 1]))
     r = 2 * (1 - tf.cos(t))
-    x = r * tf.sin(t) + tfd.Normal(loc=0., scale=0.1).sample([n, 1])
-    y = r * tf.cos(t) + tfd.Normal(loc=0., scale=0.1).sample([n, 1])
+    x = tf.convert_to_tensor(self.evaluate(
+        r * tf.sin(t) + tfd.Normal(loc=0., scale=0.1).sample([n, 1])))
+    y = tf.convert_to_tensor(self.evaluate(
+        r * tf.cos(t) + tfd.Normal(loc=0., scale=0.1).sample([n, 1])))
 
     # Model the distribution of y given x with a Mixture Density Network.
     event_shape = self._build_tensor([1], dtype=np.int32)
@@ -1114,14 +1121,14 @@ class _MixtureSameFamilyTest(object):
     self.assertEqual(15, self.evaluate(tf.convert_to_tensor(value=params_size)))
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class MixtureSameFamilyTestDynamicShape(tf.test.TestCase,
                                         _MixtureSameFamilyTest):
   dtype = np.float32
   use_static_shape = False
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class MixtureSameFamilyTestStaticShape(tf.test.TestCase,
                                        _MixtureSameFamilyTest):
   dtype = np.float64
