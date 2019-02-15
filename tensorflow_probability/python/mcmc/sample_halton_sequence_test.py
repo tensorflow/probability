@@ -23,15 +23,24 @@ import numpy as np
 
 import tensorflow as tf
 import tensorflow_probability as tfp
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfb = tf.contrib.bayesflow
 tfd = tfp.distributions
-tfe = tf.contrib.eager
 
 
+def _set_seed(seed):
+  """Helper which uses graph seed if using TFE."""
+  # TODO(b/68017812): Deprecate once TFE supports seed.
+  if tf.executing_eagerly():
+    tf.compat.v1.set_random_seed(seed)
+    return None
+  return seed
+
+
+@test_util.run_all_in_graph_and_eager_modes
 class HaltonSequenceTest(tf.test.TestCase):
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_known_values_small_bases(self):
     # The first five elements of the non-randomized Halton sequence
     # with base 2 and 3.
@@ -43,7 +52,6 @@ class HaltonSequenceTest(tf.test.TestCase):
     sample = tfp.mcmc.sample_halton_sequence(2, num_results=5, randomized=False)
     self.assertAllClose(expected, self.evaluate(sample), rtol=1e-6)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_dynamic_num_samples(self):
     """Tests that num_samples argument supports Tensors."""
     # The first five elements of the non-randomized Halton sequence
@@ -57,7 +65,6 @@ class HaltonSequenceTest(tf.test.TestCase):
         2, num_results=tf.constant(5), randomized=False)
     self.assertAllClose(expected, self.evaluate(sample), rtol=1e-6)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_sequence_indices(self):
     """Tests access of sequence elements by index."""
     dim = 5
@@ -70,7 +77,6 @@ class HaltonSequenceTest(tf.test.TestCase):
         self.evaluate(sample_direct), self.evaluate(sample_from_indices),
         rtol=1e-6)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_dtypes_works_correctly(self):
     """Tests that all supported dtypes work without error."""
     dim = 3
@@ -81,7 +87,6 @@ class HaltonSequenceTest(tf.test.TestCase):
     self.assertEqual(self.evaluate(sample_float32).dtype, np.float32)
     self.assertEqual(self.evaluate(sample_float64).dtype, np.float64)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_normal_integral_mean_and_var_correctly_estimated(self):
     n = int(1000)
     # This test is almost identical to the similarly named test in
@@ -117,7 +122,6 @@ class HaltonSequenceTest(tf.test.TestCase):
     self.assertAllClose(
         self.evaluate(p.stddev()), self.evaluate(stddev), rtol=0.02)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_docstring_example(self):
     # Produce the first 1000 members of the Halton sequence in 3 dimensions.
     num_results = 1000
@@ -150,7 +154,6 @@ class HaltonSequenceTest(tf.test.TestCase):
     self.assertAllClose(
         self.evaluate(integral_leaped), self.evaluate(true_value), rtol=0.05)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_randomized_qmc_basic(self):
     """Tests the randomization of the Halton sequences."""
     # This test is identical to the example given in Owen (2017), Figure 5.
@@ -169,7 +172,6 @@ class HaltonSequenceTest(tf.test.TestCase):
       values.append(self.evaluate(f))
     self.assertAllClose(np.mean(values), 101.6667, atol=np.std(values) * 2)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_partial_sum_func_qmc(self):
     """Tests the QMC evaluation of (x_j + x_{j+1} ...+x_{n})^2.
 
@@ -220,15 +222,13 @@ class HaltonSequenceTest(tf.test.TestCase):
     log_rel_err = np.log(100 * var_hi / var_lo)
     self.assertAllClose(log_rel_err, 0., atol=1.2)
 
-# TODO(https://github.com/tensorflow/community/pull/38): Enable this test
-# in eager mode.
   def test_seed_implies_deterministic_results(self):
     dim = 20
     num_results = 100
     sample1 = tfp.mcmc.sample_halton_sequence(
-        dim, num_results=num_results, seed=1925)
+        dim, num_results=num_results, seed=_set_seed(1925))
     sample2 = tfp.mcmc.sample_halton_sequence(
-        dim, num_results=num_results, seed=1925)
+        dim, num_results=num_results, seed=_set_seed(1925))
     [sample1_, sample2_] = self.evaluate([sample1, sample2])
     self.assertAllClose(sample1_, sample2_, atol=0., rtol=1e-6)
 

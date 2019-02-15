@@ -249,7 +249,6 @@ py_test(
     name = "sample_halton_sequence_test",
     size = "medium",
     srcs = ["sample_halton_sequence_test.py"],
-    tags = ["tf2-broken"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -283,7 +282,7 @@ py_test(
     size = "medium",
     timeout = "long",
     srcs = ["slice_sampler_test.py"],
-    tags = ["tf2-broken"],
+    shard_count = 6,
     deps = [
         ":slice_sampler_utils",
         # numpy dep,
