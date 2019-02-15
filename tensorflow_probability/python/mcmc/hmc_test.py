@@ -647,6 +647,49 @@ class HMCTest(tf.test.TestCase):
     self.assertAllEqual([3, 2], x1.shape)
     self.assertAllEqual([3], r1.accepted_results.target_log_prob.shape)
 
+  def testAdaptiveParameters(self):
+    hmc = tfp.mcmc.HamiltonianMonteCarlo(
+        target_log_prob_fn=lambda x: -x**2.,
+        step_size=0.5,
+        num_leapfrog_steps=2,
+        seed=_set_seed(1042),
+        store_parameters_in_results=True)
+    x0 = tf.constant(0.)
+    r0 = hmc.bootstrap_results(x0)
+    x1, r1 = hmc.one_step(x0, r0)
+    r1_zero = r1._replace(
+        accepted_results=r1.accepted_results._replace(
+            step_size=tf.constant(0.)))
+    x2, r2 = hmc.one_step(x1, r1_zero)
+
+    r0_, r1_, r2_, x1_, x2_ = self.evaluate([r0, r1, r2, x1, x2])
+
+    self.assertAllEqual(0.5, r0_.accepted_results.step_size)
+    self.assertAllEqual(2, r0_.accepted_results.num_leapfrog_steps)
+    self.assertAllEqual(0.5, r1_.accepted_results.step_size)
+    self.assertAllEqual(2, r1_.accepted_results.num_leapfrog_steps)
+    self.assertAllEqual(0., r2_.accepted_results.step_size)
+    self.assertAllEqual(2, r2_.accepted_results.num_leapfrog_steps)
+    # Since step size is 0, we shouldn't have moved despite being accepted.
+    self.assertAllEqual(x2_, x1_)
+    self.assertEqual(True, r2_.is_accepted)
+
+  def testAdaptiveIncompatibleWithStepSizeAdaptation(self):
+    step_size = tf.compat.v2.Variable(
+        initial_value=1.,
+        name='step_size',
+        trainable=False)
+
+    with self.assertRaisesRegexp(ValueError,
+                                 'It is invalid to simultaneously specify'):
+      tfp.mcmc.HamiltonianMonteCarlo(
+          target_log_prob_fn=lambda x: -x**2.,
+          num_leapfrog_steps=2,
+          step_size=step_size,
+          step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy(
+              num_adaptation_steps=None),
+          store_parameters_in_results=True)
+
 
 class _LogCorrectionTest(object):
 
