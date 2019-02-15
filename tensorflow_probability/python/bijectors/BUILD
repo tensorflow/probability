@@ -549,7 +549,6 @@ py_test(
     name = "batch_normalization_test",
     size = "medium",
     srcs = ["batch_normalization_test.py"],
-    tags = ["tf2-broken"],
     deps = [
         ":bijectors",
         # absl/testing:parameterized dep,
