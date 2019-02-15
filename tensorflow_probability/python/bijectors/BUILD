@@ -39,6 +39,7 @@ py_library(
         ":batch_normalization",
         ":bijector",
         ":blockwise",
+        ":categorical_to_discrete",
         ":chain",
         ":cholesky_outer_product",
         ":cholesky_to_inv_cholesky",
@@ -145,6 +146,16 @@ py_library(
     deps = [
         ":bijector",
         # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "categorical_to_discrete",
+    srcs = ["categorical_to_discrete.py"],
+    deps = [
+        ":bijector",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
 
@@ -592,6 +603,17 @@ py_test(
         ":bijectors",
         # absl/testing:parameterized dep,
         # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "categorical_to_discrete_test",
+    size = "small",
+    srcs = ["categorical_to_discrete_test.py"],
+    deps = [
+        ":bijector_test_util",
+        ":bijectors",
         # tensorflow dep,
     ],
 )
