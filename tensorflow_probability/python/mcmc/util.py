@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Internal utiltiy functions for implementing TransitionKernels."""
+"""Internal utility functions for implementing TransitionKernels."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -24,7 +24,8 @@ import tensorflow as tf
 
 from tensorflow_probability.python.math.gradient import value_and_gradient as tfp_math_value_and_gradients
 
-from tensorflow.python.ops import control_flow_util
+from tensorflow.python.ops import control_flow_util  # pylint: disable=g-direct-tensorflow-import
+
 
 __all__ = [
     'choose',
@@ -35,6 +36,7 @@ __all__ = [
     'safe_sum',
     'set_doc',
     'smart_for_loop',
+    'trace_scan',
 ]
 
 
@@ -284,3 +286,92 @@ def smart_for_loop(loop_num_iter, body_fn, initial_loop_vars,
     for _ in range(loop_num_iter_):
       result = body_fn(*result)
     return result
+
+
+def trace_scan(loop_fn,
+               initial_state,
+               elems,
+               trace_fn,
+               parallel_iterations=10,
+               name=None):
+  """A simplified version of `tf.scan` that has configurable tracing.
+
+  This function repeatedly calls `loop_fn(state, elem)`, where `state` is the
+  `initial_state` during the first iteration, and the return value of `loop_fn`
+  for every iteration thereafter. `elem` is a slice of `elements` along the
+  first dimension, accessed in order. Additionally, it calls `trace_fn` on the
+  return value of `loop_fn`. The `Tensor`s in return values of `trace_fn` are
+  stacked and returned from this function, such that the first dimension of
+  those `Tensor`s matches the size of `elems`.
+
+  Args:
+    loop_fn: A callable that takes in a `Tensor` or a nested collection of
+      `Tensor`s with the same structure as `initial_state`, a slice of `elems`
+      and returns the same structure as `initial_state`.
+    initial_state: A `Tensor` or a nested collection of `Tensor`s passed to
+      `loop_fn` in the first iteration.
+    elems: A `Tensor` that is split along the first dimension and each element
+      of which is passed to `loop_fn`.
+    trace_fn: A callable that takes in the return value of `loop_fn` and returns
+      a `Tensor` or a nested collection of `Tensor`s.
+    parallel_iterations: Passed to the internal `tf.while_loop`.
+    name: Name scope used in this function. Default: 'trace_scan'.
+
+  Returns:
+    final_state: The final return value of `loop_fn`.
+    trace: The same structure as the return value of `trace_fn`, but with each
+      `Tensor` being a stack of the corresponding `Tensors` in the return value
+      of `trace_fn` for each slice of `elems`.
+  """
+  with tf.name_scope(name, 'trace_scan',
+                     [initial_state, elems]), tf.compat.v1.variable_scope(
+                         tf.compat.v1.get_variable_scope()) as vs:
+    if vs.caching_device is None and not tf.executing_eagerly():
+      vs.set_caching_device(lambda op: op.device)
+
+    initial_state = tf.nest.map_structure(
+        lambda x: tf.convert_to_tensor(value=x, name='initial_state'),
+        initial_state)
+    elems = tf.convert_to_tensor(value=elems, name='elems')
+
+    static_length = elems.shape[0]
+    if tf.compat.dimension_value(static_length) is None:
+      length = tf.shape(input=elems)[0]
+    else:
+      length = tf.convert_to_tensor(
+          value=static_length, dtype=tf.int32, name='length')
+
+    # This is an TensorArray in part because of XLA, which had trouble with
+    # non-statically known indices. I.e. elems[i] errored, but
+    # elems_array.read(i) worked.
+    elems_array = tf.TensorArray(
+        elems.dtype, size=length, element_shape=elems.shape[1:])
+    elems_array = elems_array.unstack(elems)
+
+    trace_arrays = tf.nest.map_structure(
+        lambda x: tf.TensorArray(x.dtype, size=length, element_shape=x.shape),
+        trace_fn(initial_state))
+
+    def _body(i, state, trace_arrays):
+      state = loop_fn(state, elems_array.read(i))
+      trace_arrays = tf.nest.pack_sequence_as(trace_arrays, [
+          a.write(i, v) for a, v in zip(
+              tf.nest.flatten(trace_arrays), tf.nest.flatten(trace_fn(state)))
+      ])
+      return i + 1, state, trace_arrays
+
+    _, final_state, trace_arrays = tf.while_loop(
+        cond=lambda i, *args: i < length,
+        body=_body,
+        loop_vars=(0, initial_state, trace_arrays),
+        parallel_iterations=parallel_iterations)
+
+    stacked_trace = tf.nest.map_structure(lambda x: x.stack(), trace_arrays)
+
+    # Restore the static length if we know it.
+    def _merge_static_length(x):
+      x.set_shape(tf.TensorShape(static_length).concatenate(x.shape[1:]))
+      return x
+
+    stacked_trace = tf.nest.map_structure(_merge_static_length, stacked_trace)
+    return final_state, stacked_trace

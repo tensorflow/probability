@@ -25,10 +25,12 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+# TODO(siege): Fix this style violation.
 from tensorflow_probability.python.mcmc.util import choose
 from tensorflow_probability.python.mcmc.util import is_namedtuple_like
 from tensorflow_probability.python.mcmc.util import maybe_call_fn_and_grads
 from tensorflow_probability.python.mcmc.util import smart_for_loop
+from tensorflow_probability.python.mcmc.util import trace_scan
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -160,6 +162,7 @@ class GradientTest(tf.test.TestCase):
         maybe_call_fn_and_grads(fn, fn_args)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class SmartForLoopTest(tf.test.TestCase):
 
   def test_python_for_loop(self):
@@ -187,6 +190,31 @@ class SmartForLoopTest(tf.test.TestCase):
     self.assertEqual(iters if tf.executing_eagerly() else 1,
                      counter['body_calls'])
     self.assertAllClose([11], self.evaluate(result))
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class TraceScanTest(tf.test.TestCase):
+
+  def testBasic(self):
+
+    def _loop_fn(state, element):
+      return state + element
+
+    def _trace_fn(state):
+      return [state, state * 2]
+
+    final_state, trace = trace_scan(
+        loop_fn=_loop_fn, initial_state=0, elems=[1, 2], trace_fn=_trace_fn)
+
+    self.assertAllClose([], final_state.shape.as_list())
+    self.assertAllClose([2], trace[0].shape.as_list())
+    self.assertAllClose([2], trace[1].shape.as_list())
+
+    final_state, trace = self.evaluate([final_state, trace])
+
+    self.assertAllClose(3, final_state)
+    self.assertAllClose([1, 3], trace[0])
+    self.assertAllClose([2, 6], trace[1])
 
 
 if __name__ == '__main__':

@@ -33,7 +33,9 @@ from tensorflow_probability.python.mcmc.random_walk_metropolis import RandomWalk
 from tensorflow_probability.python.mcmc.random_walk_metropolis import UncalibratedRandomWalk
 from tensorflow_probability.python.mcmc.replica_exchange_mc import default_exchange_proposed_fn
 from tensorflow_probability.python.mcmc.replica_exchange_mc import ReplicaExchangeMC
+from tensorflow_probability.python.mcmc.sample import CheckpointableStatesAndTrace
 from tensorflow_probability.python.mcmc.sample import sample_chain
+from tensorflow_probability.python.mcmc.sample import StatesAndTrace
 from tensorflow_probability.python.mcmc.sample_annealed_importance import sample_annealed_importance_chain
 from tensorflow_probability.python.mcmc.sample_halton_sequence import sample_halton_sequence
 from tensorflow_probability.python.mcmc.slice_sampler_kernel import SliceSampler
@@ -42,26 +44,27 @@ from tensorflow_probability.python.mcmc.transformed_kernel import TransformedTra
 from tensorflow.python.util.all_util import remove_undocumented
 
 _allowed_symbols = [
-    'MetropolisAdjustedLangevinAlgorithm',
-    'UncalibratedLangevin',
     'HamiltonianMonteCarlo',
+    'MetropolisAdjustedLangevinAlgorithm',
     'MetropolisHastings',
-    'SliceSampler',
+    'RandomWalkMetropolis',
     'ReplicaExchangeMC',
+    'SliceSampler',
+    'StatesAndTrace',
+    'TransformedTransitionKernel',
     'TransitionKernel',
     'UncalibratedHamiltonianMonteCarlo',
-    'RandomWalkMetropolis',
-    'TransformedTransitionKernel',
+    'UncalibratedLangevin',
     'UncalibratedRandomWalk',
     'default_exchange_proposed_fn',
     'effective_sample_size',
+    'make_simple_step_size_update_policy',
     'potential_scale_reduction',
     'random_walk_normal_fn',
     'random_walk_uniform_fn',
     'sample_annealed_importance_chain',
     'sample_chain',
     'sample_halton_sequence',
-    'make_simple_step_size_update_policy',
 ]
 
 remove_undocumented(__name__, _allowed_symbols)
