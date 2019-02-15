@@ -28,6 +28,7 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.mcmc.util import is_list_like
 
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 InnerKernelResultsWithoutCorrection = collections.namedtuple(
     'InnerKernelResultsWithoutCorrection',
@@ -126,6 +127,7 @@ def make_bootstrap_results_fn(true_kernel_results):
   return bootstrap_results
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class MetropolisHastingsTest(tf.test.TestCase):
 
   def setUp(self):
@@ -179,20 +181,19 @@ class MetropolisHastingsTest(tf.test.TestCase):
       self.assertEqual(type(expected_inner_kernel_results), type(kr))
 
     # Now check actual values.
-    with self.cached_session() as sess:
-      [
-          expected_init_inner_kernel_results_,
-          expected_inner_kernel_results_,
-          init_kernel_results_,
-          kernel_results_,
-          next_state_,
-      ] = sess.run([
-          expected_init_inner_kernel_results,
-          expected_inner_kernel_results,
-          init_kernel_results,
-          kernel_results,
-          next_state,
-      ])
+    [
+        expected_init_inner_kernel_results_,
+        expected_inner_kernel_results_,
+        init_kernel_results_,
+        kernel_results_,
+        next_state_,
+    ] = self.evaluate([
+        expected_init_inner_kernel_results,
+        expected_inner_kernel_results,
+        init_kernel_results,
+        kernel_results,
+        next_state,
+    ])
 
     # Check that the bootstrapped kernel results are correctly initialized.
     for fn in expected_inner_init_kernel_results._fields:
@@ -271,20 +272,19 @@ class MetropolisHastingsTest(tf.test.TestCase):
       self.assertEqual(type(expected_inner_kernel_results), type(kr))
 
     # Now check actual values.
-    with self.cached_session() as sess:
-      [
-          expected_init_inner_kernel_results_,
-          expected_inner_kernel_results_,
-          init_kernel_results_,
-          kernel_results_,
-          next_state_,
-      ] = sess.run([
-          expected_init_inner_kernel_results,
-          expected_inner_kernel_results,
-          init_kernel_results,
-          kernel_results,
-          next_state,
-      ])
+    [
+        expected_init_inner_kernel_results_,
+        expected_inner_kernel_results_,
+        init_kernel_results_,
+        kernel_results_,
+        next_state_,
+    ] = self.evaluate([
+        expected_init_inner_kernel_results,
+        expected_inner_kernel_results,
+        init_kernel_results,
+        kernel_results,
+        next_state,
+    ])
 
     # Check that the bootstrapped kernel results are correctly initialized.
     for fn in expected_inner_init_kernel_results._fields:

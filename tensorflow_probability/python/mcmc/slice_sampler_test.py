@@ -215,37 +215,36 @@ class SliceSamplerTest(tf.test.TestCase):
     true_cov = dtype([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
     num_results = 25
     num_chains = 500
-    with self.cached_session() as sess:
-      # Target distribution is defined through the Cholesky decomposition
-      chol = tf.linalg.cholesky(true_cov)
-      target = tfd.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
+    # Target distribution is defined through the Cholesky decomposition
+    chol = tf.linalg.cholesky(true_cov)
+    target = tfd.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
 
-      # Initial state of the chain
-      init_state = [np.ones([num_chains, 4], dtype=dtype)]
+    # Initial state of the chain
+    init_state = [np.ones([num_chains, 4], dtype=dtype)]
 
-      # Run Slice Samper for `num_results` iterations for `num_chains`
-      # independent chains:
-      states, _ = tfp.mcmc.sample_chain(
-          num_results=num_results,
-          current_state=init_state,
-          kernel=tfp.mcmc.SliceSampler(
-              target_log_prob_fn=target.log_prob,
-              step_size=1.0,
-              max_doublings=5,
-              seed=47),
-          num_burnin_steps=300,
-          num_steps_between_results=1,
-          parallel_iterations=1)
-      result = states[0]
-      sample_mean = tf.reduce_mean(input_tensor=result, axis=[0, 1])
-      deviation = tf.reshape(result - sample_mean, shape=[-1, 4])
-      sample_cov = tf.matmul(deviation, b=deviation, transpose_a=True)
-      sample_cov /= tf.cast(tf.shape(input=deviation)[0], dtype=tf.float32)
-      sample_mean_err = sample_mean - true_mean
-      sample_cov_err = sample_cov - true_cov
+    # Run Slice Samper for `num_results` iterations for `num_chains`
+    # independent chains:
+    states, _ = tfp.mcmc.sample_chain(
+        num_results=num_results,
+        current_state=init_state,
+        kernel=tfp.mcmc.SliceSampler(
+            target_log_prob_fn=target.log_prob,
+            step_size=1.0,
+            max_doublings=5,
+            seed=47),
+        num_burnin_steps=300,
+        num_steps_between_results=1,
+        parallel_iterations=1)
+    result = states[0]
+    sample_mean = tf.reduce_mean(input_tensor=result, axis=[0, 1])
+    deviation = tf.reshape(result - sample_mean, shape=[-1, 4])
+    sample_cov = tf.matmul(deviation, b=deviation, transpose_a=True)
+    sample_cov /= tf.cast(tf.shape(input=deviation)[0], dtype=tf.float32)
+    sample_mean_err = sample_mean - true_mean
+    sample_cov_err = sample_cov - true_cov
 
-      [sample_mean_err, sample_cov_err] = sess.run([sample_mean_err,
-                                                    sample_cov_err])
+    [sample_mean_err, sample_cov_err] = self.evaluate([sample_mean_err,
+                                                       sample_cov_err])
 
     self.assertAllClose(np.zeros_like(sample_mean_err), b=sample_mean_err,
                         atol=0.1, rtol=0.1)

@@ -114,6 +114,7 @@ py_library(
 py_test(
     name = "langevin_test",
     size = "medium",
+    timeout = "long",
     srcs = ["langevin_test.py"],
     deps = [
         # numpy dep,
@@ -134,18 +135,6 @@ py_library(
 py_library(
     name = "metropolis_hastings",
     srcs = ["metropolis_hastings.py"],
-    srcs_version = "PY2AND3",
-    deps = [
-        ":kernel",
-        ":util",
-        # numpy dep,
-        # tensorflow dep,
-    ],
-)
-
-py_library(
-    name = "replica_exchange_mc",
-    srcs = ["replica_exchange_mc.py"],
     srcs_version = "PY2AND3",
     deps = [
         ":kernel",
@@ -190,6 +179,18 @@ py_test(
 )
 
 py_library(
+    name = "replica_exchange_mc",
+    srcs = ["replica_exchange_mc.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":kernel",
+        ":util",
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_library(
     name = "sample",
     srcs = ["sample.py"],
     srcs_version = "PY2AND3",
@@ -203,6 +204,7 @@ py_library(
 py_test(
     name = "sample_test",
     size = "medium",
+    timeout = "long",
     srcs = ["sample_test.py"],
     deps = [
         # numpy dep,
@@ -246,6 +248,7 @@ py_library(
 py_test(
     name = "sample_halton_sequence_test",
     size = "medium",
+    timeout = "long",
     srcs = ["sample_halton_sequence_test.py"],
     deps = [
         # numpy dep,
@@ -305,6 +308,7 @@ py_library(
 py_test(
     name = "transformed_kernel_test",
     size = "medium",
+    timeout = "long",
     srcs = ["transformed_kernel_test.py"],
     shard_count = 4,
     deps = [

@@ -68,13 +68,12 @@ class DefaultExchangeProposedFnTest(tf.test.TestCase):
         atol=0.05)
 
   def testProbExchange0p5NumReplica4(self):
-    with self.cached_session():
-      prob_exchange = 0.5
-      num_replica = 4
-      fn = tfp.mcmc.default_exchange_proposed_fn(prob_exchange)
-      exchange_proposed = fn(num_replica, seed=_set_seed(321))
+    prob_exchange = 0.5
+    num_replica = 4
+    fn = tfp.mcmc.default_exchange_proposed_fn(prob_exchange)
+    exchange_proposed = fn(num_replica, seed=_set_seed(321))
 
-      exchanges = self.generate_exchanges(exchange_proposed, num_replica)
+    exchanges = self.generate_exchanges(exchange_proposed, num_replica)
 
     # No exchanges 1 - prob_exchange of the time.
     self.assertAllClose(
@@ -89,13 +88,12 @@ class DefaultExchangeProposedFnTest(tf.test.TestCase):
         prob_exchange / 2, np.mean([len(e) == 2 for e in exchanges]), atol=0.05)
 
   def testProbExchange0p5NumReplica3(self):
-    with self.cached_session():
-      prob_exchange = 0.5
-      num_replica = 3
-      fn = tfp.mcmc.default_exchange_proposed_fn(prob_exchange)
-      exchange_proposed = fn(num_replica, seed=_set_seed(42))
+    prob_exchange = 0.5
+    num_replica = 3
+    fn = tfp.mcmc.default_exchange_proposed_fn(prob_exchange)
+    exchange_proposed = fn(num_replica, seed=_set_seed(42))
 
-      exchanges = self.generate_exchanges(exchange_proposed, num_replica)
+    exchanges = self.generate_exchanges(exchange_proposed, num_replica)
 
     # All exchanges, if proposed, will be length 1.
     self.assertAllClose(
@@ -107,13 +105,12 @@ class DefaultExchangeProposedFnTest(tf.test.TestCase):
         atol=0.05)
 
   def testProbExchange0p5NumReplica5(self):
-    with self.cached_session():
-      prob_exchange = 0.5
-      num_replica = 5
-      fn = tfp.mcmc.default_exchange_proposed_fn(prob_exchange)
-      exchange_proposed = fn(num_replica, seed=_set_seed(0))
+    prob_exchange = 0.5
+    num_replica = 5
+    fn = tfp.mcmc.default_exchange_proposed_fn(prob_exchange)
+    exchange_proposed = fn(num_replica, seed=_set_seed(0))
 
-      exchanges = self.generate_exchanges(exchange_proposed, num_replica)
+    exchanges = self.generate_exchanges(exchange_proposed, num_replica)
 
     # All exchanges, if proposed, will be length 2.
     self.assertAllClose(
@@ -125,13 +122,12 @@ class DefaultExchangeProposedFnTest(tf.test.TestCase):
         atol=0.05)
 
   def testProbExchange1p0(self):
-    with self.cached_session():
-      prob_exchange = 1.0
-      num_replica = 15
-      fn = tfp.mcmc.default_exchange_proposed_fn(prob_exchange)
-      exchange_proposed = fn(num_replica, seed=_set_seed(667))
+    prob_exchange = 1.0
+    num_replica = 15
+    fn = tfp.mcmc.default_exchange_proposed_fn(prob_exchange)
+    exchange_proposed = fn(num_replica, seed=_set_seed(667))
 
-      exchanges = self.generate_exchanges(exchange_proposed, num_replica)
+    exchanges = self.generate_exchanges(exchange_proposed, num_replica)
 
     # All exchanges, if proposed, will be length 7.  And prob_exchange is 1.
     self.assertAllClose(
@@ -143,13 +139,12 @@ class DefaultExchangeProposedFnTest(tf.test.TestCase):
         atol=0.05)
 
   def testProbExchange0p0(self):
-    with self.cached_session():
-      prob_exchange = 0.0
-      num_replica = 15
-      fn = tfp.mcmc.default_exchange_proposed_fn(prob_exchange)
-      exchange_proposed = fn(num_replica, seed=_set_seed(665))
+    prob_exchange = 0.0
+    num_replica = 15
+    fn = tfp.mcmc.default_exchange_proposed_fn(prob_exchange)
+    exchange_proposed = fn(num_replica, seed=_set_seed(665))
 
-      exchanges = self.generate_exchanges(exchange_proposed, num_replica)
+    exchanges = self.generate_exchanges(exchange_proposed, num_replica)
 
     # All exchanges, if proposed, will be length 7.  And prob_exchange is 0.
     self.assertAllClose(
@@ -161,6 +156,7 @@ class DefaultExchangeProposedFnTest(tf.test.TestCase):
         atol=0.05)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class REMCTest(tf.test.TestCase):
 
   def _getNormalREMCSamples(self,
