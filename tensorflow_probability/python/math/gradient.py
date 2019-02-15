@@ -27,7 +27,7 @@ __all__ = [
 ]
 
 
-def value_and_gradient(f, xs, watch_accessed_variables=True, name=None):
+def value_and_gradient(f, xs, use_gradient_tape=False, name=None):
   """Computes `f(*xs)` and its gradients wrt to `*xs`.
 
   Args:
@@ -39,13 +39,9 @@ def value_and_gradient(f, xs, watch_accessed_variables=True, name=None):
       function.
     xs: Python list of parameters of f for which to differentiate. (Can also
       be single `Tensor`.)
-    watch_accessed_variables: Boolean controlling whether the tape will
-      automatically `watch` any (trainable) variables accessed while the tape is
-      active. Defaults to True meaning gradients can be requested from any
-      result computed in the tape derived from reading a trainable `Variable`.
-      If False users must explicitly `watch` any `Variable`s they want to
-      request gradients from.
-      Default value: `True`.
+    use_gradient_tape: Python `bool` indicating that `tf.GradientTape`
+      should be used regardles of `tf.executing_eagerly()` status.
+      Default value: `False`.
     name: Python `str` name prefixed to ops created by this function.
       Default value: `None` (i.e., `'value_and_gradient'`).
 
@@ -59,13 +55,15 @@ def value_and_gradient(f, xs, watch_accessed_variables=True, name=None):
       xs = [xs]
     xs = [tf.convert_to_tensor(value=x, name='x{}'.format(i))
           for i, x in enumerate(xs)]
-    with tf.GradientTape(
-        persistent=len(xs) > 1,
-        watch_accessed_variables=watch_accessed_variables) as tape:
-      for x in xs:
-        tape.watch(x)
-      y = tf.convert_to_tensor(value=f(*xs), name='y')
-    dydx = [tape.gradient(y, x) for x in xs]
+    if tf.executing_eagerly() or use_gradient_tape:
+      with tf.GradientTape(watch_accessed_variables=False) as tape:
+        for x in xs:
+          tape.watch(x)
+        y = f(*xs)
+      dydx = tape.gradient(y, xs)
+    else:
+      y = f(*xs)
+      dydx = tf.gradients(ys=y, xs=xs)
     if not is_xs_list_like:
       dydx = dydx[0]
     return y, dydx
