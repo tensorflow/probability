@@ -78,7 +78,7 @@ class TransformedTransitionKernelTest(tf.test.TestCase):
         concentration0=self.dtype(10.))
     transformed_hmc = tfp.mcmc.TransformedTransitionKernel(
         inner_kernel=tfp.mcmc.HamiltonianMonteCarlo(
-            target_log_prob_fn=target.log_prob,
+            target_log_prob_fn=tf.function(target.log_prob, autograph=False),
             step_size=1.64,
             num_leapfrog_steps=2,
             seed=_maybe_seed(55)),
@@ -124,7 +124,7 @@ class TransformedTransitionKernelTest(tf.test.TestCase):
         concentration0=self.dtype(10.))
     transformed_mala = tfp.mcmc.TransformedTransitionKernel(
         inner_kernel=tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
-            target_log_prob_fn=target.log_prob,
+            target_log_prob_fn=tf.function(target.log_prob, autograph=False),
             step_size=1.,
             seed=_maybe_seed(55)),
         bijector=tfb.Sigmoid())
@@ -166,7 +166,7 @@ class TransformedTransitionKernelTest(tf.test.TestCase):
         concentration0=self.dtype(10.))
     transformed_rwm = tfp.mcmc.TransformedTransitionKernel(
         inner_kernel=tfp.mcmc.RandomWalkMetropolis(
-            target_log_prob_fn=target.log_prob,
+            target_log_prob_fn=tf.function(target.log_prob, autograph=False),
             new_state_fn=tfp.mcmc.random_walk_normal_fn(scale=1.5),
             seed=_maybe_seed(55)),
         bijector=tfb.Sigmoid())
@@ -206,9 +206,7 @@ class TransformedTransitionKernelTest(tf.test.TestCase):
     true_cov = self.dtype([[1, 0.5],
                            [0.5, 1]])
     num_results = 2000
-    counter = collections.Counter()
     def target_log_prob(x, y):
-      counter['target_calls'] += 1
       # Corresponds to unnormalized MVN.
       # z = matmul(inv(chol(true_cov)), [x, y] - true_mean)
       z = tf.stack([x, y], axis=-1) - true_mean
@@ -221,7 +219,7 @@ class TransformedTransitionKernelTest(tf.test.TestCase):
 
     transformed_hmc = tfp.mcmc.TransformedTransitionKernel(
         inner_kernel=tfp.mcmc.HamiltonianMonteCarlo(
-            target_log_prob_fn=target_log_prob,
+            target_log_prob_fn=tf.function(target_log_prob, autograph=False),
             # Affine scaling means we have to change the step_size
             # in order to get 60% acceptance, as was done in mcmc/hmc_test.py.
             step_size=[1.23 / 0.75, 1.23 / 0.5],
@@ -242,8 +240,6 @@ class TransformedTransitionKernelTest(tf.test.TestCase):
         num_burnin_steps=200,
         num_steps_between_results=1,
         parallel_iterations=1)
-    if not tf.executing_eagerly():
-      self.assertAllEqual(dict(target_calls=4), counter)
     states = tf.stack(states, axis=-1)
     self.assertEqual(num_results, tf.compat.dimension_value(states.shape[0]))
     sample_mean = tf.reduce_mean(input_tensor=states, axis=0)
