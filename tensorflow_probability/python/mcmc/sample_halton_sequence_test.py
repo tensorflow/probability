@@ -23,9 +23,9 @@ import numpy as np
 
 import tensorflow as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python.internal import monte_carlo
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
-tfb = tf.contrib.bayesflow
 tfd = tfp.distributions
 
 
@@ -108,11 +108,11 @@ class HaltonSequenceTest(tf.test.TestCase):
     q_sample = q.quantile(cdf_sample)
 
     # Compute E_p[X].
-    e_x = tfb.monte_carlo.expectation_importance_sampler(
+    e_x = monte_carlo.expectation_importance_sampler(
         f=lambda x: x, log_p=p.log_prob, sampling_dist_q=q, z=q_sample, seed=42)
 
     # Compute E_p[X^2].
-    e_x2 = tfb.monte_carlo.expectation_importance_sampler(
+    e_x2 = monte_carlo.expectation_importance_sampler(
         f=tf.square, log_p=p.log_prob, sampling_dist_q=q, z=q_sample, seed=1412)
 
     stddev = tf.sqrt(e_x2 - tf.square(e_x))

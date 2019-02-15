@@ -35,6 +35,15 @@ py_library(
 )
 
 py_library(
+    name = "monte_carlo",
+    srcs = ["monte_carlo.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_library(
     name = "dtype_util",
     srcs = ["dtype_util.py"],
     srcs_version = "PY2AND3",
