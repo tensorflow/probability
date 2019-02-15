@@ -227,7 +227,6 @@ py_test(
     name = "sample_annealed_importance_test",
     size = "medium",
     srcs = ["sample_annealed_importance_test.py"],
-    tags = ["tf2-broken"],
     deps = [
         # numpy dep,
         # tensorflow dep,

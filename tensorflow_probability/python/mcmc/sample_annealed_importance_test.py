@@ -24,6 +24,7 @@ import numpy as np
 
 import tensorflow as tf
 import tensorflow_probability as tfp
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfd = tfp.distributions
 
@@ -40,6 +41,7 @@ _maybe_seed = lambda s: tf.compat.v1.set_random_seed(s) if tf.executing_eagerly(
 ) else s
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class SampleAnnealedImportanceTest(tf.test.TestCase):
 
   def setUp(self):
@@ -87,7 +89,8 @@ class SampleAnnealedImportanceTest(tf.test.TestCase):
           target_log_prob_fn=tlp_fn,
           step_size=0.5,
           num_leapfrog_steps=2,
-          seed=_maybe_seed(45))
+          seed=_maybe_seed(make_kernel.seed()))
+    make_kernel.seed = tfp.distributions.SeedStream('make_kernel', 45)
 
     _, ais_weights, _ = tfp.mcmc.sample_annealed_importance_chain(
         num_steps=num_steps,
