@@ -72,7 +72,6 @@ py_test(
     name = "quantiles_test",
     size = "medium",
     srcs = ["quantiles_test.py"],
-    tags = ["tf2-broken"],
     deps = [
         # numpy dep,
         # tensorflow dep,

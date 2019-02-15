@@ -108,7 +108,6 @@ py_library(
 py_test(
     name = "special_math_test",
     srcs = ["special_math_test.py"],
-    tags = ["tf2-broken"],
     deps = [
         ":special_math",
         # numpy dep,

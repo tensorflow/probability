@@ -115,7 +115,6 @@ py_test(
     name = "langevin_test",
     size = "medium",
     srcs = ["langevin_test.py"],
-    tags = ["tf2-broken"],
     deps = [
         # numpy dep,
         # tensorflow dep,
