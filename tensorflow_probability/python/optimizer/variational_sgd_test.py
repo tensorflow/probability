@@ -27,8 +27,8 @@ class VariationalSGDTest(tf.test.TestCase):
   def testBasic(self):
     for dtype in [tf.half, tf.float32, tf.float64]:
       with self.cached_session():
-        var0 = tf.Variable([1.1, 2.1], dtype=dtype)
-        var1 = tf.Variable([3.0, 4.0], dtype=dtype)
+        var0 = tf.compat.v1.Variable([1.1, 2.1], dtype=dtype)
+        var1 = tf.compat.v1.Variable([3.0, 4.0], dtype=dtype)
         grads0 = tf.constant([0.1, 0.1], dtype=dtype)
         grads1 = tf.constant([0.01, 0.01], dtype=dtype)
         decay_rate = 0.53
@@ -54,12 +54,12 @@ class VariationalSGDTest(tf.test.TestCase):
   def testBasicMultiInstance(self):
     for dtype in [tf.half, tf.float32, tf.float64]:
       with self.cached_session():
-        var0 = tf.Variable([1.1, 2.1], dtype=dtype)
-        var1 = tf.Variable([3.0, 4.0], dtype=dtype)
+        var0 = tf.compat.v1.Variable([1.1, 2.1], dtype=dtype)
+        var1 = tf.compat.v1.Variable([3.0, 4.0], dtype=dtype)
         grads0 = tf.constant([0.1, 0.1], dtype=dtype)
         grads1 = tf.constant([0.01, 0.01], dtype=dtype)
-        vara = tf.Variable([1.1, 2.1], dtype=dtype)
-        varb = tf.Variable([3.0, 4.0], dtype=dtype)
+        vara = tf.compat.v1.Variable([1.1, 2.1], dtype=dtype)
+        varb = tf.compat.v1.Variable([3.0, 4.0], dtype=dtype)
         gradsa = tf.constant([0.1, 0.1], dtype=dtype)
         gradsb = tf.constant([0.01, 0.01], dtype=dtype)
         decay_rate = 0.5
@@ -113,8 +113,8 @@ class VariationalSGDTest(tf.test.TestCase):
   def testTensorLearningRate(self):
     for dtype in [tf.half, tf.float32, tf.float64]:
       with self.cached_session():
-        var0 = tf.Variable([1.1, 2.1], dtype=dtype)
-        var1 = tf.Variable([3.0, 4.0], dtype=dtype)
+        var0 = tf.compat.v1.Variable([1.1, 2.1], dtype=dtype)
+        var1 = tf.compat.v1.Variable([3.0, 4.0], dtype=dtype)
         grads0 = tf.constant([0.1, 0.1], dtype=dtype)
         grads1 = tf.constant([0.01, 0.01], dtype=dtype)
         lrate = tf.constant(3.0)
@@ -143,11 +143,11 @@ class VariationalSGDTest(tf.test.TestCase):
   def testTensorDecayLearningRate(self):
     for dtype in [tf.half, tf.float32, tf.float64]:
       with self.cached_session():
-        var0 = tf.Variable([1.1, 2.1], dtype=dtype)
-        var1 = tf.Variable([3.0, 4.0], dtype=dtype)
+        var0 = tf.compat.v1.Variable([1.1, 2.1], dtype=dtype)
+        var1 = tf.compat.v1.Variable([3.0, 4.0], dtype=dtype)
         grads0 = tf.constant([0.1, 0.1], dtype=dtype)
         grads1 = tf.constant([0.01, 0.01], dtype=dtype)
-        lrate = tf.Variable(3.0)
+        lrate = tf.compat.v1.Variable(3.0)
         lrate_decay_op = lrate.assign_add(-3.)
         decay_rate = 0.5
         batch_size = 2
@@ -188,7 +188,7 @@ class VariationalSGDTest(tf.test.TestCase):
       with self.cached_session():
         opt = tfp.optimizer.VariationalSGD(1, 1, max_learning_rate=1.0)
         values = [1.0, 3.0]
-        vars_ = [tf.Variable([v], dtype=dtype) for v in values]
+        vars_ = [tf.compat.v1.Variable([v], dtype=dtype) for v in values]
         grads_and_vars = opt.compute_gradients(vars_[0] + vars_[1], vars_)
         tf.compat.v1.global_variables_initializer().run()
         for grad, _ in grads_and_vars:
@@ -197,9 +197,9 @@ class VariationalSGDTest(tf.test.TestCase):
   def testWithGlobalStep(self):
     for dtype in [tf.half, tf.float32, tf.float64]:
       with self.cached_session():
-        global_step = tf.Variable(0, trainable=False)
-        var0 = tf.Variable([1.1, 2.1], dtype=dtype)
-        var1 = tf.Variable([3.0, 4.0], dtype=dtype)
+        global_step = tf.compat.v1.Variable(0, trainable=False)
+        var0 = tf.compat.v1.Variable([1.1, 2.1], dtype=dtype)
+        var1 = tf.compat.v1.Variable([3.0, 4.0], dtype=dtype)
         grads0 = tf.constant([0.1, 0.1], dtype=dtype)
         grads1 = tf.constant([0.01, 0.01], dtype=dtype)
         decay_rate = 0.1
@@ -232,8 +232,8 @@ class VariationalSGDTest(tf.test.TestCase):
   def testSparseBasic(self):
     for dtype in [tf.half, tf.float32, tf.float64]:
       with self.cached_session():
-        var0 = tf.Variable([[1.1], [2.1]], dtype=dtype)
-        var1 = tf.Variable([[3.0], [4.0]], dtype=dtype)
+        var0 = tf.compat.v1.Variable([[1.1], [2.1]], dtype=dtype)
+        var1 = tf.compat.v1.Variable([[3.0], [4.0]], dtype=dtype)
         grads0 = tf.IndexedSlices(
             tf.constant([0.1], shape=[1, 1], dtype=dtype),
             tf.constant([0]), tf.constant([2, 1]))

@@ -195,7 +195,7 @@ def main(argv):
 
   # Perform KL annealing. The optimal number of annealing steps
   # depends on the dataset and architecture.
-  t = tf.Variable(0.0)
+  t = tf.compat.v2.Variable(0.0)
   kl_regularizer = t / (FLAGS.kl_annealing * len(x_train) / FLAGS.batch_size)
 
   # Compute the -ELBO as the loss. The kl term is annealed from 0 to 1 over

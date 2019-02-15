@@ -33,8 +33,8 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
   def testBasic(self):
     for dtype in [tf.half, tf.float32, tf.float64]:
       with self.cached_session():
-        var0 = tf.Variable([1.1, 2.1], dtype=dtype)
-        var1 = tf.Variable([3., 4.], dtype=dtype)
+        var0 = tf.compat.v1.Variable([1.1, 2.1], dtype=dtype)
+        var1 = tf.compat.v1.Variable([3., 4.], dtype=dtype)
         grads0 = tf.constant([0.1, 0.1], dtype=dtype)
         grads1 = tf.constant([0.01, 0.01], dtype=dtype)
         decay_rate = 0.53
@@ -67,12 +67,12 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
   def testBasicMultiInstance(self):
     for dtype in [tf.half, tf.float32, tf.float64]:
       with self.cached_session():
-        var0 = tf.Variable([1.1, 2.1], dtype=dtype)
-        var1 = tf.Variable([3., 4.], dtype=dtype)
+        var0 = tf.compat.v1.Variable([1.1, 2.1], dtype=dtype)
+        var1 = tf.compat.v1.Variable([3., 4.], dtype=dtype)
         grads0 = tf.constant([0.1, 0.1], dtype=dtype)
         grads1 = tf.constant([0.01, 0.01], dtype=dtype)
-        vara = tf.Variable([1.1, 2.1], dtype=dtype)
-        varb = tf.Variable([3., 4.], dtype=dtype)
+        vara = tf.compat.v1.Variable([1.1, 2.1], dtype=dtype)
+        varb = tf.compat.v1.Variable([3., 4.], dtype=dtype)
         gradsa = tf.constant([0.1, 0.1], dtype=dtype)
         gradsb = tf.constant([0.01, 0.01], dtype=dtype)
         decay_rate = 0.5
@@ -124,8 +124,8 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
   def testTensorLearningRate(self):
     for dtype in [tf.half, tf.float32, tf.float64]:
       with self.cached_session():
-        var0 = tf.Variable([1.1, 2.1], dtype=dtype)
-        var1 = tf.Variable([3., 4.], dtype=dtype)
+        var0 = tf.compat.v1.Variable([1.1, 2.1], dtype=dtype)
+        var1 = tf.compat.v1.Variable([3., 4.], dtype=dtype)
         grads0 = tf.constant([0.1, 0.1], dtype=dtype)
         grads1 = tf.constant([0.01, 0.01], dtype=dtype)
         lrate = tf.constant(3.0)
@@ -159,7 +159,7 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
       with self.cached_session():
         opt = tfp.optimizer.StochasticGradientLangevinDynamics(3.0)
         values = [1., 3.]
-        vars_ = [tf.Variable([v], dtype=dtype) for v in values]
+        vars_ = [tf.compat.v1.Variable([v], dtype=dtype) for v in values]
         grads_and_vars = opt.compute_gradients(vars_[0] + vars_[1], vars_)
         tf.compat.v1.global_variables_initializer().run()
         for grad, _ in grads_and_vars:
@@ -168,9 +168,9 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
   def testWithGlobalStep(self):
     for dtype in [tf.half, tf.float32, tf.float64]:
       with self.cached_session():
-        global_step = tf.Variable(0, trainable=False)
-        var0 = tf.Variable([1.1, 2.1], dtype=dtype)
-        var1 = tf.Variable([3., 4.], dtype=dtype)
+        global_step = tf.compat.v1.Variable(0, trainable=False)
+        var0 = tf.compat.v1.Variable([1.1, 2.1], dtype=dtype)
+        var1 = tf.compat.v1.Variable([3., 4.], dtype=dtype)
         grads0 = tf.constant([0.1, 0.1], dtype=dtype)
         grads1 = tf.constant([0.01, 0.01], dtype=dtype)
         decay_rate = 0.1
@@ -203,8 +203,8 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
   def testSparseBasic(self):
     for dtype in [tf.half, tf.float32, tf.float64]:
       with self.cached_session():
-        var0 = tf.Variable([[1.1], [2.1]], dtype=dtype)
-        var1 = tf.Variable([[3.], [4.]], dtype=dtype)
+        var0 = tf.compat.v1.Variable([[1.1], [2.1]], dtype=dtype)
+        var1 = tf.compat.v1.Variable([[3.], [4.]], dtype=dtype)
         grads0 = tf.IndexedSlices(
             tf.constant([0.1], shape=[1, 1], dtype=dtype),
             tf.constant([0]), tf.constant([2, 1]))
@@ -314,7 +314,7 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
       loss = 0.5 * tf.linalg.matvec(loss_part, var, transpose_a=True)
 
       # Set up the learning rate with a polynomial decay
-      global_step = tf.Variable(0, trainable=False)
+      global_step = tf.compat.v1.Variable(0, trainable=False)
       starter_learning_rate = .3
       end_learning_rate = 1e-4
       decay_steps = 1e4

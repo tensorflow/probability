@@ -171,7 +171,7 @@ class HalfNormalTest(test_case.TestCase):
 
   def testFiniteGradients(self):
     for dtype in [np.float32, np.float64]:
-      scale = tf.Variable(dtype(3.0))
+      scale = tf.compat.v2.Variable(dtype(3.0))
       x = np.array([0.01, 0.1, 1., 5., 10.]).astype(dtype)
       def half_normal_function(name, x):
         def half_normal(scale):

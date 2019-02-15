@@ -92,9 +92,8 @@ def assign_moving_mean_variance(
             value=decay, dtype=base_dtype, name="decay")
         delta = value - mean_var
         with tf.control_dependencies([delta]):
-          mean_var = tf.compat.v1.assign_add(mean_var, (1. - decay) * delta)
-          variance_var = tf.compat.v1.assign_sub(
-              variance_var,
+          mean_var = mean_var.assign_add((1. - decay) * delta)
+          variance_var = variance_var.assign_sub(
               (1. - decay) * (variance_var - decay * tf.square(delta)))
         return mean_var, variance_var
 
@@ -169,7 +168,7 @@ def assign_log_moving_mean_exp(
       return log_mean_exp_var.assign_add(x)
 
 
-def moving_mean_variance(value, decay, collections=None, name=None):
+def moving_mean_variance(value, decay, name=None):
   """Compute exponentially weighted moving {mean,variance} of a streaming value.
 
   The exponentially-weighting moving `mean_var` and `variance_var` are updated
@@ -192,9 +191,6 @@ def moving_mean_variance(value, decay, collections=None, name=None):
     value: `float`-like `Tensor`. Same shape as `mean_var` and `variance_var`.
     decay: A `float`-like `Tensor`. The moving mean decay. Typically close to
       `1.`, e.g., `0.999`.
-    collections: Python list of graph-collections keys to which the internal
-      variables `mean_var` and `variance_var` are added.
-      Default value is `[GraphKeys.GLOBAL_VARIABLES]`.
     name: Optional name of the returned operation.
 
   Returns:
@@ -213,8 +209,6 @@ def moving_mean_variance(value, decay, collections=None, name=None):
        _Technical Report_, 2009.
        http://people.ds.cam.ac.uk/fanf2/hermes/doc/antiforgery/stats.pdf
   """
-  if collections is None:
-    collections = [tf.compat.v1.GraphKeys.GLOBAL_VARIABLES]
   with tf.compat.v1.variable_scope(name, "moving_mean_variance",
                                    [value, decay]):
     value = tf.convert_to_tensor(value=value, name="value")
@@ -224,19 +218,13 @@ def moving_mean_variance(value, decay, collections=None, name=None):
           "value.base_dtype({}) does not have float type `dtype`.".format(
               base_dtype.name))
     decay = tf.convert_to_tensor(value=decay, dtype=base_dtype, name="decay")
-    variance_var = tf.compat.v1.get_variable(
-        "moving_variance",
-        shape=value.shape,
-        dtype=value.dtype,
-        initializer=tf.compat.v1.initializers.zeros(),
-        trainable=False,
-        collections=collections)
-    mean_var = tf.compat.v1.get_variable(
-        "moving_mean",
-        shape=value.shape,
-        dtype=value.dtype,
-        initializer=tf.compat.v1.initializers.zeros(),
-        trainable=False,
-        collections=collections)
+    variance_var = tf.compat.v2.Variable(
+        name="moving_variance",
+        initial_value=tf.zeros(shape=value.shape, dtype=value.dtype),
+        trainable=False)
+    mean_var = tf.compat.v2.Variable(
+        name="moving_mean",
+        initial_value=tf.zeros(shape=value.shape, dtype=value.dtype),
+        trainable=False)
     return assign_moving_mean_variance(
         mean_var, variance_var, value, decay)

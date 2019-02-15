@@ -93,11 +93,10 @@ def benchmark_text_messages_hmc(
     sample_chain = tfp.mcmc.sample_chain
 
   # Initialize the step_size. (It will be automatically adapted.)
-  step_size = tf.compat.v1.get_variable(
+  step_size = tf.compat.v2.Variable(
       name='step_size',
-      initializer=tf.constant(0.05, dtype=tf.float32),
-      trainable=False,
-      use_resource=True)
+      initial_value=tf.constant(0.05, dtype=tf.float32),
+      trainable=False)
 
   def computation():
     """The benchmark computation."""

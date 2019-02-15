@@ -199,11 +199,11 @@ class LearnableMultivariateNormalDiag(tf.keras.Model):
     super(LearnableMultivariateNormalDiag, self).__init__()
     with tf.name_scope(self._name):
       self.dimensions = dimensions
-      self._mean = tf.contrib.eager.Variable(
+      self._mean = tf.compat.v2.Variable(
           tf.random.normal([dimensions], stddev=0.1), name="mean")
       # Initialize the std dev such that it will be close to 1 after a softplus
       # function.
-      self._untransformed_stddev = tf.contrib.eager.Variable(
+      self._untransformed_stddev = tf.compat.v2.Variable(
           tf.random.normal([dimensions], mean=0.55, stddev=0.1),
           name="untransformed_stddev")
 

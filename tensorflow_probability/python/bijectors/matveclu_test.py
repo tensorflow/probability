@@ -41,10 +41,9 @@ def trainable_lu_factorization(
         seed=seed)
     random_orthonormal = tf.linalg.qr(random_matrix)[0]
     lower_upper, permutation = tf.linalg.lu(random_orthonormal)
-    lower_upper = tf.Variable(
+    lower_upper = tf.compat.v2.Variable(
         initial_value=lower_upper,
         trainable=True,
-        use_resource=True,
         name='lower_upper')
     return lower_upper, permutation
 

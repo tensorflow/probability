@@ -210,8 +210,8 @@ class CauchyTest(test_case.TestCase):
 
   def testFiniteGradientAtDifficultPoints(self):
     for dtype in [np.float32, np.float64]:
-      loc = tf.Variable(dtype(0.0))
-      scale = tf.Variable(dtype(1.0))
+      loc = tf.compat.v2.Variable(dtype(0.0))
+      scale = tf.compat.v2.Variable(dtype(1.0))
       x = np.array([-100., -20., -5., 0., 5., 20., 100.]).astype(dtype)
       def cauchy_function(name, x):
         def cauchy(loc, scale):

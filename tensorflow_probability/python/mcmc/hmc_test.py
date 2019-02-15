@@ -831,19 +831,11 @@ class HMCAdaptiveStepSize(tf.test.TestCase):
     initial_state = [0., 0.]
     dtype = np.float32
 
-    # TODO(b/111765211): Switch to the following once
-    # `get_variable(use_resource=True)` has the same semantics as
-    # `tfe.Variable`.
-    #   step_size = tf.get_variable(
-    #       name='step_size',
-    #       initializer=np.array(1e-3, dtype),
-    #       use_resource=True,
-    #       trainable=False)
-    step_size = [tfe.Variable(
-        initial_value=np.array(initial_step_size, dtype),
-        name='step_size',
-        trainable=False) for initial_step_size in initial_step_sizes]
-    step_counter = tfe.Variable(
+    step_size = [
+        tf.compat.v2.Variable(initial_value=np.array(initial_step_size, dtype),
+                              name='step_size', trainable=False)
+        for initial_step_size in initial_step_sizes]
+    step_counter = tf.compat.v2.Variable(
         name='step_size_adaptation_step_counter1',
         initial_value=np.array(-1, dtype=np.int32),
         trainable=False)
@@ -884,19 +876,11 @@ class HMCAdaptiveStepSize(tf.test.TestCase):
     # Non-float32 dtype.
     dtype = np.float64
 
-    # TODO(b/111765211): Switch to the following once
-    # `get_variable(use_resource=True)` has the same semantics as
-    # `tfe.Variable`.
-    #   step_size = tf.get_variable(
-    #       name='step_size',
-    #       initializer=np.array(1e-3, dtype),
-    #       use_resource=True,
-    #       trainable=False)
-    step_size = [tfe.Variable(
-        initial_value=np.array(initial_step_size, dtype),
-        name='step_size',
-        trainable=False) for initial_step_size in initial_step_sizes]
-    step_counter = tfe.Variable(
+    step_size = [
+        tf.compat.v2.Variable(initial_value=np.array(initial_step_size, dtype),
+                              name='step_size', trainable=False)
+        for initial_step_size in initial_step_sizes]
+    step_counter = tf.compat.v2.Variable(
         name='step_size_adaptation_step_counter1',
         initial_value=np.array(-1, dtype=np.int32),
         trainable=False)
@@ -942,19 +926,11 @@ class HMCAdaptiveStepSize(tf.test.TestCase):
     initial_step_size = 1e-5
     dtype = np.float32
 
-    # TODO(b/111765211): Switch to the following once
-    # `get_variable(use_resource=True)` has the same semantics as
-    # `tfe.Variable`.
-    #   step_size = tf.get_variable(
-    #       name='step_size',
-    #       initializer=np.array(1e-3, dtype),
-    #       use_resource=True,
-    #       trainable=False)
-    step_size = tfe.Variable(
+    step_size = tf.compat.v2.Variable(
         initial_value=np.array(initial_step_size, dtype),
         name='step_size',
         trainable=False)
-    step_counter = tfe.Variable(
+    step_counter = tf.compat.v2.Variable(
         name='step_size_adaptation_step_counter2',
         initial_value=np.array(-1, dtype=np.int32),
         trainable=False)
@@ -1139,15 +1115,7 @@ class HMCEMAdaptiveStepSize(tf.test.TestCase):
     def unnormalized_log_prob(x):
       return -x - x**2
 
-    # TODO(b/111765211): Switch to the following once
-    # `get_variable(use_resource=True)` has the same semantics as
-    # `tfe.Variable`.
-    #   step_size = tf.get_variable(
-    #       name='step_size',
-    #       initializer=np.array(0.05, dtype),
-    #       use_resource=True,
-    #       trainable=False)
-    step_size = tfe.Variable(
+    step_size = tf.compat.v2.Variable(
         initial_value=np.array(0.05, dtype),
         name='step_size',
         trainable=False)

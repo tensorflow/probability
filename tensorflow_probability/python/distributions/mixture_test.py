@@ -852,11 +852,11 @@ class MixtureBenchmark(tf.test.Benchmark):
     def create_distribution(batch_size, num_components, num_features):
       cat = tfd.Categorical(logits=np.random.randn(batch_size, num_components))
       mus = [
-          tf.Variable(np.random.randn(batch_size, num_features))
+          tf.compat.v2.Variable(np.random.randn(batch_size, num_features))
           for _ in range(num_components)
       ]
       sigmas = [
-          tf.Variable(np.random.rand(batch_size, num_features))
+          tf.compat.v2.Variable(np.random.rand(batch_size, num_features))
           for _ in range(num_components)
       ]
       components = list(
@@ -892,11 +892,11 @@ class MixtureBenchmark(tf.test.Benchmark):
     def create_distribution(batch_size, num_components, num_features):
       cat = tfd.Categorical(logits=np.random.randn(batch_size, num_components))
       mus = [
-          tf.Variable(np.random.randn(batch_size, num_features))
+          tf.compat.v2.Variable(np.random.randn(batch_size, num_features))
           for _ in range(num_components)
       ]
       sigmas = [
-          tf.Variable(
+          tf.compat.v2.Variable(
               psd(np.random.rand(batch_size, num_features, num_features)))
           for _ in range(num_components)
       ]

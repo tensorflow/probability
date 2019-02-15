@@ -82,7 +82,7 @@ class _LinearRegressionTest(object):
     model = Sum(components=[linear_regression],
                 observation_noise_scale_prior=observation_noise_scale_prior)
 
-    learnable_weights = tf.Variable(
+    learnable_weights = tf.compat.v2.Variable(
         tf.zeros([num_features], dtype=true_weights.dtype))
     learnable_ssm = model.make_state_space_model(
         num_timesteps=num_timesteps,

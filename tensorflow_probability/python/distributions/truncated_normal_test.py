@@ -29,6 +29,7 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow.python.ops import gradient_checker_v2  # pylint: disable=g-direct-tensorflow-import
 
 
 def try_import(name):  # pylint: disable=invalid-name
@@ -244,53 +245,24 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase,
 
   @parameterized.parameters((np.float32), (np.float64))
   def testReparametrizable(self, dtype=np.float32):
-    # This test checks that the gradients are correct.
-    # The gradient checker only works in graph mode and with static shapes.
-    if tf.executing_eagerly():
-      return
-
-    loc = tf.Variable(dtype(0.1))
-    scale = tf.Variable(dtype(1.1))
-    low = tf.Variable(dtype(-10.0))
-    high = tf.Variable(dtype(5.0))
-    dist = tfd.TruncatedNormal(loc=loc, scale=scale,
-                               low=low,
-                               high=high)
-
-    n = int(2e5)
+    loc = tf.compat.v2.Variable(dtype(0.1))
+    scale = tf.compat.v2.Variable(dtype(1.1))
+    low = tf.compat.v2.Variable(dtype(-10.0))
+    high = tf.compat.v2.Variable(dtype(5.0))
     self.evaluate(tf.compat.v1.global_variables_initializer())
-    empirical_abs_mean = tf.reduce_mean(
-        input_tensor=tf.abs(dist.sample(n, seed=6)))
 
-    loc_err = tf.compat.v1.test.compute_gradient_error(
-        loc,
-        loc.shape,
-        empirical_abs_mean, [1],
-        x_init_value=self.evaluate(loc),
-        delta=0.1)
-    scale_err = tf.compat.v1.test.compute_gradient_error(
-        scale,
-        scale.shape,
-        empirical_abs_mean, [1],
-        x_init_value=self.evaluate(scale),
-        delta=0.1)
-    low_err = tf.compat.v1.test.compute_gradient_error(
-        low,
-        low.shape,
-        empirical_abs_mean, [1],
-        x_init_value=self.evaluate(low),
-        delta=0.1)
-    high_err = tf.compat.v1.test.compute_gradient_error(
-        high,
-        high.shape,
-        empirical_abs_mean, [1],
-        x_init_value=self.evaluate(high),
-        delta=0.1)
+    def f(loc, scale, low, high):
+      dist = tfd.TruncatedNormal(loc=loc, scale=scale, low=low, high=high)
+
+      n = int(2e5)
+      return tf.reduce_mean(input_tensor=tf.abs(dist.sample(n, seed=6)))
+
+    err = gradient_checker_v2.max_error(
+        *gradient_checker_v2.compute_gradient(
+            f, [loc, scale, low, high], delta=0.1))
+
     # These gradients are noisy due to sampling.
-    self.assertLess(loc_err, 0.05)
-    self.assertLess(scale_err, 0.05)
-    self.assertLess(low_err, 0.05)
-    self.assertLess(high_err, 0.05)
+    self.assertLess(err, 0.05)
 
   def testReparametrizableBatch(self):
     def samples_sum(loc):
@@ -309,55 +281,49 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase,
                          "survival_function", "log_survival_function"))
   )
   def testGradientsFx(self, dtype, fn_name):
-    # This test checks that the gradients are correct.
-    # The gradient checker only works in graph mode and with static shapes.
-    if tf.executing_eagerly():
-      return
-    loc = tf.Variable(dtype(0.1))
-    scale = tf.Variable(dtype(3.0))
-    low = tf.Variable(dtype(-10.0))
-    high = tf.Variable(dtype(5.0))
-    dist = tfd.TruncatedNormal(loc=loc, scale=scale,
-                               low=low,
-                               high=high)
+    loc = tf.compat.v2.Variable(dtype(0.1))
+    scale = tf.compat.v2.Variable(dtype(3.0))
+    low = tf.compat.v2.Variable(dtype(-10.0))
+    high = tf.compat.v2.Variable(dtype(5.0))
+
     x = np.array([-1.0, 0.01, 0.1, 1., 4.9]).astype(dtype)
     self.evaluate(tf.compat.v1.global_variables_initializer())
-    func = getattr(dist, fn_name)
-    mean_value = tf.reduce_mean(input_tensor=func(x))
-    loc_err = tf.compat.v1.test.compute_gradient_error(
-        loc, loc.shape, mean_value, [1], x_init_value=self.evaluate(loc))
-    scale_err = tf.compat.v1.test.compute_gradient_error(
-        scale, scale.shape, mean_value, [1], x_init_value=self.evaluate(scale))
-    self.assertLess(loc_err, 1e-2)
-    self.assertLess(scale_err, 1e-2)
+
+    def f(loc, scale):
+      dist = tfd.TruncatedNormal(loc=loc, scale=scale, low=low, high=high)
+      func = getattr(dist, fn_name)
+      return tf.reduce_mean(input_tensor=func(x))
+
+    err = gradient_checker_v2.max_error(
+        *gradient_checker_v2.compute_gradient(f, [loc, scale]))
+    self.assertLess(err, 1e-2)
 
   @parameterized.parameters(
       itertools.product((np.float32, np.float64),
                         ("entropy", "mean", "variance", "mode"))
   )
   def testGradientsNx(self, dtype, fn_name):
-    # This test checks that the gradients are correct.
-    # The gradient checker only works in graph mode and with static shapes.
-    if tf.executing_eagerly():
-      return
-    loc = tf.Variable(dtype(0.1))
-    scale = tf.Variable(dtype(3.0))
-    low = tf.Variable(dtype(-10.0))
-    high = tf.Variable(dtype(5.0))
-    dist = tfd.TruncatedNormal(loc=loc, scale=scale,
-                               low=low,
-                               high=high)
+    loc = tf.compat.v2.Variable(dtype(0.1))
+    scale = tf.compat.v2.Variable(dtype(3.0))
+    low = tf.compat.v2.Variable(dtype(-10.0))
+    high = tf.compat.v2.Variable(dtype(5.0))
+
     self.evaluate(tf.compat.v1.global_variables_initializer())
-    func = getattr(dist, fn_name)
-    v = func()
-    loc_err = tf.compat.v1.test.compute_gradient_error(
-        loc, loc.shape, v, [1], x_init_value=self.evaluate(loc))
-    self.assertLess(loc_err, 0.005)
+
+    def f(loc, scale):
+      dist = tfd.TruncatedNormal(loc=loc, scale=scale, low=low, high=high)
+      func = getattr(dist, fn_name)
+      return func()
 
     if fn_name not in ["mode"]:
-      scale_err = tf.compat.v1.test.compute_gradient_error(
-          scale, scale.shape, v, [1], x_init_value=self.evaluate(scale))
-      self.assertLess(scale_err, 0.01)
+      err = gradient_checker_v2.max_error(
+          *gradient_checker_v2.compute_gradient(f, [loc, scale]))
+      self.assertLess(err, 0.005)
+    else:
+      err = gradient_checker_v2.max_error(
+          *gradient_checker_v2.compute_gradient(
+              lambda x: f(x, scale), [loc]))
+      self.assertLess(err, 0.005)
 
 
 @test_util.run_all_in_graph_and_eager_modes

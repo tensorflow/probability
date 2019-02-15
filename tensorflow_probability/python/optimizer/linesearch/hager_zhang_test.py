@@ -170,7 +170,7 @@ class HagerZhangTest(tf.test.TestCase):
   def _test_eval_count_graph(self):
     starts = [0.1, 4.0]
     def get_fn():
-      eval_count = tf.Variable(0)
+      eval_count = tf.compat.v2.Variable(0)
       def _fdf(x):
         # Enabling locking is critical here. Otherwise, there are race
         # conditions between various call sites which causes some of the

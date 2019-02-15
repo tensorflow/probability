@@ -35,8 +35,8 @@ class MovingReduceMeanVarianceTest(tf.test.TestCase):
     true_mean = np.array([[0., 3.]])
     true_stddev = np.array([[1.1, 0.5]])
     # Start "x" out with this mean.
-    mean_var = tf.Variable(tf.zeros_like(true_mean))
-    variance_var = tf.Variable(tf.ones_like(true_stddev))
+    mean_var = tf.compat.v1.Variable(tf.zeros_like(true_mean))
+    variance_var = tf.compat.v1.Variable(tf.ones_like(true_stddev))
     x = tf.random.normal(shape, dtype=np.float64, seed=0)
     x = true_stddev * x + true_mean
     ema, emv = moving_stats.assign_moving_mean_variance(
@@ -111,7 +111,7 @@ class MovingLogExponentialMovingMeanExpTest(tf.test.TestCase):
     # Start "x" out with this mean.
     x = tf.random.normal(shape, dtype=np.float64, seed=0)
     x = true_stddev * x + true_mean
-    log_mean_exp_var = tf.Variable(tf.zeros_like(true_mean))
+    log_mean_exp_var = tf.compat.v2.Variable(tf.zeros_like(true_mean))
     self.evaluate(tf.compat.v1.global_variables_initializer())
     log_mean_exp = moving_stats.assign_log_moving_mean_exp(
         log_mean_exp_var, x, decay=decay)
