@@ -749,7 +749,6 @@ py_test(
     size = "small",
     timeout = "moderate",
     srcs = ["masked_autoregressive_test.py"],
-    tags = ["tf2-broken"],
     deps = [
         ":bijectors",
         ":masked_autoregressive",
