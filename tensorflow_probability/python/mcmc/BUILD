@@ -307,7 +307,6 @@ py_test(
     size = "medium",
     srcs = ["transformed_kernel_test.py"],
     shard_count = 4,
-    tags = ["tf2-broken"],
     deps = [
         # numpy dep,
         # tensorflow dep,
