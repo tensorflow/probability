@@ -106,8 +106,8 @@ class PoissonTest(test_case.TestCase):
     # value.
     x = [0., 2., 3., 4., 5., 6.]
 
-    dlog_pmf_dlam = self.compute_gradients(
-        lambda lam: self._make_poisson(rate=lam).log_prob(x), [lam])[0]
+    _, dlog_pmf_dlam = self.evaluate(tfp.math.value_and_gradient(
+        lambda lam: self._make_poisson(rate=lam).log_prob(x), lam))
 
     # A finite difference approximation of the derivative.
     eps = 1e-6
@@ -126,7 +126,8 @@ class PoissonTest(test_case.TestCase):
     def poisson_log_prob(lam):
       return self._make_poisson(
           rate=lam, interpolate_nondiscrete=False).log_prob(x)
-    dlog_pmf_dlam = self.compute_gradients(poisson_log_prob, [lam])[0]
+    _, dlog_pmf_dlam = self.evaluate(tfp.math.value_and_gradient(
+        poisson_log_prob, lam))
 
     self.assertEqual(dlog_pmf_dlam.shape, (batch_size,))
     print(dlog_pmf_dlam)
@@ -194,7 +195,7 @@ class PoissonTest(test_case.TestCase):
 
     def cdf(lam):
       return self._make_poisson(rate=lam, interpolate_nondiscrete=False).cdf(x)
-    dcdf_dlam = self.compute_gradients(cdf, [lam])[0]
+    _, dcdf_dlam = self.evaluate(tfp.math.value_and_gradient(cdf, lam))
 
     # A finite difference approximation of the derivative.
     eps = 1e-6

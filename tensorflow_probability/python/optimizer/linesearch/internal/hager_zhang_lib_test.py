@@ -21,6 +21,8 @@ from __future__ import print_function
 import collections
 import numpy as np
 import tensorflow as tf
+
+from tensorflow_probability.python.math.gradient import value_and_gradient
 from tensorflow_probability.python.optimizer.linesearch.internal import hager_zhang_lib as hzl
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
@@ -51,10 +53,9 @@ def test_function_x_y(x, y):
     t = tf.convert_to_tensor(value=t)
     while len(t.shape) < 3:
       t = tf.expand_dims(t, axis=-1)
-    with tf.GradientTape() as g:
-      g.watch(t)
-      p = tf.contrib.image.interpolate_spline(x, y, t, 2)
-    return ValueAndGradient(f=tf.squeeze(p), df=tf.squeeze(g.gradient(p, t)))
+    p, g = value_and_gradient(
+        lambda t_: tf.contrib.image.interpolate_spline(x, y, t_, 2), t)
+    return ValueAndGradient(f=tf.squeeze(p), df=tf.squeeze(g))
 
   return f
 

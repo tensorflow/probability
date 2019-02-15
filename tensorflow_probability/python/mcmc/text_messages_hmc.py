@@ -88,7 +88,7 @@ def benchmark_text_messages_hmc(
     return text_messages_joint_log_prob(count_data, lambda1, lambda2, tau)
 
   if tf.executing_eagerly():
-    sample_chain = tf.contrib.eager.defun(tfp.mcmc.sample_chain)
+    sample_chain = tf.function(tfp.mcmc.sample_chain)
   else:
     sample_chain = tfp.mcmc.sample_chain
 

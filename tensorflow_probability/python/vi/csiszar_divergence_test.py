@@ -25,8 +25,11 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.math.gradient import value_and_gradient
+
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
 tfd = tfp.distributions
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 def tridiag(d, diag_value, offdiag_value):
@@ -602,9 +605,6 @@ class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
     num_draws = int(2e5)
     seed = 23
 
-    p = tfd.MultivariateNormalFullCovariance(
-        covariance_matrix=tridiag(d, diag_value=1, offdiag_value=0.5))
-
     # Variance is very high when approximating Forward KL, so we make
     # scale_diag larger than in test_kl_reverse_multidim. This ensures q
     # "covers" p and thus Var_q[p/q] is smaller.
@@ -612,9 +612,10 @@ class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
 
     def construct_monte_carlo_csiszar_f_divergence(
         func, use_reparametrization=True):
-      def compute_csiszar_f_divergence(s):
-        q = tfd.MultivariateNormalDiag(
-            scale_diag=tf.tile([s], [d]))
+      def _fn(s):
+        p = tfd.MultivariateNormalFullCovariance(
+            covariance_matrix=tridiag(d, diag_value=1, offdiag_value=0.5))
+        q = tfd.MultivariateNormalDiag(scale_diag=tf.tile([s], [d]))
         return tfp.vi.monte_carlo_csiszar_f_divergence(
             f=func,
             p_log_prob=p.log_prob,
@@ -622,7 +623,7 @@ class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
             num_draws=num_draws,
             use_reparametrization=use_reparametrization,
             seed=seed)
-      return compute_csiszar_f_divergence
+      return _fn
 
     approx_kl = construct_monte_carlo_csiszar_f_divergence(
         tfp.vi.kl_reverse)
@@ -639,32 +640,28 @@ class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
             use_reparametrization=False))
 
     def exact_kl(s):
-      q = tfd.MultivariateNormalDiag(
-          scale_diag=tf.tile([s], [d]))
+      p = tfd.MultivariateNormalFullCovariance(
+          covariance_matrix=tridiag(d, diag_value=1, offdiag_value=0.5))
+      q = tfd.MultivariateNormalDiag(scale_diag=tf.tile([s], [d]))
       return tfd.kl_divergence(q, p)
 
     [
         approx_kl_,
+        approx_kl_grad_,
         approx_kl_self_normalized_,
+        approx_kl_self_normalized_grad_,
         approx_kl_score_trick_,
+        approx_kl_score_trick_grad_,
         approx_kl_self_normalized_score_trick_,
+        approx_kl_self_normalized_score_trick_grad_,
         exact_kl_,
-    ] = self.evaluate([
-        approx_kl(s),
-        approx_kl_self_normalized(s),
-        approx_kl_score_trick(s),
-        approx_kl_self_normalized_score_trick(s),
-        exact_kl(s),
-    ])
-
-    approx_kl_grad_ = self.compute_gradients(approx_kl, [s])
-    approx_kl_self_normalized_grad_ = self.compute_gradients(
-        approx_kl_self_normalized, [s])
-    approx_kl_score_trick_grad_ = self.compute_gradients(
-        approx_kl_score_trick, [s])
-    approx_kl_self_normalized_score_trick_grad_ = self.compute_gradients(
-        approx_kl_self_normalized_score_trick, [s])
-    exact_kl_grad_ = self.compute_gradients(exact_kl, [s])
+        exact_kl_grad_,
+    ] = self.evaluate(
+        list(value_and_gradient(approx_kl, s)) +
+        list(value_and_gradient(approx_kl_self_normalized, s)) +
+        list(value_and_gradient(approx_kl_score_trick, s)) +
+        list(value_and_gradient(approx_kl_self_normalized_score_trick, s)) +
+        list(value_and_gradient(exact_kl, s)))
 
     # Test average divergence.
     self.assertAllClose(approx_kl_, exact_kl_,
@@ -782,11 +779,11 @@ class CsiszarVIMCOTest(test_case.TestCase):
 
     def log_avg_u(logu):
       return tfp.vi.csiszar_vimco_helper(logu)[0]
-    grad_log_avg_u = self.compute_gradients(log_avg_u, args=[logu])[0]
+    _, grad_log_avg_u = self.evaluate(value_and_gradient(log_avg_u, logu))
 
     def log_sooavg_u(logu):
       return tfp.vi.csiszar_vimco_helper(logu)[1]
-    grad_log_sooavg_u = self.compute_gradients(log_sooavg_u, args=[logu])[0]
+    _, grad_log_sooavg_u = self.evaluate(value_and_gradient(log_sooavg_u, logu))
 
     # We skip checking against finite-difference approximation since it
     # doesn't support batches.
@@ -813,11 +810,11 @@ class CsiszarVIMCOTest(test_case.TestCase):
 
     def log_avg_u(logu):
       return tfp.vi.csiszar_vimco_helper(logu)[0]
-    grad_log_avg_u = self.compute_gradients(log_avg_u, args=[logu])[0]
+    _, grad_log_avg_u = self.evaluate(value_and_gradient(log_avg_u, logu))
 
     def log_sooavg_u(logu):
       return tfp.vi.csiszar_vimco_helper(logu)[1]
-    grad_log_sooavg_u = self.compute_gradients(log_sooavg_u, args=[logu])[0]
+    _, grad_log_sooavg_u = self.evaluate(value_and_gradient(log_sooavg_u, logu))
 
     self.assertAllClose(np_grad_log_avg_u, grad_log_avg_u,
                         rtol=delta, atol=0.)
@@ -845,11 +842,11 @@ class CsiszarVIMCOTest(test_case.TestCase):
 
     def log_avg_u(logu):
       return tfp.vi.csiszar_vimco_helper(logu)[0]
-    grad_log_avg_u = self.compute_gradients(log_avg_u, args=[logu])[0]
+    _, grad_log_avg_u = self.evaluate(value_and_gradient(log_avg_u, logu))
 
     def log_sooavg_u(logu):
       return tfp.vi.csiszar_vimco_helper(logu)[1]
-    grad_log_sooavg_u = self.compute_gradients(log_sooavg_u, args=[logu])[0]
+    _, grad_log_sooavg_u = self.evaluate(value_and_gradient(log_sooavg_u, logu))
 
     self.assertAllClose(np_grad_log_avg_u, grad_log_avg_u,
                         rtol=delta, atol=0.)

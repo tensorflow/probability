@@ -271,8 +271,7 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase,
       return tf.reduce_sum(input_tensor=dist.sample(100))
 
     loc = tf.constant([0., 1.])
-    dy_loc = self.compute_gradients(
-        samples_sum, args=[loc])[0]
+    _, dy_loc = self.evaluate(tfp.math.value_and_gradient(samples_sum, loc))
     self.assertAllGreaterEqual(dy_loc, 0.)
 
   @parameterized.parameters(

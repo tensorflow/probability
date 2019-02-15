@@ -184,9 +184,8 @@ class HalfNormalTest(test_case.TestCase):
           "log_prob", "prob", "log_survival_function",
       ]:
         print(func_name)
-        value = self.evaluate(half_normal_function(func_name, x)(scale))
-        grads = self.compute_gradients(
-            half_normal_function(func_name, x), args=[scale])
+        value, grads = self.evaluate(tfp.math.value_and_gradient(
+            half_normal_function(func_name, x), scale))
         self.assertAllFinite(value)
         self.assertAllFinite(grads)
 

@@ -191,8 +191,8 @@ class _MixtureSameFamilyTest(tfp_test_util.VectorDistributionTestHelpers):
       elif function == "mean":
         return mixture.mean() + 0 * mixture.variance()
 
-    actual = self.compute_gradients(sample_estimate, parameters)
-    expected = self.compute_gradients(exact, parameters)
+    _, actual = tfp.math.value_and_gradient(sample_estimate, parameters)
+    _, expected = tfp.math.value_and_gradient(exact, parameters)
     self.assertAllClose(actual, expected, atol=0.1, rtol=0.2)
 
   def testReparameterizationGradientsNormalScalarComponents(self):

@@ -53,5 +53,6 @@ py_test(
         ":util",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/math:gradient",
     ],
 )

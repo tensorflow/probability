@@ -309,7 +309,7 @@ def potential_scale_reduction(chains_states,
   if not chains_states_was_list:
     chains_states = [chains_states]
 
-  # tf.contrib.util.constant_value returns None iff a constant value (as a numpy
+  # tf.get_static_value returns None iff a constant value (as a numpy
   # array) is not efficiently computable.  Therefore, we try constant_value then
   # check for None.
   icn_const_ = tf.get_static_value(

@@ -29,30 +29,16 @@ import tensorflow_probability as tfp
 from tensorflow_probability.python.mcmc.hmc import _compute_log_acceptance_correction
 from tensorflow_probability.python.mcmc.hmc import _leapfrog_integrator_one_step
 from tensorflow_probability.python.mcmc.util import maybe_call_fn_and_grads
-from tensorflow.python.eager import context  # pylint: disable=g-direct-tensorflow-import
+
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
 tfb = tfp.bijectors
 tfd = tfp.distributions
-tfe = tf.contrib.eager
-
-
-# Arguments kept to match counterpart,
-# `@tfe.run_test_in_graph_and_eager_modes`.
-def run_in_graph_mode_only(__unused__=None, config=None, use_gpu=True):  # pylint: disable=invalid-name,unused-argument
-  """Execute the decorated test in graph mode only."""
-  assert not __unused__, 'Add () after run_in_graph_mode_only.'
-  def decorator(f):
-    def decorated(self, **kwargs):
-      with context.graph_mode():
-        with self.cached_session(use_gpu=use_gpu):
-          f(self, **kwargs)
-    return decorated
-  return decorator
 
 
 def _set_seed(seed):
-  """Helper which uses graph seed if using TFE."""
-  # TODO(b/68017812): Deprecate once TFE supports seed.
+  """Helper which uses graph seed if using eager."""
+  # TODO(b/68017812): Deprecate once eager correctly supports seed.
   if tf.executing_eagerly():
     tf.compat.v1.set_random_seed(seed)
     return None
@@ -237,7 +223,7 @@ class HMCTest(tf.test.TestCase):
       # should be. I.e., `expected_calls = (150 + 150) * 2 + 1`.
       expected_calls = 1202
     else:
-      expected_calls = 2
+      expected_calls = 4
     self.assertAllEqual(dict(target_calls=expected_calls), counter)
 
     expected_x = (tf.math.digamma(self._shape_param) - np.log(self._rate_param))
@@ -611,7 +597,7 @@ class HMCTest(tf.test.TestCase):
       # should be. I.e., `expected_calls = (num_results + 200) * 2 * 2 + 1`.
       expected_calls = 6802
     else:
-      expected_calls = 2
+      expected_calls = 4
     self.assertAllEqual(dict(target_calls=expected_calls), counter)
 
     states = tf.stack(states, axis=-1)
@@ -914,7 +900,6 @@ class HMCAdaptiveStepSize(tf.test.TestCase):
     self.assertNear(step_size_[0][0]/step_size_[1][0],
                     step_size_[0][-1]/step_size_[1][-1], err=1e-4)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_finite_adaptation(self):
 
     # Test that the adaptation runs for the specified number of steps.
@@ -969,6 +954,7 @@ class HMCAdaptiveStepSize(tf.test.TestCase):
                      step_size_[num_adaptation_steps:].max())
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class HMCEMAdaptiveStepSize(tf.test.TestCase):
   """This test verifies that the docstring example works as advertised."""
 
@@ -1106,7 +1092,7 @@ class HMCEMAdaptiveStepSize(tf.test.TestCase):
     self.assertGreater(loss_[:10].mean(), loss_[-10:].mean())
     self.assertNear(0.24,  # Actually smaller than weights_prior_true_scale,
                     weights_prior_estimated_scale_[-5:].mean(),
-                    err=0.005)
+                    err=0.006)
 
   @test_util.run_in_graph_and_eager_modes
   def test_step_size_adapts(self):

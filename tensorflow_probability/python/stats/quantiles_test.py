@@ -323,19 +323,24 @@ class PercentileTestWithLinearInterpolation(
     # 49.123... will not
     q = tf.constant(np.array([50, 49.123456789]))  # Percentiles, in [0, 100]
 
-    with tf.GradientTape(persistent=True) as tape:
-      tape.watch(q)
-      analytic_pct = dist.quantile(q / 100.)  # divide by 10 to make quantile.
-      sample_pct = tfp.stats.percentile(
-          x, q, interpolation='linear', preserve_gradients=False)
+    analytic_pct, grad_analytic_pct = tfp.math.value_and_gradient(
+        lambda q_: dist.quantile(q_ / 100.), q)
+    sample_pct, grad_sample_pct = tfp.math.value_and_gradient(
+        lambda q_: tfp.stats.percentile(  # pylint: disable=g-long-lambda
+            x, q_, interpolation='linear', preserve_gradients=False),
+        q)
 
-    analytic_pct, d_analytic_pct_dq, sample_pct, d_sample_pct_dq = (
-        self.evaluate([
-            analytic_pct,
-            tape.gradient(analytic_pct, q),
-            sample_pct,
-            tape.gradient(sample_pct, q),
-        ]))
+    [
+        analytic_pct,
+        d_analytic_pct_dq,
+        sample_pct,
+        d_sample_pct_dq,
+    ] = self.evaluate([
+        analytic_pct,
+        grad_analytic_pct,
+        sample_pct,
+        grad_sample_pct,
+    ])
 
     self.assertAllClose(analytic_pct, sample_pct, atol=0.05)
 
@@ -363,19 +368,23 @@ class PercentileTestWithLinearInterpolation(
     # 50th quantile will lie exactly on a data point.
     # 49.123... will not
     q = tf.constant(np.array([50, 49.123456789]))  # Percentiles, in [0, 100]
-    with tf.GradientTape(persistent=True) as tape:
-      tape.watch(q)
-      analytic_pct = dist.quantile(q / 100.)  # divide by 10 to make quantile.
-      sample_pct = tfp.stats.percentile(
-          x, q, interpolation='linear', preserve_gradients=True)
-
-    analytic_pct, d_analytic_pct_dq, sample_pct, d_sample_pct_dq = (
-        self.evaluate([
-            analytic_pct,
-            tape.gradient(analytic_pct, q),
-            sample_pct,
-            tape.gradient(sample_pct, q),
-        ]))
+    analytic_pct, grad_analytic_pct = tfp.math.value_and_gradient(
+        lambda q_: dist.quantile(q_ / 100.), q)
+    sample_pct, grad_sample_pct = tfp.math.value_and_gradient(
+        lambda q_: tfp.stats.percentile(  # pylint: disable=g-long-lambda
+            x, q_, interpolation='linear', preserve_gradients=True),
+        q)
+    [
+        analytic_pct,
+        d_analytic_pct_dq,
+        sample_pct,
+        d_sample_pct_dq,
+    ] = self.evaluate([
+        analytic_pct,
+        grad_analytic_pct,
+        sample_pct,
+        grad_sample_pct,
+    ])
 
     self.assertAllClose(analytic_pct, sample_pct, atol=0.05)
 

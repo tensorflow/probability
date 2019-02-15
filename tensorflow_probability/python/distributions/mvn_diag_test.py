@@ -51,7 +51,7 @@ class MultivariateNormalDiagTest(test_case.TestCase):
 
   def testDistWithBatchShapeOneThenTransformedThroughSoftplus(self):
     # This complex combination of events resulted in a loss of static shape
-    # information when tf.contrib.util.constant_value(self._needs_rotation) was
+    # information when tf.get_static_value(self._needs_rotation) was
     # being used incorrectly (resulting in always rotating).
     # Batch shape = [1], event shape = [3]
     mu = tf.zeros((1, 3))
@@ -212,12 +212,11 @@ class MultivariateNormalDiagTest(test_case.TestCase):
       # handle negative indexes.)
       return -tf.reduce_sum(input_tensor=tf.math.log(mvn.prob(x_pl)))
 
-    grad_neg_log_likelihood = self.compute_gradients(
-        neg_log_likelihood, args=[mu_var])
+    _, grad_neg_log_likelihood = tfp.math.value_and_gradient(
+        neg_log_likelihood, mu_var)
 
-    self.assertEqual(1, len(grad_neg_log_likelihood))
     self.assertAllClose(
-        grad_neg_log_likelihood[0],
+        self.evaluate(grad_neg_log_likelihood),
         np.tile(num_draws, dims),
         rtol=1e-6,
         atol=0.)
@@ -255,7 +254,8 @@ class MultivariateNormalDiagTest(test_case.TestCase):
       mvn = tfd.MultivariateNormalDiag(
           loc=loc, scale_diag=np.ones([dims], dtype=np.float32))
       return tfd.kl_divergence(mvn, mvn)
-    gradients = self.compute_gradients(self_kl_divergence, args=[loc])
+    _, gradients = self.evaluate(tfp.math.value_and_gradient(
+        self_kl_divergence, loc))
     self.assertAllEqual(
         np.ones_like(gradients, dtype=np.bool),
         np.isfinite(gradients))

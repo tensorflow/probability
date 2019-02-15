@@ -25,8 +25,9 @@ import tensorflow as tf
 
 import tensorflow_probability as tfp
 
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
 tfd = tfp.distributions
-tfe = tf.contrib.eager
 
 
 def _reduce_variance(x, axis=None, keepdims=False):
@@ -37,9 +38,9 @@ def _reduce_variance(x, axis=None, keepdims=False):
       keepdims=keepdims)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class RWMTest(tf.test.TestCase):
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testRWM1DUniform(self):
     """Sampling from the Standard Normal Distribution."""
     dtype = np.float32
@@ -66,7 +67,6 @@ class RWMTest(tf.test.TestCase):
     self.assertAllClose(sample_mean_, 0., atol=0.1, rtol=0.1)
     self.assertAllClose(sample_std_, 1., atol=0.1, rtol=0.1)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testRWM1DNormal(self):
     """Sampling from the Standard Normal Distribution with adaptation."""
     dtype = np.float32
@@ -92,7 +92,6 @@ class RWMTest(tf.test.TestCase):
     self.assertAllClose(sample_mean_, 0., atol=0.2, rtol=0.2)
     self.assertAllClose(sample_std_, 1., atol=0.1, rtol=0.1)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testRWM1DCauchy(self):
     """Sampling from the Standard Normal Distribution using Cauchy proposal."""
     dtype = np.float32
@@ -132,7 +131,6 @@ class RWMTest(tf.test.TestCase):
     self.assertAllClose(sample_mean_, 0., atol=0.2, rtol=0.2)
     self.assertAllClose(sample_std_, 1., atol=0.1, rtol=0.1)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testRWM2DNormal(self):
     """Sampling from a 2-D Multivariate Normal distribution."""
     dtype = np.float32

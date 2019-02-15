@@ -30,11 +30,7 @@ from tensorflow.python.framework import test_util  # pylint: disable=g-direct-te
 def _make_val_and_grad_fn(value_fn):
   @functools.wraps(value_fn)
   def val_and_grad(x):
-    with tf.GradientTape() as tape:
-      tape.watch(x)
-      fv = value_fn(x)
-      grad = tape.gradient(fv, x)
-      return fv, grad
+    return tfp.math.value_and_gradient(value_fn, x)
   return val_and_grad
 
 

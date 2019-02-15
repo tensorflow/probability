@@ -175,11 +175,8 @@ class ExponentialTest(tf.test.TestCase):
 
   def testFullyReparameterized(self):
     lam = tf.constant([0.1, 1.0])
-    with tf.GradientTape() as tape:
-      tape.watch(lam)
-      exponential = exponential_lib.Exponential(rate=lam)
-      samples = exponential.sample(100)
-    grad_lam = tape.gradient(samples, lam)
+    _, grad_lam = tfp.math.value_and_gradient(
+        lambda l: exponential_lib.Exponential(rate=lam).sample(100), lam)
     self.assertIsNotNone(grad_lam)
 
   def testExponentialExponentialKL(self):

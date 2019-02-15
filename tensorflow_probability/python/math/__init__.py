@@ -20,6 +20,7 @@ from __future__ import print_function
 
 from tensorflow_probability.python.math.custom_gradient import custom_gradient
 from tensorflow_probability.python.math.diag_jacobian import diag_jacobian
+from tensorflow_probability.python.math.gradient import value_and_gradient
 from tensorflow_probability.python.math.interpolation import batch_interp_regular_1d_grid
 from tensorflow_probability.python.math.interpolation import interp_regular_1d_grid
 from tensorflow_probability.python.math.linalg import lu_matrix_inverse
@@ -54,6 +55,7 @@ _allowed_symbols = [
     'random_rademacher',
     'random_rayleigh',
     'secant_root',
+    'value_and_gradient',
 ]
 
 remove_undocumented(__name__, _allowed_symbols)

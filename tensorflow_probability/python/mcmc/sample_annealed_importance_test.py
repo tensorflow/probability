@@ -104,7 +104,7 @@ class SampleAnnealedImportanceTest(tf.test.TestCase):
     # another call to the `convex_combined_log_prob_fn`. We could refactor
     # things to avoid this, if needed (eg, b/72994218).
     if not tf.executing_eagerly():
-      self.assertAllEqual(dict(target_calls=3, proposal_calls=3), counter)
+      self.assertAllEqual(dict(target_calls=5, proposal_calls=5), counter)
 
     event_shape = tf.shape(input=init)[independent_chain_ndims:]
     event_size = tf.reduce_prod(input_tensor=event_shape)

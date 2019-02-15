@@ -22,6 +22,8 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python.math.gradient import value_and_gradient as tfp_math_value_and_gradients
+
 from tensorflow.python.ops import control_flow_util
 
 __all__ = [
@@ -196,32 +198,19 @@ def _value_and_gradients(fn, fn_arg_list, result=None, grads=None, name=None):
       grads = _convert_to_tensor(grads, 'fn_grad')
       return result, grads
 
-    if tf.executing_eagerly():
-      if is_list_like(result) and len(result) == len(fn_arg_list):
-        # Compute the block diagonal of Jacobian.
-        # TODO(b/79158574): Guard this calculation by an arg which explicitly
-        # requests block diagonal Jacobian calculation.
-        def fn_slice(i):
-          """Needed to prevent `cell-var-from-loop` pylint warning."""
-          return lambda *args: fn(*args)[i]
-        grads = [
-            # TODO(b/122349743): Should this use value_and_gradients_fn?
-            tf.contrib.eager.gradients_function(fn_slice(i))(*fn_arg_list)[i]
-            for i in range(len(result))
-        ]
-      else:
-        grads = tf.contrib.eager.gradients_function(fn)(*fn_arg_list)
+    if is_list_like(result) and len(result) == len(fn_arg_list):
+      # Compute the block diagonal of Jacobian.
+      # TODO(b/79158574): Guard this calculation by an arg which explicitly
+      # requests block diagonal Jacobian calculation.
+      def fn_slice(i):
+        """Needed to prevent `cell-var-from-loop` pylint warning."""
+        return lambda x: fn(*(fn_arg_list[:i] + [x] + fn_arg_list[i+1:]))
+      grads = [
+          tfp_math_value_and_gradients(fn_slice(i), fn_arg_list[i])[1]
+          for i in range(len(result))
+      ]
     else:
-      if is_list_like(result) and len(result) == len(fn_arg_list):
-        # Compute the block diagonal of Jacobian.
-        # TODO(b/79158574): Guard this calculation by an arg which explicitly
-        # requests block diagonal Jacobian calculation.
-        grads = [
-            tf.gradients(ys=result[i], xs=fn_arg_list[i])[0]
-            for i in range(len(result))
-        ]
-      else:
-        grads = tf.gradients(ys=result, xs=fn_arg_list)
+      _, grads = tfp_math_value_and_gradients(fn, fn_arg_list)
 
     return result, grads
 
@@ -282,7 +271,7 @@ def smart_for_loop(loop_num_iter, body_fn, initial_loop_vars,
     loop_num_iter_ = tf.get_static_value(
         tf.convert_to_tensor(
             value=loop_num_iter, dtype=tf.int64, name='loop_num_iter'))
-    if (loop_num_iter_ is None or tf.contrib.eager.executing_eagerly() or
+    if (loop_num_iter_ is None or tf.executing_eagerly() or
         control_flow_util.GraphOrParentsInXlaContext(
             tf.compat.v1.get_default_graph())):
       return tf.while_loop(

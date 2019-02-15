@@ -24,12 +24,40 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
+
 tfd = tfp.distributions
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 @test_util.run_all_in_graph_and_eager_modes
 class _VonMisesTest(object):
+
+  def compute_gradients(self, f, args, grad_ys=None):
+    """Computes gradients using tf.GradientTape or tf.gradients.
+
+    Arguments:
+      f: Function to be differentiated.
+      args: List of `Tensor` arguments to be passed to the function `f`.
+        Gradients are computed with respect to these arguments.
+      grad_ys: Optional. A `Tensor` with the same shape as the `Tensor` returned
+        by `f` that contains the incoming gradients with respect to the result
+        of `f`.
+
+    Returns:
+      grads: List containing gradients of `f` with respect to `args`. It has the
+        same length as `args`.
+    """
+    if tf.executing_eagerly():
+      grad_fn = tf.contrib.eager.gradients_function(f)
+      if grad_ys is not None:
+        grads = grad_fn(*args, dy=grad_ys)
+      else:
+        grads = grad_fn(*args)
+    else:
+      res = f(*args)
+      grads = tf.gradients(ys=res, xs=args, grad_ys=grad_ys)
+    return self.evaluate(grads)
 
   def make_tensor(self, x):
     x = tf.cast(x, self.dtype)

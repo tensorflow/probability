@@ -24,9 +24,9 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfd = tfp.distributions
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -182,23 +182,16 @@ class ParetoTest(test_case.TestCase):
     concentration = tf.constant(3.)
     # Check the gradient on the undefined portion.
     x = scale - 1
-
-    pareto = tfd.Pareto(concentration, scale)
-    compute_pdf = lambda x: pareto.prob(x)  # pylint:disable=unnecessary-lambda
-    self.assertAlmostEqual(self.compute_gradients(
-        compute_pdf, args=[x])[0], 0.)
+    self.assertAlmostEqual(self.evaluate(tfp.math.value_and_gradient(
+        tfd.Pareto(concentration, scale).prob, x)[1]), 0.)
 
   def testParetoCDFGradientZeroOutsideSupport(self):
     scale = tf.constant(1.)
     concentration = tf.constant(3.)
     # Check the gradient on the undefined portion.
     x = scale - 1
-
-    pareto = tfd.Pareto(concentration, scale)
-    compute_cdf = lambda x: pareto.cdf(x)  # pylint:disable=unnecessary-lambda
-    self.assertAlmostEqual(
-        self.compute_gradients(
-            compute_cdf, args=[x])[0], 0.)
+    self.assertAlmostEqual(self.evaluate(tfp.math.value_and_gradient(
+        tfd.Pareto(concentration, scale).cdf, x)[1]), 0.)
 
   def testParetoMean(self):
     scale = [1.4, 2., 2.5]

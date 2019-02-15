@@ -224,9 +224,8 @@ class CauchyTest(test_case.TestCase):
           "log_survival_function", "log_prob", "prob"
       ]:
         print(func_name)
-        value = self.evaluate(cauchy_function(func_name, x)(loc, scale))
-        grads = self.compute_gradients(
-            cauchy_function(func_name, x), args=[loc, scale])
+        value, grads = self.evaluate(tfp.math.value_and_gradient(
+            cauchy_function(func_name, x), [loc, scale]))
         self.assertAllFinite(value)
         self.assertAllFinite(grads[0])
         self.assertAllFinite(grads[1])

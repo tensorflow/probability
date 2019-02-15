@@ -34,6 +34,7 @@ py_library(
     deps = [
         ":custom_gradient",
         ":diag_jacobian",
+        ":gradient",
         ":interpolation",
         ":linalg",
         ":numeric",
@@ -58,6 +59,29 @@ py_test(
     name = "custom_gradient_test",
     size = "small",
     srcs = ["custom_gradient_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "gradient",
+    srcs = [
+        "gradient.py",
+    ],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "gradient_test",
+    size = "small",
+    srcs = ["gradient_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -130,6 +154,7 @@ py_test(
         "numeric_test.py",
     ],
     deps = [
+        ":gradient",
         ":numeric",
         # absl/testing:parameterized dep,
         # numpy dep,

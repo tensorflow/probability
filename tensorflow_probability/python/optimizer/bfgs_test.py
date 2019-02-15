@@ -25,17 +25,13 @@ from scipy.stats import special_ortho_group
 
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 def _make_val_and_grad_fn(value_fn):
   @functools.wraps(value_fn)
   def val_and_grad(x):
-    with tf.GradientTape() as tape:
-      tape.watch(x)
-      fv = value_fn(x)
-      grad = tape.gradient(fv, x)
-      return fv, grad
+    return tfp.math.value_and_gradient(value_fn, x)
   return val_and_grad
 
 

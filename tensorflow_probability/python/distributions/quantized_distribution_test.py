@@ -319,12 +319,10 @@ class QuantizedDistributionTest(test_case.TestCase):
       mu = tf.compat.v2.Variable(0., name="mu", dtype=dtype)
       sigma = tf.compat.v2.Variable(1., name="sigma", dtype=dtype)
       self.evaluate(tf.compat.v1.global_variables_initializer())
-      grads = self.compute_gradients(
-          quantized_log_prob(dtype), args=[mu, sigma])
-      self._assert_all_finite(
-          self.evaluate(quantized_log_prob(dtype)(mu, sigma)))
-      self._assert_all_finite(grads[0])
-      self._assert_all_finite(grads[1])
+      value, grads = self.evaluate(tfp.math.value_and_gradient(
+          quantized_log_prob(dtype), [mu, sigma]))
+      self._assert_all_finite(value)
+      self._assert_all_finite(grads)
 
   def testProbAndGradGivesFiniteResultsForCommonEvents(self):
     def quantized_log_prob(mu, sigma):
@@ -338,12 +336,10 @@ class QuantizedDistributionTest(test_case.TestCase):
     sigma = tf.compat.v2.Variable(1.0, name="sigma")
 
     self.evaluate(tf.compat.v1.global_variables_initializer())
-    grads = self.compute_gradients(
-        quantized_log_prob, args=[mu, sigma])
-    self._assert_all_finite(
-        self.evaluate(quantized_log_prob(mu, sigma)))
-    self._assert_all_finite(grads[0])
-    self._assert_all_finite(grads[1])
+    value, grads = self.evaluate(tfp.math.value_and_gradient(
+        quantized_log_prob, [mu, sigma]))
+    self._assert_all_finite(value)
+    self._assert_all_finite(grads)
 
   def testLowerCutoffMustBeBelowUpperCutoffOrWeRaise(self):
     with self.assertRaisesOpError("must be strictly less"):

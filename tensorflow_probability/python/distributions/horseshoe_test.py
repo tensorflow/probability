@@ -179,37 +179,27 @@ class _HorseshoeTest(object):
 
   def testHorseshoeLogPDFGradient(self):
     scale = self.dtype(2.3)
-    horseshoe = tfd.Horseshoe(scale=scale)
-    x = self._test_param(np.linspace(.1, 10.1, 11))
-    horseshoe_log_prob_tf_gradient = self._tf_gradient(horseshoe.log_prob, x)
+    x = self._test_param(np.linspace(0.1, 10.1, 11))
+    [
+        horseshoe_log_prob,
+        horseshoe_log_prob_gradient,
+    ] = tfp.math.value_and_gradient(
+        lambda x_: tfd.Horseshoe(scale=scale).log_prob(x_), x)
     # The expected derivative of log_prob can be explicitly derived from
     # PDF formula as shown in Horseshoe class docstring; it will have a
     # relatively simple form assuming PDF is known.
     k = 1 / np.sqrt(2 * np.pi**3)
     horseshoe_log_prob_derivatives_expected = x / scale**2 - 2 * k * tf.exp(
-        -horseshoe.log_prob(x) - tf.math.log(x * scale))
+        -horseshoe_log_prob - tf.math.log(x * scale))
     horseshoe_log_prob_gradient_expected = tf.reshape(
         horseshoe_log_prob_derivatives_expected,
-        tf.shape(input=horseshoe_log_prob_tf_gradient))
+        tf.shape(input=horseshoe_log_prob_gradient))
     self.assertAllClose(
         self.evaluate(horseshoe_log_prob_gradient_expected),
-        self.evaluate(horseshoe_log_prob_tf_gradient),
+        self.evaluate(horseshoe_log_prob_gradient),
         # atol is not set to very tight and the max difference is observed
         # to be around 1e-3.
         atol=1.5e-3)
-
-  def _tf_gradient(self, func, x):
-    if tf.executing_eagerly():
-      with tf.GradientTape() as grad_tape:
-        grad_tape.watch(x)
-        y = func(x)
-    else:
-      y = func(x)
-
-    if tf.executing_eagerly():
-      return grad_tape.gradient(y, x)
-    else:
-      return tf.gradients(ys=y, xs=x)
 
   def _scale_mle(self, samples, scale_candidates):
     """Max log-likelihood estimate for scale.

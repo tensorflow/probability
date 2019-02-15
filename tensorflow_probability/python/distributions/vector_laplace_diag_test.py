@@ -49,7 +49,7 @@ class VectorLaplaceDiagTest(tf.test.TestCase):
 
   def testDistWithBatchShapeOneThenTransformedThroughSoftplus(self):
     # This complex combination of events resulted in a loss of static shape
-    # information when tf.contrib.util.constant_value(self._needs_rotation) was
+    # information when tf.get_static_value(self._needs_rotation) was
     # being used incorrectly (resulting in always rotating).
     # Batch shape = [1], event shape = [3]
     mu = tf.zeros((1, 3))

@@ -24,8 +24,9 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
 tfd = tfp.distributions
-tfe = tf.contrib.eager
 
 
 def _set_seed(seed):
@@ -37,6 +38,7 @@ def _set_seed(seed):
   return seed
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class DefaultExchangeProposedFnTest(tf.test.TestCase):
 
   def generate_exchanges(self, exchange_proposed, num_replica):
@@ -209,7 +211,6 @@ class REMCTest(tf.test.TestCase):
     self.assertAllClose(samps_.mean(), 0., atol=0.1, rtol=0.1)
     self.assertAllClose(samps_.std(), 1., atol=0.1, rtol=0.1)
 
-  @tfe.run_test_in_graph_and_eager_modes()
   def testNormalOddNumReplicasLowTolerance(self):
     """Sampling from the Standard Normal Distribution."""
     samps_ = self._getNormalREMCSamples(
@@ -218,7 +219,6 @@ class REMCTest(tf.test.TestCase):
     self.assertAllClose(samps_.mean(), 0., atol=0.3, rtol=0.1)
     self.assertAllClose(samps_.std(), 1., atol=0.3, rtol=0.1)
 
-  @tfe.run_test_in_graph_and_eager_modes()
   def testNormalEvenNumReplicasLowTolerance(self):
     """Sampling from the Standard Normal Distribution."""
     samps_ = self._getNormalREMCSamples(

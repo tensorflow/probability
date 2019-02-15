@@ -25,6 +25,8 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
 
 tfd = tfp.distributions
 tfb = tfp.bijectors
@@ -62,6 +64,7 @@ class FakeInnerKernel(tfp.mcmc.TransitionKernel):
     return FakeInnerKernelResults()
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class TransformedTransitionKernelTest(tf.test.TestCase):
 
   def setUp(self):
@@ -240,7 +243,7 @@ class TransformedTransitionKernelTest(tf.test.TestCase):
         num_steps_between_results=1,
         parallel_iterations=1)
     if not tf.executing_eagerly():
-      self.assertAllEqual(dict(target_calls=2), counter)
+      self.assertAllEqual(dict(target_calls=4), counter)
     states = tf.stack(states, axis=-1)
     self.assertEqual(num_results, tf.compat.dimension_value(states.shape[0]))
     sample_mean = tf.reduce_mean(input_tensor=states, axis=0)

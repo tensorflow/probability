@@ -86,6 +86,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/math:gradient",
     ],
 )
 
@@ -100,6 +101,7 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/math:gradient",
     ],
 )
 

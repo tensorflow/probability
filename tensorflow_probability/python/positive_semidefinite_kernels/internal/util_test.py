@@ -22,6 +22,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python.math.gradient import value_and_gradient
 from tensorflow_probability.python.positive_semidefinite_kernels.internal import util
 
 
@@ -99,23 +100,16 @@ class UtilTest(tf.test.TestCase):
   def testSqrtWithFiniteGradsHasCorrectGradients(self):
     self.assertTrue(np.isnan(self.evaluate(util.sqrt_with_finite_grads(-1.))))
     xs = tf.constant(np.linspace(1e-10, 10., 100))
-    with tf.GradientTape(persistent=True) as tape:
-      tape.watch(xs)
-      tf_sqrt = tf.sqrt(xs)
-      safe_sqrt = util.sqrt_with_finite_grads(xs)
-
-    self.assertAllEqual(
-        self.evaluate(tape.gradient(tf_sqrt, xs)),
-        self.evaluate(tape.gradient(safe_sqrt, xs)))
+    _, grad_tf_sqrt = value_and_gradient(tf.sqrt, xs)
+    _, grad_safe_sqrt = value_and_gradient(
+        util.sqrt_with_finite_grads, xs)
+    self.assertAllEqual(*self.evaluate([grad_tf_sqrt, grad_safe_sqrt]))
 
     zero = tf.constant(0.)
-    with tf.GradientTape(persistent=True) as tape:
-      tape.watch(zero)
-      tf_sqrt = tf.sqrt(zero)
-      safe_sqrt = util.sqrt_with_finite_grads(zero)
-    self.assertNotEqual(
-        self.evaluate(tape.gradient(tf_sqrt, zero)),
-        self.evaluate(tape.gradient(safe_sqrt, zero)))
+    _, grad_tf_sqrt = value_and_gradient(tf.sqrt, zero)
+    _, grad_safe_sqrt = value_and_gradient(
+        util.sqrt_with_finite_grads, zero)
+    self.assertNotEqual(*self.evaluate([grad_tf_sqrt, grad_safe_sqrt]))
 
   def testSqrtWithFiniteGradsBackpropsCorrectly(self):
     # Part of implementing a tf.custom_gradient is correctly handling the
@@ -133,25 +127,20 @@ class UtilTest(tf.test.TestCase):
 
     # We only test away from zero, since we know the values don't match there.
     xs = tf.constant(np.linspace(1e-10, 10., 100))
-    with tf.GradientTape(persistent=True) as tape:
-      tape.watch(xs)
-      tf_sqrt = f(tf.sqrt(h(xs)))
-      safe_sqrt = f(g(h(xs)))
-
-    self.assertAllClose(
-        self.evaluate(tape.gradient(tf_sqrt, xs)),
-        self.evaluate(tape.gradient(safe_sqrt, xs)),
-        rtol=1e-10)
+    _, grad_tf_sqrt = value_and_gradient(
+        lambda xs_: f(tf.sqrt(h(xs_))), xs)
+    _, grad_safe_sqrt = value_and_gradient(
+        lambda xs_: f(g(h(xs_))), xs)
+    self.assertAllClose(*self.evaluate([grad_tf_sqrt, grad_safe_sqrt]),
+                        rtol=1e-10)
 
   def testSqrtWithFiniteGradsWithDynamicShape(self):
     x = tf.compat.v1.placeholder_with_default([1.], shape=[None])
-    with tf.GradientTape(persistent=True) as tape:
-      tape.watch(x)
-      tf_sqrt = tf.sqrt(x)
-      safe_sqrt = util.sqrt_with_finite_grads(x)
-    self.assertAllEqual(
-        self.evaluate(tape.gradient(tf_sqrt, x)),
-        self.evaluate(tape.gradient(safe_sqrt, x)))
+    _, grad_tf_sqrt = value_and_gradient(tf.sqrt, x)
+    _, grad_safe_sqrt = value_and_gradient(
+        util.sqrt_with_finite_grads, x)
+    self.assertAllEqual(*self.evaluate([grad_tf_sqrt, grad_safe_sqrt]))
+
 
 if __name__ == '__main__':
   tf.test.main()

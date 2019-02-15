@@ -23,8 +23,10 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
+
 tfd = tfp.distributions
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -49,12 +51,8 @@ class JacobianTest(tf.test.TestCase):
     sample_shape = [3, 5]
     state = [tf.ones(sample_shape + [2], dtype=dtype),
              tf.ones(sample_shape + [1], dtype=dtype)]
-    fn_val = target_fn(*state)
-    grad_fn = tf.contrib.eager.gradients_function(target_fn)
-    if tf.executing_eagerly():
-      grads = grad_fn(*state)
-    else:
-      grads = tf.gradients(ys=fn_val, xs=state)
+    fn_val, grads = tfp.math.value_and_gradient(target_fn, state)
+    grad_fn = lambda *args: tfp.math.value_and_gradient(target_fn, args)[1]
 
     _, diag_jacobian_shape_passed = tfp.math.diag_jacobian(
         xs=state, ys=grads, fn=grad_fn, sample_shape=tf.shape(input=fn_val))
@@ -98,12 +96,8 @@ class JacobianTest(tf.test.TestCase):
       return target.log_prob(z)
 
     state = [tf.ones(sample_shape + [2, 2], dtype=dtype)]
-    fn_val = target_fn(*state)
-    grad_fn = tf.contrib.eager.gradients_function(target_fn)
-    if tf.executing_eagerly():
-      grads = grad_fn(state)
-    else:
-      grads = tf.gradients(ys=fn_val, xs=state)
+    fn_val, grads = tfp.math.value_and_gradient(target_fn, state)
+    grad_fn = lambda *args: tfp.math.value_and_gradient(target_fn, args)[1]
 
     _, diag_jacobian_shape_passed = tfp.math.diag_jacobian(
         xs=state, ys=grads, fn=grad_fn, sample_shape=tf.shape(input=fn_val))

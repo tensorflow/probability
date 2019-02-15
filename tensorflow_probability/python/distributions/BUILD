@@ -1084,10 +1084,9 @@ py_test(
     name = "bernoulli_test",
     srcs = ["bernoulli_test.py"],
     deps = [
-        ":bernoulli",
-        ":kullback_leibler",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability",
     ],
 )
 
@@ -1095,10 +1094,9 @@ py_test(
     name = "beta_test",
     srcs = ["beta_test.py"],
     deps = [
-        ":beta",
-        ":kullback_leibler",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability",
     ],
 )
 
@@ -1118,12 +1116,10 @@ py_test(
     name = "categorical_test",
     srcs = ["categorical_test.py"],
     deps = [
-        ":categorical",
-        ":kullback_leibler",
-        ":normal",
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability",
     ],
 )
 
@@ -1211,9 +1207,9 @@ py_test(
     shard_count = 4,
     tags = ["tf2-broken"],
     deps = [
-        ":dirichlet_multinomial",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability",
     ],
 )
 
@@ -1221,10 +1217,9 @@ py_test(
     name = "dirichlet_test",
     srcs = ["dirichlet_test.py"],
     deps = [
-        ":dirichlet",
-        ":kullback_leibler",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability",
     ],
 )
 
@@ -1265,10 +1260,9 @@ py_test(
     name = "gamma_test",
     srcs = ["gamma_test.py"],
     deps = [
-        ":gamma",
-        ":kullback_leibler",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability",
     ],
 )
 
@@ -1288,9 +1282,9 @@ py_test(
     size = "small",
     srcs = ["gaussian_process_test.py"],
     deps = [
-        ":distributions",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability",
         "//tensorflow_probability/python/positive_semidefinite_kernels",
     ],
 )
@@ -1300,9 +1294,9 @@ py_test(
     size = "small",
     srcs = ["gaussian_process_regression_model_test.py"],
     deps = [
-        ":distributions",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability",
         "//tensorflow_probability/python/positive_semidefinite_kernels",
     ],
 )
@@ -1446,7 +1440,6 @@ py_test(
     name = "laplace_test",
     srcs = ["laplace_test.py"],
     deps = [
-        ":laplace",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
@@ -1460,7 +1453,6 @@ py_test(
     shard_count = 4,
     tags = ["tf2-broken"],
     deps = [
-        ":linear_gaussian_ssm",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
@@ -1519,9 +1511,9 @@ py_test(
     name = "multinomial_test",
     srcs = ["multinomial_test.py"],
     deps = [
-        ":multinomial",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability",
     ],
 )
 
@@ -1529,11 +1521,10 @@ py_test(
     name = "multivariate_student_t_test",
     srcs = ["multivariate_student_t_test.py"],
     deps = [
-        ":multivariate_student_t",
-        ":student_t",
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
@@ -1616,10 +1607,9 @@ py_test(
     name = "normal_test",
     srcs = ["normal_test.py"],
     deps = [
-        ":kullback_leibler",
-        ":normal",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_case",
     ],
 )
@@ -1784,9 +1774,9 @@ py_test(
     name = "student_t_test",
     srcs = ["student_t_test.py"],
     deps = [
-        ":student_t",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
@@ -1796,9 +1786,9 @@ py_test(
     size = "small",
     srcs = ["student_t_process_test.py"],
     deps = [
-        ":distributions",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability",
         "//tensorflow_probability/python/positive_semidefinite_kernels",
     ],
 )
@@ -1807,7 +1797,6 @@ py_test(
     name = "triangular_test",
     srcs = ["triangular_test.py"],
     deps = [
-        ":triangular",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
@@ -1847,7 +1836,6 @@ py_test(
     name = "uniform_test",
     srcs = ["uniform_test.py"],
     deps = [
-        ":uniform",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
@@ -1906,7 +1894,6 @@ py_test(
     srcs = ["von_mises_fisher_test.py"],
     tags = ["tf2-broken"],
     deps = [
-        ":von_mises_fisher",
         # numpy dep,
         # scipy dep,
         # tensorflow dep,
@@ -1944,7 +1931,6 @@ py_test(
     size = "large",
     srcs = ["zipf_test.py"],
     deps = [
-        ":distributions",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",

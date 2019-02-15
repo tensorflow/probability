@@ -31,6 +31,7 @@ from tensorflow_probability.python.distributions import MixtureSameFamily
 from tensorflow_probability.python.distributions import MultivariateNormalDiag
 from tensorflow_probability.python.distributions import Normal
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.math.gradient import value_and_gradient
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.ops import gradient_checker_v2  # pylint: disable=g-direct-tensorflow-import
@@ -1370,13 +1371,12 @@ class FillTriangularTest(tf.test.TestCase):
     # Note:
     #   zeros_like_x_pl == zeros_like(x_pl)
     #   gradient(zeros_like_x_pl, x_pl) == x_pl - 1
-    with tf.GradientTape() as tape:
-      tape.watch(x_pl)
-      zeros_like_x_pl = (x_pl * tf.stop_gradient(x_pl - 1.)
-                         - tf.stop_gradient(x_pl * (x_pl - 1.)))
-      x = x_pl + zeros_like_x_pl
-      actual = distribution_util.fill_triangular(x, **kwargs)
-    grad_actual = tape.gradient(actual, x_pl)
+    def _zeros_like(x):
+      return x * tf.stop_gradient(x - 1.) - tf.stop_gradient(x * (x - 1.))
+    actual, grad_actual = value_and_gradient(
+        lambda x: distribution_util.fill_triangular(  # pylint: disable=g-long-lambda
+            x + _zeros_like(x), **kwargs),
+        x_pl)
     actual_, grad_actual_ = self.evaluate([actual, grad_actual])
     expected = self._fill_triangular(x_, **kwargs)
     if use_deferred_shape and not tf.executing_eagerly():
@@ -1663,10 +1663,8 @@ class SoftplusTest(tf.test.TestCase):
   def testInverseSoftplusGradientNeverNan(self):
     # Note that this range contains both zero and inf.
     x = tf.constant(np.logspace(-8, 6).astype(np.float16))
-    with tf.GradientTape() as tape:
-      tape.watch(x)
-      y = distribution_util.softplus_inverse(x)
-    grads = self.evaluate(tape.gradient(y, x))
+    _, grads = self.evaluate(value_and_gradient(
+        distribution_util.softplus_inverse, x))
     # Equivalent to `assertAllFalse` (if it existed).
     self.assertAllEqual(np.zeros_like(grads).astype(np.bool), np.isnan(grads))
 
@@ -1674,10 +1672,8 @@ class SoftplusTest(tf.test.TestCase):
     # This range of x is all finite, and so is 1 / x.  So the
     # gradient and its approximations should be finite as well.
     x = tf.constant(np.logspace(-4.8, 4.5).astype(np.float16))
-    with tf.GradientTape() as tape:
-      tape.watch(x)
-      y = distribution_util.softplus_inverse(x)
-    grads = self.evaluate(tape.gradient(y, x))
+    _, grads = self.evaluate(value_and_gradient(
+        distribution_util.softplus_inverse, x))
     # Equivalent to `assertAllTrue` (if it existed).
     self.assertAllEqual(
         np.ones_like(grads).astype(np.bool), np.isfinite(grads))

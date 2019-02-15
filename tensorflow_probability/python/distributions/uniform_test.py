@@ -279,12 +279,9 @@ class UniformTest(tf.test.TestCase):
   def testFullyReparameterized(self):
     a = tf.constant(0.1)
     b = tf.constant(0.8)
-    with tf.GradientTape() as tape:
-      tape.watch(a)
-      tape.watch(b)
-      uniform = uniform_lib.Uniform(a, b)
-      samples = uniform.sample(100)
-    grad_a, grad_b = tape.gradient(samples, [a, b])
+    _, [grad_a, grad_b] = tfp.math.value_and_gradient(
+        lambda a_, b_: uniform_lib.Uniform(a_, b_).sample(100),
+        [a, b])
     self.assertIsNotNone(grad_a)
     self.assertIsNotNone(grad_b)
 

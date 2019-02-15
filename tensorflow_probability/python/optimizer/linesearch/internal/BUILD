@@ -50,5 +50,6 @@ py_test(
         ":hager_zhang_lib",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/math:gradient",
     ],
 )

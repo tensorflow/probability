@@ -239,12 +239,8 @@ class LaplaceTest(tf.test.TestCase):
   def testLaplaceFullyReparameterized(self):
     loc = tf.constant(4.0)
     scale = tf.constant(3.0)
-    with tf.GradientTape() as tape:
-      tape.watch(loc)
-      tape.watch(scale)
-      laplace = tfd.Laplace(loc=loc, scale=scale)
-      samples = laplace.sample(100)
-    grad_loc, grad_scale = tape.gradient(samples, [loc, scale])
+    _, [grad_loc, grad_scale] = tfp.math.value_and_gradient(
+        lambda l, s: tfd.Laplace(loc=l, scale=s).sample(100), [loc, scale])
     self.assertIsNotNone(grad_loc)
     self.assertIsNotNone(grad_scale)
 

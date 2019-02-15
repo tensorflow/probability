@@ -25,6 +25,7 @@ import tensorflow as tf
 from tensorflow_probability.python import bijectors
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.math.gradient import value_and_gradient
 
 
 __all__ = [
@@ -220,28 +221,17 @@ class CustomExponentialFamily(
     return self._inverse_link_fn
 
   def _call(self, r):
-    mean, grad_mean = self._value_and_gradient(self._inverse_link_fn, r)
+    if self._inverse_link_fn is None:
+      # Interpret `None` as the identity function.
+      mean, grad_mean = r, tf.ones_like(r)
+    else:
+      mean, grad_mean = value_and_gradient(self._inverse_link_fn, r)
     variance = self._distribution_fn(mean).variance()
     return mean, variance, grad_mean
 
   def _log_prob(self, y, r):
     mean = self._inverse_link_fn(r)
     return self._distribution_fn(mean).log_prob(y)
-
-  def _value_and_gradient(self, fn, arg):
-    """Calls `fn` and computes the gradient of the result wrt `arg`."""
-    if fn is None:
-      # Interpret `None` as the identity function.
-      return arg, tf.ones_like(arg)
-    if tf.executing_eagerly():
-      # Not having the lambda sanitzer means we'd get an `IndexError` whenever
-      # the user supplied function has default args.
-      fn1 = lambda r: fn(r)  # pylint: disable=unnecessary-lambda
-      v, g = tf.contrib.eager.value_and_gradients_function(fn1)(arg)
-    else:
-      v = fn(arg)
-      g = tf.gradients(ys=v, xs=[arg])
-    return v, g[0]
 
 
 class Bernoulli(ExponentialFamily):

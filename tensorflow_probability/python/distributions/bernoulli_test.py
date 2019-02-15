@@ -23,10 +23,12 @@ import importlib
 # Dependency imports
 import numpy as np
 import tensorflow as tf
+import tensorflow_probability as tfp
 
-from tensorflow_probability.python.distributions import bernoulli
-from tensorflow_probability.python.distributions import kullback_leibler
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
+
+tfd = tfp.distributions
 
 
 def try_import(name):  # pylint: disable=invalid-name
@@ -44,7 +46,7 @@ special = try_import("scipy.special")
 def make_bernoulli(batch_shape, dtype=tf.int32):
   p = np.random.uniform(size=list(batch_shape))
   p = tf.constant(p, dtype=tf.float32)
-  return bernoulli.Bernoulli(probs=p, dtype=dtype)
+  return tfd.Bernoulli(probs=p, dtype=dtype)
 
 
 def entropy(p):
@@ -57,12 +59,12 @@ class BernoulliTest(tf.test.TestCase):
 
   def testP(self):
     p = [0.2, 0.4]
-    dist = bernoulli.Bernoulli(probs=p)
+    dist = tfd.Bernoulli(probs=p)
     self.assertAllClose(p, self.evaluate(dist.probs))
 
   def testLogits(self):
     logits = [-42., 42.]
-    dist = bernoulli.Bernoulli(logits=logits)
+    dist = tfd.Bernoulli(logits=logits)
     self.assertAllClose(logits, self.evaluate(dist.logits))
 
     if not special:
@@ -71,25 +73,25 @@ class BernoulliTest(tf.test.TestCase):
     self.assertAllClose(special.expit(logits), self.evaluate(dist.probs))
 
     p = [0.01, 0.99, 0.42]
-    dist = bernoulli.Bernoulli(probs=p)
+    dist = tfd.Bernoulli(probs=p)
     self.assertAllClose(special.logit(p), self.evaluate(dist.logits))
 
   def testInvalidP(self):
     invalid_ps = [1.01, 2.]
     for p in invalid_ps:
       with self.assertRaisesOpError("probs has components greater than 1"):
-        dist = bernoulli.Bernoulli(probs=p, validate_args=True)
+        dist = tfd.Bernoulli(probs=p, validate_args=True)
         self.evaluate(dist.probs)
 
     invalid_ps = [-0.01, -3.]
     for p in invalid_ps:
       with self.assertRaisesOpError("Condition x >= 0"):
-        dist = bernoulli.Bernoulli(probs=p, validate_args=True)
+        dist = tfd.Bernoulli(probs=p, validate_args=True)
         self.evaluate(dist.probs)
 
     valid_ps = [0.0, 0.5, 1.0]
     for p in valid_ps:
-      dist = bernoulli.Bernoulli(probs=p)
+      dist = tfd.Bernoulli(probs=p)
       self.assertEqual(p, self.evaluate(dist.probs))  # Should not fail
 
   def testShapes(self):
@@ -120,7 +122,7 @@ class BernoulliTest(tf.test.TestCase):
     self.assertEqual(dist64.dtype, dist64.mode().dtype)
 
   def _testPmf(self, **kwargs):
-    dist = bernoulli.Bernoulli(**kwargs)
+    dist = tfd.Bernoulli(**kwargs)
     # pylint: disable=bad-continuation
     xs = [
         0,
@@ -144,7 +146,7 @@ class BernoulliTest(tf.test.TestCase):
 
   def testPmfCorrectBroadcastDynamicShape(self):
     p = tf.compat.v1.placeholder_with_default([0.2, 0.3, 0.4], shape=None)
-    dist = bernoulli.Bernoulli(probs=p)
+    dist = tfd.Bernoulli(probs=p)
     event1 = [1, 0, 1]
     event2 = [[1, 0, 1]]
     self.assertAllClose(
@@ -154,7 +156,7 @@ class BernoulliTest(tf.test.TestCase):
 
   def testPmfInvalid(self):
     p = [0.1, 0.2, 0.7]
-    dist = bernoulli.Bernoulli(probs=p, validate_args=True)
+    dist = tfd.Bernoulli(probs=p, validate_args=True)
     with self.assertRaisesOpError("must be non-negative."):
       self.evaluate(dist.prob([1, 1, -1]))
     with self.assertRaisesOpError("Elements cannot exceed 1."):
@@ -174,11 +176,11 @@ class BernoulliTest(tf.test.TestCase):
         np.float32(samps) * np.log(np.float32(p)) +
         (1 - np.float32(samps)) * np.log(1 - np.float32(p)),
         self.evaluate(
-            bernoulli.Bernoulli(probs=p, validate_args=False).log_prob(samps)))
+            tfd.Bernoulli(probs=p, validate_args=False).log_prob(samps)))
 
   def testBroadcasting(self):
     probs = lambda p: tf.compat.v1.placeholder_with_default(p, shape=None)
-    dist = lambda p: bernoulli.Bernoulli(probs=probs(p))
+    dist = lambda p: tfd.Bernoulli(probs=probs(p))
     self.assertAllClose(np.log(0.5), self.evaluate(dist(0.5).log_prob(1)))
     self.assertAllClose(
         np.log([0.5, 0.5, 0.5]), self.evaluate(dist(0.5).log_prob([1, 1, 1])))
@@ -187,34 +189,34 @@ class BernoulliTest(tf.test.TestCase):
 
   def testPmfShapes(self):
     probs = lambda p: tf.compat.v1.placeholder_with_default(p, shape=None)
-    dist = lambda p: bernoulli.Bernoulli(probs=probs(p))
+    dist = lambda p: tfd.Bernoulli(probs=probs(p))
     self.assertEqual(
         2, len(self.evaluate(dist([[0.5], [0.5]]).log_prob(1)).shape))
 
-    dist = bernoulli.Bernoulli(probs=0.5)
+    dist = tfd.Bernoulli(probs=0.5)
     self.assertEqual(2, len(self.evaluate(dist.log_prob([[1], [1]])).shape))
 
-    dist = bernoulli.Bernoulli(probs=0.5)
+    dist = tfd.Bernoulli(probs=0.5)
     self.assertEqual((), dist.log_prob(1).shape)
     self.assertEqual((1), dist.log_prob([1]).shape)
     self.assertEqual((2, 1), dist.log_prob([[1], [1]]).shape)
 
-    dist = bernoulli.Bernoulli(probs=[[0.5], [0.5]])
+    dist = tfd.Bernoulli(probs=[[0.5], [0.5]])
     self.assertEqual((2, 1), dist.log_prob(1).shape)
 
   def testBoundaryConditions(self):
-    dist = bernoulli.Bernoulli(probs=1.0)
+    dist = tfd.Bernoulli(probs=1.0)
     self.assertAllClose(np.nan, self.evaluate(dist.log_prob(0)))
     self.assertAllClose([np.nan], [self.evaluate(dist.log_prob(1))])
 
   def testEntropyNoBatch(self):
     p = 0.2
-    dist = bernoulli.Bernoulli(probs=p)
+    dist = tfd.Bernoulli(probs=p)
     self.assertAllClose(self.evaluate(dist.entropy()), entropy(p))
 
   def testEntropyWithBatch(self):
     p = [[0.1, 0.7], [0.2, 0.6]]
-    dist = bernoulli.Bernoulli(probs=p, validate_args=False)
+    dist = tfd.Bernoulli(probs=p, validate_args=False)
     self.assertAllClose(
         self.evaluate(dist.entropy()),
         [[entropy(0.1), entropy(0.7)], [entropy(0.2),
@@ -222,7 +224,7 @@ class BernoulliTest(tf.test.TestCase):
 
   def testSampleN(self):
     p = [0.2, 0.6]
-    dist = bernoulli.Bernoulli(probs=p)
+    dist = tfd.Bernoulli(probs=p)
     n = 100000
     samples = dist.sample(n)
     samples.set_shape([n, 2])
@@ -237,21 +239,18 @@ class BernoulliTest(tf.test.TestCase):
     self.assertEqual(set([0, 1]), set(sample_values.flatten()))
     # In this test we're just interested in verifying there isn't a crash
     # owing to mismatched types. b/30940152
-    dist = bernoulli.Bernoulli(np.log([.2, .4]))
+    dist = tfd.Bernoulli(np.log([.2, .4]))
     self.assertAllEqual((1, 2), dist.sample(1, seed=42).shape.as_list())
 
   def testNotReparameterized(self):
     p = tf.constant([0.2, 0.6])
-    with tf.GradientTape() as tape:
-      tape.watch(p)
-      dist = bernoulli.Bernoulli(probs=p)
-      samples = dist.sample(100)
-    grad_p = tape.gradient(samples, p)
+    _, grad_p = tfp.math.value_and_gradient(
+        lambda x: tfd.Bernoulli(probs=x).sample(100), p)
     self.assertIsNone(grad_p)
 
   def testSampleDeterministicScalarVsVector(self):
     p = [0.2, 0.6]
-    dist = bernoulli.Bernoulli(probs=p)
+    dist = tfd.Bernoulli(probs=p)
     n = 1000
     def _maybe_seed():
       if tf.executing_eagerly():
@@ -269,13 +268,13 @@ class BernoulliTest(tf.test.TestCase):
 
   def testMean(self):
     p = np.array([[0.2, 0.7], [0.5, 0.4]], dtype=np.float32)
-    dist = bernoulli.Bernoulli(probs=p)
+    dist = tfd.Bernoulli(probs=p)
     self.assertAllEqual(self.evaluate(dist.mean()), p)
 
   def testVarianceAndStd(self):
     var = lambda p: p * (1. - p)
     p = [[0.2, 0.7], [0.5, 0.4]]
-    dist = bernoulli.Bernoulli(probs=p)
+    dist = tfd.Bernoulli(probs=p)
     self.assertAllClose(
         self.evaluate(dist.variance()),
         np.array([[var(0.2), var(0.7)], [var(0.5), var(0.4)]],
@@ -291,10 +290,10 @@ class BernoulliTest(tf.test.TestCase):
     a_p = np.array([0.5] * batch_size, dtype=np.float32)
     b_p = np.array([0.4] * batch_size, dtype=np.float32)
 
-    a = bernoulli.Bernoulli(probs=a_p)
-    b = bernoulli.Bernoulli(probs=b_p)
+    a = tfd.Bernoulli(probs=a_p)
+    b = tfd.Bernoulli(probs=b_p)
 
-    kl = kullback_leibler.kl_divergence(a, b)
+    kl = tfd.kl_divergence(a, b)
     kl_val = self.evaluate(kl)
 
     kl_expected = (a_p * np.log(a_p / b_p) + (1. - a_p) * np.log(

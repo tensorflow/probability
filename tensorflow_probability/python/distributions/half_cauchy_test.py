@@ -412,16 +412,16 @@ class _HalfCauchyTest(object):
     loc = self._create_placeholder_with_default(loc_, name="loc")
     scale = self._create_placeholder_with_default(2., name="scale")
     x = loc - 0.1
-    grads = self.compute_gradients(
+    _, grads = self.evaluate(tfp.math.value_and_gradient(
         lambda loc, scale, x: tfd.HalfCauchy(loc, scale).prob(x),
-        [loc, scale, x])
+        [loc, scale, x]))
     self.assertAllClose(
         grads,
         [np.zeros_like(loc_), 0., np.zeros_like(loc_)])
 
-    grads = self.compute_gradients(
+    _, grads = self.evaluate(tfp.math.value_and_gradient(
         lambda loc, scale, x: tfd.HalfCauchy(loc, scale).log_prob(x),
-        [loc, scale, x])
+        [loc, scale, x]))
     self.assertAllClose(
         grads,
         [np.zeros_like(loc_), 0., np.zeros_like(loc_)])
@@ -431,16 +431,16 @@ class _HalfCauchyTest(object):
     loc = self._create_placeholder_with_default(loc_, name="loc")
     scale = self._create_placeholder_with_default(2., name="scale")
     x = loc - 0.1
-    grads = self.compute_gradients(
+    _, grads = self.evaluate(tfp.math.value_and_gradient(
         lambda loc, scale, x: tfd.HalfCauchy(loc, scale).cdf(x),
-        [loc, scale, x])
+        [loc, scale, x]))
     self.assertAllClose(
         grads,
         [np.zeros_like(loc_), 0., np.zeros_like(loc_)])
 
-    grads = self.compute_gradients(
+    _, grads = self.evaluate(tfp.math.value_and_gradient(
         lambda loc, scale, x: tfd.HalfCauchy(loc, scale).log_cdf(x),
-        [loc, scale, x])
+        [loc, scale, x]))
     self.assertAllClose(
         grads,
         [np.zeros_like(loc_), 0., np.zeros_like(loc_)])
@@ -458,8 +458,8 @@ class _HalfCauchyTest(object):
         lambda loc, scale, x: tfd.HalfCauchy(loc, scale).prob(x),
         lambda loc, scale, x: tfd.HalfCauchy(loc, scale).log_prob(x),
     ]:
-      value = func(loc, scale, x)
-      grads = self.compute_gradients(func, [loc, scale, x])
+      value, grads = self.evaluate(
+          tfp.math.value_and_gradient(func, [loc, scale, x]))
       self.assertAllFinite(value)
       for grad in grads:
         self.assertAllFinite(grad)
@@ -485,8 +485,8 @@ class _HalfCauchyTest(object):
         "log_survival_function",
     ]:
       func = get_half_cauchy_func(func_name)
-      value = func(loc, scale, x)
-      grads = self.compute_gradients(func, [loc, scale, x])
+      value, grads = self.evaluate(
+          tfp.math.value_and_gradient(func, [loc, scale, x]))
       self.assertAllFinite(value)
       for grad in grads:
         self.assertAllFinite(grad)

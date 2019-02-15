@@ -24,38 +24,29 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
+
+@test_util.run_all_in_graph_and_eager_modes
 class CustomGradientTest(tf.test.TestCase):
 
   def test_works_correctly(self):
     f = lambda x: x**2 / 2
     g = lambda x: (x - 1)**3 / 3
-    x_ = np.linspace(-100, 100, int(1e4)) + [0.]
-
-    x = tf.constant(x_)
-    with tf.GradientTape() as tape:
-      tape.watch(x)
-      fx = tfp.math.custom_gradient(f(x), g(x), x)
-    gx = tape.gradient(fx, x)
-    [fx_, gx_] = self.evaluate([fx, gx])
-
-    self.assertAllClose(f(x_), fx_)
-    self.assertAllClose(g(x_), gx_)
+    x = np.concatenate([np.linspace(-100, 100, int(1e3)), [0.]], axis=0)
+    fx, gx = self.evaluate(tfp.math.value_and_gradient(
+        lambda x_: tfp.math.custom_gradient(f(x_), g(x_), x_), x))
+    self.assertAllClose(f(x), fx)
+    self.assertAllClose(g(x), gx)
 
   def test_works_correctly_both_f_g_zero(self):
     f = lambda x: x**2 / 2
     g = lambda x: x**3 / 3
-    x_ = np.linspace(-100, 100, int(1e4)) + [0.]
-
-    x = tf.constant(x_)
-    with tf.GradientTape() as tape:
-      tape.watch(x)
-      fx = tfp.math.custom_gradient(f(x), g(x), x)
-    gx = tape.gradient(fx, x)
-    fx_, gx_ = self.evaluate([fx, gx])
-
-    self.assertAllClose(f(x_), fx_)
-    self.assertAllClose(g(x_), gx_)
+    x = np.concatenate([np.linspace(-100, 100, int(1e3)), [0.]], axis=0)
+    fx, gx = self.evaluate(tfp.math.value_and_gradient(
+        lambda x_: tfp.math.custom_gradient(f(x_), g(x_), x_), x))
+    self.assertAllClose(f(x), fx)
+    self.assertAllClose(g(x), gx)
 
   def test_works_correctly_vector_of_vars(self):
     x = tf.compat.v2.Variable(2, name='x', dtype=tf.float32)
