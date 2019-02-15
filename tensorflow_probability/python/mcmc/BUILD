@@ -60,7 +60,7 @@ py_library(
 
 py_test(
     name = "diagnostic_test",
-    size = "small",
+    size = "medium",
     srcs = ["diagnostic_test.py"],
     deps = [
         # numpy dep,
