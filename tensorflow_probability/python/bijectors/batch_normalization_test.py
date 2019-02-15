@@ -26,8 +26,10 @@ from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python import distributions
 from tensorflow_probability.python.internal import test_util
+from tensorflow.python.framework import test_util as tf_test_util  # pylint: disable=g-direct-tensorflow-import
 
 
+@tf_test_util.run_all_in_graph_and_eager_modes
 class BatchNormTest(test_util.VectorDistributionTestHelpers,
                     parameterized.TestCase,
                     tf.test.TestCase):
@@ -134,38 +136,6 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers,
       expected_ildj = np.sum(
           np.log(1.) - .5 * np.log(1. + batch_norm.batchnorm.epsilon))
       self.assertAllClose(expected_ildj, np.squeeze(ildj_))
-
-  def testMaximumLikelihoodTraining(self):
-    # Test Maximum Likelihood training with default bijector.
-    training = tf.compat.v1.placeholder_with_default(True, (), "training")
-    base_dist = distributions.MultivariateNormalDiag(loc=[0., 0.])
-    batch_norm = tfb.BatchNormalization(training=training)
-    dist = distributions.TransformedDistribution(
-        distribution=base_dist,
-        bijector=batch_norm)
-    target_dist = distributions.MultivariateNormalDiag(loc=[1., 2.])
-    target_samples = target_dist.sample(200)
-    dist_samples = dist.sample(3000)
-    loss = -tf.reduce_mean(input_tensor=dist.log_prob(target_samples))
-    with tf.control_dependencies(batch_norm.batchnorm.updates):
-      train_op = tf.compat.v1.train.AdamOptimizer(1e-2).minimize(loss)
-      moving_mean = tf.identity(batch_norm.batchnorm.moving_mean)
-      moving_var = tf.identity(batch_norm.batchnorm.moving_variance)
-    self.evaluate(tf.compat.v1.global_variables_initializer())
-    for _ in range(3000):
-      self.evaluate(train_op)
-    [
-        dist_samples_,
-        moving_mean_,
-        moving_var_
-    ] = self.evaluate([
-        dist_samples,
-        moving_mean,
-        moving_var
-    ])
-    self.assertAllClose([1., 2.], np.mean(dist_samples_, axis=0), atol=5e-2)
-    self.assertAllClose([1., 2.], moving_mean_, atol=5e-2)
-    self.assertAllClose([1., 1.], moving_var_, atol=5e-2)
 
   @parameterized.named_parameters(
       ("2d_event_ndims", (10, 4), [-1], False),
