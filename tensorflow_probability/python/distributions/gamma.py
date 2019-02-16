@@ -27,7 +27,6 @@ from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.ops import control_flow_ops
 
 __all__ = [
     "Gamma",
@@ -249,7 +248,7 @@ class Gamma(distribution.Distribution):
           name="nan")
       return tf.where(self.concentration > 1., mode, nan)
     else:
-      return control_flow_ops.with_dependencies([
+      return distribution_util.with_dependencies([
           tf.compat.v1.assert_less(
               tf.ones([], self.dtype),
               self.concentration,
@@ -260,7 +259,7 @@ class Gamma(distribution.Distribution):
     tf.debugging.assert_same_float_dtype(tensors=[x], dtype=self.dtype)
     if not self.validate_args:
       return x
-    return control_flow_ops.with_dependencies([
+    return distribution_util.with_dependencies([
         tf.compat.v1.assert_positive(x),
     ], x)
 

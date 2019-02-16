@@ -146,9 +146,9 @@ class MaskedAutoregressiveFlowTest(tfp_test_util.VectorDistributionTestHelpers,
         fldj,
     ])
     self.assertEqual("masked_autoregressive_flow", ma.name)
-    self.assertAllClose(forward_x_, forward_inverse_y_, rtol=1e-6, atol=0.)
-    self.assertAllClose(x_, inverse_y_, rtol=1e-5, atol=0.)
-    self.assertAllClose(ildj_, -fldj_, rtol=1e-6, atol=0.)
+    self.assertAllClose(forward_x_, forward_inverse_y_, rtol=1e-6, atol=1e-6)
+    self.assertAllClose(x_, inverse_y_, rtol=1e-4, atol=1e-4)
+    self.assertAllClose(ildj_, -fldj_, rtol=1e-6, atol=1e-6)
 
   def testMutuallyConsistent(self):
     maf = tfb.MaskedAutoregressiveFlow(

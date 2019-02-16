@@ -20,7 +20,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow.python.ops import control_flow_ops
+from tensorflow_probability.python.internal import distribution_util
 
 __all__ = [
     "Gumbel",
@@ -68,7 +68,7 @@ class Gumbel(bijector.Bijector):
       self._scale = tf.convert_to_tensor(value=scale, name="scale")
       tf.debugging.assert_same_float_dtype([self._loc, self._scale])
       if validate_args:
-        self._scale = control_flow_ops.with_dependencies([
+        self._scale = distribution_util.with_dependencies([
             tf.compat.v1.assert_positive(
                 self._scale, message="Argument scale was not positive")
         ], self._scale)
@@ -113,4 +113,4 @@ class Gumbel(bijector.Bijector):
         y,
         tf.constant(1., y.dtype),
         message="Inverse transformation input must be less than or equal to 1.")
-    return control_flow_ops.with_dependencies([is_positive, less_than_one], y)
+    return distribution_util.with_dependencies([is_positive, less_than_one], y)

@@ -25,7 +25,6 @@ import tensorflow as tf
 
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.ops import control_flow_ops  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -123,11 +122,11 @@ def make_tril_scale(loc=None,
     if not validate_args:
       return x
     if assert_positive:
-      return control_flow_ops.with_dependencies([
+      return with_dependencies([
           tf.compat.v1.assert_positive(
               tf.linalg.diag_part(x), message="diagonal part must be positive"),
       ], x)
-    return control_flow_ops.with_dependencies([
+    return with_dependencies([
         tf.compat.v1.assert_none_equal(
             tf.linalg.diag_part(x),
             tf.zeros([], x.dtype),
@@ -219,11 +218,11 @@ def make_diag_scale(loc=None,
     if not validate_args:
       return x
     if assert_positive:
-      return control_flow_ops.with_dependencies([
+      return with_dependencies([
           tf.compat.v1.assert_positive(
               x, message="diagonal part must be positive"),
       ], x)
-    return control_flow_ops.with_dependencies([
+    return with_dependencies([
         tf.compat.v1.assert_none_equal(
             x, tf.zeros([], x.dtype), message="diagonal part must be non-zero")
     ], x)
@@ -688,7 +687,7 @@ def assert_integer_form(x,
 
 def assert_symmetric(matrix):
   matrix_t = tf.linalg.transpose(matrix)
-  return control_flow_ops.with_dependencies(
+  return with_dependencies(
       [tf.compat.v1.assert_equal(matrix, matrix_t)], matrix)
 
 
@@ -707,7 +706,7 @@ def embed_check_nonnegative_integer_form(
               x,
               message="'{}' cannot contain fractional components.".format(x)),
       ]
-    return control_flow_ops.with_dependencies(assertions, x)
+    return with_dependencies(assertions, x)
 
 
 def same_dynamic_shape(a, b):
@@ -833,7 +832,7 @@ def get_logits_and_probs(logits=None,
               tf.compat.v1.assert_less_equal(
                   probs, one, message="probs has components greater than 1.")
           ]
-        probs = control_flow_ops.with_dependencies(dependencies, probs)
+        probs = with_dependencies(dependencies, probs)
 
     with tf.name_scope("logits"):
       if multidimensional:
@@ -980,7 +979,7 @@ def embed_check_categorical_event_shape(
       return x
     else:
       event_size = tf.shape(input=x, name="x_shape")[-1]
-      return control_flow_ops.with_dependencies([
+      return with_dependencies([
           tf.compat.v1.assert_rank_at_least(
               x,
               1,
@@ -1094,7 +1093,7 @@ def embed_check_integer_casting_closed(x,
 
     if not assertions:
       return x
-    return control_flow_ops.with_dependencies(assertions, x)
+    return with_dependencies(assertions, x)
 
 
 def log_combinations(n, counts, name="log_combinations"):
@@ -2126,7 +2125,7 @@ def expand_to_vector(x, tensor_name=None, op_name=None, validate_args=False):
     if ndims is None:
       # Maybe expand ndims from 0 to 1.
       if validate_args:
-        x = control_flow_ops.with_dependencies([
+        x = with_dependencies([
             tf.compat.v1.assert_rank_in(
                 x, [0, 1], message="Input is neither scalar nor vector.")
         ], x)
@@ -2151,3 +2150,41 @@ def expand_to_vector(x, tensor_name=None, op_name=None, validate_args=False):
 
     # ndims == 1
     return x
+
+
+def with_dependencies(dependencies, output_tensor, name=None):
+  """Produces the content of `output_tensor` only after `dependencies`.
+
+  In some cases, a user may want the output of an operation to be consumed
+  externally only after some other dependencies have run first. This function
+  returns `output_tensor`, but only after all operations in `dependencies` have
+  run. Note that this means that there is no guarantee that `output_tensor` will
+  be evaluated after any `dependencies` have run.
+
+  See also `tf.tuple` and `tf.group`.
+
+  Args:
+    dependencies: Iterable of operations to run before this op finishes.
+    output_tensor: A `Tensor` or `IndexedSlices` that will be returned.
+    name: (Optional) A name for this operation.
+
+  Returns:
+    output_with_deps: Same as `output_tensor` but with embedded dependencies.
+
+  Raises:
+    TypeError: if `output_tensor` is not a `Tensor` or `IndexedSlices`.
+  """
+  if tf.executing_eagerly():
+    return output_tensor
+  with tf.name_scope(name, "control_dependency",
+                     list(dependencies) + [output_tensor]) as name:
+    with tf.compat.v1.colocate_with(output_tensor):
+      with tf.control_dependencies(dependencies):
+        output_tensor = tf.convert_to_tensor(value=output_tensor)
+        if isinstance(output_tensor, tf.Tensor):
+          return tf.identity(output_tensor, name=name)
+        else:
+          return tf.IndexedSlices(
+              tf.identity(output_tensor.values, name=name),
+              output_tensor.indices,
+              output_tensor.dense_shape)

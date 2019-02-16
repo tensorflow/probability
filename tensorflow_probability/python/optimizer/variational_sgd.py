@@ -20,7 +20,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 
-from tensorflow.python.ops import control_flow_ops
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow.python.training import training_ops
 
 
@@ -121,7 +121,7 @@ class VariationalSGD(tf.compat.v1.train.Optimizer):
         self._counter = tf.compat.v1.get_variable(
             'counter', initializer=0, trainable=False)
 
-      self._preconditioner_decay_rate = control_flow_ops.with_dependencies([
+      self._preconditioner_decay_rate = distribution_util.with_dependencies([
           tf.compat.v1.assert_non_negative(
               self._preconditioner_decay_rate,
               message='`preconditioner_decay_rate` must be non-negative'),
@@ -131,34 +131,34 @@ class VariationalSGD(tf.compat.v1.train.Optimizer):
               message='`preconditioner_decay_rate` must be at most 1.'),
       ], self._preconditioner_decay_rate)
 
-      self._batch_size = control_flow_ops.with_dependencies([
+      self._batch_size = distribution_util.with_dependencies([
           tf.compat.v1.assert_greater(
               self._batch_size,
               0,
               message='`batch_size` must be greater than zero')
       ], self._batch_size)
 
-      self._total_num_examples = control_flow_ops.with_dependencies([
+      self._total_num_examples = distribution_util.with_dependencies([
           tf.compat.v1.assert_greater(
               self._total_num_examples,
               0,
               message='`total_num_examples` must be greater than zero')
       ], self._total_num_examples)
 
-      self._burnin = control_flow_ops.with_dependencies([
+      self._burnin = distribution_util.with_dependencies([
           tf.compat.v1.assert_non_negative(
               self._burnin, message='`burnin` must be non-negative'),
           tf.compat.v1.assert_integer(
               self._burnin, message='`burnin` must be an integer')
       ], self._burnin)
 
-      self._burnin_max_learning_rate = control_flow_ops.with_dependencies([
+      self._burnin_max_learning_rate = distribution_util.with_dependencies([
           tf.compat.v1.assert_non_negative(
               self._burnin_max_learning_rate,
               message='`burnin_max_learning_rate` must be non-negative')
       ], self._burnin_max_learning_rate)
 
-      self._max_learning_rate = control_flow_ops.with_dependencies([
+      self._max_learning_rate = distribution_util.with_dependencies([
           tf.compat.v1.assert_non_negative(
               self._max_learning_rate,
               message='`max_learning_rate` must be non-negative')
@@ -204,7 +204,7 @@ class VariationalSGD(tf.compat.v1.train.Optimizer):
             tf.cast(self._counter < 1, var.dtype) *
             -(1. - decay_tensor) * (
                 avg_second - decay_tensor  * tf.square(delta)))
-      diag_preconditioner = control_flow_ops.with_dependencies(
+      diag_preconditioner = distribution_util.with_dependencies(
           [second_moment_update],
           tf.clip_by_value(avg_second, 1e-12, 1e12))
     elif isinstance(grad, tf.IndexedSlices):

@@ -25,10 +25,9 @@ import tensorflow as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import seed_stream
-from tensorflow_probability.python.internal import distribution_util as util
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.ops import control_flow_ops
 
 
 __all__ = [
@@ -242,19 +241,19 @@ class Beta(distribution.Distribution):
     beta_sample = gamma1_sample / (gamma1_sample + gamma2_sample)
     return beta_sample
 
-  @util.AppendDocstring(_beta_sample_note)
+  @distribution_util.AppendDocstring(_beta_sample_note)
   def _log_prob(self, x):
     return self._log_unnormalized_prob(x) - self._log_normalization()
 
-  @util.AppendDocstring(_beta_sample_note)
+  @distribution_util.AppendDocstring(_beta_sample_note)
   def _prob(self, x):
     return tf.exp(self._log_prob(x))
 
-  @util.AppendDocstring(_beta_sample_note)
+  @distribution_util.AppendDocstring(_beta_sample_note)
   def _log_cdf(self, x):
     return tf.math.log(self._cdf(x))
 
-  @util.AppendDocstring(_beta_sample_note)
+  @distribution_util.AppendDocstring(_beta_sample_note)
   def _cdf(self, x):
     return tf.math.betainc(self.concentration1, self.concentration0, x)
 
@@ -281,7 +280,7 @@ class Beta(distribution.Distribution):
   def _variance(self):
     return self._mean() * (1. - self._mean()) / (1. + self.total_concentration)
 
-  @util.AppendDocstring(
+  @distribution_util.AppendDocstring(
       """Note: The mode is undefined when `concentration1 <= 1` or
       `concentration0 <= 1`. If `self.allow_nan_stats` is `True`, `NaN`
       is used for undefined modes. If `self.allow_nan_stats` is `False` an
@@ -296,7 +295,7 @@ class Beta(distribution.Distribution):
       is_defined = tf.logical_and(self.concentration1 > 1.,
                                   self.concentration0 > 1.)
       return tf.where(is_defined, mode, nan)
-    return control_flow_ops.with_dependencies([
+    return distribution_util.with_dependencies([
         tf.compat.v1.assert_less(
             tf.ones([], dtype=self.dtype),
             self.concentration1,
@@ -311,7 +310,7 @@ class Beta(distribution.Distribution):
     """Checks the validity of a concentration parameter."""
     if not validate_args:
       return concentration
-    return control_flow_ops.with_dependencies([
+    return distribution_util.with_dependencies([
         tf.compat.v1.assert_positive(
             concentration, message="Concentration parameter must be positive."),
     ], concentration)
@@ -320,7 +319,7 @@ class Beta(distribution.Distribution):
     """Checks the validity of a sample."""
     if not self.validate_args:
       return x
-    return control_flow_ops.with_dependencies([
+    return distribution_util.with_dependencies([
         tf.compat.v1.assert_positive(x, message="sample must be positive"),
         tf.compat.v1.assert_less(
             x, tf.ones([], self.dtype),

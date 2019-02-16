@@ -24,7 +24,6 @@ import tensorflow as tf
 
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow.python.ops import control_flow_ops
 
 __all__ = [
     'find_bins',
@@ -284,7 +283,7 @@ def percentile(x,
     _get_static_ndims(q, expect_ndims_no_more_than=1)
 
     if validate_args:
-      q = control_flow_ops.with_dependencies([
+      q = distribution_util.with_dependencies([
           tf.compat.v1.assert_rank_in(q, [0, 1]),
           tf.compat.v1.assert_greater_equal(q, tf.cast(0., tf.float64)),
           tf.compat.v1.assert_less_equal(q, tf.cast(100., tf.float64))

@@ -25,7 +25,6 @@ from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.ops import control_flow_ops
 
 __all__ = [
     "DirichletMultinomial",
@@ -326,7 +325,7 @@ class DirichletMultinomial(distribution.Distribution):
       return concentration
     concentration = distribution_util.embed_check_categorical_event_shape(
         concentration)
-    return control_flow_ops.with_dependencies([
+    return distribution_util.with_dependencies([
         tf.compat.v1.assert_positive(
             concentration, message="Concentration parameter must be positive."),
     ], concentration)
@@ -336,7 +335,7 @@ class DirichletMultinomial(distribution.Distribution):
     if not self.validate_args:
       return counts
     counts = distribution_util.embed_check_nonnegative_integer_form(counts)
-    return control_flow_ops.with_dependencies([
+    return distribution_util.with_dependencies([
         tf.compat.v1.assert_equal(
             self.total_count,
             tf.reduce_sum(input_tensor=counts, axis=-1),

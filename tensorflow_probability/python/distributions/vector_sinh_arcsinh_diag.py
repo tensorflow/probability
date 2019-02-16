@@ -26,7 +26,6 @@ from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow.python.ops import control_flow_ops
 
 __all__ = [
     "VectorSinhArcsinhDiag",
@@ -214,7 +213,7 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
         asserts = distribution_util.maybe_check_scalar_distribution(
             distribution, dtype, validate_args)
         if asserts:
-          scale_diag_part = control_flow_ops.with_dependencies(
+          scale_diag_part = distribution_util.with_dependencies(
               asserts, scale_diag_part)
 
       # Make the SAS bijector, 'F'.

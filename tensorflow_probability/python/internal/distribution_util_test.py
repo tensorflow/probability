@@ -1837,5 +1837,33 @@ class ExpandToVectorTest(tf.test.TestCase):
         self.evaluate(_expand_tensor([[1, 2]], shape=None, validate_args=True))
 
 
+@test_util.run_all_in_graph_and_eager_modes
+class WithDependenciesTestCase(test_util.TensorFlowTestCase):
+
+  def testTupleDependencies(self):
+    counter = tf.compat.v2.Variable(0, name="my_counter")
+    const_with_dep = distribution_util.with_dependencies(
+        (tf.compat.v1.assign_add(counter, 1), tf.constant(42)),
+        tf.constant(7))
+
+    self.evaluate(tf.compat.v1.global_variables_initializer())
+    self.assertEqual(1 if tf.executing_eagerly() else 0,
+                     self.evaluate(counter))
+    self.assertEqual(7, self.evaluate(const_with_dep))
+    self.assertEqual(1, self.evaluate(counter))
+
+  def testListDependencies(self):
+    counter = tf.compat.v2.Variable(0, name="my_counter")
+    const_with_dep = distribution_util.with_dependencies(
+        [tf.compat.v1.assign_add(counter, 1), tf.constant(42)],
+        tf.constant(7))
+
+    self.evaluate(tf.compat.v1.global_variables_initializer())
+    self.assertEqual(1 if tf.executing_eagerly() else 0,
+                     self.evaluate(counter))
+    self.assertEqual(7, self.evaluate(const_with_dep))
+    self.assertEqual(1, self.evaluate(counter))
+
+
 if __name__ == "__main__":
   tf.test.main()

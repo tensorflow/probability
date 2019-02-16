@@ -23,7 +23,6 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.ops import control_flow_ops
 
 
 class OneHotCategorical(distribution.Distribution):
@@ -221,7 +220,7 @@ class OneHotCategorical(distribution.Distribution):
   def _assert_valid_sample(self, x):
     if not self.validate_args:
       return x
-    return control_flow_ops.with_dependencies([
+    return distribution_util.with_dependencies([
         tf.compat.v1.assert_non_positive(x),
         tf.compat.v1.assert_near(
             tf.zeros([], dtype=self.dtype),

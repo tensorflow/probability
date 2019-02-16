@@ -28,7 +28,6 @@ from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.ops import control_flow_ops
 
 __all__ = [
     "Wishart",
@@ -148,7 +147,7 @@ class _WishartLinearOperator(distribution.Distribution):
               message=("Degrees of freedom (df = %s) cannot be "
                        "less than dimension of scale matrix "
                        "(scale.dimension = %s)" % (self._dimension, self._df)))
-          self._df = control_flow_ops.with_dependencies(
+          self._df = distribution_util.with_dependencies(
               [assertions], self._df)
     super(_WishartLinearOperator, self).__init__(
         dtype=self._scale_operator.dtype,
@@ -539,7 +538,7 @@ class Wishart(_WishartLinearOperator):
           scale_tril = tf.convert_to_tensor(
               value=scale_tril, name="scale_tril", dtype=dtype)
           if validate_args:
-            scale_tril = control_flow_ops.with_dependencies([
+            scale_tril = distribution_util.with_dependencies([
                 tf.compat.v1.assert_positive(
                     tf.linalg.diag_part(scale_tril),
                     message="scale_tril must be positive definite"),

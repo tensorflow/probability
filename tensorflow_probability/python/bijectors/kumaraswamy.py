@@ -20,7 +20,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow.python.ops import control_flow_ops
+from tensorflow_probability.python.internal import distribution_util
 
 __all__ = [
     "Kumaraswamy",
@@ -110,7 +110,7 @@ class Kumaraswamy(bijector.Bijector):
     """Checks the validity of a concentration parameter."""
     if not validate_args:
       return concentration
-    return control_flow_ops.with_dependencies([
+    return distribution_util.with_dependencies([
         tf.compat.v1.assert_positive(
             concentration, message="Concentration parameter must be positive."),
     ], concentration)
@@ -118,7 +118,7 @@ class Kumaraswamy(bijector.Bijector):
   def _maybe_assert_valid(self, x):
     if not self.validate_args:
       return x
-    return control_flow_ops.with_dependencies([
+    return distribution_util.with_dependencies([
         tf.compat.v1.assert_non_negative(
             x, message="sample must be non-negative"),
         tf.compat.v1.assert_less_equal(

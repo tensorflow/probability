@@ -20,7 +20,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow.python.ops import control_flow_ops
+from tensorflow_probability.python.internal import distribution_util
 
 __all__ = [
     "AbsoluteValue",
@@ -89,7 +89,7 @@ class AbsoluteValue(bijector.Bijector):
 
   def _inverse(self, y):
     if self.validate_args:
-      y = control_flow_ops.with_dependencies([
+      y = distribution_util.with_dependencies([
           tf.compat.v1.assert_non_negative(
               y, message="Argument y was negative")
       ], y)
@@ -101,7 +101,7 @@ class AbsoluteValue(bijector.Bijector):
     # so Log|DF^{-1}(y)| = Log[1, 1] = [0, 0].
     zeros = tf.constant(0., dtype=y.dtype)
     if self.validate_args:
-      zeros = control_flow_ops.with_dependencies([
+      zeros = distribution_util.with_dependencies([
           tf.compat.v1.assert_non_negative(
               y, message="Argument y was negative")
       ], zeros)

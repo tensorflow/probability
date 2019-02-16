@@ -20,7 +20,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow.python.ops import control_flow_ops
+from tensorflow_probability.python.internal import distribution_util
 
 
 __all__ = [
@@ -84,4 +84,4 @@ class Softsign(bijector.Bijector):
             message="Inverse transformation input must be less than 1.")
     ]
 
-    return control_flow_ops.with_dependencies(is_valid, y)
+    return distribution_util.with_dependencies(is_valid, y)

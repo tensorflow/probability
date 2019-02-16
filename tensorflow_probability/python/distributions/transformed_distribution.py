@@ -24,7 +24,6 @@ import tensorflow as tf
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow.python.framework import tensor_util
-from tensorflow.python.ops import control_flow_ops
 
 __all__ = [
     "TransformedDistribution",
@@ -641,7 +640,7 @@ class TransformedDistribution(distribution_lib.Distribution):
 
     if not dynamic_assertions:
       return override_shape
-    return control_flow_ops.with_dependencies(
+    return distribution_util.with_dependencies(
         dynamic_assertions, override_shape)
 
   def _maybe_rotate_dims(self, x, rotate_right=False):

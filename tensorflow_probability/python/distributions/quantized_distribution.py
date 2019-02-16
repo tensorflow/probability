@@ -25,7 +25,6 @@ import tensorflow as tf
 from tensorflow_probability.python.distributions import distribution as distributions
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.ops import control_flow_ops
 
 
 __all__ = ["QuantizedDistribution"]
@@ -559,4 +558,4 @@ class QuantizedDistribution(distributions.Distribution):
         return value
       dependencies = [distribution_util.assert_integer_form(
           value, message="value has non-integer components.")]
-      return control_flow_ops.with_dependencies(dependencies, value)
+      return distribution_util.with_dependencies(dependencies, value)

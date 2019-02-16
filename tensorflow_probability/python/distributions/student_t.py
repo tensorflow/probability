@@ -27,7 +27,6 @@ from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.ops import control_flow_ops
 
 
 __all__ = [
@@ -292,7 +291,7 @@ class StudentT(distribution.Distribution):
           mean,
           tf.fill(self.batch_shape_tensor(), nan, name="nan"))
     else:
-      return control_flow_ops.with_dependencies([
+      return distribution_util.with_dependencies([
           tf.compat.v1.assert_less(
               tf.ones([], dtype=self.dtype),
               self.df,
@@ -333,7 +332,7 @@ class StudentT(distribution.Distribution):
           result_where_defined,
           tf.fill(self.batch_shape_tensor(), nan, name="nan"))
     else:
-      return control_flow_ops.with_dependencies([
+      return distribution_util.with_dependencies([
           tf.compat.v1.assert_less(
               tf.ones([], dtype=self.dtype),
               self.df,

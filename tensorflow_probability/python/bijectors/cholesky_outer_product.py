@@ -24,7 +24,6 @@ import tensorflow as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import distribution_util
-from tensorflow.python.ops import control_flow_ops
 
 
 __all__ = [
@@ -87,7 +86,7 @@ class CholeskyOuterProduct(bijector.Bijector):
       is_matrix = tf.compat.v1.assert_rank_at_least(x, 2)
       shape = tf.shape(input=x)
       is_square = tf.compat.v1.assert_equal(shape[-2], shape[-1])
-      x = control_flow_ops.with_dependencies([is_matrix, is_square], x)
+      x = distribution_util.with_dependencies([is_matrix, is_square], x)
     # For safety, explicitly zero-out the upper triangular part.
     x = tf.linalg.band_part(x, -1, 0)
     return tf.matmul(x, x, adjoint_b=True)
@@ -154,7 +153,7 @@ class CholeskyOuterProduct(bijector.Bijector):
       # Assuming lower-triangular means we only need check diag>0.
       is_positive_definite = tf.compat.v1.assert_positive(
           diag, message="Input must be positive definite.")
-      x = control_flow_ops.with_dependencies(
+      x = distribution_util.with_dependencies(
           [is_matrix, is_square, is_positive_definite], x)
 
     # Create a vector equal to: [p, p-1, ..., 2, 1].

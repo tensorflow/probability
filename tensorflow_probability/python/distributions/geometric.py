@@ -24,7 +24,6 @@ import tensorflow as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.ops import control_flow_ops
 
 
 class Geometric(distribution.Distribution):
@@ -161,7 +160,7 @@ class Geometric(distribution.Distribution):
   def _entropy(self):
     probs = self._probs
     if self.validate_args:
-      probs = control_flow_ops.with_dependencies([
+      probs = distribution_util.with_dependencies([
           tf.compat.v1.assert_less(
               probs,
               tf.constant(1., probs.dtype),

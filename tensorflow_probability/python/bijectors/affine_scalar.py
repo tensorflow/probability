@@ -20,8 +20,8 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow.python.ops import control_flow_ops
 
 
 __all__ = [
@@ -90,7 +90,7 @@ class AffineScalar(bijector.Bijector):
       if self._scale is not None:
         self._scale = tf.convert_to_tensor(value=scale, name="scale")
         if validate_args:
-          self._scale = control_flow_ops.with_dependencies([
+          self._scale = distribution_util.with_dependencies([
               tf.compat.v1.assert_none_equal(
                   self._scale, tf.zeros([], dtype=self._scale.dtype))
           ], self._scale)

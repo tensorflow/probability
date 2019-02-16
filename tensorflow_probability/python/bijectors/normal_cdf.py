@@ -23,8 +23,8 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import special_math
-from tensorflow.python.ops import control_flow_ops
 
 __all__ = [
     "NormalCDF",
@@ -83,4 +83,4 @@ class NormalCDF(bijector.Bijector):
         y,
         tf.constant(1., y.dtype),
         message="Inverse transformation input must be less than or equal to 1.")
-    return control_flow_ops.with_dependencies([is_positive, less_than_one], y)
+    return distribution_util.with_dependencies([is_positive, less_than_one], y)

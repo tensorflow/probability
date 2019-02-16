@@ -30,7 +30,6 @@ from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.ops.linalg import linear_operator_addition as linop_add_lib
 
 
@@ -451,7 +450,7 @@ class VectorDiffeomixture(distribution_lib.Distribution):
       asserts = distribution_util.maybe_check_scalar_distribution(
           distribution, dtype, validate_args)
       if asserts:
-        self._grid = control_flow_ops.with_dependencies(
+        self._grid = distribution_util.with_dependencies(
             asserts, self._grid)
       self._distribution = distribution
 
@@ -802,7 +801,7 @@ def maybe_check_quadrature_param(param, name, validate_args):
                        "{}.shape[-1] is not 1.".format(name))))
 
     if assertions:
-      return control_flow_ops.with_dependencies(assertions, param)
+      return distribution_util.with_dependencies(assertions, param)
     return param
 
 

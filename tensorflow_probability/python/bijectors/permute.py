@@ -23,7 +23,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow.python.ops import control_flow_ops
+from tensorflow_probability.python.internal import distribution_util
 
 
 __all__ = [
@@ -106,7 +106,7 @@ class Permute(bijector.Bijector):
       elif validate_args:
         p, _ = tf.nn.top_k(
             -permutation, k=tf.shape(input=permutation)[-1], sorted=True)
-        permutation = control_flow_ops.with_dependencies([
+        permutation = distribution_util.with_dependencies([
             tf.compat.v1.assert_equal(
                 -p,
                 tf.range(tf.size(input=p)),

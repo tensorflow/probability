@@ -26,9 +26,9 @@ import tensorflow as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.ops import control_flow_ops
 
 __all__ = [
     "Deterministic",
@@ -94,7 +94,7 @@ class _BaseDeterministic(distribution.Distribution):
           if loc.shape.ndims < 1:
             raise ValueError(msg)
         else:
-          loc = control_flow_ops.with_dependencies(
+          loc = distribution_util.with_dependencies(
               [tf.compat.v1.assert_rank_at_least(loc, 1, message=msg)], loc)
       self._loc = loc
 
@@ -121,7 +121,7 @@ class _BaseDeterministic(distribution.Distribution):
 
     tol = tf.convert_to_tensor(value=tol, dtype=self.loc.dtype)
     if self.validate_args:
-      tol = control_flow_ops.with_dependencies([
+      tol = distribution_util.with_dependencies([
           tf.compat.v1.assert_non_negative(
               tol, message="Argument 'tol' must be non-negative")
       ], tol)

@@ -27,7 +27,6 @@ from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.ops import control_flow_ops
 
 
 __all__ = [
@@ -285,7 +284,7 @@ class Dirichlet(distribution.Distribution):
       return tf.where(
           tf.reduce_all(input_tensor=self.concentration > 1., axis=-1), mode,
           nan)
-    return control_flow_ops.with_dependencies([
+    return distribution_util.with_dependencies([
         tf.compat.v1.assert_less(
             tf.ones([], self.dtype),
             self.concentration,
@@ -296,7 +295,7 @@ class Dirichlet(distribution.Distribution):
     """Checks the validity of the concentration parameter."""
     if not validate_args:
       return concentration
-    return control_flow_ops.with_dependencies([
+    return distribution_util.with_dependencies([
         tf.compat.v1.assert_positive(
             concentration, message="Concentration parameter must be positive."),
         tf.compat.v1.assert_rank_at_least(
@@ -313,7 +312,7 @@ class Dirichlet(distribution.Distribution):
     """Checks the validity of a sample."""
     if not self.validate_args:
       return x
-    return control_flow_ops.with_dependencies([
+    return distribution_util.with_dependencies([
         tf.compat.v1.assert_positive(x, message="samples must be positive"),
         tf.compat.v1.assert_near(
             tf.ones([], dtype=self.dtype),

@@ -22,7 +22,6 @@ import tensorflow as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow.python.ops import control_flow_ops
 
 
 __all__ = [
@@ -280,7 +279,7 @@ class Affine(bijector.Bijector):
 
     if self._is_only_identity_multiplier:
       if validate_args:
-        return control_flow_ops.with_dependencies([
+        return distribution_util.with_dependencies([
             tf.compat.v1.assert_none_equal(
                 identity_multiplier, tf.zeros([], identity_multiplier.dtype),
                 ["identity_multiplier should be non-zero."])

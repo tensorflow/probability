@@ -21,7 +21,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow.python.ops import control_flow_ops
+from tensorflow_probability.python.internal import distribution_util
 
 
 __all__ = [
@@ -79,7 +79,7 @@ class Ordered(bijector.Bijector):
     if self.validate_args:
       is_greater_one = tf.compat.v1.assert_greater(
           output_shape[-1], 1, message="Need last dimension greater than 1.")
-      output_shape = control_flow_ops.with_dependencies(
+      output_shape = distribution_util.with_dependencies(
           [is_greater_one], output_shape)
     return (output_shape[-1])[..., tf.newaxis]
 
@@ -118,4 +118,4 @@ class Ordered(bijector.Bijector):
     is_valid = tf.compat.v1.assert_positive(
         x[..., 1:] - x[..., :-1],
         message="Forward transformation input must be strictly increasing.")
-    return control_flow_ops.with_dependencies([is_valid], x)
+    return distribution_util.with_dependencies([is_valid], x)

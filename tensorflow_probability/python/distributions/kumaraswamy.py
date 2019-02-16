@@ -28,7 +28,6 @@ from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.ops import control_flow_ops
 
 __all__ = [
     "Kumaraswamy",
@@ -220,7 +219,7 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
       is_defined = (self.concentration1 > 1.) & (self.concentration0 > 1.)
       return tf.where(is_defined, mode, nan)
 
-    return control_flow_ops.with_dependencies([
+    return distribution_util.with_dependencies([
         tf.compat.v1.assert_less(
             tf.ones([], dtype=self.concentration1.dtype),
             self.concentration1,

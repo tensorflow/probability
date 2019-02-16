@@ -20,7 +20,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow.python.ops import control_flow_ops
+from tensorflow_probability.python.internal import distribution_util
 
 
 __all__ = [
@@ -71,11 +71,11 @@ class Weibull(bijector.Bijector):
           value=concentration, name="concentration")
       tf.debugging.assert_same_float_dtype([self._scale, self._concentration])
       if validate_args:
-        self._scale = control_flow_ops.with_dependencies([
+        self._scale = distribution_util.with_dependencies([
             tf.compat.v1.assert_positive(
                 self._scale, message="Argument scale was not positive")
         ], self._scale)
-        self._concentration = control_flow_ops.with_dependencies([
+        self._concentration = distribution_util.with_dependencies([
             tf.compat.v1.assert_positive(
                 self._concentration,
                 message="Argument concentration was not positive")
@@ -122,7 +122,7 @@ class Weibull(bijector.Bijector):
       return x
     is_valid = tf.compat.v1.assert_non_negative(
         x, message="Forward transformation input must be at least 0.")
-    return control_flow_ops.with_dependencies([is_valid], x)
+    return distribution_util.with_dependencies([is_valid], x)
 
   def _maybe_assert_valid_y(self, y):
     if not self.validate_args:
@@ -133,4 +133,4 @@ class Weibull(bijector.Bijector):
         y,
         tf.constant(1., y.dtype),
         message="Inverse transformation input must be less than or equal to 1.")
-    return control_flow_ops.with_dependencies([is_positive, less_than_one], y)
+    return distribution_util.with_dependencies([is_positive, less_than_one], y)

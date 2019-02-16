@@ -20,7 +20,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow.python.ops import control_flow_ops
+from tensorflow_probability.python.internal import distribution_util
 
 
 __all__ = [
@@ -106,11 +106,11 @@ class PowerTransform(bijector.Bijector):
         1. + self.power * x,
         message="Forward transformation input must be at least {}.".format(
             -1. / self.power))
-    return control_flow_ops.with_dependencies([is_valid], x)
+    return distribution_util.with_dependencies([is_valid], x)
 
   def _maybe_assert_valid_y(self, y):
     if not self.validate_args:
       return y
     is_valid = tf.compat.v1.assert_positive(
         y, message="Inverse transformation input must be greater than 0.")
-    return control_flow_ops.with_dependencies([is_valid], y)
+    return distribution_util.with_dependencies([is_valid], y)

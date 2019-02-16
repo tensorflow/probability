@@ -20,8 +20,8 @@ from __future__ import print_function
 
 import tensorflow as tf
 
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.math import diag_jacobian
-from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.training import training_ops
 
 
@@ -186,7 +186,7 @@ class StochasticGradientLangevinDynamics(tf.compat.v1.train.Optimizer):
         self._counter = tf.compat.v1.get_variable(
             'counter', initializer=0, trainable=False)
 
-      self._preconditioner_decay_rate = control_flow_ops.with_dependencies([
+      self._preconditioner_decay_rate = distribution_util.with_dependencies([
           tf.compat.v1.assert_non_negative(
               self._preconditioner_decay_rate,
               message='`preconditioner_decay_rate` must be non-negative'),
@@ -196,21 +196,21 @@ class StochasticGradientLangevinDynamics(tf.compat.v1.train.Optimizer):
               message='`preconditioner_decay_rate` must be at most 1.'),
       ], self._preconditioner_decay_rate)
 
-      self._data_size = control_flow_ops.with_dependencies([
+      self._data_size = distribution_util.with_dependencies([
           tf.compat.v1.assert_greater(
               self._data_size,
               0,
               message='`data_size` must be greater than zero')
       ], self._data_size)
 
-      self._burnin = control_flow_ops.with_dependencies([
+      self._burnin = distribution_util.with_dependencies([
           tf.compat.v1.assert_non_negative(
               self._burnin, message='`burnin` must be non-negative'),
           tf.compat.v1.assert_integer(
               self._burnin, message='`burnin` must be an integer')
       ], self._burnin)
 
-      self._diagonal_bias = control_flow_ops.with_dependencies([
+      self._diagonal_bias = distribution_util.with_dependencies([
           tf.compat.v1.assert_non_negative(
               self._diagonal_bias,
               message='`diagonal_bias` must be non-negative')
@@ -228,7 +228,7 @@ class StochasticGradientLangevinDynamics(tf.compat.v1.train.Optimizer):
   def _prepare(self):
     # We need to put the conversion and check here because a user will likely
     # want to decay the learning rate dynamically.
-    self._learning_rate_tensor = control_flow_ops.with_dependencies(
+    self._learning_rate_tensor = distribution_util.with_dependencies(
         [
             tf.compat.v1.assert_non_negative(
                 self._learning_rate,

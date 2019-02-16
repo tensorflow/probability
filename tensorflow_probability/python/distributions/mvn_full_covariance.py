@@ -20,8 +20,8 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python.distributions import mvn_tril
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow.python.ops import control_flow_ops
 
 
 __all__ = [
@@ -167,7 +167,7 @@ class MultivariateNormalFullCovariance(mvn_tril.MultivariateNormalTriL):
           covariance_matrix = tf.convert_to_tensor(
               value=covariance_matrix, name="covariance_matrix", dtype=dtype)
           if validate_args:
-            covariance_matrix = control_flow_ops.with_dependencies([
+            covariance_matrix = distribution_util.with_dependencies([
                 tf.compat.v1.assert_near(
                     covariance_matrix,
                     tf.linalg.transpose(covariance_matrix),

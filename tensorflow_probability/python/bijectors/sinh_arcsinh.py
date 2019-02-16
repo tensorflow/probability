@@ -23,7 +23,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow.python.ops import control_flow_ops
+from tensorflow_probability.python.internal import distribution_util
 
 __all__ = [
     "SinhArcsinh",
@@ -113,7 +113,7 @@ class SinhArcsinh(bijector.Bijector):
           value=tailweight, name="tailweight", dtype=self._skewness.dtype)
       tf.debugging.assert_same_float_dtype([self._skewness, self._tailweight])
       if validate_args:
-        self._tailweight = control_flow_ops.with_dependencies([
+        self._tailweight = distribution_util.with_dependencies([
             tf.compat.v1.assert_positive(
                 self._tailweight,
                 message="Argument tailweight was not positive")
