@@ -24,7 +24,6 @@ import tensorflow as tf
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.positive_semidefinite_kernels import positive_semidefinite_kernel as psd_kernel
 from tensorflow_probability.python.positive_semidefinite_kernels.internal import util
-from tensorflow.python.framework import tensor_shape
 
 __all__ = [
     "RationalQuadratic",
@@ -183,7 +182,7 @@ class RationalQuadratic(psd_kernel.PositiveSemidefiniteKernel):
         ] if x is not None
     ]
     if not shape_list:
-      return tensor_shape.scalar()
+      return tf.TensorShape([])
     return functools.reduce(tf.broadcast_static_shape, shape_list)
 
   def _batch_shape_tensor(self):

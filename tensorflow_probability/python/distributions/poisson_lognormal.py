@@ -32,7 +32,6 @@ from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.framework import tensor_shape
 
 
 __all__ = [
@@ -328,7 +327,7 @@ class PoissonLogNormalQuadratureCompound(distribution.Distribution):
         self.mixture_distribution.logits.shape)[:-1]
 
   def _event_shape(self):
-    return tensor_shape.scalar()
+    return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
     # Get ids as a [n, batch_size]-shaped matrix, unless batch_shape=[] then get

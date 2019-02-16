@@ -28,7 +28,6 @@ from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.framework import tensor_shape
 
 
 class Pareto(distribution.Distribution):
@@ -119,7 +118,7 @@ class Pareto(distribution.Distribution):
     return tf.broadcast_static_shape(self.concentration.shape, self.scale.shape)
 
   def _event_shape(self):
-    return tensor_shape.scalar()
+    return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
     shape = tf.concat([[n], self.batch_shape_tensor()], 0)

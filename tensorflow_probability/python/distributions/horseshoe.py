@@ -27,7 +27,6 @@ from tensorflow_probability.python.distributions import HalfCauchy
 from tensorflow_probability.python.distributions.seed_stream import SeedStream
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.framework import tensor_shape
 
 
 __all__ = [
@@ -178,7 +177,7 @@ class Horseshoe(distribution.Distribution):
     return tf.constant([], dtype=tf.int32)
 
   def _event_shape(self):
-    return tensor_shape.scalar()
+    return tf.TensorShape([])
 
   def _log_prob(self, x):
     # The exact HalfCauchy-Normal marginal log-density is analytically

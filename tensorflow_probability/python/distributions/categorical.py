@@ -23,7 +23,6 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import distribution_util as util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.framework import tensor_shape
 
 
 def _broadcast_cat_event_and_params(event, params, base_dtype):
@@ -198,7 +197,7 @@ class Categorical(distribution.Distribution):
           self._batch_rank = tf.rank(self._logits) - 1
 
       logits_shape = tf.shape(input=self._logits, name="logits_shape")
-      event_size = tensor_shape.dimension_value(logits_shape_static[-1])
+      event_size = tf.compat.dimension_value(logits_shape_static[-1])
       if event_size is not None:
         self._event_size = tf.convert_to_tensor(
             value=event_size, dtype=tf.int32, name="event_size")
@@ -249,7 +248,7 @@ class Categorical(distribution.Distribution):
     return tf.constant([], dtype=tf.int32)
 
   def _event_shape(self):
-    return tensor_shape.scalar()
+    return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
     if self.logits.shape.ndims == 2:

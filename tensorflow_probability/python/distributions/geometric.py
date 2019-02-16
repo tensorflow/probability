@@ -24,7 +24,6 @@ import tensorflow as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.framework import tensor_shape
 from tensorflow.python.ops import control_flow_ops
 
 
@@ -118,7 +117,7 @@ class Geometric(distribution.Distribution):
     return tf.constant([], dtype=tf.int32)
 
   def _event_shape(self):
-    return tensor_shape.scalar()
+    return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
     # Uniform variates must be sampled from the open-interval `(0, 1)` rather

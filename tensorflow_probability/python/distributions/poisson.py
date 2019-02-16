@@ -24,7 +24,6 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.framework import tensor_shape
 
 __all__ = [
     "Poisson",
@@ -149,7 +148,7 @@ class Poisson(distribution.Distribution):
     return tf.constant([], dtype=tf.int32)
 
   def _event_shape(self):
-    return tensor_shape.scalar()
+    return tf.TensorShape([])
 
   def _log_prob(self, x):
     log_probs = self._log_unnormalized_prob(x) - self._log_normalization()

@@ -27,8 +27,6 @@ from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 
-from tensorflow.python.framework import tensor_shape
-
 
 def _broadcast_to(tensor_to_broadcast, target_tensors):
   """Helper to broadcast a tensor using a list of target tensors."""
@@ -196,7 +194,7 @@ class Triangular(tf.compat.v1.distributions.Distribution):
             self.low.shape, self.high.shape))
 
   def _event_shape(self):
-    return tensor_shape.scalar()
+    return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
     stream = seed_stream.SeedStream(seed, salt="triangular")

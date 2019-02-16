@@ -28,7 +28,6 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.framework import tensor_shape
 from tensorflow.python.ops import control_flow_ops
 
 __all__ = [
@@ -261,7 +260,7 @@ class Deterministic(_BaseDeterministic):
     return tf.constant([], dtype=tf.int32)
 
   def _event_shape(self):
-    return tensor_shape.scalar()
+    return tf.TensorShape([])
 
   def _prob(self, x):
     return tf.cast(tf.abs(x - self.loc) <= self._slack, dtype=self.dtype)

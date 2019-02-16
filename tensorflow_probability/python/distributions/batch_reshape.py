@@ -23,7 +23,6 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.distributions import distribution as distribution_lib
-from tensorflow.python.framework import tensor_shape
 from tensorflow.python.framework import tensor_util
 
 
@@ -181,7 +180,7 @@ class BatchReshape(distribution_lib.Distribution):
     return self._call_and_reshape_output(
         self.distribution.entropy,
         [],
-        [tensor_shape.scalar()])
+        [tf.TensorShape([])])
 
   def _mean(self):
     return self._call_and_reshape_output(self.distribution.mean)

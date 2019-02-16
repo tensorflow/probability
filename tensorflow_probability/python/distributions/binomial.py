@@ -22,7 +22,6 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.framework import tensor_shape
 from tensorflow.python.ops import control_flow_ops
 
 
@@ -209,7 +208,7 @@ class Binomial(distribution.Distribution):
     return tf.constant([], dtype=tf.int32)
 
   def _event_shape(self):
-    return tensor_shape.scalar()
+    return tf.TensorShape([])
 
   @distribution_util.AppendDocstring(_binomial_sample_note)
   def _log_prob(self, counts):

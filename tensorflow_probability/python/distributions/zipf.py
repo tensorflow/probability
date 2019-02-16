@@ -24,7 +24,6 @@ import tensorflow as tf
 from tensorflow_probability.python.distributions.seed_stream import SeedStream
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow.python.framework import tensor_shape
 
 __all__ = [
     "Zipf",
@@ -150,7 +149,7 @@ class Zipf(tf.compat.v1.distributions.Distribution):
     return tf.constant([], dtype=tf.int32)
 
   def _event_shape(self):
-    return tensor_shape.scalar()
+    return tf.TensorShape([])
 
   def _log_prob(self, x):
     # The log probability at positive integer points x is log(x^(-power) / Z)

@@ -27,7 +27,6 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import special_math
-from tensorflow.python.framework import tensor_shape
 
 __all__ = [
     "InverseGaussian",
@@ -141,7 +140,7 @@ class InverseGaussian(distribution.Distribution):
         self.loc.shape, self.concentration.shape)
 
   def _event_shape(self):
-    return tensor_shape.scalar()
+    return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
     # See https://en.wikipedia.org/wiki/Inverse_Gaussian_distribution or
