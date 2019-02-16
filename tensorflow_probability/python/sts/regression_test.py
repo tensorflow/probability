@@ -84,20 +84,28 @@ class _LinearRegressionTest(object):
 
     learnable_weights = tf.compat.v2.Variable(
         tf.zeros([num_features], dtype=true_weights.dtype))
-    learnable_ssm = model.make_state_space_model(
-        num_timesteps=num_timesteps,
-        param_vals={
-            "LinearRegression/_weights": learnable_weights,
-            "observation_noise_scale": observation_noise_scale_prior.mode()})
 
-    loss = -learnable_ssm.log_prob(predicted_time_series)
-    train_op = tf.compat.v1.train.AdamOptimizer(0.1).minimize(loss)
-    with self.test_session() as sess:
-      sess.run(tf.compat.v1.global_variables_initializer())
-      for _ in range(80):
-        _ = sess.run(train_op)
-      self.assertAllClose(*sess.run((true_weights, learnable_weights)),
-                          atol=0.2)
+    def build_loss():
+      learnable_ssm = model.make_state_space_model(
+          num_timesteps=num_timesteps,
+          param_vals={
+              "LinearRegression/_weights": learnable_weights,
+              "observation_noise_scale": observation_noise_scale_prior.mode()})
+      return -learnable_ssm.log_prob(predicted_time_series)
+
+    # We provide graph- and eager-mode optimization for TF 2.0 compatibility.
+    num_train_steps = 80
+    optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=0.1)
+    if tf.executing_eagerly():
+      for _ in range(num_train_steps):
+        optimizer.minimize(build_loss)
+    else:
+      train_op = optimizer.minimize(build_loss())
+      self.evaluate(tf.compat.v1.global_variables_initializer())
+      for _ in range(num_train_steps):
+        _ = self.evaluate(train_op)
+    self.assertAllClose(*self.evaluate((true_weights, learnable_weights)),
+                        atol=0.2)
 
   @test_util.run_in_graph_and_eager_modes
   def test_scalar_priors_broadcast(self):

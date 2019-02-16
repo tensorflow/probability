@@ -60,7 +60,6 @@ py_test(
     size = "large",
     srcs = ["fitting_test.py"],
     shard_count = 6,
-    tags = ["tf2-broken"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -151,7 +150,6 @@ py_test(
     name = "regression_test",
     size = "medium",
     srcs = ["regression_test.py"],
-    tags = ["tf2-broken"],
     deps = [
         # numpy dep,
         # tensorflow dep,
