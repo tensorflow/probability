@@ -33,32 +33,6 @@ tfd = tfp.distributions
 @test_util.run_all_in_graph_and_eager_modes
 class _VonMisesTest(object):
 
-  def compute_gradients(self, f, args, grad_ys=None):
-    """Computes gradients using tf.GradientTape or tf.gradients.
-
-    Arguments:
-      f: Function to be differentiated.
-      args: List of `Tensor` arguments to be passed to the function `f`.
-        Gradients are computed with respect to these arguments.
-      grad_ys: Optional. A `Tensor` with the same shape as the `Tensor` returned
-        by `f` that contains the incoming gradients with respect to the result
-        of `f`.
-
-    Returns:
-      grads: List containing gradients of `f` with respect to `args`. It has the
-        same length as `args`.
-    """
-    if tf.executing_eagerly():
-      grad_fn = tf.contrib.eager.gradients_function(f)
-      if grad_ys is not None:
-        grads = grad_fn(*args, dy=grad_ys)
-      else:
-        grads = grad_fn(*args)
-    else:
-      res = f(*args)
-      grads = tf.gradients(ys=res, xs=args, grad_ys=grad_ys)
-    return self.evaluate(grads)
-
   def make_tensor(self, x):
     x = tf.cast(x, self.dtype)
     return tf.compat.v1.placeholder_with_default(
@@ -177,27 +151,24 @@ class _VonMisesTest(object):
 
   def testVonMisesCdfGradientSimple(self):
     # This is a simple finite difference test that also works in the Eager mode.
-    # Also check that the incoming gradients (grad_ys) are handled correctly.
     loc = self.make_tensor(0.5)
     concentration = self.make_tensor(0.7)
     x = self.make_tensor(0.6)
-    grad_ys = self.make_tensor(2.0)
 
-    dcdf_dloc, dcdf_dconcentration, dcdf_dx = self.compute_gradients(
-        lambda loc, concentration, x: tfd.VonMises(loc, concentration).cdf(x),
-        [loc, concentration, x],
-        grad_ys)
+    _, [dcdf_dloc, dcdf_dconcentration, dcdf_dx] = self.evaluate(
+        tfp.math.value_and_gradient(lambda l, c, x: tfd.VonMises(l, c).cdf(x),
+                                    [loc, concentration, x]))
 
     eps = 1e-3
     dcdf_dloc_diff = self.evaluate(
         (tfd.VonMises(loc + eps, concentration).cdf(x) - tfd.VonMises(
-            loc - eps, concentration).cdf(x)) / (2 * eps) * grad_ys)
+            loc - eps, concentration).cdf(x)) / (2 * eps))
     dcdf_dconcentration_diff = self.evaluate(
         (tfd.VonMises(loc, concentration + eps).cdf(x) - tfd.VonMises(
-            loc, concentration - eps).cdf(x)) / (2 * eps) * grad_ys)
+            loc, concentration - eps).cdf(x)) / (2 * eps))
     dcdf_dx_diff = self.evaluate(
         (tfd.VonMises(loc, concentration).cdf(x + eps) - tfd.VonMises(
-            loc, concentration).cdf(x - eps)) / (2 * eps) * grad_ys)
+            loc, concentration).cdf(x - eps)) / (2 * eps))
 
     self.assertAlmostEqual(dcdf_dloc, dcdf_dloc_diff, places=3)
     self.assertAlmostEqual(
@@ -390,7 +361,7 @@ class _VonMisesTest(object):
   def testVonMisesSampleAverageGradient(self):
     loc = self.make_tensor([1.] * 7)
     concentration = self.make_tensor(np.logspace(-3, 3, 7))
-    grad_ys = np.arange(7.)
+    grad_ys = np.ones(7, self.dtype.as_numpy_dtype())
     n = 1000
 
     def loss(loc, concentration):
@@ -398,15 +369,16 @@ class _VonMisesTest(object):
       samples = von_mises.sample(n, seed=137)
       return tf.reduce_mean(input_tensor=samples, axis=0)
 
-    grad_loc, grad_concentration = self.compute_gradients(
-        loss, [loc, concentration], self.make_tensor(grad_ys))
+    _, [grad_loc, grad_concentration] = self.evaluate(
+        tfp.math.value_and_gradient(
+            loss, [loc, concentration]))
 
     # dsamples / dloc = 1 => dloss / dloc = dloss / dsamples = grad_ys
     self.assertAllClose(grad_loc, grad_ys, atol=1e-1, rtol=1e-1)
     self.assertAllClose(grad_concentration, [0.] * 7, atol=1e-1, rtol=1e-1)
 
   def testVonMisesSampleCircularVarianceGradient(self):
-    loc = self.make_tensor([1.0] * 7)
+    loc = self.make_tensor([1.] * 7)
     concentration = self.make_tensor(np.logspace(-3, 3, 7))
     n = 1000
 
@@ -415,15 +387,17 @@ class _VonMisesTest(object):
       samples = von_mises.sample(n, seed=137)
       return tf.reduce_mean(input_tensor=1. - tf.cos(samples - loc), axis=0)
 
-    grad_loc, grad_concentration = self.compute_gradients(
-        loss, [loc, concentration])
+    _, [grad_loc, grad_concentration] = self.evaluate(
+        tfp.math.value_and_gradient(
+            loss, [loc, concentration]))
 
     def analytical_loss(concentration):
       return 1. - tf.math.bessel_i1e(concentration) / tf.math.bessel_i0e(
           concentration)
 
-    expected_grad_concentration, = self.compute_gradients(
-        analytical_loss, [concentration])
+    _, expected_grad_concentration, = self.evaluate(
+        tfp.math.value_and_gradient(
+            analytical_loss, concentration))
 
     self.assertAllClose(grad_loc, [0.0] * 7, atol=1e-2, rtol=1e-2)
     self.assertAllClose(
@@ -431,7 +405,9 @@ class _VonMisesTest(object):
 
   def testVonMisesSampleExtremeConcentration(self):
     loc = self.make_tensor([1., np.nan, 1.0, 1.0, np.nan])
-    concentration = self.make_tensor([1e-50, 1., 1e50, np.nan, np.nan])
+    min_value = np.finfo(self.dtype.as_numpy_dtype()).min
+    max_value = np.finfo(self.dtype.as_numpy_dtype()).max
+    concentration = self.make_tensor([min_value, 1., max_value, np.nan, np.nan])
     von_mises = tfd.VonMises(loc, concentration)
 
     samples = von_mises.sample(seed=12345)

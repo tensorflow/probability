@@ -28,7 +28,7 @@ from tensorflow_probability.python.distributions.seed_stream import SeedStream
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.framework import tensor_shape
+from tensorflow_probability.python.math.gradient import value_and_gradient
 
 
 class VonMises(distribution.Distribution):
@@ -171,7 +171,7 @@ class VonMises(distribution.Distribution):
     return tf.constant([], dtype=tf.int32)
 
   def _event_shape(self):
-    return tensor_shape.scalar()
+    return tf.TensorShape([])
 
   def _log_prob(self, x):
     return self._log_unnormalized_prob(x) - self._log_normalization()
@@ -378,7 +378,7 @@ def _von_mises_cdf_series(x, concentration, num_terms, dtype):
   # exactly representable as a float.
   num_terms = tf.cast(num_terms, dtype=dtype)
 
-  def body_fn(n, rn, drn_dconcentration, vn, dvn_dconcentration):
+  def loop_body(n, rn, drn_dconcentration, vn, dvn_dconcentration):
     """One iteration of the series loop."""
 
     denominator = 2. * n / concentration + rn
@@ -395,14 +395,14 @@ def _von_mises_cdf_series(x, concentration, num_terms, dtype):
     return n, rn, drn_dconcentration, vn, dvn_dconcentration
 
   (_, _, _, vn, dvn_dconcentration) = tf.while_loop(
-      cond=lambda n, *unused_args: n > 0.,
-      body=body_fn,
+      cond=lambda n, *_: n > 0.,
+      body=loop_body,
       loop_vars=(
           num_terms,  # n
-          tf.zeros_like(x),  # rn
-          tf.zeros_like(x),  # drn_dconcentration
-          tf.zeros_like(x),  # vn
-          tf.zeros_like(x),  # dvn_dconcentration
+          tf.zeros_like(x, name="rn"),
+          tf.zeros_like(x, name="drn_dconcentration"),
+          tf.zeros_like(x, name="vn"),
+          tf.zeros_like(x, name="dvn_dconcentration"),
       ),
   )
 
@@ -410,43 +410,19 @@ def _von_mises_cdf_series(x, concentration, num_terms, dtype):
   dcdf_dconcentration = dvn_dconcentration / np.pi
 
   # Clip the result to [0, 1].
-  zero = tf.cast(0., dtype)
-  one = tf.cast(1., dtype)
-  cdf_clipped = tf.clip_by_value(cdf, zero, one)
+  cdf_clipped = tf.clip_by_value(cdf, 0., 1.)
   # The clipped values do not depend on concentration anymore, so set their
   # derivative to zero.
-  dcdf_dconcentration *= tf.cast((cdf >= zero) & (cdf <= one), dtype)
+  dcdf_dconcentration *= tf.cast((cdf >= 0.) & (cdf <= 1.), dtype)
 
   return cdf_clipped, dcdf_dconcentration
-
-
-def _compute_value_and_grad(f, x):
-  """Enables uniform interface to value and gradient calculation.
-
-  Works in both eager and graph modes.
-
-  Arguments:
-    f: The scalar function to evaluate.
-    x: The value at which to compute the value and the gradients.
-
-  Returns:
-    A tuple: (f(x), f'(x)).
-  """
-  if tf.executing_eagerly():
-    value_and_grad_fn = tf.contrib.eager.value_and_gradients_function(f)
-    value, grads = value_and_grad_fn(x)
-    grad = grads[0]
-  else:
-    value = f(x)
-    grad = tf.gradients(ys=value, xs=x)[0]
-  return value, grad
 
 
 def _von_mises_cdf_normal(x, concentration, dtype):
   """Computes the von Mises CDF and its derivative via Normal approximation."""
 
   def cdf_func(concentration):
-    """A helper function that is passed to _compute_value_and_grad."""
+    """A helper function that is passed to value_and_gradient."""
     # z is an "almost Normally distributed" random variable.
     z = ((np.sqrt(2. / np.pi) / tf.math.bessel_i0e(concentration)) *
          tf.sin(.5 * x))
@@ -466,7 +442,7 @@ def _von_mises_cdf_normal(x, concentration, dtype):
 
     return distrib.cdf(xi)
 
-  return _compute_value_and_grad(cdf_func, concentration)
+  return value_and_gradient(cdf_func, concentration)
 
 
 def random_von_mises(shape, concentration, dtype=tf.float32, seed=None):
@@ -546,7 +522,7 @@ def random_von_mises(shape, concentration, dtype=tf.float32, seed=None):
 
     s = tf.where(concentration > s_concentration_cutoff, s_exact, s_approximate)
 
-    def loop_body(should_continue, u, w):
+    def loop_body(done, u, w):
       """Resample the non-accepted points."""
       # We resample u each time completely. Only its sign is used outside the
       # loop, which is random.
@@ -554,30 +530,30 @@ def random_von_mises(shape, concentration, dtype=tf.float32, seed=None):
           shape, minval=-1., maxval=1., dtype=dtype, seed=seed())
       z = tf.cos(np.pi * u)
       # Update the non-accepted points.
-      w = tf.where(should_continue, (1. + s * z) / (s + z), w)
+      w = tf.where(done, w, (1. + s * z) / (s + z))
       y = concentration * (s - w)
 
       v = tf.random.uniform(
           shape, minval=0., maxval=1., dtype=dtype, seed=seed())
       accept = (y * (2. - y) >= v) | (tf.math.log(y / v) + 1. >= y)
-      should_continue = should_continue & (~accept)
 
-      return should_continue, u, w
+      return done | accept, u, w
 
     _, u, w = tf.while_loop(
-        cond=lambda should_continue, *ignore: tf.reduce_any(
-            input_tensor=should_continue),
+        cond=lambda done, *_: ~tf.reduce_all(input_tensor=done),
         body=loop_body,
         loop_vars=(
-            tf.ones(shape, dtype=tf.bool),  # should_continue
-            tf.zeros(shape, dtype=dtype),  # u
-            tf.zeros(shape, dtype=dtype)),  # w
+            tf.zeros(shape, dtype=tf.bool, name="done"),
+            tf.zeros(shape, dtype=dtype, name="u"),
+            tf.zeros(shape, dtype=dtype, name="w"),
+        ),
         # The expected number of iterations depends on concentration.
         # It monotonically increases from one iteration for concentration = 0 to
         # sqrt(2 pi / e) ~= 1.52 iterations for concentration = +inf [1].
         # We use a limit of 100 iterations to avoid infinite loops
         # for very large / nan concentration.
         maximum_iterations=100,
+        parallel_iterations=1 if seed.original_seed is None else 10,
     )
 
     x = tf.sign(u) * tf.math.acos(w)
@@ -585,9 +561,8 @@ def random_von_mises(shape, concentration, dtype=tf.float32, seed=None):
     def grad(dy):
       """The gradient of the von Mises samples w.r.t. concentration."""
       broadcast_concentration = concentration + tf.zeros_like(x)
-      cdf_func = lambda conc: von_mises_cdf(x, conc)
-      _, dcdf_dconcentration = _compute_value_and_grad(
-          cdf_func, broadcast_concentration)
+      _, dcdf_dconcentration = value_and_gradient(
+          lambda conc: von_mises_cdf(x, conc), broadcast_concentration)
       inv_prob = tf.exp(-broadcast_concentration * (tf.cos(x) - 1.)) * (
           (2. * np.pi) * tf.math.bessel_i0e(broadcast_concentration))
       # Compute the implicit reparameterization gradient [2],
