@@ -153,7 +153,7 @@ class Reshape(bijector.Bijector):
       event_shape_in = tf.convert_to_tensor(
           value=event_shape_in, name='event_shape_in', dtype_hint=tf.int32)
 
-      forward_min_event_ndims = tensor_util.constant_value(
+      forward_min_event_ndims = tf.get_static_value(
           tf.size(input=event_shape_in))
       if forward_min_event_ndims is None:
         raise NotImplementedError('Rank of `event_shape_in` currently must be '
@@ -161,7 +161,7 @@ class Reshape(bijector.Bijector):
                                   '`tfprobability@tensorflow.org` if this is '
                                   'a problem for your use case.')
 
-      inverse_min_event_ndims = tensor_util.constant_value(
+      inverse_min_event_ndims = tf.get_static_value(
           tf.size(input=event_shape_out))
       if inverse_min_event_ndims is None:
         raise NotImplementedError('Rank of `event_shape_out` currently must be '
@@ -204,7 +204,7 @@ class Reshape(bijector.Bijector):
           tf.compat.v1.assert_less_equal(
               ndims, 1, message='`{}` rank should be <= 1.'.format(shape)))
 
-    # Note, we might be inclined to use tensor_util.constant_value_as_shape
+    # Note, we might be inclined to use tf.get_static_value_as_shape
     # here, but that method coerces negative values into `None`s, rendering the
     # checks we do below impossible.
     shape_tensor_ = tf.get_static_value(shape)

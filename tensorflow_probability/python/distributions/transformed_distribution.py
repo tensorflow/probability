@@ -618,8 +618,8 @@ class TransformedDistribution(distribution_lib.Distribution):
               override_shape, 1, message="shape override must be a vector")
       ]
 
-    if tensor_util.constant_value(override_shape) is not None:
-      if any(s < 0 for s in tensor_util.constant_value(override_shape)):
+    if tf.get_static_value(override_shape) is not None:
+      if any(s < 0 for s in tf.get_static_value(override_shape)):
         raise ValueError("shape override must have non-negative elements")
     elif validate_args:
       dynamic_assertions += [
