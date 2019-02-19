@@ -1206,7 +1206,6 @@ py_test(
     name = "dirichlet_multinomial_test",
     srcs = ["dirichlet_multinomial_test.py"],
     shard_count = 4,
-    tags = ["tf2-broken"],
     deps = [
         # numpy dep,
         # tensorflow dep,

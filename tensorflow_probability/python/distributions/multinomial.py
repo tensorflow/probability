@@ -334,7 +334,7 @@ def draw_sample(num_samples, num_classes, logits, num_trials, dtype, seed):
       x = tf.one_hot(
           x, depth=num_classes)  # [num_samples, num_trials, num_classes]
       x = tf.reduce_sum(input_tensor=x, axis=-2)  # [num_samples, num_classes]
-      return x
+      return tf.cast(x, dtype=dtype)
 
     x = tf.map_fn(
         _sample_one_batch_member, [flat_logits, flat_num_trials],

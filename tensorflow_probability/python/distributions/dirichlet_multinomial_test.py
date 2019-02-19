@@ -21,10 +21,12 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfd = tfp.distributions
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class DirichletMultinomialTest(tf.test.TestCase):
 
   def setUp(self):
@@ -192,16 +194,13 @@ class DirichletMultinomialTest(tf.test.TestCase):
       self.assertAllClose(mean2[class_num], 2 * mean1[class_num])
 
   def testCovarianceFromSampling(self):
-    # We will test mean, cov, var, stddev on a DirichletMultinomial constructed
-    # via broadcast between alpha, n.
     alpha = np.array([[1., 2, 3],
-                      [2.5, 4, 0.01]], dtype=np.float32)
-    # Ideally we'd be able to test broadcasting but, the multinomial sampler
-    # doesn't support different total counts.
-    n = np.float32(5)
+                      [2.5, 4, 0.1]], dtype=np.float32)
+    n = np.array([10, 30], dtype=np.float32)
     # batch_shape=[2], event_shape=[3]
     dist = tfd.DirichletMultinomial(n, alpha)
-    x = dist.sample(int(250e3), seed=1)
+    # Sample count chosen based on what can be drawn in about 1 minute.
+    x = dist.sample(int(25e3), seed=1)
     sample_mean = tf.reduce_mean(input_tensor=x, axis=0)
     x_centered = x - sample_mean[tf.newaxis, ...]
     sample_cov = tf.reduce_mean(
@@ -229,10 +228,16 @@ class DirichletMultinomialTest(tf.test.TestCase):
         dist.variance(),
         dist.stddev(),
     ])
-    self.assertAllClose(sample_mean_, analytic_mean, atol=0.04, rtol=0.)
-    self.assertAllClose(sample_cov_, analytic_cov, atol=0.05, rtol=0.)
-    self.assertAllClose(sample_var_, analytic_var, atol=0.05, rtol=0.)
-    self.assertAllClose(sample_stddev_, analytic_stddev, atol=0.02, rtol=0.)
+    # Tolerances tuned as follows:
+    # - Run with 1000 independent seeds until < 5% fail
+    # - Then double the relative tolerance
+    # If the sampled quantities are normally distributed, a 5% failure rate
+    # corresponds to a z-score of about 2; doubling this should give a z-score
+    # of 4, which corresponds to a failure rate of 6.4e-5
+    self.assertAllClose(sample_mean_, analytic_mean, rtol=0.1)
+    self.assertAllClose(sample_cov_, analytic_cov, rtol=0.3)
+    self.assertAllClose(sample_var_, analytic_var, rtol=0.2)
+    self.assertAllClose(sample_stddev_, analytic_stddev, rtol=0.1)
 
   def testCovariance(self):
     # Shape [2]
