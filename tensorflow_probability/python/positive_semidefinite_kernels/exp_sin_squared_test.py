@@ -24,8 +24,10 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability import positive_semidefinite_kernels as psd_kernels
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class ExpSinSquaredTest(tf.test.TestCase, parameterized.TestCase):
 
   def testMismatchedFloatTypesAreBad(self):
