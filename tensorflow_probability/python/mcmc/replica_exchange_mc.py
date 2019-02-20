@@ -233,8 +233,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
                make_kernel_fn,
                exchange_proposed_fn=default_exchange_proposed_fn(1.),
                seed=None,
-               name=None,
-               **kwargs):
+               name=None):
     """Instantiates this object.
 
     Args:
@@ -253,7 +252,6 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
         Default value: `None` (i.e., no seed).
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., "remc_kernel").
-      **kwargs: Arguments for `make_kernel_fn`.
 
     Raises:
       ValueError: `inverse_temperatures` doesn't have statically known 1D shape.

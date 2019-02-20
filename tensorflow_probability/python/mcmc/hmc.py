@@ -65,7 +65,7 @@ def make_simple_step_size_update_policy(num_adaptation_steps,
   The simple policy increases or decreases the `step_size_var` based on the
   average of `exp(minimum(0., log_accept_ratio))`. It is based on
   [Section 4.2 of Andrieu and Thoms (2008)](
-  http://www4.ncsu.edu/~rsmith/MA797V_S12/Andrieu08_AdaptiveMCMC_Tutorial.pdf).
+  https://people.eecs.berkeley.edu/~jordan/sail/readings/andrieu-thoms.pdf).
 
   The `num_adaptation_steps` argument is set independently of any burnin
   for the overall chain. In general, adaptation prevents the chain from

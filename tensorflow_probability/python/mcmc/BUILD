@@ -187,6 +187,19 @@ py_library(
     ],
 )
 
+py_test(
+    name = "replica_exchange_mc_test",
+    size = "medium",
+    timeout = "long",
+    srcs = ["replica_exchange_mc_test.py"],
+    shard_count = 6,
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
 py_library(
     name = "sample",
     srcs = ["sample.py"],
