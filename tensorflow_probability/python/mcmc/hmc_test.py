@@ -1126,7 +1126,7 @@ class HMCEMAdaptiveStepSize(tf.test.TestCase):
     self.assertGreater(loss_[:10].mean(), loss_[-10:].mean())
     self.assertNear(0.22,  # Actually smaller than weights_prior_true_scale,
                     weights_prior_estimated_scale_[-5:].mean(),
-                    err=0.01)
+                    err=0.02)
 
   def test_step_size_adapts(self):
     dtype = np.float32
