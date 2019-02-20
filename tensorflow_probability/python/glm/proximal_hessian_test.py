@@ -24,10 +24,9 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from tensorflow.contrib.layers.python.ops import sparse_ops
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfd = tfp.distributions
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -121,7 +120,7 @@ class _ProximalHessianTest(object):
       model_coefficients_start = np.zeros(model_matrix.shape[:-2] +
                                           model_matrix.shape[-1:])
     if convert_to_sparse_tensor:
-      model_matrix = sparse_ops.dense_to_sparse_tensor(model_matrix)
+      model_matrix = tfp.math.dense_to_sparse(model_matrix)
 
     model_matrix = self._adjust_dtype_and_shape_hints(model_matrix)
     response = self._adjust_dtype_and_shape_hints(response)

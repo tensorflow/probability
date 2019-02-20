@@ -24,8 +24,6 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from tensorflow.contrib.layers.python.ops import sparse_ops
-
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -307,7 +305,7 @@ class _SparseOrDenseMatmul(object):
 
   def verify_sparse_dense_matmul(self, x_, y_):
     if self.use_sparse_tensor:
-      x = self._make_sparse_placeholder(sparse_ops.dense_to_sparse_tensor(x_))
+      x = self._make_sparse_placeholder(tfp.math.dense_to_sparse(x_))
     else:
       x = self._make_placeholder(x_)
 
@@ -324,7 +322,7 @@ class _SparseOrDenseMatmul(object):
 
   def verify_sparse_dense_matvecmul(self, x_, y_):
     if self.use_sparse_tensor:
-      x = self._make_sparse_placeholder(sparse_ops.dense_to_sparse_tensor(x_))
+      x = self._make_sparse_placeholder(tfp.math.dense_to_sparse(x_))
     else:
       x = self._make_placeholder(x_)
 

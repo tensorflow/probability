@@ -40,6 +40,7 @@ py_library(
         ":numeric",
         ":random_ops",
         ":root_search",
+        ":sparse",
     ],
 )
 
@@ -226,6 +227,29 @@ py_test(
     srcs = ["root_search_test.py"],
     deps = [
         # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "sparse",
+    srcs = [
+        "sparse.py",
+    ],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "sparse_test",
+    size = "small",
+    srcs = ["sparse_test.py"],
+    deps = [
+        # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],

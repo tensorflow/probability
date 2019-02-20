@@ -35,13 +35,15 @@ from tensorflow_probability.python.math.numeric import soft_threshold
 from tensorflow_probability.python.math.random_ops import random_rademacher
 from tensorflow_probability.python.math.random_ops import random_rayleigh
 from tensorflow_probability.python.math.root_search import secant_root
+from tensorflow_probability.python.math.sparse import dense_to_sparse
 
-from tensorflow.python.util.all_util import remove_undocumented
+from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
 _allowed_symbols = [
     'batch_interp_regular_1d_grid',
     'clip_by_value_preserve_gradient',
     'custom_gradient',
+    'dense_to_sparse',
     'diag_jacobian',
     'interp_regular_1d_grid',
     'log1psquare',

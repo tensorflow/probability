@@ -29,7 +29,6 @@ from tensorflow_probability import edward2 as ed
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 tfd = tfp.distributions
-tfe = tf.contrib.eager
 
 
 class FakeDistribution(tfd.Distribution):
@@ -61,26 +60,15 @@ class RandomVariableTest(parameterized.TestCase, tf.test.TestCase):
   def testGradientsFirstOrder(self):
     f = lambda x: 2. * x
     x = ed.RandomVariable(tfd.Normal(0., 1.))
-    y = f(x)
-    if tfe.in_eager_mode():
-      df = tfe.gradients_function(f)
-      (z,) = df(x)
-    else:
-      (z,) = tf.gradients(ys=y, xs=x)
-    self.assertEqual(self.evaluate(z), 2.)
+    _, dydx = tfp.math.value_and_gradient(f, x)
+    self.assertEqual(self.evaluate(dydx), 2.)
 
   def testGradientsSecondOrder(self):
-    f = lambda x: 2 * (x ** 2)
-    x = ed.RandomVariable(tfd.Normal(0.0, 1.0))
-    y = f(x)
-    if tfe.in_eager_mode():
-      df = tfe.gradients_function(f)
-      d2f = tfe.gradients_function(lambda x: df(x)[0])
-      (z,) = d2f(x)
-    else:
-      (z,) = tf.gradients(ys=y, xs=x)
-      (z,) = tf.gradients(ys=z, xs=x)
-    self.assertEqual(self.evaluate(z), 4.0)
+    f = lambda x: 2. * x**2.
+    df = lambda x: tfp.math.value_and_gradient(f, x)[1]
+    x = ed.RandomVariable(tfd.Normal(0., 1.))
+    _, d2ydx2 = tfp.math.value_and_gradient(df, x)
+    self.assertEqual(self.evaluate(d2ydx2), 4.)
 
   def testStr(self):
     x = ed.RandomVariable(tfd.Normal(0.0, 1.0), value=1.234)
