@@ -91,8 +91,8 @@ def kernel(target_log_prob_fn,
     with tf.name_scope("initialize"):
       current_state = [tf.convert_to_tensor(value=s) for s in current_state]
       step_size = [tf.convert_to_tensor(value=s) for s in step_size]
-      value_and_gradients_fn = tf.contrib.eager.value_and_gradients_function(
-          target_log_prob_fn)
+      value_and_gradients_fn = lambda *args: tfp.math.value_and_gradient(  # pylint: disable=g-long-lambda
+          target_log_prob_fn, args)
       value_and_gradients_fn = _embed_no_none_gradient_check(
           value_and_gradients_fn)
       if (current_target_log_prob is None or

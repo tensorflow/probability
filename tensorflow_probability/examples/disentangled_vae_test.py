@@ -23,11 +23,10 @@ import tensorflow as tf
 
 from tensorflow_probability.examples import disentangled_vae
 
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
-class DisentangledVAETest(tf.test.TestCase):
+class _DisentangledVAETest(object):
   """Base test class."""
 
   def setUp(self):
@@ -44,8 +43,8 @@ class DisentangledVAETest(tf.test.TestCase):
     self.assertEqual(dist.batch_shape, batch_shape)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
-class DisentangledVAEComponentsTest(DisentangledVAETest):
+@test_util.run_all_in_graph_and_eager_modes
+class DisentangledVAEComponentsTest(_DisentangledVAETest, tf.test.TestCase):
   """Test class for the individual model components."""
 
   def testLearnableMultivariateNormalDiagClass(self):
@@ -70,7 +69,7 @@ class DisentangledVAEComponentsTest(DisentangledVAETest):
     self.assertDistShape(dist_z1, (self.dimensions,), ())
     for tensor in state_z1:
       self.assertEqual(tensor.shape, (1, self.hidden_size))
-    if not tfe.in_eager_mode():
+    if not tf.executing_eagerly():
       self.evaluate(tf.compat.v1.global_variables_initializer())
     h1, c1 = state_z1
     self.assertTrue(np.allclose(self.evaluate(h1), self.evaluate(h0)))
@@ -111,7 +110,7 @@ class DisentangledVAEComponentsTest(DisentangledVAETest):
     for tensor in state_z1:
       self.assertEqual(
           tensor.shape, (self.samples, self.batch_size, self.hidden_size))
-    if not tfe.in_eager_mode():
+    if not tf.executing_eagerly():
       self.evaluate(tf.compat.v1.global_variables_initializer())
     h1, c1 = state_z1
     self.assertTrue(np.allclose(self.evaluate(h1), self.evaluate(h0)))
@@ -268,8 +267,8 @@ class DisentangledVAEComponentsTest(DisentangledVAETest):
         (self.samples*2, self.samples, self.batch_size, self.length))
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
-class DisentangledSequentialVAETest(DisentangledVAETest):
+@test_util.run_all_in_graph_and_eager_modes
+class DisentangledSequentialVAETest(_DisentangledVAETest, tf.test.TestCase):
   """Test class for the DisentangledSequentialVAE model."""
 
   def setUp(self):

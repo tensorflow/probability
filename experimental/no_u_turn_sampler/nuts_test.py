@@ -38,7 +38,6 @@ from tensorflow_probability.opensource.experimental import no_u_turn_sampler
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
-tfe = tf.contrib.eager
 
 flags.DEFINE_string("model_dir",
                     default=os.path.join(os.getenv("TEST_TMPDIR", "/tmp"),
