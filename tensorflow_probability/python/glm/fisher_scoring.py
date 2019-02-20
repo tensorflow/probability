@@ -23,6 +23,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 
 
 __all__ = [
@@ -401,7 +402,7 @@ def fit_one_step(
       l2_regularizer_ = np.array(0, a.dtype.as_numpy_dtype)
       return a_, b_, l2_regularizer_
 
-    a, b, l2_regularizer = tf.contrib.framework.smart_cond(
+    a, b, l2_regularizer = prefer_static.cond(
         smart_reduce_all([not(fast_unsafe_numerics),
                           l2_regularizer > 0.]),
         _embed_l2_regularization,

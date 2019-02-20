@@ -24,6 +24,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
@@ -631,14 +632,14 @@ def move_dimension(x, source_idx, dest_idx):
   def x_permuted():
     return tf.transpose(
         a=x,
-        perm=tf.contrib.framework.smart_cond(source_idx < dest_idx,
-                                             move_right_permutation,
-                                             move_left_permutation))
+        perm=prefer_static.cond(source_idx < dest_idx,
+                                move_right_permutation,
+                                move_left_permutation))
 
   # One final conditional to handle the special case where source
   # and destination indices are equal.
-  return tf.contrib.framework.smart_cond(
-      tf.equal(source_idx, dest_idx), lambda: x, x_permuted)
+  return prefer_static.cond(tf.equal(source_idx, dest_idx),
+                            lambda: x, x_permuted)
 
 
 def assert_integer_form(x,

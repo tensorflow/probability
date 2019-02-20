@@ -34,6 +34,7 @@ import collections
 
 import numpy as np
 import tensorflow as tf
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.optimizer.linesearch.internal import hager_zhang_lib as hzl
 
 __all__ = [
@@ -328,10 +329,9 @@ def hager_zhang(value_and_gradients_function,
                               val_c_input,
                               step_size_shrink_param)
 
-      val_c, fix_evals = tf.contrib.framework.smart_cond(
-          step_size_too_large,
-          _is_too_large_fn,
-          lambda: (val_c_input, 0))
+      val_c, fix_evals = prefer_static.cond(step_size_too_large,
+                                            _is_too_large_fn,
+                                            lambda: (val_c_input, 0))
 
       # Check if c is fixed now.
       valid_at_c = hzl.is_finite(val_c) & (val_c.x > 0)
@@ -375,15 +375,13 @@ def hager_zhang(value_and_gradients_function,
             objective_at_right_pt=result.right.f,
             grad_objective_at_right_pt=result.right.df,
             full_result=result.left.full_result)
-      return tf.contrib.framework.smart_cond(
-          valid_at_c,
-          true_fn=success_fn,
-          false_fn=_failure_fn)
+      return prefer_static.cond(valid_at_c,
+                                true_fn=success_fn,
+                                false_fn=_failure_fn)
 
-    return tf.contrib.framework.smart_cond(
-        valid_inputs,
-        true_fn=_valid_inputs_fn,
-        false_fn=_invalid_inputs_fn)
+    return prefer_static.cond(valid_inputs,
+                              true_fn=_valid_inputs_fn,
+                              false_fn=_invalid_inputs_fn)
 
 
 def _fix_step_size(value_and_gradients_function,
@@ -527,10 +525,9 @@ def _bracket_and_search(
         left=result.left,
         right=result.right)
 
-  return tf.contrib.framework.smart_cond(
-      failed,
-      true_fn=_bracketing_failed_fn,
-      false_fn=_bracketing_success_fn)
+  return prefer_static.cond(failed,
+                            true_fn=_bracketing_failed_fn,
+                            false_fn=_bracketing_success_fn)
 
 
 def _line_search_after_bracketing(
@@ -666,10 +663,9 @@ def _line_search_after_bracketing(
             left=secant2_result.left,
             right=secant2_result.right)
 
-        return tf.contrib.framework.smart_cond(
-            func_is_flat,
-            true_fn=lambda: is_flat_retval,
-            false_fn=lambda: not_is_flat_retval)
+        return prefer_static.cond(func_is_flat,
+                                  true_fn=lambda: is_flat_retval,
+                                  false_fn=lambda: not_is_flat_retval)
 
       def _insufficient_shrinkage_fn():
         """Action to perform if secant2 didn't shrink the interval enough."""
@@ -686,10 +682,9 @@ def _line_search_after_bracketing(
             left=update_result.left,
             right=update_result.right)
 
-      return tf.contrib.framework.smart_cond(
-          sufficient_shrinkage,
-          true_fn=_sufficient_shrinkage_fn,
-          false_fn=_insufficient_shrinkage_fn)
+      return prefer_static.cond(sufficient_shrinkage,
+                                true_fn=_sufficient_shrinkage_fn,
+                                false_fn=_insufficient_shrinkage_fn)
 
     return tf.contrib.framework.smart_case([
         (secant2_result.failed, _failed_fn),
@@ -760,10 +755,9 @@ def _line_search_inner_bisection(
         left=val_left,
         right=val_right)
 
-  return tf.contrib.framework.smart_cond(
-      val_mid_finite,
-      true_fn=_success_fn,
-      false_fn=_failed_fn)
+  return prefer_static.cond(val_mid_finite,
+                            true_fn=_success_fn,
+                            false_fn=_failed_fn)
 
 
 def _satisfies_wolfe(val_0,
@@ -1101,10 +1095,9 @@ def _secant2_inner(value_and_gradients_function,
         in_range_not_new_case,
     ], default=_default_fn)
 
-  return tf.contrib.framework.smart_cond(
-      update_worked,
-      true_fn=_success_fn,
-      false_fn=_failed_fn)
+  return prefer_static.cond(update_worked,
+                            true_fn=_success_fn,
+                            false_fn=_failed_fn)
 
 
 def _secant2_inner_update(value_and_gradients_function,

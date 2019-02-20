@@ -33,6 +33,7 @@ import collections
 import tensorflow as tf
 
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.optimizer import bfgs_utils
 
 
@@ -237,7 +238,7 @@ def minimize(value_and_gradients_function,
                                           gradient_delta))
 
       # If not failed or converged, update the Hessian estimate.
-      state_after_inv_hessian_update = tf.contrib.framework.smart_cond(
+      state_after_inv_hessian_update = prefer_static.cond(
           next_state.converged | next_state.failed,
           lambda: next_state,
           _update_inv_hessian)
@@ -351,10 +352,9 @@ def _get_search_direction(state):
         initializer=r_direction)
     return -r_directions[-1]
 
-  return tf.contrib.framework.smart_cond(
-      tf.equal(num_elements, 0),
-      (lambda: -state.objective_gradient),
-      _two_loop_algorithm)
+  return prefer_static.cond(tf.equal(num_elements, 0),
+                            (lambda: -state.objective_gradient),
+                            _two_loop_algorithm)
 
 
 def _make_empty_stack_like(element, k):

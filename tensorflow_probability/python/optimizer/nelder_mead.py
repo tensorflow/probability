@@ -30,6 +30,8 @@ import collections
 # Dependency imports
 import tensorflow as tf
 
+from tensorflow_probability.python.internal import prefer_static
+
 # Tolerance to check for floating point zeros.
 _EPSILON = 1e-10
 
@@ -495,7 +497,7 @@ def _expansion_fn(objective_function,
                           objective_at_reflected)
     accept_expanded_fn = lambda: (expanded, expanded_objective_value)
     accept_reflected_fn = lambda: (reflected, objective_at_reflected)
-    next_pt, next_objective_value = tf.contrib.framework.smart_cond(
+    next_pt, next_objective_value = prefer_static.cond(
         expanded_is_better, accept_expanded_fn, accept_reflected_fn)
     next_simplex = _replace_at_index(simplex, worst_index, next_pt)
     next_objective_at_simplex = _replace_at_index(objective_values,
@@ -540,10 +542,9 @@ def _outside_contraction_fn(objective_function,
                                   shrinkage,
                                   batch_evaluate_objective)
 
-    return tf.contrib.framework.smart_cond(
-        is_contracted_acceptable,
-        _accept_contraction,
-        _reject_contraction)
+    return prefer_static.cond(is_contracted_acceptable,
+                              _accept_contraction,
+                              _reject_contraction)
   return _contraction
 
 
@@ -581,10 +582,9 @@ def _inside_contraction_fn(objective_function,
       return _shrink_towards_best(objective_function, simplex, best_index,
                                   shrinkage, batch_evaluate_objective)
 
-    return tf.contrib.framework.smart_cond(
-        is_contracted_acceptable,
-        _accept_contraction,
-        _reject_contraction)
+    return prefer_static.cond(is_contracted_acceptable,
+                              _accept_contraction,
+                              _reject_contraction)
   return _contraction
 
 

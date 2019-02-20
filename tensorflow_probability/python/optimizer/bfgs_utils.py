@@ -22,6 +22,7 @@ import collections
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.optimizer import linesearch
 
 # A namedtuple to hold a function value, directional derivative and the
@@ -141,7 +142,7 @@ def line_search_step(state, value_and_gradients_function, search_direction,
         ls_result.full_result.full_gradient,  # Extract gradient
         grad_tolerance, f_relative_tolerance, x_tolerance)
 
-  return tf.contrib.framework.smart_cond(
+  return prefer_static.cond(
       state_after_ls.failed,
       true_fn=lambda: state_after_ls,
       false_fn=_do_update_position)

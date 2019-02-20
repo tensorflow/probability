@@ -71,6 +71,7 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         ":dtype_util",
+        ":prefer_static",
         ":reparameterization",
         # numpy dep,
         # tensorflow dep,
@@ -87,6 +88,25 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/math:gradient",
+    ],
+)
+
+py_library(
+    name = "prefer_static",
+    srcs = ["prefer_static.py"],
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "prefer_static_test",
+    srcs = ["prefer_static_test.py"],
+    deps = [
+        ":prefer_static",
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
     ],
 )
 

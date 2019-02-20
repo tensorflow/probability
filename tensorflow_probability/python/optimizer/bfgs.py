@@ -34,6 +34,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.optimizer import bfgs_utils
 
 
@@ -240,7 +241,7 @@ def minimize(value_and_gradients_function,
                                                  state.objective_gradient)
         return search_direction, initial_inv_hessian
 
-      search_direction, inv_hessian_estimate = tf.contrib.framework.smart_cond(
+      search_direction, inv_hessian_estimate = prefer_static.cond(
           needs_reset,
           true_fn=_reset_search_dirn,
           false_fn=lambda: (search_direction, state.inverse_hessian_estimate))
@@ -255,7 +256,7 @@ def minimize(value_and_gradients_function,
           tolerance, f_relative_tolerance, x_tolerance)
 
       # If not failed or converged, update the Hessian.
-      state_after_inv_hessian_update = tf.contrib.framework.smart_cond(
+      state_after_inv_hessian_update = prefer_static.cond(
           next_state.converged | next_state.failed,
           lambda: next_state,
           lambda: _update_inv_hessian(current_state, next_state))
@@ -429,11 +430,9 @@ def _bfgs_inv_hessian_update(grad_delta, position_delta, inv_hessian_estimate):
         (position_term - cross_term) / normalization_factor)
     return next_inv_hessian_estimate
 
-  next_estimate = tf.contrib.framework.smart_cond(
-      is_singular,
-      true_fn=_is_singular_fn,
-      false_fn=_do_update_fn)
-
+  next_estimate = prefer_static.cond(is_singular,
+                                     true_fn=_is_singular_fn,
+                                     false_fn=_do_update_fn)
   return next_estimate
 
 
