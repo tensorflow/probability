@@ -403,8 +403,8 @@ def fit_one_step(
       return a_, b_, l2_regularizer_
 
     a, b, l2_regularizer = prefer_static.cond(
-        smart_reduce_all([not(fast_unsafe_numerics),
-                          l2_regularizer > 0.]),
+        prefer_static.reduce_all([not(fast_unsafe_numerics),
+                                  l2_regularizer > 0.]),
         _embed_l2_regularization,
         lambda: (a, b, l2_regularizer))
 
@@ -635,14 +635,3 @@ def num_cols(x):
   if tf.compat.dimension_value(x.shape[-1]) is not None:
     return tf.compat.dimension_value(x.shape[-1])
   return tf.shape(input=x)[-1]
-
-
-def smart_reduce_all(preds, name=None):
-  """Identical to `tf.reduce_all` but operates statically if possible."""
-  with tf.name_scope(name, 'smart_reduce_all', [preds]):
-    pred_values = [tf.contrib.framework.smart_constant_value(p) for p in preds]
-    if any(p is False for p in pred_values):
-      return False
-    if any(p is None for p in pred_values):
-      return tf.reduce_all(input_tensor=preds)
-    return all(pred_values)

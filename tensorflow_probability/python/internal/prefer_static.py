@@ -18,10 +18,47 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
+
+import numpy as np
 import tensorflow as tf
 
 from tensorflow.python import pywrap_tensorflow as c_api  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.ops import control_flow_ops  # pylint: disable=g-direct-tensorflow-import
+
+
+def _maybe_get_static_value(x):
+  static_x = tf.get_static_value(x)
+  is_static = static_x is not None
+  return (static_x if is_static else x), is_static
+
+
+def _maybe_get_static_args(args):
+  maybe_static_args = tf.compat.v2.nest.map_structure(tf.get_static_value, args)
+  all_static = all([arg is not None
+                    for arg in tf.compat.v2.nest.flatten(maybe_static_args)])
+  return maybe_static_args, all_static
+
+
+def _prefer_static(static_fn):
+  def decorator(fn):
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+      [args_, kwargs_], all_static = _maybe_get_static_args([args, kwargs])
+      if all_static:
+        return tf.constant(static_fn(*args_, **kwargs_))
+      return fn(*args, **kwargs)
+    return wrapper
+  return decorator
+
+
+greater = _prefer_static(lambda x, y, *_, **__: (x > y))(tf.greater)
+less = _prefer_static(lambda x, y, *_, **__: (x < y))(tf.less)
+equal = _prefer_static(lambda x, y, *_, **__: (x == y))(tf.equal)
+logical_and = _prefer_static(lambda x, y, *_, **__: (x and y))(tf.logical_and)
+logical_or = _prefer_static(lambda x, y, *_, **__: (x or y))(tf.logical_or)
+reduce_all = _prefer_static(np.all)(tf.reduce_all)
+reduce_any = _prefer_static(np.any)(tf.reduce_any)
 
 
 def _get_static_predicate(pred):

@@ -79,6 +79,72 @@ class GetStaticValueTest(tf.test.TestCase, parameterized.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
+class PreferStaticPredicatesTest(tf.test.TestCase, parameterized.TestCase):
+
+  @parameterized.named_parameters(
+      dict(testcase_name='_greater_true',
+           predicate=prefer_static.greater,
+           args_fn=lambda: [tf.constant(1), tf.constant(0)],
+           expected=True),
+      dict(testcase_name='_greater_false',
+           predicate=prefer_static.greater,
+           args_fn=lambda: [tf.constant(-.1), tf.constant(0.)],
+           expected=False),
+      dict(testcase_name='_greater_none',
+           predicate=prefer_static.greater,
+           args_fn=lambda: [tf.constant(1) + tf.constant(0), tf.constant(0)],
+           expected=True),
+      dict(testcase_name='_less_true',
+           predicate=prefer_static.less,
+           args_fn=lambda: [tf.constant(-1), tf.constant(0)],
+           expected=True),
+      dict(testcase_name='_equal_true',
+           predicate=prefer_static.equal,
+           args_fn=lambda: [tf.constant(0), 0],
+           expected=True),
+      dict(testcase_name='_equal_false',
+           predicate=prefer_static.equal,
+           args_fn=lambda: [tf.constant(1), tf.constant(0)],
+           expected=False),
+      dict(testcase_name='_and_true',
+           predicate=prefer_static.logical_and,
+           args_fn=lambda: [True, tf.constant(True)],
+           expected=True),
+      dict(testcase_name='_and_none',
+           predicate=prefer_static.logical_and,
+           args_fn=lambda: [tf.constant(True), tf.equal(1, 1)],
+           expected=True),
+      dict(testcase_name='_or_true',
+           predicate=prefer_static.logical_or,
+           args_fn=lambda: [tf.constant(True), tf.constant(False)],
+           expected=True),
+      dict(testcase_name='_all_true',
+           predicate=prefer_static.reduce_all,
+           args_fn=lambda: [[tf.constant(True)] * 10],
+           expected=True),
+      dict(testcase_name='_all_false',
+           predicate=prefer_static.reduce_all,
+           args_fn=lambda: [[tf.constant(True),  # pylint: disable=g-long-lambda
+                             True,
+                             tf.constant(False)]],
+           expected=False),
+      dict(testcase_name='_any_true',
+           predicate=prefer_static.reduce_any,
+           args_fn=lambda: [[tf.constant(True),  # pylint: disable=g-long-lambda
+                             tf.constant(False),
+                             tf.constant(False)]],
+           expected=True),
+      dict(testcase_name='_any_false',
+           predicate=prefer_static.reduce_any,
+           args_fn=lambda: [[tf.constant(False)] * 23],
+           expected=False),
+      )
+  def testStaticPredicate(self, predicate, args_fn, expected):
+    actual = predicate(*args_fn())
+    self.assertAllCloseAccordingToType(expected, actual)
+
+
+@test_util.run_all_in_graph_and_eager_modes
 class PreferStaticCondTest(tf.test.TestCase, parameterized.TestCase):
 
   def testTrue(self):
