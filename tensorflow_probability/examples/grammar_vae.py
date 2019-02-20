@@ -334,7 +334,7 @@ def main(argv):
       probabilistic_grammar_variational=probabilistic_grammar_variational)
   global_step = tf.compat.v1.train.get_or_create_global_step()
   optimizer = tf.compat.v1.train.AdamOptimizer(FLAGS.learning_rate)
-  writer = tf.contrib.summary.create_file_writer(FLAGS.model_dir)
+  writer = tf.compat.v2.summary.create_file_writer(FLAGS.model_dir)
   writer.set_as_default()
 
   start_time = time.time()
@@ -370,13 +370,15 @@ def main(argv):
       timesteps = tf.cast(productions.shape[1], dtype=tf.float32)
       elbo = tf.reduce_mean(input_tensor=log_likelihood - kl) / timesteps
       loss = -elbo
-      with tf.contrib.summary.record_summaries_every_n_global_steps(500):
-        tf.contrib.summary.scalar(
+      with tf.compat.v2.summary.record_if(
+          lambda: tf.math.equal(0, global_step % 500)):
+        tf.compat.v2.summary.scalar(
             "log_likelihood",
-            tf.reduce_mean(input_tensor=log_likelihood) / timesteps)
-        tf.contrib.summary.scalar("kl",
-                                  tf.reduce_mean(input_tensor=kl) / timesteps)
-        tf.contrib.summary.scalar("elbo", elbo)
+            tf.reduce_mean(input_tensor=log_likelihood) / timesteps,
+            step=global_step)
+        tf.compat.v2.summary.scalar(
+            "kl", tf.reduce_mean(input_tensor=kl) / timesteps, step=global_step)
+        tf.compat.v2.summary.scalar("elbo", elbo, step=global_step)
 
     variables = (probabilistic_grammar.variables
                  + probabilistic_grammar_variational.variables)
