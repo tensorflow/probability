@@ -1007,16 +1007,10 @@ class HMCEMAdaptiveStepSize(tf.test.TestCase):
 
   def make_training_data(self, num_samples, dims, sigma):
     dt = np.asarray(sigma).dtype
-    zeros = tf.zeros(dims, dtype=dt)
-    x = tf.transpose(
-        a=tfd.MultivariateNormalDiag(loc=zeros).sample(num_samples,
-                                                       seed=1))  # [d, n]
-    w = tfd.MultivariateNormalDiag(
-        loc=zeros,
-        scale_identity_multiplier=sigma).sample([1], seed=2)  # [1, d]
-    noise = tfd.Normal(loc=np.array(0, dt), scale=np.array(1, dt)).sample(
-        num_samples, seed=3)  # [n]
-    y = tf.matmul(w, x) + noise  # [1, n]
+    x = np.random.randn(dims, num_samples).astype(dt)
+    w = sigma * np.random.randn(1, dims).astype(dt)
+    noise = np.random.randn(num_samples).astype(dt)
+    y = w.dot(x) + noise
     return y[0], x, w[0]
 
   def make_weights_prior(self, dims, log_sigma):
@@ -1025,16 +1019,11 @@ class HMCEMAdaptiveStepSize(tf.test.TestCase):
         scale_identity_multiplier=tf.exp(log_sigma))
 
   def make_response_likelihood(self, w, x):
-    w_shape = tf.pad(
-        tensor=tf.shape(input=w),
-        paddings=[[tf.where(tf.rank(w) > 1, 0, 1), 0]],
-        constant_values=1)
-    y_shape = tf.concat([tf.shape(input=w)[:-1], [tf.shape(input=x)[-1]]],
-                        axis=0)
-    w_expand = tf.reshape(w, w_shape)
-    return tfd.Normal(
-        loc=tf.reshape(tf.matmul(w_expand, x), y_shape),
-        scale=np.array(1, w.dtype.as_numpy_dtype))  # [n]
+    if w.shape.ndims == 1:
+      y_bar = tf.matmul(w[tf.newaxis], x)[0]
+    else:
+      y_bar = tf.matmul(w, x)
+    return tfd.Normal(loc=y_bar, scale=tf.ones_like(y_bar))  # [n]
 
   def test_mcem_converges(self):
     # Setup assumptions.
@@ -1043,11 +1032,12 @@ class HMCEMAdaptiveStepSize(tf.test.TestCase):
     dims = 10
 
     weights_prior_true_scale = np.array(0.3, dtype)
-    y, x, _ = self.evaluate(
-        self.make_training_data(num_samples, dims, weights_prior_true_scale))
+    y, x, w0 = self.make_training_data(num_samples, dims,
+                                       weights_prior_true_scale)
+    tf.compat.v1.logging.vlog(1, 'w0: %s', w0)
 
     step_size = tf.compat.v2.Variable(
-        name='step_size', initial_value=np.array(0.05, dtype), trainable=False)
+        name='step_size', initial_value=np.array(0.03, dtype), trainable=False)
 
     log_sigma = tf.compat.v2.Variable(
         name='log_sigma', initial_value=np.array(0, dtype))
@@ -1066,7 +1056,7 @@ class HMCEMAdaptiveStepSize(tf.test.TestCase):
                   input_tensor=likelihood.log_prob(y), axis=-1))  # [m]
 
         num_results = 2
-        weights, kernel_results = tfp.mcmc.sample_chain(
+        weights, log_accept_ratio = tfp.mcmc.sample_chain(
             num_results=num_results,
             num_burnin_steps=0,
             current_state=weights_chain_start,
@@ -1079,6 +1069,7 @@ class HMCEMAdaptiveStepSize(tf.test.TestCase):
                         num_adaptation_steps=None)),
                 state_gradients_are_stopped=True,
             ),
+            trace_fn=lambda _, pkr: pkr.log_accept_ratio,
             parallel_iterations=1)
 
         # We do an optimization step to propagate `log_sigma` after two HMC
@@ -1089,7 +1080,7 @@ class HMCEMAdaptiveStepSize(tf.test.TestCase):
             input_tensor=unnormalized_posterior_log_prob(weights))
 
       avg_acceptance_ratio = tf.reduce_mean(
-          input_tensor=tf.exp(tf.minimum(kernel_results.log_accept_ratio, 0.)))
+          input_tensor=tf.exp(tf.minimum(log_accept_ratio, 0.)))
 
       train_op = optimizer.apply_gradients(
           [[tape.gradient(loss, log_sigma), log_sigma]])
@@ -1133,11 +1124,10 @@ class HMCEMAdaptiveStepSize(tf.test.TestCase):
 
     # Loss had better decrease....
     self.assertGreater(loss_[:10].mean(), loss_[-10:].mean())
-    self.assertNear(0.24,  # Actually smaller than weights_prior_true_scale,
+    self.assertNear(0.22,  # Actually smaller than weights_prior_true_scale,
                     weights_prior_estimated_scale_[-5:].mean(),
-                    err=0.006)
+                    err=0.01)
 
-  @test_util.run_in_graph_and_eager_modes
   def test_step_size_adapts(self):
     dtype = np.float32
 
@@ -1175,7 +1165,6 @@ class HMCEMAdaptiveStepSize(tf.test.TestCase):
     # Anything in [0.6, 0.9] is sufficient. https://arxiv.org/abs/1411.6669
     self.assertNear(0.75, kernel_results_.is_accepted.mean(), err=0.05)
 
-  @test_util.run_in_graph_and_eager_modes
   def test_reuse_step_counter(self):
     for _ in range(2):
       with tf.compat.v1.variable_scope(

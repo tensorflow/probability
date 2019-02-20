@@ -264,16 +264,10 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
 
   def make_training_data(num_samples, dims, sigma):
     dt = np.asarray(sigma).dtype
-    zeros = tf.zeros(dims, dtype=dt)
-    x = tf.transpose(
-        a=tfd.MultivariateNormalDiag(loc=zeros).sample(num_samples,
-                                                       seed=1))  # [d, n]
-    w = tfd.MultivariateNormalDiag(
-        loc=zeros,
-        scale_identity_multiplier=sigma).sample([1], seed=2)  # [1, d]
-    noise = tfd.Normal(loc=np.array(0, dt), scale=np.array(1, dt)).sample(
-        num_samples, seed=3)  # [n]
-    y = tf.matmul(w, x) + noise  # [1, n]
+    x = np.random.randn(dims, num_samples).astype(dt)
+    w = sigma * np.random.randn(1, dims).astype(dt)
+    noise = np.random.randn(num_samples).astype(dt)
+    y = w.dot(x) + noise
     return y[0], x, w[0]
 
   def make_weights_prior(dims, log_sigma):
@@ -282,28 +276,25 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
         scale_identity_multiplier=tf.exp(log_sigma))
 
   def make_response_likelihood(w, x):
-    w_shape = tf.pad(
-        tensor=tf.shape(input=w),
-        paddings=[[tf.where(tf.rank(w) > 1, 0, 1), 0]],
-        constant_values=1)
-    y_shape = tf.concat([tf.shape(input=w)[:-1], [tf.shape(input=x)[-1]]],
-                        axis=0)
-    w_expand = tf.reshape(w, w_shape)
-    return tfd.Normal(
-        loc=tf.reshape(tf.matmul(w_expand, x), y_shape),
-        scale=np.array(1, w.dtype.as_numpy_dtype))  # [n]
+    if w.shape.ndims == 1:
+      y_bar = tf.matmul(w[tf.newaxis], x)[0]
+    else:
+      y_bar = tf.matmul(w, x)
+    return tfd.Normal(loc=y_bar, scale=tf.ones_like(y_bar))  # [n]
 
   # Setup assumptions.
   dtype = np.float32
   num_samples = 500
   dims = 10
+  tf.compat.v1.random.set_random_seed(10014)
+  np.random.seed(10014)
 
   weights_prior_true_scale = np.array(0.3, dtype)
-  y, x, _ = self.make_training_data(
-      num_samples, dims, weights_prior_true_scale))
+  y, x, _ = make_training_data(
+      num_samples, dims, weights_prior_true_scale)
 
   step_size = tf.compat.v2.Variable(
-      name='step_size', initial_value=np.array(0.05, dtype), trainable=False)
+      name='step_size', initial_value=np.array(0.03, dtype), trainable=False)
 
   log_sigma = tf.compat.v2.Variable(
       name='log_sigma', initial_value=np.array(0, dtype))
@@ -374,7 +365,7 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
                 iter_, loss_[iter_], weights_prior_estimated_scale_[iter_],
                 step_size_, avg_acceptance_ratio_))
 
-  # Should converge to ~0.24.
+  # Should converge to ~0.22.
   import matplotlib.pyplot as plt
   plt.plot(weights_prior_estimated_scale_)
   plt.ylabel('weights_prior_estimated_scale')

@@ -85,12 +85,9 @@ py_library(
 py_test(
     name = "hmc_test",
     size = "medium",
+    timeout = "long",
     srcs = ["hmc_test.py"],
     shard_count = 6,
-    tags = [
-        # TODO(b/80193238): Re-enable.
-        "notap",
-    ],
     deps = [
         # numpy dep,
         # scipy dep,
