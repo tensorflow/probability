@@ -686,10 +686,9 @@ def _line_search_after_bracketing(
                                 true_fn=_sufficient_shrinkage_fn,
                                 false_fn=_insufficient_shrinkage_fn)
 
-    return tf.contrib.framework.smart_case([
-        (secant2_result.failed, _failed_fn),
-        (secant2_result.found_wolfe, _found_wolfe_fn)
-    ], default=_default_fn, exclusive=False)
+    return prefer_static.case([(secant2_result.failed, _failed_fn),
+                               (secant2_result.found_wolfe, _found_wolfe_fn)],
+                              default=_default_fn, exclusive=False)
 
   initial_args = _LineSearchInnerResult(
       iteration=starting_iteration,
@@ -985,10 +984,8 @@ def _secant2(value_and_gradients_function,
           left=inner_result.left,
           right=inner_result.right)
 
-    return tf.contrib.framework.smart_case([
-        secant_failed_case,
-        found_wolfe_case
-    ], default=_default_fn, exclusive=False)
+    return prefer_static.case([secant_failed_case, found_wolfe_case],
+                              default=_default_fn, exclusive=False)
 
 
 def _secant2_inner(value_and_gradients_function,
@@ -1022,7 +1019,7 @@ def _secant2_inner(value_and_gradients_function,
     def _do_secant(val_1, val_2):
       return _secant(val_1.x, val_2.x, val_1.df, val_2.df), True
 
-    next_c, is_new = tf.contrib.framework.smart_case([
+    next_c, is_new = prefer_static.case([
         (tf.equal(update_result.right.x, val_c.x),
          lambda: _do_secant(val_right, update_result.right)),
         (tf.equal(update_result.left.x, val_c.x),
@@ -1090,10 +1087,9 @@ def _secant2_inner(value_and_gradients_function,
           left=update_result.left,
           right=update_result.right)
 
-    return tf.contrib.framework.smart_case([
-        in_range_and_new_case,
-        in_range_not_new_case,
-    ], default=_default_fn)
+    return prefer_static.case([in_range_and_new_case,
+                               in_range_not_new_case,],
+                              default=_default_fn)
 
   return prefer_static.cond(update_worked,
                             true_fn=_success_fn,
@@ -1158,10 +1154,9 @@ def _secant2_inner_update(value_and_gradients_function,
   # we have converged.
   found_wolfe_case = found_wolfe, _found_wolfe_fn
 
-  return tf.contrib.framework.smart_case([
-      secant_failed_case,
-      found_wolfe_case
-  ], default=_default_fn, exclusive=False)
+  return prefer_static.case([secant_failed_case,
+                             found_wolfe_case],
+                            default=_default_fn, exclusive=False)
 
 
 _UpdateResult = collections.namedtuple('_UpdateResult', [

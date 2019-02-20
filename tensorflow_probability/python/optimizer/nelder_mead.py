@@ -447,15 +447,8 @@ def nelder_mead_one_step(current_simplex,
         converged,
         next_simplex,
         next_objective_at_simplex,
-        case_evals
-    ) = tf.contrib.framework.smart_case(
-        [
-            case0,
-            case1,
-            case2,
-            case3
-        ],
-        default=default_fn, exclusive=False)
+        case_evals) = prefer_static.case([case0, case1, case2, case3],
+                                         default=default_fn, exclusive=False)
     next_simplex.set_shape(current_simplex.shape)
     next_objective_at_simplex.set_shape(current_objective_values.shape)
     return (
