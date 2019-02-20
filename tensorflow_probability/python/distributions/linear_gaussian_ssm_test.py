@@ -503,30 +503,41 @@ class BatchTest(tf.test.TestCase):
 
 class MissingObservationsTests(tfp_test_case.TestCase):
 
-  def setUp(self):
-    super(MissingObservationsTests, self).setUp()
+  # One test requires derivative with respect to
+  # transition_noise.scale_diag so we allow this to be
+  # passed in as an argument if needed.
+  def make_model(self, scale_diag=None):
+    if scale_diag is None:
+      scale_diag = np.array([1.], dtype=np.float32)
 
     # Define a simple random-walk model.
-    self.num_timesteps = 8
-    self.transition_matrix = np.array([[1.]], dtype=np.float32)
-    self.transition_noise = tfd.MultivariateNormalDiag(
-        scale_diag=np.array([1.], dtype=np.float32))
-    self.observation_matrix = np.array([[1.]], dtype=np.float32)
-    self.observation_noise = tfd.MultivariateNormalDiag(
+    num_timesteps = 8
+    transition_matrix = np.array([[1.]], dtype=np.float32)
+    transition_noise = tfd.MultivariateNormalDiag(
+        scale_diag=scale_diag)
+    observation_matrix = np.array([[1.]], dtype=np.float32)
+    observation_noise = tfd.MultivariateNormalDiag(
         scale_diag=np.array([0.5], dtype=np.float32))
-    self.initial_state_prior = tfd.MultivariateNormalDiag(
+    initial_state_prior = tfd.MultivariateNormalDiag(
         loc=np.zeros(shape=[1], dtype=np.float32),
-        scale_diag=np.ones(shape=[1], dtype=np.float32))
-    self.model = tfd.LinearGaussianStateSpaceModel(
-        num_timesteps=self.num_timesteps,
-        transition_matrix=self.transition_matrix,
-        transition_noise=self.transition_noise,
-        observation_matrix=self.observation_matrix,
-        observation_noise=self.observation_noise,
-        initial_state_prior=self.initial_state_prior,
+        scale_diag=np.array([1.], dtype=np.float32))
+    model = tfd.LinearGaussianStateSpaceModel(
+        num_timesteps=num_timesteps,
+        transition_matrix=transition_matrix,
+        transition_noise=transition_noise,
+        observation_matrix=observation_matrix,
+        observation_noise=observation_noise,
+        initial_state_prior=initial_state_prior,
         initial_step=0)
 
+    return (num_timesteps, transition_matrix, transition_noise,
+            observation_matrix, observation_noise,
+            initial_state_prior, model)
+
   def testForwardFilterWithMask(self):
+    (_, transition_matrix, _,
+     observation_matrix, observation_noise,
+     initial_state_prior, model) = self.make_model()
 
     observed_time_series = np.array(
         [1.0, 2.0, -1000., 0.4, np.nan, 1000., 4.2, np.inf]).astype(np.float32)
@@ -548,16 +559,16 @@ class MissingObservationsTests(tfp_test_case.TestCase):
 
     collapsed_model = tfd.LinearGaussianStateSpaceModel(
         num_timesteps=4,
-        transition_matrix=self.transition_matrix,
+        transition_matrix=transition_matrix,
         transition_noise=collapsed_transition_noise_model,
-        observation_matrix=self.observation_matrix,
-        observation_noise=self.observation_noise,
-        initial_state_prior=self.initial_state_prior,
+        observation_matrix=observation_matrix,
+        observation_noise=observation_noise,
+        initial_state_prior=initial_state_prior,
         initial_step=0)
 
     (log_likelihoods_, filtered_means_, filtered_covs_, predicted_means_,
      predicted_covs_, observation_means_, observation_covs_) = self.evaluate(
-         self.model.forward_filter(
+         model.forward_filter(
              x=observed_time_series, mask=observation_mask))
 
     (log_likelihoods_collapsed_, filtered_means_collapsed_,
@@ -592,13 +603,13 @@ class MissingObservationsTests(tfp_test_case.TestCase):
     # Also test that auxiliary methods `log_prob` and `posterior_marginals`
     # pass the mask through correctly.
     lp_, lp_collapsed_ = self.evaluate((
-        self.model.log_prob(observed_time_series, mask=observation_mask),
+        model.log_prob(observed_time_series, mask=observation_mask),
         collapsed_model.log_prob(observed_time_series[~observation_mask])))
     self.assertAllClose(lp_, lp_collapsed_)
 
     ((posterior_means_, posterior_covs_),
      (posterior_means_collapsed_, posterior_covs_collapsed_)) = self.evaluate((
-         self.model.posterior_marginals(
+         model.posterior_marginals(
              observed_time_series, mask=observation_mask),
          collapsed_model.posterior_marginals(
              observed_time_series[~observation_mask])))
@@ -608,33 +619,46 @@ class MissingObservationsTests(tfp_test_case.TestCase):
                         posterior_covs_collapsed_)
 
   def testGradientsOfMaskedNaNsAreFinite(self):
-    observed_time_series = np.array(  # contains a (masked) NaN.
-        [1.0, 2.0, -1000., 0.4, np.nan, 1000., 4.2, np.inf]).astype(np.float32)
-    observed_time_series = observed_time_series[..., np.newaxis]
-    observation_mask = np.array(
-        [False, False, True, False, True, True, False, True]).astype(np.bool)
+    def lp_from_scale_diag(scale_diag):
+      (_, _, _, _, _, _,
+       model) = self.make_model(scale_diag)
 
-    # Check that we've avoided the NaN-gradient gotcha described in
-    # https://github.com/tensorflow/tensorflow/issues/2540.
-    log_likelihoods, _, _, _, _, _, _ = self.model.forward_filter(
-        x=observed_time_series, mask=observation_mask)
-    lp = tf.reduce_sum(input_tensor=log_likelihoods)
-    grads_ = self.evaluate(
-        tf.gradients(ys=lp, xs=self.transition_noise.scale.diag))
+      observed_time_series = np.array(  # contains a (masked) NaN.
+          [1.0, 2.0, -1000., 0.4,
+           np.nan, 1000., 4.2, np.inf]).astype(np.float32)
+      observed_time_series = observed_time_series[..., np.newaxis]
+      observation_mask = np.array(
+          [False, False, True, False, True, True, False, True]).astype(np.bool)
+
+      # Check that we've avoided the NaN-gradient gotcha described in
+      # https://stackoverflow.com/questions/33712178/tensorflow-nan-bug/42497444#42497444
+      log_likelihoods, _, _, _, _, _, _ = model.forward_filter(
+          x=observed_time_series, mask=observation_mask)
+      lp = tf.reduce_sum(input_tensor=log_likelihoods)
+      return lp
+
+    _, grads_ = self.evaluate(
+        tfp.math.value_and_gradient(
+            lp_from_scale_diag,
+            [tf.constant(np.array([1.], dtype=np.float32))]))
     self.assertAllFinite(grads_)
 
   def testMaskWhenModelHasBatchShape(self):
     # When the inputs (x, mask) have shape *smaller* than the model's batch
     # shape, they should be broadcast up so we return a result for each
     # model in the batch.
+    (num_timesteps, transition_matrix, transition_noise,
+     observation_matrix, observation_noise,
+     _, _) = self.make_model()
+
     num_timesteps = 8
     batch_shape = [4, 3]
     batch_model = tfd.LinearGaussianStateSpaceModel(
         num_timesteps=num_timesteps,
-        transition_matrix=self.transition_matrix,
-        transition_noise=self.transition_noise,
-        observation_matrix=self.observation_matrix,
-        observation_noise=self.observation_noise,
+        transition_matrix=transition_matrix,
+        transition_noise=transition_noise,
+        observation_matrix=observation_matrix,
+        observation_noise=observation_noise,
         initial_state_prior=tfd.MultivariateNormalDiag(
             scale_diag=np.random.randn(*(
                 batch_shape + [1])).astype(np.float32)),
@@ -664,23 +688,27 @@ class MissingObservationsTests(tfp_test_case.TestCase):
     # shape, we return means with a sample dimension for every sample dimension
     # in the observed time series `x`, and covariances with a sample dimension
     # for every sample dimension in the mask.
+
+    (num_timesteps, _, _, _, _,
+     _, model) = self.make_model()
+
     sample_shape = [5, 2]
     mask_sample_shape = [2]
 
     mask = np.random.randn(*np.concatenate(
-        [mask_sample_shape, [self.num_timesteps]], axis=0)) > 0
+        [mask_sample_shape, [num_timesteps]], axis=0)) > 0
     observed_time_series = np.random.randn(*np.concatenate(
-        [sample_shape, [self.num_timesteps, 1]], axis=0)).astype(
+        [sample_shape, [num_timesteps, 1]], axis=0)).astype(
             np.float32)
     observed_time_series[:, mask[..., np.newaxis]] = np.inf
 
     (log_likelihoods, filtered_means, filtered_covs, _, _, _,
-     _) = self.model.forward_filter(
+     _) = model.forward_filter(
          x=observed_time_series, mask=mask)
     self.assertAllEqual(filtered_means.shape.as_list(),
-                        sample_shape + [self.num_timesteps, 1])
+                        sample_shape + [num_timesteps, 1])
     self.assertAllEqual(filtered_covs.shape.as_list(),
-                        mask_sample_shape + [self.num_timesteps, 1, 1])
+                        mask_sample_shape + [num_timesteps, 1, 1])
 
     (log_likelihoods_, filtered_means_, filtered_covs_) = self.evaluate(
         (log_likelihoods, filtered_means, filtered_covs))
@@ -689,11 +717,11 @@ class MissingObservationsTests(tfp_test_case.TestCase):
     self.assertTrue(np.all(np.isfinite(filtered_covs_)))
 
     big_mask = np.random.randn(*np.concatenate(
-        [[1, 2, 3], sample_shape, [self.num_timesteps]], axis=0)) > 0
+        [[1, 2, 3], sample_shape, [num_timesteps]], axis=0)) > 0
     with self.assertRaisesRegexp(ValueError,
                                  "mask cannot have higher rank than x"):
       (log_likelihoods, filtered_means, filtered_covs, _, _, _,
-       _) = self.model.forward_filter(
+       _) = model.forward_filter(
            x=observed_time_series, mask=big_mask)
 
 

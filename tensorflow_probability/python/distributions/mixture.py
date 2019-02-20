@@ -137,7 +137,11 @@ class Mixture(distribution.Distribution):
                       "dtypes: %s" % [(d.name, d.dtype) for d in components])
     static_event_shape = components[0].event_shape
     static_batch_shape = cat.batch_shape
-    for d in components:
+    for di, d in enumerate(components):
+      if not static_batch_shape.is_compatible_with(d.batch_shape):
+        raise ValueError(
+            "components[{}] batch shape must be compatible with cat "
+            "shape and other component batch shapes".format(di))
       static_event_shape = static_event_shape.merge_with(d.event_shape)
       static_batch_shape = static_batch_shape.merge_with(d.batch_shape)
     if static_event_shape.ndims is None:
@@ -304,29 +308,32 @@ class Mixture(distribution.Distribution):
 
   def _sample_n(self, n, seed=None):
     if self._use_static_graph:
-      # This sampling approach is almost the same as the approach used by
-      # `MixtureSameFamily`. The differences are due to having a list of
-      # `Distribution` objects rather than a single object, and maintaining
-      # random seed management that is consistent with the non-static code path.
-      samples = []
-      cat_samples = self.cat.sample(n, seed=seed)
-      stream = seed_stream.SeedStream(seed, salt="Mixture")
+      with tf.control_dependencies(self._assertions):
+        # This sampling approach is almost the same as the approach used by
+        # `MixtureSameFamily`. The differences are due to having a list of
+        # `Distribution` objects rather than a single object, and maintaining
+        # random seed management that is consistent with the non-static code
+        # path.
+        samples = []
+        cat_samples = self.cat.sample(n, seed=seed)
+        stream = seed_stream.SeedStream(seed, salt="Mixture")
 
-      for c in range(self.num_components):
-        samples.append(self.components[c].sample(n, seed=stream()))
-      x = tf.stack(samples, -self._static_event_shape.ndims - 1)  # [n, B, k, E]
-      npdt = x.dtype.as_numpy_dtype
-      mask = tf.one_hot(
-          indices=cat_samples,  # [n, B]
-          depth=self._num_components,  # == k
-          on_value=np.ones([], dtype=npdt),
-          off_value=np.zeros([], dtype=npdt))  # [n, B, k]
-      mask = distribution_util.pad_mixture_dimensions(
-          mask, self, self._cat,
-          self._static_event_shape.ndims)                   # [n, B, k, [1]*e]
-      return tf.reduce_sum(
-          input_tensor=x * mask,
-          axis=-1 - self._static_event_shape.ndims)  # [n, B, E]
+        for c in range(self.num_components):
+          samples.append(self.components[c].sample(n, seed=stream()))
+        x = tf.stack(samples,
+                     -self._static_event_shape.ndims - 1)  # [n, B, k, E]
+        npdt = x.dtype.as_numpy_dtype
+        mask = tf.one_hot(
+            indices=cat_samples,  # [n, B]
+            depth=self._num_components,  # == k
+            on_value=np.ones([], dtype=npdt),
+            off_value=np.zeros([], dtype=npdt))  # [n, B, k]
+        mask = distribution_util.pad_mixture_dimensions(
+            mask, self, self._cat,
+            self._static_event_shape.ndims)                   # [n, B, k, [1]*e]
+        return tf.reduce_sum(
+            input_tensor=x * mask,
+            axis=-1 - self._static_event_shape.ndims)  # [n, B, E]
 
     with tf.control_dependencies(self._assertions):
       n = tf.convert_to_tensor(value=n, name="n")
