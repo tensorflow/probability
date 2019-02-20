@@ -975,7 +975,11 @@ def image_summary(seqs, name, num=None):
   seqs = tf.unstack(seqs[:num])
   joined_seqs = [tf.concat(tf.unstack(seq), 1) for seq in seqs]
   joined_seqs = tf.expand_dims(tf.concat(joined_seqs, 0), 0)
-  tf.contrib.summary.image(name, joined_seqs, max_images=1)
+  tf.compat.v2.summary.image(
+      name,
+      joined_seqs,
+      max_outputs=1,
+      step=tf.compat.v1.train.get_or_create_global_step())
 
 
 def visualize_reconstruction(inputs, reconstruct, num=3, name="reconstruction"):
@@ -1038,10 +1042,14 @@ def summarize_dist_params(dist, name, name_scope="dist_params"):
     name_scope: The name scope of this summary.
   """
   with tf.name_scope(name_scope):
-    tf.contrib.summary.histogram(name="{}/{}".format(name, "mean"),
-                                 tensor=dist.mean())
-    tf.contrib.summary.histogram(name="{}/{}".format(name, "stddev"),
-                                 tensor=dist.stddev())
+    tf.compat.v2.summary.histogram(
+        name="{}/{}".format(name, "mean"),
+        data=dist.mean(),
+        step=tf.compat.v1.train.get_or_create_global_step())
+    tf.compat.v2.summary.histogram(
+        name="{}/{}".format(name, "stddev"),
+        data=dist.stddev(),
+        step=tf.compat.v1.train.get_or_create_global_step())
 
 
 def summarize_mean_in_nats_and_bits(inputs, units, name,
@@ -1059,9 +1067,15 @@ def summarize_mean_in_nats_and_bits(inputs, units, name,
   """
   mean = tf.reduce_mean(input_tensor=inputs)
   with tf.name_scope(nats_name_scope):
-    tf.contrib.summary.scalar(name, mean)
+    tf.compat.v2.summary.scalar(
+        name,
+        mean,
+        step=tf.compat.v1.train.get_or_create_global_step())
   with tf.name_scope(bits_name_scope):
-    tf.contrib.summary.scalar(name, mean / units / tf.math.log(2.))
+    tf.compat.v2.summary.scalar(
+        name,
+        mean / units / tf.math.log(2.),
+        step=tf.compat.v1.train.get_or_create_global_step())
 
 
 def main(argv):
@@ -1094,16 +1108,20 @@ def main(argv):
       checkpoint, directory=FLAGS.model_dir, max_to_keep=5)
   checkpoint.restore(checkpoint_manager.latest_checkpoint)
 
-  writer = tf.contrib.summary.create_file_writer(FLAGS.logdir)
+  writer = tf.compat.v2.summary.create_file_writer(FLAGS.logdir)
   writer.set_as_default()
 
   dataset = sprites_data.train.map(lambda *x: x[0]).shuffle(1000).repeat()
   dataset = dataset.batch(FLAGS.batch_size).take(FLAGS.max_steps)
-  for inputs in dataset.prefetch(buffer_size=None):
-    with tf.contrib.summary.record_summaries_every_n_global_steps(
-        FLAGS.log_steps, global_step=global_step):
-      if FLAGS.enable_debug_logging:
-        tf.contrib.summary.histogram("image", inputs)
+
+  if FLAGS.enable_debug_logging:
+    for inputs in dataset.prefetch(buffer_size=None):
+      with tf.compat.v2.summary.record_if(
+          lambda: tf.math.equal(0, global_step % FLAGS.log_steps)):
+        tf.compat.v2.summary.histogram(
+            "image",
+            data=inputs,
+            step=tf.compat.v1.train.get_or_create_global_step())
 
       with tf.GradientTape() as tape:
         features = model.compressor(inputs)  # (batch, timesteps, hidden)
@@ -1163,21 +1181,35 @@ def main(argv):
                               dynamic_prior_log_prob -
                               dynamic_posterior_log_prob + likelihood_log_prob)
         loss = -elbo
-        tf.contrib.summary.scalar("elbo", elbo)
+        tf.compat.v2.summary.scalar(
+            "elbo",
+            elbo,
+            step=tf.compat.v1.train.get_or_create_global_step())
 
       grads = tape.gradient(loss, model.variables)
       grads, global_norm = tf.clip_by_global_norm(grads, FLAGS.clip_norm)
       grads_and_vars = list(zip(grads, model.variables))  # allow reuse in py3
       if FLAGS.enable_debug_logging:
         with tf.name_scope("grads"):
-          tf.contrib.summary.scalar("global_norm_grads", global_norm)
-          tf.contrib.summary.scalar("global_norm_grads_clipped",
-                                    tf.linalg.global_norm(grads))
+          tf.compat.v2.summary.scalar(
+              "global_norm_grads",
+              global_norm,
+              step=tf.compat.v1.train.get_or_create_global_step())
+          tf.compat.v2.summary.scalar(
+              "global_norm_grads_clipped",
+              tf.linalg.global_norm(grads),
+              step=tf.compat.v1.train.get_or_create_global_step())
         for grad, var in grads_and_vars:
           with tf.name_scope("grads"):
-            tf.contrib.summary.histogram("{}/grad".format(var.name), grad)
+            tf.compat.v2.summary.histogram(
+                "{}/grad".format(var.name),
+                data=grad,
+                step=tf.compat.v1.train.get_or_create_global_step())
           with tf.name_scope("vars"):
-            tf.contrib.summary.histogram(var.name, var)
+            tf.compat.v2.summary.histogram(
+                var.name,
+                data=var,
+                step=tf.compat.v1.train.get_or_create_global_step())
       optimizer.apply_gradients(grads_and_vars, global_step)
 
     is_log_step = global_step.numpy() % FLAGS.log_steps == 0
@@ -1186,7 +1218,7 @@ def main(argv):
       checkpoint_manager.save()
       print("ELBO ({}/{}): {}".format(global_step.numpy(), FLAGS.max_steps,
                                       elbo.numpy()))
-      with tf.contrib.summary.always_record_summaries():
+      with tf.compat.v2.summary.record_if(True):
         val_data = sprites_data.test.take(20)
         inputs = next(iter(val_data.shuffle(20).batch(3)))[0]
         visualize_qualitative_analysis(inputs, model,
