@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Conditional ops that use static values when available."""
+"""Operations that use static values when available."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -25,12 +25,6 @@ import tensorflow as tf
 
 from tensorflow.python import pywrap_tensorflow as c_api  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.ops import control_flow_ops  # pylint: disable=g-direct-tensorflow-import
-
-
-def _maybe_get_static_value(x):
-  static_x = tf.get_static_value(x)
-  is_static = static_x is not None
-  return (static_x if is_static else x), is_static
 
 
 def _maybe_get_static_args(args):
@@ -52,13 +46,27 @@ def _prefer_static(static_fn):
   return decorator
 
 
+# The operations below function as drop-in replacements for their standard
+# TensorFlow counterparts. However, they will attempt to statically evaluate
+# arguments and apply the given `static_fn` instead of the TensorFlow operation.
+
 greater = _prefer_static(lambda x, y, *_, **__: (x > y))(tf.greater)
 less = _prefer_static(lambda x, y, *_, **__: (x < y))(tf.less)
 equal = _prefer_static(lambda x, y, *_, **__: (x == y))(tf.equal)
 logical_and = _prefer_static(lambda x, y, *_, **__: (x and y))(tf.logical_and)
 logical_or = _prefer_static(lambda x, y, *_, **__: (x or y))(tf.logical_or)
-reduce_all = _prefer_static(np.all)(tf.reduce_all)
-reduce_any = _prefer_static(np.any)(tf.reduce_any)
+
+
+def _static_all(input_tensor, axis=None, keepdims=False, name=None):
+  del name  # unused
+  return np.all(a=input_tensor, axis=axis, keepdims=keepdims)
+reduce_all = _prefer_static(_static_all)(tf.reduce_all)
+
+
+def _static_any(input_tensor, axis=None, keepdims=False, name=None):
+  del name  # unused
+  return np.any(a=input_tensor, axis=axis, keepdims=keepdims)
+reduce_any = _prefer_static(_static_any)(tf.reduce_any)
 
 
 def _get_static_predicate(pred):
