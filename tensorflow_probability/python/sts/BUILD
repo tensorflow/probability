@@ -60,6 +60,7 @@ py_test(
     size = "large",
     srcs = ["fitting_test.py"],
     shard_count = 6,
+    tags = ["tf2-kokoro-broken"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,

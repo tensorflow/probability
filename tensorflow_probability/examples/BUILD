@@ -58,6 +58,7 @@ py_test(
     ],
     main = "bayesian_neural_network.py",
     srcs_version = "PY2AND3",
+    tags = ["tf2-kokoro-broken"],
     deps = [
         ":bayesian_neural_network_lib",
     ],
@@ -138,6 +139,7 @@ py_test(
     ],
     main = "disentangled_vae.py",
     srcs_version = "PY2AND3",
+    tags = ["tf2-kokoro-broken"],
     deps = [
         ":disentangled_vae_lib",
     ],
@@ -150,6 +152,7 @@ py_test(
     main = "disentangled_vae_test.py",
     shard_count = 2,
     srcs_version = "PY2AND3",
+    tags = ["tf2-kokoro-broken"],
     deps = [
         ":disentangled_vae_lib",
         # numpy dep,
@@ -189,6 +192,7 @@ py_test(
     ],
     main = "deep_exponential_family.py",
     srcs_version = "PY2AND3",
+    tags = ["tf2-kokoro-broken"],
     deps = [
         ":deep_exponential_family_lib",
     ],
@@ -306,6 +310,7 @@ py_test(
     ],
     main = "logistic_regression.py",
     srcs_version = "PY2AND3",
+    tags = ["tf2-kokoro-broken"],
     deps = [
         ":logistic_regression_lib",
     ],
@@ -392,6 +397,7 @@ py_test(
     ],
     main = "vq_vae.py",
     srcs_version = "PY2AND3",
+    tags = ["tf2-kokoro-broken"],
     deps = [
         ":vq_vae_lib",
     ],
@@ -429,6 +435,7 @@ py_test(
     ],
     main = "cifar10_bnn.py",
     srcs_version = "PY2AND3",
+    tags = ["tf2-kokoro-broken"],
     deps = [
         ":cifar10_bnn_lib",
     ],
