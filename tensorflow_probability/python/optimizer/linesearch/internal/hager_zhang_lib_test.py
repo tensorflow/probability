@@ -43,30 +43,26 @@ def test_function_x_y(x, y):
     A callable that takes a tf.Tensor `t` as input and returns as output the
     value and derivative of the interpolated function at `t`.
   """
-  if len(y.shape) == 1:  # No batches.
-    y = tf.expand_dims(y, axis=0)
-  b, n = y.shape
-  y = tf.expand_dims(y, axis=-1)
-  x = tf.reshape(tf.tile(x, [b]), (b, n, 1))  # Repeat x on all batches.
+  deg = len(x) - 1
+  poly = np.polyfit(x, y.T, deg)
+  poly = [tf.convert_to_tensor(value=c, dtype=tf.float32) for c in poly]
 
   def f(t):
-    t = tf.convert_to_tensor(value=t)
-    while len(t.shape) < 3:
-      t = tf.expand_dims(t, axis=-1)
-    p, g = value_and_gradient(
-        lambda t_: tf.contrib.image.interpolate_spline(x, y, t_, 2), t)
-    return ValueAndGradient(f=tf.squeeze(p), df=tf.squeeze(g))
+    t = tf.convert_to_tensor(value=t, dtype=tf.float32)
+    f, df = value_and_gradient(lambda t_: tf.math.polyval(poly, t_), t)
+    return ValueAndGradient(f=tf.squeeze(f), df=tf.squeeze(df))
 
   return f
 
 
-def test_function_x_y_dy(x, y, dy, eps=0.1):
+def test_function_x_y_dy(x, y, dy, eps=0.01):
   """Builds a polynomial with (approx) given values and derivatives."""
   x1 = x + eps
   y1 = y + eps * dy
   x2 = x - eps
   y2 = y - eps * dy
-  return test_function_x_y(tf.concat([x1, x2], -1), tf.concat([y1, y2], -1))
+  return test_function_x_y(
+      np.concatenate([x1, x2], axis=-1), np.concatenate([y1, y2], axis=-1))
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -76,10 +72,10 @@ class HagerZhangLibTest(tf.test.TestCase):
     """Tests that update works on a single line function."""
     # Example where trial point works as new left end point.
     wolfe_threshold = 1e-6
-    x = tf.constant([0.0, 0.6, 1.0])
-    y = tf.constant([1.0, 0.9, 1.2])
-    dy = tf.constant([-0.8, -0.7, 0.6])
-    fun = test_function_x_y_dy(x, y, dy, eps=0.1)
+    x = np.array([0.0, 0.6, 1.0])
+    y = np.array([1.0, 0.9, 1.2])
+    dy = np.array([-0.8, -0.7, 0.6])
+    fun = test_function_x_y_dy(x, y, dy)
 
     val_a = hzl._apply(fun, 0.0)
     val_b = hzl._apply(fun, 1.0)
@@ -106,16 +102,16 @@ class HagerZhangLibTest(tf.test.TestCase):
     # - c) Trial point has negative slope but the value is too high,
     #      bisect is used to squeeze the interval.
     # - d) Trial point is outside of the (a, b) interval.
-    x = tf.constant([0.0, 0.6, 1.0])
-    y = tf.constant([[1.0, 1.2, 1.1],
-                     [1.0, 0.9, 1.2],
-                     [1.0, 1.1, 1.2],
-                     [1.0, 1.1, 1.2]])
-    dy = tf.constant([[-0.8, 0.6, 0.6],
-                      [-0.8, -0.7, 0.6],
-                      [-0.8, -0.7, 0.6],
-                      [-0.8, -0.7, 0.6]])
-    fun = test_function_x_y_dy(x, y, dy, eps=0.1)
+    x = np.array([0.0, 0.6, 1.0])
+    y = np.array([[1.0, 1.2, 1.1],
+                  [1.0, 0.9, 1.2],
+                  [1.0, 1.1, 1.2],
+                  [1.0, 1.1, 1.2]])
+    dy = np.array([[-0.8, 0.6, 0.6],
+                   [-0.8, -0.7, 0.6],
+                   [-0.8, -0.7, 0.6],
+                   [-0.8, -0.7, 0.6]])
+    fun = test_function_x_y_dy(x, y, dy)
 
     val_a = hzl._apply(fun, tf.zeros(4))  # Values at zero.
     val_b = hzl._apply(fun, tf.ones(4))  # Values at initial step.
@@ -137,11 +133,11 @@ class HagerZhangLibTest(tf.test.TestCase):
   def test_update_batching_vs_mapping(self):
     """Tests that update function works in batching mode."""
     wolfe_threshold = 1e-6
-    x = tf.constant([0.0, 0.6, 1.0])
-    ys = tf.constant([[1.0, 1.2, 1.1],
-                      [1.0, 0.9, 1.2]])
-    dys = tf.constant([[-0.8, 0.6, 0.6],
-                       [-0.8, -0.7, 0.6]])
+    x = np.array([0.0, 0.6, 1.0])
+    ys = np.array([[1.0, 1.2, 1.1],
+                   [1.0, 0.9, 1.2]])
+    dys = np.array([[-0.8, 0.6, 0.6],
+                    [-0.8, -0.7, 0.6]])
 
     # Create each individual and batched functions.
     fun1 = test_function_x_y_dy(x, ys[0], dys[0])
@@ -170,9 +166,9 @@ class HagerZhangLibTest(tf.test.TestCase):
     # Example crafted to require one expansion during bracketing, and then
     # some bisection; same as case (d) in test_bracket_batching below.
     wolfe_threshold = 1e-6
-    x = tf.constant([0.0, 1.0, 5.0])
-    y = tf.constant([1.0, 0.9, 1.1])
-    dy = tf.constant([-0.8, -0.7, -0.8])
+    x = np.array([0.0, 1.0, 2.5, 5.0])
+    y = np.array([1.0, 0.9, -2.0, 1.1])
+    dy = np.array([-0.8, -0.7, 1.6, -0.8])
     fun = test_function_x_y_dy(x, y, dy)
 
     val_a = hzl._apply(fun, 0.0)  # Value at zero.
@@ -198,16 +194,16 @@ class HagerZhangLibTest(tf.test.TestCase):
     # - b) Minimum bracketed after one expansion.
     # - c) Needs bisect from the beginning.
     # - d) Needs one round of expansion and then bisect.
-    x = tf.constant([0.0, 1.0, 5.0])
-    y = tf.constant([[1.0, 1.2, 1.1],
-                     [1.0, 0.9, 1.2],
-                     [1.0, 1.1, 1.2],
-                     [1.0, 0.9, 1.1]])
-    dy = tf.constant([[-0.8, 0.6, -0.8],
-                      [-0.8, -0.7, 0.6],
-                      [-0.8, -0.7, -0.8],
-                      [-0.8, -0.7, -0.8]])
-    fun = test_function_x_y_dy(x, y, dy, eps=0.1)
+    x = np.array([0.0, 1.0, 2.5, 5.0])
+    y = np.array([[1.0, 1.2, 1.4, 1.1],
+                  [1.0, 0.9, -2.5, 1.2],
+                  [1.0, 1.1, -3.0, 1.2],
+                  [1.0, 0.9, -2.0, 1.1]])
+    dy = np.array([[-0.8, 0.6, -0.5, -0.8],
+                   [-0.8, -0.7, -0.5, 0.6],
+                   [-0.8, -0.7, -0.3, -0.8],
+                   [-0.8, -0.7, 1.6, -0.8]])
+    fun = test_function_x_y_dy(x, y, dy)
 
     val_a = hzl._apply(fun, tf.zeros(4))  # Values at zero.
     val_b = hzl._apply(fun, tf.ones(4))  # Values at initial step.
@@ -229,9 +225,9 @@ class HagerZhangLibTest(tf.test.TestCase):
   def test_bisect_simple(self):
     """Tests that bisect works on a 1 variable scalar valued function."""
     wolfe_threshold = 1e-6
-    x = tf.constant([0.0, 0.5, 1.0])
-    y = tf.constant([1.0, 0.6, 1.2])
-    dy = tf.constant([-0.8, 0.6, -0.7])
+    x = np.array([0.0, 0.5, 1.0])
+    y = np.array([1.0, 0.6, 1.2])
+    dy = np.array([-0.8, 0.6, -0.7])
     fun = test_function_x_y_dy(x, y, dy)
 
     val_a = hzl._apply(fun, 0.0)  # Value at zero.
@@ -248,16 +244,16 @@ class HagerZhangLibTest(tf.test.TestCase):
     # different poly. They all have negative slopes both on 0.0 and 1.0,
     # but different slopes (positive, negative) and values (low enough, too
     # high) on their midpoint.
-    x = tf.constant([0.0, 0.5, 1.0])
-    y = tf.constant([[1.0, 0.6, 1.2],
-                     [1.0, 0.6, 1.2],
-                     [1.0, 1.6, 1.2],
-                     [1.0, 1.6, 1.2]])
-    dy = tf.constant([[-0.8, 0.6, -0.7],
-                      [-0.8, -0.4, -0.7],
-                      [-0.8, 0.8, -0.7],
-                      [-0.8, -0.4, -0.7]])
-    fun = test_function_x_y_dy(x, y, dy, eps=0.1)
+    x = np.array([0.0, 0.5, 1.0])
+    y = np.array([[1.0, 0.6, 1.2],
+                  [1.0, 0.6, 1.2],
+                  [1.0, 1.6, 1.2],
+                  [1.0, 1.6, 1.2]])
+    dy = np.array([[-0.8, 0.6, -0.7],
+                   [-0.8, -0.4, -0.7],
+                   [-0.8, 0.8, -0.7],
+                   [-0.8, -0.4, -0.7]])
+    fun = test_function_x_y_dy(x, y, dy)
 
     val_a = hzl._apply(fun, tf.zeros(4))  # Values at zero.
     val_b = hzl._apply(fun, tf.ones(4))  # Values at initial step.
