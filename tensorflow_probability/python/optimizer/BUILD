@@ -76,7 +76,6 @@ py_test(
     name = "variational_sgd_test",
     size = "medium",
     srcs = ["variational_sgd_test.py"],
-    tags = ["tf2-broken"],
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",

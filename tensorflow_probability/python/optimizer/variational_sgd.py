@@ -21,6 +21,7 @@ from __future__ import print_function
 import tensorflow as tf
 
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow.python.training import training_ops
 
 
@@ -29,7 +30,7 @@ __all__ = [
 ]
 
 
-class VariationalSGD(tf.compat.v1.train.Optimizer):
+class VariationalSGD(tf.compat.v2.optimizers.Optimizer):
   """An optimizer module for constant stochastic gradient descent.
 
   This implements an optimizer module for the constant stochastic gradient
@@ -66,9 +67,6 @@ class VariationalSGD(tf.compat.v1.train.Optimizer):
       (Default: `False`)
     name: Python `str` describing ops managed by this function.
       (Default: `"VariationalSGD"`)
-    variable_scope: Variable scope used for calls to `tf.get_variable`.
-      If `None`, a new variable scope is created using name
-      `tf.get_default_graph().unique_name(name or default_name)`.
 
   Raises:
     InvalidArgumentError: If preconditioner_decay_rate is a `Tensor` not in
@@ -89,37 +87,28 @@ class VariationalSGD(tf.compat.v1.train.Optimizer):
                burnin=25,
                burnin_max_learning_rate=1e-6,
                use_single_learning_rate=False,
-               name=None,
-               variable_scope=None):
+               name=None):
     default_name = 'VariationalSGD'
     with tf.name_scope(name, default_name, [
         max_learning_rate, preconditioner_decay_rate, batch_size, burnin,
         burnin_max_learning_rate
     ]):
-      if variable_scope is None:
-        var_scope_name = tf.compat.v1.get_default_graph().unique_name(
-            name or default_name)
-        with tf.compat.v1.variable_scope(var_scope_name) as scope:
-          self._variable_scope = scope
-      else:
-        self._variable_scope = variable_scope
-
       self._preconditioner_decay_rate = tf.convert_to_tensor(
           value=preconditioner_decay_rate, name='preconditioner_decay_rate')
       self._batch_size = tf.convert_to_tensor(
           value=batch_size, name='batch_size')
       self._total_num_examples = tf.convert_to_tensor(
           value=total_num_examples, name='total_num_examples')
-      self._burnin = tf.convert_to_tensor(value=burnin, name='burnin')
+
+      self._burnin = tf.convert_to_tensor(
+          value=burnin,
+          name='burnin',
+          dtype=dtype_util.common_dtype([burnin], preferred_dtype=tf.int64))
       self._burnin_max_learning_rate = tf.convert_to_tensor(
           value=burnin_max_learning_rate, name='burnin_max_learning_rate')
       self._max_learning_rate = tf.convert_to_tensor(
           value=max_learning_rate, name='max_learning_rate')
       self._use_single_learning_rate = use_single_learning_rate
-
-      with tf.compat.v1.variable_scope(self._variable_scope):
-        self._counter = tf.compat.v1.get_variable(
-            'counter', initializer=0, trainable=False)
 
       self._preconditioner_decay_rate = distribution_util.with_dependencies([
           tf.compat.v1.assert_non_negative(
@@ -164,24 +153,26 @@ class VariationalSGD(tf.compat.v1.train.Optimizer):
               message='`max_learning_rate` must be non-negative')
       ], self._max_learning_rate)
 
-      super(VariationalSGD, self).__init__(
-          use_locking=False, name=name or default_name)
+      super(VariationalSGD, self).__init__(name=name or default_name)
+
+  def get_config(self):
+    # TODO(b/124800185): Consider migrating `max_learning_rate`, `burnin`,
+    # `preconditioner_decay_rate` and other properties into optimizer
+    # hyperparameters.
+    pass
 
   def _create_slots(self, var_list):
-    for v in var_list:
-      init_moment = tf.compat.v1.initializers.zeros(dtype=v.dtype)
-      self._get_or_make_slot_with_initializer(
-          v, init_moment, v.shape, v.dtype, 'first_moment', self._name)
-      self._get_or_make_slot_with_initializer(
-          v, init_moment, v.shape, v.dtype, 'second_moment', self._name)
+    for var in var_list:
+      self.add_slot(var, 'first_moment', 'zeros')
+      self.add_slot(var, 'second_moment', 'zeros')
 
-  def _prepare(self):
+  def _prepare(self, var_list):
     self._decay_tensor = tf.convert_to_tensor(
         value=self._preconditioner_decay_rate, name='preconditioner_decay_rate')
     self._batch_size_tensor = tf.convert_to_tensor(
         value=self._batch_size, name='batch_size_tensor')
 
-    super(VariationalSGD, self)._prepare()
+    super(VariationalSGD, self)._prepare(var_list)
 
   def _get_coordinatewise_learning_rate(self, grad, var):
     # Compute the learning rate using a moving average for the diagonal of BB^T
@@ -194,16 +185,13 @@ class VariationalSGD(tf.compat.v1.train.Optimizer):
     # via Welford's algorithm
     if isinstance(grad, tf.Tensor):
       delta = grad - avg_first
-      first_moment_update = avg_first.assign_add(
-          delta * tf.where(self._counter < 1,
-                           tf.cast(1, var.dtype),
-                           1. - decay_tensor))
+      first_moment_update = avg_first.assign_add(delta * tf.where(
+          self.iterations < 1, tf.cast(1, var.dtype), 1. - decay_tensor))
 
       with tf.control_dependencies([first_moment_update]):
         second_moment_update = avg_second.assign_add(
-            tf.cast(self._counter < 1, var.dtype) *
-            -(1. - decay_tensor) * (
-                avg_second - decay_tensor  * tf.square(delta)))
+            tf.cast(self.iterations < 1, var.dtype) * -(1. - decay_tensor) *
+            (avg_second - decay_tensor * tf.square(delta)))
       diag_preconditioner = distribution_util.with_dependencies(
           [second_moment_update],
           tf.clip_by_value(avg_second, 1e-12, 1e12))
@@ -211,13 +199,13 @@ class VariationalSGD(tf.compat.v1.train.Optimizer):
       delta = grad.values - tf.gather_nd(avg_first, grad.indices)
       first_moment_update = tf.compat.v1.scatter_add(
           avg_first, grad.indices,
-          delta * tf.where(self._counter < 1, tf.cast(1., var.dtype),
+          delta * tf.where(self.iterations < 1, tf.cast(1., var.dtype),
                            1. - decay_tensor))
 
       with tf.control_dependencies([first_moment_update]):
         avg_second = tf.compat.v1.scatter_add(
             avg_second, grad.indices,
-            tf.cast(self._counter < 1, var.dtype) * -(1. - decay_tensor) *
+            tf.cast(self.iterations < 1, var.dtype) * -(1. - decay_tensor) *
             (tf.gather_nd(avg_second, grad.indices) -
              decay_tensor * tf.square(delta)))
         avg_second = tf.gather_nd(avg_second, grad.indices)
@@ -237,40 +225,30 @@ class VariationalSGD(tf.compat.v1.train.Optimizer):
         tf.cast(self._total_num_examples, var.dtype.base_dtype) *
         diag_preconditioner)
 
-  def _apply_dense(self, grad, var):
-    max_learning_rate = tf.where(self._counter < self._burnin,
-                                 self._burnin_max_learning_rate,
-                                 self._max_learning_rate)
+  def _resource_apply_dense(self, grad, var):
+    max_learning_rate = tf.where(
+        self.iterations < tf.cast(self._burnin, tf.int64),
+        self._burnin_max_learning_rate, self._max_learning_rate)
 
     learn_rates = tf.clip_by_value(
         self._get_coordinatewise_learning_rate(grad, var), 0.,
         tf.cast(max_learning_rate, var.dtype.base_dtype))
 
     newgrad = grad * learn_rates
-    return training_ops.apply_gradient_descent(
-        var,
+    return training_ops.resource_apply_gradient_descent(
+        var.handle,
         tf.cast(1., var.dtype),
         newgrad,
-        use_locking=self._use_locking).op
+        use_locking=self._use_locking)
 
-  def _apply_sparse(self, grad, var):
-    max_learning_rate = tf.where(self._counter < self._burnin,
-                                 self._burnin_max_learning_rate,
-                                 self._max_learning_rate)
+  def _resource_apply_sparse(self, grad, var, indices):
+    max_learning_rate = tf.where(
+        self.iterations < tf.cast(self._burnin, tf.int64),
+        self._burnin_max_learning_rate, self._max_learning_rate)
 
     learn_rate = tf.clip_by_value(
         self._get_coordinatewise_learning_rate(grad, var), 0.,
         tf.cast(max_learning_rate, var.dtype))
-    delta = grad.values * learn_rate
+    delta = grad * learn_rate
 
-    return tf.compat.v1.scatter_sub(
-        var, grad.indices, delta, use_locking=self._use_locking)
-
-  def _finish(self, update_ops, name_scope):
-    update_ops.append([self._counter.assign_add(1)])
-    return tf.group(*update_ops, name=name_scope)
-
-  @property
-  def variable_scope(self):
-    """Variable scope of all calls to `tf.get_variable`."""
-    return self._variable_scope
+    return self._resource_scatter_add(var, indices, -delta)
