@@ -62,6 +62,13 @@ class StatisticalTestingTest(tf.test.TestCase, parameterized.TestCase):
           np.ones_like(below_threshold, np.bool), below_threshold,
           msg='false_pass_rate({}), false_fail_rate({})'.format(
               false_pass_rate, false_fail_rate))
+      # Could probably bring this factor of 2 down by cleverly allocating
+      # envelopes in the one-sample min_num_samples computations.
+      bound_tight = thresholds <= discrepancies * 2
+      self.assertAllEqual(
+          np.ones_like(bound_tight, np.bool), bound_tight,
+          msg='false_pass_rate({}), false_fail_rate({})'.format(
+              false_pass_rate, false_fail_rate))
 
   @parameterized.parameters(np.float32, np.float64)
   def test_dkwm_design_cdf_one_sample_soundness(self, dtype):
@@ -113,14 +120,38 @@ class StatisticalTestingTest(tf.test.TestCase, parameterized.TestCase):
                                [0, 0.25, 0.5, 0.75],
                                [0, 0.25, 0.25, 0.25]]
     low_empirical_cdfs = self.evaluate(
-        st.empirical_cdfs(samples, continuity='left'))
+        st.empirical_cdfs(samples, samples, continuity='left'))
     self.assertAllEqual(expected_low_cdf_values, low_empirical_cdfs)
     expected_high_cdf_values = [[0.5, 0.5, 1, 1],
                                 [0.25, 0.5, 0.75, 1],
                                 [0.25, 1, 1, 1]]
     high_empirical_cdfs = self.evaluate(
-        st.empirical_cdfs(samples, continuity='right'))
+        st.empirical_cdfs(samples, samples, continuity='right'))
     self.assertAllEqual(expected_high_cdf_values, high_empirical_cdfs)
+
+  @parameterized.parameters(np.float32, np.float64)
+  def test_kolmogorov_smirnov_distance(self, dtype):
+    samples = [[1, 1, 2, 2],
+               [1, 2, 3, 4],
+               [1, 3, 3, 3]]
+    samples = tf.convert_to_tensor(value=samples, dtype=dtype)
+    def cdf(x):
+      ones = tf.ones_like(x)
+      answer = tf.where(x < 3, 0.6 * ones, ones)
+      answer = tf.where(x < 2, 0.3 * ones, answer)
+      answer = tf.where(x < 1, 0.1 * ones, answer)
+      return tf.where(x < 0, 0 * ones, answer)
+    def left_continuous_cdf(x):
+      ones = tf.ones_like(x)
+      answer = tf.where(x <= 3, 0.6 * ones, ones)
+      answer = tf.where(x <= 2, 0.3 * ones, answer)
+      answer = tf.where(x <= 1, 0.1 * ones, answer)
+      return tf.where(x <= 0, 0 * ones, answer)
+    # Unlike empirical_cdfs, the samples Tensor must come in iid across the
+    # leading dimension.
+    obtained = self.evaluate(st.kolmogorov_smirnov_distance(
+        tf.transpose(a=samples), cdf, left_continuous_cdf=left_continuous_cdf))
+    self.assertAllClose([0.4, 0.25, 0.35], obtained, atol=1e-7)
 
   @parameterized.parameters(np.float32, np.float64)
   def test_dkwm_cdf_one_sample_batch_discrete_assertion(self, dtype):
@@ -149,7 +180,62 @@ class StatisticalTestingTest(tf.test.TestCase, parameterized.TestCase):
     d = st.min_discrepancy_of_true_cdfs_detectable_by_dkwm(
         tf.ones(batch_shape) * num_samples,
         false_fail_rate=1e-6, false_pass_rate=1e-6)
-    self.evaluate(d < 0.05)
+    self.assertTrue(np.all(self.evaluate(d) < 0.05))
+
+    def check_catches_mistake(wrong_probs):
+      wrong_samples = rng.choice(
+          len(wrong_probs), size=shape, p=wrong_probs).astype(dtype=dtype)
+      with self.assertRaisesOpError('Empirical CDF outside K-S envelope'):
+        self.evaluate(st.assert_true_cdf_equal_by_dkwm(
+            wrong_samples, cdf, left_continuous_cdf=left_continuous_cdf,
+            false_fail_rate=1e-6))
+
+    check_catches_mistake([0.1, 0.2, 0.3, 0.3, 0.1])
+    check_catches_mistake([0.2, 0.2, 0.3, 0.3])
+
+  @parameterized.parameters(np.float32, np.float64)
+  def test_kolmogorov_smirnov_distance_two_sample(self, dtype):
+    del dtype
+    samples1 = [[1, 1, 2, 2],
+                [1, 2, 3, 4],
+                [1, 3, 3, 3]]
+    samples2 = [[1, 2, 2, 1, 1, 2],
+                [4, 4, 3, 2, 1, 1],
+                [2, 2, 2, 1, -4, 7]]
+    # Unlike empirical_cdfs, the samples Tensors must come in iid across the
+    # leading dimension.
+    obtained = self.evaluate(st.kolmogorov_smirnov_distance_two_sample(
+        tf.transpose(a=samples1), tf.transpose(a=samples2)))
+    self.assertAllClose([0.0, 1 / 12., 0.75 - 1 / 6.], obtained, atol=1e-7)
+
+  @parameterized.parameters(np.float32, np.float64)
+  def test_dkwm_cdf_two_sample_batch_discrete_assertion(self, dtype):
+    rng = np.random.RandomState(seed=0)
+    num_samples = 52000
+    batch_shape = [3, 2]
+    shape = [num_samples] + batch_shape
+
+    probs = [0.1, 0.2, 0.3, 0.4]
+    samples1 = rng.choice(4, size=shape, p=probs).astype(dtype=dtype)
+    samples2 = rng.choice(4, size=shape, p=probs).astype(dtype=dtype)
+    self.evaluate(st.assert_true_cdf_equal_by_dkwm_two_sample(
+        samples1, samples2, false_fail_rate=1e-6))
+
+    def check_catches_mistake(wrong_probs):
+      wrong_samples = rng.choice(
+          len(wrong_probs), size=shape, p=wrong_probs).astype(dtype=dtype)
+      with self.assertRaisesOpError(
+          'Empirical CDFs outside joint K-S envelope'):
+        self.evaluate(st.assert_true_cdf_equal_by_dkwm_two_sample(
+            samples1, wrong_samples, false_fail_rate=1e-6))
+
+    n = tf.ones(batch_shape) * num_samples
+    d = st.min_discrepancy_of_true_cdfs_detectable_by_dkwm_two_sample(
+        n, n, false_fail_rate=1e-6, false_pass_rate=1e-6)
+    self.assertTrue(np.all(self.evaluate(d) < 0.05))
+
+    check_catches_mistake([0.1, 0.2, 0.3, 0.3, 0.1])
+    check_catches_mistake([0.2, 0.2, 0.3, 0.3])
 
   @parameterized.parameters(np.float32, np.float64)
   def test_dkwm_design_mean_one_sample_soundness(self, dtype):
@@ -161,8 +247,8 @@ class StatisticalTestingTest(tf.test.TestCase, parameterized.TestCase):
             st.min_discrepancy_of_true_means_detectable_by_dkwm,
             low=0., high=1.))
 
-  @parameterized.parameters(np.float32, np.float64)
-  def test_dkwm_design_mean_two_sample_soundness(self, dtype):
+  def assert_design_soundness_two_sample(
+      self, dtype, min_num_samples, min_discrepancy):
     thresholds = [1e-5, 1e-2, 1.1e-1, 0.9, 1., 1.02, 2., 10., 1e2, 1e5, 1e10]
     rates = [1e-6, 1e-3, 1e-2, 1.1e-1, 0.2, 0.5, 0.7, 1.]
     false_fail_rates, false_pass_rates = np.meshgrid(rates, rates)
@@ -175,19 +261,15 @@ class StatisticalTestingTest(tf.test.TestCase, parameterized.TestCase):
       [
           sufficient_n1,
           sufficient_n2
-      ] = st.min_num_samples_for_dkwm_mean_two_sample_test(
-          thresholds, low1=0., high1=1., low2=0., high2=1.,
+      ] = min_num_samples(
+          thresholds,
           false_fail_rate=false_fail_rate,
           false_pass_rate=false_pass_rate)
 
       detectable_discrepancies.append(
-          st.min_discrepancy_of_true_means_detectable_by_dkwm_two_sample(
+          min_discrepancy(
               n1=sufficient_n1,
-              low1=0.,
-              high1=1.,
               n2=sufficient_n2,
-              low2=0.,
-              high2=1.,
               false_fail_rate=false_fail_rate,
               false_pass_rate=false_pass_rate))
 
@@ -199,6 +281,28 @@ class StatisticalTestingTest(tf.test.TestCase, parameterized.TestCase):
           np.ones_like(below_threshold, np.bool), below_threshold,
           msg='false_pass_rate({}), false_fail_rate({})'.format(
               false_pass_rate, false_fail_rate))
+      bound_tight = thresholds <= discrepancies * 2
+      self.assertAllEqual(
+          np.ones_like(bound_tight, np.bool), bound_tight,
+          msg='false_pass_rate({}), false_fail_rate({})'.format(
+              false_pass_rate, false_fail_rate))
+
+  @parameterized.parameters(np.float32, np.float64)
+  def test_dkwm_design_cdf_two_sample_soundness(self, dtype):
+    self.assert_design_soundness_two_sample(
+        dtype, st.min_num_samples_for_dkwm_cdf_two_sample_test,
+        st.min_discrepancy_of_true_cdfs_detectable_by_dkwm_two_sample)
+
+  @parameterized.parameters(np.float32, np.float64)
+  def test_dkwm_design_mean_two_sample_soundness(self, dtype):
+    min_num_samples = functools.partial(
+        st.min_num_samples_for_dkwm_mean_two_sample_test,
+        low1=0., high1=1., low2=0., high2=1.)
+    min_discrepancy = functools.partial(
+        st.min_discrepancy_of_true_means_detectable_by_dkwm_two_sample,
+        low1=0., high1=1., low2=0., high2=1.)
+    self.assert_design_soundness_two_sample(
+        dtype, min_num_samples, min_discrepancy)
 
   @parameterized.parameters(np.float32, np.float64)
   def test_true_mean_confidence_interval_by_dkwm_one_sample(self, dtype):

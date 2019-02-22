@@ -43,7 +43,7 @@ is some expected constant.  Suppose the support of P is the interval
 
   # Check that the difference in means detectable with 5000 samples is
   # small enough
-  check2 = tf.assert_less(
+  check2 = tf.compat.v1.assert_less(
       statistical_testing.min_discrepancy_of_true_means_detectable_by_dkwm(
           num_samples, low=0., high=1.0,
           false_fail_rate=1e-6, false_pass_rate=1e-6),
@@ -125,9 +125,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
 import itertools
 
 import tensorflow as tf
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 
 __all__ = [
@@ -135,7 +137,11 @@ __all__ = [
     'min_discrepancy_of_true_cdfs_detectable_by_dkwm',
     'min_num_samples_for_dkwm_cdf_test',
     'kolmogorov_smirnov_distance',
+    'kolmogorov_smirnov_distance_two_sample',
     'empirical_cdfs',
+    'assert_true_cdf_equal_by_dkwm_two_sample',
+    'min_discrepancy_of_true_cdfs_detectable_by_dkwm_two_sample',
+    'min_num_samples_for_dkwm_cdf_two_sample_test',
     'true_mean_confidence_interval_by_dkwm',
     'assert_true_mean_equal_by_dkwm',
     'min_discrepancy_of_true_means_detectable_by_dkwm',
@@ -400,15 +406,9 @@ def kolmogorov_smirnov_distance(
   """
   with tf.name_scope(
       name, 'kolmogorov_smirnov_distance', [samples]):
-    rank = tf.rank(samples)
-
-    # Move the batch dimension of `samples` to the rightmost position,
-    # where the _batch_sort_vector function wants it.
-    perm = tf.concat([tf.range(1, rank), [0]], axis=0)
-    samples = tf.transpose(a=samples, perm=perm)
-
-    # Order the samples within each batch member
-    samples = _batch_sort_vector(samples)
+    dtype = dtype_util.common_dtype([samples], tf.float32)
+    samples = tf.convert_to_tensor(value=samples, name='samples', dtype=dtype)
+    samples = _move_dim_and_sort(samples)
 
     # Compute analytic cdf values at each sample
     cdfs = cdf(samples)
@@ -443,6 +443,62 @@ def kolmogorov_smirnov_distance(
     return tf.maximum(low_distances, high_distances)
 
 
+def kolmogorov_smirnov_distance_two_sample(samples1, samples2, name=None):
+  """Computes the Kolmogorov-Smirnov distance between the given empirical CDFs.
+
+  The (absolute) Kolmogorov-Smirnov distance is the maximum (absolute)
+  discrepancy between the CDFs, i.e.,
+
+    sup_x(|cdf1(x) - cdf2(x)|)
+
+  This is tractable to compute exactly for empirical CDFs, because they are
+  piecewise constant with known piece boundaries (the samples).
+
+  This function works even if the samples have duplicates (e.g., if the
+  underlying distribution is discrete).
+
+  Args:
+    samples1: Tensor of shape [n] + B.  Samples from some (batch of)
+      scalar-event distribution(s) of interest, giving a (batch of) empirical
+      CDF(s).  Assumed IID across the 0 dimension.
+    samples2: Tensor of shape [m] + B.  Samples from some (batch of)
+      scalar-event distribution(s) of interest, giving a (batch of) empirical
+      CDF(s).  Assumed IID across the 0 dimension.
+    name: A name for this operation (optional).
+
+  Returns:
+    distance: Tensor of shape B: (Absolute) Kolmogorov-Smirnov distance between
+      the two empirical CDFs given by the samples.
+  """
+  with tf.name_scope(
+      name, 'kolmogorov_smirnov_distance_two_sample', [samples1, samples2]):
+    dtype = dtype_util.common_dtype([samples1, samples2], tf.float32)
+    samples1 = tf.convert_to_tensor(
+        value=samples1, name='samples1', dtype=dtype)
+    samples2 = tf.convert_to_tensor(
+        value=samples2, name='samples2', dtype=dtype)
+    samples2 = _move_dim_and_sort(samples2)
+
+    cdf = functools.partial(
+        empirical_cdfs, samples2,
+        continuity='right', dtype=samples1.dtype)
+    left_continuous_cdf = functools.partial(
+        empirical_cdfs, samples2,
+        continuity='left', dtype=samples1.dtype)
+    return kolmogorov_smirnov_distance(samples1, cdf, left_continuous_cdf)
+
+
+def _move_dim_and_sort(samples):
+  """Internal helper for K-S distance computation."""
+  # Move the batch dimension of `samples` to the rightmost position,
+  # where the _batch_sort_vector function wants it.
+  samples = distribution_util.move_dimension(samples, 0, -1)
+
+  # Order the samples within each batch member
+  samples = _batch_sort_vector(samples)
+  return samples
+
+
 def _batch_sort_vector(x, ascending=True, name=None):
   """Batch sort.  Sorts the -1 dimension of each batch member independently."""
   with tf.name_scope(name, '_batch_sort_vector', [x]):
@@ -457,20 +513,20 @@ def _batch_sort_vector(x, ascending=True, name=None):
     return y
 
 
-def empirical_cdfs(samples, continuity='right', dtype=tf.float32):
-  """Evaluates the empirical CDF on a batch of potentially repeated samples.
+def empirical_cdfs(samples, positions, continuity='right',
+                   dtype=tf.float32, name=None):
+  """Evaluates the empirical CDF of a batch of samples at a batch of positions.
 
-  This is non-trivial because
-  - If the samples can repeat, their (sorted) position does not uniquely
-    determine their CDF value: the empirical CDF of the index-1 element of
-    [0, 0.5, 0.5, 1] is 0.5, not 0.25.
-  - However, samples repeating _across batch members_ must not affect each
-    other.
+  If elements of `positions` might be exactly equal to elements of `samples`
+  (e.g., if the underlying distribution of interest is discrete), there is a
+  difference between the conventional, right-continuous CDF (Pr[X <= x]) and a
+  left-continuous variant (Pr[X < x]).  The latter can be accessed by setting
+  `continuity='left'`.  The difference between the right-continuous and
+  left-continuous CDFs is the empirical pmf at each point, i.e., how many times
+  each element of `positions` occurs in its batch of `samples`.
 
-  Note: Returns results parallel to `samples`, i.e., the values of the empirical
-  CDF at those points.  In principle, it would also be reasonable to compact
-  the empirical CDF to only mention each unique sample once, but that would
-  produce a ragged result across batches.
+  Note: Returns results parallel to `positions`, i.e., the values of the
+  empirical CDF at those points.
 
   Note: The sample dimension is _last_, and the samples must be _sorted_ within
   each batch.
@@ -478,26 +534,30 @@ def empirical_cdfs(samples, continuity='right', dtype=tf.float32):
   Args:
     samples: Tensor of shape `batch + [num_samples]` of samples.  The samples
       must be in ascending order within each batch member.
+    positions: Tensor of shape `batch + [m]` of positions where to evaluate the
+      CDFs.  The positions need not be sorted.
     continuity: Whether to return a conventional, right-continuous CDF
       (`continuity = 'right'`, default) or a left-continuous CDF (`continuity =
       'left'`).  The value at each point `x` will be `F_n(X <= x)` or
-      `F_n(X < x)`, respectively.  The difference between the right-continuous
-      and left-continuous CDFs is the empirical pmf, i.e., how many times each
-      sample occurs in its batch.
+      `F_n(X < x)`, respectively.
     dtype: dtype at which to evaluate the desired empirical CDFs.
+    name: A name for this operation (optional).
 
   Returns:
-    cdf: Tensor parallel to `samples`.  For each x in samples, gives the (right-
-      or left-continuous, per the `continuity` argument) cdf at that position.
-      If `samples` contains duplicates, `cdf` will give each the same value.
+    cdf: Tensor parallel to `positions`.  For each x in `positions`, gives the
+      (right- or left-continuous, per the `continuity` argument) cdf at that
+      position.  If `positions` contains duplicates, `cdf` will give each the
+      same value.
   """
   if continuity not in ['left', 'right']:
     msg = 'Continuity value must be "left" or "right", got {}.'.format(
         continuity)
     raise ValueError(msg)
-  n = tf.cast(tf.shape(input=samples)[-1], dtype=dtype)
-  indexes = tf.searchsorted(samples, samples, side=continuity)
-  return tf.cast(indexes, dtype=dtype) / n
+  with tf.name_scope(name, 'empirical_cdfs', [samples, positions]):
+    n = tf.cast(tf.shape(input=samples)[-1], dtype=dtype)
+    indexes = tf.searchsorted(
+        sorted_sequence=samples, values=positions, side=continuity)
+    return tf.cast(indexes, dtype=dtype) / n
 
 
 def _do_maximum_mean(samples, envelope, high, name=None):
@@ -535,6 +595,188 @@ def _do_maximum_mean(samples, envelope, high, name=None):
         clip_value_max=step)
     return tf.reduce_sum(
         input_tensor=samples * max_mean_contrib, axis=-1) + envelope * high
+
+
+def assert_true_cdf_equal_by_dkwm_two_sample(
+    samples1, samples2, false_fail_rate=1e-6, name=None):
+  """Asserts the full CDFs of the two given distributions are equal.
+
+  More precisely, fails if there is enough evidence (using the
+  [Dvoretzky-Kiefer-Wolfowitz-Massart inequality]
+  (https://en.wikipedia.org/wiki/CDF-based_nonparametric_confidence_interval))
+  that the true CDF of the distribution from which `samples1` are drawn is _not_
+  the true CDF of the distribution from which `samples2` are drawn, with
+  statistical significance `false_fail_rate` or stronger, otherwise passes.  If
+  you also want to check that you are gathering enough evidence that a pass is
+  not spurious, see `min_num_samples_for_dkwm_cdf_two_sample_test` and
+  `min_discrepancy_of_true_cdfs_detectable_by_dkwm_two_sample`.
+
+  This test works as written even if the distribution in question has atoms
+  (e.g., is discrete).
+
+  Note that `false_fail_rate` is a total false failure rate for all
+  the assertions in the batch.  As such, if the batch is nontrivial,
+  the assertion will insist on stronger evidence to fail any one member.
+
+  Args:
+    samples1: Tensor of shape [n] + B.  Samples from some (batch of)
+      scalar-event distribution(s) of interest, giving a (batch of) empirical
+      CDF(s).  Assumed IID across the 0 dimension.
+    samples2: Tensor of shape [m] + B.  Samples from some (batch of)
+      scalar-event distribution(s) of interest, giving a (batch of) empirical
+      CDF(s).  Assumed IID across the 0 dimension.
+    false_fail_rate: *Scalar* floating-point `Tensor` admissible total
+      rate of mistakes.
+    name: A name for this operation (optional).
+
+  Returns:
+    check: Op that raises `InvalidArgumentError` if any expected CDF is
+      outside the corresponding confidence envelope.
+  """
+  with tf.name_scope(
+      name, 'assert_true_cdf_equal_by_dkwm_two_sample',
+      [samples1, samples2, false_fail_rate]):
+    dtype = dtype_util.common_dtype(
+        [samples1, samples2, false_fail_rate], tf.float32)
+    samples1 = tf.convert_to_tensor(
+        value=samples1, name='samples1', dtype=dtype)
+    samples2 = tf.convert_to_tensor(
+        value=samples2, name='samples2', dtype=dtype)
+    false_fail_rate = tf.convert_to_tensor(
+        value=false_fail_rate, name='false_fail_rate', dtype=dtype)
+    tf.compat.v1.assert_scalar(false_fail_rate)  # Static shape
+    compatible_samples = tf.compat.v1.assert_equal(
+        tf.shape(input=samples1)[1:],
+        tf.shape(input=samples2)[1:])
+    with tf.control_dependencies([compatible_samples]):
+      itemwise_false_fail_rate = _itemwise_error_rate(
+          total_rate=false_fail_rate,
+          param_tensors=[], samples_tensor=samples1)
+      n1 = tf.shape(input=samples1)[0]
+      envelope1 = _dkwm_cdf_envelope(n1, itemwise_false_fail_rate)
+      n2 = tf.shape(input=samples2)[0]
+      envelope2 = _dkwm_cdf_envelope(n2, itemwise_false_fail_rate)
+      distance = kolmogorov_smirnov_distance_two_sample(samples1, samples2)
+      return tf.compat.v1.assert_less_equal(
+          distance, envelope1 + envelope2,
+          message='Empirical CDFs outside joint K-S envelope')
+
+
+def min_discrepancy_of_true_cdfs_detectable_by_dkwm_two_sample(
+    n1, n2, false_fail_rate, false_pass_rate, name=None):
+  """Returns the minimum CDF discrepancy that a two-sample DKWM test can detect.
+
+  DKWM is the [Dvoretzky-Kiefer-Wolfowitz-Massart inequality]
+  (https://en.wikipedia.org/wiki/CDF-based_nonparametric_confidence_interval).
+
+  Note that `false_fail_rate` is a total false failure rate for all
+  the tests in the batch.  As such, if the batch is nontrivial, each
+  member will demand more samples.  The `false_pass_rate` is also
+  interpreted as a total, but is treated asymmetrically: If each test
+  in the batch detects its corresponding discrepancy with probability
+  at least `1 - false_pass_rate`, then running all those tests and
+  failing if any one fails will jointly detect all those discrepancies
+  with the same `false_pass_rate`.
+
+  Args:
+    n1: `Tensor` of numbers of samples to be drawn from the distributions A.
+    n2: `Tensor` of numbers of samples to be drawn from the distributions B.
+    false_fail_rate: *Scalar* floating-point `Tensor` admissible total
+      rate of false failures.
+    false_pass_rate: *Scalar* floating-point `Tensor` admissible rate
+      of false passes.
+    name: A name for this operation (optional).
+
+  Returns:
+    discr: `Tensor` of lower bounds on the K-S distances between true
+       CDFs detectable by a DKWM-based test.
+
+  For each batch member `i`, of `K` total, drawing `n1[i]` samples from scalar
+  distribution A and `n2[i]` samples from scalar distribution B is enough to
+  detect a K-S distance in CDFs of size `discr[i]` or more.  Specifically, we
+  guarantee that (a) if their true CDFs are the same, then
+  `assert_true_cdf_equal_by_dkwm_two_sample` will fail with probability at most
+  `false_fail_rate / K` (which amounts to `false_fail_rate` if applied to the
+  whole batch at once), and (b) if their true CDFs differ by at least
+  `discr[i]`, `assert_true_cdf_equal_by_dkwm_two_sample` will pass with
+  probability at most `false_pass_rate`.
+
+  The detectable discrepancy scales as
+
+  - `O(1 / sqrt(n[i]))`,
+  - `O(-log(false_fail_rate/K))`, and
+  - `O(-log(false_pass_rate))`.
+  """
+  with tf.name_scope(
+      name, 'min_discrepancy_of_true_cdfs_detectable_by_dkwm_two_sample',
+      [n1, n2, false_fail_rate, false_pass_rate]):
+    dtype = dtype_util.common_dtype(
+        [n1, n2, false_fail_rate, false_pass_rate], tf.float32)
+    n1 = tf.convert_to_tensor(value=n1, name='n1', dtype=dtype)
+    n2 = tf.convert_to_tensor(value=n2, name='n2', dtype=dtype)
+    false_fail_rate = tf.convert_to_tensor(
+        value=false_fail_rate, name='false_fail_rate', dtype=dtype)
+    false_pass_rate = tf.convert_to_tensor(
+        value=false_pass_rate, name='false_pass_rate', dtype=dtype)
+    # To fail to detect a discrepancy with the two-sample test, the given
+    # samples must be close enough that they could have come from the same true
+    # CDF.  That is, each must be close enough to a common CDF for the
+    # one-sample test to be able to fail to detect the discrepancy.
+    d1 = min_discrepancy_of_true_cdfs_detectable_by_dkwm(
+        n1, false_fail_rate / 2., false_pass_rate / 2.)
+    d2 = min_discrepancy_of_true_cdfs_detectable_by_dkwm(
+        n2, false_fail_rate / 2., false_pass_rate / 2.)
+    return d1 + d2
+
+
+def min_num_samples_for_dkwm_cdf_two_sample_test(
+    discrepancy, false_fail_rate=1e-6, false_pass_rate=1e-6, name=None):
+  """Returns how many samples suffice for a two-sample DKWM CDF test.
+
+  Args:
+    discrepancy: Floating-point `Tensor` of desired upper limits on K-S
+      distances that may go undetected with probability higher than
+      `1 - false_pass_rate`.
+    false_fail_rate: *Scalar* floating-point `Tensor` admissible total
+      rate of false failures.
+    false_pass_rate: *Scalar* floating-point `Tensor` admissible rate
+      of false passes.
+    name: A name for this operation (optional).
+
+  Returns:
+    n1: `Tensor` of numbers of samples to be drawn from the distributions A.
+    n2: `Tensor` of numbers of samples to be drawn from the distributions B.
+
+  For each batch member `i`, of `K` total, drawing `n1[i]` samples from scalar
+  distribution A and `n2[i]` samples from scalar distribution B is enough to
+  detect a K-S distance of CDFs of size `discrepancy[i]` or more.  Specifically,
+  we guarantee that (a) if the true CDFs are equal, then
+  `assert_true_cdf_equal_by_dkwm_two_sample` will fail with probability at most
+  `false_fail_rate / K` (which amounts to `false_fail_rate` if applied to the
+  whole batch at once), and (b) if the true CDFs differ from each other least
+  `discrepancy[i]`, `assert_true_cdf_equal_by_dkwm_two_sample` will pass with
+  probability at most `false_pass_rate`.
+
+  The required number of samples scales as
+
+  - `O(-log(false_fail_rate/K))`,
+  - `O(-log(false_pass_rate))`, and
+  - `O(1 / discrepancy[i]**2)`.
+  """
+  with tf.name_scope(
+      name, 'min_num_samples_for_dkwm_cdf_two_sample_test',
+      [discrepancy, false_fail_rate, false_pass_rate]):
+    dtype = dtype_util.common_dtype(
+        [discrepancy, false_fail_rate, false_pass_rate], tf.float32)
+    discrepancy = tf.convert_to_tensor(
+        value=discrepancy, name='discrepancy', dtype=dtype)
+    false_fail_rate = tf.convert_to_tensor(
+        value=false_fail_rate, name='false_fail_rate', dtype=dtype)
+    false_pass_rate = tf.convert_to_tensor(
+        value=false_pass_rate, name='false_pass_rate', dtype=dtype)
+    n = min_num_samples_for_dkwm_cdf_test(
+        discrepancy / 2., false_fail_rate / 2., false_pass_rate / 2.)
+    return n, n
 
 
 def _maximum_mean(samples, envelope, high, name=None):
@@ -667,10 +909,9 @@ def _dkwm_cdf_envelope(n, error_rate, name=None):
 def _check_shape_dominates(samples, parameters):
   """Check that broadcasting `samples` against `parameters` does not expand it.
 
-  Why?  Because I want to be very sure that the samples tensor is not
-  accidentally enlarged by broadcasting against tensors that are
-  supposed to be describing the distribution(s) sampled from, lest the
-  sample counts end up inflated.
+  Why?  To be very sure that the samples tensor is not accidentally enlarged by
+  broadcasting against tensors that are supposed to be describing the
+  distribution(s) sampled from, lest the sample counts end up inflated.
 
   Args:
     samples: A `Tensor` whose shape is to be protected against broadcasting.

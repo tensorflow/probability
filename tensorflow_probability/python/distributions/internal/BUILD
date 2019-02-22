@@ -66,6 +66,7 @@ py_library(
     srcs = ["statistical_testing.py"],
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
