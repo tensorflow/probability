@@ -654,7 +654,7 @@ class HMCTest(tf.test.TestCase):
         num_leapfrog_steps=2,
         seed=_set_seed(1042),
         store_parameters_in_results=True)
-    x0 = tf.constant(0.)
+    x0 = tf.zeros(2)
     r0 = hmc.bootstrap_results(x0)
     x1, r1 = hmc.one_step(x0, r0)
     r1_zero = r1._replace(
@@ -672,7 +672,7 @@ class HMCTest(tf.test.TestCase):
     self.assertAllEqual(2, r2_.accepted_results.num_leapfrog_steps)
     # Since step size is 0, we shouldn't have moved despite being accepted.
     self.assertAllEqual(x2_, x1_)
-    self.assertEqual(True, r2_.is_accepted)
+    self.assertAllEqual([True, True], r2_.is_accepted)
 
   def testAdaptiveIncompatibleWithStepSizeAdaptation(self):
     step_size = tf.compat.v2.Variable(

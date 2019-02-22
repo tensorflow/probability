@@ -98,6 +98,8 @@ def make_one_step_fn(dtype):
         kernel_results['grads_target_log_prob'] = [
             tf.identity(0.5 * g, name='grad_target_log_prob')
             for g in previous_kernel_results.grads_target_log_prob]
+      elif fn == 'extraneous':
+        kernel_results[fn] = getattr(previous_kernel_results, fn, None)
       else:
         kernel_results[fn] = tf.identity(
             0.5 * getattr(previous_kernel_results, fn, None),
@@ -165,6 +167,12 @@ class MetropolisHastingsTest(tf.test.TestCase):
     init_kernel_results = mh.bootstrap_results(current_state)
     next_state, kernel_results = mh.one_step(
         current_state, init_kernel_results)
+
+    # Unmodified state is passed through unmodified.
+    self.assertIs(kernel_results.accepted_results.extraneous,
+                  init_kernel_results.accepted_results.extraneous)
+    self.assertIs(kernel_results.proposed_results.extraneous,
+                  init_kernel_results.accepted_results.extraneous)
 
     # Check correct types and call pattern.
     self.assertEqual(
@@ -257,6 +265,12 @@ class MetropolisHastingsTest(tf.test.TestCase):
     init_kernel_results = mh.bootstrap_results(current_state)
     next_state, kernel_results = mh.one_step(
         current_state, init_kernel_results)
+
+    # Unmodified state is passed through unmodified.
+    self.assertIs(kernel_results.accepted_results.extraneous,
+                  init_kernel_results.accepted_results.extraneous)
+    self.assertIs(kernel_results.proposed_results.extraneous,
+                  init_kernel_results.accepted_results.extraneous)
 
     # Check correct types and call pattern.
     self.assertEqual(

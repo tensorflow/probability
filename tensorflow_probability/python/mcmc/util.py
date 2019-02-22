@@ -86,6 +86,8 @@ def _choose_base_case(is_accepted,
       m.set_shape(m.shape.merge_with(x.shape))
       return m
   def _where(accepted, rejected):
+    if accepted is rejected:
+      return accepted
     accepted = tf.convert_to_tensor(value=accepted, name='accepted')
     rejected = tf.convert_to_tensor(value=rejected, name='rejected')
     r = tf.where(_expand_is_accepted_like(accepted), accepted, rejected)
