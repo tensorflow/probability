@@ -51,8 +51,6 @@ py_test(
     srcs = ["moving_stats_test.py"],
     tags = [
         "nomsan",  # disable to avoid false positives from scipy.
-        "tf2-broken",
-        "tf2-kokoro-broken",
     ],
     deps = [
         ":moving_stats",

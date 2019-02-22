@@ -19,6 +19,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     "assign_moving_mean_variance",
@@ -35,7 +36,7 @@ def assign_moving_mean_variance(
   `variance_var` are given by the following recurrence relations:
 
   ```python
-  variance_var = decay * (variance_var + (1-decay) * (value - mean_var)**2)
+  variance_var = decay * (variance_var + (1 - decay) * (value - mean_var)**2)
   mean_var     = decay * mean_var + (1 - decay) * value
   ```
 
@@ -43,6 +44,7 @@ def assign_moving_mean_variance(
   the lag-1 mean.
 
   For derivation justification, see [Finch (2009; Eq. 143)][1].
+  Parameterization: Finch's `alpha` is `1 - decay`.
 
   Args:
     mean_var: `float`-like `Variable` representing the exponentially weighted
@@ -92,7 +94,17 @@ def assign_moving_mean_variance(
             value=decay, dtype=base_dtype, name="decay")
         delta = value - mean_var
         with tf.control_dependencies([delta]):
+          # We want mean_{t+1} = decay * mean_t + (1. - decay) * value
+          # We compute mean += decay * mean_t - mean_t + (1. - decay) * value =
+          #   = (1. - decay) * (value - mean_t)
           mean_var = mean_var.assign_add((1. - decay) * delta)
+          # We want variance_{t+1} = decay * (variance_t +
+          #   + (1 - decay) * (value - mean_var)**2).
+          # We compute variance -= variance_t - decay * (variance_t +
+          #     + (1 - decay) * (value - mean_var)**2) =
+          #   = (1 - decay) * variance_t
+          #     - decay * (1 - decay) * (value - mean_var)**2
+          #   = (1 - decay) * (variance_t - decay * (value - mean_var)**2).
           variance_var = variance_var.assign_sub(
               (1. - decay) * (variance_var - decay * tf.square(delta)))
         return mean_var, variance_var
@@ -168,6 +180,9 @@ def assign_log_moving_mean_exp(
       return log_mean_exp_var.assign_add(x)
 
 
+@deprecation.deprecated(
+    "2019-03-22", "The `moving_mean_variance` function is deprecated. "
+    "Use `assign_moving_mean_variance` and construct the Variables explicitly.")
 def moving_mean_variance(value, decay, name=None):
   """Compute exponentially weighted moving {mean,variance} of a streaming value.
 
