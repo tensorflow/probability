@@ -26,10 +26,10 @@ import tensorflow_probability as tfp
 from tensorflow_probability.python.bijectors import bijector_test_util
 tfb = tfp.bijectors
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class OrderedBijectorTest(tf.test.TestCase):
   """Tests correctness of the ordered transformation."""
 
@@ -60,8 +60,8 @@ class OrderedBijectorTest(tf.test.TestCase):
     x_ = np.asarray([[2., 3, 4], [4., 8, 13]], dtype=np.float32)
     y_ = np.asarray(
         [[2., 0, 0], [4., np.log(4.), np.log(5.)]], dtype=np.float32)
-    x = tf.placeholder_with_default(x_, shape=[2, None])
-    y = tf.placeholder_with_default(y_, shape=[2, None])
+    x = tf.compat.v1.placeholder_with_default(x_, shape=[2, None])
+    y = tf.compat.v1.placeholder_with_default(y_, shape=[2, None])
     self.assertAllClose(y_, self.evaluate(ordered.forward(x)))
     self.assertAllClose(x_, self.evaluate(ordered.inverse(y)))
     self.assertAllClose(

@@ -150,7 +150,7 @@ class SmilesGrammar(object):
     """
     symbols = []
     for production in tf.unstack(productions, axis=1):
-      lhs, rhs = self.production_rules[tf.argmax(production, axis=-1)]
+      lhs, rhs = self.production_rules[tf.argmax(input=production, axis=-1)]
       if not symbols:  # first iteration
         if lhs != self.start_symbol:
           raise ValueError("`productions` must begin with `self.start_symbol`.")
@@ -199,7 +199,7 @@ class ProbabilisticGrammar(tf.keras.Model):
     super(ProbabilisticGrammar, self).__init__()
     self.grammar = grammar
     self.latent_size = latent_size
-    self.lstm = tf.nn.rnn_cell.LSTMCell(num_units)
+    self.lstm = tf.compat.v1.nn.rnn_cell.LSTMCell(num_units)
     self.output_layer = tf.keras.layers.Dense(len(grammar.production_rules))
 
   def __call__(self, *args, **kwargs):
@@ -231,7 +231,8 @@ class ProbabilisticGrammar(tf.keras.Model):
                 self.grammar.mask(symbol, on_value=0., off_value=-1e9))
       production = ed.OneHotCategorical(logits=logits,
                                         name="production_" + str(t))
-      _, rhs = self.grammar.production_rules[tf.argmax(production, axis=-1)]
+      _, rhs = self.grammar.production_rules[tf.argmax(
+          input=production, axis=-1)]
       for symbol in rhs:
         if symbol in self.grammar.nonterminal_symbols:
           stack.append(symbol)
@@ -305,12 +306,12 @@ def make_value_setter(**model_kwargs):
 
 def main(argv):
   del argv  # unused
-  if tf.gfile.Exists(FLAGS.model_dir):
-    tf.logging.warning(
+  if tf.io.gfile.exists(FLAGS.model_dir):
+    tf.compat.v1.logging.warning(
         "Warning: deleting old log directory at {}".format(FLAGS.model_dir))
-    tf.gfile.DeleteRecursively(FLAGS.model_dir)
-  tf.gfile.MakeDirs(FLAGS.model_dir)
-  tf.enable_eager_execution()
+    tf.io.gfile.rmtree(FLAGS.model_dir)
+  tf.io.gfile.makedirs(FLAGS.model_dir)
+  tf.compat.v1.enable_eager_execution()
 
   grammar = SmilesGrammar()
   synthetic_data_distribution = ProbabilisticGrammar(
@@ -331,9 +332,9 @@ def main(argv):
       synthetic_data_distribution=synthetic_data_distribution,
       probabilistic_grammar=probabilistic_grammar,
       probabilistic_grammar_variational=probabilistic_grammar_variational)
-  global_step = tf.train.get_or_create_global_step()
-  optimizer = tf.train.AdamOptimizer(FLAGS.learning_rate)
-  writer = tf.contrib.summary.create_file_writer(FLAGS.model_dir)
+  global_step = tf.compat.v1.train.get_or_create_global_step()
+  optimizer = tf.compat.v1.train.AdamOptimizer(FLAGS.learning_rate)
+  writer = tf.compat.v2.summary.create_file_writer(FLAGS.model_dir)
   writer.set_as_default()
 
   start_time = time.time()
@@ -366,15 +367,18 @@ def main(argv):
           variational_tape["latent_code_posterior"].distribution,
           model_tape["latent_code"].distribution)
 
-      timesteps = tf.to_float(productions.shape[1])
-      elbo = tf.reduce_mean(log_likelihood - kl) / timesteps
+      timesteps = tf.cast(productions.shape[1], dtype=tf.float32)
+      elbo = tf.reduce_mean(input_tensor=log_likelihood - kl) / timesteps
       loss = -elbo
-      with tf.contrib.summary.record_summaries_every_n_global_steps(500):
-        tf.contrib.summary.scalar("log_likelihood",
-                                  tf.reduce_mean(log_likelihood) / timesteps)
-        tf.contrib.summary.scalar("kl",
-                                  tf.reduce_mean(kl) / timesteps)
-        tf.contrib.summary.scalar("elbo", elbo)
+      with tf.compat.v2.summary.record_if(
+          lambda: tf.math.equal(0, global_step % 500)):
+        tf.compat.v2.summary.scalar(
+            "log_likelihood",
+            tf.reduce_mean(input_tensor=log_likelihood) / timesteps,
+            step=global_step)
+        tf.compat.v2.summary.scalar(
+            "kl", tf.reduce_mean(input_tensor=kl) / timesteps, step=global_step)
+        tf.compat.v2.summary.scalar("elbo", elbo, step=global_step)
 
     variables = (probabilistic_grammar.variables
                  + probabilistic_grammar_variational.variables)
@@ -389,4 +393,4 @@ def main(argv):
       checkpoint.save(file_prefix=FLAGS.model_dir)
 
 if __name__ == "__main__":
-  tf.app.run()
+  tf.compat.v1.app.run()

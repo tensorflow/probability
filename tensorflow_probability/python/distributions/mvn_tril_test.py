@@ -24,10 +24,10 @@ from scipy import stats
 import tensorflow as tf
 import tensorflow_probability as tfp
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class MultivariateNormalTriLTest(tf.test.TestCase):
 
   def setUp(self):
@@ -36,7 +36,7 @@ class MultivariateNormalTriLTest(tf.test.TestCase):
   def _random_chol(self, *shape):
     mat = self._rng.rand(*shape)
     chol = tfd.matrix_diag_transform(mat, transform=tf.nn.softplus)
-    chol = tf.matrix_band_part(chol, -1, 0)
+    chol = tf.linalg.band_part(chol, -1, 0)
     sigma = tf.matmul(chol, chol, adjoint_b=True)
     return self.evaluate(chol), self.evaluate(sigma)
 
@@ -316,12 +316,12 @@ class MultivariateNormalTriLTest(tf.test.TestCase):
 
     n = int(10e3)
     samps = dist.sample(n, seed=0)
-    sample_mean = tf.reduce_mean(samps, 0)
+    sample_mean = tf.reduce_mean(input_tensor=samps, axis=0)
     x = samps - sample_mean
     sample_covariance = tf.matmul(x, x, transpose_a=True) / n
 
     sample_kl_chol = tf.reduce_mean(
-        dist.log_prob(samps) - mvn_chol.log_prob(samps), 0)
+        input_tensor=dist.log_prob(samps) - mvn_chol.log_prob(samps), axis=0)
     analytical_kl_chol = tfd.kl_divergence(dist, mvn_chol)
 
     scale = dist.scale.to_dense()
@@ -351,27 +351,32 @@ class MultivariateNormalTriLTest(tf.test.TestCase):
     sample_variance_ = np.diag(sample_covariance_)
     sample_stddev_ = np.sqrt(sample_variance_)
 
-    tf.logging.vlog(2, "true_mean:\n{}  ".format(true_mean))
-    tf.logging.vlog(2, "sample_mean:\n{}".format(sample_mean_))
-    tf.logging.vlog(2, "analytical_mean:\n{}".format(analytical_mean_))
+    tf.compat.v1.logging.vlog(2, "true_mean:\n{}  ".format(true_mean))
+    tf.compat.v1.logging.vlog(2, "sample_mean:\n{}".format(sample_mean_))
+    tf.compat.v1.logging.vlog(2,
+                              "analytical_mean:\n{}".format(analytical_mean_))
 
-    tf.logging.vlog(2, "true_covariance:\n{}".format(true_covariance))
-    tf.logging.vlog(2, "sample_covariance:\n{}".format(sample_covariance_))
-    tf.logging.vlog(2, "analytical_covariance:\n{}".format(
-        analytical_covariance_))
+    tf.compat.v1.logging.vlog(2, "true_covariance:\n{}".format(true_covariance))
+    tf.compat.v1.logging.vlog(
+        2, "sample_covariance:\n{}".format(sample_covariance_))
+    tf.compat.v1.logging.vlog(
+        2, "analytical_covariance:\n{}".format(analytical_covariance_))
 
-    tf.logging.vlog(2, "true_variance:\n{}".format(true_variance))
-    tf.logging.vlog(2, "sample_variance:\n{}".format(sample_variance_))
-    tf.logging.vlog(2, "analytical_variance:\n{}".format(analytical_variance_))
+    tf.compat.v1.logging.vlog(2, "true_variance:\n{}".format(true_variance))
+    tf.compat.v1.logging.vlog(2,
+                              "sample_variance:\n{}".format(sample_variance_))
+    tf.compat.v1.logging.vlog(
+        2, "analytical_variance:\n{}".format(analytical_variance_))
 
-    tf.logging.vlog(2, "true_stddev:\n{}".format(true_stddev))
-    tf.logging.vlog(2, "sample_stddev:\n{}".format(sample_stddev_))
-    tf.logging.vlog(2, "analytical_stddev:\n{}".format(analytical_stddev_))
+    tf.compat.v1.logging.vlog(2, "true_stddev:\n{}".format(true_stddev))
+    tf.compat.v1.logging.vlog(2, "sample_stddev:\n{}".format(sample_stddev_))
+    tf.compat.v1.logging.vlog(
+        2, "analytical_stddev:\n{}".format(analytical_stddev_))
 
-    tf.logging.vlog(2, "true_scale:\n{}".format(true_scale))
-    tf.logging.vlog(2, "scale:\n{}".format(scale_))
+    tf.compat.v1.logging.vlog(2, "true_scale:\n{}".format(true_scale))
+    tf.compat.v1.logging.vlog(2, "scale:\n{}".format(scale_))
 
-    tf.logging.vlog(
+    tf.compat.v1.logging.vlog(
         2, "kl_chol:      analytical:{}  sample:{}".format(
             analytical_kl_chol_, sample_kl_chol_))
 

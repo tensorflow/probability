@@ -32,7 +32,6 @@ from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.framework import tensor_shape
 
 
 __all__ = [
@@ -75,7 +74,7 @@ def quadrature_scheme_lognormal_gauss_hermite(
     grid = grid.astype(loc.dtype.as_numpy_dtype)
     probs = probs.astype(loc.dtype.as_numpy_dtype)
     probs /= np.linalg.norm(probs, ord=1, keepdims=True)
-    probs = tf.convert_to_tensor(probs, name="probs", dtype=loc.dtype)
+    probs = tf.convert_to_tensor(value=probs, name="probs", dtype=loc.dtype)
     # The following maps the broadcast of `loc` and `scale` to each grid
     # point, i.e., we are creating several log-rates that correspond to the
     # different Gauss-Hermite quadrature points and (possible) batches of
@@ -117,7 +116,7 @@ def quadrature_scheme_lognormal_quantiles(
         validate_args=validate_args)
     batch_ndims = dist.batch_shape.ndims
     if batch_ndims is None:
-      batch_ndims = tf.shape(dist.batch_shape_tensor())[0]
+      batch_ndims = tf.shape(input=dist.batch_shape_tensor())[0]
 
     def _compute_quantiles():
       """Helper to build quantiles."""
@@ -132,7 +131,7 @@ def quadrature_scheme_lognormal_quantiles(
       quantiles = dist.quantile(edges)
       # Cyclically permute left by one.
       perm = tf.concat([tf.range(1, 1 + batch_ndims), [0]], axis=0)
-      quantiles = tf.transpose(quantiles, perm)
+      quantiles = tf.transpose(a=quantiles, perm=perm)
       return quantiles
     quantiles = _compute_quantiles()
 
@@ -258,9 +257,9 @@ class PoissonLogNormalQuadratureCompound(distribution.Distribution):
     with tf.name_scope(name, values=[loc, scale]) as name:
       dtype = dtype_util.common_dtype([loc, scale], tf.float32)
       if loc is not None:
-        loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
+        loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
       if scale is not None:
-        scale = tf.convert_to_tensor(scale, dtype=dtype, name="scale")
+        scale = tf.convert_to_tensor(value=scale, dtype=dtype, name="scale")
       self._quadrature_grid, self._quadrature_probs = tuple(quadrature_fn(
           loc, scale, quadrature_size, validate_args))
 
@@ -276,7 +275,7 @@ class PoissonLogNormalQuadratureCompound(distribution.Distribution):
           allow_nan_stats=allow_nan_stats)
 
       self._mixture_distribution = categorical.Categorical(
-          logits=tf.log(self._quadrature_probs),
+          logits=tf.math.log(self._quadrature_probs),
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats)
 
@@ -320,7 +319,7 @@ class PoissonLogNormalQuadratureCompound(distribution.Distribution):
   def _batch_shape_tensor(self):
     return tf.broadcast_dynamic_shape(
         self.distribution.batch_shape_tensor(),
-        tf.shape(self.mixture_distribution.logits))[:-1]
+        tf.shape(input=self.mixture_distribution.logits))[:-1]
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(
@@ -328,14 +327,14 @@ class PoissonLogNormalQuadratureCompound(distribution.Distribution):
         self.mixture_distribution.logits.shape)[:-1]
 
   def _event_shape(self):
-    return tensor_shape.scalar()
+    return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
     # Get ids as a [n, batch_size]-shaped matrix, unless batch_shape=[] then get
     # ids as a [n]-shaped vector.
     batch_size = self.batch_shape.num_elements()
     if batch_size is None:
-      batch_size = tf.reduce_prod(self.batch_shape_tensor())
+      batch_size = tf.reduce_prod(input_tensor=self.batch_shape_tensor())
     # We need to "sample extra" from the mixture distribution if it doesn't
     # already specify a probs vector for each batch coordinate.
     # We only support this kind of reduced broadcasting, i.e., there is exactly
@@ -369,18 +368,19 @@ class PoissonLogNormalQuadratureCompound(distribution.Distribution):
     rate = tf.gather(tf.reshape(self.distribution.rate, shape=[-1]), ids)
     rate = tf.reshape(
         rate, shape=concat_vectors([n], self.batch_shape_tensor()))
-    return tf.random_poisson(lam=rate, shape=[], dtype=self.dtype, seed=seed)
+    return tf.random.poisson(lam=rate, shape=[], dtype=self.dtype, seed=seed)
 
   def _log_prob(self, x):
     return tf.reduce_logsumexp(
-        (self.mixture_distribution.logits + self.distribution.log_prob(
-            x[..., tf.newaxis])),
+        input_tensor=(self.mixture_distribution.logits +
+                      self.distribution.log_prob(x[..., tf.newaxis])),
         axis=-1)
 
   def _mean(self):
     return tf.exp(
         tf.reduce_logsumexp(
-            self.mixture_distribution.logits + self.distribution.log_rate,
+            input_tensor=self.mixture_distribution.logits +
+            self.distribution.log_rate,
             axis=-1))
 
   def _variance(self):
@@ -408,13 +408,14 @@ class PoissonLogNormalQuadratureCompound(distribution.Distribution):
             # log(self.distribution.variance()) = log(Var[d]) = log(rate[d])
             self.distribution.log_rate,
             # log((Mean[d] - Mean)**2)
-            2. * tf.log(
+            2. * tf.math.log(
                 tf.abs(self.distribution.mean() -
                        self._mean()[..., tf.newaxis])),
         ],
         axis=-1)
     return tf.reduce_logsumexp(
-        self.mixture_distribution.logits[..., tf.newaxis] + v, axis=[-2, -1])
+        input_tensor=self.mixture_distribution.logits[..., tf.newaxis] + v,
+        axis=[-2, -1])
 
 
 def concat_vectors(*args):

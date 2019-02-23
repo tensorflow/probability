@@ -50,7 +50,7 @@ def _uniform_unit_norm(dimension, shape, dtype, seed):
       loc=dtype.as_numpy_dtype(0.),
       scale=dtype.as_numpy_dtype(1.)).sample(
           tf.concat([shape, [dimension]], axis=0), seed=seed())
-  unit_norm = raw / tf.norm(raw, ord=2, axis=-1)[..., tf.newaxis]
+  unit_norm = raw / tf.norm(tensor=raw, ord=2, axis=-1)[..., tf.newaxis]
   return unit_norm
 
 
@@ -92,6 +92,7 @@ class LKJ(distribution.Distribution):
   def __init__(self,
                dimension,
                concentration,
+               input_output_cholesky=False,
                validate_args=False,
                allow_nan_stats=True,
                name='LKJ'):
@@ -103,6 +104,16 @@ class LKJ(distribution.Distribution):
       concentration: `float` or `double` `Tensor`. The positive concentration
         parameter of the LKJ distributions. The pdf of a sample matrix `X` is
         proportional to `det(X) ** (concentration - 1)`.
+      input_output_cholesky: Python `bool`. If `True`, functions whose input or
+        output have the semantics of samples assume inputs are in Cholesky form
+        and return outputs in Cholesky form. In particular, if this flag is
+        `True`, input to `log_prob` is presumed of Cholesky form and output from
+        `sample` is of Cholesky form.  Setting this argument to `True` is purely
+        a computational optimization and does not change the underlying
+        distribution. Additionally, validation checks which are only defined on
+        the multiplied-out form are omitted, even if `validate_args` is `True`.
+        Default value: `False` (i.e., input/output does not have Cholesky
+        semantics).
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -120,16 +131,17 @@ class LKJ(distribution.Distribution):
       raise ValueError(
           'There are no negative-dimension correlation matrices.')
     parameters = dict(locals())
+    self._input_output_cholesky = input_output_cholesky
     with tf.name_scope(name, values=[dimension, concentration]):
       concentration = tf.convert_to_tensor(
-          concentration,
+          value=concentration,
           name='concentration',
           dtype=dtype_util.common_dtype([concentration],
                                         preferred_dtype=tf.float32))
       with tf.control_dependencies([
           # concentration >= 1
           # TODO(b/111451422) Generalize to concentration > 0.
-          tf.assert_non_negative(concentration - 1.),
+          tf.compat.v1.assert_non_negative(concentration - 1.),
       ] if validate_args else []):
         self._dimension = dimension
         self._concentration = tf.identity(concentration, name='concentration')
@@ -152,8 +164,13 @@ class LKJ(distribution.Distribution):
     """Concentration parameter."""
     return self._concentration
 
+  @property
+  def input_output_cholesky(self):
+    """Boolean indicating if `Tensor` input/outputs are Cholesky factorized."""
+    return self._input_output_cholesky
+
   def _batch_shape_tensor(self):
-    return tf.shape(self.concentration)
+    return tf.shape(input=self.concentration)
 
   def _batch_shape(self):
     return self.concentration.shape
@@ -191,7 +208,7 @@ class LKJ(distribution.Distribution):
                         ' not {}'.format(self.concentration.dtype.name))
 
       concentration = _replicate(num_samples, self.concentration)
-      concentration_shape = tf.shape(concentration)
+      concentration_shape = tf.shape(input=concentration)
       if self.dimension <= 1:
         # For any dimension <= 1, there is only one possible correlation matrix.
         shape = tf.concat([
@@ -270,12 +287,17 @@ class LKJ(distribution.Distribution):
         chol_result = tf.concat(
             [chol_result, new_row[..., tf.newaxis, :]], axis=-2)
 
+      if self.input_output_cholesky:
+        return chol_result
+
       result = tf.matmul(chol_result, chol_result, transpose_b=True)
       # The diagonal for a correlation matrix should always be ones. Due to
       # numerical instability the matmul might not achieve that, so manually set
       # these to ones.
-      result = tf.matrix_set_diag(result, tf.ones(
-          shape=tf.shape(result)[:-1], dtype=result.dtype.base_dtype))
+      result = tf.linalg.set_diag(
+          result,
+          tf.ones(
+              shape=tf.shape(input=result)[:-1], dtype=result.dtype.base_dtype))
       # This sampling algorithm can produce near-PSD matrices on which standard
       # algorithms such as `tf.cholesky` or `tf.linalg.self_adjoint_eigvals`
       # fail. Specifically, as documented in b/116828694, around 2% of trials
@@ -285,7 +307,7 @@ class LKJ(distribution.Distribution):
       return result
 
   def _validate_dimension(self, x):
-    x = tf.convert_to_tensor(x, name='x')
+    x = tf.convert_to_tensor(value=x, name='x')
     if x.shape[-2:].is_fully_defined():
       if x.shape.dims[-2] == x.shape.dims[-1] == self.dimension:
         pass
@@ -295,31 +317,35 @@ class LKJ(distribution.Distribution):
                 self.dimension, self.dimension, x.shape.dims))
     elif self.validate_args:
       msg = 'Input dimension mismatch: expected [..., {}, {}], got {}'.format(
-          self.dimension, self.dimension, tf.shape(x))
-      with tf.control_dependencies(
-          [tf.assert_equal(tf.shape(x)[-2], self.dimension, message=msg),
-           tf.assert_equal(tf.shape(x)[-1], self.dimension, message=msg)]):
+          self.dimension, self.dimension, tf.shape(input=x))
+      with tf.control_dependencies([
+          tf.compat.v1.assert_equal(
+              tf.shape(input=x)[-2], self.dimension, message=msg),
+          tf.compat.v1.assert_equal(
+              tf.shape(input=x)[-1], self.dimension, message=msg)
+      ]):
         x = tf.identity(x)
     return x
 
   def _validate_correlationness(self, x):
-    if not self.validate_args:
+    if not self.validate_args or self.input_output_cholesky:
       return x
     checks = [
-        tf.assert_less_equal(
+        tf.compat.v1.assert_less_equal(
             tf.cast(-1., dtype=x.dtype.base_dtype),
             x,
             message='Correlations must be >= -1.'),
-        tf.assert_less_equal(
+        tf.compat.v1.assert_less_equal(
             x,
             tf.cast(1., x.dtype.base_dtype),
             message='Correlations must be <= 1.'),
-        tf.assert_near(
-            tf.matrix_diag_part(x),
+        tf.compat.v1.assert_near(
+            tf.linalg.diag_part(x),
             tf.cast(1., x.dtype.base_dtype),
             message='Self-correlations must be = 1.'),
-        tf.assert_near(
-            x, tf.matrix_transpose(x),
+        tf.compat.v1.assert_near(
+            x,
+            tf.linalg.transpose(x),
             message='Correlation matrices must be symmetric')
     ]
     with tf.control_dependencies(checks):
@@ -349,7 +375,7 @@ class LKJ(distribution.Distribution):
         corresponding element of `concentration`.
     """
     with tf.name_scope('log_unnorm_prob_lkj', name, [self.concentration]):
-      x = tf.convert_to_tensor(x, name='x')
+      x = tf.convert_to_tensor(value=x, name='x')
       # The density is det(matrix) ** (concentration - 1).
       # Computing the determinant with `logdet` is usually fine, since
       # correlation matrices are Hermitian and PSD. But in some cases, for a
@@ -367,7 +393,11 @@ class LKJ(distribution.Distribution):
       # an error. More care must be taken, as due to numerical stability issues,
       # self_adjoint_eigvals can return slightly negative eigenvalues even for
       # a PSD matrix.
-      _, logdet = tf.linalg.slogdet(x)
+      if self.input_output_cholesky:
+        logdet = 2.0 * tf.reduce_sum(
+            input_tensor=tf.math.log(tf.linalg.diag_part(x)), axis=[-1])
+      else:
+        _, logdet = tf.linalg.slogdet(x)
       answer = (self.concentration - 1.) * logdet
       return answer
 
@@ -388,8 +418,9 @@ class LKJ(distribution.Distribution):
       ans = tf.zeros_like(self.concentration)
       for k in range(1, self.dimension):
         ans += logpi * (k / 2.)
-        ans += tf.lgamma(self.concentration + (self.dimension - 1 - k) / 2.)
-        ans -= tf.lgamma(self.concentration + (self.dimension - 1) / 2.)
+        ans += tf.math.lgamma(self.concentration +
+                              (self.dimension - 1 - k) / 2.)
+        ans -= tf.math.lgamma(self.concentration + (self.dimension - 1) / 2.)
       return ans
 
   def _mean(self):
@@ -403,7 +434,7 @@ class LKJ(distribution.Distribution):
     return self._identity()
 
   def _identity(self):
-    batch = tf.shape(self.concentration)
+    batch = tf.shape(input=self.concentration)
     answer = tf.eye(
         num_rows=self.dimension, batch_shape=batch,
         dtype=self.concentration.dtype)

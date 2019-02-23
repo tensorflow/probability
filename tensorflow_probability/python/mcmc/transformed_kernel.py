@@ -332,12 +332,12 @@ class TransformedTransitionKernel(TransitionKernel):
       else:
         if is_list_like(transformed_init_state):
           transformed_init_state = [
-              tf.convert_to_tensor(s, name='transformed_init_state')
+              tf.convert_to_tensor(value=s, name='transformed_init_state')
               for s in transformed_init_state
           ]
         else:
           transformed_init_state = tf.convert_to_tensor(
-              transformed_init_state, name='transformed_init_state')
+              value=transformed_init_state, name='transformed_init_state')
       kernel_results = TransformedTransitionKernelResults(
           transformed_state=transformed_init_state,
           inner_results=self._inner_kernel.bootstrap_results(

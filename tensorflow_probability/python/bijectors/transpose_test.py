@@ -24,7 +24,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python import bijectors as tfb
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 class _TransposeBijectorTest(object):
@@ -49,9 +49,9 @@ class _TransposeBijectorTest(object):
       actual_y = tf.constant(actual_y_)
       perm = tf.constant(perm_)
     else:
-      actual_x = tf.placeholder_with_default(actual_x_, shape=None)
-      actual_y = tf.placeholder_with_default(actual_y_, shape=None)
-      perm = tf.placeholder_with_default(perm_, shape=[3])
+      actual_x = tf.compat.v1.placeholder_with_default(actual_x_, shape=None)
+      actual_y = tf.compat.v1.placeholder_with_default(actual_y_, shape=None)
+      perm = tf.compat.v1.placeholder_with_default(perm_, shape=[3])
 
     bijector = tfb.Transpose(perm=perm, validate_args=True)
     y = bijector.forward(actual_x)
@@ -86,8 +86,8 @@ class _TransposeBijectorTest(object):
       actual_y = tf.constant(actual_y_)
       rightmost_transposed_ndims = tf.constant(rightmost_transposed_ndims_)
     else:
-      actual_x = tf.placeholder_with_default(actual_x_, shape=None)
-      actual_y = tf.placeholder_with_default(actual_y_, shape=None)
+      actual_x = tf.compat.v1.placeholder_with_default(actual_x_, shape=None)
+      actual_y = tf.compat.v1.placeholder_with_default(actual_y_, shape=None)
       rightmost_transposed_ndims = tf.constant(rightmost_transposed_ndims_)
 
     bijector = tfb.Transpose(
@@ -114,7 +114,7 @@ class _TransposeBijectorTest(object):
     else:
       with self.assertRaisesOpError(msg):
         bijector = tfb.Transpose(
-            perm=tf.placeholder_with_default([1, 2], shape=[2]),
+            perm=tf.compat.v1.placeholder_with_default([1, 2], shape=[2]),
             validate_args=True)
         self.evaluate(bijector.forward([[0, 1]]))
 
@@ -124,12 +124,12 @@ class _TransposeBijectorTest(object):
       tfb.Transpose(rightmost_transposed_ndims=-1, validate_args=True)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class TransposeBijectorDynamicTest(_TransposeBijectorTest, tf.test.TestCase):
   is_static = False
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class TransposeBijectorStaticTest(_TransposeBijectorTest, tf.test.TestCase):
   is_static = True
 

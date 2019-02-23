@@ -24,17 +24,19 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability import positive_semidefinite_kernels as psd_kernels
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class RationalQuadraticTest(tf.test.TestCase, parameterized.TestCase):
 
   def _rational_quadratic(
       self, amplitude, length_scale, scale_mixture_rate, x, y):
-    return (1. + np.sum((x - y) ** 2) / (
+    return (amplitude ** 2) * (1. + np.sum((x - y) ** 2) / (
         2 * scale_mixture_rate * length_scale ** 2)) ** (-scale_mixture_rate)
 
   def testMismatchedFloatTypesAreBad(self):
-    with self.assertRaises(ValueError):
+    with self.assertRaises(TypeError):
       psd_kernels.RationalQuadratic(np.float32(1.), np.float64(1.))
 
   def testBatchShape(self):
@@ -118,18 +120,28 @@ class RationalQuadraticTest(tf.test.TestCase, parameterized.TestCase):
     #               `- from broadcasting kernel params
 
   def testValidateArgs(self):
-    k = psd_kernels.RationalQuadratic(
-        amplitude=-1.,
-        length_scale=-1.,
-        scale_mixture_rate=-1.,
-        validate_args=True)
     with self.assertRaises(tf.errors.InvalidArgumentError):
+      k = psd_kernels.RationalQuadratic(
+          amplitude=-1.,
+          length_scale=1.,
+          scale_mixture_rate=1.,
+          validate_args=True)
       self.evaluate(k.amplitude)
 
     with self.assertRaises(tf.errors.InvalidArgumentError):
+      k = psd_kernels.RationalQuadratic(
+          amplitude=1.,
+          length_scale=-1.,
+          scale_mixture_rate=1.,
+          validate_args=True)
       self.evaluate(k.length_scale)
 
     with self.assertRaises(tf.errors.InvalidArgumentError):
+      k = psd_kernels.RationalQuadratic(
+          amplitude=1.,
+          length_scale=1.,
+          scale_mixture_rate=-1.,
+          validate_args=True)
       self.evaluate(k.scale_mixture_rate)
 
     # But `None`'s are ok
@@ -139,3 +151,6 @@ class RationalQuadraticTest(tf.test.TestCase, parameterized.TestCase):
         scale_mixture_rate=None,
         validate_args=True)
     self.evaluate(k.apply([1.], [1.]))
+
+if __name__ == '__main__':
+  tf.test.main()

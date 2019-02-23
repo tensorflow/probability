@@ -30,8 +30,8 @@ __all__ = [
 
 
 def _add_diagonal_shift(matrix, shift):
-  return tf.matrix_set_diag(
-      matrix, tf.matrix_diag_part(matrix) + shift, name='add_diagonal_shift')
+  return tf.linalg.set_diag(
+      matrix, tf.linalg.diag_part(matrix) + shift, name='add_diagonal_shift')
 
 
 class GaussianProcess(mvn_linear_operator.MultivariateNormalLinearOperator):
@@ -169,19 +169,19 @@ class GaussianProcess(mvn_linear_operator.MultivariateNormalLinearOperator):
       amplitude=tf.get_variable('amplitude', np.float32),
       length_scale=tf.get_variable('length_scale', np.float32))
 
-  gp = tfp.GaussianProcess(kernel, observed_index_points)
+  gp = tfd.GaussianProcess(kernel, observed_index_points)
   neg_log_likelihood = -gp.log_prob(observed_values)
 
-  optimize = tf.train.AdamOptimize().minimize(neg_log_likelihood)
+  optimize = tf.train.AdamOptimizer().minimize(neg_log_likelihood)
 
   with tf.Session() as sess:
     sess.run(tf.global_variables_initializer())
 
     for i in range(1000):
-      _, nll_ = sess.run([optimize, nll])
+      _, neg_log_likelihood_ = sess.run([optimize, neg_log_likelihood])
       if i % 100 == 0:
-        print("Step {}: NLL = {}".format(i, nll_))
-    print("Final NLL = {}".format(nll_))
+        print("Step {}: NLL = {}".format(i, neg_log_likelihood_))
+    print("Final NLL = {}".format(neg_log_likelihood_))
   ```
 
   """
@@ -245,10 +245,10 @@ class GaussianProcess(mvn_linear_operator.MultivariateNormalLinearOperator):
       dtype = dtype_util.common_dtype(
           [index_points, observation_noise_variance, jitter], tf.float32)
       index_points = tf.convert_to_tensor(
-          index_points, dtype=dtype, name='index_points')
-      jitter = tf.convert_to_tensor(jitter, dtype=dtype, name='jitter')
+          value=index_points, dtype=dtype, name='index_points')
+      jitter = tf.convert_to_tensor(value=jitter, dtype=dtype, name='jitter')
       observation_noise_variance = tf.convert_to_tensor(
-          observation_noise_variance,
+          value=observation_noise_variance,
           dtype=dtype,
           name='observation_noise_variance')
 

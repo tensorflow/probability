@@ -24,7 +24,7 @@ import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 class ShapeChanging(tfb.Bijector):
@@ -37,7 +37,7 @@ class ShapeChanging(tfb.Bijector):
         validate_args=False, name="shape_changer")
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class ChainBijectorTest(tf.test.TestCase):
   """Tests the correctness of the Y = Chain(bij1, bij2, bij3) transformation."""
 
@@ -183,7 +183,7 @@ class ChainBijectorTest(tf.test.TestCase):
 
   def testChainIldjWithPlaceholder(self):
     chain = tfb.Chain((tfb.Exp(), tfb.Exp()))
-    samples = tf.placeholder_with_default(
+    samples = tf.compat.v1.placeholder_with_default(
         np.zeros([2, 10], np.float32), shape=None)
     ildj = chain.inverse_log_det_jacobian(samples, event_ndims=0)
     self.assertTrue(ildj is not None)

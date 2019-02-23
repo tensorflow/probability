@@ -75,8 +75,9 @@ class InvertBijectorTest(tf.test.TestCase):
         tfd.TransformedDistribution(
             distribution=tfd.Gamma(concentration=1., rate=2.),
             bijector=tfb.Invert(tfb.Exp())))
-    self.assertAllEqual(
-        [], self.evaluate(tf.shape(exp_gamma_distribution.sample())))
+    self.assertAllEqual([],
+                        self.evaluate(
+                            tf.shape(input=exp_gamma_distribution.sample())))
 
 
 if __name__ == "__main__":

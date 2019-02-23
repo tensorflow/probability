@@ -26,7 +26,7 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
 
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 def try_import(name):  # pylint: disable=invalid-name
@@ -34,7 +34,7 @@ def try_import(name):  # pylint: disable=invalid-name
   try:
     module = importlib.import_module(name)
   except ImportError as e:
-    tf.logging.warning("Could not import %s: %s" % (name, str(e)))
+    tf.compat.v1.logging.warning("Could not import %s: %s" % (name, str(e)))
   return module
 
 stats = try_import("scipy.stats")
@@ -42,7 +42,7 @@ stats = try_import("scipy.stats")
 tfd = tfp.distributions
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class HalfNormalTest(test_case.TestCase):
 
   def setUp(self):
@@ -58,8 +58,8 @@ class HalfNormalTest(test_case.TestCase):
     scale_shape = param_shapes["scale"]
     self.assertAllEqual(expected, self.evaluate(scale_shape))
     scale = tf.ones(scale_shape)
-    self.assertAllEqual(expected,
-                        self.evaluate(tf.shape(tfd.HalfNormal(scale).sample())))
+    self.assertAllEqual(
+        expected, self.evaluate(tf.shape(input=tfd.HalfNormal(scale).sample())))
 
   def _testParamStaticShapes(self, sample_shape, expected):
     param_shapes = tfd.HalfNormal.param_static_shapes(sample_shape)
@@ -171,22 +171,21 @@ class HalfNormalTest(test_case.TestCase):
 
   def testFiniteGradients(self):
     for dtype in [np.float32, np.float64]:
-      scale = tf.Variable(dtype(3.0))
+      scale = tf.compat.v2.Variable(dtype(3.0))
       x = np.array([0.01, 0.1, 1., 5., 10.]).astype(dtype)
       def half_normal_function(name, x):
         def half_normal(scale):
           return getattr(tfd.HalfNormal(scale=scale), name)(x)
         return half_normal
 
-      self.evaluate(tf.global_variables_initializer())
+      self.evaluate(tf.compat.v1.global_variables_initializer())
       for func_name in [
           "cdf", "log_cdf", "survival_function",
           "log_prob", "prob", "log_survival_function",
       ]:
         print(func_name)
-        value = self.evaluate(half_normal_function(func_name, x)(scale))
-        grads = self.compute_gradients(
-            half_normal_function(func_name, x), args=[scale])
+        value, grads = self.evaluate(tfp.math.value_and_gradient(
+            half_normal_function(func_name, x), scale))
         self.assertAllFinite(value)
         self.assertAllFinite(grads)
 
@@ -298,7 +297,7 @@ class HalfNormalTest(test_case.TestCase):
   def testHalfNormalShapeWithPlaceholders(self):
     if tf.executing_eagerly():
       return
-    scale = tf.placeholder_with_default(input=[1., 2], shape=None)
+    scale = tf.compat.v1.placeholder_with_default(input=[1., 2], shape=None)
     halfnorm = tfd.HalfNormal(scale=scale)
 
     # get_batch_shape should return an "<unknown>" tensor.
@@ -307,6 +306,33 @@ class HalfNormalTest(test_case.TestCase):
     self.assertAllEqual(self.evaluate(halfnorm.event_shape_tensor()), [])
     self.assertAllEqual(self.evaluate(halfnorm.batch_shape_tensor()), [2])
 
+  def testHalfNormalHalfNormalKL(self):
+    a_scale = np.arange(0.5, 1.6, 0.1)
+    b_scale = np.arange(0.5, 1.6, 0.1)
+
+    # This reshape is intended to expand the number of test cases.
+    a_scale = a_scale.reshape((len(a_scale), 1))
+    b_scale = b_scale.reshape((1, len(b_scale)))
+
+    a = tfd.HalfNormal(scale=a_scale)
+    b = tfd.HalfNormal(scale=b_scale)
+
+    true_kl = (np.log(b_scale) - np.log(a_scale) +
+               (a_scale ** 2 - b_scale ** 2) / (2 * b_scale ** 2))
+
+    kl = tfd.kl_divergence(a, b)
+
+    x = a.sample(int(4e5), seed=0)
+    kl_sample = tf.reduce_mean(
+        input_tensor=a.log_prob(x) - b.log_prob(x), axis=0)
+
+    kl_, kl_sample_ = self.evaluate([kl, kl_sample])
+    self.assertAllEqual(true_kl, kl_)
+    self.assertAllClose(true_kl, kl_sample_, atol=0., rtol=5e-2)
+
+    zero_kl = tfd.kl_divergence(a, a)
+    true_zero_kl_, zero_kl_ = self.evaluate([tf.zeros_like(zero_kl), zero_kl])
+    self.assertAllEqual(true_zero_kl_, zero_kl_)
 
 if __name__ == "__main__":
   tf.test.main()

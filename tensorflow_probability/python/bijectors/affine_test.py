@@ -25,10 +25,10 @@ import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class AffineBijectorTest(tf.test.TestCase):
   """Tests correctness of the Y = scale @ x + shift transformation."""
 
@@ -44,7 +44,7 @@ class AffineBijectorTest(tf.test.TestCase):
 
     def dynamic_run(fun, x_value, **kwargs):
       x_value = np.array(x_value, dtype=np.float32)
-      placeholder = tf.placeholder_with_default(x_value, shape=None)
+      placeholder = tf.compat.v1.placeholder_with_default(x_value, shape=None)
       return self.evaluate(fun(placeholder, **kwargs))
 
     for run in (static_run, dynamic_run):
@@ -73,7 +73,7 @@ class AffineBijectorTest(tf.test.TestCase):
 
     def dynamic_run(fun, x_value, **kwargs):
       x_value = np.array(x_value, dtype=np.float32)
-      placeholder = tf.placeholder_with_default(x_value, shape=None)
+      placeholder = tf.compat.v1.placeholder_with_default(x_value, shape=None)
       return self.evaluate(fun(placeholder, **kwargs))
 
     for run in (static_run, dynamic_run):
@@ -112,9 +112,10 @@ class AffineBijectorTest(tf.test.TestCase):
     mu_value = np.array([1., -1], dtype=np.float32)
     scale_diag_value = np.array([2., 2], dtype=np.float32)
 
-    x = tf.placeholder_with_default(x_value, shape=None)
-    mu = tf.placeholder_with_default(mu_value, shape=None)
-    scale_diag = tf.placeholder_with_default(scale_diag_value, shape=None)
+    x = tf.compat.v1.placeholder_with_default(x_value, shape=None)
+    mu = tf.compat.v1.placeholder_with_default(mu_value, shape=None)
+    scale_diag = tf.compat.v1.placeholder_with_default(
+        scale_diag_value, shape=None)
 
     bijector = tfb.Affine(shift=mu, scale_diag=scale_diag)
     self.assertAllClose([[3., 1]], self.evaluate(bijector.forward(x)))
@@ -129,7 +130,7 @@ class AffineBijectorTest(tf.test.TestCase):
 
     def dynamic_run(fun, x_value, **kwargs):
       x_value = np.array(x_value, dtype=np.float32)
-      placeholder = tf.placeholder_with_default(x_value, shape=None)
+      placeholder = tf.compat.v1.placeholder_with_default(x_value, shape=None)
       return self.evaluate(fun(placeholder, **kwargs))
 
     for run in (static_run, dynamic_run):
@@ -150,7 +151,7 @@ class AffineBijectorTest(tf.test.TestCase):
 
     def dynamic_run(fun, x_value, **kwargs):
       x_value = np.array(x_value, dtype=np.float32)
-      placeholder = tf.placeholder_with_default(x_value, shape=None)
+      placeholder = tf.compat.v1.placeholder_with_default(x_value, shape=None)
       return self.evaluate(fun(placeholder, **kwargs))
 
     for run in (static_run, dynamic_run):
@@ -170,9 +171,10 @@ class AffineBijectorTest(tf.test.TestCase):
     mu_value = np.array([[1., -1]], dtype=np.float32)
     scale_diag_value = np.array([[2., 2]], dtype=np.float32)
 
-    x = tf.placeholder_with_default(x_value, shape=None)
-    mu = tf.placeholder_with_default(mu_value, shape=None)
-    scale_diag = tf.placeholder_with_default(scale_diag_value, shape=None)
+    x = tf.compat.v1.placeholder_with_default(x_value, shape=None)
+    mu = tf.compat.v1.placeholder_with_default(mu_value, shape=None)
+    scale_diag = tf.compat.v1.placeholder_with_default(
+        scale_diag_value, shape=None)
 
     bijector = tfb.Affine(shift=mu, scale_diag=scale_diag)
     self.assertAllClose([[[3., 1]]], self.evaluate(bijector.forward(x)))
@@ -188,7 +190,7 @@ class AffineBijectorTest(tf.test.TestCase):
 
     def dynamic_run(fun, x_value, **kwargs):
       x_value = np.array(x_value, dtype=np.float32)
-      placeholder = tf.placeholder_with_default(x_value, shape=None)
+      placeholder = tf.compat.v1.placeholder_with_default(x_value, shape=None)
       return self.evaluate(fun(placeholder, **kwargs))
 
     for run in (static_run, dynamic_run):
@@ -209,7 +211,7 @@ class AffineBijectorTest(tf.test.TestCase):
 
     def dynamic_run(fun, x_value, **kwargs):
       x_value = np.array(x_value, dtype=np.float32)
-      placeholder = tf.placeholder_with_default(x_value, shape=None)
+      placeholder = tf.compat.v1.placeholder_with_default(x_value, shape=None)
       return self.evaluate(fun(placeholder, **kwargs))
 
     for run in (static_run, dynamic_run):
@@ -232,7 +234,7 @@ class AffineBijectorTest(tf.test.TestCase):
 
     def dynamic_run(fun, x_value, **kwargs):
       x_value = np.array(x_value, dtype=np.float32)
-      placeholder = tf.placeholder_with_default(x_value, shape=None)
+      placeholder = tf.compat.v1.placeholder_with_default(x_value, shape=None)
       return self.evaluate(fun(placeholder, **kwargs))
 
     for run in (static_run, dynamic_run):
@@ -253,7 +255,7 @@ class AffineBijectorTest(tf.test.TestCase):
 
     def dynamic_run(fun, x_value, **kwargs):
       x_value = np.array(x_value, dtype=np.float32)
-      placeholder = tf.placeholder_with_default(x_value, shape=None)
+      placeholder = tf.compat.v1.placeholder_with_default(x_value, shape=None)
       return self.evaluate(fun(placeholder, **kwargs))
 
     for run in (static_run, dynamic_run):
@@ -277,7 +279,7 @@ class AffineBijectorTest(tf.test.TestCase):
 
     def dynamic_run(fun, x_value, **kwargs):
       x_value = np.array(x_value, dtype=np.float32)
-      placeholder = tf.placeholder_with_default(x_value, shape=None)
+      placeholder = tf.compat.v1.placeholder_with_default(x_value, shape=None)
       return self.evaluate(fun(placeholder, **kwargs))
 
     for run in (static_run, dynamic_run):
@@ -311,7 +313,7 @@ class AffineBijectorTest(tf.test.TestCase):
 
     def dynamic_run(fun, x_value, **kwargs):
       x_value = np.array(x_value, dtype=np.float32)
-      placeholder = tf.placeholder_with_default(x_value, shape=None)
+      placeholder = tf.compat.v1.placeholder_with_default(x_value, shape=None)
       return self.evaluate(fun(placeholder, **kwargs))
 
     for run in (static_run, dynamic_run):
@@ -344,7 +346,7 @@ class AffineBijectorTest(tf.test.TestCase):
 
     def dynamic_run(fun, x_value, **kwargs):
       x_value = np.array(x_value, dtype=np.float32)
-      placeholder = tf.placeholder_with_default(x_value, shape=None)
+      placeholder = tf.compat.v1.placeholder_with_default(x_value, shape=None)
       return self.evaluate(fun(placeholder, **kwargs))
 
     for run in (static_run, dynamic_run):
@@ -378,7 +380,7 @@ class AffineBijectorTest(tf.test.TestCase):
 
     def dynamic_run(fun, x_value, **kwargs):
       x_value = np.array(x_value, dtype=np.float32)
-      placeholder = tf.placeholder_with_default(x_value, shape=None)
+      placeholder = tf.compat.v1.placeholder_with_default(x_value, shape=None)
       return self.evaluate(fun(placeholder, **kwargs))
 
     for run in (static_run, dynamic_run):
@@ -573,7 +575,7 @@ class AffineBijectorTest(tf.test.TestCase):
 
     def dynamic_run(fun, x_value, **kwargs):
       x_value = np.array(x_value, dtype=np.float32)
-      placeholder = tf.placeholder_with_default(x_value, shape=None)
+      placeholder = tf.compat.v1.placeholder_with_default(x_value, shape=None)
       return self.evaluate(fun(placeholder, **kwargs))
 
     for run in (static_run, dynamic_run):
@@ -609,9 +611,9 @@ class AffineBijectorTest(tf.test.TestCase):
   def _testScaledIdentityComplexAdjoint(self, is_dynamic):
     shift_ = np.array(-0.5, dtype=np.complex)
     scale_ = np.array(4 + 2j, dtype=np.complex)
-    shift = tf.placeholder_with_default(
+    shift = tf.compat.v1.placeholder_with_default(
         shift_, shape=None if is_dynamic else [])
-    scale = tf.placeholder_with_default(
+    scale = tf.compat.v1.placeholder_with_default(
         scale_, shape=None if is_dynamic else [])
     bijector = tfb.Affine(
         shift=shift,

@@ -52,8 +52,8 @@ def sample_uniform_initial_state(parameter,
   """
   unconstrained_prior_sample = parameter.bijector.inverse(
       parameter.prior.sample(init_sample_shape, seed=seed))
-  uniform_initializer = 4 * tf.random_uniform(
-      tf.shape(unconstrained_prior_sample),
+  uniform_initializer = 4 * tf.random.uniform(
+      tf.shape(input=unconstrained_prior_sample),
       dtype=unconstrained_prior_sample.dtype,
       seed=seed) - 2
   if return_constrained:
@@ -83,19 +83,19 @@ def pad_batch_dimension_for_multiple_chains(observed_time_series,
       observed_time_series)  # Guarantee `event_ndims=2`
   event_ndims = 2  # event_shape = [num_timesteps, observation_size=1]
 
-  model_batch_ndims = (model.batch_shape.ndims
-                       if model.batch_shape.ndims is not None
-                       else tf.shape(model.batch_shape_tensor())[0])
+  model_batch_ndims = (
+      model.batch_shape.ndims if model.batch_shape.ndims is not None else
+      tf.shape(input=model.batch_shape_tensor())[0])
 
   # Compute ndims from chain_batch_shape.
   chain_batch_shape = tf.convert_to_tensor(
-      chain_batch_shape, name='chain_batch_shape', dtype=tf.int32)
+      value=chain_batch_shape, name='chain_batch_shape', dtype=tf.int32)
   if not chain_batch_shape.shape.is_fully_defined():
     raise ValueError('Batch shape must have static rank. (given: {})'.format(
         chain_batch_shape))
   if chain_batch_shape.shape.ndims == 0:  # expand int `k` to `[k]`.
     chain_batch_shape = chain_batch_shape[tf.newaxis]
-  chain_batch_ndims = chain_batch_shape.shape[0].value
+  chain_batch_ndims = tf.compat.dimension_value(chain_batch_shape.shape[0])
 
   for _ in range(chain_batch_ndims):
     observed_time_series = tf.expand_dims(
@@ -105,15 +105,17 @@ def pad_batch_dimension_for_multiple_chains(observed_time_series,
 
 def _build_trainable_posterior(param, initial_loc_fn):
   """Built a transformed-normal variational dist over a parameter's support."""
-  loc = tf.get_variable(param.name + '_loc',
-                        initializer=lambda: initial_loc_fn(param),
-                        dtype=param.prior.dtype,
-                        use_resource=True)
-  scale = tf.nn.softplus(tf.get_variable(
-      param.name + '_scale',
-      initializer=lambda: -4 * tf.ones_like(initial_loc_fn(param)),
+  loc = tf.compat.v1.get_variable(
+      param.name + '_loc',
+      initializer=lambda: initial_loc_fn(param),
       dtype=param.prior.dtype,
-      use_resource=True))
+      use_resource=True)
+  scale = tf.nn.softplus(
+      tf.compat.v1.get_variable(
+          param.name + '_scale',
+          initializer=lambda: -4 * tf.ones_like(initial_loc_fn(param)),
+          dtype=param.prior.dtype,
+          use_resource=True))
 
   q = tfd.Normal(loc=loc, scale=scale)
 
@@ -265,8 +267,8 @@ def build_factored_variational_loss(model,
 
   with tf.name_scope(name, 'build_factored_variational_loss',
                      values=[observed_time_series]) as name:
-    observed_time_series = tf.convert_to_tensor(observed_time_series,
-                                                name='observed_time_series')
+    observed_time_series = tf.convert_to_tensor(
+        value=observed_time_series, name='observed_time_series')
     seed = tfd.SeedStream(
         seed, salt='StructuralTimeSeries_build_factored_variational_loss')
 
@@ -292,9 +294,10 @@ def build_factored_variational_loss(model,
     log_prob_fn = model.joint_log_prob(observed_time_series)
     expected_log_joint = log_prob_fn(*variational_samples)
     entropy = tf.reduce_sum(
-        [-q.log_prob(sample)
-         for (q, sample) in zip(variational_distributions.values(),
-                                variational_samples)],
+        input_tensor=[
+            -q.log_prob(sample) for (q, sample) in zip(
+                variational_distributions.values(), variational_samples)
+        ],
         axis=0)
     variational_loss = -(expected_log_joint + entropy)  # -ELBO
 
@@ -303,11 +306,14 @@ def build_factored_variational_loss(model,
 
 def _minimize_in_graph(build_loss_fn, num_steps=200, optimizer=None):
   """Run an optimizer within the graph to minimize a loss function."""
-  optimizer = tf.train.AdamOptimizer(0.1) if optimizer is None else optimizer
+  optimizer = tf.compat.v1.train.AdamOptimizer(
+      0.1) if optimizer is None else optimizer
+
   def train_loop_body(step):
     train_op = optimizer.minimize(
         build_loss_fn if tf.executing_eagerly() else build_loss_fn())
-    return tf.tuple([tf.add(step, 1)], control_inputs=[train_op])
+    return tf.tuple(tensors=[tf.add(step, 1)], control_inputs=[train_op])
+
   return tf.while_loop(cond=lambda step: step < num_steps,
                        body=train_loop_body,
                        loop_vars=[tf.constant(0)])
@@ -505,8 +511,8 @@ def fit_with_hmc(model,
   """
   with tf.name_scope(name, 'fit_with_hmc',
                      values=[observed_time_series]) as name:
-    observed_time_series = tf.convert_to_tensor(observed_time_series,
-                                                name='observed_time_series')
+    observed_time_series = tf.convert_to_tensor(
+        value=observed_time_series, name='observed_time_series')
     seed = tfd.SeedStream(seed, salt='StructuralTimeSeries_fit_with_hmc')
 
     # Initialize state and step sizes from a variational posterior if not
@@ -520,7 +526,9 @@ def fit_with_hmc(model,
         return build_factored_variational_loss(
             model, observed_time_series,
             init_batch_shape=chain_batch_shape, seed=seed())
-      make_variational = tf.make_template('make_variational', make_variational)
+
+      make_variational = tf.compat.v1.make_template('make_variational',
+                                                    make_variational)
       _, variational_distributions = make_variational()
       minimize_op = _minimize_in_graph(
           build_loss_fn=lambda: make_variational()[0],  # return just the loss.
@@ -548,17 +556,22 @@ def fit_with_hmc(model,
     # Instead we initialize with a dummy value of the appropriate
     # shape, then wrap the HMC chain with `control_dependencies` to ensure the
     # variational step sizes are assigned before HMC actually runs.
-    step_size = [tf.get_variable(
-        initializer=tf.zeros_like(sample_uniform_initial_state(
-            param, init_sample_shape=chain_batch_shape,
-            return_constrained=False)),
-        name='{}_step_size'.format(param.name),
-        trainable=False,
-        use_resource=True)
-                 for (param, ss) in zip(model.parameters, initial_step_size)]
-    step_size_init_op = tf.group(
-        [tf.assign(ss, initial_ss)
-         for (ss, initial_ss) in zip(step_size, initial_step_size)])
+    step_size = [
+        tf.compat.v1.get_variable(
+            initializer=tf.zeros_like(
+                sample_uniform_initial_state(
+                    param,
+                    init_sample_shape=chain_batch_shape,
+                    return_constrained=False)),
+            name='{}_step_size'.format(param.name),
+            trainable=False,
+            use_resource=True)
+        for (param, ss) in zip(model.parameters, initial_step_size)
+    ]
+    step_size_init_op = tf.group([
+        tf.compat.v1.assign(ss, initial_ss)
+        for (ss, initial_ss) in zip(step_size, initial_step_size)
+    ])
 
     # Run HMC to sample from the posterior on parameters.
     with tf.control_dependencies([step_size_init_op]):

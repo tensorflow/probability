@@ -16,7 +16,7 @@ import tensorflow as tf
 from tensorflow_probability.python.mcmc.eight_schools_hmc import EightSchoolsHmcBenchmarkTestHarness
 
 
-tf.enable_eager_execution()
+tf.compat.v1.enable_eager_execution()
 
 
 class EagerEightSchoolsHmcBenchmark(

@@ -26,7 +26,7 @@ import tensorflow_probability as tfp
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 class DummyMatrixTransform(tfb.Bijector):
@@ -52,13 +52,13 @@ class DummyMatrixTransform(tfb.Bijector):
 
   # Note: These jacobians don't make sense.
   def _forward_log_det_jacobian(self, x):
-    return -tf.matrix_determinant(x)
+    return -tf.linalg.det(x)
 
   def _inverse_log_det_jacobian(self, x):
-    return tf.matrix_determinant(x)
+    return tf.linalg.det(x)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class TransformedDistributionTest(tf.test.TestCase):
 
   def _cls(self):
@@ -81,10 +81,9 @@ class TransformedDistributionTest(tf.test.TestCase):
     # sample
     sample = log_normal.sample(100000, seed=235)
     self.assertAllEqual([], log_normal.event_shape)
-    with self.cached_session():
-      self.assertAllEqual([], self.evaluate(log_normal.event_shape_tensor()))
-      self.assertAllClose(
-          sp_dist.mean(), np.mean(self.evaluate(sample)), atol=0.0, rtol=0.05)
+    self.assertAllEqual([], self.evaluate(log_normal.event_shape_tensor()))
+    self.assertAllClose(
+        sp_dist.mean(), np.mean(self.evaluate(sample)), atol=0.0, rtol=0.05)
 
     # pdf, log_pdf, cdf, etc...
     # The mean of the lognormal is around 148.
@@ -97,9 +96,8 @@ class TransformedDistributionTest(tf.test.TestCase):
                  [log_normal.log_survival_function, sp_dist.logsf]]:
       actual = func[0](test_vals)
       expected = func[1](test_vals)
-      with self.cached_session():
-        self.assertAllClose(
-            expected, self.evaluate(actual), atol=0, rtol=0.01)
+      self.assertAllClose(
+          expected, self.evaluate(actual), atol=0, rtol=0.01)
 
   def testNonInjectiveTransformedDistribution(self):
     mu = 1.
@@ -112,28 +110,27 @@ class TransformedDistributionTest(tf.test.TestCase):
     # sample
     sample = abs_normal.sample(100000, seed=235)
     self.assertAllEqual([], abs_normal.event_shape)
-    with self.cached_session():
-      sample_ = self.evaluate(sample)
-      self.assertAllEqual([], self.evaluate(abs_normal.event_shape_tensor()))
+    sample_ = self.evaluate(sample)
+    self.assertAllEqual([], self.evaluate(abs_normal.event_shape_tensor()))
 
-      # Abs > 0, duh!
-      np.testing.assert_array_less(0, sample_)
+    # Abs > 0, duh!
+    np.testing.assert_array_less(0, sample_)
 
-      # Let X ~ Normal(mu, sigma), Y := |X|, then
-      # P[Y < 0.77] = P[-0.77 < X < 0.77]
-      self.assertAllClose(
-          sp_normal.cdf(0.77) - sp_normal.cdf(-0.77),
-          (sample_ < 0.77).mean(), rtol=0.01)
+    # Let X ~ Normal(mu, sigma), Y := |X|, then
+    # P[Y < 0.77] = P[-0.77 < X < 0.77]
+    self.assertAllClose(
+        sp_normal.cdf(0.77) - sp_normal.cdf(-0.77),
+        (sample_ < 0.77).mean(), rtol=0.01)
 
-      # p_Y(y) = p_X(-y) + p_X(y),
-      self.assertAllClose(
-          sp_normal.pdf(1.13) + sp_normal.pdf(-1.13),
-          self.evaluate(abs_normal.prob(1.13)))
+    # p_Y(y) = p_X(-y) + p_X(y),
+    self.assertAllClose(
+        sp_normal.pdf(1.13) + sp_normal.pdf(-1.13),
+        self.evaluate(abs_normal.prob(1.13)))
 
-      # Log[p_Y(y)] = Log[p_X(-y) + p_X(y)]
-      self.assertAllClose(
-          np.log(sp_normal.pdf(2.13) + sp_normal.pdf(-2.13)),
-          self.evaluate(abs_normal.log_prob(2.13)))
+    # Log[p_Y(y)] = Log[p_X(-y) + p_X(y)]
+    self.assertAllClose(
+        np.log(sp_normal.pdf(2.13) + sp_normal.pdf(-2.13)),
+        self.evaluate(abs_normal.log_prob(2.13)))
 
   def testQuantile(self):
     logit_normal = self._cls()(
@@ -156,7 +153,7 @@ class TransformedDistributionTest(tf.test.TestCase):
         return tf.exp(x)
 
       def _forward_log_det_jacobian(self, x):
-        return tf.convert_to_tensor(x)
+        return tf.convert_to_tensor(value=x)
 
     exp_forward_only = ExpForwardOnly()
 
@@ -179,10 +176,10 @@ class TransformedDistributionTest(tf.test.TestCase):
         super(ExpInverseOnly, self).__init__(inverse_min_event_ndims=0)
 
       def _inverse(self, y):
-        return tf.log(y)
+        return tf.math.log(y)
 
       def _inverse_log_det_jacobian(self, y):
-        return -tf.log(y)
+        return -tf.math.log(y)
 
     exp_inverse_only = ExpInverseOnly()
 
@@ -215,9 +212,9 @@ class TransformedDistributionTest(tf.test.TestCase):
             np.log(y), axis=-1))
     self.assertAllClose(expected_log_pdf,
                         self.evaluate(multi_logit_normal.log_prob(y)))
-    self.assertAllClose([1, 2, 3, 2],
-                        self.evaluate(
-                            tf.shape(multi_logit_normal.sample([1, 2, 3]))))
+    self.assertAllClose(
+        [1, 2, 3, 2],
+        self.evaluate(tf.shape(input=multi_logit_normal.sample([1, 2, 3]))))
     self.assertAllEqual([2], multi_logit_normal.event_shape)
     self.assertAllEqual([2],
                         self.evaluate(multi_logit_normal.event_shape_tensor()))
@@ -241,7 +238,37 @@ class TransformedDistributionTest(tf.test.TestCase):
     y = normal.sample()
     self.evaluate(normal.log_prob(y))
     self.evaluate(normal.prob(y))
+    self.evaluate(normal.mean())
     self.evaluate(normal.entropy())
+
+  def testMean(self):
+    shift = np.array([[-1, 0, 1], [-1, -2, -3]], dtype=np.float32)
+    diag = np.array([[1, 2, 3], [2, 3, 2]], dtype=np.float32)
+    fake_mvn = self._cls()(
+        tfd.MultivariateNormalDiag(
+            loc=tf.zeros_like(shift),
+            scale_diag=tf.ones_like(diag),
+            validate_args=True),
+        tfb.AffineLinearOperator(
+            shift,
+            scale=tf.linalg.LinearOperatorDiag(diag, is_non_singular=True),
+            validate_args=True),
+        validate_args=True)
+    self.assertAllClose(shift, self.evaluate(fake_mvn.mean()))
+
+  def testMeanShapeOverride(self):
+    shift = np.array([[-1, 0, 1], [-1, -2, -3]], dtype=np.float32)
+    diag = np.array([[1, 2, 3], [2, 3, 2]], dtype=np.float32)
+    fake_mvn = self._cls()(
+        tfd.Normal(loc=0.0, scale=1.0),
+        tfb.AffineLinearOperator(
+            shift,
+            scale=tf.linalg.LinearOperatorDiag(diag, is_non_singular=True),
+            validate_args=True),
+        batch_shape=[2],
+        event_shape=[3],
+        validate_args=True)
+    self.assertAllClose(shift, self.evaluate(fake_mvn.mean()))
 
   def testEntropy(self):
     shift = np.array([[-1, 0, 1], [-1, -2, -3]], dtype=np.float32)
@@ -296,9 +323,9 @@ class ScalarToMultiTest(tf.test.TestCase):
     # batch_shape agnostic and only care about event_ndims.
     # In the case of `Affine`, if we got it wrong then it would fire an
     # exception due to incompatible dimensions.
-    batch_shape_pl = tf.placeholder_with_default(
+    batch_shape_pl = tf.compat.v1.placeholder_with_default(
         input=np.int32(batch_shape), shape=None, name="dynamic_batch_shape")
-    event_shape_pl = tf.placeholder_with_default(
+    event_shape_pl = tf.compat.v1.placeholder_with_default(
         input=np.int32(event_shape), shape=None, name="dynamic_event_shape")
     fake_mvn_dynamic = self._cls()(
         distribution=base_distribution_class(
@@ -332,8 +359,9 @@ class ScalarToMultiTest(tf.test.TestCase):
     self.assertAllEqual([3], fake_mvn_static.event_shape)
     self.assertAllEqual([2], fake_mvn_static.batch_shape)
 
-    self.assertAllEqual(tf.TensorShape(None), fake_mvn_dynamic.event_shape)
-    self.assertAllEqual(tf.TensorShape(None), fake_mvn_dynamic.batch_shape)
+    if not tf.executing_eagerly():
+      self.assertAllEqual(tf.TensorShape(None), fake_mvn_dynamic.event_shape)
+      self.assertAllEqual(tf.TensorShape(None), fake_mvn_dynamic.batch_shape)
 
     x = self.evaluate(fake_mvn_static.sample(5, seed=0))
     for unsupported_fn in (fake_mvn_static.log_cdf, fake_mvn_static.cdf,
@@ -343,13 +371,13 @@ class ScalarToMultiTest(tf.test.TestCase):
                                    not_implemented_message):
         unsupported_fn(x)
 
-    num_samples = 5e3
+    num_samples = 7e3
     for fake_mvn in [fake_mvn_static, fake_mvn_dynamic]:
       # Ensure sample works by checking first, second moments.
       y = fake_mvn.sample(int(num_samples), seed=0)
       x = y[0:5, ...]
-      sample_mean = tf.reduce_mean(y, 0)
-      centered_y = tf.transpose(y - sample_mean, [1, 2, 0])
+      sample_mean = tf.reduce_mean(input_tensor=y, axis=0)
+      centered_y = tf.transpose(a=y - sample_mean, perm=[1, 2, 0])
       sample_cov = tf.matmul(
           centered_y, centered_y, transpose_b=True) / num_samples
       [
@@ -360,6 +388,7 @@ class ScalarToMultiTest(tf.test.TestCase):
           fake_batch_shape_,
           fake_log_prob_,
           fake_prob_,
+          fake_mean_,
           fake_entropy_,
       ] = self.evaluate([
           sample_mean,
@@ -369,6 +398,7 @@ class ScalarToMultiTest(tf.test.TestCase):
           fake_mvn.batch_shape_tensor(),
           fake_mvn.log_prob(x),
           fake_mvn.prob(x),
+          fake_mvn.mean(),
           fake_mvn.entropy(),
       ])
 
@@ -383,6 +413,7 @@ class ScalarToMultiTest(tf.test.TestCase):
           actual_mvn_log_prob(x_), fake_log_prob_, atol=0., rtol=1e-6)
       self.assertAllClose(
           np.exp(actual_mvn_log_prob(x_)), fake_prob_, atol=0., rtol=1e-5)
+      self.assertAllClose(actual_mean, fake_mean_, atol=0., rtol=1e-6)
       self.assertAllClose(actual_mvn_entropy, fake_entropy_, atol=0., rtol=1e-6)
 
   def testScalarBatchScalarEvent(self):
@@ -449,9 +480,9 @@ class ScalarToMultiTest(tf.test.TestCase):
   def testMatrixEvent(self):
     batch_shape = [2]
     event_shape = [2, 3, 3]
-    batch_shape_pl = tf.placeholder_with_default(
+    batch_shape_pl = tf.compat.v1.placeholder_with_default(
         input=np.int32(batch_shape), shape=None, name="dynamic_batch_shape")
-    event_shape_pl = tf.placeholder_with_default(
+    event_shape_pl = tf.compat.v1.placeholder_with_default(
         input=np.int32(event_shape), shape=None, name="dynamic_event_shape")
 
     scale = 2.
@@ -480,8 +511,9 @@ class ScalarToMultiTest(tf.test.TestCase):
     self.assertAllEqual([2, 3, 3], fake_mvn_static.event_shape)
     self.assertAllEqual([2], fake_mvn_static.batch_shape)
 
-    self.assertAllEqual(tf.TensorShape(None), fake_mvn_dynamic.event_shape)
-    self.assertAllEqual(tf.TensorShape(None), fake_mvn_dynamic.batch_shape)
+    if not tf.executing_eagerly():
+      self.assertAllEqual(tf.TensorShape(None), fake_mvn_dynamic.event_shape)
+      self.assertAllEqual(tf.TensorShape(None), fake_mvn_dynamic.batch_shape)
 
     num_samples = 5e3
     for fake_mvn in [fake_mvn_static, fake_mvn_dynamic]:
@@ -520,10 +552,10 @@ class ScalarToMultiTest(tf.test.TestCase):
         loc = tf.zeros(batch_shape + event_shape)
         scale_diag = tf.ones(batch_shape + event_shape)
         if shapes_are_dynamic:
-          loc = tf.placeholder_with_default(loc, shape=None,
-                                            name="dynamic_loc")
-          scale_diag = tf.placeholder_with_default(scale_diag, shape=None,
-                                                   name="dynamic_scale_diag")
+          loc = tf.compat.v1.placeholder_with_default(
+              loc, shape=None, name="dynamic_loc")
+          scale_diag = tf.compat.v1.placeholder_with_default(
+              scale_diag, shape=None, name="dynamic_scale_diag")
 
         mvn = tfd.MultivariateNormalDiag(loc=loc, scale_diag=scale_diag)
 

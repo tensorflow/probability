@@ -15,6 +15,8 @@
 # Description:
 #   Generalized Linear Model specification, fitting, and related utilities.
 
+# [internal] load python3.bzl
+
 package(
     default_visibility = [
         "//tensorflow_probability:__subpackages__",

@@ -23,10 +23,9 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.internal import test_case
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
 class _TestCaseTest(object):
 
   def setUp(self):
@@ -57,7 +56,7 @@ class _TestCaseTest(object):
     shape = (10, 10, 10)
     a = np.linspace(0., 1., num_elem)
     a[50] = np.nan
-    a = tf.reshape(tf.convert_to_tensor(a, dtype=self.dtype), shape)
+    a = tf.reshape(tf.convert_to_tensor(value=a, dtype=self.dtype), shape)
     with self.assertRaisesRegexp(AssertionError, "Arrays are not equal"):
       self.assertAllFinite(a)
 
@@ -67,7 +66,7 @@ class _TestCaseTest(object):
     shape = (10, 10, 10)
     a = np.linspace(0., 1., num_elem)
     a[100] = np.inf
-    a = tf.reshape(tf.convert_to_tensor(a, dtype=self.dtype), shape)
+    a = tf.reshape(tf.convert_to_tensor(value=a, dtype=self.dtype), shape)
     with self.assertRaisesRegexp(AssertionError, "Arrays are not equal"):
       self.assertAllFinite(a)
 
@@ -84,13 +83,13 @@ class _TestCaseTest(object):
 
   def test_assert_all_nan_input_all_nan(self):
     a = tf.convert_to_tensor(
-        np.full((10, 10, 10), np.nan), dtype=self.dtype)
+        value=np.full((10, 10, 10), np.nan), dtype=self.dtype)
     self.assertAllNan(a)
 
   def test_assert_all_nan_input_some_nan(self):
     a = np.random.rand(10, 10, 10)
     a[1, :, :] = np.nan
-    a = tf.convert_to_tensor(a, dtype=self.dtype)
+    a = tf.convert_to_tensor(value=a, dtype=self.dtype)
     with self.assertRaisesRegexp(AssertionError, "Arrays are not equal"):
       self.assertAllNan(a)
 
@@ -101,46 +100,23 @@ class _TestCaseTest(object):
 
   def test_assert_all_nan_input_inf(self):
     a = tf.convert_to_tensor(
-        np.full((10, 10, 10), np.inf), dtype=self.dtype)
+        value=np.full((10, 10, 10), np.inf), dtype=self.dtype)
     with self.assertRaisesRegexp(AssertionError, "Arrays are not equal"):
       self.assertAllNan(a)
 
   def test_assert_all_nan_input_placeholder_with_default(self):
     all_nan = np.full((10, 10, 10), np.nan).astype(self.dtype.as_numpy_dtype)
-    a = tf.placeholder_with_default(input=all_nan, shape=all_nan.shape)
+    a = tf.compat.v1.placeholder_with_default(
+        input=all_nan, shape=all_nan.shape)
     self.assertAllNan(a)
 
-  def test_compute_gradients_no_initial_gradients(self):
-    x_ = np.random.rand(1000, 100).astype(self.dtype.as_numpy_dtype)
-    x = tf.placeholder_with_default(x_, shape=x_.shape)
-    y_ = np.random.rand(100, 1).astype(self.dtype.as_numpy_dtype)
-    y = tf.placeholder_with_default(y_, shape=y_.shape)
-    f = lambda x, y: tf.matmul(x, y)  # pylint: disable=unnecessary-lambda
-    dfdx, dfdy = self.compute_gradients(f, [x, y])
-    expected_dfdx = np.transpose(y_) + np.zeros_like(x_)
-    expected_dfdy = np.transpose(np.sum(x_, axis=0, keepdims=True))
-    self.assertAllClose(dfdx, expected_dfdx, atol=0., rtol=1e-4)
-    self.assertAllClose(dfdy, expected_dfdy, atol=0., rtol=1e-4)
 
-  def test_compute_gradients_with_initial_gradients(self):
-    x_ = np.random.rand(1000, 100).astype(self.dtype.as_numpy_dtype)
-    x = tf.placeholder_with_default(x_, shape=x_.shape)
-    y_ = np.random.rand(100, 1).astype(self.dtype.as_numpy_dtype)
-    y = tf.placeholder_with_default(y_, shape=y_.shape)
-    f = lambda x, y: tf.matmul(x, y)  # pylint: disable=unnecessary-lambda
-    init_grad_ = np.random.rand(1000, 1).astype(self.dtype.as_numpy_dtype)
-    init_grad = tf.placeholder_with_default(init_grad_, shape=init_grad_.shape)
-    dfdx, dfdy = self.compute_gradients(f, [x, y], grad_ys=init_grad)
-    expected_dfdx = (np.transpose(y_) + np.zeros_like(x_)) * init_grad_
-    expected_dfdy = np.transpose(np.sum(x_ * init_grad_, axis=0, keepdims=True))
-    self.assertAllClose(dfdx, expected_dfdx, atol=0., rtol=1e-4)
-    self.assertAllClose(dfdy, expected_dfdy, atol=0., rtol=1e-4)
-
-
+@test_util.run_all_in_graph_and_eager_modes
 class TestCaseTestFloat32(test_case.TestCase, _TestCaseTest):
   dtype = tf.float32
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class TestCaseTestFloat64(test_case.TestCase, _TestCaseTest):
   dtype = tf.float64
 

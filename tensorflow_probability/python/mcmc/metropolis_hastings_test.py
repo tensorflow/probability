@@ -28,6 +28,7 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.mcmc.util import is_list_like
 
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 InnerKernelResultsWithoutCorrection = collections.namedtuple(
     'InnerKernelResultsWithoutCorrection',
@@ -97,6 +98,8 @@ def make_one_step_fn(dtype):
         kernel_results['grads_target_log_prob'] = [
             tf.identity(0.5 * g, name='grad_target_log_prob')
             for g in previous_kernel_results.grads_target_log_prob]
+      elif fn == 'extraneous':
+        kernel_results[fn] = getattr(previous_kernel_results, fn, None)
       else:
         kernel_results[fn] = tf.identity(
             0.5 * getattr(previous_kernel_results, fn, None),
@@ -126,6 +129,7 @@ def make_bootstrap_results_fn(true_kernel_results):
   return bootstrap_results
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class MetropolisHastingsTest(tf.test.TestCase):
 
   def setUp(self):
@@ -134,7 +138,7 @@ class MetropolisHastingsTest(tf.test.TestCase):
   def testCorrectlyWorksWithoutCorrection(self):
     current_state_ = [self.dtype([1, 2]),
                       self.dtype([3, 4])]
-    current_state = [tf.convert_to_tensor(s) for s in current_state_]
+    current_state = [tf.convert_to_tensor(value=s) for s in current_state_]
     expected_inner_init_kernel_results = InnerKernelResultsWithoutCorrection(
         target_log_prob=self.dtype([
             +100.,
@@ -164,6 +168,12 @@ class MetropolisHastingsTest(tf.test.TestCase):
     next_state, kernel_results = mh.one_step(
         current_state, init_kernel_results)
 
+    # Unmodified state is passed through unmodified.
+    self.assertIs(kernel_results.accepted_results.extraneous,
+                  init_kernel_results.accepted_results.extraneous)
+    self.assertIs(kernel_results.proposed_results.extraneous,
+                  init_kernel_results.accepted_results.extraneous)
+
     # Check correct types and call pattern.
     self.assertEqual(
         dict(is_calibrated=1,
@@ -179,20 +189,19 @@ class MetropolisHastingsTest(tf.test.TestCase):
       self.assertEqual(type(expected_inner_kernel_results), type(kr))
 
     # Now check actual values.
-    with self.cached_session() as sess:
-      [
-          expected_init_inner_kernel_results_,
-          expected_inner_kernel_results_,
-          init_kernel_results_,
-          kernel_results_,
-          next_state_,
-      ] = sess.run([
-          expected_init_inner_kernel_results,
-          expected_inner_kernel_results,
-          init_kernel_results,
-          kernel_results,
-          next_state,
-      ])
+    [
+        expected_init_inner_kernel_results_,
+        expected_inner_kernel_results_,
+        init_kernel_results_,
+        kernel_results_,
+        next_state_,
+    ] = self.evaluate([
+        expected_init_inner_kernel_results,
+        expected_inner_kernel_results,
+        init_kernel_results,
+        kernel_results,
+        next_state,
+    ])
 
     # Check that the bootstrapped kernel results are correctly initialized.
     for fn in expected_inner_init_kernel_results._fields:
@@ -228,7 +237,7 @@ class MetropolisHastingsTest(tf.test.TestCase):
   def testCorrectlyWorksWithCorrection(self):
     current_state_ = [self.dtype([1, 2]),
                       self.dtype([3, 4])]
-    current_state = [tf.convert_to_tensor(s) for s in current_state_]
+    current_state = [tf.convert_to_tensor(value=s) for s in current_state_]
 
     expected_inner_init_kernel_results = InnerKernelResultsWithCorrection(
         log_acceptance_correction=self.dtype([+300., -300.]),
@@ -257,6 +266,12 @@ class MetropolisHastingsTest(tf.test.TestCase):
     next_state, kernel_results = mh.one_step(
         current_state, init_kernel_results)
 
+    # Unmodified state is passed through unmodified.
+    self.assertIs(kernel_results.accepted_results.extraneous,
+                  init_kernel_results.accepted_results.extraneous)
+    self.assertIs(kernel_results.proposed_results.extraneous,
+                  init_kernel_results.accepted_results.extraneous)
+
     # Check correct types and call pattern.
     self.assertEqual(
         dict(is_calibrated=1,
@@ -271,20 +286,19 @@ class MetropolisHastingsTest(tf.test.TestCase):
       self.assertEqual(type(expected_inner_kernel_results), type(kr))
 
     # Now check actual values.
-    with self.cached_session() as sess:
-      [
-          expected_init_inner_kernel_results_,
-          expected_inner_kernel_results_,
-          init_kernel_results_,
-          kernel_results_,
-          next_state_,
-      ] = sess.run([
-          expected_init_inner_kernel_results,
-          expected_inner_kernel_results,
-          init_kernel_results,
-          kernel_results,
-          next_state,
-      ])
+    [
+        expected_init_inner_kernel_results_,
+        expected_inner_kernel_results_,
+        init_kernel_results_,
+        kernel_results_,
+        next_state_,
+    ] = self.evaluate([
+        expected_init_inner_kernel_results,
+        expected_inner_kernel_results,
+        init_kernel_results,
+        kernel_results,
+        next_state,
+    ])
 
     # Check that the bootstrapped kernel results are correctly initialized.
     for fn in expected_inner_init_kernel_results._fields:
@@ -322,7 +336,7 @@ class MetropolisHastingsTest(tf.test.TestCase):
   def testWarnings(self):
     current_state_ = [self.dtype([1, 2]),
                       self.dtype([3, 4])]
-    current_state = [tf.convert_to_tensor(s) for s in current_state_]
+    current_state = [tf.convert_to_tensor(value=s) for s in current_state_]
     expected_inner_init_kernel_results = InnerKernelResultsWithoutCorrection(
         target_log_prob=self.dtype([100., -100.]),
         grads_target_log_prob=[

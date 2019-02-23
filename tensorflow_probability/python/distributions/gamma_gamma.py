@@ -29,8 +29,6 @@ from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.framework import tensor_shape
-from tensorflow.python.ops import control_flow_ops
 
 __all__ = [
     "GammaGamma",
@@ -118,22 +116,22 @@ class GammaGamma(distribution.Distribution):
           [concentration, mixing_concentration, mixing_rate],
           preferred_dtype=tf.float32)
       concentration = tf.convert_to_tensor(
-          concentration, name="concentration", dtype=dtype)
+          value=concentration, name="concentration", dtype=dtype)
       mixing_concentration = tf.convert_to_tensor(
-          mixing_concentration, name="mixing_concentration", dtype=dtype)
+          value=mixing_concentration, name="mixing_concentration", dtype=dtype)
       mixing_rate = tf.convert_to_tensor(
-          mixing_rate, name="mixing_rate", dtype=dtype)
+          value=mixing_rate, name="mixing_rate", dtype=dtype)
       with tf.control_dependencies([
-          tf.assert_positive(concentration),
-          tf.assert_positive(mixing_concentration),
-          tf.assert_positive(mixing_rate),
+          tf.compat.v1.assert_positive(concentration),
+          tf.compat.v1.assert_positive(mixing_concentration),
+          tf.compat.v1.assert_positive(mixing_rate),
       ] if validate_args else []):
         self._concentration = tf.identity(concentration, name="concentration")
         self._mixing_concentration = tf.identity(
             mixing_concentration, name="mixing_concentration")
         self._mixing_rate = tf.identity(mixing_rate, name="mixing_rate")
 
-      tf.assert_same_float_dtype(
+      tf.debugging.assert_same_float_dtype(
           [self._concentration, self._mixing_concentration, self._mixing_rate])
 
     super(GammaGamma, self).__init__(
@@ -165,7 +163,7 @@ class GammaGamma(distribution.Distribution):
   def _batch_shape_tensor(self):
     tensors = [self.concentration, self.mixing_concentration, self.mixing_rate]
     return functools.reduce(tf.broadcast_dynamic_shape,
-                            [tf.shape(tensor) for tensor in tensors])
+                            [tf.shape(input=tensor) for tensor in tensors])
 
   def _batch_shape(self):
     tensors = [self.concentration, self.mixing_concentration, self.mixing_rate]
@@ -176,20 +174,20 @@ class GammaGamma(distribution.Distribution):
     return tf.constant([], dtype=tf.int32)
 
   def _event_shape(self):
-    return tensor_shape.scalar()
+    return tf.TensorShape([])
 
   @distribution_util.AppendDocstring(
       """Note: See `tf.random_gamma` docstring for sampling details and
       caveats.""")
   def _sample_n(self, n, seed=None):
     seed = seed_stream.SeedStream(seed, "gamma_gamma")
-    rate = tf.random_gamma(
+    rate = tf.random.gamma(
         shape=[n],
         alpha=self.mixing_concentration,
         beta=self.mixing_rate,
         dtype=self.dtype,
         seed=seed())
-    return tf.random_gamma(
+    return tf.random.gamma(
         shape=[],
         alpha=self.concentration,
         beta=rate,
@@ -203,12 +201,13 @@ class GammaGamma(distribution.Distribution):
     x = self._maybe_assert_valid_sample(x)
     return (tf.math.xlogy(self.concentration - 1., x) -
             (self.concentration + self.mixing_concentration) *
-            tf.log(x + self.mixing_rate))
+            tf.math.log(x + self.mixing_rate))
 
   def _log_normalization(self):
-    return (tf.lgamma(self.concentration) + tf.lgamma(self.mixing_concentration)
-            - tf.lgamma(self.concentration + self.mixing_concentration) -
-            self.mixing_concentration * tf.log(self.mixing_rate))
+    return (tf.math.lgamma(self.concentration) +
+            tf.math.lgamma(self.mixing_concentration) -
+            tf.math.lgamma(self.concentration + self.mixing_concentration) -
+            self.mixing_concentration * tf.math.log(self.mixing_rate))
 
   @distribution_util.AppendDocstring(
       """The mean of a Gamma-Gamma distribution is
@@ -225,17 +224,17 @@ class GammaGamma(distribution.Distribution):
           name="nan")
       return tf.where(self.mixing_concentration > 1., mean, nan)
     else:
-      return control_flow_ops.with_dependencies([
-          tf.assert_less(
+      return distribution_util.with_dependencies([
+          tf.compat.v1.assert_less(
               tf.ones([], self.dtype),
               self.mixing_concentration,
               message="mean undefined when any `mixing_concentration` <= 1"),
       ], mean)
 
   def _maybe_assert_valid_sample(self, x):
-    tf.assert_same_float_dtype(tensors=[x], dtype=self.dtype)
+    tf.debugging.assert_same_float_dtype(tensors=[x], dtype=self.dtype)
     if not self.validate_args:
       return x
-    return control_flow_ops.with_dependencies([
-        tf.assert_positive(x),
+    return distribution_util.with_dependencies([
+        tf.compat.v1.assert_positive(x),
     ], x)

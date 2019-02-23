@@ -26,6 +26,7 @@ from tensorflow_probability.python.distributions.beta import Beta
 from tensorflow_probability.python.distributions.binomial import Binomial
 from tensorflow_probability.python.distributions.categorical import Categorical
 from tensorflow_probability.python.distributions.cauchy import Cauchy
+from tensorflow_probability.python.distributions.chi import Chi
 from tensorflow_probability.python.distributions.chi2 import Chi2
 from tensorflow_probability.python.distributions.chi2 import Chi2WithAbsDf
 from tensorflow_probability.python.distributions.conditional_distribution import ConditionalDistribution
@@ -35,6 +36,7 @@ from tensorflow_probability.python.distributions.deterministic import VectorDete
 from tensorflow_probability.python.distributions.dirichlet import Dirichlet
 from tensorflow_probability.python.distributions.dirichlet_multinomial import DirichletMultinomial
 from tensorflow_probability.python.distributions.distribution import Distribution
+from tensorflow_probability.python.distributions.empirical import Empirical
 from tensorflow_probability.python.distributions.exponential import Exponential
 from tensorflow_probability.python.distributions.gamma import Gamma
 from tensorflow_probability.python.distributions.gamma_gamma import GammaGamma
@@ -52,6 +54,7 @@ from tensorflow_probability.python.distributions.internal.moving_stats import as
 from tensorflow_probability.python.distributions.internal.moving_stats import moving_mean_variance
 from tensorflow_probability.python.distributions.inverse_gamma import InverseGamma
 from tensorflow_probability.python.distributions.inverse_gamma import InverseGammaWithSoftplusConcentrationRate
+from tensorflow_probability.python.distributions.inverse_gamma import InverseGammaWithSoftplusConcentrationScale
 from tensorflow_probability.python.distributions.inverse_gaussian import InverseGaussian
 from tensorflow_probability.python.distributions.kullback_leibler import kl_divergence
 from tensorflow_probability.python.distributions.kullback_leibler import RegisterKL
@@ -141,10 +144,12 @@ __all__ = [
     'Binomial',
     'BetaWithSoftplusConcentration',
     'Categorical',
+    'Chi',
     'Chi2',
     'Chi2WithAbsDf',
     'Deterministic',
     'VectorDeterministic',
+    'Empirical',
     'Exponential',
     'ExponentialWithSoftplusRate',
     'VectorExponentialDiag',
@@ -163,6 +168,7 @@ __all__ = [
     'Independent',
     'InverseGamma',
     'InverseGammaWithSoftplusConcentrationRate',
+    'InverseGammaWithSoftplusConcentrationScale',
     'Kumaraswamy',
     'LinearGaussianStateSpaceModel',
     'Laplace',

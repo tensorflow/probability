@@ -25,17 +25,17 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 rng = np.random.RandomState(42)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class MultivariateNormalFullCovarianceTest(tf.test.TestCase):
 
   def _random_pd_matrix(self, *shape):
     mat = rng.rand(*shape)
     chol = tfd.matrix_diag_transform(mat, transform=tf.nn.softplus)
-    chol = tf.matrix_band_part(chol, -1, 0)
+    chol = tf.linalg.band_part(chol, -1, 0)
     return self.evaluate(tf.matmul(chol, chol, adjoint_b=True))
 
   def testRaisesIfInitializedWithNonSymmetricMatrix(self):

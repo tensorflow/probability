@@ -25,11 +25,9 @@ import tensorflow as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import seed_stream
-from tensorflow_probability.python.internal import distribution_util as util
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.framework import tensor_shape
-from tensorflow.python.ops import control_flow_ops
 
 
 __all__ = [
@@ -176,13 +174,14 @@ class Beta(distribution.Distribution):
                                       tf.float32)
       self._concentration1 = self._maybe_assert_valid_concentration(
           tf.convert_to_tensor(
-              concentration1, name="concentration1", dtype=dtype),
+              value=concentration1, name="concentration1", dtype=dtype),
           validate_args)
       self._concentration0 = self._maybe_assert_valid_concentration(
           tf.convert_to_tensor(
-              concentration0, name="concentration0", dtype=dtype),
+              value=concentration0, name="concentration0", dtype=dtype),
           validate_args)
-      tf.assert_same_float_dtype([self._concentration1, self._concentration0])
+      tf.debugging.assert_same_float_dtype(
+          [self._concentration1, self._concentration0])
       self._total_concentration = self._concentration1 + self._concentration0
     super(Beta, self).__init__(
         dtype=dtype,
@@ -198,9 +197,9 @@ class Beta(distribution.Distribution):
 
   @staticmethod
   def _param_shapes(sample_shape):
-    return dict(zip(
-        ["concentration1", "concentration0"],
-        [tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 2))
+    return dict(
+        zip(["concentration1", "concentration0"],
+            [tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)] * 2))
 
   @property
   def concentration1(self):
@@ -218,7 +217,7 @@ class Beta(distribution.Distribution):
     return self._total_concentration
 
   def _batch_shape_tensor(self):
-    return tf.shape(self.total_concentration)
+    return tf.shape(input=self.total_concentration)
 
   def _batch_shape(self):
     return self.total_concentration.shape
@@ -227,7 +226,7 @@ class Beta(distribution.Distribution):
     return tf.constant([], dtype=tf.int32)
 
   def _event_shape(self):
-    return tensor_shape.scalar()
+    return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
     seed = seed_stream.SeedStream(seed, "beta")
@@ -235,34 +234,28 @@ class Beta(distribution.Distribution):
         self.total_concentration, dtype=self.dtype) * self.concentration1
     expanded_concentration0 = tf.ones_like(
         self.total_concentration, dtype=self.dtype) * self.concentration0
-    gamma1_sample = tf.random_gamma(
-        shape=[n],
-        alpha=expanded_concentration1,
-        dtype=self.dtype,
-        seed=seed())
-    gamma2_sample = tf.random_gamma(
-        shape=[n],
-        alpha=expanded_concentration0,
-        dtype=self.dtype,
-        seed=seed())
+    gamma1_sample = tf.random.gamma(
+        shape=[n], alpha=expanded_concentration1, dtype=self.dtype, seed=seed())
+    gamma2_sample = tf.random.gamma(
+        shape=[n], alpha=expanded_concentration0, dtype=self.dtype, seed=seed())
     beta_sample = gamma1_sample / (gamma1_sample + gamma2_sample)
     return beta_sample
 
-  @util.AppendDocstring(_beta_sample_note)
+  @distribution_util.AppendDocstring(_beta_sample_note)
   def _log_prob(self, x):
     return self._log_unnormalized_prob(x) - self._log_normalization()
 
-  @util.AppendDocstring(_beta_sample_note)
+  @distribution_util.AppendDocstring(_beta_sample_note)
   def _prob(self, x):
     return tf.exp(self._log_prob(x))
 
-  @util.AppendDocstring(_beta_sample_note)
+  @distribution_util.AppendDocstring(_beta_sample_note)
   def _log_cdf(self, x):
-    return tf.log(self._cdf(x))
+    return tf.math.log(self._cdf(x))
 
-  @util.AppendDocstring(_beta_sample_note)
+  @distribution_util.AppendDocstring(_beta_sample_note)
   def _cdf(self, x):
-    return tf.betainc(self.concentration1, self.concentration0, x)
+    return tf.math.betainc(self.concentration1, self.concentration0, x)
 
   def _log_unnormalized_prob(self, x):
     x = self._maybe_assert_valid_sample(x)
@@ -270,17 +263,16 @@ class Beta(distribution.Distribution):
             (self.concentration0 - 1.) * tf.math.log1p(-x))
 
   def _log_normalization(self):
-    return (tf.lgamma(self.concentration1)
-            + tf.lgamma(self.concentration0)
-            - tf.lgamma(self.total_concentration))
+    return (tf.math.lgamma(self.concentration1) +
+            tf.math.lgamma(self.concentration0) -
+            tf.math.lgamma(self.total_concentration))
 
   def _entropy(self):
-    return (
-        self._log_normalization()
-        - (self.concentration1 - 1.) * tf.digamma(self.concentration1)
-        - (self.concentration0 - 1.) * tf.digamma(self.concentration0)
-        + ((self.total_concentration - 2.) *
-           tf.digamma(self.total_concentration)))
+    return (self._log_normalization() -
+            (self.concentration1 - 1.) * tf.math.digamma(self.concentration1) -
+            (self.concentration0 - 1.) * tf.math.digamma(self.concentration0) +
+            ((self.total_concentration - 2.) *
+             tf.math.digamma(self.total_concentration)))
 
   def _mean(self):
     return self._concentration1 / self._total_concentration
@@ -288,7 +280,7 @@ class Beta(distribution.Distribution):
   def _variance(self):
     return self._mean() * (1. - self._mean()) / (1. + self.total_concentration)
 
-  @util.AppendDocstring(
+  @distribution_util.AppendDocstring(
       """Note: The mode is undefined when `concentration1 <= 1` or
       `concentration0 <= 1`. If `self.allow_nan_stats` is `True`, `NaN`
       is used for undefined modes. If `self.allow_nan_stats` is `False` an
@@ -303,12 +295,12 @@ class Beta(distribution.Distribution):
       is_defined = tf.logical_and(self.concentration1 > 1.,
                                   self.concentration0 > 1.)
       return tf.where(is_defined, mode, nan)
-    return control_flow_ops.with_dependencies([
-        tf.assert_less(
+    return distribution_util.with_dependencies([
+        tf.compat.v1.assert_less(
             tf.ones([], dtype=self.dtype),
             self.concentration1,
             message="Mode undefined for concentration1 <= 1."),
-        tf.assert_less(
+        tf.compat.v1.assert_less(
             tf.ones([], dtype=self.dtype),
             self.concentration0,
             message="Mode undefined for concentration0 <= 1.")
@@ -318,28 +310,26 @@ class Beta(distribution.Distribution):
     """Checks the validity of a concentration parameter."""
     if not validate_args:
       return concentration
-    return control_flow_ops.with_dependencies([
-        tf.assert_positive(
-            concentration,
-            message="Concentration parameter must be positive."),
+    return distribution_util.with_dependencies([
+        tf.compat.v1.assert_positive(
+            concentration, message="Concentration parameter must be positive."),
     ], concentration)
 
   def _maybe_assert_valid_sample(self, x):
     """Checks the validity of a sample."""
     if not self.validate_args:
       return x
-    return control_flow_ops.with_dependencies([
-        tf.assert_positive(x, message="sample must be positive"),
-        tf.assert_less(
-            x,
-            tf.ones([], self.dtype),
+    return distribution_util.with_dependencies([
+        tf.compat.v1.assert_positive(x, message="sample must be positive"),
+        tf.compat.v1.assert_less(
+            x, tf.ones([], self.dtype),
             message="sample must be less than `1`."),
     ], x)
 
 
 # TODO(b/117098119): Remove tf.distribution references once they're gone.
-@kullback_leibler.RegisterKL(Beta, tf.distributions.Beta)
-@kullback_leibler.RegisterKL(tf.distributions.Beta, Beta)
+@kullback_leibler.RegisterKL(Beta, tf.compat.v1.distributions.Beta)
+@kullback_leibler.RegisterKL(tf.compat.v1.distributions.Beta, Beta)
 @kullback_leibler.RegisterKL(Beta, Beta)
 def _kl_beta_beta(d1, d2, name=None):
   """Calculate the batchwise KL divergence KL(d1 || d2) with d1 and d2 Beta.
@@ -365,8 +355,8 @@ def _kl_beta_beta(d1, d2, name=None):
       d2.concentration0,
       d2.total_concentration,
   ]):
-    return (delta("_log_normalization", is_property=False)
-            - tf.digamma(d1.concentration1) * delta("concentration1")
-            - tf.digamma(d1.concentration0) * delta("concentration0")
-            + (tf.digamma(d1.total_concentration)
-               * delta("total_concentration")))
+    return (delta("_log_normalization", is_property=False) -
+            tf.math.digamma(d1.concentration1) * delta("concentration1") -
+            tf.math.digamma(d1.concentration0) * delta("concentration0") +
+            (tf.math.digamma(d1.total_concentration) *
+             delta("total_concentration")))

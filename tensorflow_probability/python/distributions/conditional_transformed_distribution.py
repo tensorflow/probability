@@ -71,7 +71,7 @@ class ConditionalTransformedDistribution(
     # works).
     with self._name_scope(name, values=[sample_shape]):
       sample_shape = tf.convert_to_tensor(
-          sample_shape, dtype=tf.int32, name="sample_shape")
+          value=sample_shape, dtype=tf.int32, name="sample_shape")
       sample_shape, n = self._expand_sample_shape_to_vector(
           sample_shape, "sample_shape")
 
@@ -82,7 +82,7 @@ class ConditionalTransformedDistribution(
 
       # Next, we reshape `x` into its final form. We do this prior to the call
       # to the bijector to ensure that the bijector caching works.
-      batch_event_shape = tf.shape(x)[1:]
+      batch_event_shape = tf.shape(input=x)[1:]
       final_shape = tf.concat([sample_shape, batch_event_shape], 0)
       x = tf.reshape(x, final_shape)
 
@@ -112,14 +112,15 @@ class ConditionalTransformedDistribution(
     lp_on_fibers = [
         self._finish_log_prob_for_one_fiber(y, x_i, ildj_i, distribution_kwargs)
         for x_i, ildj_i in zip(x, ildj)]
-    return tf.reduce_logsumexp(tf.stack(lp_on_fibers), axis=0)
+    return tf.reduce_logsumexp(input_tensor=tf.stack(lp_on_fibers), axis=0)
 
   def _finish_log_prob_for_one_fiber(self, y, x, ildj, distribution_kwargs):
     """Finish computation of log_prob on one element of the inverse image."""
     x = self._maybe_rotate_dims(x, rotate_right=True)
     log_prob = self.distribution.log_prob(x, **distribution_kwargs)
     if self._is_maybe_event_override:
-      log_prob = tf.reduce_sum(log_prob, self._reduce_event_indices)
+      log_prob = tf.reduce_sum(
+          input_tensor=log_prob, axis=self._reduce_event_indices)
     return tf.cast(ildj, log_prob.dtype) + log_prob
 
   @distribution_util.AppendDocstring(kwargs_dict=_condition_kwargs_dict)
@@ -143,7 +144,7 @@ class ConditionalTransformedDistribution(
     x = self._maybe_rotate_dims(x, rotate_right=True)
     prob = self.distribution.prob(x, **distribution_kwargs)
     if self._is_maybe_event_override:
-      prob = tf.reduce_prod(prob, self._reduce_event_indices)
+      prob = tf.reduce_prod(input_tensor=prob, axis=self._reduce_event_indices)
     return tf.exp(tf.cast(ildj, prob.dtype)) * prob
 
   @distribution_util.AppendDocstring(kwargs_dict=_condition_kwargs_dict)
@@ -220,7 +221,7 @@ class ConditionalTransformedDistribution(
     if self.event_shape.ndims is not None:
       return self.event_shape.ndims
 
-    event_ndims = tf.size(self.event_shape_tensor())
+    event_ndims = tf.size(input=self.event_shape_tensor())
     event_ndims_ = distribution_util.maybe_get_static_value(event_ndims)
 
     if event_ndims_ is not None:

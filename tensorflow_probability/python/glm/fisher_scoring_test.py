@@ -24,10 +24,10 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class FitTestFast(tf.test.TestCase):
 
   dtype = np.float32
@@ -40,11 +40,11 @@ class FitTestFast(tf.test.TestCase):
         low=np.array(-0.5, self.dtype),
         high=np.array(0.5, self.dtype)).sample(d, seed=seed())
     radius = np.sqrt(2.)
-    model_coefficients *= radius / tf.linalg.norm(model_coefficients)
+    model_coefficients *= radius / tf.linalg.norm(tensor=model_coefficients)
     model_matrix = tfd.Normal(
         loc=np.array(0, self.dtype),
         scale=np.array(1, self.dtype)).sample([n, d], seed=seed())
-    scale = tf.convert_to_tensor(scale, self.dtype)
+    scale = tf.convert_to_tensor(value=scale, dtype=self.dtype)
     linear_response = tf.tensordot(
         model_matrix, model_coefficients, axes=[[1], [0]])
     if link == 'linear':
@@ -179,7 +179,8 @@ class FitTestSlow(FitTestFast):
     ] = self.make_dataset(n=n, d=3, link='probit')
     l2_regularizer = np.array(0.07 * n, model_matrix.dtype.as_numpy_dtype)
     if not static_l2:
-      l2_regularizer = tf.placeholder_with_default(l2_regularizer, shape=[])
+      l2_regularizer = tf.compat.v1.placeholder_with_default(
+          l2_regularizer, shape=[])
     [
         expected_model_coefficients,
         expected_linear_response,

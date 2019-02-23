@@ -24,8 +24,10 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability import positive_semidefinite_kernels as psd_kernels
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class ExpSinSquaredTest(tf.test.TestCase, parameterized.TestCase):
 
   def testMismatchedFloatTypesAreBad(self):
@@ -97,16 +99,17 @@ class ExpSinSquaredTest(tf.test.TestCase, parameterized.TestCase):
     #              `- from broadcasting kernel params
 
   def testValidateArgs(self):
-    k = psd_kernels.ExpSinSquared(
-        amplitude=-1., length_scale=-1., period=-1., validate_args=True)
     with self.assertRaises(tf.errors.InvalidArgumentError):
+      k = psd_kernels.ExpSinSquared(
+          amplitude=-1., length_scale=-1., period=-1., validate_args=True)
       self.evaluate(k.amplitude)
 
-    with self.assertRaises(tf.errors.InvalidArgumentError):
-      self.evaluate(k.length_scale)
+    if not tf.executing_eagerly():
+      with self.assertRaises(tf.errors.InvalidArgumentError):
+        self.evaluate(k.length_scale)
 
-    with self.assertRaises(tf.errors.InvalidArgumentError):
-      self.evaluate(k.period)
+      with self.assertRaises(tf.errors.InvalidArgumentError):
+        self.evaluate(k.period)
 
     # But `None`'s are ok
     k = psd_kernels.ExpSinSquared(

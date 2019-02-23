@@ -23,7 +23,6 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.ops import control_flow_ops
 
 
 __all__ = [
@@ -179,7 +178,7 @@ class Multinomial(distribution.Distribution):
     with tf.name_scope(name, values=[total_count, logits, probs]) as name:
       dtype = dtype_util.common_dtype([total_count, logits, probs], tf.float32)
       self._total_count = tf.convert_to_tensor(
-          total_count, name="total_count", dtype=dtype)
+          value=total_count, name="total_count", dtype=dtype)
       if validate_args:
         self._total_count = (
             distribution_util.embed_check_nonnegative_integer_form(
@@ -217,13 +216,13 @@ class Multinomial(distribution.Distribution):
     return self._probs
 
   def _batch_shape_tensor(self):
-    return tf.shape(self._mean_val)[:-1]
+    return tf.shape(input=self._mean_val)[:-1]
 
   def _batch_shape(self):
     return self._mean_val.shape.with_rank_at_least(1)[:-1]
 
   def _event_shape_tensor(self):
-    return tf.shape(self._mean_val)[-1:]
+    return tf.shape(input=self._mean_val)[-1:]
 
   def _event_shape(self):
     return self._mean_val.shape.with_rank_at_least(1)[-1:]
@@ -232,34 +231,7 @@ class Multinomial(distribution.Distribution):
     n_draws = tf.cast(self.total_count, dtype=tf.int32)
     k = self.event_shape_tensor()[0]
 
-    # broadcast the total_count and logits to same shape
-    n_draws = tf.ones_like(
-        self.logits[..., 0], dtype=n_draws.dtype) * n_draws
-    logits = tf.ones_like(
-        n_draws[..., tf.newaxis], dtype=self.logits.dtype) * self.logits
-
-    # flatten the total_count and logits
-    flat_logits = tf.reshape(logits, [-1, k])  # [B1B2...Bm, k]
-    flat_ndraws = n * tf.reshape(n_draws, [-1])  # [B1B2...Bm]
-
-    # computes each total_count and logits situation by map_fn
-    def _sample_single(args):
-      logits, n_draw = args[0], args[1]  # [K], []
-      x = tf.multinomial(logits[tf.newaxis, ...], n_draw,
-                         seed)  # [1, n*n_draw]
-      x = tf.reshape(x, shape=[n, -1])  # [n, n_draw]
-      x = tf.reduce_sum(tf.one_hot(x, depth=k), axis=-2)  # [n, k]
-      return x
-
-    x = tf.map_fn(
-        _sample_single, [flat_logits, flat_ndraws],
-        dtype=self.dtype)  # [B1B2...Bm, n, k]
-
-    # reshape the results to proper shape
-    x = tf.transpose(x, perm=[1, 0, 2])
-    final_shape = tf.concat([[n], self.batch_shape_tensor(), [k]], 0)
-    x = tf.reshape(x, final_shape)  # [n, B1, B2,..., Bm, k]
-    return x
+    return draw_sample(n, k, self.logits, n_draws, self.dtype, seed)
 
   @distribution_util.AppendDocstring(_multinomial_sample_note)
   def _log_prob(self, counts):
@@ -267,7 +239,8 @@ class Multinomial(distribution.Distribution):
 
   def _log_unnormalized_prob(self, counts):
     counts = self._maybe_assert_valid_sample(counts)
-    return tf.reduce_sum(counts * tf.nn.log_softmax(self.logits), -1)
+    return tf.reduce_sum(
+        input_tensor=counts * tf.nn.log_softmax(self.logits), axis=-1)
 
   def _log_normalization(self, counts):
     counts = self._maybe_assert_valid_sample(counts)
@@ -279,7 +252,7 @@ class Multinomial(distribution.Distribution):
   def _covariance(self):
     p = self.probs * tf.ones_like(
         self.total_count)[..., tf.newaxis]
-    return tf.matrix_set_diag(
+    return tf.linalg.set_diag(
         -tf.matmul(self._mean_val[..., tf.newaxis],
                    p[..., tf.newaxis, :]),  # outer product
         self._variance())
@@ -294,8 +267,84 @@ class Multinomial(distribution.Distribution):
     if not self.validate_args:
       return counts
     counts = distribution_util.embed_check_nonnegative_integer_form(counts)
-    return control_flow_ops.with_dependencies([
-        tf.assert_equal(
-            self.total_count, tf.reduce_sum(counts, -1),
+    return distribution_util.with_dependencies([
+        tf.compat.v1.assert_equal(
+            self.total_count,
+            tf.reduce_sum(input_tensor=counts, axis=-1),
             message="counts must sum to `self.total_count`"),
     ], counts)
+
+
+def draw_sample(num_samples, num_classes, logits, num_trials, dtype, seed):
+  """Sample a multinomial.
+
+  The batch shape is given by broadcasting num_trials with
+  remove_last_dimension(logits).
+
+  Args:
+    num_samples: Python int or singleton integer Tensor: number of multinomial
+      samples to draw.
+    num_classes: Python int or singleton integer Tensor: number of classes.
+    logits: Floating Tensor with last dimension k, of (unnormalized) logit
+      probabilities per class.
+    num_trials: Tensor of number of categorical trials each multinomial consists
+      of.  num_trials[..., tf.newaxis] must broadcast with logits.
+    dtype: dtype at which to emit samples.
+    seed: Random seed.
+
+  Returns:
+    samples: Tensor of given dtype and shape [n] + batch_shape + [k].
+  """
+  with tf.name_scope(
+      None, "multinomial.draw_sample",
+      [num_samples, num_classes, logits, num_trials]):
+    # broadcast the num_trials and logits to same shape
+    num_trials = tf.ones_like(
+        logits[..., 0], dtype=num_trials.dtype) * num_trials
+    logits = tf.ones_like(
+        num_trials[..., tf.newaxis], dtype=logits.dtype) * logits
+
+    # flatten the total_count and logits
+    # flat_logits has shape [B1B2...Bm, num_classes]
+    flat_logits = tf.reshape(logits, [-1, num_classes])
+    flat_num_trials = num_samples * tf.reshape(num_trials, [-1])  # [B1B2...Bm]
+
+    # Computes each logits and num_trials situation by map_fn.
+
+    # Using just one batch tf.random.categorical call doesn't work because that
+    # requires num_trials to be the same across all members of the batch of
+    # logits.  This restriction makes sense for tf.random.categorical because
+    # for it, num_trials is part of the returned shape.  However, the
+    # multinomial sampler does not need that restriction, because it sums out
+    # exactly that dimension.
+
+    # One possibility would be to draw a batch categorical whose sample count is
+    # max(num_trials) and mask out the excess ones.  However, if the elements of
+    # num_trials vary widely, this can be wasteful of memory.
+
+    # TODO(b/123763054, b/112152209): Revisit the possibility of writing this
+    # with a batch categorical followed by batch unsorted_segment_sum, once both
+    # of those work and are memory-efficient enough.
+    def _sample_one_batch_member(args):
+      logits, num_cat_samples = args[0], args[1]  # [K], []
+      # x has shape [1, num_cat_samples = num_samples * num_trials]
+      x = tf.random.categorical(
+          logits[tf.newaxis, ...], num_cat_samples, seed=seed)
+      x = tf.reshape(x, shape=[num_samples, -1])  # [num_samples, num_trials]
+      x = tf.one_hot(
+          x, depth=num_classes)  # [num_samples, num_trials, num_classes]
+      x = tf.reduce_sum(input_tensor=x, axis=-2)  # [num_samples, num_classes]
+      return tf.cast(x, dtype=dtype)
+
+    x = tf.map_fn(
+        _sample_one_batch_member, [flat_logits, flat_num_trials],
+        dtype=dtype)  # [B1B2...Bm, num_samples, num_classes]
+
+    # reshape the results to proper shape
+    x = tf.transpose(a=x, perm=[1, 0, 2])
+    final_shape = tf.concat([[num_samples],
+                             tf.shape(input=num_trials), [num_classes]],
+                            axis=0)
+    x = tf.reshape(x, final_shape)
+
+    return x

@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import tensorflow as tf
 from tensorflow_probability.python.bijectors import affine_scalar
 from tensorflow_probability.python.bijectors import chain
 from tensorflow_probability.python.bijectors import fill_triangular
@@ -92,23 +93,27 @@ class ScaleTriL(chain.Chain):
         value forces the output diagonal entries to be positive, but
         prevents inverting the transformation for matrices with
         diagonal entries less than this value.
-        Default value: `1e-5` (i.e., no shift is applied).
+        Default value: `1e-5`.
       validate_args: Python `bool` indicating whether arguments should be
         checked for correctness.
         Default value: `False` (i.e., arguments are not validated).
       name: Python `str` name given to ops managed by this object.
         Default value: `scale_tril`.
     """
+    with tf.name_scope(name, values=[diag_shift]) as name:
+      if diag_bijector is None:
+        diag_bijector = softplus.Softplus(validate_args=validate_args)
 
-    if diag_bijector is None:
-      diag_bijector = softplus.Softplus(validate_args=validate_args)
+      if diag_shift is not None:
+        diag_shift = tf.convert_to_tensor(
+            value=diag_shift, dtype=diag_bijector.dtype, name="diag_shift")
+        diag_bijector = chain.Chain([
+            affine_scalar.AffineScalar(shift=diag_shift),
+            diag_bijector
+        ])
 
-    if diag_shift is not None:
-      diag_bijector = chain.Chain([affine_scalar.AffineScalar(shift=diag_shift),
-                                   diag_bijector])
-
-    super(ScaleTriL, self).__init__(
-        [transform_diagonal.TransformDiagonal(diag_bijector=diag_bijector),
-         fill_triangular.FillTriangular()],
-        validate_args=validate_args,
-        name=name)
+      super(ScaleTriL, self).__init__(
+          [transform_diagonal.TransformDiagonal(diag_bijector=diag_bijector),
+           fill_triangular.FillTriangular()],
+          validate_args=validate_args,
+          name=name)

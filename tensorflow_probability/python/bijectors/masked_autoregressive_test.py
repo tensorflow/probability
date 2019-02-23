@@ -25,21 +25,24 @@ from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 
 from tensorflow_probability.python.bijectors.masked_autoregressive import _gen_mask
-from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.internal import test_util as tfp_test_util
+
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 def masked_autoregressive_2d_template(base_template, event_shape):
 
   def wrapper(x):
-    x_flat = tf.reshape(x, tf.concat([tf.shape(x)[:-len(event_shape)], [-1]],
-                                     -1))
+    x_flat = tf.reshape(
+        x, tf.concat([tf.shape(input=x)[:-len(event_shape)], [-1]], -1))
     x_shift, x_log_scale = base_template(x_flat)
-    return tf.reshape(x_shift, tf.shape(x)), tf.reshape(x_log_scale,
-                                                        tf.shape(x))
+    return tf.reshape(x_shift, tf.shape(input=x)), tf.reshape(
+        x_log_scale, tf.shape(input=x))
 
   return wrapper
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class GenMaskTest(tf.test.TestCase):
 
   def test346Exclusive(self):
@@ -65,7 +68,8 @@ class GenMaskTest(tf.test.TestCase):
     self.assertAllEqual(expected_mask, mask)
 
 
-class MaskedAutoregressiveFlowTest(test_util.VectorDistributionTestHelpers,
+@test_util.run_all_in_graph_and_eager_modes
+class MaskedAutoregressiveFlowTest(tfp_test_util.VectorDistributionTestHelpers,
                                    tf.test.TestCase):
 
   event_shape = [4]
@@ -94,7 +98,7 @@ class MaskedAutoregressiveFlowTest(test_util.VectorDistributionTestHelpers,
     # Use identity to invalidate cache.
     ildj = ma.inverse_log_det_jacobian(
         tf.identity(forward_x), event_ndims=len(self.event_shape))
-    self.evaluate(tf.global_variables_initializer())
+    self.evaluate(tf.compat.v1.global_variables_initializer())
     [
         forward_x_,
         inverse_y_,
@@ -127,7 +131,7 @@ class MaskedAutoregressiveFlowTest(test_util.VectorDistributionTestHelpers,
     # Use identity to invalidate cache.
     ildj = ma.inverse_log_det_jacobian(
         tf.identity(forward_x), event_ndims=len(self.event_shape))
-    self.evaluate(tf.global_variables_initializer())
+    self.evaluate(tf.compat.v1.global_variables_initializer())
     [
         forward_x_,
         inverse_y_,
@@ -142,9 +146,9 @@ class MaskedAutoregressiveFlowTest(test_util.VectorDistributionTestHelpers,
         fldj,
     ])
     self.assertEqual("masked_autoregressive_flow", ma.name)
-    self.assertAllClose(forward_x_, forward_inverse_y_, rtol=1e-6, atol=0.)
-    self.assertAllClose(x_, inverse_y_, rtol=1e-5, atol=0.)
-    self.assertAllClose(ildj_, -fldj_, rtol=1e-6, atol=0.)
+    self.assertAllClose(forward_x_, forward_inverse_y_, rtol=1e-6, atol=1e-6)
+    self.assertAllClose(x_, inverse_y_, rtol=1e-4, atol=1e-4)
+    self.assertAllClose(ildj_, -fldj_, rtol=1e-6, atol=1e-6)
 
   def testMutuallyConsistent(self):
     maf = tfb.MaskedAutoregressiveFlow(
@@ -189,6 +193,7 @@ class MaskedAutoregressiveFlowTest(test_util.VectorDistributionTestHelpers,
         rtol=0.02)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class MaskedAutoregressiveFlowShiftOnlyTest(MaskedAutoregressiveFlowTest):
 
   @property
@@ -202,6 +207,7 @@ class MaskedAutoregressiveFlowShiftOnlyTest(MaskedAutoregressiveFlowTest):
     }
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class MaskedAutoregressiveFlowUnrollLoopTest(MaskedAutoregressiveFlowTest):
 
   @property
@@ -217,6 +223,7 @@ class MaskedAutoregressiveFlowUnrollLoopTest(MaskedAutoregressiveFlowTest):
     }
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class MaskedAutoregressive2DTest(MaskedAutoregressiveFlowTest):
   event_shape = [3, 2]
 

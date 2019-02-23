@@ -23,11 +23,10 @@ import tensorflow as tf
 
 from tensorflow_probability.examples import disentangled_vae
 
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
-class DisentangledVAETest(tf.test.TestCase):
+class _DisentangledVAETest(object):
   """Base test class."""
 
   def setUp(self):
@@ -44,8 +43,8 @@ class DisentangledVAETest(tf.test.TestCase):
     self.assertEqual(dist.batch_shape, batch_shape)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
-class DisentangledVAEComponentsTest(DisentangledVAETest):
+@test_util.run_all_in_graph_and_eager_modes
+class DisentangledVAEComponentsTest(_DisentangledVAETest, tf.test.TestCase):
   """Test class for the individual model components."""
 
   def testLearnableMultivariateNormalDiagClass(self):
@@ -70,8 +69,8 @@ class DisentangledVAEComponentsTest(DisentangledVAETest):
     self.assertDistShape(dist_z1, (self.dimensions,), ())
     for tensor in state_z1:
       self.assertEqual(tensor.shape, (1, self.hidden_size))
-    if not tfe.in_eager_mode():
-      self.evaluate(tf.global_variables_initializer())
+    if not tf.executing_eagerly():
+      self.evaluate(tf.compat.v1.global_variables_initializer())
     h1, c1 = state_z1
     self.assertTrue(np.allclose(self.evaluate(h1), self.evaluate(h0)))
     self.assertTrue(np.allclose(self.evaluate(c1), self.evaluate(c0)))
@@ -111,8 +110,8 @@ class DisentangledVAEComponentsTest(DisentangledVAETest):
     for tensor in state_z1:
       self.assertEqual(
           tensor.shape, (self.samples, self.batch_size, self.hidden_size))
-    if not tfe.in_eager_mode():
-      self.evaluate(tf.global_variables_initializer())
+    if not tf.executing_eagerly():
+      self.evaluate(tf.compat.v1.global_variables_initializer())
     h1, c1 = state_z1
     self.assertTrue(np.allclose(self.evaluate(h1), self.evaluate(h0)))
     self.assertTrue(np.allclose(self.evaluate(c1), self.evaluate(c0)))
@@ -139,8 +138,8 @@ class DisentangledVAEComponentsTest(DisentangledVAETest):
   def testDecoderClassNoSampleShape(self):
     decoder = disentangled_vae.Decoder(20, self.channels)
 
-    z = tf.random_normal([self.batch_size, self.length, 10])
-    f = tf.random_normal([self.batch_size, 10])
+    z = tf.random.normal([self.batch_size, self.length, 10])
+    f = tf.random.normal([self.batch_size, 10])
     dist = decoder((z, f))
     self.assertDistShape(dist, (64, 64, self.channels),
                          (self.batch_size, self.length))
@@ -149,8 +148,8 @@ class DisentangledVAEComponentsTest(DisentangledVAETest):
     decoder = disentangled_vae.Decoder(20, self.channels)
 
     # Using sample shape.
-    z = tf.random_normal([self.samples, self.batch_size, self.length, 10])
-    f = tf.random_normal([self.samples, self.batch_size, 10])
+    z = tf.random.normal([self.samples, self.batch_size, self.length, 10])
+    f = tf.random.normal([self.samples, self.batch_size, 10])
     dist = decoder((z, f))
     self.assertDistShape(dist, (64, 64, self.channels),
                          (self.samples, self.batch_size, self.length))
@@ -158,7 +157,7 @@ class DisentangledVAEComponentsTest(DisentangledVAETest):
   def testCompressorClassNoSampleShape(self):
     encoder = disentangled_vae.Compressor(self.hidden_size)
 
-    xt = tf.random_normal([self.batch_size, self.length, 64, 64, 3])
+    xt = tf.random.normal([self.batch_size, self.length, 64, 64, 3])
     out = encoder(xt)
     self.assertEqual(out.shape,
                      (self.batch_size, self.length, self.hidden_size))
@@ -166,7 +165,7 @@ class DisentangledVAEComponentsTest(DisentangledVAETest):
   def testCompressorClassWithSampleShape(self):
     encoder = disentangled_vae.Compressor(self.hidden_size)
 
-    xt = tf.random_normal(
+    xt = tf.random.normal(
         [self.samples, self.batch_size, self.length, 64, 64, 3])
     out = encoder(xt)
     self.assertEqual(out.shape,
@@ -176,7 +175,7 @@ class DisentangledVAEComponentsTest(DisentangledVAETest):
   def testEncoderStaticClassNoSamples(self):
     encoder = disentangled_vae.EncoderStatic(self.latent_size, self.hidden_size)
 
-    input_features = tf.random_normal(
+    input_features = tf.random.normal(
         [self.batch_size, self.length, self.hidden_size])
     dist = encoder(input_features)
     self.assertDistShape(dist, (self.latent_size,), (self.batch_size,))
@@ -184,7 +183,7 @@ class DisentangledVAEComponentsTest(DisentangledVAETest):
   def testEncoderStaticClassSamples(self):
     encoder = disentangled_vae.EncoderStatic(self.latent_size, self.hidden_size)
 
-    input_features = tf.random_normal(
+    input_features = tf.random.normal(
         [self.samples, self.batch_size, self.length, self.hidden_size])
     dist = encoder(input_features)
     self.assertDistShape(dist, (self.latent_size,),
@@ -194,7 +193,7 @@ class DisentangledVAEComponentsTest(DisentangledVAETest):
     encoder = disentangled_vae.EncoderDynamicFactorized(
         self.latent_size, self.hidden_size)
 
-    input_features = tf.random_normal(
+    input_features = tf.random.normal(
         [self.batch_size, self.length, self.hidden_size])
     dist = encoder(input_features)
     self.assertDistShape(dist, (self.latent_size,),
@@ -204,7 +203,7 @@ class DisentangledVAEComponentsTest(DisentangledVAETest):
     encoder = disentangled_vae.EncoderDynamicFactorized(
         self.latent_size, self.hidden_size)
 
-    input_features = tf.random_normal(
+    input_features = tf.random.normal(
         [self.samples, self.batch_size, self.length, self.hidden_size])
     dist = encoder(input_features)
     self.assertDistShape(dist, (self.latent_size,),
@@ -214,9 +213,9 @@ class DisentangledVAEComponentsTest(DisentangledVAETest):
     encoder = disentangled_vae.EncoderDynamicFull(
         self.latent_size, self.hidden_size)
 
-    input_features = tf.random_normal(
+    input_features = tf.random.normal(
         [self.batch_size, self.length, self.hidden_size])
-    f = tf.random_normal([self.batch_size, self.latent_size])
+    f = tf.random.normal([self.batch_size, self.latent_size])
     dist = encoder((input_features, f))
     self.assertDistShape(dist, (self.latent_size,),
                          (self.batch_size, self.length))
@@ -225,9 +224,9 @@ class DisentangledVAEComponentsTest(DisentangledVAETest):
     encoder = disentangled_vae.EncoderDynamicFull(
         self.latent_size, self.hidden_size)
 
-    input_features = tf.random_normal(
+    input_features = tf.random.normal(
         [self.batch_size, self.length, self.hidden_size])
-    f = tf.random_normal([self.samples, self.batch_size, self.latent_size])
+    f = tf.random.normal([self.samples, self.batch_size, self.latent_size])
     dist = encoder((input_features, f))
     self.assertDistShape(dist, (self.latent_size,),
                          (self.samples, self.batch_size, self.length))
@@ -236,9 +235,9 @@ class DisentangledVAEComponentsTest(DisentangledVAETest):
     encoder = disentangled_vae.EncoderDynamicFull(
         self.latent_size, self.hidden_size)
 
-    input_features = tf.random_normal(
+    input_features = tf.random.normal(
         [self.samples, self.batch_size, self.length, self.hidden_size])
-    f = tf.random_normal([self.batch_size, self.latent_size])
+    f = tf.random.normal([self.batch_size, self.latent_size])
     dist = encoder((input_features, f))
     self.assertDistShape(dist, (self.latent_size,),
                          (self.samples, self.batch_size, self.length))
@@ -247,9 +246,9 @@ class DisentangledVAEComponentsTest(DisentangledVAETest):
     encoder = disentangled_vae.EncoderDynamicFull(
         self.latent_size, self.hidden_size)
 
-    input_features = tf.random_normal(
+    input_features = tf.random.normal(
         [self.samples, self.batch_size, self.length, self.hidden_size])
-    f = tf.random_normal([self.samples, self.batch_size, self.latent_size])
+    f = tf.random.normal([self.samples, self.batch_size, self.latent_size])
     dist = encoder((input_features, f))
     self.assertDistShape(dist, (self.latent_size,),
                          (self.samples, self.batch_size, self.length))
@@ -258,18 +257,18 @@ class DisentangledVAEComponentsTest(DisentangledVAETest):
     encoder = disentangled_vae.EncoderDynamicFull(
         self.latent_size, self.hidden_size)
 
-    input_features = tf.random_normal(
+    input_features = tf.random.normal(
         [self.batch_size, self.length, self.hidden_size])
-    f = tf.random_normal(
-        [self.samples*2, self.samples, self.batch_size, self.latent_size])
+    f = tf.random.normal(
+        [self.samples * 2, self.samples, self.batch_size, self.latent_size])
     dist = encoder((input_features, f))
     self.assertDistShape(
         dist, (self.latent_size,),
         (self.samples*2, self.samples, self.batch_size, self.length))
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
-class DisentangledSequentialVAETest(DisentangledVAETest):
+@test_util.run_all_in_graph_and_eager_modes
+class DisentangledSequentialVAETest(_DisentangledVAETest, tf.test.TestCase):
   """Test class for the DisentangledSequentialVAE model."""
 
   def setUp(self):
@@ -282,7 +281,7 @@ class DisentangledSequentialVAETest(DisentangledVAETest):
     self.model_full = disentangled_vae.DisentangledSequentialVAE(
         self.latent_size_static, self.latent_size_dynamic, self.hidden_size,
         self.channels, "full")
-    self.inputs = tf.random_normal(
+    self.inputs = tf.random.normal(
         [self.batch_size, self.length, 64, 64, self.channels])
 
   def testGenerateFactorizedFixStatic(self):

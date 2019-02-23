@@ -184,9 +184,11 @@ class SeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
       # Other model parameters must have the same dtype.
       dtype = initial_state_prior.dtype
       drift_scale = tf.convert_to_tensor(
-          drift_scale, name='drift_scale', dtype=dtype)
+          value=drift_scale, name='drift_scale', dtype=dtype)
       observation_noise_scale = tf.convert_to_tensor(
-          observation_noise_scale, name='observation_noise_scale', dtype=dtype)
+          value=observation_noise_scale,
+          name='observation_noise_scale',
+          dtype=dtype)
 
       # Coerce `num_steps_per_season` to a canonical form, an array of
       # `num_seasons` integers.
@@ -208,7 +210,8 @@ class SeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
           return any(step_in_cycle == changepoints)
         else:
           step_in_cycle = tf.floormod(t, num_steps_per_cycle)
-          return tf.reduce_any(tf.equal(step_in_cycle, changepoints))
+          return tf.reduce_any(
+              input_tensor=tf.equal(step_in_cycle, changepoints))
 
       # If the season is changing, the transition matrix rotates the latent
       # state to shift all seasons up by a dimension, and sends the current
@@ -391,16 +394,18 @@ class Seasonal(StructuralTimeSeries):
       # Heuristic default priors. Overriding these may dramatically
       # change inference performance and results.
       if drift_scale_prior is None:
-        drift_scale_prior = tfd.LogNormal(loc=tf.log(.01 * observed_stddev),
-                                          scale=3.)
+        drift_scale_prior = tfd.LogNormal(
+            loc=tf.math.log(.01 * observed_stddev), scale=3.)
       if initial_effect_prior is None:
-        initial_effect_prior = tfd.Normal(loc=observed_initial,
-                                          scale=observed_stddev)
+        initial_effect_prior = tfd.Normal(
+            loc=observed_initial,
+            scale=tf.abs(observed_initial) + observed_stddev)
 
       self._num_seasons = num_seasons
       self._num_steps_per_season = num_steps_per_season
 
-      tf.assert_same_float_dtype([drift_scale_prior, initial_effect_prior])
+      tf.debugging.assert_same_float_dtype(
+          [drift_scale_prior, initial_effect_prior])
 
       if isinstance(initial_effect_prior, tfd.Normal):
         self._initial_state_prior = tfd.MultivariateNormalDiag(

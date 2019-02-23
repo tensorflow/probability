@@ -23,13 +23,13 @@ import numpy as np
 
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow_probability.python.glm.proximal_hessian import minimize_sparse
-from tensorflow.contrib.layers.python.ops import sparse_ops
+
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
 tfd = tfp.distributions
-tfe = tf.contrib.eager
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class _ProximalHessianTest(object):
 
   # https://tminka.github.io/papers/logreg/minka-logreg.pdf
@@ -62,7 +62,8 @@ class _ProximalHessianTest(object):
 
     radius = np.sqrt(2.)
     model_coefficients *= (
-        radius / tf.linalg.norm(model_coefficients, axis=-1)[..., tf.newaxis])
+        radius /
+        tf.linalg.norm(tensor=model_coefficients, axis=-1)[..., tf.newaxis])
 
     mask = tfd.Bernoulli(probs=0.5, dtype=tf.bool).sample(batch_shape + [d])
     model_coefficients = tf.where(mask, model_coefficients,
@@ -70,7 +71,7 @@ class _ProximalHessianTest(object):
     model_matrix = tfd.Normal(
         loc=np.array(0, dtype), scale=np.array(1, dtype)).sample(
             batch_shape + [n, d], seed=seed())
-    scale = tf.convert_to_tensor(scale, dtype)
+    scale = tf.convert_to_tensor(value=scale, dtype=dtype)
     linear_response = tf.matmul(model_matrix,
                                 model_coefficients[..., tf.newaxis])[..., 0]
 
@@ -88,7 +89,7 @@ class _ProximalHessianTest(object):
     return self.evaluate([model_matrix, response, model_coefficients, mask])
 
   def _make_placeholder(self, x):
-    return tf.placeholder_with_default(
+    return tf.compat.v1.placeholder_with_default(
         input=x, shape=(x.shape if self.use_static_shape else None))
 
   def _adjust_dtype_and_shape_hints(self, x):
@@ -119,7 +120,7 @@ class _ProximalHessianTest(object):
       model_coefficients_start = np.zeros(model_matrix.shape[:-2] +
                                           model_matrix.shape[-1:])
     if convert_to_sparse_tensor:
-      model_matrix = sparse_ops.dense_to_sparse_tensor(model_matrix)
+      model_matrix = tfp.math.dense_to_sparse(model_matrix)
 
     model_matrix = self._adjust_dtype_and_shape_hints(model_matrix)
     response = self._adjust_dtype_and_shape_hints(response)
@@ -127,160 +128,6 @@ class _ProximalHessianTest(object):
         model_coefficients_start)
 
     return model_matrix, response, model_coefficients_start
-
-  def _test_finding_sparse_solution(self, batch_shape=None):
-    # Test that Proximal Hessian descent prefers sparse solutions when
-    # l1_regularizer is large enough.
-    #
-    # Define
-    #
-    #     Loss(x) := (x[0] - a[0])**2 + epsilon * sum(
-    #                    (x[i] - a[i])**2 for i in range(1, n))
-    #
-    # where `a` is a constant and epsilon is small.  Set
-    # l2_regularizer = 0 and set l1_regularizer such that
-    #
-    #     epsilon << l1_regularizer << 1.
-    #
-    # L1 regularization should cause the computed optimum to have zeros in all
-    # but the 0th coordinate: optimal_x ~= [a[0], 0, ..., 0].
-    n = 10
-    epsilon = 1e-6
-    if batch_shape is None:
-      batch_shape = []
-    # Set a[0] explicitly to make sure it's not very close to zero
-    a0 = 6.
-    a_ = np.concatenate([
-        np.full(batch_shape + [1], a0),
-        np.random.random(size=batch_shape + [n - 1])
-    ],
-                        axis=-1)
-    a = self._adjust_dtype_and_shape_hints(a_)
-
-    def _grad_and_hessian_unregularized_loss_fn(x):
-      diff = x - a
-      grad = 2. * tf.concat([diff[..., :1], epsilon * diff[..., 1:]], axis=-1)
-
-      hessian_outer = tf.SparseTensor(
-          indices=[
-              b + (i, i) for i in range(n) for b in np.ndindex(*batch_shape)
-          ],
-          values=tf.ones(shape=[np.product(batch_shape) * n], dtype=self.dtype),
-          dense_shape=batch_shape + [n, n])
-
-      hessian_middle_per_batch = 2 * tf.concat(
-          [[1.], epsilon * tf.ones([n - 1], dtype=self.dtype)], axis=0)
-      hessian_middle = tf.zeros(
-          batch_shape + [n], dtype=self.dtype) + hessian_middle_per_batch
-      return grad, hessian_outer, hessian_middle
-
-    w, is_converged, num_iter = minimize_sparse(
-        _grad_and_hessian_unregularized_loss_fn,
-        x_start=tf.zeros(batch_shape + [n], dtype=self.dtype),
-        l1_regularizer=1e-2,
-        l2_regularizer=None,
-        maximum_iterations=10,
-        maximum_full_sweeps_per_iteration=10,
-        tolerance=1e-5,
-        learning_rate=1.)
-
-    w_, is_converged_, _ = self.evaluate([w, is_converged, num_iter])
-
-    expected_w = tf.concat(
-        [a[..., :1], tf.zeros(batch_shape + [n - 1], self.dtype)], axis=-1)
-
-    # Using atol=0 ensures that w must be exactly zero in all coordinates
-    # where expected_w is exactly zero.
-    self.assertAllEqual(is_converged_, True)
-    self.assertAllClose(w_, expected_w, atol=0., rtol=1e-3)
-
-  def testFindingSparseSolution_SingleInstance(self):
-    self._test_finding_sparse_solution()
-
-  def testFindingSparseSolution_SingleBatch(self):
-    self._test_finding_sparse_solution(batch_shape=[1])
-
-  def testFindingSparseSolution_BatchOfRank2(self):
-    self._test_finding_sparse_solution(batch_shape=[2, 3])
-
-  def testL2Regularization(self):
-    # Define Loss(x) := ||x - a||_2**2, where a is a constant.
-    # Set l1_regularizer = 0 and l2_regularizer = 1.
-    # Then the regularized loss is
-    #
-    #     ||x - a||_2**2 + ||x||_2**2
-    #
-    # And the true optimum is x = 0.5 * a.
-    n = 100
-    np.random.seed(42)
-    a_ = np.random.random(size=(n,))
-    a = self._adjust_dtype_and_shape_hints(a_)
-
-    def _grad_and_hessian_unregularized_loss_fn(x):
-      grad = 2 * (x - a)
-      hessian_outer = tf.eye(n, dtype=a.dtype)
-      hessian_middle = 2. * tf.ones_like(a)
-      return grad, hessian_outer, hessian_middle
-
-    w, is_converged, num_iter = minimize_sparse(
-        _grad_and_hessian_unregularized_loss_fn,
-        x_start=tf.zeros_like(a_, dtype=self.dtype),
-        l1_regularizer=0.,
-        l2_regularizer=1.,
-        maximum_iterations=4,
-        maximum_full_sweeps_per_iteration=4,
-        tolerance=1e-5,
-        learning_rate=1.)
-
-    w_, is_converged_, _ = self.evaluate([w, is_converged, num_iter])
-
-    expected_w = 0.5 * a
-    self.assertAllEqual(is_converged_, True)
-    self.assertAllClose(w_, expected_w, atol=0., rtol=0.03)
-
-  def testNumIter(self):
-    # Same as testL2Regularization, except we set
-    # maximum_full_sweeps_per_iteration = 1 and check that the number of sweeps
-    # is equals what we expect it to (usually we don't know the exact number,
-    # but in this simple case we do -- explanation below).
-    #
-    # Since l1_regularizer = 0, the soft threshold operator is actually the
-    # identity operator, hence the `minimize_sparse` algorithm becomes literally
-    # coordinatewise Newton's method being used to find the zeros of grad
-    # Loss(x), which in this case is a linear function of x.  Hence Newton's
-    # method should find the exact correct answer in 1 sweep.  At the end of the
-    # first sweep the algorithm does not yet know it has converged; it takes a
-    # second sweep, when the algorithm notices that its answer hasn't changed at
-    # all, to become aware that convergence has happened.  Hence we expect two
-    # sweeps.  So with maximum_full_sweeps_per_iteration = 1, that means we
-    # expect 2 iterations of the outer loop.
-    n = 100
-    np.random.seed(42)
-    a_ = np.random.random(size=(n,))
-    a = self._adjust_dtype_and_shape_hints(a_)
-
-    def _grad_and_hessian_unregularized_loss_fn(x):
-      grad = 2 * (x - a)
-      hessian_outer = tf.diag(tf.ones_like(a))
-      hessian_middle = 2. * tf.ones_like(a)
-      return grad, hessian_outer, hessian_middle
-
-    w, is_converged, num_iter = minimize_sparse(
-        _grad_and_hessian_unregularized_loss_fn,
-        x_start=tf.zeros_like(a_, dtype=self.dtype),
-        l1_regularizer=0.,
-        l2_regularizer=1.,
-        maximum_iterations=4,
-        maximum_full_sweeps_per_iteration=1,
-        tolerance=1e-5,
-        learning_rate=1.)
-
-    w_, is_converged_, num_iter_ = self.evaluate([w, is_converged, num_iter])
-
-    expected_w = 0.5 * a
-    self.assertAllEqual(is_converged_, True)
-    self.assertAllEqual(num_iter_, 2)
-    self.assertAllClose(w_, expected_w, atol=0., rtol=0.03)
 
   def testTwoSweepsAreBetterThanOne(self):
     # Compare the log-likelihood after one sweep of fit_sparse to the
@@ -313,7 +160,8 @@ class _ProximalHessianTest(object):
         model_matrix=x_,
         response=y_,
         model=model,
-        model_coefficients_start=tf.convert_to_tensor(model_coefficients_1_),
+        model_coefficients_start=tf.convert_to_tensor(
+            value=model_coefficients_1_),
         l1_regularizer=800.,
         l2_regularizer=None,
         maximum_full_sweeps=1,
@@ -323,7 +171,8 @@ class _ProximalHessianTest(object):
 
     def _joint_log_prob(model_coefficients_):
       predicted_linear_response_ = tf.linalg.matvec(x_, model_coefficients_)
-      return tf.reduce_sum(model.log_prob(y_, predicted_linear_response_))
+      return tf.reduce_sum(
+          input_tensor=model.log_prob(y_, predicted_linear_response_))
 
     self.assertAllGreater(
         _joint_log_prob(model_coefficients_2_) -

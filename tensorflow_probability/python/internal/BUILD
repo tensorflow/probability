@@ -15,10 +15,13 @@
 # Description:
 #   Internal utilities for TensorFlow probability.
 
+# [internal] load python3.bzl
+
 licenses(["notice"])  # Apache 2.0
 
 package(
     default_visibility = [
+        "//energy/plasma_debugger/util/tfp_internal:__subpackages__",
         "//tensorflow_probability:__subpackages__",
     ],
 )
@@ -29,6 +32,15 @@ py_library(
     name = "internal",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
+)
+
+py_library(
+    name = "monte_carlo",
+    srcs = ["monte_carlo.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+    ],
 )
 
 py_library(
@@ -59,6 +71,7 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         ":dtype_util",
+        ":prefer_static",
         ":reparameterization",
         # numpy dep,
         # tensorflow dep,
@@ -74,6 +87,26 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/math:gradient",
+    ],
+)
+
+py_library(
+    name = "prefer_static",
+    srcs = ["prefer_static.py"],
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "prefer_static_test",
+    srcs = ["prefer_static_test.py"],
+    deps = [
+        ":prefer_static",
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
     ],
 )
 
@@ -88,6 +121,7 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/math:gradient",
     ],
 )
 

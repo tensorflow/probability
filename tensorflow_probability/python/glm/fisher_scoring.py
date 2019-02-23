@@ -23,6 +23,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 
 
 __all__ = [
@@ -341,10 +342,13 @@ def fit_one_step(
     # replace it with a value such that the row is zeroed out. Although this
     # procedure may seem circuitous, it is necessary to ensure this algorithm is
     # itself differentiable.
-    is_valid = (tf.is_finite(grad_mean) & tf.not_equal(grad_mean, 0.) &
-                tf.is_finite(variance) & (variance > 0.))
+    is_valid = (
+        tf.math.is_finite(grad_mean) & tf.not_equal(grad_mean, 0.)
+        & tf.math.is_finite(variance) & (variance > 0.))
+
     def mask_if_invalid(x, mask):
-      mask = tf.fill(tf.shape(x), value=np.array(mask, x.dtype.as_numpy_dtype))
+      mask = tf.fill(
+          tf.shape(input=x), value=np.array(mask, x.dtype.as_numpy_dtype))
       return tf.where(is_valid, x, mask)
 
     # Run one step of iteratively reweighted least-squares.
@@ -362,8 +366,9 @@ def fit_one_step(
     if dispersion is not None:
       # For convenience, we'll now scale the variance by the dispersion factor.
       variance *= dispersion
-    w = (mask_if_invalid(grad_mean, 0.) *
-         tf.rsqrt(mask_if_invalid(variance, np.inf)))
+    w = (
+        mask_if_invalid(grad_mean, 0.) *
+        tf.math.rsqrt(mask_if_invalid(variance, np.inf)))
 
     a = model_matrix * w[..., tf.newaxis]
     b = z * w
@@ -387,7 +392,7 @@ def fit_one_step(
       # equivalent to adding the term
       # `-l2_regularizer ||coefficients||_2**2` to the log-likelihood.
       num_model_coefficients = num_cols(model_matrix)
-      batch_shape = tf.shape(model_matrix)[:-2]
+      batch_shape = tf.shape(input=model_matrix)[:-2]
       eye = tf.eye(
           num_model_coefficients, batch_shape=batch_shape, dtype=a.dtype)
       a_ = tf.concat([a, tf.sqrt(l2_regularizer) * eye], axis=-2)
@@ -397,14 +402,15 @@ def fit_one_step(
       l2_regularizer_ = np.array(0, a.dtype.as_numpy_dtype)
       return a_, b_, l2_regularizer_
 
-    a, b, l2_regularizer = tf.contrib.framework.smart_cond(
-        smart_reduce_all([not(fast_unsafe_numerics),
-                          l2_regularizer > 0.]),
+    a, b, l2_regularizer = prefer_static.cond(
+        prefer_static.reduce_all([not(fast_unsafe_numerics),
+                                  l2_regularizer > 0.]),
         _embed_l2_regularization,
         lambda: (a, b, l2_regularizer))
 
-    model_coefficients_next = tf.matrix_solve_ls(
-        a, b[..., tf.newaxis],
+    model_coefficients_next = tf.linalg.lstsq(
+        a,
+        b[..., tf.newaxis],
         fast=fast_unsafe_numerics,
         l2_regularizer=l2_regularizer,
         name='model_coefficients_next')
@@ -494,10 +500,15 @@ def convergence_criteria_small_relative_norm_weights_change(
       is_converged: `bool` `Tensor`.
     """
     relative_euclidean_norm = (
-        tf.norm(model_coefficients_previous -
-                model_coefficients_next, ord=norm_order, axis=-1)
-        / (1. + tf.norm(model_coefficients_previous, ord=norm_order, axis=-1)))
-    return (iter_ > 0) & tf.reduce_all(relative_euclidean_norm < tolerance)
+        tf.norm(
+            tensor=model_coefficients_previous - model_coefficients_next,
+            ord=norm_order,
+            axis=-1) /
+        (1. +
+         tf.norm(tensor=model_coefficients_previous, ord=norm_order, axis=-1)))
+    return (iter_ > 0) & tf.reduce_all(
+        input_tensor=relative_euclidean_norm < tolerance)
+
   return convergence_criteria_fn
 
 
@@ -553,18 +564,19 @@ def prepare_args(model_matrix,
     dtype = dtype_util.common_dtype(graph_deps, np.float32)
 
     model_matrix = tf.convert_to_tensor(
-        model_matrix, dtype=dtype, name='model_matrix')
+        value=model_matrix, dtype=dtype, name='model_matrix')
 
     if offset is not None:
-      offset = tf.convert_to_tensor(offset, dtype=dtype, name='offset')
+      offset = tf.convert_to_tensor(value=offset, dtype=dtype, name='offset')
 
-    response = tf.convert_to_tensor(response, dtype=dtype, name='response')
+    response = tf.convert_to_tensor(
+        value=response, dtype=dtype, name='response')
 
     use_default_model_coefficients = model_coefficients is None
     if use_default_model_coefficients:
       # User did not supply model coefficients; assume they're all zero.
-      batch_shape = tf.shape(model_matrix)[:-2]
-      num_columns = tf.shape(model_matrix)[-1]
+      batch_shape = tf.shape(input=model_matrix)[:-2]
+      num_columns = tf.shape(input=model_matrix)[-1]
       model_coefficients = tf.zeros(
           shape=tf.concat([batch_shape, [num_columns]], axis=0),
           dtype=dtype, name='model_coefficients')
@@ -572,7 +584,7 @@ def prepare_args(model_matrix,
       # User did supply model coefficients; convert to Tensor in case it's
       # numpy or literal.
       model_coefficients = tf.convert_to_tensor(
-          model_coefficients, dtype=dtype, name='model_coefficients')
+          value=model_coefficients, dtype=dtype, name='model_coefficients')
 
     if predicted_linear_response is None:
       if use_default_model_coefficients:
@@ -583,7 +595,9 @@ def prepare_args(model_matrix,
               response, dtype, name='predicted_linear_response')
         else:
           predicted_linear_response = tf.broadcast_to(
-              offset, tf.shape(response), name='predicted_linear_response')
+              offset,
+              tf.shape(input=response),
+              name='predicted_linear_response')
       else:
         # We were given model_coefficients but not the predicted linear
         # response.
@@ -591,7 +605,8 @@ def prepare_args(model_matrix,
             model_matrix, model_coefficients, offset)
     else:
       predicted_linear_response = tf.convert_to_tensor(
-          predicted_linear_response, dtype=dtype,
+          value=predicted_linear_response,
+          dtype=dtype,
           name='predicted_linear_response')
 
   return [
@@ -617,17 +632,6 @@ def calculate_linear_predictor(model_matrix, model_coefficients, offset=None,
 
 def num_cols(x):
   """Returns number of cols in a given `Tensor`."""
-  if x.shape.ndims is not None and x.shape[-1].value is not None:
-    return x.shape[-1].value
-  return tf.shape(x)[-1]
-
-
-def smart_reduce_all(preds, name=None):
-  """Identical to `tf.reduce_all` but operates statically if possible."""
-  with tf.name_scope(name, 'smart_reduce_all', [preds]):
-    pred_values = [tf.contrib.framework.smart_constant_value(p) for p in preds]
-    if any(p is False for p in pred_values):
-      return False
-    if any(p is None for p in pred_values):
-      return tf.reduce_all(preds)
-    return all(pred_values)
+  if tf.compat.dimension_value(x.shape[-1]) is not None:
+    return tf.compat.dimension_value(x.shape[-1])
+  return tf.shape(input=x)[-1]

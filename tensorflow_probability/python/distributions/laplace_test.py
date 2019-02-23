@@ -24,7 +24,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 def try_import(name):  # pylint: disable=invalid-name
@@ -32,14 +32,14 @@ def try_import(name):  # pylint: disable=invalid-name
   try:
     module = importlib.import_module(name)
   except ImportError as e:
-    tf.logging.warning("Could not import %s: %s" % (name, str(e)))
+    tf.compat.v1.logging.warning("Could not import %s: %s" % (name, str(e)))
   return module
 
 
 stats = try_import("scipy.stats")
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class LaplaceTest(tf.test.TestCase):
 
   def testLaplaceShape(self):
@@ -239,12 +239,8 @@ class LaplaceTest(tf.test.TestCase):
   def testLaplaceFullyReparameterized(self):
     loc = tf.constant(4.0)
     scale = tf.constant(3.0)
-    with tf.GradientTape() as tape:
-      tape.watch(loc)
-      tape.watch(scale)
-      laplace = tfd.Laplace(loc=loc, scale=scale)
-      samples = laplace.sample(100)
-    grad_loc, grad_scale = tape.gradient(samples, [loc, scale])
+    _, [grad_loc, grad_scale] = tfp.math.value_and_gradient(
+        lambda l, s: tfd.Laplace(loc=l, scale=s).sample(100), [loc, scale])
     self.assertIsNotNone(grad_loc)
     self.assertIsNotNone(grad_scale)
 
@@ -340,7 +336,6 @@ class LaplaceTest(tf.test.TestCase):
           loc=loc_v, scale=scale_v, validate_args=True)
       self.evaluate(laplace.mean())
 
-  @tfe.run_test_in_graph_and_eager_modes()
   def testLaplaceLaplaceKL(self):
     batch_size = 6
     event_size = 3
@@ -355,13 +350,14 @@ class LaplaceTest(tf.test.TestCase):
 
     distance = tf.abs(a_loc - b_loc)
     ratio = a_scale / b_scale
-    true_kl = (-tf.log(ratio) - 1 + distance / b_scale +
+    true_kl = (-tf.math.log(ratio) - 1 + distance / b_scale +
                ratio * tf.exp(-distance / a_scale))
 
     kl = tfd.kl_divergence(a, b)
 
     x = a.sample(int(1e4), seed=0)
-    kl_sample = tf.reduce_mean(a.log_prob(x) - b.log_prob(x), 0)
+    kl_sample = tf.reduce_mean(
+        input_tensor=a.log_prob(x) - b.log_prob(x), axis=0)
 
     true_kl_, kl_, kl_sample_ = self.evaluate([true_kl, kl, kl_sample])
     self.assertAllEqual(true_kl_, kl_)

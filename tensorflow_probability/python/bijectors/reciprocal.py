@@ -22,7 +22,7 @@ from __future__ import print_function
 import tensorflow as tf
 
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow.python.ops import control_flow_ops
+from tensorflow_probability.python.internal import distribution_util
 
 __all__ = ["Reciprocal"]
 
@@ -69,13 +69,13 @@ class Reciprocal(bijector.Bijector):
 
   def _forward_log_det_jacobian(self, x):
     x = self._maybe_assert_valid(x)
-    return -2. * tf.log(tf.abs(x))
+    return -2. * tf.math.log(tf.abs(x))
 
   _inverse_log_det_jacobian = _forward_log_det_jacobian
 
   def _maybe_assert_valid(self, t):
     if not self.validate_args:
       return t
-    is_valid = tf.assert_none_equal(
+    is_valid = tf.compat.v1.assert_none_equal(
         t, 0., message="All elements must be non-zero.")
-    return control_flow_ops.with_dependencies([is_valid], t)
+    return distribution_util.with_dependencies([is_valid], t)

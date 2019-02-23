@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import functools
 import inspect
+import six
 
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.edward2.interceptor import interceptable
@@ -28,86 +29,13 @@ from tensorflow_probability.python.edward2.random_variable import RandomVariable
 from tensorflow_probability.python.util import docstring as docstring_util
 
 
-rv_all = [
-    'Autoregressive',
-    'BatchReshape',
-    'Bernoulli',
-    'Beta',
-    'BetaWithSoftplusConcentration',
-    'Binomial',
-    'Categorical',
-    'Cauchy',
-    'Chi2',
-    'Chi2WithAbsDf',
-    'ConditionalTransformedDistribution',
-    'Deterministic',
-    'Dirichlet',
-    'DirichletMultinomial',
-    'ExpRelaxedOneHotCategorical',
-    'Exponential',
-    'ExponentialWithSoftplusRate',
-    'Gamma',
-    'GammaGamma',
-    'GammaWithSoftplusConcentrationRate',
-    'Geometric',
-    'GaussianProcess',
-    'GaussianProcessRegressionModel',
-    'Gumbel',
-    'HalfCauchy',
-    'HalfNormal',
-    'HiddenMarkovModel',
-    'Horseshoe',
-    'Independent',
-    'InverseGamma',
-    'InverseGammaWithSoftplusConcentrationRate',
-    'InverseGaussian',
-    'Kumaraswamy',
-    'LinearGaussianStateSpaceModel',
-    'Laplace',
-    'LaplaceWithSoftplusScale',
-    'LKJ',
-    'Logistic',
-    'LogNormal',
-    'Mixture',
-    'MixtureSameFamily',
-    'Multinomial',
-    'MultivariateNormalDiag',
-    'MultivariateNormalFullCovariance',
-    'MultivariateNormalLinearOperator',
-    'MultivariateNormalTriL',
-    'MultivariateNormalDiagPlusLowRank',
-    'MultivariateNormalDiagWithSoftplusScale',
-    'MultivariateStudentTLinearOperator',
-    'NegativeBinomial',
-    'Normal',
-    'NormalWithSoftplusScale',
-    'OneHotCategorical',
-    'Pareto',
-    'Poisson',
-    'PoissonLogNormalQuadratureCompound',
-    'QuantizedDistribution',
-    'RelaxedBernoulli',
-    'RelaxedOneHotCategorical',
-    'SinhArcsinh',
-    'StudentT',
-    'StudentTWithAbsDfSoftplusScale',
-    'StudentTProcess',
-    'TransformedDistribution',
-    'Triangular',
-    'TruncatedNormal',
-    'Uniform',
-    'VectorDeterministic',
-    'VectorDiffeomixture',
-    'VectorExponentialDiag',
-    'VectorLaplaceDiag',
-    'VectorSinhArcsinhDiag',
-    'VonMises',
-    'VonMisesFisher',
-    'Wishart',
-    'Zipf',
-]
+# Dictionary between RV names and their original TFP distribution.
+rv_dict = {}
+for (dist_name, dist_class)  in six.iteritems(tfd.__dict__):
+  if inspect.isclass(dist_class) and issubclass(dist_class, tfd.Distribution):
+    rv_dict[dist_name] = dist_class
 
-__all__ = rv_all + [
+__all__ = list(rv_dict.keys()) + [
     'as_random_variable'
 ]
 
@@ -246,97 +174,5 @@ def _make_random_variable(distribution_cls):
                           value=value)
   return func
 
-
-# pylint: disable=invalid-name
-Autoregressive = _make_random_variable(tfd.Autoregressive)
-BatchReshape = _make_random_variable(tfd.BatchReshape)
-Bernoulli = _make_random_variable(tfd.Bernoulli)
-Beta = _make_random_variable(tfd.Beta)
-BetaWithSoftplusConcentration = _make_random_variable(
-    tfd.BetaWithSoftplusConcentration)
-Binomial = _make_random_variable(tfd.Binomial)
-Categorical = _make_random_variable(tfd.Categorical)
-Cauchy = _make_random_variable(tfd.Cauchy)
-Chi2 = _make_random_variable(tfd.Chi2)
-Chi2WithAbsDf = _make_random_variable(tfd.Chi2WithAbsDf)
-ConditionalTransformedDistribution = _make_random_variable(
-    tfd.ConditionalTransformedDistribution)
-Deterministic = _make_random_variable(tfd.Deterministic)
-Dirichlet = _make_random_variable(tfd.Dirichlet)
-DirichletMultinomial = _make_random_variable(tfd.DirichletMultinomial)
-ExpRelaxedOneHotCategorical = _make_random_variable(
-    tfd.ExpRelaxedOneHotCategorical)
-Exponential = _make_random_variable(tfd.Exponential)
-ExponentialWithSoftplusRate = _make_random_variable(
-    tfd.ExponentialWithSoftplusRate)
-Gamma = _make_random_variable(tfd.Gamma)
-GammaGamma = _make_random_variable(tfd.GammaGamma)
-GammaWithSoftplusConcentrationRate = _make_random_variable(
-    tfd.GammaWithSoftplusConcentrationRate)
-Geometric = _make_random_variable(tfd.Geometric)
-GaussianProcess = _make_random_variable(tfd.GaussianProcess)
-GaussianProcessRegressionModel = _make_random_variable(
-    tfd.GaussianProcessRegressionModel)
-Gumbel = _make_random_variable(tfd.Gumbel)
-HalfCauchy = _make_random_variable(tfd.HalfCauchy)
-HalfNormal = _make_random_variable(tfd.HalfNormal)
-HiddenMarkovModel = _make_random_variable(tfd.HiddenMarkovModel)
-Horseshoe = _make_random_variable(tfd.Horseshoe)
-Independent = _make_random_variable(tfd.Independent)
-InverseGamma = _make_random_variable(tfd.InverseGamma)
-InverseGammaWithSoftplusConcentrationRate = _make_random_variable(
-    tfd.InverseGammaWithSoftplusConcentrationRate)
-InverseGaussian = _make_random_variable(tfd.InverseGaussian)
-Kumaraswamy = _make_random_variable(tfd.Kumaraswamy)
-LinearGaussianStateSpaceModel = _make_random_variable(
-    tfd.LinearGaussianStateSpaceModel)
-Laplace = _make_random_variable(tfd.Laplace)
-LaplaceWithSoftplusScale = _make_random_variable(tfd.LaplaceWithSoftplusScale)
-LKJ = _make_random_variable(tfd.LKJ)
-Logistic = _make_random_variable(tfd.Logistic)
-LogNormal = _make_random_variable(tfd.LogNormal)
-Mixture = _make_random_variable(tfd.Mixture)
-MixtureSameFamily = _make_random_variable(tfd.MixtureSameFamily)
-Multinomial = _make_random_variable(tfd.Multinomial)
-MultivariateNormalDiag = _make_random_variable(tfd.MultivariateNormalDiag)
-MultivariateNormalFullCovariance = _make_random_variable(
-    tfd.MultivariateNormalFullCovariance)
-MultivariateNormalLinearOperator = _make_random_variable(
-    tfd.MultivariateNormalLinearOperator)
-MultivariateNormalTriL = _make_random_variable(tfd.MultivariateNormalTriL)
-MultivariateNormalDiagPlusLowRank = _make_random_variable(
-    tfd.MultivariateNormalDiagPlusLowRank)
-MultivariateNormalDiagWithSoftplusScale = _make_random_variable(
-    tfd.MultivariateNormalDiagWithSoftplusScale)
-MultivariateStudentTLinearOperator = _make_random_variable(
-    tfd.MultivariateStudentTLinearOperator)
-NegativeBinomial = _make_random_variable(tfd.NegativeBinomial)
-Normal = _make_random_variable(tfd.Normal)
-NormalWithSoftplusScale = _make_random_variable(tfd.NormalWithSoftplusScale)
-OneHotCategorical = _make_random_variable(tfd.OneHotCategorical)
-Pareto = _make_random_variable(tfd.Pareto)
-Poisson = _make_random_variable(tfd.Poisson)
-PoissonLogNormalQuadratureCompound = _make_random_variable(
-    tfd.PoissonLogNormalQuadratureCompound)
-QuantizedDistribution = _make_random_variable(tfd.QuantizedDistribution)
-RelaxedBernoulli = _make_random_variable(tfd.RelaxedBernoulli)
-RelaxedOneHotCategorical = _make_random_variable(tfd.RelaxedOneHotCategorical)
-SinhArcsinh = _make_random_variable(tfd.SinhArcsinh)
-StudentT = _make_random_variable(tfd.StudentT)
-StudentTWithAbsDfSoftplusScale = _make_random_variable(
-    tfd.StudentTWithAbsDfSoftplusScale)
-StudentTProcess = _make_random_variable(tfd.StudentTProcess)
-TransformedDistribution = _make_random_variable(tfd.TransformedDistribution)
-Triangular = _make_random_variable(tfd.Triangular)
-TruncatedNormal = _make_random_variable(tfd.TruncatedNormal)
-Uniform = _make_random_variable(tfd.Uniform)
-VectorDeterministic = _make_random_variable(tfd.VectorDeterministic)
-VectorDiffeomixture = _make_random_variable(tfd.VectorDiffeomixture)
-VectorExponentialDiag = _make_random_variable(tfd.VectorExponentialDiag)
-VectorLaplaceDiag = _make_random_variable(tfd.VectorLaplaceDiag)
-VectorSinhArcsinhDiag = _make_random_variable(tfd.VectorSinhArcsinhDiag)
-VonMises = _make_random_variable(tfd.VonMises)
-VonMisesFisher = _make_random_variable(tfd.VonMisesFisher)
-Wishart = _make_random_variable(tfd.Wishart)
-Zipf = _make_random_variable(tfd.Zipf)
-# pylint: enable=invalid-name
+for rv_name in rv_dict:
+  globals()[rv_name] = _make_random_variable(rv_dict[rv_name])

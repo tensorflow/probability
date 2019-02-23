@@ -21,17 +21,18 @@ from __future__ import print_function
 import inspect
 from absl.testing import parameterized
 import numpy as np
+import six
 import tensorflow as tf
 
 from tensorflow_probability import distributions as tfd
 from tensorflow_probability import edward2 as ed
 
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class GeneratedRandomVariablesTest(parameterized.TestCase, tf.test.TestCase):
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testBernoulliDoc(self):
     self.assertGreater(len(ed.Bernoulli.__doc__), 0)
     self.assertIn(inspect.cleandoc(tfd.Bernoulli.__init__.__doc__),
@@ -44,7 +45,6 @@ class GeneratedRandomVariablesTest(parameterized.TestCase, tf.test.TestCase):
       {"testcase_name": "5d_rv_1d_event", "logits": np.zeros(5), "n": [1]},
       {"testcase_name": "5d_rv_5d_event", "logits": np.zeros(5), "n": [5]},
   )
-  @tfe.run_test_in_graph_and_eager_modes
   def testBernoulliLogProb(self, logits, n):
     rv = ed.Bernoulli(logits)
     dist = tfd.Bernoulli(logits)
@@ -73,7 +73,6 @@ class GeneratedRandomVariablesTest(parameterized.TestCase, tf.test.TestCase):
        "logits": np.array([-0.2, 0.8]),
        "n": [5]},
   )
-  @tfe.run_test_in_graph_and_eager_modes
   def testBernoulliSample(self, logits, n):
     rv = ed.Bernoulli(logits)
     dist = tfd.Bernoulli(logits)
@@ -121,7 +120,6 @@ class GeneratedRandomVariablesTest(parameterized.TestCase, tf.test.TestCase):
        "batch_shape": [],
        "event_shape": [3]},
   )
-  @tfe.run_test_in_graph_and_eager_modes
   def testShape(self, rv, sample_shape, batch_shape, event_shape):
     self.assertEqual(rv.shape, sample_shape + batch_shape + event_shape)
     self.assertEqual(rv.sample_shape, sample_shape)
@@ -142,11 +140,9 @@ class GeneratedRandomVariablesTest(parameterized.TestCase, tf.test.TestCase):
        "kwargs": {"loc": [0.5], "scale": [1.0]}},
       {"cls": ed.Poisson, "value": 2, "kwargs": {"rate": 0.5}},
   )
-  @tfe.run_test_in_graph_and_eager_modes
   def testValueShapeAndDtype(self, cls, value, kwargs):
     self._testValueShapeAndDtype(cls, value, **kwargs)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testValueMismatchRaises(self):
     with self.assertRaises(ValueError):
       self._testValueShapeAndDtype(ed.Normal, 2, loc=[0.5, 0.5], scale=1.0)
@@ -157,10 +153,10 @@ class GeneratedRandomVariablesTest(parameterized.TestCase, tf.test.TestCase):
           ed.Normal, np.zeros([10, 3]), loc=[0.5, 0.5], scale=[1.0, 1.0])
 
   def testValueUnknownShape(self):
+    if tf.executing_eagerly(): return
     # should not raise error
-    ed.Bernoulli(probs=0.5, value=tf.placeholder(tf.int32))
+    ed.Bernoulli(probs=0.5, value=tf.compat.v1.placeholder(tf.int32))
 
-  @tfe.run_test_in_graph_and_eager_modes
   def testAsRandomVariable(self):
     # A wrapped Normal distribution should behave identically to
     # the builtin Normal RV.
@@ -186,6 +182,12 @@ class GeneratedRandomVariablesTest(parameterized.TestCase, tf.test.TestCase):
       log_joint_scoped = ed.make_log_joint_fn(model_scoped)
       self.assertEqual(self.evaluate(log_joint_builtin(x=7.)),
                        self.evaluate(log_joint_scoped(x=7.)))
+
+  def testAllDistributionsAreRVs(self):
+    for (dist_name, dist_class)  in six.iteritems(tfd.__dict__):
+      if inspect.isclass(dist_class) and issubclass(
+          dist_class, tfd.Distribution):
+        self.assertIn(dist_name, ed.__dict__)
 
 if __name__ == "__main__":
   tf.test.main()

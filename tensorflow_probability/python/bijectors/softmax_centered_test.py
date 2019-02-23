@@ -24,13 +24,13 @@ import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 rng = np.random.RandomState(42)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class SoftmaxCenteredBijectorTest(tf.test.TestCase):
   """Tests correctness of the Y = g(X) = exp(X) / sum(exp(X)) transformation."""
 
@@ -58,8 +58,8 @@ class SoftmaxCenteredBijectorTest(tf.test.TestCase):
     x_ = np.log([[2., 3, 4], [4., 8, 12]]).astype(np.float32)
     y_ = np.array(
         [[0.2, 0.3, 0.4, 0.1], [0.16, 0.32, 0.48, 0.04]], dtype=np.float32)
-    x = tf.placeholder_with_default(x_, shape=[2, None])
-    y = tf.placeholder_with_default(y_, shape=[2, None])
+    x = tf.compat.v1.placeholder_with_default(x_, shape=[2, None])
+    y = tf.compat.v1.placeholder_with_default(y_, shape=[2, None])
     self.assertAllClose(y_, self.evaluate(softmax.forward(x)))
     self.assertAllClose(x_, self.evaluate(softmax.inverse(y)))
     self.assertAllClose(
@@ -104,8 +104,8 @@ class SoftmaxCenteredBijectorTest(tf.test.TestCase):
                                 y.as_list())))
 
   def testShapeGettersWithDynamicShape(self):
-    x = tf.placeholder_with_default(input=[2, 4], shape=None)
-    y = tf.placeholder_with_default(input=[2, 5], shape=None)
+    x = tf.compat.v1.placeholder_with_default(input=[2, 4], shape=None)
+    y = tf.compat.v1.placeholder_with_default(input=[2, 5], shape=None)
     bijector = tfb.SoftmaxCentered(validate_args=True)
     self.assertAllEqual(
         [2, 5], self.evaluate(bijector.forward_event_shape_tensor(x)))

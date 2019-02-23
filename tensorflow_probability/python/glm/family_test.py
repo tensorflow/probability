@@ -26,14 +26,14 @@ import tensorflow_probability as tfp
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 def make_lognormal(mean):
   """Helper which creates a LogNormal with a specific mean."""
-  mean = tf.convert_to_tensor(mean, name='mean')
+  mean = tf.convert_to_tensor(value=mean, name='mean')
   s2 = np.log(2.).astype(mean.dtype.as_numpy_dtype())
-  return tfd.LogNormal(tf.log(mean) - 0.5 * s2, np.sqrt(s2))
+  return tfd.LogNormal(tf.math.log(mean) - 0.5 * s2, np.sqrt(s2))
 
 
 class _GLMTestHarness(object):
@@ -103,7 +103,7 @@ class _GLMTestHarness(object):
                         atol=1e-6, rtol=1e-4)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class BernoulliTest(tf.test.TestCase, _GLMTestHarness):
 
   def setUp(self):
@@ -113,14 +113,14 @@ class BernoulliTest(tf.test.TestCase, _GLMTestHarness):
         lambda mu: tfd.Bernoulli(probs=mu), tf.nn.sigmoid)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class BernoulliNormalCDFTest(tf.test.TestCase, _GLMTestHarness):
 
   def setUp(self):
     self.dtype = np.float32
     self.model = tfp.glm.BernoulliNormalCDF()
     def normal_cdf(r):
-      r = tf.convert_to_tensor(r, name='r')
+      r = tf.convert_to_tensor(value=r, name='r')
       n = tfd.Normal(loc=tf.zeros([], r.dtype.base_dtype),
                      scale=tf.ones([], r.dtype.base_dtype))
       return n.cdf(r)
@@ -128,7 +128,7 @@ class BernoulliNormalCDFTest(tf.test.TestCase, _GLMTestHarness):
         lambda mu: tfd.Bernoulli(probs=mu), normal_cdf)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class GammaExpTest(tf.test.TestCase, _GLMTestHarness):
 
   def setUp(self):
@@ -140,7 +140,7 @@ class GammaExpTest(tf.test.TestCase, _GLMTestHarness):
         tf.exp)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class GammaSoftplusTest(tf.test.TestCase, _GLMTestHarness):
 
   def setUp(self):
@@ -152,7 +152,7 @@ class GammaSoftplusTest(tf.test.TestCase, _GLMTestHarness):
         tf.nn.softplus)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class LogNormalTest(tf.test.TestCase, _GLMTestHarness):
 
   def setUp(self):
@@ -162,7 +162,7 @@ class LogNormalTest(tf.test.TestCase, _GLMTestHarness):
         make_lognormal, tf.exp)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class LogNormalSoftplusTest(tf.test.TestCase, _GLMTestHarness):
 
   def setUp(self):
@@ -172,7 +172,7 @@ class LogNormalSoftplusTest(tf.test.TestCase, _GLMTestHarness):
         make_lognormal, tf.nn.softplus)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class NormalTest(tf.test.TestCase, _GLMTestHarness):
 
   def setUp(self):
@@ -182,17 +182,17 @@ class NormalTest(tf.test.TestCase, _GLMTestHarness):
         lambda mu: tfd.Normal(mu, self.dtype(1)), tf.identity)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class NormalReciprocalTest(tf.test.TestCase, _GLMTestHarness):
 
   def setUp(self):
     self.dtype = np.float32
     self.model = tfp.glm.NormalReciprocal()
     self.expected = tfp.glm.CustomExponentialFamily(
-        lambda mu: tfd.Normal(mu, self.dtype(1)), tf.reciprocal)
+        lambda mu: tfd.Normal(mu, self.dtype(1)), tf.math.reciprocal)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class PoissonTest(tf.test.TestCase, _GLMTestHarness):
 
   def setUp(self):
@@ -202,7 +202,7 @@ class PoissonTest(tf.test.TestCase, _GLMTestHarness):
         lambda mu: tfd.Poisson(rate=mu), tf.exp)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class PoissonSoftplusTest(tf.test.TestCase, _GLMTestHarness):
 
   def setUp(self):

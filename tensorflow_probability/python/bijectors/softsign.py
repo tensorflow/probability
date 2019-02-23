@@ -20,7 +20,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow.python.ops import control_flow_ops
+from tensorflow_probability.python.internal import distribution_util
 
 
 __all__ = [
@@ -64,24 +64,24 @@ class Softsign(bijector.Bijector):
     return y / (1. - tf.abs(y))
 
   def _forward_log_det_jacobian(self, x):
-    return -2. * tf.log1p(tf.abs(x))
+    return -2. * tf.math.log1p(tf.abs(x))
 
   def _inverse_log_det_jacobian(self, y):
     y = self._maybe_assert_valid_y(y)
-    return -2. * tf.log1p(-tf.abs(y))
+    return -2. * tf.math.log1p(-tf.abs(y))
 
   def _maybe_assert_valid_y(self, y):
     if not self.validate_args:
       return y
     is_valid = [
-        tf.assert_greater(
+        tf.compat.v1.assert_greater(
             y,
             tf.cast(-1., dtype=y.dtype.base_dtype),
             message="Inverse transformation input must be greater than -1."),
-        tf.assert_less(
+        tf.compat.v1.assert_less(
             y,
             tf.cast(1., dtype=y.dtype.base_dtype),
             message="Inverse transformation input must be less than 1.")
     ]
 
-    return control_flow_ops.with_dependencies(is_valid, y)
+    return distribution_util.with_dependencies(is_valid, y)

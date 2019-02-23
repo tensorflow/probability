@@ -27,7 +27,6 @@ from tensorflow_probability.python.distributions import HalfCauchy
 from tensorflow_probability.python.distributions.seed_stream import SeedStream
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.framework import tensor_shape
 
 
 __all__ = [
@@ -141,10 +140,9 @@ class Horseshoe(distribution.Distribution):
     with tf.name_scope(name, values=[scale]) as name:
       dtype = dtype_util.common_dtype([scale],
                                       preferred_dtype=tf.float32)
-      scale = tf.convert_to_tensor(
-          scale, name="scale", dtype=dtype)
+      scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
       with tf.control_dependencies(
-          [tf.assert_positive(scale)] if validate_args else []):
+          [tf.compat.v1.assert_positive(scale)] if validate_args else []):
         self._scale = tf.identity(
             scale, name="scale")
     self._half_cauchy = HalfCauchy(
@@ -162,9 +160,7 @@ class Horseshoe(distribution.Distribution):
 
   @staticmethod
   def _param_shapes(sample_shape):
-    return {
-        "scale": tf.convert_to_tensor(sample_shape, dtype=tf.int32)
-    }
+    return {"scale": tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)}
 
   @property
   def scale(self):
@@ -172,7 +168,7 @@ class Horseshoe(distribution.Distribution):
     return self._scale
 
   def _batch_shape_tensor(self):
-    return tf.shape(self.scale)
+    return tf.shape(input=self.scale)
 
   def _batch_shape(self):
     return self.scale.shape
@@ -181,7 +177,7 @@ class Horseshoe(distribution.Distribution):
     return tf.constant([], dtype=tf.int32)
 
   def _event_shape(self):
-    return tensor_shape.scalar()
+    return tf.TensorShape([])
 
   def _log_prob(self, x):
     # The exact HalfCauchy-Normal marginal log-density is analytically
@@ -193,21 +189,17 @@ class Horseshoe(distribution.Distribution):
     h_inf = 1.0801359952503342  #  (1-g)*(g*g-6*g+12) / (3*g * (2-g)**2 * b)
     q = 20. / 47. * xx**1.0919284281983377
     h = 1. / (1 + xx**(1.5)) + h_inf * q / (1 + q)
-    c = -.5 * np.log(2 * np.pi**3) - tf.log(g * self._scale)
-    return -tf.log1p((1 - g) / g * tf.exp(-xx / (1 - g))) + tf.log(
-        tf.log1p(g / xx - (1 - g) / (h + b * xx)**2)) + c
+    c = -.5 * np.log(2 * np.pi**3) - tf.math.log(g * self._scale)
+    return -tf.math.log1p((1 - g) / g * tf.exp(-xx / (1 - g))) + tf.math.log(
+        tf.math.log1p(g / xx - (1 - g) / (h + b * xx)**2)) + c
 
   def _sample_n(self, n, seed=None):
     shape = tf.concat([[n], self._batch_shape_tensor()], axis=0)
     seed = SeedStream(seed, salt="random_horseshoe")
     local_shrinkage = self._half_cauchy.sample(shape, seed=seed())
     shrinkage = self.scale * local_shrinkage
-    sampled = tf.random_normal(
-        shape=shape,
-        mean=0.,
-        stddev=1.,
-        dtype=self.scale.dtype,
-        seed=seed())
+    sampled = tf.random.normal(
+        shape=shape, mean=0., stddev=1., dtype=self.scale.dtype, seed=seed())
     return sampled * shrinkage
 
   def _mean(self):

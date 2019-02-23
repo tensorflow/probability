@@ -18,10 +18,17 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import collections
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.optimizer import linesearch
+
+# A namedtuple to hold a function value, directional derivative and the
+# full gradient. To be used with the linesearch method.
+ValueAndGradient = collections.namedtuple('ValueAndGradient',
+                                          ['f', 'df', 'full_gradient'])
 
 
 def get_initial_state_args(value_and_gradients_function,
@@ -62,9 +69,9 @@ def get_initial_state_args(value_and_gradients_function,
     f0, df0 = value_and_gradients_function(initial_position)
   return dict(
       converged=_check_within_tolerance(df0, grad_tolerance),
-      failed=tf.convert_to_tensor(False),
-      num_iterations=tf.convert_to_tensor(0),
-      num_objective_evaluations=tf.convert_to_tensor(1),
+      failed=tf.convert_to_tensor(value=False),
+      num_iterations=tf.convert_to_tensor(value=0),
+      num_objective_evaluations=tf.convert_to_tensor(value=1),
       position=initial_position,
       objective_value=f0,
       objective_gradient=df0)
@@ -112,11 +119,11 @@ def line_search_step(state, value_and_gradients_function, search_direction,
   dtype = state.position.dtype.base_dtype
   line_search_value_grad_func = _restrict_along_direction(
       value_and_gradients_function, state.position, search_direction)
-  derivative_at_start_pt = tf.reduce_sum(state.objective_gradient *
+  derivative_at_start_pt = tf.reduce_sum(input_tensor=state.objective_gradient *
                                          search_direction)
   ls_result = linesearch.hager_zhang(
       line_search_value_grad_func,
-      initial_step_size=tf.convert_to_tensor(1, dtype=dtype),
+      initial_step_size=tf.convert_to_tensor(value=1, dtype=dtype),
       objective_at_zero=state.objective_value,
       grad_objective_at_zero=derivative_at_start_pt)
 
@@ -129,12 +136,13 @@ def line_search_step(state, value_and_gradients_function, search_direction,
 
   def _do_update_position():
     return _update_position(
-        value_and_gradients_function,
         state_after_ls,
         search_direction * ls_result.left_pt,
+        ls_result.full_result.f,
+        ls_result.full_result.full_gradient,  # Extract gradient
         grad_tolerance, f_relative_tolerance, x_tolerance)
 
-  return tf.contrib.framework.smart_cond(
+  return prefer_static.cond(
       state_after_ls.failed,
       true_fn=lambda: state_after_ls,
       false_fn=_do_update_position)
@@ -200,19 +208,23 @@ def _restrict_along_direction(value_and_gradients_function,
   def _restricted_func(t):
     pt = position + t * direction
     objective_value, gradient = value_and_gradients_function(pt)
-    return objective_value, tf.reduce_sum(gradient * direction)
+    return ValueAndGradient(
+        f=objective_value,
+        df=tf.reduce_sum(input_tensor=gradient * direction),
+        full_gradient=gradient)
+
   return _restricted_func
 
 
-def _update_position(value_and_gradients_function,
-                     state,
+def _update_position(state,
                      position_delta,
+                     next_objective,
+                     next_gradient,
                      grad_tolerance,
                      f_relative_tolerance,
                      x_tolerance):
   """Updates the state advancing its position by a given position_delta."""
   next_position = state.position + position_delta
-  next_objective, next_gradient = value_and_gradients_function(next_position)
   converged = _check_convergence(state.position,
                                  next_position,
                                  state.objective_value,
@@ -225,7 +237,7 @@ def _update_position(value_and_gradients_function,
       state,
       converged=converged,
       failed=~_is_finite(next_objective, next_gradient),
-      num_objective_evaluations=state.num_objective_evaluations + 1,
+      num_objective_evaluations=state.num_objective_evaluations,
       position=next_position,
       objective_value=next_objective,
       objective_gradient=next_gradient)
@@ -233,7 +245,7 @@ def _update_position(value_and_gradients_function,
 
 def _check_within_tolerance(value, tolerance):
   """Checks whether the given value is below the supplied tolerance."""
-  return tf.norm(value, ord=np.inf) <= tolerance
+  return tf.norm(tensor=value, ord=np.inf) <= tolerance
 
 
 def _check_convergence(current_position,
@@ -265,7 +277,7 @@ def _is_finite(arg1, *args):
     is_finite: Scalar boolean `Tensor` indicating whether all the supplied
       tensors are finite.
   """
-  finite = tf.reduce_all(tf.is_finite(arg1))
+  finite = tf.reduce_all(input_tensor=tf.math.is_finite(arg1))
   for arg in args:
-    finite = finite & tf.reduce_all(tf.is_finite(arg))
+    finite = finite & tf.reduce_all(input_tensor=tf.math.is_finite(arg))
   return finite

@@ -29,6 +29,7 @@ from tensorflow_probability.python.distributions import dirichlet
 from tensorflow_probability.python.distributions import gamma
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import normal
+from tensorflow.python.framework import test_util  # pylint:disable=g-direct-tensorflow-import
 
 # pylint: disable=protected-access
 _DIVERGENCES = kullback_leibler._DIVERGENCES
@@ -37,6 +38,7 @@ _registered_kl = kullback_leibler._registered_kl
 # pylint: enable=protected-access
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class KLTest(tf.test.TestCase):
 
   def testRegistration(self):
@@ -65,22 +67,21 @@ class KLTest(tf.test.TestCase):
 
     # pylint: disable=unused-argument,unused-variable
 
-    with self.cached_session():
-      a = MyDistException(loc=0.0, scale=1.0, allow_nan_stats=False)
+    a = MyDistException(loc=0.0, scale=1.0, allow_nan_stats=False)
+    with self.assertRaisesOpError(
+        "KL calculation between .* and .* returned NaN values"):
       kl = kullback_leibler.kl_divergence(a, a, allow_nan_stats=False)
-      with self.assertRaisesOpError(
-          "KL calculation between .* and .* returned NaN values"):
-        kl.eval()
-      with self.assertRaisesOpError(
-          "KL calculation between .* and .* returned NaN values"):
-        a.kl_divergence(a).eval()
-      a = MyDistException(loc=0.0, scale=1.0, allow_nan_stats=True)
-      kl_ok = kullback_leibler.kl_divergence(a, a)
-      self.assertAllEqual([float("nan")], kl_ok.eval())
-      self_kl_ok = a.kl_divergence(a)
-      self.assertAllEqual([float("nan")], self_kl_ok.eval())
-      cross_ok = a.cross_entropy(a)
-      self.assertAllEqual([float("nan")], cross_ok.eval())
+      self.evaluate(kl)
+    with self.assertRaisesOpError(
+        "KL calculation between .* and .* returned NaN values"):
+      self.evaluate(a.kl_divergence(a))
+    a = MyDistException(loc=0.0, scale=1.0, allow_nan_stats=True)
+    kl_ok = kullback_leibler.kl_divergence(a, a)
+    self.assertAllEqual([float("nan")], self.evaluate(kl_ok))
+    self_kl_ok = a.kl_divergence(a)
+    self.assertAllEqual([float("nan")], self.evaluate(self_kl_ok))
+    cross_ok = a.cross_entropy(a)
+    self.assertAllEqual([float("nan")], self.evaluate(cross_ok))
 
   def testRegistrationFailures(self):
 
@@ -166,13 +167,13 @@ class KLTest(tf.test.TestCase):
   def testBackwardsCompatibilityAliases(self):
     # Each element is a tuple(classes), tuple(args).
     aliases = [
-        ((bernoulli.Bernoulli, tf.distributions.Bernoulli), (1.,)),
-        ((beta.Beta, tf.distributions.Beta), (1., 1.)),
-        ((categorical.Categorical, tf.distributions.Categorical), ([1.0,
-                                                                    1.0],)),
-        ((dirichlet.Dirichlet, tf.distributions.Dirichlet), ([1.0],)),
-        ((gamma.Gamma, tf.distributions.Gamma), (1.0, 1.0)),
-        ((normal.Normal, tf.distributions.Normal), (1.0, 1.0)),
+        ((bernoulli.Bernoulli, tf.compat.v1.distributions.Bernoulli), (1.,)),
+        ((beta.Beta, tf.compat.v1.distributions.Beta), (1., 1.)),
+        ((categorical.Categorical, tf.compat.v1.distributions.Categorical),
+         ([1.0, 1.0],)),
+        ((dirichlet.Dirichlet, tf.compat.v1.distributions.Dirichlet), ([1.0],)),
+        ((gamma.Gamma, tf.compat.v1.distributions.Gamma), (1.0, 1.0)),
+        ((normal.Normal, tf.compat.v1.distributions.Normal), (1.0, 1.0)),
     ]
 
     for dists, args in aliases:
@@ -180,20 +181,20 @@ class KLTest(tf.test.TestCase):
         d0 = class0(*args)
         d1 = class1(*args)
         kullback_leibler.kl_divergence(d0, d1)
-        tf.distributions.kl_divergence(d0, d1)
+        tf.compat.v1.distributions.kl_divergence(d0, d1)
 
   def testBackwardsCompatibilityDeterministic(self):
     tfp_normal = normal.Normal(0.0, 1.0)
-    tf_normal = tf.distributions.Normal(0.0, 1.0)
+    tf_normal = tf.compat.v1.distributions.Normal(0.0, 1.0)
     tfp_deterministic = deterministic.Deterministic(0.0)
 
     kullback_leibler.kl_divergence(tfp_deterministic, tf_normal)
-    tf.distributions.kl_divergence(tfp_deterministic, tf_normal)
+    tf.compat.v1.distributions.kl_divergence(tfp_deterministic, tf_normal)
     kullback_leibler.kl_divergence(tfp_deterministic, tfp_normal)
-    tf.distributions.kl_divergence(tfp_deterministic, tfp_normal)
+    tf.compat.v1.distributions.kl_divergence(tfp_deterministic, tfp_normal)
 
   def testBackwardsCompatibilityFallback(self):
-    tf_normal = tf.distributions.Normal(0.0, 1.0)
+    tf_normal = tf.compat.v1.distributions.Normal(0.0, 1.0)
     kullback_leibler.kl_divergence(tf_normal, tf_normal)
 
 

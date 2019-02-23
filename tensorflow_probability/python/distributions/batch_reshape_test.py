@@ -23,16 +23,18 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
 tfd = tfp.distributions
-tfe = tf.contrib.eager
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class _BatchReshapeTest(object):
 
   def make_wishart(self, dims, new_batch_shape, old_batch_shape):
     new_batch_shape_ph = (
         tf.constant(np.int32(new_batch_shape))
-        if self.is_static_shape else tf.placeholder_with_default(
+        if self.is_static_shape else tf.compat.v1.placeholder_with_default(
             np.int32(new_batch_shape), shape=None))
 
     scale = self.dtype([
@@ -43,7 +45,7 @@ class _BatchReshapeTest(object):
     ])
     scale = np.reshape(np.concatenate([scale, scale], axis=0),
                        old_batch_shape + [dims, dims])
-    scale_ph = tf.placeholder_with_default(
+    scale_ph = tf.compat.v1.placeholder_with_default(
         scale, shape=scale.shape if self.is_static_shape else None)
     wishart = tfd.Wishart(df=5, scale=scale_ph)
     reshape_wishart = tfd.BatchReshape(
@@ -54,6 +56,11 @@ class _BatchReshapeTest(object):
     return wishart, reshape_wishart
 
   def test_matrix_variate_sample_and_log_prob(self):
+    if tf.executing_eagerly():
+      # TODO(b/122840816): Modify this test so that it runs in eager mode or
+      # document that the test is not intended to run in eager mode.
+      return
+
     dims = 2
     new_batch_shape = [4]
     old_batch_shape = [2, 2]
@@ -172,12 +179,12 @@ class _BatchReshapeTest(object):
   def make_normal(self, new_batch_shape, old_batch_shape):
     new_batch_shape_ph = (
         tf.constant(np.int32(new_batch_shape))
-        if self.is_static_shape else tf.placeholder_with_default(
+        if self.is_static_shape else tf.compat.v1.placeholder_with_default(
             np.int32(new_batch_shape), shape=None))
 
     scale = self.dtype(0.5 + np.arange(
         np.prod(old_batch_shape)).reshape(old_batch_shape))
-    scale_ph = tf.placeholder_with_default(
+    scale_ph = tf.compat.v1.placeholder_with_default(
         scale, shape=scale.shape if self.is_static_shape else None)
     normal = tfd.Normal(loc=self.dtype(0), scale=scale_ph)
     reshape_normal = tfd.BatchReshape(
@@ -185,6 +192,11 @@ class _BatchReshapeTest(object):
     return normal, reshape_normal
 
   def test_scalar_variate_sample_and_log_prob(self):
+    if tf.executing_eagerly():
+      # TODO(b/122840816): Modify this test so that it runs in eager mode or
+      # document that the test is not intended to run in eager mode.
+      return
+
     new_batch_shape = [2, 2]
     old_batch_shape = [4]
 
@@ -299,11 +311,11 @@ class _BatchReshapeTest(object):
   def make_mvn(self, dims, new_batch_shape, old_batch_shape):
     new_batch_shape_ph = (
         tf.constant(np.int32(new_batch_shape))
-        if self.is_static_shape else tf.placeholder_with_default(
+        if self.is_static_shape else tf.compat.v1.placeholder_with_default(
             np.int32(new_batch_shape), shape=None))
 
     scale = np.ones(old_batch_shape + [dims], self.dtype)
-    scale_ph = tf.placeholder_with_default(
+    scale_ph = tf.compat.v1.placeholder_with_default(
         scale, shape=scale.shape if self.is_static_shape else None)
     mvn = tfd.MultivariateNormalDiag(scale_diag=scale_ph)
     reshape_mvn = tfd.BatchReshape(
@@ -311,6 +323,11 @@ class _BatchReshapeTest(object):
     return mvn, reshape_mvn
 
   def test_vector_variate_sample_and_log_prob(self):
+    if tf.executing_eagerly():
+      # TODO(b/122840816): Modify this test so that it runs in eager mode or
+      # document that the test is not intended to run in eager mode.
+      return
+
     dims = 3
     new_batch_shape = [2, 1]
     old_batch_shape = [2]
@@ -444,15 +461,15 @@ class _BatchReshapeTest(object):
 
     new_batch_shape_ph = (
         tf.constant(np.int32(new_batch_shape))
-        if self.is_static_shape else tf.placeholder_with_default(
+        if self.is_static_shape else tf.compat.v1.placeholder_with_default(
             np.int32(new_batch_shape), shape=None))
 
     scale = np.ones(old_batch_shape + [dims], self.dtype)
-    scale_ph = tf.placeholder_with_default(
+    scale_ph = tf.compat.v1.placeholder_with_default(
         scale, shape=scale.shape if self.is_static_shape else None)
     mvn = tfd.MultivariateNormalDiag(scale_diag=scale_ph)
 
-    if self.is_static_shape:
+    if self.is_static_shape or tf.executing_eagerly():
       with self.assertRaisesRegexp(
           ValueError, (r"`batch_shape` size \(6\) must match "
                        r"`distribution\.batch_shape` size \(2\)")):
@@ -481,23 +498,23 @@ class _BatchReshapeTest(object):
 
     new_batch_shape_ph = (
         tf.constant(np.int32(new_batch_shape))
-        if self.is_static_shape else tf.placeholder_with_default(
+        if self.is_static_shape else tf.compat.v1.placeholder_with_default(
             np.int32(new_batch_shape), shape=None))
 
     scale = np.ones(old_batch_shape + [dims], self.dtype)
-    scale_ph = tf.placeholder_with_default(
+    scale_ph = tf.compat.v1.placeholder_with_default(
         scale, shape=scale.shape if self.is_static_shape else None)
     mvn = tfd.MultivariateNormalDiag(scale_diag=scale_ph)
 
-    if self.is_static_shape:
-      with self.assertRaisesRegexp(ValueError, r".*must be >=-1.*"):
+    if self.is_static_shape or tf.executing_eagerly():
+      with self.assertRaisesRegexp(ValueError, r".*must be >=(-1| 0).*"):
         tfd.BatchReshape(
             distribution=mvn,
             batch_shape=new_batch_shape_ph,
             validate_args=True)
 
     else:
-      with self.assertRaisesOpError(r".*must be >=-1.*"):
+      with self.assertRaisesOpError(r".*must be >=(-1| 0).*"):
         self.evaluate(
             tfd.BatchReshape(
                 distribution=mvn,
@@ -505,17 +522,22 @@ class _BatchReshapeTest(object):
                 validate_args=True).sample())
 
   def test_non_vector_shape(self):
+    if tf.executing_eagerly():
+      # TODO(b/122840816): Modify this test so that it runs in eager mode or
+      # document that the test is not intended to run in eager mode.
+      return
+
     dims = 2
     new_batch_shape = 2
     old_batch_shape = [2]
 
     new_batch_shape_ph = (
         tf.constant(np.int32(new_batch_shape))
-        if self.is_static_shape else tf.placeholder_with_default(
+        if self.is_static_shape else tf.compat.v1.placeholder_with_default(
             np.int32(new_batch_shape), shape=None))
 
     scale = np.ones(old_batch_shape + [dims], self.dtype)
-    scale_ph = tf.placeholder_with_default(
+    scale_ph = tf.compat.v1.placeholder_with_default(
         scale, shape=scale.shape if self.is_static_shape else None)
     mvn = tfd.MultivariateNormalDiag(scale_diag=scale_ph)
 
@@ -539,12 +561,12 @@ class _BatchReshapeTest(object):
     new_batch_shape = [1, 4, 1]
     rate_ = self.dtype([1, 10, 2, 20])
 
-    rate = tf.placeholder_with_default(
+    rate = tf.compat.v1.placeholder_with_default(
         rate_, shape=old_batch_shape if self.is_static_shape else None)
     poisson_4 = tfd.Poisson(rate)
     new_batch_shape_ph = (
         tf.constant(np.int32(new_batch_shape))
-        if self.is_static_shape else tf.placeholder_with_default(
+        if self.is_static_shape else tf.compat.v1.placeholder_with_default(
             np.int32(new_batch_shape), shape=None))
     poisson_141_reshaped = tfd.BatchReshape(
         poisson_4, new_batch_shape_ph, validate_args=True)
@@ -552,7 +574,7 @@ class _BatchReshapeTest(object):
     x_4 = self.dtype([2, 12, 3, 23])
     x_114 = self.dtype([2, 12, 3, 23]).reshape(1, 1, 4)
 
-    if self.is_static_shape:
+    if self.is_static_shape or tf.executing_eagerly():
       with self.assertRaisesRegexp(NotImplementedError,
                                    "too few batch and event dims"):
         poisson_141_reshaped.log_prob(x_4)
@@ -568,14 +590,14 @@ class _BatchReshapeTest(object):
       self.evaluate(poisson_141_reshaped.log_prob(x_114))
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class BatchReshapeStaticTest(_BatchReshapeTest, tf.test.TestCase):
 
   dtype = np.float32
   is_static_shape = True
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class BatchReshapeDynamicTest(_BatchReshapeTest, tf.test.TestCase):
 
   dtype = np.float64

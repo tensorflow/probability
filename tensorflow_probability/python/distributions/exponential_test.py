@@ -23,9 +23,12 @@ import importlib
 # Dependency imports
 import numpy as np
 import tensorflow as tf
+import tensorflow_probability as tfp
 
 from tensorflow_probability.python.distributions import exponential as exponential_lib
-tfe = tf.contrib.eager
+
+tfd = tfp.distributions
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 def try_import(name):  # pylint: disable=invalid-name
@@ -33,14 +36,14 @@ def try_import(name):  # pylint: disable=invalid-name
   try:
     module = importlib.import_module(name)
   except ImportError as e:
-    tf.logging.warning("Could not import %s: %s" % (name, str(e)))
+    tf.compat.v1.logging.warning("Could not import %s: %s" % (name, str(e)))
   return module
 
 
 stats = try_import("scipy.stats")
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class ExponentialTest(tf.test.TestCase):
 
   def testExponentialLogPDF(self):
@@ -172,12 +175,38 @@ class ExponentialTest(tf.test.TestCase):
 
   def testFullyReparameterized(self):
     lam = tf.constant([0.1, 1.0])
-    with tf.GradientTape() as tape:
-      tape.watch(lam)
-      exponential = exponential_lib.Exponential(rate=lam)
-      samples = exponential.sample(100)
-    grad_lam = tape.gradient(samples, lam)
+    _, grad_lam = tfp.math.value_and_gradient(
+        lambda l: exponential_lib.Exponential(rate=lam).sample(100), lam)
     self.assertIsNotNone(grad_lam)
+
+  def testExponentialExponentialKL(self):
+    a_rate = np.arange(0.5, 1.6, 0.1)
+    b_rate = np.arange(0.5, 1.6, 0.1)
+
+    # This reshape is intended to expand the number of test cases.
+    a_rate = a_rate.reshape((len(a_rate), 1))
+    b_rate = b_rate.reshape((1, len(b_rate)))
+
+    a = exponential_lib.Exponential(rate=a_rate)
+    b = exponential_lib.Exponential(rate=b_rate)
+
+    # Consistent with
+    # http://www.mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 108
+    true_kl = np.log(a_rate) - np.log(b_rate) + (b_rate - a_rate) / a_rate
+
+    kl = tfd.kl_divergence(a, b)
+
+    x = a.sample(int(4e5), seed=0)
+    kl_sample = tf.reduce_mean(
+        input_tensor=a.log_prob(x) - b.log_prob(x), axis=0)
+
+    kl_, kl_sample_ = self.evaluate([kl, kl_sample])
+    self.assertAllClose(true_kl, kl_, atol=0., rtol=1e-12)
+    self.assertAllClose(true_kl, kl_sample_, atol=0., rtol=8e-2)
+
+    zero_kl = tfd.kl_divergence(a, a)
+    true_zero_kl_, zero_kl_ = self.evaluate([tf.zeros_like(zero_kl), zero_kl])
+    self.assertAllEqual(true_zero_kl_, zero_kl_)
 
 
 if __name__ == "__main__":

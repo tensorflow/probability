@@ -14,6 +14,8 @@
 # ============================================================================
 # Library for representation of positive-semidefinite kernel functions.
 
+# [internal] load python3.bzl
+
 licenses(["notice"])  # Apache 2.0
 
 package(
@@ -31,6 +33,7 @@ py_library(
         ":matern",
         ":polynomial",
         ":positive_semidefinite_kernel",
+        ":rational_quadratic",
         "//tensorflow_probability/python/positive_semidefinite_kernels/internal",
     ],
 )

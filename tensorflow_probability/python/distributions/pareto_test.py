@@ -24,12 +24,12 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfd = tfp.distributions
-tfe = tf.contrib.eager
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class ParetoTest(test_case.TestCase):
 
   def _scipy_pareto(self, concentration, scale):
@@ -99,17 +99,17 @@ class ParetoTest(test_case.TestCase):
     pareto = tfd.Pareto(concentration, scale, validate_args=True)
 
     with self.assertRaisesOpError("not in the support"):
-      x = tf.placeholder_with_default(input=[2., 3., 3.], shape=[3])
+      x = tf.compat.v1.placeholder_with_default(input=[2., 3., 3.], shape=[3])
       log_prob = pareto.log_prob(x)
       self.evaluate(log_prob)
 
     with self.assertRaisesOpError("not in the support"):
-      x = tf.placeholder_with_default(input=[2., 2., 5.], shape=[3])
+      x = tf.compat.v1.placeholder_with_default(input=[2., 2., 5.], shape=[3])
       log_prob = pareto.log_prob(x)
       self.evaluate(log_prob)
 
     with self.assertRaisesOpError("not in the support"):
-      x = tf.placeholder_with_default(input=[1., 3., 5.], shape=[3])
+      x = tf.compat.v1.placeholder_with_default(input=[1., 3., 5.], shape=[3])
       log_prob = pareto.log_prob(x)
       self.evaluate(log_prob)
 
@@ -182,23 +182,16 @@ class ParetoTest(test_case.TestCase):
     concentration = tf.constant(3.)
     # Check the gradient on the undefined portion.
     x = scale - 1
-
-    pareto = tfd.Pareto(concentration, scale)
-    compute_pdf = lambda x: pareto.prob(x)  # pylint:disable=unnecessary-lambda
-    self.assertAlmostEqual(self.compute_gradients(
-        compute_pdf, args=[x])[0], 0.)
+    self.assertAlmostEqual(self.evaluate(tfp.math.value_and_gradient(
+        tfd.Pareto(concentration, scale).prob, x)[1]), 0.)
 
   def testParetoCDFGradientZeroOutsideSupport(self):
     scale = tf.constant(1.)
     concentration = tf.constant(3.)
     # Check the gradient on the undefined portion.
     x = scale - 1
-
-    pareto = tfd.Pareto(concentration, scale)
-    compute_cdf = lambda x: pareto.cdf(x)  # pylint:disable=unnecessary-lambda
-    self.assertAlmostEqual(
-        self.compute_gradients(
-            compute_cdf, args=[x])[0], 0.)
+    self.assertAlmostEqual(self.evaluate(tfp.math.value_and_gradient(
+        tfd.Pareto(concentration, scale).cdf, x)[1]), 0.)
 
   def testParetoMean(self):
     scale = [1.4, 2., 2.5]
@@ -327,7 +320,8 @@ class ParetoTest(test_case.TestCase):
     kl = tfd.kl_divergence(a, b)
 
     x = a.sample(int(1e5), seed=0)
-    kl_sample = tf.reduce_mean(a.log_prob(x) - b.log_prob(x), 0)
+    kl_sample = tf.reduce_mean(
+        input_tensor=a.log_prob(x) - b.log_prob(x), axis=0)
 
     kl_, kl_sample_ = self.evaluate([kl, kl_sample])
     self.assertAllEqual(true_kl, kl_)

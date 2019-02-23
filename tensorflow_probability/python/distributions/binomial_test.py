@@ -23,10 +23,10 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class BinomialTest(tf.test.TestCase):
 
   def testSimpleShapes(self):
@@ -93,7 +93,8 @@ class BinomialTest(tf.test.TestCase):
     self.evaluate(binom.prob([3., 1, 2]))
     self.evaluate(binom.cdf([2., 3, 2]))
     self.evaluate(binom.cdf([3., 1, 2]))
-    placeholder = tf.placeholder_with_default(input=[1.0, 2.5, 1.5], shape=[3])
+    placeholder = tf.compat.v1.placeholder_with_default(
+        input=[1.0, 2.5, 1.5], shape=[3])
     # Both equality and integer checking fail.
     with self.assertRaisesOpError("cannot contain fractional components."):
       self.evaluate(binom.prob(placeholder))

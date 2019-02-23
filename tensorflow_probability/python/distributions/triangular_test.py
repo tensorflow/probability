@@ -26,14 +26,14 @@ from tensorflow_probability.python.distributions.internal import statistical_tes
 from tensorflow_probability.python.internal import test_case
 
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 class _TriangularTest(object):
 
   def make_tensor(self, x):
     x = tf.cast(x, self._dtype)
-    return tf.placeholder_with_default(
+    return tf.compat.v1.placeholder_with_default(
         input=x, shape=x.shape if self._use_static_shape else None)
 
   def _create_triangular_dist(self, low, high, peak):
@@ -336,7 +336,7 @@ class _TriangularTest(object):
         atol=0)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class TriangularTestStaticShape(test_case.TestCase, _TriangularTest):
   _dtype = np.float32
   _use_static_shape = True
@@ -345,7 +345,7 @@ class TriangularTestStaticShape(test_case.TestCase, _TriangularTest):
     self._rng = np.random.RandomState(123)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class TriangularTestFloat64StaticShape(test_case.TestCase, _TriangularTest):
   _dtype = np.float64
   _use_static_shape = True
@@ -354,7 +354,7 @@ class TriangularTestFloat64StaticShape(test_case.TestCase, _TriangularTest):
     self._rng = np.random.RandomState(123)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class TriangularTestDynamicShape(test_case.TestCase, _TriangularTest):
   _dtype = np.float32
   _use_static_shape = False

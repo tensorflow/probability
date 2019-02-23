@@ -24,10 +24,10 @@ import tensorflow as tf
 from tensorflow_probability import distributions as tfd
 from tensorflow_probability.python.sts.internal import util as sts_util
 
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class MultivariateNormalUtilsTest(tf.test.TestCase):
 
   def test_factored_joint_mvn_diag_full(self):
@@ -142,9 +142,9 @@ class MultivariateNormalUtilsTest(tf.test.TestCase):
                                       mvn3.covariance()))
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class UtilityTests(tf.test.TestCase):
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_broadcast_batch_shape_static(self):
 
     batch_shapes = ([2], [3, 2], [1, 2])
@@ -156,20 +156,21 @@ class UtilityTests(tf.test.TestCase):
 
   def test_broadcast_batch_shape_dynamic(self):
     # Run in graph mode only, since eager mode always takes the static path
+    if tf.executing_eagerly(): return
 
     batch_shapes = ([2], [3, 2], [1, 2])
-    distributions = [tfd.Normal(
-        loc=tf.placeholder_with_default(
-            input=tf.zeros(batch_shape), shape=None),
-        scale=tf.placeholder_with_default(
-            input=tf.ones(batch_shape), shape=None))
-                     for batch_shape in batch_shapes]
+    distributions = [
+        tfd.Normal(
+            loc=tf.compat.v1.placeholder_with_default(
+                input=tf.zeros(batch_shape), shape=None),
+            scale=tf.compat.v1.placeholder_with_default(
+                input=tf.ones(batch_shape), shape=None))
+        for batch_shape in batch_shapes
+    ]
 
-    self.assertAllEqual(self.evaluate(
-        sts_util.broadcast_batch_shape(distributions)),
-                        [3, 2])
+    self.assertAllEqual(
+        [3, 2], self.evaluate(sts_util.broadcast_batch_shape(distributions)))
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_maybe_expand_trailing_dim(self):
 
     # static inputs
@@ -194,7 +195,7 @@ class UtilityTests(tf.test.TestCase):
     ]:
       shape_out = self.evaluate(
           sts_util.maybe_expand_trailing_dim(
-              tf.placeholder_with_default(
+              tf.compat.v1.placeholder_with_default(
                   input=tf.zeros(shape_in), shape=static_shape))).shape
       self.assertAllEqual(shape_out, expected_shape_out)
 

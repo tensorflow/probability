@@ -21,7 +21,7 @@ from __future__ import print_function
 import tensorflow as tf
 
 from tensorflow_probability.python import bijectors as tfb
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 class _TestBijector(tfb.ConditionalBijector):
@@ -48,7 +48,7 @@ class _TestBijector(tfb.ConditionalBijector):
     raise ValueError("forward_log_det_jacobian", arg1, arg2)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class ConditionalBijectorTest(tf.test.TestCase):
 
   def testConditionalBijector(self):
@@ -62,6 +62,20 @@ class ConditionalBijectorTest(tf.test.TestCase):
       method = getattr(b, name)
       with self.assertRaisesRegexp(ValueError, name + ".*b1.*b2"):
         method(1., event_ndims=0, arg1="b1", arg2="b2")
+
+  def testNestedCondition(self):
+    b = _TestBijector()
+    for name in ["forward", "inverse"]:
+      method = getattr(b, name)
+      with self.assertRaisesRegexp(
+          ValueError, name + ".*{'b1': 'c1'}, {'b2': 'c2'}"):
+        method(1., arg1={"b1": "c1"}, arg2={"b2": "c2"})
+
+    for name in ["inverse_log_det_jacobian", "forward_log_det_jacobian"]:
+      method = getattr(b, name)
+      with self.assertRaisesRegexp(
+          ValueError, name + ".*{'b1': 'c1'}, {'b2': 'c2'}"):
+        method(1., event_ndims=0, arg1={"b1": "c1"}, arg2={"b2": "c2"})
 
 
 if __name__ == "__main__":

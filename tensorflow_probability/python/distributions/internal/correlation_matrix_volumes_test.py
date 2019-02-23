@@ -91,11 +91,14 @@ class CorrelationMatrixVolumesTest(tf.test.TestCase):
     chk1 = st.assert_true_mean_equal_by_dkwm(
         rej_weights, low=0., high=rej_proposal_volume, expected=exact_volumes,
         false_fail_rate=1e-6)
-    chk2 = tf.assert_less(
+    chk2 = tf.compat.v1.assert_less(
         st.min_discrepancy_of_true_means_detectable_by_dkwm(
-            num_samples, low=0., high=rej_proposal_volume,
+            num_samples,
+            low=0.,
+            high=rej_proposal_volume,
             # Correct the false fail rate due to different broadcasting
-            false_fail_rate=1.1e-7, false_pass_rate=1e-6),
+            false_fail_rate=1.1e-7,
+            false_pass_rate=1e-6),
         0.036)
     with tf.control_dependencies([chk1, chk2]):
       rej_weights = tf.identity(rej_weights)
@@ -112,10 +115,13 @@ class CorrelationMatrixVolumesTest(tf.test.TestCase):
     chk1 = st.assert_true_mean_equal_by_dkwm(
         rej_weights, low=0., high=rej_proposal_volume, expected=exact_volumes,
         false_fail_rate=1e-6)
-    chk2 = tf.assert_less(
+    chk2 = tf.compat.v1.assert_less(
         st.min_discrepancy_of_true_means_detectable_by_dkwm(
-            num_samples, low=0., high=rej_proposal_volume,
-            false_fail_rate=1e-6, false_pass_rate=1e-6),
+            num_samples,
+            low=0.,
+            high=rej_proposal_volume,
+            false_fail_rate=1e-6,
+            false_pass_rate=1e-6),
         # Going for about a 3% relative error
         0.15)
     with tf.control_dependencies([chk1, chk2]):
@@ -133,10 +139,13 @@ class CorrelationMatrixVolumesTest(tf.test.TestCase):
     chk1 = st.assert_true_mean_equal_by_dkwm(
         rej_weights, low=0., high=rej_proposal_volume, expected=exact_volumes,
         false_fail_rate=1e-6)
-    chk2 = tf.assert_less(
+    chk2 = tf.compat.v1.assert_less(
         st.min_discrepancy_of_true_means_detectable_by_dkwm(
-            num_samples, low=0., high=rej_proposal_volume,
-            false_fail_rate=1e-6, false_pass_rate=1e-6),
+            num_samples,
+            low=0.,
+            high=rej_proposal_volume,
+            false_fail_rate=1e-6,
+            false_pass_rate=1e-6),
         # Going for about a 10% relative error
         1.1)
     with tf.control_dependencies([chk1, chk2]):

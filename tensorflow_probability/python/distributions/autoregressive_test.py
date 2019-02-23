@@ -22,15 +22,15 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import distribution_util
-from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
-tfe = tf.contrib.eager
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
-class AutogressiveTest(test_util.VectorDistributionTestHelpers,
+@test_util.run_all_in_graph_and_eager_modes
+class AutogressiveTest(tfp_test_util.VectorDistributionTestHelpers,
                        tf.test.TestCase):
   """Tests the Autoregressive distribution."""
 

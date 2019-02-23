@@ -80,30 +80,31 @@ def default_exchange_proposed_fn(prob_exchange):
     """Default function for `exchange_proposed_fn` of `kernel`."""
     seed_stream = distributions.SeedStream(seed, 'default_exchange_proposed_fn')
 
-    zero_start = tf.random_uniform([], seed=seed_stream()) > 0.5
+    zero_start = tf.random.uniform([], seed=seed_stream()) > 0.5
     if num_replica % 2 == 0:
 
       def _exchange():
         flat_exchange = tf.range(num_replica)
         if num_replica > 2:
-          start = tf.to_int32(~zero_start)
+          start = tf.cast(~zero_start, dtype=tf.int32)
           end = num_replica - start
           flat_exchange = flat_exchange[start:end]
-        return tf.reshape(flat_exchange, [tf.size(flat_exchange) // 2, 2])
+        return tf.reshape(flat_exchange, [tf.size(input=flat_exchange) // 2, 2])
     else:
 
       def _exchange():
-        start = tf.to_int32(zero_start)
-        end = num_replica - tf.to_int32(~zero_start)
+        start = tf.cast(zero_start, dtype=tf.int32)
+        end = num_replica - tf.cast(~zero_start, dtype=tf.int32)
         flat_exchange = tf.range(num_replica)[start:end]
-        return tf.reshape(flat_exchange, [tf.size(flat_exchange) // 2, 2])
+        return tf.reshape(flat_exchange, [tf.size(input=flat_exchange) // 2, 2])
 
     def _null_exchange():
-      return tf.reshape(tf.to_int32([]), shape=[0, 2])
+      return tf.reshape(tf.cast([], dtype=tf.int32), shape=[0, 2])
 
     return tf.cond(
-        tf.random_uniform([], seed=seed_stream()) < prob_exchange, _exchange,
-        _null_exchange)
+        pred=tf.random.uniform([], seed=seed_stream()) < prob_exchange,
+        true_fn=_exchange,
+        false_fn=_null_exchange)
 
   return default_exchange_proposed_fn_
 
@@ -232,8 +233,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
                make_kernel_fn,
                exchange_proposed_fn=default_exchange_proposed_fn(1.),
                seed=None,
-               name=None,
-               **kwargs):
+               name=None):
     """Instantiates this object.
 
     Args:
@@ -252,13 +252,12 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
         Default value: `None` (i.e., no seed).
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., "remc_kernel").
-      **kwargs: Arguments for `make_kernel_fn`.
 
     Raises:
       ValueError: `inverse_temperatures` doesn't have statically known 1D shape.
     """
     inverse_temperatures = tf.convert_to_tensor(
-        inverse_temperatures, name='inverse_temperatures')
+        value=inverse_temperatures, name='inverse_temperatures')
 
     # Note these are static checks, and don't need to be embedded in the graph.
     inverse_temperatures.shape.assert_is_fully_defined()
@@ -269,7 +268,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
     self._parameters = dict(
         target_log_prob_fn=target_log_prob_fn,
         inverse_temperatures=inverse_temperatures,
-        num_replica=inverse_temperatures.shape[0].value,
+        num_replica=tf.compat.dimension_value(inverse_temperatures.shape[0]),
         exchange_proposed_fn=exchange_proposed_fn,
         seed=seed,
         name=name)
@@ -376,13 +375,13 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
 
       exchange_proposed = self.exchange_proposed_fn(
           self.num_replica, seed=self._seed_stream())
-      exchange_proposed_n = tf.shape(exchange_proposed)[0]
+      exchange_proposed_n = tf.shape(input=exchange_proposed)[0]
 
       exchanged_states = self._get_exchanged_states(
           old_states, exchange_proposed, exchange_proposed_n,
           sampled_replica_states, sampled_replica_results)
 
-      no_exchange_proposed, _ = tf.setdiff1d(
+      no_exchange_proposed, _ = tf.compat.v1.setdiff1d(
           tf.range(self.num_replica), tf.reshape(exchange_proposed, [-1]))
 
       exchanged_states = self._insert_old_states_where_no_exchange_was_proposed(
@@ -452,9 +451,10 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
       # reproducibility).  This may mean we sample too many, but we will always
       # have enough.
       sample_shape = tf.concat(
-          ([self.num_replica // 2], tf.shape(target_log_probs)[1:]), axis=0)
-      log_uniforms = tf.log(
-          tf.random_uniform(
+          ([self.num_replica // 2], tf.shape(input=target_log_probs)[1:]),
+          axis=0)
+      log_uniforms = tf.math.log(
+          tf.random.uniform(
               shape=sample_shape, dtype=dtype, seed=self._seed_stream()))
 
       def _swap(is_exchange_accepted, x, y):
@@ -493,15 +493,16 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
         return i + 1, exchanged_states
 
       # At this point, exchanged_states[k] is a length num_replicas TensorArray.
-      return tf.while_loop(cond, body,
-                           [tf.constant(0), exchanged_states])[1]  # Remove `i`
+      return tf.while_loop(
+          cond=cond, body=body, loop_vars=[tf.constant(0),
+                                           exchanged_states])[1]  # Remove `i`
 
   def _insert_old_states_where_no_exchange_was_proposed(
       self, no_exchange_proposed, old_states, exchanged_states):
     with tf.name_scope('insert_old_states_where_no_exchange_was_proposed'):
 
       def cond(j, unused_exchanged_states):
-        return j < tf.size(no_exchange_proposed)
+        return j < tf.size(input=no_exchange_proposed)
 
       def body(j, exchanged_states):
         replica = no_exchange_proposed[j]
@@ -510,8 +511,9 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
               replica, old_states[k].read(replica))
         return j + 1, exchanged_states
 
-      return tf.while_loop(cond, body,
-                           [tf.constant(0), exchanged_states])[1]  # Remove `j`
+      return tf.while_loop(
+          cond=cond, body=body, loop_vars=[tf.constant(0),
+                                           exchanged_states])[1]  # Remove `j`
 
   def bootstrap_results(self, init_state):
     """Returns an object with the same type as returned by `one_step`.
@@ -538,9 +540,9 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
           if mcmc_util.is_list_like(init_state) else [init_state])
 
       # Convert all states parts to tensor...
-      replica_states = [[tf.convert_to_tensor(s)
-                         for s in init_state_parts]
-                        for i in range(self.num_replica)]
+      replica_states = [[
+          tf.convert_to_tensor(value=s) for s in init_state_parts
+      ] for i in range(self.num_replica)]
 
       if not mcmc_util.is_list_like(init_state):
         replica_states = [s[0] for s in replica_states]

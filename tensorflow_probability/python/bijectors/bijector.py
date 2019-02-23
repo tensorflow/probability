@@ -22,6 +22,7 @@ import abc
 import collections
 import contextlib
 import re
+import weakref
 
 # Dependency imports
 import numpy as np
@@ -43,8 +44,8 @@ class _Mapping(
     """Custom __new__ so namedtuple items have defaults.
 
     Args:
-      x: `Tensor`. Forward.
-      y: `Tensor`. Inverse.
+      x: `Tensor` or None. Input to forward; output of inverse.
+      y: `Tensor` or None. Input to inverse; output of forward.
       ildj: `Tensor`. This is the (un-reduce_sum'ed) inverse log det jacobian.
       kwargs: Python dictionary. Extra args supplied to forward/inverse/etc
         functions.
@@ -55,21 +56,16 @@ class _Mapping(
     return super(_Mapping, cls).__new__(cls, x, y, ildj, kwargs)
 
   @property
-  def x_key(self):
-    """Returns key used for caching Y=g(X)."""
-    return (self.x,) + self._deep_tuple(tuple(sorted(self.kwargs.items())))
-
-  @property
-  def y_key(self):
-    """Returns key used for caching X=g^{-1}(Y)."""
-    return (self.y,) + self._deep_tuple(tuple(sorted(self.kwargs.items())))
+  def subkey(self):
+    """Returns subkey used for caching (nested under either `x` or `y`)."""
+    return self._deep_tuple(self.kwargs)
 
   def merge(self, x=None, y=None, ildj=None, kwargs=None, mapping=None):
     """Returns new _Mapping with args merged with self.
 
     Args:
-      x: `Tensor`. Forward.
-      y: `Tensor`. Inverse.
+      x: `Tensor` or None. Input to forward; output of inverse.
+      y: `Tensor` or None. Input to inverse; output of forward.
       ildj: `Tensor`. This is the (un-reduce_sum'ed) inverse log det jacobian.
       kwargs: Python dictionary. Extra args supplied to forward/inverse/etc
         functions.
@@ -92,20 +88,34 @@ class _Mapping(
         x=self._merge(self.x, mapping.x),
         y=self._merge(self.y, mapping.y),
         ildj=self._merge(self.ildj, mapping.ildj),
-        kwargs=self._merge(self.kwargs, mapping.kwargs))
+        kwargs=self._merge(self.kwargs, mapping.kwargs, use_equals=True))
 
-  def _merge(self, old, new):
+  def remove(self, field):
+    """To support weak referencing, removes cache key from the cache value."""
+    return _Mapping(
+        x=None if field == "x" else self.x,
+        y=None if field == "y" else self.y,
+        ildj=self.ildj,
+        kwargs=self.kwargs)
+
+  def _merge(self, old, new, use_equals=False):
     """Helper to merge which handles merging one value."""
     if old is None:
       return new
-    elif new is not None and old != new:
-      raise ValueError("Incompatible values: %s != %s" % (old, new))
-    return old
+    if new is None:
+      return old
+    if (old == new) if use_equals else (old is new):
+      return old
+    raise ValueError("Incompatible values: %s != %s" % (old, new))
 
   def _deep_tuple(self, x):
-    """Converts lists of lists to tuples of tuples."""
-    return (tuple(map(self._deep_tuple, x)) if isinstance(x,
-                                                          (list, tuple)) else x)
+    """Converts nested `tuple`, `list`, or `dict` to nested `tuple`."""
+    if isinstance(x, dict):
+      return self._deep_tuple(tuple(sorted(x.items())))
+    elif isinstance(x, (list, tuple)):
+      return tuple(map(self._deep_tuple, x))
+
+    return x
 
 
 @six.add_metaclass(abc.ABCMeta)
@@ -546,8 +556,8 @@ class Bijector(object):
     self._constant_ildj = None
     self._validate_args = validate_args
     self._dtype = dtype
-    self._from_y = {}
-    self._from_x = {}
+    self._from_y = weakref.WeakKeyDictionary()
+    self._from_x = weakref.WeakKeyDictionary()
     if name:
       self._name = name
     else:
@@ -560,7 +570,7 @@ class Bijector(object):
       self._name = camel_to_snake(type(self).__name__.lstrip("_"))
 
     for i, t in enumerate(self._graph_parents):
-      if t is None or not tf.contrib.framework.is_tensor(t):
+      if t is None or not tf.is_tensor(t):
         raise ValueError("Graph parent item %d is not a Tensor; %s." % (i, t))
 
   @property
@@ -723,7 +733,7 @@ class Bijector(object):
     """
     with self._name_scope(name, [input_shape]):
       input_shape = tf.convert_to_tensor(
-          input_shape, dtype=tf.int32, name="input_shape")
+          value=input_shape, dtype=tf.int32, name="input_shape")
       return self._forward_event_shape_tensor(input_shape)
 
   def _forward_event_shape(self, input_shape):
@@ -767,7 +777,7 @@ class Bijector(object):
     """
     with self._name_scope(name, [output_shape]):
       output_shape = tf.convert_to_tensor(
-          output_shape, dtype=tf.int32, name="output_shape")
+          value=output_shape, dtype=tf.int32, name="output_shape")
       return self._inverse_event_shape_tensor(output_shape)
 
   def _inverse_event_shape(self, output_shape):
@@ -796,7 +806,7 @@ class Bijector(object):
 
   def _call_forward(self, x, name, **kwargs):
     with self._name_scope(name, [x]):
-      x = tf.convert_to_tensor(x, name="x")
+      x = tf.convert_to_tensor(value=x, name="x")
       self._maybe_assert_dtype(x)
       if not self._is_injective:  # No caching for non-injective
         return self._forward(x, **kwargs)
@@ -804,7 +814,13 @@ class Bijector(object):
       if mapping.y is not None:
         return mapping.y
       mapping = mapping.merge(y=self._forward(x, **kwargs))
-      self._cache(mapping)
+      # It's most important to cache the y->x mapping, because computing
+      # inverse(forward(y)) may be numerically unstable / lossy. Caching the
+      # x->y mapping only saves work. Since python doesn't support ephemerons,
+      # we cannot be simultaneously weak-keyed on both x and y, so we choose y.
+      self._cache_by_y(mapping)
+      if not tf.executing_eagerly():
+        self._cache_by_x(mapping)
       return mapping.y
 
   def forward(self, x, name="forward"):
@@ -830,7 +846,7 @@ class Bijector(object):
 
   def _call_inverse(self, y, name, **kwargs):
     with self._name_scope(name, [y]):
-      y = tf.convert_to_tensor(y, name="y")
+      y = tf.convert_to_tensor(value=y, name="y")
       self._maybe_assert_dtype(y)
       if not self._is_injective:  # No caching for non-injective
         return self._inverse(y, **kwargs)
@@ -838,7 +854,13 @@ class Bijector(object):
       if mapping.x is not None:
         return mapping.x
       mapping = mapping.merge(x=self._inverse(y, **kwargs))
-      self._cache(mapping)
+      # It's most important to cache the x->y mapping, because computing
+      # forward(inverse(y)) may be numerically unstable / lossy. Caching the
+      # y->x mapping only saves work. Since python doesn't support ephemerons,
+      # we cannot be simultaneously weak-keyed on both x and y, so we choose x.
+      self._cache_by_x(mapping)
+      if not tf.executing_eagerly():
+        self._cache_by_y(mapping)
       return mapping.x
 
   def inverse(self, y, name="inverse"):
@@ -954,9 +976,7 @@ class Bijector(object):
           x, y, tensor_to_use, use_inverse_ldj_fn, kwargs)
 
     return self._reduce_jacobian_det_over_event(
-        tf.shape(tensor_to_use),
-        unreduced_ildj,
-        min_event_ndims,
+        tf.shape(input=tensor_to_use), unreduced_ildj, min_event_ndims,
         event_ndims)
 
   def _compute_unreduced_nonconstant_ildj_with_caching(
@@ -1001,7 +1021,7 @@ class Bijector(object):
       ildj = -self._forward_log_det_jacobian(tensor_to_use, **kwargs)
 
     mapping = mapping.merge(x=x, y=y, ildj=ildj)
-    self._cache(mapping)
+    self._cache_update(mapping)
     return ildj
 
   def _compute_unreduced_constant_ildj_with_caching(
@@ -1063,15 +1083,15 @@ class Bijector(object):
         self._check_valid_event_ndims(
             min_event_ndims=self.inverse_min_event_ndims,
             event_ndims=event_ndims)):
-      y = tf.convert_to_tensor(y, name="y")
+      y = tf.convert_to_tensor(value=y, name="y")
       self._maybe_assert_dtype(y)
 
       if not self._is_injective:
         ildjs = self._inverse_log_det_jacobian(y, **kwargs)
         return tuple(
             self._reduce_jacobian_det_over_event(
-                tf.shape(y), ildj, self.inverse_min_event_ndims,
-                event_ndims)
+                tf.shape(
+                    input=y), ildj, self.inverse_min_event_ndims, event_ndims)
             for ildj in ildjs)
 
       return self._compute_inverse_log_det_jacobian_with_caching(
@@ -1144,7 +1164,7 @@ class Bijector(object):
         self._check_valid_event_ndims(
             min_event_ndims=self.forward_min_event_ndims,
             event_ndims=event_ndims)):
-      x = tf.convert_to_tensor(x, name="x")
+      x = tf.convert_to_tensor(value=x, name="x")
       self._maybe_assert_dtype(x)
 
       return -self._compute_inverse_log_det_jacobian_with_caching(
@@ -1196,39 +1216,57 @@ class Bijector(object):
       raise TypeError(
           "Input had dtype %s but expected %s." % (x.dtype, self.dtype))
 
-  def _cache(self, mapping):
-    """Helper which stores mapping info in forward/inverse dicts."""
+  def _cache_by_x(self, mapping):
+    """Helper which stores new mapping info in the forward dict."""
     # Merging from lookup is an added check that we're not overwriting anything
     # which is not None.
     mapping = mapping.merge(
         mapping=self._lookup(mapping.x, mapping.y, mapping.kwargs))
-    if mapping.x is None and mapping.y is None:
-      raise ValueError("Caching expects at least one of (x,y) to be known, "
-                       "i.e., not None.")
-    self._from_x[mapping.x_key] = mapping
-    self._from_y[mapping.y_key] = mapping
+    if mapping.x is None:
+      raise ValueError("Caching expects x to be known, i.e., not None.")
+    self._from_x.setdefault(mapping.x, {})[mapping.subkey] = mapping.remove("x")
+
+  def _cache_by_y(self, mapping):
+    """Helper which stores new mapping info in the inverse dict."""
+    # Merging from lookup is an added check that we're not overwriting anything
+    # which is not None.
+    mapping = mapping.merge(
+        mapping=self._lookup(mapping.x, mapping.y, mapping.kwargs))
+    if mapping.y is None:
+      raise ValueError("Caching expects y to be known, i.e., not None.")
+    self._from_y.setdefault(mapping.y, {})[mapping.subkey] = mapping.remove("y")
+
+  def _cache_update(self, mapping):
+    """Helper which updates only those cached entries that already exist."""
+    if (mapping.x is not None and
+        mapping.subkey in self._from_x.get(mapping.x, {})):
+      self._cache_by_x(mapping)
+    if (mapping.y is not None and
+        mapping.subkey in self._from_y.get(mapping.y, {})):
+      self._cache_by_y(mapping)
 
   def _lookup(self, x=None, y=None, kwargs=None):
     """Helper which retrieves mapping info from forward/inverse dicts."""
     mapping = _Mapping(x=x, y=y, kwargs=kwargs)
-    # Since _cache requires both x,y to be set, we only need to do one cache
-    # lookup since the mapping is always in both or neither.
-    if mapping.x is not None:
-      return self._from_x.get(mapping.x_key, mapping)
-    if mapping.y is not None:
-      return self._from_y.get(mapping.y_key, mapping)
+    subkey = mapping.subkey
+    if x is not None:
+      # We removed x at caching time. Add it back if we lookup successfully.
+      mapping = self._from_x.get(x, {}).get(subkey, mapping).merge(x=x)
+    if y is not None:
+      # We removed y at caching time. Add it back if we lookup successfully.
+      mapping = self._from_y.get(y, {}).get(subkey, mapping).merge(y=y)
     return mapping
 
   def _reduce_jacobian_det_over_event(
       self, shape_tensor, ildj, min_event_ndims, event_ndims):
     """Reduce jacobian over event_ndims - min_event_ndims."""
     # In this case, we need to tile the Jacobian over the event and reduce.
-    rank = tf.size(shape_tensor)
+    rank = tf.size(input=shape_tensor)
     shape_tensor = shape_tensor[rank - event_ndims:rank - min_event_ndims]
 
     ones = tf.ones(shape_tensor, ildj.dtype)
     reduced_ildj = tf.reduce_sum(
-        ones * ildj,
+        input_tensor=ones * ildj,
         axis=self._get_event_reduce_dims(min_event_ndims, event_ndims))
 
     return reduced_ildj
@@ -1245,8 +1283,8 @@ class Bijector(object):
 
   def _check_valid_event_ndims(self, min_event_ndims, event_ndims):
     """Check whether event_ndims is atleast min_event_ndims."""
-    event_ndims = tf.convert_to_tensor(event_ndims, name="event_ndims")
-    event_ndims_ = tf.contrib.util.constant_value(event_ndims)
+    event_ndims = tf.convert_to_tensor(value=event_ndims, name="event_ndims")
+    event_ndims_ = tf.get_static_value(event_ndims)
     assertions = []
 
     if not event_ndims.dtype.is_integer:
@@ -1262,7 +1300,9 @@ class Bijector(object):
                          "min_event_ndims ({})".format(event_ndims_,
                                                        min_event_ndims))
     elif self.validate_args:
-      assertions += [tf.assert_greater_equal(event_ndims, min_event_ndims)]
+      assertions += [
+          tf.compat.v1.assert_greater_equal(event_ndims, min_event_ndims)
+      ]
 
     if event_ndims.shape.is_fully_defined():
       if event_ndims.shape.ndims != 0:
@@ -1270,7 +1310,9 @@ class Bijector(object):
             event_ndims.shape.ndims))
 
     elif self.validate_args:
-      assertions += [tf.assert_rank(event_ndims, 0, message="Expected scalar.")]
+      assertions += [
+          tf.compat.v1.assert_rank(event_ndims, 0, message="Expected scalar.")
+      ]
     return assertions
 
   def _maybe_get_static_event_ndims(self, event_ndims):

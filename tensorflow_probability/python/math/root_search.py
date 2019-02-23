@@ -63,7 +63,7 @@ def secant_root(objective_fn,
       callable of a single variable. `objective_fn` must return a `Tensor` of
       the same shape and dtype as `initial_position`.
     initial_position: `Tensor` or Python float representing the starting
-      position. The callable will search for roots in the neighborhood of each
+      position. The function will search for roots in the neighborhood of each
       point. The shape of `initial_position` should match that of the input to
       `objective_fn`.
     next_position: Optional `Tensor` representing the next position in the
@@ -75,7 +75,7 @@ def secant_root(objective_fn,
         1e-4`.
     value_at_position: Optional `Tensor` or Pyhon float representing the value
       of `objective_fn` at `initial_position`. If specified, this argument must
-      have the same shape and dtype as initial_position. If not specified, the
+      have the same shape and dtype as `initial_position`. If not specified, the
       value will be evaluated during the search.
       Default value: None.
     position_tolerance: Optional `Tensor` representing the tolerance for the
@@ -118,7 +118,7 @@ def secant_root(objective_fn,
       num_iterations: The number of iterations performed.
 
   Raises:
-    ValueError: if a non-callable `stopping_policy` is passed.
+    ValueError: if a non-callable `stopping_policy_fn` is passed.
 
   #### Examples
 
@@ -135,7 +135,7 @@ def secant_root(objective_fn,
   tfp.math.secant_root(objective_fn=f, initial_position=x))
   # ==> RootSearchResults(
       estimated_root=array([-0.90617985, 0.90617985]),
-      objective_at_estimated_root=array([ -4.81727769e-10, 7.44957651e-10]),
+      objective_at_estimated_root=array([-4.81727769e-10, 7.44957651e-10]),
       num_iterations=array([ 7, 24], dtype=int32))
 
   tfp.math.secant_root(objective_fn=f,
@@ -143,7 +143,7 @@ def secant_root(objective_fn,
                        stopping_policy_fn=tf.reduce_any)
   # ==> RootSearchResults(
       estimated_root=array([-0.90617985, 3.27379206]),
-      objective_at_estimated_root=array([ -4.81727769e-10, 2.66058312e+03]),
+      objective_at_estimated_root=array([-4.81727769e-10, 2.66058312e+03]),
       num_iterations=array([7, 8], dtype=int32))
 
   # Example 2: Roots of a multiplex function from a single starting point.
@@ -158,7 +158,7 @@ def secant_root(objective_fn,
   tfp.math.secant_root(objective_fn=f, initial_position=x)
   # ==> RootSearchResults(
       estimated_root=array([-0.77459667, -0.90617985]),
-      objective_at_estimated_root=array([ -7.81339438e-11, -4.81727769e-10]),
+      objective_at_estimated_root=array([-7.81339438e-11, -4.81727769e-10]),
       num_iterations=array([7, 7], dtype=int32))
 
   # Example 3: Roots of a multiplex function from two starting points.
@@ -174,35 +174,35 @@ def secant_root(objective_fn,
   # ==> RootSearchResults(
       estimated_root=array([
           [-0.77459667, -0.90617985],
-          [ 0.77459667,  0.90617985]]),
+          [ 0.77459667, 0.90617985]]),
       objective_at_estimated_root=array([
-          [ -7.81339438e-11, -4.81727769e-10],
-          [  6.66025013e-11,  7.44957651e-10]]),
+          [-7.81339438e-11, -4.81727769e-10],
+          [6.66025013e-11, 7.44957651e-10]]),
       num_iterations=array([
-          [ 7,  7],
+          [7, 7],
           [16, 24]], dtype=int32))
   ```
   """
   if not callable(stopping_policy_fn):
-    raise ValueError('stopping_policy must be callable')
+    raise ValueError('stopping_policy_fn must be callable')
 
   position = tf.convert_to_tensor(
-      initial_position,
+      value=initial_position,
       name='position',
   )
   value_at_position = tf.convert_to_tensor(
-      value_at_position or objective_fn(position),
+      value=value_at_position or objective_fn(position),
       name='value_at_position',
       dtype=position.dtype.base_dtype)
 
   zero = tf.zeros_like(position)
   position_tolerance = tf.convert_to_tensor(
-      position_tolerance, name='position_tolerance', dtype=position.dtype)
+      value=position_tolerance, name='position_tolerance', dtype=position.dtype)
   value_tolerance = tf.convert_to_tensor(
-      value_tolerance, name='value_tolerance', dtype=position.dtype)
+      value=value_tolerance, name='value_tolerance', dtype=position.dtype)
 
   num_iterations = tf.zeros_like(position, dtype=tf.int32)
-  max_iterations = tf.convert_to_tensor(max_iterations, dtype=tf.int32)
+  max_iterations = tf.convert_to_tensor(value=max_iterations, dtype=tf.int32)
   max_iterations = tf.broadcast_to(
       max_iterations, name='max_iterations', shape=position.shape)
 
@@ -238,7 +238,7 @@ def secant_root(objective_fn,
     """
     del position, value_at_position, num_iterations, step  # Unused
     return ~tf.convert_to_tensor(
-        stopping_policy_fn(finished), name='should_stop', dtype=tf.bool)
+        value=stopping_policy_fn(finished), name='should_stop', dtype=tf.bool)
 
   # For each point in `position`, the search is stopped if either:
   # (1) A root has been found
@@ -297,17 +297,20 @@ def secant_root(objective_fn,
     if validate_args:
       assertions += [
           tf.Assert(
-              tf.reduce_all(position_tolerance > zero), [position_tolerance]),
-          tf.Assert(tf.reduce_all(value_tolerance > zero), [value_tolerance]),
+              tf.reduce_all(input_tensor=position_tolerance > zero),
+              [position_tolerance]),
           tf.Assert(
-              tf.reduce_all(max_iterations >= num_iterations),
+              tf.reduce_all(input_tensor=value_tolerance > zero),
+              [value_tolerance]),
+          tf.Assert(
+              tf.reduce_all(input_tensor=max_iterations >= num_iterations),
               [max_iterations]),
       ]
 
     with tf.control_dependencies(assertions):
       root, value_at_root, num_iterations, _, _ = tf.while_loop(
-          _should_continue,
-          _body,
+          cond=_should_continue,
+          body=_body,
           loop_vars=[
               position, value_at_position, num_iterations, step, finished
           ])

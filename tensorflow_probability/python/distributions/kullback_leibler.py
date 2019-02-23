@@ -89,7 +89,8 @@ def kl_divergence(distribution_a, distribution_b,
     # well. This typically happens when this function is called on a pair of
     # TF's distributions.
     with deprecation.silence():
-      return tf.distributions.kl_divergence(distribution_a, distribution_b)
+      return tf.compat.v1.distributions.kl_divergence(distribution_a,
+                                                      distribution_b)
 
   with tf.name_scope("KullbackLeibler"):
     kl_t = kl_fn(distribution_a, distribution_b, name=name)
@@ -101,11 +102,12 @@ def kl_divergence(distribution_a, distribution_b,
 
     with tf.control_dependencies([
         tf.Assert(
-            tf.logical_not(
-                tf.reduce_any(tf.is_nan(kl_t))),
-            ["KL calculation between %s and %s returned NaN values "
-             "(and was called with allow_nan_stats=False). Values:"
-             % (distribution_a.name, distribution_b.name), kl_t])]):
+            tf.logical_not(tf.reduce_any(input_tensor=tf.math.is_nan(kl_t))), [
+                "KL calculation between %s and %s returned NaN values "
+                "(and was called with allow_nan_stats=False). Values:" %
+                (distribution_a.name, distribution_b.name), kl_t
+            ])
+    ]):
       return tf.identity(kl_t, name="checked_kl")
 
 
@@ -187,5 +189,5 @@ class RegisterKL(object):
     # Additionally, for distributions which have deprecated copies, we register
     # all 3 combinations in their respective files (see test for the list).
     with deprecation.silence():
-      tf.distributions.RegisterKL(*self._key)(kl_fn)
+      tf.compat.v1.distributions.RegisterKL(*self._key)(kl_fn)
     return kl_fn

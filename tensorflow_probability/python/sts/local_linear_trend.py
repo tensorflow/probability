@@ -164,11 +164,13 @@ class LocalLinearTrendStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
       dtype = initial_state_prior.dtype
 
       level_scale = tf.convert_to_tensor(
-          level_scale, name='level_scale', dtype=dtype)
+          value=level_scale, name='level_scale', dtype=dtype)
       slope_scale = tf.convert_to_tensor(
-          slope_scale, name='slope_scale', dtype=dtype)
+          value=slope_scale, name='slope_scale', dtype=dtype)
       observation_noise_scale = tf.convert_to_tensor(
-          observation_noise_scale, name='observation_noise_scale', dtype=dtype)
+          value=observation_noise_scale,
+          name='observation_noise_scale',
+          dtype=dtype)
 
       # Explicitly broadcast all parameters to the same batch shape. This
       # allows us to use `tf.stack` for a compact model specification.
@@ -289,24 +291,24 @@ class LocalLinearTrend(StructuralTimeSeries):
       # change inference performance and results.
       if level_scale_prior is None:
         level_scale_prior = tfd.LogNormal(
-            loc=tf.log(.05 * observed_stddev),
+            loc=tf.math.log(.05 * observed_stddev),
             scale=3.,
             name='level_scale_prior')
       if slope_scale_prior is None:
         slope_scale_prior = tfd.LogNormal(
-            loc=tf.log(.05 * observed_stddev),
+            loc=tf.math.log(.05 * observed_stddev),
             scale=3.,
             name='slope_scale_prior')
       if initial_level_prior is None:
         initial_level_prior = tfd.Normal(
             loc=observed_initial,
-            scale=observed_stddev,
+            scale=tf.abs(observed_initial) + observed_stddev,
             name='initial_level_prior')
       if initial_slope_prior is None:
         initial_slope_prior = tfd.Normal(
             loc=0., scale=observed_stddev, name='initial_slope_prior')
 
-      tf.assert_same_float_dtype([
+      tf.debugging.assert_same_float_dtype([
           level_scale_prior, slope_scale_prior, initial_level_prior,
           initial_slope_prior
       ])

@@ -24,16 +24,16 @@ import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class TanhBijectorTest(tf.test.TestCase):
   """Tests correctness of the Y = g(X) = tanh(X) transformation."""
 
   def testBijector(self):
     self.assertEqual("tanh", tfb.Tanh().name)
-    x = np.linspace(-3., 3., 100).reshape([2, 5, 10]).astype(np.float32)
+    x = np.linspace(-3., 3., 100).reshape([2, 5, 10]).astype(np.float64)
     y = np.tanh(x)
     ildj = -np.log1p(-np.square(np.tanh(x)))
     bijector = tfb.Tanh()
@@ -56,9 +56,9 @@ class TanhBijectorTest(tf.test.TestCase):
         n=int(10e4))
 
   def testBijectiveAndFinite(self):
-    x = np.linspace(-5., 5., 100).astype(np.float32)
+    x = np.linspace(-10., 10., 100).astype(np.float64)
     eps = 1e-3
-    y = np.linspace(eps, 1. - eps, 100).astype(np.float32)
+    y = np.linspace(-1. + eps, 1. - eps, 100).astype(np.float64)
     bijector_test_util.assert_bijective_and_finite(
         tfb.Tanh(), x, y, eval_func=self.evaluate, event_ndims=0, atol=0.,
         rtol=1e-4)
@@ -66,9 +66,12 @@ class TanhBijectorTest(tf.test.TestCase):
   def testMatchWithAffineTransform(self):
     direct_bj = tfb.Tanh()
     indirect_bj = tfb.Chain([
-        tfb.AffineScalar(shift=tf.to_double(-1.0), scale=tf.to_double(2.0)),
+        tfb.AffineScalar(
+            shift=tf.cast(-1.0, dtype=tf.float64),
+            scale=tf.cast(2.0, dtype=tf.float64)),
         tfb.Sigmoid(),
-        tfb.AffineScalar(scale=tf.to_double(2.0))])
+        tfb.AffineScalar(scale=tf.cast(2.0, dtype=tf.float64))
+    ])
 
     x = np.linspace(-3.0, 3.0, 100)
     y = np.tanh(x)

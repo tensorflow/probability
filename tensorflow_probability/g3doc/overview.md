@@ -41,30 +41,37 @@ in core TensorFlow.
 
 ### Layer 2: Model Building
 
-* *Edward2* ([`tfp.edward2`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2)):
-  A probabilistic programming language for specifying flexible probabilistic
-  models as programs.
-* *Probabilistic layers* ([`tfp.layers`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/layers)):
-  Neural network layers with uncertainty over the functions they represent,
-  extending TensorFlow layers.
-* *Trainable distributions* ([`tfp.trainable_distributions`](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/trainable_distributions.py)):
-  Probability distributions parameterized by a single tensor, making it easy to
-  build neural nets that output probability distributions.
+*   *Edward2*
+    ([`tfp.edward2`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2)):
+    A probabilistic programming language for specifying flexible probabilistic
+    models as programs.
+*   *Probabilistic layers*
+    ([`tfp.layers`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/layers)):
+    Neural network layers with uncertainty over the functions they represent,
+    extending TensorFlow layers.
+*   *Trainable distributions*
+    ([`tfp.trainable_distributions`](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/trainable_distributions)):
+    Probability distributions parameterized by a single tensor, making it easy
+    to build neural nets that output probability distributions.
 
 ### Layer 3: Probabilistic Inference
 
-* *Markov chain Monte Carlo* ([`tfp.mcmc`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc)):
-  Algorithms for approximating integrals via sampling. Includes
-  [Hamiltonian Monte Carlo](https://en.wikipedia.org/wiki/Hamiltonian_Monte_Carlo){:.external},
-  random-walk Metropolis-Hastings, and the ability to build custom transition
-  kernels.
-* *Variational Inference* ([`tfp.vi`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/vi)):
-  Algorithms for approximating integrals through optimization.
-* *Optimizers* ([`tfp.optimizer`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/optimizer)):
-  Stochastic optimization methods, extending TensorFlow Optimizers. Includes
-  [Stochastic Gradient Langevin Dynamics](http://www.icml-2011.org/papers/398_icmlpaper.pdf){:.external}.
-* *Monte Carlo* ([`tfp.monte_carlo`](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/monte_carlo.py)):
-  Tools for computing Monte Carlo expectations.
+*   *Markov chain Monte Carlo*
+    ([`tfp.mcmc`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc)):
+    Algorithms for approximating integrals via sampling. Includes
+    [Hamiltonian Monte Carlo](https://en.wikipedia.org/wiki/Hamiltonian_Monte_Carlo){:.external},
+    random-walk Metropolis-Hastings, and the ability to build custom transition
+    kernels.
+*   *Variational Inference*
+    ([`tfp.vi`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/vi)):
+    Algorithms for approximating integrals through optimization.
+*   *Optimizers*
+    ([`tfp.optimizer`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/optimizer)):
+    Stochastic optimization methods, extending TensorFlow Optimizers. Includes
+    [Stochastic Gradient Langevin Dynamics](http://www.icml-2011.org/papers/398_icmlpaper.pdf){:.external}.
+*   *Monte Carlo*
+    ([`tfp.monte_carlo`](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/monte_carlo)):
+    Tools for computing Monte Carlo expectations.
 
 TensorFlow Probability is under active development and interfaces may change.
 

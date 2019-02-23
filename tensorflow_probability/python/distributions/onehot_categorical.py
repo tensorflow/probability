@@ -23,7 +23,6 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.ops import control_flow_ops
 
 
 class OneHotCategorical(distribution.Distribution):
@@ -118,13 +117,15 @@ class OneHotCategorical(distribution.Distribution):
       logits_shape_static = self._logits.shape.with_rank_at_least(1)
       if logits_shape_static.ndims is not None:
         self._batch_rank = tf.convert_to_tensor(
-            logits_shape_static.ndims - 1, dtype=tf.int32, name="batch_rank")
+            value=logits_shape_static.ndims - 1,
+            dtype=tf.int32,
+            name="batch_rank")
       else:
         with tf.name_scope(name="batch_rank"):
           self._batch_rank = tf.rank(self._logits) - 1
 
       with tf.name_scope(name="event_size"):
-        self._event_size = tf.shape(self._logits)[-1]
+        self._event_size = tf.shape(input=self._logits)[-1]
 
     super(OneHotCategorical, self).__init__(
         dtype=dtype,
@@ -151,26 +152,26 @@ class OneHotCategorical(distribution.Distribution):
     return self._probs
 
   def _batch_shape_tensor(self):
-    return tf.shape(self.logits)[:-1]
+    return tf.shape(input=self.logits)[:-1]
 
   def _batch_shape(self):
     return self.logits.shape[:-1]
 
   def _event_shape_tensor(self):
-    return tf.shape(self.logits)[-1:]
+    return tf.shape(input=self.logits)[-1:]
 
   def _event_shape(self):
     return self.logits.shape.with_rank_at_least(1)[-1:]
 
   def _sample_n(self, n, seed=None):
-    sample_shape = tf.concat([[n], tf.shape(self.logits)], 0)
+    sample_shape = tf.concat([[n], tf.shape(input=self.logits)], 0)
     logits = self.logits
     if logits.shape.ndims == 2:
       logits_2d = logits
     else:
       logits_2d = tf.reshape(logits, [-1, self.event_size])
-    samples = tf.multinomial(logits_2d, n, seed=seed)
-    samples = tf.transpose(samples)
+    samples = tf.random.categorical(logits_2d, n, seed=seed)
+    samples = tf.transpose(a=samples)
     samples = tf.one_hot(samples, self.event_size, dtype=self.dtype)
     ret = tf.reshape(samples, sample_shape)
     return ret
@@ -185,23 +186,25 @@ class OneHotCategorical(distribution.Distribution):
       logits = tf.ones_like(x, dtype=logits.dtype) * logits
       x = tf.ones_like(logits, dtype=x.dtype) * x
 
-    logits_shape = tf.shape(tf.reduce_sum(logits, -1))
+    logits_shape = tf.shape(input=tf.reduce_sum(input_tensor=logits, axis=-1))
     logits_2d = tf.reshape(logits, [-1, self.event_size])
     x_2d = tf.reshape(x, [-1, self.event_size])
     ret = -tf.nn.softmax_cross_entropy_with_logits(
-        labels=x_2d, logits=logits_2d)
+        labels=tf.stop_gradient(x_2d),
+        logits=logits_2d)
     # Reshape back to user-supplied batch and sample dims prior to 2D reshape.
     ret = tf.reshape(ret, logits_shape)
     return ret
 
   def _entropy(self):
-    return -tf.reduce_sum(tf.nn.log_softmax(self.logits) * self.probs, axis=-1)
+    return -tf.reduce_sum(
+        input_tensor=tf.nn.log_softmax(self.logits) * self.probs, axis=-1)
 
   def _mean(self):
     return self.probs
 
   def _mode(self):
-    ret = tf.argmax(self.logits, axis=self._batch_rank)
+    ret = tf.argmax(input=self.logits, axis=self._batch_rank)
     ret = tf.one_hot(ret, self.event_size, dtype=self.dtype)
     ret.set_shape(self.logits.shape)
     return ret
@@ -209,7 +212,7 @@ class OneHotCategorical(distribution.Distribution):
   def _covariance(self):
     p = self.probs
     ret = -tf.matmul(p[..., None], p[..., None, :])
-    return tf.matrix_set_diag(ret, self._variance())
+    return tf.linalg.set_diag(ret, self._variance())
 
   def _variance(self):
     return self.probs * (1. - self.probs)
@@ -217,10 +220,11 @@ class OneHotCategorical(distribution.Distribution):
   def _assert_valid_sample(self, x):
     if not self.validate_args:
       return x
-    return control_flow_ops.with_dependencies([
-        tf.assert_non_positive(x),
-        tf.assert_near(
-            tf.zeros([], dtype=self.dtype), tf.reduce_logsumexp(x, axis=[-1])),
+    return distribution_util.with_dependencies([
+        tf.compat.v1.assert_non_positive(x),
+        tf.compat.v1.assert_near(
+            tf.zeros([], dtype=self.dtype),
+            tf.reduce_logsumexp(input_tensor=x, axis=[-1])),
     ], x)
 
 
@@ -241,6 +245,6 @@ def _kl_categorical_categorical(a, b, name=None):
       name, "kl_categorical_categorical", values=[a.logits, b.logits]):
     # sum(p ln(p / q))
     return tf.reduce_sum(
-        tf.nn.softmax(a.logits) *
+        input_tensor=tf.nn.softmax(a.logits) *
         (tf.nn.log_softmax(a.logits) - tf.nn.log_softmax(b.logits)),
         axis=-1)

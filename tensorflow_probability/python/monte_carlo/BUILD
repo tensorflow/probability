@@ -15,6 +15,8 @@
 # Description:
 #   Support for Monte Carlo expectations
 
+# [internal] load python3.bzl
+
 licenses(["notice"])  # Apache 2.0
 
 package(

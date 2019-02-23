@@ -29,7 +29,6 @@ from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import special_math
-from tensorflow.python.framework import tensor_shape
 
 __all__ = [
     "Laplace",
@@ -96,13 +95,13 @@ class Laplace(distribution.Distribution):
     parameters = dict(locals())
     with tf.name_scope(name, values=[loc, scale]) as name:
       dtype = dtype_util.common_dtype([loc, scale], tf.float32)
-      loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
-      scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
-      with tf.control_dependencies([tf.assert_positive(scale)] if
-                                   validate_args else []):
+      loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
+      scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
+      with tf.control_dependencies(
+          [tf.compat.v1.assert_positive(scale)] if validate_args else []):
         self._loc = tf.identity(loc)
         self._scale = tf.identity(scale)
-        tf.assert_same_float_dtype([self._loc, self._scale])
+        tf.debugging.assert_same_float_dtype([self._loc, self._scale])
       super(Laplace, self).__init__(
           dtype=dtype,
           reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
@@ -115,8 +114,8 @@ class Laplace(distribution.Distribution):
   @staticmethod
   def _param_shapes(sample_shape):
     return dict(
-        zip(("loc", "scale"), ([tf.convert_to_tensor(
-            sample_shape, dtype=tf.int32)] * 2)))
+        zip(("loc", "scale"),
+            ([tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)] * 2)))
 
   @property
   def loc(self):
@@ -130,7 +129,7 @@ class Laplace(distribution.Distribution):
 
   def _batch_shape_tensor(self):
     return tf.broadcast_dynamic_shape(
-        tf.shape(self.loc), tf.shape(self.scale))
+        tf.shape(input=self.loc), tf.shape(input=self.scale))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(
@@ -140,7 +139,7 @@ class Laplace(distribution.Distribution):
     return tf.constant([], dtype=tf.int32)
 
   def _event_shape(self):
-    return tensor_shape.scalar()
+    return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
     shape = tf.concat([[n], self.batch_shape_tensor()], 0)
@@ -150,15 +149,15 @@ class Laplace(distribution.Distribution):
     # positive, "normal" number. However, the concept of subnormality exists
     # only at zero; here we need the smallest usable number larger than -1,
     # i.e., `-1 + eps/2`.
-    uniform_samples = tf.random_uniform(
+    uniform_samples = tf.random.uniform(
         shape=shape,
-        minval=np.nextafter(self.dtype.as_numpy_dtype(-1.),
-                            self.dtype.as_numpy_dtype(0.)),
+        minval=np.nextafter(
+            self.dtype.as_numpy_dtype(-1.), self.dtype.as_numpy_dtype(0.)),
         maxval=1.,
         dtype=self.dtype,
         seed=seed)
     return (self.loc - self.scale * tf.sign(uniform_samples) *
-            tf.log1p(-tf.abs(uniform_samples)))
+            tf.math.log1p(-tf.abs(uniform_samples)))
 
   def _log_prob(self, x):
     return self._log_unnormalized_prob(x) - self._log_normalization()
@@ -181,12 +180,12 @@ class Laplace(distribution.Distribution):
     return -tf.abs(self._z(x))
 
   def _log_normalization(self):
-    return math.log(2.) + tf.log(self.scale)
+    return math.log(2.) + tf.math.log(self.scale)
 
   def _entropy(self):
     # Use broadcasting rules to calculate the full broadcast scale.
     scale = self.scale + tf.zeros_like(self.loc)
-    return math.log(2.) + 1. + tf.log(scale)
+    return math.log(2.) + 1. + tf.math.log(scale)
 
   def _mean(self):
     return self.loc + tf.zeros_like(self.scale)
@@ -204,8 +203,8 @@ class Laplace(distribution.Distribution):
     return (x - self.loc) / self.scale
 
 
-@kullback_leibler.RegisterKL(Laplace, tf.distributions.Laplace)
-@kullback_leibler.RegisterKL(tf.distributions.Laplace, Laplace)
+@kullback_leibler.RegisterKL(Laplace, tf.compat.v1.distributions.Laplace)
+@kullback_leibler.RegisterKL(tf.compat.v1.distributions.Laplace, Laplace)
 @kullback_leibler.RegisterKL(Laplace, Laplace)
 def _kl_laplace_laplace(a, b, name=None):
   """Calculate the batched KL divergence KL(a || b) with a and b Laplace.
@@ -226,5 +225,5 @@ def _kl_laplace_laplace(a, b, name=None):
     distance = tf.abs(a.loc - b.loc)
     ratio = a.scale / b.scale
 
-    return (-tf.log(ratio) - 1 + distance / b.scale +
+    return (-tf.math.log(ratio) - 1 + distance / b.scale +
             ratio * tf.exp(-distance / a.scale))

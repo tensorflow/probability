@@ -67,8 +67,8 @@ class MatrixInverseTriL(bijector.Bijector):
 
   def _forward(self, x):
     with tf.control_dependencies(self._assertions(x)):
-      shape = tf.shape(x)
-      return tf.matrix_triangular_solve(
+      shape = tf.shape(input=x)
+      return tf.linalg.triangular_solve(
           x, tf.eye(shape[-1], batch_shape=shape[:-2]), lower=True)
 
   def _inverse(self, y):
@@ -111,27 +111,29 @@ class MatrixInverseTriL(bijector.Bijector):
     #     det(J) = (-1)^(n^2) (det Z)^(2n)
     #            = (-1)^n (det X)^(-2n).
     with tf.control_dependencies(self._assertions(x)):
-      return (-2. * tf.cast(tf.shape(x)[-1], x.dtype.base_dtype) *
-              tf.reduce_sum(tf.log(tf.abs(tf.matrix_diag_part(x))), axis=-1))
+      return (-2. * tf.cast(tf.shape(input=x)[-1], x.dtype.base_dtype) *
+              tf.reduce_sum(
+                  input_tensor=tf.math.log(tf.abs(tf.linalg.diag_part(x))),
+                  axis=-1))
 
   def _assertions(self, x):
     if not self.validate_args:
       return []
-    shape = tf.shape(x)
-    is_matrix = tf.assert_rank_at_least(
+    shape = tf.shape(input=x)
+    is_matrix = tf.compat.v1.assert_rank_at_least(
         x, 2, message="Input must have rank at least 2.")
-    is_square = tf.assert_equal(
+    is_square = tf.compat.v1.assert_equal(
         shape[-2], shape[-1], message="Input must be a square matrix.")
-    above_diagonal = tf.matrix_band_part(
-        tf.matrix_set_diag(x, tf.zeros(shape[:-1], dtype=tf.float32)), 0, -1)
-    is_lower_triangular = tf.assert_equal(
+    above_diagonal = tf.linalg.band_part(
+        tf.linalg.set_diag(x, tf.zeros(shape[:-1], dtype=tf.float32)), 0, -1)
+    is_lower_triangular = tf.compat.v1.assert_equal(
         above_diagonal,
         tf.zeros_like(above_diagonal),
         message="Input must be lower triangular.")
     # A lower triangular matrix is nonsingular iff all its diagonal entries are
     # nonzero.
-    diag_part = tf.matrix_diag_part(x)
-    is_nonsingular = tf.assert_none_equal(
+    diag_part = tf.linalg.diag_part(x)
+    is_nonsingular = tf.compat.v1.assert_none_equal(
         diag_part,
         tf.zeros_like(diag_part),
         message="Input must have all diagonal entries nonzero.")

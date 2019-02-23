@@ -25,7 +25,6 @@ import tensorflow as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.framework import tensor_shape
 
 __all__ = [
     "Cauchy",
@@ -120,13 +119,13 @@ class Cauchy(distribution.Distribution):
     parameters = dict(locals())
     with tf.name_scope(name, values=[loc, scale]) as name:
       dtype = dtype_util.common_dtype([loc, scale], tf.float32)
-      loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
-      scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
-      with tf.control_dependencies([tf.assert_positive(scale)]
-                                   if validate_args else []):
+      loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
+      scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
+      with tf.control_dependencies(
+          [tf.compat.v1.assert_positive(scale)] if validate_args else []):
         self._loc = tf.identity(loc)
         self._scale = tf.identity(scale)
-        tf.assert_same_float_dtype([self._loc, self._scale])
+        tf.debugging.assert_same_float_dtype([self._loc, self._scale])
     super(Cauchy, self).__init__(
         dtype=self._scale.dtype,
         reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
@@ -140,7 +139,7 @@ class Cauchy(distribution.Distribution):
   def _param_shapes(sample_shape):
     return dict(
         zip(("loc", "scale"),
-            ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 2)))
+            ([tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)] * 2)))
 
   @property
   def loc(self):
@@ -153,7 +152,8 @@ class Cauchy(distribution.Distribution):
     return self._scale
 
   def _batch_shape_tensor(self):
-    return tf.broadcast_dynamic_shape(tf.shape(self.loc), tf.shape(self.scale))
+    return tf.broadcast_dynamic_shape(
+        tf.shape(input=self.loc), tf.shape(input=self.scale))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(self.loc.shape, self.scale.shape)
@@ -162,11 +162,11 @@ class Cauchy(distribution.Distribution):
     return tf.constant([], dtype=tf.int32)
 
   def _event_shape(self):
-    return tensor_shape.scalar()
+    return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
     shape = tf.concat([[n], self.batch_shape_tensor()], 0)
-    probs = tf.random_uniform(
+    probs = tf.random.uniform(
         shape=shape, minval=0., maxval=1., dtype=self.dtype, seed=seed)
     return self._quantile(probs)
 
@@ -177,16 +177,16 @@ class Cauchy(distribution.Distribution):
     return tf.atan(self._z(x)) / np.pi + 0.5
 
   def _log_cdf(self, x):
-    return tf.log1p(2 / np.pi * tf.atan(self._z(x))) - np.log(2)
+    return tf.math.log1p(2 / np.pi * tf.atan(self._z(x))) - np.log(2)
 
   def _log_unnormalized_prob(self, x):
-    return -tf.log1p(tf.square(self._z(x)))
+    return -tf.math.log1p(tf.square(self._z(x)))
 
   def _log_normalization(self):
-    return np.log(np.pi) + tf.log(self.scale)
+    return np.log(np.pi) + tf.math.log(self.scale)
 
   def _entropy(self):
-    h = np.log(4 * np.pi) + tf.log(self.scale)
+    h = np.log(4 * np.pi) + tf.math.log(self.scale)
     return h * tf.ones_like(self.loc)
 
   def _quantile(self, p):

@@ -125,11 +125,11 @@ def _convert_to_tensor(value, name=None, dtype=None, preferred_dtype=None):
       preferred_dtype is not None and
       dtype is None and
       (preferred_dtype.is_integer or preferred_dtype.is_bool)):
-    v = tf.convert_to_tensor(value, name=name)
+    v = tf.convert_to_tensor(value=value, name=name)
     if v.dtype.is_floating:
       return v
   return tf.convert_to_tensor(
-      value, name=name, dtype=dtype, preferred_dtype=preferred_dtype)
+      value=value, name=name, dtype=dtype, dtype_hint=preferred_dtype)
 
 
 class _DistributionMeta(abc.ABCMeta):
@@ -386,7 +386,7 @@ class Distribution(_BaseDistribution):
     """
     graph_parents = [] if graph_parents is None else graph_parents
     for i, t in enumerate(graph_parents):
-      if t is None or not tf.contrib.framework.is_tensor(t):
+      if t is None or not tf.is_tensor(t):
         raise ValueError("Graph parent item %d is not a Tensor; %s." % (i, t))
     if not name or name[-1] != "/":  # `name` is not a name scope
       non_unique_name = name or type(self).__name__
@@ -414,8 +414,7 @@ class Distribution(_BaseDistribution):
     Args:
       value: A dictionary of parameters to assign to the `_parameters` property.
     """
-    if "self" in value:
-      del value["self"]
+    value.pop("self", None)
     self._parameter_dict = value
 
   @classmethod
@@ -470,7 +469,7 @@ class Distribution(_BaseDistribution):
 
     static_params = {}
     for name, shape in params.items():
-      static_shape = tf.contrib.util.constant_value(shape)
+      static_shape = tf.get_static_value(shape)
       if static_shape is None:
         raise ValueError(
             "sample_shape must be a fully-defined TensorShape or list/tuple")
@@ -571,9 +570,10 @@ class Distribution(_BaseDistribution):
     """
     with self._name_scope(name):
       if self.batch_shape.is_fully_defined():
-        return tf.convert_to_tensor(self.batch_shape.as_list(),
-                                    dtype=tf.int32,
-                                    name="batch_shape")
+        return tf.convert_to_tensor(
+            value=self.batch_shape.as_list(),
+            dtype=tf.int32,
+            name="batch_shape")
       return self._batch_shape_tensor()
 
   def _batch_shape(self):
@@ -608,9 +608,10 @@ class Distribution(_BaseDistribution):
     """
     with self._name_scope(name):
       if self.event_shape.is_fully_defined():
-        return tf.convert_to_tensor(self.event_shape.as_list(),
-                                    dtype=tf.int32,
-                                    name="event_shape")
+        return tf.convert_to_tensor(
+            value=self.event_shape.as_list(),
+            dtype=tf.int32,
+            name="event_shape")
       return self._event_shape_tensor()
 
   def _event_shape(self):
@@ -638,7 +639,8 @@ class Distribution(_BaseDistribution):
     """
     with self._name_scope(name):
       return tf.convert_to_tensor(
-          self._is_scalar_helper(self.event_shape, self.event_shape_tensor),
+          value=self._is_scalar_helper(self.event_shape,
+                                       self.event_shape_tensor),
           name="is_scalar_event")
 
   def is_scalar_batch(self, name="is_scalar_batch"):
@@ -652,7 +654,8 @@ class Distribution(_BaseDistribution):
     """
     with self._name_scope(name):
       return tf.convert_to_tensor(
-          self._is_scalar_helper(self.batch_shape, self.batch_shape_tensor),
+          value=self._is_scalar_helper(self.batch_shape,
+                                       self.batch_shape_tensor),
           name="is_scalar_batch")
 
   def _sample_n(self, n, seed=None):
@@ -663,11 +666,11 @@ class Distribution(_BaseDistribution):
     """Wrapper around _sample_n."""
     with self._name_scope(name, values=[sample_shape]):
       sample_shape = tf.convert_to_tensor(
-          sample_shape, dtype=tf.int32, name="sample_shape")
+          value=sample_shape, dtype=tf.int32, name="sample_shape")
       sample_shape, n = self._expand_sample_shape_to_vector(
           sample_shape, "sample_shape")
       samples = self._sample_n(n, seed, **kwargs)
-      batch_event_shape = tf.shape(samples)[1:]
+      batch_event_shape = tf.shape(input=samples)[1:]
       final_shape = tf.concat([sample_shape, batch_event_shape], 0)
       samples = tf.reshape(samples, final_shape)
       samples = self._set_sample_static_shape(samples, sample_shape)
@@ -697,7 +700,7 @@ class Distribution(_BaseDistribution):
       if hasattr(self, "_log_prob"):
         return self._log_prob(value, **kwargs)
       if hasattr(self, "_prob"):
-        return tf.log(self._prob(value, **kwargs))
+        return tf.math.log(self._prob(value, **kwargs))
       raise NotImplementedError("log_prob is not implemented: {}".format(
           type(self).__name__))
 
@@ -747,7 +750,7 @@ class Distribution(_BaseDistribution):
       if hasattr(self, "_log_cdf"):
         return self._log_cdf(value, **kwargs)
       if hasattr(self, "_cdf"):
-        return tf.log(self._cdf(value, **kwargs))
+        return tf.math.log(self._cdf(value, **kwargs))
       raise NotImplementedError("log_cdf is not implemented: {}".format(
           type(self).__name__))
 
@@ -819,7 +822,7 @@ class Distribution(_BaseDistribution):
         return self._log_survival_function(value, **kwargs)
       except NotImplementedError as original_exception:
         try:
-          return tf.log1p(-self.cdf(value, **kwargs))
+          return tf.math.log1p(-self.cdf(value, **kwargs))
         except NotImplementedError:
           raise original_exception
 
@@ -1111,6 +1114,14 @@ class Distribution(_BaseDistribution):
       return self._kl_divergence(other)
 
   def __str__(self):
+    maybe_batch_shape = ""
+    if self.batch_shape.ndims is not None:
+      maybe_batch_shape = ", batch_shape={}".format(
+          self.batch_shape).replace("None", "?")
+    maybe_event_shape = ""
+    if self.event_shape.ndims is not None:
+      maybe_event_shape = ", event_shape={}".format(
+          self.event_shape).replace("None", "?")
     return ("tfp.distributions.{type_name}("
             "\"{self_name}\""
             "{maybe_batch_shape}"
@@ -1118,12 +1129,8 @@ class Distribution(_BaseDistribution):
             ", dtype={dtype})".format(
                 type_name=type(self).__name__,
                 self_name=self.name,
-                maybe_batch_shape=(", batch_shape={}".format(self.batch_shape)
-                                   if self.batch_shape.ndims is not None
-                                   else ""),
-                maybe_event_shape=(", event_shape={}".format(self.event_shape)
-                                   if self.event_shape.ndims is not None
-                                   else ""),
+                maybe_batch_shape=maybe_batch_shape,
+                maybe_event_shape=maybe_event_shape,
                 dtype=self.dtype.name))
 
   def __repr__(self):
@@ -1134,8 +1141,8 @@ class Distribution(_BaseDistribution):
             " dtype={dtype}>".format(
                 type_name=type(self).__name__,
                 self_name=self.name,
-                batch_shape=self.batch_shape,
-                event_shape=self.event_shape,
+                batch_shape=str(self.batch_shape).replace("None", "?"),
+                event_shape=str(self.event_shape).replace("None", "?"),
                 dtype=self.dtype.name))
 
   @contextlib.contextmanager
@@ -1148,38 +1155,19 @@ class Distribution(_BaseDistribution):
 
   def _expand_sample_shape_to_vector(self, x, name):
     """Helper to `sample` which ensures input is 1D."""
-    x_static_val = tf.contrib.util.constant_value(x)
+    x_static_val = tf.get_static_value(x)
     if x_static_val is None:
-      prod = tf.reduce_prod(x)
+      prod = tf.reduce_prod(input_tensor=x)
     else:
       prod = np.prod(x_static_val, dtype=x.dtype.as_numpy_dtype())
 
-    ndims = x.shape.ndims  # != sample_ndims
-    if ndims is None:
-      # Maybe expand_dims.
-      ndims = tf.rank(x)
-      expanded_shape = util.pick_vector(
-          tf.equal(ndims, 0),
-          np.array([1], dtype=np.int32), tf.shape(x))
-      x = tf.reshape(x, expanded_shape)
-    elif ndims == 0:
-      # Definitely expand_dims.
-      if x_static_val is not None:
-        x = tf.convert_to_tensor(
-            np.array([x_static_val], dtype=x.dtype.as_numpy_dtype()),
-            name=name)
-      else:
-        x = tf.reshape(x, [1])
-    elif ndims != 1:
-      raise ValueError("Input is neither scalar nor vector.")
-
+    x = util.expand_to_vector(x, tensor_name=name)
     return x, prod
 
   def _set_sample_static_shape(self, x, sample_shape):
     """Helper to `sample`; sets static shape info."""
     # Set shape hints.
-    sample_shape = tf.TensorShape(
-        tf.contrib.util.constant_value(sample_shape))
+    sample_shape = tf.TensorShape(tf.get_static_value(sample_shape))
 
     ndims = x.shape.ndims
     sample_ndims = sample_shape.ndims
@@ -1224,10 +1212,9 @@ class Distribution(_BaseDistribution):
     if static_shape.ndims is not None:
       return static_shape.ndims == 0
     shape = dynamic_shape_fn()
-    if (shape.shape.ndims is not None and
-        shape.shape[0].value is not None):
+    if tf.compat.dimension_value(shape.shape[0]) is not None:
       # If the static_shape is correctly written then we should never execute
       # this branch. We keep it just in case there's some unimagined corner
       # case.
       return shape.shape.as_list() == [0]
-    return tf.equal(tf.shape(shape)[0], 0)
+    return tf.equal(tf.shape(input=shape)[0], 0)

@@ -24,11 +24,13 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.bijectors import bijector_test_util
+
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+
 tfb = tfp.bijectors
-tfe = tf.contrib.eager
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class AffineScalarBijectorTest(tf.test.TestCase):
   """Tests correctness of the Y = scale @ x + shift transformation."""
 
@@ -44,7 +46,7 @@ class AffineScalarBijectorTest(tf.test.TestCase):
 
     def dynamic_run(fun, x_value, **kwargs):
       x_value = np.array(x_value, dtype=np.float32)
-      x = tf.placeholder_with_default(x_value, shape=None)
+      x = tf.compat.v1.placeholder_with_default(x_value, shape=None)
       return self.evaluate(fun(x, **kwargs))
 
     for run in (static_run, dynamic_run):
@@ -64,7 +66,7 @@ class AffineScalarBijectorTest(tf.test.TestCase):
 
     def dynamic_run(fun, x_value, **kwargs):
       x_value = np.array(x_value, dtype=np.float64)
-      x = tf.placeholder_with_default(x_value, shape=None)
+      x = tf.compat.v1.placeholder_with_default(x_value, shape=None)
       return self.evaluate(fun(x, **kwargs))
 
     for run in (static_run, dynamic_run):
@@ -85,7 +87,7 @@ class AffineScalarBijectorTest(tf.test.TestCase):
 
     def dynamic_run(fun, x_value, **kwargs):
       x_value = np.array(x_value)
-      x = tf.placeholder_with_default(x_value, shape=None)
+      x = tf.compat.v1.placeholder_with_default(x_value, shape=None)
       return self.evaluate(fun(x, **kwargs))
 
     for run in (static_run, dynamic_run):
@@ -106,7 +108,7 @@ class AffineScalarBijectorTest(tf.test.TestCase):
 
     def dynamic_run(fun, x_value, **kwargs):
       x_value = np.array(x_value, dtype=np.float32)
-      x = tf.placeholder_with_default(x_value, shape=None)
+      x = tf.compat.v1.placeholder_with_default(x_value, shape=None)
       return self.evaluate(fun(x, **kwargs))
 
     for run in (static_run, dynamic_run):
@@ -127,7 +129,7 @@ class AffineScalarBijectorTest(tf.test.TestCase):
 
     def dynamic_run(fun, x_value, **kwargs):
       x_value = np.array(x_value, dtype=np.float32)
-      x = tf.placeholder_with_default(x_value, shape=None)
+      x = tf.compat.v1.placeholder_with_default(x_value, shape=None)
       return self.evaluate(fun(x, **kwargs))
 
     for run in (static_run, dynamic_run):

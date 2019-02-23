@@ -27,7 +27,6 @@ from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.ops import control_flow_ops
 
 
 class ExpRelaxedOneHotCategorical(distribution.Distribution):
@@ -168,23 +167,25 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
           multidimensional=True,
           dtype=dtype)
 
-      with tf.control_dependencies([tf.assert_positive(temperature)]
-                                   if validate_args else []):
+      with tf.control_dependencies(
+          [tf.compat.v1.assert_positive(temperature)] if validate_args else []):
         self._temperature = tf.convert_to_tensor(
-            temperature, name="temperature", dtype=dtype)
+            value=temperature, name="temperature", dtype=dtype)
         self._temperature_2d = tf.reshape(
             self._temperature, [-1, 1], name="temperature_2d")
 
       logits_shape_static = self._logits.shape.with_rank_at_least(1)
       if logits_shape_static.ndims is not None:
         self._batch_rank = tf.convert_to_tensor(
-            logits_shape_static.ndims - 1, dtype=tf.int32, name="batch_rank")
+            value=logits_shape_static.ndims - 1,
+            dtype=tf.int32,
+            name="batch_rank")
       else:
         with tf.name_scope(name="batch_rank"):
           self._batch_rank = tf.rank(self._logits) - 1
 
       with tf.name_scope(name="event_size"):
-        self._event_size = tf.shape(self._logits)[-1]
+        self._event_size = tf.shape(input=self._logits)[-1]
 
     super(ExpRelaxedOneHotCategorical, self).__init__(
         dtype=dtype,
@@ -216,19 +217,19 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
     return self._probs
 
   def _batch_shape_tensor(self):
-    return tf.shape(self._logits)[:-1]
+    return tf.shape(input=self._logits)[:-1]
 
   def _batch_shape(self):
     return self.logits.shape[:-1]
 
   def _event_shape_tensor(self):
-    return tf.shape(self.logits)[-1:]
+    return tf.shape(input=self.logits)[-1:]
 
   def _event_shape(self):
     return self.logits.shape.with_rank_at_least(1)[-1:]
 
   def _sample_n(self, n, seed=None):
-    sample_shape = tf.concat([[n], tf.shape(self.logits)], 0)
+    sample_shape = tf.concat([[n], tf.shape(input=self.logits)], 0)
     logits = self.logits * tf.ones(sample_shape, dtype=self.dtype)
     logits_2d = tf.reshape(logits, [-1, self.event_size])
     # Uniform variates must be sampled from the open-interval `(0, 1)` rather
@@ -238,13 +239,13 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
     # numbers x, y have the reasonable property that, `x + y >= max(x, y)`. In
     # this case, a subnormal number (i.e., np.nextafter) can cause us to sample
     # 0.
-    uniform = tf.random_uniform(
-        shape=tf.shape(logits_2d),
+    uniform = tf.random.uniform(
+        shape=tf.shape(input=logits_2d),
         minval=np.finfo(self.dtype.as_numpy_dtype).tiny,
         maxval=1.,
         dtype=self.dtype,
         seed=seed)
-    gumbel = -tf.log(-tf.log(uniform))
+    gumbel = -tf.math.log(-tf.math.log(uniform))
     noisy_logits = (gumbel + logits_2d) / self._temperature_2d
     samples = tf.nn.log_softmax(noisy_logits)
     ret = tf.reshape(samples, sample_shape)
@@ -259,15 +260,17 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
         x.shape != logits.shape):
       logits = tf.ones_like(x, dtype=logits.dtype) * logits
       x = tf.ones_like(logits, dtype=x.dtype) * x
-    logits_shape = tf.shape(tf.reduce_sum(logits, axis=[-1]))
+    logits_shape = tf.shape(input=tf.reduce_sum(input_tensor=logits, axis=[-1]))
     logits_2d = tf.reshape(logits, [-1, self.event_size])
     x_2d = tf.reshape(x, [-1, self.event_size])
     # compute the normalization constant
     k = tf.cast(self.event_size, x.dtype)
-    log_norm_const = (tf.lgamma(k) + (k - 1.) * tf.log(self.temperature))
+    log_norm_const = (
+        tf.math.lgamma(k) + (k - 1.) * tf.math.log(self.temperature))
     # compute the unnormalized density
     log_softmax = tf.nn.log_softmax(logits_2d - x_2d * self._temperature_2d)
-    log_unnorm_prob = tf.reduce_sum(log_softmax, [-1], keepdims=False)
+    log_unnorm_prob = tf.reduce_sum(
+        input_tensor=log_softmax, axis=[-1], keepdims=False)
     # combine unnormalized density with normalization constant
     log_prob = log_norm_const + log_unnorm_prob
     # Reshapes log_prob to be consistent with shape of user-supplied logits
@@ -277,10 +280,11 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
   def _assert_valid_sample(self, x):
     if not self.validate_args:
       return x
-    return control_flow_ops.with_dependencies([
-        tf.assert_non_positive(x),
-        tf.assert_near(
-            tf.zeros([], dtype=self.dtype), tf.reduce_logsumexp(x, axis=[-1])),
+    return distribution_util.with_dependencies([
+        tf.compat.v1.assert_non_positive(x),
+        tf.compat.v1.assert_near(
+            tf.zeros([], dtype=self.dtype),
+            tf.reduce_logsumexp(input_tensor=x, axis=[-1])),
     ], x)
 
 

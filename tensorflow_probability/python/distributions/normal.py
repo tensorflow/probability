@@ -26,7 +26,6 @@ from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import special_math
-from tensorflow.python.framework import tensor_shape
 
 
 __all__ = [
@@ -129,13 +128,13 @@ class Normal(distribution.Distribution):
     parameters = dict(locals())
     with tf.name_scope(name, values=[loc, scale]) as name:
       dtype = dtype_util.common_dtype([loc, scale], tf.float32)
-      loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
-      scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
-      with tf.control_dependencies([tf.assert_positive(scale)] if
-                                   validate_args else []):
+      loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
+      scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
+      with tf.control_dependencies(
+          [tf.compat.v1.assert_positive(scale)] if validate_args else []):
         self._loc = tf.identity(loc)
         self._scale = tf.identity(scale)
-        tf.assert_same_float_dtype([self._loc, self._scale])
+        tf.debugging.assert_same_float_dtype([self._loc, self._scale])
     super(Normal, self).__init__(
         dtype=dtype,
         reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
@@ -148,8 +147,8 @@ class Normal(distribution.Distribution):
   @staticmethod
   def _param_shapes(sample_shape):
     return dict(
-        zip(("loc", "scale"), ([tf.convert_to_tensor(
-            sample_shape, dtype=tf.int32)] * 2)))
+        zip(("loc", "scale"),
+            ([tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)] * 2)))
 
   @property
   def loc(self):
@@ -163,8 +162,7 @@ class Normal(distribution.Distribution):
 
   def _batch_shape_tensor(self):
     return tf.broadcast_dynamic_shape(
-        tf.shape(self.loc),
-        tf.shape(self.scale))
+        tf.shape(input=self.loc), tf.shape(input=self.scale))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(
@@ -175,11 +173,11 @@ class Normal(distribution.Distribution):
     return tf.constant([], dtype=tf.int32)
 
   def _event_shape(self):
-    return tensor_shape.scalar()
+    return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
     shape = tf.concat([[n], self.batch_shape_tensor()], 0)
-    sampled = tf.random_normal(
+    sampled = tf.random.normal(
         shape=shape, mean=0., stddev=1., dtype=self.loc.dtype, seed=seed)
     return sampled * self.scale + self.loc
 
@@ -202,12 +200,12 @@ class Normal(distribution.Distribution):
     return -0.5 * tf.square(self._z(x))
 
   def _log_normalization(self):
-    return 0.5 * math.log(2. * math.pi) + tf.log(self.scale)
+    return 0.5 * math.log(2. * math.pi) + tf.math.log(self.scale)
 
   def _entropy(self):
     # Use broadcasting rules to calculate the full broadcast scale.
     scale = self.scale * tf.ones_like(self.loc)
-    return 0.5 * math.log(2. * math.pi * math.e) + tf.log(scale)
+    return 0.5 * math.log(2. * math.pi * math.e) + tf.math.log(scale)
 
   def _mean(self):
     return self.loc * tf.ones_like(self.scale)
@@ -233,8 +231,8 @@ class Normal(distribution.Distribution):
 
 
 # TODO(b/117098119): Remove tf.distribution references once they're gone.
-@kullback_leibler.RegisterKL(Normal, tf.distributions.Normal)
-@kullback_leibler.RegisterKL(tf.distributions.Normal, Normal)
+@kullback_leibler.RegisterKL(Normal, tf.compat.v1.distributions.Normal)
+@kullback_leibler.RegisterKL(tf.compat.v1.distributions.Normal, Normal)
 @kullback_leibler.RegisterKL(Normal, Normal)
 def _kl_normal_normal(n_a, n_b, name=None):
   """Calculate the batched KL divergence KL(n_a || n_b) with n_a and n_b Normal.
@@ -255,5 +253,5 @@ def _kl_normal_normal(n_a, n_b, name=None):
     s_a_squared = tf.square(n_a.scale)
     s_b_squared = tf.square(n_b.scale)
     ratio = s_a_squared / s_b_squared
-    return (tf.square(n_a.loc - n_b.loc) / (two * s_b_squared) +
-            half * (ratio - one - tf.log(ratio)))
+    return (tf.square(n_a.loc - n_b.loc) / (two * s_b_squared) + half *
+            (ratio - one - tf.math.log(ratio)))

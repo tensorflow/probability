@@ -30,8 +30,8 @@ __all__ = [
 
 
 def _add_diagonal_shift(matrix, shift):
-  return tf.matrix_set_diag(
-      matrix, tf.matrix_diag_part(matrix) + shift, name='add_diagonal_shift')
+  return tf.linalg.set_diag(
+      matrix, tf.linalg.diag_part(matrix) + shift, name='add_diagonal_shift')
 
 
 class StudentTProcess(
@@ -233,15 +233,15 @@ class StudentTProcess(
         name, values=[df, index_points, jitter]) as name:
       dtype = dtype_util.common_dtype(
           [df, index_points, jitter], tf.float32)
-      df = tf.convert_to_tensor(df, dtype=dtype, name='df')
+      df = tf.convert_to_tensor(value=df, dtype=dtype, name='df')
       index_points = tf.convert_to_tensor(
-          index_points, dtype=dtype, name='index_points')
-      jitter = tf.convert_to_tensor(jitter, dtype=dtype, name='jitter')
+          value=index_points, dtype=dtype, name='index_points')
+      jitter = tf.convert_to_tensor(value=jitter, dtype=dtype, name='jitter')
 
-      with tf.control_dependencies(
-          [tf.assert_greater(df, tf.cast(2., df.dtype),
-                             message='`df` must be greater than 2.')]
-          if validate_args else []):
+      with tf.control_dependencies([
+          tf.compat.v1.assert_greater(
+              df, tf.cast(2., df.dtype), message='`df` must be greater than 2.')
+      ] if validate_args else []):
         self._df = tf.identity(df)
 
       self._kernel = kernel

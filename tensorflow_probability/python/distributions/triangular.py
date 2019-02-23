@@ -27,8 +27,6 @@ from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 
-from tensorflow.python.framework import tensor_shape
-
 
 def _broadcast_to(tensor_to_broadcast, target_tensors):
   """Helper to broadcast a tensor using a list of target tensors."""
@@ -38,7 +36,7 @@ def _broadcast_to(tensor_to_broadcast, target_tensors):
   return output
 
 
-class Triangular(tf.distributions.Distribution):
+class Triangular(tf.compat.v1.distributions.Distribution):
   r"""Triangular distribution with `low`, `high` and `peak` parameters.
 
   #### Mathematical Details
@@ -138,22 +136,23 @@ class Triangular(tf.distributions.Distribution):
     parameters = locals()
     with tf.name_scope(name, values=[low, high, peak]) as name:
       dtype = dtype_util.common_dtype([low, high, peak], tf.float32)
-      low = tf.convert_to_tensor(low, name="low", dtype=dtype)
-      high = tf.convert_to_tensor(high, name="high", dtype=dtype)
-      peak = tf.convert_to_tensor(peak, name="peak", dtype=dtype)
+      low = tf.convert_to_tensor(value=low, name="low", dtype=dtype)
+      high = tf.convert_to_tensor(value=high, name="high", dtype=dtype)
+      peak = tf.convert_to_tensor(value=peak, name="peak", dtype=dtype)
 
       with tf.control_dependencies([
-          tf.assert_less(
+          tf.compat.v1.assert_less(
               low, high, message="triangular not defined when low >= high."),
-          tf.assert_less_equal(
+          tf.compat.v1.assert_less_equal(
               low, peak, message="triangular not defined when low > peak."),
-          tf.assert_less_equal(
+          tf.compat.v1.assert_less_equal(
               peak, high, message="triangular not defined when peak > high."),
       ] if validate_args else []):
         self._low = tf.identity(low, name="low")
         self._high = tf.identity(high, name="high")
         self._peak = tf.identity(peak, name="peak")
-        tf.assert_same_float_dtype([self._low, self._high, self._peak])
+        tf.debugging.assert_same_float_dtype(
+            [self._low, self._high, self._peak])
     super(Triangular, self).__init__(
         dtype=self._low.dtype,
         reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
@@ -184,10 +183,9 @@ class Triangular(tf.distributions.Distribution):
 
   def _batch_shape_tensor(self):
     return tf.broadcast_dynamic_shape(
-        tf.shape(self.peak),
+        tf.shape(input=self.peak),
         tf.broadcast_dynamic_shape(
-            tf.shape(self.low),
-            tf.shape(self.high)))
+            tf.shape(input=self.low), tf.shape(input=self.high)))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(
@@ -196,12 +194,12 @@ class Triangular(tf.distributions.Distribution):
             self.low.shape, self.high.shape))
 
   def _event_shape(self):
-    return tensor_shape.scalar()
+    return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
     stream = seed_stream.SeedStream(seed, salt="triangular")
     shape = tf.concat([[n], self.batch_shape_tensor()], axis=0)
-    samples = tf.random_uniform(shape=shape, dtype=self.dtype, seed=stream())
+    samples = tf.random.uniform(shape=shape, dtype=self.dtype, seed=stream())
     # We use Inverse CDF sampling here. Because the CDF is a quadratic function,
     # we must use sqrts here.
     interval_length = self.high - self.low
@@ -223,8 +221,9 @@ class Triangular(tf.distributions.Distribution):
   def _prob(self, x):
     if self.validate_args:
       with tf.control_dependencies([
-          tf.assert_greater_equal(x, self.low),
-          tf.assert_less_equal(x, self.high)]):
+          tf.compat.v1.assert_greater_equal(x, self.low),
+          tf.compat.v1.assert_less_equal(x, self.high)
+      ]):
         x = tf.identity(x)
 
     broadcast_x_to_high = _broadcast_to(x, [self.high])
@@ -248,7 +247,7 @@ class Triangular(tf.distributions.Distribution):
         broadcast_x_to_peak < self.low, broadcast_x_to_peak > self.high)
 
     broadcast_shape = tf.broadcast_dynamic_shape(
-        tf.shape(x), self.batch_shape_tensor())
+        tf.shape(input=x), self.batch_shape_tensor())
 
     return tf.where(
         outside_interval,
@@ -257,7 +256,7 @@ class Triangular(tf.distributions.Distribution):
 
   def _cdf(self, x):
     broadcast_shape = tf.broadcast_dynamic_shape(
-        tf.shape(x), self.batch_shape_tensor())
+        tf.shape(input=x), self.batch_shape_tensor())
 
     broadcast_x_to_high = _broadcast_to(x, [self.high])
     left_of_peak = tf.logical_and(
@@ -270,11 +269,11 @@ class Triangular(tf.distributions.Distribution):
     result_inside_interval = tf.where(
         left_of_peak,
         # (x - low) ** 2 / ((high - low) * (peak - low))
-        tf.squared_difference(x, self.low) / (
-            interval_length * (self.peak - self.low)),
+        tf.math.squared_difference(x, self.low) / (interval_length *
+                                                   (self.peak - self.low)),
         # 1 - (high - x) ** 2 / ((high - low) * (high - peak))
-        1. - tf.squared_difference(self.high, x) / (
-            interval_length * (self.high - self.peak)))
+        1. - tf.math.squared_difference(self.high, x) /
+        (interval_length * (self.high - self.peak)))
 
     broadcast_x_to_high_peak = _broadcast_to(broadcast_x_to_high, [self.peak])
     zeros = tf.zeros(broadcast_shape, dtype=self.dtype)
@@ -288,13 +287,13 @@ class Triangular(tf.distributions.Distribution):
         broadcast_x_to_peak_low >= self.high, ones, result_if_not_big)
 
   def _entropy(self):
-    return 0.5 - np.log(2.) + tf.log(self.high - self.low)
+    return 0.5 - np.log(2.) + tf.math.log(self.high - self.low)
 
   def _mean(self):
     return (self.low + self.high + self.peak) / 3.
 
   def _variance(self):
     # ((high - low) ** 2 + (peak - low) ** 2 + (peak - high) ** 2) / 36
-    return (tf.squared_difference(self.high, self.low) +
-            tf.squared_difference(self.high, self.peak) +
-            tf.squared_difference(self.peak, self.low)) / 36.
+    return (tf.math.squared_difference(self.high, self.low) +
+            tf.math.squared_difference(self.high, self.peak) +
+            tf.math.squared_difference(self.peak, self.low)) / 36.

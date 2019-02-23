@@ -18,6 +18,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+
+import functools
+
+
 import tensorflow as tf
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.positive_semidefinite_kernels import positive_semidefinite_kernel as psd_kernel
@@ -46,7 +50,7 @@ def _maybe_shape_static(tensor):
 def _maybe_shape_dynamic(tensor):
   if tensor is None:
     return []
-  return tf.shape(tensor)
+  return tf.shape(input=tensor)
 
 
 class Polynomial(psd_kernel.PositiveSemidefiniteKernel):
@@ -60,7 +64,7 @@ class Polynomial(psd_kernel.PositiveSemidefiniteKernel):
 
     ```none
     k(x, y) = bias_variance**2 + slope_variance**2 *
-              (x dot y')**exponent
+              ((x - shift) dot (y - shift))**exponent
     ```
 
     #### References
@@ -68,12 +72,15 @@ class Polynomial(psd_kernel.PositiveSemidefiniteKernel):
     [1]: Carl Edward Rasmussen and Christopher K. I. Williams. Gaussian
          Processes for Machine Learning. Section 4.4.2. 2006.
          http://www.gaussianprocess.org/gpml/chapters/RW4.pdf
+    [2]: David Duvenaud. The Kernel Cookbook.
+         https://www.cs.toronto.edu/~duvenaud/cookbook/
 
   """
 
   def __init__(self,
                bias_variance=None,
                slope_variance=None,
+               shift=None,
                exponent=None,
                feature_ndims=1,
                validate_args=False,
@@ -84,20 +91,27 @@ class Polynomial(psd_kernel.PositiveSemidefiniteKernel):
       bias_variance: Positive floating point `Tensor` that controls the
         variance from the origin. If bias = 0, there is no variance and the
         fitted function goes through the origin.  Must be broadcastable with
-        `slope_variance`, `exponent`, and inputs to `apply` and `matrix`
-        methods. A value of `None` is treated like 0.
+        `slope_variance`, `shift`, `exponent`, and inputs to `apply` and
+        `matrix` methods. A value of `None` is treated like 0.
         Default Value: `None`
       slope_variance: Positive floating point `Tensor` that controls the
         variance of the regression line slope that is the basis for the
-        polynomial. Must be broadcastable with `bias_variance`, `exponent`,
-        and inputs to `apply` and `matrix` methods. A value of `None` is
-        treated like 1.
+        polynomial. Must be broadcastable with `bias_variance`, `shift`,
+        `exponent`, and inputs to `apply` and `matrix` methods. A value of
+        `None` is treated like 1.
+        Default Value: `None`
+      shift: Floating point `Tensor` that contols the intercept with the
+        x-axis of the linear function to be exponentiated to get this
+        polynomial. Must be broadcastable with `bias_variance`,
+        `slope_variance`, `exponent` and inputs to `apply` and `matrix`
+        methods. A value of `None` is treated like 0, which results in having
+        the intercept at the origin.
         Default Value: `None`
       exponent: Positive floating point `Tensor` that controls the exponent
         (also known as the degree) of the polynomial function. Must be
-        broadcastable with `bias_variance`, `slope_variance` and inputs to
-        `apply` and `matrix` methods. A value of `None` is treated like 1,
-        which results in a linear kernel.
+        broadcastable with `bias_variance`, `slope_variance`, `shift`,
+        and inputs to `apply` and `matrix` methods. A value of `None` is
+        treated like 1, which results in a linear kernel.
         Default Value: `None`
       feature_ndims: Python `int` number of rightmost dims to include in
         kernel computation.
@@ -108,27 +122,31 @@ class Polynomial(psd_kernel.PositiveSemidefiniteKernel):
       name: Python `str` name prefixed to Ops created by this class.
         Default Value: `'Polynomial'`
     """
-    with tf.name_scope(name, values=[bias_variance, slope_variance,
-                                     exponent]):
+    with tf.name_scope(name, values=[
+        bias_variance, slope_variance, shift, exponent]):
       dtype = dtype_util.common_dtype(
-          [bias_variance, slope_variance, exponent], tf.float32)
+          [bias_variance, slope_variance, shift, exponent], tf.float32)
       if bias_variance is not None:
         bias_variance = tf.convert_to_tensor(
-            bias_variance, name='bias_variance', dtype=dtype)
+            value=bias_variance, name='bias_variance', dtype=dtype)
       self._bias_variance = _validate_arg_if_not_none(
-          bias_variance, tf.assert_positive, validate_args)
+          bias_variance, tf.compat.v1.assert_positive, validate_args)
       if slope_variance is not None:
         slope_variance = tf.convert_to_tensor(
-            slope_variance, name='slope_variance', dtype=dtype)
+            value=slope_variance, name='slope_variance', dtype=dtype)
       self._slope_variance = _validate_arg_if_not_none(
-          slope_variance, tf.assert_positive, validate_args)
+          slope_variance, tf.compat.v1.assert_positive, validate_args)
+      if shift is not None:
+        shift = tf.convert_to_tensor(value=shift, name='shift', dtype=dtype)
+      self._shift = shift
       if exponent is not None:
         exponent = tf.convert_to_tensor(
-            exponent, name='exponent', dtype=dtype)
+            value=exponent, name='exponent', dtype=dtype)
       self._exponent = _validate_arg_if_not_none(
-          exponent, tf.assert_positive, validate_args)
-      tf.assert_same_float_dtype(
-          [self._bias_variance, self._slope_variance, self._exponent])
+          exponent, tf.compat.v1.assert_positive, validate_args)
+      tf.debugging.assert_same_float_dtype([
+          self._bias_variance, self._slope_variance, self._shift, self._exponent
+      ])
     super(Polynomial, self).__init__(
         feature_ndims, dtype=dtype, name=name)
 
@@ -143,27 +161,35 @@ class Polynomial(psd_kernel.PositiveSemidefiniteKernel):
     return self._slope_variance
 
   @property
+  def shift(self):
+    """Shift of linear function that is exponentiated."""
+    return self._shift
+
+  @property
   def exponent(self):
     """Exponent of the polynomial term."""
     return self._exponent
 
   def _batch_shape(self):
-    return tf.broadcast_static_shape(
-        tf.broadcast_static_shape(
-            _maybe_shape_static(self.slope_variance),
-            _maybe_shape_static(self.bias_variance)),
-        _maybe_shape_static(self.exponent))
+    return functools.reduce(
+        tf.broadcast_static_shape,
+        map(_maybe_shape_static, [self.slope_variance, self.bias_variance,
+                                  self.shift, self.exponent]))
 
   def _batch_shape_tensor(self):
-    return tf.broadcast_dynamic_shape(
-        tf.broadcast_dynamic_shape(
-            _maybe_shape_dynamic(self.slope_variance),
-            _maybe_shape_dynamic(self.bias_variance)),
-        _maybe_shape_dynamic(self.exponent))
+    return functools.reduce(
+        tf.broadcast_dynamic_shape,
+        map(_maybe_shape_dynamic, [self.slope_variance, self.bias_variance,
+                                   self.shift, self.exponent]))
 
   def _apply(self, x1, x2, param_expansion_ndims=0):
-    dot_prod = util.sum_rightmost_ndims_preserving_shape(
-        x1 * x2, ndims=self.feature_ndims)
+    if self.shift is None:
+      dot_prod = util.sum_rightmost_ndims_preserving_shape(
+          x1 * x2, ndims=self.feature_ndims)
+    else:
+      dot_prod = util.sum_rightmost_ndims_preserving_shape(
+          (x1 - self.shift) * (x2 - self.shift),
+          ndims=self.feature_ndims)
 
     if self.exponent is not None:
       exponent = util.pad_shape_right_with_ones(
@@ -193,13 +219,15 @@ class Linear(Polynomial):
     exponent.
 
     ```none
-    k(x, y) = bias_variance**2 + slope_variance**2 * (x dot y')
+    k(x, y) = bias_variance**2 + slope_variance**2 *
+              ((x - shift) dot (y - shift))
     ```
   """
 
   def __init__(self,
                bias_variance=None,
                slope_variance=None,
+               shift=None,
                feature_ndims=1,
                validate_args=False,
                name='Linear'):
@@ -209,14 +237,20 @@ class Linear(Polynomial):
       bias_variance: Positive floating point `Tensor` that controls the
         variance from the origin. If bias = 0, there is no variance and the
         fitted function goes through the origin (also known as the homogeneous
-        linear kernel). Must be broadcastable with `slope_variance` and inputs
-        to `apply` and `matrix` methods. A value of `None` is treated like 0.
+        linear kernel). Must be broadcastable with `slope_variance`,
+        `shift` and inputs to `apply` and `matrix` methods. A value of
+        `None` is treated like 0.
         Default Value: `None`
       slope_variance: Positive floating point `Tensor` that controls the
         variance of the regression line slope. Must be broadcastable with
-        `bias_variance` and inputs to `apply` and `matrix` methods. A value of
-        `None` is treated like 1.
+        `bias_variance`, `shift`, and inputs to `apply` and `matrix`
+        methods. A value of `None` is treated like 1.
         Default Value: `None`
+      shift: Floating point `Tensor` that controls the intercept with the
+        x-axis of the linear interpolation. Must be broadcastable with
+        `bias_variance`, `slope_variance`, and inputs to `apply` and `matrix`
+        methods. A value of `None` is treated like 0, which results in having
+        the intercept at the origin.
       feature_ndims: Python `int` number of rightmost dims to include in
         kernel computation.
         Default Value: 1
@@ -229,6 +263,7 @@ class Linear(Polynomial):
     super(Linear, self).__init__(
         bias_variance=bias_variance,
         slope_variance=slope_variance,
+        shift=shift,
         exponent=None,
         feature_ndims=feature_ndims,
         validate_args=validate_args,

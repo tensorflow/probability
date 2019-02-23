@@ -30,6 +30,8 @@ import collections
 # Dependency imports
 import tensorflow as tf
 
+from tensorflow_probability.python.internal import prefer_static
+
 # Tolerance to check for floating point zeros.
 _EPSILON = 1e-10
 
@@ -314,19 +316,14 @@ def minimize(objective_function,
       return (not_converged if max_iterations is None
               else (not_converged & (num_iterations < max_iterations)))
 
-    (
-        converged,
-        num_iterations,
-        final_simplex,
-        final_objective_values,
-        final_evaluations
-    ) = tf.while_loop(_is_converged,
-                      _loop_body,
-                      initial_args,
-                      parallel_iterations=parallel_iterations)
-    order = tf.contrib.framework.argsort(final_objective_values,
-                                         direction='ASCENDING',
-                                         stable=True)
+    (converged, num_iterations, final_simplex, final_objective_values,
+     final_evaluations) = tf.while_loop(
+         cond=_is_converged,
+         body=_loop_body,
+         loop_vars=initial_args,
+         parallel_iterations=parallel_iterations)
+    order = tf.argsort(
+        final_objective_values, direction='ASCENDING', stable=True)
     best_index = order[0]
     # The explicit cast to Tensor below is done to avoid returning a mixture
     # of Python types and Tensors which cause problems with session.run.
@@ -335,16 +332,15 @@ def minimize(objective_function,
     # of the presence of non-tensors. This is very annoying so we explicitly
     # cast those arguments to Tensors.
     return NelderMeadOptimizerResults(
-        converged=tf.convert_to_tensor(converged),
+        converged=tf.convert_to_tensor(value=converged),
         num_objective_evaluations=final_evaluations,
         position=final_simplex[best_index],
         objective_value=final_objective_values[best_index],
         final_simplex=final_simplex,
         final_objective_values=final_objective_values,
-        num_iterations=tf.convert_to_tensor(num_iterations),
+        num_iterations=tf.convert_to_tensor(value=num_iterations),
         initial_simplex=simplex,
-        initial_objective_values=objective_at_simplex
-    )
+        initial_objective_values=objective_at_simplex)
 
 
 def nelder_mead_one_step(current_simplex,
@@ -362,9 +358,8 @@ def nelder_mead_one_step(current_simplex,
   """A single iteration of the Nelder Mead algorithm."""
   with tf.name_scope(name, 'nelder_mead_one_step'):
     domain_dtype = current_simplex.dtype.base_dtype
-    order = tf.contrib.framework.argsort(current_objective_values,
-                                         direction='ASCENDING',
-                                         stable=True)
+    order = tf.argsort(
+        current_objective_values, direction='ASCENDING', stable=True)
     (
         best_index,
         worst_index,
@@ -384,7 +379,8 @@ def nelder_mead_one_step(current_simplex,
     )
 
     # Compute the centroid of the face opposite the worst vertex.
-    face_centroid = tf.reduce_sum(current_simplex, axis=0) - worst_vertex
+    face_centroid = tf.reduce_sum(
+        input_tensor=current_simplex, axis=0) - worst_vertex
     face_centroid /= tf.cast(dim, domain_dtype)
 
     # Reflect the worst vertex through the opposite face.
@@ -451,15 +447,8 @@ def nelder_mead_one_step(current_simplex,
         converged,
         next_simplex,
         next_objective_at_simplex,
-        case_evals
-    ) = tf.contrib.framework.smart_case(
-        [
-            case0,
-            case1,
-            case2,
-            case3
-        ],
-        default=default_fn, exclusive=False)
+        case_evals) = prefer_static.case([case0, case1, case2, case3],
+                                         default=default_fn, exclusive=False)
     next_simplex.set_shape(current_simplex.shape)
     next_objective_at_simplex.set_shape(current_objective_values.shape)
     return (
@@ -501,7 +490,7 @@ def _expansion_fn(objective_function,
                           objective_at_reflected)
     accept_expanded_fn = lambda: (expanded, expanded_objective_value)
     accept_reflected_fn = lambda: (reflected, objective_at_reflected)
-    next_pt, next_objective_value = tf.contrib.framework.smart_cond(
+    next_pt, next_objective_value = prefer_static.cond(
         expanded_is_better, accept_expanded_fn, accept_reflected_fn)
     next_simplex = _replace_at_index(simplex, worst_index, next_pt)
     next_objective_at_simplex = _replace_at_index(objective_values,
@@ -546,10 +535,9 @@ def _outside_contraction_fn(objective_function,
                                   shrinkage,
                                   batch_evaluate_objective)
 
-    return tf.contrib.framework.smart_cond(
-        is_contracted_acceptable,
-        _accept_contraction,
-        _reject_contraction)
+    return prefer_static.cond(is_contracted_acceptable,
+                              _accept_contraction,
+                              _reject_contraction)
   return _contraction
 
 
@@ -587,10 +575,9 @@ def _inside_contraction_fn(objective_function,
       return _shrink_towards_best(objective_function, simplex, best_index,
                                   shrinkage, batch_evaluate_objective)
 
-    return tf.contrib.framework.smart_cond(
-        is_contracted_acceptable,
-        _accept_contraction,
-        _reject_contraction)
+    return prefer_static.cond(is_contracted_acceptable,
+                              _accept_contraction,
+                              _reject_contraction)
   return _contraction
 
 
@@ -658,7 +645,7 @@ def _check_convergence(simplex,
   objective_convergence = tf.abs(worst_objective -
                                  best_objective) < func_tolerance
   simplex_degeneracy = tf.reduce_max(
-      tf.abs(simplex - best_vertex)) < position_tolerance
+      input_tensor=tf.abs(simplex - best_vertex)) < position_tolerance
   return objective_convergence | simplex_degeneracy
 
 
@@ -783,12 +770,12 @@ def _prepare_args_with_initial_simplex(objective_function,
                                        objective_at_initial_simplex,
                                        batch_evaluate_objective):
   """Evaluates the objective function at the specified initial simplex."""
-  initial_simplex = tf.convert_to_tensor(initial_simplex)
+  initial_simplex = tf.convert_to_tensor(value=initial_simplex)
 
   # If d is the dimension of the problem, the number of vertices in the
   # simplex should be d+1. From this, we can infer the number of dimensions
   # as n - 1 where n is the number of vertices specified.
-  num_vertices = tf.shape(initial_simplex)[0]
+  num_vertices = tf.shape(input=initial_simplex)[0]
   dim = num_vertices - 1
   num_evaluations = 0
 
@@ -797,7 +784,7 @@ def _prepare_args_with_initial_simplex(objective_function,
         objective_function, initial_simplex, batch_evaluate_objective)
     num_evaluations += n_evals
   objective_at_initial_simplex = tf.convert_to_tensor(
-      objective_at_initial_simplex)
+      value=objective_at_initial_simplex)
   return (dim,
           num_vertices,
           initial_simplex,
@@ -811,11 +798,11 @@ def _prepare_args_with_initial_vertex(objective_function,
                                       objective_at_initial_vertex,
                                       batch_evaluate_objective):
   """Constructs a standard axes aligned simplex."""
-  dim = tf.size(initial_vertex)
+  dim = tf.size(input=initial_vertex)
   num_vertices = dim + 1
   unit_vectors_along_axes = tf.reshape(
       tf.eye(dim, dim, dtype=initial_vertex.dtype.base_dtype),
-      tf.concat([[dim], tf.shape(initial_vertex)], axis=0))
+      tf.concat([[dim], tf.shape(input=initial_vertex)], axis=0))
 
   # If step_sizes does not broadcast to initial_vertex, the multiplication
   # in the second term will fail.
@@ -890,7 +877,7 @@ def _evaluate_objective_multiple(objective_function, arg_batch,
       num_evaluations: An `int32` scalar `Tensor`containing the number of
         points on which the objective function was evaluated (i.e `batch_size`).
   """
-  n_points = tf.shape(arg_batch)[0]
+  n_points = tf.shape(input=arg_batch)[0]
   if batch_evaluate_objective:
     return objective_function(arg_batch), n_points
   return tf.map_fn(objective_function, arg_batch), n_points

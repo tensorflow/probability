@@ -22,7 +22,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 def _scipy_invgauss(loc, concentration):
@@ -33,12 +33,12 @@ def _scipy_invgauss(loc, concentration):
   return stats.invgauss(mu=loc/concentration, scale=concentration)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class _InverseGaussianTest(object):
 
   def make_tensor(self, x):
     x = tf.cast(x, self.dtype)
-    return tf.placeholder_with_default(
+    return tf.compat.v1.placeholder_with_default(
         input=x, shape=x.shape if self.use_static_shape else None)
 
   def testInverseGaussianShape(self):

@@ -22,12 +22,12 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 rng = np.random.RandomState(0)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class DeterministicTest(tf.test.TestCase):
 
   def testShape(self):
@@ -150,11 +150,11 @@ class DeterministicTest(tf.test.TestCase):
           self.evaluate(sample))
 
   def testSampleDynamicWithBatchDims(self):
-    loc = tf.placeholder_with_default(input=[0., 0], shape=[2])
+    loc = tf.compat.v1.placeholder_with_default(input=[0., 0], shape=[2])
 
     deterministic = tfd.Deterministic(loc)
     for sample_shape_ in [(), (4,)]:
-      sample_shape = tf.placeholder_with_default(
+      sample_shape = tf.compat.v1.placeholder_with_default(
           input=np.array(sample_shape_, dtype=np.int32), shape=None)
       sample_ = self.evaluate(deterministic.sample(sample_shape))
       self.assertAllClose(
@@ -206,20 +206,22 @@ class VectorDeterministicTest(tf.test.TestCase):
     self.assertEqual(deterministic.event_shape, tf.TensorShape([4]))
 
   def testShapeUknown(self):
-    loc = tf.placeholder(np.float32, shape=[None])
+    loc = tf.compat.v1.placeholder_with_default(np.float32([0]), shape=[None])
     deterministic = tfd.VectorDeterministic(loc)
     self.assertAllEqual(deterministic.event_shape_tensor().shape, [1])
 
   def testInvalidTolRaises(self):
     loc = rng.rand(2, 3, 4).astype(np.float32)
-    deterministic = tfd.VectorDeterministic(loc, atol=-1, validate_args=True)
-    with self.assertRaisesOpError("Condition x >= 0"):
+    with self.assertRaisesRegexp((ValueError, tf.errors.InvalidArgumentError),
+                                 "Condition x >= 0"):
+      deterministic = tfd.VectorDeterministic(loc, atol=-1, validate_args=True)
       self.evaluate(deterministic.prob(loc))
 
   def testInvalidXRaises(self):
     loc = rng.rand(2, 3, 4).astype(np.float32)
-    deterministic = tfd.VectorDeterministic(loc, atol=-1, validate_args=True)
-    with self.assertRaisesRegexp(ValueError, "must have rank at least 1"):
+    with self.assertRaisesRegexp((ValueError, tf.errors.InvalidArgumentError),
+                                 "must have rank at least 1"):
+      deterministic = tfd.VectorDeterministic(loc, atol=1, validate_args=True)
       self.evaluate(deterministic.prob(0.))
 
   def testProbVectorDeterministicWithNoBatchDims(self):
@@ -291,11 +293,12 @@ class VectorDeterministicTest(tf.test.TestCase):
           self.evaluate(sample))
 
   def testSampleDynamicWithBatchDims(self):
-    loc = tf.placeholder_with_default(input=[[0.], [0.]], shape=[2, 1])
+    loc = tf.compat.v1.placeholder_with_default(
+        input=[[0.], [0.]], shape=[2, 1])
 
     deterministic = tfd.VectorDeterministic(loc)
     for sample_shape_ in [(), (4,)]:
-      sample_shape = tf.placeholder_with_default(
+      sample_shape = tf.compat.v1.placeholder_with_default(
           input=np.array(sample_shape_, dtype=np.int32), shape=None)
       sample_ = self.evaluate(deterministic.sample(sample_shape))
       self.assertAllClose(

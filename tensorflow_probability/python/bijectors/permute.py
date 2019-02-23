@@ -23,7 +23,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow.python.ops import control_flow_ops
+from tensorflow_probability.python.internal import distribution_util
 
 
 __all__ = [
@@ -90,30 +90,30 @@ class Permute(bijector.Bijector):
       NotImplementedError: if `axis` is not negative.
     """
     with tf.name_scope(name, "permute", values=[permutation, axis]):
-      axis = tf.convert_to_tensor(axis, name="axis")
+      axis = tf.convert_to_tensor(value=axis, name="axis")
       if not axis.dtype.is_integer:
         raise TypeError("axis.dtype ({}) should be `int`-like.".format(
             axis.dtype.name))
-      permutation = tf.convert_to_tensor(permutation, name="permutation")
+      permutation = tf.convert_to_tensor(value=permutation, name="permutation")
       if not permutation.dtype.is_integer:
         raise TypeError("permutation.dtype ({}) should be `int`-like.".format(
             permutation.dtype.name))
-      p = tf.contrib.util.constant_value(permutation)
+      p = tf.get_static_value(permutation)
       if p is not None:
         if set(p) != set(np.arange(p.size)):
           raise ValueError("Permutation over `d` must contain exactly one of "
                            "each of `{0, 1, ..., d}`.")
       elif validate_args:
         p, _ = tf.nn.top_k(
-            -permutation, k=tf.shape(permutation)[-1], sorted=True)
-        permutation = control_flow_ops.with_dependencies([
-            tf.assert_equal(
+            -permutation, k=tf.shape(input=permutation)[-1], sorted=True)
+        permutation = distribution_util.with_dependencies([
+            tf.compat.v1.assert_equal(
                 -p,
-                tf.range(tf.size(p)),
+                tf.range(tf.size(input=p)),
                 message=("Permutation over `d` must contain exactly one of "
                          "each of `{0, 1, ..., d}`.")),
         ], permutation)
-      axis_ = tf.contrib.util.constant_value(axis)
+      axis_ = tf.get_static_value(axis)
       if axis_ is None:
         raise NotImplementedError("`axis` must be known prior to graph "
                                   "execution.")
@@ -142,7 +142,8 @@ class Permute(bijector.Bijector):
     return tf.gather(x, self.permutation, axis=self.axis)
 
   def _inverse(self, y):
-    return tf.gather(y, tf.invert_permutation(self.permutation), axis=self.axis)
+    return tf.gather(
+        y, tf.math.invert_permutation(self.permutation), axis=self.axis)
 
   def _inverse_log_det_jacobian(self, y):
     # is_constant_jacobian = True for this bijector, hence the

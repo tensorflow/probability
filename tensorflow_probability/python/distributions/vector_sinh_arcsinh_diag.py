@@ -26,7 +26,6 @@ from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow.python.ops import control_flow_ops
 
 __all__ = [
     "VectorSinhArcsinhDiag",
@@ -176,7 +175,7 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
           [loc, scale_diag, scale_identity_multiplier, skewness, tailweight],
           tf.float32)
       loc = loc if loc is None else tf.convert_to_tensor(
-          loc, name="loc", dtype=dtype)
+          value=loc, name="loc", dtype=dtype)
       tailweight = 1. if tailweight is None else tailweight
       has_default_skewness = skewness is None
       skewness = 0. if skewness is None else skewness
@@ -214,13 +213,14 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
         asserts = distribution_util.maybe_check_scalar_distribution(
             distribution, dtype, validate_args)
         if asserts:
-          scale_diag_part = control_flow_ops.with_dependencies(
+          scale_diag_part = distribution_util.with_dependencies(
               asserts, scale_diag_part)
 
       # Make the SAS bijector, 'F'.
-      skewness = tf.convert_to_tensor(skewness, dtype=dtype, name="skewness")
+      skewness = tf.convert_to_tensor(
+          value=skewness, dtype=dtype, name="skewness")
       tailweight = tf.convert_to_tensor(
-          tailweight, dtype=dtype, name="tailweight")
+          value=tailweight, dtype=dtype, name="tailweight")
       f = sinh_arcsinh_bijector.SinhArcsinh(
           skewness=skewness, tailweight=tailweight)
       if has_default_skewness:
@@ -232,7 +232,7 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
 
       # Make the Affine bijector, Z --> loc + C * Z.
       c = 2 * scale_diag_part / f_noskew.forward(
-          tf.convert_to_tensor(2, dtype=dtype))
+          tf.convert_to_tensor(value=2, dtype=dtype))
       affine = affine_bijector.Affine(
           shift=loc, scale_diag=c, validate_args=validate_args)
 

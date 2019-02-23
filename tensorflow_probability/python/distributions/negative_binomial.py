@@ -25,7 +25,6 @@ from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.framework import tensor_shape
 
 
 class NegativeBinomial(distribution.Distribution):
@@ -96,9 +95,9 @@ class NegativeBinomial(distribution.Distribution):
       self._logits, self._probs = distribution_util.get_logits_and_probs(
           logits, probs, validate_args=validate_args, name=name, dtype=dtype)
       total_count = tf.convert_to_tensor(
-          total_count, name="total_count", dtype=dtype)
-      with tf.control_dependencies([tf.assert_positive(total_count)]
-                                   if validate_args else []):
+          value=total_count, name="total_count", dtype=dtype)
+      with tf.control_dependencies(
+          [tf.compat.v1.assert_positive(total_count)] if validate_args else []):
         self._total_count = tf.identity(total_count, name="total_count")
 
     super(NegativeBinomial, self).__init__(
@@ -127,7 +126,7 @@ class NegativeBinomial(distribution.Distribution):
 
   def _batch_shape_tensor(self):
     return tf.broadcast_dynamic_shape(
-        tf.shape(self.total_count), tf.shape(self.probs))
+        tf.shape(input=self.total_count), tf.shape(input=self.probs))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(self.total_count.shape,
@@ -137,29 +136,26 @@ class NegativeBinomial(distribution.Distribution):
     return tf.constant([], dtype=tf.int32)
 
   def _event_shape(self):
-    return tensor_shape.scalar()
+    return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
     # Here we use the fact that if:
     # lam ~ Gamma(concentration=total_count, rate=(1-probs)/probs)
     # then X ~ Poisson(lam) is Negative Binomially distributed.
     stream = seed_stream.SeedStream(seed, salt="NegativeBinomial")
-    rate = tf.random_gamma(
+    rate = tf.random.gamma(
         shape=[n],
         alpha=self.total_count,
         beta=tf.exp(-self.logits),
         dtype=self.dtype,
         seed=stream())
-    return tf.random_poisson(
-        rate,
-        shape=[],
-        dtype=self.dtype,
-        seed=stream())
+    return tf.random.poisson(
+        lam=rate, shape=[], dtype=self.dtype, seed=stream())
 
   def _cdf(self, x):
     if self.validate_args:
       x = distribution_util.embed_check_nonnegative_integer_form(x)
-    return tf.betainc(self.total_count, 1. + x, tf.sigmoid(-self.logits))
+    return tf.math.betainc(self.total_count, 1. + x, tf.sigmoid(-self.logits))
 
   def _log_prob(self, x):
     return (self._log_unnormalized_prob(x)
@@ -168,14 +164,14 @@ class NegativeBinomial(distribution.Distribution):
   def _log_unnormalized_prob(self, x):
     if self.validate_args:
       x = distribution_util.embed_check_nonnegative_integer_form(x)
-    return (self.total_count * tf.log_sigmoid(-self.logits) +
-            x * tf.log_sigmoid(self.logits))
+    return (self.total_count * tf.math.log_sigmoid(-self.logits) +
+            x * tf.math.log_sigmoid(self.logits))
 
   def _log_normalization(self, x):
     if self.validate_args:
       x = distribution_util.embed_check_nonnegative_integer_form(x)
-    return (-tf.lgamma(self.total_count + x) + tf.lgamma(1. + x) + tf.lgamma(
-        self.total_count))
+    return (-tf.math.lgamma(self.total_count + x) + tf.math.lgamma(1. + x) +
+            tf.math.lgamma(self.total_count))
 
   def _mean(self):
     return self.total_count * tf.exp(self.logits)

@@ -23,7 +23,7 @@ import tensorflow as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import positive_semidefinite_kernels as psd_kernels
 
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 class _StudentTProcessTest(object):
@@ -44,10 +44,11 @@ class _StudentTProcessTest(object):
     batched_index_points = np.stack([index_points]*6)
     # ==> shape = [6, 25, 2]
     if not self.is_static:
-      df = tf.placeholder_with_default(df, shape=None)
-      amplitude = tf.placeholder_with_default(amplitude, shape=None)
-      length_scale = tf.placeholder_with_default(length_scale, shape=None)
-      batched_index_points = tf.placeholder_with_default(
+      df = tf.compat.v1.placeholder_with_default(df, shape=None)
+      amplitude = tf.compat.v1.placeholder_with_default(amplitude, shape=None)
+      length_scale = tf.compat.v1.placeholder_with_default(
+          length_scale, shape=None)
+      batched_index_points = tf.compat.v1.placeholder_with_default(
           batched_index_points, shape=None)
     kernel = psd_kernels.ExponentiatedQuadratic(amplitude, length_scale)
     tp = tfd.StudentTProcess(
@@ -80,7 +81,7 @@ class _StudentTProcessTest(object):
       self.assertIsNone(samples.shape.ndims)
       self.assertIsNone(tp.batch_shape.ndims)
       self.assertEqual(tp.event_shape.ndims, 1)
-      self.assertIsNone(tp.event_shape.dims[0].value)
+      self.assertIsNone(tf.compat.dimension_value(tp.event_shape.dims[0]))
 
   def testVarianceAndCovarianceMatrix(self):
     df = np.float64(4.)
@@ -129,8 +130,10 @@ class _StudentTProcessTest(object):
 
     # ==> shape = [6, 25, 2]
     if not self.is_static:
-      index_points_1 = tf.placeholder_with_default(index_points_1, shape=None)
-      index_points_2 = tf.placeholder_with_default(index_points_2, shape=None)
+      index_points_1 = tf.compat.v1.placeholder_with_default(
+          index_points_1, shape=None)
+      index_points_2 = tf.compat.v1.placeholder_with_default(
+          index_points_2, shape=None)
 
     mean_fn = lambda x: np.array([0.], np.float32)
     kernel_1 = psd_kernels.ExponentiatedQuadratic()
@@ -161,8 +164,7 @@ class _StudentTProcessTest(object):
       self.assertAllEqual(tp1.index_points, index_points_1)
       self.assertAllEqual(tp2.index_points, index_points_2)
       self.assertAllEqual(
-          tf.contrib.util.constant_value(tp1.jitter),
-          tf.contrib.util.constant_value(tp2.jitter))
+          tf.get_static_value(tp1.jitter), tf.get_static_value(tp2.jitter))
     else:
       self.assertAllEqual(
           self.evaluate(tp1.batch_shape_tensor()),
@@ -178,12 +180,12 @@ class _StudentTProcessTest(object):
       self.assertAllEqual(self.evaluate(tp2.index_points), index_points_2)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class StudentTProcessStaticTest(_StudentTProcessTest, tf.test.TestCase):
   is_static = True
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class StudentTProcessDynamicTest(_StudentTProcessTest, tf.test.TestCase):
   is_static = False
 

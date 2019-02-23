@@ -27,8 +27,6 @@ from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.framework import tensor_shape
-from tensorflow.python.ops import control_flow_ops
 
 
 __all__ = [
@@ -172,16 +170,15 @@ class StudentT(distribution.Distribution):
     parameters = dict(locals())
     with tf.name_scope(name, values=[df, loc, scale]) as name:
       dtype = dtype_util.common_dtype([df, loc, scale], tf.float32)
-      df = tf.convert_to_tensor(df, name="df", dtype=dtype)
-      loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
-      scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
-      with tf.control_dependencies([tf.assert_positive(df)]
-                                   if validate_args else []):
+      df = tf.convert_to_tensor(value=df, name="df", dtype=dtype)
+      loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
+      scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
+      with tf.control_dependencies(
+          [tf.compat.v1.assert_positive(df)] if validate_args else []):
         self._df = tf.identity(df)
         self._loc = tf.identity(loc)
         self._scale = tf.identity(scale)
-        tf.assert_same_float_dtype(
-            (self._df, self._loc, self._scale))
+        tf.debugging.assert_same_float_dtype((self._df, self._loc, self._scale))
     super(StudentT, self).__init__(
         dtype=self._scale.dtype,
         reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
@@ -194,9 +191,8 @@ class StudentT(distribution.Distribution):
   @staticmethod
   def _param_shapes(sample_shape):
     return dict(
-        zip(("df", "loc", "scale"), (
-            [tf.convert_to_tensor(
-                sample_shape, dtype=tf.int32)] * 3)))
+        zip(("df", "loc", "scale"),
+            ([tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)] * 3)))
 
   @property
   def df(self):
@@ -215,9 +211,9 @@ class StudentT(distribution.Distribution):
 
   def _batch_shape_tensor(self):
     return tf.broadcast_dynamic_shape(
-        tf.shape(self.df),
+        tf.shape(input=self.df),
         tf.broadcast_dynamic_shape(
-            tf.shape(self.loc), tf.shape(self.scale)))
+            tf.shape(input=self.loc), tf.shape(input=self.scale)))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(
@@ -229,7 +225,7 @@ class StudentT(distribution.Distribution):
     return tf.constant([], dtype=tf.int32)
 
   def _event_shape(self):
-    return tensor_shape.scalar()
+    return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
     # The sampling method comes from the fact that if:
@@ -240,15 +236,14 @@ class StudentT(distribution.Distribution):
     #   Y ~ StudentT(df).
     seed = seed_stream.SeedStream(seed, "student_t")
     shape = tf.concat([[n], self.batch_shape_tensor()], 0)
-    normal_sample = tf.random_normal(shape, dtype=self.dtype, seed=seed())
+    normal_sample = tf.random.normal(shape, dtype=self.dtype, seed=seed())
     df = self.df * tf.ones(self.batch_shape_tensor(), dtype=self.dtype)
-    gamma_sample = tf.random_gamma(
-        [n],
-        0.5 * df,
-        beta=0.5,
-        dtype=self.dtype,
-        seed=seed())
-    samples = normal_sample * tf.rsqrt(gamma_sample / df)
+    gamma_sample = tf.random.gamma([n],
+                                   0.5 * df,
+                                   beta=0.5,
+                                   dtype=self.dtype,
+                                   seed=seed())
+    samples = normal_sample * tf.math.rsqrt(gamma_sample / df)
     return samples * self.scale + self.loc  # Abs(scale) not wanted.
 
   def _log_prob(self, x):
@@ -256,20 +251,18 @@ class StudentT(distribution.Distribution):
 
   def _log_unnormalized_prob(self, x):
     y = (x - self.loc) / self.scale  # Abs(scale) superfluous.
-    return -0.5 * (self.df + 1.) * tf.log1p(y**2. / self.df)
+    return -0.5 * (self.df + 1.) * tf.math.log1p(y**2. / self.df)
 
   def _log_normalization(self):
-    return (tf.log(tf.abs(self.scale)) +
-            0.5 * tf.log(self.df) +
-            0.5 * np.log(np.pi) +
-            tf.lgamma(0.5 * self.df) -
-            tf.lgamma(0.5 * (self.df + 1.)))
+    return (tf.math.log(tf.abs(self.scale)) + 0.5 * tf.math.log(self.df) +
+            0.5 * np.log(np.pi) + tf.math.lgamma(0.5 * self.df) -
+            tf.math.lgamma(0.5 * (self.df + 1.)))
 
   def _cdf(self, x):
     # Take Abs(scale) to make subsequent where work correctly.
     y = (x - self.loc) / tf.abs(self.scale)
     x_t = self.df / (y**2. + self.df)
-    neg_cdf = 0.5 * tf.betainc(0.5 * self.df, 0.5, x_t)
+    neg_cdf = 0.5 * tf.math.betainc(0.5 * self.df, 0.5, x_t)
     return tf.where(tf.less(y, 0.), neg_cdf, 1. - neg_cdf)
 
   def _entropy(self):
@@ -277,12 +270,10 @@ class StudentT(distribution.Distribution):
                 dtype=self.dtype)[..., tf.newaxis]
     u = v * self.df[..., tf.newaxis]
     beta_arg = tf.concat([u, v], -1) / 2.
-    return (tf.log(tf.abs(self.scale)) +
-            0.5 * tf.log(self.df) +
-            tf.lbeta(beta_arg) +
-            0.5 * (self.df + 1.) *
-            (tf.digamma(0.5 * (self.df + 1.)) -
-             tf.digamma(0.5 * self.df)))
+    return (tf.math.log(tf.abs(self.scale)) + 0.5 * tf.math.log(self.df) +
+            tf.math.lbeta(beta_arg) + 0.5 * (self.df + 1.) *
+            (tf.math.digamma(0.5 *
+                             (self.df + 1.)) - tf.math.digamma(0.5 * self.df)))
 
   @distribution_util.AppendDocstring(
       """The mean of Student's T equals `loc` if `df > 1`, otherwise it is
@@ -300,14 +291,12 @@ class StudentT(distribution.Distribution):
           mean,
           tf.fill(self.batch_shape_tensor(), nan, name="nan"))
     else:
-      return control_flow_ops.with_dependencies(
-          [
-              tf.assert_less(
-                  tf.ones([], dtype=self.dtype),
-                  self.df,
-                  message="mean not defined for components of df <= 1"),
-          ],
-          mean)
+      return distribution_util.with_dependencies([
+          tf.compat.v1.assert_less(
+              tf.ones([], dtype=self.dtype),
+              self.df,
+              message="mean not defined for components of df <= 1"),
+      ], mean)
 
   @distribution_util.AppendDocstring("""
       The variance for Student's T equals
@@ -343,14 +332,12 @@ class StudentT(distribution.Distribution):
           result_where_defined,
           tf.fill(self.batch_shape_tensor(), nan, name="nan"))
     else:
-      return control_flow_ops.with_dependencies(
-          [
-              tf.assert_less(
-                  tf.ones([], dtype=self.dtype),
-                  self.df,
-                  message="variance not defined for components of df <= 1"),
-          ],
-          result_where_defined)
+      return distribution_util.with_dependencies([
+          tf.compat.v1.assert_less(
+              tf.ones([], dtype=self.dtype),
+              self.df,
+              message="variance not defined for components of df <= 1"),
+      ], result_where_defined)
 
   def _mode(self):
     return tf.identity(self.loc)

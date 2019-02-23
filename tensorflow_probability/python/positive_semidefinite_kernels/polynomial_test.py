@@ -25,10 +25,10 @@ import numpy as np
 
 import tensorflow as tf
 from tensorflow_probability import positive_semidefinite_kernels as psd_kernels
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class PolynomialTest(tf.test.TestCase, parameterized.TestCase):
   """Test the Polynomial kernel."""
 
@@ -37,17 +37,22 @@ class PolynomialTest(tf.test.TestCase, parameterized.TestCase):
       psd_kernels.Polynomial(
           bias_variance=np.float32(1.),
           slope_variance=np.float64(1.),
+          shift=0.,
           exponent=1.
       )
 
   def testFloat32Fallback(self):
     # Should be OK (float32 fallback).
     self.polynomial = psd_kernels.Polynomial(
-        bias_variance=0, slope_variance=1, exponent=1)
+        bias_variance=0,
+        slope_variance=1,
+        shift=0,
+        exponent=1)
     # Should be OK.
     psd_kernels.Polynomial(
         bias_variance=np.float32(1.),
         slope_variance=1.,
+        shift=0.,
         exponent=1.)
 
   def testValidateArgsNonPositiveAreBad(self):
@@ -67,11 +72,19 @@ class PolynomialTest(tf.test.TestCase, parameterized.TestCase):
           validate_args=True)
       self.evaluate(k.exponent)
 
+  def testShifttNonPositiveIsOk(self):
+    # No exception expected
+    k = psd_kernels.Polynomial(
+        shift=-1.,
+        validate_args=True)
+    self.evaluate(k.shift)
+
   def testValidateArgsNoneIsOk(self):
     # No exception expected
     k = psd_kernels.Polynomial(
         bias_variance=None,
         slope_variance=None,
+        shift=None,
         exponent=None,
         validate_args=True)
     self.evaluate(k.apply([[1.]], [[1.]]))
@@ -82,17 +95,47 @@ class PolynomialTest(tf.test.TestCase, parameterized.TestCase):
     self.assertEqual([2, 3, 2], k.batch_shape.as_list())
 
   @parameterized.named_parameters(
-      ('Shape [] kernel', 2., 2., 2., []),
-      ('Shape [1] kernel', [2.], [2.], [2.], [1]),
-      ('Shape [2] kernel', [1., 2.], [1., 2.], [1., 2.], [2]),
-      ('Shape [2, 1] kernel', [[1.], [2.]], [[1.], [2.]], [[1.], [2.]],
-       [2, 1]),
-      ('Shape [2, 1] broadcast kernel', 2., [2.], [[1.], [2.]], [2, 1]))
+      dict(
+          testcase_name='Shape [] kernel',
+          bias_variance=2.,
+          slope_variance=2.,
+          shift=2.,
+          exponent=2.,
+          shape=[]),
+      dict(
+          testcase_name='Shape [1] kernel',
+          bias_variance=[2.],
+          slope_variance=[2.],
+          shift=[2.],
+          exponent=[2.],
+          shape=[1]),
+      dict(
+          testcase_name='Shape [2] kernel',
+          bias_variance=[1., 2.],
+          slope_variance=[1., 2.],
+          shift=[1., 2.],
+          exponent=[1., 2.],
+          shape=[2]),
+      dict(
+          testcase_name='Shape [2, 1] kernel',
+          bias_variance=[[1.], [2.]],
+          slope_variance=[[1.], [2.]],
+          shift=[[1.], [2.]],
+          exponent=[[1.], [2.]],
+          shape=[2, 1]),
+      dict(
+          testcase_name='Shape [2, 1] broadcast kernel',
+          bias_variance=None,
+          slope_variance=2.,
+          shift=[2.],
+          exponent=[[1.], [2.]],
+          shape=[2, 1]))
   def testBatchShape(self, bias_variance, slope_variance,
-                     exponent, shape):
+                     shift, exponent, shape):
     k = psd_kernels.Polynomial(
         bias_variance=bias_variance,
         slope_variance=slope_variance,
+        shift=shift,
         exponent=exponent,
         validate_args=True)
     self.assertAllEqual(k.batch_shape.as_list(), shape)
@@ -103,6 +146,7 @@ class PolynomialTest(tf.test.TestCase, parameterized.TestCase):
     k = psd_kernels.Polynomial(
         bias_variance=0.,
         slope_variance=1.,
+        shift=0.,
         exponent=1.,
         feature_ndims=1)
     x = np.ones([5, 3], np.float32)
@@ -114,6 +158,7 @@ class PolynomialTest(tf.test.TestCase, parameterized.TestCase):
     k = psd_kernels.Polynomial(
         bias_variance=np.float64(0.),
         slope_variance=np.float64(1.),
+        shift=np.float64(0.),
         exponent=np.float64(1.),
         feature_ndims=1)
     x = np.ones([5, 3], np.float64)
@@ -121,13 +166,26 @@ class PolynomialTest(tf.test.TestCase, parameterized.TestCase):
     k.apply(x, y)
 
   @parameterized.named_parameters(
-      ('1 feature dimension', 1, (5, 3), (5, 3), (5,)),
-      ('2 feature dimensions', 2, (5, 3, 2), (5, 3, 2), (5,)))
+      dict(
+          testcase_name='1 feature dimension',
+          feature_ndims=1,
+          x_shape=(5, 3),
+          y_shape=(5, 3),
+          apply_shape=(5,),
+      ),
+      dict(
+          testcase_name='2 feature dimension',
+          feature_ndims=2,
+          x_shape=(5, 3, 2),
+          y_shape=(5, 3, 2),
+          apply_shape=(5,),
+      ))
   def testShapesAreCorrectApply(self, feature_ndims,
                                 x_shape, y_shape, apply_shape):
     k = psd_kernels.Polynomial(
         bias_variance=0.,
         slope_variance=1.,
+        shift=0.,
         exponent=1.,
         feature_ndims=feature_ndims)
     x = np.ones(x_shape, np.float32)
@@ -136,17 +194,33 @@ class PolynomialTest(tf.test.TestCase, parameterized.TestCase):
         k.apply(x, y).shape, apply_shape)
 
   @parameterized.named_parameters(
-      ('1 feature dimension, 1 batch dimension',
-       1, (5, 3), (4, 3), (5, 4)),
-      ('1 feature dimension, 2 batch dimensions',
-       1, (10, 5, 3), (10, 4, 3), (10, 5, 4)),
-      ('2 feature dimensions, 1 batch dimension',
-       2, (5, 3, 2), (4, 3, 2), (5, 4)))
+      dict(
+          testcase_name='1 feature dimension, 1 batch dimension',
+          feature_ndims=1,
+          x_shape=(5, 3),
+          y_shape=(4, 3),
+          matrix_shape=(5, 4),
+      ),
+      dict(
+          testcase_name='1 feature dimension, 2 batch dimensions',
+          feature_ndims=1,
+          x_shape=(10, 5, 3),
+          y_shape=(10, 4, 3),
+          matrix_shape=(10, 5, 4),
+      ),
+      dict(
+          testcase_name='2 feature dimensions, 1 batch dimension',
+          feature_ndims=2,
+          x_shape=(5, 3, 2),
+          y_shape=(4, 3, 2),
+          matrix_shape=(5, 4),
+      ))
   def testShapesAreCorrectMatrix(self, feature_ndims,
                                  x_shape, y_shape, matrix_shape):
     k = psd_kernels.Polynomial(
         bias_variance=0.,
         slope_variance=1.,
+        shift=0.,
         exponent=1.,
         feature_ndims=feature_ndims)
     x = np.ones(x_shape, np.float32)
@@ -171,21 +245,24 @@ class PolynomialTest(tf.test.TestCase, parameterized.TestCase):
   def testValuesAreCorrect(self):
     bias_variance = 1.5
     slope_variance = 0.5
+    shift = 1.
     exponent = 2
     k = psd_kernels.Polynomial(
         bias_variance=bias_variance,
         slope_variance=slope_variance,
+        shift=shift,
         exponent=exponent
     )
     x = np.random.uniform(-1, 1, size=[5, 3]).astype(np.float32)
     y = np.random.uniform(-1, 1, size=[4, 3]).astype(np.float32)
     self.assertAllClose(
         self.evaluate(k.matrix(x, y)),
-        bias_variance**2 + slope_variance**2 * (x.dot(y.T))**exponent
+        (bias_variance ** 2 + slope_variance ** 2 *
+         ((x - shift).dot((y - shift).T)) ** exponent)
     )
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class LinearTest(tf.test.TestCase, parameterized.TestCase):
   """Test the Linear kernel."""
 

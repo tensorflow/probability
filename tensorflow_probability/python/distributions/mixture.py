@@ -114,7 +114,7 @@ class Mixture(distribution.Distribution):
     parameters = dict(locals())
     # TODO(b/117098119): Remove tf.distribution references once they're gone.
     if not isinstance(cat, categorical.Categorical) and not isinstance(
-        cat, tf.distributions.Categorical):
+        cat, tf.compat.v1.distributions.Categorical):
       raise TypeError("cat must be a Categorical distribution, but saw: %s" %
                       cat)
     if not components:
@@ -125,7 +125,8 @@ class Mixture(distribution.Distribution):
     # TODO(b/117098119): Remove tf.distribution references once they're gone.
     if not all(
         isinstance(c, distribution.Distribution) or
-        isinstance(cat, tf.distributions.Distribution) for c in components):
+        isinstance(cat, tf.compat.v1.distributions.Distribution)
+        for c in components):
       raise TypeError(
           "all entries in components must be Distribution instances"
           " but saw: %s" % components)
@@ -136,7 +137,11 @@ class Mixture(distribution.Distribution):
                       "dtypes: %s" % [(d.name, d.dtype) for d in components])
     static_event_shape = components[0].event_shape
     static_batch_shape = cat.batch_shape
-    for d in components:
+    for di, d in enumerate(components):
+      if not static_batch_shape.is_compatible_with(d.batch_shape):
+        raise ValueError(
+            "components[{}] batch shape must be compatible with cat "
+            "shape and other component batch shapes".format(di))
       static_event_shape = static_event_shape.merge_with(d.event_shape)
       static_batch_shape = static_batch_shape.merge_with(d.batch_shape)
     if static_event_shape.ndims is None:
@@ -147,7 +152,7 @@ class Mixture(distribution.Distribution):
     # Ensure that all batch and event ndims are consistent.
     with tf.name_scope(name, values=[cat.logits]) as name:
       num_components = cat.event_size
-      static_num_components = tf.contrib.util.constant_value(num_components)
+      static_num_components = tf.get_static_value(num_components)
       if static_num_components is None:
         raise ValueError(
             "Could not infer number of classes from cat and unable "
@@ -159,19 +164,19 @@ class Mixture(distribution.Distribution):
                          (static_num_components, len(components)))
 
       cat_batch_shape = cat.batch_shape_tensor()
-      cat_batch_rank = tf.size(cat_batch_shape)
+      cat_batch_rank = tf.size(input=cat_batch_shape)
       if validate_args:
         batch_shapes = [d.batch_shape_tensor() for d in components]
-        batch_ranks = [tf.size(bs) for bs in batch_shapes]
+        batch_ranks = [tf.size(input=bs) for bs in batch_shapes]
         check_message = ("components[%d] batch shape must match cat "
                          "batch shape")
         self._assertions = [
-            tf.assert_equal(
+            tf.compat.v1.assert_equal(
                 cat_batch_rank, batch_ranks[di], message=check_message % di)
             for di in range(len(components))
         ]
         self._assertions += [
-            tf.assert_equal(
+            tf.compat.v1.assert_equal(
                 cat_batch_shape, batch_shapes[di], message=check_message % di)
             for di in range(len(components))
         ]
@@ -272,11 +277,11 @@ class Mixture(distribution.Distribution):
           tf.reshape(stacked_devs, [-1, len(self.components)]))
 
       # I.e. re-shape to list(batch_shape) + list(event_shape).
-      return tf.reshape(batched_dev, tf.shape(broadcasted_cat_probs)[:-1])
+      return tf.reshape(batched_dev, tf.shape(input=broadcasted_cat_probs)[:-1])
 
   def _log_prob(self, x):
     with tf.control_dependencies(self._assertions):
-      x = tf.convert_to_tensor(x, name="x")
+      x = tf.convert_to_tensor(value=x, name="x")
       distribution_log_probs = [d.log_prob(x) for d in self.components]
       cat_log_probs = self._cat_probs(log_probs=True)
       final_log_probs = [
@@ -284,12 +289,12 @@ class Mixture(distribution.Distribution):
           for (cat_lp, d_lp) in zip(cat_log_probs, distribution_log_probs)
       ]
       concat_log_probs = tf.stack(final_log_probs, 0)
-      log_sum_exp = tf.reduce_logsumexp(concat_log_probs, [0])
+      log_sum_exp = tf.reduce_logsumexp(input_tensor=concat_log_probs, axis=[0])
       return log_sum_exp
 
   def _log_cdf(self, x):
     with tf.control_dependencies(self._assertions):
-      x = tf.convert_to_tensor(x, name="x")
+      x = tf.convert_to_tensor(value=x, name="x")
       distribution_log_cdfs = [d.log_cdf(x) for d in self.components]
       cat_log_probs = self._cat_probs(log_probs=True)
       final_log_cdfs = [
@@ -297,37 +302,42 @@ class Mixture(distribution.Distribution):
           for (cat_lp, d_lcdf) in zip(cat_log_probs, distribution_log_cdfs)
       ]
       concatted_log_cdfs = tf.stack(final_log_cdfs, axis=0)
-      mixture_log_cdf = tf.reduce_logsumexp(concatted_log_cdfs, [0])
+      mixture_log_cdf = tf.reduce_logsumexp(
+          input_tensor=concatted_log_cdfs, axis=[0])
       return mixture_log_cdf
 
   def _sample_n(self, n, seed=None):
     if self._use_static_graph:
-      # This sampling approach is almost the same as the approach used by
-      # `MixtureSameFamily`. The differences are due to having a list of
-      # `Distribution` objects rather than a single object, and maintaining
-      # random seed management that is consistent with the non-static code path.
-      samples = []
-      cat_samples = self.cat.sample(n, seed=seed)
-      stream = seed_stream.SeedStream(seed, salt="Mixture")
+      with tf.control_dependencies(self._assertions):
+        # This sampling approach is almost the same as the approach used by
+        # `MixtureSameFamily`. The differences are due to having a list of
+        # `Distribution` objects rather than a single object, and maintaining
+        # random seed management that is consistent with the non-static code
+        # path.
+        samples = []
+        cat_samples = self.cat.sample(n, seed=seed)
+        stream = seed_stream.SeedStream(seed, salt="Mixture")
 
-      for c in range(self.num_components):
-        samples.append(self.components[c].sample(n, seed=stream()))
-      x = tf.stack(samples, -self._static_event_shape.ndims - 1)  # [n, B, k, E]
-      npdt = x.dtype.as_numpy_dtype
-      mask = tf.one_hot(
-          indices=cat_samples,  # [n, B]
-          depth=self._num_components,  # == k
-          on_value=np.ones([], dtype=npdt),
-          off_value=np.zeros([], dtype=npdt))  # [n, B, k]
-      mask = distribution_util.pad_mixture_dimensions(
-          mask, self, self._cat,
-          self._static_event_shape.ndims)                   # [n, B, k, [1]*e]
-      return tf.reduce_sum(
-          x * mask, axis=-1 - self._static_event_shape.ndims)  # [n, B, E]
+        for c in range(self.num_components):
+          samples.append(self.components[c].sample(n, seed=stream()))
+        x = tf.stack(samples,
+                     -self._static_event_shape.ndims - 1)  # [n, B, k, E]
+        npdt = x.dtype.as_numpy_dtype
+        mask = tf.one_hot(
+            indices=cat_samples,  # [n, B]
+            depth=self._num_components,  # == k
+            on_value=np.ones([], dtype=npdt),
+            off_value=np.zeros([], dtype=npdt))  # [n, B, k]
+        mask = distribution_util.pad_mixture_dimensions(
+            mask, self, self._cat,
+            self._static_event_shape.ndims)                   # [n, B, k, [1]*e]
+        return tf.reduce_sum(
+            input_tensor=x * mask,
+            axis=-1 - self._static_event_shape.ndims)  # [n, B, E]
 
     with tf.control_dependencies(self._assertions):
-      n = tf.convert_to_tensor(n, name="n")
-      static_n = tf.contrib.util.constant_value(n)
+      n = tf.convert_to_tensor(value=n, name="n")
+      static_n = tf.get_static_value(n)
       n = int(static_n) if static_n is not None else n
       cat_samples = self.cat.sample(n, seed=seed)
 
@@ -336,15 +346,15 @@ class Mixture(distribution.Distribution):
         samples_shape = static_samples_shape.as_list()
         samples_size = static_samples_shape.num_elements()
       else:
-        samples_shape = tf.shape(cat_samples)
-        samples_size = tf.size(cat_samples)
+        samples_shape = tf.shape(input=cat_samples)
+        samples_size = tf.size(input=cat_samples)
       static_batch_shape = self.batch_shape
       if static_batch_shape.is_fully_defined():
         batch_shape = static_batch_shape.as_list()
         batch_size = static_batch_shape.num_elements()
       else:
         batch_shape = self.batch_shape_tensor()
-        batch_size = tf.reduce_prod(batch_shape)
+        batch_size = tf.reduce_prod(input_tensor=batch_shape)
       static_event_shape = self.event_shape
       if static_event_shape.is_fully_defined():
         event_shape = np.array(static_event_shape.as_list(), dtype=np.int32)
@@ -392,7 +402,7 @@ class Mixture(distribution.Distribution):
       stream = seed_stream.SeedStream(seed, salt="Mixture")
 
       for c in range(self.num_components):
-        n_class = tf.size(partitioned_samples_indices[c])
+        n_class = tf.size(input=partitioned_samples_indices[c])
         samples_class_c = self.components[c].sample(
             n_class, seed=stream())
 

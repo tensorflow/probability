@@ -22,10 +22,10 @@ from scipy import interpolate as scipy_interpolate
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class InterpRegular1DGridTest(tf.test.TestCase):
   """Test for tfp.math.interp_regular_1d_grid."""
 
@@ -131,15 +131,16 @@ class InterpRegular1DGridTest(tf.test.TestCase):
     # With only 10 interpolating points between x_ref = 1 and 100000,
     # and y_ref = log(x_ref), we better use a log-spaced grid, or else error
     # will be very bad.
-    implied_x_ref = tf.exp(tf.linspace(tf.log(x_min), tf.log(x_max), num_pts))
-    y_ref = tf.log(implied_x_ref)
+    implied_x_ref = tf.exp(
+        tf.linspace(tf.math.log(x_min), tf.math.log(x_max), num_pts))
+    y_ref = tf.math.log(implied_x_ref)
 
     x = tf.linspace(x_min + 0.123, x_max, 20)
-    y_expected = tf.log(x)
+    y_expected = tf.math.log(x)
 
     with self.test_session():
       y = tfp.math.interp_regular_1d_grid(
-          x, x_min, x_max, y_ref, grid_regularizing_transform=tf.log)
+          x, x_min, x_max, y_ref, grid_regularizing_transform=tf.math.log)
       self.assertAllEqual(y_expected.shape, y.shape)
       y_ = self.evaluate(y)
       # Super duper accuracy!  Note accuracy was not good if I did not use the
@@ -292,11 +293,11 @@ class InterpRegular1DGridTest(tf.test.TestCase):
       y_ = self.evaluate(y)
       self.assertAllClose(y_, y_expected, atol=0, rtol=1e-6)
       if not tf.executing_eagerly():
-        dy_dx_ = self.evaluate(tf.gradients(y, x)[0])
+        dy_dx_ = self.evaluate(tf.gradients(ys=y, xs=x)[0])
         self.assertAllClose([2., 2., 0., 2., 2.], dy_dx_)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class BatchInterpRegular1DGridTest(tf.test.TestCase):
   """Test for 1-D usage of tfp.math.interp_regular_1d_grid."""
 
@@ -411,19 +412,16 @@ class BatchInterpRegular1DGridTest(tf.test.TestCase):
     # With only 10 interpolating points between x_ref = 1 and 100000,
     # and y_ref = log(x_ref), we better use a log-spaced grid, or else error
     # will be very bad.
-    implied_x_ref = tf.exp(tf.linspace(tf.log(x_min), tf.log(x_max), num_pts))
-    y_ref = tf.log(implied_x_ref)
+    implied_x_ref = tf.exp(
+        tf.linspace(tf.math.log(x_min), tf.math.log(x_max), num_pts))
+    y_ref = tf.math.log(implied_x_ref)
 
     x = tf.linspace(x_min + 0.123, x_max, 20)
-    y_expected = tf.log(x)
+    y_expected = tf.math.log(x)
 
     with self.test_session():
       y = tfp.math.batch_interp_regular_1d_grid(
-          x,
-          x_min,
-          x_max,
-          y_ref,
-          grid_regularizing_transform=tf.log)
+          x, x_min, x_max, y_ref, grid_regularizing_transform=tf.math.log)
       self.assertAllEqual(y_expected.shape, y.shape)
       y_ = self.evaluate(y)
       # Super duper accuracy!  Note accuracy was not good if I did not use the
@@ -434,7 +432,9 @@ class BatchInterpRegular1DGridTest(tf.test.TestCase):
     # First batch member is an exponential function, second is a log.
     implied_x_ref = [tf.linspace(-3., 3.2, 200), tf.linspace(0.5, 3., 200)]
     y_ref = tf.stack(  # Shape [2, 200]
-        [tf.exp(implied_x_ref[0]), tf.log(implied_x_ref[1])], axis=0)
+        [tf.exp(implied_x_ref[0]),
+         tf.math.log(implied_x_ref[1])],
+        axis=0)
 
     x = [[-1., 1., 0.],  # Shape [2, 3].  Batch=2, 3 values per batch.
          [1., 2., 3.]]
@@ -454,7 +454,9 @@ class BatchInterpRegular1DGridTest(tf.test.TestCase):
     # First batch member is an exponential function, second is a log.
     implied_x_ref = [tf.linspace(-3., 3.2, 200), tf.linspace(0.5, 3., 200)]
     y_ref = tf.stack(  # Shape [2, 200]
-        [tf.exp(implied_x_ref[0]), tf.log(implied_x_ref[1])], axis=0)
+        [tf.exp(implied_x_ref[0]),
+         tf.math.log(implied_x_ref[1])],
+        axis=0)
 
     # x.shape = [3] ==> No batch dim.
     # Values of x will be broadcast so effectively x.shape = [2, 3]
@@ -494,7 +496,9 @@ class BatchInterpRegular1DGridTest(tf.test.TestCase):
   def test_vector_valued_interpolation_with_empty_batch_shape(self):
     implied_x_ref = tf.linspace(1., 3., 200)  # Shape [200]
     y_ref = tf.stack(  # Shape [200, 2]
-        [tf.exp(implied_x_ref), tf.log(implied_x_ref)], axis=-1)
+        [tf.exp(implied_x_ref),
+         tf.math.log(implied_x_ref)],
+        axis=-1)
 
     # x has no batch dims, which it shouldn't since axis=0.
     x = [1., 2., 3.]
@@ -579,7 +583,7 @@ class BatchInterpRegular1DGridTest(tf.test.TestCase):
       y_ = self.evaluate(y)
       self.assertAllClose(y_, y_expected, atol=0, rtol=1e-6)
       if not tf.executing_eagerly():
-        dy_dx_ = self.evaluate(tf.gradients(y, x)[0])
+        dy_dx_ = self.evaluate(tf.gradients(ys=y, xs=x)[0])
         self.assertAllClose([2., 2., 0., 2., 2.], dy_dx_)
 
 

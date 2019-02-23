@@ -25,13 +25,13 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 # In all tests that follow, we use scipy.stats.geom, which
 # represents the "Shifted" Geometric distribution. Hence, loc=-1 is passed
 # in to each scipy function for testing.
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class GeometricTest(tf.test.TestCase):
 
   def testGeometricShape(self):
@@ -78,7 +78,7 @@ class GeometricTest(tf.test.TestCase):
   def testGeometricLogPmf_validate_args(self):
     batch_size = 6
     probs = tf.constant([.9] * batch_size)
-    x = tf.placeholder_with_default(
+    x = tf.compat.v1.placeholder_with_default(
         input=[2.5, 3.2, 4.3, 5.1, 6., 7.], shape=[6])
     geom = tfd.Geometric(probs=probs, validate_args=True)
 

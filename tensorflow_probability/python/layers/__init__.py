@@ -30,8 +30,14 @@ from tensorflow_probability.python.layers.dense_variational import DenseReparame
 from tensorflow_probability.python.layers.distribution_layer import CategoricalMixtureOfOneHotCategorical
 from tensorflow_probability.python.layers.distribution_layer import DistributionLambda
 from tensorflow_probability.python.layers.distribution_layer import IndependentBernoulli
+from tensorflow_probability.python.layers.distribution_layer import IndependentLogistic
+from tensorflow_probability.python.layers.distribution_layer import IndependentNormal
+from tensorflow_probability.python.layers.distribution_layer import IndependentPoisson
 from tensorflow_probability.python.layers.distribution_layer import KLDivergenceAddLoss
 from tensorflow_probability.python.layers.distribution_layer import KLDivergenceRegularizer
+from tensorflow_probability.python.layers.distribution_layer import MixtureLogistic
+from tensorflow_probability.python.layers.distribution_layer import MixtureNormal
+from tensorflow_probability.python.layers.distribution_layer import MixtureSameFamily
 from tensorflow_probability.python.layers.distribution_layer import MultivariateNormalTriL
 from tensorflow_probability.python.layers.distribution_layer import OneHotCategorical
 from tensorflow_probability.python.layers.util import default_loc_scale_fn
@@ -51,8 +57,14 @@ _allowed_symbols = [
     'DenseReparameterization',
     'DistributionLambda',
     'IndependentBernoulli',
+    'IndependentLogistic',
+    'IndependentNormal',
+    'IndependentPoisson',
     'KLDivergenceAddLoss',
     'KLDivergenceRegularizer',
+    'MixtureLogistic',
+    'MixtureNormal',
+    'MixtureSameFamily',
     'MultivariateNormalTriL',
     'OneHotCategorical',
     'default_loc_scale_fn',

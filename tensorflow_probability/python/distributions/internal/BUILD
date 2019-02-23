@@ -15,6 +15,8 @@
 # Description:
 #   Internal helper libraries for distributions.
 
+# [internal] load python3.bzl
+
 licenses(["notice"])  # Apache 2.0
 
 package(
@@ -47,7 +49,9 @@ py_test(
     name = "moving_stats_test",
     size = "small",
     srcs = ["moving_stats_test.py"],
-    tags = ["nomsan"],  # disable to avoid false positives from scipy.
+    tags = [
+        "nomsan",  # disable to avoid false positives from scipy.
+    ],
     deps = [
         ":moving_stats",
         # numpy dep,
@@ -60,6 +64,7 @@ py_library(
     srcs = ["statistical_testing.py"],
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
     ],
 )

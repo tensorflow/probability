@@ -20,7 +20,8 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow.python.ops import control_flow_ops
+from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 
 
 __all__ = [
@@ -84,20 +85,23 @@ class AffineScalar(bijector.Bijector):
       self._scale = scale
 
       if self._shift is not None:
-        self._shift = tf.convert_to_tensor(shift, name="shift")
+        self._shift = tf.convert_to_tensor(value=shift, name="shift")
 
       if self._scale is not None:
-        self._scale = tf.convert_to_tensor(self._scale, name="scale")
+        self._scale = tf.convert_to_tensor(value=scale, name="scale")
         if validate_args:
-          self._scale = control_flow_ops.with_dependencies([
-              tf.assert_none_equal(self._scale,
-                                   tf.zeros([], dtype=self._scale.dtype))
+          self._scale = distribution_util.with_dependencies([
+              tf.compat.v1.assert_none_equal(
+                  self._scale, tf.zeros([], dtype=self._scale.dtype))
           ], self._scale)
+
+      dtype = dtype_util.common_dtype([self._shift, self._scale])
 
       super(AffineScalar, self).__init__(
           forward_min_event_ndims=0,
           is_constant_jacobian=True,
           validate_args=validate_args,
+          dtype=dtype,
           name=name)
 
   @property
@@ -133,4 +137,4 @@ class AffineScalar(bijector.Bijector):
     if self.scale is None:
       return tf.constant(0., dtype=x.dtype.base_dtype)
 
-    return tf.log(tf.abs(self.scale))
+    return tf.math.log(tf.abs(self.scale))

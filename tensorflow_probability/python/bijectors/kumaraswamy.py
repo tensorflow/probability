@@ -20,7 +20,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow.python.ops import control_flow_ops
+from tensorflow_probability.python.internal import distribution_util
 
 __all__ = [
     "Kumaraswamy",
@@ -65,10 +65,10 @@ class Kumaraswamy(bijector.Bijector):
 
     with self._name_scope("init", values=[concentration1, concentration0]):
       concentration1 = self._maybe_assert_valid_concentration(
-          tf.convert_to_tensor(concentration1, name="concentration1"),
+          tf.convert_to_tensor(value=concentration1, name="concentration1"),
           validate_args=validate_args)
       concentration0 = self._maybe_assert_valid_concentration(
-          tf.convert_to_tensor(concentration0, name="concentration0"),
+          tf.convert_to_tensor(value=concentration0, name="concentration0"),
           validate_args=validate_args)
 
     self._concentration1 = concentration1
@@ -91,34 +91,37 @@ class Kumaraswamy(bijector.Bijector):
   def _forward(self, x):
     x = self._maybe_assert_valid(x)
     return tf.exp(
-        tf.log1p(-tf.exp(tf.log1p(-x) / self.concentration0)) /
+        tf.math.log1p(-tf.exp(tf.math.log1p(-x) / self.concentration0)) /
         self.concentration1)
 
   def _inverse(self, y):
     y = self._maybe_assert_valid(y)
-    return tf.exp(tf.log1p(-(1 - y**self.concentration1)**self.concentration0))
+    return tf.exp(
+        tf.math.log1p(-(1 - y**self.concentration1)**self.concentration0))
 
   def _inverse_log_det_jacobian(self, y):
     y = self._maybe_assert_valid(y)
-    return (tf.log(self.concentration1) + tf.log(
-        self.concentration0) + tf.math.xlogy(self.concentration1 - 1, y) +
-            (self.concentration0 - 1) * tf.log1p(-y**self.concentration1))
+    return (tf.math.log(self.concentration1) +
+            tf.math.log(self.concentration0) +
+            tf.math.xlogy(self.concentration1 - 1, y) +
+            (self.concentration0 - 1) * tf.math.log1p(-y**self.concentration1))
 
   def _maybe_assert_valid_concentration(self, concentration, validate_args):
     """Checks the validity of a concentration parameter."""
     if not validate_args:
       return concentration
-    return control_flow_ops.with_dependencies([
-        tf.assert_positive(
+    return distribution_util.with_dependencies([
+        tf.compat.v1.assert_positive(
             concentration, message="Concentration parameter must be positive."),
     ], concentration)
 
   def _maybe_assert_valid(self, x):
     if not self.validate_args:
       return x
-    return control_flow_ops.with_dependencies([
-        tf.assert_non_negative(x, message="sample must be non-negative"),
-        tf.assert_less_equal(
+    return distribution_util.with_dependencies([
+        tf.compat.v1.assert_non_negative(
+            x, message="sample must be non-negative"),
+        tf.compat.v1.assert_less_equal(
             x,
             tf.ones([], self.concentration0.dtype),
             message="sample must be no larger than `1`."),

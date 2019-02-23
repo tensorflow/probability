@@ -39,7 +39,6 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 tfd = tfp.distributions
-tfe = tf.contrib.eager
 
 __all__ = [
     "kernel",
@@ -90,10 +89,10 @@ def kernel(target_log_prob_fn,
                              current_target_log_prob,
                              current_grads_target_log_prob]):
     with tf.name_scope("initialize"):
-      current_state = [tf.convert_to_tensor(s) for s in current_state]
-      step_size = [tf.convert_to_tensor(s) for s in step_size]
-      value_and_gradients_fn = tfe.value_and_gradients_function(
-          target_log_prob_fn)
+      current_state = [tf.convert_to_tensor(value=s) for s in current_state]
+      step_size = [tf.convert_to_tensor(value=s) for s in step_size]
+      value_and_gradients_fn = lambda *args: tfp.math.value_and_gradient(  # pylint: disable=g-long-lambda
+          target_log_prob_fn, args)
       value_and_gradients_fn = _embed_no_none_gradient_check(
           value_and_gradients_fn)
       if (current_target_log_prob is None or
@@ -104,16 +103,17 @@ def kernel(target_log_prob_fn,
       seed_stream = tfd.SeedStream(seed, "nuts_kernel")
       current_momentum = []
       for state_tensor in current_state:
-        momentum_tensor = tf.random_normal(shape=tf.shape(state_tensor),
-                                           dtype=state_tensor.dtype,
-                                           seed=seed_stream())
+        momentum_tensor = tf.random.normal(
+            shape=tf.shape(input=state_tensor),
+            dtype=state_tensor.dtype,
+            seed=seed_stream())
         current_momentum.append(momentum_tensor)
 
       # Draw a slice variable u ~ Uniform(0, p(initial state, initial
       # momentum)) and compute log u. For numerical stability, we perform this
       # in log space where log u = log (u' * p(...)) = log u' + log
       # p(...) and u' ~ Uniform(0, 1).
-      log_slice_sample = tf.log(tf.random_uniform([], seed=seed_stream()))
+      log_slice_sample = tf.math.log(tf.random.uniform([], seed=seed_stream()))
       log_slice_sample += _log_joint(current_target_log_prob,
                                      current_momentum)
 
@@ -466,8 +466,10 @@ def _embed_no_none_gradient_check(value_and_gradients_fn):
 
 def _has_no_u_turn(state_one, state_two, momentum):
   """If two given states and momentum do not exhibit a U-turn pattern."""
-  dot_product = sum([tf.reduce_sum((s1 - s2) * m)
-                     for s1, s2, m in zip(state_one, state_two, momentum)])
+  dot_product = sum([
+      tf.reduce_sum(input_tensor=(s1 - s2) * m)
+      for s1, s2, m in zip(state_one, state_two, momentum)
+  ])
   return dot_product > 0
 
 
@@ -498,14 +500,14 @@ def _leapfrog(value_and_gradients_fn,
 
 def _log_joint(current_target_log_prob, current_momentum):
   """Log-joint probability given a state's log-probability and momentum."""
-  momentum_log_prob = -sum([tf.reduce_sum(0.5 * (m ** 2.))
-                            for m in current_momentum])
+  momentum_log_prob = -sum(
+      [tf.reduce_sum(input_tensor=0.5 * (m**2.)) for m in current_momentum])
   return current_target_log_prob + momentum_log_prob
 
 
 def _random_bernoulli(shape, probs, dtype=tf.int32, seed=None, name=None):
   """Returns samples from a Bernoulli distribution."""
   with tf.name_scope(name, "random_bernoulli", [shape, probs]):
-    probs = tf.convert_to_tensor(probs)
-    random_uniform = tf.random_uniform(shape, dtype=probs.dtype, seed=seed)
+    probs = tf.convert_to_tensor(value=probs)
+    random_uniform = tf.random.uniform(shape, dtype=probs.dtype, seed=seed)
     return tf.cast(tf.less(random_uniform, probs), dtype)

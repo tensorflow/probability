@@ -157,7 +157,7 @@ class _ConvVariational(tf.keras.layers.Layer):
     self.dilation_rate = tf_layers_util.normalize_tuple(
         dilation_rate, rank, 'dilation_rate')
     self.activation = tf.keras.activations.get(activation)
-    self.input_spec = tf.layers.InputSpec(ndim=self.rank + 2)
+    self.input_spec = tf.keras.layers.InputSpec(ndim=self.rank + 2)
     self.kernel_posterior_fn = kernel_posterior_fn
     self.kernel_posterior_tensor_fn = kernel_posterior_tensor_fn
     self.kernel_prior_fn = kernel_prior_fn
@@ -173,10 +173,10 @@ class _ConvVariational(tf.keras.layers.Layer):
       channel_axis = 1
     else:
       channel_axis = -1
-    if input_shape[channel_axis].value is None:
+    input_dim = tf.compat.dimension_value(input_shape[channel_axis])
+    if input_dim is None:
       raise ValueError('The channel dimension of the inputs '
                        'should be defined. Found `None`.')
-    input_dim = input_shape[channel_axis].value
     kernel_shape = self.kernel_size + (input_dim, self.filters)
 
     # If self.dtype is None, build weights using the default dtype.
@@ -210,8 +210,8 @@ class _ConvVariational(tf.keras.layers.Layer):
           self.trainable, self.add_variable)
     self._built_bias_divergence = False
 
-    self.input_spec = tf.layers.InputSpec(ndim=self.rank + 2,
-                                          axes={channel_axis: input_dim})
+    self.input_spec = tf.keras.layers.InputSpec(
+        ndim=self.rank + 2, axes={channel_axis: input_dim})
     self._convolution_op = nn_ops.Convolution(
         input_shape,
         filter_shape=tf.TensorShape(kernel_shape),
@@ -224,7 +224,7 @@ class _ConvVariational(tf.keras.layers.Layer):
     self.built = True
 
   def call(self, inputs):
-    inputs = tf.convert_to_tensor(inputs, dtype=self.dtype)
+    inputs = tf.convert_to_tensor(value=inputs, dtype=self.dtype)
 
     outputs = self._apply_variational_kernel(inputs)
     outputs = self._apply_variational_bias(outputs)
@@ -546,6 +546,10 @@ class Conv1DReparameterization(_ConvReparameterization):
   per epoch (e.g. if `kl` is the sum of `losses` for each element of the batch,
   you should pass `kl / num_examples_per_epoch` to your optimizer).
 
+  You can access the `kernel` and/or `bias` posterior and prior distributions
+  after the layer is built via the `kernel_posterior`, `kernel_prior`,
+  `bias_posterior` and `bias_prior` properties.
+
   #### Examples
 
   We illustrate a Bayesian neural network with [variational inference](
@@ -680,6 +684,10 @@ class Conv2DReparameterization(_ConvReparameterization):
   optimization, make sure to scale this loss such that it is applied just once
   per epoch (e.g. if `kl` is the sum of `losses` for each element of the batch,
   you should pass `kl / num_examples_per_epoch` to your optimizer).
+
+  You can access the `kernel` and/or `bias` posterior and prior distributions
+  after the layer is built via the `kernel_posterior`, `kernel_prior`,
+  `bias_posterior` and `bias_prior` properties.
 
   #### Examples
 
@@ -1065,10 +1073,12 @@ class _ConvFlipout(_ConvVariational):
     outputs = self._convolution_op(
         inputs, self.kernel_posterior.distribution.loc)
 
-    input_shape = tf.shape(inputs)
-    output_shape = tf.shape(outputs)
+    input_shape = tf.shape(input=inputs)
     batch_shape = tf.expand_dims(input_shape[0], 0)
-    channels = input_shape[-1]
+    if self.data_format == 'channels_first':
+      channels = input_shape[1]
+    else:
+      channels = input_shape[-1]
 
     seed_stream = tfd.SeedStream(self.seed, salt='ConvFlipout')
 
@@ -1082,16 +1092,15 @@ class _ConvFlipout(_ConvVariational):
                    tf.expand_dims(self.filters, 0)], 0),
         dtype=inputs.dtype,
         seed=seed_stream())
-    for _ in range(self.rank):
-      sign_input = tf.expand_dims(sign_input, 1)  # 2D ex: (B, 1, 1, C)
-      sign_output = tf.expand_dims(sign_output, 1)
 
-    sign_input = tf.tile(  # tile for element-wise op broadcasting
-        sign_input,
-        [1] + [input_shape[i + 1] for i in range(self.rank)] + [1])
-    sign_output = tf.tile(
-        sign_output,
-        [1] + [output_shape[i + 1] for i in range(self.rank)] + [1])
+    if self.data_format == 'channels_first':
+      for _ in range(self.rank):
+        sign_input = tf.expand_dims(sign_input, -1)  # 2D ex: (B, C, 1, 1)
+        sign_output = tf.expand_dims(sign_output, -1)
+    else:
+      for _ in range(self.rank):
+        sign_input = tf.expand_dims(sign_input, 1)  # 2D ex: (B, 1, 1, C)
+        sign_output = tf.expand_dims(sign_output, 1)
 
     perturbed_inputs = self._convolution_op(
         inputs * sign_input, self.kernel_posterior_affine_tensor) * sign_output

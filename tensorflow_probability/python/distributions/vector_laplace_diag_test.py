@@ -24,14 +24,15 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class VectorLaplaceDiagTest(tf.test.TestCase):
   """Well tested because this is a simple override of the base class."""
 
   def setUp(self):
+    super(VectorLaplaceDiagTest, self).setUp()
     self._rng = np.random.RandomState(42)
 
   def testScalarParams(self):
@@ -48,7 +49,7 @@ class VectorLaplaceDiagTest(tf.test.TestCase):
 
   def testDistWithBatchShapeOneThenTransformedThroughSoftplus(self):
     # This complex combination of events resulted in a loss of static shape
-    # information when tf.contrib.util.constant_value(self._needs_rotation) was
+    # information when tf.get_static_value(self._needs_rotation) was
     # being used incorrectly (resulting in always rotating).
     # Batch shape = [1], event shape = [3]
     mu = tf.zeros((1, 3))
@@ -76,7 +77,7 @@ class VectorLaplaceDiagTest(tf.test.TestCase):
     diag = [1., -2]
     dist = tfd.VectorLaplaceDiag(mu, diag, validate_args=True)
     samps = self.evaluate(dist.sample(int(1e4), seed=0))
-    cov_mat = 2. * self.evaluate(tf.matrix_diag(diag))**2
+    cov_mat = 2. * self.evaluate(tf.linalg.diag(diag))**2
 
     self.assertAllClose(mu, samps.mean(axis=0), atol=0., rtol=0.05)
     self.assertAllClose(cov_mat, np.cov(samps.T), atol=0.05, rtol=0.05)
@@ -103,7 +104,7 @@ class VectorLaplaceDiagTest(tf.test.TestCase):
 
     n = int(1e4)
     samps = self.evaluate(dist.sample(n, seed=0))
-    cov_mat = 2. * self.evaluate(tf.matrix_diag(diag))**2
+    cov_mat = 2. * self.evaluate(tf.linalg.diag(diag))**2
     sample_cov = np.matmul(
         samps.transpose([1, 2, 0]), samps.transpose([1, 0, 2])) / n
 

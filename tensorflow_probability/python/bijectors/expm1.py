@@ -66,11 +66,11 @@ class Expm1(bijector.Bijector):
 
   def _inverse(self, y):
     """Returns the inverse `Bijector` evaluation, i.e., Y = g^-1(X)."""
-    return tf.log1p(y)
+    return tf.math.log1p(y)
 
   def _inverse_log_det_jacobian(self, y):
     """Returns the (log o det o Jacobian o g^-1)(y)."""
-    return -tf.log1p(y)
+    return -tf.math.log1p(y)
 
   def _forward_log_det_jacobian(self, x):
     """Returns the (log o det o Jacobian o g)(x)."""

@@ -180,7 +180,7 @@ class _VectorStudentT(transformed_distribution.TransformedDistribution):
     with tf.name_scope(name) as name:
       with tf.name_scope("init", values=graph_parents):
         dtype = dtype_util.common_dtype(graph_parents, tf.float32)
-        df = tf.convert_to_tensor(df, name="df", dtype=dtype)
+        df = tf.convert_to_tensor(value=df, name="df", dtype=dtype)
         # The shape of the _VectorStudentT distribution is governed by the
         # relationship between df.batch_shape and affine.batch_shape. In
         # pseudocode the basic procedure is:

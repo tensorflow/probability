@@ -23,10 +23,10 @@ import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class CholeskyToInvCholeskyTest(tf.test.TestCase):
 
   def testBijector(self):
@@ -80,7 +80,7 @@ class CholeskyToInvCholeskyTest(tf.test.TestCase):
       evaluated at x.
     """
     x_vector = input_to_vector.forward(x)
-    n = tf.shape(x_vector)[-1]
+    n = tf.shape(input=x_vector)[-1]
     x_plus_eps_vector = x_vector + eps * tf.eye(n, dtype=x_vector.dtype)
     x_plus_eps = input_to_vector.inverse(x_plus_eps_vector)
 
@@ -91,7 +91,7 @@ class CholeskyToInvCholeskyTest(tf.test.TestCase):
 
     jacobian_numerical = (f_x_plus_eps_vector - f_x_vector) / eps
     return (
-        tf.log(tf.abs(tf.matrix_determinant(jacobian_numerical))) +
+        tf.math.log(tf.abs(tf.linalg.det(jacobian_numerical))) +
         input_to_vector.forward_log_det_jacobian(x, event_ndims=event_ndims) -
         output_to_vector.forward_log_det_jacobian(f_x, event_ndims=event_ndims))
 

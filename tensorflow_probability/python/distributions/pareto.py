@@ -28,7 +28,6 @@ from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.framework import tensor_shape
 
 
 class Pareto(distribution.Distribution):
@@ -83,11 +82,12 @@ class Pareto(distribution.Distribution):
     with tf.name_scope(name, values=[concentration, scale]):
       dtype = dtype_util.common_dtype([concentration, scale], tf.float32)
       self._concentration = tf.convert_to_tensor(
-          concentration, name="concentration", dtype=dtype)
-      self._scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
+          value=concentration, name="concentration", dtype=dtype)
+      self._scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
       with tf.control_dependencies([
-          tf.assert_positive(self._concentration),
-          tf.assert_positive(self._scale)] if validate_args else []):
+          tf.compat.v1.assert_positive(self._concentration),
+          tf.compat.v1.assert_positive(self._scale)
+      ] if validate_args else []):
         self._concentration = tf.identity(
             self._concentration, name="concentration")
         self._scale = tf.identity(self._scale, name="scale")
@@ -112,41 +112,44 @@ class Pareto(distribution.Distribution):
 
   def _batch_shape_tensor(self):
     return tf.broadcast_dynamic_shape(
-        tf.shape(self.concentration), tf.shape(self.scale))
+        tf.shape(input=self.concentration), tf.shape(input=self.scale))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(self.concentration.shape, self.scale.shape)
 
   def _event_shape(self):
-    return tensor_shape.scalar()
+    return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
     shape = tf.concat([[n], self.batch_shape_tensor()], 0)
-    sampled = tf.random_uniform(
-        shape, maxval=1., seed=seed, dtype=self.dtype)
-    log_sample = tf.log(self.scale) - tf.log1p(-sampled) / self.concentration
+    sampled = tf.random.uniform(shape, maxval=1., seed=seed, dtype=self.dtype)
+    log_sample = tf.math.log(
+        self.scale) - tf.math.log1p(-sampled) / self.concentration
     return tf.exp(log_sample)
 
   def _log_prob(self, x):
     with tf.control_dependencies([
-        tf.assert_greater_equal(
-            x, self.scale,
-            message="x is not in the support of the distribution."
-        )] if self.validate_args else []):
+        tf.compat.v1.assert_greater_equal(
+            x,
+            self.scale,
+            message="x is not in the support of the distribution.")
+    ] if self.validate_args else []):
 
       def log_prob_on_support(z):
-        return (tf.log(self.concentration) +
-                self.concentration * tf.log(self.scale) -
-                (self.concentration + 1.) * tf.log(z))
+        return (tf.math.log(self.concentration) +
+                self.concentration * tf.math.log(self.scale) -
+                (self.concentration + 1.) * tf.math.log(z))
 
       return self._extend_support(x, log_prob_on_support, alt=-np.inf)
 
   def _prob(self, x):
     with tf.control_dependencies([
-        tf.assert_greater_equal(
-            x, self.scale,
-            message="x is not in the support of the distribution."
-        )] if self.validate_args else []):
+        tf.compat.v1.assert_greater_equal(
+            x,
+            self.scale,
+            message="x is not in the support of the distribution.")
+    ] if self.validate_args else []):
+
       def prob_on_support(z):
         return (self.concentration * (self.scale ** self.concentration) /
                 (z ** (self.concentration + 1)))
@@ -154,18 +157,22 @@ class Pareto(distribution.Distribution):
 
   def _log_cdf(self, x):
     return self._extend_support(
-        x, lambda x: tf.log1p(-(self.scale / x) ** self.concentration),
+        x,
+        lambda x: tf.math.log1p(-(self.scale / x)**self.concentration),
         alt=-np.inf)
 
   def _cdf(self, x):
     return self._extend_support(
         x,
-        lambda x: -tf.math.expm1(self.concentration * tf.log(self.scale / x)),
+        lambda x: -tf.math.expm1(self.concentration * tf.math.log(self.scale / x
+                                                                 )),
         alt=0.)
 
   def _log_survival_function(self, x):
     return self._extend_support(
-        x, lambda x: self.concentration * tf.log(self.scale / x), alt=np.inf)
+        x,
+        lambda x: self.concentration * tf.math.log(self.scale / x),
+        alt=np.inf)
 
   @distribution_util.AppendDocstring(
       """The mean of Pareto is defined` if `concentration > 1.`, otherwise it
@@ -174,7 +181,7 @@ class Pareto(distribution.Distribution):
     broadcasted_concentration = self.concentration + tf.zeros_like(
         self.scale)
     infs = tf.fill(
-        dims=tf.shape(broadcasted_concentration),
+        dims=tf.shape(input=broadcasted_concentration),
         value=np.array(np.inf, dtype=self.dtype.as_numpy_dtype))
 
     return tf.where(
@@ -188,7 +195,7 @@ class Pareto(distribution.Distribution):
   def _variance(self):
     broadcasted_concentration = self.concentration + tf.zeros_like(self.scale)
     infs = tf.fill(
-        dims=tf.shape(broadcasted_concentration),
+        dims=tf.shape(input=broadcasted_concentration),
         value=np.array(np.inf, dtype=self.dtype.as_numpy_dtype))
     return tf.where(
         broadcasted_concentration > 2.,
@@ -228,7 +235,7 @@ class Pareto(distribution.Distribution):
       alt = tf.ones_like(y)
     else:
       alt = tf.fill(
-          dims=tf.shape(y),
+          dims=tf.shape(input=y),
           value=np.array(alt, dtype=self.dtype.as_numpy_dtype))
     return tf.where(is_invalid, alt, y)
 
@@ -259,7 +266,7 @@ def _kl_pareto_pareto(a, b, name=None):
         [a.concentration, b.concentration, a.scale, b.scale], tf.float32)
     return tf.where(
         a.scale >= b.scale,
-        b.concentration * (tf.log(a.scale) - tf.log(b.scale)) +
-        tf.log(a.concentration) - tf.log(b.concentration) +
+        b.concentration * (tf.math.log(a.scale) - tf.math.log(b.scale)) +
+        tf.math.log(a.concentration) - tf.math.log(b.concentration) +
         b.concentration / a.concentration - 1.0,
         tf.broadcast_to(tf.cast(np.inf, common_type), final_batch_shape))

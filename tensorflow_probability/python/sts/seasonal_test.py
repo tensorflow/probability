@@ -25,7 +25,7 @@ import tensorflow_probability as tfp
 from tensorflow_probability.python.sts import SeasonalStateSpaceModel
 
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 tfl = tf.linalg
 
 
@@ -214,25 +214,25 @@ class _SeasonalStateSpaceModelTest(object):
     """
 
     ndarray = np.asarray(ndarray).astype(self.dtype)
-    return tf.placeholder_with_default(
+    return tf.compat.v1.placeholder_with_default(
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class SeasonalStateSpaceModelTestStaticShape32(
     tf.test.TestCase, _SeasonalStateSpaceModelTest):
   dtype = np.float32
   use_static_shape = True
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class SeasonalStateSpaceModelTestDynamicShape32(
     tf.test.TestCase, _SeasonalStateSpaceModelTest):
   dtype = np.float32
   use_static_shape = False
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class SeasonalStateSpaceModelTestStaticShape64(
     tf.test.TestCase, _SeasonalStateSpaceModelTest):
   dtype = np.float64

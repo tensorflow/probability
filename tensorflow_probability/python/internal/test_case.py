@@ -51,29 +51,3 @@ class TestCase(tf.test.TestCase):
     is_nan = np.isnan(self._GetNdArray(a))
     all_true = np.ones_like(is_nan, dtype=np.bool)
     self.assertAllEqual(all_true, is_nan)
-
-  def compute_gradients(self, f, args, grad_ys=None):
-    """Computes gradients using tf.GradientTape or tf.gradients.
-
-    Arguments:
-      f: Function to be differentiated.
-      args: List of `Tensor` arguments to be passed to the function `f`.
-        Gradients are computed with respect to these arguments.
-      grad_ys: Optional. A `Tensor` with the same shape as the `Tensor` returned
-        by `f` that contains the incoming gradients with respect to the result
-        of `f`.
-
-    Returns:
-      grads: List containing gradients of `f` with respect to `args`. It has the
-        same length as `args`.
-    """
-    if tf.executing_eagerly():
-      grad_fn = tf.contrib.eager.gradients_function(f)
-      if grad_ys is not None:
-        grads = grad_fn(*args, dy=grad_ys)
-      else:
-        grads = grad_fn(*args)
-    else:
-      res = f(*args)
-      grads = tf.gradients(res, args, grad_ys=grad_ys)
-    return self.evaluate(grads)

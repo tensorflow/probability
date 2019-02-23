@@ -26,7 +26,7 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
 
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 def try_import(name):  # pylint: disable=invalid-name
@@ -34,7 +34,7 @@ def try_import(name):  # pylint: disable=invalid-name
   try:
     module = importlib.import_module(name)
   except ImportError as e:
-    tf.logging.warning("Could not import %s: %s" % (name, str(e)))
+    tf.compat.v1.logging.warning("Could not import %s: %s" % (name, str(e)))
   return module
 
 
@@ -43,7 +43,7 @@ stats = try_import("scipy.stats")
 tfd = tfp.distributions
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class CauchyTest(test_case.TestCase):
 
   def setUp(self):
@@ -62,7 +62,8 @@ class CauchyTest(test_case.TestCase):
     loc = tf.zeros(loc_shape)
     scale = tf.ones(scale_shape)
     self.assertAllEqual(
-        expected, self.evaluate(tf.shape(tfd.Cauchy(loc, scale).sample())))
+        expected, self.evaluate(
+            tf.shape(input=tfd.Cauchy(loc, scale).sample())))
 
   def _testParamStaticShapes(self, sample_shape, expected):
     param_shapes = tfd.Cauchy.param_static_shapes(sample_shape)
@@ -209,23 +210,22 @@ class CauchyTest(test_case.TestCase):
 
   def testFiniteGradientAtDifficultPoints(self):
     for dtype in [np.float32, np.float64]:
-      loc = tf.Variable(dtype(0.0))
-      scale = tf.Variable(dtype(1.0))
+      loc = tf.compat.v2.Variable(dtype(0.0))
+      scale = tf.compat.v2.Variable(dtype(1.0))
       x = np.array([-100., -20., -5., 0., 5., 20., 100.]).astype(dtype)
       def cauchy_function(name, x):
         def cauchy(loc, scale):
           return getattr(tfd.Cauchy(loc=loc, scale=scale), name)(x)
         return cauchy
 
-      self.evaluate(tf.global_variables_initializer())
+      self.evaluate(tf.compat.v1.global_variables_initializer())
       for func_name in [
           "cdf", "log_cdf", "survival_function",
           "log_survival_function", "log_prob", "prob"
       ]:
         print(func_name)
-        value = self.evaluate(cauchy_function(func_name, x)(loc, scale))
-        grads = self.compute_gradients(
-            cauchy_function(func_name, x), args=[loc, scale])
+        value, grads = self.evaluate(tfp.math.value_and_gradient(
+            cauchy_function(func_name, x), [loc, scale]))
         self.assertAllFinite(value)
         self.assertAllFinite(grads[0])
         self.assertAllFinite(grads[1])
@@ -418,8 +418,8 @@ class CauchyTest(test_case.TestCase):
   def testCauchyShapeWithPlaceholders(self):
     if tf.executing_eagerly():
       return
-    loc = tf.placeholder_with_default(input=5., shape=[])
-    scale = tf.placeholder_with_default(input=[1., 2], shape=None)
+    loc = tf.compat.v1.placeholder_with_default(input=5., shape=[])
+    scale = tf.compat.v1.placeholder_with_default(input=[1., 2], shape=None)
     cauchy = tfd.Cauchy(loc=loc, scale=scale)
 
     # get_batch_shape should return an "<unknown>" tensor.

@@ -28,7 +28,6 @@ from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.ops import control_flow_ops
 
 __all__ = [
     "Wishart",
@@ -118,21 +117,20 @@ class _WishartLinearOperator(distribution.Distribution):
 
         self._scale_operator = scale_operator
         self._df = tf.convert_to_tensor(
-            df, dtype=scale_operator.dtype, name="df")
-        tf.assert_same_float_dtype([self._df, self._scale_operator])
-        if (self._scale_operator.shape.ndims is None or
-            self._scale_operator.shape[-1].value is None):
+            value=df, dtype=scale_operator.dtype, name="df")
+        tf.debugging.assert_same_float_dtype([self._df, self._scale_operator])
+        if tf.compat.dimension_value(self._scale_operator.shape[-1]) is None:
           self._dimension = tf.cast(
               self._scale_operator.domain_dimension_tensor(),
               dtype=self._scale_operator.dtype,
               name="dimension")
         else:
           self._dimension = tf.convert_to_tensor(
-              self._scale_operator.shape[-1].value,
+              value=tf.compat.dimension_value(self._scale_operator.shape[-1]),
               dtype=self._scale_operator.dtype,
               name="dimension")
-        df_val = tf.contrib.util.constant_value(self._df)
-        dim_val = tf.contrib.util.constant_value(self._dimension)
+        df_val = tf.get_static_value(self._df)
+        dim_val = tf.get_static_value(self._dimension)
         if df_val is not None and dim_val is not None:
           df_val = np.asarray(df_val)
           if not df_val.shape:
@@ -143,13 +141,13 @@ class _WishartLinearOperator(distribution.Distribution):
                 "dimension of scale matrix (scale.dimension = %s)"
                 % (df_val, dim_val))
         elif validate_args:
-          assertions = tf.assert_less_equal(
+          assertions = tf.compat.v1.assert_less_equal(
               self._dimension,
               self._df,
               message=("Degrees of freedom (df = %s) cannot be "
                        "less than dimension of scale matrix "
                        "(scale.dimension = %s)" % (self._dimension, self._df)))
-          self._df = control_flow_ops.with_dependencies(
+          self._df = distribution_util.with_dependencies(
               [assertions], self._df)
     super(_WishartLinearOperator, self).__init__(
         dtype=self._scale_operator.dtype,
@@ -202,7 +200,7 @@ class _WishartLinearOperator(distribution.Distribution):
 
   def _batch_shape_tensor(self):
     return tf.broadcast_dynamic_shape(
-        tf.shape(self.df), self.scale_operator.batch_shape_tensor())
+        tf.shape(input=self.df), self.scale_operator.batch_shape_tensor())
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(
@@ -211,14 +209,14 @@ class _WishartLinearOperator(distribution.Distribution):
   def _sample_n(self, n, seed):
     batch_shape = self.batch_shape_tensor()
     event_shape = self.event_shape_tensor()
-    batch_ndims = tf.shape(batch_shape)[0]
+    batch_ndims = tf.shape(input=batch_shape)[0]
 
     ndims = batch_ndims + 3  # sample_ndims=1, event_ndims=2
     shape = tf.concat([[n], batch_shape, event_shape], 0)
     stream = seed_stream.SeedStream(seed, salt="Wishart")
 
     # Complexity: O(nbk**2)
-    x = tf.random_normal(
+    x = tf.random.normal(
         shape=shape, mean=0., stddev=1., dtype=self.dtype, seed=stream())
 
     # Complexity: O(nbk)
@@ -228,7 +226,7 @@ class _WishartLinearOperator(distribution.Distribution):
         self.scale_operator.batch_shape_tensor(),
         dtype=self.df.dtype.base_dtype)
 
-    g = tf.random_gamma(
+    g = tf.random.gamma(
         shape=[n],
         alpha=self._multi_gamma_sequence(0.5 * expanded_df, self.dimension),
         beta=0.5,
@@ -236,15 +234,15 @@ class _WishartLinearOperator(distribution.Distribution):
         seed=stream())
 
     # Complexity: O(nbk**2)
-    x = tf.matrix_band_part(x, -1, 0)  # Tri-lower.
+    x = tf.linalg.band_part(x, -1, 0)  # Tri-lower.
 
     # Complexity: O(nbk)
-    x = tf.matrix_set_diag(x, tf.sqrt(g))
+    x = tf.linalg.set_diag(x, tf.sqrt(g))
 
     # Make batch-op ready.
     # Complexity: O(nbk**2)
     perm = tf.concat([tf.range(1, ndims), [0]], 0)
-    x = tf.transpose(x, perm)
+    x = tf.transpose(a=x, perm=perm)
     shape = tf.concat([batch_shape, [event_shape[0]], [-1]], 0)
     x = tf.reshape(x, shape)
 
@@ -258,7 +256,7 @@ class _WishartLinearOperator(distribution.Distribution):
     shape = tf.concat([batch_shape, event_shape, [n]], 0)
     x = tf.reshape(x, shape)
     perm = tf.concat([[ndims - 1], tf.range(0, ndims - 1)], 0)
-    x = tf.transpose(x, perm)
+    x = tf.transpose(a=x, perm=perm)
 
     if not self.input_output_cholesky:
       # Complexity: O(nbk**3)
@@ -271,14 +269,14 @@ class _WishartLinearOperator(distribution.Distribution):
       x_sqrt = x
     else:
       # Complexity: O(nbk**3)
-      x_sqrt = tf.cholesky(x)
+      x_sqrt = tf.linalg.cholesky(x)
 
     batch_shape = self.batch_shape_tensor()
     event_shape = self.event_shape_tensor()
     ndims = tf.rank(x_sqrt)
     # sample_ndims = ndims - batch_ndims - event_ndims
-    sample_ndims = ndims - tf.shape(batch_shape)[0] - 2
-    sample_shape = tf.strided_slice(tf.shape(x_sqrt), [0], [sample_ndims])
+    sample_ndims = ndims - tf.shape(input=batch_shape)[0] - 2
+    sample_shape = tf.strided_slice(tf.shape(input=x_sqrt), [0], [sample_ndims])
 
     # We need to be able to pre-multiply each matrix by its corresponding
     # batch scale matrix. Since a Distribution Tensor supports multiple
@@ -295,7 +293,7 @@ class _WishartLinearOperator(distribution.Distribution):
     scale_sqrt_inv_x_sqrt = x_sqrt
     perm = tf.concat([tf.range(sample_ndims, ndims),
                       tf.range(0, sample_ndims)], 0)
-    scale_sqrt_inv_x_sqrt = tf.transpose(scale_sqrt_inv_x_sqrt, perm)
+    scale_sqrt_inv_x_sqrt = tf.transpose(a=scale_sqrt_inv_x_sqrt, perm=perm)
     shape = tf.concat((batch_shape,
                        (tf.cast(self.dimension, dtype=tf.int32), -1)), 0)
     scale_sqrt_inv_x_sqrt = tf.reshape(scale_sqrt_inv_x_sqrt, shape)
@@ -314,7 +312,7 @@ class _WishartLinearOperator(distribution.Distribution):
         tf.range(ndims - sample_ndims, ndims),
         tf.range(0, ndims - sample_ndims)
     ], 0)
-    scale_sqrt_inv_x_sqrt = tf.transpose(scale_sqrt_inv_x_sqrt, perm)
+    scale_sqrt_inv_x_sqrt = tf.transpose(a=scale_sqrt_inv_x_sqrt, perm=perm)
 
     # Write V = SS', X = LL'. Then:
     # tr[inv(V) X] = tr[inv(S)' inv(S) L L']
@@ -324,11 +322,11 @@ class _WishartLinearOperator(distribution.Distribution):
     # The second equality follows from the cyclic permutation property.
     # Complexity: O(nbk**2)
     trace_scale_inv_x = tf.reduce_sum(
-        tf.square(scale_sqrt_inv_x_sqrt), axis=[-2, -1])
+        input_tensor=tf.square(scale_sqrt_inv_x_sqrt), axis=[-2, -1])
 
     # Complexity: O(nbk)
     half_log_det_x = tf.reduce_sum(
-        tf.log(tf.matrix_diag_part(x_sqrt)), axis=[-1])
+        input_tensor=tf.math.log(tf.linalg.diag_part(x_sqrt)), axis=[-1])
 
     # Complexity: O(nbk**2)
     log_prob = ((self.df - self.dimension - 1.) * half_log_det_x -
@@ -374,7 +372,7 @@ class _WishartLinearOperator(distribution.Distribution):
     # and add two dimensions to the end.
     df = self.df[..., tf.newaxis, tf.newaxis]
     x = tf.sqrt(df) * self._square_scale_operator()
-    d = tf.expand_dims(tf.matrix_diag_part(x), -1)
+    d = tf.expand_dims(tf.linalg.diag_part(x), -1)
     v = tf.square(x) + tf.matmul(d, d, adjoint_b=True)
     return v
 
@@ -414,14 +412,14 @@ class _WishartLinearOperator(distribution.Distribution):
     """Computes the log multivariate gamma function; log(Gamma_p(a))."""
     with self._name_scope(name, values=[a, p]):
       seq = self._multi_gamma_sequence(a, p)
-      return (0.25 * p * (p - 1.) * math.log(math.pi) + tf.reduce_sum(
-          tf.lgamma(seq), axis=[-1]))
+      return (0.25 * p * (p - 1.) * math.log(math.pi) +
+              tf.reduce_sum(input_tensor=tf.math.lgamma(seq), axis=[-1]))
 
   def _multi_digamma(self, a, p, name="multi_digamma"):
     """Computes the multivariate digamma function; Psi_p(a)."""
     with self._name_scope(name, values=[a, p]):
       seq = self._multi_gamma_sequence(a, p)
-      return tf.reduce_sum(tf.digamma(seq), axis=[-1])
+      return tf.reduce_sum(input_tensor=tf.math.digamma(seq), axis=[-1])
 
 
 class Wishart(_WishartLinearOperator):
@@ -530,23 +528,23 @@ class Wishart(_WishartLinearOperator):
           raise ValueError("Must pass scale or scale_tril, but not both.")
 
         dtype = dtype_util.common_dtype([df, scale, scale_tril], tf.float32)
-        df = tf.convert_to_tensor(df, name="df", dtype=dtype)
+        df = tf.convert_to_tensor(value=df, name="df", dtype=dtype)
         if scale is not None:
-          scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
+          scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
           if validate_args:
             scale = distribution_util.assert_symmetric(scale)
-          scale_tril = tf.cholesky(scale)
+          scale_tril = tf.linalg.cholesky(scale)
         else:  # scale_tril is not None
           scale_tril = tf.convert_to_tensor(
-              scale_tril, name="scale_tril", dtype=dtype)
+              value=scale_tril, name="scale_tril", dtype=dtype)
           if validate_args:
-            scale_tril = control_flow_ops.with_dependencies([
-                tf.assert_positive(
-                    tf.matrix_diag_part(scale_tril),
+            scale_tril = distribution_util.with_dependencies([
+                tf.compat.v1.assert_positive(
+                    tf.linalg.diag_part(scale_tril),
                     message="scale_tril must be positive definite"),
-                tf.assert_equal(
-                    tf.shape(scale_tril)[-1],
-                    tf.shape(scale_tril)[-2],
+                tf.compat.v1.assert_equal(
+                    tf.shape(input=scale_tril)[-1],
+                    tf.shape(input=scale_tril)[-2],
                     message="scale_tril must be square")
             ], scale_tril)
 

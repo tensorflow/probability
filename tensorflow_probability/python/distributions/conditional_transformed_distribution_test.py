@@ -26,7 +26,7 @@ import tensorflow_probability as tfp
 from tensorflow_probability.python.distributions import transformed_distribution_test
 
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 class _ChooseLocation(tfp.bijectors.ConditionalBijector):
@@ -36,7 +36,7 @@ class _ChooseLocation(tfp.bijectors.ConditionalBijector):
     self._graph_parents = []
     self._name = name
     with self._name_scope("init", values=[loc]):
-      self._loc = tf.convert_to_tensor(loc, name="loc")
+      self._loc = tf.convert_to_tensor(value=loc, name="loc")
       super(_ChooseLocation, self).__init__(
           graph_parents=[self._loc],
           is_constant_jacobian=True,
@@ -54,12 +54,12 @@ class _ChooseLocation(tfp.bijectors.ConditionalBijector):
     return 0.
 
   def _gather_loc(self, z):
-    z = tf.convert_to_tensor(z)
+    z = tf.convert_to_tensor(value=z)
     z = tf.cast((1 + z) / 2, tf.int32)
     return tf.gather(self._loc, z)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class ConditionalTransformedDistributionTest(
     transformed_distribution_test.TransformedDistributionTest):
 
@@ -77,7 +77,9 @@ class ConditionalTransformedDistributionTest(
                 conditional_normal.sample(5, bijector_kwargs={"z": z}))), z)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+# TODO(b/122840816): Should these tests also run in eager mode?  Tests in
+# `transformed_distribution_test.ScalarToMultiTest` are not currently run in
+# eager mode.
 class ConditionalScalarToMultiTest(
     transformed_distribution_test.ScalarToMultiTest):
 

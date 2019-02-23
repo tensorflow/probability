@@ -101,11 +101,11 @@ landing_page:
         path: https://medium.com/tensorflow/industrial-ai-bhges-physics-based-probabilistic-deep-learning-using-tensorflow-probability-5f215c791863
   - classname: devsite-landing-row-cards
     items:
-    - heading: "Probabilistic Machine Learning in TensorFlow"
-      youtube_id: BjUkL8DFH5Q
+    - heading: "TFP @ O'Reilly AI SF"
+      youtube_id: GqxmRKplj4w
       buttons:
       - label: Watch the video
-        path: https://www.youtube.com/watch?v=BjUkL8DFH5Q
+        path: https://www.youtube.com/watch?v=GqxmRKplj4w
     - heading: "Introducing TensorFlow Probability"
       image_path: /resources/images/tf-logo-card-16x9.png
       path: https://docs.google.com/presentation/d/1BWhNVHzhFfYiFL8ynX1wFmag8YjzvHeqKkd8Z0G8H7Y

@@ -214,7 +214,7 @@ class AdditiveStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
       assertions = []
 
       # Check that all components have the same dtype
-      tf.assert_same_float_dtype(component_ssms)
+      tf.debugging.assert_same_float_dtype(component_ssms)
 
       # Construct an initial state prior as a block-diagonal combination
       # of the component state priors.
@@ -243,11 +243,12 @@ class AdditiveStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
         num_timesteps = component_ssms[0].num_timesteps
       if validate_args and len(static_num_timesteps) != len(component_ssms):
         assertions += [
-            tf.assert_equal(num_timesteps,
-                            ssm.num_timesteps,
-                            message='Additive model components must all have '
-                            'the same number of timesteps.')
-            for ssm in component_ssms]
+            tf.compat.v1.assert_equal(
+                num_timesteps,
+                ssm.num_timesteps,
+                message='Additive model components must all have '
+                'the same number of timesteps.') for ssm in component_ssms
+        ]
 
       # Define the transition and observation models for the additive SSM.
       # See the "mathematical details" section of the class docstring for
@@ -268,7 +269,7 @@ class AdditiveStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
       # matrices from components. We also take this as an opportunity to enforce
       # any dynamic assertions we may have generated above.
       broadcast_batch_shape = tf.convert_to_tensor(
-          sts_util.broadcast_batch_shape(component_ssms), dtype=tf.int32)
+          value=sts_util.broadcast_batch_shape(component_ssms), dtype=tf.int32)
       broadcast_obs_matrix = tf.ones(
           tf.concat([broadcast_batch_shape, [1, 1]], axis=0), dtype=dtype)
       if assertions:
@@ -283,7 +284,7 @@ class AdditiveStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
 
       if observation_noise_scale is not None:
         observation_noise_scale = tf.convert_to_tensor(
-            observation_noise_scale,
+            value=observation_noise_scale,
             name='observation_noise_scale',
             dtype=dtype)
         def observation_noise_fn(t):
@@ -395,7 +396,7 @@ class Sum(StructuralTimeSeries):
             sts_util.empirical_statistics(observed_time_series)
             if observed_time_series is not None else (1., 0.))
         observation_noise_scale_prior = tfd.LogNormal(
-            loc=tf.log(.01 * observed_stddev), scale=2.)
+            loc=tf.math.log(.01 * observed_stddev), scale=2.)
 
       # Check that components have unique names, to ensure that inherited
       # parameters will be assigned unique names.

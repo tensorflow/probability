@@ -34,6 +34,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.optimizer import bfgs_utils
 
 
@@ -184,18 +185,17 @@ def minimize(value_and_gradients_function,
   with tf.name_scope(name, 'minimize', [initial_position,
                                         tolerance,
                                         initial_inverse_hessian_estimate]):
-    initial_position = tf.convert_to_tensor(initial_position,
-                                            name='initial_position')
+    initial_position = tf.convert_to_tensor(
+        value=initial_position, name='initial_position')
     dtype = initial_position.dtype.base_dtype
-    tolerance = tf.convert_to_tensor(tolerance, dtype=dtype,
-                                     name='grad_tolerance')
-    f_relative_tolerance = tf.convert_to_tensor(f_relative_tolerance,
-                                                dtype=dtype,
-                                                name='f_relative_tolerance')
-    x_tolerance = tf.convert_to_tensor(x_tolerance,
-                                       dtype=dtype,
-                                       name='x_tolerance')
-    max_iterations = tf.convert_to_tensor(max_iterations, name='max_iterations')
+    tolerance = tf.convert_to_tensor(
+        value=tolerance, dtype=dtype, name='grad_tolerance')
+    f_relative_tolerance = tf.convert_to_tensor(
+        value=f_relative_tolerance, dtype=dtype, name='f_relative_tolerance')
+    x_tolerance = tf.convert_to_tensor(
+        value=x_tolerance, dtype=dtype, name='x_tolerance')
+    max_iterations = tf.convert_to_tensor(
+        value=max_iterations, name='max_iterations')
 
     if initial_inverse_hessian_estimate is None:
       # Control inputs are an optional list of tensors to evaluate before
@@ -204,7 +204,7 @@ def minimize(value_and_gradients_function,
       control_inputs = None
       domain_shape = distribution_util.prefer_static_shape(initial_position)
       inv_hessian_shape = tf.concat([domain_shape, domain_shape], 0)
-      initial_inv_hessian = tf.eye(tf.size(initial_position), dtype=dtype)
+      initial_inv_hessian = tf.eye(tf.size(input=initial_position), dtype=dtype)
       initial_inv_hessian = tf.reshape(initial_inv_hessian,
                                        inv_hessian_shape,
                                        name='initial_inv_hessian')
@@ -212,7 +212,7 @@ def minimize(value_and_gradients_function,
       # If an initial inverse Hessian is supplied, these control inputs ensure
       # that it is positive definite and symmetric.
       initial_inv_hessian = tf.convert_to_tensor(
-          initial_inverse_hessian_estimate,
+          value=initial_inverse_hessian_estimate,
           dtype=dtype,
           name='initial_inv_hessian')
       control_inputs = _inv_hessian_control_inputs(
@@ -231,8 +231,8 @@ def minimize(value_and_gradients_function,
 
       search_direction = _get_search_direction(state.inverse_hessian_estimate,
                                                state.objective_gradient)
-      derivative_at_start_pt = tf.reduce_sum(state.objective_gradient *
-                                             search_direction)
+      derivative_at_start_pt = tf.reduce_sum(
+          input_tensor=state.objective_gradient * search_direction)
       # If the derivative at the start point is not negative, reset the
       # Hessian estimate and recompute the search direction.
       needs_reset = derivative_at_start_pt >= 0
@@ -241,7 +241,7 @@ def minimize(value_and_gradients_function,
                                                  state.objective_gradient)
         return search_direction, initial_inv_hessian
 
-      search_direction, inv_hessian_estimate = tf.contrib.framework.smart_cond(
+      search_direction, inv_hessian_estimate = prefer_static.cond(
           needs_reset,
           true_fn=_reset_search_dirn,
           false_fn=lambda: (search_direction, state.inverse_hessian_estimate))
@@ -256,7 +256,7 @@ def minimize(value_and_gradients_function,
           tolerance, f_relative_tolerance, x_tolerance)
 
       # If not failed or converged, update the Hessian.
-      state_after_inv_hessian_update = tf.contrib.framework.smart_cond(
+      state_after_inv_hessian_update = prefer_static.cond(
           next_state.converged | next_state.failed,
           lambda: next_state,
           lambda: _update_inv_hessian(current_state, next_state))
@@ -269,8 +269,11 @@ def minimize(value_and_gradients_function,
         control_inputs)
     kwargs['inverse_hessian_estimate'] = initial_inv_hessian
     initial_state = BfgsOptimizerResults(**kwargs)
-    return tf.while_loop(_cond, _body, [initial_state],
-                         parallel_iterations=parallel_iterations)[0]
+    return tf.while_loop(
+        cond=_cond,
+        body=_body,
+        loop_vars=[initial_state],
+        parallel_iterations=parallel_iterations)[0]
 
 
 def _inv_hessian_control_inputs(initial_inverse_hessian_estimate,
@@ -297,14 +300,19 @@ def _inv_hessian_control_inputs(initial_inverse_hessian_estimate,
   # The supplied Hessian may not be of rank 2. Reshape it so it is.
   initial_inv_hessian_sqr_mat = tf.reshape(
       initial_inverse_hessian_estimate,
-      tf.stack([tf.size(initial_position),
-                tf.size(initial_position)], axis=0))
+      tf.stack(
+          [tf.size(input=initial_position),
+           tf.size(input=initial_position)],
+          axis=0))
   # If the matrix is not positive definite, the Cholesky decomposition will
   # fail. Adding an assert on it ensures it will be triggered.
-  cholesky_factor = tf.cholesky(initial_inv_hessian_sqr_mat)
-  is_positive_definite = tf.reduce_all(tf.is_finite(cholesky_factor))
-  asymmetry = tf.norm(initial_inv_hessian_sqr_mat -
-                      tf.transpose(initial_inv_hessian_sqr_mat), np.inf)
+  cholesky_factor = tf.linalg.cholesky(initial_inv_hessian_sqr_mat)
+  is_positive_definite = tf.reduce_all(
+      input_tensor=tf.math.is_finite(cholesky_factor))
+  asymmetry = tf.norm(
+      tensor=initial_inv_hessian_sqr_mat -
+      tf.transpose(a=initial_inv_hessian_sqr_mat),
+      ord=np.inf)
   is_symmetric = tf.equal(asymmetry, 0)
   return [tf.Assert(is_positive_definite,
                     ['Initial inverse Hessian is not positive definite.',
@@ -388,7 +396,7 @@ def _bfgs_inv_hessian_update(grad_delta, position_delta, inv_hessian_estimate):
       satisfy the same conditions.
   """
   # The normalization term (y^T . s)
-  normalization_factor = tf.reduce_sum(grad_delta * position_delta)
+  normalization_factor = tf.reduce_sum(input_tensor=grad_delta * position_delta)
 
   is_singular = tf.equal(normalization_factor, 0)
 
@@ -403,7 +411,7 @@ def _bfgs_inv_hessian_update(grad_delta, position_delta, inv_hessian_estimate):
     # H.y where H is the inverse Hessian and y is the gradient change.
     conditioned_grad_delta = _mul_right(inv_hessian_estimate, grad_delta)
     conditioned_grad_delta_norm = tf.reduce_sum(
-        conditioned_grad_delta * grad_delta)
+        input_tensor=conditioned_grad_delta * grad_delta)
 
     # The first rank 1 update term requires the outer product: s.y^T.
     # We leverage broadcasting to do this in a shape agnostic manner.
@@ -422,11 +430,9 @@ def _bfgs_inv_hessian_update(grad_delta, position_delta, inv_hessian_estimate):
         (position_term - cross_term) / normalization_factor)
     return next_inv_hessian_estimate
 
-  next_estimate = tf.contrib.framework.smart_cond(
-      is_singular,
-      true_fn=_is_singular_fn,
-      false_fn=_do_update_fn)
-
+  next_estimate = prefer_static.cond(is_singular,
+                                     true_fn=_is_singular_fn,
+                                     false_fn=_do_update_fn)
   return next_estimate
 
 
@@ -493,7 +499,7 @@ def _tensor_product(t1, t2):
     product: A tensor with the same elements as the input `x` but with rank
       `r + n` where `r` is the rank of `x`.
   """
-  t1_shape = tf.shape(t1)
+  t1_shape = tf.shape(input=t1)
   padding = tf.ones([tf.rank(t2)], dtype=t1_shape.dtype)
   padded_shape = tf.concat([t1_shape, padding], axis=0)
   t1_padded = tf.reshape(t1, padded_shape)

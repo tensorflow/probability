@@ -24,7 +24,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 def try_import(name):  # pylint: disable=invalid-name
@@ -32,7 +32,7 @@ def try_import(name):  # pylint: disable=invalid-name
   try:
     module = importlib.import_module(name)
   except ImportError as e:
-    tf.logging.warning("Could not import %s: %s" % (name, str(e)))
+    tf.compat.v1.logging.warning("Could not import %s: %s" % (name, str(e)))
   return module
 
 stats = try_import("scipy.stats")
@@ -40,7 +40,7 @@ stats = try_import("scipy.stats")
 tfd = tfp.distributions
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class ProductDistributionTest(tf.test.TestCase):
 
   def setUp(self):
@@ -112,10 +112,11 @@ class ProductDistributionTest(tf.test.TestCase):
         reinterpreted_batch_ndims=1)
 
     x = ind.sample(int(n_samp), seed=42)
-    sample_mean = tf.reduce_mean(x, axis=0)
-    sample_var = tf.reduce_mean(tf.squared_difference(x, sample_mean), axis=0)
+    sample_mean = tf.reduce_mean(input_tensor=x, axis=0)
+    sample_var = tf.reduce_mean(
+        input_tensor=tf.math.squared_difference(x, sample_mean), axis=0)
     sample_std = tf.sqrt(sample_var)
-    sample_entropy = -tf.reduce_mean(ind.log_prob(x), axis=0)
+    sample_entropy = -tf.reduce_mean(input_tensor=ind.log_prob(x), axis=0)
 
     [
         sample_mean_,
@@ -148,8 +149,8 @@ class ProductDistributionTest(tf.test.TestCase):
   def test_event_ndims_is_static_when_possible(self):
     ind = tfd.Independent(
         distribution=tfd.Normal(
-            loc=tf.placeholder_with_default(input=[2.], shape=None),
-            scale=tf.placeholder_with_default(input=1., shape=None)),
+            loc=tf.compat.v1.placeholder_with_default(input=[2.], shape=None),
+            scale=tf.compat.v1.placeholder_with_default(input=1., shape=None)),
         reinterpreted_batch_ndims=1)
     # Even though `event_shape` is not static, event_ndims must equal
     # `reinterpreted_batch_ndims + distribution.event_shape.ndims`.
@@ -194,7 +195,8 @@ class ProductDistributionTest(tf.test.TestCase):
     normal_kl = tfd.kl_divergence(normal1, normal2)
     ind_kl = tfd.kl_divergence(ind1, ind2)
     self.assertAllClose(
-        self.evaluate(tf.reduce_sum(normal_kl, axis=-1)), self.evaluate(ind_kl))
+        self.evaluate(tf.reduce_sum(input_tensor=normal_kl, axis=-1)),
+        self.evaluate(ind_kl))
 
   def testKLIdentity(self):
     normal1 = tfd.Normal(
@@ -231,7 +233,7 @@ class ProductDistributionTest(tf.test.TestCase):
     mvn_kl = tfd.kl_divergence(mvn1, mvn2)
     ind_kl = tfd.kl_divergence(ind1, ind2)
     self.assertAllClose(
-        self.evaluate(tf.reduce_sum(mvn_kl, axis=[-1, -2])),
+        self.evaluate(tf.reduce_sum(input_tensor=mvn_kl, axis=[-1, -2])),
         self.evaluate(ind_kl))
 
   def _testMnistLike(self, static_shape):
@@ -244,7 +246,7 @@ class ProductDistributionTest(tf.test.TestCase):
     def expected_log_prob(x, logits):
       return (x * logits - np.log1p(np.exp(logits))).sum(-1).sum(-1).sum(-1)
 
-    logits_ph = tf.placeholder_with_default(
+    logits_ph = tf.compat.v1.placeholder_with_default(
         input=logits, shape=logits.shape if static_shape else None)
     ind = tfd.Independent(
         distribution=tfd.Bernoulli(logits=logits_ph))
@@ -262,8 +264,8 @@ class ProductDistributionTest(tf.test.TestCase):
         log_prob_x,
         ind.batch_shape_tensor(),
         ind.event_shape_tensor(),
-        tf.shape(x),
-        tf.shape(log_prob_x),
+        tf.shape(input=x),
+        tf.shape(input=log_prob_x),
     ])
 
     if static_shape:

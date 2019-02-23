@@ -165,11 +165,10 @@ class LinearRegression(StructuralTimeSeries):
 
       if not isinstance(design_matrix, tfl.LinearOperator):
         design_matrix = tfl.LinearOperatorFullMatrix(
-            tf.convert_to_tensor(design_matrix,
-                                 name='design_matrix'),
+            tf.convert_to_tensor(value=design_matrix, name='design_matrix'),
             name='design_matrix_linop')
 
-      if design_matrix.shape[-1].value is not None:
+      if tf.compat.dimension_value(design_matrix.shape[-1]) is not None:
         num_features = design_matrix.shape[-1]
       else:
         num_features = design_matrix.shape_tensor()[-1]
@@ -192,7 +191,7 @@ class LinearRegression(StructuralTimeSeries):
             batch_shape=design_matrix_batch_shape_,
             event_shape=[num_features])
 
-      tf.assert_same_float_dtype([design_matrix, weights_prior])
+      tf.debugging.assert_same_float_dtype([design_matrix, weights_prior])
 
       self._design_matrix = design_matrix
 
@@ -241,4 +240,3 @@ class LinearRegression(StructuralTimeSeries):
         observation_noise=observation_noise_fn,
         initial_state_prior=initial_state_prior,
         initial_step=initial_step)
-

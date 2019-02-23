@@ -21,7 +21,8 @@ from __future__ import print_function
 # Dependency imports
 import tensorflow as tf
 
-tfe = tf.contrib.eager
+from tensorflow_probability.python.math.gradient import value_and_gradient
+
 
 __all__ = [
     'diag_jacobian',
@@ -72,12 +73,7 @@ def diag_jacobian(xs,
     sample_shape = [3, 5]
     state = [tf.ones(sample_shape + [2], dtype=dtype),
              tf.ones(sample_shape + [1], dtype=dtype)]
-    fn_val = target_fn(*state)
-    grad_fn = tfe.gradients_function(target_fn)
-    if tfe.executing_eagerly():
-      grads = grad_fn(*state)
-    else:
-      grads = tf.gradients(fn_val, state)
+    fn_val, grads = tfp.math.value_and_gradient(target_fn, state)
 
     # We can either pass the `sample_shape` of the `state` or not, which impacts
     # computational speed of `diag_jacobian`
@@ -132,8 +128,8 @@ def diag_jacobian(xs,
     jacobians_diag_res = []
     # Convert input `xs` to a list
     xs = list(xs) if _is_list_like(xs) else [xs]
-    xs = [tf.convert_to_tensor(x) for x in xs]
-    if not tfe.executing_eagerly():
+    xs = [tf.convert_to_tensor(value=x) for x in xs]
+    if not tf.executing_eagerly():
       if ys is None:
         if fn is None:
           raise ValueError('Both `ys` and `fn` can not be `None`')
@@ -150,8 +146,9 @@ def diag_jacobian(xs,
         y_ = tf.reshape(y, tf.concat([sample_shape, [-1]], -1))
 
         # Declare an iterator and tensor array loop variables for the gradients.
-        n = tf.size(x) / tf.to_int32(tf.reduce_prod(sample_shape))
-        n = tf.to_int32(n)
+        n = tf.size(input=x) / tf.cast(
+            tf.reduce_prod(input_tensor=sample_shape), dtype=tf.int32)
+        n = tf.cast(n, dtype=tf.int32)
         loop_vars = [
             0,
             tf.TensorArray(x.dtype, n)
@@ -160,7 +157,7 @@ def diag_jacobian(xs,
         def loop_body(j):
           """Loop function to compute gradients of the each direction."""
           # Gradient along direction `j`.
-          res = tf.gradients(y_[..., j], x)[0]  # pylint: disable=cell-var-from-loop
+          res = tf.gradients(ys=y_[..., j], xs=x)[0]  # pylint: disable=cell-var-from-loop
           if res is None:
             # Return zero, if the gradient is `None`.
             res = tf.zeros(tf.concat([sample_shape, [1]], -1),
@@ -176,16 +173,15 @@ def diag_jacobian(xs,
         # Iterate over all elements of the gradient and compute second order
         # derivatives.
         _, jacobian_diag_res = tf.while_loop(
-            lambda j, _: j < n,  # pylint: disable=cell-var-from-loop
-            lambda j, result: (j + 1, result.write(j, loop_body(j))),
-            loop_vars,
-            parallel_iterations=parallel_iterations
-        )
+            cond=lambda j, _: j < n,  # pylint: disable=cell-var-from-loop
+            body=lambda j, result: (j + 1, result.write(j, loop_body(j))),
+            loop_vars=loop_vars,
+            parallel_iterations=parallel_iterations)
 
-        shape_x = tf.shape(x)
+        shape_x = tf.shape(input=x)
         # Stack gradients together and move flattened `event_shape` to the
         # zero position
-        reshaped_jacobian_diag = tf.transpose(jacobian_diag_res.stack())
+        reshaped_jacobian_diag = tf.transpose(a=jacobian_diag_res.stack())
         # Reshape to the original tensor
         reshaped_jacobian_diag = tf.reshape(reshaped_jacobian_diag, shape_x)
         jacobians_diag_res.append(reshaped_jacobian_diag)
@@ -211,39 +207,40 @@ def diag_jacobian(xs,
         # Expand dimensions before returning in order to support 0D input `xs`
         return lambda *state: tf.expand_dims(fn_broadcast(*state)[i], 0)[..., j]
 
+      def make_loop_body(i, x):
+        """Loop function to compute gradients of the each direction."""
+        def _fn(j, result):
+          res = value_and_gradient(fn_slice(i, j), xs)[1][i]
+          if res is None:
+            res = tf.zeros(tf.concat([sample_shape, [1]], -1), dtype=x.dtype)
+          else:
+            res = tf.reshape(res, tf.concat([sample_shape, [-1]], -1))
+            res = res[..., j]
+          return j + 1, result.write(j, res)
+        return _fn
+
       for i, x in enumerate(xs):
         # Declare an iterator and tensor array loop variables for the gradients.
-        n = tf.size(x) / tf.to_int32(tf.reduce_prod(sample_shape))
-        n = tf.to_int32(n)
+        n = tf.size(input=x) / tf.cast(
+            tf.reduce_prod(input_tensor=sample_shape), dtype=tf.int32)
+        n = tf.cast(n, dtype=tf.int32)
         loop_vars = [
             0,
             tf.TensorArray(x.dtype, n)
         ]
 
-        def loop_body(j):
-          """Loop function to compute gradients of the each direction."""
-          res = tfe.gradients_function(fn_slice(i, j))(*xs)[i]  # pylint: disable=cell-var-from-loop
-          if res is None:
-            res = tf.zeros(tf.concat([sample_shape, [1]], -1),
-                           dtype=x.dtype)  # pylint: disable=cell-var-from-loop
-          else:
-            res = tf.reshape(res, tf.concat([sample_shape, [-1]], -1))
-            res = res[..., j]
-          return  res
-
         # Iterate over all elements of the gradient and compute second order
         # derivatives.
         _, jacobian_diag_res = tf.while_loop(
-            lambda j, _: j < n,
-            lambda j, result: (j + 1, result.write(j, loop_body(j))),
-            loop_vars,
-            parallel_iterations=parallel_iterations
-        )
+            cond=lambda j, _: j < n,
+            body=make_loop_body(i, x),
+            loop_vars=loop_vars,
+            parallel_iterations=parallel_iterations)
 
-        shape_x = tf.shape(x)
+        shape_x = tf.shape(input=x)
         # Stack gradients together and move flattened `event_shape` to the
         # zero position
-        reshaped_jacobian_diag = tf.transpose(jacobian_diag_res.stack())
+        reshaped_jacobian_diag = tf.transpose(a=jacobian_diag_res.stack())
         # Reshape to the original tensor
         reshaped_jacobian_diag = tf.reshape(reshaped_jacobian_diag, shape_x)
         jacobians_diag_res.append(reshaped_jacobian_diag)

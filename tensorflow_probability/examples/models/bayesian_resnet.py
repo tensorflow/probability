@@ -54,9 +54,11 @@ def bayesian_resnet(input_shape,
   strides = [1, 2, 2, 2]
 
   def _untransformed_scale_constraint(t):
-    return tf.clip_by_value(t, -1000, tf.log(kernel_posterior_scale_constraint))
+    return tf.clip_by_value(t, -1000,
+                            tf.math.log(kernel_posterior_scale_constraint))
+
   kernel_posterior_fn = tfp.layers.default_mean_field_normal_fn(
-      untransformed_scale_initializer=tf.random_normal_initializer(
+      untransformed_scale_initializer=tf.compat.v1.initializers.random_normal(
           mean=kernel_posterior_scale_mean,
           stddev=kernel_posterior_scale_stddev),
       untransformed_scale_constraint=_untransformed_scale_constraint)

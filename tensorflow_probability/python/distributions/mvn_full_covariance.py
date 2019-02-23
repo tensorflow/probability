@@ -20,8 +20,8 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python.distributions import mvn_tril
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow.python.ops import control_flow_ops
 
 
 __all__ = [
@@ -99,7 +99,7 @@ class MultivariateNormalFullCovariance(mvn_tril.MultivariateNormalTriL):
   covariance_matrix = ...  # shape: [2, 3, 3], symmetric, positive definite.
   mvn = tfd.MultivariateNormalFullCovariance(
       loc=mu,
-      covariance=covariance_matrix)
+      covariance_matrix=covariance_matrix)
 
   # Compute the pdf of two `R^3` observations; return a length-2 vector.
   x = [[-0.9, 0, 0.1],
@@ -160,17 +160,17 @@ class MultivariateNormalFullCovariance(mvn_tril.MultivariateNormalTriL):
       with tf.name_scope("init", values=[loc, covariance_matrix]):
         dtype = dtype_util.common_dtype([loc, covariance_matrix], tf.float32)
         loc = loc if loc is None else tf.convert_to_tensor(
-            loc, name="loc", dtype=dtype)
+            value=loc, name="loc", dtype=dtype)
         if covariance_matrix is None:
           scale_tril = None
         else:
           covariance_matrix = tf.convert_to_tensor(
-              covariance_matrix, name="covariance_matrix", dtype=dtype)
+              value=covariance_matrix, name="covariance_matrix", dtype=dtype)
           if validate_args:
-            covariance_matrix = control_flow_ops.with_dependencies([
-                tf.assert_near(
+            covariance_matrix = distribution_util.with_dependencies([
+                tf.compat.v1.assert_near(
                     covariance_matrix,
-                    tf.matrix_transpose(covariance_matrix),
+                    tf.linalg.transpose(covariance_matrix),
                     message="Matrix was not symmetric")
             ], covariance_matrix)
           # No need to validate that covariance_matrix is non-singular.
@@ -178,7 +178,7 @@ class MultivariateNormalFullCovariance(mvn_tril.MultivariateNormalTriL):
           # is called by the Bijector.
           # However, cholesky() ignores the upper triangular part, so we do need
           # to separately assert symmetric.
-          scale_tril = tf.cholesky(covariance_matrix)
+          scale_tril = tf.linalg.cholesky(covariance_matrix)
         super(MultivariateNormalFullCovariance, self).__init__(
             loc=loc,
             scale_tril=scale_tril,

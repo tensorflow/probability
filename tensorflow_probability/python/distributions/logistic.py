@@ -26,7 +26,6 @@ import tensorflow as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.framework import tensor_shape
 
 
 class Logistic(distribution.Distribution):
@@ -118,13 +117,13 @@ class Logistic(distribution.Distribution):
     parameters = dict(locals())
     with tf.name_scope(name, values=[loc, scale]) as name:
       dtype = dtype_util.common_dtype([loc, scale], preferred_dtype=tf.float32)
-      loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
-      scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
-      with tf.control_dependencies([tf.assert_positive(scale)]
-                                   if validate_args else []):
+      loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
+      scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
+      with tf.control_dependencies(
+          [tf.compat.v1.assert_positive(scale)] if validate_args else []):
         self._loc = tf.identity(loc, name="loc")
         self._scale = tf.identity(scale, name="scale")
-        tf.assert_same_float_dtype([self._loc, self._scale])
+        tf.debugging.assert_same_float_dtype([self._loc, self._scale])
     super(Logistic, self).__init__(
         dtype=self._scale.dtype,
         reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
@@ -138,7 +137,7 @@ class Logistic(distribution.Distribution):
   def _param_shapes(sample_shape):
     return dict(
         zip(("loc", "scale"),
-            ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 2)))
+            ([tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)] * 2)))
 
   @property
   def loc(self):
@@ -151,7 +150,8 @@ class Logistic(distribution.Distribution):
     return self._scale
 
   def _batch_shape_tensor(self):
-    return tf.broadcast_dynamic_shape(tf.shape(self.loc), tf.shape(self.scale))
+    return tf.broadcast_dynamic_shape(
+        tf.shape(input=self.loc), tf.shape(input=self.scale))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(self.loc.shape,
@@ -161,7 +161,7 @@ class Logistic(distribution.Distribution):
     return tf.constant([], dtype=tf.int32)
 
   def _event_shape(self):
-    return tensor_shape.scalar()
+    return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
     # Uniform variates must be sampled from the open-interval `(0, 1)` rather
@@ -171,13 +171,13 @@ class Logistic(distribution.Distribution):
     # numbers x, y have the reasonable property that, `x + y >= max(x, y)`. In
     # this case, a subnormal number (i.e., np.nextafter) can cause us to sample
     # 0.
-    uniform = tf.random_uniform(
+    uniform = tf.random.uniform(
         shape=tf.concat([[n], self.batch_shape_tensor()], 0),
         minval=np.finfo(self.dtype.as_numpy_dtype).tiny,
         maxval=1.,
         dtype=self.dtype,
         seed=seed)
-    sampled = tf.log(uniform) - tf.log1p(-1. * uniform)
+    sampled = tf.math.log(uniform) - tf.math.log1p(-1. * uniform)
     return sampled * self.scale + self.loc
 
   def _log_prob(self, x):
@@ -200,12 +200,12 @@ class Logistic(distribution.Distribution):
     return -z - 2. * tf.nn.softplus(-z)
 
   def _log_normalization(self):
-    return tf.log(self.scale)
+    return tf.math.log(self.scale)
 
   def _entropy(self):
     # Use broadcasting rules to calculate the full broadcast sigma.
     scale = self.scale * tf.ones_like(self.loc)
-    return 2 + tf.log(scale)
+    return 2 + tf.math.log(scale)
 
   def _mean(self):
     return self.loc * tf.ones_like(self.scale)

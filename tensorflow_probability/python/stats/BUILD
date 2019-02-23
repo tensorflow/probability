@@ -15,6 +15,8 @@
 # Description:
 #   Statistical Ops.
 
+# [internal] load python3.bzl
+
 package(
     default_visibility = [
         "//tensorflow_probability:__subpackages__",

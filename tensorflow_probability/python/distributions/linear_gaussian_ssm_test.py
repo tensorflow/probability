@@ -24,6 +24,9 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import _augment_sample_shape
+from tensorflow_probability.python.distributions.linear_gaussian_ssm import backward_smoothing_update
+from tensorflow_probability.python.distributions.linear_gaussian_ssm import BackwardPassState
+from tensorflow_probability.python.distributions.linear_gaussian_ssm import build_backward_pass_step
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import build_kalman_cov_step
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import build_kalman_filter_step
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import build_kalman_mean_step
@@ -31,11 +34,15 @@ from tensorflow_probability.python.distributions.linear_gaussian_ssm import kalm
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import KalmanFilterState
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import linear_gaussian_update
 
+from tensorflow_probability.python.internal import test_case as tfp_test_case
+
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
 tfd = tfp.distributions
-tfe = tf.contrib.eager
 tfl = tf.linalg
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class _IIDNormalTest(object):
 
   def setUp(self):
@@ -128,10 +135,10 @@ class _IIDNormalTest(object):
         lp_kalman = iid_latents.log_prob(x)
 
         marginal_variance = tf.convert_to_tensor(
-            transition_variance_val + observation_variance_val,
+            value=transition_variance_val + observation_variance_val,
             dtype=self.dtype)
         lp_iid = tf.reduce_sum(
-            tfd.Normal(
+            input_tensor=tfd.Normal(
                 loc=tf.zeros([], dtype=self.dtype),
                 scale=tf.sqrt(marginal_variance)).log_prob(x),
             axis=(-2, -1))
@@ -154,29 +161,29 @@ class _IIDNormalTest(object):
     """
 
     ndarray = np.asarray(ndarray).astype(self.dtype)
-    return tf.placeholder_with_default(
+    return tf.compat.v1.placeholder_with_default(
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class IIDNormalTestStatic32(_IIDNormalTest, tf.test.TestCase):
   use_static_shape = True
   dtype = np.float32
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class IIDNormalTestStatic64(_IIDNormalTest, tf.test.TestCase):
   use_static_shape = True
   dtype = np.float64
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class IIDNormalTestDynamic32(_IIDNormalTest, tf.test.TestCase):
   use_static_shape = False
   dtype = np.float32
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class SanityChecks(tf.test.TestCase):
 
   def test_deterministic_system(self):
@@ -304,7 +311,7 @@ class SanityChecks(tf.test.TestCase):
 
     def observation_noise(t):
       t = tf.cast(t, tf.float32)
-      return tfd.MultivariateNormalDiag(scale_diag=[tf.log(t+1.)])
+      return tfd.MultivariateNormalDiag(scale_diag=[tf.math.log(t + 1.)])
 
     model = tfd.LinearGaussianStateSpaceModel(
         num_timesteps=num_timesteps,
@@ -327,7 +334,7 @@ class SanityChecks(tf.test.TestCase):
     self.assertAllClose(observation_variances, variance_[..., 0])
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class BatchTest(tf.test.TestCase):
   """Test that methods broadcast batch dimensions for each parameter."""
 
@@ -359,24 +366,28 @@ class BatchTest(tf.test.TestCase):
 
     return tfd.LinearGaussianStateSpaceModel(
         num_timesteps=num_timesteps,
-        transition_matrix=tf.random_normal(
-            transition_matrix_batch_shape + [latent_size, latent_size]),
+        transition_matrix=tf.random.normal(transition_matrix_batch_shape +
+                                           [latent_size, latent_size]),
         transition_noise=tfd.MultivariateNormalDiag(
-            scale_diag=tf.nn.softplus(tf.random_normal(
-                transition_noise_batch_shape + [latent_size]))),
-        observation_matrix=tf.random_normal(
-            observation_matrix_batch_shape + [observation_size, latent_size]),
+            scale_diag=tf.nn.softplus(
+                tf.random.normal(transition_noise_batch_shape +
+                                 [latent_size]))),
+        observation_matrix=tf.random.normal(observation_matrix_batch_shape +
+                                            [observation_size, latent_size]),
         observation_noise=tfd.MultivariateNormalDiag(
-            scale_diag=tf.nn.softplus(tf.random_normal(
-                observation_noise_batch_shape + [observation_size]))),
+            scale_diag=tf.nn.softplus(
+                tf.random.normal(observation_noise_batch_shape +
+                                 [observation_size]))),
         initial_state_prior=tfd.MultivariateNormalDiag(
-            scale_diag=tf.nn.softplus(tf.random_normal(
-                prior_batch_shape + [latent_size]))),
+            scale_diag=tf.nn.softplus(
+                tf.random.normal(prior_batch_shape + [latent_size]))),
         validate_args=True)
 
   def _sanity_check_shapes(self, model,
                            batch_shape,
                            event_shape,
+                           num_timesteps,
+                           latent_size,
                            sample_shape=(2, 1)):
 
     # Lists can't be default arguments, but we'll want sample_shape to
@@ -394,9 +405,15 @@ class BatchTest(tf.test.TestCase):
     lp = model.log_prob(y)
     self.assertEqual(lp.shape.as_list(), sample_shape + batch_shape)
 
+    (posterior_means, posterior_covs) = model.posterior_marginals(y)
+    self.assertEqual(posterior_means.shape.as_list(),
+                     sample_shape + batch_shape + [num_timesteps, latent_size])
+    self.assertEqual(posterior_covs.shape.as_list(),
+                     batch_shape + [num_timesteps, latent_size, latent_size])
+
     # Try an argument with no batch shape to ensure we broadcast
     # correctly.
-    unbatched_y = tf.random_normal(event_shape)
+    unbatched_y = tf.random.normal(event_shape)
     lp = model.log_prob(unbatched_y)
     self.assertEqual(lp.shape.as_list(), batch_shape)
 
@@ -404,6 +421,12 @@ class BatchTest(tf.test.TestCase):
                      batch_shape + event_shape)
     self.assertEqual(model.variance().shape.as_list(),
                      batch_shape + event_shape)
+
+    (posterior_means, posterior_covs) = model.posterior_marginals(unbatched_y)
+    self.assertEqual(posterior_means.shape.as_list(),
+                     batch_shape + [num_timesteps, latent_size])
+    self.assertEqual(posterior_covs.shape.as_list(),
+                     batch_shape + [num_timesteps, latent_size, latent_size])
 
   def test_constant_batch_shape(self):
     """Simple case where all components have the same batch shape."""
@@ -425,7 +448,8 @@ class BatchTest(tf.test.TestCase):
     # check that we get the basic shapes right
     self.assertEqual(model.latent_size, latent_size)
     self.assertEqual(model.observation_size, observation_size)
-    self._sanity_check_shapes(model, batch_shape, event_shape)
+    self._sanity_check_shapes(model, batch_shape, event_shape,
+                              num_timesteps, latent_size)
 
   def test_broadcast_batch_shape(self):
     """Broadcasting when only one component has batch shape."""
@@ -441,37 +465,388 @@ class BatchTest(tf.test.TestCase):
                                      latent_size,
                                      observation_size,
                                      prior_batch_shape=batch_shape)
-    self._sanity_check_shapes(model, batch_shape, event_shape)
+    self._sanity_check_shapes(model, batch_shape, event_shape,
+                              num_timesteps, latent_size)
 
     # Test batching only over the transition op
     model = self._build_random_model(num_timesteps,
                                      latent_size,
                                      observation_size,
                                      transition_matrix_batch_shape=batch_shape)
-    self._sanity_check_shapes(model, batch_shape, event_shape)
+    self._sanity_check_shapes(model, batch_shape, event_shape,
+                              num_timesteps, latent_size)
 
     # Test batching only over the transition noise
     model = self._build_random_model(num_timesteps,
                                      latent_size,
                                      observation_size,
                                      transition_noise_batch_shape=batch_shape)
-    self._sanity_check_shapes(model, batch_shape, event_shape)
+    self._sanity_check_shapes(model, batch_shape, event_shape,
+                              num_timesteps, latent_size)
 
     # Test batching only over the observation op
     model = self._build_random_model(num_timesteps,
                                      latent_size,
                                      observation_size,
                                      observation_matrix_batch_shape=batch_shape)
-    self._sanity_check_shapes(model, batch_shape, event_shape)
+    self._sanity_check_shapes(model, batch_shape, event_shape,
+                              num_timesteps, latent_size)
 
     # Test batching only over the observation noise
     model = self._build_random_model(num_timesteps,
                                      latent_size,
                                      observation_size,
                                      observation_noise_batch_shape=batch_shape)
-    self._sanity_check_shapes(model, batch_shape, event_shape)
+    self._sanity_check_shapes(model, batch_shape, event_shape,
+                              num_timesteps, latent_size)
 
 
+class MissingObservationsTests(tfp_test_case.TestCase):
+
+  # One test requires derivative with respect to
+  # transition_noise.scale_diag so we allow this to be
+  # passed in as an argument if needed.
+  def make_model(self, scale_diag=None):
+    if scale_diag is None:
+      scale_diag = np.array([1.], dtype=np.float32)
+
+    # Define a simple random-walk model.
+    num_timesteps = 8
+    transition_matrix = np.array([[1.]], dtype=np.float32)
+    transition_noise = tfd.MultivariateNormalDiag(
+        scale_diag=scale_diag)
+    observation_matrix = np.array([[1.]], dtype=np.float32)
+    observation_noise = tfd.MultivariateNormalDiag(
+        scale_diag=np.array([0.5], dtype=np.float32))
+    initial_state_prior = tfd.MultivariateNormalDiag(
+        loc=np.zeros(shape=[1], dtype=np.float32),
+        scale_diag=np.array([1.], dtype=np.float32))
+    model = tfd.LinearGaussianStateSpaceModel(
+        num_timesteps=num_timesteps,
+        transition_matrix=transition_matrix,
+        transition_noise=transition_noise,
+        observation_matrix=observation_matrix,
+        observation_noise=observation_noise,
+        initial_state_prior=initial_state_prior,
+        initial_step=0)
+
+    return (num_timesteps, transition_matrix, transition_noise,
+            observation_matrix, observation_noise,
+            initial_state_prior, model)
+
+  def testForwardFilterWithMask(self):
+    (_, transition_matrix, _,
+     observation_matrix, observation_noise,
+     initial_state_prior, model) = self.make_model()
+
+    observed_time_series = np.array(
+        [1.0, 2.0, -1000., 0.4, np.nan, 1000., 4.2, np.inf]).astype(np.float32)
+    observed_time_series = observed_time_series[..., np.newaxis]
+    observation_mask = np.array(
+        [False, False, True, False, True, True, False, True]).astype(np.bool)
+
+    # In a random walk, skipping a timestep just adds variance, so we can
+    # construct a model of the four 'unmasked' timesteps by directly collapsing
+    # out the masked timesteps. We test that the filtering distributions and
+    # likelihoods from the masked model match those from the collapsed
+    # model at observed timesteps.
+    collapsed_transition_variances = tf.constant([1., 2., 3., 2.],
+                                                 dtype=np.float32)
+
+    def collapsed_transition_noise_model(t):
+      return tfd.MultivariateNormalDiag(
+          scale_diag=[tf.sqrt(collapsed_transition_variances[t])])
+
+    collapsed_model = tfd.LinearGaussianStateSpaceModel(
+        num_timesteps=4,
+        transition_matrix=transition_matrix,
+        transition_noise=collapsed_transition_noise_model,
+        observation_matrix=observation_matrix,
+        observation_noise=observation_noise,
+        initial_state_prior=initial_state_prior,
+        initial_step=0)
+
+    (log_likelihoods_, filtered_means_, filtered_covs_, predicted_means_,
+     predicted_covs_, observation_means_, observation_covs_) = self.evaluate(
+         model.forward_filter(
+             x=observed_time_series, mask=observation_mask))
+
+    (log_likelihoods_collapsed_, filtered_means_collapsed_,
+     filtered_covs_collapsed_, predicted_means_collapsed_,
+     predicted_covs_collapsed_, observation_means_collapsed_,
+     observation_covs_collapsed_) = self.evaluate(
+         collapsed_model.forward_filter(
+             x=observed_time_series[~observation_mask]))
+
+    self.assertAllClose(log_likelihoods_[~observation_mask],
+                        log_likelihoods_collapsed_)
+    self.assertAllEqual(log_likelihoods_[observation_mask],
+                        np.zeros(log_likelihoods_[observation_mask].shape))
+    self.assertAllClose(filtered_means_[~observation_mask],
+                        filtered_means_collapsed_)
+    self.assertAllClose(filtered_covs_[~observation_mask],
+                        filtered_covs_collapsed_)
+
+    # Check the predictive distributions over latents at the final timestep.
+    # We don't bother checking the other timesteps because the collapsing
+    # makes it nontrivial to compute which ones should match up.
+    self.assertAllClose(predicted_means_[-1],
+                        predicted_means_collapsed_[-1])
+    self.assertAllClose(predicted_covs_[-1],
+                        predicted_covs_collapsed_[-1])
+
+    self.assertAllClose(observation_means_[~observation_mask],
+                        observation_means_collapsed_)
+    self.assertAllClose(observation_covs_[~observation_mask],
+                        observation_covs_collapsed_)
+
+    # Also test that auxiliary methods `log_prob` and `posterior_marginals`
+    # pass the mask through correctly.
+    lp_, lp_collapsed_ = self.evaluate((
+        model.log_prob(observed_time_series, mask=observation_mask),
+        collapsed_model.log_prob(observed_time_series[~observation_mask])))
+    self.assertAllClose(lp_, lp_collapsed_)
+
+    ((posterior_means_, posterior_covs_),
+     (posterior_means_collapsed_, posterior_covs_collapsed_)) = self.evaluate((
+         model.posterior_marginals(
+             observed_time_series, mask=observation_mask),
+         collapsed_model.posterior_marginals(
+             observed_time_series[~observation_mask])))
+    self.assertAllClose(posterior_means_[~observation_mask],
+                        posterior_means_collapsed_)
+    self.assertAllClose(posterior_covs_[~observation_mask],
+                        posterior_covs_collapsed_)
+
+  def testGradientsOfMaskedNaNsAreFinite(self):
+    def lp_from_scale_diag(scale_diag):
+      (_, _, _, _, _, _,
+       model) = self.make_model(scale_diag)
+
+      observed_time_series = np.array(  # contains a (masked) NaN.
+          [1.0, 2.0, -1000., 0.4,
+           np.nan, 1000., 4.2, np.inf]).astype(np.float32)
+      observed_time_series = observed_time_series[..., np.newaxis]
+      observation_mask = np.array(
+          [False, False, True, False, True, True, False, True]).astype(np.bool)
+
+      # Check that we've avoided the NaN-gradient gotcha described in
+      # https://stackoverflow.com/questions/33712178/tensorflow-nan-bug/42497444#42497444
+      log_likelihoods, _, _, _, _, _, _ = model.forward_filter(
+          x=observed_time_series, mask=observation_mask)
+      lp = tf.reduce_sum(input_tensor=log_likelihoods)
+      return lp
+
+    _, grads_ = self.evaluate(
+        tfp.math.value_and_gradient(
+            lp_from_scale_diag,
+            [tf.constant(np.array([1.], dtype=np.float32))]))
+    self.assertAllFinite(grads_)
+
+  def testMaskWhenModelHasBatchShape(self):
+    # When the inputs (x, mask) have shape *smaller* than the model's batch
+    # shape, they should be broadcast up so we return a result for each
+    # model in the batch.
+    (num_timesteps, transition_matrix, transition_noise,
+     observation_matrix, observation_noise,
+     _, _) = self.make_model()
+
+    num_timesteps = 8
+    batch_shape = [4, 3]
+    batch_model = tfd.LinearGaussianStateSpaceModel(
+        num_timesteps=num_timesteps,
+        transition_matrix=transition_matrix,
+        transition_noise=transition_noise,
+        observation_matrix=observation_matrix,
+        observation_noise=observation_noise,
+        initial_state_prior=tfd.MultivariateNormalDiag(
+            scale_diag=np.random.randn(*(
+                batch_shape + [1])).astype(np.float32)),
+        initial_step=0)
+
+    mask = np.random.randn(num_timesteps) > 0
+    observed_time_series = np.random.randn(num_timesteps, 1).astype(np.float32)
+    observed_time_series[mask[..., np.newaxis]] = np.inf
+
+    (log_likelihoods, filtered_means, filtered_covs, _, _, _,
+     _) = batch_model.forward_filter(
+         x=observed_time_series, mask=mask)
+    # Test that shapes are as expected, and are statically inferred.
+    self.assertAllEqual(filtered_means.shape.as_list(),
+                        batch_shape + [num_timesteps, 1])
+    self.assertAllEqual(filtered_covs.shape.as_list(),
+                        batch_shape + [num_timesteps, 1, 1])
+
+    (log_likelihoods_, filtered_means_, filtered_covs_) = self.evaluate(
+        (log_likelihoods, filtered_means, filtered_covs))
+    self.assertTrue(np.all(np.isfinite(log_likelihoods_)))
+    self.assertTrue(np.all(np.isfinite(filtered_means_)))
+    self.assertTrue(np.all(np.isfinite(filtered_covs_)))
+
+  def testMaskWhenTimeSeriesHasSampleShape(self):
+    # When the inputs (x, mask) have shape *larger* than the model's batch
+    # shape, we return means with a sample dimension for every sample dimension
+    # in the observed time series `x`, and covariances with a sample dimension
+    # for every sample dimension in the mask.
+
+    (num_timesteps, _, _, _, _,
+     _, model) = self.make_model()
+
+    sample_shape = [5, 2]
+    mask_sample_shape = [2]
+
+    mask = np.random.randn(*np.concatenate(
+        [mask_sample_shape, [num_timesteps]], axis=0)) > 0
+    observed_time_series = np.random.randn(*np.concatenate(
+        [sample_shape, [num_timesteps, 1]], axis=0)).astype(
+            np.float32)
+    observed_time_series[:, mask[..., np.newaxis]] = np.inf
+
+    (log_likelihoods, filtered_means, filtered_covs, _, _, _,
+     _) = model.forward_filter(
+         x=observed_time_series, mask=mask)
+    self.assertAllEqual(filtered_means.shape.as_list(),
+                        sample_shape + [num_timesteps, 1])
+    self.assertAllEqual(filtered_covs.shape.as_list(),
+                        mask_sample_shape + [num_timesteps, 1, 1])
+
+    (log_likelihoods_, filtered_means_, filtered_covs_) = self.evaluate(
+        (log_likelihoods, filtered_means, filtered_covs))
+    self.assertTrue(np.all(np.isfinite(log_likelihoods_)))
+    self.assertTrue(np.all(np.isfinite(filtered_means_)))
+    self.assertTrue(np.all(np.isfinite(filtered_covs_)))
+
+    big_mask = np.random.randn(*np.concatenate(
+        [[1, 2, 3], sample_shape, [num_timesteps]], axis=0)) > 0
+    with self.assertRaisesRegexp(ValueError,
+                                 "mask cannot have higher rank than x"):
+      (log_likelihoods, filtered_means, filtered_covs, _, _, _,
+       _) = model.forward_filter(
+           x=observed_time_series, mask=big_mask)
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class KalmanSmootherTest(tf.test.TestCase):
+
+  def build_kf(self):
+    # Define a simple model with 3D latents and 2D observations.
+
+    self.transition_matrix = np.array(
+        [[1., 0.5, 0.], [-0.2, 0.3, 0.], [0.01, 0.02, 0.97]], dtype=np.float32)
+
+    self.transition_noise = tfd.MultivariateNormalDiag(
+        loc=np.array([-4.3, 0.9, 0.], dtype=np.float32),
+        scale_diag=np.array([1., 1., 0.5], dtype=np.float32))
+
+    self.observation_matrix = np.array(
+        [[1., 1., 0.2], [0.3, -0.7, -0.2]], dtype=np.float32)
+    self.observation_noise = tfd.MultivariateNormalDiag(
+        loc=np.array([-0.9, 0.1], dtype=np.float32),
+        scale_diag=np.array([0.3, 0.1], dtype=np.float32))
+
+    self.initial_state_prior = tfd.MultivariateNormalDiag(
+        loc=np.zeros(shape=[3,], dtype=np.float32),
+        scale_diag=np.ones(shape=[3,], dtype=np.float32))
+
+    return tfd.LinearGaussianStateSpaceModel(
+        num_timesteps=5,
+        transition_matrix=self.transition_matrix,
+        transition_noise=self.transition_noise,
+        observation_matrix=self.observation_matrix,
+        observation_noise=self.observation_noise,
+        initial_state_prior=self.initial_state_prior,
+        initial_step=0)
+
+  def testKalmanSmoother(self):
+    obs = np.array(
+        [[[1.36560337, 0.28252135],
+          [-0.44638565, -0.76692033],
+          [0.43440145, -1.65087236],
+          [-0.96462844, -0.29173164],
+          [-0.46593086, 0.23341251]]],
+        dtype=np.float32)
+
+    kf = self.build_kf()
+    _, filtered_means, filtered_covs, _, _, _, _ = kf.forward_filter(obs)
+    smoothed_means, smoothed_covs = kf.posterior_marginals(obs)
+
+    # Numbers are checked against results from well-tested open source package.
+    # In order to replicate the numbers below, one could run the following
+    # script with PyKalman installed. https://pykalman.github.io with v.0.9.2.
+    # """
+    # import numpy as np
+    # import pykalman
+    # kf = pykalman.KalmanFilter(
+    #     transition_matrices=np.array(
+    #         [[1., 0.5, 0.], [-0.2, 0.3, 0.], [0.01, 0.02, 0.97]],
+    # .       dtype=np.float32),
+    #     observation_matrices=np.array(
+    #         [[1., 1., 0.2], [0.3, -0.7, -0.2]], dtype=np.float32),
+    #     transition_covariance=np.diag(np.square([1., 1., 0.5])),
+    #     observation_covariance=np.diag(np.square([0.3, 0.1])),
+    #     transition_offsets=np.array([-4.3, 0.9, 0.], dtype=np.float32),
+    #     observation_offsets=np.array([-0.9, 0.1], dtype=np.float32),
+    #     initial_state_mean=np.zeros(shape=[3,], dtype=np.float32),
+    #     initial_state_covariance=np.diag(np.ones(shape=[3,],
+    # .                                            dtype=np.float32)),
+    #     n_dim_state=3, n_dim_obs=2)
+    # x = np.array([[1.36560337, 0.28252135],
+    #               [-0.44638565, -0.76692033],
+    #               [0.43440145, -1.65087236],
+    #               [-0.96462844, -0.29173164],
+    #               [-0.46593086, 0.23341251]],
+    #              dtype=np.float32)
+    # filtered_means, filtered_covs = kf.filter(x)
+    # smoothed_means, smoothed_covs = kf.smooth(x)
+    # """
+
+    self.assertAllClose(self.evaluate(filtered_means),
+                        [[[1.67493705, 0.46825252, 0.02124943],
+                          [-0.64631546, 1.00897487, -0.09965568],
+                          [-1.01912747, 2.20042742, -0.35873311],
+                          [-0.67203603, 0.65843169, -1.13269043],
+                          [0.08385944, 0.50706669, -2.05841075]]])
+    self.assertAllClose(self.evaluate(filtered_covs),
+                        [[[0.05451537, -0.00583471, 0.05521206],
+                          [-0.00583471, 0.07889925, -0.23913612],
+                          [0.05521206, -0.23913612, 0.93451188]],
+                         [[0.05475972, -0.00706799, 0.05972831],
+                          [-0.00706799, 0.08838377, -0.27438752],
+                          [0.05972831, -0.27438752, 1.06529626]],
+                         [[0.05507039, -0.00857061, 0.06554467],
+                          [-0.00857061, 0.09565483, -0.30253237],
+                          [0.06554467, -0.30253237, 1.17423936]],
+                         [[0.05534107, -0.00984834, 0.07049446],
+                          [-0.00984834, 0.10168645, -0.3258982],
+                          [0.07049446, -0.3258982, 1.26475611]],
+                         [[0.05556491, -0.01090359, 0.07458252],
+                          [-0.01090359, 0.10666106, -0.34516996],
+                          [0.07458252, -0.34516996, 1.33941529]]])
+    self.assertAllClose(self.evaluate(smoothed_means),
+                        [[[1.6779677, 0.85140403, -1.35974017],
+                          [-0.56246908, 1.46082297, -1.62395504],
+                          [-0.90536, 2.63540628, -1.83427299],
+                          [-0.47239553, 0.95851585, -2.01734974],
+                          [0.08385944, 0.50706669, -2.05841075]]])
+    self.assertAllClose(self.evaluate(smoothed_covs),
+                        [[[0.05213916, -0.00658443, 0.05523982],
+                          [-0.00658443, 0.07103678, -0.21066964],
+                          [0.05523982, -0.21066964, 0.82790034]],
+                         [[0.05249696, -0.00812691, 0.06099242],
+                          [-0.00812691, 0.0799351, -0.24409068],
+                          [0.06099242, -0.24409068, 0.95324973]],
+                         [[0.05297552, -0.01009223, 0.06865306],
+                          [-0.01009223, 0.08801685, -0.27559063],
+                          [0.06865306, -0.27559063, 1.07602637]],
+                         [[0.05343939, -0.0120551, 0.07628306],
+                          [-0.0120551, 0.09641572, -0.30821036],
+                          [0.07628306, -0.30821036, 1.20272402]],
+                         [[0.05556491, -0.01090359, 0.07458252],
+                          [-0.01090359, 0.10666106, -0.34516996],
+                          [0.07458252, -0.34516996, 1.33941529]]])
+
+
+@test_util.run_all_in_graph_and_eager_modes
 class _KalmanStepsTest(object):
 
   def setUp(self):
@@ -611,6 +986,90 @@ class _KalmanStepsTest(object):
     self.assertAllClose(self.evaluate(predictive_dist.covariance()),
                         expected_predicted_cov)
 
+  def testBackwardSmoothingStep(self):
+    filtered_mean = [[2.], [-3.]]
+    filtered_cov = [[1.2, 0.4],
+                    [0.4, 2.3]]
+    predicted_mean = [[2.1], [-2.7]]
+    predicted_cov = [[1.1, 0.5],
+                     [0.5, 2.]]
+    next_smoothed_mean = [[1.9], [-2.9]]
+    next_smoothed_cov = [[1.4, 0.4],
+                         [0.4, 2.1]]
+    transition_matrix = [[0.6, 0.3],
+                         [0.4, 0.7]]
+
+    filtered_mean = self.build_tensor(filtered_mean)
+    filtered_cov = self.build_tensor(filtered_cov)
+    predicted_mean = self.build_tensor(predicted_mean)
+    predicted_cov = self.build_tensor(predicted_cov)
+    next_smoothed_mean = self.build_tensor(next_smoothed_mean)
+    next_smoothed_cov = self.build_tensor(next_smoothed_cov)
+    get_transition_matrix_for_timestep = (
+        lambda t: tfl.LinearOperatorFullMatrix(transition_matrix))
+    transition_matrix = get_transition_matrix_for_timestep(0)
+
+    posterior_mean, posterior_cov = backward_smoothing_update(
+        filtered_mean, filtered_cov,
+        predicted_mean, predicted_cov,
+        next_smoothed_mean, next_smoothed_cov,
+        transition_matrix)
+
+    # The expected results are calculated by analytical calculation.
+    self.assertAllClose(self.evaluate(posterior_mean),
+                        [[1.824], [-3.252]])
+    self.assertAllClose(self.evaluate(posterior_cov),
+                        [[1.30944, 0.45488],
+                         [0.45488, 2.35676]])
+
+  def testBackwardPassStep(self):
+    filtered_mean = [[2.], [-3.]]
+    filtered_cov = [[1.2, 0.4],
+                    [0.4, 2.3]]
+    predicted_mean = [[2.1], [-2.7]]
+    predicted_cov = [[1.1, 0.5],
+                     [0.5, 2.]]
+    next_smoothed_mean = [[1.9], [-2.9]]
+    next_smoothed_cov = [[1.4, 0.4],
+                         [0.4, 2.1]]
+    transition_matrix = [[0.6, 0.3],
+                         [0.4, 0.7]]
+
+    filtered_mean = self.build_tensor(filtered_mean)
+    filtered_cov = self.build_tensor(filtered_cov)
+    predicted_mean = self.build_tensor(predicted_mean)
+    predicted_cov = self.build_tensor(predicted_cov)
+    next_smoothed_mean = self.build_tensor(next_smoothed_mean)
+    next_smoothed_cov = self.build_tensor(next_smoothed_cov)
+    get_transition_matrix_for_timestep = (
+        lambda t: tfl.LinearOperatorFullMatrix(transition_matrix))
+
+    smooth_step = build_backward_pass_step(
+        get_transition_matrix_for_timestep)
+
+    initial_backward_state = BackwardPassState(
+        backward_mean=next_smoothed_mean,
+        backward_cov=next_smoothed_cov,
+        timestep=self.build_tensor(0))
+
+    smoothed_state = self.evaluate(
+        smooth_step(initial_backward_state,
+                    [filtered_mean,
+                     filtered_cov,
+                     predicted_mean,
+                     predicted_cov]))
+
+    expected_posterior_mean = [[1.824], [-3.252]]
+    expected_posterior_cov = [[1.30944, 0.45488],
+                              [0.45488, 2.35676]]
+
+    self.assertAllClose(smoothed_state.backward_mean,
+                        expected_posterior_mean)
+    self.assertAllClose(smoothed_state.backward_cov,
+                        expected_posterior_cov)
+    self.assertAllClose(smoothed_state.timestep,
+                        -1)
+
   def testLinearGaussianObservationScalarPath(self):
 
     # Construct observed data with a scalar observation.
@@ -634,9 +1093,10 @@ class _KalmanStepsTest(object):
          x_observed_tensor)
 
     # Ensure we take the scalar-optimized path when shape is static.
-    self.assertIsInstance(predictive_dist,
-                          (tfd.Independent if self.use_static_shape
-                           else tfd.MultivariateNormalTriL))
+    if self.use_static_shape or tf.executing_eagerly():
+      self.assertIsInstance(predictive_dist, tfd.Independent)
+    else:
+      self.assertIsInstance(predictive_dist, tfd.MultivariateNormalTriL)
     self.assertAllEqual(
         self.evaluate(predictive_dist.event_shape_tensor()), [1])
     self.assertAllEqual(
@@ -718,7 +1178,7 @@ class _KalmanStepsTest(object):
                         np.diag(self.observation_noise_scale_diag**2))
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class KalmanStepsTestStatic(tf.test.TestCase, _KalmanStepsTest):
 
   use_static_shape = True
@@ -727,10 +1187,10 @@ class KalmanStepsTestStatic(tf.test.TestCase, _KalmanStepsTest):
     return _KalmanStepsTest.setUp(self)
 
   def build_tensor(self, tensor):
-    return tf.convert_to_tensor(tensor)
+    return tf.convert_to_tensor(value=tensor)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class KalmanStepsTestDynamic(tf.test.TestCase, _KalmanStepsTest):
 
   use_static_shape = False
@@ -739,10 +1199,11 @@ class KalmanStepsTestDynamic(tf.test.TestCase, _KalmanStepsTest):
     return _KalmanStepsTest.setUp(self)
 
   def build_tensor(self, tensor):
-    return tf.placeholder_with_default(input=tf.convert_to_tensor(tensor),
-                                       shape=None)
+    return tf.compat.v1.placeholder_with_default(
+        input=tf.convert_to_tensor(value=tensor), shape=None)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class _AugmentSampleShapeTest(object):
 
   def testAugmentsShape(self):
@@ -785,7 +1246,7 @@ class _AugmentSampleShapeTest(object):
                                 validate_args=True))
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class AugmentSampleShapeTestStatic(tf.test.TestCase, _AugmentSampleShapeTest):
 
   def assertRaisesError(self, msg):
@@ -794,7 +1255,7 @@ class AugmentSampleShapeTestStatic(tf.test.TestCase, _AugmentSampleShapeTest):
   def build_inputs(self, full_batch_shape, partial_batch_shape):
 
     full_batch_shape = np.asarray(full_batch_shape, dtype=np.int32)
-    dist = tfd.Normal(tf.random_normal(partial_batch_shape), 1.)
+    dist = tfd.Normal(tf.random.normal(partial_batch_shape), 1.)
 
     return full_batch_shape, dist
 
@@ -802,21 +1263,22 @@ class AugmentSampleShapeTestStatic(tf.test.TestCase, _AugmentSampleShapeTest):
     return x
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class AugmentSampleShapeTestDynamic(tf.test.TestCase, _AugmentSampleShapeTest):
 
   def assertRaisesError(self, msg):
-    return self.assertRaisesOpError(msg)
+    if tf.executing_eagerly():
+      return self.assertRaisesRegexp(Exception, msg)
+    else:
+      return self.assertRaisesOpError(msg)
 
   def build_inputs(self, full_batch_shape, partial_batch_shape):
-    full_batch_shape = tf.placeholder_with_default(
-        input=np.asarray(full_batch_shape, dtype=np.int32),
-        shape=None)
+    full_batch_shape = tf.compat.v1.placeholder_with_default(
+        input=np.asarray(full_batch_shape, dtype=np.int32), shape=None)
 
-    partial_batch_shape = tf.placeholder_with_default(
-        input=np.asarray(partial_batch_shape, dtype=np.int32),
-        shape=None)
-    dist = tfd.Normal(tf.random_normal(partial_batch_shape), 1.)
+    partial_batch_shape = tf.compat.v1.placeholder_with_default(
+        input=np.asarray(partial_batch_shape, dtype=np.int32), shape=None)
+    dist = tfd.Normal(tf.random.normal(partial_batch_shape), 1.)
 
     return full_batch_shape, dist
 

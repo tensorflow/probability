@@ -31,24 +31,26 @@ from __future__ import print_function
 # pylint: disable=wildcard-import
 from tensorflow_probability.python.edward2.generated_random_variables import *
 from tensorflow_probability.python.edward2.generated_random_variables import as_random_variable
-from tensorflow_probability.python.edward2.generated_random_variables import rv_all
+from tensorflow_probability.python.edward2.generated_random_variables import rv_dict
 from tensorflow_probability.python.edward2.interceptor import get_next_interceptor
 from tensorflow_probability.python.edward2.interceptor import interceptable
 from tensorflow_probability.python.edward2.interceptor import interception
 from tensorflow_probability.python.edward2.interceptor import tape
 from tensorflow_probability.python.edward2.program_transformations import make_log_joint_fn
+from tensorflow_probability.python.edward2.program_transformations import make_value_setter
 from tensorflow_probability.python.edward2.random_variable import RandomVariable
 # pylint: enable=wildcard-import
 
 from tensorflow.python.util.all_util import remove_undocumented
 
-_allowed_symbols = rv_all + [
+_allowed_symbols = list(rv_dict.keys()) + [
     "RandomVariable",
     "as_random_variable",
     "interception",
     "get_next_interceptor",
     "interceptable",
     "make_log_joint_fn",
+    "make_value_setter",
     "tape",
 ]
 

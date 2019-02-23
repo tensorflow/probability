@@ -24,7 +24,7 @@ import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 class _ReshapeBijectorTest(object):
@@ -39,9 +39,6 @@ class _ReshapeBijectorTest(object):
   for either Python exceptions (in the case of static shapes) or
   TensorFlow op errors (dynamic shapes).
   """
-
-  def setUp(self):
-    self._rng = np.random.RandomState(42)
 
   def testBijector(self):
     """Do a basic sanity check of forward, inverse, jacobian."""
@@ -224,7 +221,7 @@ class _ReshapeBijectorTest(object):
     raise NotImplementedError("Subclass failed to implement `build_shapes`.")
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class ReshapeBijectorTestStatic(tf.test.TestCase, _ReshapeBijectorTest):
 
   def build_shapes(self, shape_in, shape_out):
@@ -325,16 +322,19 @@ class ReshapeBijectorTestDynamic(tf.test.TestCase, _ReshapeBijectorTest):
   def build_shapes(self, shape_in, shape_out):
     shape_in = np.array(shape_in, np.int32)
     shape_out = np.array(shape_out, np.int32)
-    return (tf.placeholder_with_default(shape_in, shape=[len(shape_in)]),
-            tf.placeholder_with_default(shape_out, shape=[len(shape_out)]))
+    return (tf.compat.v1.placeholder_with_default(
+        shape_in, shape=[len(shape_in)]),
+            tf.compat.v1.placeholder_with_default(
+                shape_out, shape=[len(shape_out)]))
 
   def assertRaisesError(self, msg):
+    if tf.executing_eagerly():
+      return self.assertRaisesRegexp(Exception, msg)
     return self.assertRaisesOpError(msg)
 
   def testEventShape(self):
     # Shape is always known for reshaping in eager mode, so we skip these tests.
-    if tf.executing_eagerly():
-      return
+    if tf.executing_eagerly(): return
 
     event_shape_in, event_shape_out = self.build_shapes([2, 3], [6])
     bijector = tfb.Reshape(
@@ -362,8 +362,7 @@ class ReshapeBijectorTestDynamic(tf.test.TestCase, _ReshapeBijectorTest):
     self._testInputOutputMismatchOpError("Input to reshape is a tensor with")
 
   def testMultipleUnspecifiedDimensionsOpError(self):
-    with self.assertRaisesError(
-        "elements must have at most one `-1`."):
+    with self.assertRaisesError("must have at most one `-1`."):
       shape_in, shape_out = self.build_shapes([2, 3], [4, -1, -1,])
       bijector = tfb.Reshape(
           event_shape_out=shape_out,
@@ -383,7 +382,8 @@ class ReshapeBijectorTestDynamic(tf.test.TestCase, _ReshapeBijectorTest):
       self.evaluate(bijector.forward_event_shape_tensor(shape_in))
 
   def testUnknownShapeRank(self):
-    unknown_shape = tf.placeholder_with_default([2, 2], shape=None)
+    if tf.executing_eagerly(): return
+    unknown_shape = tf.compat.v1.placeholder_with_default([2, 2], shape=None)
     known_shape = [2, 2]
 
     with self.assertRaisesRegexp(NotImplementedError,

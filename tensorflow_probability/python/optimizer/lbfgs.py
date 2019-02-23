@@ -33,6 +33,7 @@ import collections
 import tensorflow as tf
 
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.optimizer import bfgs_utils
 
 
@@ -191,18 +192,17 @@ def minimize(value_and_gradients_function,
 
   with tf.name_scope(name, 'minimize', [initial_position,
                                         tolerance]):
-    initial_position = tf.convert_to_tensor(initial_position,
-                                            name='initial_position')
+    initial_position = tf.convert_to_tensor(
+        value=initial_position, name='initial_position')
     dtype = initial_position.dtype.base_dtype
-    tolerance = tf.convert_to_tensor(tolerance, dtype=dtype,
-                                     name='grad_tolerance')
-    f_relative_tolerance = tf.convert_to_tensor(f_relative_tolerance,
-                                                dtype=dtype,
-                                                name='f_relative_tolerance')
-    x_tolerance = tf.convert_to_tensor(x_tolerance,
-                                       dtype=dtype,
-                                       name='x_tolerance')
-    max_iterations = tf.convert_to_tensor(max_iterations, name='max_iterations')
+    tolerance = tf.convert_to_tensor(
+        value=tolerance, dtype=dtype, name='grad_tolerance')
+    f_relative_tolerance = tf.convert_to_tensor(
+        value=f_relative_tolerance, dtype=dtype, name='f_relative_tolerance')
+    x_tolerance = tf.convert_to_tensor(
+        value=x_tolerance, dtype=dtype, name='x_tolerance')
+    max_iterations = tf.convert_to_tensor(
+        value=max_iterations, name='max_iterations')
 
     # The `state` here is a `LBfgsOptimizerResults` tuple with values for the
     # current state of the algorithm computation.
@@ -238,7 +238,7 @@ def minimize(value_and_gradients_function,
                                           gradient_delta))
 
       # If not failed or converged, update the Hessian estimate.
-      state_after_inv_hessian_update = tf.contrib.framework.smart_cond(
+      state_after_inv_hessian_update = prefer_static.cond(
           next_state.converged | next_state.failed,
           lambda: next_state,
           _update_inv_hessian)
@@ -248,8 +248,11 @@ def minimize(value_and_gradients_function,
                                        initial_position,
                                        num_correction_pairs,
                                        tolerance)
-    return tf.while_loop(_cond, _body, [initial_state],
-                         parallel_iterations=parallel_iterations)[0]
+    return tf.while_loop(
+        cond=_cond,
+        body=_body,
+        loop_vars=[initial_state],
+        parallel_iterations=parallel_iterations)[0]
 
 
 def _get_initial_state(value_and_gradients_function,
@@ -315,12 +318,13 @@ def _get_search_direction(state):
     gradient_deltas = state.gradient_deltas[-num_elements:]
 
     # Pre-compute all `inv_rho[i]`s.
-    inv_rhos = tf.reduce_sum(gradient_deltas * position_deltas, axis=1)
+    inv_rhos = tf.reduce_sum(
+        input_tensor=gradient_deltas * position_deltas, axis=1)
 
     def first_loop(acc, args):
       _, q_direction = acc
       position_delta, gradient_delta, inv_rho = args
-      alpha = tf.reduce_sum(position_delta * q_direction) / inv_rho
+      alpha = tf.reduce_sum(input_tensor=position_delta * q_direction) / inv_rho
       return (alpha, q_direction - alpha * gradient_delta)
 
     # Run first loop body computing and collecting `alpha[i]`s, while also
@@ -332,13 +336,13 @@ def _get_search_direction(state):
 
     # We use `H^0_k = gamma_k * I` as an estimate for the initial inverse
     # hessian for the k-th iteration; then `r_direction = H^0_k * q_direction`.
-    gamma_k = inv_rhos[-1] / tf.reduce_sum(
-        gradient_deltas[-1] * gradient_deltas[-1])
+    gamma_k = inv_rhos[-1] / tf.reduce_sum(input_tensor=gradient_deltas[-1] *
+                                           gradient_deltas[-1])
     r_direction = gamma_k * q_directions[0]
 
     def second_loop(r_direction, args):
       alpha, position_delta, gradient_delta, inv_rho = args
-      beta = tf.reduce_sum(gradient_delta * r_direction) / inv_rho
+      beta = tf.reduce_sum(input_tensor=gradient_delta * r_direction) / inv_rho
       return r_direction + (alpha - beta) * position_delta
 
     # Finally, run second loop body computing the updated `r_direction` at each
@@ -348,10 +352,9 @@ def _get_search_direction(state):
         initializer=r_direction)
     return -r_directions[-1]
 
-  return tf.contrib.framework.smart_cond(
-      tf.equal(num_elements, 0),
-      (lambda: -state.objective_gradient),
-      _two_loop_algorithm)
+  return prefer_static.cond(tf.equal(num_elements, 0),
+                            (lambda: -state.objective_gradient),
+                            _two_loop_algorithm)
 
 
 def _make_empty_stack_like(element, k):

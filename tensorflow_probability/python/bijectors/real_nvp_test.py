@@ -21,14 +21,18 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 import tensorflow as tf
+
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_util
-tfe = tf.contrib.eager
+from tensorflow_probability.python.internal import test_util as tfp_test_util
+
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
-class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
+@test_util.run_all_in_graph_and_eager_modes
+class RealNVPTest(
+    tfp_test_util.VectorDistributionTestHelpers,
+    tf.test.TestCase):
 
   @property
   def _real_nvp_kwargs(self):
@@ -79,7 +83,7 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
     fldj = nvp.forward_log_det_jacobian(x, event_ndims=1)
     # Use identity to invalidate cache.
     ildj = nvp.inverse_log_det_jacobian(tf.identity(forward_x), event_ndims=1)
-    self.evaluate(tf.global_variables_initializer())
+    self.evaluate(tf.compat.v1.global_variables_initializer())
     [
         forward_x_,
         inverse_y_,
@@ -110,7 +114,7 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
     fldj = nvp.forward_log_det_jacobian(x, event_ndims=1)
     # Use identity to invalidate cache.
     ildj = nvp.inverse_log_det_jacobian(tf.identity(forward_x), event_ndims=1)
-    self.evaluate(tf.global_variables_initializer())
+    self.evaluate(tf.compat.v1.global_variables_initializer())
     [
         forward_x_,
         inverse_y_,
@@ -135,19 +139,17 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
         np.float32).reshape((batch_size, 4 * 2))
 
     conditions = {
-        "a": tf.random_normal((batch_size, 4), dtype=tf.float32),
-        "b": tf.random_normal((batch_size, 2), dtype=tf.float32),
+        "a": tf.random.normal((batch_size, 4), dtype=tf.float32, seed=584),
+        "b": tf.random.normal((batch_size, 2), dtype=tf.float32, seed=9817),
     }
 
     def _condition_shift_and_log_scale_fn(x0, output_units, a, b):
       x = tf.concat((x0, a, b), axis=-1)
-      out = tf.layers.dense(
-          inputs=x,
-          units=2 * output_units)
+      out = tf.compat.v1.layers.dense(inputs=x, units=2 * output_units)
       shift, log_scale = tf.split(out, 2, axis=-1)
       return shift, log_scale
 
-    condition_shift_and_log_scale_fn = tf.make_template(
+    condition_shift_and_log_scale_fn = tf.compat.v1.make_template(
         "real_nvp_condition_template", _condition_shift_and_log_scale_fn)
 
     nvp = tfb.RealNVP(
@@ -166,7 +168,7 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
     # Use identity to invalidate cache.
     ildj = nvp.inverse_log_det_jacobian(
         tf.identity(forward_x), event_ndims=1, **conditions)
-    self.evaluate(tf.global_variables_initializer())
+    self.evaluate(tf.compat.v1.global_variables_initializer())
     [
         forward_x_,
         inverse_y_,
@@ -181,9 +183,9 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
         fldj,
     ])
     self.assertEqual("real_nvp", nvp.name)
-    self.assertAllClose(forward_x_, forward_inverse_y_, rtol=1e-6, atol=0.)
-    self.assertAllClose(x_, inverse_y_, rtol=1e-6, atol=0.)
-    self.assertAllClose(ildj_, -fldj_, rtol=1e-6, atol=0.)
+    self.assertAllClose(forward_x_, forward_inverse_y_, rtol=1e-5, atol=1e-5)
+    self.assertAllClose(x_, inverse_y_, rtol=1e-5, atol=1e-5)
+    self.assertAllClose(ildj_, -fldj_, rtol=1e-5, atol=1e-5)
 
   def testMutuallyConsistent(self):
     dims = 4
@@ -197,10 +199,11 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
     self.run_test_sample_consistent_log_prob(
         sess_run_fn=self.evaluate,
         dist=dist,
-        num_samples=int(2e5),
+        num_samples=int(1e6),
+        seed=54819,
         radius=1.,
         center=0.,
-        rtol=0.02)
+        rtol=0.1)
 
   def testInvertMutuallyConsistent(self):
     dims = 4
@@ -215,13 +218,14 @@ class RealNVPTest(test_util.VectorDistributionTestHelpers, tf.test.TestCase):
     self.run_test_sample_consistent_log_prob(
         sess_run_fn=self.evaluate,
         dist=dist,
-        num_samples=int(1e5),
+        num_samples=int(1e6),
+        seed=22197,
         radius=1.,
         center=0.,
-        rtol=0.02)
+        rtol=0.1)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class NICETest(RealNVPTest):
 
   @property
@@ -234,7 +238,7 @@ class NICETest(RealNVPTest):
     }
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class RealNVPConstantShiftScaleTest(RealNVPTest):
 
   @property

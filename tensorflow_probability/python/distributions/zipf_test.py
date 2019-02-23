@@ -24,10 +24,10 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class ZipfTest(test_case.TestCase):
 
   def assertBetween(self, x, minimum, maximum):
@@ -397,11 +397,11 @@ class ZipfTest(test_case.TestCase):
     power = 1.5
 
     zipf1 = tfd.Zipf(power=power, name="zipf1")
-    tf.set_random_seed(seed)
+    tf.compat.v1.set_random_seed(seed)
     samples1 = self.evaluate(zipf1.sample(n, seed=seed))
 
     zipf2 = tfd.Zipf(power=power, name="zipf2")
-    tf.set_random_seed(seed)
+    tf.compat.v1.set_random_seed(seed)
     samples2 = self.evaluate(zipf2.sample(n, seed=seed))
 
     self.assertAllEqual(samples1, samples2)

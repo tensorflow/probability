@@ -22,7 +22,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 tfl = tf.linalg
 
 
@@ -48,24 +48,33 @@ class VariationalInferenceTests(tf.test.TestCase):
 
     model = self._build_model(observed_time_series)
 
-    (variational_loss,
-     _) = tfp.sts.build_factored_variational_loss(
-         model=model,
-         observed_time_series=observed_time_series,
-         init_batch_shape=num_inits)
+    def build_variational_loss():
+      (variational_loss, _) = tfp.sts.build_factored_variational_loss(
+          model=model,
+          observed_time_series=observed_time_series,
+          init_batch_shape=num_inits)
+      return variational_loss
 
-    train_op = tf.train.AdamOptimizer(0.1).minimize(variational_loss)
-    with self.test_session() as sess:
-      sess.run(tf.global_variables_initializer())
-
+    # We provide graph- and eager-mode optimization for TF 2.0 compatibility.
+    optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=0.1)
+    if tf.executing_eagerly():
       for _ in range(5):  # don't actually run to completion
-        _, _ = sess.run((train_op, variational_loss))
-
+        optimizer.minimize(build_variational_loss)
       # Draw multiple samples to reduce Monte Carlo error in the optimized
       # variational bounds.
       avg_loss = np.mean(
-          [sess.run(variational_loss) for _ in range(25)], axis=0)
-      self.assertAllEqual(avg_loss.shape, [num_inits] + batch_shape)
+          [self.evaluate(build_variational_loss()) for _ in range(25)], axis=0)
+    else:
+      variational_loss = build_variational_loss()
+      train_op = optimizer.minimize(variational_loss)
+      self.evaluate(tf.compat.v1.global_variables_initializer())
+      for _ in range(5):  # don't actually run to completion
+        _ = self.evaluate(train_op)
+      # Draw multiple samples to reduce Monte Carlo error in the optimized
+      # variational bounds.
+      avg_loss = np.mean(
+          [self.evaluate(variational_loss) for _ in range(25)], axis=0)
+    self.assertAllEqual(avg_loss.shape, [num_inits] + batch_shape)
 
 
 class _HMCTests(object):
@@ -94,7 +103,7 @@ class _HMCTests(object):
         num_warmup_steps=2,
         num_variational_steps=2)
 
-    self.evaluate(tf.global_variables_initializer())
+    self.evaluate(tf.compat.v1.global_variables_initializer())
     samples_, kernel_results_ = self.evaluate((samples, kernel_results))
 
     acceptance_rate = np.mean(
@@ -128,7 +137,7 @@ class _HMCTests(object):
         num_warmup_steps=2,
         num_variational_steps=2)
 
-    self.evaluate(tf.global_variables_initializer())
+    self.evaluate(tf.compat.v1.global_variables_initializer())
     samples_, kernel_results_ = self.evaluate((samples, kernel_results))
 
     acceptance_rate = np.mean(
@@ -151,7 +160,7 @@ class _HMCTests(object):
     if self.use_static_shape:
       return tensor.shape.as_list()
     else:
-      return list(self.evaluate(tf.shape(tensor)))
+      return list(self.evaluate(tf.shape(input=tensor)))
 
   def _batch_shape_as_list(self, distribution):
     if self.use_static_shape:
@@ -178,11 +187,11 @@ class _HMCTests(object):
     """
 
     ndarray = np.asarray(ndarray).astype(self.dtype)
-    return tf.placeholder_with_default(
+    return tf.compat.v1.placeholder_with_default(
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class HMCTestsStatic32(tf.test.TestCase, parameterized.TestCase, _HMCTests):
   dtype = np.float32
   use_static_shape = True
@@ -210,7 +219,7 @@ class HMCTestsStatic32(tf.test.TestCase, parameterized.TestCase, _HMCTests):
         num_warmup_steps=1,
         num_variational_steps=1)
 
-    self.evaluate(tf.global_variables_initializer())
+    self.evaluate(tf.compat.v1.global_variables_initializer())
     for parameter, parameter_samples in zip(model.parameters, samples):
       self.assertAllEqual(self._shape_as_list(parameter_samples),
                           [num_results] +

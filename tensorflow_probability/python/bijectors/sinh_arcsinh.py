@@ -23,7 +23,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow.python.ops import control_flow_ops
+from tensorflow_probability.python.internal import distribution_util
 
 __all__ = [
     "SinhArcsinh",
@@ -108,13 +108,13 @@ class SinhArcsinh(bijector.Bijector):
     with self._name_scope("init", values=[skewness, tailweight]):
       tailweight = 1. if tailweight is None else tailweight
       skewness = 0. if skewness is None else skewness
-      self._skewness = tf.convert_to_tensor(skewness, name="skewness")
+      self._skewness = tf.convert_to_tensor(value=skewness, name="skewness")
       self._tailweight = tf.convert_to_tensor(
-          tailweight, name="tailweight", dtype=self._skewness.dtype)
-      tf.assert_same_float_dtype([self._skewness, self._tailweight])
+          value=tailweight, name="tailweight", dtype=self._skewness.dtype)
+      tf.debugging.assert_same_float_dtype([self._skewness, self._tailweight])
       if validate_args:
-        self._tailweight = control_flow_ops.with_dependencies([
-            tf.assert_positive(
+        self._tailweight = distribution_util.with_dependencies([
+            tf.compat.v1.assert_positive(
                 self._tailweight,
                 message="Argument tailweight was not positive")
         ], self._tailweight)
@@ -148,11 +148,11 @@ class SinhArcsinh(bijector.Bijector):
 
     # This is computed inside the log to avoid catastrophic cancellations
     # from cosh((arcsinh(y) / tailweight) - skewness) and sqrt(x**2 + 1).
-    return (tf.log(
+    return (tf.math.log(
         tf.cosh(tf.asinh(y) / self.tailweight - self.skewness)
         # TODO(srvasude): Consider using cosh(arcsinh(x)) in cases
         # where (arcsinh(x) / tailweight) - skewness ~= arcsinh(x).
-        / _sqrtx2p1(y)) - tf.log(self.tailweight))
+        / _sqrtx2p1(y)) - tf.math.log(self.tailweight))
 
   def _forward_log_det_jacobian(self, x):
     # y = sinh((arcsinh(x) + skewness) * tailweight)
@@ -162,8 +162,8 @@ class SinhArcsinh(bijector.Bijector):
 
     # This is computed inside the log to avoid catastrophic cancellations
     # from cosh((arcsinh(x) + skewness) * tailweight) and sqrt(x**2 + 1).
-    return (tf.log(
+    return (tf.math.log(
         tf.cosh((tf.asinh(x) + self.skewness) * self.tailweight)
         # TODO(srvasude): Consider using cosh(arcsinh(x)) in cases
         # where (arcsinh(x) + skewness) * tailweight ~= arcsinh(x).
-        / _sqrtx2p1(x)) + tf.log(self.tailweight))
+        / _sqrtx2p1(x)) + tf.math.log(self.tailweight))

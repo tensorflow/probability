@@ -24,20 +24,20 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class NormalTest(tf.test.TestCase):
 
   def testNormalConjugateKnownSigmaPosterior(self):
-    with tf.Session():
+    with tf.compat.v1.Session():
       mu0 = tf.constant([3.0])
       sigma0 = tf.constant([math.sqrt(10.0)])
       sigma = tf.constant([math.sqrt(2.0)])
       x = tf.constant([-2.5, 2.5, 4.0, 0.0, -1.0, 2.0])
-      s = tf.reduce_sum(x)
-      n = tf.size(x)
+      s = tf.reduce_sum(input_tensor=x)
+      n = tf.size(input=x)
       prior = tfd.Normal(loc=mu0, scale=sigma0)
       posterior = tfd.normal_conjugates_known_scale_posterior(
           prior=prior, scale=sigma, s=s, n=n)
@@ -48,15 +48,15 @@ class NormalTest(tf.test.TestCase):
       self.assertEqual(posterior_log_pdf.shape, (6,))
 
   def testNormalConjugateKnownSigmaPosteriorND(self):
-    with tf.Session():
+    with tf.compat.v1.Session():
       batch_size = 6
       mu0 = tf.constant([[3.0, -3.0]] * batch_size)
       sigma0 = tf.constant([[math.sqrt(10.0), math.sqrt(15.0)]] * batch_size)
       sigma = tf.constant([[math.sqrt(2.0)]] * batch_size)
       x = tf.transpose(
-          tf.constant([[-2.5, 2.5, 4.0, 0.0, -1.0, 2.0]], dtype=tf.float32))
-      s = tf.reduce_sum(x)
-      n = tf.size(x)
+          a=tf.constant([[-2.5, 2.5, 4.0, 0.0, -1.0, 2.0]], dtype=tf.float32))
+      s = tf.reduce_sum(input_tensor=x)
+      n = tf.size(input=x)
       prior = tfd.Normal(loc=mu0, scale=sigma0)
       posterior = tfd.normal_conjugates_known_scale_posterior(
           prior=prior, scale=sigma, s=s, n=n)
@@ -67,7 +67,7 @@ class NormalTest(tf.test.TestCase):
       self.assertEqual(posterior_log_pdf.shape, (6, 2))
 
   def testNormalConjugateKnownSigmaNDPosteriorND(self):
-    with tf.Session():
+    with tf.compat.v1.Session():
       batch_size = 6
       mu0 = tf.constant([[3.0, -3.0]] * batch_size)
       sigma0 = tf.constant([[math.sqrt(10.0), math.sqrt(15.0)]] * batch_size)
@@ -75,8 +75,8 @@ class NormalTest(tf.test.TestCase):
       x = tf.constant(
           [[-2.5, 2.5, 4.0, 0.0, -1.0, 2.0], [2.5, -2.5, -4.0, 0.0, 1.0, -2.0]],
           dtype=tf.float32)
-      s = tf.reduce_sum(x, reduction_indices=[1])
-      x = tf.transpose(x)  # Reshape to shape (6, 2)
+      s = tf.reduce_sum(input_tensor=x, axis=[1])
+      x = tf.transpose(a=x)  # Reshape to shape (6, 2)
       n = tf.constant([6] * 2)
       prior = tfd.Normal(loc=mu0, scale=sigma0)
       posterior = tfd.normal_conjugates_known_scale_posterior(
@@ -91,14 +91,14 @@ class NormalTest(tf.test.TestCase):
       self.assertEqual(self.evaluate(posterior_log_pdf).shape, (6, 2))
 
   def testNormalConjugateKnownSigmaPredictive(self):
-    with tf.Session():
+    with tf.compat.v1.Session():
       batch_size = 6
       mu0 = tf.constant([3.0] * batch_size)
       sigma0 = tf.constant([math.sqrt(10.0)] * batch_size)
       sigma = tf.constant([math.sqrt(2.0)] * batch_size)
       x = tf.constant([-2.5, 2.5, 4.0, 0.0, -1.0, 2.0])
-      s = tf.reduce_sum(x)
-      n = tf.size(x)
+      s = tf.reduce_sum(input_tensor=x)
+      n = tf.size(input=x)
       prior = tfd.Normal(loc=mu0, scale=sigma0)
       predictive = tfd.normal_conjugates_known_scale_predictive(
           prior=prior, scale=sigma, s=s, n=n)

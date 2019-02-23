@@ -19,6 +19,8 @@ from __future__ import division
 from __future__ import print_function
 
 import functools
+import weakref
+
 # Dependency imports
 import numpy as np
 
@@ -27,10 +29,10 @@ import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class BaseBijectorTest(tf.test.TestCase):
   """Tests properties of the Bijector base-class."""
 
@@ -101,7 +103,7 @@ class ForwardOnlyBijector(tfb.Bijector):
     return 2 * x
 
   def _forward_log_det_jacobian(self, _):
-    return tf.log(2.)
+    return tf.math.log(2.)
 
 
 class InverseOnlyBijector(tfb.Bijector):
@@ -117,7 +119,7 @@ class InverseOnlyBijector(tfb.Bijector):
     return y / 2.
 
   def _inverse_log_det_jacobian(self, _):
-    return -tf.log(2.)
+    return -tf.math.log(2.)
 
 
 class ExpOnlyJacobian(tfb.Bijector):
@@ -131,10 +133,10 @@ class ExpOnlyJacobian(tfb.Bijector):
         name="exp")
 
   def _inverse_log_det_jacobian(self, y):
-    return -tf.log(y)
+    return -tf.math.log(y)
 
   def _forward_log_det_jacobian(self, x):
-    return tf.log(x)
+    return tf.math.log(x)
 
 
 class ConstantJacobian(tfb.Bijector):
@@ -154,7 +156,7 @@ class ConstantJacobian(tfb.Bijector):
     return tf.constant(-2., x.dtype)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class BijectorTestEventNdims(tf.test.TestCase):
 
   def assertRaisesError(self, msg):
@@ -177,17 +179,17 @@ class BijectorTestEventNdims(tf.test.TestCase):
   def testBijectorDynamicEventNdims(self):
     with self.assertRaisesError("Expected scalar"):
       bij = ExpOnlyJacobian(validate_args=True)
-      event_ndims = tf.placeholder_with_default((1, 2), shape=None)
+      event_ndims = tf.compat.v1.placeholder_with_default((1, 2), shape=None)
       self.evaluate(
           bij.forward_log_det_jacobian(1., event_ndims=event_ndims))
     with self.assertRaisesError("Expected scalar"):
       bij = ExpOnlyJacobian(validate_args=True)
-      event_ndims = tf.placeholder_with_default((1, 2), shape=None)
+      event_ndims = tf.compat.v1.placeholder_with_default((1, 2), shape=None)
       self.evaluate(
           bij.inverse_log_det_jacobian(1., event_ndims=event_ndims))
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class BijectorCachingTest(tf.test.TestCase):
 
   def testCachingOfForwardResults(self):
@@ -204,6 +206,10 @@ class BijectorCachingTest(tf.test.TestCase):
     # Call forward and forward_log_det_jacobian one-by-one (not together).
     y = forward_only_bijector.forward(x)
     _ = forward_only_bijector.forward_log_det_jacobian(x, event_ndims=0)
+    if tf.executing_eagerly():
+      self.assertIsNot(y, forward_only_bijector.forward(x))
+    else:
+      self.assertIs(y, forward_only_bijector.forward(x))
 
     # Now, everything should be cached if the argument is y, so these are ok.
     forward_only_bijector.inverse(y)
@@ -223,13 +229,29 @@ class BijectorCachingTest(tf.test.TestCase):
     # Call inverse and inverse_log_det_jacobian one-by-one (not together).
     x = inverse_only_bijector.inverse(y)
     _ = inverse_only_bijector.inverse_log_det_jacobian(y, event_ndims=0)
+    if tf.executing_eagerly():
+      self.assertIsNot(x, inverse_only_bijector.inverse(y))
+    else:
+      self.assertIs(x, inverse_only_bijector.inverse(y))
 
     # Now, everything should be cached if the argument is x.
     inverse_only_bijector.forward(x)
     inverse_only_bijector.forward_log_det_jacobian(x, event_ndims=0)
 
+  def testCachingGarbageCollection(self):
+    bijector = ForwardOnlyBijector()
+    refs = []
+    niters = 3
+    for _ in range(niters):
+      y = bijector.forward(tf.zeros([10]))
+      refs.append(weakref.ref(y))
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+    # We tolerate leaking tensor references in graph mode only.
+    expected_live = 1 if tf.executing_eagerly() else niters
+    self.assertEqual(expected_live, sum(ref() is not None for ref in refs))
+
+
+@test_util.run_all_in_graph_and_eager_modes
 class BijectorReduceEventDimsTest(tf.test.TestCase):
   """Test reducing of event dims."""
 
@@ -293,8 +315,8 @@ class BijectorReduceEventDimsTest(tf.test.TestCase):
 
   def testHandlesNonStaticEventNdims(self):
     x_ = [[[1., 2.], [3., 4.]]]
-    x = tf.placeholder_with_default(x_, shape=None)
-    event_ndims = tf.placeholder_with_default(1, shape=None)
+    x = tf.compat.v1.placeholder_with_default(x_, shape=None)
+    event_ndims = tf.compat.v1.placeholder_with_default(1, shape=None)
     bij = ExpOnlyJacobian(forward_min_event_ndims=1)
     bij.inverse_log_det_jacobian(x, event_ndims=event_ndims)
     ildj = self.evaluate(
@@ -302,7 +324,7 @@ class BijectorReduceEventDimsTest(tf.test.TestCase):
     self.assertAllClose(-np.log(x_), ildj)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class BijectorCompositionTest(tf.test.TestCase):
 
   def testComposeFromChainBijector(self):
@@ -357,11 +379,12 @@ class BijectorCompositionTest(tf.test.TestCase):
 class BijectorLDJCachingTest(tf.test.TestCase):
 
   def testShapeCachingIssue(self):
+    if tf.executing_eagerly(): return
     # Exercise the scenario outlined in
     # https://github.com/tensorflow/probability/issues/253 (originally reported
     # internally as b/119756336).
-    x1 = tf.placeholder(tf.float32, shape=[None, 2], name="x1")
-    x2 = tf.placeholder(tf.float32, shape=[None, 2], name="x2")
+    x1 = tf.compat.v1.placeholder(tf.float32, shape=[None, 2], name="x1")
+    x2 = tf.compat.v1.placeholder(tf.float32, shape=[None, 2], name="x2")
 
     bij = ConstantJacobian()
 

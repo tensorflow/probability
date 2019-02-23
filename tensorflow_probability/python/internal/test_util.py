@@ -79,9 +79,9 @@ class DiscreteScalarDistributionTestHelpers(object):
     y = dist.sample(num_samples, seed=seed)
     y = tf.reshape(y, shape=[num_samples, -1])
     if batch_size is None:
-      batch_size = tf.reduce_prod(dist.batch_shape_tensor())
-    batch_dims = tf.shape(dist.batch_shape_tensor())[0]
-    edges_expanded_shape = 1 + tf.pad([-2], paddings=[[0, batch_dims]])
+      batch_size = tf.reduce_prod(input_tensor=dist.batch_shape_tensor())
+    batch_dims = tf.shape(input=dist.batch_shape_tensor())[0]
+    edges_expanded_shape = 1 + tf.pad(tensor=[-2], paddings=[[0, batch_dims]])
     for b, x in enumerate(tf.unstack(y, num=batch_size, axis=1)):
       counts, edges = self.histogram(x)
       edges = tf.reshape(edges, edges_expanded_shape)
@@ -120,9 +120,10 @@ class DiscreteScalarDistributionTestHelpers(object):
       atol: Python `float`-type indicating the admissible absolute error between
         analytical and sample statistics.
     """
-    x = tf.to_float(dist.sample(num_samples, seed=seed))
-    sample_mean = tf.reduce_mean(x, axis=0)
-    sample_variance = tf.reduce_mean(tf.square(x - sample_mean), axis=0)
+    x = tf.cast(dist.sample(num_samples, seed=seed), dtype=tf.float32)
+    sample_mean = tf.reduce_mean(input_tensor=x, axis=0)
+    sample_variance = tf.reduce_mean(
+        input_tensor=tf.square(x - sample_mean), axis=0)
     sample_stddev = tf.sqrt(sample_variance)
 
     [
@@ -167,14 +168,16 @@ class DiscreteScalarDistributionTestHelpers(object):
       edges: 1D `Tensor` characterizing intervals used for counting.
     """
     with tf.name_scope(name, "histogram", [x]):
-      x = tf.convert_to_tensor(x, name="x")
+      x = tf.convert_to_tensor(value=x, name="x")
       if value_range is None:
-        value_range = [tf.reduce_min(x), 1 + tf.reduce_max(x)]
-      value_range = tf.convert_to_tensor(value_range, name="value_range")
+        value_range = [
+            tf.reduce_min(input_tensor=x), 1 + tf.reduce_max(input_tensor=x)
+        ]
+      value_range = tf.convert_to_tensor(value=value_range, name="value_range")
       lo = value_range[0]
       hi = value_range[1]
       if nbins is None:
-        nbins = tf.to_int32(hi - lo)
+        nbins = tf.cast(hi - lo, dtype=tf.int32)
       delta = (hi - lo) / tf.cast(nbins, dtype=value_range.dtype.base_dtype)
       edges = tf.range(
           start=lo, limit=hi, delta=delta, dtype=x.dtype.base_dtype)
@@ -270,8 +273,8 @@ class VectorDistributionTestHelpers(object):
       # a required dependency of core.
       radius = np.asarray(radius)
       dims = tf.cast(dims, dtype=radius.dtype)
-      return tf.exp((dims / 2.) * np.log(np.pi) - tf.lgamma(1. + dims / 2.) +
-                    dims * tf.log(radius))
+      return tf.exp((dims / 2.) * np.log(np.pi) -
+                    tf.math.lgamma(1. + dims / 2.) + dims * tf.math.log(radius))
 
     def monte_carlo_hypersphere_volume(dist, num_samples, radius, center):
       # https://en.wikipedia.org/wiki/Importance_sampling
@@ -279,10 +282,9 @@ class VectorDistributionTestHelpers(object):
       x = tf.identity(x)  # Invalidate bijector cacheing.
       inverse_log_prob = tf.exp(-dist.log_prob(x))
       importance_weights = tf.where(
-          tf.norm(x - center, axis=-1) <= radius,
-          inverse_log_prob,
+          tf.norm(tensor=x - center, axis=-1) <= radius, inverse_log_prob,
           tf.zeros_like(inverse_log_prob))
-      return tf.reduce_mean(importance_weights, axis=0)
+      return tf.reduce_mean(input_tensor=importance_weights, axis=0)
 
     # Build graph.
     with tf.name_scope(
@@ -297,7 +299,7 @@ class VectorDistributionTestHelpers(object):
           num_samples=num_samples,
           radius=radius,
           center=center)
-      init_op = tf.global_variables_initializer()
+      init_op = tf.compat.v1.global_variables_initializer()
 
     # Execute graph.
     sess_run_fn(init_op)
@@ -346,10 +348,10 @@ class VectorDistributionTestHelpers(object):
     """
 
     x = dist.sample(num_samples, seed=seed)
-    sample_mean = tf.reduce_mean(x, axis=0)
+    sample_mean = tf.reduce_mean(input_tensor=x, axis=0)
     sample_covariance = tf.reduce_mean(
-        _vec_outer_square(x - sample_mean), axis=0)
-    sample_variance = tf.matrix_diag_part(sample_covariance)
+        input_tensor=_vec_outer_square(x - sample_mean), axis=0)
+    sample_variance = tf.linalg.diag_part(sample_covariance)
     sample_stddev = tf.sqrt(sample_variance)
 
     [

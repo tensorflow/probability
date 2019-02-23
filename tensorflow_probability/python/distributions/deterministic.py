@@ -26,10 +26,9 @@ import tensorflow as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.framework import tensor_shape
-from tensorflow.python.ops import control_flow_ops
 
 __all__ = [
     "Deterministic",
@@ -88,15 +87,15 @@ class _BaseDeterministic(distribution.Distribution):
     with tf.name_scope(name, values=[loc, atol, rtol]) as name:
       dtype = dtype_util.common_dtype([loc, atol, rtol],
                                       preferred_dtype=tf.float32)
-      loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
+      loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
       if is_vector and validate_args:
         msg = "Argument loc must be at least rank 1."
         if loc.shape.ndims is not None:
           if loc.shape.ndims < 1:
             raise ValueError(msg)
         else:
-          loc = control_flow_ops.with_dependencies(
-              [tf.assert_rank_at_least(loc, 1, message=msg)], loc)
+          loc = distribution_util.with_dependencies(
+              [tf.compat.v1.assert_rank_at_least(loc, 1, message=msg)], loc)
       self._loc = loc
 
       super(_BaseDeterministic, self).__init__(
@@ -118,12 +117,12 @@ class _BaseDeterministic(distribution.Distribution):
 
   def _get_tol(self, tol):
     if tol is None:
-      return tf.convert_to_tensor(0, dtype=self.loc.dtype)
+      return tf.convert_to_tensor(value=0, dtype=self.loc.dtype)
 
-    tol = tf.convert_to_tensor(tol, dtype=self.loc.dtype)
+    tol = tf.convert_to_tensor(value=tol, dtype=self.loc.dtype)
     if self.validate_args:
-      tol = control_flow_ops.with_dependencies([
-          tf.assert_non_negative(
+      tol = distribution_util.with_dependencies([
+          tf.compat.v1.assert_non_negative(
               tol, message="Argument 'tol' must be non-negative")
       ], tol)
     return tol
@@ -156,12 +155,12 @@ class _BaseDeterministic(distribution.Distribution):
     return self.mean()
 
   def _sample_n(self, n, seed=None):  # pylint: disable=unused-arg
-    n_static = tf.contrib.util.constant_value(tf.convert_to_tensor(n))
+    n_static = tf.get_static_value(tf.convert_to_tensor(value=n))
     if n_static is not None and self.loc.shape.ndims is not None:
       ones = [1] * self.loc.shape.ndims
       multiples = [n_static] + ones
     else:
-      ones = tf.ones_like(tf.shape(self.loc))
+      ones = tf.ones_like(tf.shape(input=self.loc))
       multiples = tf.concat(([n], ones), axis=0)
 
     return tf.tile(self.loc[tf.newaxis, ...], multiples=multiples)
@@ -252,7 +251,7 @@ class Deterministic(_BaseDeterministic):
         name=name)
 
   def _batch_shape_tensor(self):
-    return tf.shape(self.loc)
+    return tf.shape(input=self.loc)
 
   def _batch_shape(self):
     return self.loc.shape
@@ -261,7 +260,7 @@ class Deterministic(_BaseDeterministic):
     return tf.constant([], dtype=tf.int32)
 
   def _event_shape(self):
-    return tensor_shape.scalar()
+    return tf.TensorShape([])
 
   def _prob(self, x):
     return tf.cast(tf.abs(x - self.loc) <= self._slack, dtype=self.dtype)
@@ -360,36 +359,38 @@ class VectorDeterministic(_BaseDeterministic):
         name=name)
 
   def _batch_shape_tensor(self):
-    return tf.shape(self.loc)[:-1]
+    return tf.shape(input=self.loc)[:-1]
 
   def _batch_shape(self):
     return self.loc.shape[:-1]
 
   def _event_shape_tensor(self):
-    return tf.shape(self.loc)[-1:]
+    return tf.shape(input=self.loc)[-1:]
 
   def _event_shape(self):
     return self.loc.shape[-1:]
 
   def _prob(self, x):
     if self.validate_args:
-      is_vector_check = tf.assert_rank_at_least(x, 1)
-      right_vec_space_check = tf.assert_equal(
+      is_vector_check = tf.compat.v1.assert_rank_at_least(x, 1)
+      right_vec_space_check = tf.compat.v1.assert_equal(
           self.event_shape_tensor(),
-          tf.gather(tf.shape(x),
+          tf.gather(tf.shape(input=x),
                     tf.rank(x) - 1),
-          message=
-          "Argument 'x' not defined in the same space R^k as this distribution")
+          message="Argument 'x' not defined in the same space R^k as this distribution"
+      )
       with tf.control_dependencies([is_vector_check]):
         with tf.control_dependencies([right_vec_space_check]):
           x = tf.identity(x)
     return tf.cast(
-        tf.reduce_all(tf.abs(x - self.loc) <= self._slack, axis=-1),
+        tf.reduce_all(
+            input_tensor=tf.abs(x - self.loc) <= self._slack, axis=-1),
         dtype=self.dtype)
 
 
 # TODO(b/117098119): Remove tf.distribution references once they're gone.
-@kullback_leibler.RegisterKL(_BaseDeterministic, tf.distributions.Distribution)
+@kullback_leibler.RegisterKL(_BaseDeterministic,
+                             tf.compat.v1.distributions.Distribution)
 @kullback_leibler.RegisterKL(_BaseDeterministic, distribution.Distribution)
 def _kl_deterministic_distribution(a, b, name=None):
   """Calculate the batched KL divergence `KL(a || b)` with `a` Deterministic.

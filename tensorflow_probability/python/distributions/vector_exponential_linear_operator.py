@@ -182,7 +182,7 @@ class VectorExponentialLinearOperator(
       # Since expand_dims doesn't preserve constant-ness, we obtain the
       # non-dynamic value if possible.
       loc = loc if loc is None else tf.convert_to_tensor(
-          loc, name="loc", dtype=scale.dtype)
+          value=loc, name="loc", dtype=scale.dtype)
       batch_shape, event_shape = distribution_util.shapes_from_loc_and_scale(
           loc, scale)
 
@@ -238,7 +238,7 @@ class VectorExponentialLinearOperator(
     # and then since Cov(wi, wj) = 1 if i=j, and 0 otherwise,
     #   Cov(X) = L Cov(W W^T) L^T = L L^T.
     if distribution_util.is_diagonal_scale(self.scale):
-      return tf.matrix_diag(tf.square(self.scale.diag_part()))
+      return tf.linalg.diag(tf.square(self.scale.diag_part()))
     else:
       return self.scale.matmul(self.scale.to_dense(), adjoint_arg=True)
 
@@ -247,9 +247,9 @@ class VectorExponentialLinearOperator(
       return tf.square(self.scale.diag_part())
     elif (isinstance(self.scale, tf.linalg.LinearOperatorLowRankUpdate) and
           self.scale.is_self_adjoint):
-      return tf.matrix_diag_part(self.scale.matmul(self.scale.to_dense()))
+      return tf.linalg.diag_part(self.scale.matmul(self.scale.to_dense()))
     else:
-      return tf.matrix_diag_part(
+      return tf.linalg.diag_part(
           self.scale.matmul(self.scale.to_dense(), adjoint_arg=True))
 
   def _stddev(self):
@@ -258,10 +258,10 @@ class VectorExponentialLinearOperator(
     elif (isinstance(self.scale, tf.linalg.LinearOperatorLowRankUpdate) and
           self.scale.is_self_adjoint):
       return tf.sqrt(
-          tf.matrix_diag_part(self.scale.matmul(self.scale.to_dense())))
+          tf.linalg.diag_part(self.scale.matmul(self.scale.to_dense())))
     else:
       return tf.sqrt(
-          tf.matrix_diag_part(
+          tf.linalg.diag_part(
               self.scale.matmul(self.scale.to_dense(), adjoint_arg=True)))
 
   def _mode(self):

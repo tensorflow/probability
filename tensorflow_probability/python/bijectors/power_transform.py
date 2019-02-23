@@ -20,7 +20,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow.python.ops import control_flow_ops
+from tensorflow_probability.python.internal import distribution_util
 
 
 __all__ = [
@@ -58,8 +58,8 @@ class PowerTransform(bijector.Bijector):
     self._name = name
     self._validate_args = validate_args
     with self._name_scope("init", values=[power]):
-      power = tf.contrib.util.constant_value(
-          tf.convert_to_tensor(power, name="power"))
+      power = tf.get_static_value(
+          tf.convert_to_tensor(value=power, name="power"))
     if power is None or power < 0:
       raise ValueError("`power` must be a non-negative TF constant.")
     self._power = power
@@ -79,38 +79,38 @@ class PowerTransform(bijector.Bijector):
       return tf.exp(x)
     # If large x accuracy is an issue, consider using:
     # (1. + x * self.power)**(1. / self.power) when x >> 1.
-    return tf.exp(tf.log1p(x * self.power) / self.power)
+    return tf.exp(tf.math.log1p(x * self.power) / self.power)
 
   def _inverse(self, y):
     y = self._maybe_assert_valid_y(y)
     if self.power == 0.:
-      return tf.log(y)
+      return tf.math.log(y)
     # If large y accuracy is an issue, consider using:
     # (y**self.power - 1.) / self.power when y >> 1.
-    return tf.math.expm1(tf.log(y) * self.power) / self.power
+    return tf.math.expm1(tf.math.log(y) * self.power) / self.power
 
   def _inverse_log_det_jacobian(self, y):
     y = self._maybe_assert_valid_y(y)
-    return (self.power - 1.) * tf.log(y)
+    return (self.power - 1.) * tf.math.log(y)
 
   def _forward_log_det_jacobian(self, x):
     x = self._maybe_assert_valid_x(x)
     if self.power == 0.:
       return x
-    return (1. / self.power - 1.) * tf.log1p(x * self.power)
+    return (1. / self.power - 1.) * tf.math.log1p(x * self.power)
 
   def _maybe_assert_valid_x(self, x):
     if not self.validate_args or self.power == 0.:
       return x
-    is_valid = tf.assert_non_negative(
+    is_valid = tf.compat.v1.assert_non_negative(
         1. + self.power * x,
         message="Forward transformation input must be at least {}.".format(
             -1. / self.power))
-    return control_flow_ops.with_dependencies([is_valid], x)
+    return distribution_util.with_dependencies([is_valid], x)
 
   def _maybe_assert_valid_y(self, y):
     if not self.validate_args:
       return y
-    is_valid = tf.assert_positive(
+    is_valid = tf.compat.v1.assert_positive(
         y, message="Inverse transformation input must be greater than 0.")
-    return control_flow_ops.with_dependencies([is_valid], y)
+    return distribution_util.with_dependencies([is_valid], y)

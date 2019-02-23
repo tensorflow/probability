@@ -151,7 +151,7 @@ def _effective_sample_size_single_state(states, filter_beyond_lag,
       'effective_sample_size_single_state',
       values=[states, filter_beyond_lag, filter_threshold]):
 
-    states = tf.convert_to_tensor(states, name='states')
+    states = tf.convert_to_tensor(value=states, name='states')
     dt = states.dtype
 
     # filter_beyond_lag == None ==> auto_corr is the full sequence.
@@ -159,7 +159,7 @@ def _effective_sample_size_single_state(states, filter_beyond_lag,
         states, axis=0, max_lags=filter_beyond_lag)
     if filter_threshold is not None:
       filter_threshold = tf.convert_to_tensor(
-          filter_threshold, dtype=dt, name='filter_threshold')
+          value=filter_threshold, dtype=dt, name='filter_threshold')
       # Get a binary mask to zero out values of auto_corr below the threshold.
       #   mask[i, ...] = 1 if auto_corr[j, ...] > threshold for all j <= i,
       #   mask[i, ...] = 0, otherwise.
@@ -196,7 +196,8 @@ def _effective_sample_size_single_state(states, filter_beyond_lag,
           axis=0)
     nk_factor = tf.reshape(nk_factor, new_shape)
 
-    return n / (-1 + 2 * tf.reduce_sum(nk_factor * auto_corr, axis=0))
+    return n / (-1 +
+                2 * tf.reduce_sum(input_tensor=nk_factor * auto_corr, axis=0))
 
 
 def potential_scale_reduction(chains_states,
@@ -308,11 +309,11 @@ def potential_scale_reduction(chains_states,
   if not chains_states_was_list:
     chains_states = [chains_states]
 
-  # tf.contrib.util.constant_value returns None iff a constant value (as a numpy
+  # tf.get_static_value returns None iff a constant value (as a numpy
   # array) is not efficiently computable.  Therefore, we try constant_value then
   # check for None.
-  icn_const_ = tf.contrib.util.constant_value(
-      tf.convert_to_tensor(independent_chain_ndims))
+  icn_const_ = tf.get_static_value(
+      tf.convert_to_tensor(value=independent_chain_ndims))
   if icn_const_ is not None:
     independent_chain_ndims = icn_const_
     if icn_const_ < 1:
@@ -338,7 +339,7 @@ def _potential_scale_reduction_single_state(state, independent_chain_ndims):
       values=[state, independent_chain_ndims]):
     # We assume exactly one leading dimension indexes e.g. correlated samples
     # from each Markov chain.
-    state = tf.convert_to_tensor(state, name='state')
+    state = tf.convert_to_tensor(value=state, name='state')
     sample_ndims = 1
 
     sample_axis = tf.range(0, sample_ndims)
@@ -354,12 +355,13 @@ def _potential_scale_reduction_single_state(state, independent_chain_ndims):
     # B / n is the between chain variance, the variance of the chain means.
     # W is the within sequence variance, the mean of the chain variances.
     b_div_n = _reduce_variance(
-        tf.reduce_mean(state, sample_axis, keepdims=True),
+        tf.reduce_mean(input_tensor=state, axis=sample_axis, keepdims=True),
         sample_and_chain_axis,
         biased=False)
     w = tf.reduce_mean(
-        _reduce_variance(state, sample_axis, keepdims=True, biased=True),
-        sample_and_chain_axis)
+        input_tensor=_reduce_variance(
+            state, sample_axis, keepdims=True, biased=True),
+        axis=sample_and_chain_axis)
 
     # sigma^2_+ is an estimate of the true variance, which would be unbiased if
     # each chain was drawn from the target.  c.f. "law of total variance."
@@ -371,10 +373,12 @@ def _potential_scale_reduction_single_state(state, independent_chain_ndims):
 # TODO(b/72873233) Move some variant of this to tfd.sample_stats.
 def _reduce_variance(x, axis=None, biased=True, keepdims=False):
   with tf.name_scope('reduce_variance'):
-    x = tf.convert_to_tensor(x, name='x')
-    mean = tf.reduce_mean(x, axis=axis, keepdims=True)
+    x = tf.convert_to_tensor(value=x, name='x')
+    mean = tf.reduce_mean(input_tensor=x, axis=axis, keepdims=True)
     biased_var = tf.reduce_mean(
-        tf.squared_difference(x, mean), axis=axis, keepdims=keepdims)
+        input_tensor=tf.math.squared_difference(x, mean),
+        axis=axis,
+        keepdims=keepdims)
     if biased:
       return biased_var
     n = _axis_size(x, axis)
@@ -384,9 +388,9 @@ def _reduce_variance(x, axis=None, biased=True, keepdims=False):
 def _axis_size(x, axis=None):
   """Get number of elements of `x` in `axis`, as type `x.dtype`."""
   if axis is None:
-    return tf.cast(tf.size(x), x.dtype)
+    return tf.cast(tf.size(input=x), x.dtype)
   return tf.cast(
-      tf.reduce_prod(tf.gather(tf.shape(x), axis)), x.dtype)
+      tf.reduce_prod(input_tensor=tf.gather(tf.shape(input=x), axis)), x.dtype)
 
 
 def _is_list_like(x):

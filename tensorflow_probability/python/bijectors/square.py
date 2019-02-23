@@ -23,7 +23,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow.python.ops import control_flow_ops
+from tensorflow_probability.python.internal import distribution_util
 
 
 __all__ = [
@@ -73,11 +73,11 @@ class Square(bijector.Bijector):
 
   def _forward_log_det_jacobian(self, x):
     x = self._maybe_assert_valid(x)
-    return np.log(2.) + tf.log(x)
+    return np.log(2.) + tf.math.log(x)
 
   def _maybe_assert_valid(self, t):
     if not self.validate_args:
       return t
-    is_valid = tf.assert_non_negative(
+    is_valid = tf.compat.v1.assert_non_negative(
         t, message="All elements must be non-negative.")
-    return control_flow_ops.with_dependencies([is_valid], t)
+    return distribution_util.with_dependencies([is_valid], t)

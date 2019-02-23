@@ -45,7 +45,7 @@ class Independent(distribution_lib.Distribution):
   E]`-shaped events. It operates by reinterpreting the rightmost batch dims as
   part of the event dimensions. The `reinterpreted_batch_ndims` parameter
   controls the number of batch dims which are absorbed as event dims;
-  `reinterpreted_batch_ndims < len(batch_shape)`.  For example, the `log_prob`
+  `reinterpreted_batch_ndims <= len(batch_shape)`.  For example, the `log_prob`
   function entails a `reduce_sum` over the rightmost `reinterpreted_batch_ndims`
   after calling the base distribution's `log_prob`.  In other words, since the
   batch dimension(s) index independent distributions, the resultant multivariate
@@ -119,11 +119,11 @@ class Independent(distribution_lib.Distribution):
         reinterpreted_batch_ndims = self._get_default_reinterpreted_batch_ndims(
             distribution)
       reinterpreted_batch_ndims = tf.convert_to_tensor(
-          reinterpreted_batch_ndims,
+          value=reinterpreted_batch_ndims,
           dtype=tf.int32,
           name="reinterpreted_batch_ndims")
       self._reinterpreted_batch_ndims = reinterpreted_batch_ndims
-      self._static_reinterpreted_batch_ndims = tf.contrib.util.constant_value(
+      self._static_reinterpreted_batch_ndims = tf.get_static_value(
           reinterpreted_batch_ndims)
       if self._static_reinterpreted_batch_ndims is not None:
         self._reinterpreted_batch_ndims = self._static_reinterpreted_batch_ndims
@@ -151,10 +151,9 @@ class Independent(distribution_lib.Distribution):
   def _batch_shape_tensor(self):
     with tf.control_dependencies(self._runtime_assertions):
       batch_shape = self.distribution.batch_shape_tensor()
-      batch_ndims = (
-          batch_shape.shape[0].value
-          if batch_shape.shape.with_rank_at_least(1)[0].value else
-          tf.shape(batch_shape)[0])
+      batch_ndims = tf.compat.dimension_value(batch_shape.shape[0])
+      if batch_ndims is None:
+        batch_ndims = tf.shape(input=batch_shape)[0]
       return batch_shape[:batch_ndims - self.reinterpreted_batch_ndims]
 
   def _batch_shape(self):
@@ -169,9 +168,10 @@ class Independent(distribution_lib.Distribution):
     with tf.control_dependencies(self._runtime_assertions):
       batch_shape = self.distribution.batch_shape_tensor()
       batch_ndims = (
-          batch_shape.shape[0].value
-          if batch_shape.shape.with_rank_at_least(1)[0].value else
-          tf.shape(batch_shape)[0])
+          tf.compat.dimension_value(batch_shape.shape[0])  # pylint: disable=g-long-ternary
+          if tf.compat.dimension_value(
+              batch_shape.shape.with_rank_at_least(1)[0]) else tf.shape(
+                  input=batch_shape)[0])
       return tf.concat(
           [
               batch_shape[batch_ndims - self.reinterpreted_batch_ndims:],
@@ -227,7 +227,7 @@ class Independent(distribution_lib.Distribution):
   def _make_runtime_assertions(
       self, distribution, reinterpreted_batch_ndims, validate_args):
     assertions = []
-    static_reinterpreted_batch_ndims = tf.contrib.util.constant_value(
+    static_reinterpreted_batch_ndims = tf.get_static_value(
         reinterpreted_batch_ndims)
     batch_ndims = distribution.batch_shape.ndims
     if batch_ndims is not None and static_reinterpreted_batch_ndims is not None:
@@ -238,11 +238,12 @@ class Independent(distribution_lib.Distribution):
     elif validate_args:
       batch_shape = distribution.batch_shape_tensor()
       batch_ndims = (
-          batch_shape.shape[0].value
-          if batch_shape.shape.with_rank_at_least(1)[0].value is not None else
-          tf.shape(batch_shape)[0])
+          tf.compat.dimension_value(batch_shape.shape[0])  # pylint: disable=g-long-ternary
+          if (tf.compat.dimension_value(
+              batch_shape.shape.with_rank_at_least(1)[0]) is not None) else
+          tf.shape(input=batch_shape)[0])
       assertions.append(
-          tf.assert_less_equal(
+          tf.compat.v1.assert_less_equal(
               reinterpreted_batch_ndims,
               batch_ndims,
               message=("reinterpreted_batch_ndims cannot exceed "
@@ -261,7 +262,7 @@ class Independent(distribution_lib.Distribution):
     ndims = distribution.batch_shape.ndims
     if ndims is None:
       which_maximum = tf.maximum
-      ndims = tf.shape(distribution.batch_shape_tensor())[0]
+      ndims = tf.shape(input=distribution.batch_shape_tensor())[0]
     else:
       which_maximum = np.maximum
     return which_maximum(0, ndims - 1)
@@ -303,20 +304,25 @@ def _kl_independent(a, b, name="kl_independent"):
         reduce_dims = [-i - 1 for i in range(0, num_reduce_dims)]
 
         return tf.reduce_sum(
-            kullback_leibler.kl_divergence(p, q, name=name), axis=reduce_dims)
+            input_tensor=kullback_leibler.kl_divergence(p, q, name=name),
+            axis=reduce_dims)
       else:
         raise NotImplementedError("KL between Independents with different "
                                   "event shapes not supported.")
     else:
       raise ValueError("Event shapes do not match.")
   else:
-    with tf.control_dependencies([
-        tf.assert_equal(a.event_shape_tensor(), b.event_shape_tensor()),
-        tf.assert_equal(p.event_shape_tensor(), q.event_shape_tensor())
-    ]):
+    with tf.control_dependencies(
+        [
+            tf.compat.v1.assert_equal(a.event_shape_tensor(),
+                                      b.event_shape_tensor()),
+            tf.compat.v1.assert_equal(p.event_shape_tensor(),
+                                      q.event_shape_tensor())
+        ]):
       num_reduce_dims = (
-          tf.shape(a.event_shape_tensor()[0]) - tf.shape(
-              p.event_shape_tensor()[0]))
+          tf.shape(input=a.event_shape_tensor()[0]) -
+          tf.shape(input=p.event_shape_tensor()[0]))
       reduce_dims = tf.range(-num_reduce_dims - 1, -1, 1)
       return tf.reduce_sum(
-          kullback_leibler.kl_divergence(p, q, name=name), axis=reduce_dims)
+          input_tensor=kullback_leibler.kl_divergence(p, q, name=name),
+          axis=reduce_dims)

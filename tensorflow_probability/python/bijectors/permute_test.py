@@ -24,10 +24,10 @@ import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class PermuteBijectorTest(tf.test.TestCase):
   """Tests correctness of the Permute bijector."""
 
@@ -42,7 +42,7 @@ class PermuteBijectorTest(tf.test.TestCase):
     expected_x = np.random.randn(4, 2, 3)
     expected_y = expected_x[..., expected_permutation]
 
-    permutation_ph = tf.placeholder_with_default(
+    permutation_ph = tf.compat.v1.placeholder_with_default(
         expected_permutation, shape=None)
     bijector = tfb.Permute(permutation=permutation_ph, validate_args=True)
     [
@@ -67,7 +67,7 @@ class PermuteBijectorTest(tf.test.TestCase):
 
   def testRaisesOpError(self):
     with self.assertRaisesError("Permutation over `d` must contain"):
-      permutation = tf.placeholder_with_default([1, 2], shape=None)
+      permutation = tf.compat.v1.placeholder_with_default([1, 2], shape=None)
       bijector = tfb.Permute(permutation=permutation, validate_args=True)
       self.evaluate(bijector.inverse([1.]))
 

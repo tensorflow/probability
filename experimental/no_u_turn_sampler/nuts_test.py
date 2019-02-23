@@ -38,7 +38,6 @@ from tensorflow_probability.opensource.experimental import no_u_turn_sampler
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
-tfe = tf.contrib.eager
 
 flags.DEFINE_string("model_dir",
                     default=os.path.join(os.getenv("TEST_TMPDIR", "/tmp"),
@@ -73,7 +72,7 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
 
   def setUp(self):
     super(NutsTest, self).setUp()
-    tf.gfile.MakeDirs(FLAGS.model_dir)
+    tf.io.gfile.makedirs(FLAGS.model_dir)
 
   def testOneStepFromOrigin(self):
     def target_log_prob_fn(event):
@@ -97,13 +96,13 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
     def target_log_prob_fn(event):
       return tfd.Normal(loc=0., scale=1.).log_prob(event)
 
-    tf.set_random_seed(4)
+    tf.compat.v1.set_random_seed(4)
     xs = no_u_turn_sampler.kernel(
         target_log_prob_fn=target_log_prob_fn,
         current_state=[0.],
         step_size=[0.3],
         seed=3)
-    tf.set_random_seed(4)
+    tf.compat.v1.set_random_seed(4)
     ys = no_u_turn_sampler.kernel(
         target_log_prob_fn=target_log_prob_fn,
         current_state=[0.],
@@ -118,7 +117,7 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
 
     rng = np.random.RandomState(seed=7)
     states = tf.cast(rng.normal(size=10), dtype=tf.float32)
-    tf.set_random_seed(2)
+    tf.compat.v1.set_random_seed(2)
     samples = []
     for seed, state in enumerate(states):
       [state], _, _ = no_u_turn_sampler.kernel(
@@ -192,7 +191,8 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
   def testSkewedMultivariateNormal2d(self):
     def target_log_prob_fn(event):
       return tfd.MultivariateNormalFullCovariance(
-          loc=tf.zeros(2), covariance_matrix=tf.diag([1., 10.])).log_prob(event)
+          loc=tf.zeros(2),
+          covariance_matrix=tf.linalg.tensor_diag([1., 10.])).log_prob(event)
 
     rng = np.random.RandomState(seed=7)
     states = tf.cast(rng.normal(scale=[1.0, 10.0], size=[10, 2]), tf.float32)
@@ -260,5 +260,5 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
 
 
 if __name__ == "__main__":
-  tf.enable_eager_execution()
+  tf.compat.v1.enable_eager_execution()
   tf.test.main()

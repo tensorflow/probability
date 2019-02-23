@@ -76,15 +76,16 @@ class ExponentiatedQuadratic(psd_kernel.PositiveSemidefiniteKernel):
       dtype = dtype_util.common_dtype([amplitude, length_scale], tf.float32)
       if amplitude is not None:
         amplitude = tf.convert_to_tensor(
-            amplitude, name='amplitude', dtype=dtype)
+            value=amplitude, name='amplitude', dtype=dtype)
       self._amplitude = _validate_arg_if_not_none(
-          amplitude, tf.assert_positive, validate_args)
+          amplitude, tf.compat.v1.assert_positive, validate_args)
       if length_scale is not None:
         length_scale = tf.convert_to_tensor(
-            length_scale, name='length_scale', dtype=dtype)
+            value=length_scale, name='length_scale', dtype=dtype)
       self._length_scale = _validate_arg_if_not_none(
-          length_scale, tf.assert_positive, validate_args)
-      tf.assert_same_float_dtype([self._amplitude, self._length_scale])
+          length_scale, tf.compat.v1.assert_positive, validate_args)
+      tf.debugging.assert_same_float_dtype(
+          [self._amplitude, self._length_scale])
     super(ExponentiatedQuadratic, self).__init__(
         feature_ndims, dtype=dtype, name=name)
 
@@ -106,12 +107,12 @@ class ExponentiatedQuadratic(psd_kernel.PositiveSemidefiniteKernel):
 
   def _batch_shape_tensor(self):
     return tf.broadcast_dynamic_shape(
-        [] if self.amplitude is None else tf.shape(self.amplitude),
-        [] if self.length_scale is None else tf.shape(self.length_scale))
+        [] if self.amplitude is None else tf.shape(input=self.amplitude),
+        [] if self.length_scale is None else tf.shape(input=self.length_scale))
 
   def _apply(self, x1, x2, param_expansion_ndims=0):
     exponent = -0.5 * util.sum_rightmost_ndims_preserving_shape(
-        tf.squared_difference(x1, x2), self.feature_ndims)
+        tf.math.squared_difference(x1, x2), self.feature_ndims)
     if self.length_scale is not None:
       length_scale = util.pad_shape_right_with_ones(
           self.length_scale, param_expansion_ndims)
@@ -120,6 +121,6 @@ class ExponentiatedQuadratic(psd_kernel.PositiveSemidefiniteKernel):
     if self.amplitude is not None:
       amplitude = util.pad_shape_right_with_ones(
           self.amplitude, param_expansion_ndims)
-      exponent += 2. * tf.log(amplitude)
+      exponent += 2. * tf.math.log(amplitude)
 
     return tf.exp(exponent)

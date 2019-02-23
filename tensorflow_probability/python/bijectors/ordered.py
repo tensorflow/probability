@@ -21,7 +21,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow.python.ops import control_flow_ops
+from tensorflow_probability.python.internal import distribution_util
 
 
 __all__ = [
@@ -77,16 +77,16 @@ class Ordered(bijector.Bijector):
 
   def _inverse_event_shape_tensor(self, output_shape):
     if self.validate_args:
-      is_greater_one = tf.assert_greater(
+      is_greater_one = tf.compat.v1.assert_greater(
           output_shape[-1], 1, message="Need last dimension greater than 1.")
-      output_shape = control_flow_ops.with_dependencies(
+      output_shape = distribution_util.with_dependencies(
           [is_greater_one], output_shape)
     return (output_shape[-1])[..., tf.newaxis]
 
   def _forward(self, x):
     x = self._maybe_assert_valid_x(x)
     y0 = x[..., 0, tf.newaxis]
-    yk = tf.log(x[..., 1:] - x[..., :-1])
+    yk = tf.math.log(x[..., 1:] - x[..., :-1])
     y = tf.concat([y0, yk], axis=-1)
     return y
 
@@ -105,16 +105,17 @@ class Ordered(bijector.Bijector):
     # |det(Jac)| = prod_{i=1}^{K} exp(y[i]).
     # (1) - Stan Modeling Language User's Guide and Reference Manual
     #       Version 2.17.0 session 35.2
-    return tf.reduce_sum(y[..., 1:], axis=-1)
+    return tf.reduce_sum(input_tensor=y[..., 1:], axis=-1)
 
   def _forward_log_det_jacobian(self, x):
     x = self._maybe_assert_valid_x(x)
-    return -tf.reduce_sum(tf.log(x[..., 1:] - x[..., :-1]), axis=-1)
+    return -tf.reduce_sum(
+        input_tensor=tf.math.log(x[..., 1:] - x[..., :-1]), axis=-1)
 
   def _maybe_assert_valid_x(self, x):
     if not self.validate_args:
       return x
-    is_valid = tf.assert_positive(
+    is_valid = tf.compat.v1.assert_positive(
         x[..., 1:] - x[..., :-1],
         message="Forward transformation input must be strictly increasing.")
-    return control_flow_ops.with_dependencies([is_valid], x)
+    return distribution_util.with_dependencies([is_valid], x)

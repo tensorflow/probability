@@ -24,14 +24,13 @@ import tensorflow as tf
 from tensorflow_probability.python.distributions.seed_stream import SeedStream
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow.python.framework import tensor_shape
 
 __all__ = [
     "Zipf",
 ]
 
 
-class Zipf(tf.distributions.Distribution):
+class Zipf(tf.compat.v1.distributions.Distribution):
   """Zipf distribution.
 
   The Zipf distribution is parameterized by a `power` parameter.
@@ -99,7 +98,7 @@ class Zipf(tf.distributions.Distribution):
     parameters = dict(locals())
     with tf.name_scope(name, values=[power]) as name:
       power = tf.convert_to_tensor(
-          power,
+          value=power,
           name="power",
           dtype=dtype_util.common_dtype([power], preferred_dtype=tf.float32))
       if not power.dtype.is_floating or power.dtype.base_dtype is tf.float16:
@@ -109,7 +108,7 @@ class Zipf(tf.distributions.Distribution):
       runtime_assertions = []
       if validate_args:
         runtime_assertions += [
-            tf.assert_greater(power, tf.cast(1., power.dtype))
+            tf.compat.v1.assert_greater(power, tf.cast(1., power.dtype))
         ]
       with tf.control_dependencies(runtime_assertions):
         self._power = tf.identity(power, name="power")
@@ -118,7 +117,7 @@ class Zipf(tf.distributions.Distribution):
     self._sample_maximum_iterations = sample_maximum_iterations
     super(Zipf, self).__init__(
         dtype=dtype,
-        reparameterization_type=tf.distributions.NOT_REPARAMETERIZED,
+        reparameterization_type=tf.compat.v1.distributions.NOT_REPARAMETERIZED,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
         parameters=parameters,
@@ -141,7 +140,7 @@ class Zipf(tf.distributions.Distribution):
     return self._sample_maximum_iterations
 
   def _batch_shape_tensor(self):
-    return tf.shape(self.power)
+    return tf.shape(input=self.power)
 
   def _batch_shape(self):
     return self.power.shape
@@ -150,7 +149,7 @@ class Zipf(tf.distributions.Distribution):
     return tf.constant([], dtype=tf.int32)
 
   def _event_shape(self):
-    return tensor_shape.scalar()
+    return tf.TensorShape([])
 
   def _log_prob(self, x):
     # The log probability at positive integer points x is log(x^(-power) / Z)
@@ -182,31 +181,34 @@ class Zipf(tf.distributions.Distribution):
     x = tf.cast(x, self.power.dtype)
     safe_x = tf.maximum(x if self.interpolate_nondiscrete else tf.floor(x), 0.)
 
-    cdf = 1. - (tf.zeta(self.power, safe_x + 1.) / tf.zeta(self.power, 1.))
+    cdf = 1. - (
+        tf.math.zeta(self.power, safe_x + 1.) / tf.math.zeta(self.power, 1.))
     return tf.where(
-        tf.broadcast_to(tf.less(x, 1.), tf.shape(cdf)), tf.zeros_like(cdf), cdf)
+        tf.broadcast_to(tf.less(x, 1.), tf.shape(input=cdf)),
+        tf.zeros_like(cdf), cdf)
 
   def _log_normalization(self):
-    return tf.log(tf.zeta(self.power, 1.))
+    return tf.math.log(tf.math.zeta(self.power, 1.))
 
   def _log_unnormalized_prob(self, x):
     safe_x = tf.maximum(x if self.interpolate_nondiscrete else tf.floor(x), 1.)
-    y = -self.power * tf.log(safe_x)
-    is_supported = tf.broadcast_to(tf.equal(x, safe_x), tf.shape(y))
+    y = -self.power * tf.math.log(safe_x)
+    is_supported = tf.broadcast_to(tf.equal(x, safe_x), tf.shape(input=y))
     neg_inf = tf.fill(
-        tf.shape(y), value=np.array(-np.inf, dtype=y.dtype.as_numpy_dtype))
+        tf.shape(input=y),
+        value=np.array(-np.inf, dtype=y.dtype.as_numpy_dtype))
     return tf.where(is_supported, y, neg_inf)
 
   @distribution_util.AppendDocstring(
       """Note: Zipf has an infinite mean when `power` <= 2.""")
   def _mean(self):
-    zeta_p = tf.zeta(self.power[..., tf.newaxis] - [0., 1.], 1.)
+    zeta_p = tf.math.zeta(self.power[..., tf.newaxis] - [0., 1.], 1.)
     return zeta_p[..., 1] / zeta_p[..., 0]
 
   @distribution_util.AppendDocstring(
       """Note: Zipf has infinite variance when `power` <= 3.""")
   def _variance(self):
-    zeta_p = tf.zeta(self.power[..., tf.newaxis] - [0., 1., 2.], 1.)
+    zeta_p = tf.math.zeta(self.power[..., tf.newaxis] - [0., 1., 2.], 1.)
     return ((zeta_p[..., 0] * zeta_p[..., 2]) - (zeta_p[..., 1]**2)) / (
         zeta_p[..., 0]**2)
 
@@ -236,7 +238,7 @@ class Zipf(tf.distributions.Distribution):
       """Resample the non-accepted points."""
       # The range of U is chosen so that the resulting sample K lies in
       # [0, tf.int64.max). The final sample, if accepted, is K + 1.
-      u = tf.random_uniform(
+      u = tf.random.uniform(
           shape,
           minval=minval_u,
           maxval=maxval_u,
@@ -268,7 +270,8 @@ class Zipf(tf.distributions.Distribution):
       return [should_continue & (~accept), k]
 
     should_continue, samples = tf.while_loop(
-        cond=lambda should_continue, *ignore: tf.reduce_any(should_continue),
+        cond=lambda should_continue, *ignore: tf.reduce_any(
+            input_tensor=should_continue),
         body=loop_body,
         loop_vars=[
             tf.ones(shape, dtype=tf.bool),  # should_continue
@@ -312,10 +315,10 @@ class Zipf(tf.distributions.Distribution):
     """
     x = tf.cast(x, self.power.dtype)
     t = self.power - 1.
-    return tf.exp((-t) * tf.log1p(x) - tf.log(t))
+    return tf.exp((-t) * tf.math.log1p(x) - tf.math.log(t))
 
   def _hat_integral_inverse(self, x):
     """Inverse function of _hat_integral."""
     x = tf.cast(x, self.power.dtype)
     t = self.power - 1.
-    return tf.math.expm1(-(tf.log(t) + tf.log(x)) / t)
+    return tf.math.expm1(-(tf.math.log(t) + tf.math.log(x)) / t)

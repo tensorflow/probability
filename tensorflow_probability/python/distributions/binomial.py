@@ -22,8 +22,6 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.framework import tensor_shape
-from tensorflow.python.ops import control_flow_ops
 
 
 _binomial_sample_note = """
@@ -57,7 +55,7 @@ def _bdtr(k, n, p):
   ones = tf.ones_like(n - k)
   k_eq_n = tf.equal(k, n)
   safe_dn = tf.where(k_eq_n, ones, n - k)
-  dk = tf.betainc(a=safe_dn, b=k + 1, x=1 - p)
+  dk = tf.math.betainc(a=safe_dn, b=k + 1, x=1 - p)
   return tf.where(k_eq_n, ones, dk)
 
 
@@ -164,7 +162,8 @@ class Binomial(distribution.Distribution):
     with tf.name_scope(name, values=[total_count, logits, probs]) as name:
       dtype = dtype_util.common_dtype([total_count, logits, probs], tf.float32)
       self._total_count = self._maybe_assert_valid_total_count(
-          tf.convert_to_tensor(total_count, name="total_count", dtype=dtype),
+          tf.convert_to_tensor(
+              value=total_count, name="total_count", dtype=dtype),
           validate_args)
       self._logits, self._probs = distribution_util.get_logits_and_probs(
           logits=logits,
@@ -198,7 +197,7 @@ class Binomial(distribution.Distribution):
 
   def _batch_shape_tensor(self):
     return tf.broadcast_dynamic_shape(
-        tf.shape(self.total_count), tf.shape(self.probs))
+        tf.shape(input=self.total_count), tf.shape(input=self.probs))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(self.total_count.shape,
@@ -208,7 +207,7 @@ class Binomial(distribution.Distribution):
     return tf.constant([], dtype=tf.int32)
 
   def _event_shape(self):
-    return tensor_shape.scalar()
+    return tf.TensorShape([])
 
   @distribution_util.AppendDocstring(_binomial_sample_note)
   def _log_prob(self, counts):
@@ -236,8 +235,8 @@ class Binomial(distribution.Distribution):
 
   def _log_normalization(self, counts):
     counts = self._maybe_assert_valid_sample(counts)
-    return (tf.lgamma(1. + self.total_count - counts) + tf.lgamma(1. + counts) -
-            tf.lgamma(1. + self.total_count))
+    return (tf.math.lgamma(1. + self.total_count - counts) +
+            tf.math.lgamma(1. + counts) - tf.math.lgamma(1. + self.total_count))
 
   def _mean(self):
     return self.total_count * self.probs
@@ -256,8 +255,8 @@ class Binomial(distribution.Distribution):
   def _maybe_assert_valid_total_count(self, total_count, validate_args):
     if not validate_args:
       return total_count
-    return control_flow_ops.with_dependencies([
-        tf.assert_non_negative(
+    return distribution_util.with_dependencies([
+        tf.compat.v1.assert_non_negative(
             total_count, message="total_count must be non-negative."),
         distribution_util.assert_integer_form(
             total_count,
@@ -269,8 +268,8 @@ class Binomial(distribution.Distribution):
     if not self.validate_args:
       return counts
     counts = distribution_util.embed_check_nonnegative_integer_form(counts)
-    return control_flow_ops.with_dependencies([
-        tf.assert_less_equal(
+    return distribution_util.with_dependencies([
+        tf.compat.v1.assert_less_equal(
             counts,
             self.total_count,
             message="counts are not less than or equal to n."),

@@ -24,10 +24,10 @@ import scipy.optimize as optimize
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class RootSearchTest(tf.test.TestCase):
 
   def test_secant_finds_all_roots_from_one_initial_position(self):

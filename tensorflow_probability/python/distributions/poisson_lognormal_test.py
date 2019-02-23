@@ -20,21 +20,21 @@ from __future__ import print_function
 
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 class _PoissonLogNormalQuadratureCompoundTest(
-    test_util.DiscreteScalarDistributionTestHelpers):
+    tfp_test_util.DiscreteScalarDistributionTestHelpers):
   """Tests the PoissonLogNormalQuadratureCompoundTest distribution."""
 
   def testSampleProbConsistent(self):
     pln = tfd.PoissonLogNormalQuadratureCompound(
-        loc=tf.placeholder_with_default(
+        loc=tf.compat.v1.placeholder_with_default(
             -2., shape=[] if self.static_shape else None),
-        scale=tf.placeholder_with_default(
+        scale=tf.compat.v1.placeholder_with_default(
             1.1, shape=[] if self.static_shape else None),
         quadrature_size=10,
         validate_args=True)
@@ -43,9 +43,9 @@ class _PoissonLogNormalQuadratureCompoundTest(
 
   def testMeanVariance(self):
     pln = tfd.PoissonLogNormalQuadratureCompound(
-        loc=tf.placeholder_with_default(
+        loc=tf.compat.v1.placeholder_with_default(
             0., shape=[] if self.static_shape else None),
-        scale=tf.placeholder_with_default(
+        scale=tf.compat.v1.placeholder_with_default(
             1., shape=[] if self.static_shape else None),
         quadrature_size=10,
         validate_args=True)
@@ -53,9 +53,9 @@ class _PoissonLogNormalQuadratureCompoundTest(
 
   def testSampleProbConsistentBroadcastScalar(self):
     pln = tfd.PoissonLogNormalQuadratureCompound(
-        loc=tf.placeholder_with_default(
+        loc=tf.compat.v1.placeholder_with_default(
             [0., -0.5], shape=[2] if self.static_shape else None),
-        scale=tf.placeholder_with_default(
+        scale=tf.compat.v1.placeholder_with_default(
             1., shape=[] if self.static_shape else None),
         quadrature_size=10,
         validate_args=True)
@@ -64,9 +64,9 @@ class _PoissonLogNormalQuadratureCompoundTest(
 
   def testMeanVarianceBroadcastScalar(self):
     pln = tfd.PoissonLogNormalQuadratureCompound(
-        loc=tf.placeholder_with_default(
+        loc=tf.compat.v1.placeholder_with_default(
             [0., -0.5], shape=[2] if self.static_shape else None),
-        scale=tf.placeholder_with_default(
+        scale=tf.compat.v1.placeholder_with_default(
             1., shape=[] if self.static_shape else None),
         quadrature_size=10,
         validate_args=True)
@@ -75,9 +75,9 @@ class _PoissonLogNormalQuadratureCompoundTest(
 
   def testSampleProbConsistentBroadcastBoth(self):
     pln = tfd.PoissonLogNormalQuadratureCompound(
-        loc=tf.placeholder_with_default(
+        loc=tf.compat.v1.placeholder_with_default(
             [[0.], [-0.5]], shape=[2, 1] if self.static_shape else None),
-        scale=tf.placeholder_with_default(
+        scale=tf.compat.v1.placeholder_with_default(
             [[1., 0.9]], shape=[1, 2] if self.static_shape else None),
         quadrature_size=10,
         validate_args=True)
@@ -86,9 +86,9 @@ class _PoissonLogNormalQuadratureCompoundTest(
 
   def testMeanVarianceBroadcastBoth(self):
     pln = tfd.PoissonLogNormalQuadratureCompound(
-        loc=tf.placeholder_with_default(
+        loc=tf.compat.v1.placeholder_with_default(
             [[0.], [-0.5]], shape=[2, 1] if self.static_shape else None),
-        scale=tf.placeholder_with_default(
+        scale=tf.compat.v1.placeholder_with_default(
             [[1., 0.9]], shape=[1, 2] if self.static_shape else None),
         quadrature_size=10,
         validate_args=True)
@@ -96,7 +96,7 @@ class _PoissonLogNormalQuadratureCompoundTest(
         self.evaluate, pln, rtol=0.1, atol=0.01)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class PoissonLogNormalQuadratureCompoundStaticShapeTest(
     _PoissonLogNormalQuadratureCompoundTest, tf.test.TestCase):
 
@@ -105,7 +105,7 @@ class PoissonLogNormalQuadratureCompoundStaticShapeTest(
     return True
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class PoissonLogNormalQuadratureCompoundDynamicShapeTest(
     _PoissonLogNormalQuadratureCompoundTest, tf.test.TestCase):
 

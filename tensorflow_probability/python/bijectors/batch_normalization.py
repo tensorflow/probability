@@ -149,7 +149,7 @@ class BatchNormalization(bijector.Bijector):
     """
     # Scale must be positive.
     g_constraint = lambda x: tf.nn.relu(x) + 1e-6
-    self.batchnorm = batchnorm_layer or tf.layers.BatchNormalization(
+    self.batchnorm = batchnorm_layer or tf.compat.v1.layers.BatchNormalization(
         gamma_constraint=g_constraint)
     self._validate_bn_layer(self.batchnorm)
     self._training = training
@@ -171,7 +171,7 @@ class BatchNormalization(bijector.Bijector):
       `tf.layers.BatchNormalization`, or if `batchnorm_layer.renorm=True` or
       if `batchnorm_layer.virtual_batch_size` is specified.
     """
-    if not isinstance(layer, tf.layers.BatchNormalization):
+    if not isinstance(layer, tf.compat.v1.layers.BatchNormalization):
       raise ValueError(
           "batchnorm_layer must be an instance of BatchNormalization layer.")
     if layer.renorm:
@@ -234,18 +234,19 @@ class BatchNormalization(bijector.Bijector):
     use_saved_statistics = tf.cast(
         tf.logical_or(use_saved_statistics, tf.logical_not(self._training)),
         tf.float32)
-    log_variance = tf.log(
-        (1 - use_saved_statistics) * tf.nn.moments(y, axes=reduction_axes,
-                                                   keep_dims=True)[1]
-        + use_saved_statistics * self.batchnorm.moving_variance
-        + self.batchnorm.epsilon)
+    log_variance = tf.math.log(
+        (1 - use_saved_statistics) *
+        tf.nn.moments(x=y, axes=reduction_axes, keepdims=True)[1] +
+        use_saved_statistics * self.batchnorm.moving_variance +
+        self.batchnorm.epsilon)
 
     # `gamma` and `log Var(y)` reductions over event_dims.
     # Log(total change in area from gamma term).
-    log_total_gamma = tf.reduce_sum(tf.log(self.batchnorm.gamma))
+    log_total_gamma = tf.reduce_sum(
+        input_tensor=tf.math.log(self.batchnorm.gamma))
 
     # Log(total change in area from log-variance term).
-    log_total_variance = tf.reduce_sum(log_variance)
+    log_total_variance = tf.reduce_sum(input_tensor=log_variance)
     # The ildj is scalar, as it does not depend on the values of x and are
     # constant across minibatch elements.
     return log_total_gamma - 0.5 * log_total_variance

@@ -27,7 +27,6 @@ from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.ops import control_flow_ops
 
 
 __all__ = [
@@ -180,12 +179,13 @@ class Dirichlet(distribution.Distribution):
     with tf.name_scope(name, values=[concentration]) as name:
       self._concentration = self._maybe_assert_valid_concentration(
           tf.convert_to_tensor(
-              concentration,
+              value=concentration,
               name="concentration",
               dtype=dtype_util.common_dtype([concentration],
                                             preferred_dtype=tf.float32)),
           validate_args)
-      self._total_concentration = tf.reduce_sum(self._concentration, -1)
+      self._total_concentration = tf.reduce_sum(
+          input_tensor=self._concentration, axis=-1)
     super(Dirichlet, self).__init__(
         dtype=self._concentration.dtype,
         validate_args=validate_args,
@@ -207,24 +207,22 @@ class Dirichlet(distribution.Distribution):
     return self._total_concentration
 
   def _batch_shape_tensor(self):
-    return tf.shape(self.total_concentration)
+    return tf.shape(input=self.total_concentration)
 
   def _batch_shape(self):
     return self.total_concentration.shape
 
   def _event_shape_tensor(self):
-    return tf.shape(self.concentration)[-1:]
+    return tf.shape(input=self.concentration)[-1:]
 
   def _event_shape(self):
     return self.concentration.shape.with_rank_at_least(1)[-1:]
 
   def _sample_n(self, n, seed=None):
-    gamma_sample = tf.random_gamma(
-        shape=[n],
-        alpha=self.concentration,
-        dtype=self.dtype,
-        seed=seed)
-    return gamma_sample / tf.reduce_sum(gamma_sample, -1, keepdims=True)
+    gamma_sample = tf.random.gamma(
+        shape=[n], alpha=self.concentration, dtype=self.dtype, seed=seed)
+    return gamma_sample / tf.reduce_sum(
+        input_tensor=gamma_sample, axis=-1, keepdims=True)
 
   @distribution_util.AppendDocstring(_dirichlet_sample_note)
   def _log_prob(self, x):
@@ -236,29 +234,28 @@ class Dirichlet(distribution.Distribution):
 
   def _log_unnormalized_prob(self, x):
     x = self._maybe_assert_valid_sample(x)
-    return tf.reduce_sum(tf.math.xlogy(self.concentration - 1., x), -1)
+    return tf.reduce_sum(
+        input_tensor=tf.math.xlogy(self.concentration - 1., x), axis=-1)
 
   def _log_normalization(self):
-    return tf.lbeta(self.concentration)
+    return tf.math.lbeta(self.concentration)
 
   def _entropy(self):
     k = tf.cast(self.event_shape_tensor()[0], self.dtype)
-    return (
-        self._log_normalization()
-        + ((self.total_concentration - k)
-           * tf.digamma(self.total_concentration))
-        - tf.reduce_sum(
-            (self.concentration - 1.) * tf.digamma(self.concentration),
-            axis=-1))
+    return (self._log_normalization() +
+            ((self.total_concentration - k) *
+             tf.math.digamma(self.total_concentration)) - tf.reduce_sum(
+                 input_tensor=(self.concentration - 1.) *
+                 tf.math.digamma(self.concentration),
+                 axis=-1))
 
   def _mean(self):
     return self.concentration / self.total_concentration[..., tf.newaxis]
 
   def _covariance(self):
     x = self._variance_scale_term() * self._mean()
-    return tf.matrix_set_diag(
-        -tf.matmul(x[..., tf.newaxis],
-                   x[..., tf.newaxis, :]),  # outer prod
+    return tf.linalg.set_diag(
+        -tf.matmul(x[..., tf.newaxis], x[..., tf.newaxis, :]),  # outer prod
         self._variance())
 
   def _variance(self):
@@ -268,7 +265,7 @@ class Dirichlet(distribution.Distribution):
 
   def _variance_scale_term(self):
     """Helper to `_covariance` and `_variance` which computes a shared scale."""
-    return tf.rsqrt(1. + self.total_concentration[..., tf.newaxis])
+    return tf.math.rsqrt(1. + self.total_concentration[..., tf.newaxis])
 
   @distribution_util.AppendDocstring(
       """Note: The mode is undefined when any `concentration <= 1`. If
@@ -281,14 +278,14 @@ class Dirichlet(distribution.Distribution):
         self.total_concentration[..., tf.newaxis] - k)
     if self.allow_nan_stats:
       nan = tf.fill(
-          tf.shape(mode),
+          tf.shape(input=mode),
           np.array(np.nan, dtype=self.dtype.as_numpy_dtype()),
           name="nan")
       return tf.where(
-          tf.reduce_all(self.concentration > 1., axis=-1),
-          mode, nan)
-    return control_flow_ops.with_dependencies([
-        tf.assert_less(
+          tf.reduce_all(input_tensor=self.concentration > 1., axis=-1), mode,
+          nan)
+    return distribution_util.with_dependencies([
+        tf.compat.v1.assert_less(
             tf.ones([], self.dtype),
             self.concentration,
             message="Mode undefined when any concentration <= 1"),
@@ -298,15 +295,16 @@ class Dirichlet(distribution.Distribution):
     """Checks the validity of the concentration parameter."""
     if not validate_args:
       return concentration
-    return control_flow_ops.with_dependencies([
-        tf.assert_positive(
+    return distribution_util.with_dependencies([
+        tf.compat.v1.assert_positive(
+            concentration, message="Concentration parameter must be positive."),
+        tf.compat.v1.assert_rank_at_least(
             concentration,
-            message="Concentration parameter must be positive."),
-        tf.assert_rank_at_least(
-            concentration, 1,
+            1,
             message="Concentration parameter must have >=1 dimensions."),
-        tf.assert_less(
-            1, tf.shape(concentration)[-1],
+        tf.compat.v1.assert_less(
+            1,
+            tf.shape(input=concentration)[-1],
             message="Concentration parameter must have event_size >= 2."),
     ], concentration)
 
@@ -314,18 +312,18 @@ class Dirichlet(distribution.Distribution):
     """Checks the validity of a sample."""
     if not self.validate_args:
       return x
-    return control_flow_ops.with_dependencies([
-        tf.assert_positive(x, message="samples must be positive"),
-        tf.assert_near(
+    return distribution_util.with_dependencies([
+        tf.compat.v1.assert_positive(x, message="samples must be positive"),
+        tf.compat.v1.assert_near(
             tf.ones([], dtype=self.dtype),
-            tf.reduce_sum(x, -1),
+            tf.reduce_sum(input_tensor=x, axis=-1),
             message="sample last-dimension must sum to `1`"),
     ], x)
 
 
 # TODO(b/117098119): Remove tf.distribution references once they're gone.
-@kullback_leibler.RegisterKL(Dirichlet, tf.distributions.Dirichlet)
-@kullback_leibler.RegisterKL(tf.distributions.Dirichlet, Dirichlet)
+@kullback_leibler.RegisterKL(Dirichlet, tf.compat.v1.distributions.Dirichlet)
+@kullback_leibler.RegisterKL(tf.compat.v1.distributions.Dirichlet, Dirichlet)
 @kullback_leibler.RegisterKL(Dirichlet, Dirichlet)
 def _kl_dirichlet_dirichlet(d1, d2, name=None):
   """Batchwise KL divergence KL(d1 || d2) with d1 and d2 Dirichlet.
@@ -393,11 +391,11 @@ def _kl_dirichlet_dirichlet(d1, d2, name=None):
     #     = sum_i[(a[i] - b[i]) * (digamma(a[i]) - digamma(sum_j a[j]))]
     #          - lbeta(a) + lbeta(b))
 
-    digamma_sum_d1 = tf.digamma(
-        tf.reduce_sum(d1.concentration, axis=-1, keepdims=True))
-    digamma_diff = tf.digamma(d1.concentration) - digamma_sum_d1
+    digamma_sum_d1 = tf.math.digamma(
+        tf.reduce_sum(input_tensor=d1.concentration, axis=-1, keepdims=True))
+    digamma_diff = tf.math.digamma(d1.concentration) - digamma_sum_d1
     concentration_diff = d1.concentration - d2.concentration
 
-    return (tf.reduce_sum(concentration_diff * digamma_diff, axis=-1) -
-            tf.lbeta(d1.concentration) +
-            tf.lbeta(d2.concentration))
+    return (
+        tf.reduce_sum(input_tensor=concentration_diff * digamma_diff, axis=-1) -
+        tf.math.lbeta(d1.concentration) + tf.math.lbeta(d2.concentration))

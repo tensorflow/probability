@@ -32,8 +32,8 @@ def is_list_like(x):
 
 
 def identity(x, dtype=None, name=None):
-  return tf.identity(tf.convert_to_tensor(
-      x, dtype=dtype, name=name), name=name)
+  return tf.identity(
+      tf.convert_to_tensor(value=x, dtype=dtype, name=name), name=name)
 
 
 def custom_gradient(fx, gx, x, fx_gx_manually_stopped=False, name=None):
@@ -77,7 +77,7 @@ def custom_gradient(fx, gx, x, fx_gx_manually_stopped=False, name=None):
       return x
     return tf.stop_gradient(x)
   with tf.name_scope(name, 'custom_gradient', [fx, gx, x]):
-    fx = tf.convert_to_tensor(fx, name='fx')
+    fx = tf.convert_to_tensor(value=fx, name='fx')
     # We don't want to bother eagerly computing `gx` since we may not even need
     # it.
     with tf.control_dependencies([fx]):
@@ -96,9 +96,9 @@ def custom_gradient(fx, gx, x, fx_gx_manually_stopped=False, name=None):
       for x_, gx_ in zip(x, gx):
         # Observe: tf.gradients(f(x), x)[i].shape == x[i].shape
         # thus we check that the user is supplying correct shapes.
-        equal_shape = tf.assert_equal(
-            tf.shape(x_),
-            tf.shape(gx_),
+        equal_shape = tf.compat.v1.assert_equal(
+            tf.shape(input=x_),
+            tf.shape(input=gx_),
             message='Each `x` must have the same shape as each `gx`.')
         with tf.control_dependencies([equal_shape]):
           # IEEE754 ensures `(x-x)==0.` and that `0.*x==0.` so we make sure to
@@ -109,10 +109,10 @@ def custom_gradient(fx, gx, x, fx_gx_manually_stopped=False, name=None):
           # "Is there a floating point value of x, for which x-x == 0 is false?"
           # http://stackoverflow.com/q/2686644
           zeros_like_x_ = x_ - tf.stop_gradient(x_)
-          override_grad.append(tf.reduce_sum(
-              maybe_stop(gx_) * zeros_like_x_))
+          override_grad.append(
+              tf.reduce_sum(input_tensor=maybe_stop(gx_) * zeros_like_x_))
       override_grad = sum(override_grad)
-      override_grad /= tf.cast(tf.size(fx), dtype=fx.dtype.base_dtype)
+      override_grad /= tf.cast(tf.size(input=fx), dtype=fx.dtype.base_dtype)
 
       # Proof of correctness:
       #

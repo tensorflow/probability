@@ -15,6 +15,8 @@
 # Description:
 #   TensorFlow Probability utility functions.
 
+# [internal] load python3.bzl
+
 package(
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
@@ -31,7 +33,6 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         ":docstring",
-        ":variables",
     ],
 )
 
@@ -51,29 +52,6 @@ py_test(
     name = "docstring_test",
     size = "small",
     srcs = ["docstring_test.py"],
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-    ],
-)
-
-py_library(
-    name = "variables",
-    srcs = [
-        "variables.py",
-    ],
-    srcs_version = "PY2AND3",
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-    ],
-)
-
-py_test(
-    name = "variables_test",
-    size = "small",
-    srcs = ["variables_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
