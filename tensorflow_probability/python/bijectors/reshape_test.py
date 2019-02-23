@@ -50,19 +50,21 @@ class _ReshapeBijectorTest(object):
         event_shape_out=shape_out,
         event_shape_in=shape_in,
         validate_args=True)
-    (x_,
-     y_,
-     fldj_,
-     ildj_,
-     fest_,
-     iest_) = self.evaluate((
-         bijector.inverse(expected_y),
-         bijector.forward(expected_x),
-         bijector.forward_log_det_jacobian(expected_x, event_ndims=2),
-         bijector.inverse_log_det_jacobian(expected_y, event_ndims=2),
-         bijector.forward_event_shape_tensor(expected_x.shape),
-         bijector.inverse_event_shape_tensor(expected_y.shape),
-     ))
+    [
+        x_,
+        y_,
+        fldj_,
+        ildj_,
+        fest_,
+        iest_,
+    ] = self.evaluate([
+        bijector.inverse(expected_y),
+        bijector.forward(expected_x),
+        bijector.forward_log_det_jacobian(expected_x, event_ndims=2),
+        bijector.inverse_log_det_jacobian(expected_y, event_ndims=2),
+        bijector.forward_event_shape_tensor(expected_x.shape),
+        bijector.inverse_event_shape_tensor(expected_y.shape),
+    ])
     self.assertEqual("reshape", bijector.name)
     self.assertAllClose(expected_y, y_, rtol=1e-6, atol=0)
     self.assertAllClose(expected_x, x_, rtol=1e-6, atol=0)
@@ -177,12 +179,10 @@ class _ReshapeBijectorTest(object):
         event_shape_out=shape_out,
         event_shape_in=shape_in,
         validate_args=True)
-    (x_,
-     y_,
-    ) = self.evaluate((
+    x_, y_, = self.evaluate([
         bijector.inverse(expected_y),
         bijector.forward(expected_x),
-    ))
+    ])
     self.assertAllClose(expected_y, y_, rtol=1e-6, atol=0)
     self.assertAllClose(expected_x, x_, rtol=1e-6, atol=0)
 
@@ -194,12 +194,10 @@ class _ReshapeBijectorTest(object):
         event_shape_out=shape_out,
         event_shape_in=shape_in,
         validate_args=True)
-    (x_,
-     y_,
-    ) = self.evaluate((
+    x_, y_, = self.evaluate([
         bijector.inverse(expected_y),
         bijector.forward(expected_x),
-    ))
+    ])
     self.assertAllClose(expected_y, y_, rtol=1e-6, atol=0)
     self.assertAllClose(expected_x, x_, rtol=1e-6, atol=0)
 
@@ -208,12 +206,10 @@ class _ReshapeBijectorTest(object):
     expected_y = np.reshape(expected_x, [4, 2, 2])
     _, shape_out = self.build_shapes([-1,], [-1, 2])
     bijector = tfb.Reshape(shape_out, validate_args=True)
-    (x_,
-     y_,
-    ) = self.evaluate((
+    x_, y_, = self.evaluate([
         bijector.inverse(expected_y),
         bijector.forward(expected_x),
-    ))
+    ])
     self.assertAllClose(expected_y, y_, rtol=1e-6, atol=0)
     self.assertAllClose(expected_x, x_, rtol=1e-6, atol=0)
 
@@ -322,10 +318,12 @@ class ReshapeBijectorTestDynamic(tf.test.TestCase, _ReshapeBijectorTest):
   def build_shapes(self, shape_in, shape_out):
     shape_in = np.array(shape_in, np.int32)
     shape_out = np.array(shape_out, np.int32)
-    return (tf.compat.v1.placeholder_with_default(
-        shape_in, shape=[len(shape_in)]),
-            tf.compat.v1.placeholder_with_default(
-                shape_out, shape=[len(shape_out)]))
+    return (
+        tf.compat.v1.placeholder_with_default(
+            shape_in, shape=[len(shape_in)]),
+        tf.compat.v1.placeholder_with_default(
+            shape_out, shape=[len(shape_out)]),
+    )
 
   def assertRaisesError(self, msg):
     if tf.executing_eagerly():

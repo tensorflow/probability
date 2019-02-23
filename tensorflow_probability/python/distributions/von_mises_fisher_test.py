@@ -85,7 +85,7 @@ class VonMisesFisherTest(tfp_test_util.VectorDistributionTestHelpers,
     # Length of the mean vector is strictly ascending with concentration.
     self.assertAllEqual(mean_lengths, np.sort(mean_lengths, axis=0))
     self.assertAllClose(np.linalg.norm(sample_mean, axis=-1), mean_lengths,
-                        atol=0.02)
+                        atol=0.025)
 
   def testSampleMeanDir3d(self):
     mean_dir = tf.nn.l2_normalize([[1., 2, 3],
@@ -125,7 +125,7 @@ class VonMisesFisherTest(tfp_test_util.VectorDistributionTestHelpers,
     # Length of the mean vector is strictly ascending with concentration.
     self.assertAllEqual(mean_lengths, np.sort(mean_lengths, axis=0))
     self.assertAllClose(np.linalg.norm(sample_mean, axis=-1), mean_lengths,
-                        atol=0.02)
+                        atol=0.025)
 
   def _verifyPdfWithNumpy(self, vmf, atol=1e-4):
     """Verifies log_prob evaluations with numpy/scipy.
