@@ -1451,7 +1451,6 @@ py_test(
     size = "large",
     srcs = ["linear_gaussian_ssm_test.py"],
     shard_count = 4,
-    tags = ["tf2-broken"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -1486,7 +1485,6 @@ py_test(
     name = "mixture_test",
     size = "medium",
     srcs = ["mixture_test.py"],
-    tags = ["tf2-broken"],
     deps = [
         # numpy dep,
         # scipy dep,
