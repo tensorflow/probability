@@ -146,6 +146,9 @@ class DistributionLambda(tf.keras.layers.Lambda):
           distribution=make_distribution_fn(*fargs, **fkwargs),
           convert_to_tensor_fn=convert_to_tensor_fn)
       value = tf.convert_to_tensor(value=distribution)
+      # TODO(b/126056144): Remove silent handle once we identify how/why Keras
+      # is losing the distribution handle for activity_regularizer.
+      value._tfp_distribution = distribution  # pylint: disable=protected-access
       # TODO(b/120153609): Keras is incorrectly presuming everything is a
       # `tf.Tensor`. Closing this bug entails ensuring Keras only accesses
       # `tf.Tensor` properties after calling `tf.convert_to_tensor`.
@@ -981,6 +984,10 @@ class KLDivergenceRegularizer(tf.keras.regularizers.Regularizer):
         weight=weight)
 
   def __call__(self, distribution_a):
+    # TODO(b/126056144): Remove reacquisition of distribution handle once we
+    # identify how/why Keras lost it.
+    if hasattr(distribution_a, '_tfp_distribution'):
+      distribution_a = distribution_a._tfp_distribution  # pylint: disable=protected-access
     return self._kl_divergence_fn(distribution_a)
 
 

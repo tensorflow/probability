@@ -81,10 +81,6 @@ class EndToEndTest(tf.test.TestCase):
     self.x_test = np.random.rand(
         self.test_size, *self.input_shape).astype(np.float32)
 
-  # TODO(b/120307671): Once this bug is resolved, use
-  # `activity_regularizer=tfpl.KLDivergenceRegularizer` instead of
-  # `KLDivergenceAddLoss`.
-
   def test_keras_sequential_api(self):
     """Test `DistributionLambda`s are composable via Keras `Sequential` API."""
 
@@ -93,11 +89,12 @@ class EndToEndTest(tf.test.TestCase):
         tfkl.Flatten(),
         tfkl.Dense(10, activation='relu'),
         tfkl.Dense(tfpl.MultivariateNormalTriL.params_size(self.encoded_size)),
-        tfpl.MultivariateNormalTriL(self.encoded_size),
-        tfpl.KLDivergenceAddLoss(
-            tfd.Independent(tfd.Normal(loc=[0., 0], scale=1),
-                            reinterpreted_batch_ndims=1),
-            weight=self.train_size),
+        tfpl.MultivariateNormalTriL(
+            self.encoded_size,
+            activity_regularizer=tfpl.KLDivergenceRegularizer(
+                tfd.Independent(tfd.Normal(loc=[0., 0], scale=1),
+                                reinterpreted_batch_ndims=1),
+                weight=self.train_size)),
     ])
 
     decoder_model = tfk.Sequential([
