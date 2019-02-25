@@ -168,7 +168,7 @@ class MaskedAutoregressiveFlowTest(tfp_test_util.VectorDistributionTestHelpers,
         num_samples=int(1e6),
         radius=1.,
         center=0.,
-        rtol=0.02)
+        rtol=0.025)
 
   def testInvertMutuallyConsistent(self):
     maf = tfb.Invert(
@@ -190,7 +190,7 @@ class MaskedAutoregressiveFlowTest(tfp_test_util.VectorDistributionTestHelpers,
         num_samples=int(1e6),
         radius=1.,
         center=0.,
-        rtol=0.02)
+        rtol=0.025)
 
 
 @test_util.run_all_in_graph_and_eager_modes

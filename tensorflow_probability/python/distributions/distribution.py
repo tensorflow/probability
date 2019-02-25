@@ -211,21 +211,12 @@ class _DistributionMeta(abc.ABCMeta):
               classname, class_special_attr_docstring))
       attrs[attr] = class_attr_value
 
-    # Now we'll intercept the default __init__.
-    #
-    # We prefer injecting `__init__` via `attrs` because then the class is
-    # created purely by Python, i.e., we inject new behavior before Python may
-    # make decisions about how to build the class. However, because Python2
-    # doesn't offer a handle to a default `__init__`, we must actually build the
-    # class when we dont have an explicit subclass `__init__`.
-    new_cls = None
+    # Now we'll intercept the default __init__ if it exists.
     default_init = attrs.get("__init__", None)
     if default_init is None:
-      # Looks like the subclass uses Python's default `__init__`.
-      # Let's build the class so we can get a handle to it.
-      new_cls = super(_DistributionMeta, mcs).__new__(
+      # The class has no __init__ because its abstract. (And we won't add one.)
+      return super(_DistributionMeta, mcs).__new__(
           mcs, classname, baseclasses, attrs)
-      default_init = new_cls.__init__
 
     # pylint: disable=protected-access
     @functools.wraps(default_init)
@@ -251,15 +242,9 @@ class _DistributionMeta(abc.ABCMeta):
             self_._parameters, self_)
     # pylint: enable=protected-access
 
-    if new_cls is None:
-      # We haven't yet built the class; do so now (with the patched __init__).
-      attrs["__init__"] = wrapped_init
-      return super(_DistributionMeta, mcs).__new__(
-          mcs, classname, baseclasses, attrs)
-    else:
-      # We've already built the class; patch in the new `__init__`.
-      setattr(new_cls, "__init__", wrapped_init)
-      return new_cls
+    attrs["__init__"] = wrapped_init
+    return super(_DistributionMeta, mcs).__new__(
+        mcs, classname, baseclasses, attrs)
 
 
 @six.add_metaclass(_DistributionMeta)
