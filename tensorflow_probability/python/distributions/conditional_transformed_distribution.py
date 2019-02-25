@@ -42,8 +42,8 @@ _condition_kwargs_dict = {
 
 
 class ConditionalTransformedDistribution(
-    conditional_distribution.ConditionalDistribution,
-    transformed_distribution.TransformedDistribution):
+    transformed_distribution.TransformedDistribution,
+    conditional_distribution.ConditionalDistribution):
   """A TransformedDistribution that allows intrinsic conditioning."""
 
   @distribution_util.AppendDocstring(kwargs_dict=_condition_kwargs_dict)

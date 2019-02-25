@@ -376,5 +376,35 @@ class DistributionTest(tf.test.TestCase):
       terrible_distribution.log_cdf(1.)
 
 
+class Dummy(tfd.Distribution):
+
+  # To ensure no code is keying on the unspecial name "self", we use "me".
+  def __init__(me, arg1, arg2, arg3=None, **named):  # pylint: disable=no-self-argument
+    super(Dummy, me).__init__(
+        dtype=tf.float32,
+        reparameterization_type=tfd.NOT_REPARAMETERIZED,
+        validate_args=False,
+        allow_nan_stats=False)
+    me._mean_ = tf.convert_to_tensor(value=arg1 + arg2)
+
+  def _mean(self):
+    return self._mean_
+
+
+class ParametersTest(tf.test.TestCase):
+
+  def testParameters(self):
+    d = Dummy(1., arg2=2.)
+    actual_d_parameters = d.parameters
+    self.assertEqual({"arg1": 1., "arg2": 2., "arg3": None, "named": {}},
+                     actual_d_parameters)
+    self.assertIs(actual_d_parameters, d.parameters)
+
+  @test_util.run_in_graph_and_eager_modes(assert_no_eager_garbage=True)
+  def testNoSelfRefs(self):
+    d = Dummy(1., arg2=2.)
+    self.assertAllEqual(1. + 2., self.evaluate(d.mean()))
+
+
 if __name__ == "__main__":
   tf.test.main()

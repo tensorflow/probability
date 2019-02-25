@@ -20,6 +20,8 @@ from __future__ import print_function
 
 import abc
 import contextlib
+import functools
+import inspect
 import types
 
 import numpy as np
@@ -132,6 +134,11 @@ def _convert_to_tensor(value, name=None, dtype=None, preferred_dtype=None):
       value=value, name=name, dtype=dtype, dtype_hint=preferred_dtype)
 
 
+def _remove_dict_keys_with_value(dict_, val):
+  """Removes `dict` keys which have have `self` as value."""
+  return {k: v for k, v in dict_.items() if v is not val}
+
+
 class _DistributionMeta(abc.ABCMeta):
   """Helper metaclass for tfp.Distribution."""
 
@@ -204,8 +211,55 @@ class _DistributionMeta(abc.ABCMeta):
               classname, class_special_attr_docstring))
       attrs[attr] = class_attr_value
 
-    return super(_DistributionMeta, mcs).__new__(
-        mcs, classname, baseclasses, attrs)
+    # Now we'll intercept the default __init__.
+    #
+    # We prefer injecting `__init__` via `attrs` because then the class is
+    # created purely by Python, i.e., we inject new behavior before Python may
+    # make decisions about how to build the class. However, because Python2
+    # doesn't offer a handle to a default `__init__`, we must actually build the
+    # class when we dont have an explicit subclass `__init__`.
+    new_cls = None
+    default_init = attrs.get("__init__", None)
+    if default_init is None:
+      # Looks like the subclass uses Python's default `__init__`.
+      # Let's build the class so we can get a handle to it.
+      new_cls = super(_DistributionMeta, mcs).__new__(
+          mcs, classname, baseclasses, attrs)
+      default_init = new_cls.__init__
+
+    # pylint: disable=protected-access
+    @functools.wraps(default_init)
+    def wrapped_init(self_, *args, **kwargs):
+      """A "master `__init__`" which is always called."""
+      # Note: if we ever want to have things set in `self` before `__init__` is
+      # called, here is the place to do it.
+      self_._parameters = None
+      default_init(self_, *args, **kwargs)
+      # Note: if we ever want to override things set in `self` by subclass
+      # `__init__`, here is the place to do it.
+      if self_._parameters is None:
+        # We prefer subclasses will set `parameters = dict(locals())` because
+        # this has nearly zero overhead. However, failing to do this, we will
+        # resolve the input arguments dynamically and only when needed.
+        dummy_self = tuple()
+        self_._parameters = lambda: (  # pylint: disable=g-long-lambda
+            _remove_dict_keys_with_value(
+                inspect.getcallargs(default_init, dummy_self, *args, **kwargs),
+                dummy_self))
+      elif hasattr(self_._parameters, "pop"):
+        self_._parameters = _remove_dict_keys_with_value(
+            self_._parameters, self_)
+    # pylint: enable=protected-access
+
+    if new_cls is None:
+      # We haven't yet built the class; do so now (with the patched __init__).
+      attrs["__init__"] = wrapped_init
+      return super(_DistributionMeta, mcs).__new__(
+          mcs, classname, baseclasses, attrs)
+    else:
+      # We've already built the class; patch in the new `__init__`.
+      setattr(new_cls, "__init__", wrapped_init)
+      return new_cls
 
 
 @six.add_metaclass(_DistributionMeta)
@@ -396,26 +450,10 @@ class Distribution(_BaseDistribution):
     self._reparameterization_type = reparameterization_type
     self._allow_nan_stats = allow_nan_stats
     self._validate_args = validate_args
-    self._parameters = parameters or {}
+    self._parameters = parameters
+    self._parameters_sanitized = False
     self._graph_parents = graph_parents
     self._name = name
-
-  @property
-  def _parameters(self):
-    return self._parameter_dict
-
-  @_parameters.setter
-  def _parameters(self, value):
-    """Intercept assignments to self._parameters to avoid reference cycles.
-
-    Parameters are often created using locals(), so we need to clean out any
-    references to `self` before assigning it to an attribute.
-
-    Args:
-      value: A dictionary of parameters to assign to the `_parameters` property.
-    """
-    value.pop("self", None)
-    self._parameter_dict = value
 
   @classmethod
   def param_shapes(cls, sample_shape, name="DistributionParamShapes"):
@@ -484,12 +522,12 @@ class Distribution(_BaseDistribution):
   @property
   def name(self):
     """Name prepended to all ops created by this `Distribution`."""
-    return self._name
+    return self._name if hasattr(self, "_name") else None
 
   @property
   def dtype(self):
     """The `DType` of `Tensor`s handled by this `Distribution`."""
-    return self._dtype
+    return self._dtype if hasattr(self, "_dtype") else None
 
   @property
   def parameters(self):
@@ -497,8 +535,15 @@ class Distribution(_BaseDistribution):
     # Remove "self", "__class__", or other special variables. These can appear
     # if the subclass used:
     # `parameters = dict(locals())`.
-    return {k: v for k, v in self._parameters.items()
-            if not k.startswith("__") and k != "self"}
+    if (not hasattr(self, "_parameters_sanitized") or
+        not self._parameters_sanitized):
+      if callable(self._parameters):
+        self._parameters = self._parameters()
+      self._parameters = {
+          k: v for k, v in self._parameters.items()
+          if not k.startswith("__") and v is not self}
+      self._parameters_sanitized = True
+    return self._parameters
 
   @property
   def reparameterization_type(self):
@@ -550,7 +595,12 @@ class Distribution(_BaseDistribution):
         `dict(self.parameters, **override_parameters_kwargs)`.
     """
     parameters = dict(self.parameters, **override_parameters_kwargs)
-    return type(self)(**parameters)
+    d = type(self)(**parameters)
+    # pylint: disable=protected-access
+    d._parameters = parameters
+    d._parameters_sanitized = True
+    # pylint: enable=protected-access
+    return d
 
   def _batch_shape_tensor(self):
     raise NotImplementedError(
@@ -1128,10 +1178,10 @@ class Distribution(_BaseDistribution):
             "{maybe_event_shape}"
             ", dtype={dtype})".format(
                 type_name=type(self).__name__,
-                self_name=self.name,
+                self_name=self.name or "<unknown>",
                 maybe_batch_shape=maybe_batch_shape,
                 maybe_event_shape=maybe_event_shape,
-                dtype=self.dtype.name))
+                dtype=self.dtype.name if self.dtype else "<unknown>"))
 
   def __repr__(self):
     return ("<tfp.distributions.{type_name} "
@@ -1140,10 +1190,10 @@ class Distribution(_BaseDistribution):
             " event_shape={event_shape}"
             " dtype={dtype}>".format(
                 type_name=type(self).__name__,
-                self_name=self.name,
+                self_name=self.name or "<unknown>",
                 batch_shape=str(self.batch_shape).replace("None", "?"),
                 event_shape=str(self.event_shape).replace("None", "?"),
-                dtype=self.dtype.name))
+                dtype=self.dtype.name if self.dtype else "<unknown>"))
 
   @contextlib.contextmanager
   def _name_scope(self, name=None, values=None):
