@@ -68,6 +68,50 @@ def test_function_x_y_dy(x, y, dy, eps=0.01):
 @test_util.run_all_in_graph_and_eager_modes
 class HagerZhangLibTest(tf.test.TestCase):
 
+  def test_secant2_batching_vs_mapping(self):
+    # We build a simple example function with 2 batches, one where the wolfe
+    # condition is satisfied immediately, and another which does not converge.
+    wolfe_threshold = 1e-6
+    x = np.array([0.0, 1.0, 1.5, 2.0])
+    ys = np.array([[1.1, 1.0, 0.5, 1.0],
+                   [1.1, 1.0, 1.0, 1.0]])
+    dys = np.array([[-0.8, -0.8, 0.1, 0.8],
+                    [-0.8, -0.8, -1.0, 0.8]])
+
+    # Create each individual and batched functions.
+    fun1 = test_function_x_y_dy(x, ys[0], dys[0])
+    fun2 = test_function_x_y_dy(x, ys[1], dys[1])
+    funs = test_function_x_y_dy(x, ys, dys)
+
+    def eval_secant2(fun, p=lambda x: x):
+      val_0 = hzl._apply(fun, p(0.0))
+      val_a = hzl._apply(fun, p(1.0))
+      val_b = hzl._apply(fun, p(2.0))
+      f_lim = val_0.f + (wolfe_threshold * tf.abs(val_0.f))
+      return self.evaluate(hzl.secant2(fun, val_0, val_a, val_b, f_lim))
+
+    result1 = eval_secant2(fun1)
+    result2 = eval_secant2(fun2)
+    results = eval_secant2(funs, p=lambda x: [x, x])
+
+    # Assert secant2 converges on first function, but not the second one.
+    self.assertTrue(result1.converged)
+    self.assertTrue(results.converged[0])
+    self.assertFalse(result2.converged)
+    self.assertFalse(results.converged[1])
+
+    # Batching is strictly better than not in number of evaluations.
+    self.assertLess(results.num_evals, result1.num_evals + result2.num_evals)
+
+    # Both batching/non-batching versions get the same results.
+    self.assertEqual(result1.left.x, results.left.x[0])
+    self.assertEqual(result1.right.x, results.right.x[0])
+    self.assertEqual(result2.left.x, results.left.x[1])
+    self.assertEqual(result2.right.x, results.right.x[1])
+
+    # Left and right are the same on the one that converged.
+    self.assertEqual(result1.left.x, result1.right.x)
+
   def test_update_simple(self):
     """Tests that update works on a single line function."""
     # Example where trial point works as new left end point.
