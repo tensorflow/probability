@@ -1115,7 +1115,12 @@ def _make_kl_divergence_fn(
       # Losses appended with the model.add_loss and are expected to be a single
       # scalar, unlike model.loss, which is expected to be the loss per sample.
       # Therefore, we reduce over all dimensions, regardless of the shape.
-      return tf.reduce_mean(input_tensor=kl)
+      # We take the sum because (apparently) Keras will add this to the *post*
+      # `reduce_sum` (total) loss.
+      # TODO(b/126259176): Add end-to-end Keras/TFP test to ensure the API's
+      # align, particularly wrt how losses are aggregated (across batch
+      # members).
+      return tf.reduce_sum(input_tensor=kl, name='batch_total_kl_divergence')
 
   return _fn
 

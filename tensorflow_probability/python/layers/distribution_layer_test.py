@@ -94,7 +94,7 @@ class EndToEndTest(tf.test.TestCase):
             activity_regularizer=tfpl.KLDivergenceRegularizer(
                 tfd.Independent(tfd.Normal(loc=[0., 0], scale=1),
                                 reinterpreted_batch_ndims=1),
-                weight=self.train_size)),
+                weight=0.9)),  # "beta" as in beta-VAE.
     ])
 
     decoder_model = tfk.Sequential([
@@ -133,7 +133,7 @@ class EndToEndTest(tf.test.TestCase):
         tfpl.KLDivergenceAddLoss(
             tfd.Independent(tfd.Normal(loc=[0., 0], scale=1),
                             reinterpreted_batch_ndims=1),
-            weight=self.train_size),
+            weight=0.9),  # "beta" as in beta-VAE.
     ]
 
     decoder_model = [
@@ -177,7 +177,7 @@ class EndToEndTest(tf.test.TestCase):
             tfpl.KLDivergenceAddLoss(
                 tfd.Independent(tfd.Normal(loc=tf.zeros(encoded_size), scale=1),
                                 reinterpreted_batch_ndims=1),
-                weight=train_size),
+                weight=0.9),  # "beta" as in beta-VAE.
         ]
 
       def call(self, inputs):
@@ -231,7 +231,7 @@ class EndToEndTest(tf.test.TestCase):
             # TODO(b/119756336): Due to eager/graph Jacobian graph caching bug
             # we add here the capability for deferred construction of the prior.
             lambda: tfd.MultivariateNormalDiag(loc=tf.zeros(self.encoded_size)),
-            weight=self.train_size),
+            weight=0.9),  # "beta" as in beta-VAE.
     ])
 
     decoder_model = tfk.Sequential([
