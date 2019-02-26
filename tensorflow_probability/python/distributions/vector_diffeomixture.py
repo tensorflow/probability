@@ -927,7 +927,7 @@ def linop_scale(w, op):
 
 def concat_vectors(*args):
   """Concatenates input vectors, statically if possible."""
-  args_ = [distribution_util.static_value(x) for x in args]
+  args_ = [tf.get_static_value(x) for x in args]
   if any(vec is None for vec in args_):
     return tf.concat(args, axis=0)
   return [val for vec in args_ for val in vec]

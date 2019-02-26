@@ -25,7 +25,6 @@ import tensorflow as tf
 
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import distribution_util
 
 from tensorflow_probability.python.sts.internal import util as sts_util
 from tensorflow_probability.python.sts.structural_time_series import Parameter
@@ -224,9 +223,9 @@ class AdditiveStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
       dtype = initial_state_prior.dtype
 
       static_num_timesteps = [
-          distribution_util.static_value(ssm.num_timesteps)
+          tf.get_static_value(ssm.num_timesteps)
           for ssm in component_ssms
-          if distribution_util.static_value(ssm.num_timesteps) is not None
+          if tf.get_static_value(ssm.num_timesteps) is not None
       ]
 
       # If any components have a static value for `num_timesteps`, use that

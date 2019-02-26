@@ -115,11 +115,11 @@ def _augment_sample_shape(partial_batch_dist,
 
   expected_partial_batch_shape = (
       full_sample_and_batch_shape[num_broadcast_dims:])
-  expected_partial_batch_shape_static = distribution_util.static_value(
+  expected_partial_batch_shape_static = tf.get_static_value(
       full_sample_and_batch_shape[num_broadcast_dims:])
 
   # Raise errors statically if possible.
-  num_broadcast_dims_static = distribution_util.static_value(num_broadcast_dims)
+  num_broadcast_dims_static = tf.get_static_value(num_broadcast_dims)
   if num_broadcast_dims_static is not None:
     if num_broadcast_dims_static < 0:
       raise ValueError("Cannot broadcast distribution {} batch shape to "
@@ -412,8 +412,8 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
             observation_matrix, observation_noise
         ])
 
-        latent_size_ = distribution_util.static_value(self.latent_size)
-        observation_size_ = distribution_util.static_value(
+        latent_size_ = tf.get_static_value(self.latent_size)
+        observation_size_ = tf.get_static_value(
             self.observation_size)
         runtime_assertions = [
             _check_equal_shape(

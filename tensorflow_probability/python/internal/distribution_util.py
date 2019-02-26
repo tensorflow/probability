@@ -500,11 +500,6 @@ def pad_mixture_dimensions(x, mixture_distribution, categorical_distribution,
     return x
 
 
-def static_value(x):
-  """Returns the static value of a `Tensor` or `None`."""
-  return tf.get_static_value(tf.convert_to_tensor(value=x))
-
-
 def pick_scalar_condition(pred, true_value, false_value, name=None):
   """Convenience function that chooses one of two values based on the predicate.
 
