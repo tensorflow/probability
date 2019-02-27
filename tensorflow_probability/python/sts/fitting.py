@@ -314,9 +314,12 @@ def _minimize_in_graph(build_loss_fn, num_steps=200, optimizer=None):
         build_loss_fn if tf.executing_eagerly() else build_loss_fn())
     return tf.tuple(tensors=[tf.add(step, 1)], control_inputs=[train_op])
 
-  return tf.while_loop(cond=lambda step: step < num_steps,
-                       body=train_loop_body,
-                       loop_vars=[tf.constant(0)])
+  minimize_op = tf.compat.v1.while_loop(
+      cond=lambda step: step < num_steps,
+      body=train_loop_body,
+      loop_vars=[tf.constant(0)],
+      return_same_structure=True)[0]  # Always return a single op.
+  return minimize_op
 
 
 def fit_with_hmc(model,
