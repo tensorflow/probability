@@ -396,7 +396,7 @@ def minimize_one_step(gradient_unregularized_loss,
 
         # Update the entire batch at `coord` even if `delta` may be 0 at some
         # batch coordinates. In those cases, adding `delta` is a no-op.
-        x_update = tf.tensor_scatter_add(x_update, [[coord]], [delta])
+        x_update = tf.tensor_scatter_nd_add(x_update, [[coord]], [delta])
 
         with tf.control_dependencies([x_update]):
           x_update_diff_norm_sq_ = x_update_diff_norm_sq + delta**2
