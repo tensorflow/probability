@@ -37,6 +37,7 @@ py_library(
         ":bernoulli",
         ":beta",
         ":binomial",
+        ":blockwise",
         ":categorical",
         ":cauchy",
         ":chi",
@@ -166,6 +167,17 @@ py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:reparameterization",
+    ],
+)
+
+py_library(
+    name = "blockwise",
+    srcs = ["blockwise.py"],
+    deps = [
+        ":distribution",
+        ":seed_stream",
+        # tensorflow dep,
         "//tensorflow_probability/python/internal:reparameterization",
     ],
 )
@@ -1108,6 +1120,15 @@ py_test(
     deps = [
         # numpy dep,
         # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_test(
+    name = "blockwise_test",
+    srcs = ["blockwise_test.py"],
+    deps = [
         # tensorflow dep,
         "//tensorflow_probability",
     ],

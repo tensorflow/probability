@@ -24,6 +24,7 @@ from tensorflow_probability.python.distributions.batch_reshape import BatchResha
 from tensorflow_probability.python.distributions.bernoulli import Bernoulli
 from tensorflow_probability.python.distributions.beta import Beta
 from tensorflow_probability.python.distributions.binomial import Binomial
+from tensorflow_probability.python.distributions.blockwise import Blockwise
 from tensorflow_probability.python.distributions.categorical import Categorical
 from tensorflow_probability.python.distributions.cauchy import Cauchy
 from tensorflow_probability.python.distributions.chi import Chi
@@ -119,12 +120,14 @@ from tensorflow_probability.python.internal.reparameterization import FULLY_REPA
 from tensorflow_probability.python.internal.reparameterization import NOT_REPARAMETERIZED
 from tensorflow_probability.python.internal.reparameterization import ReparameterizationType
 
+# pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.ops.distributions.beta import BetaWithSoftplusConcentration
 from tensorflow.python.ops.distributions.exponential import ExponentialWithSoftplusRate
 from tensorflow.python.ops.distributions.gamma import GammaWithSoftplusConcentrationRate
 from tensorflow.python.ops.distributions.laplace import LaplaceWithSoftplusScale
 from tensorflow.python.ops.distributions.normal import NormalWithSoftplusScale
 from tensorflow.python.ops.distributions.student_t import StudentTWithAbsDfSoftplusScale
+# pylint: enable=g-direct-tensorflow-import
 
 # pylint: enable=unused-import,wildcard-import,line-too-long,g-importing-member
 
@@ -142,6 +145,7 @@ __all__ = [
     'Bernoulli',
     'Beta',
     'Binomial',
+    'Blockwise',
     'BetaWithSoftplusConcentration',
     'Categorical',
     'Chi',
