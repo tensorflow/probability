@@ -1063,6 +1063,7 @@ py_library(
     name = "zipf",
     srcs = ["zipf.py"],
     deps = [
+        ":distribution",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",

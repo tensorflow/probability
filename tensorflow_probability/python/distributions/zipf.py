@@ -21,6 +21,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions.seed_stream import SeedStream
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
@@ -30,7 +31,7 @@ __all__ = [
 ]
 
 
-class Zipf(tf.compat.v1.distributions.Distribution):
+class Zipf(distribution.Distribution):
   """Zipf distribution.
 
   The Zipf distribution is parameterized by a `power` parameter.

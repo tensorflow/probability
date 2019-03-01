@@ -23,6 +23,7 @@ import numpy as np
 
 import tensorflow as tf
 
+from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
@@ -36,7 +37,7 @@ def _broadcast_to(tensor_to_broadcast, target_tensors):
   return output
 
 
-class Triangular(tf.compat.v1.distributions.Distribution):
+class Triangular(distribution.Distribution):
   r"""Triangular distribution with `low`, `high` and `peak` parameters.
 
   #### Mathematical Details
