@@ -164,7 +164,7 @@ class MixtureSameFamily(distribution.Distribution):
       s = components_distribution.event_shape_tensor()
       self._event_ndims = tf.compat.dimension_value(s.shape[0])
       if self._event_ndims is None:
-        self._event_ndims = tf.shape(input=s)[0]
+        self._event_ndims = tf.size(input=s)
       self._event_size = tf.reduce_prod(input_tensor=s)
 
       if not mixture_distribution.dtype.is_integer:
