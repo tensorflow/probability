@@ -26,9 +26,10 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.distributions import uniform as uniform_lib
+from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 tfd = tfp.distributions
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 def try_import(name):  # pylint: disable=invalid-name
@@ -157,7 +158,7 @@ class UniformTest(tf.test.TestCase):
     n = tf.constant(100000)
     uniform = uniform_lib.Uniform(low=a, high=b)
 
-    samples = uniform.sample(n, seed=137)
+    samples = uniform.sample(n, seed=tfp_test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(sample_values.shape, (100000, 2))
     self.assertAllClose(
@@ -317,7 +318,7 @@ class UniformTest(tf.test.TestCase):
 
     # This is essentially an approximated integral from the direct definition
     # of KL divergence.
-    x = a.sample(int(1e4), seed=0)
+    x = a.sample(int(1e4), seed=tfp_test_util.test_seed())
     kl_sample = tf.reduce_mean(
         input_tensor=a.log_prob(x) - b.log_prob(x), axis=0)
 

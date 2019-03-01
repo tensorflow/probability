@@ -59,7 +59,8 @@ class VonMisesFisherTest(tfp_test_util.VectorDistributionTestHelpers,
     self.assertEqual([5, 3], vmf.batch_shape.as_list())
     self.assertEqual([2], vmf.event_shape.as_list())
     nsamples = 12000
-    samples = vmf.sample(sample_shape=[nsamples], seed=2142)
+    samples = vmf.sample(
+        sample_shape=[nsamples], seed=tfp_test_util.test_seed())
     self.assertEqual([nsamples, 5, 3, 2], samples.shape.as_list())
     sample_mean = self.evaluate(samples).mean(axis=0)
     # Assert that positive-concentration distributions have samples with
@@ -74,7 +75,7 @@ class VonMisesFisherTest(tfp_test_util.VectorDistributionTestHelpers,
     # Pick out >1 concentration distributions to assert ~1 inner product with
     # mean direction.
     self.assertAllClose(np.ones_like(inner_product)[2:], inner_product[2:],
-                        atol=0.01)
+                        atol=1e-3)
     # Inner products should be roughly ascending by concentration.
     self.assertAllEqual(np.round(np.sort(inner_product, axis=0), decimals=3),
                         np.round(inner_product, decimals=3))
@@ -99,7 +100,8 @@ class VonMisesFisherTest(tfp_test_util.VectorDistributionTestHelpers,
     self.assertEqual([5, 2], vmf.batch_shape.as_list())
     self.assertEqual([3], vmf.event_shape.as_list())
     nsamples = int(2e4)
-    samples = vmf.sample(sample_shape=[nsamples], seed=2143)
+    samples = vmf.sample(
+        sample_shape=[nsamples], seed=tfp_test_util.test_seed())
     self.assertEqual([nsamples, 5, 2, 3], samples.shape.as_list())
     sample_mean = self.evaluate(samples).mean(axis=0)
     # Assert that positive-concentration distributions have samples with
@@ -144,10 +146,9 @@ class VonMisesFisherTest(tfp_test_util.VectorDistributionTestHelpers,
     uniforms /= np.linalg.norm(uniforms, axis=-1, keepdims=True)
     uniforms = uniforms.astype(vmf.dtype.as_numpy_dtype)
     # Concatenate in some sampled points from the distribution under test.
-    samples = tf.concat([
-        uniforms,
-        vmf.sample(sample_shape=[nsamples], seed=2144),
-    ], axis=0)
+    vmf_samples = vmf.sample(
+        sample_shape=[nsamples], seed=tfp_test_util.test_seed())
+    samples = tf.concat([uniforms, vmf_samples], axis=0)
     samples = tf.debugging.check_numerics(samples, 'samples')
     samples = self.evaluate(samples)
     log_prob = vmf.log_prob(samples)
@@ -186,7 +187,8 @@ class VonMisesFisherTest(tfp_test_util.VectorDistributionTestHelpers,
     """
     dim = tf.compat.dimension_value(vmf.event_shape[-1])
     nsamples = 50000
-    samples = vmf.sample(sample_shape=[nsamples], seed=2145)
+    samples = vmf.sample(
+        sample_shape=[nsamples], seed=tfp_test_util.test_seed())
     samples = tf.debugging.check_numerics(samples, 'samples')
     log_prob = vmf.log_prob(samples)
     log_prob = tf.debugging.check_numerics(log_prob, 'log_prob')
@@ -242,7 +244,7 @@ class VonMisesFisherTest(tfp_test_util.VectorDistributionTestHelpers,
   def _verifyCovariance(self, vmf):
     dim = tf.compat.dimension_value(vmf.event_shape[-1])
     nsamples = 10000
-    samples = vmf.sample(nsamples, seed=2146)
+    samples = vmf.sample(nsamples, seed=tfp_test_util.test_seed())
     samples = tf.debugging.check_numerics(samples, 'samples')
     cov = vmf.covariance()
     samples, cov = self.evaluate([samples, cov])

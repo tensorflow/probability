@@ -61,8 +61,13 @@ class AutogressiveTest(tfp_test_util.VectorDistributionTestHelpers,
     if tf.executing_eagerly():
       return
     self.run_test_sample_consistent_log_prob(
-        self.evaluate, ar, num_samples=int(1e6),
-        radius=1., center=0., rtol=0.01, seed=77)
+        self.evaluate,
+        ar,
+        num_samples=int(1e6),
+        radius=1.,
+        center=0.,
+        rtol=0.01,
+        seed=tfp_test_util.test_seed())
 
   def testCompareToBijector(self):
     """Demonstrates equivalence between TD, Bijector approach and AR dist."""

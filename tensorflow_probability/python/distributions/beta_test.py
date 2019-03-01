@@ -20,9 +20,11 @@ import importlib
 
 # Dependency imports
 import numpy as np
+
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfd = tfp.distributions
@@ -273,16 +275,17 @@ class BetaTest(tf.test.TestCase):
     a_val = 1.
     b_val = 2.
     n_val = 100
+    seed = tfp_test_util.test_seed()
 
-    tf.compat.v1.set_random_seed(654321)
+    tf.compat.v1.set_random_seed(seed)
     beta1 = tfd.Beta(
         concentration1=a_val, concentration0=b_val, name="beta1")
-    samples1 = self.evaluate(beta1.sample(n_val, seed=123456))
+    samples1 = self.evaluate(beta1.sample(n_val, seed=seed))
 
-    tf.compat.v1.set_random_seed(654321)
+    tf.compat.v1.set_random_seed(seed)
     beta2 = tfd.Beta(
         concentration1=a_val, concentration0=b_val, name="beta2")
-    samples2 = self.evaluate(beta2.sample(n_val, seed=123456))
+    samples2 = self.evaluate(beta2.sample(n_val, seed=seed))
 
     self.assertAllClose(samples1, samples2)
 

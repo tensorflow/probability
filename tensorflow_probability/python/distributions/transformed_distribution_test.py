@@ -21,12 +21,15 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 from scipy import stats
+
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+
 tfb = tfp.bijectors
 tfd = tfp.distributions
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 class DummyMatrixTransform(tfb.Bijector):
@@ -79,7 +82,7 @@ class TransformedDistributionTest(tf.test.TestCase):
     sp_dist = stats.lognorm(s=sigma, scale=np.exp(mu))
 
     # sample
-    sample = log_normal.sample(100000, seed=235)
+    sample = log_normal.sample(100000, seed=tfp_test_util.test_seed())
     self.assertAllEqual([], log_normal.event_shape)
     self.assertAllEqual([], self.evaluate(log_normal.event_shape_tensor()))
     self.assertAllClose(
@@ -108,7 +111,7 @@ class TransformedDistributionTest(tf.test.TestCase):
     sp_normal = stats.norm(mu, sigma)
 
     # sample
-    sample = abs_normal.sample(100000, seed=235)
+    sample = abs_normal.sample(100000, seed=tfp_test_util.test_seed())
     self.assertAllEqual([], abs_normal.event_shape)
     sample_ = self.evaluate(sample)
     self.assertAllEqual([], self.evaluate(abs_normal.event_shape_tensor()))
@@ -162,7 +165,7 @@ class TransformedDistributionTest(tf.test.TestCase):
     log_normal = self._cls()(
         distribution=tfd.Normal(loc=mu, scale=sigma), bijector=exp_forward_only)
 
-    sample = log_normal.sample([2, 3], seed=42)
+    sample = log_normal.sample([2, 3], seed=tfp_test_util.test_seed())
     sample_val, log_pdf_val = self.evaluate(
         [sample, log_normal.log_prob(sample)])
     expected_log_pdf = stats.lognorm.logpdf(
@@ -192,7 +195,8 @@ class TransformedDistributionTest(tf.test.TestCase):
     exp_normal = self._cls()(
         distribution=tfd.Normal(loc=mu, scale=sigma), bijector=log_forward_only)
 
-    sample = exp_normal.sample([2, 3], seed=42)
+    sample = exp_normal.sample(
+        [2, 3], seed=tfp_test_util.test_seed(hardcoded_seed=42))
     sample_val, log_pdf_val = self.evaluate(
         [sample, exp_normal.log_prob(sample)])
     expected_log_pdf = sample_val + stats.norm.logpdf(
@@ -363,7 +367,7 @@ class ScalarToMultiTest(tf.test.TestCase):
       self.assertAllEqual(tf.TensorShape(None), fake_mvn_dynamic.event_shape)
       self.assertAllEqual(tf.TensorShape(None), fake_mvn_dynamic.batch_shape)
 
-    x = self.evaluate(fake_mvn_static.sample(5, seed=0))
+    x = self.evaluate(fake_mvn_static.sample(5, seed=tfp_test_util.test_seed()))
     for unsupported_fn in (fake_mvn_static.log_cdf, fake_mvn_static.cdf,
                            fake_mvn_static.survival_function,
                            fake_mvn_static.log_survival_function):
@@ -374,7 +378,7 @@ class ScalarToMultiTest(tf.test.TestCase):
     num_samples = 7e3
     for fake_mvn in [fake_mvn_static, fake_mvn_dynamic]:
       # Ensure sample works by checking first, second moments.
-      y = fake_mvn.sample(int(num_samples), seed=0)
+      y = fake_mvn.sample(int(num_samples), seed=tfp_test_util.test_seed())
       x = y[0:5, ...]
       sample_mean = tf.reduce_mean(input_tensor=y, axis=0)
       centered_y = tf.transpose(a=y - sample_mean, perm=[1, 2, 0])
@@ -518,7 +522,7 @@ class ScalarToMultiTest(tf.test.TestCase):
     num_samples = 5e3
     for fake_mvn in [fake_mvn_static, fake_mvn_dynamic]:
       # Ensure sample works by checking first, second moments.
-      y = fake_mvn.sample(int(num_samples), seed=0)
+      y = fake_mvn.sample(int(num_samples), seed=tfp_test_util.test_seed())
       x = y[0:5, ...]
       [
           x_,
@@ -540,8 +544,10 @@ class ScalarToMultiTest(tf.test.TestCase):
       self.assertAllEqual([2], fake_batch_shape_)
       self.assertAllClose(
           actual_mvn_log_prob(x_), fake_log_prob_, atol=0., rtol=1e-6)
+      # With this many dimensions and samples, the direct space probability
+      # may underflow.
       self.assertAllClose(
-          np.exp(actual_mvn_log_prob(x_)), fake_prob_, atol=0., rtol=1e-5)
+          np.exp(actual_mvn_log_prob(x_)), fake_prob_, atol=1e-12, rtol=1e-5)
 
   def testEmptyEvent(self):
     # Verify that zero-dimensional multivariate Normal distributions still

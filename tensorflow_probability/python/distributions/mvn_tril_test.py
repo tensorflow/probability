@@ -21,10 +21,13 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 from scipy import stats
+
 import tensorflow as tf
 import tensorflow_probability as tfp
-tfd = tfp.distributions
+
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+tfd = tfp.distributions
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -136,7 +139,7 @@ class MultivariateNormalTriLTest(tf.test.TestCase):
 
     n = tf.constant(100000)
     mvn = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
-    samples = mvn.sample(n, seed=137)
+    samples = mvn.sample(n, seed=tfp_test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, [int(100e3), 2])
     self.assertAllClose(sample_values.mean(axis=0), mu, atol=1e-2)
@@ -156,7 +159,8 @@ class MultivariateNormalTriLTest(tf.test.TestCase):
     chol[2, 3, 1, 1] = -chol[2, 3, 1, 1]
 
     mvn = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
-    samples_val = self.evaluate(mvn.sample((10, 11, 12), seed=137))
+    samples_val = self.evaluate(mvn.sample(
+        (10, 11, 12), seed=tfp_test_util.test_seed()))
 
     # Check sample shape
     self.assertEqual((10, 11, 12, 3, 5, 2), samples_val.shape)
@@ -181,7 +185,7 @@ class MultivariateNormalTriLTest(tf.test.TestCase):
 
     mvn = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
     n = tf.constant(100000)
-    samples = mvn.sample(n, seed=137)
+    samples = mvn.sample(n, seed=tfp_test_util.test_seed())
     sample_values = self.evaluate(samples)
 
     self.assertEqual(samples.shape, (100000, 3, 5, 2))
@@ -315,7 +319,7 @@ class MultivariateNormalTriLTest(tf.test.TestCase):
         validate_args=True)
 
     n = int(10e3)
-    samps = dist.sample(n, seed=0)
+    samps = dist.sample(n, seed=tfp_test_util.test_seed())
     sample_mean = tf.reduce_mean(input_tensor=samps, axis=0)
     x = samps - sample_mean
     sample_covariance = tf.matmul(x, x, transpose_a=True) / n

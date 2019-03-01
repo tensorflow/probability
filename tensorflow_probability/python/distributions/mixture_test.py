@@ -26,6 +26,7 @@ from scipy import stats
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 tfd = tfp.distributions
 
 
@@ -540,8 +541,9 @@ class MixtureTest(tf.test.TestCase):
     sigmas = [0.1, 5.0, 3.0, 0.2, 4.0]
 
     n = 100
+    seed = tfp_test_util.test_seed()
 
-    tf.compat.v1.set_random_seed(654321)
+    tf.compat.v1.set_random_seed(seed)
     components = [
         tfd.Normal(loc=mu, scale=sigma) for mu, sigma in zip(mus, sigmas)
     ]
@@ -551,9 +553,9 @@ class MixtureTest(tf.test.TestCase):
         components,
         name="mixture1",
         use_static_graph=self.use_static_graph)
-    samples1 = self.evaluate(dist1.sample(n, seed=_set_seed(123456)))
+    samples1 = self.evaluate(dist1.sample(n, seed=seed))
 
-    tf.compat.v1.set_random_seed(654321)
+    tf.compat.v1.set_random_seed(seed)
     components2 = [
         tfd.Normal(loc=mu, scale=sigma) for mu, sigma in zip(mus, sigmas)
     ]
@@ -563,7 +565,7 @@ class MixtureTest(tf.test.TestCase):
         components2,
         name="mixture2",
         use_static_graph=self.use_static_graph)
-    samples2 = self.evaluate(dist2.sample(n, seed=_set_seed(123456)))
+    samples2 = self.evaluate(dist2.sample(n, seed=seed))
 
     self.assertAllClose(samples1, samples2)
 

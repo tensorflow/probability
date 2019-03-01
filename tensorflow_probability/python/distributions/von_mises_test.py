@@ -20,12 +20,13 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
+
 import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
-
 
 tfd = tfp.distributions
 
@@ -136,7 +137,8 @@ class _VonMisesTest(object):
       locs = tf.cast(tf.constant([1.0] * n), self.dtype)
       concentrations = tf.cast(tf.constant(np.logspace(-3, 3, n)), self.dtype)
       von_mises = tfd.VonMises(locs, concentrations)
-      x = tf.constant(self.evaluate(von_mises.sample(seed=137)))
+      x = tf.constant(self.evaluate(
+          von_mises.sample(seed=tfp_test_util.test_seed())))
       cdf = von_mises.cdf(x)
 
       self.assertLess(
@@ -246,7 +248,7 @@ class _VonMisesTest(object):
         concentration=self.make_tensor(np.array([[0.8, 0.0, 0.5]])))
 
     kl_actual = tfd.kl_divergence(d1, d2)
-    x = d1.sample(int(1e5), seed=0)
+    x = d1.sample(int(1e5), seed=tfp_test_util.test_seed(hardcoded_seed=0))
     kl_sample = tf.reduce_mean(
         input_tensor=d1.log_prob(x) - d2.log_prob(x), axis=0)
     kl_same = tfd.kl_divergence(d1, d1)
@@ -268,7 +270,8 @@ class _VonMisesTest(object):
         self.make_tensor(locs_v), self.make_tensor(concentrations_v))
 
     n = 10000
-    samples = von_mises.sample(n, seed=12345)
+    seed = tfp_test_util.test_seed(hardcoded_seed=12345, set_eager_seed=False)
+    samples = von_mises.sample(n, seed=seed)
 
     expected_mean = von_mises.mean()
     actual_mean = tf.atan2(
@@ -293,7 +296,7 @@ class _VonMisesTest(object):
     von_mises = tfd.VonMises(self.make_tensor(1.0), self.make_tensor(0.0))
 
     n = 10000
-    samples = von_mises.sample(n, seed=12345)
+    samples = von_mises.sample(n, seed=tfp_test_util.test_seed())
 
     # For circular uniform distribution, the mean is not well-defined,
     # so only checking the variance.
@@ -313,7 +316,8 @@ class _VonMisesTest(object):
     von_mises = tfd.VonMises(self.make_tensor(0.0),
                              self.make_tensor(concentrations_v))
     n = 10000
-    sample_values = self.evaluate(von_mises.sample(n, seed=137))
+    sample_values = self.evaluate(
+        von_mises.sample(n, seed=tfp_test_util.test_seed()))
     self.assertEqual(sample_values.shape, (n, 50))
 
     try:
@@ -336,7 +340,8 @@ class _VonMisesTest(object):
     locs_v = np.linspace(-10., 10., 50)
     von_mises = tfd.VonMises(self.make_tensor(locs_v), self.make_tensor(0.))
     n = 10000
-    sample_values = self.evaluate(von_mises.sample(n, seed=137))
+    sample_values = self.evaluate(
+        von_mises.sample(n, seed=tfp_test_util.test_seed(hardcoded_seed=137)))
     self.assertEqual(sample_values.shape, (n, 50))
 
     try:
@@ -366,7 +371,7 @@ class _VonMisesTest(object):
 
     def loss(loc, concentration):
       von_mises = tfd.VonMises(loc, concentration)
-      samples = von_mises.sample(n, seed=137)
+      samples = von_mises.sample(n, seed=tfp_test_util.test_seed())
       return tf.reduce_mean(input_tensor=samples, axis=0)
 
     _, [grad_loc, grad_concentration] = self.evaluate(
@@ -384,7 +389,7 @@ class _VonMisesTest(object):
 
     def loss(loc, concentration):
       von_mises = tfd.VonMises(loc, concentration)
-      samples = von_mises.sample(n, seed=137)
+      samples = von_mises.sample(n, seed=tfp_test_util.test_seed())
       return tf.reduce_mean(input_tensor=1. - tf.cos(samples - loc), axis=0)
 
     _, [grad_loc, grad_concentration] = self.evaluate(
@@ -410,7 +415,7 @@ class _VonMisesTest(object):
     concentration = self.make_tensor([min_value, 1., max_value, np.nan, np.nan])
     von_mises = tfd.VonMises(loc, concentration)
 
-    samples = von_mises.sample(seed=12345)
+    samples = von_mises.sample(seed=tfp_test_util.test_seed())
     # Check that it does not end up in an infinite loop.
     self.assertEqual(self.evaluate(samples).shape, (5,))
 

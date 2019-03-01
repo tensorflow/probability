@@ -21,9 +21,11 @@ from __future__ import print_function
 import importlib
 # Dependency imports
 import numpy as np
+
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -53,7 +55,7 @@ class ProductDistributionTest(tf.test.TestCase):
         distribution=tfd.Normal(loc=loc, scale=scale),
         reinterpreted_batch_ndims=1)
 
-    x = ind.sample([4, 5], seed=42)
+    x = ind.sample([4, 5], seed=tfp_test_util.test_seed(hardcoded_seed=42))
     log_prob_x = ind.log_prob(x)
     x_, actual_log_prob_x = self.evaluate([x, log_prob_x])
 
@@ -74,7 +76,7 @@ class ProductDistributionTest(tf.test.TestCase):
             loc=loc, scale_identity_multiplier=scale),
         reinterpreted_batch_ndims=1)
 
-    x = ind.sample([4, 5], seed=42)
+    x = ind.sample([4, 5], seed=tfp_test_util.test_seed())
     log_prob_x = ind.log_prob(x)
     x_, actual_log_prob_x = self.evaluate([x, log_prob_x])
 
@@ -111,7 +113,7 @@ class ProductDistributionTest(tf.test.TestCase):
             loc=loc, scale_identity_multiplier=scale),
         reinterpreted_batch_ndims=1)
 
-    x = ind.sample(int(n_samp), seed=42)
+    x = ind.sample(int(n_samp), seed=tfp_test_util.test_seed(hardcoded_seed=42))
     sample_mean = tf.reduce_mean(input_tensor=x, axis=0)
     sample_var = tf.reduce_mean(
         input_tensor=tf.math.squared_difference(x, sample_mean), axis=0)
@@ -250,7 +252,7 @@ class ProductDistributionTest(tf.test.TestCase):
         input=logits, shape=logits.shape if static_shape else None)
     ind = tfd.Independent(
         distribution=tfd.Bernoulli(logits=logits_ph))
-    x = ind.sample(sample_shape, seed=42)
+    x = ind.sample(sample_shape, seed=tfp_test_util.test_seed())
     log_prob_x = ind.log_prob(x)
     [
         x_,

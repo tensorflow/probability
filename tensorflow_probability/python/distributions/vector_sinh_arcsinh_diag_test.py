@@ -53,9 +53,10 @@ class VectorSinhArcsinhDiagTest(tfp_test_util.VectorDistributionTestHelpers,
     norm_pdf, sasnorm_pdf = self.evaluate([norm.prob(x), sasnorm.prob(x)])
     self.assertAllClose(norm_pdf, sasnorm_pdf)
 
-    norm_samps, sasnorm_samps = self.evaluate(
-        [norm.sample(10000, seed=0),
-         sasnorm.sample(10000, seed=0)])
+    norm_samps, sasnorm_samps = self.evaluate([
+        norm.sample(10000, seed=tfp_test_util.test_seed()),
+        sasnorm.sample(10000, seed=tfp_test_util.test_seed())
+    ])
     self.assertAllClose(loc, sasnorm_samps.mean(axis=0), atol=0.1)
     self.assertAllClose(
         norm_samps.mean(axis=0), sasnorm_samps.mean(axis=0), atol=0.1)
@@ -83,9 +84,10 @@ class VectorSinhArcsinhDiagTest(tfp_test_util.VectorDistributionTestHelpers,
     vlap_pdf, sasvlap_pdf = self.evaluate([vlap.prob(x), sasvlap.prob(x)])
     self.assertAllClose(vlap_pdf, sasvlap_pdf)
 
-    vlap_samps, sasvlap_samps = self.evaluate(
-        [vlap.sample(10000, seed=0),
-         sasvlap.sample(10000, seed=0)])
+    vlap_samps, sasvlap_samps = self.evaluate([
+        vlap.sample(10000, seed=tfp_test_util.test_seed()),
+        sasvlap.sample(10000, seed=tfp_test_util.test_seed())
+    ])
     self.assertAllClose(loc, sasvlap_samps.mean(axis=0), atol=0.1)
     self.assertAllClose(
         vlap_samps.mean(axis=0), sasvlap_samps.mean(axis=0), atol=0.1)
@@ -116,9 +118,10 @@ class VectorSinhArcsinhDiagTest(tfp_test_util.VectorDistributionTestHelpers,
 
     # 0.1% quantile and 99.9% quantile are outliers, and should be more
     # extreme in the normal.  The 97.772% quantiles should be the same.
-    norm_samps, sasnorm_samps = self.evaluate(
-        [norm.sample(int(5e5), seed=1),
-         sasnorm.sample(int(5e5), seed=1)])
+    norm_samps, sasnorm_samps = self.evaluate([
+        norm.sample(int(5e5), seed=tfp_test_util.test_seed(hardcoded_seed=1)),
+        sasnorm.sample(int(5e5), seed=tfp_test_util.test_seed(hardcoded_seed=1))
+    ])
     np.testing.assert_array_less(
         np.percentile(norm_samps, 0.1, axis=0),
         np.percentile(sasnorm_samps, 0.1, axis=0))
@@ -160,9 +163,10 @@ class VectorSinhArcsinhDiagTest(tfp_test_util.VectorDistributionTestHelpers,
 
     # 0.1% quantile and 99.9% quantile are outliers, and should be more
     # extreme in the sasnormal.  The 97.772% quantiles should be the same.
-    norm_samps, sasnorm_samps = self.evaluate(
-        [norm.sample(int(5e5), seed=2),
-         sasnorm.sample(int(5e5), seed=2)])
+    norm_samps, sasnorm_samps = self.evaluate([
+        norm.sample(int(5e5), seed=tfp_test_util.test_seed()),
+        sasnorm.sample(int(5e5), seed=tfp_test_util.test_seed())
+    ])
     np.testing.assert_array_less(
         np.percentile(sasnorm_samps, 0.1, axis=0),
         np.percentile(norm_samps, 0.1, axis=0))
@@ -192,7 +196,8 @@ class VectorSinhArcsinhDiagTest(tfp_test_util.VectorDistributionTestHelpers,
         skewness=3.0,
         validate_args=True)
 
-    sasnorm_samps = self.evaluate(sasnorm.sample(10000, seed=4))
+    sasnorm_samps = self.evaluate(
+        sasnorm.sample(10000, seed=tfp_test_util.test_seed()))
     np.testing.assert_array_less(loc, sasnorm_samps.mean(axis=0))
 
   def test_consistency_random_parameters_with_batch_dim(self):

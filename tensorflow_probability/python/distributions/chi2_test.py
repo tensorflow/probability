@@ -25,6 +25,7 @@ from scipy import stats
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 tfd = tfp.distributions
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
@@ -106,7 +107,7 @@ class Chi2Test(tf.test.TestCase):
 
     kl = tfd.kl_divergence(a, b)
 
-    x = a.sample(int(1e5), seed=0)
+    x = a.sample(int(1e5), seed=tfp_test_util.test_seed())
     kl_sample = tf.reduce_mean(
         input_tensor=a.log_prob(x) - b.log_prob(x), axis=0)
 

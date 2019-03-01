@@ -24,6 +24,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 tfd = tfp.distributions
 
 
@@ -324,7 +325,7 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
     histograms = [[[0.2, 0.8], [0.4, 0.6]]]
     dist = tfd.Categorical(tf.math.log(histograms) - 50.)
     n = 10000
-    samples = dist.sample(n, seed=123)
+    samples = dist.sample(n, seed=tfp_test_util.test_seed())
     samples.set_shape([n, 1, 2])
     self.assertEqual(samples.dtype, tf.int32)
     sample_values = self.evaluate(samples)
@@ -338,7 +339,7 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
   def testSampleWithSampleShape(self):
     histograms = [[[0.2, 0.8], [0.4, 0.6]]]
     dist = tfd.Categorical(tf.math.log(histograms) - 50.)
-    samples = dist.sample((100, 100), seed=123)
+    samples = dist.sample((100, 100), seed=tfp_test_util.test_seed())
     prob = dist.prob(samples)
     prob_val = self.evaluate(prob)
     self.assertAllClose(

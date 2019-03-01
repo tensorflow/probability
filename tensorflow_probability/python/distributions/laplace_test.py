@@ -23,6 +23,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 tfd = tfp.distributions
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
@@ -218,7 +219,7 @@ class LaplaceTest(tf.test.TestCase):
     scale = tf.constant(scale_v)
     n = 100000
     laplace = tfd.Laplace(loc=loc, scale=scale)
-    samples = laplace.sample(n, seed=137)
+    samples = laplace.sample(n, seed=tfp_test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n,))
     self.assertEqual(sample_values.shape, (n,))
@@ -249,7 +250,7 @@ class LaplaceTest(tf.test.TestCase):
     scale_v = np.array([np.arange(1, 11, dtype=np.float32)]).T  # 10 x 1
     laplace = tfd.Laplace(loc=loc_v, scale=scale_v)
     n = 10000
-    samples = laplace.sample(n, seed=137)
+    samples = laplace.sample(n, seed=tfp_test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n, 10, 100))
     self.assertEqual(sample_values.shape, (n, 10, 100))
@@ -288,7 +289,7 @@ class LaplaceTest(tf.test.TestCase):
   def testLaplacePdfOfSampleMultiDims(self):
     laplace = tfd.Laplace(loc=[7., 11.], scale=[[5.], [6.]])
     num = 50000
-    samples = laplace.sample(num, seed=137)
+    samples = laplace.sample(num, seed=tfp_test_util.test_seed())
     pdfs = laplace.prob(samples)
     sample_vals, pdf_vals = self.evaluate([samples, pdfs])
     self.assertEqual(samples.shape, (num, 2, 2))
@@ -355,7 +356,7 @@ class LaplaceTest(tf.test.TestCase):
 
     kl = tfd.kl_divergence(a, b)
 
-    x = a.sample(int(1e4), seed=0)
+    x = a.sample(int(1e4), seed=tfp_test_util.test_seed())
     kl_sample = tf.reduce_mean(
         input_tensor=a.log_prob(x) - b.log_prob(x), axis=0)
 

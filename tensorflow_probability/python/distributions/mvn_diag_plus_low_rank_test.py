@@ -22,8 +22,10 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-tfd = tfp.distributions
+
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+tfd = tfp.distributions
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -149,7 +151,8 @@ class MultivariateNormalDiagPlusLowRankTest(tf.test.TestCase):
     scale = dist.scale.to_dense()
 
     n = int(30e3)
-    samps = dist.sample(n, seed=0)
+    samps = dist.sample(
+        n, seed=tfp_test_util.test_seed(hardcoded_seed=0, set_eager_seed=False))
     sample_mean = tf.reduce_mean(input_tensor=samps, axis=0)
     x = samps - sample_mean
     sample_covariance = tf.matmul(x, x, transpose_a=True) / n
@@ -176,7 +179,7 @@ class MultivariateNormalDiagPlusLowRankTest(tf.test.TestCase):
         loc=np.array([-1., 0.25, 1.25], dtype=np.float32),
         scale_diag=np.array([1.5, 0.5, 1.], dtype=np.float32),
         validate_args=True)
-    samps = baseline.sample(n, seed=0)
+    samps = baseline.sample(n, seed=tfp_test_util.test_seed())
 
     sample_kl_identity_diag_baseline = tf.reduce_mean(
         input_tensor=baseline.log_prob(samps) - mvn_identity.log_prob(samps),

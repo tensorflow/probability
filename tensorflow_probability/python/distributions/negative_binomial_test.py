@@ -22,8 +22,10 @@ from scipy import stats
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-tfd = tfp.distributions
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+
+tfd = tfp.distributions
 
 
 # In all tests that follow, we use scipy.stats.nbinom, which
@@ -188,7 +190,7 @@ class NegativeBinomialTest(tf.test.TestCase):
     n = int(100e3)
     negbinom = tfd.NegativeBinomial(total_count=total_count, probs=probs)
 
-    samples = negbinom.sample(n, seed=12345)
+    samples = negbinom.sample(n, seed=tfp_test_util.test_seed())
     self.assertEqual([n, 2], samples.shape)
 
     sample_mean = tf.reduce_mean(input_tensor=samples, axis=0)

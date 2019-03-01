@@ -22,11 +22,12 @@ import importlib
 
 # Dependency imports
 import numpy as np
+
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
-
 
 tfd = tfp.distributions
 
@@ -240,7 +241,8 @@ class BernoulliTest(tf.test.TestCase):
     # In this test we're just interested in verifying there isn't a crash
     # owing to mismatched types. b/30940152
     dist = tfd.Bernoulli(np.log([.2, .4]))
-    self.assertAllEqual((1, 2), dist.sample(1, seed=42).shape.as_list())
+    self.assertAllEqual((1, 2), dist.sample(
+        1, seed=tfp_test_util.test_seed()).shape.as_list())
 
   def testNotReparameterized(self):
     p = tf.constant([0.2, 0.6])

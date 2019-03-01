@@ -18,9 +18,11 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
+
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfd = tfp.distributions
@@ -200,7 +202,7 @@ class DirichletMultinomialTest(tf.test.TestCase):
     # batch_shape=[2], event_shape=[3]
     dist = tfd.DirichletMultinomial(n, alpha)
     # Sample count chosen based on what can be drawn in about 1 minute.
-    x = dist.sample(int(25e3), seed=1)
+    x = dist.sample(int(25e3), seed=tfp_test_util.test_seed())
     sample_mean = tf.reduce_mean(input_tensor=x, axis=0)
     x_centered = x - sample_mean[tf.newaxis, ...]
     sample_cov = tf.reduce_mean(
@@ -398,7 +400,7 @@ class DirichletMultinomialTest(tf.test.TestCase):
         total_count=5.,
         concentration=1. + 2. * self._rng.rand(4, 3, 2).astype(np.float32))
     n = int(3e3)
-    x = dist.sample(n, seed=0)
+    x = dist.sample(n, seed=tfp_test_util.test_seed())
     sample_mean = tf.reduce_mean(input_tensor=x, axis=0)
     # Cyclically rotate event dims left.
     x_centered = tf.transpose(a=x - sample_mean, perm=[1, 2, 3, 0])
@@ -426,7 +428,7 @@ class DirichletMultinomialTest(tf.test.TestCase):
         total_count=5.,
         concentration=1. + 2. * self._rng.rand(4).astype(np.float32))
     n = int(5e3)
-    x = dist.sample(n, seed=0)
+    x = dist.sample(n, seed=tfp_test_util.test_seed())
     sample_mean = tf.reduce_mean(input_tensor=x, axis=0)
     x_centered = x - sample_mean  # Already transposed to [n, 2].
     sample_covariance = tf.matmul(

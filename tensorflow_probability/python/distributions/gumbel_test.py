@@ -21,12 +21,15 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 from scipy import stats
+
 import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
-tfd = tfp.distributions
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+
+tfd = tfp.distributions
 
 
 class _GumbelTest(object):
@@ -179,7 +182,7 @@ class _GumbelTest(object):
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale))
 
-    samples = gumbel.sample(n, seed=123456)
+    samples = gumbel.sample(n, seed=tfp_test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual((n,), sample_values.shape)
     self.assertAllClose(
@@ -199,7 +202,7 @@ class _GumbelTest(object):
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale))
 
-    samples = gumbel.sample(n, seed=12345)
+    samples = gumbel.sample(n, seed=tfp_test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertAllClose(
         stats.gumbel_r.mean(loc=loc, scale=scale),
@@ -217,7 +220,7 @@ class _GumbelTest(object):
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale))
 
-    samples = gumbel.sample(n, seed=123456)
+    samples = gumbel.sample(n, seed=tfp_test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertAllClose(
         stats.gumbel_r.var(loc=loc, scale=scale),
@@ -249,7 +252,7 @@ class _GumbelTest(object):
 
     kl = tfd.kl_divergence(a, b)
 
-    x = a.sample(int(1e5), seed=4342)
+    x = a.sample(int(1e5), seed=tfp_test_util.test_seed())
     kl_sample = tf.reduce_mean(
         input_tensor=a.log_prob(x) - b.log_prob(x), axis=0)
 

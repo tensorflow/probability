@@ -160,7 +160,22 @@ py_library(
     srcs = ["test_util.py"],
     srcs_version = "PY2AND3",
     deps = [
+        # absl/flags dep,
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/distributions:seed_stream",
+    ],
+)
+
+py_test(
+    name = "test_util_test",
+    size = "small",
+    srcs = ["test_util_test.py"],
+    deps = [
+        ":test_util",
+        # absl/flags dep,
+        # absl/testing:flagsaver dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions:seed_stream",
     ],
 )
