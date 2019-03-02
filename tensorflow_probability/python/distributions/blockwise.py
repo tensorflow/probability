@@ -145,6 +145,11 @@ class Blockwise(distribution.Distribution):
       return sum(tf.cast(d.log_prob(tf.cast(x, d.dtype)), self.dtype)
                  for d, x in zip(self.distributions, xs))
 
+  def _mean(self):
+    with tf.control_dependencies(self._assertions):
+      means = [tf.cast(d.mean(), self.dtype) for d in self._distributions]
+      return tf.concat(means, axis=-1)
+
 
 def _flatten(list_of_lists):
   return [item for sublist in list_of_lists for item in sublist]  # pylint: disable=g-complex-comprehension
@@ -172,20 +177,17 @@ def _maybe_validate_distributions(distributions, dtype_override, validate_args):
       raise TypeError('Distributions must have same dtype; '
                       'found: {}.'.format(set(dt.name for dt in dts)))
 
-  event_ndims = [d.event_shape.ndims for d in distributions]
-  if not any(r is None for r in event_ndims):
-    if any(r != 1 for r in event_ndims):
-      raise ValueError('`distributions` must all be vector variate, '
-                       'found event ndims: {}'.format(event_ndims))
-  elif validate_args:
-    event_ndims = [tf.size(input=d.event_shape_tensor())
-                   if d.event_shape.ndims is None
-                   else d.event_shape.ndims]
-    assertions.extend(
-        tf.compat.v1.assert_equal(  # pylint: disable=g-complex-comprehension
-            r1, r2,
-            message='Distribution `event_ndims`s must be identical.')
-        for r1, r2 in zip(event_ndims[1:], event_ndims[:-1]))
+  # Validate event_ndims.
+  for d in distributions:
+    if d.event_shape.ndims is not None:
+      if d.event_shape.ndims != 1:
+        raise ValueError('`Distribution` must be vector variate, '
+                         'found event nimds: {}.'.format(d.event_shape.ndims))
+    elif validate_args:
+      assertions.append(
+          tf.compat.v1.assert_equal(
+              1, tf.size(input=d.event_shape_tensor()),
+              message='`Distribution` must be vector variate.'))
 
   batch_shapes = [d.batch_shape for d in distributions]
   if all(b.is_fully_defined() for b in batch_shapes):

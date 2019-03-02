@@ -16,6 +16,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
@@ -54,6 +55,9 @@ class BlockwiseTest(test_case.TestCase):
     self.assertIs(tf.float32, x.dtype)
     self.assertEqual((2, 1), y_.shape)
     self.assertIs(tf.float32, y.dtype)
+
+    self.assertAllClose(np.zeros((6,), dtype=np.float32),
+                        self.evaluate(d.mean()))
 
 
 if __name__ == '__main__':
