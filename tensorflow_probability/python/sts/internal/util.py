@@ -76,7 +76,7 @@ def factored_joint_mvn(distributions):
 
   graph_parents = [tensor for distribution in distributions
                    for tensor in distribution._graph_parents]  # pylint: disable=protected-access
-  with tf.name_scope('factored_joint_mvn', values=graph_parents):
+  with tf.compat.v1.name_scope('factored_joint_mvn', values=graph_parents):
 
     # We explicitly broadcast the `locs` so that we can concatenate them.
     # We don't have direct numerical access to the `scales`, which are arbitrary
@@ -116,7 +116,7 @@ def sum_mvns(distributions):
 
   graph_parents = [tensor for distribution in distributions
                    for tensor in distribution._graph_parents]  # pylint: disable=protected-access
-  with tf.name_scope('sum_mvns', values=graph_parents):
+  with tf.compat.v1.name_scope('sum_mvns', values=graph_parents):
     if all([isinstance(mvn, tfd.MultivariateNormalDiag)
             for mvn in distributions]):
       return tfd.MultivariateNormalDiag(
@@ -144,7 +144,8 @@ def empirical_statistics(observed_time_series):
       of each time series in the batch.
   """
 
-  with tf.name_scope('empirical_statistics', values=[observed_time_series]):
+  with tf.compat.v1.name_scope(
+      'empirical_statistics', values=[observed_time_series]):
     observed_time_series = tf.convert_to_tensor(
         value=observed_time_series, name='observed_time_series')
     observed_time_series = maybe_expand_trailing_dim(observed_time_series)
@@ -175,7 +176,7 @@ def maybe_expand_trailing_dim(observed_time_series):
     expanded_time_series: `Tensor` of shape `batch_shape + [num_timesteps, 1]`.
   """
 
-  with tf.name_scope(
+  with tf.compat.v1.name_scope(
       'maybe_expand_trailing_dim', values=[observed_time_series]):
     observed_time_series = tf.convert_to_tensor(
         value=observed_time_series, name='observed_time_series')

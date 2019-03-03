@@ -93,7 +93,7 @@ class Laplace(distribution.Distribution):
       TypeError: if `loc` and `scale` are of different dtype.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[loc, scale]) as name:
+    with tf.compat.v1.name_scope(name, values=[loc, scale]) as name:
       dtype = dtype_util.common_dtype([loc, scale], tf.float32)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
       scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
@@ -218,8 +218,8 @@ def _kl_laplace_laplace(a, b, name=None):
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.name_scope(name, "kl_laplace_laplace",
-                     [a.loc, b.loc, a.scale, b.scale]):
+  with tf.compat.v1.name_scope(name, "kl_laplace_laplace",
+                               [a.loc, b.loc, a.scale, b.scale]):
     # Consistent with
     # http://www.mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 38
     distance = tf.abs(a.loc - b.loc)

@@ -50,7 +50,7 @@ class MatvecLU(bijector.Bijector):
   ```python
   def trainable_lu_factorization(
       event_size, batch_shape=(), seed=None, dtype=tf.float32, name=None):
-    with tf.name_scope(name, 'trainable_lu_factorization',
+    with tf.compat.v1.name_scope(name, 'trainable_lu_factorization',
                        [event_size, batch_shape]):
       event_size = tf.convert_to_tensor(
           event_size, preferred_dtype=tf.int32, name='event_size')
@@ -118,7 +118,8 @@ class MatvecLU(bijector.Bijector):
       ValueError: If both/neither `channels` and `lower_upper`/`permutation` are
         specified.
     """
-    with tf.name_scope(name, 'MatvecLU', [lower_upper, permutation]) as name:
+    with tf.compat.v1.name_scope(name, 'MatvecLU',
+                                 [lower_upper, permutation]) as name:
       self._lower_upper = tf.convert_to_tensor(
           value=lower_upper, dtype_hint=tf.float32, name='lower_upper')
       self._permutation = tf.convert_to_tensor(

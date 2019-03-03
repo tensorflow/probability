@@ -78,7 +78,7 @@ class Chi(transformed_distribution.TransformedDistribution):
       name: Python `str` name prefixed to Ops created by this class.
         Default value: `'Chi'`.
     """
-    with tf.name_scope(name, values=[df]) as name:
+    with tf.compat.v1.name_scope(name, values=[df]) as name:
       df = tf.convert_to_tensor(
           value=df,
           name="df",
@@ -126,7 +126,7 @@ def _kl_chi_chi(a, b, name=None):
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.name_scope(name, "kl_chi_chi", [a.df, b.df]):
+  with tf.compat.v1.name_scope(name, "kl_chi_chi", [a.df, b.df]):
     # Consistent with
     # https://mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 118
     # The paper introduces an additional scaling parameter; setting that

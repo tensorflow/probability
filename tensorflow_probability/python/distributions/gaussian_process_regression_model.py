@@ -406,7 +406,7 @@ class GaussianProcessRegressionModel(
         - `mean_fn` is not `None` and not callable.
     """
     parameters = dict(locals())
-    with tf.name_scope(name) as name:
+    with tf.compat.v1.name_scope(name) as name:
       dtype = dtype_util.common_dtype([
           index_points, observation_index_points, observations,
           observation_noise_variance, predictive_noise_variance, jitter
@@ -456,7 +456,7 @@ class GaussianProcessRegressionModel(
       self._mean_fn = mean_fn
       self._validate_args = validate_args
 
-      with tf.name_scope('init', values=[index_points, jitter]):
+      with tf.compat.v1.name_scope('init', values=[index_points, jitter]):
         (loc,
          covariance) = self._compute_marginal_distribution_loc_and_covariance()
         self._covariance_matrix = covariance

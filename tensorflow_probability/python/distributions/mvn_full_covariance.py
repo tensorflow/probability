@@ -156,8 +156,8 @@ class MultivariateNormalFullCovariance(mvn_tril.MultivariateNormalTriL):
     parameters = dict(locals())
 
     # Convert the covariance_matrix up to a scale_tril and call MVNTriL.
-    with tf.name_scope(name) as name:
-      with tf.name_scope("init", values=[loc, covariance_matrix]):
+    with tf.compat.v1.name_scope(name) as name:
+      with tf.compat.v1.name_scope("init", values=[loc, covariance_matrix]):
         dtype = dtype_util.common_dtype([loc, covariance_matrix], tf.float32)
         loc = loc if loc is None else tf.convert_to_tensor(
             value=loc, name="loc", dtype=dtype)

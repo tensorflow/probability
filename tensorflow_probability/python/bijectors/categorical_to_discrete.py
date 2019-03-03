@@ -56,7 +56,7 @@ class CategoricalToDiscrete(bijector.Bijector):
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
     """
-    with tf.name_scope(name, values=[map_values]):
+    with tf.compat.v1.name_scope(name, values=[map_values]):
       map_values = tf.convert_to_tensor(value=map_values, name='map_values')
       assertions = _maybe_check_valid_map_values(map_values, validate_args)
       if assertions:

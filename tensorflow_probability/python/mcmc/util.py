@@ -56,7 +56,7 @@ def is_namedtuple_like(x):
 
 
 def make_name(super_name, default_super_name, sub_name):
-  """Helper which makes a `str` name; useful for tf.name_scope."""
+  """Helper which makes a `str` name; useful for tf.compat.v1.name_scope."""
   name = super_name if super_name is not None else default_super_name
   if sub_name is not None:
     name += '_' + sub_name
@@ -70,7 +70,7 @@ def _choose_base_case(is_accepted,
   """Helper to `choose` which expand_dims `is_accepted` and applies tf.where."""
   def _expand_is_accepted_like(x):
     """Helper to expand `is_accepted` like the shape of some input arg."""
-    with tf.name_scope('expand_is_accepted_like'):
+    with tf.compat.v1.name_scope('expand_is_accepted_like'):
       expand_shape = tf.concat([
           tf.shape(input=is_accepted),
           tf.ones([tf.rank(x) - tf.rank(is_accepted)], dtype=tf.int32),
@@ -93,8 +93,9 @@ def _choose_base_case(is_accepted,
     r = tf.where(_expand_is_accepted_like(accepted), accepted, rejected)
     r.set_shape(r.shape.merge_with(accepted.shape.merge_with(rejected.shape)))
     return r
-  with tf.name_scope(name, 'choose', values=[
-      is_accepted, accepted, rejected]):
+
+  with tf.compat.v1.name_scope(
+      name, 'choose', values=[is_accepted, accepted, rejected]):
     if not is_list_like(accepted):
       return _where(accepted, rejected)
     return [(choose(is_accepted, a, r, name=name) if is_namedtuple_like(a)
@@ -138,7 +139,7 @@ def safe_sum(x, alt_value=-np.inf, name=None):
     TypeError: if `x` is not list-like.
     ValueError: if `x` is empty.
   """
-  with tf.name_scope(name, 'safe_sum', [x, alt_value]):
+  with tf.compat.v1.name_scope(name, 'safe_sum', [x, alt_value]):
     if not is_list_like(x):
       raise TypeError('Expected list input.')
     if not x:
@@ -178,7 +179,9 @@ def set_doc(value):
 
 def _value_and_gradients(fn, fn_arg_list, result=None, grads=None, name=None):
   """Helper to `maybe_call_fn_and_grads`."""
-  with tf.name_scope(name, 'value_and_gradients', [fn_arg_list, result, grads]):
+  with tf.compat.v1.name_scope(name, 'value_and_gradients',
+                               [fn_arg_list, result, grads]):
+
     def _convert_to_tensor(x, name):
       ctt = lambda x_: x_ if x_ is None else tf.convert_to_tensor(
           value=x_, name=name)
@@ -226,8 +229,8 @@ def maybe_call_fn_and_grads(fn,
                             check_non_none_grads=True,
                             name=None):
   """Calls `fn` and computes the gradient of the result wrt `args_list`."""
-  with tf.name_scope(name, 'maybe_call_fn_and_grads',
-                     [fn_arg_list, result, grads]):
+  with tf.compat.v1.name_scope(name, 'maybe_call_fn_and_grads',
+                               [fn_arg_list, result, grads]):
     fn_arg_list = (list(fn_arg_list) if is_list_like(fn_arg_list)
                    else [fn_arg_list])
     result, grads = _value_and_gradients(fn, fn_arg_list, result, grads)
@@ -270,8 +273,8 @@ def smart_for_loop(loop_num_iter, body_fn, initial_loop_vars,
   Returns:
     result: `Tensor` representing applying `body_fn` iteratively `n` times.
   """
-  with tf.name_scope(
-      name, 'smart_for_loop', [loop_num_iter, initial_loop_vars]):
+  with tf.compat.v1.name_scope(name, 'smart_for_loop',
+                               [loop_num_iter, initial_loop_vars]):
     loop_num_iter_ = tf.get_static_value(
         tf.convert_to_tensor(
             value=loop_num_iter, dtype=tf.int64, name='loop_num_iter'))
@@ -325,9 +328,9 @@ def trace_scan(loop_fn,
       `Tensor` being a stack of the corresponding `Tensors` in the return value
       of `trace_fn` for each slice of `elems`.
   """
-  with tf.name_scope(name, 'trace_scan',
-                     [initial_state, elems]), tf.compat.v1.variable_scope(
-                         tf.compat.v1.get_variable_scope()) as vs:
+  with tf.compat.v1.name_scope(
+      name, 'trace_scan', [initial_state, elems]), tf.compat.v1.variable_scope(
+          tf.compat.v1.get_variable_scope()) as vs:
     if vs.caching_device is None and not tf.executing_eagerly():
       vs.set_caching_device(lambda op: op.device)
 

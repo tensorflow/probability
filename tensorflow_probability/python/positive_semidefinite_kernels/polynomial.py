@@ -122,8 +122,8 @@ class Polynomial(psd_kernel.PositiveSemidefiniteKernel):
       name: Python `str` name prefixed to Ops created by this class.
         Default Value: `'Polynomial'`
     """
-    with tf.name_scope(name, values=[
-        bias_variance, slope_variance, shift, exponent]):
+    with tf.compat.v1.name_scope(
+        name, values=[bias_variance, slope_variance, shift, exponent]):
       dtype = dtype_util.common_dtype(
           [bias_variance, slope_variance, shift, exponent], tf.float32)
       if bias_variance is not None:

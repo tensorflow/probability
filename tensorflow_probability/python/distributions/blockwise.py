@@ -61,7 +61,7 @@ class Blockwise(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.name_scope(name) as name:
+    with tf.compat.v1.name_scope(name) as name:
       self._assertions = _maybe_validate_distributions(
           distributions, dtype_override, validate_args)
 

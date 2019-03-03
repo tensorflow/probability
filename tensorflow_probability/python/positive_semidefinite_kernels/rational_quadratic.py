@@ -109,7 +109,7 @@ class RationalQuadratic(psd_kernel.PositiveSemidefiniteKernel):
         possibly degrading runtime performance
       name: Python `str` name prefixed to Ops created by this class.
     """
-    with tf.name_scope(
+    with tf.compat.v1.name_scope(
         name, values=[amplitude, scale_mixture_rate, length_scale]) as name:
       dtype = dtype_util.common_dtype([
           amplitude, scale_mixture_rate, length_scale], tf.float32)

@@ -153,7 +153,7 @@ class InverseGamma(distribution.Distribution):
     if rate is not None:
       scale = rate
     parameters = dict(locals())
-    with tf.name_scope(name, values=[concentration, scale]) as name:
+    with tf.compat.v1.name_scope(name, values=[concentration, scale]) as name:
       dtype = dtype_util.common_dtype([concentration, scale],
                                       preferred_dtype=tf.float32)
       concentration = tf.convert_to_tensor(
@@ -325,7 +325,7 @@ class InverseGammaWithSoftplusConcentrationScale(InverseGamma):
     if rate is not None:
       scale = rate
     parameters = dict(locals())
-    with tf.name_scope(name, values=[concentration, scale]) as name:
+    with tf.compat.v1.name_scope(name, values=[concentration, scale]) as name:
       dtype = dtype_util.common_dtype([concentration, scale])
       concentration = tf.convert_to_tensor(
           value=concentration, name="softplus_concentration", dtype=dtype)

@@ -45,7 +45,7 @@ def dense_to_sparse(x, ignore_value=None, name=None):
   """
   # Copied (with modifications) from:
   # tensorflow/contrib/layers/python/ops/sparse_ops.py.
-  with tf.name_scope(name, 'dense_to_sparse', [x, ignore_value]):
+  with tf.compat.v1.name_scope(name, 'dense_to_sparse', [x, ignore_value]):
     x = tf.convert_to_tensor(value=x, name='x')
     if ignore_value is None:
       if x.dtype.base_dtype == tf.string:

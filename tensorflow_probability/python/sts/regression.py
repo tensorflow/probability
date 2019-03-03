@@ -160,7 +160,7 @@ class LinearRegression(StructuralTimeSeries):
       name: the name of this model component.
         Default value: 'LinearRegression'.
     """
-    with tf.name_scope(
+    with tf.compat.v1.name_scope(
         name, 'LinearRegression', values=[design_matrix]) as name:
 
       if not isinstance(design_matrix, tfl.LinearOperator):

@@ -308,7 +308,7 @@ def sample_chain(
   if not kernel.is_calibrated:
     warnings.warn("supplied `TransitionKernel` is not calibrated. Markov "
                   "chain may not converge to intended target distribution.")
-  with tf.name_scope(
+  with tf.compat.v1.name_scope(
       name, "mcmc_sample_chain",
       [num_results, num_burnin_steps, num_steps_between_results]):
     num_results = tf.convert_to_tensor(

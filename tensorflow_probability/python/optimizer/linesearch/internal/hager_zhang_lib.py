@@ -148,13 +148,10 @@ def secant2(value_and_gradients_function,
       right: Instance of _FnDFn. The position and the associated value and
         derivative at the updated right end point of the interval.
   """
-  with tf.name_scope(name, 'secant2',
-                     [val_0,
-                      val_left,
-                      val_right,
-                      f_lim,
-                      sufficient_decrease_param,
-                      curvature_param]):
+  with tf.compat.v1.name_scope(name, 'secant2', [
+      val_0, val_left, val_right, f_lim, sufficient_decrease_param,
+      curvature_param
+  ]):
     # This will always be s.t. left <= c <= right
     val_c = _apply(value_and_gradients_function, _secant(val_left, val_right))
     failed = ~is_finite(val_c)

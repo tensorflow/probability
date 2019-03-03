@@ -99,7 +99,7 @@ class InverseGaussian(distribution.Distribution):
         Default value: 'InverseGaussian'.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[loc, concentration]):
+    with tf.compat.v1.name_scope(name, values=[loc, concentration]):
       dtype = dtype_util.common_dtype([loc, concentration],
                                       preferred_dtype=tf.float32)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)

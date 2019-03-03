@@ -84,7 +84,7 @@ class _BaseDeterministic(distribution.Distribution):
       ValueError:  If `loc` is a scalar.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[loc, atol, rtol]) as name:
+    with tf.compat.v1.name_scope(name, values=[loc, atol, rtol]) as name:
       dtype = dtype_util.common_dtype([loc, atol, rtol],
                                       preferred_dtype=tf.float32)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
@@ -404,5 +404,5 @@ def _kl_deterministic_distribution(a, b, name=None):
   Returns:
     Batchwise `KL(a || b)`.
   """
-  with tf.name_scope(name, "kl_deterministic_distribution", [a.loc]):
+  with tf.compat.v1.name_scope(name, "kl_deterministic_distribution", [a.loc]):
     return -b.log_prob(a.loc)

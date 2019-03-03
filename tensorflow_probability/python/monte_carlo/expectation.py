@@ -154,7 +154,7 @@ def expectation(f, samples, log_prob=None, use_reparametrization=True,
       `callable`.
   """
 
-  with tf.name_scope(name, 'expectation', [samples]):
+  with tf.compat.v1.name_scope(name, 'expectation', [samples]):
     if not callable(f):
       raise ValueError('`f` must be a callable function.')
     if use_reparametrization:
@@ -204,7 +204,7 @@ def _sample_max(values):
 
 def _get_samples(dist, z, n, seed):
   """Check args and return samples."""
-  with tf.name_scope('get_samples', values=[z, n]):
+  with tf.compat.v1.name_scope('get_samples', values=[z, n]):
     if (n is None) == (z is None):
       raise ValueError(
           'Must specify exactly one of arguments "n" and "z".  Found: '

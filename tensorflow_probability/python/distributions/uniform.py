@@ -99,7 +99,7 @@ class Uniform(distribution.Distribution):
       InvalidArgumentError: if `low >= high` and `validate_args=False`.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[low, high]) as name:
+    with tf.compat.v1.name_scope(name, values=[low, high]) as name:
       dtype = dtype_util.common_dtype([low, high], tf.float32)
       low = tf.convert_to_tensor(value=low, name="low", dtype=dtype)
       high = tf.convert_to_tensor(value=high, name="high", dtype=dtype)
@@ -223,8 +223,8 @@ def _kl_uniform_uniform(a, b, name=None):
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.name_scope(name, "kl_uniform_uniform",
-                     [a.low, b.low, a.high, b.high]):
+  with tf.compat.v1.name_scope(name, "kl_uniform_uniform",
+                               [a.low, b.low, a.high, b.high]):
     # Consistent with
     # http://www.mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 60
     # Watch out for the change in conventions--they use 'a' and 'b' to refer to

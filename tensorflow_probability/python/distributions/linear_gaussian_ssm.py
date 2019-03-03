@@ -328,13 +328,13 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
 
     parameters = locals()
 
-    with tf.name_scope(name, values=[num_timesteps,
-                                     transition_matrix,
-                                     transition_noise,
-                                     observation_matrix,
-                                     observation_noise,
-                                     initial_state_prior,
-                                     initial_step]) as name:
+    with tf.compat.v1.name_scope(
+        name,
+        values=[
+            num_timesteps, transition_matrix, transition_noise,
+            observation_matrix, observation_noise, initial_state_prior,
+            initial_step
+        ]) as name:
 
       self.num_timesteps = tf.convert_to_tensor(
           value=num_timesteps, name="num_timesteps")
@@ -497,11 +497,10 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
         `batch_shape + [num_timesteps, latent_size, latent_size]`.
         which is of the same shape as filtered_covs.
     """
-    with tf.name_scope("backward_pass",
-                       values=[filtered_means,
-                               filtered_covs,
-                               predicted_means,
-                               predicted_covs]):
+    with tf.compat.v1.name_scope(
+        "backward_pass",
+        values=[filtered_means, filtered_covs, predicted_means,
+                predicted_covs]):
       filtered_means = tf.convert_to_tensor(
           value=filtered_means, name="filtered_means")
       filtered_covs = tf.convert_to_tensor(
@@ -602,7 +601,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
   def _joint_sample_n(self, n, seed=None):
     """Draw a joint sample from the prior over latents and observations."""
 
-    with tf.name_scope("sample_n_joint"):
+    with tf.compat.v1.name_scope("sample_n_joint"):
       stream = seed_stream.SeedStream(
           seed, salt="LinearGaussianStateSpaceModel_sample_n_joint")
 
@@ -769,7 +768,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
          dimensions than `observation_means`.
     """
 
-    with tf.name_scope("forward_filter", values=[x]):
+    with tf.compat.v1.name_scope("forward_filter", values=[x]):
       x = tf.convert_to_tensor(value=x, name="x")
       if mask is not None:
         mask = tf.convert_to_tensor(value=mask, name="mask", dtype_hint=tf.bool)
@@ -973,7 +972,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
          dimensions than `filtered_means`.
     """
 
-    with tf.name_scope("smooth", values=[x]):
+    with tf.compat.v1.name_scope("smooth", values=[x]):
       x = tf.convert_to_tensor(value=x, name="x")
       (_, filtered_means, filtered_covs,
        predicted_means, predicted_covs, _, _) = self.forward_filter(
@@ -1000,7 +999,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
         observation_size]`
     """
 
-    with tf.name_scope("mean_joint"):
+    with tf.compat.v1.name_scope("mean_joint"):
 
       # The initial timestep is a special case, since we sample the
       # latent state from the prior rather than the transition model.
@@ -1060,7 +1059,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
         observation_size, observation_size]`
     """
 
-    with tf.name_scope("covariance_joint"):
+    with tf.compat.v1.name_scope("covariance_joint"):
 
       with tf.control_dependencies(self.runtime_assertions):
         initial_latent_cov = _broadcast_to_shape(

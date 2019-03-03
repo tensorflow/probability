@@ -135,7 +135,7 @@ class Triangular(distribution.Distribution):
         * `low > peak`.
     """
     parameters = locals()
-    with tf.name_scope(name, values=[low, high, peak]) as name:
+    with tf.compat.v1.name_scope(name, values=[low, high, peak]) as name:
       dtype = dtype_util.common_dtype([low, high, peak], tf.float32)
       low = tf.convert_to_tensor(value=low, name="low", dtype=dtype)
       high = tf.convert_to_tensor(value=high, name="high", dtype=dtype)

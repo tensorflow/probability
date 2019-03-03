@@ -71,7 +71,7 @@ def expectation_importance_sampler(f,
       to batch shape of `q`, and `dtype` = `q.dtype`.
   """
   q = sampling_dist_q
-  with tf.name_scope(name, values=[z, n]):
+  with tf.compat.v1.name_scope(name, values=[z, n]):
     z = _get_samples(q, z, n, seed)
 
     log_p_z = log_p(z)
@@ -146,7 +146,7 @@ def expectation_importance_sampler_logspace(
       to batch shape of `q`, and `dtype` = `q.dtype`.
   """
   q = sampling_dist_q
-  with tf.name_scope(name, values=[z, n]):
+  with tf.compat.v1.name_scope(name, values=[z, n]):
     z = _get_samples(q, z, n, seed)
     log_values = log_f(z) + log_p(z) - q.log_prob(z)
     return _logspace_mean(log_values)
@@ -309,7 +309,7 @@ def expectation(f, samples, log_prob=None, use_reparametrization=True,
       `callable`.
   """
 
-  with tf.name_scope(name, 'expectation', [samples]):
+  with tf.compat.v1.name_scope(name, 'expectation', [samples]):
     if not callable(f):
       raise ValueError('`f` must be a callable function.')
     if use_reparametrization:
@@ -349,7 +349,7 @@ def _sample_max(values):
 
 def _get_samples(dist, z, n, seed):
   """Check args and return samples."""
-  with tf.name_scope('get_samples', values=[z, n]):
+  with tf.compat.v1.name_scope('get_samples', values=[z, n]):
     if (n is None) == (z is None):
       raise ValueError(
           'Must specify exactly one of arguments "n" and "z".  Found: '

@@ -127,7 +127,7 @@ class Gumbel(transformed_distribution.TransformedDistribution):
     Raises:
       TypeError: if loc and scale are different dtypes.
     """
-    with tf.name_scope(name, values=[loc, scale]) as name:
+    with tf.compat.v1.name_scope(name, values=[loc, scale]) as name:
       dtype = dtype_util.common_dtype([loc, scale], preferred_dtype=tf.float32)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
       scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
@@ -203,8 +203,8 @@ def _kl_gumbel_gumbel(a, b, name=None):
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.name_scope(name, "kl_gumbel_gumbel",
-                     [a.loc, b.loc, a.scale, b.scale]):
+  with tf.compat.v1.name_scope(name, "kl_gumbel_gumbel",
+                               [a.loc, b.loc, a.scale, b.scale]):
     # Consistent with
     # http://www.mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 64
     # The paper uses beta to refer to scale and mu to refer to loc.

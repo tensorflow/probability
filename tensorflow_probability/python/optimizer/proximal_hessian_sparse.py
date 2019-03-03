@@ -234,7 +234,7 @@ def minimize_one_step(gradient_unregularized_loss,
       tolerance,
       learning_rate,
   ]
-  with tf.name_scope(name, 'minimize_one_step', graph_deps):
+  with tf.compat.v1.name_scope(name, 'minimize_one_step', graph_deps):
     x_shape = _get_shape(x_start)
     batch_shape = x_shape[:-1]
     dims = x_shape[-1]
@@ -559,7 +559,7 @@ def minimize(grad_and_hessian_loss_fn,
       tolerance,
       learning_rate,
   ],
-  with tf.name_scope(name, 'minimize', graph_deps):
+  with tf.compat.v1.name_scope(name, 'minimize', graph_deps):
 
     def _loop_cond(x_start, converged, iter_):
       del x_start

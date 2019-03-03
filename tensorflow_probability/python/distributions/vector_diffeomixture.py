@@ -75,8 +75,9 @@ def quadrature_scheme_softmaxnormal_gauss_hermite(
     probs:  Shape `[b1, ..., bB, K, quadrature_size]` `Tensor` representing the
       associated with each grid point.
   """
-  with tf.name_scope(name, "quadrature_scheme_softmaxnormal_gauss_hermite",
-                     [normal_loc, normal_scale]):
+  with tf.compat.v1.name_scope(name,
+                               "quadrature_scheme_softmaxnormal_gauss_hermite",
+                               [normal_loc, normal_scale]):
     normal_loc = tf.convert_to_tensor(value=normal_loc, name="normal_loc")
     dt = normal_loc.dtype.base_dtype
     normal_scale = tf.convert_to_tensor(
@@ -134,8 +135,8 @@ def quadrature_scheme_softmaxnormal_quantiles(
     probs:  Shape `[b1, ..., bB, K, quadrature_size]` `Tensor` representing the
       associated with each grid point.
   """
-  with tf.name_scope(name, "softmax_normal_grid_and_probs",
-                     [normal_loc, normal_scale]):
+  with tf.compat.v1.name_scope(name, "softmax_normal_grid_and_probs",
+                               [normal_loc, normal_scale]):
     normal_loc = tf.convert_to_tensor(value=normal_loc, name="normal_loc")
     dt = normal_loc.dtype.base_dtype
     normal_scale = tf.convert_to_tensor(
@@ -387,7 +388,7 @@ class VectorDiffeomixture(distribution_lib.Distribution):
       ValueError: if `not distribution.is_scalar_event`.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[mix_loc, temperature]) as name:
+    with tf.compat.v1.name_scope(name, values=[mix_loc, temperature]) as name:
       if not scale or len(scale) < 2:
         raise ValueError("Must specify list (or list-like object) of scale "
                          "LinearOperators, one for each component with "
@@ -769,7 +770,7 @@ class VectorDiffeomixture(distribution_lib.Distribution):
 
 def maybe_check_quadrature_param(param, name, validate_args):
   """Helper which checks validity of `loc` and `scale` init args."""
-  with tf.name_scope(name="check_" + name, values=[param]):
+  with tf.compat.v1.name_scope(name="check_" + name, values=[param]):
     assertions = []
     if param.shape.ndims is not None:
       if param.shape.ndims == 0:
@@ -807,7 +808,7 @@ def maybe_check_quadrature_param(param, name, validate_args):
 
 def determine_batch_event_shapes(grid, endpoint_affine):
   """Helper to infer batch_shape and event_shape."""
-  with tf.name_scope(name="determine_batch_event_shapes"):
+  with tf.compat.v1.name_scope(name="determine_batch_event_shapes"):
     # grid  # shape: [B, k, q]
     # endpoint_affine     # len=k, shape: [B, d, d]
     batch_shape = grid.shape[:-2]
@@ -853,7 +854,7 @@ def interpolate_loc(grid, loc):
   if deg is None:
     raise ValueError("Num quadrature grid points must be known prior "
                      "to graph execution.")
-  with tf.name_scope("interpolate_loc", values=[grid, loc]):
+  with tf.compat.v1.name_scope("interpolate_loc", values=[grid, loc]):
     if loc is None or loc[0] is None and loc[1] is None:
       return [None]*deg
     # shape: [B, 1, k, deg]
@@ -881,7 +882,7 @@ def interpolate_scale(grid, scale):
   if deg is None:
     raise ValueError("Num quadrature grid points must be known prior "
                      "to graph execution.")
-  with tf.name_scope("interpolate_scale", values=[grid]):
+  with tf.compat.v1.name_scope("interpolate_scale", values=[grid]):
     return [linop_add_lib.add_operators([
         linop_scale(grid[..., k, q], s)
         for k, s in enumerate(scale)
@@ -891,7 +892,7 @@ def interpolate_scale(grid, scale):
 def linop_scale(w, op):
   """Creates weighted `LinOp` from existing `LinOp`."""
   # We assume w > 0. (This assumption only relates to the is_* attributes.)
-  with tf.name_scope("linop_scale", values=[w]):
+  with tf.compat.v1.name_scope("linop_scale", values=[w]):
     # TODO(b/35301104): LinearOperatorComposition doesn't combine operators, so
     # special case combinations here. Once it does, this function can be
     # replaced by:
@@ -949,7 +950,7 @@ def vec_osquare(x):
 
 def softmax(x, axis, name=None):
   """Equivalent to tf.nn.softmax but works around b/70297725."""
-  with tf.name_scope(name, "softmax", [x, axis]):
+  with tf.compat.v1.name_scope(name, "softmax", [x, axis]):
     x = tf.convert_to_tensor(value=x, name="x")
     ndims = (
         x.shape.ndims

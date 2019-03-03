@@ -198,7 +198,7 @@ class DistributionTest(tf.test.TestCase):
   def testNameScopeWorksCorrectly(self):
     x = tfd.Normal(loc=0., scale=1., name="x")
     x_duplicate = tfd.Normal(loc=0., scale=1., name="x")
-    with tf.name_scope("y") as name:
+    with tf.compat.v1.name_scope("y") as name:
       y = tfd.Bernoulli(logits=0., name=name)
     x_sample = x.sample(name="custom_sample")
     x_sample_duplicate = x.sample(name="custom_sample")

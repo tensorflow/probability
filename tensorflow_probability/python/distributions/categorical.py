@@ -174,7 +174,7 @@ class Categorical(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[logits, probs]) as name:
+    with tf.compat.v1.name_scope(name, values=[logits, probs]) as name:
       self._logits, self._probs = util.get_logits_and_probs(
           logits=logits,
           probs=probs,
@@ -193,7 +193,7 @@ class Categorical(distribution.Distribution):
             dtype=tf.int32,
             name="batch_rank")
       else:
-        with tf.name_scope(name="batch_rank"):
+        with tf.compat.v1.name_scope(name="batch_rank"):
           self._batch_rank = tf.rank(self._logits) - 1
 
       logits_shape = tf.shape(input=self._logits, name="logits_shape")
@@ -202,7 +202,7 @@ class Categorical(distribution.Distribution):
         self._event_size = tf.convert_to_tensor(
             value=event_size, dtype=tf.int32, name="event_size")
       else:
-        with tf.name_scope(name="event_size"):
+        with tf.compat.v1.name_scope(name="event_size"):
           self._event_size = logits_shape[self._batch_rank]
 
       if logits_shape_static[:-1].is_fully_defined():
@@ -211,7 +211,7 @@ class Categorical(distribution.Distribution):
             dtype=tf.int32,
             name="batch_shape")
       else:
-        with tf.name_scope(name="batch_shape"):
+        with tf.compat.v1.name_scope(name="batch_shape"):
           self._batch_shape_val = logits_shape[:-1]
     super(Categorical, self).__init__(
         dtype=dtype,
@@ -324,8 +324,8 @@ def _kl_categorical_categorical(a, b, name=None):
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.name_scope(name, "kl_categorical_categorical",
-                     values=[a.logits, b.logits]):
+  with tf.compat.v1.name_scope(
+      name, "kl_categorical_categorical", values=[a.logits, b.logits]):
     # sum(probs log(probs / (1 - probs)))
     delta_log_probs1 = (tf.nn.log_softmax(a.logits) -
                         tf.nn.log_softmax(b.logits))

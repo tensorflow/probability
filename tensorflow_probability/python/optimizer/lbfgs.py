@@ -190,8 +190,7 @@ def minimize(value_and_gradients_function,
     raise NotImplementedError(
         'Support of initial_inverse_hessian_estimate arg not yet implemented')
 
-  with tf.name_scope(name, 'minimize', [initial_position,
-                                        tolerance]):
+  with tf.compat.v1.name_scope(name, 'minimize', [initial_position, tolerance]):
     initial_position = tf.convert_to_tensor(
         value=initial_position, name='initial_position')
     dtype = initial_position.dtype.base_dtype

@@ -137,7 +137,8 @@ def vector_size_to_square_matrix_size(d, validate_args, name=None):
       raise ValueError("Vector length is not a triangular number.")
     return int(n)
   else:
-    with tf.name_scope(name, "vector_size_to_square_matrix_size", [d]) as name:
+    with tf.compat.v1.name_scope(name, "vector_size_to_square_matrix_size",
+                                 [d]) as name:
       n = (-1. + tf.sqrt(1 + 8. * tf.cast(d, dtype=tf.float32))) / 2.
       if validate_args:
         with tf.control_dependencies([

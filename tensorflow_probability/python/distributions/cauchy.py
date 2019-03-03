@@ -117,7 +117,7 @@ class Cauchy(distribution.Distribution):
       TypeError: if `loc` and `scale` have different `dtype`.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[loc, scale]) as name:
+    with tf.compat.v1.name_scope(name, values=[loc, scale]) as name:
       dtype = dtype_util.common_dtype([loc, scale], tf.float32)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
       scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
@@ -197,12 +197,12 @@ class Cauchy(distribution.Distribution):
 
   def _z(self, x):
     """Standardize input `x`."""
-    with tf.name_scope("standardize", values=[x]):
+    with tf.compat.v1.name_scope("standardize", values=[x]):
       return (x - self.loc) / self.scale
 
   def _inv_z(self, z):
     """Reconstruct input `x` from a its normalized version."""
-    with tf.name_scope("reconstruct", values=[z]):
+    with tf.compat.v1.name_scope("reconstruct", values=[z]):
       return z * self.scale + self.loc
 
   def _mean(self):

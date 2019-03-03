@@ -132,7 +132,7 @@ class LKJ(distribution.Distribution):
           'There are no negative-dimension correlation matrices.')
     parameters = dict(locals())
     self._input_output_cholesky = input_output_cholesky
-    with tf.name_scope(name, values=[dimension, concentration]):
+    with tf.compat.v1.name_scope(name, values=[dimension, concentration]):
       concentration = tf.convert_to_tensor(
           value=concentration,
           name='concentration',
@@ -202,7 +202,7 @@ class LKJ(distribution.Distribution):
           'Cannot sample negative-dimension correlation matrices.')
     # Notation below: B is the batch shape, i.e., tf.shape(concentration)
     seed = seed_stream.SeedStream(seed, 'sample_lkj')
-    with tf.name_scope('sample_lkj', name, [self.concentration]):
+    with tf.compat.v1.name_scope('sample_lkj', name, [self.concentration]):
       if not self.concentration.dtype.is_floating:
         raise TypeError('The concentration argument should have floating type,'
                         ' not {}'.format(self.concentration.dtype.name))
@@ -374,7 +374,8 @@ class LKJ(distribution.Distribution):
         `x`, with respect to an LKJ distribution with parameter the
         corresponding element of `concentration`.
     """
-    with tf.name_scope('log_unnorm_prob_lkj', name, [self.concentration]):
+    with tf.compat.v1.name_scope('log_unnorm_prob_lkj', name,
+                                 [self.concentration]):
       x = tf.convert_to_tensor(value=x, name='x')
       # The density is det(matrix) ** (concentration - 1).
       # Computing the determinant with `logdet` is usually fine, since
@@ -413,7 +414,8 @@ class LKJ(distribution.Distribution):
     """
     # The formula is from D. Lewandowski et al [1], p. 1999, from the
     # proof that eqs 16 and 17 are equivalent.
-    with tf.name_scope('log_normalization_lkj', name, [self.concentration]):
+    with tf.compat.v1.name_scope('log_normalization_lkj', name,
+                                 [self.concentration]):
       logpi = np.log(np.pi)
       ans = tf.zeros_like(self.concentration)
       for k in range(1, self.dimension):

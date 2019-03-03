@@ -54,8 +54,8 @@ def _undo_batch_normalization(x,
   Returns:
     batch_unnormalized: The de-normalized, de-scaled, de-offset `Tensor`.
   """
-  with tf.name_scope(name, "undo_batchnorm",
-                     [x, mean, variance, scale, offset]):
+  with tf.compat.v1.name_scope(name, "undo_batchnorm",
+                               [x, mean, variance, scale, offset]):
     # inv = tf.rsqrt(variance + variance_epsilon)
     # if scale is not None:
     #   inv *= scale

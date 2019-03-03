@@ -67,7 +67,7 @@ def _event_size(event_shape, name=None):
     when the number of elements can be computed immediately.  Otherwise, returns
     a scalar tensor.
   """
-  with tf.name_scope(name, 'event_size', [event_shape]):
+  with tf.compat.v1.name_scope(name, 'event_size', [event_shape]):
     event_shape = tf.convert_to_tensor(
         value=event_shape, dtype=tf.int32, name='event_shape')
 
@@ -267,7 +267,8 @@ class MultivariateNormalTriL(DistributionLambda):
   @staticmethod
   def new(params, event_size, validate_args=False, name=None):
     """Create the distribution instance from a `params` vector."""
-    with tf.name_scope(name, 'MultivariateNormalTriL', [params, event_size]):
+    with tf.compat.v1.name_scope(name, 'MultivariateNormalTriL',
+                                 [params, event_size]):
       params = tf.convert_to_tensor(value=params, name='params')
       scale_tril = tfb.ScaleTriL(
           diag_shift=np.array(1e-5, params.dtype.as_numpy_dtype()),
@@ -280,8 +281,8 @@ class MultivariateNormalTriL(DistributionLambda):
   @staticmethod
   def params_size(event_size, name=None):
     """The number of `params` needed to create a single distribution."""
-    with tf.name_scope(name, 'MultivariateNormalTriL_params_size',
-                       [event_size]):
+    with tf.compat.v1.name_scope(name, 'MultivariateNormalTriL_params_size',
+                                 [event_size]):
       return event_size + event_size * (event_size + 1) // 2
 
 
@@ -372,7 +373,8 @@ class OneHotCategorical(DistributionLambda):
   @staticmethod
   def new(params, event_size, dtype=None, validate_args=False, name=None):
     """Create the distribution instance from a `params` vector."""
-    with tf.name_scope(name, 'OneHotCategorical', [params, event_size]):
+    with tf.compat.v1.name_scope(name, 'OneHotCategorical',
+                                 [params, event_size]):
       return tfd.OneHotCategorical(
           logits=params,
           dtype=dtype or params.dtype.base_dtype,
@@ -478,8 +480,8 @@ class CategoricalMixtureOfOneHotCategorical(DistributionLambda):
   def new(params, event_size, num_components,
           dtype=None, validate_args=False, name=None):
     """Create the distribution instance from a `params` vector."""
-    with tf.name_scope(name, 'CategoricalMixtureOfOneHotCategorical',
-                       [params, event_size, num_components]):
+    with tf.compat.v1.name_scope(name, 'CategoricalMixtureOfOneHotCategorical',
+                                 [params, event_size, num_components]):
       dist = MixtureSameFamily.new(
           params,
           num_components,
@@ -500,7 +502,7 @@ class CategoricalMixtureOfOneHotCategorical(DistributionLambda):
   @staticmethod
   def params_size(event_size, num_components, name=None):
     """The number of `params` needed to create a single distribution."""
-    with tf.name_scope(
+    with tf.compat.v1.name_scope(
         name, 'CategoricalMixtureOfOneHotCategorical_params_size',
         [event_size, num_components]):
       return MixtureSameFamily.params_size(
@@ -596,7 +598,8 @@ class IndependentBernoulli(DistributionLambda):
   @staticmethod
   def new(params, event_shape=(), dtype=None, validate_args=False, name=None):
     """Create the distribution instance from a `params` vector."""
-    with tf.name_scope(name, 'IndependentBernoulli', [params, event_shape]):
+    with tf.compat.v1.name_scope(name, 'IndependentBernoulli',
+                                 [params, event_shape]):
       params = tf.convert_to_tensor(value=params, name='params')
       event_shape = dist_util.expand_to_vector(
           tf.convert_to_tensor(
@@ -622,7 +625,8 @@ class IndependentBernoulli(DistributionLambda):
   @staticmethod
   def params_size(event_shape=(), name=None):
     """The number of `params` needed to create a single distribution."""
-    with tf.name_scope(name, 'IndependentBernoulli_params_size', [event_shape]):
+    with tf.compat.v1.name_scope(name, 'IndependentBernoulli_params_size',
+                                 [event_shape]):
       event_shape = tf.convert_to_tensor(
           value=event_shape, name='event_shape', dtype_hint=tf.int32)
       return _event_size(
@@ -631,7 +635,7 @@ class IndependentBernoulli(DistributionLambda):
 
 def _eval_all_one_hot(fn, dist, name=None):
   """OneHotCategorical helper computing probs, cdf, etc over its support."""
-  with tf.name_scope(name, 'eval_all_one_hot'):
+  with tf.compat.v1.name_scope(name, 'eval_all_one_hot'):
     event_size = dist.event_shape_tensor()[-1]
     batch_ndims = tf.size(input=dist.batch_shape_tensor())
     # Reshape `eye(d)` to: `[d] + [1]*batch_ndims + [d]`.
@@ -699,7 +703,8 @@ class IndependentLogistic(DistributionLambda):
   @staticmethod
   def new(params, event_shape=(), validate_args=False, name=None):
     """Create the distribution instance from a `params` vector."""
-    with tf.name_scope(name, 'IndependentLogistic', [params, event_shape]):
+    with tf.compat.v1.name_scope(name, 'IndependentLogistic',
+                                 [params, event_shape]):
       params = tf.convert_to_tensor(value=params, name='params')
       event_shape = dist_util.expand_to_vector(
           tf.convert_to_tensor(
@@ -722,7 +727,8 @@ class IndependentLogistic(DistributionLambda):
   @staticmethod
   def params_size(event_shape=(), name=None):
     """The number of `params` needed to create a single distribution."""
-    with tf.name_scope(name, 'IndependentLogistic_params_size', [event_shape]):
+    with tf.compat.v1.name_scope(name, 'IndependentLogistic_params_size',
+                                 [event_shape]):
       event_shape = tf.convert_to_tensor(
           value=event_shape, name='event_shape', dtype_hint=tf.int32)
       return 2 * _event_size(
@@ -782,7 +788,8 @@ class IndependentNormal(DistributionLambda):
   @staticmethod
   def new(params, event_shape=(), validate_args=False, name=None):
     """Create the distribution instance from a `params` vector."""
-    with tf.name_scope(name, 'IndependentNormal', [params, event_shape]):
+    with tf.compat.v1.name_scope(name, 'IndependentNormal',
+                                 [params, event_shape]):
       params = tf.convert_to_tensor(value=params, name='params')
       event_shape = dist_util.expand_to_vector(
           tf.convert_to_tensor(
@@ -805,7 +812,8 @@ class IndependentNormal(DistributionLambda):
   @staticmethod
   def params_size(event_shape=(), name=None):
     """The number of `params` needed to create a single distribution."""
-    with tf.name_scope(name, 'IndependentNormal_params_size', [event_shape]):
+    with tf.compat.v1.name_scope(name, 'IndependentNormal_params_size',
+                                 [event_shape]):
       event_shape = tf.convert_to_tensor(
           value=event_shape, name='event_shape', dtype_hint=tf.int32)
       return 2 * _event_size(
@@ -881,7 +889,8 @@ class IndependentPoisson(DistributionLambda):
   @staticmethod
   def new(params, event_shape=(), validate_args=False, name=None):
     """Create the distribution instance from a `params` vector."""
-    with tf.name_scope(name, 'IndependentPoisson', [params, event_shape]):
+    with tf.compat.v1.name_scope(name, 'IndependentPoisson',
+                                 [params, event_shape]):
       params = tf.convert_to_tensor(value=params, name='params')
       event_shape = dist_util.expand_to_vector(
           tf.convert_to_tensor(
@@ -902,7 +911,8 @@ class IndependentPoisson(DistributionLambda):
   @staticmethod
   def params_size(event_shape=(), name=None):
     """The number of `params` needed to create a single distribution."""
-    with tf.name_scope(name, 'IndependentPoisson_params_size', [event_shape]):
+    with tf.compat.v1.name_scope(name, 'IndependentPoisson_params_size',
+                                 [event_shape]):
       event_shape = tf.convert_to_tensor(
           value=event_shape, name='event_shape', dtype_hint=tf.int32)
       return _event_size(
@@ -1103,7 +1113,7 @@ def _make_kl_divergence_fn(
   # Closure over: distribution_b, kl_divergence_fn, weight.
   def _fn(distribution_a):
     """Closure that computes KLDiv as a function of `a` as in `KL[a, b]`."""
-    with tf.name_scope('kldivergence_loss'):
+    with tf.compat.v1.name_scope('kldivergence_loss'):
       # TODO(b/119756336): Due to eager/graph Jacobian graph caching bug
       # we add here the capability for deferred construction of the prior.
       # This capability can probably be removed once b/119756336 is resolved.
@@ -1203,8 +1213,8 @@ class MixtureSameFamily(DistributionLambda):
   def new(params, num_components, component_layer,
           validate_args=False, name=None):
     """Create the distribution instance from a `params` vector."""
-    with tf.name_scope(name, 'MixtureSameFamily',
-                       [params, num_components, component_layer]):
+    with tf.compat.v1.name_scope(name, 'MixtureSameFamily',
+                                 [params, num_components, component_layer]):
       params = tf.convert_to_tensor(value=params, name='params')
       num_components = tf.convert_to_tensor(
           value=num_components, name='num_components', dtype_hint=tf.int32)
@@ -1239,8 +1249,8 @@ class MixtureSameFamily(DistributionLambda):
      params_size: The number of parameters needed to create the mixture
        distribution.
     """
-    with tf.name_scope(name, 'MixtureSameFamily_params_size',
-                       [num_components, component_params_size]):
+    with tf.compat.v1.name_scope(name, 'MixtureSameFamily_params_size',
+                                 [num_components, component_params_size]):
       num_components = tf.convert_to_tensor(
           value=num_components, name='num_components', dtype_hint=tf.int32)
       component_params_size = tf.convert_to_tensor(

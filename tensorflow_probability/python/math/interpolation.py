@@ -50,7 +50,7 @@ def _interp_regular_1d_grid_impl(x,
   # between tf.gather and tf.batch_gather.  In particular, we do *not* make the
   # no-batch version a special case of the batch version, because that would
   # an inefficient use of batch_gather with unnecessarily broadcast args.
-  with tf.name_scope(
+  with tf.compat.v1.name_scope(
       name,
       values=[
           x, x_ref_min, x_ref_max, y_ref, axis, fill_value, fill_value_below,

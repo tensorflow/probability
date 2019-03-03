@@ -132,7 +132,7 @@ def effective_sample_size(states,
                                               'filter_threshold')
 
   # Process items, one at a time.
-  with tf.name_scope(name, 'effective_sample_size'):
+  with tf.compat.v1.name_scope(name, 'effective_sample_size'):
     ess_list = [
         _effective_sample_size_single_state(s, ml, mlt)
         for (s, ml, mlt) in zip(states, filter_beyond_lag, filter_threshold)
@@ -147,7 +147,7 @@ def _effective_sample_size_single_state(states, filter_beyond_lag,
                                         filter_threshold):
   """ESS computation for one single Tensor argument."""
 
-  with tf.name_scope(
+  with tf.compat.v1.name_scope(
       'effective_sample_size_single_state',
       values=[states, filter_beyond_lag, filter_threshold]):
 
@@ -321,7 +321,7 @@ def potential_scale_reduction(chains_states,
           'Argument `independent_chain_ndims` must be `>= 1`, found: {}'.format(
               independent_chain_ndims))
 
-  with tf.name_scope(name, 'potential_scale_reduction'):
+  with tf.compat.v1.name_scope(name, 'potential_scale_reduction'):
     rhat_list = [
         _potential_scale_reduction_single_state(s, independent_chain_ndims)
         for s in chains_states
@@ -334,7 +334,7 @@ def potential_scale_reduction(chains_states,
 
 def _potential_scale_reduction_single_state(state, independent_chain_ndims):
   """potential_scale_reduction for one single state `Tensor`."""
-  with tf.name_scope(
+  with tf.compat.v1.name_scope(
       'potential_scale_reduction_single_state',
       values=[state, independent_chain_ndims]):
     # We assume exactly one leading dimension indexes e.g. correlated samples
@@ -372,7 +372,7 @@ def _potential_scale_reduction_single_state(state, independent_chain_ndims):
 
 # TODO(b/72873233) Move some variant of this to tfd.sample_stats.
 def _reduce_variance(x, axis=None, biased=True, keepdims=False):
-  with tf.name_scope('reduce_variance'):
+  with tf.compat.v1.name_scope('reduce_variance'):
     x = tf.convert_to_tensor(value=x, name='x')
     mean = tf.reduce_mean(input_tensor=x, axis=axis, keepdims=True)
     biased_var = tf.reduce_mean(

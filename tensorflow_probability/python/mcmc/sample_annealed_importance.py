@@ -189,9 +189,8 @@ def sample_annealed_importance_chain(
   ```
 
   """
-  with tf.name_scope(
-      name, "sample_annealed_importance_chain",
-      [num_steps, current_state]):
+  with tf.compat.v1.name_scope(name, "sample_annealed_importance_chain",
+                               [num_steps, current_state]):
     num_steps = tf.convert_to_tensor(
         value=num_steps, dtype=tf.int32, name="num_steps")
     if mcmc_util.is_list_like(current_state):

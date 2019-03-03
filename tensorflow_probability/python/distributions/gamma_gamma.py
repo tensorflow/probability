@@ -110,7 +110,7 @@ class GammaGamma(distribution.Distribution):
       TypeError: if `concentration` and `rate` are different dtypes.
     """
     parameters = dict(locals())
-    with tf.name_scope(
+    with tf.compat.v1.name_scope(
         name, values=[concentration, mixing_concentration, mixing_rate]):
       dtype = dtype_util.common_dtype(
           [concentration, mixing_concentration, mixing_rate],

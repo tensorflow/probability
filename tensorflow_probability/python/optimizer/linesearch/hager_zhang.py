@@ -279,17 +279,12 @@ def hager_zhang(value_and_gradients_function,
         If converged is True, it is equal to the dfn_step.
         Otherwise it corresponds to the last interval computed.
   """
-  with tf.name_scope(name, 'hager_zhang',
-                     [initial_step_size,
-                      objective_at_zero,
-                      grad_objective_at_zero,
-                      objective_at_initial_step_size,
-                      grad_objective_at_initial_step_size,
-                      threshold_use_approximate_wolfe_condition,
-                      shrinkage_param,
-                      expansion_param,
-                      sufficient_decrease_param,
-                      curvature_param]):
+  with tf.compat.v1.name_scope(name, 'hager_zhang', [
+      initial_step_size, objective_at_zero, grad_objective_at_zero,
+      objective_at_initial_step_size, grad_objective_at_initial_step_size,
+      threshold_use_approximate_wolfe_condition, shrinkage_param,
+      expansion_param, sufficient_decrease_param, curvature_param
+  ]):
     val_0, val_c_input, f_lim, prepare_evals = _prepare_args(
         value_and_gradients_function,
         initial_step_size,

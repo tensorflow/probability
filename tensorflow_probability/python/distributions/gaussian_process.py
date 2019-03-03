@@ -239,7 +239,7 @@ class GaussianProcess(mvn_linear_operator.MultivariateNormalLinearOperator):
       ValueError: if `mean_fn` is not `None` and is not callable.
     """
     parameters = dict(locals())
-    with tf.name_scope(
+    with tf.compat.v1.name_scope(
         name, values=[index_points, observation_noise_variance,
                       jitter]) as name:
       dtype = dtype_util.common_dtype(
@@ -265,7 +265,7 @@ class GaussianProcess(mvn_linear_operator.MultivariateNormalLinearOperator):
       self._observation_noise_variance = observation_noise_variance
       self._jitter = jitter
 
-      with tf.name_scope('init', values=[index_points, jitter]):
+      with tf.compat.v1.name_scope('init', values=[index_points, jitter]):
         kernel_matrix = _add_diagonal_shift(
             kernel.matrix(self.index_points, self.index_points),
             jitter + observation_noise_variance)

@@ -178,7 +178,8 @@ def sample_halton_sequence(dim,
   if not dtype.is_floating:
     raise ValueError('dtype must be of `float`-type')
 
-  with tf.name_scope(name, 'sample', values=[num_results, sequence_indices]):
+  with tf.compat.v1.name_scope(
+      name, 'sample', values=[num_results, sequence_indices]):
     # Here and in the following, the shape layout is as follows:
     # [sample dimension, event dimension, coefficient dimension].
     # The coefficient dimension is an intermediate axes which will hold the
@@ -325,7 +326,8 @@ def _get_indices(num_results, sequence_indices, dtype, name=None):
   Returns:
     indices: `Tensor` of dtype `dtype` and shape = `[n, 1, 1]`.
   """
-  with tf.name_scope(name, '_get_indices', [num_results, sequence_indices]):
+  with tf.compat.v1.name_scope(name, '_get_indices',
+                               [num_results, sequence_indices]):
     if sequence_indices is None:
       num_results = tf.cast(num_results, dtype=dtype)
       sequence_indices = tf.range(num_results, dtype=dtype)

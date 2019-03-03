@@ -148,7 +148,7 @@ class PositiveSemidefiniteKernel(object):
     self._feature_ndims = feature_ndims
     self._dtype = dtype
     if not name or name[-1] != '/':  # `name` is not a name scope
-      name = tf.name_scope(name or type(self).__name__).name
+      name = tf.compat.v1.name_scope(name or type(self).__name__).name
     self._name = name
 
   @property
@@ -219,21 +219,21 @@ class PositiveSemidefiniteKernel(object):
         `Tensor` which evaluates to a vector of integers which are the
         fully-broadcast shapes of the kernel parameters.
     """
-    with tf.name_scope(self._name):
+    with tf.compat.v1.name_scope(self._name):
       if self.batch_shape.is_fully_defined():
         return tf.convert_to_tensor(
             value=self.batch_shape.as_list(),
             dtype=tf.int32,
             name='batch_shape')
-      with tf.name_scope('batch_shape_tensor'):
+      with tf.compat.v1.name_scope('batch_shape_tensor'):
         return self._batch_shape_tensor()
 
   @contextlib.contextmanager
   def _name_scope(self, name=None, values=None):
     """Helper function to standardize op scope."""
-    with tf.name_scope(self.name):
+    with tf.compat.v1.name_scope(self.name):
       values = [] if values is None else values
-      with tf.name_scope(name, values=values) as scope:
+      with tf.compat.v1.name_scope(name, values=values) as scope:
         yield scope
 
   def apply(self, x1, x2):

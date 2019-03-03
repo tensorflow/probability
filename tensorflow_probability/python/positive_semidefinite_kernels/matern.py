@@ -133,7 +133,8 @@ class MaternOneHalf(_AmplitudeLengthScaleMixin,
         possibly degrading runtime performance
       name: Python `str` name prefixed to Ops created by this class.
     """
-    with tf.name_scope(name, values=[amplitude, length_scale]) as name:
+    with tf.compat.v1.name_scope(
+        name, values=[amplitude, length_scale]) as name:
       dtype = super(MaternOneHalf, self)._init_params(amplitude, length_scale,
                                                       validate_args)
     super(MaternOneHalf, self).__init__(feature_ndims, dtype=dtype, name=name)
@@ -195,7 +196,8 @@ class MaternThreeHalves(_AmplitudeLengthScaleMixin,
         possibly degrading runtime performance
       name: Python `str` name prefixed to Ops created by this class.
     """
-    with tf.name_scope(name, values=[amplitude, length_scale]) as name:
+    with tf.compat.v1.name_scope(
+        name, values=[amplitude, length_scale]) as name:
       dtype = super(MaternThreeHalves, self)._init_params(
           amplitude, length_scale, validate_args)
     super(MaternThreeHalves, self).__init__(
@@ -259,7 +261,8 @@ class MaternFiveHalves(_AmplitudeLengthScaleMixin,
         possibly degrading runtime performance
       name: Python `str` name prefixed to Ops created by this class.
     """
-    with tf.name_scope(name, values=[amplitude, length_scale]) as name:
+    with tf.compat.v1.name_scope(
+        name, values=[amplitude, length_scale]) as name:
       dtype = super(MaternFiveHalves, self)._init_params(
           amplitude, length_scale, validate_args)
     super(MaternFiveHalves, self).__init__(

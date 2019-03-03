@@ -80,7 +80,7 @@ class Softplus(bijector.Bijector):
                hinge_softness=None,
                validate_args=False,
                name="softplus"):
-    with tf.name_scope(name, values=[hinge_softness]):
+    with tf.compat.v1.name_scope(name, values=[hinge_softness]):
       if hinge_softness is None:
         self._hinge_softness = None
       else:

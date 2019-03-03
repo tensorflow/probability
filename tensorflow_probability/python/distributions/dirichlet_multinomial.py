@@ -196,7 +196,8 @@ class DirichletMultinomial(distribution.Distribution):
     # * We broadcast explicitly to include the effect of `counts` on
     #   `concentration` for calls that do not involve `counts`.
     parameters = dict(locals())
-    with tf.name_scope(name, values=[total_count, concentration]) as name:
+    with tf.compat.v1.name_scope(
+        name, values=[total_count, concentration]) as name:
       dtype = dtype_util.common_dtype([total_count, concentration], tf.float32)
       self._total_count = tf.convert_to_tensor(
           value=total_count, name="total_count", dtype=dtype)

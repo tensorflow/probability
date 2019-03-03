@@ -137,7 +137,7 @@ class Horseshoe(distribution.Distribution):
         Default value: 'Horseshoe'.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[scale]) as name:
+    with tf.compat.v1.name_scope(name, values=[scale]) as name:
       dtype = dtype_util.common_dtype([scale],
                                       preferred_dtype=tf.float32)
       scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)

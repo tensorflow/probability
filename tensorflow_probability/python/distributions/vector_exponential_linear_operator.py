@@ -178,7 +178,8 @@ class VectorExponentialLinearOperator(
     if not scale.dtype.is_floating:
       raise TypeError("`scale` parameter must have floating-point dtype.")
 
-    with tf.name_scope(name, values=[loc] + scale.graph_parents) as name:
+    with tf.compat.v1.name_scope(
+        name, values=[loc] + scale.graph_parents) as name:
       # Since expand_dims doesn't preserve constant-ness, we obtain the
       # non-dynamic value if possible.
       loc = loc if loc is None else tf.convert_to_tensor(

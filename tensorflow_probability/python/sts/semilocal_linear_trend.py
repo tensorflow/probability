@@ -174,8 +174,11 @@ class SemiLocalLinearTrendStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
         Default value: "SemiLocalLinearTrendStateSpaceModel".
     """
 
-    with tf.name_scope(name, 'SemiLocalLinearTrendStateSpaceModel', values=[
-        level_scale, slope_mean, slope_scale, autoregressive_coef]) as name:
+    with tf.compat.v1.name_scope(
+        name,
+        'SemiLocalLinearTrendStateSpaceModel',
+        values=[level_scale, slope_mean, slope_scale,
+                autoregressive_coef]) as name:
 
       dtype = initial_state_prior.dtype
 
@@ -380,7 +383,7 @@ class SemiLocalLinearTrend(StructuralTimeSeries):
         Default value: 'SemiLocalLinearTrend'.
     """
 
-    with tf.name_scope(
+    with tf.compat.v1.name_scope(
         name, 'SemiLocalLinearTrend', values=[observed_time_series]) as name:
 
       if observed_time_series is not None:

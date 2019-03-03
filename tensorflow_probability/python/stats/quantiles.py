@@ -103,7 +103,8 @@ def find_bins(x,
   #    quantile/percentile return these edges in the leftmost (sample) dim.
   # 2. Say you have event_shape = [5], then we expect the bin will be different
   #    for all 5 events, so the index of the bin should not be in the event dim.
-  with tf.name_scope(name, default_name='find_bins', values=[x, edges]):
+  with tf.compat.v1.name_scope(
+      name, default_name='find_bins', values=[x, edges]):
     in_type = dtype_util.common_dtype([x, edges],
                                       preferred_dtype=tf.float32)
     edges = tf.convert_to_tensor(value=edges, name='edges', dtype=in_type)
@@ -270,7 +271,7 @@ def percentile(x,
       raise ValueError('Argument `interpolation` must be in %s.  Found %s' %
                        (allowed_interpolations, interpolation))
 
-  with tf.name_scope(name, values=[x, q]):
+  with tf.compat.v1.name_scope(name, values=[x, q]):
     x = tf.convert_to_tensor(value=x, name='x')
 
     if interpolation in {'linear', 'midpoint'} and x.dtype.is_integer:
@@ -449,7 +450,8 @@ def quantiles(x,
   ```
 
   """
-  with tf.name_scope(name, 'quantiles', values=[x, num_quantiles, axis]):
+  with tf.compat.v1.name_scope(
+      name, 'quantiles', values=[x, num_quantiles, axis]):
     x = tf.convert_to_tensor(value=x, name='x')
     return percentile(
         x,

@@ -43,7 +43,7 @@ def log1psquare(x, name=None):
   Returns:
     log1psq: Float `Tensor` representing `log(1. + x**2.)`.
   """
-  with tf.name_scope(name, 'log1psquare', [x]):
+  with tf.compat.v1.name_scope(name, 'log1psquare', [x]):
     x = tf.convert_to_tensor(value=x, dtype_hint=tf.float32, name='x')
     dtype = x.dtype.as_numpy_dtype
 
@@ -142,7 +142,7 @@ def soft_threshold(x, threshold, name=None):
 
   """
   # https://math.stackexchange.com/questions/471339/derivation-of-soft-thresholding-operator
-  with tf.name_scope(name, 'soft_threshold', [x, threshold]):
+  with tf.compat.v1.name_scope(name, 'soft_threshold', [x, threshold]):
     x = tf.convert_to_tensor(value=x, name='x')
     threshold = tf.convert_to_tensor(
         value=threshold, dtype=x.dtype, name='threshold')
@@ -178,8 +178,8 @@ def clip_by_value_preserve_gradient(t, clip_value_min, clip_value_max,
   Returns:
     clipped_t: A clipped `Tensor`.
   """
-  with tf.name_scope(name, 'clip_by_value_preserve_gradient',
-                     [t, clip_value_min, clip_value_max]):
+  with tf.compat.v1.name_scope(name, 'clip_by_value_preserve_gradient',
+                               [t, clip_value_min, clip_value_max]):
     t = tf.convert_to_tensor(value=t, name='t')
     clip_t = tf.clip_by_value(t, clip_value_min, clip_value_max)
     return t + tf.stop_gradient(clip_t - t)

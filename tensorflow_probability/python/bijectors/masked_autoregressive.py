@@ -388,7 +388,8 @@ def masked_dense(inputs,
   def masked_initializer(shape, dtype=None, partition_info=None):
     return mask * kernel_initializer(shape, dtype, partition_info)
 
-  with tf.name_scope(name, "masked_dense", [inputs, units, num_blocks]):
+  with tf.compat.v1.name_scope(name, "masked_dense",
+                               [inputs, units, num_blocks]):
     layer = tf.compat.v1.layers.Dense(
         units,
         kernel_initializer=masked_initializer,
@@ -476,7 +477,9 @@ def masked_autoregressive_default_template(hidden_layers,
        Conference on Machine Learning_, 2015. https://arxiv.org/abs/1502.03509
   """
   name = name or "masked_autoregressive_default_template"
-  with tf.name_scope(name, values=[log_scale_min_clip, log_scale_max_clip]):
+  with tf.compat.v1.name_scope(
+      name, values=[log_scale_min_clip, log_scale_max_clip]):
+
     def _fn(x):
       """MADE parameterized via `masked_autoregressive_default_template`."""
       # TODO(b/67594795): Better support of dynamic shape.

@@ -97,7 +97,7 @@ class Zipf(distribution.Distribution):
       TypeError: if `power` is not `float` like.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[power]) as name:
+    with tf.compat.v1.name_scope(name, values=[power]) as name:
       power = tf.convert_to_tensor(
           value=power,
           name="power",

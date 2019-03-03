@@ -43,7 +43,8 @@ def _logsum_expbig_minus_expsmall(big, small):
   Returns:
     `Tensor` of same `dtype` of `big` and broadcast shape.
   """
-  with tf.name_scope("logsum_expbig_minus_expsmall", values=[small, big]):
+  with tf.compat.v1.name_scope(
+      "logsum_expbig_minus_expsmall", values=[small, big]):
     return tf.math.log1p(-tf.exp(small - big)) + big
 
 
@@ -266,7 +267,7 @@ class QuantizedDistribution(distributions.Distribution):
     values = (
         list(distribution.parameters.values()) +
         [low, high])
-    with tf.name_scope(name, values=values) as name:
+    with tf.compat.v1.name_scope(name, values=values) as name:
       self._dist = distribution
 
       if low is not None:
@@ -338,7 +339,7 @@ class QuantizedDistribution(distributions.Distribution):
   def _sample_n(self, n, seed=None):
     low = self._low
     high = self._high
-    with tf.name_scope("transform"):
+    with tf.compat.v1.name_scope("transform"):
       n = tf.convert_to_tensor(value=n, name="n")
       x_samps = self.distribution.sample(n, seed=seed)
       ones = tf.ones_like(x_samps)
@@ -552,7 +553,7 @@ class QuantizedDistribution(distributions.Distribution):
     return result_so_far
 
   def _check_integer(self, value):
-    with tf.name_scope("check_integer", values=[value]):
+    with tf.compat.v1.name_scope("check_integer", values=[value]):
       value = tf.convert_to_tensor(value=value, name="value")
       if not self.validate_args:
         return value

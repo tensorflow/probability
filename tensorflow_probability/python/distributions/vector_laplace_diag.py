@@ -211,8 +211,8 @@ class VectorLaplaceDiag(vllo.VectorLaplaceLinearOperator):
       ValueError: if at most `scale_identity_multiplier` is specified.
     """
     parameters = dict(locals())
-    with tf.name_scope(name):
-      with tf.name_scope(
+    with tf.compat.v1.name_scope(name):
+      with tf.compat.v1.name_scope(
           "init", values=[loc, scale_diag, scale_identity_multiplier]):
         dtype = dtype_util.common_dtype(
             [loc, scale_diag, scale_identity_multiplier], tf.float32)

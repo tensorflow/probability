@@ -269,7 +269,7 @@ def real_nvp_default_template(hidden_layers,
        Processing Systems_, 2017. https://arxiv.org/abs/1705.07057
   """
 
-  with tf.name_scope(name, "real_nvp_default_template"):
+  with tf.compat.v1.name_scope(name, "real_nvp_default_template"):
 
     def _fn(x, output_units, **condition_kwargs):
       """Fully connected MLP parameterized via `real_nvp_template`."""

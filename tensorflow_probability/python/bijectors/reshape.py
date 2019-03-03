@@ -141,7 +141,8 @@ class Reshape(bijector.Bijector):
        has non-vector shape (`rank > 1`), or if their sizes do not
        match.
     """
-    with tf.name_scope(name, 'reshape', [event_shape_out, event_shape_in]):
+    with tf.compat.v1.name_scope(name, 'reshape',
+                                 [event_shape_out, event_shape_in]):
       event_shape_out = tf.convert_to_tensor(
           value=event_shape_out, name='event_shape_out', dtype_hint=tf.int32)
       event_shape_in = tf.convert_to_tensor(

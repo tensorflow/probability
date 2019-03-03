@@ -229,7 +229,7 @@ class StudentTProcess(
       ValueError: if `mean_fn` is not `None` and is not callable.
     """
     parameters = dict(locals())
-    with tf.name_scope(
+    with tf.compat.v1.name_scope(
         name, values=[df, index_points, jitter]) as name:
       dtype = dtype_util.common_dtype(
           [df, index_points, jitter], tf.float32)
@@ -256,7 +256,7 @@ class StudentTProcess(
       self._mean_fn = mean_fn
       self._jitter = jitter
 
-      with tf.name_scope('init', values=[index_points, jitter]):
+      with tf.compat.v1.name_scope('init', values=[index_points, jitter]):
         kernel_matrix = _add_diagonal_shift(
             kernel.matrix(self.index_points, self.index_points),
             jitter)

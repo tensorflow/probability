@@ -207,8 +207,10 @@ class AdditiveStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
       ValueError: if components have different `num_timesteps`.
     """
 
-    with tf.name_scope(name, 'AdditiveStateSpaceModel',
-                       values=[observation_noise_scale, initial_step]) as name:
+    with tf.compat.v1.name_scope(
+        name,
+        'AdditiveStateSpaceModel',
+        values=[observation_noise_scale, initial_step]) as name:
 
       assertions = []
 
@@ -388,7 +390,7 @@ class Sum(StructuralTimeSeries):
       ValueError: if components do not have unique names.
     """
 
-    with tf.name_scope(
+    with tf.compat.v1.name_scope(
         name, 'Sum', values=[observed_time_series]) as name:
       if observation_noise_scale_prior is None:
         observed_stddev, _ = (

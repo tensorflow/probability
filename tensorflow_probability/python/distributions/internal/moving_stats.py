@@ -74,8 +74,8 @@ def assign_moving_mean_variance(
        _Technical Report_, 2009.
        http://people.ds.cam.ac.uk/fanf2/hermes/doc/antiforgery/stats.pdf
   """
-  with tf.name_scope(name, "assign_moving_mean_variance",
-                     [variance_var, mean_var, value, decay]):
+  with tf.compat.v1.name_scope(name, "assign_moving_mean_variance",
+                               [variance_var, mean_var, value, decay]):
     with tf.compat.v1.colocate_with(variance_var):
       with tf.compat.v1.colocate_with(mean_var):
         base_dtype = mean_var.dtype.base_dtype
@@ -153,8 +153,8 @@ def assign_log_moving_mean_exp(
     TypeError: if `log_mean_exp_var`, `log_value`, `decay` have different
       `base_dtype`.
   """
-  with tf.name_scope(name, "assign_log_moving_mean_exp",
-                     [log_mean_exp_var, log_value, decay]):
+  with tf.compat.v1.name_scope(name, "assign_log_moving_mean_exp",
+                               [log_mean_exp_var, log_value, decay]):
     # We want to update the variable in a numerically stable and lock-free way.
     # To do this, observe that variable `x` updated by `v` is:
     # x = log(w exp(x) + (1-w) exp(v))

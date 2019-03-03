@@ -61,7 +61,7 @@ class LogNormal(transformed_distribution.TransformedDistribution):
         undefined statistics will return NaN for this statistic.
       name: The name to give Ops created by the initializer.
     """
-    with tf.name_scope(name, values=[loc, scale]) as name:
+    with tf.compat.v1.name_scope(name, values=[loc, scale]) as name:
       dtype = dtype_util.common_dtype([loc, scale], tf.float32)
       super(LogNormal, self).__init__(
           distribution=normal.Normal(

@@ -142,9 +142,8 @@ def one_step_predictive(model, observed_time_series, parameter_samples):
 
   """
 
-  with tf.name_scope('one_step_predictive',
-                     values=[observed_time_series,
-                             parameter_samples]):
+  with tf.compat.v1.name_scope(
+      'one_step_predictive', values=[observed_time_series, parameter_samples]):
     observed_time_series = tf.convert_to_tensor(
         value=observed_time_series, name='observed_time_series')
     observed_time_series = sts_util.maybe_expand_trailing_dim(
@@ -305,10 +304,9 @@ def forecast(model,
 
   """
 
-  with tf.name_scope('forecast',
-                     values=[observed_time_series,
-                             parameter_samples,
-                             num_steps_forecast]):
+  with tf.compat.v1.name_scope(
+      'forecast',
+      values=[observed_time_series, parameter_samples, num_steps_forecast]):
     observed_time_series = tf.convert_to_tensor(
         value=observed_time_series, name='observed_time_series')
     observed_time_series = sts_util.maybe_expand_trailing_dim(

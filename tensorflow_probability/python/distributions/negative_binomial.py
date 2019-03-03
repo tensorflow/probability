@@ -89,7 +89,8 @@ class NegativeBinomial(distribution.Distribution):
     """
 
     parameters = dict(locals())
-    with tf.name_scope(name, values=[total_count, logits, probs]) as name:
+    with tf.compat.v1.name_scope(
+        name, values=[total_count, logits, probs]) as name:
       dtype = dtype_util.common_dtype([total_count, logits, probs],
                                       preferred_dtype=tf.float32)
       self._logits, self._probs = distribution_util.get_logits_and_probs(

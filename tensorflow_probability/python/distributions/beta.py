@@ -169,7 +169,8 @@ class Beta(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[concentration1, concentration0]) as name:
+    with tf.compat.v1.name_scope(
+        name, values=[concentration1, concentration0]) as name:
       dtype = dtype_util.common_dtype([concentration1, concentration0],
                                       tf.float32)
       self._concentration1 = self._maybe_assert_valid_concentration(
@@ -347,14 +348,18 @@ def _kl_beta_beta(d1, d2, name=None):
     fn1 = getattr(d1, fn)
     fn2 = getattr(d2, fn)
     return (fn2 - fn1) if is_property else (fn2() - fn1())
-  with tf.name_scope(name, "kl_beta_beta", values=[
-      d1.concentration1,
-      d1.concentration0,
-      d1.total_concentration,
-      d2.concentration1,
-      d2.concentration0,
-      d2.total_concentration,
-  ]):
+
+  with tf.compat.v1.name_scope(
+      name,
+      "kl_beta_beta",
+      values=[
+          d1.concentration1,
+          d1.concentration0,
+          d1.total_concentration,
+          d2.concentration1,
+          d2.concentration0,
+          d2.total_concentration,
+      ]):
     return (delta("_log_normalization", is_property=False) -
             tf.math.digamma(d1.concentration1) * delta("concentration1") -
             tf.math.digamma(d1.concentration0) * delta("concentration0") +

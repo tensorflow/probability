@@ -1205,8 +1205,8 @@ class Bijector(object):
   @contextlib.contextmanager
   def _name_scope(self, name=None, values=None):
     """Helper function to standardize op scope."""
-    with tf.name_scope(self.name):
-      with tf.name_scope(
+    with tf.compat.v1.name_scope(self.name):
+      with tf.compat.v1.name_scope(
           name, values=(values or []) + self.graph_parents) as scope:
         yield scope
 

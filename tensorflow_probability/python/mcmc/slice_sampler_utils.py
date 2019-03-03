@@ -60,8 +60,8 @@ def _left_doubling_increments(batch_shape, max_doublings, step_size, seed=None,
     widths: A tensor of shape (max_doublings+1, ones_like(batch_shape)). The
       widths of the intervals at each stage of the doubling.
   """
-  with tf.name_scope(name, 'left_doubling_increments',
-                     [batch_shape, max_doublings, step_size]):
+  with tf.compat.v1.name_scope(name, 'left_doubling_increments',
+                               [batch_shape, max_doublings, step_size]):
 
     step_size = tf.convert_to_tensor(value=step_size)
     dtype = step_size.dtype.base_dtype
@@ -113,7 +113,7 @@ def _find_best_interval_idx(x, name=None):
       first set of bounds outside the slice and if there are none, the index of
       the widest set.
   """
-  with tf.name_scope(name, 'find_best_interval_idx', [x]):
+  with tf.compat.v1.name_scope(name, 'find_best_interval_idx', [x]):
     # Returns max_doublings + 1. Positive int32.
     k = tf.shape(input=x)[0]
     dtype = x.dtype.base_dtype
@@ -174,8 +174,9 @@ def slice_bounds_by_doubling(x_initial,
        No. 3 , 705-767.
        https://projecteuclid.org/download/pdf_1/euclid.aos/1056562461
   """
-  with tf.name_scope(name, 'slice_bounds_by_doubling',
-                     [x_initial, log_slice_heights, max_doublings, step_size]):
+  with tf.compat.v1.name_scope(
+      name, 'slice_bounds_by_doubling',
+      [x_initial, log_slice_heights, max_doublings, step_size]):
     seed_gen = distributions.SeedStream(seed, salt='slice_bounds_by_doubling')
     x_initial = tf.convert_to_tensor(value=x_initial)
     batch_shape = tf.shape(input=x_initial)
@@ -258,9 +259,10 @@ def _test_acceptance(x_initial, target_log_prob, decided, log_slice_heights,
     acceptable: A boolean tensor of same shape as `x_initial` indicating whether
       the proposed points are acceptable for reversibility or not.
   """
-  with tf.name_scope(name, 'test_acceptance',
-                     [x_initial, decided, log_slice_heights, x_proposed,
-                      step_size, lower_bounds, upper_bounds]):
+  with tf.compat.v1.name_scope(name, 'test_acceptance', [
+      x_initial, decided, log_slice_heights, x_proposed, step_size,
+      lower_bounds, upper_bounds
+  ]):
     d = tf.zeros_like(x_initial, dtype=tf.bool)
     # Keeps track of points for which the loop has "effectively terminated".
     # Termination is when either their interval width has shrunk to the minimum
@@ -336,9 +338,9 @@ def _sample_with_shrinkage(x_initial, target_log_prob, log_slice_heights,
     x_proposed: A tensor of the same shape and dtype as `x_initial`. The next
       proposed state of the chain.
   """
-  with tf.name_scope(name, 'sample_with_shrinkage',
-                     [x_initial, log_slice_heights, step_size, lower_bounds,
-                      upper_bounds]):
+  with tf.compat.v1.name_scope(
+      name, 'sample_with_shrinkage',
+      [x_initial, log_slice_heights, step_size, lower_bounds, upper_bounds]):
     seed_gen = distributions.SeedStream(seed, salt='_sample_with_shrinkage')
     # Keeps track of whether an acceptable sample has been found for the chain.
     found = tf.zeros_like(x_initial, dtype=tf.bool)
@@ -407,8 +409,8 @@ def slice_sampler_one_dim(target_log_prob, x_initial, step_size=0.01,
     lower_bounds: Tensor of the same shape and dtype as `x_initial`. The lower
       bounds for the slice found.
   """
-  with tf.name_scope(name, 'slice_sampler_one_dim',
-                     [x_initial, step_size, max_doublings]):
+  with tf.compat.v1.name_scope(name, 'slice_sampler_one_dim',
+                               [x_initial, step_size, max_doublings]):
     x_initial = tf.convert_to_tensor(value=x_initial)
     # Obtain the input dtype of the array.
     dtype = x_initial.dtype.base_dtype

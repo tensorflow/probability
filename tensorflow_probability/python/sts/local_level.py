@@ -144,8 +144,8 @@ class LocalLevelStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
         Default value: "LocalLevelStateSpaceModel".
     """
 
-    with tf.name_scope(
-        name, 'LocalLevelStateSpaceModel', [level_scale]) as name:
+    with tf.compat.v1.name_scope(name, 'LocalLevelStateSpaceModel',
+                                 [level_scale]) as name:
 
       # The initial state prior determines the dtype of sampled values.
       # Other model parameters must have the same dtype.
@@ -232,7 +232,7 @@ class LocalLevel(StructuralTimeSeries):
         Default value: 'LocalLevel'.
     """
 
-    with tf.name_scope(
+    with tf.compat.v1.name_scope(
         name, 'LocalLevel', values=[observed_time_series]) as name:
 
       dtype = dtype_util.common_dtype([level_scale_prior, initial_level_prior])

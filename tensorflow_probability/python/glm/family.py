@@ -74,7 +74,7 @@ class ExponentialFamily(object):
         functions. Default value: `None` (i.e., the subclass name).
     """
     if not name or name[-1] != '/':  # `name` is not a name scope.
-      with tf.name_scope(name or type(self).__name__) as name:
+      with tf.compat.v1.name_scope(name or type(self).__name__) as name:
         pass
     self._name = name
 
@@ -173,8 +173,9 @@ class ExponentialFamily(object):
   @contextlib.contextmanager
   def _name_scope(self, name=None, default_name=None, values=None):
     """Helper function to standardize op scope."""
-    with tf.name_scope(self.name):
-      with tf.name_scope(name, default_name, values=values or []) as scope:
+    with tf.compat.v1.name_scope(self.name):
+      with tf.compat.v1.name_scope(
+          name, default_name, values=values or []) as scope:
         yield scope
 
 

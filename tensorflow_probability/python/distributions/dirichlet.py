@@ -176,7 +176,7 @@ class Dirichlet(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[concentration]) as name:
+    with tf.compat.v1.name_scope(name, values=[concentration]) as name:
       self._concentration = self._maybe_assert_valid_concentration(
           tf.convert_to_tensor(
               value=concentration,
@@ -337,8 +337,10 @@ def _kl_dirichlet_dirichlet(d1, d2, name=None):
   Returns:
     Batchwise KL(d1 || d2)
   """
-  with tf.name_scope(name, "kl_dirichlet_dirichlet", values=[
-      d1.concentration, d2.concentration]):
+  with tf.compat.v1.name_scope(
+      name,
+      "kl_dirichlet_dirichlet",
+      values=[d1.concentration, d2.concentration]):
     # The KL between Dirichlet distributions can be derived as follows. We have
     #
     #   Dir(x; a) = 1 / B(a) * prod_i[x[i]^(a[i] - 1)]

@@ -121,7 +121,7 @@ class TruncatedNormal(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[loc, scale, low, high]) as name:
+    with tf.compat.v1.name_scope(name, values=[loc, scale, low, high]) as name:
       dtype = dtype_util.common_dtype([loc, scale, low, high], tf.float32)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
       scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)

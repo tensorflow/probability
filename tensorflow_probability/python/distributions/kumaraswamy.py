@@ -146,7 +146,8 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
         more of the statistic's batch members are undefined.
       name: Python `str` name prefixed to Ops created by this class.
     """
-    with tf.name_scope(name, values=[concentration1, concentration0]) as name:
+    with tf.compat.v1.name_scope(
+        name, values=[concentration1, concentration0]) as name:
       dtype = dtype_util.common_dtype([concentration1, concentration0],
                                       tf.float32)
       concentration1 = tf.convert_to_tensor(

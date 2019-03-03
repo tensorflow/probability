@@ -156,8 +156,8 @@ class LocalLinearTrendStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
         Default value: "LocalLinearTrendStateSpaceModel".
     """
 
-    with tf.name_scope(name, 'LocalLinearTrendStateSpaceModel',
-                       [level_scale, slope_scale]) as name:
+    with tf.compat.v1.name_scope(name, 'LocalLinearTrendStateSpaceModel',
+                                 [level_scale, slope_scale]) as name:
 
       # The initial state prior determines the dtype of sampled values.
       # Other model parameters must have the same dtype.
@@ -280,7 +280,7 @@ class LocalLinearTrend(StructuralTimeSeries):
         Default value: 'LocalLinearTrend'.
     """
 
-    with tf.name_scope(
+    with tf.compat.v1.name_scope(
         name, 'LocalLinearTrend', values=[observed_time_series]) as name:
 
       observed_stddev, observed_initial = (

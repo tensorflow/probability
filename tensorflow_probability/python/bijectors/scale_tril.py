@@ -100,7 +100,7 @@ class ScaleTriL(chain.Chain):
       name: Python `str` name given to ops managed by this object.
         Default value: `scale_tril`.
     """
-    with tf.name_scope(name, values=[diag_shift]) as name:
+    with tf.compat.v1.name_scope(name, values=[diag_shift]) as name:
       if diag_bijector is None:
         diag_bijector = softplus.Softplus(validate_args=validate_args)
 

@@ -182,9 +182,9 @@ def minimize(value_and_gradients_function,
       inverse_hessian_estimate: A tensor containing the inverse of the
         estimated Hessian.
   """
-  with tf.name_scope(name, 'minimize', [initial_position,
-                                        tolerance,
-                                        initial_inverse_hessian_estimate]):
+  with tf.compat.v1.name_scope(
+      name, 'minimize',
+      [initial_position, tolerance, initial_inverse_hessian_estimate]):
     initial_position = tf.convert_to_tensor(
         value=initial_position, name='initial_position')
     dtype = initial_position.dtype.base_dtype

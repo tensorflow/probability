@@ -79,7 +79,7 @@ class Geometric(distribution.Distribution):
     """
 
     parameters = dict(locals())
-    with tf.name_scope(name, values=[logits, probs]) as name:
+    with tf.compat.v1.name_scope(name, values=[logits, probs]) as name:
       self._logits, self._probs = distribution_util.get_logits_and_probs(
           logits, probs, validate_args=validate_args, name=name)
 

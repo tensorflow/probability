@@ -102,7 +102,7 @@ class HalfNormal(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[scale]) as name:
+    with tf.compat.v1.name_scope(name, values=[scale]) as name:
       scale = tf.convert_to_tensor(
           value=scale,
           name="scale",
@@ -184,8 +184,8 @@ def _kl_half_normal_half_normal(a, b, name=None):
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.name_scope(name, "kl_half_normal_half_normal",
-                     [a.scale, b.scale]):
+  with tf.compat.v1.name_scope(name, "kl_half_normal_half_normal",
+                               [a.scale, b.scale]):
     # Consistent with
     # http://www.mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 119
     return (tf.math.log(b.scale) - tf.math.log(a.scale) +

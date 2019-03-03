@@ -283,7 +283,7 @@ class DiscreteScalarDistributionTestHelpers(object):
         `counts[i] = sum{ edges[i-1] <= values[j] < edges[i] : j }`.
       edges: 1D `Tensor` characterizing intervals used for counting.
     """
-    with tf.name_scope(name, 'histogram', [x]):
+    with tf.compat.v1.name_scope(name, 'histogram', [x]):
       x = tf.convert_to_tensor(value=x, name='x')
       if value_range is None:
         value_range = [
@@ -403,7 +403,7 @@ class VectorDistributionTestHelpers(object):
       return tf.reduce_mean(input_tensor=importance_weights, axis=0)
 
     # Build graph.
-    with tf.name_scope(
+    with tf.compat.v1.name_scope(
         'run_test_sample_consistent_log_prob',
         values=[num_samples, radius, center] + dist._graph_parents):  # pylint: disable=protected-access
       batch_shape = dist.batch_shape_tensor()
@@ -500,5 +500,5 @@ class VectorDistributionTestHelpers(object):
 
 def _vec_outer_square(x, name=None):
   """Computes the outer-product of a vector, i.e., x.T x."""
-  with tf.name_scope(name, 'vec_osquare', [x]):
+  with tf.compat.v1.name_scope(name, 'vec_osquare', [x]):
     return x[..., :, tf.newaxis] * x[..., tf.newaxis, :]

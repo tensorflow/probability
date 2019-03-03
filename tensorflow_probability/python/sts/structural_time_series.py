@@ -195,7 +195,7 @@ class StructuralTimeSeries(object):
     seed = distributions.SeedStream(
         seed, salt='StructuralTimeSeries_prior_sample')
 
-    with tf.name_scope(
+    with tf.compat.v1.name_scope(
         'prior_sample',
         values=[num_timesteps, params_sample_shape, trajectories_sample_shape]):
       param_samples = [
@@ -230,7 +230,8 @@ class StructuralTimeSeries(object):
        inference.
     """
 
-    with tf.name_scope('joint_log_prob', values=[observed_time_series]):
+    with tf.compat.v1.name_scope(
+        'joint_log_prob', values=[observed_time_series]):
       observed_time_series = tf.convert_to_tensor(value=observed_time_series)
       observed_time_series = sts_util.maybe_expand_trailing_dim(
           observed_time_series)

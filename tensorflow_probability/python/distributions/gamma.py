@@ -141,7 +141,7 @@ class Gamma(distribution.Distribution):
       TypeError: if `concentration` and `rate` are different dtypes.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[concentration, rate]) as name:
+    with tf.compat.v1.name_scope(name, values=[concentration, rate]) as name:
       dtype = dtype_util.common_dtype([concentration, rate], tf.float32)
       concentration = tf.convert_to_tensor(
           value=concentration, name="concentration", dtype=dtype)
@@ -280,8 +280,10 @@ def _kl_gamma_gamma(g0, g1, name=None):
   Returns:
     kl_gamma_gamma: `Tensor`. The batchwise KL(g0 || g1).
   """
-  with tf.name_scope(name, "kl_gamma_gamma", values=[
-      g0.concentration, g0.rate, g1.concentration, g1.rate]):
+  with tf.compat.v1.name_scope(
+      name,
+      "kl_gamma_gamma",
+      values=[g0.concentration, g0.rate, g1.concentration, g1.rate]):
     # Result from:
     #   http://www.fil.ion.ucl.ac.uk/~wpenny/publications/densities.ps
     # For derivation see:

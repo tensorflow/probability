@@ -265,8 +265,9 @@ def build_factored_variational_loss(model,
 
   """
 
-  with tf.name_scope(name, 'build_factored_variational_loss',
-                     values=[observed_time_series]) as name:
+  with tf.compat.v1.name_scope(
+      name, 'build_factored_variational_loss',
+      values=[observed_time_series]) as name:
     observed_time_series = tf.convert_to_tensor(
         value=observed_time_series, name='observed_time_series')
     seed = tfd.SeedStream(
@@ -512,8 +513,8 @@ def fit_with_hmc(model,
        https://arxiv.org/abs/1411.6669
 
   """
-  with tf.name_scope(name, 'fit_with_hmc',
-                     values=[observed_time_series]) as name:
+  with tf.compat.v1.name_scope(
+      name, 'fit_with_hmc', values=[observed_time_series]) as name:
     observed_time_series = tf.convert_to_tensor(
         value=observed_time_series, name='observed_time_series')
     seed = tfd.SeedStream(seed, salt='StructuralTimeSeries_fit_with_hmc')

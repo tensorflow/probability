@@ -162,7 +162,8 @@ class RelaxedBernoulli(transformed_distribution.TransformedDistribution):
       ValueError: If both `probs` and `logits` are passed, or if neither.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[logits, probs, temperature]) as name:
+    with tf.compat.v1.name_scope(
+        name, values=[logits, probs, temperature]) as name:
       dtype = dtype_util.common_dtype([logits, probs, temperature], tf.float32)
       self._temperature = tf.convert_to_tensor(
           value=temperature, name="temperature", dtype=dtype)

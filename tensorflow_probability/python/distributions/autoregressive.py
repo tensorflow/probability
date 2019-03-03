@@ -144,7 +144,7 @@ class Autoregressive(distribution.Distribution):
       ValueError: if `num_steps < 1`.
     """
     parameters = dict(locals())
-    with tf.name_scope(name) as name:
+    with tf.compat.v1.name_scope(name) as name:
       self._distribution_fn = distribution_fn
       self._sample0 = sample0
       self._distribution0 = (distribution_fn() if sample0 is None

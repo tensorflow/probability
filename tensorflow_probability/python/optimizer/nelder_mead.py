@@ -247,13 +247,10 @@ def minimize(objective_function,
         supplied.
       2. If `initial_simplex` and `step_sizes` are both specified.
   """
-  with tf.name_scope(name, 'minimize', [initial_simplex,
-                                        initial_vertex,
-                                        step_sizes,
-                                        objective_at_initial_simplex,
-                                        objective_at_initial_vertex,
-                                        func_tolerance,
-                                        position_tolerance]):
+  with tf.compat.v1.name_scope(name, 'minimize', [
+      initial_simplex, initial_vertex, step_sizes, objective_at_initial_simplex,
+      objective_at_initial_vertex, func_tolerance, position_tolerance
+  ]):
     (
         dim,
         _,
@@ -356,7 +353,7 @@ def nelder_mead_one_step(current_simplex,
                          shrinkage=None,
                          name=None):
   """A single iteration of the Nelder Mead algorithm."""
-  with tf.name_scope(name, 'nelder_mead_one_step'):
+  with tf.compat.v1.name_scope(name, 'nelder_mead_one_step'):
     domain_dtype = current_simplex.dtype.base_dtype
     order = tf.argsort(
         current_objective_values, direction='ASCENDING', stable=True)

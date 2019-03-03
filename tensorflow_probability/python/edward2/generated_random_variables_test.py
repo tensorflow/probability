@@ -175,7 +175,7 @@ class GeneratedRandomVariablesTest(parameterized.TestCase, tf.test.TestCase):
 
     # Check that our attempt to back out the variable name from the
     # Distribution name is robust to name scoping.
-    with tf.name_scope("nested_scope"):
+    with tf.compat.v1.name_scope("nested_scope"):
       dist = tfd.Normal(1., 0.1, name="x")
       def model_scoped():
         return ed.as_random_variable(dist)

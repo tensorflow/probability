@@ -92,7 +92,7 @@ def kl_divergence(distribution_a, distribution_b,
       return tf.compat.v1.distributions.kl_divergence(distribution_a,
                                                       distribution_b)
 
-  with tf.name_scope("KullbackLeibler"):
+  with tf.compat.v1.name_scope("KullbackLeibler"):
     kl_t = kl_fn(distribution_a, distribution_b, name=name)
     if allow_nan_stats:
       return kl_t
@@ -138,7 +138,7 @@ def cross_entropy(ref, other,
     cross_entropy: `ref.dtype` `Tensor` with shape `[B1, ..., Bn]`
       representing `n` different calculations of (Shanon) cross entropy.
   """
-  with tf.name_scope(name, "cross_entropy"):
+  with tf.compat.v1.name_scope(name, "cross_entropy"):
     return ref.entropy() + kl_divergence(
         ref, other, allow_nan_stats=allow_nan_stats)
 

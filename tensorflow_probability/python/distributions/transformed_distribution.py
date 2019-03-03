@@ -249,7 +249,8 @@ class TransformedDistribution(distribution_lib.Distribution):
     parameters = dict(locals())
     name = name or (("" if bijector is None else bijector.name) +
                     distribution.name)
-    with tf.name_scope(name, values=[event_shape, batch_shape]) as name:
+    with tf.compat.v1.name_scope(
+        name, values=[event_shape, batch_shape]) as name:
       # For convenience we define some handy constants.
       self._zero = tf.constant(0, dtype=tf.int32, name="zero")
       self._empty = tf.constant([], dtype=tf.int32, name="empty")

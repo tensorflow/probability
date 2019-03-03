@@ -139,7 +139,7 @@ def sqrt_with_finite_grads(x, name=None):
   the sqrt (as opposed to just using the max floating point value) to avoid
   potential overflow when combining this value with others downstream.
   """
-  with tf.name_scope(name, 'sqrt_with_finite_grads', [x]):
+  with tf.compat.v1.name_scope(name, 'sqrt_with_finite_grads', [x]):
     x = tf.convert_to_tensor(value=x, name='x')
     if not x.dtype.is_floating:
       raise TypeError('Input `x` must be floating type.')

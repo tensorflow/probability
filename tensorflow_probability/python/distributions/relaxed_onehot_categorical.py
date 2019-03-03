@@ -156,7 +156,8 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[logits, probs, temperature]) as name:
+    with tf.compat.v1.name_scope(
+        name, values=[logits, probs, temperature]) as name:
 
       dtype = dtype_util.common_dtype([logits, probs, temperature], tf.float32)
       self._logits, self._probs = distribution_util.get_logits_and_probs(
@@ -181,10 +182,10 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
             dtype=tf.int32,
             name="batch_rank")
       else:
-        with tf.name_scope(name="batch_rank"):
+        with tf.compat.v1.name_scope(name="batch_rank"):
           self._batch_rank = tf.rank(self._logits) - 1
 
-      with tf.name_scope(name="event_size"):
+      with tf.compat.v1.name_scope(name="event_size"):
         self._event_size = tf.shape(input=self._logits)[-1]
 
     super(ExpRelaxedOneHotCategorical, self).__init__(

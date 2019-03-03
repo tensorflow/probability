@@ -89,7 +89,7 @@ class Exponential(gamma.Gamma):
     # true in the parent class "Gamma."  Therefore, passing
     # allow_nan_stats=True
     # through to the parent class results in unnecessary asserts.
-    with tf.name_scope(name, values=[rate]) as name:
+    with tf.compat.v1.name_scope(name, values=[rate]) as name:
       self._rate = tf.convert_to_tensor(
           value=rate,
           name="rate",

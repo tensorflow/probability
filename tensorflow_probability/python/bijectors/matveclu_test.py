@@ -29,8 +29,8 @@ from tensorflow.python.framework import test_util  # pylint: disable=g-direct-te
 
 def trainable_lu_factorization(
     event_size, batch_shape=(), seed=None, dtype=tf.float32, name=None):
-  with tf.name_scope(name, 'trainable_lu_factorization',
-                     [event_size, batch_shape]):
+  with tf.compat.v1.name_scope(name, 'trainable_lu_factorization',
+                               [event_size, batch_shape]):
     event_size = tf.convert_to_tensor(
         value=event_size, dtype_hint=tf.int32, name='event_size')
     batch_shape = tf.convert_to_tensor(

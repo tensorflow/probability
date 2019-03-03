@@ -179,7 +179,7 @@ def fit(
   graph_deps = [model_matrix, response, model_coefficients_start,
                 predicted_linear_response_start, dispersion, offset,
                 learning_rate, maximum_iterations]
-  with tf.name_scope(name, 'fit', graph_deps):
+  with tf.compat.v1.name_scope(name, 'fit', graph_deps):
     [
         model_matrix,
         response,
@@ -320,7 +320,7 @@ def fit_one_step(
   """
   graph_deps = [model_matrix, response, model_coefficients_start,
                 predicted_linear_response_start, dispersion, learning_rate]
-  with tf.name_scope(name, 'fit_one_step', graph_deps):
+  with tf.compat.v1.name_scope(name, 'fit_one_step', graph_deps):
 
     [
         model_matrix,
@@ -560,7 +560,7 @@ def prepare_args(model_matrix,
   """
   graph_deps = [model_matrix, response, model_coefficients,
                 predicted_linear_response, offset]
-  with tf.name_scope(name, 'prepare_args', graph_deps):
+  with tf.compat.v1.name_scope(name, 'prepare_args', graph_deps):
     dtype = dtype_util.common_dtype(graph_deps, np.float32)
 
     model_matrix = tf.convert_to_tensor(
@@ -621,8 +621,8 @@ def prepare_args(model_matrix,
 def calculate_linear_predictor(model_matrix, model_coefficients, offset=None,
                                name=None):
   """Computes `model_matrix @ model_coefficients + offset`."""
-  with tf.name_scope(name, 'calculate_linear_predictor',
-                     [model_matrix, model_coefficients, offset]):
+  with tf.compat.v1.name_scope(name, 'calculate_linear_predictor',
+                               [model_matrix, model_coefficients, offset]):
     predicted_linear_response = tf.linalg.matvec(model_matrix,
                                                  model_coefficients)
     if offset is not None:

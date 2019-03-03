@@ -107,7 +107,7 @@ def auto_correlation(x,
   # Since F[x] is the DFT of x, this leads us to a zero-padding and FFT/IFFT
   # based version of estimating RXX.
   # Note that this is a special case of the Wiener-Khinchin Theorem.
-  with tf.name_scope(name, values=[x]):
+  with tf.compat.v1.name_scope(name, values=[x]):
     x = tf.convert_to_tensor(value=x, name='x')
 
     # Rotate dimensions of x in order to put axis at the rightmost dim.
@@ -273,7 +273,8 @@ def cholesky_covariance(x, sample_axis=0, keepdims=False, name=None):
     chol:  `Tensor` of same `dtype` as `x`.  The last two dimensions hold
       lower triangular matrices (the Cholesky factors).
   """
-  with tf.name_scope(name, 'cholesky_covariance', values=[x, sample_axis]):
+  with tf.compat.v1.name_scope(
+      name, 'cholesky_covariance', values=[x, sample_axis]):
     sample_axis = tf.convert_to_tensor(value=sample_axis, dtype=tf.int32)
     cov = covariance(
         x, sample_axis=sample_axis, event_axis=-1, keepdims=keepdims)
@@ -340,7 +341,7 @@ def covariance(x,
     ValueError:  If `event_axis` is found to not be contiguous.
   """
 
-  with tf.name_scope(
+  with tf.compat.v1.name_scope(
       name, 'covariance', values=[x, y, event_axis, sample_axis]):
     x = tf.convert_to_tensor(value=x, name='x')
     # Covariance *only* uses the centered versions of x (and y).
@@ -525,7 +526,7 @@ def correlation(x,
     ValueError:  If `event_axis` is found to not be contiguous.
   """
 
-  with tf.name_scope(
+  with tf.compat.v1.name_scope(
       name, 'correlation', values=[x, y, event_axis, sample_axis]):
     # Corr[X, Y] = Cov[X, Y] / (Stddev[X] * Stddev[Y])
     #            = Cov[X / Stddev[X], Y / Stddev[Y]]
@@ -594,7 +595,7 @@ def stddev(x, sample_axis=0, keepdims=False, name=None):
     stddev: A `Tensor` of same `dtype` as the `x`, and rank equal to
       `rank(x) - len(sample_axis)`
   """
-  with tf.name_scope(name, 'stddev', values=[x, sample_axis]):
+  with tf.compat.v1.name_scope(name, 'stddev', values=[x, sample_axis]):
     return tf.sqrt(variance(x, sample_axis=sample_axis, keepdims=keepdims))
 
 
@@ -632,7 +633,7 @@ def variance(x, sample_axis=0, keepdims=False, name=None):
     var: A `Tensor` of same `dtype` as the `x`, and rank equal to
       `rank(x) - len(sample_axis)`
   """
-  with tf.name_scope(name, 'variance', values=[x, sample_axis]):
+  with tf.compat.v1.name_scope(name, 'variance', values=[x, sample_axis]):
     return covariance(
         x, y=None, sample_axis=sample_axis, event_axis=None, keepdims=keepdims)
 

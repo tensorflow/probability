@@ -132,7 +132,7 @@ class Empirical(distribution.Distribution):
     """
 
     parameters = locals()
-    with tf.name_scope(name, values=[samples]):
+    with tf.compat.v1.name_scope(name, values=[samples]):
       self._samples = tf.convert_to_tensor(value=samples, name='samples')
       self._event_ndims = event_ndims
       self._samples_axis = ((self.samples.shape.ndims or tf.rank(self.samples))

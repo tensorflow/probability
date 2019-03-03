@@ -429,7 +429,7 @@ class Distribution(_BaseDistribution):
         raise ValueError("Graph parent item %d is not a Tensor; %s." % (i, t))
     if not name or name[-1] != "/":  # `name` is not a name scope
       non_unique_name = name or type(self).__name__
-      with tf.name_scope(non_unique_name) as name:
+      with tf.compat.v1.name_scope(non_unique_name) as name:
         pass
     self._dtype = dtype
     self._reparameterization_type = reparameterization_type
@@ -458,7 +458,7 @@ class Distribution(_BaseDistribution):
     Returns:
       `dict` of parameter name to `Tensor` shapes.
     """
-    with tf.name_scope(name, values=[sample_shape]):
+    with tf.compat.v1.name_scope(name, values=[sample_shape]):
       return cls._param_shapes(sample_shape)
 
   @classmethod
@@ -1183,9 +1183,11 @@ class Distribution(_BaseDistribution):
   @contextlib.contextmanager
   def _name_scope(self, name=None, values=None):
     """Helper function to standardize op scope."""
-    with tf.name_scope(self.name):
-      with tf.name_scope(name, values=(
-          ([] if values is None else values) + self._graph_parents)) as scope:
+    with tf.compat.v1.name_scope(self.name):
+      with tf.compat.v1.name_scope(
+          name,
+          values=(([] if values is None else values) +
+                  self._graph_parents)) as scope:
         yield scope
 
   def _expand_sample_shape_to_vector(self, x, name):

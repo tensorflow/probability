@@ -123,7 +123,7 @@ class VonMises(distribution.Distribution):
       TypeError: if loc and concentration are different dtypes.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[loc, concentration]) as name:
+    with tf.compat.v1.name_scope(name, values=[loc, concentration]) as name:
       dtype = dtype_util.common_dtype([loc, concentration],
                                       preferred_dtype=tf.float32)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
@@ -221,7 +221,7 @@ class VonMises(distribution.Distribution):
 
   def _z(self, x):
     """Standardize input `x` to a zero-loc von Mises."""
-    with tf.name_scope("standardize", values=[x]):
+    with tf.compat.v1.name_scope("standardize", values=[x]):
       return x - self.loc
 
   def _sample_n(self, n, seed=None):
@@ -254,7 +254,7 @@ def _kl_von_mises_von_mises(d1, d2, name=None):
   Returns:
     Batchwise KL(d1 || d2)
   """
-  with tf.name_scope(
+  with tf.compat.v1.name_scope(
       name,
       "kl_von_mises_von_mises",
       values=[d1.loc, d1.concentration, d2.loc, d2.concentration]):

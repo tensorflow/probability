@@ -118,7 +118,8 @@ class Transpose(bijector.Bijector):
       NotImplementedError: if `rightmost_transposed_ndims` is not known prior to
         graph execution.
     """
-    with tf.name_scope(name, values=[perm, rightmost_transposed_ndims]):
+    with tf.compat.v1.name_scope(
+        name, values=[perm, rightmost_transposed_ndims]):
       if (rightmost_transposed_ndims is None) == (perm is None):
         raise ValueError('Must specify exactly one of '
                          '`rightmost_transposed_ndims` and `perm`.')
@@ -196,8 +197,9 @@ class Transpose(bijector.Bijector):
 def _maybe_validate_rightmost_transposed_ndims(
     rightmost_transposed_ndims, validate_args, name=None):
   """Checks that `rightmost_transposed_ndims` is valid."""
-  with tf.name_scope(name, 'maybe_validate_rightmost_transposed_ndims',
-                     [rightmost_transposed_ndims]):
+  with tf.compat.v1.name_scope(name,
+                               'maybe_validate_rightmost_transposed_ndims',
+                               [rightmost_transposed_ndims]):
     assertions = []
     if not rightmost_transposed_ndims.dtype.is_integer:
       raise TypeError('`rightmost_transposed_ndims` must be integer type.')
@@ -228,7 +230,7 @@ def _maybe_validate_rightmost_transposed_ndims(
 
 def _maybe_validate_perm(perm, validate_args, name=None):
   """Checks that `perm` is valid."""
-  with tf.name_scope(name, 'maybe_validate_perm', [perm]):
+  with tf.compat.v1.name_scope(name, 'maybe_validate_perm', [perm]):
     assertions = []
     if not perm.dtype.is_integer:
       raise TypeError('`perm` must be integer type')

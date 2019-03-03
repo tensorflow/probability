@@ -79,7 +79,7 @@ class Pareto(distribution.Distribution):
         Default value: 'Pareto'.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[concentration, scale]):
+    with tf.compat.v1.name_scope(name, values=[concentration, scale]):
       dtype = dtype_util.common_dtype([concentration, scale], tf.float32)
       self._concentration = tf.convert_to_tensor(
           value=concentration, name="concentration", dtype=dtype)
@@ -253,8 +253,9 @@ def _kl_pareto_pareto(a, b, name=None):
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.name_scope(name, "kl_pareto_pareto",
-                     [a.concentration, b.concentration, a.scale, b.scale]):
+  with tf.compat.v1.name_scope(
+      name, "kl_pareto_pareto",
+      [a.concentration, b.concentration, a.scale, b.scale]):
     # Consistent with
     # http://www.mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 55
     # Terminology is different from source to source for Pareto distributions.

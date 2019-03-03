@@ -152,7 +152,8 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
     if validate_args and not scale.is_positive_definite:
       raise ValueError("`scale` must be positive definite.")
 
-    with tf.name_scope(name, values=[df, loc] + scale.graph_parents) as name:
+    with tf.compat.v1.name_scope(
+        name, values=[df, loc] + scale.graph_parents) as name:
       dtype = dtype_util.common_dtype([df, loc, scale],
                                       preferred_dtype=tf.float32)
 

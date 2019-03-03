@@ -155,10 +155,11 @@ class HiddenMarkovModel(distribution.Distribution):
     parameters = dict(locals())
 
     # pylint: disable=protected-access
-    with tf.name_scope(name=name, values=(
-        initial_distribution._graph_parents +
-        transition_distribution._graph_parents +
-        observation_distribution._graph_parents)) as name:
+    with tf.compat.v1.name_scope(
+        name=name,
+        values=(initial_distribution._graph_parents +
+                transition_distribution._graph_parents +
+                observation_distribution._graph_parents)) as name:
       self._runtime_assertions = []  # pylint: enable=protected-access
 
       if num_steps < 1:
@@ -656,7 +657,7 @@ class HiddenMarkovModel(distribution.Distribution):
       have size `num_steps`.
     """
 
-    with tf.name_scope("posterior_marginals", values=[observations]):
+    with tf.compat.v1.name_scope("posterior_marginals", values=[observations]):
       with tf.control_dependencies(self._runtime_assertions):
 
         observation_tensor_shape = tf.shape(input=observations)

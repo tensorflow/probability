@@ -164,7 +164,8 @@ class VonMisesFisher(distribution.Distribution):
       ValueError: For known-bad arguments, i.e. unsupported event dimension.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[mean_direction, concentration]) as name:
+    with tf.compat.v1.name_scope(
+        name, values=[mean_direction, concentration]) as name:
       dtype = dtype_util.common_dtype([mean_direction, concentration],
                                       tf.float32)
       mean_direction = tf.convert_to_tensor(

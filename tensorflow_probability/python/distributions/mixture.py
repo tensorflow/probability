@@ -150,7 +150,7 @@ class Mixture(distribution.Distribution):
           "none of the components provide a static number of ndims")
 
     # Ensure that all batch and event ndims are consistent.
-    with tf.name_scope(name, values=[cat.logits]) as name:
+    with tf.compat.v1.name_scope(name, values=[cat.logits]) as name:
       num_components = cat.event_size
       static_num_components = tf.get_static_value(num_components)
       if static_num_components is None:

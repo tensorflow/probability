@@ -154,7 +154,7 @@ class StochasticGradientLangevinDynamics(tf.compat.v2.optimizers.Optimizer):
                name=None,
                parallel_iterations=10):
     default_name = 'StochasticGradientLangevinDynamics'
-    with tf.name_scope(name, default_name, [
+    with tf.compat.v1.name_scope(name, default_name, [
         learning_rate, preconditioner_decay_rate, data_size, burnin,
         diagonal_bias
     ]):

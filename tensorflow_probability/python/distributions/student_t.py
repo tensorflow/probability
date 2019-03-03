@@ -168,7 +168,7 @@ class StudentT(distribution.Distribution):
       TypeError: if loc and scale are different dtypes.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[df, loc, scale]) as name:
+    with tf.compat.v1.name_scope(name, values=[df, loc, scale]) as name:
       dtype = dtype_util.common_dtype([df, loc, scale], tf.float32)
       df = tf.convert_to_tensor(value=df, name="df", dtype=dtype)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)

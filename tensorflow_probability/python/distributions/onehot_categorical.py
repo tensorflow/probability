@@ -109,7 +109,7 @@ class OneHotCategorical(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[logits, probs]) as name:
+    with tf.compat.v1.name_scope(name, values=[logits, probs]) as name:
       self._logits, self._probs = distribution_util.get_logits_and_probs(
           name=name, logits=logits, probs=probs, validate_args=validate_args,
           multidimensional=True)
@@ -121,10 +121,10 @@ class OneHotCategorical(distribution.Distribution):
             dtype=tf.int32,
             name="batch_rank")
       else:
-        with tf.name_scope(name="batch_rank"):
+        with tf.compat.v1.name_scope(name="batch_rank"):
           self._batch_rank = tf.rank(self._logits) - 1
 
-      with tf.name_scope(name="event_size"):
+      with tf.compat.v1.name_scope(name="event_size"):
         self._event_size = tf.shape(input=self._logits)[-1]
 
     super(OneHotCategorical, self).__init__(
@@ -241,7 +241,7 @@ def _kl_categorical_categorical(a, b, name=None):
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.name_scope(
+  with tf.compat.v1.name_scope(
       name, "kl_categorical_categorical", values=[a.logits, b.logits]):
     # sum(p ln(p / q))
     return tf.reduce_sum(

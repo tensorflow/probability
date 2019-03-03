@@ -677,13 +677,13 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
 
   @mcmc_util.set_doc(HamiltonianMonteCarlo.one_step.__doc__)
   def one_step(self, current_state, previous_kernel_results):
-    with tf.name_scope(
+    with tf.compat.v1.name_scope(
         name=mcmc_util.make_name(self.name, 'hmc', 'one_step'),
-        values=[self.step_size,
-                self.num_leapfrog_steps,
-                current_state,
-                previous_kernel_results.target_log_prob,
-                previous_kernel_results.grads_target_log_prob]):
+        values=[
+            self.step_size, self.num_leapfrog_steps, current_state,
+            previous_kernel_results.target_log_prob,
+            previous_kernel_results.grads_target_log_prob
+        ]):
       if self._store_parameters_in_results:
         step_size = previous_kernel_results.step_size
         num_leapfrog_steps = previous_kernel_results.num_leapfrog_steps
@@ -765,7 +765,7 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
 
   @mcmc_util.set_doc(HamiltonianMonteCarlo.bootstrap_results.__doc__)
   def bootstrap_results(self, init_state):
-    with tf.name_scope(
+    with tf.compat.v1.name_scope(
         name=mcmc_util.make_name(self.name, 'hmc', 'bootstrap_results'),
         values=[init_state]):
       if not mcmc_util.is_list_like(init_state):
@@ -971,11 +971,11 @@ def _leapfrog_integrator_one_step(
   # So using per-variable step sizes in HMC will give results that are
   # exactly identical to explicitly using a diagonal mass matrix.
 
-  with tf.name_scope(
-      name, 'hmc_leapfrog_integrator_one_step',
-      [independent_chain_ndims, step_sizes,
-       current_momentum_parts, current_state_parts,
-       current_target_log_prob, current_target_log_prob_grad_parts]):
+  with tf.compat.v1.name_scope(name, 'hmc_leapfrog_integrator_one_step', [
+      independent_chain_ndims, step_sizes, current_momentum_parts,
+      current_state_parts, current_target_log_prob,
+      current_target_log_prob_grad_parts
+  ]):
 
     # Step 1: Update momentum.
     proposed_momentum_parts = [
@@ -1113,7 +1113,7 @@ def _compute_log_acceptance_correction(current_momentums,
     log_acceptance_correction: `Tensor` representing the `log`
       acceptance-correction.  (See docstring for mathematical definition.)
   """
-  with tf.name_scope(
+  with tf.compat.v1.name_scope(
       name, 'compute_log_acceptance_correction',
       [independent_chain_ndims, current_momentums, proposed_momentums]):
     log_current_kinetic, log_proposed_kinetic = [], []

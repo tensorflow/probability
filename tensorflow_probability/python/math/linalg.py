@@ -108,7 +108,7 @@ def pinv(a, rcond=None, validate_args=False, name=None):
   [1]: G. Strang. "Linear Algebra and Its Applications, 2nd Ed." Academic Press,
        Inc., 1980, pp. 139-142.
   """
-  with tf.name_scope(name, 'pinv', [a, rcond]):
+  with tf.compat.v1.name_scope(name, 'pinv', [a, rcond]):
     a = tf.convert_to_tensor(value=a, name='a')
 
     if not a.dtype.is_floating:
@@ -216,7 +216,7 @@ def lu_solve(lower_upper, perm, rhs,
 
   """
 
-  with tf.name_scope(name, 'lu_solve', [lower_upper, perm, rhs]):
+  with tf.compat.v1.name_scope(name, 'lu_solve', [lower_upper, perm, rhs]):
     lower_upper = tf.convert_to_tensor(
         value=lower_upper, dtype_hint=tf.float32, name='lower_upper')
     perm = tf.convert_to_tensor(value=perm, dtype_hint=tf.int32, name='perm')
@@ -316,7 +316,7 @@ def lu_matrix_inverse(lower_upper, perm, validate_args=False, name=None):
 
   """
 
-  with tf.name_scope(name, 'lu_matrix_inverse', [lower_upper, perm]):
+  with tf.compat.v1.name_scope(name, 'lu_matrix_inverse', [lower_upper, perm]):
     lower_upper = tf.convert_to_tensor(
         value=lower_upper, dtype_hint=tf.float32, name='lower_upper')
     perm = tf.convert_to_tensor(value=perm, dtype_hint=tf.int32, name='perm')
@@ -365,7 +365,7 @@ def lu_reconstruct(lower_upper, perm, validate_args=False, name=None):
   ```
 
   """
-  with tf.name_scope(name, 'lu_reconstruct', [lower_upper, perm]):
+  with tf.compat.v1.name_scope(name, 'lu_reconstruct', [lower_upper, perm]):
     lower_upper = tf.convert_to_tensor(
         value=lower_upper, dtype_hint=tf.float32, name='lower_upper')
     perm = tf.convert_to_tensor(value=perm, dtype_hint=tf.int32, name='perm')
@@ -489,8 +489,8 @@ def sparse_or_dense_matmul(sparse_or_dense_a,
     `dense_b` is adjointed through `kwargs` then the shape is adjusted
     accordingly.
   """
-  with tf.name_scope(name, 'sparse_or_dense_matmul',
-                     [sparse_or_dense_a, dense_b]):
+  with tf.compat.v1.name_scope(name, 'sparse_or_dense_matmul',
+                               [sparse_or_dense_a, dense_b]):
     dense_b = tf.convert_to_tensor(
         value=dense_b, dtype_hint=tf.float32, name='dense_b')
 
@@ -540,8 +540,8 @@ def sparse_or_dense_matvecmul(sparse_or_dense_matrix,
     product: A dense (batch of) vector-shaped Tensor of the same batch shape and
     dtype as `sparse_or_dense_matrix` and `dense_vector`.
   """
-  with tf.name_scope(name, 'sparse_or_dense_matvecmul',
-                     [sparse_or_dense_matrix, dense_vector]):
+  with tf.compat.v1.name_scope(name, 'sparse_or_dense_matvecmul',
+                               [sparse_or_dense_matrix, dense_vector]):
     dense_vector = tf.convert_to_tensor(
         value=dense_vector, dtype_hint=tf.float32, name='dense_vector')
     return tf.squeeze(

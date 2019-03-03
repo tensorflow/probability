@@ -177,8 +177,10 @@ class SeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
         scalar nor `[num_seasons]`).
     """
 
-    with tf.name_scope(name, 'SeasonalStateSpaceModel',
-                       values=[drift_scale, observation_noise_scale]) as name:
+    with tf.compat.v1.name_scope(
+        name,
+        'SeasonalStateSpaceModel',
+        values=[drift_scale, observation_noise_scale]) as name:
 
       # The initial state prior determines the dtype of sampled values.
       # Other model parameters must have the same dtype.
@@ -385,7 +387,8 @@ class Seasonal(StructuralTimeSeries):
         Default value: 'Seasonal'.
     """
 
-    with tf.name_scope(name, 'Seasonal', values=[observed_time_series]) as name:
+    with tf.compat.v1.name_scope(
+        name, 'Seasonal', values=[observed_time_series]) as name:
 
       observed_stddev, observed_initial = (
           sts_util.empirical_statistics(observed_time_series)

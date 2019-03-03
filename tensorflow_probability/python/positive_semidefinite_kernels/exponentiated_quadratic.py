@@ -72,7 +72,8 @@ class ExponentiatedQuadratic(psd_kernel.PositiveSemidefiniteKernel):
         possibly degrading runtime performance
       name: Python `str` name prefixed to Ops created by this class.
     """
-    with tf.name_scope(name, values=[amplitude, length_scale]) as name:
+    with tf.compat.v1.name_scope(
+        name, values=[amplitude, length_scale]) as name:
       dtype = dtype_util.common_dtype([amplitude, length_scale], tf.float32)
       if amplitude is not None:
         amplitude = tf.convert_to_tensor(

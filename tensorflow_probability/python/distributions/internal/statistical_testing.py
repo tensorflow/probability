@@ -208,8 +208,8 @@ def assert_true_cdf_equal_by_dkwm(
     check: Op that raises `InvalidArgumentError` if any expected CDF is
       outside the corresponding confidence envelope.
   """
-  with tf.name_scope(
-      name, 'assert_true_cdf_equal_by_dkwm', [samples, false_fail_rate]):
+  with tf.compat.v1.name_scope(name, 'assert_true_cdf_equal_by_dkwm',
+                               [samples, false_fail_rate]):
     dtype = dtype_util.common_dtype([samples, false_fail_rate], tf.float32)
     samples = tf.convert_to_tensor(value=samples, name='samples', dtype=dtype)
     false_fail_rate = tf.convert_to_tensor(
@@ -269,8 +269,9 @@ def min_discrepancy_of_true_cdfs_detectable_by_dkwm(
   - `O(-log(false_fail_rate/K))`, and
   - `O(-log(false_pass_rate))`.
   """
-  with tf.name_scope(name, 'min_discrepancy_of_true_cdfs_detectable_by_dkwm',
-                     [n, false_fail_rate, false_pass_rate]):
+  with tf.compat.v1.name_scope(
+      name, 'min_discrepancy_of_true_cdfs_detectable_by_dkwm',
+      [n, false_fail_rate, false_pass_rate]):
     dtype = dtype_util.common_dtype(
         [n, false_fail_rate, false_pass_rate], tf.float32)
     n = tf.convert_to_tensor(value=n, name='n', dtype=dtype)
@@ -335,9 +336,8 @@ def min_num_samples_for_dkwm_cdf_test(
   - `O(-log(false_pass_rate))`, and
   - `O(1 / discrepancy[i]**2)`.
   """
-  with tf.name_scope(
-      name, 'min_num_samples_for_dkwm_cdf_test',
-      [false_fail_rate, false_pass_rate, discrepancy]):
+  with tf.compat.v1.name_scope(name, 'min_num_samples_for_dkwm_cdf_test',
+                               [false_fail_rate, false_pass_rate, discrepancy]):
     dtype = dtype_util.common_dtype(
         [false_fail_rate, false_pass_rate, discrepancy], tf.float32)
     discrepancy = tf.convert_to_tensor(
@@ -404,8 +404,7 @@ def kolmogorov_smirnov_distance(
     distance: Tensor of shape B: (Absolute) Kolmogorov-Smirnov distance between
       the empirical and analytic CDFs.
   """
-  with tf.name_scope(
-      name, 'kolmogorov_smirnov_distance', [samples]):
+  with tf.compat.v1.name_scope(name, 'kolmogorov_smirnov_distance', [samples]):
     dtype = dtype_util.common_dtype([samples], tf.float32)
     samples = tf.convert_to_tensor(value=samples, name='samples', dtype=dtype)
     samples = _move_dim_and_sort(samples)
@@ -470,8 +469,8 @@ def kolmogorov_smirnov_distance_two_sample(samples1, samples2, name=None):
     distance: Tensor of shape B: (Absolute) Kolmogorov-Smirnov distance between
       the two empirical CDFs given by the samples.
   """
-  with tf.name_scope(
-      name, 'kolmogorov_smirnov_distance_two_sample', [samples1, samples2]):
+  with tf.compat.v1.name_scope(name, 'kolmogorov_smirnov_distance_two_sample',
+                               [samples1, samples2]):
     dtype = dtype_util.common_dtype([samples1, samples2], tf.float32)
     samples1 = tf.convert_to_tensor(
         value=samples1, name='samples1', dtype=dtype)
@@ -501,7 +500,7 @@ def _move_dim_and_sort(samples):
 
 def _batch_sort_vector(x, ascending=True, name=None):
   """Batch sort.  Sorts the -1 dimension of each batch member independently."""
-  with tf.name_scope(name, '_batch_sort_vector', [x]):
+  with tf.compat.v1.name_scope(name, '_batch_sort_vector', [x]):
     x = tf.convert_to_tensor(value=x, name='x')
     n = tf.shape(input=x)[-1]
     if ascending:
@@ -553,7 +552,7 @@ def empirical_cdfs(samples, positions, continuity='right',
     msg = 'Continuity value must be "left" or "right", got {}.'.format(
         continuity)
     raise ValueError(msg)
-  with tf.name_scope(name, 'empirical_cdfs', [samples, positions]):
+  with tf.compat.v1.name_scope(name, 'empirical_cdfs', [samples, positions]):
     n = tf.cast(tf.shape(input=samples)[-1], dtype=dtype)
     indexes = tf.searchsorted(
         sorted_sequence=samples, values=positions, side=continuity)
@@ -562,7 +561,8 @@ def empirical_cdfs(samples, positions, continuity='right',
 
 def _do_maximum_mean(samples, envelope, high, name=None):
   """Common code between maximum_mean and minimum_mean."""
-  with tf.name_scope(name, 'do_maximum_mean', [samples, envelope, high]):
+  with tf.compat.v1.name_scope(name, 'do_maximum_mean',
+                               [samples, envelope, high]):
     dtype = dtype_util.common_dtype([samples, envelope, high], tf.float32)
     samples = tf.convert_to_tensor(value=samples, name='samples', dtype=dtype)
     envelope = tf.convert_to_tensor(
@@ -633,9 +633,8 @@ def assert_true_cdf_equal_by_dkwm_two_sample(
     check: Op that raises `InvalidArgumentError` if any expected CDF is
       outside the corresponding confidence envelope.
   """
-  with tf.name_scope(
-      name, 'assert_true_cdf_equal_by_dkwm_two_sample',
-      [samples1, samples2, false_fail_rate]):
+  with tf.compat.v1.name_scope(name, 'assert_true_cdf_equal_by_dkwm_two_sample',
+                               [samples1, samples2, false_fail_rate]):
     dtype = dtype_util.common_dtype(
         [samples1, samples2, false_fail_rate], tf.float32)
     samples1 = tf.convert_to_tensor(
@@ -707,7 +706,7 @@ def min_discrepancy_of_true_cdfs_detectable_by_dkwm_two_sample(
   - `O(-log(false_fail_rate/K))`, and
   - `O(-log(false_pass_rate))`.
   """
-  with tf.name_scope(
+  with tf.compat.v1.name_scope(
       name, 'min_discrepancy_of_true_cdfs_detectable_by_dkwm_two_sample',
       [n1, n2, false_fail_rate, false_pass_rate]):
     dtype = dtype_util.common_dtype(
@@ -763,9 +762,9 @@ def min_num_samples_for_dkwm_cdf_two_sample_test(
   - `O(-log(false_pass_rate))`, and
   - `O(1 / discrepancy[i]**2)`.
   """
-  with tf.name_scope(
-      name, 'min_num_samples_for_dkwm_cdf_two_sample_test',
-      [discrepancy, false_fail_rate, false_pass_rate]):
+  with tf.compat.v1.name_scope(name,
+                               'min_num_samples_for_dkwm_cdf_two_sample_test',
+                               [discrepancy, false_fail_rate, false_pass_rate]):
     dtype = dtype_util.common_dtype(
         [discrepancy, false_fail_rate, false_pass_rate], tf.float32)
     discrepancy = tf.convert_to_tensor(
@@ -812,7 +811,7 @@ def _maximum_mean(samples, envelope, high, name=None):
     InvalidArgumentError: If some `sample` is found to be larger than
       the corresponding `high`.
   """
-  with tf.name_scope(name, 'maximum_mean', [samples, envelope, high]):
+  with tf.compat.v1.name_scope(name, 'maximum_mean', [samples, envelope, high]):
     dtype = dtype_util.common_dtype([samples, envelope, high], tf.float32)
     samples = tf.convert_to_tensor(value=samples, name='samples', dtype=dtype)
     envelope = tf.convert_to_tensor(
@@ -859,7 +858,7 @@ def _minimum_mean(samples, envelope, low, name=None):
     InvalidArgumentError: If some `sample` is found to be smaller than
       the corresponding `low`.
   """
-  with tf.name_scope(name, 'minimum_mean', [samples, envelope, low]):
+  with tf.compat.v1.name_scope(name, 'minimum_mean', [samples, envelope, low]):
     dtype = dtype_util.common_dtype([samples, envelope, low], tf.float32)
     samples = tf.convert_to_tensor(value=samples, name='samples', dtype=dtype)
     envelope = tf.convert_to_tensor(
@@ -901,7 +900,7 @@ def _dkwm_cdf_envelope(n, error_rate, name=None):
       as `O(1 / sqrt(n))`.  The shape is the broadcast of `n` and
       `error_rate`.
   """
-  with tf.name_scope(name, 'dkwm_cdf_envelope', [n, error_rate]):
+  with tf.compat.v1.name_scope(name, 'dkwm_cdf_envelope', [n, error_rate]):
     n = tf.cast(n, dtype=error_rate.dtype)
     return tf.sqrt(-tf.math.log(error_rate / 2.) / (2. * n))
 
@@ -976,8 +975,8 @@ def true_mean_confidence_interval_by_dkwm(
     high: A floating-point `Tensor` of stochastic upper bounds on the
       true means.
   """
-  with tf.name_scope(name, 'true_mean_confidence_interval_by_dkwm',
-                     [samples, low, high, error_rate]):
+  with tf.compat.v1.name_scope(name, 'true_mean_confidence_interval_by_dkwm',
+                               [samples, low, high, error_rate]):
     dtype = dtype_util.common_dtype(
         [samples, low, high, error_rate], tf.float32)
     samples = tf.convert_to_tensor(value=samples, name='samples', dtype=dtype)
@@ -1000,8 +999,8 @@ def true_mean_confidence_interval_by_dkwm(
 def _itemwise_error_rate(
     total_rate, param_tensors, samples_tensor=None, name=None):
   """Distributes a total error rate for a batch of assertions."""
-  with tf.name_scope(name, 'itemwise_error_rate',
-                     [total_rate, param_tensors, samples_tensor]):
+  with tf.compat.v1.name_scope(name, 'itemwise_error_rate',
+                               [total_rate, param_tensors, samples_tensor]):
     result_shape = [1]
     for p_tensor in param_tensors:
       result_shape = tf.broadcast_dynamic_shape(
@@ -1049,8 +1048,8 @@ def assert_true_mean_equal_by_dkwm(
     check: Op that raises `InvalidArgumentError` if any expected mean is
       outside the corresponding confidence interval.
   """
-  with tf.name_scope(name, 'assert_true_mean_equal_by_dkwm',
-                     [samples, low, high, expected, false_fail_rate]):
+  with tf.compat.v1.name_scope(name, 'assert_true_mean_equal_by_dkwm',
+                               [samples, low, high, expected, false_fail_rate]):
     return assert_true_mean_in_interval_by_dkwm(
         samples, low, high, expected, expected, false_fail_rate)
 
@@ -1109,8 +1108,9 @@ def min_discrepancy_of_true_means_detectable_by_dkwm(
   - `O(-log(false_fail_rate/K))`, and
   - `O(-log(false_pass_rate))`.
   """
-  with tf.name_scope(name, 'min_discrepancy_of_true_means_detectable_by_dkwm',
-                     [n, low, high, false_fail_rate, false_pass_rate]):
+  with tf.compat.v1.name_scope(
+      name, 'min_discrepancy_of_true_means_detectable_by_dkwm',
+      [n, low, high, false_fail_rate, false_pass_rate]):
     dtype = dtype_util.common_dtype(
         [n, low, high, false_fail_rate, false_pass_rate], tf.float32)
     n = tf.convert_to_tensor(value=n, name='n', dtype=dtype)
@@ -1174,7 +1174,7 @@ def min_num_samples_for_dkwm_mean_test(
   as `O((high[i] - low[i])**2)`, `O(-log(false_fail_rate/K))`,
   `O(-log(false_pass_rate))`, and `O(1 / discrepancy[i]**2)`.
   """
-  with tf.name_scope(
+  with tf.compat.v1.name_scope(
       name, 'min_num_samples_for_dkwm_mean_test',
       [low, high, false_fail_rate, false_pass_rate, discrepancy]):
     dtype = dtype_util.common_dtype(
@@ -1234,8 +1234,8 @@ def assert_true_mean_in_interval_by_dkwm(
       interval.
   """
   args_list = [samples, low, high, expected_low, expected_high, false_fail_rate]
-  with tf.name_scope(
-      name, 'assert_true_mean_in_interval_by_dkwm', args_list):
+  with tf.compat.v1.name_scope(name, 'assert_true_mean_in_interval_by_dkwm',
+                               args_list):
     dtype = dtype_util.common_dtype(args_list, tf.float32)
     samples = tf.convert_to_tensor(value=samples, name='samples', dtype=dtype)
     low = tf.convert_to_tensor(value=low, name='low', dtype=dtype)
@@ -1316,7 +1316,7 @@ def assert_true_mean_equal_by_dkwm_two_sample(
       intervals true for corresponding true means do not overlap.
   """
   args_list = [samples1, low1, high1, samples2, low2, high2, false_fail_rate]
-  with tf.name_scope(
+  with tf.compat.v1.name_scope(
       name, 'assert_true_mean_equal_by_dkwm_two_sample', args_list):
     dtype = dtype_util.common_dtype(args_list, tf.float32)
     samples1 = tf.convert_to_tensor(
@@ -1407,9 +1407,8 @@ def min_discrepancy_of_true_means_detectable_by_dkwm_two_sample(
   """
   args_list = (
       [n1, low1, high1, n2, low2, high2, false_fail_rate, false_pass_rate])
-  with tf.name_scope(
-      name,
-      'min_discrepancy_of_true_means_detectable_by_dkwm_two_sample',
+  with tf.compat.v1.name_scope(
+      name, 'min_discrepancy_of_true_means_detectable_by_dkwm_two_sample',
       args_list):
     dtype = dtype_util.common_dtype(args_list, tf.float32)
     n1 = tf.convert_to_tensor(value=n1, name='n1', dtype=dtype)
@@ -1480,10 +1479,8 @@ def min_num_samples_for_dkwm_mean_two_sample_test(
   """
   args_list = (
       [low1, high1, low2, high2, false_fail_rate, false_pass_rate, discrepancy])
-  with tf.name_scope(
-      name,
-      'min_num_samples_for_dkwm_mean_two_sample_test',
-      args_list):
+  with tf.compat.v1.name_scope(
+      name, 'min_num_samples_for_dkwm_mean_two_sample_test', args_list):
     dtype = dtype_util.common_dtype(args_list, tf.float32)
     discrepancy = tf.convert_to_tensor(
         value=discrepancy, name='discrepancy', dtype=dtype)

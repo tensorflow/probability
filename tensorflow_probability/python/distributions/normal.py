@@ -126,7 +126,7 @@ class Normal(distribution.Distribution):
       TypeError: if `loc` and `scale` have different `dtype`.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[loc, scale]) as name:
+    with tf.compat.v1.name_scope(name, values=[loc, scale]) as name:
       dtype = dtype_util.common_dtype([loc, scale], tf.float32)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
       scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
@@ -221,12 +221,12 @@ class Normal(distribution.Distribution):
 
   def _z(self, x):
     """Standardize input `x` to a unit normal."""
-    with tf.name_scope("standardize", values=[x]):
+    with tf.compat.v1.name_scope("standardize", values=[x]):
       return (x - self.loc) / self.scale
 
   def _inv_z(self, z):
     """Reconstruct input `x` from a its normalized version."""
-    with tf.name_scope("reconstruct", values=[z]):
+    with tf.compat.v1.name_scope("reconstruct", values=[z]):
       return z * self.scale + self.loc
 
 
@@ -246,7 +246,7 @@ def _kl_normal_normal(n_a, n_b, name=None):
   Returns:
     Batchwise KL(n_a || n_b)
   """
-  with tf.name_scope(name, "kl_normal_normal", [n_a.loc, n_b.loc]):
+  with tf.compat.v1.name_scope(name, "kl_normal_normal", [n_a.loc, n_b.loc]):
     one = tf.constant(1, dtype=n_a.dtype)
     two = tf.constant(2, dtype=n_a.dtype)
     half = tf.constant(0.5, dtype=n_a.dtype)

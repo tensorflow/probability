@@ -204,7 +204,7 @@ def correlation_matrix_volume_rejection_samples(
     volume: The volume of the set of `dim` by `dim` correlation-like
       matrices.
   """
-  with tf.name_scope("rejection_sampler"):
+  with tf.compat.v1.name_scope("rejection_sampler"):
     rej_proposals = _uniform_correlation_like_matrix(
         dim, sample_shape, dtype, seed=seed)
     rej_proposal_volume = 2. ** (dim * (dim - 1) / 2.)

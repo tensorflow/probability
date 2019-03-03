@@ -131,7 +131,7 @@ def ndtr(x, name="ndtr"):
     TypeError: if `x` is not floating-type.
   """
 
-  with tf.name_scope(name, values=[x]):
+  with tf.compat.v1.name_scope(name, values=[x]):
     x = tf.convert_to_tensor(value=x, name="x")
     if x.dtype.as_numpy_dtype not in [np.float32, np.float64]:
       raise TypeError(
@@ -172,7 +172,7 @@ def ndtri(p, name="ndtri"):
     TypeError: if `p` is not floating-type.
   """
 
-  with tf.name_scope(name, values=[p]):
+  with tf.compat.v1.name_scope(name, values=[p]):
     p = tf.convert_to_tensor(value=p, name="p")
     if p.dtype.as_numpy_dtype not in [np.float32, np.float64]:
       raise TypeError(
@@ -343,7 +343,7 @@ def log_ndtr(x, series_order=3, name="log_ndtr"):
   if series_order > 30:
     raise ValueError("series_order must be <= 30.")
 
-  with tf.name_scope(name, values=[x]):
+  with tf.compat.v1.name_scope(name, values=[x]):
     x = tf.convert_to_tensor(value=x, name="x")
 
     if x.dtype.as_numpy_dtype == np.float64:
@@ -419,7 +419,7 @@ def erfinv(x, name="erfinv"):
     TypeError: if `x` is not floating-type.
   """
 
-  with tf.name_scope(name, values=[x]):
+  with tf.compat.v1.name_scope(name, values=[x]):
     x = tf.convert_to_tensor(value=x, name="x")
     if x.dtype.as_numpy_dtype not in [np.float32, np.float64]:
       raise TypeError(
@@ -462,7 +462,7 @@ def log_cdf_laplace(x, name="log_cdf_laplace"):
     TypeError: if `x.dtype` is not handled.
   """
 
-  with tf.name_scope(name, values=[x]):
+  with tf.compat.v1.name_scope(name, values=[x]):
     x = tf.convert_to_tensor(value=x, name="x")
 
     # For x < 0, L(x) = 0.5 * exp{x} exactly, so Log[L(x)] = log(0.5) + x.

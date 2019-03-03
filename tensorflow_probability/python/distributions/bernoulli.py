@@ -65,7 +65,7 @@ class Bernoulli(distribution.Distribution):
       ValueError: If p and logits are passed, or if neither are passed.
     """
     parameters = dict(locals())
-    with tf.name_scope(name) as name:
+    with tf.compat.v1.name_scope(name) as name:
       self._logits, self._probs = util.get_logits_and_probs(
           logits=logits,
           probs=probs,
@@ -165,8 +165,8 @@ def _kl_bernoulli_bernoulli(a, b, name=None):
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.name_scope(name, "kl_bernoulli_bernoulli",
-                     values=[a.logits, b.logits]):
+  with tf.compat.v1.name_scope(
+      name, "kl_bernoulli_bernoulli", values=[a.logits, b.logits]):
     delta_probs0 = tf.nn.softplus(-b.logits) - tf.nn.softplus(-a.logits)
     delta_probs1 = tf.nn.softplus(b.logits) - tf.nn.softplus(a.logits)
     return (tf.sigmoid(a.logits) * delta_probs0
