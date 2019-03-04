@@ -29,6 +29,8 @@ __all__ = [
 def common_dtype(args_list, preferred_dtype=None):
   """Returns explict dtype from `args_list` if there is one."""
   dtype = None
+  # Make a copy so as to not modify arguments.
+  args_list = list(args_list)
   while args_list:
     a = args_list.pop()
     if hasattr(a, 'dtype'):

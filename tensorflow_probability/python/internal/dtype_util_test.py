@@ -31,6 +31,13 @@ ed = tfp.edward2
 
 class DtypeUtilTest(tf.test.TestCase):
 
+  def testNoModifyArgsList(self):
+    x = tf.ones(3, tf.float32)
+    y = tf.zeros(4, tf.float32)
+    lst = [x, y]
+    self.assertEqual(tf.float32, dtype_util.common_dtype(lst))
+    self.assertLen(lst, 2)
+
   def testCommonDtypeFromLinop(self):
     x = tf.linalg.LinearOperatorDiag(tf.ones(3, tf.float16))
     self.assertEqual(
