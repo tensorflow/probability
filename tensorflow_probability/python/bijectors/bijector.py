@@ -524,6 +524,7 @@ class Bijector(object):
       ValueError:  If a member of `graph_parents` is not a `Tensor`.
     """
     self._graph_parents = graph_parents or []
+    self._use_tf_function = True
 
     if forward_min_event_ndims is None and inverse_min_event_ndims is None:
       raise ValueError("Must specify at least one of `forward_min_event_ndims` "
@@ -808,12 +809,14 @@ class Bijector(object):
     with self._name_scope(name, [x]):
       x = tf.convert_to_tensor(value=x, name="x")
       self._maybe_assert_dtype(x)
+      forward_fn = (self._tf_function_forward if self._use_tf_function
+                    else self._forward)
       if not self._is_injective:  # No caching for non-injective
-        return self._forward(x, **kwargs)
+        return forward_fn(x, **kwargs)
       mapping = self._lookup(x=x, kwargs=kwargs)
       if mapping.y is not None:
         return mapping.y
-      mapping = mapping.merge(y=self._forward(x, **kwargs))
+      mapping = mapping.merge(y=forward_fn(x, **kwargs))
       # It's most important to cache the y->x mapping, because computing
       # inverse(forward(y)) may be numerically unstable / lossy. Caching the
       # x->y mapping only saves work. Since python doesn't support ephemerons,
@@ -848,12 +851,14 @@ class Bijector(object):
     with self._name_scope(name, [y]):
       y = tf.convert_to_tensor(value=y, name="y")
       self._maybe_assert_dtype(y)
+      inverse_fn = (self._tf_function_inverse if self._use_tf_function
+                    else self._inverse)
       if not self._is_injective:  # No caching for non-injective
-        return self._inverse(y, **kwargs)
+        return inverse_fn(y, **kwargs)
       mapping = self._lookup(y=y, kwargs=kwargs)
       if mapping.x is not None:
         return mapping.x
-      mapping = mapping.merge(x=self._inverse(y, **kwargs))
+      mapping = mapping.merge(x=inverse_fn(y, **kwargs))
       # It's most important to cache the x->y mapping, because computing
       # forward(inverse(y)) may be numerically unstable / lossy. Caching the
       # y->x mapping only saves work. Since python doesn't support ephemerons,
@@ -881,19 +886,6 @@ class Bijector(object):
       NotImplementedError: if `_inverse` is not implemented.
     """
     return self._call_inverse(y, name)
-
-  def _has_inverse_log_det_jacobian_def(self):
-    return hasattr(self, "_inverse_log_det_jacobian")
-
-  def _has_forward_log_det_jacobian_def(self):
-    return hasattr(self, "_forward_log_det_jacobian")
-
-  def _check_has_log_det_jacobian_def(self):
-    if not (self._has_inverse_log_det_jacobian_def() or
-            self._has_forward_log_det_jacobian_def()):
-      raise NotImplementedError(
-          "Neither _forward_log_det_jacobian nor _inverse_log_det_jacobian "
-          "is implemented. One or the other is required.")
 
   def _compute_inverse_log_det_jacobian_with_caching(
       self, x, y, prefer_inverse_ldj_fn, event_ndims, kwargs):
@@ -952,14 +944,18 @@ class Bijector(object):
         Also updates the cache as needed.
     """
     # Ensure at least one of _inverse/_forward_log_det_jacobian is defined.
-    self._check_has_log_det_jacobian_def()
+    if not (hasattr(self, "_inverse_log_det_jacobian") or
+            hasattr(self, "_forward_log_det_jacobian")):
+      raise NotImplementedError(
+          "Neither _forward_log_det_jacobian nor _inverse_log_det_jacobian "
+          "is implemented. One or the other is required.")
 
     # Use inverse_log_det_jacobian if either
     #   1. it is preferred to *and* we are able, or
     #   2. forward ldj fn isn't implemented (so we have no choice).
     use_inverse_ldj_fn = (
-        (prefer_inverse_ldj_fn and self._has_inverse_log_det_jacobian_def()) or
-        not self._has_forward_log_det_jacobian_def())
+        (prefer_inverse_ldj_fn and hasattr(self, "_inverse_log_det_jacobian"))
+        or not hasattr(self, "_forward_log_det_jacobian"))
 
     if use_inverse_ldj_fn:
       tensor_to_use = y if y is not None else self.forward(x, **kwargs)
@@ -1016,9 +1012,15 @@ class Bijector(object):
       return mapping.ildj
 
     if use_inverse_ldj_fn:
-      ildj = self._inverse_log_det_jacobian(tensor_to_use, **kwargs)
+      ildj_fn = (self._tf_function_inverse_log_det_jacobian
+                 if self._use_tf_function
+                 else self._inverse_log_det_jacobian)
+      ildj = ildj_fn(tensor_to_use, **kwargs)
     else:
-      ildj = -self._forward_log_det_jacobian(tensor_to_use, **kwargs)
+      fldj_fn = (self._tf_function_forward_log_det_jacobian
+                 if self._use_tf_function
+                 else self._forward_log_det_jacobian)
+      ildj = -fldj_fn(tensor_to_use, **kwargs)
 
     mapping = mapping.merge(x=x, y=y, ildj=ildj)
     self._cache_update(mapping)
@@ -1051,9 +1053,15 @@ class Bijector(object):
       return self._constant_ildj
 
     if use_inverse_ldj_fn:
-      ildj = self._inverse_log_det_jacobian(tensor_to_use, **kwargs)
+      ildj_fn = (self._tf_function_inverse_log_det_jacobian
+                 if self._use_tf_function
+                 else self._inverse_log_det_jacobian)
+      ildj = ildj_fn(tensor_to_use, **kwargs)
     else:
-      ildj = -self._forward_log_det_jacobian(tensor_to_use, **kwargs)
+      fldj_fn = (self._tf_function_forward_log_det_jacobian
+                 if self._use_tf_function
+                 else self._forward_log_det_jacobian)
+      ildj = -fldj_fn(tensor_to_use, **kwargs)
     self._constant_ildj = ildj
     return ildj
 
@@ -1087,11 +1095,15 @@ class Bijector(object):
       self._maybe_assert_dtype(y)
 
       if not self._is_injective:
-        ildjs = self._inverse_log_det_jacobian(y, **kwargs)
+        ildj_fn = (self._tf_function_inverse_log_det_jacobian
+                   if self._use_tf_function
+                   else self._inverse_log_det_jacobian)
+        ildjs = ildj_fn(y, **kwargs)
         return tuple(
-            self._reduce_jacobian_det_over_event(
-                tf.shape(
-                    input=y), ildj, self.inverse_min_event_ndims, event_ndims)
+            self._reduce_jacobian_det_over_event(  # pylint: disable=g-complex-comprehension
+                tf.shape(input=y),
+                ildj,
+                self.inverse_min_event_ndims, event_ndims)
             for ildj in ildjs)
 
       return self._compute_inverse_log_det_jacobian_with_caching(
@@ -1330,3 +1342,19 @@ class Bijector(object):
       event_ndims_ = int(event_ndims_)
 
     return event_ndims_
+
+  @tf.function
+  def _tf_function_forward(self, x, **kwargs):
+    return self._forward(x, **kwargs)
+
+  @tf.function
+  def _tf_function_inverse(self, y, **kwargs):
+    return self._inverse(y, **kwargs)
+
+  @tf.function
+  def _tf_function_forward_log_det_jacobian(self, x, **kwargs):
+    return self._forward_log_det_jacobian(x, **kwargs)
+
+  @tf.function
+  def _tf_function_inverse_log_det_jacobian(self, y, **kwargs):
+    return self._inverse_log_det_jacobian(y, **kwargs)

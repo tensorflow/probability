@@ -81,6 +81,7 @@ class Blockwise(bijector_base.Bijector):
         validate_args=validate_args,
         name=name or
         'blockwise_of_' + '_and_'.join([b.name for b in bijectors]))
+    self._use_tf_function = False  # So input bijectors cache EagerTensors.
 
     if not bijectors:
       raise ValueError('`bijectors` must not be empty.')

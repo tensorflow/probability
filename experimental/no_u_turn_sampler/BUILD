@@ -56,7 +56,11 @@ py_test(
     ],
     main = "logistic_regression.py",
     srcs_version = "PY2AND3",
-    tags = ["nozapfhahn"],
+    tags = [
+        "manual",
+        "notap",
+        "nozapfhahn",
+    ],  # TODO(b/127209621): Re-enable.
     deps = [
         ":logistic_regression_lib",
     ],

@@ -62,6 +62,9 @@ class CholeskyToInvCholesky(bijector.Bijector):
         validate_args=validate_args,
         name=name or "cholesky_to_inv_cholesky")
     self._cholesky = CholeskyOuterProduct()
+    # No upside in additional `tf.function` decorating since
+    # `self._cholesky` is "private."
+    self._cholesky._use_tf_function = False  # pylint: disable=protected-access
 
   def _forward(self, x):
     with tf.control_dependencies(self._assertions(x)):

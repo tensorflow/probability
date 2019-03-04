@@ -187,6 +187,7 @@ class Chain(bijector.Bijector):
         dtype=dtype,
         name=name or ("identity" if not bijectors else
                       "_of_".join(["chain"] + [b.name for b in bijectors])))
+    self._use_tf_function = False  # So input bijectors cache EagerTensors.
 
   @property
   def bijectors(self):

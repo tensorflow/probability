@@ -142,12 +142,13 @@ class ExpOnlyJacobian(tfb.Bijector):
 class ConstantJacobian(tfb.Bijector):
   """Only used for jacobian calculations."""
 
-  def __init__(self, forward_min_event_ndims=0):
+  def __init__(self, forward_min_event_ndims=0, use_tf_function=True):
     super(ConstantJacobian, self).__init__(
         validate_args=False,
         is_constant_jacobian=True,
         forward_min_event_ndims=forward_min_event_ndims,
         name="c")
+    self._use_tf_function = use_tf_function
 
   def _inverse_log_det_jacobian(self, y):
     return tf.constant(2., y.dtype)
@@ -386,7 +387,7 @@ class BijectorLDJCachingTest(tf.test.TestCase):
     x1 = tf.compat.v1.placeholder(tf.float32, shape=[None, 2], name="x1")
     x2 = tf.compat.v1.placeholder(tf.float32, shape=[None, 2], name="x2")
 
-    bij = ConstantJacobian()
+    bij = ConstantJacobian(use_tf_function=False)
 
     bij.forward_log_det_jacobian(x2, event_ndims=1)
     a = bij.forward_log_det_jacobian(x1, event_ndims=1, name="a_fldj")

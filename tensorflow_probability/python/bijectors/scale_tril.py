@@ -75,6 +75,7 @@ class ScaleTriL(chain.Chain):
                                             #  = log(expm1(1.)) = 0.5413
        diag_shift=None)
   ```
+
   """
 
   def __init__(self,
@@ -117,3 +118,4 @@ class ScaleTriL(chain.Chain):
            fill_triangular.FillTriangular()],
           validate_args=validate_args,
           name=name)
+      self._use_tf_function = False  # So input bijectors cache EagerTensors.

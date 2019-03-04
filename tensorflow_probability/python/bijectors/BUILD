@@ -818,7 +818,7 @@ py_test(
 
 py_test(
     name = "real_nvp_test",
-    size = "small",
+    size = "medium",
     srcs = ["real_nvp_test.py"],
     deps = [
         ":bijectors",
