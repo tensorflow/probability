@@ -24,7 +24,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.bijectors import bijector
-
+from tensorflow_probability.python.internal import distribution_util as util
 
 __all__ = [
     'Transpose',
@@ -130,11 +130,13 @@ class Transpose(bijector.Bijector):
             name='rightmost_transposed_ndims')
         rightmost_transposed_ndims_ = tf.get_static_value(
             rightmost_transposed_ndims)
-        with tf.control_dependencies(_maybe_validate_rightmost_transposed_ndims(
-            rightmost_transposed_ndims, validate_args)):
-          rightmost_transposed_ndims = tf.identity(rightmost_transposed_ndims)
+        assertions = _maybe_validate_rightmost_transposed_ndims(
+            rightmost_transposed_ndims, validate_args)
+        if assertions:
+          with tf.control_dependencies(assertions):
+            rightmost_transposed_ndims = tf.identity(rightmost_transposed_ndims)
         perm = tf.range(
-            start=rightmost_transposed_ndims - 1,
+            start=util.prefer_static_value(rightmost_transposed_ndims) - 1,
             limit=-1,
             delta=-1,
             name='perm')
@@ -144,8 +146,10 @@ class Transpose(bijector.Bijector):
             input=perm, name='rightmost_transposed_ndims')
         rightmost_transposed_ndims_ = tf.get_static_value(
             rightmost_transposed_ndims)
-        with tf.control_dependencies(_maybe_validate_perm(perm, validate_args)):
-          perm = tf.identity(perm)
+        assertions = _maybe_validate_perm(perm, validate_args)
+        if assertions:
+          with tf.control_dependencies(assertions):
+            perm = tf.identity(perm)
 
       # TODO(b/110828604): If bijector base class ever supports dynamic
       # `min_event_ndims`, then this class already works dynamically and the
@@ -176,8 +180,53 @@ class Transpose(bijector.Bijector):
   def _forward(self, x):
     return self._transpose(x, self.perm)
 
+  def _event_shape(self, shape, static_perm_to_shape):
+    """Helper for _forward and _inverse_event_shape."""
+    rightmost_ = tf.get_static_value(self.rightmost_transposed_ndims)
+    if shape.ndims is None or rightmost_ is None:
+      return tf.TensorShape(None)
+    if shape.ndims < rightmost_:
+      raise ValueError('Invalid shape: min event ndims={} but got {}'.format(
+          rightmost_, shape))
+    perm_ = tf.get_static_value(self.perm, partial=True)
+    if perm_ is None:
+      return shape[:shape.ndims - rightmost_].concatenate(
+          [None] * int(rightmost_))
+    # We can use elimination to reidentify a single None dimension.
+    if sum(p is None for p in perm_) == 1:
+      present = np.argsort([-1 if p is None else p for p in perm_])
+      for i, p in enumerate(present[1:]):  # The -1 sorts to position 0.
+        if i != p:
+          perm_ = [i if p is None else p for p in perm_]
+          break
+    return shape[:shape.ndims - rightmost_].concatenate(
+        static_perm_to_shape(shape[shape.ndims - rightmost_:], perm_))
+
+  def _forward_event_shape(self, input_shape):
+    def static_perm_to_shape(subshp, perm):
+      return tf.TensorShape(
+          [None if p is None else subshp[p] for p in perm])
+    return self._event_shape(input_shape, static_perm_to_shape)
+
+  def _forward_event_shape_tensor(self, input_shape):
+    perm = self._make_perm(tf.size(input=input_shape), self.perm)
+    return tf.gather(input_shape, perm)
+
   def _inverse(self, y):
     return self._transpose(y, tf.argsort(self.perm))
+
+  def _inverse_event_shape(self, output_shape):
+    def static_perm_to_shape(subshp, perm):
+      result = [None] * len(perm)
+      for i, p in enumerate(perm):
+        if p is not None:
+          result[p] = subshp[i]
+      return tf.TensorShape(result)
+    return self._event_shape(output_shape, static_perm_to_shape)
+
+  def _inverse_event_shape_tensor(self, output_shape):
+    perm = self._make_perm(tf.size(input=output_shape), tf.argsort(self.perm))
+    return tf.gather(output_shape, perm)
 
   def _inverse_log_det_jacobian(self, y):
     return tf.constant(0, dtype=y.dtype)
@@ -185,12 +234,19 @@ class Transpose(bijector.Bijector):
   def _forward_log_det_jacobian(self, x):
     return tf.constant(0, dtype=x.dtype)
 
-  def _transpose(self, x, perm):
-    sample_batch_ndims = tf.rank(x) - self.rightmost_transposed_ndims
+  def _make_perm(self, x_rank, perm):
+    sample_batch_ndims = (
+        util.prefer_static_value(x_rank) -
+        util.prefer_static_value(self.rightmost_transposed_ndims))
+    dtype = perm.dtype
     perm = tf.concat([
-        tf.range(sample_batch_ndims),
-        sample_batch_ndims + perm,
+        tf.range(tf.cast(sample_batch_ndims, dtype)),
+        tf.cast(sample_batch_ndims + util.prefer_static_value(perm), dtype),
     ], axis=0)
+    return perm
+
+  def _transpose(self, x, perm):
+    perm = self._make_perm(tf.rank(x), perm)
     return tf.transpose(a=x, perm=perm)
 
 

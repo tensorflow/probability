@@ -799,7 +799,7 @@ class Bijector(object):
       inverse_event_shape_tensor: `TensorShape` indicating event-portion shape
         after applying `inverse`. Possibly unknown.
     """
-    return self._inverse_event_shape(output_shape)
+    return self._inverse_event_shape(tf.TensorShape(output_shape))
 
   def _forward(self, x):
     """Subclass implementation for `forward` public function."""

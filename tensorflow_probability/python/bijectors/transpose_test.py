@@ -24,6 +24,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python import distributions as tfd
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -122,6 +123,94 @@ class _TransposeBijectorTest(object):
     msg = '`rightmost_transposed_ndims` must be non-negative.'
     with self.assertRaisesRegexp(ValueError, msg):
       tfb.Transpose(rightmost_transposed_ndims=-1, validate_args=True)
+
+  def testTransformedDist(self):
+    d = tfd.Independent(tfd.Normal(tf.zeros([4, 3, 2]), 1), 3)
+    dt = tfb.Transpose([1, 0])(d)
+    self.assertEqual((4, 3, 2), d.event_shape)
+    self.assertEqual((4, 2, 3), dt.event_shape)
+    dt = tfb.Invert(tfb.Transpose([1, 0, 2]))(d)
+    self.assertEqual((4, 3, 2), d.event_shape)
+    self.assertEqual((3, 4, 2), dt.event_shape)
+
+  def testEventShapes(self):
+    shape_static = [5, 4, 3, 2]
+    shape_dynamic = tf.compat.v1.placeholder_with_default(
+        tf.constant(shape_static), shape=None)
+
+    def make_bijector(perm=None, rightmost_transposed_ndims=None):
+      if perm is not None:
+        perm = tf.convert_to_tensor(value=perm)
+        if not self.is_static:
+          perm = tf.compat.v1.placeholder_with_default(perm, shape=perm.shape)
+      return tfb.Transpose(
+          perm, rightmost_transposed_ndims=rightmost_transposed_ndims)
+
+    for is_shape_static, shape, shape_t in [
+        (True, tf.zeros(shape_static).shape, tf.constant(shape_static)),
+        (False, tf.zeros(shape_dynamic).shape, shape_dynamic)]:
+
+      # pylint: disable=cell-var-from-loop
+      def event_shape(b, direction):
+        shape_fn = getattr(b, '{}_event_shape'.format(direction))
+        if (is_shape_static and self.is_static) or tf.executing_eagerly():
+          result = shape_fn(shape)
+          self.assertTrue(result.is_fully_defined())
+          return result
+        if is_shape_static:
+          self.assertEqual(len(shape), shape_fn(shape).ndims)
+        else:
+          self.assertIsNone(shape_fn(shape).ndims)
+        shape_tensor_fn = getattr(b, '{}_event_shape_tensor'.format(direction))
+        return self.evaluate(shape_tensor_fn(shape_t))
+      # pylint: enable=cell-var-from-loop
+
+      self.assertAllEqual((5, 3, 4, 2),
+                          event_shape(make_bijector([1, 0, 2]), 'forward'))
+      self.assertAllEqual((5, 2, 4, 3),
+                          event_shape(make_bijector([2, 0, 1]), 'forward'))
+      self.assertAllEqual(
+          (5, 4, 2, 3),
+          event_shape(make_bijector(rightmost_transposed_ndims=2), 'forward'))
+      self.assertAllEqual(
+          (5, 2, 3, 4),
+          event_shape(make_bijector(rightmost_transposed_ndims=3), 'forward'))
+      self.assertAllEqual((5, 3, 4, 2),
+                          event_shape(make_bijector([1, 0, 2]), 'inverse'))
+      self.assertAllEqual((5, 3, 2, 4),
+                          event_shape(make_bijector([2, 0, 1]), 'inverse'))
+      self.assertAllEqual(
+          (5, 4, 2, 3),
+          event_shape(make_bijector(rightmost_transposed_ndims=2), 'inverse'))
+      self.assertAllEqual(
+          (5, 2, 3, 4),
+          event_shape(make_bijector(rightmost_transposed_ndims=3), 'inverse'))
+
+  def testPartialStaticPermEventShapes(self):
+    if tf.executing_eagerly(): return  # this test is not interesting in eager.
+    perm = tf.convert_to_tensor(value=[
+        tf.constant(2),
+        tf.compat.v1.placeholder_with_default(0, []),
+        tf.compat.v1.placeholder_with_default(1, [])
+    ])
+    self.assertAllEqual([2, None, None], tf.get_static_value(
+        perm, partial=True))
+    b = tfb.Transpose(perm)
+    self.assertAllEqual([8, 5, None, None],
+                        b.forward_event_shape([8, 7, 6, 5]).as_list())
+    self.assertAllEqual([8, None, None, 7],
+                        b.inverse_event_shape([8, 7, 6, 5]).as_list())
+
+    # Process of elimination should allow us to deduce one non-static perm idx.
+    perm = tf.convert_to_tensor(value=[
+        tf.constant(2),
+        tf.compat.v1.placeholder_with_default(0, []),
+        tf.constant(1)
+    ])
+    self.assertAllEqual([2, None, 1], tf.get_static_value(perm, partial=True))
+    b = tfb.Transpose(perm)
+    self.assertAllEqual([8, 5, 7, 6], b.forward_event_shape([8, 7, 6, 5]))
+    self.assertAllEqual([8, 6, 5, 7], b.inverse_event_shape([8, 7, 6, 5]))
 
 
 @test_util.run_all_in_graph_and_eager_modes
