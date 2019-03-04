@@ -53,14 +53,13 @@ py_test(
     args = [
         "--fake_data",
         "--max_steps=3",
+        "--skip_plots",
     ],
     main = "logistic_regression.py",
     srcs_version = "PY2AND3",
     tags = [
-        "manual",
-        "notap",
         "nozapfhahn",
-    ],  # TODO(b/127209621): Re-enable.
+    ],
     deps = [
         ":logistic_regression_lib",
     ],

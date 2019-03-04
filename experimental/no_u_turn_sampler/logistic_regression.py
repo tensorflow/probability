@@ -18,11 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import cProfile
-import functools
 import os
-import pstats
-import time
 # Dependency imports
 from absl import flags
 import matplotlib
@@ -34,35 +30,29 @@ import tensorflow as tf
 from tensorflow_probability import edward2 as ed
 from tensorflow_probability.opensource.experimental import no_u_turn_sampler
 
-flags.DEFINE_integer("max_steps",
-                     default=5,
-                     help="Number of training steps to run.")
-flags.DEFINE_string("model_dir",
-                    default=os.path.join(os.getenv("TEST_TMPDIR", "/tmp"),
-                                         "logistic_regression/"),
-                    help="Path to write plots to.")
-flags.DEFINE_bool("fake_data",
-                  default=None,
-                  help="If True, uses fake data. Defaults to real data.")
+flags.DEFINE_integer(
+    "max_steps",
+    default=5,
+    help="Number of training steps to run.")
+
+flags.DEFINE_string(
+    "model_dir",
+    default=os.path.join(os.getenv("TEST_TMPDIR", "/tmp"),
+                         "logistic_regression/"),
+    help="Path to write plots to.")
+
+flags.DEFINE_bool(
+    "fake_data",
+    default=False,
+    help="If True, uses fake data. Defaults to real data.")
+
+flags.DEFINE_bool(
+    "skip_plots",
+    default=False,
+    help=("If True, skips drawing plots (just checking "
+          "error-free execution). Defaults to drawing plots."))
 
 FLAGS = flags.FLAGS
-
-
-def profile(func):
-  """Decorator for profiling the execution of a function."""
-  @functools.wraps(func)
-  def func_wrapped(*args, **kwargs):
-    """Function which wraps original function with start/stop profiling."""
-    pr = cProfile.Profile()
-    pr.enable()
-    start = time.time()
-    output = func(*args, **kwargs)
-    print("Elapsed", time.time() - start)
-    pr.disable()
-    ps = pstats.Stats(pr).sort_stats("cumulative")
-    ps.print_stats()
-    return output
-  return func_wrapped
 
 
 def logistic_regression(features):
@@ -97,11 +87,12 @@ def covertype():
 
 def main(argv):
   del argv  # unused
-  if tf.io.gfile.exists(FLAGS.model_dir):
-    tf.compat.v1.logging.warning(
-        "Warning: deleting old log directory at {}".format(FLAGS.model_dir))
-    tf.io.gfile.rmtree(FLAGS.model_dir)
-  tf.io.gfile.makedirs(FLAGS.model_dir)
+  if not FLAGS.skip_plots:
+    if tf.io.gfile.exists(FLAGS.model_dir):
+      tf.compat.v1.logging.warning(
+          "Warning: deleting old log directory at {}".format(FLAGS.model_dir))
+      tf.io.gfile.rmtree(FLAGS.model_dir)
+    tf.io.gfile.makedirs(FLAGS.model_dir)
 
   tf.compat.v1.enable_eager_execution()
   print("Number of available GPUs", tf.contrib.eager.num_gpus())
@@ -115,6 +106,7 @@ def main(argv):
   print("Number of features", features.shape[1])
 
   log_joint = ed.make_log_joint_fn(logistic_regression)
+  @tf.function
   def target_log_prob_fn(coeffs):
     return log_joint(features=features, coeffs=coeffs, labels=labels)
 
@@ -140,7 +132,6 @@ def main(argv):
   # Initialize step size via result of 50 warmup steps from Stan.
   step_size = 0.00167132
 
-  kernel = profile(no_u_turn_sampler.kernel)
   coeffs_samples = []
   target_log_prob = None
   grads_target_log_prob = None
@@ -150,21 +141,23 @@ def main(argv):
         [coeffs],
         target_log_prob,
         grads_target_log_prob,
-    ] = kernel(target_log_prob_fn=target_log_prob_fn,
-               current_state=[coeffs],
-               step_size=[step_size],
-               seed=step,
-               current_target_log_prob=target_log_prob,
-               current_grads_target_log_prob=grads_target_log_prob)
+    ] = no_u_turn_sampler.kernel(
+        target_log_prob_fn=target_log_prob_fn,
+        current_state=[coeffs],
+        step_size=[step_size],
+        seed=step,
+        current_target_log_prob=target_log_prob,
+        current_grads_target_log_prob=grads_target_log_prob)
     coeffs_samples.append(coeffs)
 
-  for coeffs_sample in coeffs_samples:
-    plt.plot(coeffs_sample.numpy())
+  if not FLAGS.skip_plots:
+    for coeffs_sample in coeffs_samples:
+      plt.plot(coeffs_sample.numpy())
 
-  filename = os.path.join(FLAGS.model_dir, "coeffs_samples.png")
-  plt.savefig(filename)
-  print("Figure saved as", filename)
-  plt.close()
+    filename = os.path.join(FLAGS.model_dir, "coeffs_samples.png")
+    plt.savefig(filename)
+    print("Figure saved as", filename)
+    plt.close()
 
 if __name__ == "__main__":
   tf.compat.v1.app.run()
