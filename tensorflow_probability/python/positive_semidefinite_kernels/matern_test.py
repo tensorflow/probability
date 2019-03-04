@@ -24,6 +24,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability import positive_semidefinite_kernels as psd_kernels
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 class _MaternTestCase(parameterized.TestCase, tf.test.TestCase):
@@ -142,6 +143,7 @@ class _MaternTestCase(parameterized.TestCase, tf.test.TestCase):
         self.evaluate(grads))
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class MaternOneHalfTest(_MaternTestCase):
 
   _kernel_type = psd_kernels.MaternOneHalf
@@ -151,6 +153,7 @@ class MaternOneHalfTest(_MaternTestCase):
     return amplitude**2 * np.exp(-norm)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class MaternThreeHalvesTest(_MaternTestCase):
 
   _kernel_type = psd_kernels.MaternThreeHalves
@@ -160,6 +163,7 @@ class MaternThreeHalvesTest(_MaternTestCase):
     return amplitude**2 * (1 + norm) * np.exp(-norm)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class MaternFiveHalvesTest(_MaternTestCase):
 
   _kernel_type = psd_kernels.MaternFiveHalves
