@@ -25,6 +25,9 @@ import operator
 import six
 import tensorflow as tf
 
+from tensorflow_probability.python.internal import dtype_util
+
+
 __all__ = [
     'PositiveSemidefiniteKernel',
 ]
@@ -695,8 +698,10 @@ class _SumKernel(PositiveSemidefiniteKernel):
     if name is None:
       name = 'SumKernel'
     # We have ensured the list is non-empty and all feature_ndims are the same.
-    super(_SumKernel, self).__init__(feature_ndims=kernels[0].feature_ndims,
-                                     name=name)
+    super(_SumKernel, self).__init__(
+        feature_ndims=kernels[0].feature_ndims,
+        dtype=dtype_util.common_dtype(kernels),
+        name=name)
 
   @property
   def kernels(self):
@@ -760,8 +765,10 @@ class _ProductKernel(PositiveSemidefiniteKernel):
     if name is None:
       name = 'ProductKernel'
     # We have ensured the list is non-empty and all feature_ndims are the same.
-    super(_ProductKernel, self).__init__(feature_ndims=kernels[0].feature_ndims,
-                                         name=name)
+    super(_ProductKernel, self).__init__(
+        feature_ndims=kernels[0].feature_ndims,
+        dtype=dtype_util.common_dtype(kernels),
+        name=name)
 
   @property
   def kernels(self):

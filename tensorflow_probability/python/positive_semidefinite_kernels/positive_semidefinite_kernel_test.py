@@ -21,6 +21,7 @@ from __future__ import print_function
 
 import functools
 import operator
+
 from absl.testing import parameterized
 import tensorflow as tf
 import tensorflow_probability as tfp
@@ -295,6 +296,7 @@ class PositiveSemidefiniteKernelTest(tf.test.TestCase, parameterized.TestCase):
     x, y, _ = self.createKernelInputs()
     sum_kernel = k0 + k1 + k2 + k21
     self.assertAllEqual(sum_kernel.batch_shape, [2, 2])
+    self.assertEqual(sum_kernel.dtype, tf.float32)
     self.assertAllEqual(
         self.evaluate(sum_kernel.matrix(x, y)),
         sum([self.evaluate(k.matrix(x, y))
@@ -310,6 +312,7 @@ class PositiveSemidefiniteKernelTest(tf.test.TestCase, parameterized.TestCase):
 
     x, y, _ = self.createKernelInputs()
     sum_kernel = k2 + k21
+    self.assertEqual(sum_kernel.dtype, tf.float32)
     self.assertAllEqual(self.evaluate(sum_kernel.batch_shape_tensor()), [2, 2])
     self.assertAllEqual(
         self.evaluate(sum_kernel.matrix(x, y)),
@@ -324,6 +327,7 @@ class PositiveSemidefiniteKernelTest(tf.test.TestCase, parameterized.TestCase):
 
     x, y, _ = self.createKernelInputs()
     product_kernel = k0 * k1 * k2 * k21
+    self.assertEqual(product_kernel.dtype, tf.float32)
     self.assertAllEqual(product_kernel.batch_shape, [2, 2])
     self.assertAllEqual(
         self.evaluate(product_kernel.matrix(x, y)),
@@ -342,6 +346,7 @@ class PositiveSemidefiniteKernelTest(tf.test.TestCase, parameterized.TestCase):
 
     x, y, _ = self.createKernelInputs()
     product_kernel = k2 * k21
+    self.assertEqual(product_kernel.dtype, tf.float32)
     self.assertAllEqual(
         self.evaluate(product_kernel.batch_shape_tensor()), [2, 2])
     self.assertAllEqual(
