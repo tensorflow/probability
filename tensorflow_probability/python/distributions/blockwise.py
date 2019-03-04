@@ -23,6 +23,7 @@ import functools
 import tensorflow as tf
 
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import reparameterization
 
@@ -173,7 +174,7 @@ def _maybe_validate_distributions(distributions, dtype_override, validate_args):
 
   if dtype_override is None:
     dts = [d.dtype.base_dtype for d in distributions if d.dtype is not None]
-    if dts[:1] != dts[:-1]:
+    if dts[1:] != dts[:-1]:
       raise TypeError('Distributions must have same dtype; '
                       'found: {}.'.format(set(dt.name for dt in dts)))
 
@@ -206,3 +207,53 @@ def _maybe_validate_distributions(distributions, dtype_override, validate_args):
         for b1, b2 in zip(batch_shapes[1:], batch_shapes[:-1]))
 
   return assertions
+
+
+@kullback_leibler.RegisterKL(Blockwise, Blockwise)
+def _kl_blockwise_blockwise(b0, b1, name=None):
+  """Calculate the batched KL divergence KL(b0 || b1) with b0 and b1 Blockwise distributions.
+
+  Args:
+    b0: instance of a Blockwise distribution object.
+    b1: instance of a Blockwise distribution object.
+    name: (optional) Name to use for created operations. Default is
+      "kl_blockwise_blockwise".
+
+  Returns:
+    kl_blockwise_blockwise: `Tensor`. The batchwise KL(b0 || b1).
+  """
+  if len(b0.distributions) != len(b1.distributions):
+    raise ValueError(
+        'Can only compute KL divergence between Blockwise distributions with '
+        'the same number of component distributions.')
+
+  # We also need to check that the event shapes match for each one.
+  b0_event_sizes = [_event_size(d) for d in b0.distributions]
+  b1_event_sizes = [_event_size(d) for d in b1.distributions]
+
+  assertions = []
+  message = ('Can only compute KL divergence between Blockwise distributions '
+             'with the same pairwise event shapes.')
+
+  if (all(isinstance(event_size, int) for event_size in b0_event_sizes) and
+      all(isinstance(event_size, int) for event_size in b1_event_sizes)):
+    if b0_event_sizes != b1_event_sizes:
+      raise ValueError(message)
+  else:
+    if b0.validate_args or b1.validate_args:
+      assertions.extend(
+          tf.compat.v1.assert_equal(  # pylint: disable=g-complex-comprehension
+              e1, e2, message=message)
+          for e1, e2 in zip(b0_event_sizes, b1_event_sizes))
+
+  with tf.compat.v1.name_scope(name, 'kl_blockwise_blockwise'):
+    with tf.control_dependencies(assertions):
+      return sum([
+          kullback_leibler.kl_divergence(d1, d2) for d1, d2 in zip(
+              b0.distributions, b1.distributions)])
+
+
+def _event_size(d):
+  if d.event_shape.num_elements() is not None:
+    return d.event_shape.num_elements()
+  return tf.reduce_prod(input_tensor=d.event_shape_tensor())

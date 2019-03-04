@@ -59,6 +59,116 @@ class BlockwiseTest(test_case.TestCase):
     self.assertAllClose(np.zeros((6,), dtype=np.float32),
                         self.evaluate(d.mean()))
 
+  def testKlBlockwiseError(self):
+    d0 = tfd.Blockwise(
+        [
+            tfd.Independent(
+                tfd.Normal(loc=tf.zeros(3., dtype=tf.float64), scale=1.),
+                reinterpreted_batch_ndims=1),
+            tfd.MultivariateNormalTriL(
+                scale_tril=tf.eye(2, dtype=tf.float64))
+        ])
+
+    # Same event_shape as d0.
+    d1 = tfd.Blockwise(
+        [
+            tfd.Independent(
+                tfd.Normal(loc=tf.zeros(5., tf.float64), scale=1.),
+                reinterpreted_batch_ndims=1),
+        ])
+
+    with self.assertRaisesRegexp(ValueError, 'same number of component'):
+      tfd.kl_divergence(d0, d1)
+
+    # Fix d1 to have the same event_shape, but components have different shapes.
+    d1 = tfd.Blockwise(
+        [
+            tfd.MultivariateNormalTriL(
+                scale_tril=tf.eye(2, dtype=tf.float64)),
+            tfd.Independent(
+                tfd.Normal(loc=tf.zeros(3., dtype=tf.float64), scale=1.),
+                reinterpreted_batch_ndims=1),
+        ])
+    with self.assertRaisesRegexp(ValueError, 'same pairwise event shapes'):
+      tfd.kl_divergence(d0, d1)
+
+  def testKlBlockwiseIsSum(self):
+
+    gamma0 = tfd.Gamma(concentration=[1., 2., 3.], rate=1.)
+    gamma1 = tfd.Gamma(concentration=[3., 4., 5.], rate=1.)
+
+    normal0 = tfd.Normal(loc=tf.zeros(3.), scale=2.)
+    normal1 = tfd.Normal(loc=tf.ones(3.), scale=[2., 3., 4.])
+
+    d0 = tfd.Blockwise([
+        tfd.Independent(gamma0, reinterpreted_batch_ndims=1),
+        tfd.Independent(normal0, reinterpreted_batch_ndims=1)])
+
+    d1 = tfd.Blockwise([
+        tfd.Independent(gamma1, reinterpreted_batch_ndims=1),
+        tfd.Independent(normal1, reinterpreted_batch_ndims=1)])
+
+    kl_sum = tf.reduce_sum(
+        input_tensor=(tfd.kl_divergence(gamma0, gamma1) +
+                      tfd.kl_divergence(normal0, normal1)))
+
+    blockwise_kl = tfd.kl_divergence(d0, d1)
+
+    kl_sum_, blockwise_kl_ = self.evaluate([kl_sum, blockwise_kl])
+
+    self.assertAllClose(kl_sum_, blockwise_kl_)
+
+  def testKLBlockwise(self):
+    # d0 and d1 are two MVN's that are 6 dimensional. Construct the
+    # corresponding MVNs, and ensure that the KL between the MVNs is close to
+    # the Blockwise ones.
+    # In both cases the scale matrix has a block diag structure, owing to
+    # independence of the component distributions.
+    d0 = tfd.Blockwise(
+        [
+            tfd.Independent(
+                tfd.Normal(loc=tf.zeros(4, dtype=tf.float64), scale=1.),
+                reinterpreted_batch_ndims=1),
+            tfd.MultivariateNormalTriL(
+                scale_tril=tf.compat.v1.placeholder_with_default(
+                    tf.eye(2, dtype=tf.float64),
+                    shape=None)),
+        ])
+
+    d0_mvn = tfd.MultivariateNormalLinearOperator(
+        loc=np.float64([0.] * 6),
+        scale=tf.linalg.LinearOperatorBlockDiag([
+            tf.linalg.LinearOperatorIdentity(
+                num_rows=4,
+                dtype=tf.float64),
+            tf.linalg.LinearOperatorLowerTriangular(
+                tf.eye(2, dtype=tf.float64))]))
+
+    d1 = tfd.Blockwise(
+        [
+            tfd.Independent(
+                tfd.Normal(loc=tf.ones(4, dtype=tf.float64), scale=1),
+                reinterpreted_batch_ndims=1),
+            tfd.MultivariateNormalTriL(
+                loc=tf.ones(2, dtype=tf.float64),
+                scale_tril=tf.compat.v1.placeholder_with_default(
+                    np.float64([[1., 0.], [2., 3.]]),
+                    shape=None)),
+        ])
+    d1_mvn = tfd.MultivariateNormalLinearOperator(
+        loc=np.float64([1.] * 6),
+        scale=tf.linalg.LinearOperatorBlockDiag([
+            tf.linalg.LinearOperatorIdentity(
+                num_rows=4,
+                dtype=tf.float64),
+            tf.linalg.LinearOperatorLowerTriangular(
+                np.float64([[1., 0.], [2., 3.]]))]))
+
+    blockwise_kl = tfd.kl_divergence(d0, d1)
+    mvn_kl = tfd.kl_divergence(d0_mvn, d1_mvn)
+    blockwise_kl_, mvn_kl_ = self.evaluate([blockwise_kl, mvn_kl])
+    self.assertAllClose(blockwise_kl_, mvn_kl_)
+
 
 if __name__ == '__main__':
   tf.test.main()
