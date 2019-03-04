@@ -401,5 +401,54 @@ class SparseOrDenseMatmulDynamicSparse(tf.test.TestCase, _SparseOrDenseMatmul):
   use_sparse_tensor = True
 
 
+class _MatrixRankTest(object):
+
+  def test_batch_default_tolerance(self):
+    x_ = np.array([[[2, 3, -2],  # = row2+row3
+                    [-1, 1, -2],
+                    [3, 2, 0]],
+                   [[0, 2, 0],   # = 2*row2
+                    [0, 1, 0],
+                    [0, 3, 0]],  # = 3*row2
+                   [[1, 0, 0],
+                    [0, 1, 0],
+                    [0, 0, 1]]],
+                  self.dtype)
+    x = tf.compat.v1.placeholder_with_default(
+        x_, shape=x_.shape if self.use_static_shape else None)
+    self.assertAllEqual([2, 1, 3], self.evaluate(tfp.math.matrix_rank(x)))
+
+  def test_custom_tolerance_broadcasts(self):
+    q = tf.linalg.qr(tf.random.uniform([3, 3], dtype=self.dtype))[0]
+    e = tf.constant([0.1, 0.2, 0.3], dtype=self.dtype)
+    a = tf.linalg.solve(q, tf.transpose(a=e * q), adjoint=True)
+    self.assertAllEqual([3, 2, 1, 0], self.evaluate(tfp.math.matrix_rank(
+        a, tol=[[0.09], [0.19], [0.29], [0.31]])))
+
+  def test_nonsquare(self):
+    x_ = np.array([[[2, 3, -2, 2],   # = row2+row3
+                    [-1, 1, -2, 4],
+                    [3, 2, 0, -2]],
+                   [[0, 2, 0, 6],    # = 2*row2
+                    [0, 1, 0, 3],
+                    [0, 3, 0, 9]]],  # = 3*row2
+                  self.dtype)
+    x = tf.compat.v1.placeholder_with_default(
+        x_, shape=x_.shape if self.use_static_shape else None)
+    self.assertAllEqual([2, 1], self.evaluate(tfp.math.matrix_rank(x)))
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class MatrixRankStatic32Test(tf.test.TestCase, _MatrixRankTest):
+  dtype = np.float32
+  use_static_shape = True
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class MatrixRankDynamic64Test(tf.test.TestCase, _MatrixRankTest):
+  dtype = np.float64
+  use_static_shape = False
+
+
 if __name__ == '__main__':
   tf.test.main()

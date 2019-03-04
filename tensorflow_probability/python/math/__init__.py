@@ -26,6 +26,7 @@ from tensorflow_probability.python.math.interpolation import interp_regular_1d_g
 from tensorflow_probability.python.math.linalg import lu_matrix_inverse
 from tensorflow_probability.python.math.linalg import lu_reconstruct
 from tensorflow_probability.python.math.linalg import lu_solve
+from tensorflow_probability.python.math.linalg import matrix_rank
 from tensorflow_probability.python.math.linalg import pinv
 from tensorflow_probability.python.math.linalg import sparse_or_dense_matmul
 from tensorflow_probability.python.math.linalg import sparse_or_dense_matvecmul
@@ -47,16 +48,17 @@ _allowed_symbols = [
     'diag_jacobian',
     'interp_regular_1d_grid',
     'log1psquare',
-    'soft_threshold',
     'lu_matrix_inverse',
     'lu_reconstruct',
     'lu_solve',
+    'matrix_rank',
     'pinv',
-    'sparse_or_dense_matvecmul',
-    'sparse_or_dense_matmul',
     'random_rademacher',
     'random_rayleigh',
     'secant_root',
+    'soft_threshold',
+    'sparse_or_dense_matmul',
+    'sparse_or_dense_matvecmul',
     'value_and_gradient',
 ]
 

@@ -33,10 +33,47 @@ __all__ = [
     'lu_matrix_inverse',
     'lu_reconstruct',
     'lu_solve',
+    'matrix_rank',
     'pinv',
     'sparse_or_dense_matmul',
     'sparse_or_dense_matvecmul',
 ]
+
+
+def matrix_rank(a, tol=None, validate_args=False, name=None):
+  """Compute the matrix rank; the number of non-zero SVD singular values.
+
+  Arguments:
+    a: (Batch of) `float`-like matrix-shaped `Tensor`(s) which are to be
+      pseudo-inverted.
+    tol: Threshold below which the singular value is counted as "zero".
+      Default value: `None` (i.e., `eps * max(rows, cols) * max(singular_val)`).
+    validate_args: When `True`, additional assertions might be embedded in the
+      graph.
+      Default value: `False` (i.e., no graph assertions are added).
+    name: Python `str` prefixed to ops created by this function.
+      Default value: "matrix_rank".
+
+  Returns:
+    matrix_rank: (Batch of) `int32` scalars representing the number of non-zero
+      singular values.
+  """
+  with tf.compat.v1.name_scope(name, 'matrix_rank', [a, tol]):
+    a = tf.convert_to_tensor(value=a, dtype_hint=tf.float32, name='a')
+    assertions = _maybe_validate_matrix(a, validate_args)
+    if assertions:
+      with tf.control_dependencies(assertions):
+        a = tf.identity(a)
+    s = tf.linalg.svd(a, compute_uv=False)
+    if tol is None:
+      if a.shape[-2:].is_fully_defined():
+        m = np.max(a.shape[-2:].as_list())
+      else:
+        m = tf.reduce_max(input_tensor=tf.shape(input=a)[-2:])
+      eps = np.finfo(a.dtype.as_numpy_dtype).eps
+      tol = (eps * tf.cast(m, a.dtype) *
+             tf.reduce_max(input_tensor=s, axis=-1, keepdims=True))
+    return tf.reduce_sum(input_tensor=tf.cast(s > tol, tf.int32), axis=-1)
 
 
 def pinv(a, rcond=None, validate_args=False, name=None):
@@ -111,17 +148,9 @@ def pinv(a, rcond=None, validate_args=False, name=None):
   with tf.compat.v1.name_scope(name, 'pinv', [a, rcond]):
     a = tf.convert_to_tensor(value=a, name='a')
 
-    if not a.dtype.is_floating:
-      raise TypeError('Input `a` must have `float`-like `dtype` '
-                      '(saw {}).'.format(a.dtype.name))
-    if a.shape.ndims is not None:
-      if a.shape.ndims < 2:
-        raise ValueError('Input `a` must have at least 2 dimensions '
-                         '(saw: {}).'.format(a.shape.ndims))
-    elif validate_args:
-      assert_rank_at_least_2 = tf.compat.v1.assert_rank_at_least(
-          a, rank=2, message='Input `a` must have at least 2 dimensions.')
-      with tf.control_dependencies([assert_rank_at_least_2]):
+    assertions = _maybe_validate_matrix(a, validate_args)
+    if assertions:
+      with tf.control_dependencies(assertions):
         a = tf.identity(a)
 
     dtype = a.dtype.as_numpy_dtype
@@ -620,3 +649,19 @@ def _sparse_block_diag(sp_a):
   dense_shape = sp_a_shape[0] * sp_a_shape[1:]
   return tf.SparseTensor(
       indices=indices, values=sp_a.values, dense_shape=dense_shape)
+
+
+def _maybe_validate_matrix(a, validate_args):
+  """Checks that input is a `float` matrix."""
+  assertions = []
+  if not a.dtype.is_floating:
+    raise TypeError('Input `a` must have `float`-like `dtype` '
+                    '(saw {}).'.format(a.dtype.name))
+  if a.shape.ndims is not None:
+    if a.shape.ndims < 2:
+      raise ValueError('Input `a` must have at least 2 dimensions '
+                       '(saw: {}).'.format(a.shape.ndims))
+  elif validate_args:
+    assertions.append(tf.compat.v1.assert_rank_at_least(
+        a, rank=2, message='Input `a` must have at least 2 dimensions.'))
+  return assertions
