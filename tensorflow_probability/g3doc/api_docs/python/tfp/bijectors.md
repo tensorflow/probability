@@ -1,7 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.bijectors" />
 <meta itemprop="path" content="Stable" />
-<meta itemprop="property" content="__all__"/>
 </div>
 
 # Module: tfp.bijectors
@@ -34,6 +33,8 @@ Bijector Ops.
 
 [`class Exp`](../tfp/bijectors/Exp.md): Compute `Y = g(X) = exp(X)`.
 
+[`class Expm1`](../tfp/bijectors/Expm1.md): Compute `Y = g(X) = exp(X) - 1`.
+
 [`class FillTriangular`](../tfp/bijectors/FillTriangular.md): Transforms vectors to triangular.
 
 [`class Gumbel`](../tfp/bijectors/Gumbel.md): Compute `Y = g(X) = exp(-exp(-(X - loc) / scale))`.
@@ -46,9 +47,11 @@ Bijector Ops.
 
 [`class Kumaraswamy`](../tfp/bijectors/Kumaraswamy.md): Compute `Y = g(X) = (1 - (1 - X)**(1 / b))**(1 / a), X in [0, 1]`.
 
-[`class MaskedAutoregressiveFlow`](../tfp/bijectors/MaskedAutoregressiveFlow.md): Affine MaskedAutoregressiveFlow bijector for vector-valued events.
+[`class MaskedAutoregressiveFlow`](../tfp/bijectors/MaskedAutoregressiveFlow.md): Affine MaskedAutoregressiveFlow bijector.
 
 [`class MatrixInverseTriL`](../tfp/bijectors/MatrixInverseTriL.md): Computes `g(L) = inv(L)`, where `L` is a lower-triangular matrix.
+
+[`class MatvecLU`](../tfp/bijectors/MatvecLU.md): Matrix-vector multiply using LU decomposition.
 
 [`class NormalCDF`](../tfp/bijectors/NormalCDF.md): Compute `Y = g(X) = NormalCDF(x)`.
 
@@ -59,6 +62,8 @@ Bijector Ops.
 [`class PowerTransform`](../tfp/bijectors/PowerTransform.md): Compute `Y = g(X) = (1 + X * c)**(1 / c), X >= -1 / c`.
 
 [`class RealNVP`](../tfp/bijectors/RealNVP.md): RealNVP "affine coupling layer" for vector-valued events.
+
+[`class Reciprocal`](../tfp/bijectors/Reciprocal.md): A `Bijector` that computes the reciprocal `b(x) = 1. / x` entrywise.
 
 [`class Reshape`](../tfp/bijectors/Reshape.md): Reshapes the `event_shape` of a `Tensor`.
 
@@ -91,8 +96,4 @@ Bijector Ops.
 [`masked_dense(...)`](../tfp/bijectors/masked_dense.md): A autoregressively masked dense layer. Analogous to `tf.layers.dense`.
 
 [`real_nvp_default_template(...)`](../tfp/bijectors/real_nvp_default_template.md): Build a scale-and-shift function using a multi-layer neural network.
-
-## Other Members
-
-<h3 id="__all__"><code>__all__</code></h3>
 

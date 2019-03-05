@@ -8,6 +8,7 @@
 <meta itemprop="property" content="is_constant_jacobian"/>
 <meta itemprop="property" content="name"/>
 <meta itemprop="property" content="validate_args"/>
+<meta itemprop="property" content="__call__"/>
 <meta itemprop="property" content="__init__"/>
 <meta itemprop="property" content="forward"/>
 <meta itemprop="property" content="forward_event_shape"/>
@@ -91,6 +92,62 @@ Returns True if Tensor arguments will be validated.
 
 
 ## Methods
+
+<h3 id="__call__"><code>__call__</code></h3>
+
+``` python
+__call__(
+    value,
+    name=None,
+    **kwargs
+)
+```
+
+Applies or composes the `Bijector`, depending on input type.
+
+This is a convenience function which applies the `Bijector` instance in
+three different ways, depending on the input:
+
+1. If the input is a `tfd.Distribution` instance, return
+   `tfd.TransformedDistribution(distribution=input, bijector=self)`.
+2. If the input is a `tfb.Bijector` instance, return
+   `tfb.Chain([self, input])`.
+3. Otherwise, return `self.forward(input)`
+
+#### Args:
+
+* <b>`value`</b>: A `tfd.Distribution`, `tfb.Bijector`, or a `Tensor`.
+* <b>`name`</b>: Python `str` name given to ops created by this function.
+* <b>`**kwargs`</b>: Additional keyword arguments passed into the created
+    `tfd.TransformedDistribution`, `tfb.Bijector`, or `self.forward`.
+
+
+#### Returns:
+
+* <b>`composition`</b>: A `tfd.TransformedDistribution` if the input was a
+    `tfd.Distribution`, a `tfb.Chain` if the input was a `tfb.Bijector`, or
+    a `Tensor` computed by `self.forward`.
+
+#### Examples
+
+```python
+sigmoid = tfb.Reciprocal()(
+    tfb.AffineScalar(shift=1.)(
+      tfb.Exp()(
+        tfb.AffineScalar(scale=-1.))))
+# ==> `tfb.Chain([
+#         tfb.Reciprocal(),
+#         tfb.AffineScalar(shift=1.),
+#         tfb.Exp(),
+#         tfb.AffineScalar(scale=-1.),
+#      ])`  # ie, `tfb.Sigmoid()`
+
+log_normal = tfb.Exp()(tfd.Normal(0, 1))
+# ==> `tfd.TransformedDistribution(tfd.Normal(0, 1), tfb.Exp())`
+
+tfb.Exp()([-1., 0., 1.])
+# ==> tf.exp([-1., 0., 1.])
+```
 
 <h3 id="forward"><code>forward</code></h3>
 
@@ -305,10 +362,10 @@ evaluated at `g^{-1}(y)`.
 
 #### Returns:
 
-`Tensor`, if this bijector is injective.
-  If not injective, returns the tuple of local log det
-  Jacobians, `log(det(Dg_i^{-1}(y)))`, where `g_i` is the restriction
-  of `g` to the `ith` partition `Di`.
+* <b>`ildj`</b>: `Tensor`, if this bijector is injective.
+    If not injective, returns the tuple of local log det
+    Jacobians, `log(det(Dg_i^{-1}(y)))`, where `g_i` is the restriction
+    of `g` to the `ith` partition `Di`.
 
 
 #### Raises:

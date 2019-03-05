@@ -8,6 +8,7 @@
 <meta itemprop="property" content="is_constant_jacobian"/>
 <meta itemprop="property" content="name"/>
 <meta itemprop="property" content="validate_args"/>
+<meta itemprop="property" content="__call__"/>
 <meta itemprop="property" content="__init__"/>
 <meta itemprop="property" content="forward"/>
 <meta itemprop="property" content="forward_event_shape"/>
@@ -25,11 +26,11 @@
 
 Inherits From: [`Bijector`](../../tfp/bijectors/Bijector.md)
 
-Affine MaskedAutoregressiveFlow bijector for vector-valued events.
+Affine MaskedAutoregressiveFlow bijector.
 
 The affine autoregressive flow [(Papamakarios et al., 2016)][3] provides a
-relatively simple framework for user-specified (deep) architectures to learn
-a distribution over vector-valued events. Regarding terminology,
+relatively simple framework for user-specified (deep) architectures to learn a
+distribution over continuous events. Regarding terminology,
 
   "Autoregressive models decompose the joint density as a product of
   conditionals, and model each conditional in turn. Normalizing flows
@@ -38,7 +39,10 @@ a distribution over vector-valued events. Regarding terminology,
   [(Papamakarios et al., 2016)][3]
 
 In other words, the "autoregressive property" is equivalent to the
-decomposition, `p(x) = prod{ p(x[i] | x[0:i]) : i=0, ..., d }`. The provided
+decomposition, `p(x) = prod{ p(x[perm[i]] | x[perm[0:i]]) : i=0, ..., d }`
+where `perm` is some permutation of `{0, ..., d}`. In the simple case where
+the permutation is identity this reduces to:
+`p(x) = prod{ p(x[i] | x[0:i]) : i=0, ..., d }`. The provided
 `shift_and_log_scale_fn`, `masked_autoregressive_default_template`, achieves
 this property by zeroing out weights in its `masked_dense` layers.
 
@@ -81,7 +85,7 @@ semantics, the forward transformation is
 ```python
 def forward(x):
   y = zeros_like(x)
-  event_size = x.shape[-1]
+  event_size = x.shape[-event_dims:].num_elements()
   for _ in range(event_size):
     shift, log_scale = shift_and_log_scale_fn(y)
     y = x * tf.exp(log_scale) + shift
@@ -174,6 +178,7 @@ __init__(
     is_constant_jacobian=False,
     validate_args=False,
     unroll_loop=False,
+    event_ndims=1,
     name=None
 )
 ```
@@ -201,6 +206,10 @@ Creates the MaskedAutoregressiveFlow bijector.
     `_forward` should be replaced with a static for loop. Requires that
     the final dimension of `x` be known at graph construction time. Defaults
     to `False`.
+* <b>`event_ndims`</b>: Python `integer`, the intrinsic dimensionality of this
+    bijector. 1 corresponds to a simple vector autoregressive bijector as
+    implemented by the `masked_autoregressive_default_template`, 2 might be
+    useful for a 2D convolutional `shift_and_log_scale_fn` and so on.
 * <b>`name`</b>: Python `str`, name given to ops managed by this object.
 
 
@@ -245,6 +254,62 @@ Returns True if Tensor arguments will be validated.
 
 
 ## Methods
+
+<h3 id="__call__"><code>__call__</code></h3>
+
+``` python
+__call__(
+    value,
+    name=None,
+    **kwargs
+)
+```
+
+Applies or composes the `Bijector`, depending on input type.
+
+This is a convenience function which applies the `Bijector` instance in
+three different ways, depending on the input:
+
+1. If the input is a `tfd.Distribution` instance, return
+   `tfd.TransformedDistribution(distribution=input, bijector=self)`.
+2. If the input is a `tfb.Bijector` instance, return
+   `tfb.Chain([self, input])`.
+3. Otherwise, return `self.forward(input)`
+
+#### Args:
+
+* <b>`value`</b>: A `tfd.Distribution`, `tfb.Bijector`, or a `Tensor`.
+* <b>`name`</b>: Python `str` name given to ops created by this function.
+* <b>`**kwargs`</b>: Additional keyword arguments passed into the created
+    `tfd.TransformedDistribution`, `tfb.Bijector`, or `self.forward`.
+
+
+#### Returns:
+
+* <b>`composition`</b>: A `tfd.TransformedDistribution` if the input was a
+    `tfd.Distribution`, a `tfb.Chain` if the input was a `tfb.Bijector`, or
+    a `Tensor` computed by `self.forward`.
+
+#### Examples
+
+```python
+sigmoid = tfb.Reciprocal()(
+    tfb.AffineScalar(shift=1.)(
+      tfb.Exp()(
+        tfb.AffineScalar(scale=-1.))))
+# ==> `tfb.Chain([
+#         tfb.Reciprocal(),
+#         tfb.AffineScalar(shift=1.),
+#         tfb.Exp(),
+#         tfb.AffineScalar(scale=-1.),
+#      ])`  # ie, `tfb.Sigmoid()`
+
+log_normal = tfb.Exp()(tfd.Normal(0, 1))
+# ==> `tfd.TransformedDistribution(tfd.Normal(0, 1), tfb.Exp())`
+
+tfb.Exp()([-1., 0., 1.])
+# ==> tf.exp([-1., 0., 1.])
+```
 
 <h3 id="forward"><code>forward</code></h3>
 
@@ -459,10 +524,10 @@ evaluated at `g^{-1}(y)`.
 
 #### Returns:
 
-`Tensor`, if this bijector is injective.
-  If not injective, returns the tuple of local log det
-  Jacobians, `log(det(Dg_i^{-1}(y)))`, where `g_i` is the restriction
-  of `g` to the `ith` partition `Di`.
+* <b>`ildj`</b>: `Tensor`, if this bijector is injective.
+    If not injective, returns the tuple of local log det
+    Jacobians, `log(det(Dg_i^{-1}(y)))`, where `g_i` is the restriction
+    of `g` to the `ith` partition `Di`.
 
 
 #### Raises:

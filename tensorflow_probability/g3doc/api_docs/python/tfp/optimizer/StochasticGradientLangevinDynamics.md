@@ -64,8 +64,7 @@ with tf.Session(graph=tf.Graph()) as sess:
   # Partially defined loss function
   loss_part = tf.cholesky_solve(chol, tf.expand_dims(var, -1))
   # Loss function
-  loss = 0.5 * tf.squeeze(tf.matmul(loss_part, tf.expand_dims(var, -1),
-                                    transpose_a=True))
+  loss = 0.5 * tf.linalg.matvec(loss_part, var, transpose_a=True)
 
   # Set up the learning rate with a polynomial decay
   global_step = tf.Variable(0, trainable=False)

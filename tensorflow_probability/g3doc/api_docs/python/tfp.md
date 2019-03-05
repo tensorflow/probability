@@ -2,6 +2,7 @@
 <meta itemprop="name" content="tfp" />
 <meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="__version__"/>
+<meta itemprop="property" content="symbol"/>
 </div>
 
 # Module: tfp
@@ -24,15 +25,17 @@ Tools for probabilistic reasoning in TensorFlow.
 
 [`mcmc`](./tfp/mcmc.md) module: TensorFlow Probability MCMC python package.
 
-[`monte_carlo`](./tfp/monte_carlo.md) module: Monte Carlo integration and helpers.
+[`monte_carlo`](./tfp/monte_carlo.md) module: Support for Monte Carlo expectations.
 
 [`optimizer`](./tfp/optimizer.md) module: TensorFlow Probability Optimizer python package.
 
 [`positive_semidefinite_kernels`](./tfp/positive_semidefinite_kernels.md) module: Positive-semidefinite kernels package.
 
+[`stats`](./tfp/stats.md) module: Statistical functions.
+
 [`sts`](./tfp/sts.md) module: Framework for Bayesian structural time series models.
 
-[`trainable_distributions`](./tfp/trainable_distributions.md) module: Trainable distributions.
+[`trainable_distributions`](./tfp/trainable_distributions.md) module: Support for trainable distributions.
 
 [`util`](./tfp/util.md) module: TensorFlow Probability python utilities.
 
@@ -41,4 +44,6 @@ Tools for probabilistic reasoning in TensorFlow.
 ## Other Members
 
 <h3 id="__version__"><code>__version__</code></h3>
+
+<h3 id="symbol"><code>symbol</code></h3>
 

@@ -62,16 +62,19 @@ step_size = tf.get_variable(
     trainable=False)
 
 # Initialize the HMC transition kernel.
+num_results = int(10e3)
+num_burnin_steps = int(1e3)
 hmc = tfp.mcmc.HamiltonianMonteCarlo(
     target_log_prob_fn=unnormalized_log_prob,
     num_leapfrog_steps=3,
     step_size=step_size,
-    step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy())
+    step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy(
+      num_adaptation_steps=int(num_burnin_steps * 0.8)))
 
 # Run the chain (with burn-in).
 samples, kernel_results = tfp.mcmc.sample_chain(
-    num_results=int(10e3),
-    num_burnin_steps=int(1e3),
+    num_results=num_results,
+    num_burnin_steps=num_burnin_steps,
     current_state=1.,
     kernel=hmc)
 
@@ -184,7 +187,8 @@ weights, kernel_results = tfp.mcmc.sample_chain(
         target_log_prob_fn=unnormalized_posterior_log_prob,
         num_leapfrog_steps=2,
         step_size=step_size,
-        step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy(),
+        step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy(
+          num_adaptation_steps=None),
         state_gradients_are_stopped=True))
 
 avg_acceptance_ratio = tf.reduce_mean(

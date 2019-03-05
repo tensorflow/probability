@@ -16,7 +16,11 @@ tfp.distributions.auto_correlation(
 )
 ```
 
-Auto correlation along one axis.
+Auto correlation along one axis. (deprecated)
+
+Warning: THIS FUNCTION IS DEPRECATED. It will be removed after 2018-10-01.
+Instructions for updating:
+auto_correlation is moved to the `stats` namespace.  Access it via: <a href="../../tfp/stats/auto_correlation.md"><code>tfp.stats.auto_correlation</code></a>.
 
 Given a `1-D` wide sense stationary (WSS) sequence `X`, the auto correlation
 `RXX` may be defined as  (with `E` expectation and `Conj` complex conjugate)
@@ -54,9 +58,9 @@ contains a slight bias, which goes to zero as `len(x) - m --> infinity`.
 * <b>`x`</b>:  `float32` or `complex64` `Tensor`.
 * <b>`axis`</b>:  Python `int`. The axis number along which to compute correlation.
     Other dimensions index different batch members.
-* <b>`max_lags`</b>:  Positive `int` tensor.  The maximum value of `m` to consider
-    (in equation above).  If `max_lags >= x.shape[axis]`, we effectively
-    re-set `max_lags` to `x.shape[axis] - 1`.
+* <b>`max_lags`</b>:  Positive `int` tensor.  The maximum value of `m` to consider (in
+    equation above).  If `max_lags >= x.shape[axis]`, we effectively re-set
+    `max_lags` to `x.shape[axis] - 1`.
 * <b>`center`</b>:  Python `bool`.  If `False`, do not subtract the mean estimate `mu`
     from `x[n]` when forming `w[n]`.
 * <b>`normalize`</b>:  Python `bool`.  If `False`, do not divide by the variance
