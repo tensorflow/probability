@@ -113,9 +113,13 @@ class VariableLayer(tf.keras.layers.Layer):
     self.regularizer = tf.keras.regularizers.get(regularizer)
     self.constraint = tf.keras.constraints.get(constraint)
 
+    shape = tf.get_static_value(dist_util.expand_to_vector(shape))
+    if shape is None:
+      raise ValueError('Shape must be known statically.')
+
     self._var = self.add_weight(
         'constant',
-        shape=dist_util.expand_to_vector(shape),
+        shape=shape,
         initializer=self.initializer,
         regularizer=self.regularizer,
         constraint=self.constraint,
