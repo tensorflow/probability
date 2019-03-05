@@ -34,6 +34,7 @@ py_library(
     deps = [
         ":conv_variational",
         ":dense_variational",
+        ":dense_variational_v2",
         ":distribution_layer",
         ":initializers",
         ":util",
@@ -86,6 +87,30 @@ py_test(
     name = "dense_variational_test",
     size = "small",
     srcs = ["dense_variational_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "dense_variational_v2",
+    srcs = [
+        "dense_variational_v2.py",
+    ],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions:kullback_leibler",
+        "//tensorflow_probability/python/distributions:seed_stream",
+    ],
+)
+
+py_test(
+    name = "dense_variational_v2_test",
+    size = "small",
+    srcs = ["dense_variational_v2_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,

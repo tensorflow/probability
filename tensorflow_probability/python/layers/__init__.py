@@ -27,6 +27,7 @@ from tensorflow_probability.python.layers.conv_variational import Convolution3DR
 from tensorflow_probability.python.layers.dense_variational import DenseFlipout
 from tensorflow_probability.python.layers.dense_variational import DenseLocalReparameterization
 from tensorflow_probability.python.layers.dense_variational import DenseReparameterization
+from tensorflow_probability.python.layers.dense_variational_v2 import DenseVariational
 from tensorflow_probability.python.layers.distribution_layer import CategoricalMixtureOfOneHotCategorical
 from tensorflow_probability.python.layers.distribution_layer import DistributionLambda
 from tensorflow_probability.python.layers.distribution_layer import IndependentBernoulli
@@ -58,6 +59,7 @@ _allowed_symbols = [
     'DenseFlipout',
     'DenseLocalReparameterization',
     'DenseReparameterization',
+    'DenseVariational',
     'DistributionLambda',
     'IndependentBernoulli',
     'IndependentLogistic',
