@@ -75,6 +75,7 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
     tf.io.gfile.makedirs(FLAGS.model_dir)
 
   def testOneStepFromOrigin(self):
+    @tf.function
     def target_log_prob_fn(event):
       return tfd.Normal(loc=0., scale=1.).log_prob(event)
 
@@ -93,6 +94,7 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
     plt.close()
 
   def testReproducibility(self):
+    @tf.function
     def target_log_prob_fn(event):
       return tfd.Normal(loc=0., scale=1.).log_prob(event)
 
@@ -112,6 +114,7 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
       self.assertAllEqual(x, y)
 
   def testNormal(self):
+    @tf.function
     def target_log_prob_fn(event):
       return tfd.Normal(loc=0., scale=1.).log_prob(event)
 
@@ -133,6 +136,7 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
                           suffix="one_step_posterior_conservation_normal.png")
 
   def testLogitBeta(self):
+    @tf.function
     def target_log_prob_fn(event):
       return tfd.TransformedDistribution(
           distribution=tfd.Beta(concentration0=1.0, concentration1=3.0),
@@ -162,6 +166,7 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
     _ = scipy.stats.ks_2samp(samples.flatten(), states.numpy().flatten())
 
   def testMultivariateNormal2d(self):
+    @tf.function
     def target_log_prob_fn(event):
       return tfd.MultivariateNormalFullCovariance(
           loc=tf.zeros(2), covariance_matrix=tf.eye(2)).log_prob(event)
@@ -189,6 +194,7 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
                           suffix="one_step_posterior_conservation_2d_dim_1.png")
 
   def testSkewedMultivariateNormal2d(self):
+    @tf.function
     def target_log_prob_fn(event):
       return tfd.MultivariateNormalFullCovariance(
           loc=tf.zeros(2),
@@ -227,6 +233,7 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
       (5, 10,),
   )
   def testMultivariateNormalNd(self, event_size, num_samples):
+    @tf.function
     def target_log_prob_fn(event):
       return tfd.MultivariateNormalFullCovariance(
           loc=tf.zeros(event_size),
