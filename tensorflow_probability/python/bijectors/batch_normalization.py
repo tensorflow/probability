@@ -161,7 +161,6 @@ class BatchNormalization(bijector.Bijector):
         forward_min_event_ndims=forward_min_event_ndims,
         validate_args=validate_args,
         name=name)
-    self._use_tf_function = False  # BatchNormalization has non-graph deps.
 
   def _validate_bn_layer(self, layer):
     """Check for valid BatchNormalization layer.

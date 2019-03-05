@@ -103,11 +103,6 @@ class CholeskyToInvCholeskyTest(tf.test.TestCase):
   def testJacobian(self):
     cholesky_to_vector = tfb.Invert(
         tfb.ScaleTriL(diag_bijector=tfb.Exp(), diag_shift=None))
-    use_tf_function = True
-    if not use_tf_function:
-      b = cholesky_to_vector.bijector.bijectors
-      b[0].diag_bijector._use_tf_function = False
-      b[1]._use_tf_function = False
     bijector = tfb.CholeskyToInvCholesky()
     for x in [np.array([[2.]],
                        dtype=np.float64),

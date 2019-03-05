@@ -61,7 +61,6 @@ class TransformDiagonal(bijector.Bijector):
         validate_args=validate_args,
         dtype=diag_bijector.dtype,
         name=name)
-    self._use_tf_function = False  # So input bijectors cache EagerTensors.
 
   @property
   def diag_bijector(self):

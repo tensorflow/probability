@@ -118,4 +118,3 @@ class ScaleTriL(chain.Chain):
            fill_triangular.FillTriangular()],
           validate_args=validate_args,
           name=name)
-      self._use_tf_function = False  # So input bijectors cache EagerTensors.
