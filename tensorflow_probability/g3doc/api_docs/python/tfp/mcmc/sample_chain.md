@@ -69,8 +69,6 @@ Warning: when setting a `seed` in the `kernel`, ensure that `sample_chain`'s
 * <b>`next_states`</b>: Tensor or Python list of `Tensor`s representing the
     state(s) of the Markov chain(s) at each result step. Has same shape as
     input `current_state` but with a prepended `num_results`-size dimension.
-* <b>`kernel_results`</b>: `collections.namedtuple` of internal calculations used to
-    advance the chain.
 * <b>`kernel_results`</b>: A (possibly nested) `tuple`, `namedtuple` or `list` of
     `Tensor`s representing internal calculations made within this function.
 
@@ -79,7 +77,7 @@ Warning: when setting a `seed` in the `kernel`, ensure that `sample_chain`'s
 ##### Sample from a diagonal-variance Gaussian.
 
 ```python
-import tensorflow tf
+import tensorflow as tf
 import tensorflow_probability as tfp
 tfd = tfp.distributions
 
@@ -121,7 +119,7 @@ for i=1..n:
 where `F` denotes factors.
 
 ```python
-import tensorflow tf
+import tensorflow as tf
 import tensorflow_probability as tfp
 tfd = tfp.distributions
 

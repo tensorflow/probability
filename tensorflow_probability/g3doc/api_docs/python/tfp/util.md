@@ -13,5 +13,5 @@ TensorFlow Probability python utilities.
 
 ## Functions
 
-[`externalize_variables_as_args(...)`](../tfp/util/externalize_variables_as_args.md): "Converts variables within a callable into explicit args.
+[`externalize_variables_as_args(...)`](../tfp/util/externalize_variables_as_args.md): "Converts variables within a callable into explicit args. (deprecated)
 

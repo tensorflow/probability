@@ -58,7 +58,7 @@ __init__(
 
 DEPRECATED FUNCTION
 
-THIS FUNCTION IS DEPRECATED. It will be removed after 2019-01-01.
+Warning: THIS FUNCTION IS DEPRECATED. It will be removed after 2019-01-01.
 Instructions for updating:
 Use `tfd.Exponential(tf.nn.softplus(rate)).
 

@@ -63,9 +63,9 @@ samples, _ = tfp.mcmc.sample_chain(
   num_burnin_steps=500,
   parallel_iterations=1)  # For determinism.
 
-sample_mean = tf.reduce_mean(samples, axis=0)
+sample_mean = tf.math.reduce_mean(samples, axis=0)
 sample_std = tf.sqrt(
-    tf.reduce_mean(tf.squared_difference(samples, sample_mean),
+    tf.math.reduce_mean(tf.squared_difference(samples, sample_mean),
                    axis=0))
 with tf.Session() as sess:
   [sample_mean_, sample_std_] = sess.run([sample_mean, sample_std])
@@ -98,7 +98,7 @@ target = tfd.MultivariateNormalTriL(loc=true_mean, scale_tril=L)
 # Then the target log-density is defined as follows:
 def target_log_prob(x, y):
   # Stack the input tensors together
-  z = tf.stack([x, y], axis=-1) - true_mean
+  z = tf.stack([x, y], axis=-1)
   return target.log_prob(tf.squeeze(z))
 
 # Initial state of the chain
@@ -118,13 +118,13 @@ samples, _ = tfp.mcmc.sample_chain(
     parallel_iterations=1)
 samples = tf.stack(samples, axis=-1)
 
-sample_mean = tf.reduce_mean(samples, axis=0)
+sample_mean = tf.math.reduce_mean(samples, axis=0)
 x = tf.squeeze(samples - sample_mean)
 sample_cov = tf.matmul(tf.transpose(x, [1, 2, 0]),
                        tf.transpose(x, [1, 0, 2])) / num_results
 
-mean_sample_mean = tf.reduce_mean(sample_mean)
-mean_sample_cov = tf.reduce_mean(sample_cov, axis=0)
+mean_sample_mean = tf.math.reduce_mean(sample_mean)
+mean_sample_cov = tf.math.reduce_mean(sample_cov, axis=0)
 x = tf.reshape(sample_cov - mean_sample_cov, [num_chains, 2 * 2])
 cov_sample_cov = tf.reshape(tf.matmul(x, x, transpose_a=True) / num_chains,
                             shape=[2 * 2, 2 * 2])
@@ -181,9 +181,9 @@ samples, _ = tfp.mcmc.sample_chain(
         seed=42),
     parallel_iterations=1)  # For determinism.
 
-sample_mean = tf.reduce_mean(samples, axis=0)
+sample_mean = tf.math.reduce_mean(samples, axis=0)
 sample_std = tf.sqrt(
-    tf.reduce_mean(tf.squared_difference(samples, sample_mean),
+    tf.math.reduce_mean(tf.squared_difference(samples, sample_mean),
                    axis=0))
 with tf.Session() as sess:
   [sample_mean_, sample_std_] = sess.run([sample_mean, sample_std])

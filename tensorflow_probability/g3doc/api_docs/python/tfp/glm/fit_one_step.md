@@ -41,7 +41,7 @@ Runs one step of Fisher scoring.
     matching `response`; represents `offset` shifted initial linear
     predictions based on `model_coefficients_start`.
     Default value: `offset` if `model_coefficients is None`, and
-    `tfp.math.matvecmul(model_matrix, model_coefficients_start) + offset`
+    `tf.linalg.matvec(model_matrix, model_coefficients_start) + offset`
     otherwise.
 * <b>`l2_regularizer`</b>: Optional scalar `Tensor` representing L2 regularization
     penalty, i.e.,
@@ -72,4 +72,4 @@ Runs one step of Fisher scoring.
     `model_matrix`.
 * <b>`predicted_linear_response`</b>: `response`-shaped `Tensor` representing linear
     predictions based on new `model_coefficients`, i.e.,
-    `tfp.math.matvecmul(model_matrix, model_coefficients_next) + offset`.
+    `tf.linalg.matvec(model_matrix, model_coefficients_next) + offset`.

@@ -157,8 +157,8 @@ Get tensor that the random variable corresponds to.
 
 ``` python
 __abs__(
-    a,
-    *args
+    x,
+    name=None
 )
 ```
 
@@ -186,6 +186,9 @@ A `Tensor` or `SparseTensor` the same size and type as `x` with absolute
   values.
 Note, for `complex64` or `complex128` input, the returned `Tensor` will be
   of type `float32` or `float64`, respectively.
+
+If `x` is a `SparseTensor`, returns
+`SparseTensor(x.indices, tf.math.abs(x.values, ...), x.dense_shape)`
 
 <h3 id="__add__"><code>__add__</code></h3>
 
@@ -423,7 +426,8 @@ The appropriate slice of "tensor", based on "slice_spec".
 #### Raises:
 
 * <b>`ValueError`</b>: If a slice range is negative size.
-* <b>`TypeError`</b>: If the slice indices aren't int, slice, or Ellipsis.
+* <b>`TypeError`</b>: If the slice indices aren't int, slice, ellipsis,
+    tf.newaxis or scalar int32/int64 tensors.
 
 <h3 id="__gt__"><code>__gt__</code></h3>
 
@@ -660,7 +664,7 @@ Returns element-wise remainder of division. When `x < 0` xor `y < 0` is
 true, this follows Python semantics in that the result here is consistent
 with a flooring divide. E.g. `floor(x / y) * y + mod(x, y) = x`.
 
-*NOTE*: `FloorMod` supports broadcasting. More about broadcasting
+*NOTE*: `floormod` supports broadcasting. More about broadcasting
 [here](http://docs.scipy.org/doc/numpy/user/basics.broadcasting.html)
 
 #### Args:
@@ -715,6 +719,9 @@ I.e., \\(y = -x\\).
 #### Returns:
 
 A `Tensor`. Has the same type as `x`.
+
+If `x` is a `SparseTensor`, returns
+`SparseTensor(x.indices, tf.math.negative(x.values, ...), x.dense_shape)`
 
 <h3 id="__nonzero__"><code>__nonzero__</code></h3>
 
@@ -1026,7 +1033,7 @@ Returns element-wise remainder of division. When `x < 0` xor `y < 0` is
 true, this follows Python semantics in that the result here is consistent
 with a flooring divide. E.g. `floor(x / y) * y + mod(x, y) = x`.
 
-*NOTE*: `FloorMod` supports broadcasting. More about broadcasting
+*NOTE*: `floormod` supports broadcasting. More about broadcasting
 [here](http://docs.scipy.org/doc/numpy/user/basics.broadcasting.html)
 
 #### Args:

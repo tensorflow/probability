@@ -7,7 +7,7 @@
 
 ``` python
 tfp.mcmc.make_simple_step_size_update_policy(
-    num_adaptation_steps=None,
+    num_adaptation_steps,
     target_rate=0.75,
     decrement_multiplier=0.01,
     increment_multiplier=0.01,
@@ -36,8 +36,7 @@ inspect the behavior of the chain during adaptation.
 * <b>`num_adaptation_steps`</b>: Scalar `int` `Tensor` number of initial steps to
     during which to adjust the step size. This may be greater, less than, or
     equal to the number of burnin steps. If `None`, the step size is adapted
-    on every step.
-    Default value: `None`.
+    on every step (note this breaks stationarity of the chain!).
 * <b>`target_rate`</b>: Scalar `Tensor` representing desired `accept_ratio`.
     Default value: `0.75` (i.e., [center of asymptotically optimal
     rate](https://arxiv.org/abs/1411.6669)).

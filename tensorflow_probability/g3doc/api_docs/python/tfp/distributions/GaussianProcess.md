@@ -59,7 +59,7 @@ in applications, it is often some finite dimensional real or complex vector
 space. In such cases, the GP may be thought of as a distribution over
 (real- or complex-valued) functions defined over the index set.
 
-Just as Gaussian distriubtions are fully specified by their first and second
+Just as Gaussian distributions are fully specified by their first and second
 moments, a Gaussian process can be completely specified by a mean and
 covariance function. Let `S` denote the index set and `K` the space in which
 each indexed random variable takes its values (again, often R or C). The mean
@@ -184,19 +184,19 @@ kernel = psd_kernels.ExponentiatedQuadratic(
     amplitude=tf.get_variable('amplitude', np.float32),
     length_scale=tf.get_variable('length_scale', np.float32))
 
-gp = tfp.GaussianProcess(kernel, observed_index_points)
+gp = tfd.GaussianProcess(kernel, observed_index_points)
 neg_log_likelihood = -gp.log_prob(observed_values)
 
-optimize = tf.train.AdamOptimize().minimize(neg_log_likelihood)
+optimize = tf.train.AdamOptimizer().minimize(neg_log_likelihood)
 
 with tf.Session() as sess:
   sess.run(tf.global_variables_initializer())
 
   for i in range(1000):
-    _, nll_ = sess.run([optimize, nll])
+    _, neg_log_likelihood_ = sess.run([optimize, neg_log_likelihood])
     if i % 100 == 0:
-      print("Step {}: NLL = {}".format(i, nll_))
-  print("Final NLL = {}".format(nll_))
+      print("Step {}: NLL = {}".format(i, neg_log_likelihood_))
+  print("Final NLL = {}".format(neg_log_likelihood_))
 ```
 
 <h2 id="__init__"><code>__init__</code></h2>
@@ -498,7 +498,7 @@ Computes the (Shannon) cross entropy.
 
 Denote this distribution (`self`) by `P` and the `other` distribution by
 `Q`. Assuming `P, Q` are absolutely continuous with respect to
-one another and permit densities `p(x) dr(x)` and `q(x) dr(x)`, (Shanon)
+one another and permit densities `p(x) dr(x)` and `q(x) dr(x)`, (Shannon)
 cross entropy is defined as:
 
 ```none
@@ -516,7 +516,7 @@ where `F` denotes the support of the random variable `X ~ P`.
 #### Returns:
 
 * <b>`cross_entropy`</b>: `self.dtype` `Tensor` with shape `[B1, ..., Bn]`
-    representing `n` different calculations of (Shanon) cross entropy.
+    representing `n` different calculations of (Shannon) cross entropy.
 
 <h3 id="entropy"><code>entropy</code></h3>
 
@@ -599,7 +599,7 @@ KL[p, q] = E_p[log(p(X)/q(X))]
 ```
 
 where `F` denotes the support of the random variable `X ~ p`, `H[., .]`
-denotes (Shanon) cross entropy, and `H[.]` denotes (Shanon) entropy.
+denotes (Shannon) cross entropy, and `H[.]` denotes (Shannon) entropy.
 
 #### Args:
 
