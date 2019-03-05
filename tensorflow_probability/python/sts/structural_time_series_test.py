@@ -22,6 +22,8 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+
+from tensorflow_probability.python.sts import Autoregressive
 from tensorflow_probability.python.sts import LinearRegression
 from tensorflow_probability.python.sts import LocalLevel
 from tensorflow_probability.python.sts import LocalLinearTrend
@@ -216,6 +218,13 @@ class _StsTestHarness(object):
     ssm = model.make_state_space_model(
         num_timesteps=num_timesteps, param_vals=param_samples)
     self.assertEqual(ssm.batch_shape, time_series_sample_shape)
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class AutoregressiveTest(tf.test.TestCase, _StsTestHarness):
+
+  def _build_sts(self, observed_time_series=None):
+    return Autoregressive(order=3, observed_time_series=observed_time_series)
 
 
 @test_util.run_all_in_graph_and_eager_modes

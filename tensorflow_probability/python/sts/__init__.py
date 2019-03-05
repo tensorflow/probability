@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from tensorflow_probability.python.sts.autoregressive import Autoregressive
+from tensorflow_probability.python.sts.autoregressive import AutoregressiveStateSpaceModel
 from tensorflow_probability.python.sts.fitting import build_factored_variational_loss
 from tensorflow_probability.python.sts.fitting import fit_with_hmc
 from tensorflow_probability.python.sts.fitting import sample_uniform_initial_state
@@ -40,6 +42,8 @@ from tensorflow.python.util.all_util import remove_undocumented
 
 _allowed_symbols = [
     'AdditiveStateSpaceModel',
+    'Autoregressive',
+    'AutoregressiveStateSpaceModel',
     'LinearRegression',
     'LocalLevel',
     'LocalLevelStateSpaceModel',

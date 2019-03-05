@@ -32,6 +32,7 @@ py_library(
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":autoregressive",
         ":fitting",
         ":forecast",
         ":local_level",
@@ -41,6 +42,28 @@ py_library(
         ":semilocal_linear_trend",
         ":structural_time_series",
         ":sum",
+    ],
+)
+
+py_library(
+    name = "autoregressive",
+    srcs = ["autoregressive.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/sts/internal",
+    ],
+)
+
+py_test(
+    name = "autoregressive_test",
+    size = "medium",
+    srcs = ["autoregressive_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
     ],
 )
 
