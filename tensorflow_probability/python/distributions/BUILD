@@ -1398,6 +1398,7 @@ py_test(
     size = "medium",
     srcs = ["hidden_markov_model_test.py"],
     deps = [
+        # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
