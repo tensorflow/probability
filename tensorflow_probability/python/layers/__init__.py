@@ -44,6 +44,7 @@ from tensorflow_probability.python.layers.initializers import BlockwiseInitializ
 from tensorflow_probability.python.layers.util import default_loc_scale_fn
 from tensorflow_probability.python.layers.util import default_mean_field_normal_fn
 from tensorflow_probability.python.layers.util import default_multivariate_normal_fn
+from tensorflow_probability.python.layers.variable_input import VariableLayer
 
 _allowed_symbols = [
     'BlockwiseInitializer',
@@ -69,6 +70,7 @@ _allowed_symbols = [
     'MixtureSameFamily',
     'MultivariateNormalTriL',
     'OneHotCategorical',
+    'VariableLayer',
     'default_loc_scale_fn',
     'default_mean_field_normal_fn',
     'default_multivariate_normal_fn',

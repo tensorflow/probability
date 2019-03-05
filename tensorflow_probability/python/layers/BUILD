@@ -37,6 +37,7 @@ py_library(
         ":distribution_layer",
         ":initializers",
         ":util",
+        ":variable_input",
     ],
 )
 
@@ -144,5 +145,26 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "variable_input",
+    srcs = [
+        "variable_input.py",
+    ],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/layers/internal",
+    ],
+)
+
+py_test(
+    name = "variable_input_test",
+    srcs = ["variable_input_test.py"],
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability",
     ],
 )
