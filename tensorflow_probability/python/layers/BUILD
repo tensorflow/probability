@@ -35,6 +35,7 @@ py_library(
         ":conv_variational",
         ":dense_variational",
         ":distribution_layer",
+        ":initializers",
         ":util",
     ],
 )
@@ -109,6 +110,26 @@ py_test(
     srcs = ["distribution_layer_test.py"],
     deps = [
         # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "initializers",
+    srcs = [
+        "initializers.py",
+    ],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "initializers_test",
+    srcs = ["initializers_test.py"],
+    deps = [
         # tensorflow dep,
         "//tensorflow_probability",
     ],
