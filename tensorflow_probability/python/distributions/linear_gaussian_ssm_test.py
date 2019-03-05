@@ -81,7 +81,7 @@ class _IIDNormalTest(object):
 
     return model
 
-  def test_iid_normal_sample(self):
+  def testIIDNormalSample(self):
     num_timesteps = 10
     latent_size = 3
     observation_size = 2
@@ -113,7 +113,7 @@ class _IIDNormalTest(object):
                             np.ones(result_shape) * marginal_variance,
                             rtol=5*stderr_variance)
 
-  def test_iid_normal_logprob(self):
+  def testIIDNormalLogprob(self):
 
     # In the case where the latent states are iid normal (achieved by
     # setting the transition matrix to zero, so there's no dependence
@@ -218,7 +218,7 @@ class SanityChecks(tf.test.TestCase):
     self.assertAllClose(mean_[..., 0], expected_observations)
     self.assertAllClose(sample_[..., 0], expected_observations)
 
-  def test_variance(self):
+  def testVariance(self):
 
     num_timesteps = 5
     prior_scale = 17.
@@ -249,7 +249,7 @@ class SanityChecks(tf.test.TestCase):
     variance_ = self.evaluate(model.variance())
     self.assertAllClose(variance_[..., 0], observation_variance)
 
-  def test_time_varying_operators(self):
+  def testTimeVaryingOperators(self):
 
     num_timesteps = 5
     prior_mean = 1.3
@@ -298,7 +298,7 @@ class SanityChecks(tf.test.TestCase):
     lp_ = self.evaluate(model.log_prob(sample_))
     self.assertGreater(lp_, 0.)
 
-  def test_time_varying_noise(self):
+  def testTimeVaryingNoise(self):
 
     num_timesteps = 5
     prior_mean = 0.
@@ -428,7 +428,7 @@ class BatchTest(tf.test.TestCase):
     self.assertEqual(posterior_covs.shape.as_list(),
                      batch_shape + [num_timesteps, latent_size, latent_size])
 
-  def test_constant_batch_shape(self):
+  def testConstantBatchShape(self):
     """Simple case where all components have the same batch shape."""
     num_timesteps = 5
     latent_size = 3
@@ -451,7 +451,7 @@ class BatchTest(tf.test.TestCase):
     self._sanity_check_shapes(model, batch_shape, event_shape,
                               num_timesteps, latent_size)
 
-  def test_broadcast_batch_shape(self):
+  def testBroadcastBatchShape(self):
     """Broadcasting when only one component has batch shape."""
 
     num_timesteps = 5
