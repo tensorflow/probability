@@ -295,8 +295,8 @@ def shapes_from_loc_and_scale(loc, scale, name="shapes_from_loc_and_scale"):
   See `MultivariateNormalLinearOperator` for a usage example.
 
   Args:
-    loc:  `N-D` `Tensor` with `N >= 1` (already converted to tensor) or `None`.
-      If `None`, both batch and event shape are determined by `scale`.
+    loc: `Tensor` (already converted to tensor) or `None`. If `None`, or
+      loc.shape.ndims==0, both batch and event shape are determined by `scale`.
     scale:  A `LinearOperator` instance.
     name:  A string name to prepend to created ops.
 
@@ -308,6 +308,8 @@ def shapes_from_loc_and_scale(loc, scale, name="shapes_from_loc_and_scale"):
     ValueError:  If the last dimension of `loc` is determined statically to be
       different than the range of `scale`.
   """
+  if loc is not None and loc.shape.ndims == 0:
+    loc = None  # scalar loc is irrelevant to determining batch/event shape.
   with tf.compat.v1.name_scope(name, values=[loc] + scale.graph_parents):
     # Get event shape.
     event_size = scale.range_dimension_tensor()

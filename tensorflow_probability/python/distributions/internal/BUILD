@@ -121,3 +121,20 @@ py_test(
         # numpy dep,
     ],
 )
+
+py_library(
+    name = "slicing",
+    srcs = ["slicing.py"],
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "slicing_test",
+    srcs = ["slicing_test.py"],
+    deps = [
+        ":slicing",
+        # tensorflow dep,
+    ],
+)

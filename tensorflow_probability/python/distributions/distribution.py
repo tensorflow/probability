@@ -29,6 +29,7 @@ import six
 import tensorflow as tf
 
 from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.distributions.internal import slicing
 from tensorflow_probability.python.internal import distribution_util as util
 from tensorflow.python.util import tf_inspect
 
@@ -530,6 +531,60 @@ class Distribution(_BaseDistribution):
       self._parameters_sanitized = True
     return self._parameters
 
+  def _params_event_ndims(self):
+    """Returns a dict mapping constructor argument names to per-event rank.
+
+    Distributions may implement this method to provide support for slicing
+    (`__getitem__`) on the batch axes.
+
+    Examples: Normal has scalar parameters, so would return
+    `{'loc': 0, 'scale': 0}`. On the other hand, MultivariateNormalTriL has
+    vector loc and matrix scale, so returns `{'loc': 1, 'scale_tril': 2}`. When
+    a distribution accepts multiple parameterizations, either all possible
+    parameters may be specified by the dict, e.g. Bernoulli returns
+    `{'logits': 0, 'probs': 0}`, or if convenient only the parameters relevant
+    to this instance may be specified.
+
+    Parameter dtypes are inferred from Tensor attributes on the distribution
+    where available, e.g. `bernoulli.probs`, 'mvn.scale_tril', falling back with
+    a warning to the dtype of the distribution.
+
+    Returns:
+      params_event_ndims: Per-event parameter ranks, a `str->int dict`.
+    """
+    raise NotImplementedError(
+        "{} does not support batch slicing; must implement "
+        "_params_event_ndims.".format(type(self)))
+
+  def __getitem__(self, slices):
+    """Slices the batch axes of this distribution, returning a new instance.
+
+    ```python
+    b = tfd.Bernoulli(logits=tf.zeros([3, 5, 7, 9]))
+    b.batch_shape  # => [3, 5, 7, 9]
+    b2 = b[:, tf.newaxis, ..., -2:, 1::2]
+    b2.batch_shape  # => [3, 1, 5, 2, 4]
+
+    x = tf.random.normal([5, 3, 2, 2])
+    cov = tf.matmul(x, x, transpose_b=True)
+    chol = tf.cholesky(cov)
+    loc = tf.random.normal([4, 1, 3, 1])
+    mvn = tfd.MultivariateNormalTriL(loc, chol)
+    mvn.batch_shape  # => [4, 5, 3]
+    mvn.event_shape  # => [2]
+    mvn2 = mvn[:, 3:, ..., ::-1, tf.newaxis]
+    mvn2.batch_shape  # => [4, 2, 3, 1]
+    mvn2.event_shape  # => [2]
+    ```
+
+    Args:
+      slices: slices from the [] operator
+
+    Returns:
+      dist: A new `tfd.Distribution` instance with sliced parameters.
+    """
+    return slicing.batch_slice(self, self._params_event_ndims(), {}, slices)
+
   @property
   def reparameterization_type(self):
     """Describes how samples from the distribution are reparameterized.
@@ -579,13 +634,20 @@ class Distribution(_BaseDistribution):
         of self.parameters and override_parameters_kwargs, i.e.,
         `dict(self.parameters, **override_parameters_kwargs)`.
     """
-    parameters = dict(self.parameters, **override_parameters_kwargs)
-    d = type(self)(**parameters)
-    # pylint: disable=protected-access
-    d._parameters = parameters
-    d._parameters_sanitized = True
-    # pylint: enable=protected-access
-    return d
+    try:
+      # We want track provenance from origin variables, so we use batch_slice
+      # if this distribution supports slicing. See the comment on
+      # PROVENANCE_ATTR in slicing.py
+      return slicing.batch_slice(self, self._params_event_ndims(),
+                                 override_parameters_kwargs, Ellipsis)
+    except NotImplementedError:
+      parameters = dict(self.parameters, **override_parameters_kwargs)
+      d = type(self)(**parameters)
+      # pylint: disable=protected-access
+      d._parameters = parameters
+      d._parameters_sanitized = True
+      # pylint: enable=protected-access
+      return d
 
   def _batch_shape_tensor(self):
     raise NotImplementedError(

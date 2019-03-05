@@ -305,5 +305,128 @@ class BernoulliTest(tf.test.TestCase):
     self.assertAllClose(kl_val, kl_expected)
 
 
+class _MakeSlicer(object):
+
+  def __getitem__(self, slices):
+    return lambda x: x.__getitem__(slices)
+
+make_slicer = _MakeSlicer()
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class BernoulliSlicingTest(tf.test.TestCase):
+
+  def testSlice(self):
+    logits = self.evaluate(tf.random.normal([20, 3, 1, 5]))
+    dist = tfd.Bernoulli(logits=logits)
+    batch_shape = dist.batch_shape.as_list()
+    dist_noshape = tfd.Bernoulli(
+        logits=tf.compat.v1.placeholder_with_default(logits, shape=None))
+
+    def check(*slicers):
+      for ds, assert_static_shape in (dist, True), (dist_noshape, False):
+        bs = batch_shape
+        prob = self.evaluate(dist.prob(0))
+        for slicer in slicers:
+          ds = slicer(ds)
+          bs = slicer(np.zeros(bs)).shape
+          prob = slicer(prob)
+          if assert_static_shape or tf.executing_eagerly():
+            self.assertAllEqual(bs, ds.batch_shape)
+          else:
+            self.assertIsNone(ds.batch_shape.ndims)
+          self.assertAllEqual(bs, self.evaluate(ds.batch_shape_tensor()))
+          self.assertAllClose(prob, self.evaluate(ds.prob(0)))
+
+    check(make_slicer[3])
+    check(make_slicer[tf.newaxis])
+    check(make_slicer[3::7])
+    check(make_slicer[:, :2])
+    check(make_slicer[tf.newaxis, :, ..., 0, :2])
+    check(make_slicer[tf.newaxis, :, ..., 3:, tf.newaxis])
+    check(make_slicer[..., tf.newaxis, 3:, tf.newaxis])
+    check(make_slicer[..., tf.newaxis, -3:, tf.newaxis])
+    check(make_slicer[tf.newaxis, :-3, tf.newaxis, ...])
+    def halfway(x):
+      if isinstance(x, tfd.Bernoulli):
+        return x.batch_shape_tensor()[0] // 2
+      return x.shape[0] // 2
+    check(lambda x: x[halfway(x)])
+    check(lambda x: x[:halfway(x)])
+    check(lambda x: x[halfway(x):])
+    check(make_slicer[:-3, tf.newaxis], make_slicer[..., 0, :2],
+          make_slicer[::2])
+    if tf.executing_eagerly(): return
+    with self.assertRaisesRegexp((ValueError, tf.errors.InvalidArgumentError),
+                                 "Index out of range.*input has only 4 dims"):
+      check(make_slicer[19, tf.newaxis, 2, ..., :, 0, 4])
+    with self.assertRaisesRegexp((ValueError, tf.errors.InvalidArgumentError),
+                                 "slice index.*out of bounds"):
+      check(make_slicer[..., 2, :])  # ...,1,5 -> 2 is oob.
+
+  def testSliceSequencePreservesOrigVarGradLinkage(self):
+    logits = tf.compat.v2.Variable(tf.random.normal([20, 3, 1, 5]))
+    self.evaluate(logits.initializer)
+    dist = tfd.Bernoulli(logits=logits)
+    for slicer in [make_slicer[:5], make_slicer[..., -1], make_slicer[:, 1::2]]:
+      with tf.GradientTape() as tape:
+        dist = slicer(dist)
+        lp = dist.log_prob(0)
+      dlpdlogits = tape.gradient(lp, logits)
+      self.assertIsNotNone(dlpdlogits)
+      self.assertGreater(
+          self.evaluate(tf.reduce_sum(input_tensor=tf.abs(dlpdlogits))), 0)
+
+  def testSliceThenCopyPreservesOrigVarGradLinkage(self):
+    logits = tf.compat.v2.Variable(tf.random.normal([20, 3, 1, 5]))
+    self.evaluate(logits.initializer)
+    dist = tfd.Bernoulli(logits=logits)
+    dist = dist[:5]
+    with tf.GradientTape() as tape:
+      dist = dist.copy(name="bern2")
+      lp = dist.log_prob(0)
+    dlpdlogits = tape.gradient(lp, logits)
+    self.assertIn("bern2", dist.name)
+    self.assertIsNotNone(dlpdlogits)
+    self.assertGreater(
+        self.evaluate(tf.reduce_sum(input_tensor=tf.abs(dlpdlogits))), 0)
+    with tf.GradientTape() as tape:
+      dist = dist[:3]
+      lp = dist.log_prob(0)
+    dlpdlogits = tape.gradient(lp, logits)
+    self.assertIn("bern2", dist.name)
+    self.assertIsNotNone(dlpdlogits)
+    self.assertGreater(
+        self.evaluate(tf.reduce_sum(input_tensor=tf.abs(dlpdlogits))), 0)
+
+  def testCopyUnknownRank(self):
+    logits = tf.compat.v1.placeholder_with_default(
+        tf.random.normal([20, 3, 1, 5]), shape=None)
+    dist = tfd.Bernoulli(logits=logits, name="b1")
+    self.assertIn("b1", dist.name)
+    dist = dist.copy(name="b2")
+    self.assertIn("b2", dist.name)
+
+  def testSliceCopyOverrideNameSliceAgainCopyOverrideLogitsSliceAgain(self):
+    logits = tf.random.normal([20, 3, 2, 5])
+    dist = tfd.Bernoulli(logits=logits, name="b1")
+    self.assertIn("b1", dist.name)
+    dist = dist[:10].copy(name="b2")
+    self.assertAllEqual((10, 3, 2, 5), dist.batch_shape)
+    self.assertIn("b2", dist.name)
+    dist = dist.copy(name="b3")[..., 1]
+    self.assertAllEqual((10, 3, 2), dist.batch_shape)
+    self.assertIn("b3", dist.name)
+    dist = dist.copy(logits=tf.random.normal([2]))
+    self.assertAllEqual((2,), dist.batch_shape)
+    self.assertIn("b3", dist.name)
+
+  def testDocstrSliceExample(self):
+    b = tfd.Bernoulli(logits=tf.zeros([3, 5, 7, 9]))  # batch shape [3, 5, 7, 9]
+    self.assertAllEqual((3, 5, 7, 9), b.batch_shape)
+    b2 = b[:, tf.newaxis, ..., -2:, 1::2]  # batch shape [3, 1, 5, 2, 4]
+    self.assertAllEqual((3, 1, 5, 2, 4), b2.batch_shape)
+
+
 if __name__ == "__main__":
   tf.test.main()

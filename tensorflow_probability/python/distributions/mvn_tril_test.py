@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+from absl.testing import parameterized
 import numpy as np
 from scipy import stats
 
@@ -31,10 +32,11 @@ tfd = tfp.distributions
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class MultivariateNormalTriLTest(tf.test.TestCase):
+class MultivariateNormalTriLTest(tf.test.TestCase, parameterized.TestCase):
 
   def setUp(self):
     self._rng = np.random.RandomState(42)
+    super(MultivariateNormalTriLTest, self).setUp()
 
   def _random_chol(self, *shape):
     mat = self._rng.rand(*shape)
@@ -416,6 +418,120 @@ def _compute_non_batch_kl(mu_a, sigma_a, mu_b, sigma_b):
   l = np.log(np.linalg.det(sigma_b) / np.linalg.det(sigma_a))
 
   return 0.5 * (t + q - k + l)
+
+
+class _MakeSlicer(object):
+
+  def __getitem__(self, slices):
+    return lambda x: x.__getitem__(slices)
+
+make_slicer = _MakeSlicer()
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class MultivariateNormalTriLSlicingTest(tf.test.TestCase,
+                                        parameterized.TestCase):
+
+  def setUp(self):
+    self._rng = np.random.RandomState(42)
+    super(MultivariateNormalTriLSlicingTest, self).setUp()
+
+  def _random_chol(self, *shape):
+    mat = self._rng.rand(*shape)
+    chol = tfd.matrix_diag_transform(mat, transform=tf.nn.softplus)
+    chol = tf.linalg.band_part(chol, -1, 0)
+    sigma = tf.matmul(chol, chol, adjoint_b=True)
+    return self.evaluate(chol), self.evaluate(sigma)
+
+  @parameterized.parameters([
+      [make_slicer[3]],
+      [make_slicer[tf.newaxis]],
+      [make_slicer[3::2]],
+      [make_slicer[:, :2]],
+      [make_slicer[tf.newaxis, :, ..., 0, :2]],
+      [make_slicer[tf.newaxis, :, ..., 3:, tf.newaxis]],
+      [make_slicer[..., tf.newaxis, 3:, tf.newaxis]],
+      [make_slicer[..., tf.newaxis, -3:, tf.newaxis]],
+      [make_slicer[tf.newaxis, :-3, tf.newaxis, ...]],
+      [make_slicer[:-3, tf.newaxis]],
+      [make_slicer[:-3, tf.newaxis], make_slicer[..., 0, :2], make_slicer[::2]],
+  ])
+  def testSlice(self, *slicers):
+    # Check broadcasting mu/chol.
+    # mu has batch [4, 3] and event [1]
+    # chol has batch [7, 4, 1] and event [2,2]
+    mu = self._rng.rand(4, 3, 1)
+    chol, _ = self._random_chol(7, 4, 1, 2, 2)
+    chol[1, 1] = -chol[1, 1]
+    dist = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
+    batch_shape = dist.batch_shape.as_list()
+    probs = self.evaluate(dist.prob([0, 0]))
+    for slicer in slicers:
+      batch_shape = slicer(np.zeros(batch_shape)).shape
+      probs = slicer(probs)
+      dist = slicer(dist)
+      self.assertAllEqual(batch_shape, self.evaluate(dist.batch_shape_tensor()))
+      self.assertAllClose(probs, self.evaluate(dist.prob([0, 0])))
+
+  @parameterized.parameters([
+      [make_slicer[3]],
+      [make_slicer[tf.newaxis]],
+      [make_slicer[3::2]],
+      [make_slicer[:, :2]],
+      [make_slicer[tf.newaxis, :, ..., -1]],
+      [make_slicer[tf.newaxis, :, ..., 3:, tf.newaxis]],
+      [make_slicer[..., tf.newaxis, 3:, tf.newaxis]],
+      [make_slicer[..., tf.newaxis, -3:, tf.newaxis]],
+      [make_slicer[tf.newaxis, :-3, tf.newaxis, ...]],
+      [make_slicer[:-3, tf.newaxis], make_slicer[..., 0, :2], make_slicer[::2]],
+  ])
+  def testSliceWithUnslicedMu(self, *slicers):
+    # Covers the case where one of the params has lower than minimal event
+    # rank (i.e. the native rank for loc is 1, but mu has rank 0).
+    mu = self._rng.rand()
+    chol, _ = self._random_chol(7, 4, 2, 2)
+    chol[1, 1] = -chol[1, 1]
+    dist = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
+    batch_shape = dist.batch_shape.as_list()
+    probs = self.evaluate(dist.prob([0, 0]))
+    for slicer in slicers:
+      batch_shape = slicer(np.zeros(batch_shape)).shape
+      probs = slicer(probs)
+      dist = slicer(dist)
+      self.assertAllEqual(batch_shape, self.evaluate(dist.batch_shape_tensor()))
+      self.assertAllClose(probs, self.evaluate(dist.prob([0, 0])))
+
+  def testSliceSequencePreservesOrigVarGradLinkage(self):
+    mu = self._rng.rand(4, 3, 1)
+    mu = tf.compat.v2.Variable(mu)
+    chol, _ = self._random_chol(7, 4, 1, 2, 2)
+    chol[1, 1] = -chol[1, 1]
+    chol = tf.compat.v2.Variable(chol)
+    self.evaluate([mu.initializer, chol.initializer])
+    dist = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
+    for slicer in [make_slicer[:5], make_slicer[..., -1], make_slicer[:, 1::2]]:
+      with tf.GradientTape() as tape:
+        dist = slicer(dist)
+        lp = dist.log_prob([0, 0])
+      dlpdmu, dlpdchol = tape.gradient(lp, [mu, chol])
+      self.assertIsNotNone(dlpdmu)
+      self.assertIsNotNone(dlpdchol)
+      self.assertGreater(
+          self.evaluate(tf.reduce_sum(input_tensor=tf.abs(dlpdmu))), 0)
+      self.assertGreater(
+          self.evaluate(tf.reduce_sum(input_tensor=tf.abs(dlpdchol))), 0)
+
+  def testDocstrSliceExample(self):
+    x = tf.random.normal([5, 3, 2, 2])
+    cov = tf.matmul(x, x, transpose_b=True)
+    chol = tf.linalg.cholesky(cov)
+    loc = tf.random.normal([4, 1, 3, 1])
+    mvn = tfd.MultivariateNormalTriL(loc, chol)
+    self.assertAllEqual((4, 5, 3), mvn.batch_shape)
+    self.assertAllEqual((2,), mvn.event_shape)
+    mvn2 = mvn[:, 3:, ..., ::-1, tf.newaxis]
+    self.assertAllEqual((4, 2, 3, 1), mvn2.batch_shape)
+    self.assertAllEqual((2,), mvn2.event_shape)
 
 
 if __name__ == "__main__":

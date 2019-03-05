@@ -300,6 +300,7 @@ py_library(
         # numpy dep,
         # six dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/distributions/internal:slicing",
         "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
@@ -1649,10 +1650,12 @@ py_test(
 
 py_test(
     name = "mvn_tril_test",
-    size = "small",
+    size = "medium",
     srcs = ["mvn_tril_test.py"],
+    shard_count = 5,
     tags = ["nomsan"],
     deps = [
+        # absl/testing:parameterized dep,
         # numpy dep,
         # scipy dep,
         # tensorflow dep,
