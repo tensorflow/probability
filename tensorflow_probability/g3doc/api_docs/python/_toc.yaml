@@ -46,6 +46,8 @@ toc:
       path: /probability/api_docs/python/tfp/bijectors/DiscreteCosineTransform
     - title: Exp
       path: /probability/api_docs/python/tfp/bijectors/Exp
+    - title: Expm1
+      path: /probability/api_docs/python/tfp/bijectors/Expm1
     - title: FillTriangular
       path: /probability/api_docs/python/tfp/bijectors/FillTriangular
     - title: Gumbel
@@ -66,6 +68,8 @@ toc:
       path: /probability/api_docs/python/tfp/bijectors/masked_dense
     - title: MatrixInverseTriL
       path: /probability/api_docs/python/tfp/bijectors/MatrixInverseTriL
+    - title: MatvecLU
+      path: /probability/api_docs/python/tfp/bijectors/MatvecLU
     - title: NormalCDF
       path: /probability/api_docs/python/tfp/bijectors/NormalCDF
     - title: Ordered
@@ -78,6 +82,8 @@ toc:
       path: /probability/api_docs/python/tfp/bijectors/RealNVP
     - title: real_nvp_default_template
       path: /probability/api_docs/python/tfp/bijectors/real_nvp_default_template
+    - title: Reciprocal
+      path: /probability/api_docs/python/tfp/bijectors/Reciprocal
     - title: Reshape
       path: /probability/api_docs/python/tfp/bijectors/Reshape
     - title: ScaleTriL
@@ -128,6 +134,8 @@ toc:
       path: /probability/api_docs/python/tfp/distributions/Categorical
     - title: Cauchy
       path: /probability/api_docs/python/tfp/distributions/Cauchy
+    - title: Chi
+      path: /probability/api_docs/python/tfp/distributions/Chi
     - title: Chi2
       path: /probability/api_docs/python/tfp/distributions/Chi2
     - title: Chi2WithAbsDf
@@ -172,6 +180,10 @@ toc:
       path: /probability/api_docs/python/tfp/distributions/HalfCauchy
     - title: HalfNormal
       path: /probability/api_docs/python/tfp/distributions/HalfNormal
+    - title: HiddenMarkovModel
+      path: /probability/api_docs/python/tfp/distributions/HiddenMarkovModel
+    - title: Horseshoe
+      path: /probability/api_docs/python/tfp/distributions/Horseshoe
     - title: Independent
       path: /probability/api_docs/python/tfp/distributions/Independent
     - title: InverseGamma
@@ -268,6 +280,8 @@ toc:
       path: /probability/api_docs/python/tfp/distributions/softplus_inverse
     - title: StudentT
       path: /probability/api_docs/python/tfp/distributions/StudentT
+    - title: StudentTProcess
+      path: /probability/api_docs/python/tfp/distributions/StudentTProcess
     - title: StudentTWithAbsDfSoftplusScale
       path: /probability/api_docs/python/tfp/distributions/StudentTWithAbsDfSoftplusScale
     - title: TransformedDistribution
@@ -306,10 +320,14 @@ toc:
       path: /probability/api_docs/python/tfp/edward2/as_random_variable
     - title: Autoregressive
       path: /probability/api_docs/python/tfp/edward2/Autoregressive
+    - title: BatchReshape
+      path: /probability/api_docs/python/tfp/edward2/BatchReshape
     - title: Bernoulli
       path: /probability/api_docs/python/tfp/edward2/Bernoulli
     - title: Beta
       path: /probability/api_docs/python/tfp/edward2/Beta
+    - title: BetaWithSoftplusConcentration
+      path: /probability/api_docs/python/tfp/edward2/BetaWithSoftplusConcentration
     - title: Binomial
       path: /probability/api_docs/python/tfp/edward2/Binomial
     - title: Categorical
@@ -318,6 +336,8 @@ toc:
       path: /probability/api_docs/python/tfp/edward2/Cauchy
     - title: Chi2
       path: /probability/api_docs/python/tfp/edward2/Chi2
+    - title: Chi2WithAbsDf
+      path: /probability/api_docs/python/tfp/edward2/Chi2WithAbsDf
     - title: ConditionalTransformedDistribution
       path: /probability/api_docs/python/tfp/edward2/ConditionalTransformedDistribution
     - title: Deterministic
@@ -328,16 +348,34 @@ toc:
       path: /probability/api_docs/python/tfp/edward2/DirichletMultinomial
     - title: Exponential
       path: /probability/api_docs/python/tfp/edward2/Exponential
+    - title: ExponentialWithSoftplusRate
+      path: /probability/api_docs/python/tfp/edward2/ExponentialWithSoftplusRate
     - title: ExpRelaxedOneHotCategorical
       path: /probability/api_docs/python/tfp/edward2/ExpRelaxedOneHotCategorical
     - title: Gamma
       path: /probability/api_docs/python/tfp/edward2/Gamma
+    - title: GammaGamma
+      path: /probability/api_docs/python/tfp/edward2/GammaGamma
+    - title: GammaWithSoftplusConcentrationRate
+      path: /probability/api_docs/python/tfp/edward2/GammaWithSoftplusConcentrationRate
+    - title: GaussianProcess
+      path: /probability/api_docs/python/tfp/edward2/GaussianProcess
+    - title: GaussianProcessRegressionModel
+      path: /probability/api_docs/python/tfp/edward2/GaussianProcessRegressionModel
     - title: Geometric
       path: /probability/api_docs/python/tfp/edward2/Geometric
     - title: get_next_interceptor
       path: /probability/api_docs/python/tfp/edward2/get_next_interceptor
+    - title: Gumbel
+      path: /probability/api_docs/python/tfp/edward2/Gumbel
+    - title: HalfCauchy
+      path: /probability/api_docs/python/tfp/edward2/HalfCauchy
     - title: HalfNormal
       path: /probability/api_docs/python/tfp/edward2/HalfNormal
+    - title: HiddenMarkovModel
+      path: /probability/api_docs/python/tfp/edward2/HiddenMarkovModel
+    - title: Horseshoe
+      path: /probability/api_docs/python/tfp/edward2/Horseshoe
     - title: Independent
       path: /probability/api_docs/python/tfp/edward2/Independent
     - title: interceptable
@@ -346,14 +384,28 @@ toc:
       path: /probability/api_docs/python/tfp/edward2/interception
     - title: InverseGamma
       path: /probability/api_docs/python/tfp/edward2/InverseGamma
+    - title: InverseGammaWithSoftplusConcentrationRate
+      path: /probability/api_docs/python/tfp/edward2/InverseGammaWithSoftplusConcentrationRate
+    - title: InverseGaussian
+      path: /probability/api_docs/python/tfp/edward2/InverseGaussian
     - title: Kumaraswamy
       path: /probability/api_docs/python/tfp/edward2/Kumaraswamy
     - title: Laplace
       path: /probability/api_docs/python/tfp/edward2/Laplace
+    - title: LaplaceWithSoftplusScale
+      path: /probability/api_docs/python/tfp/edward2/LaplaceWithSoftplusScale
+    - title: LinearGaussianStateSpaceModel
+      path: /probability/api_docs/python/tfp/edward2/LinearGaussianStateSpaceModel
+    - title: LKJ
+      path: /probability/api_docs/python/tfp/edward2/LKJ
     - title: Logistic
       path: /probability/api_docs/python/tfp/edward2/Logistic
+    - title: LogNormal
+      path: /probability/api_docs/python/tfp/edward2/LogNormal
     - title: make_log_joint_fn
       path: /probability/api_docs/python/tfp/edward2/make_log_joint_fn
+    - title: make_value_setter
+      path: /probability/api_docs/python/tfp/edward2/make_value_setter
     - title: Mixture
       path: /probability/api_docs/python/tfp/edward2/Mixture
     - title: MixtureSameFamily
@@ -362,16 +414,28 @@ toc:
       path: /probability/api_docs/python/tfp/edward2/Multinomial
     - title: MultivariateNormalDiag
       path: /probability/api_docs/python/tfp/edward2/MultivariateNormalDiag
+    - title: MultivariateNormalDiagPlusLowRank
+      path: /probability/api_docs/python/tfp/edward2/MultivariateNormalDiagPlusLowRank
+    - title: MultivariateNormalDiagWithSoftplusScale
+      path: /probability/api_docs/python/tfp/edward2/MultivariateNormalDiagWithSoftplusScale
     - title: MultivariateNormalFullCovariance
       path: /probability/api_docs/python/tfp/edward2/MultivariateNormalFullCovariance
+    - title: MultivariateNormalLinearOperator
+      path: /probability/api_docs/python/tfp/edward2/MultivariateNormalLinearOperator
     - title: MultivariateNormalTriL
       path: /probability/api_docs/python/tfp/edward2/MultivariateNormalTriL
+    - title: MultivariateStudentTLinearOperator
+      path: /probability/api_docs/python/tfp/edward2/MultivariateStudentTLinearOperator
     - title: NegativeBinomial
       path: /probability/api_docs/python/tfp/edward2/NegativeBinomial
     - title: Normal
       path: /probability/api_docs/python/tfp/edward2/Normal
+    - title: NormalWithSoftplusScale
+      path: /probability/api_docs/python/tfp/edward2/NormalWithSoftplusScale
     - title: OneHotCategorical
       path: /probability/api_docs/python/tfp/edward2/OneHotCategorical
+    - title: Pareto
+      path: /probability/api_docs/python/tfp/edward2/Pareto
     - title: Poisson
       path: /probability/api_docs/python/tfp/edward2/Poisson
     - title: PoissonLogNormalQuadratureCompound
@@ -388,10 +452,18 @@ toc:
       path: /probability/api_docs/python/tfp/edward2/SinhArcsinh
     - title: StudentT
       path: /probability/api_docs/python/tfp/edward2/StudentT
+    - title: StudentTProcess
+      path: /probability/api_docs/python/tfp/edward2/StudentTProcess
+    - title: StudentTWithAbsDfSoftplusScale
+      path: /probability/api_docs/python/tfp/edward2/StudentTWithAbsDfSoftplusScale
     - title: tape
       path: /probability/api_docs/python/tfp/edward2/tape
     - title: TransformedDistribution
       path: /probability/api_docs/python/tfp/edward2/TransformedDistribution
+    - title: Triangular
+      path: /probability/api_docs/python/tfp/edward2/Triangular
+    - title: TruncatedNormal
+      path: /probability/api_docs/python/tfp/edward2/TruncatedNormal
     - title: Uniform
       path: /probability/api_docs/python/tfp/edward2/Uniform
     - title: VectorDeterministic
@@ -404,8 +476,14 @@ toc:
       path: /probability/api_docs/python/tfp/edward2/VectorLaplaceDiag
     - title: VectorSinhArcsinhDiag
       path: /probability/api_docs/python/tfp/edward2/VectorSinhArcsinhDiag
+    - title: VonMises
+      path: /probability/api_docs/python/tfp/edward2/VonMises
+    - title: VonMisesFisher
+      path: /probability/api_docs/python/tfp/edward2/VonMisesFisher
     - title: Wishart
       path: /probability/api_docs/python/tfp/edward2/Wishart
+    - title: Zipf
+      path: /probability/api_docs/python/tfp/edward2/Zipf
   - title: tfp.glm
     section:
     - title: Overview
@@ -450,6 +528,8 @@ toc:
     section:
     - title: Overview
       path: /probability/api_docs/python/tfp/layers
+    - title: CategoricalMixtureOfOneHotCategorical
+      path: /probability/api_docs/python/tfp/layers/CategoricalMixtureOfOneHotCategorical
     - title: Convolution1DFlipout
       path: /probability/api_docs/python/tfp/layers/Convolution1DFlipout
     - title: Convolution1DReparameterization
@@ -474,24 +554,54 @@ toc:
       path: /probability/api_docs/python/tfp/layers/DenseLocalReparameterization
     - title: DenseReparameterization
       path: /probability/api_docs/python/tfp/layers/DenseReparameterization
+    - title: DistributionLambda
+      path: /probability/api_docs/python/tfp/layers/DistributionLambda
+    - title: IndependentBernoulli
+      path: /probability/api_docs/python/tfp/layers/IndependentBernoulli
+    - title: IndependentLogistic
+      path: /probability/api_docs/python/tfp/layers/IndependentLogistic
+    - title: IndependentNormal
+      path: /probability/api_docs/python/tfp/layers/IndependentNormal
+    - title: IndependentPoisson
+      path: /probability/api_docs/python/tfp/layers/IndependentPoisson
+    - title: KLDivergenceAddLoss
+      path: /probability/api_docs/python/tfp/layers/KLDivergenceAddLoss
+    - title: KLDivergenceRegularizer
+      path: /probability/api_docs/python/tfp/layers/KLDivergenceRegularizer
+    - title: MixtureSameFamily
+      path: /probability/api_docs/python/tfp/layers/MixtureSameFamily
+    - title: MultivariateNormalTriL
+      path: /probability/api_docs/python/tfp/layers/MultivariateNormalTriL
+    - title: OneHotCategorical
+      path: /probability/api_docs/python/tfp/layers/OneHotCategorical
   - title: tfp.math
     section:
     - title: Overview
       path: /probability/api_docs/python/tfp/math
+    - title: batch_interp_regular_1d_grid
+      path: /probability/api_docs/python/tfp/math/batch_interp_regular_1d_grid
     - title: custom_gradient
       path: /probability/api_docs/python/tfp/math/custom_gradient
     - title: diag_jacobian
       path: /probability/api_docs/python/tfp/math/diag_jacobian
+    - title: interp_regular_1d_grid
+      path: /probability/api_docs/python/tfp/math/interp_regular_1d_grid
     - title: log1psquare
       path: /probability/api_docs/python/tfp/math/log1psquare
-    - title: matvecmul
-      path: /probability/api_docs/python/tfp/math/matvecmul
+    - title: lu_matrix_inverse
+      path: /probability/api_docs/python/tfp/math/lu_matrix_inverse
+    - title: lu_reconstruct
+      path: /probability/api_docs/python/tfp/math/lu_reconstruct
+    - title: lu_solve
+      path: /probability/api_docs/python/tfp/math/lu_solve
     - title: pinv
       path: /probability/api_docs/python/tfp/math/pinv
     - title: random_rademacher
       path: /probability/api_docs/python/tfp/math/random_rademacher
     - title: random_rayleigh
       path: /probability/api_docs/python/tfp/math/random_rayleigh
+    - title: secant_root
+      path: /probability/api_docs/python/tfp/math/secant_root
   - title: tfp.mcmc
     section:
     - title: Overview
@@ -548,6 +658,12 @@ toc:
       path: /probability/api_docs/python/tfp/optimizer
     - title: bfgs_minimize
       path: /probability/api_docs/python/tfp/optimizer/bfgs_minimize
+    - title: differential_evolution_minimize
+      path: /probability/api_docs/python/tfp/optimizer/differential_evolution_minimize
+    - title: differential_evolution_one_step
+      path: /probability/api_docs/python/tfp/optimizer/differential_evolution_one_step
+    - title: lbfgs_minimize
+      path: /probability/api_docs/python/tfp/optimizer/lbfgs_minimize
     - title: nelder_mead_minimize
       path: /probability/api_docs/python/tfp/optimizer/nelder_mead_minimize
     - title: nelder_mead_one_step
@@ -570,24 +686,62 @@ toc:
       path: /probability/api_docs/python/tfp/positive_semidefinite_kernels/ExponentiatedQuadratic
     - title: ExpSinSquared
       path: /probability/api_docs/python/tfp/positive_semidefinite_kernels/ExpSinSquared
+    - title: Linear
+      path: /probability/api_docs/python/tfp/positive_semidefinite_kernels/Linear
     - title: MaternFiveHalves
       path: /probability/api_docs/python/tfp/positive_semidefinite_kernels/MaternFiveHalves
     - title: MaternOneHalf
       path: /probability/api_docs/python/tfp/positive_semidefinite_kernels/MaternOneHalf
     - title: MaternThreeHalves
       path: /probability/api_docs/python/tfp/positive_semidefinite_kernels/MaternThreeHalves
+    - title: Polynomial
+      path: /probability/api_docs/python/tfp/positive_semidefinite_kernels/Polynomial
     - title: PositiveSemidefiniteKernel
       path: /probability/api_docs/python/tfp/positive_semidefinite_kernels/PositiveSemidefiniteKernel
+    - title: RationalQuadratic
+      path: /probability/api_docs/python/tfp/positive_semidefinite_kernels/RationalQuadratic
+  - title: tfp.stats
+    section:
+    - title: Overview
+      path: /probability/api_docs/python/tfp/stats
+    - title: auto_correlation
+      path: /probability/api_docs/python/tfp/stats/auto_correlation
+    - title: cholesky_covariance
+      path: /probability/api_docs/python/tfp/stats/cholesky_covariance
+    - title: correlation
+      path: /probability/api_docs/python/tfp/stats/correlation
+    - title: covariance
+      path: /probability/api_docs/python/tfp/stats/covariance
+    - title: percentile
+      path: /probability/api_docs/python/tfp/stats/percentile
+    - title: quantiles
+      path: /probability/api_docs/python/tfp/stats/quantiles
+    - title: stddev
+      path: /probability/api_docs/python/tfp/stats/stddev
+    - title: variance
+      path: /probability/api_docs/python/tfp/stats/variance
   - title: tfp.sts
     section:
     - title: Overview
       path: /probability/api_docs/python/tfp/sts
     - title: AdditiveStateSpaceModel
       path: /probability/api_docs/python/tfp/sts/AdditiveStateSpaceModel
+    - title: build_factored_variational_loss
+      path: /probability/api_docs/python/tfp/sts/build_factored_variational_loss
+    - title: fit_with_hmc
+      path: /probability/api_docs/python/tfp/sts/fit_with_hmc
+    - title: forecast
+      path: /probability/api_docs/python/tfp/sts/forecast
+    - title: LinearRegression
+      path: /probability/api_docs/python/tfp/sts/LinearRegression
     - title: LocalLinearTrend
       path: /probability/api_docs/python/tfp/sts/LocalLinearTrend
     - title: LocalLinearTrendStateSpaceModel
       path: /probability/api_docs/python/tfp/sts/LocalLinearTrendStateSpaceModel
+    - title: one_step_predictive
+      path: /probability/api_docs/python/tfp/sts/one_step_predictive
+    - title: sample_uniform_initial_state
+      path: /probability/api_docs/python/tfp/sts/sample_uniform_initial_state
     - title: Seasonal
       path: /probability/api_docs/python/tfp/sts/Seasonal
     - title: SeasonalStateSpaceModel

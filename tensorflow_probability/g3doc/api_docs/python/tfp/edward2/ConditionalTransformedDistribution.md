@@ -30,7 +30,7 @@ Construct a Transformed Distribution.
 * <b>`distribution`</b>: The base distribution instance to transform. Typically an
     instance of `Distribution`.
 * <b>`bijector`</b>: The object responsible for calculating the transformation.
-    Typically an instance of `Bijector`. `None` means `Identity()`.
+    Typically an instance of `Bijector`.
 * <b>`batch_shape`</b>: `integer` vector `Tensor` which overrides `distribution`
     `batch_shape`; valid only if `distribution.is_scalar_batch()`.
 * <b>`event_shape`</b>: `integer` vector `Tensor` which overrides `distribution`

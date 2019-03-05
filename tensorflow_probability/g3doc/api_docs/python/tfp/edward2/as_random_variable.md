@@ -50,8 +50,8 @@ from tensorflow_probability import distributions as tfd
 from tensorflow_probability import edward2 as ed
 
 def model():
-  # equivalent to ed.Normal(0., 1., name="x")
-  return ed.as_random_variable(tfd.Normal(0., 1., name="x"))
+  # equivalent to ed.Normal(0., 1., name='x')
+  return ed.as_random_variable(tfd.Normal(0., 1., name='x'))
 
 log_joint = ed.make_log_joint_fn(model)
 output = log_joint(x=2.)

@@ -38,18 +38,19 @@ For large, sparse data sets, `model_matrix` should be supplied as a
 
 #### Args:
 
-* <b>`model_matrix`</b>: matrix-shaped, `float` `Tensor` or `SparseTensor` where each
-    row represents a sample's features.  Has shape `[N, n]` where `N` is the
-    number of data samples and `n` is the number of features per sample.
-* <b>`response`</b>: vector-shaped `Tensor` with the same dtype as `model_matrix` where
-    each element represents a sample's observed response (to the corresponding
-    row of features).
+* <b>`model_matrix`</b>: (Batch of) matrix-shaped, `float` `Tensor` or `SparseTensor`
+    where each row represents a sample's features.  Has shape `[N, n]` where
+    `N` is the number of data samples and `n` is the number of features per
+    sample.
+* <b>`response`</b>: (Batch of) vector-shaped `Tensor` with the same dtype as
+    `model_matrix` where each element represents a sample's observed response
+    (to the corresponding row of features).
 * <b>`model`</b>: <a href="../../tfp/glm/ExponentialFamily.md"><code>tfp.glm.ExponentialFamily</code></a>-like instance, which specifies the link
     function and distribution of the GLM, and thus characterizes the negative
     log-likelihood which will be minimized. Must have sufficient statistic
     equal to the response, that is, `T(y) = y`.
-* <b>`model_coefficients_start`</b>: vector-shaped, `float` `Tensor` with the same
-    dtype as `model_matrix`, representing the initial values of the
+* <b>`model_coefficients_start`</b>: (Batch of) vector-shaped, `float` `Tensor` with
+    the same dtype as `model_matrix`, representing the initial values of the
     coefficients for the GLM regression.  Has shape `[n]` where `model_matrix`
     has shape `[N, n]`.
 * <b>`tolerance`</b>: scalar, `float` `Tensor` representing the tolerance for each
@@ -74,17 +75,15 @@ For large, sparse data sets, `model_matrix` should be supplied as a
 * <b>`name`</b>: Python string representing the name of the TensorFlow operation.
     The default name is `"fit_sparse"`.
 
-Note that this function does not support batched inputs.
-
 
 #### Returns:
 
-* <b>`model_coefficients`</b>: `Tensor` of the same shape and dtype as
+* <b>`model_coefficients`</b>: (Batch of) `Tensor` of the same shape and dtype as
     `model_coefficients_start`, representing the computed model coefficients
     which minimize the regularized negative log-likelihood.
 * <b>`is_converged`</b>: scalar, `bool` `Tensor` indicating whether the minimization
-    procedure converged within the specified number of iterations.  Here
-    convergence means that an iteration of the inner loop
+    procedure converged across all batches within the specified number of
+    iterations.  Here convergence means that an iteration of the inner loop
     (`fit_sparse_one_step`) returns `True` for its `is_converged` output
     value.
 * <b>`iter`</b>: scalar, `int` `Tensor` indicating the actual number of iterations of

@@ -21,6 +21,12 @@ TensorFlow Probability Optimizer python package.
 
 [`bfgs_minimize(...)`](../tfp/optimizer/bfgs_minimize.md): Applies the BFGS algorithm to minimize a differentiable function.
 
+[`differential_evolution_minimize(...)`](../tfp/optimizer/differential_evolution_minimize.md): Applies the Differential evolution algorithm to minimize a function.
+
+[`differential_evolution_one_step(...)`](../tfp/optimizer/differential_evolution_one_step.md): Performs one step of the differential evolution algorithm.
+
+[`lbfgs_minimize(...)`](../tfp/optimizer/lbfgs_minimize.md): Applies the L-BFGS algorithm to minimize a differentiable function.
+
 [`nelder_mead_minimize(...)`](../tfp/optimizer/nelder_mead_minimize.md): Minimum of the objective function using the Nelder Mead simplex algorithm.
 
 [`nelder_mead_one_step(...)`](../tfp/optimizer/nelder_mead_one_step.md): A single iteration of the Nelder Mead algorithm.

@@ -98,7 +98,7 @@ approx_kl_bernoulli_bernoulli = tfp.monte_carlo.expectation(
 # ==> 0.38336259
 # Relative Error: <1%
 
-# For comparing the gradients, see `monte_carlo_test.py`.
+# For comparing the gradients, see `expectation_test.py`.
 ```
 
 Note: The above example is for illustration only. To compute approximate

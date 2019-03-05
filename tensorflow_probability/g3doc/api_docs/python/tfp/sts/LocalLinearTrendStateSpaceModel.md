@@ -13,6 +13,7 @@
 <meta itemprop="property" content="slope_scale"/>
 <meta itemprop="property" content="validate_args"/>
 <meta itemprop="property" content="__init__"/>
+<meta itemprop="property" content="backward_smoothing_pass"/>
 <meta itemprop="property" content="batch_shape_tensor"/>
 <meta itemprop="property" content="cdf"/>
 <meta itemprop="property" content="copy"/>
@@ -31,6 +32,7 @@
 <meta itemprop="property" content="mode"/>
 <meta itemprop="property" content="param_shapes"/>
 <meta itemprop="property" content="param_static_shapes"/>
+<meta itemprop="property" content="posterior_marginals"/>
 <meta itemprop="property" content="prob"/>
 <meta itemprop="property" content="quantile"/>
 <meta itemprop="property" content="sample"/>
@@ -261,6 +263,53 @@ Python `bool` indicating possibly expensive checks are enabled.
 
 ## Methods
 
+<h3 id="backward_smoothing_pass"><code>backward_smoothing_pass</code></h3>
+
+``` python
+backward_smoothing_pass(
+    filtered_means,
+    filtered_covs,
+    predicted_means,
+    predicted_covs
+)
+```
+
+Run the backward pass in Kalman smoother.
+
+The backward smoothing is using Rauch, Tung and Striebel smoother as
+as discussed in section 18.3.2 of Kevin P. Murphy, 2012, Machine Learning:
+A Probabilistic Perspective, The MIT Press. The inputs are returned by
+`forward_filter` function.
+
+#### Args:
+
+* <b>`filtered_means`</b>: Means of the per-timestep filtered marginal
+    distributions p(z_t | x_{:t}), as a Tensor of shape
+    `sample_shape(x) + batch_shape + [num_timesteps, latent_size]`.
+* <b>`filtered_covs`</b>: Covariances of the per-timestep filtered marginal
+    distributions p(z_t | x_{:t}), as a Tensor of shape
+    `batch_shape + [num_timesteps, latent_size, latent_size]`.
+* <b>`predicted_means`</b>: Means of the per-timestep predictive
+     distributions over latent states, p(z_{t+1} | x_{:t}), as a
+     Tensor of shape `sample_shape(x) + batch_shape +
+     [num_timesteps, latent_size]`.
+* <b>`predicted_covs`</b>: Covariances of the per-timestep predictive
+     distributions over latent states, p(z_{t+1} | x_{:t}), as a
+     Tensor of shape `batch_shape + [num_timesteps, latent_size,
+     latent_size]`.
+
+
+#### Returns:
+
+* <b>`posterior_means`</b>: Means of the smoothed marginal distributions
+    p(z_t | x_{1:T}), as a Tensor of shape
+    `sample_shape(x) + batch_shape + [num_timesteps, latent_size]`,
+    which is of the same shape as filtered_means.
+* <b>`posterior_covs`</b>: Covariances of the smoothed marginal distributions
+    p(z_t | x_{1:T}), as a Tensor of shape
+    `batch_shape + [num_timesteps, latent_size, latent_size]`.
+    which is of the same shape as filtered_covs.
+
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
 
 ``` python
@@ -389,7 +438,7 @@ Computes the (Shannon) cross entropy.
 
 Denote this distribution (`self`) by `P` and the `other` distribution by
 `Q`. Assuming `P, Q` are absolutely continuous with respect to
-one another and permit densities `p(x) dr(x)` and `q(x) dr(x)`, (Shanon)
+one another and permit densities `p(x) dr(x)` and `q(x) dr(x)`, (Shannon)
 cross entropy is defined as:
 
 ```none
@@ -407,7 +456,7 @@ where `F` denotes the support of the random variable `X ~ P`.
 #### Returns:
 
 * <b>`cross_entropy`</b>: `self.dtype` `Tensor` with shape `[B1, ..., Bn]`
-    representing `n` different calculations of (Shanon) cross entropy.
+    representing `n` different calculations of (Shannon) cross entropy.
 
 <h3 id="entropy"><code>entropy</code></h3>
 
@@ -544,7 +593,7 @@ KL[p, q] = E_p[log(p(X)/q(X))]
 ```
 
 where `F` denotes the support of the random variable `X ~ p`, `H[., .]`
-denotes (Shanon) cross entropy, and `H[.]` denotes (Shanon) entropy.
+denotes (Shannon) cross entropy, and `H[.]` denotes (Shannon) entropy.
 
 #### Args:
 
@@ -723,6 +772,55 @@ constant-valued tensors when constant values are fed.
 #### Raises:
 
 * <b>`ValueError`</b>: if `sample_shape` is a `TensorShape` and is not fully defined.
+
+<h3 id="posterior_marginals"><code>posterior_marginals</code></h3>
+
+``` python
+posterior_marginals(x)
+```
+
+Run a Kalman smoother to return posterior mean and cov.
+
+Note that the returned values `smoothed_means` depend on the observed
+time series `x`, while the `smoothed_covs` are independent
+of the observed series; i.e., they depend only on the model itself.
+This means that the mean values have shape `concat([sample_shape(x),
+batch_shape, [num_timesteps, {latent/observation}_size]])`,
+while the covariances have shape `concat[(batch_shape, [num_timesteps,
+{latent/observation}_size, {latent/observation}_size]])`, which
+does not depend on the sample shape.
+
+This function only performs smoothing. If the user wants the
+intermediate values, which are returned by filtering pass `forward_filter`,
+one could get it by:
+```
+(log_likelihoods,
+ filtered_means, filtered_covs,
+ predicted_means, predicted_covs,
+ observation_means, observation_covs) = model.forward_filter(x)
+smoothed_means, smoothed_covs = model.backward_smoothing_pass(x)
+```
+where `x` is an observation sequence.
+
+#### Args:
+
+* <b>`x`</b>: a float-type `Tensor` with rightmost dimensions
+    `[num_timesteps, observation_size]` matching
+    `self.event_shape`. Additional dimensions must match or be
+    broadcastable to `self.batch_shape`; any further dimensions
+    are interpreted as a sample shape.
+
+
+#### Returns:
+
+* <b>`smoothed_means`</b>: Means of the per-timestep smoothed
+     distributions over latent states, p(x_{t} | x_{:T}), as a
+     Tensor of shape `sample_shape(x) + batch_shape +
+     [num_timesteps, observation_size]`.
+* <b>`smoothed_covs`</b>: Covariances of the per-timestep smoothed
+     distributions over latent states, p(x_{t} | x_{:T}), as a
+     Tensor of shape `batch_shape + [num_timesteps,
+     observation_size, observation_size]`.
 
 <h3 id="prob"><code>prob</code></h3>
 

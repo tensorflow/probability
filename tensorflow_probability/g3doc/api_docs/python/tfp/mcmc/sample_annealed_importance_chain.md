@@ -19,9 +19,9 @@ tfp.mcmc.sample_annealed_importance_chain(
 
 Runs annealed importance sampling (AIS) to estimate normalizing constants.
 
-This function uses Hamiltonian Monte Carlo to sample from a series of
-distributions that slowly interpolates between an initial "proposal"
-distribution:
+This function uses an MCMC transition operator (e.g., Hamiltonian Monte Carlo)
+to sample from a series of distributions that slowly interpolates between
+an initial "proposal" distribution:
 
 `exp(proposal_log_prob_fn(x) - proposal_log_normalizer)`
 
@@ -36,8 +36,9 @@ distribution:
 
 `E[exp(ais_weights)] = exp(target_log_normalizer - proposal_log_normalizer)`.
 
-Note: `proposal_log_prob_fn` and `target_log_prob_fn` are called exactly three
-times (although this may be reduced to two times, in the future).
+Note: When running in graph mode, `proposal_log_prob_fn` and
+`target_log_prob_fn` are called exactly three times (although this may be
+reduced to two times in the future).
 
 #### Args:
 
@@ -58,10 +59,9 @@ times (although this may be reduced to two times, in the future).
     `target_log_prob_fn`. The `target_log_prob_fn` argument represents the
     `TransitionKernel`'s target log distribution.  Note:
     `sample_annealed_importance_chain` creates a new `target_log_prob_fn`
-    which
-  is an interpolation between the supplied `target_log_prob_fn` and
-  `proposal_log_prob_fn`; it is this interpolated function which is used as an
-  argument to `make_kernel_fn`.
+    which is an interpolation between the supplied `target_log_prob_fn` and
+    `proposal_log_prob_fn`; it is this interpolated function which is used as
+    an argument to `make_kernel_fn`.
 * <b>`parallel_iterations`</b>: The number of iterations allowed to run in parallel.
       It must be a positive integer. See `tf.while_loop` for more details.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this function.

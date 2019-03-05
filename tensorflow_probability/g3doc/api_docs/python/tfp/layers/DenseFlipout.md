@@ -3,6 +3,7 @@
 <meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="activity_regularizer"/>
 <meta itemprop="property" content="dtype"/>
+<meta itemprop="property" content="dynamic"/>
 <meta itemprop="property" content="input"/>
 <meta itemprop="property" content="input_mask"/>
 <meta itemprop="property" content="input_shape"/>
@@ -20,6 +21,7 @@
 <meta itemprop="property" content="weights"/>
 <meta itemprop="property" content="__call__"/>
 <meta itemprop="property" content="__init__"/>
+<meta itemprop="property" content="__setattr__"/>
 <meta itemprop="property" content="apply"/>
 <meta itemprop="property" content="build"/>
 <meta itemprop="property" content="compute_mask"/>
@@ -66,6 +68,13 @@ variance.
 The arguments permit separate specification of the surrogate posterior
 (`q(W|x)`), prior (`p(W)`), and divergence for both the `kernel` and `bias`
 distributions.
+
+Upon being built, this layer adds losses (accessible via the `losses`
+property) representing the divergences of `kernel` and/or `bias` surrogate
+posteriors and their respective priors. When doing minibatch stochastic
+optimization, make sure to scale this loss such that it is applied just once
+per epoch (e.g. if `kl` is the sum of `losses` for each element of the batch,
+you should pass `kl / num_examples_per_epoch` to your optimizer).
 
 #### Examples
 
@@ -176,6 +185,10 @@ Construct layer.
 Optional regularizer function for the output of this layer.
 
 <h3 id="dtype"><code>dtype</code></h3>
+
+
+
+<h3 id="dynamic"><code>dynamic</code></h3>
 
 
 
@@ -333,6 +346,8 @@ Output shape, as an integer shape tuple
 
 Returns the list of all layer variables/weights.
 
+Alias of `self.weights`.
+
 #### Returns:
 
 A list of variables.
@@ -388,6 +403,17 @@ Note:
 
 * <b>`ValueError`</b>: if the layer's `call` method returns None (an invalid value).
 
+<h3 id="__setattr__"><code>__setattr__</code></h3>
+
+``` python
+__setattr__(
+    name,
+    value
+)
+```
+
+
+
 <h3 id="apply"><code>apply</code></h3>
 
 ``` python
@@ -400,7 +426,7 @@ apply(
 
 Apply the layer on a input.
 
-This simply wraps `self.__call__`.
+This is an alias of `self.__call__`.
 
 #### Arguments:
 
