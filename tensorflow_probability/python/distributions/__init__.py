@@ -89,8 +89,6 @@ from tensorflow_probability.python.distributions.quantized_distribution import Q
 from tensorflow_probability.python.distributions.relaxed_bernoulli import RelaxedBernoulli
 from tensorflow_probability.python.distributions.relaxed_onehot_categorical import ExpRelaxedOneHotCategorical
 from tensorflow_probability.python.distributions.relaxed_onehot_categorical import RelaxedOneHotCategorical
-from tensorflow_probability.python.distributions.sample_stats import auto_correlation
-from tensorflow_probability.python.distributions.sample_stats import percentile
 from tensorflow_probability.python.distributions.seed_stream import SeedStream
 from tensorflow_probability.python.distributions.sinh_arcsinh import SinhArcsinh
 from tensorflow_probability.python.distributions.student_t import StudentT
@@ -132,7 +130,6 @@ from tensorflow.python.ops.distributions.student_t import StudentTWithAbsDfSoftp
 # pylint: enable=unused-import,wildcard-import,line-too-long,g-importing-member
 
 __all__ = [
-    'auto_correlation',
     'Cauchy',
     'ConditionalDistribution',
     'ConditionalTransformedDistribution',
@@ -229,7 +226,6 @@ __all__ = [
     'tridiag',
     'normal_conjugates_known_scale_posterior',
     'normal_conjugates_known_scale_predictive',
-    'percentile',
     'assign_moving_mean_variance',
     'assign_log_moving_mean_exp',
     'moving_mean_variance',

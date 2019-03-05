@@ -89,7 +89,6 @@ py_library(
         ":quantized_distribution",
         ":relaxed_bernoulli",
         ":relaxed_onehot_categorical",
-        ":sample_stats",
         ":seed_stream",
         ":sinh_arcsinh",
         ":student_t",
@@ -817,17 +816,6 @@ py_library(
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
-    ],
-)
-
-py_library(
-    name = "sample_stats",
-    srcs = ["sample_stats.py"],
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability/python/internal:distribution_util",
-        "//tensorflow_probability/python/stats",
     ],
 )
 
@@ -1784,18 +1772,6 @@ py_test(
     deps = [
         # numpy dep,
         # scipy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-    ],
-)
-
-py_test(
-    name = "sample_stats_test",
-    size = "medium",
-    srcs = ["sample_stats_test.py"],
-    tags = ["nomsan"],  # disable to avoid false positives from scipy.
-    deps = [
-        # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],
