@@ -96,6 +96,9 @@ class Geometric(distribution.Distribution):
         graph_parents=[self._probs, self._logits],
         name=name)
 
+  def _params_event_ndims(self):
+    return dict(logits=0, probs=0)
+
   @property
   def logits(self):
     """Log-odds of a `1` outcome (vs `0`)."""

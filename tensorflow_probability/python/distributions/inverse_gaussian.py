@@ -121,6 +121,9 @@ class InverseGaussian(distribution.Distribution):
         graph_parents=[self._loc, self._concentration],
         name=name)
 
+  def _params_event_ndims(self):
+    return dict(loc=0, concentration=0)
+
   @property
   def loc(self):
     """Location parameter."""

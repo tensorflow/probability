@@ -197,6 +197,9 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
         graph_parents=[self._logits, self._probs, self._temperature],
         name=name)
 
+  def _params_event_ndims(self):
+    return dict(temperature=0, logits=1, probs=1)
+
   @property
   def event_size(self):
     """Scalar `int32` tensor: the number of classes."""

@@ -560,3 +560,6 @@ class Wishart(_WishartLinearOperator):
           allow_nan_stats=allow_nan_stats,
           name=name)
     self._parameters = parameters
+
+  def _params_event_ndims(self):
+    return dict(df=0, scale=2, scale_tril=2)

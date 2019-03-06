@@ -95,6 +95,9 @@ class Chi(transformed_distribution.TransformedDistribution):
                                  name=name),
           bijector=invert_bijector.Invert(square_bijector.Square()))
 
+  def _params_event_ndims(self):
+    return dict(df=0)
+
   @property
   def df(self):
     """Distribution parameter for degrees of freedom."""

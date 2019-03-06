@@ -222,6 +222,9 @@ class DirichletMultinomial(distribution.Distribution):
         graph_parents=[self._total_count, self._concentration],
         name=name)
 
+  def _params_event_ndims(self):
+    return dict(total_count=0, concentration=1)
+
   @property
   def total_count(self):
     """Number of trials used to construct a sample."""

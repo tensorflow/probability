@@ -215,6 +215,9 @@ class VonMisesFisher(distribution.Distribution):
           graph_parents=[self._mean_direction, self._concentration],
           name=name)
 
+  def _params_event_ndims(self):
+    return dict(mean_direction=1, concentration=0)
+
   @property
   def mean_direction(self):
     """Mean direction parameter."""

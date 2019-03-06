@@ -196,6 +196,9 @@ class Dirichlet(distribution.Distribution):
                        self._total_concentration],
         name=name)
 
+  def _params_event_ndims(self):
+    return dict(concentration=1)
+
   @property
   def concentration(self):
     """Concentration parameter; expected counts for that coordinate."""

@@ -194,6 +194,9 @@ class StudentT(distribution.Distribution):
         zip(("df", "loc", "scale"),
             ([tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)] * 3)))
 
+  def _params_event_ndims(self):
+    return dict(df=0, loc=0, scale=0)
+
   @property
   def df(self):
     """Degrees of freedom in these Student's t distribution(s)."""

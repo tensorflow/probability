@@ -117,6 +117,9 @@ class Laplace(distribution.Distribution):
         zip(("loc", "scale"),
             ([tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)] * 2)))
 
+  def _params_event_ndims(self):
+    return dict(loc=0, scale=0)
+
   @property
   def loc(self):
     """Distribution parameter for the location."""

@@ -218,4 +218,4 @@ class MultivariateNormalTriL(
     self._parameters = parameters
 
   def _params_event_ndims(self):
-    return {"loc": 1, "scale_tril": 2}
+    return dict(loc=1, scale_tril=2)

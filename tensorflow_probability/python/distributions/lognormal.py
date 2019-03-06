@@ -72,6 +72,9 @@ class LogNormal(transformed_distribution.TransformedDistribution):
           validate_args=validate_args,
           name=name)
 
+  def _params_event_ndims(self):
+    return dict(loc=0, scale=0)
+
   @property
   def loc(self):
     """Distribution parameter for the pre-transformed mean."""

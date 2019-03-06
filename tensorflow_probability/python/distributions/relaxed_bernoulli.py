@@ -189,6 +189,9 @@ class RelaxedBernoulli(transformed_distribution.TransformedDistribution):
   def _param_shapes(sample_shape):
     return {"logits": tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)}
 
+  def _params_event_ndims(self):
+    return dict(temparature=0, logits=0, probs=0)
+
   @property
   def temperature(self):
     """Distribution parameter for the location."""

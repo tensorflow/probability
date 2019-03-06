@@ -168,6 +168,9 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
         name=name)
     self._reparameterization_type = reparameterization.FULLY_REPARAMETERIZED
 
+  def _params_event_ndims(self):
+    return dict(concentration1=0, concentration0=0)
+
   @property
   def concentration1(self):
     """Concentration parameter associated with a `1` outcome."""

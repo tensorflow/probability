@@ -145,6 +145,9 @@ class GammaGamma(distribution.Distribution):
         ],
         name=name)
 
+  def _params_event_ndims(self):
+    return dict(concentration=0, mixing_concentration=0, mixing_rate=0)
+
   @property
   def concentration(self):
     """Concentration parameter."""

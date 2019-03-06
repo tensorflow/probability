@@ -107,6 +107,9 @@ class Exponential(gamma.Gamma):
   def _param_shapes(sample_shape):
     return {"rate": tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)}
 
+  def _params_event_ndims(self):
+    return dict(rate=0)
+
   @property
   def rate(self):
     return self._rate

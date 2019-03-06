@@ -125,6 +125,9 @@ class Zipf(distribution.Distribution):
         graph_parents=[self._power],
         name=name)
 
+  def _params_event_ndims(self):
+    return dict(power=0)
+
   @property
   def power(self):
     """Exponent parameter."""

@@ -154,6 +154,9 @@ class LKJ(distribution.Distribution):
         graph_parents=[self._concentration],
         name=name)
 
+  def _params_event_ndims(self):
+    return dict(concentration=0)
+
   @property
   def dimension(self):
     """Dimension of returned correlation matrices."""

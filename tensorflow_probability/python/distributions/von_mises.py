@@ -150,6 +150,9 @@ class VonMises(distribution.Distribution):
         zip(("loc", "concentration"),
             ([tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)] * 2)))
 
+  def _params_event_ndims(self):
+    return dict(loc=0, concentration=0)
+
   @property
   def loc(self):
     """Distribution parameter for the circular mean (loc)."""

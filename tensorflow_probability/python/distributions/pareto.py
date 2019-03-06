@@ -100,6 +100,9 @@ class Pareto(distribution.Distribution):
         graph_parents=[self._concentration, self._scale],
         name=name)
 
+  def _params_event_ndims(self):
+    return dict(concentration=0, scale=0)
+
   @property
   def scale(self):
     """Scale parameter and also the lower bound of the support."""

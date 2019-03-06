@@ -226,6 +226,9 @@ class Categorical(distribution.Distribution):
                        self._probs],
         name=name)
 
+  def _params_event_ndims(self):
+    return dict(logits=1, probs=1)
+
   @property
   @deprecation.deprecated(
       "2019-05-19", "The `event_size` property is deprecated.  Use "

@@ -163,6 +163,9 @@ class Triangular(distribution.Distribution):
         graph_parents=[self._low, self._high, self._peak],
         name=name)
 
+  def _params_event_ndims(self):
+    return dict(low=0, high=0, peak=0)
+
   @property
   def low(self):
     """Lower boundary of the interval."""

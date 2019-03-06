@@ -85,7 +85,7 @@ class Bernoulli(distribution.Distribution):
     return {"logits": tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)}
 
   def _params_event_ndims(self):
-    return {"logits": 0, "probs": 0}
+    return dict(logits=0, probs=0)
 
   @property
   def logits(self):
