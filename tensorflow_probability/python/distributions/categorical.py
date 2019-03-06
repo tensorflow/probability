@@ -19,10 +19,13 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
+
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import distribution_util as util
 from tensorflow_probability.python.internal import reparameterization
+
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 def _broadcast_cat_event_and_params(event, params, base_dtype):
@@ -52,11 +55,11 @@ def _broadcast_cat_event_and_params(event, params, base_dtype):
 
 
 class Categorical(distribution.Distribution):
-  """Categorical distribution.
+  """Categorical distribution over integers.
 
   The Categorical distribution is parameterized by either probabilities or
   log-probabilities of a set of `K` classes. It is defined over the integers
-  `{0, 1, ..., K}`.
+  `{0, 1, ..., K-1}`.
 
   The Categorical distribution is closely related to the `OneHotCategorical` and
   `Multinomial` distributions.  The Categorical distribution can be intuited as
@@ -197,13 +200,13 @@ class Categorical(distribution.Distribution):
           self._batch_rank = tf.rank(self._logits) - 1
 
       logits_shape = tf.shape(input=self._logits, name="logits_shape")
-      event_size = tf.compat.dimension_value(logits_shape_static[-1])
-      if event_size is not None:
-        self._event_size = tf.convert_to_tensor(
-            value=event_size, dtype=tf.int32, name="event_size")
+      num_categories = tf.compat.dimension_value(logits_shape_static[-1])
+      if num_categories is not None:
+        self._num_categories = tf.convert_to_tensor(
+            value=num_categories, dtype=tf.int32, name="num_categories")
       else:
-        with tf.compat.v1.name_scope(name="event_size"):
-          self._event_size = logits_shape[self._batch_rank]
+        with tf.compat.v1.name_scope(name="num_categories"):
+          self._num_categories = logits_shape[self._batch_rank]
 
       if logits_shape_static[:-1].is_fully_defined():
         self._batch_shape_val = tf.constant(
@@ -224,9 +227,18 @@ class Categorical(distribution.Distribution):
         name=name)
 
   @property
+  @deprecation.deprecated(
+      "2019-05-19", "The `event_size` property is deprecated.  Use "
+      "`num_categories` instead.  They have the same value, but `event_size` "
+      "is misnamed.")
   def event_size(self):
-    """Scalar `int32` tensor: the number of classes."""
-    return self._event_size
+    """Scalar `int32` tensor: the number of categories."""
+    return self._num_categories
+
+  @property
+  def num_categories(self):
+    """Scalar `int32` tensor: the number of categories."""
+    return self._num_categories
 
   @property
   def logits(self):
@@ -254,7 +266,7 @@ class Categorical(distribution.Distribution):
     if self.logits.shape.ndims == 2:
       logits_2d = self.logits
     else:
-      logits_2d = tf.reshape(self.logits, [-1, self.event_size])
+      logits_2d = tf.reshape(self.logits, [-1, self.num_categories])
     sample_dtype = tf.int64 if self.dtype.size > 4 else tf.int32
     draws = tf.random.categorical(
         logits_2d, n, dtype=sample_dtype, seed=seed)
@@ -264,25 +276,34 @@ class Categorical(distribution.Distribution):
 
   def _cdf(self, k):
     k = tf.convert_to_tensor(value=k, name="k")
-    if self.validate_args:
-      k = util.embed_check_integer_casting_closed(
-          k, target_dtype=tf.int32)
 
     k, probs = _broadcast_cat_event_and_params(
         k, self.probs, base_dtype=self.dtype.base_dtype)
 
-    # batch-flatten everything in order to use `sequence_mask()`.
-    batch_flattened_probs = tf.reshape(probs,
-                                       (-1, self._event_size))
-    batch_flattened_k = tf.reshape(k, [-1])
+    # Since the lowest number in the support is 0, any k < 0 should be zero in
+    # the output.
+    should_be_zero = k < 0
 
-    to_sum_over = tf.where(
-        tf.sequence_mask(batch_flattened_k, self._event_size),
-        batch_flattened_probs,
-        tf.zeros_like(batch_flattened_probs))
-    batch_flattened_cdf = tf.reduce_sum(input_tensor=to_sum_over, axis=-1)
-    # Reshape back to the shape of the argument.
-    return tf.reshape(batch_flattened_cdf, tf.shape(input=k))
+    # Will use k as an index in the gather below, so clip it to {0,...,K-1}.
+    k = tf.clip_by_value(tf.cast(k, tf.int32), 0, self.num_categories - 1)
+
+    batch_shape = tf.shape(input=k)
+
+    # tf.gather(..., batch_dims=batch_dims) requires static batch_dims kwarg, so
+    # to handle the case where the batch shape is dynamic, flatten the batch
+    # dims (so we know batch_dims=1).
+    k_flat_batch = tf.reshape(k, [-1])
+    probs_flat_batch = tf.reshape(
+        probs, tf.concat(([-1], [self.num_categories]), axis=0))
+
+    cdf_flat = tf.gather(
+        tf.cumsum(probs_flat_batch, axis=-1),
+        k_flat_batch[..., tf.newaxis],
+        batch_dims=1)
+
+    cdf = tf.reshape(cdf_flat, shape=batch_shape)
+
+    return tf.where(should_be_zero, tf.zeros_like(cdf), cdf)
 
   def _log_prob(self, k):
     k = tf.convert_to_tensor(value=k, name="k")

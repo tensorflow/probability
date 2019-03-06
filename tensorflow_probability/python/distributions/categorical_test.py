@@ -61,10 +61,10 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
                           self.evaluate(dist.batch_shape_tensor()))
       self.assertAllEqual([], dist.event_shape)
       self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
-      self.assertEqual(10, self.evaluate(dist.event_size))
-      # event_size is available as a constant because the shape is
+      self.assertEqual(10, self.evaluate(dist.num_categories))
+      # num_categories is available as a constant because the shape is
       # known at graph build time.
-      self.assertEqual(10, tf.get_static_value(dist.event_size))
+      self.assertEqual(10, tf.get_static_value(dist.num_categories))
 
     for batch_shape in ([], [1], [2, 3, 4]):
       dist = make_categorical(
@@ -75,7 +75,7 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
                           self.evaluate(dist.batch_shape_tensor()))
       self.assertAllEqual([], dist.event_shape)
       self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
-      self.assertEqual(10, self.evaluate(dist.event_size))
+      self.assertEqual(10, self.evaluate(dist.num_categories))
 
   def testDtype(self):
     dist = make_categorical([], 5, dtype=tf.int32)
@@ -136,24 +136,26 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
     # three classes.
     event_feed_one = [0, 1]
     histograms_feed_one = [[0.5, 0.3, 0.2], [1.0, 0.0, 0.0]]
-    expected_cdf_one = [0.0, 1.0]
+    expected_cdf_one = [0.5, 1.0]
 
     # six classes.
     event_feed_two = [2, 5]
     histograms_feed_two = [[0.9, 0.0, 0.0, 0.0, 0.0, 0.1],
                            [0.15, 0.2, 0.05, 0.35, 0.13, 0.12]]
-    expected_cdf_two = [0.9, 0.88]
+    expected_cdf_two = [0.9, 1.0]
 
-    actual_cdf_one = self.evaluate(cdf_op(histograms_feed_one, event_feed_one))
-    actual_cdf_two = self.evaluate(cdf_op(histograms_feed_two, event_feed_two))
+    actual_cdf_one = self.evaluate(
+        cdf_op(histograms_feed_one, event_feed_one))
+    actual_cdf_two = self.evaluate(
+        cdf_op(histograms_feed_two, event_feed_two))
 
     self.assertAllClose(expected_cdf_one, actual_cdf_one)
     self.assertAllClose(expected_cdf_two, actual_cdf_two)
 
   @parameterized.named_parameters(
-      ("test1", [0, 1], [[0.5, 0.3, 0.2], [1.0, 0.0, 0.0]], [0.0, 1.0]),
+      ("test1", [0, 1], [[0.5, 0.3, 0.2], [1.0, 0.0, 0.0]], [0.5, 1.0]),
       ("test2", [2, 5], [[0.9, 0.0, 0.0, 0.0, 0.0, 0.1],
-                         [0.15, 0.2, 0.05, 0.35, 0.13, 0.12]], [0.9, 0.88]))
+                         [0.15, 0.2, 0.05, 0.35, 0.13, 0.12]], [0.9, 1.0]))
   def testCDFWithDynamicEventShapeUnknownNdims(
       self, events, histograms, expected_cdf):
     """Test that dynamically-sized events with unknown shape work."""
@@ -167,11 +169,27 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
     self.assertAllClose(actual_cdf, expected_cdf)
 
   def testCDFWithBatch(self):
-    histograms = [[0.1, 0.2, 0.3, 0.25, 0.15],
-                  [0.0, 0.75, 0.2, 0.05, 0.0]]
-    event = [0, 3]
-    expected_cdf = [0.0, 0.95]
+    histograms = [[0.2, 0.1, 0.3, 0.25, 0.15],
+                  [0.1, 0.2, 0.3, 0.2, 0.2],
+                  [0.1, 0.2, 0.3, 0.2, 0.2],
+                  [0.1, 0.2, 0.3, 0.2, 0.2]]
+    # Note we're testing events outside [0, K-1].
+    event = [0, 3, -1, 10]
+    expected_cdf = [0.2, 0.8, 0.0, 1.0]
     dist = tfd.Categorical(probs=histograms)
+    cdf_op = dist.cdf(event)
+
+    self.assertAllClose(expected_cdf, self.evaluate(cdf_op))
+
+  def testCDFWithBatchAndFloatDtype(self):
+    histograms = [[0.1, 0.2, 0.3, 0.2, 0.2],
+                  [0.1, 0.2, 0.3, 0.2, 0.2],
+                  [0.1, 0.2, 0.3, 0.2, 0.2],
+                  [0.1, 0.2, 0.3, 0.2, 0.2]]
+    # Note we're testing events outside [0, K-1].
+    event = [-1., 10., 2.0, 2.5]
+    expected_cdf = [0.0, 1.0, 0.6, 0.6]
+    dist = tfd.Categorical(probs=histograms, dtype=tf.float32)
     cdf_op = dist.cdf(event)
 
     self.assertAllClose(expected_cdf, self.evaluate(cdf_op))
@@ -179,7 +197,7 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
   def testCDFNoBatch(self):
     histogram = [0.1, 0.2, 0.3, 0.4]
     event = 2
-    expected_cdf = 0.3
+    expected_cdf = 0.6
     dist = tfd.Categorical(probs=histogram)
     cdf_op = dist.cdf(event)
 
@@ -201,12 +219,12 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
     # We test that the probabilities are correctly broadcasted over the
     # additional leading batch dimension of size 3.
     expected_cdf_result = np.zeros((3, 2))
-    expected_cdf_result[0, 0] = 0
-    expected_cdf_result[0, 1] = 0
-    expected_cdf_result[1, 0] = 0.2
-    expected_cdf_result[1, 1] = 0.3
-    expected_cdf_result[2, 0] = 0.3
-    expected_cdf_result[2, 1] = 0.75
+    expected_cdf_result[0, 0] = 0.2
+    expected_cdf_result[0, 1] = 0.3
+    expected_cdf_result[1, 0] = 0.3
+    expected_cdf_result[1, 1] = 0.3 + 0.45
+    expected_cdf_result[2, 0] = 1.0
+    expected_cdf_result[2, 1] = 1.0
 
     self.assertAllClose(expected_cdf_result, self.evaluate(dist.cdf(devent)))
 
