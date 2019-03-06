@@ -21,6 +21,7 @@ from __future__ import print_function
 import tensorflow as tf
 from tensorflow_probability.python.distributions import gamma
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -114,6 +115,11 @@ class Chi2(gamma.Gamma):
 class Chi2WithAbsDf(Chi2):
   """Chi2 with parameter transform `df = floor(abs(df))`."""
 
+  @deprecation.deprecated(
+      "2019-06-05",
+      "Chi2WithAbsDf is deprecated, use "
+      "Chi2(df=tf.floor(tf.abs(scale_diag))) instead.",
+      warn_once=True)
   def __init__(self,
                df,
                validate_args=False,

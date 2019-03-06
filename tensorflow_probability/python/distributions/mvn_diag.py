@@ -21,6 +21,7 @@ from __future__ import print_function
 import tensorflow as tf
 from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -217,6 +218,12 @@ class MultivariateNormalDiag(
 class MultivariateNormalDiagWithSoftplusScale(MultivariateNormalDiag):
   """MultivariateNormalDiag with `diag_stddev = softplus(diag_stddev)`."""
 
+  @deprecation.deprecated(
+      "2019-06-05",
+      "MultivariateNormalDiagWithSoftplusScale is deprecated, use "
+      "MultivariateNormalDiag(loc=loc, scale_diag=tf.nn.softplus(scale_diag)) "
+      "instead.",
+      warn_once=True)
   def __init__(self,
                loc,
                scale_diag,

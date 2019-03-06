@@ -26,7 +26,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.util import deprecation
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -308,11 +308,11 @@ class InverseGamma(distribution.Distribution):
     ], x)
 
 
-class InverseGammaWithSoftplusConcentrationScale(InverseGamma):
+class _InverseGammaWithSoftplusConcentrationScale(InverseGamma):
   """`InverseGamma` with softplus of `concentration` and `scale`."""
 
   @deprecation.deprecated_args(
-      "2019-05-08", "The `rate` parameter is deprecation. Use `scale` instead."
+      "2019-05-08", "The `rate` parameter is deprecated. Use `scale` instead."
       "The `rate` parameter was always interpreted as a `scale`parameter, but "
       "erroneously misnamed.", "rate")
   def __init__(self,
@@ -331,7 +331,7 @@ class InverseGammaWithSoftplusConcentrationScale(InverseGamma):
           value=concentration, name="softplus_concentration", dtype=dtype)
       scale = tf.convert_to_tensor(
           value=scale, name="softplus_scale", dtype=dtype)
-      super(InverseGammaWithSoftplusConcentrationScale, self).__init__(
+      super(_InverseGammaWithSoftplusConcentrationScale, self).__init__(
           concentration=tf.nn.softplus(
               concentration, name="softplus_concentration"),
           scale=tf.nn.softplus(scale, name="softplus_scale"),
@@ -342,10 +342,20 @@ class InverseGammaWithSoftplusConcentrationScale(InverseGamma):
 
 
 _rate_deprecator = deprecation.deprecated(
-    "2019-05-08",
+    "2019-06-05",
     "InverseGammaWithSoftplusConcentrationRate is deprecated, use "
-    "InverseGammaWithSoftplusConcentrationScale instead.",
+    "InverseGamma(concentration=tf.nn.softplus(concentration), "
+    "scale=tf.nn.softplus(scale)) instead.",
     warn_once=True)
 # pylint: disable=invalid-name
 InverseGammaWithSoftplusConcentrationRate = _rate_deprecator(
-    InverseGammaWithSoftplusConcentrationScale)
+    _InverseGammaWithSoftplusConcentrationScale)
+
+_scale_deprecator = deprecation.deprecated(
+    "2019-06-05",
+    "InverseGammaWithSoftplusConcentrationScale is deprecated, use "
+    "InverseGamma(concentration=tf.nn.softplus(concentration), "
+    "scale=tf.nn.softplus(scale)) instead.",
+    warn_once=True)
+InverseGammaWithSoftplusConcentrationScale = _scale_deprecator(
+    _InverseGammaWithSoftplusConcentrationScale)
