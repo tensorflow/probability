@@ -1545,7 +1545,8 @@ class VariationalGaussianProcess(DistributionLambda):
     self._variational_inducing_observations_loc = self.add_variable(
         name='variational_inducing_observations_loc',
         shape=self._event_shape.as_list() + [self._num_inducing_points],
-        initializer=tf.compat.v1.initializers.zeros(dtype=self._dtype))
+        initializer=tf.compat.v1.initializers.zeros(),
+        dtype=self._dtype)
 
     eyes = (np.ones(self._event_shape.as_list() + [1, 1]) *
             np.eye(self._num_inducing_points, dtype=self._dtype))
