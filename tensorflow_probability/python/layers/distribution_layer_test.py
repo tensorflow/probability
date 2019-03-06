@@ -1132,5 +1132,77 @@ class MixtureSameFamilyTestStaticShape(tf.test.TestCase,
   use_static_shape = True
 
 
+@test_util.run_all_in_graph_and_eager_modes
+class VariationalGaussianProcessEndToEnd(tf.test.TestCase):
+
+  def testEndToEnd(self):
+    np.random.seed(43)
+    dtype = np.float64
+
+    n = 1000
+    w0 = 0.125
+    b0 = 5.
+    x_range = [-20, 60]
+
+    def s(x):
+      g = (x - x_range[0]) / (x_range[1] - x_range[0])
+      return 3*(0.25 + g**2.)
+
+    x = (x_range[1] - x_range[0]) * np.random.rand(n) + x_range[0]
+    eps = np.random.randn(n) * s(x)
+    y = (w0 * x * (1 + np.sin(x)) + b0) + eps
+    x0 = np.linspace(*x_range, num=1000)
+
+    class KernelFn(tf.keras.layers.Layer):
+
+      def __init__(self, **kwargs):
+        super(KernelFn, self).__init__(**kwargs)
+
+        self._amplitude = self.add_variable(
+            initializer=tf.compat.v1.initializers.constant(.54),
+            dtype=dtype,
+            name='amplitude')
+
+      def call(self, x):
+        return x
+
+      @property
+      def kernel(self):
+        return tfp.positive_semidefinite_kernels.ExponentiatedQuadratic(
+            amplitude=tf.nn.softplus(self._amplitude))
+
+    num_inducing_points = 50
+    model = tf.keras.Sequential([
+        tf.keras.layers.InputLayer(input_shape=[1], dtype=dtype),
+        tf.keras.layers.Dense(1, kernel_initializer='Ones', use_bias=False,
+                              activation=None),
+        tfp.layers.VariationalGaussianProcess(
+            num_inducing_points=num_inducing_points,
+            kernel_provider=KernelFn(),
+            inducing_index_points_initializer=(
+                tf.compat.v1.initializers.constant(
+                    np.linspace(*x_range,
+                                num=num_inducing_points,
+                                dtype=dtype)[..., np.newaxis]))),
+    ])
+
+    if not tf.executing_eagerly():
+      self.evaluate(tf.compat.v1.global_variables_initializer())
+
+    batch_size = 64
+    kl_weight = np.float64(batch_size) / n
+    loss = lambda y, d: d.variational_loss(y, kl_weight=kl_weight)
+    model.compile(
+        optimizer=tf.compat.v1.train.AdamOptimizer(learning_rate=0.02),
+        loss=loss)
+
+    # This should have no issues
+    model.fit(x, y, epochs=5, batch_size=batch_size, verbose=False)
+
+    vgp = model(x0[..., None])
+    num_samples = 7
+    samples_ = self.evaluate(vgp.sample(num_samples))
+    self.assertAllEqual(samples_.shape, (7, 1000, 1))
+
 if __name__ == '__main__':
   tf.test.main()

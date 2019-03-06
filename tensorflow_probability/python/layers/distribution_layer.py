@@ -47,6 +47,7 @@ __all__ = [
     'MixtureSameFamily',
     'MultivariateNormalTriL',
     'OneHotCategorical',
+    'VariationalGaussianProcess',
 ]
 
 
@@ -1438,3 +1439,149 @@ class MixtureLogistic(DistributionLambda):
         num_components,
         IndependentLogistic.params_size(event_shape, name=name),
         name=name)
+
+
+class VariationalGaussianProcess(DistributionLambda):
+  """A VariationalGaussianProcess Layer.
+
+  Create a VariationalGaussianProcess distribtuion whose `index_points` are the
+  inputs to the layer. Parameterized by number of inducing points and a
+  `kernel_provider`, which should be a `tf.keras.Layer` with an @property that
+  late-binds variable parameters to a
+  `tfp.positive_semidefinite_kernel.PositiveSemidefiniteKernel` instance (this
+  requirement has to do with the way that variables must be created in a keras
+  model). The `mean_fn` is an optional argument which, if omitted, will be
+  automatically configured to be a constant function with trainable variable
+  output.
+  """
+
+  def __init__(
+      self,
+      num_inducing_points,
+      kernel_provider,
+      event_shape=(1,),
+      inducing_index_points_initializer=None,
+      mean_fn=None,
+      jitter=1e-6,
+      name=None):
+    """Construct a VariationalGaussianProcess Layer.
+
+    Args:
+      num_inducing_points: number of inducing points in the
+        VariationalGaussianProcess distribution.
+      kernel_provider: a `Layer` instance equipped with an @property, which
+        yields a `PositiveSemidefiniteKernel` instance. The latter is used to
+        parameterize the constructed VariationalGaussianProcess distribution
+        returned by calling the layer.
+      event_shape: the shape of the output of the layer. This translates to a
+        batch of underlying VariationalGaussianProcess distribtuions. For
+        example, `event_shape = [3]` means we are modeling a batch of 3
+        distributions over functions. We can think of this as a distrbution over
+        3-dimensional vector-valued functions.
+      inducing_index_points_initializer: a `tf.keras.initializer.Initializer`
+        used to initialize the trainable `inducing_index_points` variables.
+        Training VGP's is pretty sensitive to choice of initial inducing index
+        point locations. A reasonable heuristic is to scatter them near the
+        data, not too close to each other.
+      mean_fn: a callable that maps layer inputs to mean function values. Passed
+        to the mean_fn parameter of VariationalGaussianProcess distribution. If
+        omitted, defaults to a constant function with trainable variable value.
+      jitter: a small term added to the diagonal of various kernel matrices for
+        numerical stability.
+      name: name to give to this layer and the scope of ops and variables it
+        contains.
+    """
+    super(VariationalGaussianProcess, self).__init__(
+        lambda x: VariationalGaussianProcess.new(  # pylint: disable=g-long-lambda
+            x,
+            kernel_provider=self._kernel_provider,
+            event_shape=self._event_shape,
+            inducing_index_points=self._inducing_index_points,
+            variational_inducing_observations_loc=(
+                self._variational_inducing_observations_loc),
+            variational_inducing_observations_scale=(
+                self._variational_inducing_observations_scale),
+            mean_fn=self._mean_fn,
+            observation_noise_variance=tf.nn.softplus(
+                self._unconstrained_observation_noise_variance),
+            jitter=self._jitter))
+
+    tmp_kernel = kernel_provider.kernel
+    self._dtype = tmp_kernel.dtype.as_numpy_dtype
+    self._feature_ndims = tmp_kernel.feature_ndims
+    self._num_inducing_points = num_inducing_points
+    self._event_shape = tf.TensorShape(event_shape)
+    self._mean_fn = mean_fn
+    self._jitter = jitter
+    self._inducing_index_points_initializer = inducing_index_points_initializer
+    self._kernel_provider = kernel_provider
+
+  def build(self, input_shape):
+    input_feature_shape = input_shape[-self._feature_ndims:]
+
+    inducing_index_points_shape = (
+        self._event_shape.as_list() +
+        [self._num_inducing_points] +
+        input_feature_shape.as_list())
+
+    if self._mean_fn is None:
+      self.mean = self.add_variable(
+          initializer=tf.compat.v1.initializers.constant([0.]),
+          dtype=self._dtype,
+          name='mean')
+      self._mean_fn = lambda x: self.mean
+
+    self._unconstrained_observation_noise_variance = self.add_variable(
+        initializer=tf.compat.v1.initializers.constant(-10.),
+        dtype=self._dtype,
+        name='observation_noise_variance')
+
+    self._inducing_index_points = self.add_variable(
+        name='inducing_index_points',
+        shape=inducing_index_points_shape,
+        initializer=self._inducing_index_points_initializer,
+        dtype=self._dtype)
+
+    self._variational_inducing_observations_loc = self.add_variable(
+        name='variational_inducing_observations_loc',
+        shape=self._event_shape.as_list() + [self._num_inducing_points],
+        initializer=tf.compat.v1.initializers.zeros(dtype=self._dtype))
+
+    eyes = (np.ones(self._event_shape.as_list() + [1, 1]) *
+            np.eye(self._num_inducing_points, dtype=self._dtype))
+    self._variational_inducing_observations_scale = self.add_variable(
+        name='variational_inducing_observations_scale',
+        shape=(self._event_shape.as_list() +
+               [self._num_inducing_points, self._num_inducing_points]),
+        initializer=tf.compat.v1.initializers.constant(1e-5 * eyes))
+
+  @staticmethod
+  def new(x,
+          kernel_provider,
+          event_shape,
+          inducing_index_points,
+          mean_fn,
+          variational_inducing_observations_loc,
+          variational_inducing_observations_scale,
+          observation_noise_variance,
+          jitter=1e-6,
+          name=None):
+    vgp = tfd.VariationalGaussianProcess(
+        kernel=kernel_provider.kernel,
+        index_points=x,
+        inducing_index_points=inducing_index_points,
+        variational_inducing_observations_loc=(
+            variational_inducing_observations_loc),
+        variational_inducing_observations_scale=(
+            variational_inducing_observations_scale),
+        mean_fn=mean_fn,
+        observation_noise_variance=observation_noise_variance,
+        jitter=jitter)
+    ind = tfd.Independent(vgp, reinterpreted_batch_ndims=1)
+    bij = tfb.Transpose(rightmost_transposed_ndims=2)
+    d = tfd.TransformedDistribution(ind, bijector=bij)
+    def _transposed_variational_loss(y, kl_weight=1.):
+      loss = vgp.variational_loss(bij.forward(y), kl_weight=kl_weight)
+      return loss
+    d.variational_loss = _transposed_variational_loss
+    return d

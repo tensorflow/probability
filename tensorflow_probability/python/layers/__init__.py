@@ -41,6 +41,7 @@ from tensorflow_probability.python.layers.distribution_layer import MixtureNorma
 from tensorflow_probability.python.layers.distribution_layer import MixtureSameFamily
 from tensorflow_probability.python.layers.distribution_layer import MultivariateNormalTriL
 from tensorflow_probability.python.layers.distribution_layer import OneHotCategorical
+from tensorflow_probability.python.layers.distribution_layer import VariationalGaussianProcess
 from tensorflow_probability.python.layers.initializers import BlockwiseInitializer
 from tensorflow_probability.python.layers.util import default_loc_scale_fn
 from tensorflow_probability.python.layers.util import default_mean_field_normal_fn
