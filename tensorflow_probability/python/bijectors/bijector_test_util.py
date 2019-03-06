@@ -21,6 +21,7 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 import tensorflow as tf
+from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.distributions import uniform as uniform_distribution
 
 
@@ -229,3 +230,58 @@ def assert_bijective_and_finite(bijector,
   np.testing.assert_allclose(y_from_y, y, atol=atol, rtol=rtol)
   np.testing.assert_allclose(-ildj_f_x, fldj_x, atol=atol, rtol=rtol)
   np.testing.assert_allclose(-ildj_y, fldj_g_y, atol=atol, rtol=rtol)
+
+
+def get_fldj_theoretical(bijector,
+                         x,
+                         event_ndims,
+                         input_to_unconstrained=None,
+                         output_to_unconstrained=None):
+  """Numerically approximate the forward log det Jacobian of a bijector.
+
+  We compute the Jacobian of the chain
+  output_to_unconst_vec(bijector(inverse(input_to_unconst_vec))) so that
+  we're working with a full rank matrix.  We then adjust the resulting Jacobian
+  for the unconstraining bijectors.
+
+  Bijectors that constrain / unconstrain their inputs/outputs may not be
+  testable with this method, since the composition above may reduce the test
+  to something trivial.  However, bijectors that map within constrained spaces
+  should be fine.
+
+  Args:
+    bijector: the bijector whose Jacobian we wish to approximate
+    x: the value for which we want to approximate the Jacobian.  x must have
+      a batch dimension for compatibility with tape.batch_jacobian.
+    event_ndims: number of dimensions in an event
+    input_to_unconstrained: bijector that maps the input to the above bijector
+      to an unconstrained 1-D vector.  If the inputs are already unconstrained
+      vectors, use None.
+    output_to_unconstrained: bijector that maps the output of the above bijector
+      to an unconstrained 1-D vector.  If the outputs are unconstrained
+      vectors, use None.
+
+  Returns:
+    A numerical approximation to the log det Jacobian of bijector.forward
+    evaluated at x.
+  """
+  if input_to_unconstrained is None:
+    input_to_unconstrained = identity_bijector.Identity()
+  if output_to_unconstrained is None:
+    output_to_unconstrained = identity_bijector.Identity()
+
+  x = tf.convert_to_tensor(value=x)
+  x_unconstrained = input_to_unconstrained.forward(x)
+  with tf.GradientTape(persistent=True) as tape:
+    tape.watch(x_unconstrained)
+    f_x = bijector.forward(input_to_unconstrained.inverse(x_unconstrained))
+    f_x_unconstrained = output_to_unconstrained.forward(f_x)
+  jacobian = tape.batch_jacobian(
+      f_x_unconstrained, x_unconstrained, experimental_use_pfor=False)
+
+  return (
+      tf.linalg.slogdet(jacobian).log_abs_determinant +
+      input_to_unconstrained.forward_log_det_jacobian(
+          x, event_ndims=event_ndims) -
+      output_to_unconstrained.forward_log_det_jacobian(
+          f_x, event_ndims=event_ndims))

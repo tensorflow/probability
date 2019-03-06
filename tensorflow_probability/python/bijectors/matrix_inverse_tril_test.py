@@ -186,6 +186,20 @@ class MatrixInverseTriLBijectorTest(tf.test.TestCase):
     with self.assertRaisesOpError(nonsingular_error_msg):
       self.evaluate(inv.inverse_log_det_jacobian(x_, event_ndims=2))
 
+  # TODO(b/126613399): enable when MatrixInvTriL fldj is fixed
+  ## def testJacobian(self):
+  ##   bijector = tfb.MatrixInverseTriL()
+  ##   x_ = np.array([[[1./2., 0.],
+  ##                   [1., 1./3]],
+  ##                  [[1./3., 0.],
+  ##                   [2., 1.]]], dtype=np.float32)
+  ##   fldj = bijector.forward_log_det_jacobian(x_, event_ndims=2)
+  ##   fldj_theoretical = bijector_test_util.get_fldj_theoretical(
+  ##       bijector, x_, event_ndims=2,
+  ##       input_to_unconst_vec=tfb.Invert(tfb.FillTriangular()),
+  ##       output_to_unconst_vec=tfb.Invert(tfb.FillTriangular()))
+  ##   fldj_, fldj_theoretical_ = self.evaluate([fldj, fldj_theoretical])
+  ##   self.assertAllClose(fldj_, fldj_theoretical_)
 
 if __name__ == "__main__":
   tf.test.main()

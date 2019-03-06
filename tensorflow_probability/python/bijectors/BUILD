@@ -480,6 +480,7 @@ py_library(
     name = "bijector_test_util",
     srcs = ["bijector_test_util.py"],
     deps = [
+        ":identity",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:uniform",

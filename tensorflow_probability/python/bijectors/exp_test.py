@@ -61,6 +61,15 @@ class ExpBijectorTest(tf.test.TestCase):
     bijector_test_util.assert_bijective_and_finite(
         bijector, x, y, eval_func=self.evaluate, event_ndims=0)
 
+  def testJacobian(self):
+    bijector = tfb.Exp()
+    x = np.expand_dims(np.linspace(-1, 1, num=10), -1)
+    fldj = bijector.forward_log_det_jacobian(x, event_ndims=1)
+    fldj_theoretical = bijector_test_util.get_fldj_theoretical(
+        bijector, x, event_ndims=1)
+    fldj_, fldj_theoretical_ = self.evaluate([fldj, fldj_theoretical])
+    self.assertAllClose(fldj_, fldj_theoretical_)
+
 
 if __name__ == "__main__":
   tf.test.main()
