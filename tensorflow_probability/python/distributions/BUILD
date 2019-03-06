@@ -98,6 +98,7 @@ py_library(
         ":triangular",
         ":truncated_normal",
         ":uniform",
+        ":variational_gaussian_process",
         ":vector_diffeomixture",
         ":vector_exponential_diag",
         ":vector_laplace_diag",
@@ -921,6 +922,20 @@ py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
+    ],
+)
+
+py_library(
+    name = "variational_gaussian_process",
+    srcs = ["variational_gaussian_process.py"],
+    deps = [
+        ":gaussian_process",
+        ":kullback_leibler",
+        ":mvn_linear_operator",
+        ":normal",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -1897,6 +1912,18 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_test(
+    name = "variational_gaussian_process_test",
+    size = "small",
+    srcs = ["variational_gaussian_process_test.py"],
+    deps = [
+        #":distributions",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
     ],
 )
 

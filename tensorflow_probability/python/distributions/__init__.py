@@ -99,6 +99,7 @@ from tensorflow_probability.python.distributions.transformed_distribution import
 from tensorflow_probability.python.distributions.triangular import Triangular
 from tensorflow_probability.python.distributions.truncated_normal import TruncatedNormal
 from tensorflow_probability.python.distributions.uniform import Uniform
+from tensorflow_probability.python.distributions.variational_gaussian_process import VariationalGaussianProcess
 from tensorflow_probability.python.distributions.vector_diffeomixture import quadrature_scheme_softmaxnormal_gauss_hermite
 from tensorflow_probability.python.distributions.vector_diffeomixture import quadrature_scheme_softmaxnormal_quantiles
 from tensorflow_probability.python.distributions.vector_diffeomixture import VectorDiffeomixture
@@ -164,6 +165,7 @@ __all__ = [
     'Geometric',
     'GaussianProcess',
     'GaussianProcessRegressionModel',
+    'VariationalGaussianProcess',
     'Gumbel',
     'HalfCauchy',
     'HalfNormal',
