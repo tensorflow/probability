@@ -1461,6 +1461,8 @@ class VariationalGaussianProcess(DistributionLambda):
       kernel_provider,
       event_shape=(1,),
       inducing_index_points_initializer=None,
+      unconstrained_observation_noise_variance_initializer=(
+          tf.compat.v1.initializers.constant(-10.)),
       mean_fn=None,
       jitter=1e-6,
       name=None):
@@ -1483,6 +1485,10 @@ class VariationalGaussianProcess(DistributionLambda):
         Training VGP's is pretty sensitive to choice of initial inducing index
         point locations. A reasonable heuristic is to scatter them near the
         data, not too close to each other.
+      unconstrained_observation_noise_variance_initializer: a
+        `tf.keras.initializer.Initializer` used to initialize the unconstrained
+        observation noise variable. The observation noise variance is computed
+        from this variable via the `tf.nn.softplus` function.
       mean_fn: a callable that maps layer inputs to mean function values. Passed
         to the mean_fn parameter of VariationalGaussianProcess distribution. If
         omitted, defaults to a constant function with trainable variable value.
@@ -1514,6 +1520,8 @@ class VariationalGaussianProcess(DistributionLambda):
     self._mean_fn = mean_fn
     self._jitter = jitter
     self._inducing_index_points_initializer = inducing_index_points_initializer
+    self._unconstrained_observation_noise_variance_initializer = (
+        unconstrained_observation_noise_variance_initializer)
     self._kernel_provider = kernel_provider
 
   def build(self, input_shape):
@@ -1532,7 +1540,7 @@ class VariationalGaussianProcess(DistributionLambda):
       self._mean_fn = lambda x: self.mean
 
     self._unconstrained_observation_noise_variance = self.add_variable(
-        initializer=tf.compat.v1.initializers.constant(-10.),
+        initializer=self._unconstrained_observation_noise_variance_initializer,
         dtype=self._dtype,
         name='observation_noise_variance')
 
