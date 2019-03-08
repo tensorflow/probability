@@ -29,8 +29,8 @@ class VariableLayer(tf.keras.layers.Layer):
   This layer implements the mathematical function `f(x) = c` where `c` is a
   constant, i.e., unchanged for all `x`. Like other Keras layers, the constant
   is `trainable`.  This layer can also be interpretted as the special case of
-  `tf.keras.layers.Dense` when the `kernel` is forced to be the identity matrix
-  (`tf.eye`).
+  `tf.keras.layers.Dense` when the `kernel` is forced to be the zero matrix
+  (`tf.zeros`).
 
   #### Examples
 
