@@ -316,6 +316,14 @@ make_slicer = _MakeSlicer()
 @test_util.run_all_in_graph_and_eager_modes
 class BernoulliSlicingTest(tf.test.TestCase):
 
+  def testScalarSlice(self):
+    logits = self.evaluate(tf.random.normal([]))
+    dist = tfd.Bernoulli(logits=logits)
+    self.assertAllEqual([], dist.batch_shape)
+    self.assertAllEqual([1], dist[tf.newaxis].batch_shape)
+    self.assertAllEqual([], dist[...].batch_shape)
+    self.assertAllEqual([1, 1], dist[tf.newaxis, ..., tf.newaxis].batch_shape)
+
   def testSlice(self):
     logits = self.evaluate(tf.random.normal([20, 3, 1, 5]))
     dist = tfd.Bernoulli(logits=logits)
