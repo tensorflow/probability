@@ -243,7 +243,7 @@ class LocalLevel(StructuralTimeSeries):
               value=observed_time_series,
               dtype=dtype,
               name='observed_time_series')
-          observed_stddev, observed_initial = (
+          _, observed_stddev, observed_initial = (
               sts_util.empirical_statistics(observed_time_series))
         else:
           observed_stddev, observed_initial = (tf.convert_to_tensor(

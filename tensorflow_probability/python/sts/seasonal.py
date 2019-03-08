@@ -390,9 +390,9 @@ class Seasonal(StructuralTimeSeries):
     with tf.compat.v1.name_scope(
         name, 'Seasonal', values=[observed_time_series]) as name:
 
-      observed_stddev, observed_initial = (
+      _, observed_stddev, observed_initial = (
           sts_util.empirical_statistics(observed_time_series)
-          if observed_time_series is not None else (1., 0.))
+          if observed_time_series is not None else (0., 1., 0.))
 
       # Heuristic default priors. Overriding these may dramatically
       # change inference performance and results.

@@ -337,7 +337,7 @@ class Autoregressive(StructuralTimeSeries):
            initial_state_prior], preferred_dtype=tf.float32)
 
       if observed_time_series is not None:
-        observed_stddev, observed_initial = sts_util.empirical_statistics(
+        _, observed_stddev, observed_initial = sts_util.empirical_statistics(
             observed_time_series)
       else:
         observed_stddev, observed_initial = (

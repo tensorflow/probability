@@ -36,6 +36,7 @@ class _ForecastTest(object):
                                         scale=self._build_tensor(1.)),
         name='seasonal')
     return tfp.sts.Sum(components=[seasonal],
+                       constant_offset=0.,  # Simplifies analytic calculations.
                        observed_time_series=observed_time_series)
 
   def test_one_step_predictive_correctness(self):

@@ -158,6 +158,7 @@ class AdditiveStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
 
   def __init__(self,
                component_ssms,
+               constant_offset=0.,
                observation_noise_scale=None,
                initial_state_prior=None,
                initial_step=0,
@@ -173,6 +174,11 @@ class AdditiveStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
         different `latent_size`, but they must have the same `dtype`, event
         shape (`num_timesteps` and `observation_size`), and their batch shapes
         must broadcast to a compatible batch shape.
+      constant_offset: scalar `float` `Tensor`, or batch of scalars,
+        specifying a constant value added to the sum of outputs from the
+        component models. This allows the components to model the shifted series
+        `observed_time_series - constant_offset`.
+        Default value: `0.`
       observation_noise_scale: Optional scalar `float` `Tensor` indicating the
         standard deviation of the observation noise. May contain additional
         batch dimensions, which must broadcast with the batch shape of elements
@@ -211,11 +217,13 @@ class AdditiveStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
         name,
         'AdditiveStateSpaceModel',
         values=[observation_noise_scale, initial_step]) as name:
-
-      assertions = []
-
       # Check that all components have the same dtype
-      tf.debugging.assert_same_float_dtype(component_ssms)
+      dtype = tf.debugging.assert_same_float_dtype(component_ssms)
+
+      constant_offset = tf.convert_to_tensor(value=constant_offset,
+                                             name='constant_offset',
+                                             dtype=dtype)
+      assertions = []
 
       # Construct an initial state prior as a block-diagonal combination
       # of the component state priors.
@@ -283,6 +291,7 @@ class AdditiveStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
                        broadcast_obs_matrix for ssm in component_ssms],
                       axis=-1))
 
+      offset_vector = constant_offset[..., tf.newaxis]
       if observation_noise_scale is not None:
         observation_noise_scale = tf.convert_to_tensor(
             value=observation_noise_scale,
@@ -291,11 +300,14 @@ class AdditiveStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
         def observation_noise_fn(t):
           return tfd.MultivariateNormalDiag(
               loc=sum([ssm.get_observation_noise_for_timestep(t).mean()
-                       for ssm in component_ssms]),
+                       for ssm in component_ssms]) + offset_vector,
               scale_diag=observation_noise_scale[..., tf.newaxis])
       else:
         def observation_noise_fn(t):
           return sts_util.sum_mvns(
+              [tfd.MultivariateNormalDiag(
+                  loc=offset_vector,
+                  scale_diag=tf.zeros_like(offset_vector))] +
               [ssm.get_observation_noise_for_timestep(t)
                for ssm in component_ssms])
 
@@ -363,6 +375,7 @@ class Sum(StructuralTimeSeries):
 
   def __init__(self,
                components,
+               constant_offset=None,
                observation_noise_scale_prior=None,
                observed_time_series=None,
                name=None):
@@ -371,6 +384,12 @@ class Sum(StructuralTimeSeries):
     Args:
       components: Python `list` of one or more StructuralTimeSeries instances.
         These must have unique names.
+      constant_offset: optional scalar `float` `Tensor`, or batch of scalars,
+        specifying a constant value added to the sum of outputs from the
+        component models. This allows the components to model the shifted series
+        `observed_time_series - constant_offset`. If `None`, this is set to the
+        mean of the provided `observed_time_series`.
+        Default value: `None`.
       observation_noise_scale_prior: optional `tfd.Distribution` instance
         specifying a prior on `observation_noise_scale`. If `None`, a heuristic
         default prior is constructed based on the provided
@@ -379,8 +398,8 @@ class Sum(StructuralTimeSeries):
       observed_time_series: optional `float` `Tensor` of shape
         `batch_shape + [T, 1]` (omitting the trailing unit dimension is also
         supported when `T > 1`), specifying an observed time series. This is
-        used only if `observation_noise_scale_prior` is not provided, to
-        construct a default heuristic prior.
+        used to set the constant offset, if not provided, and to construct a
+        default heuristic `observation_noise_scale_prior` if not provided.
         Default value: `None`.
       name: Python `str` name of this model component; used as `name_scope`
         for ops created by this class.
@@ -392,12 +411,22 @@ class Sum(StructuralTimeSeries):
 
     with tf.compat.v1.name_scope(
         name, 'Sum', values=[observed_time_series]) as name:
+      if observed_time_series is not None:
+        observed_time_series = tf.convert_to_tensor(value=observed_time_series,
+                                                    name='observed_time_series')
+        observed_time_series = sts_util.maybe_expand_trailing_dim(
+            observed_time_series)
+        observed_mean, observed_stddev, _ = (
+            sts_util.empirical_statistics(observed_time_series))
+      else:
+        observed_mean, observed_stddev = 0., 1.
+
       if observation_noise_scale_prior is None:
-        observed_stddev, _ = (
-            sts_util.empirical_statistics(observed_time_series)
-            if observed_time_series is not None else (1., 0.))
         observation_noise_scale_prior = tfd.LogNormal(
             loc=tf.math.log(.01 * observed_stddev), scale=2.)
+
+      if constant_offset is None:
+        constant_offset = observed_mean
 
       # Check that components have unique names, to ensure that inherited
       # parameters will be assigned unique names.
@@ -420,6 +449,7 @@ class Sum(StructuralTimeSeries):
 
       self._components = components
       self._components_by_name = components_by_name
+      self._constant_offset = constant_offset
 
       super(Sum, self).__init__(
           parameters=parameters,
@@ -436,6 +466,11 @@ class Sum(StructuralTimeSeries):
   def components_by_name(self):
     """OrderedDict mapping component names to components."""
     return self._components_by_name
+
+  @property
+  def constant_offset(self):
+    """Constant value subtracted from observed data."""
+    return self._constant_offset
 
   def _make_state_space_model(self,
                               num_timesteps,
@@ -466,6 +501,7 @@ class Sum(StructuralTimeSeries):
 
     return AdditiveStateSpaceModel(
         component_ssms=component_ssms,
+        constant_offset=self.constant_offset,
         observation_noise_scale=observation_noise_scale,
         initial_state_prior=initial_state_prior,
         initial_step=initial_step)

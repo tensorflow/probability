@@ -387,7 +387,7 @@ class SemiLocalLinearTrend(StructuralTimeSeries):
         name, 'SemiLocalLinearTrend', values=[observed_time_series]) as name:
 
       if observed_time_series is not None:
-        observed_stddev, observed_initial = sts_util.empirical_statistics(
+        _, observed_stddev, observed_initial = sts_util.empirical_statistics(
             observed_time_series)
       else:
         observed_stddev, observed_initial = 1., 0.

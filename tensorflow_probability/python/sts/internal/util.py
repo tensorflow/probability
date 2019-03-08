@@ -138,10 +138,12 @@ def empirical_statistics(observed_time_series):
        `batch_shape + [num_timesteps]` (allowed if `num_timesteps > 1`).
 
   Returns:
+    observed_mean: `Tensor` of shape `batch_shape`, giving the empirical
+      mean of each time series in the batch.
     observed_stddev: `Tensor` of shape `batch_shape`, giving the empirical
       standard deviation of each time series in the batch.
-    observed_initial: `Tensor of shape `batch_shape`, giving the initial value
-      of each time series in the batch.
+    observed_initial: `Tensor of shape `batch_shape`, giving the
+      initial value of each time series in the batch.
   """
 
   with tf.compat.v1.name_scope(
@@ -149,11 +151,11 @@ def empirical_statistics(observed_time_series):
     observed_time_series = tf.convert_to_tensor(
         value=observed_time_series, name='observed_time_series')
     observed_time_series = maybe_expand_trailing_dim(observed_time_series)
-    _, observed_variance = tf.nn.moments(
+    observed_mean, observed_variance = tf.nn.moments(
         x=tf.squeeze(observed_time_series, -1), axes=-1)
     observed_stddev = tf.sqrt(observed_variance)
     observed_initial = observed_time_series[..., 0, 0]
-    return observed_stddev, observed_initial
+    return observed_mean, observed_stddev, observed_initial
 
 
 def maybe_expand_trailing_dim(observed_time_series):
