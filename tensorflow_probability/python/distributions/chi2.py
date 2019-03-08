@@ -121,7 +121,7 @@ class Chi2WithAbsDf(Chi2):
   @deprecation.deprecated(
       "2019-06-05",
       "Chi2WithAbsDf is deprecated, use "
-      "Chi2(df=tf.floor(tf.abs(scale_diag))) instead.",
+      "Chi2(df=tf.floor(tf.abs(df))) instead.",
       warn_once=True)
   def __init__(self,
                df,
