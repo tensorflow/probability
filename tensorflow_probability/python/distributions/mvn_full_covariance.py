@@ -186,3 +186,6 @@ class MultivariateNormalFullCovariance(mvn_tril.MultivariateNormalTriL):
             allow_nan_stats=allow_nan_stats,
             name=name)
     self._parameters = parameters
+
+  def _params_event_ndims(self):
+    return dict(loc=1, covariance_matrix=2)
