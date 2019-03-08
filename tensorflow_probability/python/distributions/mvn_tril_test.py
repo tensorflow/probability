@@ -473,6 +473,22 @@ class MultivariateNormalTriLSlicingTest(tf.test.TestCase,
       self.assertAllEqual(batch_shape, self.evaluate(dist.batch_shape_tensor()))
       self.assertAllClose(probs, self.evaluate(dist.prob([0, 0])))
 
+  def testSteppedSliceOnBroadcastDim(self, *slicers):
+    # Check a failure scenario identified by hypothesis.
+    event_dim = 3
+    mu = self._rng.rand(1, 1, 6, 1, event_dim)
+    chol, _ = self._random_chol(2, 7, 6, 9, event_dim, event_dim)
+    slicer = make_slicer[44:-52:-3, tf.newaxis, -94::, tf.newaxis, 5, 1]
+
+    dist = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
+    batch_shape = dist.batch_shape.as_list()
+    probs = self.evaluate(dist.prob([0] * event_dim))
+    batch_shape = slicer(np.zeros(batch_shape)).shape
+    probs = slicer(probs)
+    dist = slicer(dist)
+    self.assertAllEqual(batch_shape, self.evaluate(dist.batch_shape_tensor()))
+    self.assertAllClose(probs, self.evaluate(dist.prob([0] * event_dim)))
+
   @parameterized.parameters([
       [make_slicer[3]],
       [make_slicer[tf.newaxis]],

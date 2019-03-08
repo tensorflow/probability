@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import collections
 import warnings
 
 import six
@@ -92,6 +93,8 @@ def _slice_single_param(param, param_event_ndims, slices, dist_batch_shape):
         start = tf.where(is_broadcast, 0, start)
       if stop is not None:
         stop = tf.where(is_broadcast, 1, stop)
+      if step is not None:
+        step = tf.where(is_broadcast, 1, step)
       param_slices.append(slice(start, stop, step))
     else:  # int, or int Tensor, e.g. d[d.batch_shape_tensor()[0] // 2]
       param_slices.append(tf.where(is_broadcast, 0, slc))
@@ -123,9 +126,11 @@ def _slice_params_to_dict(dist, params_event_ndims, slices):
       # some distributions have multiple possible parameterizations; this
       # param was not provided
       continue
+    dtype = None
     if hasattr(dist, param_name):
-      dtype = getattr(dist, param_name).dtype
-    else:
+      attr = getattr(dist, param_name)
+      dtype = getattr(attr, 'dtype', None)
+    if dtype is None:
       dtype = dist.dtype
       warnings.warn('Unable to find property getter for parameter Tensor {} '
                     'on {}, falling back to Distribution.dtype {}'.format(
@@ -172,7 +177,7 @@ def batch_slice(dist, params_event_ndims, params_overrides, slices):
   Returns:
     new_dist: A batch-sliced `tfd.Distribution`.
   """
-  if not isinstance(slices, tuple):
+  if not isinstance(slices, collections.Sequence):
     slices = (slices,)
   # We track the history of slice and copy(**param_overrides) in order to trace
   # back to the original distribution's source variables.

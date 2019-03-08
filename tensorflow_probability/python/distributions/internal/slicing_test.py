@@ -37,6 +37,15 @@ make_slices = _MakeSlices()
 @test_util.run_all_in_graph_and_eager_modes
 class SlicingTest(tf.test.TestCase):
 
+  def test_single_param_slice_withstep_broadcastdim(self):
+    event_dim = 3
+    sliced = slicing._slice_single_param(
+        tf.zeros([1, 1, event_dim]),
+        param_event_ndims=1,
+        slices=make_slices[44:-52:-3, -94::],
+        dist_batch_shape=tf.constant([2, 7], dtype=tf.int32))
+    self.assertAllEqual((1, 1, event_dim), self.evaluate(sliced).shape)
+
   def test_single_param_slice_stop_leadingdim(self):
     sliced = slicing._slice_single_param(
         tf.zeros([7, 6, 5, 4, 3]),
