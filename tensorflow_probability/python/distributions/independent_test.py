@@ -289,6 +289,44 @@ class ProductDistributionTest(tf.test.TestCase):
   def testMnistLikeDynamicShape(self):
     self._testMnistLike(static_shape=False)
 
+  def testSlicingScalarDistZeroReinterpretedDims(self):
+    """Verifies a failure scenario identified by hypothesis testing.
+
+    Calling self.copy(distribution=sliced_underlying) without explicitly
+    specifying reinterpreted_batch_ndims allowed the default fallback logic of
+    underlying.batch_shape.ndims-1 to take over, which we don't want in the
+    slice case.
+    """
+    d = tfd.Independent(tfd.Bernoulli(logits=0))
+    self.assertAllEqual([], d[...].batch_shape)
+    self.assertAllEqual([], d[...].event_shape)
+    self.assertAllEqual([1], d[tf.newaxis].batch_shape)
+    self.assertAllEqual([], d[tf.newaxis].event_shape)
+    self.assertAllEqual([1], d[..., tf.newaxis].batch_shape)
+    self.assertAllEqual([], d[..., tf.newaxis].event_shape)
+    self.assertAllEqual([1, 1], d[tf.newaxis, ..., tf.newaxis].batch_shape)
+    self.assertAllEqual([], d[tf.newaxis, ..., tf.newaxis].event_shape)
+
+  def testSlicingGeneral(self):
+    d = tfd.Independent(tfd.Bernoulli(logits=tf.zeros([5, 6])))
+    self.assertAllEqual([5], d.batch_shape)
+    self.assertAllEqual([6], d.event_shape)
+    self.assertAllEqual([1, 5], d[tf.newaxis].batch_shape)
+    self.assertAllEqual([6], d[tf.newaxis].event_shape)
+
+    d = tfd.Independent(tfd.Bernoulli(logits=tf.zeros([4, 5, 6])))
+    self.assertAllEqual([4], d.batch_shape)
+    self.assertAllEqual([5, 6], d.event_shape)
+    self.assertAllEqual([1, 3], d[tf.newaxis, ..., :3].batch_shape)
+    self.assertAllEqual([5, 6], d[tf.newaxis, ..., :3].event_shape)
+
+    d = tfd.Independent(tfd.Bernoulli(logits=tf.zeros([4, 5, 6])),
+                        reinterpreted_batch_ndims=1)
+    self.assertAllEqual([4, 5], d.batch_shape)
+    self.assertAllEqual([6], d.event_shape)
+    self.assertAllEqual([1, 4, 3], d[tf.newaxis, ..., :3].batch_shape)
+    self.assertAllEqual([6], d[tf.newaxis, ..., :3].event_shape)
+
 
 if __name__ == "__main__":
   tf.test.main()

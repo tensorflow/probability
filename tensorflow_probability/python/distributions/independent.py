@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import collections
+
 # Dependency imports
 import numpy as np
 import tensorflow as tf
@@ -147,6 +149,20 @@ class Independent(distribution_lib.Distribution):
   @property
   def reinterpreted_batch_ndims(self):
     return self._reinterpreted_batch_ndims
+
+  def __getitem__(self, slices):
+    if self._static_reinterpreted_batch_ndims is None:
+      raise NotImplementedError(
+          "Cannot slice Independent with non-static reinterpreted_batch_ndims")
+    slices = (tuple(slices) if isinstance(slices, collections.Sequence)
+              else (slices,))
+    if Ellipsis not in slices:
+      slices = slices + (Ellipsis,)
+    slices = slices + tuple(
+        [slice(None) for _ in range(self._static_reinterpreted_batch_ndims)])
+    return self.copy(
+        distribution=self.distribution.__getitem__(slices),
+        reinterpreted_batch_ndims=self._static_reinterpreted_batch_ndims)
 
   def _batch_shape_tensor(self):
     with tf.control_dependencies(self._runtime_assertions):
