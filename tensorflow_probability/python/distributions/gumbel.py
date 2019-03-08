@@ -127,6 +127,7 @@ class Gumbel(transformed_distribution.TransformedDistribution):
     Raises:
       TypeError: if loc and scale are different dtypes.
     """
+    parameters = dict(locals())
     with tf.compat.v1.name_scope(name, values=[loc, scale]) as name:
       dtype = dtype_util.common_dtype([loc, scale], preferred_dtype=tf.float32)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
@@ -153,6 +154,7 @@ class Gumbel(transformed_distribution.TransformedDistribution):
           # be inverted.
           bijector=invert_bijector.Invert(self._gumbel_bijector),
           batch_shape=distribution_util.get_broadcast_shape(loc, scale),
+          parameters=parameters,
           name=name)
 
   @staticmethod

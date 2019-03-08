@@ -27,7 +27,6 @@ from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import reparameterization
 
 __all__ = [
     "Kumaraswamy",
@@ -146,6 +145,7 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
         more of the statistic's batch members are undefined.
       name: Python `str` name prefixed to Ops created by this class.
     """
+    parameters = dict(locals())
     with tf.compat.v1.name_scope(
         name, values=[concentration1, concentration0]) as name:
       dtype = dtype_util.common_dtype([concentration1, concentration0],
@@ -165,8 +165,8 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
             validate_args=validate_args),
         batch_shape=distribution_util.get_broadcast_shape(
             concentration1, concentration0),
+        parameters=parameters,
         name=name)
-    self._reparameterization_type = reparameterization.FULLY_REPARAMETERIZED
 
   def _params_event_ndims(self):
     return dict(concentration1=0, concentration0=0)

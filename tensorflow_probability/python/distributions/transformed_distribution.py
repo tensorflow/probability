@@ -227,6 +227,7 @@ class TransformedDistribution(distribution_lib.Distribution):
                batch_shape=None,
                event_shape=None,
                validate_args=False,
+               parameters=None,
                name=None):
     """Construct a Transformed Distribution.
 
@@ -243,10 +244,12 @@ class TransformedDistribution(distribution_lib.Distribution):
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
+      parameters: Locals dict captured by subclass constructor, to be used for
+        copy/slice re-instantiation operations.
       name: Python `str` name prefixed to Ops created by this class. Default:
         `bijector.name + distribution.name`.
     """
-    parameters = dict(locals())
+    parameters = dict(locals()) if parameters is None else parameters
     name = name or (("" if bijector is None else bijector.name) +
                     distribution.name)
     with tf.compat.v1.name_scope(

@@ -78,6 +78,7 @@ class Chi(transformed_distribution.TransformedDistribution):
       name: Python `str` name prefixed to Ops created by this class.
         Default value: `'Chi'`.
     """
+    parameters = dict(locals())
     with tf.compat.v1.name_scope(name, values=[df]) as name:
       df = tf.convert_to_tensor(
           value=df,
@@ -93,7 +94,8 @@ class Chi(transformed_distribution.TransformedDistribution):
                                  validate_args=validate_args,
                                  allow_nan_stats=allow_nan_stats,
                                  name=name),
-          bijector=invert_bijector.Invert(square_bijector.Square()))
+          bijector=invert_bijector.Invert(square_bijector.Square()),
+          parameters=parameters)
 
   def _params_event_ndims(self):
     return dict(df=0)

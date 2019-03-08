@@ -162,8 +162,8 @@ class InverseGamma(distribution.Distribution):
       with tf.control_dependencies([
           tf.compat.v1.assert_positive(
               concentration, message="Concentration must be positive."),
-          tf.compat.v1
-          .assert_positive(scale, message="Scale must be positive."),
+          tf.compat.v1.assert_positive(
+              scale, message="Scale must be positive."),
       ] if validate_args else []):
         self._concentration = tf.identity(concentration, name="concentration")
         self._scale = tf.identity(scale, name="scale")
