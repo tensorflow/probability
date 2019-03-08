@@ -156,7 +156,7 @@ class Empirical(distribution.Distribution):
     return {'samples': tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)}
 
   def _params_event_ndims(self):
-    return dict(samples=self._event_ndims)
+    return dict(samples=self._event_ndims + 1)
 
   @property
   def samples(self):
