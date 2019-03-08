@@ -135,7 +135,7 @@ class _WishartLinearOperator(distribution.Distribution):
           df_val = np.asarray(df_val)
           if not df_val.shape:
             df_val = [df_val]
-          if any(df_val < dim_val):
+          if np.any(df_val < dim_val):
             raise ValueError(
                 "Degrees of freedom (df = %s) cannot be less than "
                 "dimension of scale matrix (scale.dimension = %s)"

@@ -407,6 +407,11 @@ class WishartTest(tf.test.TestCase):
     self.assertAllEqual(expected_shape, x.shape)
     self.assertAllEqual(expected_shape, x_.shape)
 
+  def testStaticAssertNonFlatDfDoesntRaise(self):
+    # Check we don't get ValueError: The truth value of an array with more than
+    # one element is ambiguous. Use a.any() or a.all()
+    tfd.Wishart(df=[[2., 2]], scale=make_pd(1., 2), validate_args=True)
+
 
 if __name__ == "__main__":
   tf.test.main()
