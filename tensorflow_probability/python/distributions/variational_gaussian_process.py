@@ -57,7 +57,7 @@ def _solve_cholesky_factored_system_vec(cholesky_factor, rhs, name=None):
     rhs = tf.convert_to_tensor(value=rhs, name='rhs')
     lin_op = tf.linalg.LinearOperatorLowerTriangular(
         cholesky_factor, name=scope)
-    return lin_op.solvevec(lin_op.solvevec(rhs))
+    return lin_op.solvevec(lin_op.solvevec(rhs), adjoint=True)
 
 
 class VariationalGaussianProcess(
