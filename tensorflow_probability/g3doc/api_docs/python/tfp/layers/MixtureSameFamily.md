@@ -61,7 +61,7 @@ tfkl = tf.keras.layers
 
 # Load data -- graph of a [cardioid](https://en.wikipedia.org/wiki/Cardioid).
 n = 2000
-t = tfd.Uniform(low=-np.pi, high=np.pi).sample([n, 1]))
+t = tfd.Uniform(low=-np.pi, high=np.pi).sample([n, 1])
 r = 2 * (1 - tf.cos(t))
 x = r * tf.sin(t) + tfd.Normal(loc=0., scale=0.1).sample([n, 1])
 y = r * tf.cos(t) + tfd.Normal(loc=0., scale=0.1).sample([n, 1])
