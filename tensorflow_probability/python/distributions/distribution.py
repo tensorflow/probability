@@ -585,6 +585,9 @@ class Distribution(_BaseDistribution):
     """
     return slicing.batch_slice(self, self._params_event_ndims(), {}, slices)
 
+  def __iter__(self):
+    raise TypeError("{!r} object is not iterable".format(type(self).__name__))
+
   @property
   def reparameterization_type(self):
     """Describes how samples from the distribution are reparameterized.

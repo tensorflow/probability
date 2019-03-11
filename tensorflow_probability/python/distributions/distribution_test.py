@@ -375,6 +375,14 @@ class DistributionTest(tf.test.TestCase):
         NotImplementedError, "log_cdf is not implemented"):
       terrible_distribution.log_cdf(1.)
 
+  def testNotIterable(self):
+    normal = tfd.Normal(loc=0., scale=1.)
+    with self.assertRaisesRegexp(
+        TypeError,
+        "'Normal' object is not iterable"
+    ):
+      list(normal)
+
 
 class Dummy(tfd.Distribution):
 
