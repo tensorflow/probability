@@ -28,12 +28,15 @@ tfd = tfp.distributions
 
 class _ForecastTest(object):
 
-  def _build_model(self, observed_time_series, constant_offset=None):
+  def _build_model(self, observed_time_series,
+                   prior_batch_shape=(),
+                   constant_offset=None):
     seasonal = tfp.sts.Seasonal(
         num_seasons=4,
         observed_time_series=observed_time_series,
-        initial_effect_prior=tfd.Normal(loc=self._build_tensor(0.),
-                                        scale=self._build_tensor(1.)),
+        initial_effect_prior=tfd.Normal(
+            loc=self._build_tensor(np.zeros(prior_batch_shape)),
+            scale=self._build_tensor(1.)),
         name='seasonal')
     return tfp.sts.Sum(components=[seasonal],
                        constant_offset=constant_offset,
@@ -86,7 +89,8 @@ class _ForecastTest(object):
     batch_shape = [3, 2]
     observed_time_series = self._build_tensor(np.random.randn(
         *(batch_shape + [num_timesteps])))
-    model = self._build_model(observed_time_series)
+    model = self._build_model(observed_time_series,
+                              prior_batch_shape=batch_shape[1:])
     prior_samples = [param.prior.sample(num_param_samples)
                      for param in model.parameters]
 
@@ -188,7 +192,8 @@ class _ForecastTest(object):
     # By not passing a constant offset, we test that the default behavior
     # (setting constant offset to the observed mean) works when the observed
     # time series has batch shape.
-    model = self._build_model(observed_time_series)
+    model = self._build_model(observed_time_series,
+                              prior_batch_shape=batch_shape[1:])
     prior_samples = [param.prior.sample(num_param_samples)
                      for param in model.parameters]
 

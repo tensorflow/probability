@@ -344,6 +344,31 @@ class _AdditiveStateSpaceModelTest(tf.test.TestCase):
     self.assertAllClose(stddev_, offset_stddev_)
     self.assertAllClose(stddev_, offset_with_scale_stddev_)
 
+  def test_batch_shape_ignores_component_state_priors(self):
+    # If we pass an initial_state_prior directly to an AdditiveSSM, overriding
+    # the initial state priors of component models, the overall batch shape
+    # should no longer depend on the (overridden) component priors.
+    # This ensures that we produce correct shapes in forecasting, where the
+    # shapes may have changed to include dimensions corresponding to posterior
+    # draws.
+
+    # Create a component model with no batch shape *except* in the initial state
+    # prior.
+    latent_size = 2
+    ssm = self._dummy_model(
+        latent_size=latent_size,
+        batch_shape=[],
+        initial_state_prior_batch_shape=[5, 5])
+
+    # If we override the initial state prior with an unbatched prior, the
+    # resulting AdditiveSSM should not have batch dimensions.
+    unbatched_initial_state_prior = tfd.MultivariateNormalDiag(
+        scale_diag=self._build_placeholder(np.ones([latent_size])))
+    additive_ssm = AdditiveStateSpaceModel(
+        [ssm], initial_state_prior=unbatched_initial_state_prior)
+
+    self.assertAllEqual(self.evaluate(additive_ssm.batch_shape_tensor()), [])
+
   def _build_placeholder(self, ndarray, dtype=None):
     """Convert a numpy array to a TF placeholder.
 
@@ -365,10 +390,14 @@ class _AdditiveStateSpaceModelTest(tf.test.TestCase):
   def _dummy_model(self,
                    num_timesteps=5,
                    batch_shape=None,
+                   initial_state_prior_batch_shape=None,
                    latent_size=2,
                    observation_size=1,
                    dtype=None):
     batch_shape = batch_shape if batch_shape is not None else []
+    initial_state_prior_batch_shape = (
+        initial_state_prior_batch_shape
+        if initial_state_prior_batch_shape is not None else batch_shape)
     dtype = dtype if dtype is not None else self.dtype
 
     return tfd.LinearGaussianStateSpaceModel(
@@ -386,7 +415,8 @@ class _AdditiveStateSpaceModelTest(tf.test.TestCase):
                 np.ones(batch_shape + [observation_size]), dtype=dtype)),
         initial_state_prior=tfd.MultivariateNormalDiag(
             scale_diag=self._build_placeholder(
-                np.ones(batch_shape + [latent_size]), dtype=dtype)))
+                np.ones(initial_state_prior_batch_shape + [latent_size]),
+                dtype=dtype)))
 
 
 @test_util.run_all_in_graph_and_eager_modes

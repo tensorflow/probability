@@ -278,7 +278,9 @@ class AdditiveStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
       # matrices from components. We also take this as an opportunity to enforce
       # any dynamic assertions we may have generated above.
       broadcast_batch_shape = tf.convert_to_tensor(
-          value=sts_util.broadcast_batch_shape(component_ssms), dtype=tf.int32)
+          value=sts_util.broadcast_batch_shape(
+              [ssm.get_observation_matrix_for_timestep(initial_step)
+               for ssm in component_ssms]), dtype=tf.int32)
       broadcast_obs_matrix = tf.ones(
           tf.concat([broadcast_batch_shape, [1, 1]], axis=0), dtype=dtype)
       if assertions:
