@@ -36,6 +36,20 @@ __all__ = [
 ]
 
 
+def _get_tol(tol, dtype, validate_args):
+  """Gets a Tensor of type `dtype`, 0 if `tol` is None, validation optional."""
+  if tol is None:
+    return tf.convert_to_tensor(value=0, dtype=dtype)
+
+  tol = tf.convert_to_tensor(value=tol, dtype=dtype)
+  if validate_args:
+    tol = distribution_util.with_dependencies([
+        tf.compat.v1.assert_non_negative(
+            tol, message="Argument 'tol' must be non-negative")
+    ], tol)
+  return tol
+
+
 @six.add_metaclass(abc.ABCMeta)
 class _BaseDeterministic(distribution.Distribution):
   """Base class for Deterministic distributions."""
@@ -47,6 +61,7 @@ class _BaseDeterministic(distribution.Distribution):
                is_vector=False,
                validate_args=False,
                allow_nan_stats=True,
+               parameters=None,
                name="_BaseDeterministic"):
     """Initialize a batch of `_BaseDeterministic` distributions.
 
@@ -78,12 +93,12 @@ class _BaseDeterministic(distribution.Distribution):
         (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
         result is undefined. When `False`, an exception is raised if one or
         more of the statistic's batch members are undefined.
+      parameters: Dict of locals to facilitate copy construction.
       name: Python `str` name prefixed to Ops created by this class.
 
     Raises:
       ValueError:  If `loc` is a scalar.
     """
-    parameters = dict(locals())
     with tf.compat.v1.name_scope(name, values=[loc, atol, rtol]) as name:
       dtype = dtype_util.common_dtype([loc, atol, rtol],
                                       preferred_dtype=tf.float32)
@@ -97,6 +112,8 @@ class _BaseDeterministic(distribution.Distribution):
           loc = distribution_util.with_dependencies(
               [tf.compat.v1.assert_rank_at_least(loc, 1, message=msg)], loc)
       self._loc = loc
+      self._atol = _get_tol(atol, self._loc.dtype, validate_args)
+      self._rtol = _get_tol(rtol, self._loc.dtype, validate_args)
 
       super(_BaseDeterministic, self).__init__(
           dtype=self._loc.dtype,
@@ -104,28 +121,14 @@ class _BaseDeterministic(distribution.Distribution):
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
           parameters=parameters,
-          graph_parents=[self._loc],
+          graph_parents=[self._loc, self._atol, self._rtol],
           name=name)
 
-      self._atol = self._get_tol(atol)
-      self._rtol = self._get_tol(rtol)
       # Avoid using the large broadcast with self.loc if possible.
       if rtol is None:
         self._slack = self.atol
       else:
         self._slack = self.atol + self.rtol * tf.abs(self.loc)
-
-  def _get_tol(self, tol):
-    if tol is None:
-      return tf.convert_to_tensor(value=0, dtype=self.loc.dtype)
-
-    tol = tf.convert_to_tensor(value=tol, dtype=self.loc.dtype)
-    if self.validate_args:
-      tol = distribution_util.with_dependencies([
-          tf.compat.v1.assert_non_negative(
-              tol, message="Argument 'tol' must be non-negative")
-      ], tol)
-    return tol
 
   @property
   def loc(self):
@@ -242,19 +245,25 @@ class Deterministic(_BaseDeterministic):
         more of the statistic's batch members are undefined.
       name: Python `str` name prefixed to Ops created by this class.
     """
+    parameters = dict(locals())
     super(Deterministic, self).__init__(
         loc,
         atol=atol,
         rtol=rtol,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
+        parameters=parameters,
         name=name)
 
+  def _params_event_ndims(self):
+    return dict(loc=0, atol=0, rtol=0)
+
   def _batch_shape_tensor(self):
-    return tf.shape(input=self.loc)
+    return tf.broadcast_dynamic_shape(
+        tf.shape(input=self.loc), tf.shape(input=self._slack))
 
   def _batch_shape(self):
-    return self.loc.shape
+    return tf.broadcast_static_shape(self.loc.shape, self._slack.shape)
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
@@ -349,6 +358,7 @@ class VectorDeterministic(_BaseDeterministic):
         more of the statistic's batch members are undefined.
       name: Python `str` name prefixed to Ops created by this class.
     """
+    parameters = dict(locals())
     super(VectorDeterministic, self).__init__(
         loc,
         atol=atol,
@@ -356,13 +366,18 @@ class VectorDeterministic(_BaseDeterministic):
         is_vector=True,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
+        parameters=parameters,
         name=name)
 
+  def _params_event_ndims(self):
+    return dict(loc=1, atol=1, rtol=1)
+
   def _batch_shape_tensor(self):
-    return tf.shape(input=self.loc)[:-1]
+    return tf.broadcast_dynamic_shape(
+        tf.shape(input=self.loc), tf.shape(input=self._slack))[:-1]
 
   def _batch_shape(self):
-    return self.loc.shape[:-1]
+    return tf.broadcast_static_shape(self.loc.shape, self._slack.shape)[:-1]
 
   def _event_shape_tensor(self):
     return tf.shape(input=self.loc)[-1:]
