@@ -158,35 +158,11 @@ def one_step_predictive(model, observed_time_series, parameter_samples):
     (_, _, _, _, _, observation_means, observation_covs
     ) = lgssm.forward_filter(observed_time_series)
 
-    # Construct the predictive distribution by mixing over posterior draws.
-    # Unfortunately this requires some shenanigans with shapes. The predictive
-    # parameters have shape
-    #   `concat([
-    #      [num_posterior_draws],
-    #      observed_time_series.sample_shape,
-    #      lgssm.batch_shape,
-    #      lgssm.event_shape  # => [num_timesteps, 1]
-    #    ]`
-    # Because MixtureSameFamily mixes over the rightmost batch dimension,
-    # we need to move the `num_posterior_draws` dimension to be rightmost
-    # in the batch shape. This requires use of `Independent` (to preserve
-    # `num_timesteps` as part of the event shape) and `move_dimension`.
-    # TODO(b/120245392): enhance `MixtureSameFamily` to reduce along an
-    # arbitrary axis, and eliminate `move_dimension` calls here.
-    predictions = tfd.Independent(
-        distribution=tfd.Normal(
-            loc=dist_util.move_dimension(observation_means[..., 0], 0, -2),
-            scale=tf.sqrt(dist_util.move_dimension(
-                observation_covs[..., 0, 0], 0, -2))),
-        reinterpreted_batch_ndims=1)
-
-    num_posterior_draws = dist_util.prefer_static_value(
-        tf.shape(input=observation_means))[0]
-    return tfd.MixtureSameFamily(
-        mixture_distribution=tfd.Categorical(
-            logits=tf.zeros([num_posterior_draws],
-                            dtype=predictions.dtype)),
-        components_distribution=predictions)
+    # Squeeze dims to convert from LGSSM's event shape `[num_timesteps, 1]`
+    # to a scalar time series.
+    return sts_util.mix_over_posterior_draws(
+        means=observation_means[..., 0],
+        variances=observation_covs[..., 0, 0])
 
 
 def forecast(model,

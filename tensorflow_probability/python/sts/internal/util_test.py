@@ -199,5 +199,24 @@ class UtilityTests(tf.test.TestCase):
                   input=tf.zeros(shape_in), shape=static_shape))).shape
       self.assertAllEqual(shape_out, expected_shape_out)
 
+  def test_mix_over_posterior_draws(self):
+    num_posterior_draws = 3
+    batch_shape = [2, 1]
+    means = np.random.randn(*np.concatenate([[num_posterior_draws],
+                                             batch_shape]))
+    variances = np.exp(np.random.randn(*np.concatenate(
+        [[num_posterior_draws], batch_shape])))
+
+    posterior_mixture_dist = sts_util.mix_over_posterior_draws(means, variances)
+
+    # Compute the true statistics of the mixture distribution.
+    mixture_mean = np.mean(means, axis=0)
+    mixture_variance = np.mean(variances + means**2, axis=0) - mixture_mean**2
+
+    self.assertAllClose(mixture_mean,
+                        self.evaluate(posterior_mixture_dist.mean()))
+    self.assertAllClose(mixture_variance,
+                        self.evaluate(posterior_mixture_dist.variance()))
+
 if __name__ == "__main__":
   tf.test.main()

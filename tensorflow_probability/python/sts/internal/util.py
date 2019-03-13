@@ -21,8 +21,9 @@ from __future__ import print_function
 import tensorflow as tf
 
 from tensorflow_probability.python import distributions as tfd
-
 from tensorflow_probability.python.distributions.mvn_linear_operator import MultivariateNormalLinearOperator
+from tensorflow_probability.python.internal import distribution_util as dist_util
+
 
 tfl = tf.linalg
 
@@ -193,3 +194,49 @@ def maybe_expand_trailing_dim(observed_time_series):
           true_fn=lambda: observed_time_series,
           false_fn=lambda: observed_time_series[..., tf.newaxis])
     return expanded_time_series
+
+
+def mix_over_posterior_draws(means, variances):
+  """Construct a predictive normal distribution that mixes over posterior draws.
+
+  Args:
+    means: float `Tensor` of shape
+      `[num_posterior_draws, ..., num_timesteps]`.
+    variances: float `Tensor` of shape
+      `[num_posterior_draws, ..., num_timesteps]`.
+
+  Returns:
+    mixture_dist: `tfd.MixtureSameFamily(tfd.Independent(tfd.Normal))` instance
+      representing a uniform mixture over the posterior samples, with
+      `batch_shape = ...` and `event_shape = [num_timesteps]`.
+
+  """
+  # The inputs `means`, `variances` have shape
+  #   `concat([
+  #      [num_posterior_draws],
+  #      sample_shape,
+  #      batch_shape,
+  #      [num_timesteps]])`
+  # Because MixtureSameFamily mixes over the rightmost batch dimension,
+  # we need to move the `num_posterior_draws` dimension to be rightmost
+  # in the batch shape. This requires use of `Independent` (to preserve
+  # `num_timesteps` as part of the event shape) and `move_dimension`.
+  # TODO(b/120245392): enhance `MixtureSameFamily` to reduce along an
+  # arbitrary axis, and eliminate `move_dimension` calls here.
+
+  with tf.compat.v1.name_scope(
+      'mix_over_posterior_draws', values=[means, variances]):
+    num_posterior_draws = dist_util.prefer_static_value(
+        tf.shape(input=means))[0]
+
+    component_observations = tfd.Independent(
+        distribution=tfd.Normal(
+            loc=dist_util.move_dimension(means, 0, -2),
+            scale=tf.sqrt(dist_util.move_dimension(variances, 0, -2))),
+        reinterpreted_batch_ndims=1)
+
+    return tfd.MixtureSameFamily(
+        mixture_distribution=tfd.Categorical(
+            logits=tf.zeros([num_posterior_draws],
+                            dtype=component_observations.dtype)),
+        components_distribution=component_observations)
