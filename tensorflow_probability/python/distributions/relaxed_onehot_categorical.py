@@ -221,10 +221,13 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
     return self._probs
 
   def _batch_shape_tensor(self):
-    return tf.shape(input=self._logits)[:-1]
+    return tf.broadcast_dynamic_shape(
+        tf.shape(input=self.temperature),
+        tf.shape(input=self.logits)[:-1])
 
   def _batch_shape(self):
-    return self.logits.shape[:-1]
+    return tf.broadcast_static_shape(self.temperature.shape,
+                                     self.logits.shape[:-1])
 
   def _event_shape_tensor(self):
     return tf.shape(input=self.logits)[-1:]
@@ -233,9 +236,6 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
     return self.logits.shape.with_rank_at_least(1)[-1:]
 
   def _sample_n(self, n, seed=None):
-    sample_shape = tf.concat([[n], tf.shape(input=self.logits)], 0)
-    logits = self.logits * tf.ones(sample_shape, dtype=self.dtype)
-    logits_2d = tf.reshape(logits, [-1, self.event_size])
     # Uniform variates must be sampled from the open-interval `(0, 1)` rather
     # than `[0, 1)`. To do so, we use `np.finfo(self.dtype.as_numpy_dtype).tiny`
     # because it is the smallest, positive, "normal" number. A "normal" number
@@ -243,17 +243,17 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
     # numbers x, y have the reasonable property that, `x + y >= max(x, y)`. In
     # this case, a subnormal number (i.e., np.nextafter) can cause us to sample
     # 0.
+    uniform_shape = tf.concat(
+        [[n], self.batch_shape_tensor(), self.event_shape_tensor()], 0)
     uniform = tf.random.uniform(
-        shape=tf.shape(input=logits_2d),
+        shape=uniform_shape,
         minval=np.finfo(self.dtype.as_numpy_dtype).tiny,
         maxval=1.,
         dtype=self.dtype,
         seed=seed)
     gumbel = -tf.math.log(-tf.math.log(uniform))
-    noisy_logits = (gumbel + logits_2d) / self._temperature_2d
-    samples = tf.nn.log_softmax(noisy_logits)
-    ret = tf.reshape(samples, sample_shape)
-    return ret
+    noisy_logits = (gumbel + self.logits) / self.temperature[..., tf.newaxis]
+    return tf.nn.log_softmax(noisy_logits)
 
   def _log_prob(self, x):
     x = self._assert_valid_sample(x)
@@ -264,22 +264,17 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
         x.shape != logits.shape):
       logits = tf.ones_like(x, dtype=logits.dtype) * logits
       x = tf.ones_like(logits, dtype=x.dtype) * x
-    logits_shape = tf.shape(input=tf.reduce_sum(input_tensor=logits, axis=[-1]))
-    logits_2d = tf.reshape(logits, [-1, self.event_size])
-    x_2d = tf.reshape(x, [-1, self.event_size])
     # compute the normalization constant
     k = tf.cast(self.event_size, x.dtype)
     log_norm_const = (
         tf.math.lgamma(k) + (k - 1.) * tf.math.log(self.temperature))
     # compute the unnormalized density
-    log_softmax = tf.nn.log_softmax(logits_2d - x_2d * self._temperature_2d)
+    log_softmax = tf.nn.log_softmax(
+        self.logits - x * self.temperature[..., tf.newaxis])
     log_unnorm_prob = tf.reduce_sum(
         input_tensor=log_softmax, axis=[-1], keepdims=False)
     # combine unnormalized density with normalization constant
-    log_prob = log_norm_const + log_unnorm_prob
-    # Reshapes log_prob to be consistent with shape of user-supplied logits
-    ret = tf.reshape(log_prob, logits_shape)
-    return ret
+    return log_norm_const + log_unnorm_prob
 
   def _assert_valid_sample(self, x):
     if not self.validate_args:
