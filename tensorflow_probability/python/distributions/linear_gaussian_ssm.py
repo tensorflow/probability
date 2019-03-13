@@ -1104,6 +1104,56 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
     _, observation_covs = self._joint_covariances()
     return tf.linalg.diag_part(observation_covs)
 
+  def latents_to_observations(self, latent_means, latent_covs):
+    """Push latent means and covariances forward through the observation model.
+
+    Args:
+      latent_means: float `Tensor` of shape `[..., num_timesteps, latent_size]`
+      latent_covs: float `Tensor` of shape
+        `[..., num_timesteps, latent_size, latent_size]`.
+
+    Returns:
+      observation_means: float `Tensor` of shape
+        `[..., num_timesteps, observation_size]`
+      observation_covs: float `Tensor` of shape
+        `[..., num_timesteps, observation_size, observation_size]`
+    """
+
+    with tf.compat.v1.name_scope(
+        "latents_to_observations", values=[latent_means, latent_covs]):
+
+      pushforward_latents_step = build_pushforward_latents_step(
+          self.get_observation_matrix_for_timestep,
+          self.get_observation_noise_for_timestep)
+
+      latent_means = distribution_util.move_dimension(
+          latent_means, source_idx=-2, dest_idx=0)
+      latent_means = latent_means[..., tf.newaxis]  # Make matmul happy.
+      latent_covs = distribution_util.move_dimension(
+          latent_covs, source_idx=-3, dest_idx=0)
+
+      (initial_observation_mean,
+       initial_observation_cov) = pushforward_latents_step(
+           _=None,  # Loop body ignores previous observations.
+           latent_t_mean_cov=(self.initial_step,
+                              latent_means[self.initial_step],
+                              latent_covs[self.initial_step]))
+
+      # TODO(davmre) this loop is embarassingly parallel; replace with `pfor`.
+      timesteps = tf.range(self.initial_step,
+                           self.initial_step + self.num_timesteps)
+      observation_means, observation_covs = tf.scan(
+          pushforward_latents_step,
+          elems=(timesteps, latent_means, latent_covs),
+          initializer=(initial_observation_mean, initial_observation_cov),
+          parallel_iterations=10000)
+
+      observation_means = distribution_util.move_dimension(
+          observation_means[..., 0], source_idx=0, dest_idx=-2)
+      observation_covs = distribution_util.move_dimension(
+          observation_covs, source_idx=0, dest_idx=-3)
+
+      return observation_means, observation_covs
 
 KalmanFilterState = collections.namedtuple("KalmanFilterState", [
     "filtered_mean", "filtered_cov",
@@ -1641,6 +1691,42 @@ def build_kalman_sample_step(get_transition_matrix_for_timestep,
     return (latent_sampled, observation_sampled)
 
   return sample_step
+
+
+def build_pushforward_latents_step(get_observation_matrix_for_timestep,
+                                   get_observation_noise_for_timestep):
+  """Build a callable to push latent means/covs to observed means/covs.
+
+  Args:
+    get_observation_matrix_for_timestep: callable taking a timestep
+      as an integer `Tensor` argument, and returning a `LinearOperator`
+      of shape `[observation_size, observation_size]`.
+    get_observation_noise_for_timestep: callable taking a timestep as
+      an integer `Tensor` argument, and returning a
+      `MultivariateNormalLinearOperator` of event shape
+      `[observation_size]`.
+
+  Returns:
+    pushforward_latents_step: a callable that computes the observation mean and
+    covariance at time `t`, given latent mean and covariance at time `t`.
+  """
+
+  def pushforward_latents_step(_, latent_t_mean_cov):
+    """Loop body fn to pushforward latents to observations at a time step."""
+    t, latent_mean, latent_cov = latent_t_mean_cov
+
+    observation_matrix = get_observation_matrix_for_timestep(t)
+    observation_noise = get_observation_noise_for_timestep(t)
+    observation_mean = _propagate_mean(latent_mean,
+                                       observation_matrix,
+                                       observation_noise)
+    observation_cov = _propagate_cov(latent_cov,
+                                     observation_matrix,
+                                     observation_noise)
+
+    return (observation_mean, observation_cov)
+
+  return pushforward_latents_step
 
 
 def _propagate_mean(mean, linop, dist):

@@ -30,6 +30,7 @@ from tensorflow_probability.python.distributions.linear_gaussian_ssm import buil
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import build_kalman_cov_step
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import build_kalman_filter_step
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import build_kalman_mean_step
+from tensorflow_probability.python.distributions.linear_gaussian_ssm import build_pushforward_latents_step
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import kalman_transition
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import KalmanFilterState
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import linear_gaussian_update
@@ -499,6 +500,32 @@ class BatchTest(tf.test.TestCase):
                                      observation_noise_batch_shape=batch_shape)
     self._sanity_check_shapes(model, batch_shape, event_shape,
                               num_timesteps, latent_size)
+
+  def testLatentsToObservationsWorksWithBatchShape(self):
+    num_timesteps = 5
+    latent_size = 3
+    observation_size = 2
+    batch_shape = [3, 4]
+
+    model = self._build_random_model(num_timesteps,
+                                     latent_size,
+                                     observation_size,
+                                     prior_batch_shape=batch_shape,
+                                     transition_matrix_batch_shape=batch_shape,
+                                     transition_noise_batch_shape=batch_shape,
+                                     observation_matrix_batch_shape=batch_shape,
+                                     observation_noise_batch_shape=batch_shape)
+    latent_means, observation_means = model._joint_mean()
+    latent_covs, observation_covs = model._joint_covariances()
+    (pushforward_means, pushforward_covs) = model.latents_to_observations(
+        latent_means, latent_covs)
+
+    (observation_means_, observation_covs_,
+     pushforward_means_, pushforward_covs_) = self.evaluate((
+         observation_means, observation_covs,
+         pushforward_means, pushforward_covs))
+    self.assertAllClose(pushforward_means_, observation_means_)
+    self.assertAllClose(pushforward_covs_, observation_covs_)
 
 
 class MissingObservationsTests(tfp_test_case.TestCase):
@@ -1175,6 +1202,29 @@ class _KalmanStepsTest(object):
     self.assertAllClose(obs_cov,
                         np.dot(self.observation_matrix,
                                np.dot(new_cov, self.observation_matrix.T)) +
+                        np.diag(self.observation_noise_scale_diag**2))
+
+  def testPushforwardLatentsStepIsCorrect(self):
+
+    latent_mean_ = np.asarray([1.1, -3.], dtype=np.float32)[..., np.newaxis]
+    latent_cov_ = np.asarray([[.5, -.2], [-.2, .9]], dtype=np.float32)
+    latent_mean_tensor = self.build_tensor(latent_mean_)
+    latent_cov_tensor = self.build_tensor(latent_cov_)
+
+    pushforward_step = build_pushforward_latents_step(
+        self.get_observation_matrix_for_timestep,
+        self.get_observation_noise_for_timestep)
+    obs_mean, obs_cov = self.evaluate(
+        pushforward_step(_=None,  # Loop body ignores previous observations.
+                         latent_t_mean_cov=(
+                             0, latent_mean_tensor, latent_cov_tensor)))
+
+    self.assertAllClose(obs_mean,
+                        np.dot(self.observation_matrix, latent_mean_) +
+                        self.observation_bias[:, np.newaxis])
+    self.assertAllClose(obs_cov,
+                        np.dot(self.observation_matrix,
+                               np.dot(latent_cov_, self.observation_matrix.T)) +
                         np.diag(self.observation_noise_scale_diag**2))
 
 
