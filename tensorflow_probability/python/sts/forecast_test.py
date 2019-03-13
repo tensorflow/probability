@@ -28,7 +28,7 @@ tfd = tfp.distributions
 
 class _ForecastTest(object):
 
-  def _build_model(self, observed_time_series):
+  def _build_model(self, observed_time_series, constant_offset=None):
     seasonal = tfp.sts.Seasonal(
         num_seasons=4,
         observed_time_series=observed_time_series,
@@ -36,13 +36,15 @@ class _ForecastTest(object):
                                         scale=self._build_tensor(1.)),
         name='seasonal')
     return tfp.sts.Sum(components=[seasonal],
-                       constant_offset=0.,  # Simplifies analytic calculations.
+                       constant_offset=constant_offset,
                        observed_time_series=observed_time_series)
 
   def test_one_step_predictive_correctness(self):
     observed_time_series_ = np.array([1., -1., -3., 4., 0.5, 2., 1., 3.])
     observed_time_series = self._build_tensor(observed_time_series_)
-    model = self._build_model(observed_time_series)
+    model = self._build_model(
+        observed_time_series,
+        constant_offset=0.)  # Simplifies analytic calculations.
 
     drift_scale = 0.1
     observation_noise_scale = 0.01
@@ -103,7 +105,9 @@ class _ForecastTest(object):
   def test_forecast_correctness(self):
     observed_time_series_ = np.array([1., -1., -3., 4.])
     observed_time_series = self._build_tensor(observed_time_series_)
-    model = self._build_model(observed_time_series)
+    model = self._build_model(
+        observed_time_series,
+        constant_offset=0.)  # Simplifies analytic calculations.
 
     drift_scale = 0.1
     observation_noise_scale = 0.01
@@ -180,6 +184,10 @@ class _ForecastTest(object):
     batch_shape = [3, 2]
     observed_time_series = self._build_tensor(np.random.randn(
         *(batch_shape + [num_timesteps])))
+
+    # By not passing a constant offset, we test that the default behavior
+    # (setting constant offset to the observed mean) works when the observed
+    # time series has batch shape.
     model = self._build_model(observed_time_series)
     prior_samples = [param.prior.sample(num_param_samples)
                      for param in model.parameters]

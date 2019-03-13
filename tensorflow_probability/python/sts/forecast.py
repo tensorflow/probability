@@ -340,11 +340,36 @@ def forecast(model,
         loc=dist_util.move_dimension(predictive_means[..., -1, :], 0, -2),
         covariance_matrix=dist_util.move_dimension(
             predictive_covs[..., -1, :, :], 0, -3))
-    forecast_ssm = model.make_state_space_model(
+
+    # Ugly hack: because we moved `num_posterior_draws` to the trailing (rather
+    # than leading) dimension of parameters, the parameter batch shapes no
+    # longer broadcast against the `constant_offset` attribute used in `sts.Sum`
+    # models. We fix this by manually adding an extra broadcasting dim to
+    # `constant_offset` if present.
+    # The root cause of this hack is that we mucked with param dimensions above
+    # and are now passing params that are 'invalid' in the sense that they don't
+    # match the shapes of the model's param priors. The fix (as above) will be
+    # to update MixtureSameFamily so we can avoid changing param dimensions
+    # altogether.
+    # TODO(b/120245392): enhance `MixtureSameFamily` to reduce along an
+    # arbitrary axis, and eliminate this hack.
+    kwargs = {}
+    if hasattr(model, 'constant_offset'):
+      kwargs['constant_offset'] = tf.convert_to_tensor(
+          value=model.constant_offset,
+          dtype=forecast_prior.dtype)[..., tf.newaxis]
+
+    # We assume that any STS model that has a `constant_offset` attribute
+    # will allow it to be overridden as a kwarg. This is currently just
+    # `sts.Sum`.
+    # TODO(b/120245392): when kwargs hack is removed, switch back to calling
+    # the public version of `_make_state_space_model`.
+    forecast_ssm = model._make_state_space_model(  # pylint: disable=protected-access
         num_timesteps=num_steps_forecast,
-        param_vals=parameter_samples_with_reordered_batch_dimension,
+        param_map=parameter_samples_with_reordered_batch_dimension,
         initial_state_prior=forecast_prior,
-        initial_step=num_observed_steps)
+        initial_step=num_observed_steps,
+        **kwargs)
 
     num_posterior_draws = dist_util.prefer_static_value(
         forecast_ssm.batch_shape_tensor())[-1]

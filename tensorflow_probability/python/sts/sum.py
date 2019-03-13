@@ -476,7 +476,8 @@ class Sum(StructuralTimeSeries):
                               num_timesteps,
                               param_map,
                               initial_step=0,
-                              initial_state_prior=None):
+                              initial_state_prior=None,
+                              constant_offset=None):
 
     # List the model parameters in canonical order
     param_vals_list = [param_map[p.name] for p in self.parameters]
@@ -499,9 +500,12 @@ class Sum(StructuralTimeSeries):
               param_vals=component_param_vals,
               initial_step=initial_step))
 
+    if constant_offset is None:
+      constant_offset = self.constant_offset
+
     return AdditiveStateSpaceModel(
         component_ssms=component_ssms,
-        constant_offset=self.constant_offset,
+        constant_offset=constant_offset,
         observation_noise_scale=observation_noise_scale,
         initial_state_prior=initial_state_prior,
         initial_step=initial_step)
