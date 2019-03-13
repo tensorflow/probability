@@ -26,10 +26,133 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 
 __all__ = [
+    'count_integers',
     'find_bins',
+    'histogram',
     'percentile',
     'quantiles',
 ]
+
+
+# TODO(b/124015136) This function isn't necessary once tf.math.bincount supports
+# an `axis` kwarg.
+def count_integers(arr,
+                   weights=None,
+                   minlength=None,
+                   maxlength=None,
+                   axis=None,
+                   dtype=tf.int32,
+                   name=None):
+  """Counts the number of occurrences of each value in an integer array `arr`.
+
+  Works like `tf.math.bincount`, but provides an `axis` kwarg that specifies
+  dimensions to reduce over.  With
+    `~axis = [i for i in range(arr.ndim) if i not in axis]`,
+  this function returns a `Tensor` of shape `[K] + arr.shape[~axis]`.
+
+  If `minlength` and `maxlength` are not given, `K = tf.reduce_max(arr) + 1`
+  if `arr` is non-empty, and 0 otherwise.
+  If `weights` are non-None, then index `i` of the output stores the sum of the
+  value in `weights` at each index where the corresponding value in `arr` is
+  `i`.
+
+  Args:
+    arr: An `int32` `Tensor` of non-negative values.
+    weights: If non-None, must be the same shape as arr. For each value in
+      `arr`, the bin will be incremented by the corresponding weight instead of
+      1.
+    minlength: If given, ensures the output has length at least `minlength`,
+      padding with zeros at the end if necessary.
+    maxlength: If given, skips values in `arr` that are equal or greater than
+      `maxlength`, ensuring that the output has length at most `maxlength`.
+    axis: A `0-D` or `1-D` `int32` `Tensor` (with static values) designating
+      dimensions in `arr` to reduce over.
+      `Default value:` `None`, meaning reduce over all dimensions.
+    dtype: If `weights` is None, determines the type of the output bins.
+    name: A name scope for the associated operations (optional).
+
+  Returns:
+    A vector with the same dtype as `weights` or the given `dtype`. The bin
+    values.
+  """
+  with tf.compat.v1.name_scope(
+      name, 'count_integers', values=[arr, weights, minlength, maxlength,
+                                      axis]):
+    if axis is None:
+      return tf.math.bincount(
+          arr,
+          weights=weights,
+          minlength=minlength,
+          maxlength=maxlength,
+          dtype=dtype)
+
+    arr = tf.convert_to_tensor(value=arr, dtype=tf.int32, name='arr')
+    arr_ndims = _get_static_ndims(arr, expect_static=True)
+
+    axis = _make_static_axis_non_negative_list(axis, arr_ndims)
+
+    # ~axis from docstring.  Dims in arr that are not in axis.
+    not_axis = sorted(set(range(arr_ndims)).difference(axis))
+
+    # If we're reducing over everything, just use standard bincount.
+    if not not_axis:
+      return tf.math.bincount(
+          arr,
+          weights=weights,
+          minlength=minlength,
+          maxlength=maxlength,
+          dtype=dtype)
+
+    # Move dims in ~axis to the left, so we can tf.map_fn bincount over them,
+    # Producing counts for every index I in ~axis.
+    # Thus, flat_arr is not totally flat, it just has the dims in ~axis
+    # flattened.
+    flat_arr = _move_dims_to_flat_end(arr, not_axis, arr_ndims, right_end=False)
+
+    # tf.map_fn over dim 0.
+    if weights is None:
+
+      def one_bincount(arr_slice):
+        return tf.math.bincount(
+            arr_slice,
+            weights=None,
+            minlength=minlength,
+            maxlength=maxlength,
+            dtype=dtype)
+
+      flat_counts = tf.map_fn(one_bincount, elems=flat_arr, dtype=dtype)
+    else:
+      weights = tf.convert_to_tensor(value=weights, name='weights')
+      _get_static_ndims(weights, expect_static=True, expect_ndims=arr_ndims)
+      flat_weights = _move_dims_to_flat_end(
+          weights, not_axis, arr_ndims, right_end=False)
+
+      def one_bincount(arr_and_weights_slices):
+        arr_slice, weights_slice = arr_and_weights_slices
+        return tf.math.bincount(
+            arr_slice,
+            weights=weights_slice,
+            minlength=minlength,
+            maxlength=maxlength,
+            dtype=dtype)
+
+      flat_counts = tf.map_fn(
+          one_bincount, elems=[flat_arr, flat_weights], dtype=weights.dtype)
+
+    # flat_counts.shape = [prod(~axis), K], because map_fn stacked on axis 0.
+    # bincount needs to have the K bins in axis 0, so transpose...
+    flat_counts_t = tf.transpose(a=flat_counts, perm=[1, 0])
+
+    # Throw in this assert, to ensure shape assumptions are correct.
+    _get_static_ndims(flat_counts_t, expect_ndims=2, expect_static=True)
+
+    # not_axis_shape = arr.shape[~axis]
+    not_axis_shape = tf.gather(tf.shape(input=arr), indices=not_axis)
+
+    # The first index of flat_counts_t indexes bins 0,..,K-1, the rest are ~axis
+    out_shape = tf.concat([[-1], not_axis_shape], axis=0)
+
+    return tf.reshape(flat_counts_t, out_shape)
 
 
 def find_bins(x,
@@ -166,6 +289,117 @@ def find_bins(x,
     return bins
 
 
+def histogram(x,
+              edges,
+              axis=None,
+              extend_lower_interval=False,
+              extend_upper_interval=False,
+              dtype=None,
+              name=None):
+  """Count how often `x` falls in intervals defined by `edges`.
+
+  Given `edges = [c0, ..., cK]`, defining intervals
+  `I0 = [c0, c1)`, `I1 = [c1, c2)`, ..., `I_{K-1} = [c_{K-1}, cK]`,
+  This function counts how often `x` falls into each interval.
+
+  Values of `x` outside of the intervals cause errors.  Consider using
+  `extend_lower_interval`, `extend_upper_interval` to deal with this.
+
+  Args:
+    x:  Numeric `N-D` `Tensor` with `N > 0`.  If `axis` is not
+      `None`, must have statically known number of dimensions. The
+      `axis` kwarg determines which dimensions index iid samples.
+      Other dimensions of `x` index "events" for which we will compute different
+      histograms.
+    edges:  `Tensor` of same `dtype` as `x`.  The first dimension indexes edges
+      of intervals.  Must either be `1-D` or have `edges.shape[1:]` the same
+      as the dimensions of `x` excluding `axis`.
+      If `rank(edges) > 1`, `edges[k]` designates a shape `edges.shape[1:]`
+      `Tensor` of interval edges for the corresponding dimensions of `x`.
+    axis:  Optional `0-D` or `1-D` integer `Tensor` with constant
+      values. The axis in `x` that index iid samples.
+      `Default value:` `None` (treat every dimension as sample dimension).
+    extend_lower_interval:  Python `bool`.  If `True`, extend the lowest
+      interval `I0` to `(-inf, c1]`.
+    extend_upper_interval:  Python `bool`.  If `True`, extend the upper
+      interval `I_{K-1}` to `[c_{K-1}, +inf)`.
+    dtype: The output type (`int32` or `int64`). `Default value:` `x.dtype`.
+    name:  A Python string name to prepend to created ops.
+      `Default value:` 'histogram'
+
+  Returns:
+    counts: `Tensor` of type `dtype` and, with
+      `~axis = [i for i in range(arr.ndim) if i not in axis]`,
+      `counts.shape = [edges.shape[0]] + x.shape[~axis]`.
+      With `I` a multi-index into `~axis`, `counts[k][I]` is the number of times
+      event(s) fell into the `kth` interval of `edges`.
+
+  #### Examples
+
+  ```python
+  # x.shape = [1000, 2]
+  # x[:, 0] ~ Uniform(0, 1), x[:, 1] ~ Uniform(1, 2).
+  x = tf.stack([tf.random_uniform([1000]), 1 + tf.random_uniform([1000])],
+               axis=-1)
+
+  # edges ==> bins [0, 0.5), [0.5, 1.0), [1.0, 1.5), [1.5, 2.0].
+  edges = [0., 0.5, 1.0, 1.5, 2.0]
+
+  tfp.stats.histogram(x, edges)
+  ==> approximately [500, 500, 500, 500]
+
+  tfp.stats.histogram(x, edges, axis=0)
+  ==> approximately [[500, 500, 0, 0], [0, 0, 500, 500]]
+  ```
+
+  """
+  with tf.compat.v1.name_scope(name, 'histogram', values=[x, edges, axis]):
+
+    # Tensor conversions.
+    in_dtype = dtype_util.common_dtype([x, edges], preferred_dtype=tf.float32)
+
+    x = tf.convert_to_tensor(value=x, name='x', dtype=in_dtype)
+    edges = tf.convert_to_tensor(value=edges, name='edges', dtype=in_dtype)
+
+    # Move dims in axis to the left end as one flattened dim.
+    # After this, x.shape = [n_samples] + E.
+    if axis is None:
+      x = tf.reshape(x, shape=[-1])
+    else:
+      x_ndims = _get_static_ndims(
+          x, expect_static=True, expect_ndims_at_least=1)
+      axis = _make_static_axis_non_negative_list(axis, x_ndims)
+      if not axis:
+        raise ValueError('`axis` cannot be empty.  Found: {}'.format(axis))
+      x = _move_dims_to_flat_end(x, axis, x_ndims, right_end=False)
+
+    # bins.shape = x.shape = [n_samples] + E,
+    # and bins[i] is a shape E Tensor of the bins that sample `i` fell into.
+    # E is the "event shape", which is [] if axis is None.
+    bins = find_bins(
+        x,
+        edges=edges,
+        # If not extending intervals, then values outside the edges will return
+        # -1, which gives an error when fed to bincount.
+        extend_lower_interval=extend_lower_interval,
+        extend_upper_interval=extend_upper_interval,
+        dtype=tf.int32)
+
+    # TODO(b/124015136) Use standard tf.math.bincount once it supports `axis`.
+    counts = count_integers(
+        bins,
+        # Ensure we get correct output, even if x did not fall into every bin
+        minlength=tf.shape(input=edges)[0] - 1,
+        maxlength=tf.shape(input=edges)[0] - 1,
+        axis=0,
+        dtype=dtype or in_dtype)
+    n_edges = tf.compat.dimension_value(edges.shape[0])
+    if n_edges is not None:
+      counts.set_shape(
+          tf.TensorShape([n_edges - 1]).concatenate(counts.shape[1:]))
+    return counts
+
+
 def percentile(x,
                q,
                axis=None,
@@ -196,7 +430,7 @@ def percentile(x,
       `x` must have statically known number of dimensions.
     q:  Scalar or vector `Tensor` with values in `[0, 100]`. The percentile(s).
     axis:  Optional `0-D` or `1-D` integer `Tensor` with constant values. The
-      axis that hold independent samples over which to return the desired
+      axis that index independent samples over which to return the desired
       percentile.  If `None` (the default), treat every dimension as a sample
       dimension, returning a scalar.
     interpolation : {'nearest', 'linear', 'lower', 'higher', 'midpoint'}.
@@ -297,7 +531,7 @@ def percentile(x,
       x_ndims = _get_static_ndims(
           x, expect_static=True, expect_ndims_at_least=1)
       axis = _make_static_axis_non_negative_list(axis, x_ndims)
-      y = _move_dims_to_flat_end(x, axis, x_ndims)
+      y = _move_dims_to_flat_end(x, axis, x_ndims, right_end=True)
 
     frac_at_q_or_above = 1. - q / 100.
 
@@ -400,7 +634,7 @@ def quantiles(x,
     num_quantiles:  Scalar `integer` `Tensor`.  The number of intervals the
       returned `num_quantiles + 1` cut points divide the range into.
     axis:  Optional `0-D` or `1-D` integer `Tensor` with constant values. The
-      axis that hold independent samples over which to return the desired
+      axis that index independent samples over which to return the desired
       percentile.  If `None` (the default), treat every dimension as a sample
       dimension, returning a scalar.
     interpolation : {'nearest', 'linear', 'lower', 'higher', 'midpoint'}.
@@ -456,8 +690,12 @@ def quantiles(x,
     return percentile(
         x,
         q=tf.linspace(
-            tf.convert_to_tensor(value=0, dtype=x.dtype),
-            tf.convert_to_tensor(value=100, dtype=x.dtype),
+            # percentile casts q to float64 before using it...so may as well use
+            # float64 here. Note that  using x.dtype won't work with linspace
+            # if x is integral type (which is anothe motivation for hard-coding
+            # float64).
+            tf.convert_to_tensor(value=0, dtype=tf.float64),
+            tf.convert_to_tensor(value=100, dtype=tf.float64),
             num=num_quantiles + 1),
         axis=axis,
         interpolation=interpolation,
@@ -587,36 +825,43 @@ def _make_static_axis_non_negative_list(axis, ndims):
   return list(int(dim) for dim in axis)
 
 
-def _move_dims_to_flat_end(x, axis, x_ndims):
+def _move_dims_to_flat_end(x, axis, x_ndims, right_end=True):
   """Move dims corresponding to `axis` in `x` to the end, then flatten.
 
   Args:
     x: `Tensor` with shape `[B0,B1,...,Bb]`.
     axis:  Python list of indices into dimensions of `x`.
     x_ndims:  Python integer holding number of dimensions in `x`.
+    right_end:  Python bool.  Whether to move dims to the right end (else left).
 
   Returns:
     `Tensor` with value from `x` and dims in `axis` moved to end into one single
       dimension.
   """
+
+  if not axis:
+    return x
+
   # Suppose x.shape = [a, b, c, d]
   # Suppose axis = [1, 3]
 
-  # front_dims = [0, 2] in example above.
-  front_dims = sorted(set(range(x_ndims)).difference(axis))
+  # other_dims = [0, 2] in example above.
+  other_dims = sorted(set(range(x_ndims)).difference(axis))
   # x_permed.shape = [a, c, b, d]
-  x_permed = tf.transpose(a=x, perm=front_dims + list(axis))
+  perm = other_dims + list(axis) if right_end else list(axis) + other_dims
+  x_permed = tf.transpose(a=x, perm=perm)
 
   if x.shape.is_fully_defined():
     x_shape = x.shape.as_list()
-    # front_shape = [a, c], end_shape = [b * d]
-    front_shape = [x_shape[i] for i in front_dims]
+    # other_shape = [a, c], end_shape = [b * d]
+    other_shape = [x_shape[i] for i in other_dims]
     end_shape = [np.prod([x_shape[i] for i in axis])]
-    full_shape = front_shape + end_shape
+    full_shape = (
+        other_shape + end_shape if right_end else end_shape + other_shape)
   else:
-    front_shape = tf.shape(input=x_permed)[:x_ndims - len(axis)]
-    end_shape = [-1]
-    full_shape = tf.concat([front_shape, end_shape], axis=0)
+    other_shape = tf.gather(tf.shape(input=x), other_dims)
+    full_shape = tf.concat(
+        [other_shape, [-1]] if right_end else [[-1], other_shape], axis=0)
   return tf.reshape(x_permed, shape=full_shape)
 
 
