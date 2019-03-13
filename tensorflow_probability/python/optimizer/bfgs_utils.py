@@ -25,10 +25,11 @@ import tensorflow as tf
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.optimizer import linesearch
 
-# A namedtuple to hold a function value, directional derivative and the
-# full gradient. To be used with the linesearch method.
+# A namedtuple to hold the point at which a line function is evaluated, the
+# value of the function, directional derivative, and full gradient evaluated
+# evaluated at that point. To be used with the linesearch method.
 ValueAndGradient = collections.namedtuple('ValueAndGradient',
-                                          ['f', 'df', 'full_gradient'])
+                                          ['x', 'f', 'df', 'full_gradient'])
 
 
 def get_initial_state_args(value_and_gradients_function,
@@ -121,11 +122,15 @@ def line_search_step(state, value_and_gradients_function, search_direction,
       value_and_gradients_function, state.position, search_direction)
   derivative_at_start_pt = tf.reduce_sum(input_tensor=state.objective_gradient *
                                          search_direction)
+  val_0 = ValueAndGradient(x=tf.convert_to_tensor(value=0, dtype=dtype),
+                           f=state.objective_value,
+                           df=derivative_at_start_pt,
+                           full_gradient=state.objective_gradient)
+
   ls_result = linesearch.hager_zhang(
       line_search_value_grad_func,
       initial_step_size=tf.convert_to_tensor(value=1, dtype=dtype),
-      objective_at_zero=state.objective_value,
-      grad_objective_at_zero=derivative_at_start_pt)
+      value_at_zero=val_0)
 
   state_after_ls = update_fields(
       state,
@@ -137,9 +142,9 @@ def line_search_step(state, value_and_gradients_function, search_direction,
   def _do_update_position():
     return _update_position(
         state_after_ls,
-        search_direction * ls_result.left_pt,
-        ls_result.full_result.f,
-        ls_result.full_result.full_gradient,  # Extract gradient
+        search_direction * ls_result.left.x,
+        ls_result.left.f,
+        ls_result.left.full_gradient,
         grad_tolerance, f_relative_tolerance, x_tolerance)
 
   return prefer_static.cond(
@@ -209,6 +214,7 @@ def _restrict_along_direction(value_and_gradients_function,
     pt = position + t * direction
     objective_value, gradient = value_and_gradients_function(pt)
     return ValueAndGradient(
+        x=t,
         f=objective_value,
         df=tf.reduce_sum(input_tensor=gradient * direction),
         full_gradient=gradient)

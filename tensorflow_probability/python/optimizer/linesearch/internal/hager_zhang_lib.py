@@ -36,27 +36,6 @@ import tensorflow as tf
 from tensorflow_probability.python.internal import prefer_static
 
 
-FnDFn = collections.namedtuple(
-    'FnDFn', [
-        'x',  # A scalar tensor of real dtype, the function point to be
-              # evaluated.
-        'f',  # A scalar tensor of real dtype, the value of the function at the
-              # supplied point.
-        'df',  # A scalar tensor of real dypt, the derivative of the function at
-               # the supplied point.
-        'full_result'  # Return value of the `value_and_gradients_function`
-                       # at the left end point `left_pt`.
-    ])
-
-
-def _apply(value_and_gradients_function, x):
-  """Evaluate the objective function and returns an `FnDFn` instance."""
-  x = tf.convert_to_tensor(value=x)
-  full_result = value_and_gradients_function(x)
-  f, df = full_result.f, full_result.df
-  return FnDFn(x=x, f=f, df=df, full_result=full_result)
-
-
 def _val_where(cond, tval, fval):
   """Like tf.where but works on namedtuples."""
   if isinstance(tval, tf.Tensor):
@@ -73,15 +52,14 @@ _Secant2Result = collections.namedtuple('_Secant2Result', [
     'converged',  # Boolean indicating whether wolfe conditions are satisfied.
     'failed',     # Boolean indicating whether the secant procedure failed.
     'num_evals',  # The total number of objective evaluations performed.
-    'left',       # The left end point (instance of FnDFn).
-    'right'       # The right end point (instance of FnDFn).
+    'left',       # Result of value_and_gradients_function at left end point.
+    'right'       # Result of value_and_gradients_function at right end point.
 ])
 
 
 def secant2(value_and_gradients_function,
             val_0,
-            val_left,
-            val_right,
+            search_interval,
             f_lim,
             sufficient_decrease_param=0.1,
             curvature_param=0.9,
@@ -113,13 +91,24 @@ def secant2(value_and_gradients_function,
       tensor of shape [n], and the fields 'f' and 'df' in the returned
       namedtuple should each be a tensor of shape [n], with the corresponding
       function values and derivatives at the input points.
-    val_0: Instance of _FnDFn. The function and derivative value at 0.
-    val_left: Instance of _FnDFn. The value and derivative of the function
-      evaluated at the left end point of the bracketing interval (labelled `a`
-      above).
-    val_right: Instance of _FnDFn. The value and derivative of the function
-      evaluated at the right end point of the bracketing interval (labelled `b`
-      above).
+    val_0: A namedtuple, as returned by value_and_gradients_function evaluated
+      at `0.`.
+    search_interval: A namedtuple describing the current search interval,
+      must include the fields:
+      - converged: Boolean `Tensor` of shape [n], indicating batch members
+          where search has already converged. Interval for these batch members
+          won't be modified.
+      - failed: Boolean `Tensor` of shape [n], indicating batch members
+          where search has already failed. Interval for these batch members
+          wont be modified.
+      - iterations: Scalar int32 `Tensor`. Number of line search iterations
+          so far.
+      - func_evals: Scalar int32 `Tensor`. Number of function evaluations
+          so far.
+      - left: A namedtuple, as returned by value_and_gradients_function,
+          of the left end point of the current search interval.
+      - right: A namedtuple, as returned by value_and_gradients_function,
+          of the right end point of the current search interval.
     f_lim: Scalar `Tensor` of real dtype. The function value threshold for
       the approximate Wolfe conditions to be checked.
     sufficient_decrease_param: Positive scalar `Tensor` of real dtype.
@@ -143,28 +132,29 @@ def secant2(value_and_gradients_function,
         gradient values were encountered (i.e. infinity or NaNs).
       num_evals: A scalar int32 `Tensor`. The total number of function
         evaluations made.
-      left: Instance of _FnDFn. The position and the associated value and
-        derivative at the updated left end point of the interval.
-      right: Instance of _FnDFn. The position and the associated value and
-        derivative at the updated right end point of the interval.
+      left: Return value of value_and_gradients_function at the updated left
+        end point of the interval.
+      right: Return value of value_and_gradients_function at the updated right
+        end point of the interval.
   """
   with tf.compat.v1.name_scope(name, 'secant2', [
-      val_0, val_left, val_right, f_lim, sufficient_decrease_param,
-      curvature_param
-  ]):
+      val_0, search_interval, f_lim, sufficient_decrease_param,
+      curvature_param]):
     # This will always be s.t. left <= c <= right
-    val_c = _apply(value_and_gradients_function, _secant(val_left, val_right))
-    failed = ~is_finite(val_c)
-    converged = ~failed & _satisfies_wolfe(
-        val_0, val_c, f_lim, sufficient_decrease_param, curvature_param)
-    val_left = _val_where(converged, val_c, val_left)
-    val_right = _val_where(converged, val_c, val_right)
+    val_c = value_and_gradients_function(
+        _secant(search_interval.left, search_interval.right))
+    failed = search_interval.failed | ~is_finite(val_c)
+    converged = search_interval.converged | (~failed & _satisfies_wolfe(
+        val_0, val_c, f_lim, sufficient_decrease_param, curvature_param))
+    new_converged = converged & ~search_interval.converged
+    val_left = _val_where(new_converged, val_c, search_interval.left)
+    val_right = _val_where(new_converged, val_c, search_interval.right)
 
     initial_args = _Secant2Result(
         active=~failed & ~converged,
         converged=converged,
         failed=failed,
-        num_evals=tf.convert_to_tensor(value=1),
+        num_evals=search_interval.func_evals + 1,
         left=val_left,
         right=val_right)
 
@@ -236,7 +226,7 @@ def _secant2_inner(value_and_gradients_function,
   def _apply_inner_update():
     next_val_c = prefer_static.cond(
         needs_extra_eval,
-        (lambda: _apply(value_and_gradients_function, next_c)),
+        (lambda: value_and_gradients_function(next_c)),
         (lambda: val_c))
     return _secant2_inner_update(
         value_and_gradients_function, next_args, val_0, next_val_c, f_lim,
@@ -303,8 +293,8 @@ _IntermediateResult = collections.namedtuple('_IntermediateResult', [
     'stopped',    # Boolean indicating whether bracketing/bisection terminated.
     'failed',     # Boolean indicating whether objective evaluation failed.
     'num_evals',  # The total number of objective evaluations performed.
-    'left',       # The left end point (instance of FnDFn).
-    'right'       # The right end point (instance of FnDFn).
+    'left',       # Result of value_and_gradients_function at left end point.
+    'right'       # Result of value_and_gradients_function at right end point.
 ])
 
 
@@ -372,15 +362,12 @@ def update(value_and_gradients_function, val_left, val_right, val_trial, f_lim,
       tensor of shape [n], and the fields 'f' and 'df' in the returned
       namedtuple should each be a tensor of shape [n], with the corresponding
       function values and derivatives at the input points.
-    val_left: Instance of _FnDFn. The value and derivative of the function
-      evaluated at the left end point of the bracketing interval (labelled 'a'
-      above).
-    val_right: Instance of _FnDFn. The value and derivative of the function
-      evaluated at the right end point of the bracketing interval (labelled 'b'
-      above).
-    val_trial: Instance of _FnDFn. The value and derivative of the function
-      evaluated at the trial point to be used to shrink the interval (labelled
-      'c' above).
+    val_left: Return value of value_and_gradients_function at the left
+      end point of the bracketing interval (labelles 'a' above).
+    val_right: Return value of value_and_gradients_function at the right
+      end point of the bracketing interval (labelles 'b' above).
+    val_trial: Return value of value_and_gradients_function at the trial point
+      to be used to shrink the interval (labelled 'c' above).
     f_lim: real `Tensor` of shape [n]. The function value threshold for
       the approximate Wolfe conditions to be checked for each batch member.
     active: optional boolean `Tensor` of shape [n]. Relevant in batching mode
@@ -398,10 +385,10 @@ def update(value_and_gradients_function, val_left, val_right, val_trial, f_lim,
         where an error was encountered.
       num_evals: An int32 scalar `Tensor`. The number of times the objective
         function was evaluated.
-      left: Instance of `FnDFn`. The position and the associated value and
-        derivative at the updated left end point of the interval found.
-      right: Instance of `FnDFn`. The position and the associated value and
-        derivative at the updated right end point of the interval found.
+      left: Return value of value_and_gradients_function at the updated left
+        end point of the interval found.
+      right: Return value of value_and_gradients_function at the updated right
+        end point of the interval found.
   """
   # We should only update if the trial point is within the interval.
   within_range = (val_left.x < val_trial.x) & (val_trial.x < val_right.x)
@@ -437,8 +424,7 @@ def update(value_and_gradients_function, val_left, val_right, val_trial, f_lim,
 
 
 def bracket(value_and_gradients_function,
-            val_0,
-            val_c,
+            search_interval,
             f_lim,
             max_iterations,
             expansion_param=5.0):
@@ -446,9 +432,9 @@ def bracket(value_and_gradients_function,
 
   Applies the Hager Zhang bracketing algorithm to find an interval containing
   a region with points satisfying Wolfe conditions. Uses the supplied initial
-  step size 'c' to find such an interval. The only condition on 'c' is that
-  it should be positive. For more details see steps B0-B3 in
-  [Hager and Zhang (2006)][2].
+  step size 'c', the right end point of the provided search interval, to find
+  such an interval. The only condition on 'c' is that it should be positive.
+  For more details see steps B0-B3 in [Hager and Zhang (2006)][2].
 
   Args:
     value_and_gradients_function: A Python callable that accepts a real scalar
@@ -459,9 +445,22 @@ def bracket(value_and_gradients_function,
       `n` distinct directions at once) accepting n points as input, i.e. a
       tensor of shape [n], and return a tuple of two tensors of shape [n], the
       function values and the corresponding derivatives at the input points.
-    val_0: Instance of `FnDFn`. The function and derivative value at 0.
-    val_c: Instance of `FnDFn`. The value and derivative of the function
-      evaluated at the initial trial point (labelled 'c' above).
+    search_interval: A namedtuple describing the current search interval,
+      must include the fields:
+      - converged: Boolean `Tensor` of shape [n], indicating batch members
+          where search has already converged. Interval for these batch members
+          wont be modified.
+      - failed: Boolean `Tensor` of shape [n], indicating batch members
+          where search has already failed. Interval for these batch members
+          wont be modified.
+      - iterations: Scalar int32 `Tensor`. Number of line search iterations
+          so far.
+      - func_evals: Scalar int32 `Tensor`. Number of function evaluations
+          so far.
+      - left: A namedtuple, as returned by value_and_gradients_function
+          evaluated at 0, the left end point of the current interval.
+      - right: A namedtuple, as returned by value_and_gradients_function,
+          of the right end point of the current interval (labelled 'c' above).
     f_lim: real `Tensor` of shape [n]. The function value threshold for
       the approximate Wolfe conditions to be checked for each batch member.
     max_iterations: Int32 scalar `Tensor`. The maximum number of iterations
@@ -480,32 +479,30 @@ def bracket(value_and_gradients_function,
         where an error was encountered during bracketing.
       num_evals: An int32 scalar `Tensor`. The number of times the objective
         function was evaluated.
-      left: Instance of `FnDFn`. The position and the associated value and
-        derivative at the updated left end point of the interval found.
-      right: Instance of `FnDFn`. The position and the associated value and
-        derivative at the updated right end point of the interval found.
+      left: Return value of value_and_gradients_function at the updated left
+        end point of the interval found.
+      right: Return value of value_and_gradients_function at the updated right
+        end point of the interval found.
   """
-  # Fail if either of the initial points are not finite.
-  failed = ~is_finite(val_0, val_c)
+  # If the slope at right end point is positive, step B1 in [2], then the given
+  # initial points already bracket a minimum.
+  bracketed = search_interval.right.df >= 0
 
-  # If the slope at `c` is positive, step B1 in [2], then the given initial
-  # points already bracket a minimum.
-  bracketed = val_c.df >= 0
-
-  # Bisection is needed, step B2, if `c` almost works as left point but the
-  # objective value is too high.
-  needs_bisect = (val_c.df < 0) & (val_c.f > f_lim)
+  # Bisection is needed, step B2, if right end point almost works as a new left
+  # end point but the objective value is too high.
+  needs_bisect = (
+      search_interval.right.df < 0) & (search_interval.right.f > f_lim)
 
   # In these three cases bracketing is already `stopped` and there is no need
   # to perform further evaluations. Otherwise the bracketing loop is needed to
   # expand the interval, step B3, until the conditions are met.
   initial_args = _IntermediateResult(
-      iteration=tf.convert_to_tensor(value=0),
-      stopped=failed | bracketed | needs_bisect,
-      failed=failed,
-      num_evals=tf.convert_to_tensor(value=0),
-      left=val_0,
-      right=val_c)
+      iteration=search_interval.iterations,
+      stopped=search_interval.failed | bracketed | needs_bisect,
+      failed=search_interval.failed,
+      num_evals=search_interval.func_evals,
+      left=search_interval.left,
+      right=search_interval.right)
 
   def _loop_cond(curr):
     return (curr.iteration <
@@ -517,8 +514,7 @@ def bracket(value_and_gradients_function,
     # either: failed, successfully bracketed, or not yet bracketed but needs
     # bisect. On the only remaining case, step B3 in [2]. case we need to
     # expand and update the left/right values appropriately.
-    new_right = _apply(value_and_gradients_function,
-                       expansion_param * curr.right.x)
+    new_right = value_and_gradients_function(expansion_param * curr.right.x)
     left = _val_where(curr.stopped, curr.left, curr.right)
     right = _val_where(curr.stopped, curr.right, new_right)
 
@@ -538,11 +534,11 @@ def bracket(value_and_gradients_function,
       cond=_loop_cond, body=_loop_body, loop_vars=[initial_args])[0]
 
   # For entries where bisect is still needed, mark them as not yet stopped,
-  # reset the left point to 0, and run `_bisect` on them.
+  # reset the left end point, and run `_bisect` on them.
   needs_bisect = (
       (bracket_result.right.df < 0) & (bracket_result.right.f > f_lim))
   stopped = bracket_result.failed | ~needs_bisect
-  left = _val_where(stopped, bracket_result.left, val_0)
+  left = _val_where(stopped, bracket_result.left, search_interval.left)
   bisect_args = bracket_result._replace(stopped=stopped, left=left)
   return _bisect(value_and_gradients_function, bisect_args, f_lim)
 
@@ -564,10 +560,10 @@ def bisect(value_and_gradients_function,
       `n` distinct directions at once) accepting n points as input, i.e. a
       tensor of shape [n], and return a tuple of two tensors of shape [n], the
       function values and the corresponding derivatives at the input points.
-    initial_left: Instance of _FnDFn. The value and derivative of the function
-      evaluated at the left end point of the current bracketing interval.
-    initial_right: Instance of _FnDFn. The value and derivative of the function
-      evaluated at the right end point of the current bracketing interval.
+    initial_left: Return value of value_and_gradients_function at the left end
+      point of the current bracketing interval.
+    initial_right: Return value of value_and_gradients_function at the right end
+      point of the current bracketing interval.
     f_lim: real `Tensor` of shape [n]. The function value threshold for
       the approximate Wolfe conditions to be checked for each batch member.
 
@@ -581,10 +577,10 @@ def bisect(value_and_gradients_function,
         failed to produce a finite value.
       num_evals: A scalar int32 tensor. The number of value and gradients
         function evaluations.
-      final_left: Instance of _FnDFn. The value and derivative of the function
-        evaluated at the left end point of the bracketing interval found.
-      final_right: Instance of _FnDFn. The value and derivative of the function
-        evaluated at the right end point of the bracketing interval found.
+      left: Return value of value_and_gradients_function at the left end
+        point of the bracketing interval found.
+      right: Return value of value_and_gradients_function at the right end
+        point of the bracketing interval found.
   """
   failed = ~is_finite(initial_left, initial_right)
   needs_bisect = (initial_right.df < 0) & (initial_right.f > f_lim)
@@ -606,7 +602,7 @@ def _bisect(value_and_gradients_function, initial_args, f_lim):
 
   def _loop_body(curr):
     """Narrow down interval to satisfy opposite slope conditions."""
-    mid = _apply(value_and_gradients_function, (curr.left.x + curr.right.x) / 2)
+    mid = value_and_gradients_function((curr.left.x + curr.right.x) / 2)
 
     # Fail if function values at mid point are no longer finite; or left/right
     # points are so close to it that we can't distinguish them any more.
@@ -649,12 +645,14 @@ def is_finite(val_1, val_2=None):
   """Checks if the supplied values are finite.
 
   Args:
-    val_1: Instance of _FnDFn. The function and derivative value.
-    val_2: (Optional) Instance of _FnDFn. The function and derivative value.
+    val_1: A namedtuple instance with the function value and derivative,
+      as returned e.g. by value_and_gradients_function evaluations.
+    val_2: (Optional) A namedtuple instance with the function value and
+      derivative, as returned e.g. by value_and_gradients_function evaluations.
 
   Returns:
     is_finite: Scalar boolean `Tensor` indicating whether the function value
-      and the gradient in `val_1` (and optionally) in `val_2` are all finite.
+      and the derivative in `val_1` (and optionally in `val_2`) are all finite.
   """
   val_1_finite = tf.math.is_finite(val_1.f) & tf.math.is_finite(val_1.df)
   if val_2 is not None:
@@ -701,9 +699,10 @@ def _satisfies_wolfe(val_0,
   `f_lim` corresponds to the product: epsilon * |f(0)|.
 
   Args:
-    val_0: Instance of _FnDFn. The function and derivative value at 0.
-    val_c: Instance of _FnDFn. The function and derivative value at the
-      point to be tested.
+    val_0: A namedtuple, as returned by value_and_gradients_function
+      evaluated at 0.
+    val_c: A namedtuple, as returned by value_and_gradients_function
+      evaluated at the point to be tested.
     f_lim: Scalar `Tensor` of real dtype. The function value threshold for
       the approximate Wolfe conditions to be checked.
     sufficient_decrease_param: Positive scalar `Tensor` of real dtype.
@@ -743,10 +742,10 @@ def _secant(val_a, val_b):
   Hence c is a weighted average of a and b and thus always in [a, b].
 
   Args:
-    val_a: Instance of _FnDFn. The function and derivative value at the left
-      end point (i.e. a).
-    val_b: Instance of _FnDFn. The function and derivative value at the right
-      end point (i.e. b).
+    val_a: A namedtuple with the left end point, function value and derivative,
+      of the current interval (i.e. a).
+    val_b: A namedtuple with the right end point, function value and derivative,
+      of the current interval (i.e. b).
 
   Returns:
     approx_minimum: A scalar real `Tensor`. An approximation to the point

@@ -29,7 +29,23 @@ from tensorflow.python.framework import test_util  # pylint: disable=g-direct-te
 
 
 # Define value and gradient namedtuple
-ValueAndGradient = collections.namedtuple('ValueAndGradient', ['f', 'df'])
+ValueAndGradient = collections.namedtuple('ValueAndGradient', ['x', 'f', 'df'])
+
+
+LineSearchInterval = collections.namedtuple(
+    'LineSearchInterval',
+    ['converged', 'failed', 'func_evals', 'iterations', 'left', 'right'])
+
+
+def _interval(val_left, val_right):
+  false = tf.zeros_like(val_left.x, dtype=bool)
+  return LineSearchInterval(
+      converged=false,
+      failed=false,
+      func_evals=tf.constant(value=0),
+      iterations=tf.constant(value=0),
+      left=val_left,
+      right=val_right)
 
 
 def test_function_x_y(x, y):
@@ -43,14 +59,18 @@ def test_function_x_y(x, y):
     A callable that takes a tf.Tensor `t` as input and returns as output the
     value and derivative of the interpolated function at `t`.
   """
+  batches = y.shape[0] if len(y.shape) == 2 else None
   deg = len(x) - 1
   poly = np.polyfit(x, y.T, deg)
   poly = [tf.convert_to_tensor(value=c, dtype=tf.float32) for c in poly]
 
   def f(t):
     t = tf.convert_to_tensor(value=t, dtype=tf.float32)
+    if batches is not None and not tuple(t.shape):
+      # Broadcast a scalar through all batches.
+      t = tf.tile(tf.expand_dims(t, -1), [batches])
     f, df = value_and_gradient(lambda t_: tf.math.polyval(poly, t_), t)
-    return ValueAndGradient(f=tf.squeeze(f), df=tf.squeeze(df))
+    return ValueAndGradient(x=t, f=tf.squeeze(f), df=tf.squeeze(df))
 
   return f
 
@@ -83,16 +103,17 @@ class HagerZhangLibTest(tf.test.TestCase):
     fun2 = test_function_x_y_dy(x, ys[1], dys[1])
     funs = test_function_x_y_dy(x, ys, dys)
 
-    def eval_secant2(fun, p=lambda x: x):
-      val_0 = hzl._apply(fun, p(0.0))
-      val_a = hzl._apply(fun, p(1.0))
-      val_b = hzl._apply(fun, p(2.0))
+    def eval_secant2(fun):
+      val_0 = fun(0.0)
+      val_a = fun(1.0)
+      val_b = fun(2.0)
       f_lim = val_0.f + (wolfe_threshold * tf.abs(val_0.f))
-      return self.evaluate(hzl.secant2(fun, val_0, val_a, val_b, f_lim))
+      return self.evaluate(
+          hzl.secant2(fun, val_0, _interval(val_a, val_b), f_lim))
 
     result1 = eval_secant2(fun1)
     result2 = eval_secant2(fun2)
-    results = eval_secant2(funs, p=lambda x: [x, x])
+    results = eval_secant2(funs)
 
     # Assert secant2 converges on first function, but not the second one.
     self.assertTrue(result1.converged)
@@ -121,9 +142,9 @@ class HagerZhangLibTest(tf.test.TestCase):
     dy = np.array([-0.8, -0.7, 0.6])
     fun = test_function_x_y_dy(x, y, dy)
 
-    val_a = hzl._apply(fun, 0.0)
-    val_b = hzl._apply(fun, 1.0)
-    val_trial = hzl._apply(fun, 0.6)
+    val_a = fun(0.0)
+    val_b = fun(1.0)
+    val_trial = fun(0.6)
     f_lim = val_a.f + (wolfe_threshold * tf.abs(val_a.f))
 
     result = self.evaluate(hzl.update(fun, val_a, val_b, val_trial, f_lim))
@@ -157,9 +178,9 @@ class HagerZhangLibTest(tf.test.TestCase):
                    [-0.8, -0.7, 0.6]])
     fun = test_function_x_y_dy(x, y, dy)
 
-    val_a = hzl._apply(fun, tf.zeros(4))  # Values at zero.
-    val_b = hzl._apply(fun, tf.ones(4))  # Values at initial step.
-    val_trial = hzl._apply(fun, [0.6, 0.6, 0.6, 1.5])
+    val_a = fun(0.0)  # Values at zero.
+    val_b = fun(1.0)  # Values at initial step.
+    val_trial = fun([0.6, 0.6, 0.6, 1.5])
     f_lim = val_a.f + (wolfe_threshold * tf.abs(val_a.f))
 
     expected_left = np.array([0.0, 0.6, 0.0, 0.0])
@@ -188,16 +209,16 @@ class HagerZhangLibTest(tf.test.TestCase):
     fun2 = test_function_x_y_dy(x, ys[1], dys[1])
     funs = test_function_x_y_dy(x, ys, dys)
 
-    def eval_update(fun, p=lambda x: x):
-      val_a = hzl._apply(fun, p(0.0))
-      val_b = hzl._apply(fun, p(1.0))
-      val_trial = hzl._apply(fun, p(0.6))
+    def eval_update(fun):
+      val_a = fun(0.0)
+      val_b = fun(1.0)
+      val_trial = fun(0.6)
       f_lim = val_a.f + (wolfe_threshold * tf.abs(val_a.f))
       return self.evaluate(hzl.update(fun, val_a, val_b, val_trial, f_lim))
 
     result1 = eval_update(fun1)
     result2 = eval_update(fun2)
-    results = eval_update(funs, p=lambda x: [x, x])
+    results = eval_update(funs)
 
     # Both batching/non-batching versions get the same result.
     self.assertEqual(result1.left.x, results.left.x[0])
@@ -215,12 +236,12 @@ class HagerZhangLibTest(tf.test.TestCase):
     dy = np.array([-0.8, -0.7, 1.6, -0.8])
     fun = test_function_x_y_dy(x, y, dy)
 
-    val_a = hzl._apply(fun, 0.0)  # Value at zero.
-    val_b = hzl._apply(fun, 1.0)  # Value at initial step.
+    val_a = fun(0.0)  # Value at zero.
+    val_b = fun(1.0)  # Value at initial step.
     f_lim = val_a.f + (wolfe_threshold * tf.abs(val_a.f))
 
     result = self.evaluate(
-        hzl.bracket(fun, val_a, val_b, f_lim, max_iterations=5))
+        hzl.bracket(fun, _interval(val_a, val_b), f_lim, max_iterations=5))
 
     self.assertEqual(result.iteration, 1)  # One expansion.
     self.assertEqual(result.num_evals, 2)  # Once bracketing, once bisecting.
@@ -249,14 +270,14 @@ class HagerZhangLibTest(tf.test.TestCase):
                    [-0.8, -0.7, 1.6, -0.8]])
     fun = test_function_x_y_dy(x, y, dy)
 
-    val_a = hzl._apply(fun, tf.zeros(4))  # Values at zero.
-    val_b = hzl._apply(fun, tf.ones(4))  # Values at initial step.
+    val_a = fun(0.0)
+    val_b = fun(1.0)
     f_lim = val_a.f + (wolfe_threshold * tf.abs(val_a.f))
 
     expected_left = np.array([0.0, 1.0, 0.0, 0.0])
     expected_right = np.array([1.0, 5.0, 0.5, 2.5])
 
-    result = self.evaluate(hzl.bracket(fun, val_a, val_b, f_lim,
+    result = self.evaluate(hzl.bracket(fun, _interval(val_a, val_b), f_lim,
                                        max_iterations=5))
     self.assertEqual(result.num_evals, 2)  # Once bracketing, once bisecting.
     self.assertTrue(np.all(result.stopped))
@@ -274,8 +295,8 @@ class HagerZhangLibTest(tf.test.TestCase):
     dy = np.array([-0.8, 0.6, -0.7])
     fun = test_function_x_y_dy(x, y, dy)
 
-    val_a = hzl._apply(fun, 0.0)  # Value at zero.
-    val_b = hzl._apply(fun, 1.0)  # Value at initial step.
+    val_a = fun(0.0)  # Value at zero.
+    val_b = fun(1.0)  # Value at initial step.
     f_lim = val_a.f + (wolfe_threshold * tf.abs(val_a.f))
 
     result = self.evaluate(hzl.bisect(fun, val_a, val_b, f_lim))
@@ -299,8 +320,8 @@ class HagerZhangLibTest(tf.test.TestCase):
                    [-0.8, -0.4, -0.7]])
     fun = test_function_x_y_dy(x, y, dy)
 
-    val_a = hzl._apply(fun, tf.zeros(4))  # Values at zero.
-    val_b = hzl._apply(fun, tf.ones(4))  # Values at initial step.
+    val_a = fun(0.0)  # Values at zero.
+    val_b = fun(1.0)  # Values at initial step.
     f_lim = val_a.f + (wolfe_threshold * tf.abs(val_a.f))
 
     expected_left = np.array([0.0, 0.5, 0.0, 0.0])
