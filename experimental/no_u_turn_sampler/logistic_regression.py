@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Trains a Bayesian logistic regression model using No-U-Turn Sampler."""
+"""Trains a Bayesian logistic regression model using the No-U-Turn Sampler."""
 
 from __future__ import absolute_import
 from __future__ import division
