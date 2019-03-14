@@ -92,10 +92,10 @@ class Chi(transformed_distribution.TransformedDistribution):
       super(Chi, self).__init__(
           distribution=chi2.Chi2(df=self._df,
                                  validate_args=validate_args,
-                                 allow_nan_stats=allow_nan_stats,
-                                 name=name),
+                                 allow_nan_stats=allow_nan_stats),
           bijector=invert_bijector.Invert(square_bijector.Square()),
-          parameters=parameters)
+          parameters=parameters,
+          name=name)
 
   def _params_event_ndims(self):
     return dict(df=0)
