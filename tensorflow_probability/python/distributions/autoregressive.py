@@ -70,14 +70,15 @@ class Autoregressive(distribution.Distribution):
 
   ```python
   tfd = tfp.distributions
+  tfb = tfp.bijectors
 
-  def normal_fn(self, event_size):
-    n = event_size * (event_size + 1) / 2
+  def _normal_fn(event_size):
+    n = event_size * (event_size + 1) // 2
     p = tf.Variable(tfd.Normal(loc=0., scale=1.).sample(n))
-    affine = tfd.bijectors.Affine(
+    affine = tfb.Affine(
         scale_tril=tfd.fill_triangular(0.25 * p))
     def _fn(samples):
-      scale = tf.exp(affine.forward(samples)).eval()
+      scale = tf.exp(affine.forward(samples))
       return tfd.Independent(
           tfd.Normal(loc=0., scale=scale, validate_args=True),
           reinterpreted_batch_ndims=1)
@@ -85,8 +86,8 @@ class Autoregressive(distribution.Distribution):
 
   batch_and_event_shape = [3, 2, 4]
   sample0 = tf.zeros(batch_and_event_shape)
-  ar = autoregressive_lib.Autoregressive(
-      self._normal_fn(batch_and_event_shape[-1]), sample0)
+  ar = tfd.Autoregressive(
+      _normal_fn(batch_and_event_shape[-1]), sample0)
   x = ar.sample([6, 5])
   # ==> x.shape = [6, 5, 3, 2, 4]
   prob_x = ar.prob(x)
@@ -198,11 +199,14 @@ class Autoregressive(distribution.Distribution):
     seed = seed_stream.SeedStream(seed, salt="Autoregressive")()
     samples = self.distribution0.sample(n, seed=seed)
     for _ in range(self._num_steps):
+      # pylint: disable=not-callable
       samples = self.distribution_fn(samples).sample(seed=seed)
     return samples
 
   def _log_prob(self, value):
+    # pylint: disable=not-callable
     return self.distribution_fn(value).log_prob(value)
 
   def _prob(self, value):
+    # pylint: disable=not-callable
     return self.distribution_fn(value).prob(value)
