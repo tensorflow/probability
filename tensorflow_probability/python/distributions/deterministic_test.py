@@ -159,6 +159,15 @@ class DeterministicTest(tf.test.TestCase):
           np.zeros(sample_shape + (2,)).astype(np.float32),
           self.evaluate(sample))
 
+  def testSampleWithBatchAtol(self):
+    deterministic = tfd.Deterministic(0., atol=[.1, .1])
+    for sample_shape in [(), (4,)]:
+      sample = deterministic.sample(sample_shape)
+      self.assertAllEqual(sample_shape + (2,), sample.shape)
+      self.assertAllClose(
+          np.zeros(sample_shape + (2,)).astype(np.float32),
+          self.evaluate(sample))
+
   def testSampleDynamicWithBatchDims(self):
     loc = tf.compat.v1.placeholder_with_default(input=[0., 0], shape=[2])
 

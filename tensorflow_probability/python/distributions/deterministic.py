@@ -157,16 +157,12 @@ class _BaseDeterministic(distribution.Distribution):
   def _mode(self):
     return self.mean()
 
-  def _sample_n(self, n, seed=None):  # pylint: disable=unused-arg
-    n_static = tf.get_static_value(tf.convert_to_tensor(value=n))
-    if n_static is not None and self.loc.shape.ndims is not None:
-      ones = [1] * self.loc.shape.ndims
-      multiples = [n_static] + ones
-    else:
-      ones = tf.ones_like(tf.shape(input=self.loc))
-      multiples = tf.concat(([n], ones), axis=0)
-
-    return tf.tile(self.loc[tf.newaxis, ...], multiples=multiples)
+  def _sample_n(self, n, seed=None):
+    del seed  # unused
+    return tf.broadcast_to(
+        self.loc,
+        tf.concat([[n], self.batch_shape_tensor(), self.event_shape_tensor()],
+                  axis=0))
 
 
 class Deterministic(_BaseDeterministic):
