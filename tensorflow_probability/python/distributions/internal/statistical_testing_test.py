@@ -26,6 +26,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 # pylint: disable=g-error-prone-assert-raises
@@ -474,6 +475,45 @@ class StatisticalTestingTest(tf.test.TestCase, parameterized.TestCase):
     answer = samples[2] * weight + sum(samples[3:]) / n + envelope * 1.
     self.assertAllClose(max_mean, answer, rtol=1e-9)
 
+  @parameterized.parameters(np.float32, np.float64)
+  def test_random_projections(self, dtype):
+    strm = tfp_test_util.test_seed_stream()
+    rng = np.random.RandomState(seed=strm() % 2**31)
+    num_samples = 57000
+
+    # Validate experiment design
+
+    # False fail rate here is the target rate of 1e-6 divided by the number of
+    # projections.
+    d = st.min_discrepancy_of_true_cdfs_detectable_by_dkwm_two_sample(
+        num_samples, num_samples, false_fail_rate=1e-8, false_pass_rate=1e-6)
+    # Choose num_samples so the discrepancy is below 0.05, which should be
+    # enough to detect a mean shift of around 1/8 of a standard deviation, or a
+    # scale increase of around 25% (in any particular projection).
+    self.assertLess(self.evaluate(d), 0.05)
+
+    ground_truth = rng.multivariate_normal(
+        mean=[0, 0], cov=[[1, 0.5], [0.5, 1]], size=num_samples).astype(dtype)
+    more_samples = rng.multivariate_normal(
+        mean=[0, 0], cov=[[1, 0.5], [0.5, 1]], size=num_samples).astype(dtype)
+    self.evaluate(
+        st.assert_multivariate_true_cdf_equal_on_projections_two_sample(
+            ground_truth, more_samples, num_projections=100,
+            false_fail_rate=1e-6, seed=strm()))
+
+    def assert_catches_mistake(mean, cov):
+      wrong_samples = rng.multivariate_normal(
+          mean=mean, cov=cov, size=num_samples).astype(dtype=dtype)
+      msg = 'Empirical CDFs outside joint K-S envelope'
+      with self.assertRaisesOpError(msg):
+        self.evaluate(
+            st.assert_multivariate_true_cdf_equal_on_projections_two_sample(
+                ground_truth, wrong_samples, num_projections=100,
+                false_fail_rate=1e-6, seed=strm()))
+
+    assert_catches_mistake([0, 1], [[1, 0.5], [0.5, 1]])
+    assert_catches_mistake([0, 0], [[1, 0.7], [0.7, 1]])
+    assert_catches_mistake([0, 0], [[1, 0.3], [0.3, 1]])
 
 if __name__ == '__main__':
   tf.test.main()

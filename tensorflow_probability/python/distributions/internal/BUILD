@@ -64,6 +64,7 @@ py_library(
     srcs = ["statistical_testing.py"],
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/distributions:seed_stream",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
     ],
@@ -79,6 +80,7 @@ py_test(
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 

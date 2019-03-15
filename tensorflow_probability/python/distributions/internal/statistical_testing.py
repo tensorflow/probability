@@ -129,6 +129,7 @@ import functools
 import itertools
 
 import tensorflow as tf
+from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 
@@ -150,6 +151,7 @@ __all__ = [
     'assert_true_mean_equal_by_dkwm_two_sample',
     'min_discrepancy_of_true_means_detectable_by_dkwm_two_sample',
     'min_num_samples_for_dkwm_mean_two_sample_test',
+    'assert_multivariate_true_cdf_equal_on_projections_two_sample',
 ]
 
 
@@ -1501,3 +1503,108 @@ def min_num_samples_for_dkwm_mean_two_sample_test(
         discrepancy / 2., low2, high2,
         false_fail_rate / 2., false_pass_rate / 2.)
     return n1, n2
+
+
+def _random_unit_hypersphere(sample_shape, event_shape, dtype, seed):
+  target_shape = tf.concat([sample_shape, event_shape], axis=0)
+  return tf.math.l2_normalize(
+      tf.random.normal(target_shape, seed=seed, dtype=dtype),
+      axis=-1 - tf.range(tf.size(input=event_shape)))
+
+
+def assert_multivariate_true_cdf_equal_on_projections_two_sample(
+    samples1, samples2, num_projections, event_ndims=1,
+    false_fail_rate=1e-6, seed=17, name=None):
+  """Asserts the given multivariate distributions are equal.
+
+  The test is a 1-D DKWM-style test of equality in distribution along the given
+  number of random projections.  This is of course imperfect, but can behave
+  reasonably, especially if `num_projections` is significantly more than the
+  dimensionality of the sample space.
+
+  More precisely, the test
+  (i) assumes the event shape is given by the trailing `event_ndims` dimensions
+      in each `samples` Tensor;
+  (ii) generates `num_projections` random projections from this space to scalar;
+  (iii) fails if there is enough evidence (using the
+      [Dvoretzky-Kiefer-Wolfowitz-Massart inequality]
+      (https://en.wikipedia.org/wiki/CDF-based_nonparametric_confidence_interval))
+      along any of these projections that `samples1` and `samples2` come from
+      different true distributions.
+
+  This test works as written even if the distribution in question has atoms
+  (e.g., is discrete).
+
+  Note that the top dimension of each `samples` is treated as iid, and the
+  bottom `event_ndims` dimensions are projected to scalar.  The remaining
+  dimensions, if any, are treated as batch dimensions, and `false_fail_rate` is
+  a total false failure rate for all the assertions in the batch (and all
+  projections).  As such, if the batch is nontrivial, the assertion will insist
+  on stronger evidence to fail any one member.
+
+  A note on experiment design: This test boils down to `num_projections`
+  two-sample CDF equality tests.  As such, one can compute the number of samples
+  to draw or the detectable discrepancy (along any projection) using
+  `min_num_samples_for_dkwm_cdf_two_sample_test` and
+  `min_discrepancy_of_true_cdfs_detectable_by_dkwm_two_sample` respectively,
+  just being sure to divide the false failure rate by the number of projections
+  requested (no need to adjust the false pass rate).
+
+  Args:
+    samples1: Tensor of shape [n] + B + E.  Samples from some (batch of)
+      distribution(s) of interest.  Assumed IID across the 0 dimension.
+    samples2: Tensor of shape [m] + B + E.  Samples from some (batch of)
+      distribution(s) of interest.  Assumed IID across the 0 dimension.
+    num_projections: Scalar integer Tensor.  Number of projections to use.  Each
+      projection will be a random direction on the unit hypershpere of shape E.
+    event_ndims: Number of trailing dimensions forming the event shape.
+      `rank(E) == event_ndims`.
+    false_fail_rate: *Scalar* floating-point `Tensor` admissible total
+      rate of mistakes.
+    seed: Optional PRNG seed to use for generating the random projections.
+      Changing this from the default should generally not be necessary.
+    name: A name for this operation (optional).
+
+  Returns:
+    check: Op that raises `InvalidArgumentError` if the two samples do not match
+      along any of the generated projections.
+  """
+  # Shape of samples{1,2}: one iid sample dimension; arbitrary batch shape;
+  # arbitrary event shape.  Batch and event shapes must agree.
+  # The semantics of event shape is that the events are randomly projected to
+  # scalar.
+  # The test is done batched across the batch shape.
+  # Notate the shape of samples1 as [n1] + batch_shape + event_shape.
+  # Notate the shape of samples2 as [n2] + batch_shape + event_shape.
+  args_list = (
+      [samples1, samples2, num_projections, event_ndims, false_fail_rate])
+  strm = seed_stream.SeedStream(salt='random projections', seed=seed)
+  with tf.compat.v1.name_scope(
+      name,
+      'assert_multivariate_true_cdf_equal_on_projections_two_sample',
+      args_list):
+    dtype = dtype_util.common_dtype(
+        [samples1, samples2, false_fail_rate], tf.float32)
+    samples1 = tf.convert_to_tensor(
+        value=samples1, name='samples1', dtype=dtype)
+    samples2 = tf.convert_to_tensor(
+        value=samples2, name='samples2', dtype=dtype)
+    num_projections = tf.convert_to_tensor(
+        value=num_projections, name='num_projections')
+    false_fail_rate = tf.convert_to_tensor(
+        value=false_fail_rate, name='false_fail_rate', dtype=dtype)
+    tf.compat.v1.assert_scalar(false_fail_rate)  # Static shape
+    compatible_samples = tf.compat.v1.assert_equal(
+        tf.shape(input=samples1)[1:],
+        tf.shape(input=samples2)[1:])
+    with tf.control_dependencies([compatible_samples]):
+      event_shape = tf.shape(input=samples1)[-event_ndims:]
+      random_projections = _random_unit_hypersphere(
+          [num_projections], event_shape, dtype=dtype, seed=strm())
+      last_axes = list(range(-1, -(event_ndims+1), -1))
+      # proj1 shape should be [n1] + batch_shape + [num_projections]
+      proj1 = tf.tensordot(samples1, random_projections, [last_axes, last_axes])
+      # proj2 shape should be [n2] + batch_shape + [num_projections]
+      proj2 = tf.tensordot(samples2, random_projections, [last_axes, last_axes])
+      return assert_true_cdf_equal_by_dkwm_two_sample(
+          proj1, proj2, false_fail_rate=false_fail_rate)
