@@ -650,6 +650,18 @@ class EmpiricalNdTest(tfp_test_util.VectorDistributionTestHelpers):
     self.assertAllClose(self.evaluate(dist.stddev()),
                         np.sqrt(expected_variance))
 
+  def testLogProbAfterSlice(self):
+    samples = np.random.randn(6, 5, 4)
+    dist = empirical.Empirical(samples=samples, event_ndims=1)
+    self.assertAllEqual((6,), dist.batch_shape)
+    self.assertAllEqual((4,), dist.event_shape)
+    sliced_dist = dist[:, tf.newaxis]
+    samples = self.evaluate(dist.sample())
+    self.assertAllEqual((6, 4), samples.shape)
+    lp, sliced_lp = self.evaluate([
+        dist.log_prob(samples), sliced_dist.log_prob(samples[:, tf.newaxis])])
+    self.assertAllEqual(lp[:, tf.newaxis], sliced_lp)
+
 
 class EmpiricalScalarStaticShapeTest(
     EmpiricalScalarTest, tf.test.TestCase):

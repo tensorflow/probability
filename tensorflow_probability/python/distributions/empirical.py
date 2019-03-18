@@ -31,9 +31,16 @@ __all__ = [
 
 def _broadcast_event_and_samples(event, samples, event_ndims):
   """Broadcasts the event or samples."""
-  samples_shape = tf.shape(input=samples)[:-event_ndims - 1]
+  # This is the shape of self.samples, without the samples axis, i.e. the shape
+  # of the result of a call to dist.sample(). This way we can broadcast it with
+  # event to get a properly-sized event, then add the singleton dim back at
+  # -event_ndims - 1.
+  samples_shape = tf.concat(
+      [tf.shape(input=samples)[:-event_ndims - 1],
+       tf.shape(input=samples)[tf.rank(samples) - event_ndims:]],
+      axis=0)
   event *= tf.ones(samples_shape, dtype=event.dtype)
-  event = tf.expand_dims(event, axis=-event_ndims-1)
+  event = tf.expand_dims(event, axis=-event_ndims - 1)
   samples *= tf.ones_like(event, dtype=samples.dtype)
 
   return event, samples
@@ -259,7 +266,7 @@ class Empirical(distribution.Distribution):
     cdf = tf.reduce_sum(
         input_tensor=tf.cast(
             tf.reduce_all(
-                input_tensor=samples - event <= 0,
+                input_tensor=samples <= event,
                 axis=tf.range(-self._event_ndims, 0)),
             dtype=tf.int32),
         axis=-1) / self.num_samples
