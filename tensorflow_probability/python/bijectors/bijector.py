@@ -684,7 +684,13 @@ class Bijector(object):
     from tensorflow_probability.python.distributions import distribution  # pylint: disable=g-import-not-at-top
     from tensorflow_probability.python.distributions import transformed_distribution  # pylint: disable=g-import-not-at-top
 
-    if isinstance(value, transformed_distribution.TransformedDistribution):
+    # TODO(b/128841942): Handle Conditional distributions and bijectors.
+    if type(value) is transformed_distribution.TransformedDistribution:  # pylint: disable=unidiomatic-typecheck
+      # We cannot accept subclasses with different constructors here, because
+      # subclass constructors may accept constructor arguments TD doesn't know
+      # how to handle. e.g. `TypeError: __init__() got an unexpected keyword
+      # argument 'allow_nan_stats'` when doing
+      # `tfb.Identity()(tfd.Chi(df=1., allow_nan_stats=True))`.
       new_kwargs = value.parameters
       new_kwargs.update(kwargs)
       new_kwargs["name"] = name or new_kwargs.get("name", None)

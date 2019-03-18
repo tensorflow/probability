@@ -351,6 +351,10 @@ class BijectorCompositionTest(tf.test.TestCase):
                         expected_log_normal.log_prob(x)]),
         atol=0, rtol=1e-3)
 
+  def testComposeFromTDSubclassWithAlternateCtorArgs(self):
+    # This line used to raise an exception.
+    tfb.Identity()(tfd.Chi(df=1., allow_nan_stats=True))
+
   def testComposeFromNonTransformedDistribution(self):
     actual_log_normal = tfb.Exp()(tfd.Normal(0.5, 2.))
     expected_log_normal = tfd.LogNormal(0.5, 2.)

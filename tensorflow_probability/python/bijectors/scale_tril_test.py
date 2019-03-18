@@ -60,7 +60,7 @@ class ScaleTriLBijectorTest(tf.test.TestCase):
     self.assertAllEqual(y.shape, batch_shape + [3, 3])
 
     x_ = self.evaluate(b.inverse(y))
-    self.assertAllClose(x, x_)
+    self.assertAllClose(x, x_, rtol=1e-5)
 
     fldj = self.evaluate(b.forward_log_det_jacobian(x, event_ndims=1))
     ildj = self.evaluate(b.inverse_log_det_jacobian(y, event_ndims=2))
