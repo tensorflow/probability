@@ -474,6 +474,49 @@ class Sum(StructuralTimeSeries):
     """Constant value subtracted from observed data."""
     return self._constant_offset
 
+  def make_component_state_space_models(self,
+                                        num_timesteps,
+                                        param_vals,
+                                        initial_step=0):
+    """Build an ordered list of Distribution instances for component models.
+
+    Args:
+      num_timesteps: Python `int` number of timesteps to model.
+      param_vals: a list of `Tensor` parameter values in order corresponding to
+        `self.parameters`, or a dict mapping from parameter names to values.
+      initial_step: optional `int` specifying the initial timestep to model.
+        This is relevant when the model contains time-varying components,
+        e.g., holidays or seasonality.
+
+    Returns:
+      component_ssms: a Python list of `LinearGaussianStateSpaceModel`
+        Distribution objects, in order corresponding to `self.components`.
+    """
+
+    with tf.compat.v1.name_scope('make_component_state_space_models'):
+
+      # List the model parameters in canonical order
+      param_map = self._canonicalize_param_vals_as_map(param_vals)
+      param_vals_list = [param_map[p.name] for p in self.parameters]
+
+      # Build SSMs for each component model. We process the components in
+      # canonical order, extracting the parameters for each component from the
+      # (ordered) list of parameters.
+      remaining_param_vals = param_vals_list[1:]
+      component_ssms = []
+      for component in self.components:
+        num_parameters = len(component.parameters)
+        component_param_vals = remaining_param_vals[:num_parameters]
+        remaining_param_vals = remaining_param_vals[num_parameters:]
+
+        component_ssms.append(
+            component.make_state_space_model(
+                num_timesteps,
+                param_vals=component_param_vals,
+                initial_step=initial_step))
+
+    return component_ssms
+
   def _make_state_space_model(self,
                               num_timesteps,
                               param_map,
@@ -485,22 +528,10 @@ class Sum(StructuralTimeSeries):
     param_vals_list = [param_map[p.name] for p in self.parameters]
     observation_noise_scale = param_vals_list[0]
 
-    # Build SSMs for each component model. We process the components in
-    # canonical order, extracting the parameters for each component from the
-    # (ordered) list of parameters.
-    remaining_param_vals = param_vals_list[1:]
-    component_ssms = []
-    for component in self.components:
-      # Pop the parameters for this component from the beginning of the list.
-      num_parameters = len(component.parameters)
-      component_param_vals = remaining_param_vals[:num_parameters]
-      remaining_param_vals = remaining_param_vals[num_parameters:]
-
-      component_ssms.append(
-          component.make_state_space_model(
-              num_timesteps,
-              param_vals=component_param_vals,
-              initial_step=initial_step))
+    component_ssms = self.make_component_state_space_models(
+        num_timesteps=num_timesteps,
+        param_vals=param_map,
+        initial_step=initial_step)
 
     if constant_offset is None:
       constant_offset = self.constant_offset

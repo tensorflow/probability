@@ -33,6 +33,7 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         ":autoregressive",
+        ":decomposition",
         ":fitting",
         ":forecast",
         ":local_level",
@@ -61,6 +62,29 @@ py_test(
     size = "medium",
     srcs = ["autoregressive_test.py"],
     deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "decomposition",
+    srcs = ["decomposition.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/sts/internal",
+    ],
+)
+
+py_test(
+    name = "decomposition_test",
+    size = "medium",
+    srcs = ["decomposition_test.py"],
+    deps = [
+        # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
