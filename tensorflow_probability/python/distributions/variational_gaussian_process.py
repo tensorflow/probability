@@ -310,16 +310,18 @@ class VariationalGaussianProcess(
   train_op = optimizer.minimize(loss)
 
   num_iters = 10000
+  num_logs = 10
   with tf.Session() as sess:
-    batch_idxs = np.random.randint(num_training_points_, size=[batch_size])
-    x_train_batch_ = x_train_[batch_idxs, ...]
-    y_train_batch_ = y_train_[batch_idxs]
+    for i in range(num_iters):
+      batch_idxs = np.random.randint(num_training_points_, size=[batch_size])
+      x_train_batch_ = x_train_[batch_idxs, ...]
+      y_train_batch_ = y_train_[batch_idxs]
 
-    [_, loss_] = sess.run([train_op,loss],
-                          feed_dict={x_train_batch: x_train_batch_,
-                                     y_train_batch: y_train_batch_})
-    if i % (num_iters / 20) == 0:
-      print(i, loss_)
+      [_, loss_] = sess.run([train_op, loss],
+                            feed_dict={x_train_batch: x_train_batch_,
+                                       y_train_batch: y_train_batch_})
+      if i % (num_iters / num_logs) == 0 or i + 1 == num_iters:
+        print(i, loss_)
 
   # Generate a plot with
   #   - the posterior predictive mean
