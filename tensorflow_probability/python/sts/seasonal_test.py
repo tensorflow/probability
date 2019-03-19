@@ -22,6 +22,8 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
+
+from tensorflow_probability.python.sts import ConstrainedSeasonalStateSpaceModel
 from tensorflow_probability.python.sts import SeasonalStateSpaceModel
 
 tfd = tfp.distributions
@@ -29,7 +31,7 @@ from tensorflow.python.framework import test_util  # pylint: disable=g-direct-te
 tfl = tf.linalg
 
 
-class _SeasonalStateSpaceModelTest(object):
+class _SeasonalStateSpaceModelTest(tf.test.TestCase):
 
   def test_day_of_week_example(self):
 
@@ -219,25 +221,122 @@ class _SeasonalStateSpaceModelTest(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SeasonalStateSpaceModelTestStaticShape32(
-    tf.test.TestCase, _SeasonalStateSpaceModelTest):
+class SeasonalStateSpaceModelTestStaticShape32(_SeasonalStateSpaceModelTest):
   dtype = np.float32
   use_static_shape = True
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SeasonalStateSpaceModelTestDynamicShape32(
-    tf.test.TestCase, _SeasonalStateSpaceModelTest):
+class SeasonalStateSpaceModelTestDynamicShape32(_SeasonalStateSpaceModelTest):
   dtype = np.float32
   use_static_shape = False
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SeasonalStateSpaceModelTestStaticShape64(
-    tf.test.TestCase, _SeasonalStateSpaceModelTest):
+class SeasonalStateSpaceModelTestStaticShape64(_SeasonalStateSpaceModelTest):
   dtype = np.float64
   use_static_shape = True
 
+
+class _ConstrainedSeasonalStateSpaceModelTest(tf.test.TestCase):
+
+  # TODO(b/128635942): write additional tests for ConstrainedSeasonalSSM
+
+  def test_batch_shape(self):
+    batch_shape = [3, 2]
+    partial_batch_shape = [2]
+
+    num_seasons = 24
+    initial_state_prior = tfd.MultivariateNormalDiag(
+        scale_diag=self._build_placeholder(
+            np.exp(np.random.randn(
+                *(partial_batch_shape + [num_seasons - 1])))))
+    drift_scale = self._build_placeholder(
+        np.exp(np.random.randn(*batch_shape)))
+    observation_noise_scale = self._build_placeholder(
+        np.exp(np.random.randn(*partial_batch_shape)))
+
+    ssm = ConstrainedSeasonalStateSpaceModel(
+        num_timesteps=9,
+        num_seasons=24,
+        num_steps_per_season=2,
+        drift_scale=drift_scale,
+        observation_noise_scale=observation_noise_scale,
+        initial_state_prior=initial_state_prior)
+
+    # First check that the model's batch shape is the broadcast batch shape
+    # of parameters, as expected.
+
+    self.assertAllEqual(self.evaluate(ssm.batch_shape_tensor()), batch_shape)
+    y_ = self.evaluate(ssm.sample())
+    self.assertAllEqual(y_.shape[:-2], batch_shape)
+
+    # Next check that the broadcasting works as expected, and the batch log_prob
+    # actually matches the log probs of independent models.
+    individual_ssms = []
+    for i in range(batch_shape[0]):
+      for j in range(batch_shape[1]):
+        individual_ssms.append(ConstrainedSeasonalStateSpaceModel(
+            num_timesteps=9,
+            num_seasons=num_seasons,
+            num_steps_per_season=2,
+            drift_scale=drift_scale[i, j, ...],
+            observation_noise_scale=observation_noise_scale[j, ...],
+            initial_state_prior=tfd.MultivariateNormalDiag(
+                scale_diag=initial_state_prior.scale.diag[j, ...])))
+
+    batch_lps_ = self.evaluate(ssm.log_prob(y_)).flatten()
+
+    individual_ys = [y_[i, j, ...]  # pylint: disable=g-complex-comprehension
+                     for i in range(batch_shape[0])
+                     for j in range(batch_shape[1])]
+    individual_lps_ = self.evaluate([
+        individual_ssm.log_prob(individual_y)
+        for (individual_ssm, individual_y)
+        in zip(individual_ssms, individual_ys)])
+
+    self.assertAllClose(individual_lps_, batch_lps_)
+
+  def _build_placeholder(self, ndarray):
+    """Convert a numpy array to a TF placeholder.
+
+    Args:
+      ndarray: any object convertible to a numpy array via `np.asarray()`.
+
+    Returns:
+      placeholder: a TensorFlow `placeholder` with default value given by the
+      provided `ndarray`, dtype given by `self.dtype`, and shape specified
+      statically only if `self.use_static_shape` is `True`.
+    """
+
+    ndarray = np.asarray(ndarray).astype(self.dtype)
+    return tf.compat.v1.placeholder_with_default(
+        input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class ConstrainedSeasonalStateSpaceModelTestStaticShape32(
+    _ConstrainedSeasonalStateSpaceModelTest):
+  dtype = np.float32
+  use_static_shape = True
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class ConstrainedSeasonalStateSpaceModelTestDynamicShape32(
+    _ConstrainedSeasonalStateSpaceModelTest):
+  dtype = np.float32
+  use_static_shape = False
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class ConstrainedSeasonalStateSpaceModelTestStaticShape64(
+    _ConstrainedSeasonalStateSpaceModelTest):
+  dtype = np.float64
+  use_static_shape = True
+
+# Don't run tests for the abstract base classes.
+del _SeasonalStateSpaceModelTest
+del _ConstrainedSeasonalStateSpaceModelTest
 
 if __name__ == "__main__":
   tf.test.main()

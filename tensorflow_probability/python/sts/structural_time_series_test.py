@@ -247,14 +247,25 @@ class SeasonalTest(tf.test.TestCase, _StsTestHarness):
   def _build_sts(self, observed_time_series=None):
     # Note that a Seasonal model with `num_steps_per_season > 1` would have
     # deterministic dependence between timesteps, so evaluating `log_prob` of an
-    # arbitary time series leads to Cholesky decomposition errors unless the
+    # arbitrary time series leads to Cholesky decomposition errors unless the
     # model also includes an observation noise component (which it would in
     # practice, but this test harness attempts to test the component in
     # isolation). The `num_steps_per_season=1` case tested here will not suffer
     # from this issue.
     return Seasonal(num_seasons=7,
                     num_steps_per_season=1,
-                    observed_time_series=observed_time_series)
+                    observed_time_series=observed_time_series,
+                    constrain_mean_effect_to_zero=False)
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class SeasonalWithZeroMeanConstraintTest(tf.test.TestCase, _StsTestHarness):
+
+  def _build_sts(self, observed_time_series=None):
+    return Seasonal(num_seasons=7,
+                    num_steps_per_season=1,
+                    observed_time_series=observed_time_series,
+                    constrain_mean_effect_to_zero=True)
 
 
 @test_util.run_all_in_graph_and_eager_modes

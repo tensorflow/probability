@@ -37,6 +37,7 @@ class _ForecastTest(object):
         initial_effect_prior=tfd.Normal(
             loc=self._build_tensor(np.zeros(prior_batch_shape)),
             scale=self._build_tensor(1.)),
+        constrain_mean_effect_to_zero=False,  # Simplifies analysis.
         name='seasonal')
     return tfp.sts.Sum(components=[seasonal],
                        constant_offset=constant_offset,

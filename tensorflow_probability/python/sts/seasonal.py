@@ -23,11 +23,53 @@ import tensorflow as tf
 
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import distribution_util as dist_util
 
+from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.sts.internal import util as sts_util
 from tensorflow_probability.python.sts.structural_time_series import Parameter
 from tensorflow_probability.python.sts.structural_time_series import StructuralTimeSeries
+from tensorflow_probability.python.util import docstring as docstring_util
+
+
+seasonal_init_args = """
+    Args:
+      num_timesteps: Scalar `int` `Tensor` number of timesteps to model
+        with this distribution.
+      num_seasons: Scalar Python `int` number of seasons.
+      drift_scale: Scalar (any additional dimensions are treated as batch
+        dimensions) `float` `Tensor` indicating the standard deviation of the
+        change in effect between consecutive occurrences of a given season.
+        This is assumed to be the same for all seasons.
+      initial_state_prior: instance of `tfd.MultivariateNormal`
+        representing the prior distribution on latent states; must
+        have event shape `[num_seasons]`.
+      observation_noise_scale: Scalar (any additional dimensions are
+        treated as batch dimensions) `float` `Tensor` indicating the standard
+        deviation of the observation noise.
+        Default value: 0.
+      num_steps_per_season: Python `int` number of steps in each
+        season. This may be either a scalar (shape `[]`), in which case all
+        seasons have the same length, or a NumPy array of shape `[num_seasons]`.
+        Default value: 1.
+      initial_step: Optional scalar `int` `Tensor` specifying the starting
+        timestep.
+        Default value: 0.
+      validate_args: Python `bool`. Whether to validate input
+        with asserts. If `validate_args` is `False`, and the inputs are
+        invalid, correct behavior is not guaranteed.
+        Default value: `False`.
+      allow_nan_stats: Python `bool`. If `False`, raise an
+        exception if a statistic (e.g. mean/mode/etc...) is undefined for any
+        batch member. If `True`, batch members with valid parameters leading to
+        undefined statistics will return NaN for this statistic.
+        Default value: `True`.
+      name: Python `str` name prefixed to ops created by this class.
+        Default value: "SeasonalStateSpaceModel".
+
+    Raises:
+      ValueError: if `num_steps_per_season` has invalid shape (neither
+        scalar nor `[num_seasons]`).
+    """
 
 
 class SeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
@@ -60,6 +102,8 @@ class SeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
     `observation_noise_scale` are each (a batch of) scalars. The batch shape of
     this `Distribution` is the broadcast batch shape of these parameters and of
     the `initial_state_prior`.
+
+    Note: there is no requirement that the effects sum to zero.
 
     #### Mathematical Details
 
@@ -123,8 +167,10 @@ class SeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
     on January 23 (steps are zero-indexed). A general implementation of
     month-of-year seasonality would require additional logic; this
     version works over time periods not involving a leap year.
-    """
 
+  """
+
+  @docstring_util.expand_docstring(seasonal_init_args=seasonal_init_args)
   def __init__(self,
                num_timesteps,
                num_seasons,
@@ -135,51 +181,14 @@ class SeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
                initial_step=0,
                validate_args=False,
                allow_nan_stats=True,
-               name=None):
-    """Build a state space model implementing seasonal effects.
+               name=None):  # pylint: disable=g-doc-args
+    """Build a seasonal effect state space model.
 
-    Args:
-      num_timesteps: Scalar `int` `Tensor` number of timesteps to model
-        with this distribution.
-      num_seasons: Scalar Python `int` number of seasons.
-      drift_scale: Scalar (any additional dimensions are treated as batch
-        dimensions) `float` `Tensor` indicating the standard deviation of the
-        change in effect between consecutive occurrences of a given season.
-        This is assumed to be the same for all seasons.
-      initial_state_prior: instance of `tfd.MultivariateNormal`
-        representing the prior distribution on latent states; must
-        have event shape `[num_seasons]`.
-      observation_noise_scale: Scalar (any additional dimensions are
-        treated as batch dimensions) `float` `Tensor` indicating the standard
-        deviation of the observation noise.
-        Default value: 0.
-      num_steps_per_season: Python `int` number of steps in each
-        season. This may be either a scalar (shape `[]`), in which case all
-        seasons have the same length, or a NumPy array of shape `[num_seasons]`.
-        Default value: 1.
-      initial_step: Optional scalar `int` `Tensor` specifying the starting
-        timestep.
-        Default value: 0.
-      validate_args: Python `bool`. Whether to validate input
-        with asserts. If `validate_args` is `False`, and the inputs are
-        invalid, correct behavior is not guaranteed.
-        Default value: `False`.
-      allow_nan_stats: Python `bool`. If `False`, raise an
-        exception if a statistic (e.g. mean/mode/etc...) is undefined for any
-        batch member. If `True`, batch members with valid parameters leading to
-        undefined statistics will return NaN for this statistic.
-        Default value: `True`.
-      name: Python `str` name prefixed to ops created by this class.
-        Default value: "SeasonalStateSpaceModel".
-
-    Raises:
-      ValueError: if `num_steps_per_season` has invalid shape (neither
-        scalar nor `[num_seasons]`).
+    {seasonal_init_args}
     """
 
     with tf.compat.v1.name_scope(
-        name,
-        'SeasonalStateSpaceModel',
+        name, 'SeasonalStateSpaceModel',
         values=[drift_scale, observation_noise_scale]) as name:
 
       # The initial state prior determines the dtype of sampled values.
@@ -202,45 +211,19 @@ class SeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
                          ' or have length [num_seasons] = [{}] (saw: shape {})'.
                          format(num_seasons, num_steps_per_season.shape))
 
-      # Utility method to compute whether the season is changing.
-      num_steps_per_cycle = np.sum(num_steps_per_season)
-      changepoints = np.cumsum(num_steps_per_season) - 1
-      def is_last_day_of_season(t):
-        t_ = dist_util.maybe_get_static_value(t)
-        if t_ is not None:  # static case
-          step_in_cycle = t_ % num_steps_per_cycle
-          return any(step_in_cycle == changepoints)
-        else:
-          step_in_cycle = tf.floormod(t, num_steps_per_cycle)
-          return tf.reduce_any(
-              input_tensor=tf.equal(step_in_cycle, changepoints))
+      is_last_day_of_season = build_is_last_day_of_season(num_steps_per_season)
 
-      # If the season is changing, the transition matrix rotates the latent
-      # state to shift all seasons up by a dimension, and sends the current
-      # season's effect to the bottom.
-      seasonal_permutation = np.concatenate(
-          [np.arange(1, num_seasons), [0]], axis=0)
-      seasonal_permutation_matrix = np.eye(num_seasons)[seasonal_permutation]
-      def seasonal_transition_matrix(t):
-        return tf.linalg.LinearOperatorFullMatrix(
-            matrix=dist_util.pick_scalar_condition(
-                is_last_day_of_season(t),
-                tf.constant(seasonal_permutation_matrix, dtype=dtype),
-                tf.eye(num_seasons, dtype=dtype)))
+      seasonal_transition_matrix = build_seasonal_transition_matrix(
+          num_seasons=num_seasons,
+          is_last_day_of_season=is_last_day_of_season,
+          dtype=dtype)
 
-      # If the season is changing, the transition noise model adds random drift
-      # to the effect of the outgoing season.
-      drift_scale_diag = tf.stack(
-          [tf.zeros_like(drift_scale)] * (num_seasons - 1) + [drift_scale],
-          axis=-1)
-      def seasonal_transition_noise(t):
-        noise_scale = dist_util.pick_scalar_condition(
-            is_last_day_of_season(t),
-            drift_scale_diag,
-            tf.zeros_like(drift_scale_diag, dtype=dtype))
-        return tfd.MultivariateNormalDiag(loc=tf.zeros(num_seasons,
-                                                       dtype=dtype),
-                                          scale_diag=noise_scale)
+      seasonal_transition_noise = build_seasonal_transition_noise(
+          drift_scale, num_seasons, is_last_day_of_season)
+
+      observation_matrix = tf.concat([
+          tf.ones([1, 1], dtype=dtype),
+          tf.zeros([1, num_seasons-1], dtype=dtype)], axis=-1)
 
       self._drift_scale = drift_scale
       self._observation_noise_scale = observation_noise_scale
@@ -251,10 +234,7 @@ class SeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
           num_timesteps=num_timesteps,
           transition_matrix=seasonal_transition_matrix,
           transition_noise=seasonal_transition_noise,
-          observation_matrix=tf.concat([tf.ones([1, 1], dtype=dtype),
-                                        tf.zeros([1, num_seasons-1],
-                                                 dtype=dtype)],
-                                       axis=-1),
+          observation_matrix=observation_matrix,
           observation_noise=tfd.MultivariateNormalDiag(
               scale_diag=observation_noise_scale[..., tf.newaxis]),
           initial_state_prior=initial_state_prior,
@@ -282,6 +262,391 @@ class SeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
   def num_steps_per_season(self):
     """Number of steps in each season."""
     return self._num_steps_per_season
+
+
+class ConstrainedSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
+  """Seasonal state space model with effects constrained to sum to zero.
+
+    See `SeasonalStateSpaceModel` for background.
+
+    #### Mathematical details
+
+    The constrained model implements a reparameterization of the
+    naive `SeasonalStateSpaceModel`. Instead of directly representing the
+    seasonal effects in the latent space, the latent space of the constrained
+    model represents the difference between each effect and the mean effect.
+    The following discussion assumes familiarity with the mathematical details
+    of `SeasonalStateSpaceModel`.
+
+    *Reparameterization and constraints*: let the seasonal effects at a given
+    timestep be `E = [e_1, ..., e_N]`. The difference between each effect `e_i`
+    and the mean effect is `z_i = e_i - sum_i(e_i)/N`. By itself, this
+    transformation is not invertible because recovering the absolute effects
+    requires that we know the mean as well. To fix this, we'll define
+    `z_N = sum_i(e_i)/N` as the mean effect. It's easy to see that this is
+    invertible: given the mean effect and the differences of the first `N - 1`
+    effects from the mean, it's easy to solve for all `N` effects. Formally,
+    we've defined the invertible linear reparameterization `Z = R E`, where
+
+    ```
+    R = [1 - 1/N, -1/N,    ..., -1/N
+         -1/N,    1 - 1/N, ..., -1/N,
+         ...
+         1/N,     1/N,     ...,  1/N]
+    ```
+
+    represents the change of basis from 'effect coordinates' E to
+    'residual coordinates' Z. The `Z`s form the latent space of the
+    `ConstrainedSeasonalStateSpaceModel`.
+
+    To constrain the mean effect `z_N` to zero, we fix the prior to zero,
+    `p(z_N) ~ N(0., 0)`, and after the transition at each timestep we project
+    `z_N` back to zero. Note that this projection is linear: to set the Nth
+    dimension to zero, we simply multiply by the identity matrix with a missing
+    element in the bottom right, i.e., `Z_constrained = P Z`,
+    where `P = eye(N) - scatter((N-1, N-1), 1)`.
+
+    *Model*: concretely, suppose a naive seasonal effect model has initial state
+    prior `N(m, S)`, transition matrix `F` and noise covariance
+    `Q`, and observation matrix `H`. Then the corresponding constrained seasonal
+    effect model has initial state prior `N(P R m, P R S R' P')`,
+    transition matrix `P R F R^-1` and noise covariance `F R Q R' F'`, and
+    observation matrix `H R^-1`, where the change-of-basis matrix `R` and
+    constraint projection matrix `P` are as defined above. This follows
+    directly from applying the reparameterization `Z = R E`, and then enforcing
+    the zero-sum constraint on the prior and transition noise covariances.
+
+    In practice, because the sum of effects `z_N` is constrained to be zero, it
+    will never contribute a term to any linear operation on the latent space,
+    so we can drop that dimension from the model entirely.
+    `ConstrainedSeasonalStateSpaceModel` does this, so that it implements the
+    `N - 1` dimension latent space `z_1, ..., z_[N-1]`.
+
+    Note that since we constrained the mean effect to be zero, the latent
+    `z_i`'s now recover their interpretation as the *actual* effects,
+    `z_i = e_i` for `i = `1, ..., N - 1`, even though they were originally
+    defined as residuals. The `N`th effect is represented only implicitly, as
+    the nonzero mean of the first `N - 1` effects. Although the computational
+    represention is not symmetric across all `N` effects, we derived the
+    `ConstrainedSeasonalStateSpaceModel` by starting with a symmetric
+    representation and imposing only a symmetric constraint (the zero-sum
+    constraint), so the probability model remains symmetric over all `N`
+    seasonal effects.
+
+    #### Examples
+
+    A constrained state-space model with day-of-week seasonality on hourly data:
+
+    ```python
+    day_of_week = ConstrainedSeasonalStateSpaceModel(
+      num_timesteps=30,
+      num_seasons=7,
+      drift_scale=0.1,
+      initial_state_prior=tfd.MultivariateNormalDiag(
+        scale_diag=tf.ones([7], dtype=tf.float32),
+      num_steps_per_season=24)
+    ```
+
+    A model with basic month-of-year seasonality on daily data, demonstrating
+    seasons of varying length:
+
+    ```python
+    month_of_year = ConstrainedSeasonalStateSpaceModel(
+      num_timesteps=2 * 365,  # 2 years
+      num_seasons=12,
+      drift_scale=0.1,
+      initial_state_prior=tfd.MultivariateNormalDiag(
+        scale_diag=tf.ones([12], dtype=tf.float32)),
+      num_steps_per_season=[31, 28, 31, 30, 30, 31, 31, 31, 30, 31, 30, 31],
+      initial_step=22)
+    ```
+
+    Note that we've used `initial_step=22` to denote that the model begins
+    on January 23 (steps are zero-indexed). A general implementation of
+    month-of-year seasonality would require additional logic; this
+    version works over time periods not involving a leap year.
+  """
+
+  def __init__(self,
+               num_timesteps,
+               num_seasons,
+               drift_scale,
+               initial_state_prior,
+               observation_noise_scale=1e-4,  # Avoid degeneracy.
+               num_steps_per_season=1,
+               initial_step=0,
+               validate_args=False,
+               allow_nan_stats=True,
+               name=None):  # pylint: disable=g-doc-args
+    """Build a seasonal effect state space model with a zero-sum constraint.
+
+    {seasonal_init_args}
+    """
+
+    with tf.compat.v1.name_scope(
+        name, 'ConstrainedSeasonalStateSpaceModel',
+        values=[drift_scale, observation_noise_scale]) as name:
+
+      # The initial state prior determines the dtype of sampled values.
+      # Other model parameters must have the same dtype.
+      dtype = initial_state_prior.dtype
+      drift_scale = tf.convert_to_tensor(
+          value=drift_scale, name='drift_scale', dtype=dtype)
+      observation_noise_scale = tf.convert_to_tensor(
+          value=observation_noise_scale,
+          name='observation_noise_scale',
+          dtype=dtype)
+
+      # Coerce `num_steps_per_season` to a canonical form, an array of
+      # `num_seasons` integers.
+      num_steps_per_season = np.asarray(num_steps_per_season)
+      if not num_steps_per_season.shape:
+        num_steps_per_season = np.tile(num_steps_per_season, num_seasons)
+      elif num_steps_per_season.shape != (num_seasons,):
+        raise ValueError('num_steps_per_season must either be scalar (shape [])'
+                         ' or have length [num_seasons] = [{}] (saw: shape {})'.
+                         format(num_seasons, num_steps_per_season.shape))
+
+      is_last_day_of_season = build_is_last_day_of_season(num_steps_per_season)
+
+      [
+          effects_to_residuals,
+          residuals_to_effects
+      ] = build_effects_to_residuals_matrix(num_seasons, dtype=dtype)
+
+      seasonal_transition_matrix = build_seasonal_transition_matrix(
+          num_seasons=num_seasons,
+          is_last_day_of_season=is_last_day_of_season,
+          dtype=dtype,
+          basis_change_matrix=effects_to_residuals,
+          basis_change_matrix_inv=residuals_to_effects)
+
+      seasonal_transition_noise = build_constrained_seasonal_transition_noise(
+          drift_scale, num_seasons, is_last_day_of_season)
+
+      observation_matrix = tf.concat(
+          [tf.ones([1, 1], dtype=dtype),
+           tf.zeros([1, num_seasons-1], dtype=dtype)], axis=-1)
+      observation_matrix = tf.matmul(observation_matrix, residuals_to_effects)
+
+      self._drift_scale = drift_scale
+      self._observation_noise_scale = observation_noise_scale
+      self._num_seasons = num_seasons
+      self._num_steps_per_season = num_steps_per_season
+
+      super(ConstrainedSeasonalStateSpaceModel, self).__init__(
+          num_timesteps=num_timesteps,
+          transition_matrix=seasonal_transition_matrix,
+          transition_noise=seasonal_transition_noise,
+          observation_matrix=observation_matrix,
+          observation_noise=tfd.MultivariateNormalDiag(
+              scale_diag=observation_noise_scale[..., tf.newaxis]),
+          initial_state_prior=initial_state_prior,
+          initial_step=initial_step,
+          allow_nan_stats=allow_nan_stats,
+          validate_args=validate_args,
+          name=name)
+
+  @property
+  def drift_scale(self):
+    """Standard deviation of the drift in effects between seasonal cycles."""
+    return self._drift_scale
+
+  @property
+  def observation_noise_scale(self):
+    """Standard deviation of the observation noise."""
+    return self._observation_noise_scale
+
+  @property
+  def num_seasons(self):
+    """Number of seasons."""
+    return self._num_seasons
+
+  @property
+  def num_steps_per_season(self):
+    """Number of steps in each season."""
+    return self._num_steps_per_season
+
+
+def build_is_last_day_of_season(num_steps_per_season):
+  """Build utility method to compute whether the season is changing."""
+  num_steps_per_cycle = np.sum(num_steps_per_season)
+  changepoints = np.cumsum(num_steps_per_season) - 1
+  def is_last_day_of_season(t):
+    t_ = dist_util.maybe_get_static_value(t)
+    if t_ is not None:  # static case
+      step_in_cycle = t_ % num_steps_per_cycle
+      return any(step_in_cycle == changepoints)
+    else:
+      step_in_cycle = tf.floormod(t, num_steps_per_cycle)
+      return tf.reduce_any(
+          input_tensor=tf.equal(step_in_cycle, changepoints))
+  return is_last_day_of_season
+
+
+def build_effects_to_residuals_matrix(num_seasons, dtype):
+  """Build change-of-basis matrices for constrained seasonal effects.
+
+  This method builds the matrix that transforms seasonal effects into
+  effect residuals (differences from the mean effect), and additionally
+  projects these residuals onto the subspace where the mean effect is zero.
+
+  See `ConstrainedSeasonalStateSpaceModel` for mathematical details.
+
+  Args:
+    num_seasons: scalar `int` number of seasons.
+    dtype: TensorFlow `dtype` for the returned values.
+  Returns:
+    effects_to_residuals: `Tensor` of shape
+      `[num_seasons-1, num_seasons]`, such that `differences_from_mean_effect =
+      matmul(effects_to_residuals, seasonal_effects)`.  In the
+      notation of `ConstrainedSeasonalStateSpaceModel`, this is
+      `effects_to_residuals = P * R`.
+    residuals_to_effects: the (pseudo)-inverse of the above; a
+      `Tensor` of shape `[num_seasons, num_seasons-1]`. In the
+      notation of `ConstrainedSeasonalStateSpaceModel`, this is
+      `residuals_to_effects = R^{-1} * P'`.
+  """
+
+  # Build the matrix that converts effects `e_i` into differences from the mean
+  # effect `(e_i - sum(e_i)) / num_seasons`, with the mean effect in the last
+  # row so that the transformation is invertible.
+  effects_to_residuals_fullrank = np.eye(num_seasons) - 1./num_seasons
+  effects_to_residuals_fullrank[-1, :] = 1./num_seasons  # compute mean effect
+  residuals_to_effects_fullrank = np.linalg.inv(effects_to_residuals_fullrank)
+
+  # Drop the final dimension, effectively setting the mean effect to zero.
+  effects_to_residuals = effects_to_residuals_fullrank[:-1, :]
+  residuals_to_effects = residuals_to_effects_fullrank[:, :-1]
+
+  # Return Tensor values of the specified dtype.
+  effects_to_residuals = tf.cast(
+      effects_to_residuals, dtype=dtype, name='effects_to_residuals')
+  residuals_to_effects = tf.cast(
+      residuals_to_effects, dtype=dtype, name='residuals_to_effects')
+
+  return effects_to_residuals, residuals_to_effects
+
+
+def build_seasonal_transition_matrix(
+    num_seasons, is_last_day_of_season, dtype,
+    basis_change_matrix=None, basis_change_matrix_inv=None):
+  """Build a function computing transitions for a seasonal effect model."""
+
+  with tf.compat.v1.name_scope('build_seasonal_transition_matrix'):
+    # If the season is changing, the transition matrix permutes the latent
+    # state to shift all seasons up by a dimension, and sends the current
+    # season's effect to the bottom.
+    seasonal_permutation = np.concatenate(
+        [np.arange(1, num_seasons), [0]], axis=0)
+    seasonal_permutation_matrix = tf.constant(
+        np.eye(num_seasons)[seasonal_permutation], dtype=dtype)
+
+    # Optionally transform the transition matrix into a reparameterized space,
+    # enforcing the zero-sum constraint for ConstrainedSeasonalStateSpaceModel.
+    if basis_change_matrix is not None:
+      seasonal_permutation_matrix = tf.matmul(
+          basis_change_matrix,
+          tf.matmul(seasonal_permutation_matrix, basis_change_matrix_inv))
+
+    identity_matrix = tf.eye(
+        tf.shape(input=seasonal_permutation_matrix)[-1], dtype=dtype)
+
+    def seasonal_transition_matrix(t):
+      return tf.linalg.LinearOperatorFullMatrix(
+          matrix=dist_util.pick_scalar_condition(
+              is_last_day_of_season(t),
+              seasonal_permutation_matrix,
+              identity_matrix))
+
+  return seasonal_transition_matrix
+
+
+def build_seasonal_transition_noise(
+    drift_scale, num_seasons, is_last_day_of_season):
+  """Build the transition noise model for a SeasonalStateSpaceModel."""
+
+  # If the current season has just ended, increase the variance of its effect
+  # following drift_scale. (the just-ended seasonal effect will always be the
+  # bottom element of the vector). Otherwise, do nothing.
+  drift_scale_diag = tf.stack(
+      [tf.zeros_like(drift_scale)] * (num_seasons - 1) + [drift_scale],
+      axis=-1)
+  def seasonal_transition_noise(t):
+    noise_scale_diag = dist_util.pick_scalar_condition(
+        is_last_day_of_season(t),
+        drift_scale_diag,
+        tf.zeros_like(drift_scale_diag))
+    return tfd.MultivariateNormalDiag(
+        loc=tf.zeros(num_seasons, dtype=drift_scale.dtype),
+        scale_diag=noise_scale_diag)
+  return seasonal_transition_noise
+
+
+def build_constrained_seasonal_transition_noise(
+    drift_scale, num_seasons, is_last_day_of_season):
+  """Build transition noise distribution for a ConstrainedSeasonalSSM."""
+
+  # Conceptually, this method takes the noise covariance on effects L @ L'
+  # computed by `build_seasonal_transition_noise`, with scale factor
+  #       L = [ 0, 0, ..., 0
+  #             ...
+  #             0, 0, ..., drift_scale],
+  # and transforms it to act on the constrained-residual representation.
+  #
+  # The resulting noise covariance M @ M' is equivalent to
+  #    M @ M' = effects_to_residuals @ LL' @ residuals_to_effects
+  # where `@` is matrix multiplication. However because this matrix is
+  # rank-deficient, we can't take its Cholesky decomposition directly, so we'll
+  # construct its lower-triangular scale factor `M` by hand instead.
+  #
+  # Concretely, let `M = P @ R @ L` be the scale factor in the
+  # transformed space, with matrices `R`, `P` applying the reparameterization
+  # and zero-mean constraint respectively as defined in the
+  # "Mathematical Details" section of `ConstrainedSeasonalStateSpaceModel`. It's
+  # easy to see (*) that the implied covariance
+  # `M @ M' = P @ R @ L @ L' @ R' @ P'` is just the constant matrix
+  #  `M @ M' = [ 1, 1, ..., 1, 0
+  #              1, 1, ..., 1, 0
+  #              ...
+  #              1, 1, ..., 1, 0
+  #              0, 0, ..., 0, 0] * (drift_scale / num_seasons)**2`
+  # with zeros in the final row and column. So we can directly construct
+  # the lower-triangular factor
+  #  `Q = [ 1, 0, ...  0
+  #         1, 0, ..., 0
+  #         ...
+  #         1, 0, ..., 0
+  #         0, 0, ..., 0 ] * drift_scale/num_seasons`
+  # such that Q @ Q' = M @ M'. In practice, we don't reify the final row and
+  # column full of zeroes, i.e., we construct
+  # `Q[:num_seasons-1, :num_seasons-1]` as the scale-TriL covariance factor.
+  #
+  # (*) Argument: `L` is zero everywhere but the last column, so `R @ L` will be
+  # too. Since the last column of `R` is the constant `-1/num_seasons`, `R @ L`
+  # is simply the matrix with constant `-drift_scale/num_seasons` in the final
+  # column (except the final row, which is negated) and zero in all other
+  # columns, and `M = P @ R @ L` additionally zeroes out the final row. Then
+  # M @ M' is just the outer product of that final column with itself (since all
+  # other columns are zero), which gives the matrix shown above.
+
+  drift_scale_tril_nonzeros = tf.concat([
+      tf.ones([num_seasons - 1, 1], dtype=drift_scale.dtype),
+      tf.zeros([num_seasons - 1, num_seasons - 2], dtype=drift_scale.dtype)],
+                                        axis=-1)
+  drift_scale_tril = (drift_scale_tril_nonzeros *
+                      drift_scale[..., tf.newaxis, tf.newaxis] / num_seasons)
+
+  # Inject transition noise iff it is the last day of the season.
+  def seasonal_transition_noise(t):
+    noise_scale_tril = dist_util.pick_scalar_condition(
+        is_last_day_of_season(t),
+        drift_scale_tril,
+        tf.zeros_like(drift_scale_tril))
+    return tfd.MultivariateNormalTriL(
+        loc=tf.zeros(num_seasons-1, dtype=drift_scale.dtype),
+        scale_tril=noise_scale_tril)
+  return seasonal_transition_noise
 
 
 class Seasonal(StructuralTimeSeries):
@@ -354,6 +719,7 @@ class Seasonal(StructuralTimeSeries):
                num_steps_per_season=1,
                drift_scale_prior=None,
                initial_effect_prior=None,
+               constrain_mean_effect_to_zero=True,
                observed_time_series=None,
                name=None):
     """Specify a seasonal effects model.
@@ -377,6 +743,13 @@ class Seasonal(StructuralTimeSeries):
         heuristic default prior is constructed based on the provided
         `observed_time_series`.
         Default value: `None`.
+      constrain_mean_effect_to_zero: if `True`, use a model parameterization
+        that constrains the mean effect across all seasons to be zero. This
+        constraint is generally helpful in identifying the contributions of
+        different model components and can lead to more interpretable
+        posterior decompositions. It may be undesirable if you plan to directly
+        examine the latent space of the underlying state space model.
+        Default value: `True`.
       observed_time_series: optional `float` `Tensor` of shape
         `batch_shape + [T, 1]` (omitting the trailing unit dimension is also
         supported when `T > 1`), specifying an observed time series.
@@ -404,26 +777,52 @@ class Seasonal(StructuralTimeSeries):
             loc=observed_initial,
             scale=tf.abs(observed_initial) + observed_stddev)
 
-      self._num_seasons = num_seasons
-      self._num_steps_per_season = num_steps_per_season
-
-      tf.debugging.assert_same_float_dtype(
+      dtype = tf.debugging.assert_same_float_dtype(
           [drift_scale_prior, initial_effect_prior])
 
       if isinstance(initial_effect_prior, tfd.Normal):
-        self._initial_state_prior = tfd.MultivariateNormalDiag(
+        initial_state_prior = tfd.MultivariateNormalDiag(
             loc=tf.stack([initial_effect_prior.mean()] * num_seasons, axis=-1),
             scale_diag=tf.stack([initial_effect_prior.stddev()] * num_seasons,
                                 axis=-1))
       else:
-        self._initial_state_prior = initial_effect_prior
+        initial_state_prior = initial_effect_prior
+
+      if constrain_mean_effect_to_zero:
+        # Transform the prior to the residual parameterization used by
+        # `ConstrainedSeasonalStateSpaceModel`, imposing a zero-sum constraint.
+        # This doesn't change the marginal prior on individual effects, but
+        # does introduce dependence between the effects.
+        (effects_to_residuals, _) = build_effects_to_residuals_matrix(
+            num_seasons, dtype=dtype)
+        effects_to_residuals_linop = tf.linalg.LinearOperatorFullMatrix(
+            effects_to_residuals)  # Use linop so that matmul broadcasts.
+        initial_state_prior_loc = effects_to_residuals_linop.matvec(
+            initial_state_prior.mean())
+        initial_state_prior_scale_linop = effects_to_residuals_linop.matmul(
+            initial_state_prior.scale)  # returns LinearOperator
+        initial_state_prior = tfd.MultivariateNormalFullCovariance(
+            loc=initial_state_prior_loc,
+            covariance_matrix=initial_state_prior_scale_linop.matmul(
+                initial_state_prior_scale_linop.to_dense(), adjoint_arg=True))
+
+      self._constrain_mean_effect_to_zero = constrain_mean_effect_to_zero
+      self._initial_state_prior = initial_state_prior
+      self._num_seasons = num_seasons
+      self._num_steps_per_season = num_steps_per_season
 
       super(Seasonal, self).__init__(
           parameters=[
               Parameter('drift_scale', drift_scale_prior, tfb.Softplus()),
           ],
-          latent_size=num_seasons,
+          latent_size=(num_seasons - 1
+                       if self.constrain_mean_effect_to_zero else num_seasons),
           name=name)
+
+  @property
+  def constrain_mean_effect_to_zero(self):
+    """Whether to constrain the mean effect to zero."""
+    return self._constrain_mean_effect_to_zero
 
   @property
   def num_seasons(self):
@@ -449,10 +848,19 @@ class Seasonal(StructuralTimeSeries):
     if initial_state_prior is None:
       initial_state_prior = self.initial_state_prior
 
-    return SeasonalStateSpaceModel(
-        num_timesteps=num_timesteps,
-        num_seasons=self.num_seasons,
-        num_steps_per_season=self.num_steps_per_season,
-        initial_state_prior=initial_state_prior,
-        initial_step=initial_step,
-        **param_map)
+    if self.constrain_mean_effect_to_zero:
+      return ConstrainedSeasonalStateSpaceModel(
+          num_timesteps=num_timesteps,
+          num_seasons=self.num_seasons,
+          num_steps_per_season=self.num_steps_per_season,
+          initial_state_prior=initial_state_prior,
+          initial_step=initial_step,
+          **param_map)
+    else:
+      return SeasonalStateSpaceModel(
+          num_timesteps=num_timesteps,
+          num_seasons=self.num_seasons,
+          num_steps_per_season=self.num_steps_per_season,
+          initial_state_prior=initial_state_prior,
+          initial_step=initial_step,
+          **param_map)
