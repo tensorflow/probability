@@ -39,6 +39,15 @@ def tridiag(d, diag_value, offdiag_value):
   return diag_mat + three_bands
 
 
+def _set_seed(seed):
+  """Helper which uses graph seed if using eager."""
+  # TODO(b/68017812): Deprecate once eager correctly supports seed.
+  if tf.executing_eagerly():
+    tf.compat.v1.set_random_seed(seed)
+    return None
+  return seed
+
+
 @test_util.run_all_in_graph_and_eager_modes
 class AmariAlphaTest(test_case.TestCase):
 
@@ -861,53 +870,46 @@ class CsiszarVIMCOTest(test_case.TestCase):
         grad_log_sooavg_u.mean(axis=0))
 
   def test_vimco_and_gradient(self):
-    # TODO(b/117119069): Rewrite the test below to be eager friendly and
-    # remove this conditional.
-    if tf.executing_eagerly():
-      return
-
     dims = 5  # Dimension
-    num_draws = int(20)
+    num_draws = int(1e3)
     num_batch_draws = int(3)
-    seed = 1
+    seed = 81792
 
-    f = lambda logu: tfp.vi.kl_reverse(logu, self_normalized=False)
-    np_f = lambda logu: -logu
+    with tf.GradientTape(persistent=True) as tape:
+      f = lambda logu: tfp.vi.kl_reverse(logu, self_normalized=False)
+      np_f = lambda logu: -logu
 
-    p = tfd.MultivariateNormalFullCovariance(
-        covariance_matrix=tridiag(dims, diag_value=1, offdiag_value=0.5))
+      s = tf.constant(1.)
+      tape.watch(s)
+      p = tfd.MultivariateNormalFullCovariance(
+          covariance_matrix=tridiag(dims, diag_value=1, offdiag_value=0.5))
 
-    # Variance is very high when approximating Forward KL, so we make
-    # scale_diag larger than in test_kl_reverse_multidim. This ensures q
-    # "covers" p and thus Var_q[p/q] is smaller.
-    s = tf.constant(1.)
-    q = tfd.MultivariateNormalDiag(
-        scale_diag=tf.tile([s], [dims]))
+      # Variance is very high when approximating Forward KL, so we make
+      # scale_diag larger than in test_kl_reverse_multidim. This ensures q
+      # "covers" p and thus Var_q[p/q] is smaller.
+      q = tfd.MultivariateNormalDiag(
+          scale_diag=tf.tile([s], [dims]))
 
-    vimco = tfp.vi.csiszar_vimco(
-        f=f,
-        p_log_prob=p.log_prob,
-        q=q,
-        num_draws=num_draws,
-        num_batch_draws=num_batch_draws,
-        seed=seed)
+      vimco = tfp.vi.csiszar_vimco(
+          f=f,
+          p_log_prob=p.log_prob,
+          q=q,
+          num_draws=num_draws,
+          num_batch_draws=num_batch_draws,
+          seed=_set_seed(seed))
 
-    x = q.sample(sample_shape=[num_draws, num_batch_draws],
-                 seed=seed)
-    x = tf.stop_gradient(x)
-    logu = p.log_prob(x) - q.log_prob(x)
-    f_log_sum_u = f(tfp.vi.csiszar_vimco_helper(logu)[0])
+      # We want the seed to be the same since we will use computations
+      # with the same underlying sample to show correctness of vimco.
+      x = q.sample(sample_shape=[num_draws, num_batch_draws],
+                   seed=_set_seed(seed))
+      x = tf.stop_gradient(x)
+      logu = p.log_prob(x) - q.log_prob(x)
+      f_log_sum_u = f(tfp.vi.csiszar_vimco_helper(logu)[0])
+      q_log_prob_x = q.log_prob(x)
 
-    grad_sum = lambda fs: tf.gradients(ys=fs, xs=s)[0]
-
-    def jacobian(x):
-      # Warning: this function is slow and may not even finish if prod(shape)
-      # is larger than, say, 100.
-      shape = x.shape.as_list()
-      assert all(s is not None for s in shape)
-      x = tf.reshape(x, shape=[-1])
-      r = [grad_sum(x[i]) for i in range(np.prod(shape))]
-      return tf.reshape(tf.stack(r), shape=shape)
+    grad_vimco = tape.gradient(vimco, s)
+    grad_mean_f_log_sum_u = tape.gradient(f_log_sum_u, s) / num_batch_draws
+    jacobian_logqx = tape.jacobian(q_log_prob_x, s)
 
     [
         logu_,
@@ -918,18 +920,18 @@ class CsiszarVIMCOTest(test_case.TestCase):
         grad_mean_f_log_sum_u_,
     ] = self.evaluate([
         logu,
-        jacobian(q.log_prob(x)),
+        jacobian_logqx,
         vimco,
-        grad_sum(vimco),
+        grad_vimco,
         f_log_sum_u,
-        grad_sum(f_log_sum_u) / num_batch_draws,
+        grad_mean_f_log_sum_u,
     ])
 
     np_log_avg_u, np_log_sooavg_u = self._csiszar_vimco_helper(logu_)
 
     # Test VIMCO loss is correct.
     self.assertAllClose(np_f(np_log_avg_u).mean(axis=0), vimco_,
-                        rtol=1e-5, atol=0.)
+                        rtol=1e-4, atol=0.)
 
     # Test gradient of VIMCO loss is correct.
     #
@@ -944,7 +946,7 @@ class CsiszarVIMCOTest(test_case.TestCase):
     # correctness of the zero-th order derivative (for each batch member).
     # Since `tfp.vi.csiszar_vimco_helper` itself does not manipulate any
     # gradient information, we can safely rely on TF.
-    self.assertAllClose(np_f(np_log_avg_u), f_log_sum_u_, rtol=1e-4, atol=0.)
+    self.assertAllClose(np_f(np_log_avg_u), f_log_sum_u_, rtol=2e-4, atol=0.)
     #
     # Regarding `jacobian_logqx_`, note that testing the gradient of
     # `q.log_prob` is outside the scope of this unit-test thus we may safely
@@ -960,8 +962,7 @@ class CsiszarVIMCOTest(test_case.TestCase):
                 axis=0),
             axis=0))
 
-    self.assertAllClose(np_grad_vimco, grad_vimco_,
-                        rtol=1e-5, atol=0.)
+    self.assertAllClose(np_grad_vimco, grad_vimco_, rtol=3e-2, atol=1e-4)
 
 
 if __name__ == "__main__":
