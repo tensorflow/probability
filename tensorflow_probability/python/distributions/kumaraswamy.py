@@ -120,8 +120,8 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
   """
 
   def __init__(self,
-               concentration1=None,
-               concentration0=None,
+               concentration1=1.,
+               concentration0=1.,
                validate_args=False,
                allow_nan_stats=True,
                name="Kumaraswamy"):

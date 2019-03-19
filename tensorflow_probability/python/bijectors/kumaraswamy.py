@@ -42,8 +42,8 @@ class Kumaraswamy(bijector.Bijector):
   """
 
   def __init__(self,
-               concentration1,
-               concentration0,
+               concentration1=1.,
+               concentration0=1.,
                validate_args=False,
                name="kumaraswamy"):
     """Instantiates the `Kumaraswamy` bijector.
