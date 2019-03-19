@@ -13,7 +13,7 @@ testing static shape).
 import tensorflow as tf
 tfe = tf.contrib.eager
 
-class _DistributionTest(object):
+class _DistributionTest(tf.test.TestCase):
 
   @tfe.run_test_in_graph_and_eager_modes
   def testSomething(self):
@@ -25,13 +25,15 @@ class _DistributionTest(object):
     [...] = self.evaluate([...])
     ...
 
-class DistributionTest_StaticShape(tf.test.TestCase, _DistributionTest):
+class DistributionTest_StaticShape(_DistributionTest):
   dtype = np.float32
   use_static_shape = True
 
-class DistributionTest_DynamicShape(tf.test.TestCase, _DistributionTest):
+class DistributionTest_DynamicShape(_DistributionTest):
   dtype = np.float32
   use_static_shape = False
+
+del _DistributionTest  # Don't run tests for the base class.
 ```
 
 
@@ -44,7 +46,7 @@ multiple input `Tensors`, factoring out the placeholder creation can help
 avoid boilerplate and improve readability. For example,
 
 ```python
-class _DistributionTest(object):
+class _DistributionTest(tf.test.TestCase):
 
   @tfe.run_test_in_graph_and_eager_modes
   def testSomething(self):
@@ -62,13 +64,15 @@ class _DistributionTest(object):
     return tf.placeholder_with_default(
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
-class DistributionTest_StaticShape(tf.test.TestCase, _DistributionTest):
+class DistributionTest_StaticShape(_DistributionTest):
   dtype = np.float32
   use_static_shape = True
 
-class DistributionTest_DynamicShape(tf.test.TestCase, _DistributionTest):
+class DistributionTest_DynamicShape(_DistributionTest):
   dtype = np.float32
   use_static_shape = False
+
+del _DistributionTest  # Don't run tests for the base class.
 ```
 
 These ideas can be extended as appropriate. For example, in the [`Reshape`
@@ -83,7 +87,7 @@ respectively appropriate check, i.e.,
 import tensorflow as tf
 tfe = tf.contrib.eager
 
-class _DistributionTest(object):
+class _DistributionTest(tf.test.TestCase):
 
   @tfe.run_test_in_graph_and_eager_modes
   def testSomething(self):
@@ -94,15 +98,17 @@ class _DistributionTest(object):
       [...] = self.evaluate(something_that_might_throw_exception([...]))
     ...
 
-class DistributionTest_StaticShape(test.TestCase, _DistributionTest):
+class DistributionTest_StaticShape(_DistributionTest):
   ...
   def assertRaisesError(self, msg):
     return self.assertRaisesRegexp(Exception, msg)
 
-class DistributionTest_DynamicShape(test.TestCase, _DistributionTest):
+class DistributionTest_DynamicShape(_DistributionTest):
   ...
   def assertRaisesError(self, msg):
     return self.assertRaisesOpError(msg)
+
+del _DistributionTest  # Don't run tests for the base class.
 ```
 
 
