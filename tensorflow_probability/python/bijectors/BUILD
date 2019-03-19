@@ -52,6 +52,7 @@ py_library(
         ":identity",
         ":inline",
         ":invert",
+        ":iterated_sigmoid_centered",
         ":kumaraswamy",
         ":masked_autoregressive",
         ":matrix_inverse_tril",
@@ -432,6 +433,16 @@ py_library(
 py_library(
     name = "square",
     srcs = ["square.py"],
+    deps = [
+        ":bijector",
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "iterated_sigmoid_centered",
+    srcs = ["iterated_sigmoid_centered.py"],
     deps = [
         ":bijector",
         # numpy dep,
@@ -932,6 +943,18 @@ py_test(
     name = "square_test",
     size = "small",
     srcs = ["square_test.py"],
+    deps = [
+        ":bijector_test_util",
+        ":bijectors",
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "iterated_sigmoid_centered_test",
+    size = "small",
+    srcs = ["iterated_sigmoid_centered_test.py"],
     deps = [
         ":bijector_test_util",
         ":bijectors",
