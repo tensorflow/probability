@@ -322,7 +322,8 @@ class Categorical(distribution.Distribution):
 
   def _entropy(self):
     return -tf.reduce_sum(
-        input_tensor=tf.nn.log_softmax(self.logits) * self.probs, axis=-1)
+        input_tensor=tf.math.multiply_no_nan(
+            tf.nn.log_softmax(self.logits), self.probs), axis=-1)
 
   def _mode(self):
     ret = tf.argmax(input=self.logits, axis=self._batch_rank)
