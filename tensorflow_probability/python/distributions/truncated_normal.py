@@ -197,7 +197,8 @@ class TruncatedNormal(distribution.Distribution):
             "high": shape,
             "low": shape}
 
-  def _params_event_ndims(self):
+  @classmethod
+  def _params_event_ndims(cls):
     return dict(loc=0, scale=0, low=0, high=0)
 
   @property

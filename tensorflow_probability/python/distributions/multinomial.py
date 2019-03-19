@@ -201,7 +201,8 @@ class Multinomial(distribution.Distribution):
         graph_parents=[self._total_count, self._logits, self._probs],
         name=name)
 
-  def _params_event_ndims(self):
+  @classmethod
+  def _params_event_ndims(cls):
     return dict(total_count=0, logits=1, probs=1)
 
   @property

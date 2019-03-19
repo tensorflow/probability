@@ -196,7 +196,8 @@ class Dirichlet(distribution.Distribution):
                        self._total_concentration],
         name=name)
 
-  def _params_event_ndims(self):
+  @classmethod
+  def _params_event_ndims(cls):
     return dict(concentration=1)
 
   @property

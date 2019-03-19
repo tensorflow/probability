@@ -531,7 +531,8 @@ class Distribution(_BaseDistribution):
       self._parameters_sanitized = True
     return self._parameters
 
-  def _params_event_ndims(self):
+  @classmethod
+  def _params_event_ndims(cls):
     """Returns a dict mapping constructor argument names to per-event rank.
 
     Distributions may implement this method to provide support for slicing
@@ -554,7 +555,7 @@ class Distribution(_BaseDistribution):
     """
     raise NotImplementedError(
         "{} does not support batch slicing; must implement "
-        "_params_event_ndims.".format(type(self)))
+        "_params_event_ndims.".format(cls))
 
   def __getitem__(self, slices):
     """Slices the batch axes of this distribution, returning a new instance.

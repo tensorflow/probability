@@ -251,7 +251,8 @@ class Deterministic(_BaseDeterministic):
         parameters=parameters,
         name=name)
 
-  def _params_event_ndims(self):
+  @classmethod
+  def _params_event_ndims(cls):
     return dict(loc=0, atol=0, rtol=0)
 
   def _batch_shape_tensor(self):
@@ -365,7 +366,8 @@ class VectorDeterministic(_BaseDeterministic):
         parameters=parameters,
         name=name)
 
-  def _params_event_ndims(self):
+  @classmethod
+  def _params_event_ndims(cls):
     return dict(loc=1, atol=1, rtol=1)
 
   def _batch_shape_tensor(self):

@@ -195,5 +195,6 @@ class VectorExponentialDiag(velo.VectorExponentialLinearOperator):
         name=name)
     self._parameters = parameters
 
-  def _params_event_ndims(self):
+  @classmethod
+  def _params_event_ndims(cls):
     return dict(loc=1, scale_diag=1, scale_identity_multiplier=0)

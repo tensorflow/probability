@@ -123,7 +123,8 @@ class Poisson(distribution.Distribution):
         graph_parents=[self._rate],
         name=name)
 
-  def _params_event_ndims(self):
+  @classmethod
+  def _params_event_ndims(cls):
     return dict(rate=0, log_rate=0)
 
   @property

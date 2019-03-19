@@ -168,7 +168,8 @@ class Gamma(distribution.Distribution):
         zip(("concentration", "rate"),
             ([tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)] * 2)))
 
-  def _params_event_ndims(self):
+  @classmethod
+  def _params_event_ndims(cls):
     return dict(concentration=0, rate=0)
 
   @property

@@ -74,7 +74,8 @@ class LogNormal(transformed_distribution.TransformedDistribution):
           parameters=parameters,
           name=name)
 
-  def _params_event_ndims(self):
+  @classmethod
+  def _params_event_ndims(cls):
     return dict(loc=0, scale=0)
 
   @property

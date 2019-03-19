@@ -168,7 +168,8 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
         parameters=parameters,
         name=name)
 
-  def _params_event_ndims(self):
+  @classmethod
+  def _params_event_ndims(cls):
     return dict(concentration1=0, concentration0=0)
 
   @property

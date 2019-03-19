@@ -154,7 +154,8 @@ class LKJ(distribution.Distribution):
         graph_parents=[self._concentration],
         name=name)
 
-  def _params_event_ndims(self):
+  @classmethod
+  def _params_event_ndims(cls):
     return dict(concentration=0)
 
   @property

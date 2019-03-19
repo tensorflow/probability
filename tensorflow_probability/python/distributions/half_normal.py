@@ -123,7 +123,8 @@ class HalfNormal(distribution.Distribution):
   def _param_shapes(sample_shape):
     return {"scale": tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)}
 
-  def _params_event_ndims(self):
+  @classmethod
+  def _params_event_ndims(cls):
     return dict(scale=0)
 
   @property

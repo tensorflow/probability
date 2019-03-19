@@ -107,7 +107,8 @@ class Chi2(gamma.Gamma):
   def _param_shapes(sample_shape):
     return {"df": tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)}
 
-  def _params_event_ndims(self):
+  @classmethod
+  def _params_event_ndims(cls):
     return dict(df=0)
 
   @property

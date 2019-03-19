@@ -226,7 +226,8 @@ class Categorical(distribution.Distribution):
                        self._probs],
         name=name)
 
-  def _params_event_ndims(self):
+  @classmethod
+  def _params_event_ndims(cls):
     return dict(logits=1, probs=1)
 
   @property

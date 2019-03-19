@@ -136,7 +136,8 @@ class HalfCauchy(distribution.Distribution):
         zip(("loc", "scale"),
             ([tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)] * 2)))
 
-  def _params_event_ndims(self):
+  @classmethod
+  def _params_event_ndims(cls):
     return dict(loc=0, scale=0)
 
   @property

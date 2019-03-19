@@ -2015,3 +2015,18 @@ py_test(
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
+
+py_test(
+    name = "distribution_properties_test",
+    size = "medium",
+    srcs = ["distribution_properties_test.py"],
+    shard_count = 2,
+    deps = [
+        # hypothesis dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)

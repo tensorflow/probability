@@ -100,7 +100,8 @@ class Pareto(distribution.Distribution):
         graph_parents=[self._concentration, self._scale],
         name=name)
 
-  def _params_event_ndims(self):
+  @classmethod
+  def _params_event_ndims(cls):
     return dict(concentration=0, scale=0)
 
   @property

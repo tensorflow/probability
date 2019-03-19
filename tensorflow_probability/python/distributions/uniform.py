@@ -126,7 +126,8 @@ class Uniform(distribution.Distribution):
         zip(("low", "high"),
             ([tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)] * 2)))
 
-  def _params_event_ndims(self):
+  @classmethod
+  def _params_event_ndims(cls):
     return dict(low=0, high=0)
 
   @property

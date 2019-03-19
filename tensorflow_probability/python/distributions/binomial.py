@@ -181,7 +181,8 @@ class Binomial(distribution.Distribution):
         graph_parents=[self._total_count, self._logits, self._probs],
         name=name)
 
-  def _params_event_ndims(self):
+  @classmethod
+  def _params_event_ndims(cls):
     return dict(total_count=0, logits=0, probs=0)
 
   @property

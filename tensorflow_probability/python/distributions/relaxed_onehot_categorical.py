@@ -197,7 +197,8 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
         graph_parents=[self._logits, self._probs, self._temperature],
         name=name)
 
-  def _params_event_ndims(self):
+  @classmethod
+  def _params_event_ndims(cls):
     return dict(temperature=0, logits=1, probs=1)
 
   @property
