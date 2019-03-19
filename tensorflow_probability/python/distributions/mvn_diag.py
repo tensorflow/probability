@@ -214,6 +214,10 @@ class MultivariateNormalDiag(
         name=name)
     self._parameters = parameters
 
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(loc=1, scale_diag=1, scale_identity_multiplier=0)
+
 
 class MultivariateNormalDiagWithSoftplusScale(MultivariateNormalDiag):
   """MultivariateNormalDiag with `diag_stddev = softplus(diag_stddev)`."""
@@ -239,3 +243,7 @@ class MultivariateNormalDiagWithSoftplusScale(MultivariateNormalDiag):
           allow_nan_stats=allow_nan_stats,
           name=name)
     self._parameters = parameters
+
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(loc=1, scale_diag=1)
