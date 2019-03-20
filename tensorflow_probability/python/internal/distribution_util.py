@@ -686,7 +686,7 @@ def assert_integer_form(x,
 def assert_symmetric(matrix):
   matrix_t = tf.linalg.transpose(matrix)
   return with_dependencies(
-      [tf.compat.v1.assert_equal(matrix, matrix_t)], matrix)
+      [tf.compat.v1.assert_near(matrix, matrix_t)], matrix)
 
 
 def embed_check_nonnegative_integer_form(
