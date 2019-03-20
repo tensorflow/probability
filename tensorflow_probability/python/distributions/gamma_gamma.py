@@ -43,6 +43,9 @@ class GammaGamma(distribution.Distribution):
   defined over positive real numbers using parameters `concentration`,
   `mixing_concentration` and `mixing_rate`.
 
+  This distribution is also referred to as the beta of the second kind (B2), and
+  can be useful for transaction value modeling, as [(Fader and Hardi, 2013)][1].
+
   #### Mathematical Details
 
   It is derived from the following Gamma-Gamma hierarchical model by integrating
@@ -66,14 +69,19 @@ class GammaGamma(distribution.Distribution):
   ```
   where the normalizing constant `Z = Beta(alpha, alpha0) * beta0**(-alpha0)`.
 
-  See:
-    http://www.brucehardie.com/notes/025/gamma_gamma.pdf
-
   Samples of this distribution are reparameterized as samples of the Gamma
-  distribution are reparameterized using the technique described in the paper
+  distribution are reparameterized using the technique described in
+  [(Figurnov et al., 2018)][2].
 
-  [Michael Figurnov, Shakir Mohamed, Andriy Mnih.
-  Implicit Reparameterization Gradients, 2018](https://arxiv.org/abs/1805.08498)
+  #### References
+
+  [1]: Peter S. Fader, Bruce G. S. Hardi. The Gamma-Gamma Model of Monetary
+       Value. _Technical Report_, 2013.
+       http://www.brucehardie.com/notes/025/gamma_gamma.pdf
+
+  [2]: Michael Figurnov, Shakir Mohamed, Andriy Mnih.
+       Implicit Reparameterization Gradients. _arXiv preprint arXiv:1805.08498_,
+       2018. https://arxiv.org/abs/1805.08498
   """
 
   def __init__(self,
@@ -181,13 +189,14 @@ class GammaGamma(distribution.Distribution):
     return tf.TensorShape([])
 
   @distribution_util.AppendDocstring(
-      """Note: See `tf.random_gamma` docstring for sampling details and
+      """Note: See `tf.random.gamma` docstring for sampling details and
       caveats.""")
   def _sample_n(self, n, seed=None):
     seed = seed_stream.SeedStream(seed, "gamma_gamma")
     rate = tf.random.gamma(
         shape=[n],
-        alpha=self.mixing_concentration,
+        # Be sure to draw enough rates for the fully-broadcasted gamma-gamma.
+        alpha=self.mixing_concentration + tf.zeros_like(self.concentration),
         beta=self.mixing_rate,
         dtype=self.dtype,
         seed=seed())
@@ -232,8 +241,32 @@ class GammaGamma(distribution.Distribution):
           tf.compat.v1.assert_less(
               tf.ones([], self.dtype),
               self.mixing_concentration,
-              message="mean undefined when any `mixing_concentration` <= 1"),
+              message="mean undefined when `mixing_concentration` <= 1"),
       ], mean)
+
+  @distribution_util.AppendDocstring(
+      """The variance of a Gamma-Gamma distribution is
+      `concentration**2 * mixing_rate**2 / ((mixing_concentration - 1)**2 *
+      (mixing_concentration - 2))`, when `mixing_concentration > 2`, and `NaN`
+      otherwise. If `self.allow_nan_stats` is `False`, an exception will be
+      raised rather than returning `NaN`""")
+  def _variance(self):
+    variance = (tf.square(self.concentration * self.mixing_rate /
+                          (self.mixing_concentration - 1.)) /
+                (self.mixing_concentration - 2.))
+    if self.allow_nan_stats:
+      nan = tf.fill(
+          self.batch_shape_tensor(),
+          np.array(np.nan, dtype=self.dtype.as_numpy_dtype()),
+          name="nan")
+      return tf.where(self.mixing_concentration > 2., variance, nan)
+    else:
+      return distribution_util.with_dependencies([
+          tf.compat.v1.assert_less(
+              tf.ones([], self.dtype) * 2.,
+              self.mixing_concentration,
+              message="variance undefined when `mixing_concentration` <= 2"),
+      ], variance)
 
   def _maybe_assert_valid_sample(self, x):
     tf.debugging.assert_same_float_dtype(tensors=[x], dtype=self.dtype)
