@@ -36,13 +36,13 @@ import tensorflow as tf
 from tensorflow_probability.python.internal import prefer_static
 
 
-def _val_where(cond, tval, fval):
+def val_where(cond, tval, fval):
   """Like tf.where but works on namedtuples."""
   if isinstance(tval, tf.Tensor):
     return tf.where(cond, tval, fval)
   elif isinstance(tval, tuple):
     cls = type(tval)
-    return cls(*(_val_where(cond, t, f) for t, f in zip(tval, fval)))
+    return cls(*(val_where(cond, t, f) for t, f in zip(tval, fval)))
   else:
     raise Exception(TypeError)
 
@@ -147,8 +147,8 @@ def secant2(value_and_gradients_function,
     converged = search_interval.converged | (~failed & _satisfies_wolfe(
         val_0, val_c, f_lim, sufficient_decrease_param, curvature_param))
     new_converged = converged & ~search_interval.converged
-    val_left = _val_where(new_converged, val_c, search_interval.left)
-    val_right = _val_where(new_converged, val_c, search_interval.right)
+    val_left = val_where(new_converged, val_c, search_interval.left)
+    val_right = val_where(new_converged, val_c, search_interval.right)
 
     initial_args = _Secant2Result(
         active=~failed & ~converged,
@@ -194,8 +194,8 @@ def _secant2_inner(value_and_gradients_function,
   # Update active and failed flags, update left/right on non-failed entries.
   active = initial_args.active & ~update_result.failed
   failed = initial_args.failed | update_result.failed
-  val_left = _val_where(active, update_result.left, initial_args.left)
-  val_right = _val_where(active, update_result.right, initial_args.right)
+  val_left = val_where(active, update_result.left, initial_args.left)
+  val_right = val_where(active, update_result.right, initial_args.right)
 
   # Check if new `c` points should be generated.
   updated_left = active & tf.equal(val_left.x, val_c.x)
@@ -255,8 +255,8 @@ def _secant2_inner_update(value_and_gradients_function,
   # cases we set `val_left = val_right = val_c`.
   found_wolfe = active & _satisfies_wolfe(
       val_0, val_c, f_lim, sufficient_decrease_param, curvature_param)
-  val_left = _val_where(found_wolfe, val_c, initial_args.left)
-  val_right = _val_where(found_wolfe, val_c, initial_args.right)
+  val_left = val_where(found_wolfe, val_c, initial_args.left)
+  val_right = val_where(found_wolfe, val_c, initial_args.right)
   converged = initial_args.converged | found_wolfe
   active = active & ~found_wolfe
 
@@ -410,8 +410,8 @@ def update(value_and_gradients_function, val_left, val_right, val_trial, f_lim,
   # - the needs_bisect condition is true.
   # In both cases we want to keep the current left and replace right
   # with the trial point.
-  left = _val_where(within_range & valid_left, val_trial, val_left)
-  right = _val_where(within_range & ~valid_left, val_trial, val_right)
+  left = val_where(within_range & valid_left, val_trial, val_left)
+  right = val_where(within_range & ~valid_left, val_trial, val_right)
 
   bisect_args = _IntermediateResult(
       iteration=tf.convert_to_tensor(value=0),
@@ -484,6 +484,8 @@ def bracket(value_and_gradients_function,
       right: Return value of value_and_gradients_function at the updated right
         end point of the interval found.
   """
+  already_stopped = search_interval.failed | search_interval.converged
+
   # If the slope at right end point is positive, step B1 in [2], then the given
   # initial points already bracket a minimum.
   bracketed = search_interval.right.df >= 0
@@ -498,7 +500,7 @@ def bracket(value_and_gradients_function,
   # expand the interval, step B3, until the conditions are met.
   initial_args = _IntermediateResult(
       iteration=search_interval.iterations,
-      stopped=search_interval.failed | bracketed | needs_bisect,
+      stopped=already_stopped | bracketed | needs_bisect,
       failed=search_interval.failed,
       num_evals=search_interval.func_evals,
       left=search_interval.left,
@@ -515,8 +517,8 @@ def bracket(value_and_gradients_function,
     # bisect. On the only remaining case, step B3 in [2]. case we need to
     # expand and update the left/right values appropriately.
     new_right = value_and_gradients_function(expansion_param * curr.right.x)
-    left = _val_where(curr.stopped, curr.left, curr.right)
-    right = _val_where(curr.stopped, curr.right, new_right)
+    left = val_where(curr.stopped, curr.left, curr.right)
+    right = val_where(curr.stopped, curr.right, new_right)
 
     # Updated the failed, bracketed, and needs_bisect conditions.
     failed = curr.failed | ~is_finite(right)
@@ -524,7 +526,7 @@ def bracket(value_and_gradients_function,
     needs_bisect = (right.df < 0) & (right.f > f_lim)
     return [_IntermediateResult(
         iteration=curr.iteration + 1,
-        stopped=failed | bracketed | needs_bisect,
+        stopped=curr.stopped | failed | bracketed | needs_bisect,
         failed=failed,
         num_evals=curr.num_evals + 1,
         left=left,
@@ -537,8 +539,8 @@ def bracket(value_and_gradients_function,
   # reset the left end point, and run `_bisect` on them.
   needs_bisect = (
       (bracket_result.right.df < 0) & (bracket_result.right.f > f_lim))
-  stopped = bracket_result.failed | ~needs_bisect
-  left = _val_where(stopped, bracket_result.left, search_interval.left)
+  stopped = already_stopped | bracket_result.failed | ~needs_bisect
+  left = val_where(stopped, bracket_result.left, search_interval.left)
   bisect_args = bracket_result._replace(stopped=stopped, left=left)
   return _bisect(value_and_gradients_function, bisect_args, f_lim)
 
@@ -618,8 +620,8 @@ def _bisect(value_and_gradients_function, initial_args, f_lim):
     # started the loop so we just update the right end point and continue.
     to_update = ~(curr.stopped | failed)
     update_left = (mid.df < 0) & (mid.f <= f_lim)
-    left = _val_where(to_update & update_left, mid, curr.left)
-    right = _val_where(to_update & ~update_left, mid, curr.right)
+    left = val_where(to_update & update_left, mid, curr.left)
+    right = val_where(to_update & ~update_left, mid, curr.right)
 
     # We're done when the right end point has a positive slope.
     stopped = curr.stopped | failed | (right.df >= 0)

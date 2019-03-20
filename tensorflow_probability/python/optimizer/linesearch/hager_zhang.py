@@ -70,6 +70,7 @@ def hager_zhang(value_and_gradients_function,
                 initial_step_size=None,
                 value_at_initial_step=None,
                 value_at_zero=None,
+                converged=None,
                 threshold_use_approximate_wolfe_condition=1e-6,
                 shrinkage_param=0.66,
                 expansion_param=5.0,
@@ -192,6 +193,11 @@ def hager_zhang(value_and_gradients_function,
       value_and_gradients_function at `0.`, i.e. a namedtuple with
       'x', 'f', 'df', if already known by the caller. If not supplied the tuple
       will be computed by evaluating value_and_gradients_function.
+    converged: (Optional) In batching mode a tensor of shape [n], indicating
+      batch members which have already converged and no further search should
+      be performed. These batch members are also reported as converged in the
+      output, and both their `left` and `right` are set to the
+      `value_at_initial_step`.
     threshold_use_approximate_wolfe_condition: Scalar positive `Tensor`
       of real dtype. Corresponds to the parameter 'epsilon' in
       [Hager and Zhang (2006)][2]. Used to estimate the
@@ -241,7 +247,7 @@ def hager_zhang(value_and_gradients_function,
         Otherwise, it corresponds to the last interval computed.
   """
   with tf.compat.v1.name_scope(name, 'hager_zhang', [
-      initial_step_size, value_at_initial_step, value_at_zero,
+      initial_step_size, value_at_initial_step, value_at_zero, converged,
       threshold_use_approximate_wolfe_condition, shrinkage_param,
       expansion_param, sufficient_decrease_param, curvature_param]):
     val_0, val_initial, f_lim, prepare_evals = _prepare_args(
@@ -254,20 +260,27 @@ def hager_zhang(value_and_gradients_function,
     valid_inputs = (hzl.is_finite(val_0) & (val_0.df < 0) &
                     tf.math.is_finite(val_initial.x) & (val_initial.x > 0))
 
+    if converged is None:
+      init_converged = tf.zeros_like(valid_inputs)  # i.e. all false.
+    else:
+      init_converged = tf.convert_to_tensor(value=converged)
+
+    failed = ~init_converged & ~valid_inputs
+    active = ~init_converged & valid_inputs
+
     # Note: _fix_step_size returns immediately if either all inputs are invalid
-    # or none need fixing.
+    # or none of the active ones need fixing.
     fix_step_evals, val_c, fix_failed = _fix_step_size(
-        value_and_gradients_function, val_initial, valid_inputs,
+        value_and_gradients_function, val_initial, active,
         step_size_shrink_param)
 
-    failed = ~valid_inputs | fix_failed
     init_interval = HagerZhangLineSearchResult(
-        converged=tf.zeros_like(failed),  # i.e. all False.
-        failed=failed,
+        converged=init_converged,
+        failed=failed | fix_failed,
         func_evals=prepare_evals + fix_step_evals,
         iterations=tf.convert_to_tensor(value=0),
         left=val_0,
-        right=val_c)
+        right=hzl.val_where(init_converged, val_0, val_c))
 
     def _apply_bracket_and_search():
       """Bracketing and searching to do for valid inputs."""
@@ -276,8 +289,9 @@ def hager_zhang(value_and_gradients_function,
           shrinkage_param, expansion_param, sufficient_decrease_param,
           curvature_param)
 
+    init_active = ~init_interval.failed & ~init_interval.converged
     return prefer_static.cond(
-        tf.reduce_any(input_tensor=~failed),
+        tf.reduce_any(input_tensor=init_active),
         _apply_bracket_and_search,
         lambda: init_interval)
 
@@ -382,7 +396,8 @@ def _bracket_and_search(
   bracket_result = hzl.bracket(value_and_gradients_function, init_interval,
                                f_lim, max_iterations, expansion_param)
 
-  converged = _very_close(bracket_result.left.x, bracket_result.right.x)
+  converged = init_interval.converged | _very_close(
+      bracket_result.left.x, bracket_result.right.x)
 
   # We fail if we have not yet converged but already exhausted all iterations.
   exhausted_iterations = ~converged & tf.greater_equal(
@@ -627,7 +642,7 @@ def _prepare_args(value_and_gradients_function,
     eval_count += 1
 
   if val_0 is None:
-    x_0 = tf.zeros_like(initial_step_size)
+    x_0 = tf.zeros_like(val_initial.x)
     val_0 = value_and_gradients_function(x_0)
     eval_count += 1
 

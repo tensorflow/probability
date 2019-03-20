@@ -223,7 +223,8 @@ def minimize(value_and_gradients_function,
       next_state = bfgs_utils.line_search_step(
           current_state,
           value_and_gradients_function, search_direction,
-          tolerance, f_relative_tolerance, x_tolerance)
+          tolerance, f_relative_tolerance, x_tolerance,
+          bfgs_utils.converged_all)
 
       def _update_inv_hessian():
         position_delta = next_state.position - current_state.position
