@@ -181,7 +181,7 @@ class TransformedTransitionKernel(TransitionKernel):
         inner_kernel=inner_kernel,
         bijector=bijector,
         name=name or 'transformed_kernel')
-    inner_kernel_kwargs = inner_kernel.parameters
+    inner_kernel_kwargs = inner_kernel.parameters.copy()
     target_log_prob_fn = inner_kernel_kwargs['target_log_prob_fn']
     self._forward_transform = forward_transform_fn(bijector)
     self._inverse_transform = inverse_transform_fn(bijector)
