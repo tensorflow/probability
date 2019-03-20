@@ -22,6 +22,7 @@ from tensorflow_probability.python.math.custom_gradient import custom_gradient
 from tensorflow_probability.python.math.diag_jacobian import diag_jacobian
 from tensorflow_probability.python.math.gradient import value_and_gradient
 from tensorflow_probability.python.math.interpolation import batch_interp_regular_1d_grid
+from tensorflow_probability.python.math.interpolation import batch_interp_regular_nd_grid
 from tensorflow_probability.python.math.interpolation import interp_regular_1d_grid
 from tensorflow_probability.python.math.linalg import lu_matrix_inverse
 from tensorflow_probability.python.math.linalg import lu_reconstruct
@@ -42,6 +43,7 @@ from tensorflow.python.util.all_util import remove_undocumented  # pylint: disab
 
 _allowed_symbols = [
     'batch_interp_regular_1d_grid',
+    'batch_interp_regular_nd_grid',
     'clip_by_value_preserve_gradient',
     'custom_gradient',
     'dense_to_sparse',
