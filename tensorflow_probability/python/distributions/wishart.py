@@ -243,7 +243,7 @@ class _WishartLinearOperator(distribution.Distribution):
     # Complexity: O(nbk**2)
     perm = tf.concat([tf.range(1, ndims), [0]], 0)
     x = tf.transpose(a=x, perm=perm)
-    shape = tf.concat([batch_shape, [event_shape[0]], [-1]], 0)
+    shape = tf.concat([batch_shape, [event_shape[0]], [event_shape[1] * n]], 0)
     x = tf.reshape(x, shape)
 
     # Complexity: O(nbM) where M is the complexity of the operator solving a
@@ -273,10 +273,17 @@ class _WishartLinearOperator(distribution.Distribution):
 
     batch_shape = self.batch_shape_tensor()
     event_shape = self.event_shape_tensor()
+    x_ndims = tf.rank(input=x_sqrt)
+    num_singleton_axes_to_prepend = (
+        tf.maximum(tf.size(input=batch_shape) + 2, x_ndims) - x_ndims)
+    x_with_prepended_singletons_shape = tf.concat([
+        tf.ones([num_singleton_axes_to_prepend], dtype=tf.int32),
+        tf.shape(input=x_sqrt)], 0)
+    x_sqrt = tf.reshape(x_sqrt, x_with_prepended_singletons_shape)
     ndims = tf.rank(x_sqrt)
     # sample_ndims = ndims - batch_ndims - event_ndims
-    sample_ndims = ndims - tf.shape(input=batch_shape)[0] - 2
-    sample_shape = tf.strided_slice(tf.shape(input=x_sqrt), [0], [sample_ndims])
+    sample_ndims = ndims - tf.size(input=batch_shape) - 2
+    sample_shape = tf.shape(input=x_sqrt)[:sample_ndims]
 
     # We need to be able to pre-multiply each matrix by its corresponding
     # batch scale matrix. Since a Distribution Tensor supports multiple
@@ -294,8 +301,13 @@ class _WishartLinearOperator(distribution.Distribution):
     perm = tf.concat([tf.range(sample_ndims, ndims),
                       tf.range(0, sample_ndims)], 0)
     scale_sqrt_inv_x_sqrt = tf.transpose(a=scale_sqrt_inv_x_sqrt, perm=perm)
-    shape = tf.concat((batch_shape,
-                       (tf.cast(self.dimension, dtype=tf.int32), -1)), 0)
+    last_dimsize = (
+        tf.cast(self.dimension, dtype=tf.int32) *
+        tf.reduce_prod(
+            input_tensor=x_with_prepended_singletons_shape[:sample_ndims]))
+    shape = tf.concat([x_with_prepended_singletons_shape[sample_ndims:-2],
+                       [tf.cast(self.dimension, dtype=tf.int32),
+                        last_dimsize]], 0)
     scale_sqrt_inv_x_sqrt = tf.reshape(scale_sqrt_inv_x_sqrt, shape)
 
     # Complexity: O(nbM*k) where M is the complexity of the operator solving a
@@ -334,15 +346,11 @@ class _WishartLinearOperator(distribution.Distribution):
                 self.log_normalization())
 
     # Set shape hints.
-    # Try to merge what we know from the input then what we know from the
+    # Try to merge what we know from the input x with what we know from the
     # parameters of this distribution.
-    if x.shape.ndims is not None:
-      log_prob.set_shape(x.shape[:-2])
-    if (log_prob.shape.ndims is not None and
-        self.batch_shape.ndims is not None and
-        self.batch_shape.ndims > 0):
-      log_prob.shape[-self.batch_shape.ndims:].merge_with(
-          self.batch_shape)
+    if x.shape.ndims is not None and self.batch_shape.ndims is not None:
+      log_prob.set_shape(
+          tf.broadcast_static_shape(x.shape[:-2], self.batch_shape))
 
     return log_prob
 

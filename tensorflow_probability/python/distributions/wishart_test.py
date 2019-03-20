@@ -132,6 +132,14 @@ class WishartTest(tf.test.TestCase):
     w = tfd.Wishart(df, scale_tril=chol_scale)
     self.assertAllEqual(wishart_var(df, scale), self.evaluate(w.variance()))
 
+  def testSamplingEmptyDist(self):
+    w = tfd.Wishart(df=[1], scale_tril=[[1.]], validate_args=True)
+    self.evaluate(w[:0].sample())
+
+  def testLogProbEmptyDist(self):
+    w = tfd.Wishart(df=[1], scale_tril=[[1.]], validate_args=True)
+    self.evaluate(w[:0].log_prob([[1.]]))
+
   def testSampleWithSameSeed(self):
     if tf.executing_eagerly():
       return
@@ -406,6 +414,29 @@ class WishartTest(tf.test.TestCase):
     expected_shape = sample_shape + batch_shape + [dims, dims]
     self.assertAllEqual(expected_shape, x.shape)
     self.assertAllEqual(expected_shape, x_.shape)
+
+  def testLogProbBroadcastsX(self):
+    dims = 2
+    batch_shape = [2, 3]
+    scale = np.float32([
+        [[1., 0.5],
+         [0.5, 1.]],
+        [[0.5, 0.25],
+         [0.25, 0.75]],
+    ])
+    scale = np.reshape(np.concatenate([scale, scale, scale], axis=0),
+                       batch_shape + [dims, dims])
+    wishart = tfd.Wishart(df=5, scale=scale)
+    x = np.random.randn(dims, dims)
+    x = np.matmul(x, x.T)
+    lp = wishart.log_prob(x)
+    lp_bc = wishart.log_prob(x * np.ones([2, 3, 1, 1]))
+    lp_, lp_bc_ = self.evaluate([lp, lp_bc])
+    self.assertAllEqual(batch_shape, lp.shape)
+    self.assertAllEqual(batch_shape, lp_.shape)
+    self.assertAllEqual(batch_shape, lp_bc.shape)
+    self.assertAllEqual(batch_shape, lp_bc_.shape)
+    self.assertAllClose(lp_bc_, lp_)
 
   def testStaticAssertNonFlatDfDoesntRaise(self):
     # Check we don't get ValueError: The truth value of an array with more than
