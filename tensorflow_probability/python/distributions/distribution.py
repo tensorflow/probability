@@ -20,9 +20,9 @@ from __future__ import print_function
 
 import abc
 import contextlib
-import functools
 import inspect
 import types
+import decorator
 
 import numpy as np
 import six
@@ -31,7 +31,7 @@ import tensorflow as tf
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions.internal import slicing
 from tensorflow_probability.python.internal import distribution_util as util
-from tensorflow.python.util import tf_inspect
+from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -220,9 +220,14 @@ class _DistributionMeta(abc.ABCMeta):
           mcs, classname, baseclasses, attrs)
 
     # pylint: disable=protected-access
-    @functools.wraps(default_init)
-    def wrapped_init(self_, *args, **kwargs):
+    # For a comparison of different methods for wrapping functions, see:
+    # https://hynek.me/articles/decorators/
+    @decorator.decorator
+    def wrapped_init(wrapped, self_, *args, **kwargs):
       """A "master `__init__`" which is always called."""
+      # We can't use `wrapped` because it results in a self reference which
+      # confounds `tf.function`.
+      del wrapped
       # Note: if we ever want to have things set in `self` before `__init__` is
       # called, here is the place to do it.
       self_._parameters = None
@@ -243,7 +248,7 @@ class _DistributionMeta(abc.ABCMeta):
             self_._parameters, self_)
     # pylint: enable=protected-access
 
-    attrs["__init__"] = wrapped_init
+    attrs["__init__"] = wrapped_init(default_init)  # pylint: disable=no-value-for-parameter,assignment-from-no-return
     return super(_DistributionMeta, mcs).__new__(
         mcs, classname, baseclasses, attrs)
 

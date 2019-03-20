@@ -21,8 +21,11 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-tfd = tfp.distributions
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+
+
+tfd = tfp.distributions
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -408,10 +411,27 @@ class ParametersTest(tf.test.TestCase):
                      actual_d_parameters)
     self.assertIs(actual_d_parameters, d.parameters)
 
+  def testArgSpec(self):
+    argspec = distribution_util.getfullargspec(Dummy)
+    self.assertAllEqual(["me", "arg1", "arg2", "arg3"], argspec.args)
+    self.assertIs(None, argspec.varargs)
+    self.assertIs("named", argspec.varkw)
+    self.assertAllEqual((None,), argspec.defaults)
+
   @test_util.run_in_graph_and_eager_modes(assert_no_eager_garbage=True)
   def testNoSelfRefs(self):
     d = Dummy(1., arg2=2.)
     self.assertAllEqual(1. + 2., self.evaluate(d.mean()))
+
+  def testTfFunction(self):
+    if not tf.executing_eagerly(): return
+    @tf.function
+    def normal_differential_entropy(scale):
+      return tfd.Normal(0., scale).entropy()
+    scale = 0.25
+    self.assertNear(0.5 * np.log(2. * np.pi * np.e * scale**2.),
+                    normal_differential_entropy(scale).numpy(),
+                    err=1e-5)
 
 
 if __name__ == "__main__":

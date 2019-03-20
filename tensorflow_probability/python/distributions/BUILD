@@ -297,6 +297,7 @@ py_library(
     srcs = ["distribution.py"],
     deps = [
         ":kullback_leibler",
+        # decorator dep,
         # numpy dep,
         # six dep,
         # tensorflow dep,

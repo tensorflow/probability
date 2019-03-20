@@ -31,6 +31,7 @@ from version import __version__  # pylint: disable=g-import-not-at-top
 REQUIRED_PACKAGES = [
     'six >= 1.10.0',
     'numpy >= 1.13.3',
+    'decorator',
 ]
 
 if '--release' in sys.argv:

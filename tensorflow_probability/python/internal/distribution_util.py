@@ -2186,3 +2186,39 @@ def with_dependencies(dependencies, output_tensor, name=None):
               tf.identity(output_tensor.values, name=name),
               output_tensor.indices,
               output_tensor.dense_shape)
+
+
+def getfullargspec(fn):
+  """Portable version of `getfullargspec` in style of Python3 `FullArgSpec`.
+
+  Also does a better job of handling classes (by inspecting `__init__`).
+
+  Arguments:
+    fn: `callable` whose signature will be inspected.
+
+  Returns:
+    args: `list` of positional parameter `str` names.
+    varargs: `str` name of the `*` parameter or `None` if arbitrary positional
+      arguments are not accepted.
+    varkw: `str` name of the `**` parameter or `None` if arbitrary keyword
+      arguments are not accepted.
+    defaults: `n`-tuple of default argument values corresponding to the last `n`
+      positional parameters, or `None` if there are no such defaults defined.
+    kwonlyargs: `list` of keyword-only parameter `str` names in declaration
+      order.
+    kwonlydefaults: `dict` mapping parameter `str` names from `kwonlyargs` to
+    the default values used if no argument is supplied.
+    annotations: `dict` mapping parameter `str` names to annotations. The
+      special key "return" is used to report the function return value
+      annotation (if any).
+
+  ### Example
+
+  ```python
+  getfullargspec(lambda x, y, z=42, *va, **kw: _)
+  # ==> ArgSpec(args=['x', 'y', 'z'], varargs='va', varkw='kw', defaults=(42,))
+  ```
+
+  """
+  return tf_inspect.getfullargspec(
+      fn.__init__ if tf_inspect.isclass(fn) else fn)
