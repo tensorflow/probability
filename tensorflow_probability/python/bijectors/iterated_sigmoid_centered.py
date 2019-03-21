@@ -80,17 +80,17 @@ class IteratedSigmoidCentered(bijector.Bijector):
   def _forward_event_shape(self, input_shape):
     if not input_shape[-1:].is_fully_defined():
       return input_shape
-    return tf.TensorShape([input_shape[-1] + 1])
+    return input_shape[:-1].concatenate(input_shape[-1] + 1)
 
   def _forward_event_shape_tensor(self, input_shape):
-    return input_shape[-1:] + 1
+    return tf.concat([input_shape[:-1], [input_shape[-1] + 1]], axis=0)
 
   def _inverse_event_shape(self, output_shape):
     if not output_shape[-1:].is_fully_defined():
       return output_shape
     if output_shape[-1] <= 1:
       raise ValueError("output_shape[-1] = %d <= 1" % output_shape[-1])
-    return tf.TensorShape([output_shape[-1] - 1])
+    return output_shape[:-1].concatenate(output_shape[-1] - 1)
 
   def _inverse_event_shape_tensor(self, output_shape):
     if self.validate_args:
@@ -100,7 +100,7 @@ class IteratedSigmoidCentered(bijector.Bijector):
     else:
       dependencies = []
     with tf.control_dependencies(dependencies):
-      return output_shape[-1:] - 1
+      return tf.concat([output_shape[:-1], [output_shape[-1] - 1]], axis=0)
 
   def _forward(self, x):
     # As specified in the Stan reference manual, the procedure is as follows:

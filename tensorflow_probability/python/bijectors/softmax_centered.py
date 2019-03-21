@@ -66,7 +66,7 @@ class SoftmaxCentered(bijector.Bijector):
         name=name)
 
   def _forward_event_shape(self, input_shape):
-    if input_shape.ndims is None or input_shape[-1] is None:
+    if not input_shape[-1:].is_fully_defined():
       return input_shape
     return input_shape[:-1].concatenate(input_shape[-1] + 1)
 
@@ -74,7 +74,7 @@ class SoftmaxCentered(bijector.Bijector):
     return tf.concat([input_shape[:-1], [input_shape[-1] + 1]], axis=0)
 
   def _inverse_event_shape(self, output_shape):
-    if output_shape.ndims is None or output_shape[-1] is None:
+    if not output_shape[-1:].is_fully_defined():
       return output_shape
     if output_shape[-1] <= 1:
       raise ValueError("output_shape[-1] = %d <= 1" % output_shape[-1])
