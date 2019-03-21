@@ -231,13 +231,13 @@ with tf.Session() as sess:
         avg_acceptance_ratio,
     ], feed_dict={weights_chain_start: weights_[iter_]})
     print('iter:{:>2}  loss:{: 9.3f}  scale:{:.3f}  '
-          'step_size:{:.4f}  avg_acceptance_ratio:{:.4f}').format(
+          'step_size:{:.4f}  avg_acceptance_ratio:{:.4f}'.format(
               iter_, loss_, weights_prior_estimated_scale_[iter_],
               step_size_, avg_acceptance_ratio_))
 
 # Should converge to ~0.24.
 import matplotlib.pyplot as plt
-plot.plot(weights_prior_estimated_scale_)
+plt.plot(weights_prior_estimated_scale_)
 plt.ylabel('weights_prior_estimated_scale')
 plt.xlabel('iteration')
 ```
