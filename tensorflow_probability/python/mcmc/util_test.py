@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
+import warnings
 # Dependency imports
 
 from absl.testing import parameterized
@@ -359,6 +360,36 @@ class EnableStoreParametersInResultsTest(tf.test.TestCase,
     kernel = FakeInnerNoParameters()
     new_kernel = util.enable_store_parameters_in_results(kernel)
     self.assertIs(kernel, new_kernel)
+
+
+class TensorConvertible(object):
+  pass
+
+
+tf.register_tensor_conversion_function(
+    TensorConvertible, conversion_func=lambda *args: tf.constant(0))
+
+
+class SimpleTensorWarningTest(tf.test.TestCase, parameterized.TestCase):
+
+  @parameterized.parameters([[tf.Variable(0)], [tf.compat.v2.Variable(0)],
+                             [TensorConvertible()]])
+  def testWarn(self, tensor):
+    warnings.simplefilter('always')
+    with warnings.catch_warnings(record=True) as triggered:
+      util.warn_if_parameters_are_not_simple_tensors({'a': tensor})
+    self.assertTrue(
+        any('Please consult the docstring' in str(warning.message)
+            for warning in triggered))
+
+  @parameterized.parameters([[1.], [np.array(1.)], [tf.constant(1.)]])
+  def testNoWarn(self, tensor):
+    warnings.simplefilter('always')
+    with warnings.catch_warnings(record=True) as triggered:
+      util.warn_if_parameters_are_not_simple_tensors({'a': tensor})
+    self.assertFalse(
+        any('Please consult the docstring' in str(warning.message)
+            for warning in triggered))
 
 
 if __name__ == '__main__':

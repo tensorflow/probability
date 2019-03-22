@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import functools
+import warnings
 
 # Dependency imports
 import numpy as np
@@ -43,6 +44,7 @@ __all__ = [
     'smart_for_loop',
     'trace_scan',
     'enable_store_parameters_in_results',
+    'warn_if_parameters_are_not_simple_tensors',
 ]
 
 
@@ -481,3 +483,16 @@ def enable_store_parameters_in_results(kernel):
     kernel = outer_kernel
 
   return kernel
+
+
+def warn_if_parameters_are_not_simple_tensors(params_dict):
+  for param_name, param in params_dict.items():
+    if not isinstance(param, tf.Tensor) and np.array(param).dtype == np.object:
+      warnings.warn(
+          '`{}` is not a `tf.Tensor`, Python number of Numpy array. If this '
+          'parameter is mutable (e.g., a `tf.Variable`), then the '
+          'behavior implied by `store_parameters_in_results` will silently '
+          'change on 2019-08-01. Please consult the docstring for '
+          '`store_parameters_in_results` details and use '
+          '`store_parameters_in_results=True` to silence this warning.'.format(
+              param_name))

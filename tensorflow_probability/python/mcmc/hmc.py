@@ -604,6 +604,9 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
                                 'not currently supported. To run in Eager '
                                 'mode with a seed, use `tf.set_random_seed`.')
     self._seed_stream = distributions.SeedStream(seed, 'hmc_one_step')
+    if not store_parameters_in_results:
+      mcmc_util.warn_if_parameters_are_not_simple_tensors(
+          dict(step_size=step_size, num_leapfrog_steps=num_leapfrog_steps))
     self._parameters = dict(
         target_log_prob_fn=target_log_prob_fn,
         step_size=step_size,

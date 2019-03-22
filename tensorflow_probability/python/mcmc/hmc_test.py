@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
+import warnings
 # Dependency imports
 import numpy as np
 from scipy import stats
@@ -689,6 +690,18 @@ class HMCTest(tf.test.TestCase):
           step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy(
               num_adaptation_steps=None),
           store_parameters_in_results=True)
+
+  def testWarnMutableParameters(self):
+    warnings.simplefilter('always')
+    with warnings.catch_warnings(record=True) as triggered:
+      tfp.mcmc.HamiltonianMonteCarlo(
+          target_log_prob_fn=lambda x: -x**2.,
+          num_leapfrog_steps=tf.compat.v2.Variable(2.),
+          step_size=tf.compat.v2.Variable(0.1),
+          store_parameters_in_results=False)
+    self.assertTrue(
+        any('Please consult the docstring' in str(warning.message)
+            for warning in triggered))
 
 
 class _LogCorrectionTest(object):
