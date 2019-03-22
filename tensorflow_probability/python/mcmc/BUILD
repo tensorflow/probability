@@ -42,6 +42,7 @@ py_library(
         ":sample",
         ":sample_annealed_importance",
         ":sample_halton_sequence",
+        ":simple_step_size_adaptation",
         ":slice_sampler_kernel",
         ":transformed_kernel",
     ],
@@ -343,6 +344,8 @@ py_test(
     size = "small",
     srcs = ["util_test.py"],
     deps = [
+        ":util",
+        # absl/testing:parameterized dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],
@@ -377,6 +380,27 @@ py_test(
     srcs = ["eight_schools_hmc_graph_test.py"],
     deps = [
         ":eight_schools_hmc",
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "simple_step_size_adaptation",
+    srcs = ["simple_step_size_adaptation.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":kernel",
+        ":util",
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "simple_step_size_adaptation_test",
+    srcs = ["simple_step_size_adaptation_test.py"],
+    deps = [
+        # absl/testing:parameterized dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],

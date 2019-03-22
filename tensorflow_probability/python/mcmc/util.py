@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
+
 # Dependency imports
 import numpy as np
 import tensorflow as tf
@@ -25,18 +27,22 @@ import tensorflow as tf
 from tensorflow_probability.python.math.gradient import value_and_gradient as tfp_math_value_and_gradients
 
 from tensorflow.python.ops import control_flow_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
     'choose',
     'is_list_like',
     'is_namedtuple_like',
+    'make_innermost_setter',
+    'make_innermost_getter',
     'make_name',
     'maybe_call_fn_and_grads',
     'safe_sum',
     'set_doc',
     'smart_for_loop',
     'trace_scan',
+    'enable_store_parameters_in_results',
 ]
 
 
@@ -380,3 +386,98 @@ def trace_scan(loop_fn,
 
     stacked_trace = tf.nest.map_structure(_merge_static_length, stacked_trace)
     return final_state, stacked_trace
+
+
+def make_innermost_setter(setter):
+  """Wraps a setter so it applies to the inner-most results in `kernel_results`.
+
+  The wrapped setter unwraps `kernel_results` and applies `setter` to the first
+  results without an `inner_results` attribute.
+
+  Args:
+    setter: A callable that takes the kernel results as well as some `*args` and
+      `**kwargs` and returns a modified copy of those kernel results.
+
+  Returns:
+    new_setter: A wrapped `setter`.
+  """
+
+  @functools.wraps(setter)
+  def _new_setter(kernel_results, *args, **kwargs):
+    """Wrapped setter."""
+    results_stack = []
+    while hasattr(kernel_results, 'inner_results'):
+      results_stack.append(kernel_results)
+      kernel_results = kernel_results.inner_results
+
+    new_kernel_results = setter(kernel_results, *args, **kwargs)
+    for outer_results in reversed(results_stack):
+      new_kernel_results = outer_results._replace(
+          inner_results=new_kernel_results)
+
+    return new_kernel_results
+
+  return _new_setter
+
+
+def make_innermost_getter(getter):
+  """Wraps a getter so it applies to the inner-most results in `kernel_results`.
+
+  The wrapped getter unwraps `kernel_results` and returns the return value of
+  `getter` called with the first results without an `inner_results` attribute.
+
+  Args:
+    getter: A callable that takes Kernel results and returns some value.
+
+  Returns:
+    new_getter: A wrapped `getter`.
+  """
+
+  @functools.wraps(getter)
+  def _new_getter(kernel_results, *args, **kwargs):
+    """Wrapped getter."""
+    results_stack = []
+    while hasattr(kernel_results, 'inner_results'):
+      results_stack.append(kernel_results)
+      kernel_results = kernel_results.inner_results
+
+    return getter(kernel_results, *args, **kwargs)
+
+  return _new_getter
+
+
+def enable_store_parameters_in_results(kernel):
+  """Enables the `store_parameters_in_results` parameter in a chain of kernels.
+
+  This is a temporary utility for use during the transition period of the
+  parameter storage methods.
+
+  Args:
+    kernel: A TransitionKernel.
+
+  Returns:
+    kernel: The same kernel, but recreated with `store_parameters_in_results`
+        recursively set to `True` in its parameters and its inner kernels (as
+        appropriate).
+  """
+  kernel_stack = []
+  while hasattr(kernel, 'parameters') and 'inner_kernel' in kernel.parameters:
+    kernel_stack.append(kernel)
+    kernel = kernel.parameters['inner_kernel']
+
+  def _recreate_kernel(kernel, parameters):
+    new_parameters = kernel.parameters.copy()
+    new_parameters.update(parameters)
+    if 'store_parameters_in_results' in new_parameters:
+      new_parameters['store_parameters_in_results'] = True
+    with deprecation.silence():
+      return type(kernel)(**new_parameters)
+
+  if hasattr(kernel, 'parameters'):
+    kernel = _recreate_kernel(kernel, {})
+
+  for outer_kernel in reversed(kernel_stack):
+    outer_kernel = _recreate_kernel(outer_kernel, {'inner_kernel': kernel})
+    kernel = outer_kernel
+
+  return kernel

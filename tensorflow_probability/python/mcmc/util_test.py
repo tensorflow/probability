@@ -20,17 +20,13 @@ from __future__ import print_function
 
 import collections
 # Dependency imports
-import numpy as np
 
+from absl.testing import parameterized
+import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-# TODO(siege): Fix this style violation.
-from tensorflow_probability.python.mcmc.util import choose
-from tensorflow_probability.python.mcmc.util import is_namedtuple_like
-from tensorflow_probability.python.mcmc.util import maybe_call_fn_and_grads
-from tensorflow_probability.python.mcmc.util import smart_for_loop
-from tensorflow_probability.python.mcmc.util import trace_scan
+from tensorflow_probability.python.mcmc import util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -59,7 +55,7 @@ class ChooseTest(tf.test.TestCase):
                 np.float32([8, 10]),
                 np.float64([12, 14]),
             ]))
-    chosen = choose(
+    chosen = util.choose(
         tf.constant([False, True]),
         accepted,
         rejected)
@@ -81,7 +77,7 @@ class ChooseTest(tf.test.TestCase):
     # "usual" broadcasting being applied on the right first (event first).
     zeros_states = [np.zeros((2, 3))]
     ones_states = [np.ones((2, 3))]
-    chosen = choose(
+    chosen = util.choose(
         tf.constant([True, False]),
         zeros_states,
         ones_states)
@@ -102,19 +98,19 @@ class IsNamedTupleLikeTest(tf.test.TestCase):
   def test_true_for_namedtuple_without_fields(self):
     NoFields = collections.namedtuple('NoFields', [])  # pylint: disable=invalid-name
     no_fields = NoFields()
-    self.assertTrue(is_namedtuple_like(no_fields))
+    self.assertTrue(util.is_namedtuple_like(no_fields))
 
   def test_true_for_namedtuple_with_fields(self):
     HasFields = collections.namedtuple('HasFields', ['a', 'b'])  # pylint: disable=invalid-name
     has_fields = HasFields(a=1, b=2)
-    self.assertTrue(is_namedtuple_like(has_fields))
+    self.assertTrue(util.is_namedtuple_like(has_fields))
 
   def test_false_for_base_case(self):
-    self.assertFalse(is_namedtuple_like(tuple([1, 2])))
-    self.assertFalse(is_namedtuple_like(list([3., 4.])))
-    self.assertFalse(is_namedtuple_like(dict(a=5, b=6)))
-    self.assertFalse(is_namedtuple_like(tf.constant(1.)))
-    self.assertFalse(is_namedtuple_like(np.int32()))
+    self.assertFalse(util.is_namedtuple_like(tuple([1, 2])))
+    self.assertFalse(util.is_namedtuple_like(list([3., 4.])))
+    self.assertFalse(util.is_namedtuple_like(dict(a=5, b=6)))
+    self.assertFalse(util.is_namedtuple_like(tf.constant(1.)))
+    self.assertFalse(util.is_namedtuple_like(np.int32()))
 
 
 class GradientTest(tf.test.TestCase):
@@ -127,7 +123,7 @@ class GradientTest(tf.test.TestCase):
     fn_args = [dtype(3), dtype(3)]
     # Convert function input to a list of tensors
     fn_args = [tf.convert_to_tensor(value=arg) for arg in fn_args]
-    fn_result, grads = maybe_call_fn_and_grads(fn, fn_args)
+    fn_result, grads = util.maybe_call_fn_and_grads(fn, fn_args)
     fn_result_, grads_ = self.evaluate([fn_result, grads])
     self.assertNear(18., fn_result_, err=1e-5)
     for grad in grads_:
@@ -135,7 +131,7 @@ class GradientTest(tf.test.TestCase):
 
   def testGradientWorksDespiteBijectorCaching(self):
     x = tf.constant(2.)
-    fn_result, grads = maybe_call_fn_and_grads(
+    fn_result, grads = util.maybe_call_fn_and_grads(
         lambda x_: tfd.LogNormal(loc=0., scale=1.).log_prob(x_), x)
     self.assertAllEqual(False, fn_result is None)
     self.assertAllEqual([False], [g is None for g in grads])
@@ -155,11 +151,11 @@ class GradientTest(tf.test.TestCase):
     if tf.executing_eagerly():
       with self.assertRaisesRegexp(
           ValueError, 'Encountered `None`.*\n.*fn_arg_list.*\n.*None'):
-        maybe_call_fn_and_grads(fn, fn_args)
+        util.maybe_call_fn_and_grads(fn, fn_args)
     else:
       with self.assertRaisesRegexp(
           ValueError, 'Encountered `None`.*\n.*fn_arg_list.*arg1.*\n.*None'):
-        maybe_call_fn_and_grads(fn, fn_args)
+        util.maybe_call_fn_and_grads(fn, fn_args)
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -172,7 +168,7 @@ class SmartForLoopTest(tf.test.TestCase):
       counter['body_calls'] += 1
       return [x + 1]
 
-    result = smart_for_loop(
+    result = util.smart_for_loop(
         loop_num_iter=n, body_fn=body, initial_loop_vars=[tf.constant(1)])
     self.assertEqual(10, counter['body_calls'])
     self.assertAllClose([11], self.evaluate(result))
@@ -185,7 +181,7 @@ class SmartForLoopTest(tf.test.TestCase):
       counter['body_calls'] += 1
       return [x + 1]
 
-    result = smart_for_loop(
+    result = util.smart_for_loop(
         loop_num_iter=n, body_fn=body, initial_loop_vars=[tf.constant(1)])
     self.assertEqual(iters if tf.executing_eagerly() else 1,
                      counter['body_calls'])
@@ -203,7 +199,7 @@ class TraceScanTest(tf.test.TestCase):
     def _trace_fn(state):
       return [state, state * 2]
 
-    final_state, trace = trace_scan(
+    final_state, trace = util.trace_scan(
         loop_fn=_loop_fn, initial_state=0, elems=[1, 2], trace_fn=_trace_fn)
 
     self.assertAllClose([], final_state.shape.as_list())
@@ -215,6 +211,154 @@ class TraceScanTest(tf.test.TestCase):
     self.assertAllClose(3, final_state)
     self.assertAllClose([1, 3], trace[0])
     self.assertAllClose([2, 6], trace[1])
+
+
+WrapperResults = collections.namedtuple('WrapperResults',
+                                        'inner_results, value')
+SimpleResults = collections.namedtuple('SimpleResults', 'value')
+
+
+def _test_setter_fn(simple_results, increment=1):
+  return simple_results._replace(value=simple_results.value + increment)
+
+
+class MakeInnermostSetterTest(tf.test.TestCase):
+
+  def testNoWrapper(self):
+    results = SimpleResults(1)
+    new_results = util.make_innermost_setter(_test_setter_fn)(results)
+    self.assertEqual(2, new_results.value)
+
+  def testNoWrapperArg(self):
+    results = SimpleResults(1)
+    new_results = util.make_innermost_setter(_test_setter_fn)(results, 2)
+    self.assertEqual(3, new_results.value)
+
+  def testNoWrapperKwarg(self):
+    results = SimpleResults(1)
+    new_results = util.make_innermost_setter(_test_setter_fn)(
+        results, increment=2)
+    self.assertEqual(3, new_results.value)
+
+  def testOneWrapper(self):
+    results = WrapperResults(inner_results=SimpleResults(1), value=2)
+    new_results = util.make_innermost_setter(_test_setter_fn)(results)
+    self.assertEqual(2, new_results.value)
+    self.assertEqual(2, new_results.inner_results.value)
+
+  def testTwoWrappers(self):
+    results = WrapperResults(
+        inner_results=WrapperResults(inner_results=SimpleResults(1), value=2),
+        value=3)
+    new_results = util.make_innermost_setter(_test_setter_fn)(results)
+    self.assertEqual(3, new_results.value)
+    self.assertEqual(2, new_results.inner_results.value)
+    self.assertEqual(2, new_results.inner_results.inner_results.value)
+
+
+class MakeInnermostGetterTest(tf.test.TestCase):
+
+  def testNoWrapper(self):
+    results = SimpleResults(1)
+    inner_results = util.make_innermost_getter(lambda r: r)(results)
+    self.assertIs(inner_results, results)
+
+  def testNoWrapperArg(self):
+    results = SimpleResults(1)
+    value = util.make_innermost_getter(lambda r, a: r.value + a)(results, 1)
+    self.assertEqual(2, value)
+
+  def testNoWrapperKwarg(self):
+    results = SimpleResults(1)
+    value = util.make_innermost_getter(lambda r, a: r.value + a)(results, a=1)
+    self.assertEqual(2, value)
+
+  def testOneWrapper(self):
+    results = WrapperResults(inner_results=SimpleResults(1), value=2)
+    inner_results = util.make_innermost_getter(lambda r: r)(results)
+    self.assertIs(inner_results, results.inner_results)
+
+  def testTwoWrappers(self):
+    results = WrapperResults(
+        inner_results=WrapperResults(inner_results=SimpleResults(1), value=2),
+        value=3)
+    inner_results = util.make_innermost_getter(lambda r: r)(results)
+    self.assertIs(inner_results, results.inner_results.inner_results)
+
+
+class FakeWrapperOld(object):
+
+  def __init__(self, inner_kernel):
+    self.parameters = dict(inner_kernel=inner_kernel)
+
+
+class FakeWrapperNew(object):
+
+  def __init__(self, inner_kernel, store_parameters_in_results=False):
+    self.parameters = dict(
+        inner_kernel=inner_kernel,
+        store_parameters_in_results=store_parameters_in_results)
+
+
+class FakeInnerOld(object):
+
+  def __init__(self):
+    self.parameters = {}
+
+
+class FakeInnerNew(object):
+
+  def __init__(self, store_parameters_in_results=False):
+    self.parameters = dict(
+        store_parameters_in_results=store_parameters_in_results)
+
+
+class FakeInnerNoParameters(object):
+  pass
+
+
+class EnableStoreParametersInResultsTest(tf.test.TestCase,
+                                         parameterized.TestCase):
+
+  @parameterized.parameters(FakeInnerOld(),
+                            FakeInnerNew(),
+                            FakeWrapperOld(FakeInnerOld()),
+                            FakeWrapperOld(FakeInnerNew()),
+                            FakeWrapperNew(FakeInnerOld()),
+                            FakeWrapperNew(FakeInnerNew()),
+                            FakeWrapperOld(FakeWrapperOld(FakeInnerOld())),
+                            FakeWrapperOld(FakeWrapperOld(FakeInnerNew())),
+                            FakeWrapperOld(FakeWrapperNew(FakeInnerOld())),
+                            FakeWrapperOld(FakeWrapperNew(FakeInnerNew())),
+                            FakeWrapperNew(FakeWrapperOld(FakeInnerOld())),
+                            FakeWrapperNew(FakeWrapperOld(FakeInnerNew())),
+                            FakeWrapperNew(FakeWrapperNew(FakeInnerOld())),
+                            FakeWrapperNew(FakeWrapperNew(FakeInnerNew())),
+                           )
+  def testAllCases(self, kernel):
+    new_kernel = util.enable_store_parameters_in_results(kernel)
+
+    flat_kernel = [kernel]
+    while 'inner_kernel' in kernel.parameters:
+      kernel = kernel.parameters['inner_kernel']
+      flat_kernel.append(kernel)
+
+    flat_new_kernel = [new_kernel]
+    while 'inner_kernel' in new_kernel.parameters:
+      new_kernel = new_kernel.parameters['inner_kernel']
+      flat_new_kernel.append(new_kernel)
+
+    self.assertEqual(len(flat_kernel), len(flat_new_kernel))
+    for kernel, new_kernel in zip(flat_kernel, flat_new_kernel):
+      self.assertIsNot(kernel, new_kernel)
+      self.assertIs(type(kernel), type(new_kernel))
+      if 'store_parameters_in_results' in new_kernel.parameters:
+        self.assertTrue(new_kernel.parameters['store_parameters_in_results'])
+
+  def testNoParameters(self):
+    kernel = FakeInnerNoParameters()
+    new_kernel = util.enable_store_parameters_in_results(kernel)
+    self.assertIs(kernel, new_kernel)
 
 
 if __name__ == '__main__':
