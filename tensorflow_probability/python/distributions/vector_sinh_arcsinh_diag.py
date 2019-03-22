@@ -105,7 +105,7 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
                distribution=None,
                validate_args=False,
                allow_nan_stats=True,
-               name="MultivariateNormalLinearOperator"):
+               name="VectorSinhArcsinhDiag"):
     """Construct VectorSinhArcsinhDiag distribution on `R^k`.
 
     The arguments `scale_diag` and `scale_identity_multiplier` combine to
