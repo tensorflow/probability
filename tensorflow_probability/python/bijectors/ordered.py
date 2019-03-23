@@ -60,29 +60,6 @@ class Ordered(bijector.Bijector):
         validate_args=validate_args,
         name=name)
 
-  def _forward_event_shape(self, input_shape):
-    if input_shape.ndims is None or input_shape[-1] is None:
-      return input_shape
-    return tf.TensorShape([input_shape[-1]])
-
-  def _forward_event_shape_tensor(self, input_shape):
-    return (input_shape[-1])[..., tf.newaxis]
-
-  def _inverse_event_shape(self, output_shape):
-    if output_shape.ndims is None or output_shape[-1] is None:
-      return output_shape
-    if output_shape[-1] <= 1:
-      raise ValueError("output_shape[-1] = %d <= 1" % output_shape[-1])
-    return tf.TensorShape([output_shape[-1]])
-
-  def _inverse_event_shape_tensor(self, output_shape):
-    if self.validate_args:
-      is_greater_one = tf.compat.v1.assert_greater(
-          output_shape[-1], 1, message="Need last dimension greater than 1.")
-      output_shape = distribution_util.with_dependencies(
-          [is_greater_one], output_shape)
-    return (output_shape[-1])[..., tf.newaxis]
-
   def _forward(self, x):
     x = self._maybe_assert_valid_x(x)
     y0 = x[..., 0, tf.newaxis]
