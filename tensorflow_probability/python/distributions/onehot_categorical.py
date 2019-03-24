@@ -181,6 +181,7 @@ class OneHotCategorical(distribution.Distribution):
     return ret
 
   def _log_prob(self, x):
+    x = tf.cast(x, self.logits.dtype)
     x = self._assert_valid_sample(x)
     # broadcast logits or x if need be.
     logits = self.logits
@@ -227,7 +228,7 @@ class OneHotCategorical(distribution.Distribution):
     return distribution_util.with_dependencies([
         tf.compat.v1.assert_non_positive(x),
         tf.compat.v1.assert_near(
-            tf.zeros([], dtype=self.dtype),
+            tf.zeros([], dtype=self.logits.dtype),
             tf.reduce_logsumexp(input_tensor=x, axis=[-1])),
     ], x)
 
