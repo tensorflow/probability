@@ -346,9 +346,9 @@ class DistributionPropertiesTest(tf.test.TestCase):
     # Make sure the slice string appears in Hypothesis' attempted example log,
     # by drawing and discarding it.
     data.draw(hps.just(slice_str))
-    sliced_dist = dist.__getitem__(slices)
+    sliced_dist = dist[slices]
     self.assertAllEqual(
-        np.zeros(batch_shape).__getitem__(slices).shape,
+        np.zeros(batch_shape)[slices].shape,
         sliced_dist.batch_shape)
 
   def _run_test(self, data):

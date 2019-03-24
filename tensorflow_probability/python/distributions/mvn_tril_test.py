@@ -423,7 +423,7 @@ def _compute_non_batch_kl(mu_a, sigma_a, mu_b, sigma_b):
 class _MakeSlicer(object):
 
   def __getitem__(self, slices):
-    return lambda x: x.__getitem__(slices)
+    return lambda x: x[slices]
 
 make_slicer = _MakeSlicer()
 

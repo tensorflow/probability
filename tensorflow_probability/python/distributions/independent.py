@@ -158,10 +158,10 @@ class Independent(distribution_lib.Distribution):
               else (slices,))
     if Ellipsis not in slices:
       slices = slices + (Ellipsis,)
-    slices = slices + tuple(
-        [slice(None) for _ in range(self._static_reinterpreted_batch_ndims)])
+    slices = slices + (slice(None),) * int(
+        self._static_reinterpreted_batch_ndims)
     return self.copy(
-        distribution=self.distribution.__getitem__(slices),
+        distribution=self.distribution[slices],
         reinterpreted_batch_ndims=self._static_reinterpreted_batch_ndims)
 
   def _batch_shape_tensor(self):

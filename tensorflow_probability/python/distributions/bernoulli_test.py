@@ -308,7 +308,7 @@ class BernoulliTest(tf.test.TestCase):
 class _MakeSlicer(object):
 
   def __getitem__(self, slices):
-    return lambda x: x.__getitem__(slices)
+    return lambda x: x[slices]
 
 make_slicer = _MakeSlicer()
 
