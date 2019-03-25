@@ -26,7 +26,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.mcmc.util import is_list_like
+from tensorflow_probability.python.mcmc.internal.util import is_list_like
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 

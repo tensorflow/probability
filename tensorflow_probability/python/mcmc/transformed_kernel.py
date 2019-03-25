@@ -22,11 +22,8 @@ import collections
 
 import tensorflow as tf
 
-# Because we use TF's `remove_undocumented`, we must directly import what we
-# use.
-from tensorflow_probability.python.mcmc.kernel import TransitionKernel
-from tensorflow_probability.python.mcmc.util import is_list_like
-from tensorflow_probability.python.mcmc.util import make_name
+from tensorflow_probability.python.mcmc import kernel as kernel_base
+from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
 
 __all__ = [
@@ -42,7 +39,7 @@ TransformedTransitionKernelResults = collections.namedtuple(
 
 def forward_log_det_jacobian_fn(bijector):
   """Makes a function which applies a list of Bijectors' `log_det_jacobian`s."""
-  if not is_list_like(bijector):
+  if not mcmc_util.is_list_like(bijector):
     bijector = [bijector]
 
   def fn(transformed_state_parts, event_ndims):
@@ -56,7 +53,7 @@ def forward_log_det_jacobian_fn(bijector):
 
 def forward_transform_fn(bijector):
   """Makes a function which applies a list of Bijectors' `forward`s."""
-  if not is_list_like(bijector):
+  if not mcmc_util.is_list_like(bijector):
     bijector = [bijector]
 
   def fn(transformed_state_parts):
@@ -67,7 +64,7 @@ def forward_transform_fn(bijector):
 
 def inverse_transform_fn(bijector):
   """Makes a function which applies a list of Bijectors' `inverse`s."""
-  if not is_list_like(bijector):
+  if not mcmc_util.is_list_like(bijector):
     bijector = [bijector]
   def fn(state_parts):
     return [b.inverse(sp)
@@ -75,7 +72,7 @@ def inverse_transform_fn(bijector):
   return fn
 
 
-class TransformedTransitionKernel(TransitionKernel):
+class TransformedTransitionKernel(kernel_base.TransitionKernel):
   """TransformedTransitionKernel applies a bijector to the MCMC's state space.
 
   The `TransformedTransitionKernel` `TransitionKernel` enables fitting
@@ -254,18 +251,19 @@ class TransformedTransitionKernel(TransitionKernel):
         advance the chain.
     """
     with tf.compat.v1.name_scope(
-        name=make_name(self.name, 'transformed_kernel', 'one_step'),
+        name=mcmc_util.make_name(self.name, 'transformed_kernel', 'one_step'),
         values=[previous_kernel_results]):
       transformed_next_state, kernel_results = self._inner_kernel.one_step(
           previous_kernel_results.transformed_state,
           previous_kernel_results.inner_results)
       transformed_next_state_parts = (
           transformed_next_state
-          if is_list_like(transformed_next_state) else [transformed_next_state])
+          if mcmc_util.is_list_like(transformed_next_state) else
+          [transformed_next_state])
       next_state_parts = self._forward_transform(transformed_next_state_parts)
       next_state = (
-          next_state_parts
-          if is_list_like(transformed_next_state) else next_state_parts[0])
+          next_state_parts if mcmc_util.is_list_like(transformed_next_state)
+          else next_state_parts[0])
       kernel_results = TransformedTransitionKernelResults(
           transformed_state=transformed_next_state,
           inner_results=kernel_results)
@@ -320,17 +318,18 @@ class TransformedTransitionKernel(TransitionKernel):
       raise ValueError('Must specify exactly one of `init_state` '
                        'or `transformed_init_state`.')
     with tf.compat.v1.name_scope(
-        name=make_name(self.name, 'transformed_kernel', 'bootstrap_results'),
+        name=mcmc_util.make_name(self.name, 'transformed_kernel',
+                                 'bootstrap_results'),
         values=[init_state, transformed_init_state]):
       if transformed_init_state is None:
-        init_state_parts = (init_state if is_list_like(init_state)
+        init_state_parts = (init_state if mcmc_util.is_list_like(init_state)
                             else [init_state])
         transformed_init_state_parts = self._inverse_transform(init_state_parts)
         transformed_init_state = (
-            transformed_init_state_parts
-            if is_list_like(init_state) else transformed_init_state_parts[0])
+            transformed_init_state_parts if mcmc_util.is_list_like(init_state)
+            else transformed_init_state_parts[0])
       else:
-        if is_list_like(transformed_init_state):
+        if mcmc_util.is_list_like(transformed_init_state):
           transformed_init_state = [
               tf.convert_to_tensor(value=s, name='transformed_init_state')
               for s in transformed_init_state

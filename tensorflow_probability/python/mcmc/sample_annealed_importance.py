@@ -23,7 +23,7 @@ import collections
 import numpy as np
 
 import tensorflow as tf
-from tensorflow_probability.python.mcmc import util as mcmc_util
+from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
 
 __all__ = [

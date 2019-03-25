@@ -24,7 +24,7 @@ import tensorflow as tf
 
 from tensorflow_probability.python import distributions
 from tensorflow_probability.python.mcmc import kernel as kernel_base
-from tensorflow_probability.python.mcmc import util as mcmc_util
+from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
 __all__ = [
     'ReplicaExchangeMC',

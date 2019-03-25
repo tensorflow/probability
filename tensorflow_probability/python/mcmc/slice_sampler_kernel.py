@@ -26,9 +26,9 @@ import tensorflow as tf
 from tensorflow_probability.python import distributions
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.mcmc import kernel as kernel_base
-from tensorflow_probability.python.mcmc import slice_sampler_utils as ssu
 
-from tensorflow_probability.python.mcmc import util as mcmc_util
+from tensorflow_probability.python.mcmc.internal import slice_sampler_utils as ssu
+from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
 
 __all__ = [

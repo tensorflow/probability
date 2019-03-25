@@ -24,7 +24,7 @@ import tensorflow as tf
 
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.mcmc import kernel as kernel_base
-from tensorflow_probability.python.mcmc import util as mcmc_util
+from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
 
 @mcmc_util.make_innermost_setter

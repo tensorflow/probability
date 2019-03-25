@@ -29,7 +29,7 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.mcmc.hmc import _compute_log_acceptance_correction
 from tensorflow_probability.python.mcmc.hmc import _leapfrog_integrator_one_step
-from tensorflow_probability.python.mcmc.util import maybe_call_fn_and_grads
+from tensorflow_probability.python.mcmc.internal.util import maybe_call_fn_and_grads
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
