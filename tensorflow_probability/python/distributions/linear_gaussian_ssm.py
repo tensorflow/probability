@@ -780,14 +780,15 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
       check_mask_dims_op = None
       check_mask_shape_op = None
       if mask is not None:
-        if mask.shape.ndims > x.shape.ndims:
+        if mask.shape.ndims is None or x.shape.ndims is None:
+          check_mask_dims_op = tf.compat.v1.assert_greater_equal(
+              tf.rank(x),
+              tf.rank(mask),
+              message=("mask cannot have higher rank than x!"))
+        elif mask.shape.ndims > x.shape.ndims:
           raise ValueError(
               "mask cannot have higher rank than x! ({} vs {})"
               .format(mask.shape.ndims, x.shape.ndims))
-        check_mask_dims_op = tf.compat.v1.assert_greater_equal(
-            tf.rank(x),
-            tf.rank(mask),
-            message=("mask cannot have higher rank than x!"))
         check_mask_shape_op = _check_equal_shape(
             "mask", mask.shape[-1:], tf.shape(input=mask)[-1:],
             self.event_shape[-2:-1], self.event_shape_tensor()[-2:-1])

@@ -561,16 +561,26 @@ class MissingObservationsTests(tfp_test_case.TestCase):
             observation_matrix, observation_noise,
             initial_state_prior, model)
 
-  def testForwardFilterWithMask(self):
+  def testForwardFilterWithDynamicShapeMask(self):
     (_, transition_matrix, _,
      observation_matrix, observation_noise,
      initial_state_prior, model) = self.make_model()
 
-    observed_time_series = np.array(
+    observed_time_series_ = np.array(
         [1.0, 2.0, -1000., 0.4, np.nan, 1000., 4.2, np.inf]).astype(np.float32)
-    observed_time_series = observed_time_series[..., np.newaxis]
-    observation_mask = np.array(
+    observed_time_series_ = observed_time_series_[..., np.newaxis]
+    observation_mask_ = np.array(
         [False, False, True, False, True, True, False, True]).astype(np.bool)
+
+    # Pass inputs with dynamic shape. Ideally we would run all tests with
+    # both static and dynamic shape, but since LGSSM tests are unusually
+    # heavyweight, we split the load: this test uses dynamic shape and others
+    # use static shape, so we expect to catch any pervasive problems with both
+    # approaches.
+    observed_time_series = tf.compat.v1.placeholder_with_default(
+        input=observed_time_series_, shape=None)
+    observation_mask = tf.compat.v1.placeholder_with_default(
+        input=observation_mask_, shape=None)
 
     # In a random walk, skipping a timestep just adds variance, so we can
     # construct a model of the four 'unmasked' timesteps by directly collapsing
@@ -603,15 +613,15 @@ class MissingObservationsTests(tfp_test_case.TestCase):
      predicted_covs_collapsed_, observation_means_collapsed_,
      observation_covs_collapsed_) = self.evaluate(
          collapsed_model.forward_filter(
-             x=observed_time_series[~observation_mask]))
+             x=observed_time_series[~observation_mask_]))
 
-    self.assertAllClose(log_likelihoods_[~observation_mask],
+    self.assertAllClose(log_likelihoods_[~observation_mask_],
                         log_likelihoods_collapsed_)
-    self.assertAllEqual(log_likelihoods_[observation_mask],
-                        np.zeros(log_likelihoods_[observation_mask].shape))
-    self.assertAllClose(filtered_means_[~observation_mask],
+    self.assertAllEqual(log_likelihoods_[observation_mask_],
+                        np.zeros(log_likelihoods_[observation_mask_].shape))
+    self.assertAllClose(filtered_means_[~observation_mask_],
                         filtered_means_collapsed_)
-    self.assertAllClose(filtered_covs_[~observation_mask],
+    self.assertAllClose(filtered_covs_[~observation_mask_],
                         filtered_covs_collapsed_)
 
     # Check the predictive distributions over latents at the final timestep.
@@ -622,16 +632,16 @@ class MissingObservationsTests(tfp_test_case.TestCase):
     self.assertAllClose(predicted_covs_[-1],
                         predicted_covs_collapsed_[-1])
 
-    self.assertAllClose(observation_means_[~observation_mask],
+    self.assertAllClose(observation_means_[~observation_mask_],
                         observation_means_collapsed_)
-    self.assertAllClose(observation_covs_[~observation_mask],
+    self.assertAllClose(observation_covs_[~observation_mask_],
                         observation_covs_collapsed_)
 
     # Also test that auxiliary methods `log_prob` and `posterior_marginals`
     # pass the mask through correctly.
     lp_, lp_collapsed_ = self.evaluate((
         model.log_prob(observed_time_series, mask=observation_mask),
-        collapsed_model.log_prob(observed_time_series[~observation_mask])))
+        collapsed_model.log_prob(observed_time_series[~observation_mask_])))
     self.assertAllClose(lp_, lp_collapsed_)
 
     ((posterior_means_, posterior_covs_),
@@ -639,10 +649,10 @@ class MissingObservationsTests(tfp_test_case.TestCase):
          model.posterior_marginals(
              observed_time_series, mask=observation_mask),
          collapsed_model.posterior_marginals(
-             observed_time_series[~observation_mask])))
-    self.assertAllClose(posterior_means_[~observation_mask],
+             observed_time_series[~observation_mask_])))
+    self.assertAllClose(posterior_means_[~observation_mask_],
                         posterior_means_collapsed_)
-    self.assertAllClose(posterior_covs_[~observation_mask],
+    self.assertAllClose(posterior_covs_[~observation_mask_],
                         posterior_covs_collapsed_)
 
   def testGradientsOfMaskedNaNsAreFinite(self):
