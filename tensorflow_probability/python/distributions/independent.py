@@ -151,6 +151,11 @@ class Independent(distribution_lib.Distribution):
     return self._reinterpreted_batch_ndims
 
   def __getitem__(self, slices):
+    # Because slicing is parameterization-dependent, we only implement slicing
+    # for instances of Independent, not subclasses thereof.
+    if type(self) is not Independent:  # pylint: disable=unidiomatic-typecheck
+      return super(Independent, self).__getitem__(slices)
+
     if self._static_reinterpreted_batch_ndims is None:
       raise NotImplementedError(
           "Cannot slice Independent with non-static reinterpreted_batch_ndims")
