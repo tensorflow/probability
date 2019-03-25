@@ -257,6 +257,8 @@ class Empirical(distribution.Distribution):
 
     entropy = tf.map_fn(_get_entropy, samples)
     entropy_shape = self.batch_shape_tensor()
+    if self.dtype.is_floating:
+      entropy = tf.cast(entropy, self.dtype)
     return tf.reshape(entropy, entropy_shape)
 
   def _cdf(self, event):
@@ -270,6 +272,8 @@ class Empirical(distribution.Distribution):
                 axis=tf.range(-self._event_ndims, 0)),
             dtype=tf.int32),
         axis=-1) / self.num_samples
+    if self.dtype.is_floating:
+      cdf = tf.cast(cdf, self.dtype)
     return cdf
 
   def _prob(self, event):
@@ -283,4 +287,6 @@ class Empirical(distribution.Distribution):
                 axis=tf.range(-self._event_ndims, 0)),
             dtype=tf.int32),
         axis=-1) / self.num_samples
+    if self.dtype.is_floating:
+      prob = tf.cast(prob, self.dtype)
     return prob
