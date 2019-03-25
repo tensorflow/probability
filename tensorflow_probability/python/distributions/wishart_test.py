@@ -438,6 +438,22 @@ class WishartTest(tf.test.TestCase):
     self.assertAllEqual(batch_shape, lp_bc_.shape)
     self.assertAllClose(lp_bc_, lp_)
 
+  def testLogProbBroadcastOverDfInsideMixture(self):
+    dims = 2
+    scale = np.float32([[0.5, 0.25],  #
+                        [0.25, 0.75]])
+    df = np.arange(3., 8., dtype=np.float32)
+    dist = tfd.MixtureSameFamily(
+        components_distribution=tfd.Wishart(df=df, scale=scale),
+        mixture_distribution=tfd.Categorical(logits=tf.zeros(df.shape)))
+    x = np.random.randn(dims, dims)
+    x = np.matmul(x, x.T)
+    lp = dist.log_prob(x)
+    lp_ = self.evaluate(lp)
+    self.assertAllEqual([], dist.batch_shape)
+    self.assertAllEqual([], lp.shape)
+    self.assertAllEqual([], lp_.shape)
+
   def testStaticAssertNonFlatDfDoesntRaise(self):
     # Check we don't get ValueError: The truth value of an array with more than
     # one element is ambiguous. Use a.any() or a.all()

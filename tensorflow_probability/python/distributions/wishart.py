@@ -301,24 +301,26 @@ class _WishartLinearOperator(distribution.Distribution):
     perm = tf.concat([tf.range(sample_ndims, ndims),
                       tf.range(0, sample_ndims)], 0)
     scale_sqrt_inv_x_sqrt = tf.transpose(a=scale_sqrt_inv_x_sqrt, perm=perm)
-    last_dimsize = (
+    last_dim_size = (
         tf.cast(self.dimension, dtype=tf.int32) *
         tf.reduce_prod(
             input_tensor=x_with_prepended_singletons_shape[:sample_ndims]))
-    shape = tf.concat([x_with_prepended_singletons_shape[sample_ndims:-2],
-                       [tf.cast(self.dimension, dtype=tf.int32),
-                        last_dimsize]], 0)
+    shape = tf.concat(
+        [x_with_prepended_singletons_shape[sample_ndims:-2],
+         [tf.cast(self.dimension, dtype=tf.int32), last_dim_size]],
+        axis=0)
     scale_sqrt_inv_x_sqrt = tf.reshape(scale_sqrt_inv_x_sqrt, shape)
 
     # Complexity: O(nbM*k) where M is the complexity of the operator solving a
     # vector system. For LinearOperatorLowerTriangular, each solve is O(k**2) so
     # this step has complexity O(nbk^3).
-    scale_sqrt_inv_x_sqrt = self.scale_operator.solve(
-        scale_sqrt_inv_x_sqrt)
+    scale_sqrt_inv_x_sqrt = self.scale_operator.solve(scale_sqrt_inv_x_sqrt)
 
     # Undo make batch-op ready.
     # Complexity: O(nbk**2)
-    shape = tf.concat([batch_shape, event_shape, sample_shape], 0)
+    shape = tf.concat(
+        [tf.shape(input=scale_sqrt_inv_x_sqrt)[:-2], event_shape, sample_shape],
+        axis=0)
     scale_sqrt_inv_x_sqrt = tf.reshape(scale_sqrt_inv_x_sqrt, shape)
     perm = tf.concat([
         tf.range(ndims - sample_ndims, ndims),
