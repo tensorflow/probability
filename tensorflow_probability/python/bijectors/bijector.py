@@ -36,6 +36,12 @@ __all__ = [
 ]
 
 
+def _get_current_graph():
+  if tf.executing_eagerly():
+    return None
+  return tf.compat.v1.get_default_graph()
+
+
 class _Mapping(
     collections.namedtuple("_Mapping", ["x", "y", "ildj", "kwargs"])):
   """Helper class to make it easier to manage caching in `Bijector`."""
@@ -553,7 +559,8 @@ class Bijector(object):
     self._forward_min_event_ndims = forward_min_event_ndims
     self._inverse_min_event_ndims = inverse_min_event_ndims
     self._is_constant_jacobian = is_constant_jacobian
-    self._constant_ildj = None
+    # Keyed by the current graph.
+    self._constant_ildj = {}
     self._validate_args = validate_args
     self._dtype = dtype
     self._from_y = weakref.WeakKeyDictionary()
@@ -1044,14 +1051,15 @@ class Bijector(object):
       ildj: the (un-reduce_sum'ed) value of the ILDJ for the specified input.
         Also updates the cache as needed.
     """
-    if self._constant_ildj is not None:
-      return self._constant_ildj
+    current_graph = _get_current_graph()
+    if current_graph in self._constant_ildj:
+      return self._constant_ildj[current_graph]
 
     if use_inverse_ldj_fn:
       ildj = self._inverse_log_det_jacobian(tensor_to_use, **kwargs)
     else:
       ildj = -self._forward_log_det_jacobian(tensor_to_use, **kwargs)
-    self._constant_ildj = ildj
+    self._constant_ildj[current_graph] = ildj
     return ildj
 
   def _call_inverse_log_det_jacobian(self, y, event_ndims, name, **kwargs):

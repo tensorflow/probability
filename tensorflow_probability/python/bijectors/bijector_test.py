@@ -400,5 +400,34 @@ class BijectorLDJCachingTest(tf.test.TestCase):
       sess.run(a, feed_dict={x1: x1_value})
 
 
+@test_util.run_all_in_graph_and_eager_modes
+class BijectorConstILDJLeakTest(tf.test.TestCase):
+
+  # See discussion in b/129297998.
+  def testConstILDJLeak(self):
+    bij = ConstantJacobian()
+
+    call_fldj = lambda: bij.forward_log_det_jacobian(0., event_ndims=0)
+
+    @tf.function
+    def func1():
+      call_fldj()
+      return call_fldj()
+
+    @tf.function
+    def func2():
+      call_fldj()
+      return call_fldj()
+
+    func1()
+    self.assertLen(bij._constant_ildj, 1)
+    func2()
+    self.assertLen(bij._constant_ildj, 2)
+
+    call_fldj()
+    call_fldj()
+    self.assertLen(bij._constant_ildj, 3)
+
+
 if __name__ == "__main__":
   tf.test.main()
