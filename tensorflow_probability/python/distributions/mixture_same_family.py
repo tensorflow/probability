@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import collections
+
 # Dependency imports
 import numpy as np
 import tensorflow as tf
@@ -177,8 +179,8 @@ class MixtureSameFamily(distribution.Distribution):
         raise ValueError("`mixture_distribution` must have scalar `event_dim`s")
       elif validate_args:
         self._runtime_assertions += [
-            tf.compat.v1.assert_rank(
-                mixture_distribution.event_shape_tensor(),
+            tf.compat.v1.assert_equal(
+                tf.size(input=mixture_distribution.event_shape_tensor()),
                 0,
                 message="`mixture_distribution` must have scalar `event_dim`s"),
         ]
@@ -229,7 +231,7 @@ class MixtureSameFamily(distribution.Distribution):
 
       self._reparameterize = reparameterize
       if reparameterize:
-        # Note: tfd.Independent passes through the reparametrization type hence
+        # Note: tfd.Independent passes through the reparameterization type hence
         # we do not need separate logic for Independent.
         if (self._components_distribution.reparameterization_type !=
             reparameterization.FULLY_REPARAMETERIZED):
@@ -257,6 +259,33 @@ class MixtureSameFamily(distribution.Distribution):
   @property
   def components_distribution(self):
     return self._components_distribution
+
+  def __getitem__(self, slices):
+    # Because slicing is parameterization-dependent, we only implement slicing
+    # for instances of MSF, not subclasses thereof.
+    if type(self) is not MixtureSameFamily:  # pylint: disable=unidiomatic-typecheck
+      return super(MixtureSameFamily, self).__getitem__(slices)
+
+    slices = (
+        list(slices) if isinstance(slices, collections.Sequence) else [slices])
+    mixture_rank = self.mixture_distribution.batch_shape.ndims
+    if mixture_rank is None:
+      raise NotImplementedError("Cannot slice MixtureSameFamily with unknown "
+                                "mixture_distribution rank")
+    elif mixture_rank > 0:
+      sliced_mixture_dist = self.mixture_distribution.__getitem__(slices)
+    else:  # must be scalar
+      sliced_mixture_dist = self.mixture_distribution
+
+    # The components distribution has the component axis as the last batch dim,
+    # and this must be preserved.
+    if Ellipsis not in slices:
+      slices.append(Ellipsis)
+    slices.append(slice(None))
+    sliced_components_dist = self.components_distribution.__getitem__(slices)
+    return self.copy(
+        mixture_distribution=sliced_mixture_dist,
+        components_distribution=sliced_components_dist)
 
   def _batch_shape_tensor(self):
     with tf.control_dependencies(self._runtime_assertions):

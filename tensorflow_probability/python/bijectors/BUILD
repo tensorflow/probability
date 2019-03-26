@@ -498,6 +498,17 @@ py_library(
     ],
 )
 
+py_library(
+    name = "hypothesis_testlib",
+    testonly = 1,
+    srcs = ["hypothesis_testlib.py"],
+    deps = [
+        # hypothesis dep,
+        # six dep,
+        "//tensorflow_probability",
+    ],
+)
+
 py_test(
     name = "bijector_test",
     size = "small",

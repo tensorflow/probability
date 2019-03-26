@@ -265,6 +265,25 @@ class TransformedDistribution(distribution_lib.Distribution):
     """Function transforming x => y."""
     return self._bijector
 
+  def __getitem__(self, slices):
+    # Because slicing is parameterization-dependent, we only implement slicing
+    # for instances of TD, not subclasses thereof.
+    if type(self) is not TransformedDistribution:  # pylint: disable=unidiomatic-typecheck
+      return super(TransformedDistribution, self).__getitem__(slices)
+
+    if self.distribution.batch_shape.ndims is None:
+      raise NotImplementedError(
+          "Slicing TransformedDistribution with underlying distribution of "
+          "unknown rank is not yet implemented")
+    overrides = {}
+    if (self.distribution.batch_shape.ndims == 0 and
+        self.parameters.get("batch_shape", None) is not None):
+      overrides["batch_shape"] = tf.shape(
+          input=tf.zeros(self.parameters["batch_shape"])[slices])
+    elif self.parameters.get("distribution", None) is not None:
+      overrides["distribution"] = self.distribution[slices]
+    return self.copy(**overrides)
+
   def _event_shape_tensor(self):
     return self.bijector.forward_event_shape_tensor(
         distribution_util.pick_vector(

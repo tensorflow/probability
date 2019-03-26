@@ -2020,17 +2020,43 @@ py_test(
     ],
 )
 
-py_test(
-    name = "distribution_properties_test",
-    size = "medium",
+py_library(
+    name = "distribution_properties_testlib",
+    testonly = 1,
     srcs = ["distribution_properties_test.py"],
-    shard_count = 2,
+    srcs_version = "PY2AND3",
     deps = [
         # hypothesis dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/bijectors:hypothesis_testlib",
         "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
+)
+
+py_test(
+    name = "distribution_properties_test_eager",
+    size = "medium",
+    srcs = ["distribution_properties_test.py"],
+    args = ["--tf_mode=eager"],
+    main = "distribution_properties_test.py",
+    tags = ["hypothesis"],
+    deps = [":distribution_properties_testlib"],
+)
+
+py_test(
+    name = "distribution_properties_test_graph",
+    size = "medium",
+    srcs = ["distribution_properties_test.py"],
+    args = ["--tf_mode=graph"],
+    main = "distribution_properties_test.py",
+    tags = ["hypothesis"],
+    deps = [":distribution_properties_testlib"],
+)
+
+test_suite(
+    name = "distribution_properties_test",
+    tags = ["hypothesis"],
 )
