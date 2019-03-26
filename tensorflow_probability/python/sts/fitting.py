@@ -62,47 +62,6 @@ def sample_uniform_initial_state(parameter,
     return uniform_initializer
 
 
-def pad_batch_dimension_for_multiple_chains(observed_time_series,
-                                            model,
-                                            chain_batch_shape):
-  """"Expand the observed time series with extra batch dimension(s)."""
-
-  # Running with multiple chains introduces an extra batch dimension. In
-  # general we also need to pad the observed time series with a matching batch
-  # dimension.
-  #
-  # For example, suppose our model has batch shape [3, 4] and
-  # the observed time series has shape `concat([[5], [3, 4], [100])`,
-  # corresponding to `sample_shape`, `batch_shape`, and `num_timesteps`
-  # respectively. The model will produce distributions with batch shape
-  # `concat([chain_batch_shape, [3, 4]])`, so we pad `observed_time_series` to
-  # have matching shape `[5, 1, 3, 4, 100]`, where the added `1` dimension
-  # between the sample and batch shapes will broadcast to `chain_batch_shape`.
-
-  observed_time_series = sts_util.maybe_expand_trailing_dim(
-      observed_time_series)  # Guarantee `event_ndims=2`
-  event_ndims = 2  # event_shape = [num_timesteps, observation_size=1]
-
-  model_batch_ndims = (
-      model.batch_shape.ndims if model.batch_shape.ndims is not None else
-      tf.shape(input=model.batch_shape_tensor())[0])
-
-  # Compute ndims from chain_batch_shape.
-  chain_batch_shape = tf.convert_to_tensor(
-      value=chain_batch_shape, name='chain_batch_shape', dtype=tf.int32)
-  if not chain_batch_shape.shape.is_fully_defined():
-    raise ValueError('Batch shape must have static rank. (given: {})'.format(
-        chain_batch_shape))
-  if chain_batch_shape.shape.ndims == 0:  # expand int `k` to `[k]`.
-    chain_batch_shape = chain_batch_shape[tf.newaxis]
-  chain_batch_ndims = tf.compat.dimension_value(chain_batch_shape.shape[0])
-
-  for _ in range(chain_batch_ndims):
-    observed_time_series = tf.expand_dims(
-        observed_time_series, -(model_batch_ndims + event_ndims + 1))
-  return observed_time_series
-
-
 def _build_trainable_posterior(param, initial_loc_fn):
   """Built a transformed-normal variational dist over a parameter's support."""
   loc = tf.compat.v1.get_variable(
@@ -288,7 +247,7 @@ def build_factored_variational_loss(model,
     # Multiple initializations (similar to HMC chains) manifest as an extra
     # param batch dimension, so we need to add corresponding batch dimension(s)
     # to `observed_time_series`.
-    observed_time_series = pad_batch_dimension_for_multiple_chains(
+    observed_time_series = sts_util.pad_batch_dimension_for_multiple_chains(
         observed_time_series, model, chain_batch_shape=init_batch_shape)
 
     # Construct the variational bound.
@@ -552,7 +511,7 @@ def fit_with_hmc(model,
 
     # Multiple chains manifest as an extra param batch dimension, so we need to
     # add a corresponding batch dimension to `observed_time_series`.
-    observed_time_series = pad_batch_dimension_for_multiple_chains(
+    observed_time_series = sts_util.pad_batch_dimension_for_multiple_chains(
         observed_time_series, model, chain_batch_shape=chain_batch_shape)
 
     # When the initial step size depends on a variational optimization, we

@@ -23,6 +23,7 @@ import tensorflow as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.distributions.mvn_linear_operator import MultivariateNormalLinearOperator
 from tensorflow_probability.python.internal import distribution_util as dist_util
+from tensorflow_probability.python.internal import prefer_static
 
 
 tfl = tf.linalg
@@ -46,6 +47,62 @@ def broadcast_batch_shape(distributions):
                                              distribution.batch_shape_tensor())
 
   return tf.convert_to_tensor(value=batch_shape)
+
+
+def pad_batch_dimension_for_multiple_chains(
+    observed_time_series, model, chain_batch_shape):
+  """"Expand the observed time series with extra batch dimension(s)."""
+  # Running with multiple chains introduces an extra batch dimension. In
+  # general we also need to pad the observed time series with a matching batch
+  # dimension.
+  #
+  # For example, suppose our model has batch shape [3, 4] and
+  # the observed time series has shape `concat([[5], [3, 4], [100])`,
+  # corresponding to `sample_shape`, `batch_shape`, and `num_timesteps`
+  # respectively. The model will produce distributions with batch shape
+  # `concat([chain_batch_shape, [3, 4]])`, so we pad `observed_time_series` to
+  # have matching shape `[5, 1, 3, 4, 100]`, where the added `1` dimension
+  # between the sample and batch shapes will broadcast to `chain_batch_shape`.
+
+  observed_time_series = maybe_expand_trailing_dim(
+      observed_time_series)  # Guarantee `event_ndims=2`
+
+  event_ndims = 2  # event_shape = [num_timesteps, observation_size=1]
+
+  model_batch_ndims = (
+      model.batch_shape.ndims if model.batch_shape.ndims is not None else
+      tf.shape(input=model.batch_shape_tensor())[0])
+
+  # Compute ndims from chain_batch_shape.
+  chain_batch_shape = tf.convert_to_tensor(
+      value=chain_batch_shape, name='chain_batch_shape', dtype=tf.int32)
+  if not chain_batch_shape.shape.is_fully_defined():
+    raise ValueError('Batch shape must have static rank. (given: {})'.format(
+        chain_batch_shape))
+  if chain_batch_shape.shape.ndims == 0:  # expand int `k` to `[k]`.
+    chain_batch_shape = chain_batch_shape[tf.newaxis]
+  chain_batch_ndims = tf.compat.dimension_value(chain_batch_shape.shape[0])
+
+  def do_padding(observed_time_series_tensor):
+    current_sample_shape = tf.shape(
+        input=observed_time_series_tensor)[:-(model_batch_ndims + event_ndims)]
+    current_batch_and_event_shape = tf.shape(
+        input=observed_time_series_tensor)[-(model_batch_ndims + event_ndims):]
+    return tf.reshape(
+        tensor=observed_time_series_tensor,
+        shape=tf.concat([
+            current_sample_shape,
+            tf.ones([chain_batch_ndims], dtype=tf.int32),
+            current_batch_and_event_shape], axis=0))
+
+  # Padding is only needed if the observed time series has sample shape.
+  observed_time_series = prefer_static.cond(
+      (dist_util.prefer_static_rank(observed_time_series) >
+       model_batch_ndims + event_ndims),
+      lambda: do_padding(observed_time_series),
+      lambda: observed_time_series)
+
+  return observed_time_series
 
 
 def factored_joint_mvn(distributions):
