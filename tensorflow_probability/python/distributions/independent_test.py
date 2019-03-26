@@ -327,6 +327,29 @@ class IndependentDistributionTest(tf.test.TestCase):
     self.assertAllEqual([1, 4, 3], d[tf.newaxis, ..., :3].batch_shape)
     self.assertAllEqual([6], d[tf.newaxis, ..., :3].event_shape)
 
+  def testSlicingSubclasses(self):
+    class IndepBern1d(tfd.Independent):
+
+      def __init__(self, logits):
+        super(IndepBern1d, self).__init__(tfd.Bernoulli(logits=logits,
+                                                        dtype=tf.float32),
+                                          reinterpreted_batch_ndims=1)
+        self._parameters = {"logits": logits}
+
+    d = IndepBern1d(tf.zeros([4, 5, 6]))
+    with self.assertRaisesRegexp(NotImplementedError,
+                                 "does not support batch slicing"):
+      d[:3]  # pylint: disable=pointless-statement
+
+    class IndepBern1dSliceable(IndepBern1d):
+
+      def _params_event_ndims(self):
+        return dict(logits=1)
+
+    d_sliceable = IndepBern1dSliceable(tf.zeros([4, 5, 6]))
+    self.assertAllEqual([3, 5], d_sliceable[:3].batch_shape)
+    self.assertAllEqual([6], d_sliceable[:3].event_shape)
+
 
 if __name__ == "__main__":
   tf.test.main()
