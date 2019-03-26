@@ -43,7 +43,7 @@ tfd = tfp.distributions
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ProductDistributionTest(tf.test.TestCase):
+class IndependentDistributionTest(tf.test.TestCase):
 
   def setUp(self):
     self._rng = np.random.RandomState(42)

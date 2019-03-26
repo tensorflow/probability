@@ -20,12 +20,11 @@ from __future__ import print_function
 
 import collections
 
-# Dependency imports
-import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.internal import prefer_static
 
 
 class Independent(distribution_lib.Distribution):
@@ -172,9 +171,8 @@ class Independent(distribution_lib.Distribution):
   def _batch_shape_tensor(self):
     with tf.control_dependencies(self._runtime_assertions):
       batch_shape = self.distribution.batch_shape_tensor()
-      batch_ndims = tf.compat.dimension_value(batch_shape.shape[0])
-      if batch_ndims is None:
-        batch_ndims = tf.shape(input=batch_shape)[0]
+      batch_ndims = prefer_static.rank_from_shape(
+          batch_shape, self.distribution.batch_shape)
       return batch_shape[:batch_ndims - self.reinterpreted_batch_ndims]
 
   def _batch_shape(self):
@@ -188,23 +186,17 @@ class Independent(distribution_lib.Distribution):
   def _event_shape_tensor(self):
     with tf.control_dependencies(self._runtime_assertions):
       batch_shape = self.distribution.batch_shape_tensor()
-      batch_ndims = (
-          tf.compat.dimension_value(batch_shape.shape[0])  # pylint: disable=g-long-ternary
-          if tf.compat.dimension_value(
-              batch_shape.shape.with_rank_at_least(1)[0]) else tf.shape(
-                  input=batch_shape)[0])
-      return tf.concat(
-          [
-              batch_shape[batch_ndims - self.reinterpreted_batch_ndims:],
-              self.distribution.event_shape_tensor(),
-          ],
-          axis=0)
+      batch_ndims = prefer_static.rank_from_shape(
+          batch_shape, self.distribution.batch_shape)
+      return prefer_static.concat([
+          batch_shape[batch_ndims - self.reinterpreted_batch_ndims:],
+          self.distribution.event_shape_tensor(),
+      ], axis=0)
 
   def _event_shape(self):
     batch_shape = self.distribution.batch_shape
     if self._static_reinterpreted_batch_ndims is None:
       return tf.TensorShape(None)
-
     if batch_shape.ndims is not None:
       reinterpreted_batch_shape = batch_shape[
           batch_shape.ndims - self._static_reinterpreted_batch_ndims:]
@@ -257,36 +249,24 @@ class Independent(distribution_lib.Distribution):
                          "distribution.batch_ndims({})".format(
                              static_reinterpreted_batch_ndims, batch_ndims))
     elif validate_args:
-      batch_shape = distribution.batch_shape_tensor()
-      batch_ndims = (
-          tf.compat.dimension_value(batch_shape.shape[0])  # pylint: disable=g-long-ternary
-          if (tf.compat.dimension_value(
-              batch_shape.shape.with_rank_at_least(1)[0]) is not None) else
-          tf.shape(input=batch_shape)[0])
       assertions.append(
           tf.compat.v1.assert_less_equal(
               reinterpreted_batch_ndims,
-              batch_ndims,
+              prefer_static.rank_from_shape(distribution.batch_shape_tensor,
+                                            distribution.batch_shape),
               message=("reinterpreted_batch_ndims cannot exceed "
                        "distribution.batch_ndims")))
     return assertions
 
   def _reduce(self, op, stat):
-    if self._static_reinterpreted_batch_ndims is None:
-      range_ = tf.range(self._reinterpreted_batch_ndims)
-    else:
-      range_ = np.arange(self._static_reinterpreted_batch_ndims)
-    return op(stat, axis=-1 - range_)
+    axis = 1 + prefer_static.range(self._reinterpreted_batch_ndims)
+    return op(stat, axis=-axis)
 
   def _get_default_reinterpreted_batch_ndims(self, distribution):
     """Computes the default value for reinterpreted_batch_ndim __init__ arg."""
-    ndims = distribution.batch_shape.ndims
-    if ndims is None:
-      which_maximum = tf.maximum
-      ndims = tf.shape(input=distribution.batch_shape_tensor())[0]
-    else:
-      which_maximum = np.maximum
-    return which_maximum(0, ndims - 1)
+    ndims = prefer_static.rank_from_shape(
+        distribution.batch_shape_tensor, distribution.batch_shape)
+    return prefer_static.maximum(0, ndims - 1)
 
 
 @kullback_leibler.RegisterKL(Independent, Independent)
@@ -341,9 +321,11 @@ def _kl_independent(a, b, name="kl_independent"):
                                       q.event_shape_tensor())
         ]):
       num_reduce_dims = (
-          tf.shape(input=a.event_shape_tensor()[0]) -
-          tf.shape(input=p.event_shape_tensor()[0]))
-      reduce_dims = tf.range(-num_reduce_dims - 1, -1, 1)
+          prefer_static.rank_from_shape(
+              a.event_shape_tensor, a.event_shape) -
+          prefer_static.rank_from_shape(
+              p.event_shape_tensor, a.event_shape))
+      reduce_dims = prefer_static.range(-num_reduce_dims - 1, -1, 1)
       return tf.reduce_sum(
           input_tensor=kullback_leibler.kl_divergence(p, q, name=name),
           axis=reduce_dims)

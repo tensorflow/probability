@@ -458,6 +458,7 @@ py_library(
         ":kullback_leibler",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:prefer_static",
     ],
 )
 
@@ -886,6 +887,7 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:prefer_static",
     ],
 )
 
@@ -1222,6 +1224,7 @@ py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

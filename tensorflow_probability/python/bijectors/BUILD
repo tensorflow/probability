@@ -523,7 +523,7 @@ py_test(
 
 py_test(
     name = "affine_test",
-    size = "large",
+    size = "small",
     srcs = ["affine_test.py"],
     shard_count = 5,
     tags = ["noasan"],  # times out b/63678675

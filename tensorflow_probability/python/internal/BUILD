@@ -95,6 +95,7 @@ py_library(
     name = "prefer_static",
     srcs = ["prefer_static.py"],
     deps = [
+        # decorator dep,
         # tensorflow dep,
     ],
 )

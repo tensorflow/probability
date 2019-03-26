@@ -21,11 +21,7 @@ import tensorflow as tf
 from tensorflow_probability.python.distributions import conditional_distribution
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
-
-
-# pylint: disable=protected-access
-_concat_vectors = transformed_distribution._concat_vectors
-# pylint: enable=protected-access
+from tensorflow_probability.python.internal import prefer_static
 
 
 __all__ = [
@@ -50,11 +46,12 @@ class ConditionalTransformedDistribution(
   def _sample_n(self, n, seed=None,
                 bijector_kwargs=None,
                 distribution_kwargs=None):
-    sample_shape = _concat_vectors(
+    sample_shape = prefer_static.concat([
         distribution_util.pick_vector(self._needs_rotation, self._empty, [n]),
         self._override_batch_shape,
         self._override_event_shape,
-        distribution_util.pick_vector(self._needs_rotation, [n], self._empty))
+        distribution_util.pick_vector(self._needs_rotation, [n], self._empty),
+    ], axis=0)
     distribution_kwargs = distribution_kwargs or {}
     x = self.distribution.sample(sample_shape=sample_shape,
                                  seed=seed,
@@ -83,7 +80,8 @@ class ConditionalTransformedDistribution(
       # Next, we reshape `x` into its final form. We do this prior to the call
       # to the bijector to ensure that the bijector caching works.
       batch_event_shape = tf.shape(input=x)[1:]
-      final_shape = tf.concat([sample_shape, batch_event_shape], 0)
+      final_shape = prefer_static.concat([sample_shape, batch_event_shape],
+                                         axis=0)
       x = tf.reshape(x, final_shape)
 
       # Finally, we apply the bijector's forward transformation. For caching to

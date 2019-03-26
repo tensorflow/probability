@@ -17,13 +17,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# Dependency imports
-import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.internal import distribution_util
-from tensorflow.python.framework import tensor_util
+from tensorflow_probability.python.internal import prefer_static
+from tensorflow.python.framework import tensor_util  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     "TransformedDistribution",
@@ -35,81 +34,20 @@ __all__ = [
 # graph construction.
 
 
-def _static_value(x):
-  """Returns the static value of a `Tensor` or `None`."""
-  return tf.get_static_value(tf.convert_to_tensor(value=x))
-
-
-def _logical_and(*args):
-  """Convenience function which attempts to statically `reduce_all`."""
-  args_ = [_static_value(x) for x in args]
-  if any(x is not None and not bool(x) for x in args_):
-    return tf.constant(False)
-  if all(x is not None and bool(x) for x in args_):
-    return tf.constant(True)
-  if len(args) == 2:
-    return tf.logical_and(*args)
-  return tf.reduce_all(input_tensor=args)
-
-
-def _logical_equal(x, y):
-  """Convenience function which attempts to statically compute `x == y`."""
-  x_ = _static_value(x)
-  y_ = _static_value(y)
-  if x_ is None or y_ is None:
-    return tf.equal(x, y)
-  return tf.constant(np.array_equal(x_, y_))
-
-
-def _logical_not(x):
-  """Convenience function which attempts to statically apply `logical_not`."""
-  x_ = _static_value(x)
-  if x_ is None:
-    return tf.logical_not(x)
-  return tf.constant(np.logical_not(x_))
-
-
-def _concat_vectors(*args):
-  """Convenience function which concatenates input vectors."""
-  args_ = [_static_value(x) for x in args]
-  if any(x_ is None for x_ in args_):
-    return tf.concat(args, 0)
-  return tf.constant([x_ for vec_ in args_ for x_ in vec_])
-
-
 def _pick_scalar_condition(pred, cond_true, cond_false):
   """Convenience function which chooses the condition based on the predicate."""
   # Note: This function is only valid if all of pred, cond_true, and cond_false
   # are scalars. This means its semantics are arguably more like tf.cond than
   # tf.where even though we use tf.where to implement it.
-  pred_ = _static_value(pred)
+  pred_ = tf.get_static_value(tf.convert_to_tensor(value=pred))
   if pred_ is None:
     return tf.where(pred, cond_true, cond_false)
   return cond_true if pred_ else cond_false
 
 
-def _ones_like(x):
-  """Convenience function attempts to statically construct `ones_like`."""
-  # Should only be used for small vectors.
-  if x.shape.is_fully_defined():
-    return tf.ones(x.shape.as_list(), dtype=x.dtype)
-  return tf.ones_like(x)
-
-
-def _ndims_from_shape(shape):
-  """Returns `Tensor`'s `rank` implied by a `Tensor` shape."""
-  if shape.shape.ndims not in (None, 1):
-    raise ValueError("input is not a valid shape: not 1D")
-  if not shape.dtype.is_integer:
-    raise TypeError("input is not a valid shape: wrong dtype")
-  if shape.shape.is_fully_defined():
-    return tf.constant(shape.shape.as_list()[0])
-  return tf.shape(input=shape)[0]
-
-
-def _is_scalar_from_shape(shape):
+def _is_scalar_from_shape_tensor(shape):
   """Returns `True` `Tensor` if `Tensor` shape implies a scalar."""
-  return _logical_equal(_ndims_from_shape(shape), 0)
+  return prefer_static.equal(prefer_static.rank_from_shape(shape), 0)
 
 
 class TransformedDistribution(distribution_lib.Distribution):
@@ -265,8 +203,10 @@ class TransformedDistribution(distribution_lib.Distribution):
       self._override_batch_shape = self._maybe_validate_shape_override(
           batch_shape, distribution.is_scalar_batch(), validate_args,
           "batch_shape")
-      self._is_batch_override = _logical_not(_logical_equal(
-          _ndims_from_shape(self._override_batch_shape), self._zero))
+      self._is_batch_override = prefer_static.logical_not(
+          prefer_static.equal(
+              prefer_static.rank_from_shape(self._override_batch_shape),
+              self._zero))
       self._is_maybe_batch_override = bool(
           tf.get_static_value(self._override_batch_shape) is None or
           tf.get_static_value(self._override_batch_shape).size != 0)
@@ -274,8 +214,10 @@ class TransformedDistribution(distribution_lib.Distribution):
       self._override_event_shape = self._maybe_validate_shape_override(
           event_shape, distribution.is_scalar_event(), validate_args,
           "event_shape")
-      self._is_event_override = _logical_not(_logical_equal(
-          _ndims_from_shape(self._override_event_shape), self._zero))
+      self._is_event_override = prefer_static.logical_not(
+          prefer_static.equal(
+              prefer_static.rank_from_shape(self._override_event_shape),
+              self._zero))
       self._is_maybe_event_override = bool(
           tf.get_static_value(self._override_event_shape) is None or
           tf.get_static_value(self._override_event_shape).size != 0)
@@ -286,11 +228,12 @@ class TransformedDistribution(distribution_lib.Distribution):
       # and we're overriding event shape. When that case happens the event dims
       # will incorrectly be to the left of the batch dims. In this case we'll
       # cyclically permute left the new dims.
-      self._needs_rotation = _logical_and(
+      self._needs_rotation = prefer_static.reduce_all([
           self._is_event_override,
-          _logical_not(self._is_batch_override),
-          _logical_not(distribution.is_scalar_batch()))
-      override_event_ndims = _ndims_from_shape(self._override_event_shape)
+          prefer_static.logical_not(self._is_batch_override),
+          prefer_static.logical_not(distribution.is_scalar_batch())])
+      override_event_ndims = prefer_static.rank_from_shape(
+          self._override_event_shape)
       self._rotate_ndims = _pick_scalar_condition(
           self._needs_rotation, override_event_ndims, 0)
       # We'll be reducing the head dims (if at all), i.e., this will be []
@@ -368,11 +311,12 @@ class TransformedDistribution(distribution_lib.Distribution):
             else self.distribution.batch_shape)
 
   def _sample_n(self, n, seed=None):
-    sample_shape = _concat_vectors(
+    sample_shape = prefer_static.concat([
         distribution_util.pick_vector(self._needs_rotation, self._empty, [n]),
         self._override_batch_shape,
         self._override_event_shape,
-        distribution_util.pick_vector(self._needs_rotation, [n], self._empty))
+        distribution_util.pick_vector(self._needs_rotation, [n], self._empty),
+    ], axis=0)
     x = self.distribution.sample(sample_shape=sample_shape, seed=seed)
     x = self._maybe_rotate_dims(x)
     # We'll apply the bijector in the `_call_sample_n` function.
@@ -530,14 +474,14 @@ class TransformedDistribution(distribution_lib.Distribution):
       # A batch (respectively event) shape override is only allowed if the batch
       # (event) shape of the base distribution is [], so concatenating all the
       # shapes does the right thing.
-      new_shape = tf.concat([
-          _ones_like(self._override_batch_shape),
+      new_shape = prefer_static.concat([
+          prefer_static.ones_like(self._override_batch_shape),
           self.distribution.batch_shape_tensor(),
-          _ones_like(self._override_event_shape),
+          prefer_static.ones_like(self._override_event_shape),
           self.distribution.event_shape_tensor(),
       ], 0)
       x = tf.reshape(x, new_shape)
-      new_shape = tf.concat(
+      new_shape = prefer_static.concat(
           [self.batch_shape_tensor(),
            self.event_shape_tensor()], 0)
       x = tf.broadcast_to(x, new_shape)
@@ -570,16 +514,16 @@ class TransformedDistribution(distribution_lib.Distribution):
           dtype=entropy.dtype.base_dtype)
     if self._is_maybe_batch_override:
       new_shape = tf.concat([
-          _ones_like(self._override_batch_shape),
+          prefer_static.ones_like(self._override_batch_shape),
           self.distribution.batch_shape_tensor()
       ], 0)
       entropy = tf.reshape(entropy, new_shape)
       multiples = tf.concat([
           self._override_batch_shape,
-          _ones_like(self.distribution.batch_shape_tensor())
+          prefer_static.ones_like(self.distribution.batch_shape_tensor())
       ], 0)
       entropy = tf.tile(entropy, multiples)
-    dummy = tf.zeros(
+    dummy = prefer_static.zeros(
         shape=tf.concat(
             [self.batch_shape_tensor(), self.event_shape_tensor()],
             0),
@@ -606,7 +550,7 @@ class TransformedDistribution(distribution_lib.Distribution):
     if not override_shape.dtype.is_integer:
       raise TypeError("shape override must be an integer")
 
-    override_is_scalar = _is_scalar_from_shape(override_shape)
+    override_is_scalar = _is_scalar_from_shape_tensor(override_shape)
     if tf.get_static_value(override_is_scalar):
       return self._empty
 
@@ -631,8 +575,9 @@ class TransformedDistribution(distribution_lib.Distribution):
               message="shape override must have non-negative elements")
       ]
 
-    is_both_nonscalar = _logical_and(_logical_not(base_is_scalar),
-                                     _logical_not(override_is_scalar))
+    is_both_nonscalar = prefer_static.logical_and(
+        prefer_static.logical_not(base_is_scalar),
+        prefer_static.logical_not(override_is_scalar))
     if tf.get_static_value(is_both_nonscalar) is not None:
       if tf.get_static_value(is_both_nonscalar):
         raise ValueError("base distribution not scalar")
@@ -652,10 +597,11 @@ class TransformedDistribution(distribution_lib.Distribution):
     needs_rotation_const = tf.get_static_value(self._needs_rotation)
     if needs_rotation_const is not None and not needs_rotation_const:
       return x
-    ndims = tf.rank(x)
+    ndims = prefer_static.rank(x)
     n = (ndims - self._rotate_ndims) if rotate_right else self._rotate_ndims
-    return tf.transpose(
-        a=x, perm=_concat_vectors(tf.range(n, ndims), tf.range(0, n)))
+    perm = prefer_static.concat([
+        prefer_static.range(n, ndims), prefer_static.range(0, n)], axis=0)
+    return tf.transpose(a=x, perm=perm)
 
   def _maybe_get_static_event_ndims(self):
     if self.event_shape.ndims is not None:
