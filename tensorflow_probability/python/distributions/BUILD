@@ -63,6 +63,7 @@ py_library(
         ":independent",
         ":inverse_gamma",
         ":inverse_gaussian",
+        ":joint_distribution",
         ":kullback_leibler",
         ":kumaraswamy",
         ":laplace",
@@ -487,6 +488,21 @@ py_library(
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:special_math",
+    ],
+)
+
+py_library(
+    name = "joint_distribution",
+    srcs = ["joint_distribution.py"],
+    deps = [
+        ":distribution",
+        ":kullback_leibler",
+        ":seed_stream",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:reparameterization",
     ],
 )
 
@@ -1477,6 +1493,17 @@ py_test(
         ":kullback_leibler",
         ":normal",
         # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "joint_distribution_test",
+    size = "small",
+    srcs = ["joint_distribution_test.py"],
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 

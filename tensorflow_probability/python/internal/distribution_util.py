@@ -2222,3 +2222,10 @@ def getfullargspec(fn):
   """
   return tf_inspect.getfullargspec(
       fn.__init__ if tf_inspect.isclass(fn) else fn)
+
+
+def is_distribution_instance(d):
+  """Standardizes our definition of being a `tfd.Distribution`."""
+  return (not tf_inspect.isclass(d) and
+          hasattr(d, "log_prob") and
+          hasattr(d, "sample"))

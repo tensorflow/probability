@@ -28,6 +28,30 @@ from tensorflow.python.framework import test_util  # pylint: disable=g-direct-te
 tfd = tfp.distributions
 
 
+class ListDistribution(tfd.Distribution):
+
+  def __init__(self):
+    super(ListDistribution, self).__init__(
+        dtype=None, reparameterization_type=None,
+        validate_args=False, allow_nan_stats=False)
+
+  @property
+  def name(self):
+    return "ListDistribution"
+
+  @property
+  def dtype(self):
+    return (tf.float16, None, tf.int32)
+
+  @property
+  def batch_shape(self):
+    return (tf.TensorShape(None), None, tf.TensorShape([None, 2]))
+
+  @property
+  def event_shape(self):
+    return (None, tf.TensorShape([3, None]), tf.TensorShape(None))
+
+
 @test_util.run_all_in_graph_and_eager_modes
 class DistributionTest(tf.test.TestCase):
 
@@ -353,6 +377,22 @@ class DistributionTest(tf.test.TestCase):
         " batch_shape=(?,)"  # Partially known.
         " event_shape=(3,)"
         " dtype=float32>")
+
+  def testStrWorksCorrectlyListDistribution(self):
+    self.assertEqual(
+        str(ListDistribution()),
+        "tfp.distributions.ListDistribution(\"ListDistribution\","
+        " batch_shape=(<unknown>, <unknown>, (?, 2)),"
+        " event_shape=(<unknown>, (3, ?), <unknown>),"
+        " dtype=(float16, <unknown>, int32))")
+
+  def testReprWorksCorrectlyListDistribution(self):
+    self.assertEqual(
+        repr(ListDistribution()),
+        "<tfp.distributions.ListDistribution 'ListDistribution'"
+        " batch_shape=(<unknown>, <unknown>, (?, 2))"
+        " event_shape=(<unknown>, (3, ?), <unknown>)"
+        " dtype=(float16, <unknown>, int32)>")
 
   def testUnimplemtnedProbAndLogProbExceptions(self):
     class TerribleDistribution(tfd.Distribution):

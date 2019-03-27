@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import abc
+import collections
 import contextlib
 import inspect
 import types
@@ -123,6 +124,17 @@ def _update_docstring(old_str, append_str):
 
 def _convert_to_tensor(value, name=None, dtype=None, preferred_dtype=None):
   """Converts to tensor avoiding an eager bug that loses float precision."""
+  if (isinstance(dtype, collections.Sequence) or
+      isinstance(preferred_dtype, collections.Sequence)):
+    if dtype is None:
+      dtype = [None] * len(preferred_dtype)
+    if preferred_dtype is None:
+      preferred_dtype = [None] * len(dtype)
+    if len(value) != len(dtype) or len(dtype) != len(preferred_dtype):
+      raise ValueError("Number of input `value`s must match "
+                       "number of `dtype`s.")
+    return tuple(_convert_to_tensor(v, name, d, p)
+                 for v, d, p in zip(value, dtype, preferred_dtype))
   # TODO(b/116672045): Remove this function.
   if (tf.executing_eagerly() and
       preferred_dtype is not None and
@@ -1220,14 +1232,14 @@ class Distribution(_BaseDistribution):
       return self._kl_divergence(other)
 
   def __str__(self):
-    maybe_batch_shape = ""
-    if self.batch_shape.ndims is not None:
-      maybe_batch_shape = ", batch_shape={}".format(
-          self.batch_shape).replace("None", "?")
-    maybe_event_shape = ""
-    if self.event_shape.ndims is not None:
-      maybe_event_shape = ", event_shape={}".format(
-          self.event_shape).replace("None", "?")
+    if self.batch_shape:
+      maybe_batch_shape = ", batch_shape=" + _str_tensorshape(self.batch_shape)
+    else:
+      maybe_batch_shape = ""
+    if self.event_shape:
+      maybe_event_shape = ", event_shape=" + _str_tensorshape(self.event_shape)
+    else:
+      maybe_event_shape = ""
     return ("tfp.distributions.{type_name}("
             "\"{self_name}\""
             "{maybe_batch_shape}"
@@ -1237,7 +1249,7 @@ class Distribution(_BaseDistribution):
                 self_name=self.name or "<unknown>",
                 maybe_batch_shape=maybe_batch_shape,
                 maybe_event_shape=maybe_event_shape,
-                dtype=self.dtype.name if self.dtype else "<unknown>"))
+                dtype=_str_dtype(self.dtype)))
 
   def __repr__(self):
     return ("<tfp.distributions.{type_name} "
@@ -1247,9 +1259,9 @@ class Distribution(_BaseDistribution):
             " dtype={dtype}>".format(
                 type_name=type(self).__name__,
                 self_name=self.name or "<unknown>",
-                batch_shape=str(self.batch_shape).replace("None", "?"),
-                event_shape=str(self.event_shape).replace("None", "?"),
-                dtype=self.dtype.name if self.dtype else "<unknown>"))
+                batch_shape=_str_tensorshape(self.batch_shape),
+                event_shape=_str_tensorshape(self.event_shape),
+                dtype=_str_dtype(self.dtype)))
 
   @contextlib.contextmanager
   def _name_scope(self, name=None, values=None):
@@ -1326,3 +1338,15 @@ class Distribution(_BaseDistribution):
       # case.
       return shape.shape.as_list() == [0]
     return tf.equal(tf.shape(input=shape)[0], 0)
+
+
+def _str_tensorshape(x):
+  str_ = lambda x_: str(x_) if x_ is not None else "<unknown>"
+  return (str_(x) if x is None or hasattr(x, "ndims")
+          else ("(" + ", ".join(map(str_, x)) + ")")).replace("None", "?")
+
+
+def _str_dtype(x):
+  str_ = lambda x_: x_.name if x_ else "<unknown>"
+  return (str_(x) if x is None or hasattr(x, "name")
+          else ("(" + ", ".join(map(str_, x)) + ")"))

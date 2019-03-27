@@ -57,6 +57,7 @@ from tensorflow_probability.python.distributions.inverse_gamma import InverseGam
 from tensorflow_probability.python.distributions.inverse_gamma import InverseGammaWithSoftplusConcentrationRate  # deprecated, remove 6/5/19
 from tensorflow_probability.python.distributions.inverse_gamma import InverseGammaWithSoftplusConcentrationScale  # deprecated, remove 6/5/19
 from tensorflow_probability.python.distributions.inverse_gaussian import InverseGaussian
+from tensorflow_probability.python.distributions.joint_distribution import JointDistributionSequential
 from tensorflow_probability.python.distributions.kullback_leibler import kl_divergence
 from tensorflow_probability.python.distributions.kullback_leibler import RegisterKL
 from tensorflow_probability.python.distributions.kumaraswamy import Kumaraswamy
@@ -160,6 +161,7 @@ __all__ = [
     'InverseGamma',
     'InverseGammaWithSoftplusConcentrationRate',
     'InverseGammaWithSoftplusConcentrationScale',
+    'JointDistributionSequential',
     'Kumaraswamy',
     'LinearGaussianStateSpaceModel',
     'Laplace',
