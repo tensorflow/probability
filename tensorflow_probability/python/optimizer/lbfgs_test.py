@@ -172,8 +172,6 @@ class LBfgsTest(tf.test.TestCase):
     self.assertTrue(_norm(results.objective_gradient) <= 1e-5)
     self.assertArrayNear(results.position, np.array([1.0, 1.0]), 1e-5)
 
-  # TODO(b/116767573): Also run in eager mode but as a separate test, otherwise
-  # it takes too long to run.
   def test_himmelblau(self):
     """Tests minimization on the Himmelblau's function.
 
@@ -185,7 +183,10 @@ class LBfgsTest(tf.test.TestCase):
     The function has four minima located at (3, 2), (-2.805118, 3.131312),
     (-3.779310, -3.283186), (3.584428, -1.848126).
 
-    All these minima may be reached from appropriate starting points.
+    All these minima may be reached from appropriate starting points. To keep
+    the runtime of this test small, here we only find the first two minima.
+    However, all four can be easily found in `test_himmelblau_batch_all` below
+    with the help of batching.
     """
     @_make_val_and_grad_fn
     def himmelblau(coord):
@@ -196,8 +197,6 @@ class LBfgsTest(tf.test.TestCase):
         # Start Point, Target Minimum, Num evaluations expected.
         [(1, 1), (3, 2), 31],
         [(-2, 2), (-2.805118, 3.131312), 17],
-        [(-1, -1), (-3.779310, -3.283186), 29],
-        [(1, -2), (3.584428, -1.848126), 26]
     ]
     dtype = 'float64'
     for start, expected_minima, expected_evals in starts_and_targets:
@@ -209,6 +208,65 @@ class LBfgsTest(tf.test.TestCase):
                            np.array(expected_minima, dtype=dtype),
                            1e-5)
       self.assertEqual(results.num_objective_evaluations, expected_evals)
+
+  def test_himmelblau_batch_all(self):
+    @_make_val_and_grad_fn
+    def himmelblau(coord):
+      x, y = coord[..., 0], coord[..., 1]
+      return (x * x + y - 11) ** 2 + (x + y * y - 7) ** 2
+
+    dtype = 'float64'
+    starts = tf.constant([[1, 1],
+                          [-2, 2],
+                          [-1, -1],
+                          [1, -2]], dtype=dtype)
+    expected_minima = np.array([[3, 2],
+                                [-2.805118, 3.131312],
+                                [-3.779310, -3.283186],
+                                [3.584428, -1.848126]], dtype=dtype)
+    batch_results = self.evaluate(tfp.optimizer.lbfgs_minimize(
+        himmelblau, initial_position=starts,
+        stopping_condition=tfp.optimizer.converged_all, tolerance=1e-8))
+
+    self.assertFalse(np.any(batch_results.failed))  # None have failed.
+    self.assertTrue(np.all(batch_results.converged))  # All converged.
+
+    # All converged points are near expected minima.
+    for actual, expected in zip(batch_results.position, expected_minima):
+      self.assertArrayNear(actual, expected, 1e-5)
+    self.assertEqual(batch_results.num_objective_evaluations, 36)
+
+  def test_himmelblau_batch_any(self):
+    @_make_val_and_grad_fn
+    def himmelblau(coord):
+      x, y = coord[..., 0], coord[..., 1]
+      return (x * x + y - 11) ** 2 + (x + y * y - 7) ** 2
+
+    dtype = 'float64'
+    starts = tf.constant([[1, 1],
+                          [-2, 2],
+                          [-1, -1],
+                          [1, -2]], dtype=dtype)
+    expected_minima = np.array([[3, 2],
+                                [-2.805118, 3.131312],
+                                [-3.779310, -3.283186],
+                                [3.584428, -1.848126]], dtype=dtype)
+
+    # Run with `converged_any` stopping condition, to stop as soon as any of
+    # the batch members have converged.
+    batch_results = self.evaluate(tfp.optimizer.lbfgs_minimize(
+        himmelblau, initial_position=starts,
+        stopping_condition=tfp.optimizer.converged_any, tolerance=1e-8))
+
+    self.assertFalse(np.any(batch_results.failed))  # None have failed.
+    self.assertTrue(np.any(batch_results.converged))  # At least one converged.
+    self.assertFalse(np.all(batch_results.converged))  # But not all did.
+
+    # Converged points are near expected minima.
+    for actual, expected in zip(batch_results.position[batch_results.converged],
+                                expected_minima[batch_results.converged]):
+      self.assertArrayNear(actual, expected, 1e-5)
+    self.assertEqual(batch_results.num_objective_evaluations, 28)
 
   def test_data_fitting(self):
     """Tests MLE estimation for a simple geometric GLM."""
@@ -243,8 +301,6 @@ class LBfgsTest(tf.test.TestCase):
         neg_log_likelihood, initial_position=start, tolerance=1e-6))
     self.assertTrue(results.converged)
 
-  # TODO(b/116767573): Also run in eager mode but as a separate test, otherwise
-  # it takes too long to run.
   def test_determinism(self):
     """Tests that the results are determinsitic."""
     dim = 25

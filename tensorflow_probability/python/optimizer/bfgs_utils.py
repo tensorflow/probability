@@ -145,11 +145,12 @@ def line_search_step(state, value_and_gradients_function, search_direction,
                            f=state.objective_value,
                            df=derivative_at_start_pt,
                            full_gradient=state.objective_gradient)
+  inactive = state.failed | state.converged
   ls_result = linesearch.hager_zhang(
       line_search_value_grad_func,
       initial_step_size=_broadcast(1, state.position),
       value_at_zero=val_0,
-      converged=state.failed | state.converged)  # No search needed for these.
+      converged=inactive)  # No search needed for these.
 
   state_after_ls = update_fields(
       state,
@@ -159,9 +160,16 @@ def line_search_step(state, value_and_gradients_function, search_direction,
           state.num_objective_evaluations + ls_result.func_evals))
 
   def _do_update_position():
+    # For inactive batch members `left.x` is zero. However, their
+    # `search_direction` might also be undefined, so we can't rely on
+    # multiplication by zero to produce a `position_delta` of zero.
+    position_delta = tf.where(
+        inactive,
+        tf.zeros_like(search_direction),
+        search_direction * tf.expand_dims(ls_result.left.x, axis=-1))
     return _update_position(
         state_after_ls,
-        search_direction * tf.expand_dims(ls_result.left.x, axis=-1),
+        position_delta,
         ls_result.left.f,
         ls_result.left.full_gradient,
         grad_tolerance, f_relative_tolerance, x_tolerance)
