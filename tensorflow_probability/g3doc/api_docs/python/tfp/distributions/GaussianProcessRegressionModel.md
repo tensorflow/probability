@@ -305,7 +305,6 @@ num_results = 200
 
 # Now we can sample from the posterior predictive distribution at a new set
 # of index points.
-index_points = np.linspace(-1., 1., 200)[..., np.newaxis]
 gprm = tfd.GaussianProcessRegressionModel(
     # Batch of `num_results` kernels parameterized by the MCMC samples.
     kernel=psd_kernels.ExponentiatedQuadratic(amplitudes, length_scales),
