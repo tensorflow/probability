@@ -21,10 +21,14 @@ from __future__ import print_function
 import collections
 
 # Dependency imports
+
 from absl.testing import parameterized
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
+
+from tensorflow_probability.python.internal import test_util as tfp_test_util
+
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfd = tfp.distributions
@@ -386,7 +390,7 @@ class SimpleStepSizeAdaptationTest(tf.test.TestCase, parameterized.TestCase):
     self.assertAllClose(new_step_size, step_size)
 
   def testExample(self):
-    tf.compat.v1.random.set_random_seed(1337)
+    tf.compat.v1.random.set_random_seed(tfp_test_util.test_seed())
     target_log_prob_fn = tfd.Normal(loc=0., scale=1.).log_prob
     num_burnin_steps = 500
     num_results = 500
@@ -397,7 +401,7 @@ class SimpleStepSizeAdaptationTest(tf.test.TestCase, parameterized.TestCase):
         target_log_prob_fn=target_log_prob_fn,
         num_leapfrog_steps=2,
         step_size=step_size,
-        seed=_set_seed(1337))
+        seed=_set_seed(tfp_test_util.test_seed()))
     kernel = tfp.mcmc.SimpleStepSizeAdaptation(
         inner_kernel=kernel, num_adaptation_steps=int(num_burnin_steps * 0.8))
 
@@ -411,7 +415,7 @@ class SimpleStepSizeAdaptationTest(tf.test.TestCase, parameterized.TestCase):
     p_accept = tf.reduce_mean(
         input_tensor=tf.exp(tf.minimum(log_accept_ratio, 0.)))
 
-    self.assertAllClose(0.75, self.evaluate(p_accept), atol=0.05)
+    self.assertAllClose(0.75, self.evaluate(p_accept), atol=0.15)
 
 
 if __name__ == '__main__':
