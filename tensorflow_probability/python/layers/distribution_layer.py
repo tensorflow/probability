@@ -19,10 +19,11 @@ from __future__ import division
 from __future__ import print_function
 
 import functools
-
 # Dependency imports
 import numpy as np
+import six
 import tensorflow as tf
+
 
 # By importing `distributions` as `tfd`, docstrings will show
 # `tfd.Distribution`. We import `bijectors` the same way, for consistency.
@@ -138,8 +139,12 @@ class DistributionLambda(tf.keras.layers.Lambda):
     #     return tf.concat(output_shape, axis=0)
     #   output_shape = default_output_shape
 
-    if isinstance(convert_to_tensor_fn, property):
-      convert_to_tensor_fn = convert_to_tensor_fn.fget
+    convert_to_tensor_fn = _get_convert_to_tensor_fn(convert_to_tensor_fn)
+
+    # If there is a 'function' keyword argument (e.g., because we are being
+    # called from a subclasses `from_config` method), remove it.  We pass
+    # a function to `Lambda.__init__` below as the first positional argument.
+    kwargs.pop('function', None)
 
     def _fn(*fargs, **fkwargs):
       """Wraps `make_distribution_fn` to return both dist and concrete value."""
@@ -591,10 +596,17 @@ class IndependentBernoulli(DistributionLambda):
         Default value: `False`.
       **kwargs: Additional keyword arguments passed to `tf.keras.Layer`.
     """
+    convert_to_tensor_fn = _get_convert_to_tensor_fn(convert_to_tensor_fn)
+
     super(IndependentBernoulli, self).__init__(
         lambda t: type(self).new(t, event_shape, sample_dtype, validate_args),
         convert_to_tensor_fn,
         **kwargs)
+
+    self._event_shape = event_shape
+    self._convert_to_tensor_fn = convert_to_tensor_fn
+    self._sample_dtype = sample_dtype
+    self._validate_args = validate_args
 
   @staticmethod
   def new(params, event_shape=(), dtype=None, validate_args=False, name=None):
@@ -632,6 +644,27 @@ class IndependentBernoulli(DistributionLambda):
           value=event_shape, name='event_shape', dtype_hint=tf.int32)
       return _event_size(
           event_shape, name=name or 'IndependentBernoulli_params_size')
+
+  def get_config(self):
+    """Returns the config of this layer.
+
+    NOTE: At the moment, this configuration can only be serialized if the
+    Layer's `convert_to_tensor_fn` is a serializable Keras object (i.e.,
+    implements `get_config`) or one of the standard values:
+     - `Distribution.sample` (or `"sample"`)
+     - `Distribution.mean` (or `"mean"`)
+     - `Distribution.mode` (or `"mode"`)
+     - `Distribution.stddev` (or `"stddev"`)
+     - `Distribution.variance` (or `"variance"`)
+    """
+    config = {
+        'event_shape': self._event_shape,
+        'convert_to_tensor_fn': _serialize(self._convert_to_tensor_fn),
+        'sample_dtype': self._sample_dtype,
+        'validate_args': self._validate_args
+    }
+    base_config = super(IndependentBernoulli, self).get_config()
+    return dict(list(base_config.items()) + list(config.items()))
 
 
 def _eval_all_one_hot(fn, dist, name=None):
@@ -696,10 +729,16 @@ class IndependentLogistic(DistributionLambda):
         Default value: `False`.
       **kwargs: Additional keyword arguments passed to `tf.keras.Layer`.
     """
+    convert_to_tensor_fn = _get_convert_to_tensor_fn(convert_to_tensor_fn)
+
     super(IndependentLogistic, self).__init__(
         lambda t: type(self).new(t, event_shape, validate_args),
         convert_to_tensor_fn,
         **kwargs)
+
+    self._event_shape = event_shape
+    self._convert_to_tensor_fn = convert_to_tensor_fn
+    self._validate_args = validate_args
 
   @staticmethod
   def new(params, event_shape=(), validate_args=False, name=None):
@@ -734,6 +773,26 @@ class IndependentLogistic(DistributionLambda):
           value=event_shape, name='event_shape', dtype_hint=tf.int32)
       return 2 * _event_size(
           event_shape, name=name or 'IndependentLogistic_params_size')
+
+  def get_config(self):
+    """Returns the config of this layer.
+
+    NOTE: At the moment, this configuration can only be serialized if the
+    Layer's `convert_to_tensor_fn` is a serializable Keras object (i.e.,
+    implements `get_config`) or one of the standard values:
+     - `Distribution.sample` (or `"sample"`)
+     - `Distribution.mean` (or `"mean"`)
+     - `Distribution.mode` (or `"mode"`)
+     - `Distribution.stddev` (or `"stddev"`)
+     - `Distribution.variance` (or `"variance"`)
+    """
+    config = {
+        'event_shape': self._event_shape,
+        'convert_to_tensor_fn': _serialize(self._convert_to_tensor_fn),
+        'validate_args': self._validate_args
+    }
+    base_config = super(IndependentLogistic, self).get_config()
+    return dict(list(base_config.items()) + list(config.items()))
 
 
 class IndependentNormal(DistributionLambda):
@@ -781,10 +840,16 @@ class IndependentNormal(DistributionLambda):
         Default value: `False`.
       **kwargs: Additional keyword arguments passed to `tf.keras.Layer`.
     """
+    convert_to_tensor_fn = _get_convert_to_tensor_fn(convert_to_tensor_fn)
+
     super(IndependentNormal, self).__init__(
         lambda t: type(self).new(t, event_shape, validate_args),
         convert_to_tensor_fn,
         **kwargs)
+
+    self._event_shape = event_shape
+    self._convert_to_tensor_fn = convert_to_tensor_fn
+    self._validate_args = validate_args
 
   @staticmethod
   def new(params, event_shape=(), validate_args=False, name=None):
@@ -819,6 +884,26 @@ class IndependentNormal(DistributionLambda):
           value=event_shape, name='event_shape', dtype_hint=tf.int32)
       return 2 * _event_size(
           event_shape, name=name or 'IndependentNormal_params_size')
+
+  def get_config(self):
+    """Returns the config of this layer.
+
+    NOTE: At the moment, this configuration can only be serialized if the
+    Layer's `convert_to_tensor_fn` is a serializable Keras object (i.e.,
+    implements `get_config`) or one of the standard values:
+     - `Distribution.sample` (or `"sample"`)
+     - `Distribution.mean` (or `"mean"`)
+     - `Distribution.mode` (or `"mode"`)
+     - `Distribution.stddev` (or `"stddev"`)
+     - `Distribution.variance` (or `"variance"`)
+    """
+    config = {
+        'event_shape': self._event_shape,
+        'convert_to_tensor_fn': _serialize(self._convert_to_tensor_fn),
+        'validate_args': self._validate_args
+    }
+    base_config = super(IndependentNormal, self).get_config()
+    return dict(list(base_config.items()) + list(config.items()))
 
 
 class IndependentPoisson(DistributionLambda):
@@ -882,10 +967,16 @@ class IndependentPoisson(DistributionLambda):
         Default value: `False`.
       **kwargs: Additional keyword arguments passed to `tf.keras.Layer`.
     """
+    convert_to_tensor_fn = _get_convert_to_tensor_fn(convert_to_tensor_fn)
+
     super(IndependentPoisson, self).__init__(
         lambda t: type(self).new(t, event_shape, validate_args),
         convert_to_tensor_fn,
         **kwargs)
+
+    self._event_shape = event_shape
+    self._convert_to_tensor_fn = convert_to_tensor_fn
+    self._validate_args = validate_args
 
   @staticmethod
   def new(params, event_shape=(), validate_args=False, name=None):
@@ -918,6 +1009,26 @@ class IndependentPoisson(DistributionLambda):
           value=event_shape, name='event_shape', dtype_hint=tf.int32)
       return _event_size(
           event_shape, name=name or 'IndependentPoisson_params_size')
+
+  def get_config(self):
+    """Returns the config of this layer.
+
+    NOTE: At the moment, this configuration can only be serialized if the
+    Layer's `convert_to_tensor_fn` is a serializable Keras object (i.e.,
+    implements `get_config`) or one of the standard values:
+     - `Distribution.sample` (or `"sample"`)
+     - `Distribution.mean` (or `"mean"`)
+     - `Distribution.mode` (or `"mode"`)
+     - `Distribution.stddev` (or `"stddev"`)
+     - `Distribution.variance` (or `"variance"`)
+    """
+    config = {
+        'event_shape': self._event_shape,
+        'convert_to_tensor_fn': _serialize(self._convert_to_tensor_fn),
+        'validate_args': self._validate_args
+    }
+    base_config = super(IndependentPoisson, self).get_config()
+    return dict(list(base_config.items()) + list(config.items()))
 
 
 class KLDivergenceRegularizer(tf.keras.regularizers.Regularizer):
@@ -1327,10 +1438,17 @@ class MixtureNormal(DistributionLambda):
         Default value: `False`.
       **kwargs: Additional keyword arguments passed to `tf.keras.Layer`.
     """
+    convert_to_tensor_fn = _get_convert_to_tensor_fn(convert_to_tensor_fn)
+
     super(MixtureNormal, self).__init__(
         lambda t: type(self).new(t, num_components, event_shape, validate_args),
         convert_to_tensor_fn,
         **kwargs)
+
+    self._num_components = num_components
+    self._event_shape = event_shape
+    self._convert_to_tensor_fn = convert_to_tensor_fn
+    self._validate_args = validate_args
 
   @staticmethod
   def new(params, num_components, event_shape=(),
@@ -1350,6 +1468,27 @@ class MixtureNormal(DistributionLambda):
         num_components,
         IndependentNormal.params_size(event_shape, name=name),
         name=name)
+
+  def get_config(self):
+    """Returns the config of this layer.
+
+    NOTE: At the moment, this configuration can only be serialized if the
+    Layer's `convert_to_tensor_fn` is a serializable Keras object (i.e.,
+    implements `get_config`) or one of the standard values:
+     - `Distribution.sample` (or `"sample"`)
+     - `Distribution.mean` (or `"mean"`)
+     - `Distribution.mode` (or `"mode"`)
+     - `Distribution.stddev` (or `"stddev"`)
+     - `Distribution.variance` (or `"variance"`)
+    """
+    config = {
+        'num_components': self._num_components,
+        'event_shape': self._event_shape,
+        'convert_to_tensor_fn': _serialize(self._convert_to_tensor_fn),
+        'validate_args': self._validate_args
+    }
+    base_config = super(MixtureNormal, self).get_config()
+    return dict(list(base_config.items()) + list(config.items()))
 
 
 class MixtureLogistic(DistributionLambda):
@@ -1415,10 +1554,17 @@ class MixtureLogistic(DistributionLambda):
         Default value: `False`.
       **kwargs: Additional keyword arguments passed to `tf.keras.Layer`.
     """
+    convert_to_tensor_fn = _get_convert_to_tensor_fn(convert_to_tensor_fn)
+
     super(MixtureLogistic, self).__init__(
         lambda t: type(self).new(t, num_components, event_shape, validate_args),
         convert_to_tensor_fn,
         **kwargs)
+
+    self._num_components = num_components
+    self._event_shape = event_shape
+    self._convert_to_tensor_fn = convert_to_tensor_fn
+    self._validate_args = validate_args
 
   @staticmethod
   def new(params, num_components, event_shape=(),
@@ -1439,6 +1585,27 @@ class MixtureLogistic(DistributionLambda):
         num_components,
         IndependentLogistic.params_size(event_shape, name=name),
         name=name)
+
+  def get_config(self):
+    """Returns the config of this layer.
+
+    NOTE: At the moment, this configuration can only be serialized if the
+    Layer's `convert_to_tensor_fn` is a serializable Keras object (i.e.,
+    implements `get_config`) or one of the standard values:
+     - `Distribution.sample` (or `"sample"`)
+     - `Distribution.mean` (or `"mean"`)
+     - `Distribution.mode` (or `"mode"`)
+     - `Distribution.stddev` (or `"stddev"`)
+     - `Distribution.variance` (or `"variance"`)
+    """
+    config = {
+        'num_components': self._num_components,
+        'event_shape': self._event_shape,
+        'convert_to_tensor_fn': _serialize(self._convert_to_tensor_fn),
+        'validate_args': self._validate_args
+    }
+    base_config = super(MixtureLogistic, self).get_config()
+    return dict(list(base_config.items()) + list(config.items()))
 
 
 class VariationalGaussianProcess(DistributionLambda):
@@ -1594,3 +1761,53 @@ class VariationalGaussianProcess(DistributionLambda):
       return loss
     d.variational_loss = _transposed_variational_loss
     return d
+
+
+# For deserialization.
+tf.keras.utils.get_custom_objects().update({
+    'IndependentBernoulli': IndependentBernoulli,
+    'IndependentLogistic': IndependentLogistic,
+    'IndependentNormal': IndependentNormal,
+    'IndependentPoisson': IndependentPoisson,
+    'MixtureLogistic': MixtureLogistic,
+    'MixtureNormal': MixtureNormal,
+})
+
+sample = tfd.Distribution.sample
+mean = tfd.Distribution.mean
+mode = tfd.Distribution.mode
+stddev = tfd.Distribution.stddev
+variance = tfd.Distribution.variance
+
+
+def _serialize(convert_to_tensor_fn):
+  return tf.keras.utils.serialize_keras_object(convert_to_tensor_fn)
+
+
+def _deserialize(name, custom_objects=None):
+  return tf.keras.utils.deserialize_keras_object(
+      name,
+      module_objects=globals(),
+      custom_objects=custom_objects,
+      printable_module_name='convert-to-tensor function')
+
+
+def _get_convert_to_tensor_fn(identifier):
+  """Return a convert-to-tensor func, given a name, config, callable, etc."""
+  if identifier is None:
+    return None
+
+  if isinstance(identifier, six.string_types):
+    identifier = str(identifier)
+    return _deserialize(identifier)
+
+  if isinstance(identifier, dict):
+    return _deserialize(identifier)
+
+  if isinstance(identifier, property):
+    identifier = identifier.fget
+  if callable(identifier):
+    return identifier
+
+  raise ValueError('Could not interpret '
+                   'convert-to-tensor function identifier:', identifier)

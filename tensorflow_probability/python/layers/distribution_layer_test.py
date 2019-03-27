@@ -576,6 +576,58 @@ class _IndependentLayerTest(object):
     x = layer(t)
     self._check_distribution(t, x, batch_shape)
 
+  def test_serialization(self):
+    event_shape = []
+    params_size = self.layer_class.params_size(event_shape)
+    batch_shape = [4, 1]
+
+    low = self._build_tensor(-3., dtype=np.float32)
+    high = self._build_tensor(3., dtype=np.float32)
+    x = self.evaluate(tfd.Uniform(low, high).sample(
+        batch_shape + [params_size], seed=42))
+
+    model = tfk.Sequential([
+        tfkl.Dense(params_size, input_shape=(params_size,), dtype=tf.float32),
+        self.layer_class(event_shape, validate_args=True),
+    ])
+
+    model_file = self.create_tempfile()
+    model.save(model_file.full_path)
+    model_copy = tfk.models.load_model(model_file.full_path)
+
+    self.assertAllEqual(self.evaluate(model(x).mean()),
+                        self.evaluate(model_copy(x).mean()))
+
+    ones = np.ones([7] + batch_shape + event_shape)
+    self.assertAllEqual(self.evaluate(model(x).log_prob(ones)),
+                        self.evaluate(model_copy(x).log_prob(ones)))
+
+  def test_model_export(self):
+    event_shape = [3, 2]
+    params_size = self.layer_class.params_size(event_shape)
+    batch_shape = [4]
+
+    low = self._build_tensor(-3., dtype=np.float64)
+    high = self._build_tensor(3., dtype=np.float64)
+    x = self.evaluate(tfd.Uniform(low, high).sample(
+        batch_shape + [params_size], seed=42))
+
+    model = tfk.Sequential([
+        tfkl.Dense(params_size, input_shape=(params_size,), dtype=tf.float64),
+        self.layer_class(event_shape, validate_args=True,
+                         convert_to_tensor_fn='mean'),
+        # NOTE: For TensorFlow to be able to serialize the graph (i.e., for
+        # serving), the model must output a Tensor and not a Distribution.
+        tfkl.Dense(1),
+    ])
+    model.compile(optimizer='adam', loss='mse')
+
+    model_dir = self.create_tempdir()
+    tfk.experimental.export_saved_model(model, model_dir.full_path)
+    model_copy = tfk.experimental.load_from_saved_model(model_dir.full_path)
+
+    self.assertAllEqual(self.evaluate(model(x)), self.evaluate(model_copy(x)))
+
 
 @test_util.run_all_in_graph_and_eager_modes
 class _IndependentBernoulliTest(_IndependentLayerTest):
@@ -877,6 +929,60 @@ class _MixtureLayerTest(object):
     layer = self.layer_class(n, event_shape, validate_args=True)
     x = layer(t)
     self._check_distribution(t, x, batch_shape)
+
+  def test_serialization(self):
+    n = 3
+    event_shape = []
+    params_size = self.layer_class.params_size(n, event_shape)
+    batch_shape = [4, 1]
+
+    low = self._build_tensor(-3., dtype=np.float32)
+    high = self._build_tensor(3., dtype=np.float32)
+    x = self.evaluate(tfd.Uniform(low, high).sample(
+        batch_shape + [params_size], seed=42))
+
+    model = tfk.Sequential([
+        tfkl.Dense(params_size, input_shape=(params_size,), dtype=tf.float32),
+        self.layer_class(n, event_shape, validate_args=True),
+    ])
+
+    model_file = self.create_tempfile()
+    model.save(model_file.full_path)
+    model_copy = tfk.models.load_model(model_file.full_path)
+
+    self.assertAllEqual(self.evaluate(model(x).mean()),
+                        self.evaluate(model_copy(x).mean()))
+
+    ones = np.ones([7] + batch_shape + event_shape)
+    self.assertAllEqual(self.evaluate(model(x).log_prob(ones)),
+                        self.evaluate(model_copy(x).log_prob(ones)))
+
+  def test_model_export(self):
+    n = 5
+    event_shape = [3, 2]
+    params_size = self.layer_class.params_size(n, event_shape)
+    batch_shape = [4]
+
+    low = self._build_tensor(-3., dtype=np.float64)
+    high = self._build_tensor(3., dtype=np.float64)
+    x = self.evaluate(tfd.Uniform(low, high).sample(
+        batch_shape + [params_size], seed=42))
+
+    model = tfk.Sequential([
+        tfkl.Dense(params_size, input_shape=(params_size,), dtype=tf.float64),
+        self.layer_class(n, event_shape, validate_args=True,
+                         convert_to_tensor_fn='mean'),
+        # NOTE: For TensorFlow to be able to serialize the graph (i.e., for
+        # serving), the model must output a Tensor and not a Distribution.
+        tfkl.Dense(1),
+    ])
+    model.compile(optimizer='adam', loss='mse')
+
+    model_dir = self.create_tempdir()
+    tfk.experimental.export_saved_model(model, model_dir.full_path)
+    model_copy = tfk.experimental.load_from_saved_model(model_dir.full_path)
+
+    self.assertAllEqual(self.evaluate(model(x)), self.evaluate(model_copy(x)))
 
 
 @test_util.run_all_in_graph_and_eager_modes
