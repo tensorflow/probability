@@ -571,7 +571,7 @@ def percentile(x,
       larger_y_idx = _get_indices('lower')
       exact_idx = (d - 1) * frac_at_q_or_above
       if preserve_gradients:
-        # If q cooresponds to a point in x, we will initially have
+        # If q corresponds to a point in x, we will initially have
         # larger_y_idx == smaller_y_idx.
         # This results in the gradient w.r.t. fraction being zero (recall `q`
         # enters only through `fraction`...and see that things cancel).
@@ -589,6 +589,25 @@ def percentile(x,
           tf.gather(sorted_y, larger_y_idx, axis=-1) * (1 - fraction) +
           tf.gather(sorted_y, smaller_y_idx, axis=-1) * fraction)
 
+    # Propagate NaNs
+    if x.dtype in (tf.bfloat16, tf.float16, tf.float32, tf.float64):
+      # Apparently tf.is_nan doesn't like other dtypes
+      nan_batch_members = tf.reduce_any(
+          input_tensor=tf.math.is_nan(x), axis=axis)
+      right_rank_matched_shape = tf.pad(
+          tensor=tf.shape(input=nan_batch_members),
+          paddings=[[0, tf.rank(input=q)]],
+          constant_values=1)
+      nan_batch_members = tf.reshape(
+          nan_batch_members, shape=right_rank_matched_shape)
+      shape_gathered_y = tf.shape(input=gathered_y)
+      nan = np.array(np.nan, gathered_y.dtype.as_numpy_dtype)
+      gathered_y = tf.where(
+          tf.broadcast_to(nan_batch_members, shape_gathered_y),
+          tf.fill(shape_gathered_y, nan),
+          gathered_y)
+
+    # Expand dimensions if requested
     if keep_dims:
       if axis is None:
         ones_vec = tf.ones(

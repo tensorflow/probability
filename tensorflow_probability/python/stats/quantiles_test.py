@@ -526,6 +526,25 @@ class PercentileTestWithLowerInterpolation(tf.test.TestCase):
       self.assertAllEqual((), pct.shape)
       self.assertAllClose(expected_percentile, self.evaluate(pct))
 
+  def test_nan_propagation(self):
+    qs = [0, 10, 20, 49, 50, 51, 60, 80, 100]
+    for xs in [[float('nan'), 1.0],
+               [1.0, float('nan')],
+               [1.0, 2.0, 3.0, 4.0, float('nan')],
+               [1.0, float('nan'), 2.0, 3.0, 4.0]]:
+      # Test each percentile individually
+      for q in qs:
+        expected_percentile = np.percentile(
+            xs, q=q, interpolation=self._interpolation)
+        self.assertTrue(np.isnan(expected_percentile))
+        pct = tfp.stats.percentile(xs, q=q, interpolation=self._interpolation)
+        self.assertTrue(self.evaluate(tf.math.is_nan(pct)))
+      # Test vector percentile as well
+      expected_percentiles = np.percentile(
+          xs, q=qs, interpolation=self._interpolation)
+      pcts = tfp.stats.percentile(xs, q=qs, interpolation=self._interpolation)
+      self.assertAllEqual(expected_percentiles, pcts)
+
 
 class PercentileTestWithLinearInterpolation(
     PercentileTestWithLowerInterpolation):
