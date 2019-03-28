@@ -881,13 +881,16 @@ def monte_carlo_csiszar_f_divergence(
       to parameters) is valid.
     TypeError: if `p_log_prob` is not a Python `callable`.
   """
+  reparameterization_types = tf.nest.flatten(q.reparameterization_type)
   with tf.compat.v1.name_scope(name, "monte_carlo_csiszar_f_divergence",
                                [num_draws]):
     if use_reparametrization is None:
-      use_reparametrization = (q.reparameterization_type
-                               == tfd.FULLY_REPARAMETERIZED)
+      use_reparametrization = all(
+          reparameterization_type == tfd.FULLY_REPARAMETERIZED
+          for reparameterization_type in reparameterization_types)
     elif (use_reparametrization and
-          q.reparameterization_type != tfd.FULLY_REPARAMETERIZED):
+          any(reparameterization_type != tfd.FULLY_REPARAMETERIZED
+              for reparameterization_type in reparameterization_types)):
       # TODO(jvdillon): Consider only raising an exception if the gradient is
       # requested.
       raise ValueError(

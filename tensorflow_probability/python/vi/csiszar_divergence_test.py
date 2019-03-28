@@ -540,39 +540,6 @@ class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
     self.assertAllClose(approx_kl_self_normalized_, exact_kl_,
                         rtol=0.02, atol=0.)
 
-  def test_kl_reverse_multidim(self):
-    d = 5  # Dimension
-
-    p = tfd.MultivariateNormalFullCovariance(
-        covariance_matrix=tridiag(d, diag_value=1, offdiag_value=0.5))
-
-    q = tfd.MultivariateNormalDiag(scale_diag=[0.5]*d)
-
-    approx_kl = tfp.vi.monte_carlo_csiszar_f_divergence(
-        f=tfp.vi.kl_reverse,
-        p_log_prob=p.log_prob,
-        q=q,
-        num_draws=int(3e5),
-        seed=12475)
-
-    approx_kl_self_normalized = tfp.vi.monte_carlo_csiszar_f_divergence(
-        f=lambda logu: tfp.vi.kl_reverse(logu, self_normalized=True),
-        p_log_prob=p.log_prob,
-        q=q,
-        num_draws=int(3e5),
-        seed=12485)
-
-    exact_kl = tfd.kl_divergence(q, p)
-
-    [approx_kl_, approx_kl_self_normalized_, exact_kl_] = self.evaluate([
-        approx_kl, approx_kl_self_normalized, exact_kl])
-
-    self.assertAllClose(approx_kl_, exact_kl_,
-                        rtol=0.02, atol=0.)
-
-    self.assertAllClose(approx_kl_self_normalized_, exact_kl_,
-                        rtol=0.08, atol=0.)
-
   def test_kl_forward_multidim(self):
     d = 5  # Dimension
 
@@ -608,6 +575,70 @@ class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
 
     self.assertAllClose(approx_kl_self_normalized_, exact_kl_,
                         rtol=0.05, atol=0.)
+
+  def test_kl_reverse_multidim(self):
+    d = 5  # Dimension
+
+    p = tfd.MultivariateNormalFullCovariance(
+        covariance_matrix=tridiag(d, diag_value=1, offdiag_value=0.5))
+
+    q = tfd.MultivariateNormalDiag(scale_diag=[0.5]*d)
+
+    approx_kl = tfp.vi.monte_carlo_csiszar_f_divergence(
+        f=tfp.vi.kl_reverse,
+        p_log_prob=p.log_prob,
+        q=q,
+        num_draws=int(3e5),
+        seed=12475)
+
+    approx_kl_self_normalized = tfp.vi.monte_carlo_csiszar_f_divergence(
+        f=lambda logu: tfp.vi.kl_reverse(logu, self_normalized=True),
+        p_log_prob=p.log_prob,
+        q=q,
+        num_draws=int(3e5),
+        seed=12485)
+
+    exact_kl = tfd.kl_divergence(q, p)
+
+    [approx_kl_, approx_kl_self_normalized_, exact_kl_] = self.evaluate([
+        approx_kl, approx_kl_self_normalized, exact_kl])
+
+    self.assertAllClose(approx_kl_, exact_kl_,
+                        rtol=0.02, atol=0.)
+
+    self.assertAllClose(approx_kl_self_normalized_, exact_kl_,
+                        rtol=0.08, atol=0.)
+
+  def test_kl_jd(self):
+    # By convolution, this two distributions should be the same after
+    # normalization
+    p = tfd.JointDistributionSequential([
+        tfd.Normal(0., 1.),
+        lambda mu: tfd.Normal(mu, 1.)
+    ])
+
+    q = tfd.JointDistributionSequential([
+        tfd.Normal(0., 1.),
+        tfd.Normal(0., tf.sqrt(2.))
+    ])
+
+    forward_kl = tfp.vi.monte_carlo_csiszar_f_divergence(
+        f=lambda logu: tfp.vi.kl_forward(logu, self_normalized=True),
+        p_log_prob=p.log_prob,
+        q=q,
+        num_draws=int(3e5),
+        seed=12475)
+
+    reverse_kl = tfp.vi.monte_carlo_csiszar_f_divergence(
+        f=lambda logu: tfp.vi.kl_reverse(logu, self_normalized=True),
+        p_log_prob=p.log_prob,
+        q=q,
+        num_draws=int(3e5),
+        seed=12475)
+
+    [forward_kl_, reverse_kl_] = self.evaluate([forward_kl, reverse_kl])
+
+    self.assertAllClose(forward_kl_+reverse_kl_, 1., rtol=0.01, atol=0.)
 
   def test_score_trick(self):
     d = 5  # Dimension
