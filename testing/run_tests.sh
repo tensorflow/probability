@@ -55,7 +55,10 @@ install_python_packages() {
   # NB: tf-nightly pulls in other deps, like numpy, absl, and six, transitively.
   # Some tests use methods from the additional libraries below, so we install
   # them although they're not official dependencies of the TFP library.
-  pip install tf-nightly scipy hypothesis matplotlib decorator
+  pip install tf-nightly scipy hypothesis matplotlib
+
+  # Install additional TFP dependencies.
+  pip install decorator cloudpickle
 
   # Upgrade numpy to the latest to address issues that happen when testing with
   # Python 3 (https://github.com/tensorflow/tensorflow/issues/16488).

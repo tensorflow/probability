@@ -123,6 +123,7 @@ py_library(
     srcs = ["distribution_layer.py"],
     srcs_version = "PY2AND3",
     deps = [
+        # cloudpickle dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors",
         "//tensorflow_probability/python/distributions",

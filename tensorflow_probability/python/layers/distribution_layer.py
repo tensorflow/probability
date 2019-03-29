@@ -18,12 +18,16 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import codecs
 import functools
+import io
+import pickle
+
 # Dependency imports
+from cloudpickle import CloudPickler
 import numpy as np
 import six
 import tensorflow as tf
-
 
 # By importing `distributions` as `tfd`, docstrings will show
 # `tfd.Distribution`. We import `bijectors` the same way, for consistency.
@@ -139,11 +143,15 @@ class DistributionLambda(tf.keras.layers.Lambda):
     #     return tf.concat(output_shape, axis=0)
     #   output_shape = default_output_shape
 
+    if isinstance(make_distribution_fn, six.string_types):
+      # We are being called from `from_config`, so need to un-pickle.
+      make_distribution_fn = _deserialize_function(make_distribution_fn)
+
     convert_to_tensor_fn = _get_convert_to_tensor_fn(convert_to_tensor_fn)
 
     # If there is a 'function' keyword argument (e.g., because we are being
-    # called from a subclasses `from_config` method), remove it.  We pass
-    # a function to `Lambda.__init__` below as the first positional argument.
+    # called from a `from_config` method), remove it.  We pass a function to
+    # `Lambda.__init__` below as the first positional argument.
     kwargs.pop('function', None)
 
     def _fn(*fargs, **fkwargs):
@@ -163,6 +171,9 @@ class DistributionLambda(tf.keras.layers.Lambda):
       return distribution, value
 
     super(DistributionLambda, self).__init__(_fn, **kwargs)
+
+    self._make_distribution_fn = make_distribution_fn
+    self._convert_to_tensor_fn = convert_to_tensor_fn
 
     # We'll need to keep track of who's calling who since the functional
     # API has a different way of injecting `_keras_history` than the
@@ -185,6 +196,45 @@ class DistributionLambda(tf.keras.layers.Lambda):
       # either to be used as an input to another Keras `Model`.
       return distribution, value
     return distribution
+
+  def get_config(self):
+    """Returns the config of this layer.
+
+    This Layer's `make_distribution_fn` is serialized via a library built on
+    Python pickle.  This serialization of Python functions is provided for
+    convenience, but:
+
+      1. The use of this format for long-term storage of models is discouraged.
+         In particular, it may not be possible to deserialize in a different
+         version of Python.
+
+      2. While serialization is generally supported for lambdas, local
+         functions, and static methods (and closures over these constructs),
+         complex functions may fail to serialize.
+
+      3. `Tensor` objects (and functions referencing `Tensor` objects) can only
+         be serialized when the tensor value is statically known.  (Such Tensors
+         are serialized as numpy arrays.)
+
+    Instead of relying on `DistributionLambda.get_config`, consider subclassing
+    `DistributionLambda` and directly implementing Keras serialization via
+    `get_config` / `from_config`.
+
+    NOTE: At the moment, `DistributionLambda` can only be serialized if the
+    `convert_to_tensor_fn` is a serializable Keras object (i.e., implements
+    `get_config`) or one of the standard values:
+     - `Distribution.sample` (or `"sample"`)
+     - `Distribution.mean` (or `"mean"`)
+     - `Distribution.mode` (or `"mode"`)
+     - `Distribution.stddev` (or `"stddev"`)
+     - `Distribution.variance` (or `"variance"`)
+    """
+    config = {
+        'make_distribution_fn': _serialize_function(self._make_distribution_fn),
+        'convert_to_tensor_fn': _serialize(self._convert_to_tensor_fn),
+    }
+    base_config = super(DistributionLambda, self).get_config()
+    return dict(list(base_config.items()) + list(config.items()))
 
 
 # TODO(b/120160878): Add more shape validation logic to each layer. Consider
@@ -266,7 +316,7 @@ class MultivariateNormalTriL(DistributionLambda):
       **kwargs: Additional keyword arguments passed to `tf.keras.Layer`.
     """
     super(MultivariateNormalTriL, self).__init__(
-        lambda t: type(self).new(t, event_size, validate_args),
+        lambda t: MultivariateNormalTriL.new(t, event_size, validate_args),
         convert_to_tensor_fn,
         **kwargs)
 
@@ -372,7 +422,8 @@ class OneHotCategorical(DistributionLambda):
       **kwargs: Additional keyword arguments passed to `tf.keras.Layer`.
     """
     super(OneHotCategorical, self).__init__(
-        lambda t: type(self).new(t, event_size, sample_dtype, validate_args),
+        lambda t: OneHotCategorical.new(  # pylint: disable=g-long-lambda
+            t, event_size, sample_dtype, validate_args),
         convert_to_tensor_fn,
         **kwargs)
 
@@ -477,7 +528,8 @@ class CategoricalMixtureOfOneHotCategorical(DistributionLambda):
       **kwargs: Additional keyword arguments passed to `tf.keras.Layer`.
     """
     super(CategoricalMixtureOfOneHotCategorical, self).__init__(
-        lambda t: type(self).new(  # pylint: disable=g-long-lambda
+        # pylint: disable=g-long-lambda
+        lambda t: CategoricalMixtureOfOneHotCategorical.new(
             t, event_size, num_components, sample_dtype, validate_args),
         convert_to_tensor_fn,
         **kwargs)
@@ -598,8 +650,15 @@ class IndependentBernoulli(DistributionLambda):
     """
     convert_to_tensor_fn = _get_convert_to_tensor_fn(convert_to_tensor_fn)
 
+    # If there is a 'make_distribution_fn' keyword argument (e.g., because we
+    # are being called from a `from_config` method), remove it.  We pass the
+    # distribution function to `DistributionLambda.__init__` below as the first
+    # positional argument.
+    kwargs.pop('make_distribution_fn', None)
+
     super(IndependentBernoulli, self).__init__(
-        lambda t: type(self).new(t, event_shape, sample_dtype, validate_args),
+        lambda t: IndependentBernoulli.new(  # pylint: disable=g-long-lambda
+            t, event_shape, sample_dtype, validate_args),
         convert_to_tensor_fn,
         **kwargs)
 
@@ -731,8 +790,14 @@ class IndependentLogistic(DistributionLambda):
     """
     convert_to_tensor_fn = _get_convert_to_tensor_fn(convert_to_tensor_fn)
 
+    # If there is a 'make_distribution_fn' keyword argument (e.g., because we
+    # are being called from a `from_config` method), remove it.  We pass the
+    # distribution function to `DistributionLambda.__init__` below as the first
+    # positional argument.
+    kwargs.pop('make_distribution_fn', None)
+
     super(IndependentLogistic, self).__init__(
-        lambda t: type(self).new(t, event_shape, validate_args),
+        lambda t: IndependentLogistic.new(t, event_shape, validate_args),
         convert_to_tensor_fn,
         **kwargs)
 
@@ -842,8 +907,14 @@ class IndependentNormal(DistributionLambda):
     """
     convert_to_tensor_fn = _get_convert_to_tensor_fn(convert_to_tensor_fn)
 
+    # If there is a 'make_distribution_fn' keyword argument (e.g., because we
+    # are being called from a `from_config` method), remove it.  We pass the
+    # distribution function to `DistributionLambda.__init__` below as the first
+    # positional argument.
+    kwargs.pop('make_distribution_fn', None)
+
     super(IndependentNormal, self).__init__(
-        lambda t: type(self).new(t, event_shape, validate_args),
+        lambda t: IndependentNormal.new(t, event_shape, validate_args),
         convert_to_tensor_fn,
         **kwargs)
 
@@ -969,8 +1040,14 @@ class IndependentPoisson(DistributionLambda):
     """
     convert_to_tensor_fn = _get_convert_to_tensor_fn(convert_to_tensor_fn)
 
+    # If there is a 'make_distribution_fn' keyword argument (e.g., because we
+    # are being called from a `from_config` method), remove it.  We pass the
+    # distribution function to `DistributionLambda.__init__` below as the first
+    # positional argument.
+    kwargs.pop('make_distribution_fn', None)
+
     super(IndependentPoisson, self).__init__(
-        lambda t: type(self).new(t, event_shape, validate_args),
+        lambda t: IndependentPoisson.new(t, event_shape, validate_args),
         convert_to_tensor_fn,
         **kwargs)
 
@@ -1316,7 +1393,7 @@ class MixtureSameFamily(DistributionLambda):
       **kwargs: Additional keyword arguments passed to `tf.keras.Layer`.
     """
     super(MixtureSameFamily, self).__init__(
-        lambda t: type(self).new(  # pylint: disable=g-long-lambda
+        lambda t: MixtureSameFamily.new(  # pylint: disable=g-long-lambda
             t, num_components, component_layer, validate_args),
         convert_to_tensor_fn,
         **kwargs)
@@ -1440,8 +1517,15 @@ class MixtureNormal(DistributionLambda):
     """
     convert_to_tensor_fn = _get_convert_to_tensor_fn(convert_to_tensor_fn)
 
+    # If there is a 'make_distribution_fn' keyword argument (e.g., because we
+    # are being called from a `from_config` method), remove it.  We pass the
+    # distribution function to `DistributionLambda.__init__` below as the first
+    # positional argument.
+    kwargs.pop('make_distribution_fn', None)
+
     super(MixtureNormal, self).__init__(
-        lambda t: type(self).new(t, num_components, event_shape, validate_args),
+        lambda t: MixtureNormal.new(  # pylint: disable=g-long-lambda
+            t, num_components, event_shape, validate_args),
         convert_to_tensor_fn,
         **kwargs)
 
@@ -1556,8 +1640,15 @@ class MixtureLogistic(DistributionLambda):
     """
     convert_to_tensor_fn = _get_convert_to_tensor_fn(convert_to_tensor_fn)
 
+    # If there is a 'make_distribution_fn' keyword argument (e.g., because we
+    # are being called from a `from_config` method), remove it.  We pass the
+    # distribution function to `DistributionLambda.__init__` below as the first
+    # positional argument.
+    kwargs.pop('make_distribution_fn', None)
+
     super(MixtureLogistic, self).__init__(
-        lambda t: type(self).new(t, num_components, event_shape, validate_args),
+        lambda t: MixtureLogistic.new(  # pylint: disable=g-long-lambda
+            t, num_components, event_shape, validate_args),
         convert_to_tensor_fn,
         **kwargs)
 
@@ -1765,6 +1856,7 @@ class VariationalGaussianProcess(DistributionLambda):
 
 # For deserialization.
 tf.keras.utils.get_custom_objects().update({
+    'DistributionLambda': DistributionLambda,
     'IndependentBernoulli': IndependentBernoulli,
     'IndependentLogistic': IndependentLogistic,
     'IndependentNormal': IndependentNormal,
@@ -1811,3 +1903,41 @@ def _get_convert_to_tensor_fn(identifier):
 
   raise ValueError('Could not interpret '
                    'convert-to-tensor function identifier:', identifier)
+
+
+class _TensorCloudPickler(CloudPickler):
+  """Subclass of `CloudPickler` that includes pickling of `Tensor` objects."""
+
+  def __init__(self, out_file, protocol=None):
+    CloudPickler.__init__(self, out_file, protocol)
+
+  @staticmethod
+  def save_tensor(cloud_pickler, tensor, name=None):
+    val = tf.get_static_value(tensor)
+    if val is None:
+      raise ValueError('Cannot pickle Tensor -- '
+                       'its value is not known statically: {}.'.format(tensor))
+    CloudPickler.save_reduce(cloud_pickler, np.array, (val,))
+
+  def inject_addons(self):
+    tensor_class = tf.convert_to_tensor(value=1.).__class__
+    CloudPickler.dispatch[tensor_class] = _TensorCloudPickler.save_tensor
+
+  @staticmethod
+  def dumps(obj, protocol=None):
+    out_file = io.BytesIO()
+    try:
+      _TensorCloudPickler(out_file, protocol).dump(obj)
+      return out_file.getvalue()
+    finally:
+      out_file.close()
+
+
+def _serialize_function(func):
+  raw_code = _TensorCloudPickler.dumps(func)
+  return codecs.encode(raw_code, 'base64').decode('ascii')
+
+
+def _deserialize_function(code):
+  raw_code = codecs.decode(code.encode('ascii'), 'base64')
+  return pickle.loads(raw_code)

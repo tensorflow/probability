@@ -32,6 +32,7 @@ REQUIRED_PACKAGES = [
     'six >= 1.10.0',
     'numpy >= 1.13.3',
     'decorator',
+    'cloudpickle >= 0.6.1',
 ]
 
 if '--release' in sys.argv:

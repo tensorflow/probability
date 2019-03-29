@@ -261,6 +261,123 @@ class EndToEndTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
+class DistributionLambdaSerializationTest(tf.test.TestCase):
+
+  def assertSerializable(self, model, batch_size=1):
+    """Assert that a model can be saved/loaded via Keras Model.save/load_model.
+
+    Arguments:
+      model: A Keras model that outputs a `tfd.Distribution`.
+      batch_size: The batch size to use when checking that the model produces
+        the same results as a serialized/deserialized copy.  Default value: 1.
+    """
+    batch_shape = [batch_size]
+
+    input_shape = batch_shape + model.input.shape[1:].as_list()
+    dtype = model.input.dtype.as_numpy_dtype()
+
+    model_file = self.create_tempfile()
+    model.save(model_file.full_path)
+    model_copy = tfk.models.load_model(model_file.full_path)
+
+    x = np.random.uniform(-3., 3., input_shape).astype(dtype)
+
+    model_x_mean = self.evaluate(model(x).mean())
+    self.assertAllEqual(model_x_mean, self.evaluate(model_copy(x).mean()))
+
+    output_shape = model_x_mean.shape
+    y = np.random.uniform(0., 1., output_shape).astype(dtype)
+
+    self.assertAllEqual(self.evaluate(model(x).log_prob(y)),
+                        self.evaluate(model_copy(x).log_prob(y)))
+
+  def assertExportable(self, model, batch_size=1):
+    """Assert a Keras model supports export_saved_model/load_from_saved_model.
+
+    Arguments:
+      model: A Keras model with Tensor output.
+      batch_size: The batch size to use when checking that the model produces
+        the same results as a serialized/deserialized copy.  Default value: 1.
+    """
+    batch_shape = [batch_size]
+
+    input_shape = batch_shape + model.input.shape[1:].as_list()
+    dtype = model.input.dtype.as_numpy_dtype()
+
+    model_dir = self.create_tempdir()
+    tfk.experimental.export_saved_model(model, model_dir.full_path)
+    model_copy = tfk.experimental.load_from_saved_model(model_dir.full_path)
+
+    x = np.random.uniform(-3., 3., input_shape).astype(dtype)
+    self.assertAllEqual(self.evaluate(model(x)), self.evaluate(model_copy(x)))
+    self.assertAllEqual(model.predict(x), model_copy.predict(x))
+
+  def test_serialization(self):
+    model = tfk.Sequential([
+        tfkl.Dense(2, input_shape=(5,)),
+        # pylint: disable=g-long-lambda
+        tfpl.DistributionLambda(lambda t: tfd.Normal(
+            loc=t[..., 0:1], scale=tf.exp(t[..., 1:2])))
+    ])
+    self.assertSerializable(model)
+
+    model = tfk.Sequential([
+        tfkl.Dense(2, input_shape=(5,)),
+        # pylint: disable=g-long-lambda
+        tfpl.DistributionLambda(lambda t: tfd.Normal(
+            loc=t[..., 0:1], scale=tf.exp(t[..., 1:2]))),
+        tfkl.Lambda(lambda d: d.mean() + d.stddev())
+    ])
+    self.assertExportable(model, batch_size=4)
+
+  @staticmethod
+  def _make_distribution(t):
+    return tfpl.MixtureSameFamily.new(t, 3, tfpl.IndependentNormal([2]))
+
+  def test_serialization_static_method(self):
+    model = tfk.Sequential([
+        tfkl.Dense(15, input_shape=(5,)),
+        tfpl.DistributionLambda(
+            # pylint: disable=unnecessary-lambda
+            lambda t: DistributionLambdaSerializationTest._make_distribution(t))
+    ])
+    model.compile(optimizer='adam', loss='mse')
+    self.assertSerializable(model, batch_size=3)
+
+    model = tfk.Sequential([
+        tfkl.Dense(15, input_shape=(5,)),
+        tfpl.DistributionLambda(
+            DistributionLambdaSerializationTest._make_distribution,
+            convert_to_tensor_fn=tfd.Distribution.mean),
+        tfkl.Lambda(lambda x: x + 1.)
+    ])
+    model.compile(optimizer='adam', loss='mse')
+    self.assertExportable(model)
+
+  def test_serialization_closure_over_lambdas_tensors_and_numpy_array(self):
+    num_components = np.array(3)
+    one = tf.convert_to_tensor(value=1)
+    mk_ind_norm = lambda event_shape: tfpl.IndependentNormal(event_shape + one)
+    def make_distribution(t):
+      return tfpl.MixtureSameFamily.new(
+          t, num_components, mk_ind_norm(1))
+
+    model = tfk.Sequential([
+        tfkl.Dense(15, input_shape=(5,)),
+        tfpl.DistributionLambda(make_distribution)
+    ])
+    self.assertSerializable(model, batch_size=4)
+
+    model = tfk.Sequential([
+        tfkl.Dense(15, input_shape=(5,)),
+        # pylint: disable=unnecessary-lambda
+        tfpl.DistributionLambda(lambda t: make_distribution(t)),
+        tfkl.Lambda(lambda d: d.mean() + d.stddev())
+    ])
+    self.assertExportable(model, batch_size=2)
+
+
+@test_util.run_all_in_graph_and_eager_modes
 class KLDivergenceAddLoss(tf.test.TestCase):
 
   def test_approx_kl(self):
@@ -581,13 +698,13 @@ class _IndependentLayerTest(object):
     params_size = self.layer_class.params_size(event_shape)
     batch_shape = [4, 1]
 
-    low = self._build_tensor(-3., dtype=np.float32)
-    high = self._build_tensor(3., dtype=np.float32)
+    low = self._build_tensor(-3., dtype=self.dtype)
+    high = self._build_tensor(3., dtype=self.dtype)
     x = self.evaluate(tfd.Uniform(low, high).sample(
         batch_shape + [params_size], seed=42))
 
     model = tfk.Sequential([
-        tfkl.Dense(params_size, input_shape=(params_size,), dtype=tf.float32),
+        tfkl.Dense(params_size, input_shape=(params_size,), dtype=self.dtype),
         self.layer_class(event_shape, validate_args=True),
     ])
 
@@ -598,7 +715,9 @@ class _IndependentLayerTest(object):
     self.assertAllEqual(self.evaluate(model(x).mean()),
                         self.evaluate(model_copy(x).mean()))
 
-    ones = np.ones([7] + batch_shape + event_shape)
+    self.assertEqual(self.dtype, model(x).mean().dtype.as_numpy_dtype)
+
+    ones = np.ones([7] + batch_shape + event_shape, dtype=self.dtype)
     self.assertAllEqual(self.evaluate(model(x).log_prob(ones)),
                         self.evaluate(model_copy(x).log_prob(ones)))
 
@@ -607,13 +726,13 @@ class _IndependentLayerTest(object):
     params_size = self.layer_class.params_size(event_shape)
     batch_shape = [4]
 
-    low = self._build_tensor(-3., dtype=np.float64)
-    high = self._build_tensor(3., dtype=np.float64)
+    low = self._build_tensor(-3., dtype=self.dtype)
+    high = self._build_tensor(3., dtype=self.dtype)
     x = self.evaluate(tfd.Uniform(low, high).sample(
         batch_shape + [params_size], seed=42))
 
     model = tfk.Sequential([
-        tfkl.Dense(params_size, input_shape=(params_size,), dtype=tf.float64),
+        tfkl.Dense(params_size, input_shape=(params_size,), dtype=self.dtype),
         self.layer_class(event_shape, validate_args=True,
                          convert_to_tensor_fn='mean'),
         # NOTE: For TensorFlow to be able to serialize the graph (i.e., for
@@ -627,6 +746,7 @@ class _IndependentLayerTest(object):
     model_copy = tfk.experimental.load_from_saved_model(model_dir.full_path)
 
     self.assertAllEqual(self.evaluate(model(x)), self.evaluate(model_copy(x)))
+    self.assertEqual(self.dtype, model(x).dtype.as_numpy_dtype)
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -936,13 +1056,13 @@ class _MixtureLayerTest(object):
     params_size = self.layer_class.params_size(n, event_shape)
     batch_shape = [4, 1]
 
-    low = self._build_tensor(-3., dtype=np.float32)
-    high = self._build_tensor(3., dtype=np.float32)
+    low = self._build_tensor(-3., dtype=self.dtype)
+    high = self._build_tensor(3., dtype=self.dtype)
     x = self.evaluate(tfd.Uniform(low, high).sample(
         batch_shape + [params_size], seed=42))
 
     model = tfk.Sequential([
-        tfkl.Dense(params_size, input_shape=(params_size,), dtype=tf.float32),
+        tfkl.Dense(params_size, input_shape=(params_size,), dtype=self.dtype),
         self.layer_class(n, event_shape, validate_args=True),
     ])
 
@@ -953,7 +1073,9 @@ class _MixtureLayerTest(object):
     self.assertAllEqual(self.evaluate(model(x).mean()),
                         self.evaluate(model_copy(x).mean()))
 
-    ones = np.ones([7] + batch_shape + event_shape)
+    self.assertEqual(self.dtype, model(x).mean().dtype.as_numpy_dtype)
+
+    ones = np.ones([7] + batch_shape + event_shape, dtype=self.dtype)
     self.assertAllEqual(self.evaluate(model(x).log_prob(ones)),
                         self.evaluate(model_copy(x).log_prob(ones)))
 
@@ -963,13 +1085,13 @@ class _MixtureLayerTest(object):
     params_size = self.layer_class.params_size(n, event_shape)
     batch_shape = [4]
 
-    low = self._build_tensor(-3., dtype=np.float64)
-    high = self._build_tensor(3., dtype=np.float64)
+    low = self._build_tensor(-3., dtype=self.dtype)
+    high = self._build_tensor(3., dtype=self.dtype)
     x = self.evaluate(tfd.Uniform(low, high).sample(
         batch_shape + [params_size], seed=42))
 
     model = tfk.Sequential([
-        tfkl.Dense(params_size, input_shape=(params_size,), dtype=tf.float64),
+        tfkl.Dense(params_size, input_shape=(params_size,), dtype=self.dtype),
         self.layer_class(n, event_shape, validate_args=True,
                          convert_to_tensor_fn='mean'),
         # NOTE: For TensorFlow to be able to serialize the graph (i.e., for
@@ -983,6 +1105,7 @@ class _MixtureLayerTest(object):
     model_copy = tfk.experimental.load_from_saved_model(model_dir.full_path)
 
     self.assertAllEqual(self.evaluate(model(x)), self.evaluate(model_copy(x)))
+    self.assertEqual(self.dtype, model(x).dtype.as_numpy_dtype)
 
 
 @test_util.run_all_in_graph_and_eager_modes
