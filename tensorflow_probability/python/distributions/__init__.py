@@ -90,6 +90,7 @@ from tensorflow_probability.python.distributions.quantized_distribution import Q
 from tensorflow_probability.python.distributions.relaxed_bernoulli import RelaxedBernoulli
 from tensorflow_probability.python.distributions.relaxed_onehot_categorical import ExpRelaxedOneHotCategorical
 from tensorflow_probability.python.distributions.relaxed_onehot_categorical import RelaxedOneHotCategorical
+from tensorflow_probability.python.distributions.sample import Sample
 from tensorflow_probability.python.distributions.seed_stream import SeedStream
 from tensorflow_probability.python.distributions.sinh_arcsinh import SinhArcsinh
 from tensorflow_probability.python.distributions.student_t import StudentT
@@ -172,6 +173,7 @@ __all__ = [
     'Normal',
     'Poisson',
     'PoissonLogNormalQuadratureCompound',
+    'Sample',
     'SeedStream',
     'SinhArcsinh',
     'StudentT',

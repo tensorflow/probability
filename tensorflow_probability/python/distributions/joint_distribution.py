@@ -92,18 +92,21 @@ class JointDistributionSequential(distribution_lib.Distribution):
   #     g ~ Gamma(concentration=e[0], rate=e[1])
   #     n ~ Normal(loc=0, scale=2.)
   #     m ~ Normal(loc=n, scale=g)
+  #     for i = 1, ..., 12:
+  #       x[i] ~ Bernoulli(logits=m)
 
   # In TFP, we can write this as:
   joint = tfd.JointDistributionSequential([
                    tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),  # e
       lambda    e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1]),    # g
                    tfd.Normal(loc=0, scale=2.),                           # n
-      lambda n, g: tfd.Normal(loc=n, scale=g)                             # x
+      lambda n, g: tfd.Normal(loc=n, scale=g)                             # m
+      lambda    m: tfd.Sample(tfd.Bernoulli(logits=m), 12)                # x
   ])
   # (Notice the 1:1 correspondence between "math" and "code".)
 
   x = joint.sample()
-  # ==> A length-4 list of tfd.Distribution instances
+  # ==> A length-5 list of tfd.Distribution instances
   joint.log_prob(x)
   # ==> A scalar `Tensor` representing the total log prob under all four
   #     distributions.
@@ -112,7 +115,8 @@ class JointDistributionSequential(distribution_lib.Distribution):
   # ==> (('e', ()),
   #      ('g', ('e',)),
   #      ('n', ()),
-  #      ('x', ('n', 'g')))
+  #      ('m', ('n', 'g')),
+  #      ('x', ('m',)))
   ```
 
   #### Discussion
@@ -121,7 +125,7 @@ class JointDistributionSequential(distribution_lib.Distribution):
   items must be either a:
 
   1. `tfd.Distribution`-like instance (e.g., `e` and `n`), or a
-  2. Python `callable` (e.g., `g`, `m`).
+  2. Python `callable` (e.g., `g`, `m`, `x`).
 
   Regarding #1, an object is deemed "`tfd.Distribution`-like" if it has a
   `sample`, `log_prob`, and distribution properties, e.g., `batch_shape`,

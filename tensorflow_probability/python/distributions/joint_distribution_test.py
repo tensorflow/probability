@@ -41,6 +41,7 @@ class JointDistributionSequentialTest(tf.test.TestCase, parameterized.TestCase):
             lambda e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1]),
             tfd.Normal(loc=0, scale=2.),
             tfd.Normal,  # Or, `lambda loc, scale: tfd.Normal(loc, scale)`.
+            lambda m: tfd.Sample(tfd.Bernoulli(logits=m), 12),
         ],
         validate_args=True)
 
@@ -49,28 +50,30 @@ class JointDistributionSequentialTest(tf.test.TestCase, parameterized.TestCase):
             ('e', ()),
             ('scale', ('e',)),
             ('loc', ()),
-            ('x', ('loc', 'scale')),
+            ('m', ('loc', 'scale')),
+            ('x', ('m',)),
         ),
         d._resolve_graph())
 
     xs = d.sample(seed=tfp_test_util.test_seed())
-    self.assertLen(xs, 4)
+    self.assertLen(xs, 5)
     # We'll verify the shapes work as intended when we plumb these back into the
     # respective log_probs.
 
     ds, _ = d.sample_distributions(value=xs)
-    self.assertLen(ds, 4)
+    self.assertLen(ds, 5)
     self.assertIsInstance(ds[0], tfd.Independent)
     self.assertIsInstance(ds[1], tfd.Gamma)
     self.assertIsInstance(ds[2], tfd.Normal)
     self.assertIsInstance(ds[3], tfd.Normal)
+    self.assertIsInstance(ds[4], tfd.Sample)
 
     # Static properties.
     self.assertAllEqual(
-        [tf.float32, tf.float32, tf.float32, tf.float32],
+        [tf.float32, tf.float32, tf.float32, tf.float32, tf.int32],
         d.dtype)
     for expected, actual_tensorshape, actual_shapetensor in zip(
-        [[2], [], [], []],
+        [[2], [], [], [], [12]],
         d.event_shape,
         self.evaluate(d.event_shape_tensor())):
       self.assertAllEqual(expected, actual_tensorshape)

@@ -90,6 +90,7 @@ py_library(
         ":quantized_distribution",
         ":relaxed_bernoulli",
         ":relaxed_onehot_categorical",
+        ":sample",
         ":seed_stream",
         ":sinh_arcsinh",
         ":student_t",
@@ -839,6 +840,19 @@ py_library(
 )
 
 py_library(
+    name = "sample",
+    srcs = ["sample.py"],
+    deps = [
+        ":distribution",
+        ":kullback_leibler",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+    ],
+)
+
+py_library(
     name = "seed_stream",
     srcs = ["seed_stream.py"],
 )
@@ -900,6 +914,7 @@ py_library(
     srcs = ["transformed_distribution.py"],
     deps = [
         ":distribution",
+        ":sample",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
@@ -1821,6 +1836,18 @@ py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+    ],
+)
+
+py_test(
+    name = "sample_test",
+    size = "small",
+    srcs = ["sample_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
