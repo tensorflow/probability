@@ -133,7 +133,7 @@ py_library(
 
 py_test(
     name = "distribution_layer_test",
-    size = "medium",
+    size = "large",
     srcs = ["distribution_layer_test.py"],
     deps = [
         # numpy dep,
