@@ -359,6 +359,7 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         ":kernel",
+        # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/mcmc/internal",
     ],

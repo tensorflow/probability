@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import collections
 
+import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.internal import dtype_util
@@ -45,10 +46,24 @@ def _hmc_like_log_accept_prob_getter_fn(kernel_results):
   return tf.minimum(tf.constant(0., log_accept_ratio.dtype), log_accept_ratio)
 
 
-def _reduce_logmeanexp(value, dims):
+def _reduce_logmeanexp(value, dims, keepdims=False):
   # This is intentionally numerically imprecise for simplicity. For the purposes
   # of computing the mean acceptance probability this is more than sufficient.
-  return tf.math.log(tf.reduce_mean(input_tensor=tf.exp(value), axis=dims))
+  return tf.math.log(
+      tf.reduce_mean(input_tensor=tf.exp(value), axis=dims, keepdims=keepdims))
+
+
+def _get_differing_dims(a, b):
+  # Get the indices of dimensions where shapes of `a` and `b` differ.
+  # `a` is allowed to have fewer dimensions than `b`.
+  if a.shape.is_fully_defined() and b.shape.is_fully_defined():
+    a_shape = np.array(a.shape.as_list())
+    b_shape = np.array(b.shape.as_list())
+    return np.where(a_shape != b_shape[:len(a_shape)])[0]
+  else:
+    return tf.where(
+        tf.not_equal(tf.shape(input=a),
+                     tf.shape(input=b)[:tf.rank(a)]))[:, 0]
 
 
 class SimpleStepSizeAdaptationResults(
@@ -62,8 +77,8 @@ class SimpleStepSizeAdaptationResults(
     inner_results: Results of the inner kernel.
     target_accept_prob: Floating point scalar `Tensor`. Target accept
       probability.
-    adaptation_rate: Floating point scalar `Tensor`. Fraction by which to
-      adjust the step size during each step.
+    adaptation_rate: Floating point scalar `Tensor`. Fraction by which to adjust
+      the step size during each step.
     step: Int64 scalar `Tensor`. The current step number as perceived by this
       kernel. Increases by 1 for every call to `one_step`.
     new_step_size:  Floating point scalar `Tensor` or a list thereof (one for
@@ -125,6 +140,13 @@ class SimpleStepSizeAdaptation(kernel_base.TransitionKernel):
     all chains are for the same distribution, this can help during the initial
     warmup period.
 
+  - Step size has shape [C0, 1, 1] or [C0, 1, S], the `log_accept_prob` will be
+    averaged across its `C1` dimension. This means that you will learn a shared
+    step size based on the mean acceptance probability across chains that share
+    the coordinate across the `C0` dimension. This can be useful when the `C0`
+    dimension indexes different distributions, while `C1` indexes replicas of a
+    single distribution, all sampled in parallel.
+
   #### Examples
 
   ```python
@@ -172,17 +194,16 @@ class SimpleStepSizeAdaptation(kernel_base.TransitionKernel):
 
   """
 
-  def __init__(
-      self,
-      inner_kernel,
-      num_adaptation_steps,
-      target_accept_prob=0.75,
-      adaptation_rate=0.01,
-      step_size_setter_fn=_hmc_like_step_size_setter_fn,
-      step_size_getter_fn=_hmc_like_step_size_getter_fn,
-      log_accept_prob_getter_fn=_hmc_like_log_accept_prob_getter_fn,
-      validate_args=False,
-      name=None):
+  def __init__(self,
+               inner_kernel,
+               num_adaptation_steps,
+               target_accept_prob=0.75,
+               adaptation_rate=0.01,
+               step_size_setter_fn=_hmc_like_step_size_setter_fn,
+               step_size_getter_fn=_hmc_like_step_size_getter_fn,
+               log_accept_prob_getter_fn=_hmc_like_log_accept_prob_getter_fn,
+               validate_args=False,
+               name=None):
     """Creates the step size adaptation kernel.
 
     The default setter_fn and the getter_fn callbacks assume that the inner
@@ -308,19 +329,6 @@ class SimpleStepSizeAdaptation(kernel_base.TransitionKernel):
       log_target_accept_prob = tf.math.log(
           previous_kernel_results.target_accept_prob)
 
-      def _get_new_step_size(old_step_size, num_reduce_dims):
-        reduced_log_accept_prob = _reduce_logmeanexp(log_accept_prob,
-                                                     tf.range(num_reduce_dims))
-
-        new_step_size = mcmc_util.choose(
-            reduced_log_accept_prob > log_target_accept_prob,
-            old_step_size * (1. + previous_kernel_results.adaptation_rate),
-            old_step_size / (1. + previous_kernel_results.adaptation_rate))
-
-        return tf.where(
-            previous_kernel_results.step < self.num_adaptation_steps,
-            new_step_size, old_step_size)
-
       state_parts = tf.nest.flatten(current_state)
       step_size = self.step_size_getter_fn(new_inner_results)
       step_size_parts = tf.nest.flatten(step_size)
@@ -331,6 +339,19 @@ class SimpleStepSizeAdaptation(kernel_base.TransitionKernel):
         # Compute new step sizes for each step size part. If step size part has
         # smaller rank than the corresponding state part, then the difference is
         # averaged away in the log accept prob.
+        #
+        # Example:
+        #
+        # state_part has shape      [2, 3, 4, 5]
+        # step_size_part has shape     [1, 4, 1]
+        # log_accept_prob has shape [2, 3, 4]
+        #
+        # Since step size has 1 rank fewer than the state, we reduce away the
+        # leading dimension of log_accept_prob to get a Tensor with shape [3,
+        # 4]. Next, since log_accept_prob must broadcast into step_size_part on
+        # the left, we reduce the dimensions where their shapes differ, to get a
+        # Tensor with shape [1, 4], which now is compatible with the leading
+        # dimensions of step_size_part.
         #
         # There is a subtlety here in that step_size_parts might be a length-1
         # list, which means that we'll be "structure-broadcasting" it for all
@@ -353,8 +374,24 @@ class SimpleStepSizeAdaptation(kernel_base.TransitionKernel):
         num_reduce_dims = tf.minimum(
             log_accept_prob_rank,
             tf.rank(state_part) - tf.rank(step_size_part))
+        reduced_log_accept_prob = _reduce_logmeanexp(log_accept_prob,
+                                                     tf.range(num_reduce_dims))
+        # reduced_log_accept_prob must broadcast into step_size_part on the
+        # left, so we do an additional reduction over dimensions where their
+        # shapes differ.
+        reduce_indices = _get_differing_dims(reduced_log_accept_prob,
+                                             step_size_part)
+        reduced_log_accept_prob = _reduce_logmeanexp(
+            reduced_log_accept_prob, reduce_indices, keepdims=True)
+
+        new_step_size_part = mcmc_util.choose(
+            reduced_log_accept_prob > log_target_accept_prob,
+            step_size_part * (1. + previous_kernel_results.adaptation_rate),
+            step_size_part / (1. + previous_kernel_results.adaptation_rate))
+
         new_step_size_parts.append(
-            _get_new_step_size(step_size_part, num_reduce_dims))
+            tf.where(previous_kernel_results.step < self.num_adaptation_steps,
+                     new_step_size_part, step_size_part))
       new_step_size = tf.nest.pack_sequence_as(step_size, new_step_size_parts)
 
       return new_state, previous_kernel_results._replace(

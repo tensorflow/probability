@@ -349,46 +349,6 @@ class SimpleStepSizeAdaptationTest(tf.test.TestCase, parameterized.TestCase):
     else:
       _impl()
 
-  @parameterized.parameters(
-      (np.float64(1.), np.float64(1. / _RATE)),
-      ([np.float64(1.), np.ones([3, 1])], [
-          np.float64(1. / _RATE),
-          np.array([[1. / _RATE], [1. * _RATE], [1. / _RATE]])
-      ]),
-      ([np.float64(1.), np.ones([2, 3, 1])], [
-          np.float64(1. / _RATE),
-          np.array([[[1. / _RATE], [1. * _RATE], [1. / _RATE]],
-                    [[1. * _RATE], [1. * _RATE], [1. / _RATE]]])
-      ]),
-  )
-  def testBroadcasting(self, old_step_size, new_step_size):
-    log_accept_ratio = tf.constant(
-        [[np.log(0.73), np.log(0.76), np.log(0.73)],
-         [np.log(0.76), np.log(0.76), np.log(0.73)]],
-        dtype=tf.float64)
-    state = [
-        tf.zeros([2, 3], dtype=tf.float64),
-        tf.zeros([2, 3, 4], dtype=tf.float64)
-    ]
-
-    kernel = FakeMHKernel(
-        FakeSteppedKernel(step_size=old_step_size),
-        log_accept_ratio=log_accept_ratio)
-    kernel = tfp.mcmc.SimpleStepSizeAdaptation(
-        kernel,
-        num_adaptation_steps=1,
-        adaptation_rate=tf.constant(_RATE - 1., dtype=tf.float64),
-        validate_args=True)
-
-    kernel_results = kernel.bootstrap_results(state)
-    for _ in range(2):
-      _, kernel_results = kernel.one_step(state, kernel_results)
-
-    step_size = self.evaluate(
-        kernel_results.inner_results.accepted_results.step_size,)
-
-    self.assertAllClose(new_step_size, step_size)
-
   def testExample(self):
     tf.compat.v1.random.set_random_seed(tfp_test_util.test_seed())
     target_log_prob_fn = tfd.Normal(loc=0., scale=1.).log_prob
@@ -416,6 +376,81 @@ class SimpleStepSizeAdaptationTest(tf.test.TestCase, parameterized.TestCase):
         input_tensor=tf.exp(tf.minimum(log_accept_ratio, 0.)))
 
     self.assertAllClose(0.75, self.evaluate(p_accept), atol=0.15)
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class SimpleStepSizeAdaptationStaticBroadcastingTest(tf.test.TestCase,
+                                                     parameterized.TestCase):
+  use_static_shape = True
+
+  @parameterized.parameters(
+      (np.float64(1.), np.float64(1. / _RATE)),
+      ([np.float64(1.), np.ones([3, 1])], [
+          np.float64(1. / _RATE),
+          np.array([[1. / _RATE], [1. * _RATE], [1. / _RATE]])
+      ]),
+      ([np.float64(1.), np.ones([2, 3, 1])], [
+          np.float64(1. / _RATE),
+          np.array([[[1. / _RATE], [1. * _RATE], [1. / _RATE]],
+                    [[1. * _RATE], [1. * _RATE], [1. / _RATE]]])
+      ]),
+      ([np.float64(1.), np.ones([2, 1, 1])], [
+          np.float64(1. / _RATE),
+          np.array([[[1. / _RATE]], [[1. * _RATE]]])
+      ]),
+      ([np.float64(1.), np.ones([1, 3, 1])], [
+          np.float64(1. / _RATE),
+          np.array([[[1. / _RATE], [1. * _RATE], [1. / _RATE]]])
+      ]),
+      ([np.float64(1.), np.ones([1, 1, 1])], [
+          np.float64(1. / _RATE),
+          np.array([[[1. / _RATE]]])
+      ]),
+      ([np.float64(1.), np.ones([1, 1])], [
+          np.float64(1. / _RATE),
+          np.array([[1. / _RATE]])
+      ]),
+      ([np.float64(1.), np.ones([1])], [
+          np.float64(1. / _RATE),
+          np.array([1. / _RATE])
+      ]),
+  )
+  def testBroadcasting(self, old_step_size, new_step_size):
+    log_accept_ratio = tf.constant(
+        [[np.log(0.73), np.log(0.76), np.log(0.73)],
+         [np.log(0.77), np.log(0.77), np.log(0.73)]],
+        dtype=tf.float64)
+    log_accept_ratio = tf.compat.v1.placeholder_with_default(
+        input=log_accept_ratio,
+        shape=log_accept_ratio.shape if self.use_static_shape else None)
+    state = [
+        tf.zeros([2, 3], dtype=tf.float64),
+        tf.zeros([2, 3, 4], dtype=tf.float64)
+    ]
+
+    kernel = FakeMHKernel(
+        FakeSteppedKernel(step_size=old_step_size),
+        log_accept_ratio=log_accept_ratio)
+    kernel = tfp.mcmc.SimpleStepSizeAdaptation(
+        kernel,
+        num_adaptation_steps=1,
+        adaptation_rate=tf.constant(_RATE - 1., dtype=tf.float64),
+        validate_args=True)
+
+    kernel_results = kernel.bootstrap_results(state)
+    for _ in range(2):
+      _, kernel_results = kernel.one_step(state, kernel_results)
+
+    step_size = self.evaluate(
+        kernel_results.inner_results.accepted_results.step_size,)
+
+    self.assertAllClose(new_step_size, step_size)
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class SimpleStepSizeAdaptationDynamicBroadcastingTest(
+    SimpleStepSizeAdaptationStaticBroadcastingTest):
+  use_static_shape = False
 
 
 if __name__ == '__main__':
