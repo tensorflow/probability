@@ -116,13 +116,15 @@ def _value(self, dtype=None, name=None, as_ref=False):  # pylint: disable=g-doc-
           ' results in `tf.convert_to_tensor(x)` being identical to '
           '`x.mean()`.'.format(type(self), self))
     with self._name_scope('value'):
-      self._concrete_value = tfd._convert_to_tensor(
-          value=(self._convert_to_tensor_fn(self)
-                 if callable(self._convert_to_tensor_fn)
-                 else self._convert_to_tensor_fn),
-          name=name or 'concrete_value',
-          dtype=dtype,
-          preferred_dtype=self.dtype)
+      self._concrete_value = (self._convert_to_tensor_fn(self)
+                              if callable(self._convert_to_tensor_fn)
+                              else self._convert_to_tensor_fn)
+      if not tf.is_tensor(self._concrete_value):
+        self._concrete_value = tfd._convert_to_tensor(
+            value=self._concrete_value,
+            name=name or 'concrete_value',
+            dtype=dtype,
+            preferred_dtype=self.dtype)
   return self._concrete_value
   # pylint: enable=protected-access
 

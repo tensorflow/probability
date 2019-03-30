@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import codecs
+import collections
 import functools
 import io
 import pickle
@@ -35,7 +36,8 @@ from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.layers.internal import distribution_tensor_coercible as dtc
-from tensorflow.python.keras.utils import tf_utils as keras_tf_utils
+from tensorflow_probability.python.layers.internal import tensor_tuple as tensor_tuple
+from tensorflow.python.keras.utils import tf_utils as keras_tf_utils  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -156,18 +158,37 @@ class DistributionLambda(tf.keras.layers.Lambda):
 
     def _fn(*fargs, **fkwargs):
       """Wraps `make_distribution_fn` to return both dist and concrete value."""
+      d = make_distribution_fn(*fargs, **fkwargs)
+      value_is_seq = isinstance(d.dtype, collections.Sequence)
+      maybe_composite_convert_to_tensor_fn = (
+          (lambda d: tensor_tuple.TensorTuple(convert_to_tensor_fn(d)))
+          if value_is_seq else convert_to_tensor_fn)
       distribution = dtc._TensorCoercible(  # pylint: disable=protected-access
-          distribution=make_distribution_fn(*fargs, **fkwargs),
-          convert_to_tensor_fn=convert_to_tensor_fn)
-      value = tf.convert_to_tensor(value=distribution)
+          distribution=d,
+          convert_to_tensor_fn=maybe_composite_convert_to_tensor_fn)
+
+      # Calling `distrbution._value()` is equivalent to:
+      # from tensorflow.python.framework import ops
+      # value = ops.convert_to_tensor_or_composite(value=distribution)
+      # We'd prefer to call ops.convert_to_tensor_or_composite but do not,
+      # favoring our own non-public API over TF's.
+      value = distribution._value()  # pylint: disable=protected-access
+
       # TODO(b/126056144): Remove silent handle once we identify how/why Keras
       # is losing the distribution handle for activity_regularizer.
       value._tfp_distribution = distribution  # pylint: disable=protected-access
       # TODO(b/120153609): Keras is incorrectly presuming everything is a
       # `tf.Tensor`. Closing this bug entails ensuring Keras only accesses
       # `tf.Tensor` properties after calling `tf.convert_to_tensor`.
-      distribution.shape = value.shape
-      distribution.get_shape = value.get_shape
+      if value_is_seq:
+        value.shape = value[-1].shape
+        value.get_shape = value[-1].get_shape
+        value.dtype = value[-1].dtype
+        distribution.shape = value[-1].shape
+        distribution.get_shape = value[-1].get_shape
+      else:
+        distribution.shape = value.shape
+        distribution.get_shape = value.get_shape
       return distribution, value
 
     super(DistributionLambda, self).__init__(_fn, **kwargs)

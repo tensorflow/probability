@@ -33,6 +33,7 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         ":distribution_tensor_coercible",
+        ":tensor_tuple",
     ],
 )
 
@@ -56,5 +57,24 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "tensor_tuple",
+    srcs = ["tensor_tuple.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "tensor_tuple_test",
+    size = "small",
+    srcs = ["tensor_tuple_test.py"],
+    deps = [
+        ":tensor_tuple",
+        # tensorflow dep,
     ],
 )

@@ -372,6 +372,11 @@ class JointDistributionSequential(distribution_lib.Distribution):
       _, xs = self.sample_distributions(sample_shape, seed, value)
       return xs
 
+  def _call_sample_n(self, sample_shape, seed, name, **kwargs):
+    # Implemented here so generically calling `Distribution.sample` still works.
+    # (This is needed for convenient Tensor coercion in tfp.layers.)
+    return self.sample(sample_shape, seed, value=None, name=name)
+
   def log_prob_parts(self, value, name='log_prob_parts'):
     """Log probability density/mass function.
 

@@ -18,9 +18,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+# Dependency imports
+import numpy as np
 
-from tensorflow_probability.python.internal import distribution_util as dist_util
+import tensorflow as tf
 
 
 class VariableLayer(tf.keras.layers.Layer):
@@ -113,9 +114,14 @@ class VariableLayer(tf.keras.layers.Layer):
     self.regularizer = tf.keras.regularizers.get(regularizer)
     self.constraint = tf.keras.constraints.get(constraint)
 
-    shape = tf.get_static_value(dist_util.expand_to_vector(shape))
+    shape = tf.get_static_value(shape)
     if shape is None:
       raise ValueError('Shape must be known statically.')
+    shape = np.array(shape, dtype=np.int32)
+    ndims = len(shape.shape)
+    if ndims > 1:
+      raise ValueError('Shape must be scalar or vector.')
+    shape = shape.reshape(-1)  # Ensures vector shape.
 
     self._var = self.add_weight(
         'constant',

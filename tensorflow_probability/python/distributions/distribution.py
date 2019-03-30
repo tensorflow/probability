@@ -131,8 +131,10 @@ def _convert_to_tensor(value, name=None, dtype=None, preferred_dtype=None):
     if preferred_dtype is None:
       preferred_dtype = [None] * len(dtype)
     if len(value) != len(dtype) or len(dtype) != len(preferred_dtype):
-      raise ValueError("Number of input `value`s must match "
-                       "number of `dtype`s.")
+      raise ValueError(
+          "Number of input `value`s must match number of `dtype`s "
+          "(value:{}, dtype:{}, preferred_dtype:{}.".format(
+              len(value), len(dtype), len(preferred_dtype)))
     return tuple(_convert_to_tensor(v, name, d, p)
                  for v, d, p in zip(value, dtype, preferred_dtype))
   # TODO(b/116672045): Remove this function.
