@@ -29,7 +29,32 @@ py_library(
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":missing_values_util",
         ":util",
+    ],
+)
+
+py_library(
+    name = "missing_values_util",
+    srcs = [
+        "missing_values_util.py",
+    ],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions",
+    ],
+)
+
+py_test(
+    name = "missing_values_util_test",
+    size = "medium",
+    srcs = ["missing_values_util_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
     ],
 )
 

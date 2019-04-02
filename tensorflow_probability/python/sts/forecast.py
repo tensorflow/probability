@@ -46,7 +46,9 @@ def one_step_predictive(model, observed_time_series, parameter_samples):
     observed_time_series: `float` `Tensor` of shape
       `concat([sample_shape, model.batch_shape, [num_timesteps, 1]]) where
       `sample_shape` corresponds to i.i.d. observations, and the trailing `[1]`
-      dimension may (optionally) be omitted if `num_timesteps > 1`.
+      dimension may (optionally) be omitted if `num_timesteps > 1`. May
+      optionally be an instance of `tfp.sts.MaskedTimeSeries` including a
+      mask `Tensor` to encode the locations of missing observations.
     parameter_samples: Python `list` of `Tensors` representing posterior samples
       of model parameters, with shapes `[concat([[num_posterior_draws],
       param.prior.batch_shape, param.prior.event_shape]) for param in
@@ -144,9 +146,11 @@ def one_step_predictive(model, observed_time_series, parameter_samples):
 
   with tf.compat.v1.name_scope(
       'one_step_predictive', values=[observed_time_series, parameter_samples]):
-    observed_time_series = tf.convert_to_tensor(
-        value=observed_time_series, name='observed_time_series')
-    observed_time_series = sts_util.maybe_expand_trailing_dim(
+
+    [
+        observed_time_series,
+        is_missing
+    ] = sts_util.canonicalize_observed_time_series_with_mask(
         observed_time_series)
 
     # Run filtering over the training timesteps to extract the
@@ -156,7 +160,7 @@ def one_step_predictive(model, observed_time_series, parameter_samples):
     lgssm = model.make_state_space_model(
         num_timesteps=num_timesteps, param_vals=parameter_samples)
     (_, _, _, _, _, observation_means, observation_covs
-    ) = lgssm.forward_filter(observed_time_series)
+    ) = lgssm.forward_filter(observed_time_series, mask=is_missing)
 
     # Squeeze dims to convert from LGSSM's event shape `[num_timesteps, 1]`
     # to a scalar time series.
@@ -181,7 +185,9 @@ def forecast(model,
     observed_time_series: `float` `Tensor` of shape
       `concat([sample_shape, model.batch_shape, [num_timesteps, 1]])` where
       `sample_shape` corresponds to i.i.d. observations, and the trailing `[1]`
-      dimension may (optionally) be omitted if `num_timesteps > 1`.
+      dimension may (optionally) be omitted if `num_timesteps > 1`. May
+      optionally be an instance of `tfp.sts.MaskedTimeSeries` including a
+      mask `Tensor` to encode the locations of missing observations.
     parameter_samples: Python `list` of `Tensors` representing posterior samples
       of model parameters, with shapes `[concat([[num_posterior_draws],
       param.prior.batch_shape, param.prior.event_shape]) for param in
@@ -283,9 +289,10 @@ def forecast(model,
   with tf.compat.v1.name_scope(
       'forecast',
       values=[observed_time_series, parameter_samples, num_steps_forecast]):
-    observed_time_series = tf.convert_to_tensor(
-        value=observed_time_series, name='observed_time_series')
-    observed_time_series = sts_util.maybe_expand_trailing_dim(
+    [
+        observed_time_series,
+        mask
+    ] = sts_util.canonicalize_observed_time_series_with_mask(
         observed_time_series)
 
     # Run filtering over the observed timesteps to extract the
@@ -298,7 +305,7 @@ def forecast(model,
     observed_data_ssm = model.make_state_space_model(
         num_timesteps=num_observed_steps, param_vals=parameter_samples)
     (_, _, _, predictive_means, predictive_covs, _, _
-    ) = observed_data_ssm.forward_filter(observed_time_series)
+    ) = observed_data_ssm.forward_filter(observed_time_series, mask=mask)
 
     # Build a batch of state-space models over the forecast period. Because
     # we'll use MixtureSameFamily to mix over the posterior draws, we need to

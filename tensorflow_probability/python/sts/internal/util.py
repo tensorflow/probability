@@ -24,7 +24,7 @@ from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.distributions.mvn_linear_operator import MultivariateNormalLinearOperator
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import prefer_static
-
+from tensorflow_probability.python.sts.internal import missing_values_util
 
 tfl = tf.linalg
 
@@ -64,8 +64,10 @@ def pad_batch_dimension_for_multiple_chains(
   # have matching shape `[5, 1, 3, 4, 100]`, where the added `1` dimension
   # between the sample and batch shapes will broadcast to `chain_batch_shape`.
 
-  observed_time_series = maybe_expand_trailing_dim(
-      observed_time_series)  # Guarantee `event_ndims=2`
+  [  # Extract mask and guarantee `event_ndims=2`.
+      observed_time_series,
+      is_missing
+  ] = canonicalize_observed_time_series_with_mask(observed_time_series)
 
   event_ndims = 2  # event_shape = [num_timesteps, observation_size=1]
 
@@ -101,6 +103,15 @@ def pad_batch_dimension_for_multiple_chains(
        model_batch_ndims + event_ndims),
       lambda: do_padding(observed_time_series),
       lambda: observed_time_series)
+
+  if is_missing is not None:
+    is_missing = prefer_static.cond(
+        (dist_util.prefer_static_rank(is_missing) >
+         model_batch_ndims + event_ndims),
+        lambda: do_padding(is_missing),
+        lambda: is_missing)
+    return missing_values_util.MaskedTimeSeries(observed_time_series,
+                                                is_missing=is_missing)
 
   return observed_time_series
 
@@ -207,20 +218,43 @@ def empirical_statistics(observed_time_series):
 
   with tf.compat.v1.name_scope(
       'empirical_statistics', values=[observed_time_series]):
-    observed_time_series = tf.convert_to_tensor(
-        value=observed_time_series, name='observed_time_series')
-    observed_time_series = maybe_expand_trailing_dim(observed_time_series)
-    observed_mean, observed_variance = tf.nn.moments(
-        x=tf.squeeze(observed_time_series, -1), axes=-1)
+
+    [
+        observed_time_series,
+        mask
+    ] = canonicalize_observed_time_series_with_mask(observed_time_series)
+
+    squeezed_series = observed_time_series[..., 0]
+    if mask is None:
+      observed_mean, observed_variance = tf.nn.moments(
+          x=squeezed_series, axes=-1)
+      observed_initial = squeezed_series[..., 0]
+    else:
+      broadcast_mask = tf.broadcast_to(tf.cast(mask, tf.bool),
+                                       tf.shape(input=squeezed_series))
+      observed_mean, observed_variance = (
+          missing_values_util.moments_of_masked_time_series(
+              squeezed_series, broadcast_mask=broadcast_mask))
+      try:
+        observed_initial = (
+            missing_values_util.initial_value_of_masked_time_series(
+                squeezed_series, broadcast_mask=broadcast_mask))
+      except NotImplementedError:
+        tf.compat.v1.logging.warn(
+            'Cannot compute initial values for a masked time series'
+            'with dynamic shape; using the mean instead. This will'
+            'affect heuristic priors and may change the results of'
+            'inference.')
+        observed_initial = observed_mean
+
     observed_stddev = tf.sqrt(observed_variance)
-    observed_initial_centered = observed_time_series[..., 0, 0] - observed_mean
+    observed_initial_centered = observed_initial - observed_mean
     return observed_mean, observed_stddev, observed_initial_centered
 
 
-def maybe_expand_trailing_dim(observed_time_series):
-  """Ensures `observed_time_series` has a trailing dimension of size 1.
+def _maybe_expand_trailing_dim(observed_time_series_tensor):
+  """Ensures `observed_time_series_tensor` has a trailing dimension of size 1.
 
-  This utility method tries to make time-series shape handling more ergonomic.
   The `tfd.LinearGaussianStateSpaceModel` Distribution has event shape of
   `[num_timesteps, observation_size]`, but canonical BSTS models
   are univariate, so their observation_size is always `1`. The extra trailing
@@ -229,29 +263,70 @@ def maybe_expand_trailing_dim(observed_time_series):
   where  `num_timesteps = 1`; this can be avoided by specifying any unit-length
   series in the explicit `[num_timesteps, 1]` style.
 
+  Most users should not call this method directly, and instead call
+  `canonicalize_observed_time_series_with_mask`, which handles converting
+  to `Tensor` and specifying an optional missingness mask.
+
   Args:
-    observed_time_series: `Tensor` of shape `batch_shape + [num_timesteps, 1]`
-      or `batch_shape + [num_timesteps]`, where `num_timesteps > 1`.
+    observed_time_series_tensor: `Tensor` of shape
+      `batch_shape + [num_timesteps, 1]` or `batch_shape + [num_timesteps]`,
+      where `num_timesteps > 1`.
 
   Returns:
     expanded_time_series: `Tensor` of shape `batch_shape + [num_timesteps, 1]`.
   """
 
   with tf.compat.v1.name_scope(
-      'maybe_expand_trailing_dim', values=[observed_time_series]):
-    observed_time_series = tf.convert_to_tensor(
-        value=observed_time_series, name='observed_time_series')
-    if (observed_time_series.shape.ndims is not None and
-        tf.compat.dimension_value(observed_time_series.shape[-1]) is not None):
+      'maybe_expand_trailing_dim', values=[observed_time_series_tensor]):
+    if (observed_time_series_tensor.shape.ndims is not None and
+        tf.compat.dimension_value(
+            observed_time_series_tensor.shape[-1]) is not None):
       expanded_time_series = (
-          observed_time_series if observed_time_series.shape[-1] == 1 else
-          observed_time_series[..., tf.newaxis])
+          observed_time_series_tensor
+          if observed_time_series_tensor.shape[-1] == 1
+          else observed_time_series_tensor[..., tf.newaxis])
     else:
       expanded_time_series = tf.cond(
-          pred=tf.equal(tf.shape(input=observed_time_series)[-1], 1),
-          true_fn=lambda: observed_time_series,
-          false_fn=lambda: observed_time_series[..., tf.newaxis])
+          pred=tf.equal(tf.shape(input=observed_time_series_tensor)[-1], 1),
+          true_fn=lambda: observed_time_series_tensor,
+          false_fn=lambda: observed_time_series_tensor[..., tf.newaxis])
     return expanded_time_series
+
+
+def canonicalize_observed_time_series_with_mask(
+    maybe_masked_observed_time_series):
+  """Extract a Tensor with canonical shape and optional mask.
+
+  Args:
+    maybe_masked_observed_time_series: a `Tensor`-like object with shape
+      `[..., num_timesteps]` or `[..., num_timesteps, 1]`, or a
+      `tfp.sts.MaskedTimeSeries` containing such an object.
+  Returns:
+    masked_time_series: a `tfp.sts.MaskedTimeSeries` namedtuple, in which
+      the `observed_time_series` is converted to `Tensor` with canonical shape
+      `[..., num_timesteps, 1]`, and `is_missing` is either `None` or a boolean
+      `Tensor`.
+  """
+
+  with tf.compat.v1.name_scope('canonicalize_observed_time_series_with_mask'):
+    if hasattr(maybe_masked_observed_time_series, 'is_missing'):
+      observed_time_series = (
+          maybe_masked_observed_time_series.time_series)
+      is_missing = maybe_masked_observed_time_series.is_missing
+    else:
+      observed_time_series = maybe_masked_observed_time_series
+      is_missing = None
+
+    observed_time_series = tf.convert_to_tensor(value=observed_time_series,
+                                                name='observed_time_series')
+    observed_time_series = _maybe_expand_trailing_dim(observed_time_series)
+
+    if is_missing is not None:
+      is_missing = tf.convert_to_tensor(
+          value=is_missing, name='is_missing', dtype_hint=tf.bool)
+
+    return missing_values_util.MaskedTimeSeries(observed_time_series,
+                                                is_missing=is_missing)
 
 
 def mix_over_posterior_draws(means, variances):

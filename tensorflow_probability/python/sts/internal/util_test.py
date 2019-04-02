@@ -23,6 +23,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability import distributions as tfd
+from tensorflow_probability.python.sts.internal import missing_values_util
 from tensorflow_probability.python.sts.internal import util as sts_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
@@ -173,9 +174,41 @@ class _UtilityTests(tf.test.TestCase):
         # pyformat: enable
     ]:
       shape_out = self._shape_as_list(
-          sts_util.maybe_expand_trailing_dim(
+          sts_util._maybe_expand_trailing_dim(
               self._build_tensor(np.zeros(shape_in))))
       self.assertAllEqual(shape_out, expected_shape_out)
+
+  def test_empirical_statistics_accepts_masked_values(self):
+
+    # Ensure that masks broadcast over batch shape by creating a batch of
+    # time series.
+    time_series = np.random.randn(3, 2, 5)
+    mask = np.array([True, False, False, True, False])
+
+    masked_series = missing_values_util.MaskedTimeSeries(
+        time_series=time_series, is_missing=mask)
+    mean, stddev, initial = self.evaluate(
+        sts_util.empirical_statistics(masked_series))
+
+    broadcast_mask = np.broadcast_to(mask, time_series.shape)
+    unmasked_series = time_series[~broadcast_mask].reshape([3, 2, 3])
+    unmasked_mean, unmasked_stddev, unmasked_initial = self.evaluate(
+        sts_util.empirical_statistics(unmasked_series))
+    self.assertAllClose(mean, unmasked_mean)
+    self.assertAllClose(stddev, unmasked_stddev)
+    self.assertAllClose(initial, unmasked_initial)
+
+    # Run the same tests without batch shape.
+    unbatched_time_series = time_series[0, 0, :]
+    masked_series = missing_values_util.MaskedTimeSeries(
+        time_series=unbatched_time_series, is_missing=mask)
+    mean, stddev, initial = self.evaluate(
+        sts_util.empirical_statistics(masked_series))
+    unmasked_mean, unmasked_stddev, unmasked_initial = self.evaluate(
+        sts_util.empirical_statistics(unbatched_time_series[~mask]))
+    self.assertAllClose(mean, unmasked_mean)
+    self.assertAllClose(stddev, unmasked_stddev)
+    self.assertAllClose(initial, unmasked_initial)
 
   def test_mix_over_posterior_draws(self):
     num_posterior_draws = 3

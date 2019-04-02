@@ -27,6 +27,7 @@ from tensorflow_probability.python.sts.fitting import fit_with_hmc
 from tensorflow_probability.python.sts.fitting import sample_uniform_initial_state
 from tensorflow_probability.python.sts.forecast import forecast
 from tensorflow_probability.python.sts.forecast import one_step_predictive
+from tensorflow_probability.python.sts.internal.missing_values_util import MaskedTimeSeries
 from tensorflow_probability.python.sts.local_level import LocalLevel
 from tensorflow_probability.python.sts.local_level import LocalLevelStateSpaceModel
 from tensorflow_probability.python.sts.local_linear_trend import LocalLinearTrend
@@ -53,6 +54,7 @@ _allowed_symbols = [
     'LocalLevelStateSpaceModel',
     'LocalLinearTrend',
     'LocalLinearTrendStateSpaceModel',
+    'MaskedTimeSeries',
     'Seasonal',
     'SeasonalStateSpaceModel',
     'SemiLocalLinearTrend',

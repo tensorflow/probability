@@ -121,10 +121,11 @@ def decompose_by_component(model, observed_time_series, parameter_samples):
   Args:
     model: An instance of `tfp.sts.Sum` representing a structural time series
       model.
-    observed_time_series: optional `float` `Tensor` of shape
+    observed_time_series: `float` `Tensor` of shape
       `batch_shape + [num_timesteps, 1]` (omitting the trailing unit dimension
       is also supported when `num_timesteps > 1`), specifying an observed time
-      series.
+      series. May optionally be an instance of `tfp.sts.MaskedTimeSeries`, which
+      includes a mask `Tensor` to specify timesteps with missing observations.
     parameter_samples: Python `list` of `Tensors` representing posterior
       samples of model parameters, with shapes `[concat([
       [num_posterior_draws], param.prior.batch_shape,
@@ -199,9 +200,10 @@ def decompose_by_component(model, observed_time_series, parameter_samples):
 
   with tf.compat.v1.name_scope('decompose_by_component',
                                values=[observed_time_series]):
-    observed_time_series = tf.convert_to_tensor(
-        value=observed_time_series, name='observed_time_series')
-    observed_time_series = sts_util.maybe_expand_trailing_dim(
+    [
+        observed_time_series,
+        is_missing
+    ] = sts_util.canonicalize_observed_time_series_with_mask(
         observed_time_series)
 
     # Run smoothing over the training timesteps to extract the
@@ -211,7 +213,7 @@ def decompose_by_component(model, observed_time_series, parameter_samples):
     ssm = model.make_state_space_model(num_timesteps=num_timesteps,
                                        param_vals=parameter_samples)
     posterior_means, posterior_covs = ssm.posterior_marginals(
-        observed_time_series)
+        observed_time_series, mask=is_missing)
 
     return _decompose_from_posterior_marginals(
         model, posterior_means, posterior_covs, parameter_samples)

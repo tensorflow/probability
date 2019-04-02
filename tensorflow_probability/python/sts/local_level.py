@@ -226,7 +226,9 @@ class LocalLevel(StructuralTimeSeries):
         `batch_shape + [T, 1]` (omitting the trailing unit dimension is also
         supported when `T > 1`), specifying an observed time series.
         Any priors not explicitly set will be given default values according to
-        the scale of the observed time series (or batch of time series).
+        the scale of the observed time series (or batch of time series). May
+        optionally be an instance of `tfp.sts.MaskedTimeSeries`, which includes
+        a mask `Tensor` to specify timesteps with missing observations.
         Default value: `None`.
       name: the name of this model component.
         Default value: 'LocalLevel'.
@@ -239,10 +241,6 @@ class LocalLevel(StructuralTimeSeries):
 
       if level_scale_prior is None or initial_level_prior is None:
         if observed_time_series is not None:
-          observed_time_series = tf.convert_to_tensor(
-              value=observed_time_series,
-              dtype=dtype,
-              name='observed_time_series')
           _, observed_stddev, observed_initial = (
               sts_util.empirical_statistics(observed_time_series))
         else:

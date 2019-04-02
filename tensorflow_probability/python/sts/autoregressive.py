@@ -322,7 +322,9 @@ class Autoregressive(StructuralTimeSeries):
         `batch_shape + [T, 1]` (omitting the trailing unit dimension is also
         supported when `T > 1`), specifying an observed time series.
         Any priors not explicitly set will be given default values according to
-        the scale of the observed time series (or batch of time series).
+        the scale of the observed time series (or batch of time series). May
+        optionally be an instance of `tfp.sts.MaskedTimeSeries`, which includes
+        a mask `Tensor` to specify timesteps with missing observations.
         Default value: `None`.
       name: the name of this model component.
         Default value: 'Autoregressive'.
@@ -330,15 +332,22 @@ class Autoregressive(StructuralTimeSeries):
     with tf.compat.v1.name_scope(
         name, 'Autoregressive', values=[observed_time_series]) as name:
 
+      masked_time_series = None
+      if observed_time_series is not None:
+        masked_time_series = (
+            sts_util.canonicalize_observed_time_series_with_mask(
+                observed_time_series))
+
       dtype = dtype_util.common_dtype(
-          [observed_time_series,
+          [(masked_time_series.time_series
+            if masked_time_series is not None else None),
            coefficients_prior,
            level_scale_prior,
            initial_state_prior], preferred_dtype=tf.float32)
 
       if observed_time_series is not None:
         _, observed_stddev, observed_initial = sts_util.empirical_statistics(
-            observed_time_series)
+            masked_time_series)
       else:
         observed_stddev, observed_initial = (
             tf.convert_to_tensor(value=1., dtype=dtype),

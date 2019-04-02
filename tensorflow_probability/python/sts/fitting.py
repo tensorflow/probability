@@ -124,7 +124,9 @@ def build_factored_variational_loss(model,
     observed_time_series: `float` `Tensor` of shape
       `concat([sample_shape, model.batch_shape, [num_timesteps, 1]]) where
       `sample_shape` corresponds to i.i.d. observations, and the trailing `[1]`
-      dimension may (optionally) be omitted if `num_timesteps > 1`.
+      dimension may (optionally) be omitted if `num_timesteps > 1`. May
+      optionally be an instance of `tfp.sts.MaskedTimeSeries`, which includes
+      a mask `Tensor` to specify timesteps with missing observations.
     init_batch_shape: Batch shape (Python `tuple`, `list`, or `int`) of initial
       states to optimize in parallel.
       Default value: `()`. (i.e., just run a single optimization).
@@ -227,8 +229,6 @@ def build_factored_variational_loss(model,
   with tf.compat.v1.name_scope(
       name, 'build_factored_variational_loss',
       values=[observed_time_series]) as name:
-    observed_time_series = tf.convert_to_tensor(
-        value=observed_time_series, name='observed_time_series')
     seed = tfd.SeedStream(
         seed, salt='StructuralTimeSeries_build_factored_variational_loss')
 
@@ -319,7 +319,9 @@ def fit_with_hmc(model,
     observed_time_series: `float` `Tensor` of shape
       `concat([sample_shape, model.batch_shape, [num_timesteps, 1]]) where
       `sample_shape` corresponds to i.i.d. observations, and the trailing `[1]`
-      dimension may (optionally) be omitted if `num_timesteps > 1`.
+      dimension may (optionally) be omitted if `num_timesteps > 1`. May
+      optionally be an instance of `tfp.sts.MaskedTimeSeries`, which includes
+      a mask `Tensor` to specify timesteps with missing observations.
     num_results: Integer number of Markov chain draws.
       Default value: `100`.
     num_warmup_steps: Integer number of steps to take before starting to
@@ -474,8 +476,6 @@ def fit_with_hmc(model,
   """
   with tf.compat.v1.name_scope(
       name, 'fit_with_hmc', values=[observed_time_series]) as name:
-    observed_time_series = tf.convert_to_tensor(
-        value=observed_time_series, name='observed_time_series')
     seed = tfd.SeedStream(seed, salt='StructuralTimeSeries_fit_with_hmc')
 
     # Initialize state and step sizes from a variational posterior if not

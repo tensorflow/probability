@@ -401,7 +401,9 @@ class Sum(StructuralTimeSeries):
         `batch_shape + [T, 1]` (omitting the trailing unit dimension is also
         supported when `T > 1`), specifying an observed time series. This is
         used to set the constant offset, if not provided, and to construct a
-        default heuristic `observation_noise_scale_prior` if not provided.
+        default heuristic `observation_noise_scale_prior` if not provided. May
+        optionally be an instance of `tfp.sts.MaskedTimeSeries`, which includes
+        a mask `Tensor` to specify timesteps with missing observations.
         Default value: `None`.
       name: Python `str` name of this model component; used as `name_scope`
         for ops created by this class.
@@ -414,10 +416,6 @@ class Sum(StructuralTimeSeries):
     with tf.compat.v1.name_scope(
         name, 'Sum', values=[observed_time_series]) as name:
       if observed_time_series is not None:
-        observed_time_series = tf.convert_to_tensor(value=observed_time_series,
-                                                    name='observed_time_series')
-        observed_time_series = sts_util.maybe_expand_trailing_dim(
-            observed_time_series)
         observed_mean, observed_stddev, _ = (
             sts_util.empirical_statistics(observed_time_series))
       else:

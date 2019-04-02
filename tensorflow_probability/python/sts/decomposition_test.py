@@ -69,6 +69,31 @@ class _DecompositionTest(tf.test.TestCase):
         model, component_dists,
         expected_shape=param_batch_shape + [num_timesteps])
 
+  def testDecomposeByComponentSupportsMissingData(self):
+    num_timesteps = 8
+    model, observed_time_series, param_samples = self._build_model_and_params(
+        num_timesteps=num_timesteps, param_batch_shape=[])
+
+    # Check that missing values are properly handled by setting them to NaN,
+    # and asserting (below) that the NaNs don't propagate.
+    is_missing = [True, True, False, False, True, False, False, True]
+    nans = np.zeros([num_timesteps], dtype=self.dtype)
+    nans[is_missing] = np.nan
+    masked_time_series = tfp.sts.MaskedTimeSeries(
+        time_series=observed_time_series + nans,
+        is_missing=is_missing)
+
+    component_dists = tfp.sts.decompose_by_component(
+        model,
+        observed_time_series=masked_time_series,
+        parameter_samples=param_samples)
+
+    component_means_, component_stddevs_ = self.evaluate(
+        ([d.mean() for d in component_dists.values()],
+         [d.stddev() for d in component_dists.values()]))
+    self.assertTrue(np.all(np.isfinite(component_means_)))
+    self.assertTrue(np.all(np.isfinite(component_stddevs_)))
+
   def testDecomposeForecastByComponentSupportsBatchShape(self):
     num_timesteps = 12
     param_batch_shape = [2, 1]
@@ -129,7 +154,7 @@ class DecompositionTestStatic32(_DecompositionTest):
 
 
 # Run in graph mode only to reduce test weight.
-class ForecastTestDynamic64(_DecompositionTest):
+class DecompositionTestDynamic64(_DecompositionTest):
   dtype = np.float64
   use_static_shape = False
 

@@ -213,19 +213,57 @@ class _ForecastTest(object):
     self.assertAllEqual(forecast_mean_.shape,
                         batch_shape + [num_steps_forecast])
 
-  def _build_tensor(self, ndarray):
+  def test_methods_handle_masked_inputs(self):
+    num_param_samples = 5
+    num_timesteps = 4
+    num_steps_forecast = 2
+
+    # Build a time series with `NaN`s that will propagate if not properly
+    # masked.
+    observed_time_series_ = np.random.randn(num_timesteps)
+    is_missing_ = np.random.randn(num_timesteps) > 0
+    observed_time_series_[is_missing_] = np.nan
+    observed_time_series = tfp.sts.MaskedTimeSeries(
+        self._build_tensor(observed_time_series_),
+        is_missing=self._build_tensor(is_missing_, dtype=np.bool))
+
+    model = self._build_model(observed_time_series)
+    prior_samples = [param.prior.sample(num_param_samples)
+                     for param in model.parameters]
+
+    forecast_dist = tfp.sts.forecast(model, observed_time_series,
+                                     parameter_samples=prior_samples,
+                                     num_steps_forecast=num_steps_forecast)
+
+    forecast_mean_, forecast_stddev_ = self.evaluate((
+        forecast_dist.mean(),
+        forecast_dist.stddev()))
+    self.assertTrue(np.all(np.isfinite(forecast_mean_)))
+    self.assertTrue(np.all(np.isfinite(forecast_stddev_)))
+
+    onestep_dist = tfp.sts.one_step_predictive(
+        model, observed_time_series,
+        parameter_samples=prior_samples)
+    onestep_mean_, onestep_stddev_ = self.evaluate((
+        onestep_dist.mean(),
+        onestep_dist.stddev()))
+    self.assertTrue(np.all(np.isfinite(onestep_mean_)))
+    self.assertTrue(np.all(np.isfinite(onestep_stddev_)))
+
+  def _build_tensor(self, ndarray, dtype=None):
     """Convert a numpy array to a TF placeholder.
 
     Args:
       ndarray: any object convertible to a numpy array via `np.asarray()`.
+      dtype: optional `dtype`.
 
     Returns:
       placeholder: a TensorFlow `placeholder` with default value given by the
-      provided `ndarray`, dtype given by `self.dtype`, and shape specified
-      statically only if `self.use_static_shape` is `True`.
+      provided `ndarray`, dtype given by `self.dtype` (if not specified), and
+      shape specified statically only if `self.use_static_shape` is `True`.
     """
 
-    ndarray = np.asarray(ndarray).astype(self.dtype)
+    ndarray = np.asarray(ndarray).astype(self.dtype if dtype is None else dtype)
     return tf.compat.v1.placeholder_with_default(
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
