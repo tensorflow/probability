@@ -144,9 +144,6 @@ class Polynomial(psd_kernel.PositiveSemidefiniteKernel):
             value=exponent, name='exponent', dtype=dtype)
       self._exponent = _validate_arg_if_not_none(
           exponent, tf.compat.v1.assert_positive, validate_args)
-      tf.debugging.assert_same_float_dtype([
-          self._bias_variance, self._slope_variance, self._shift, self._exponent
-      ])
     super(Polynomial, self).__init__(
         feature_ndims, dtype=dtype, name=name)
 

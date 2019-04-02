@@ -99,8 +99,6 @@ class ExpSinSquared(psd_kernel.PositiveSemidefiniteKernel):
             value=length_scale, name='length_scale', dtype=dtype)
       self._length_scale = _validate_arg_if_not_none(
           length_scale, tf.compat.v1.assert_positive, validate_args)
-      tf.debugging.assert_same_float_dtype(
-          [self._amplitude, self._length_scale, self._period])
     super(ExpSinSquared, self).__init__(feature_ndims, dtype=dtype, name=name)
 
   def _apply(self, x1, x2, param_expansion_ndims=0):

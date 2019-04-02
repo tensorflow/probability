@@ -65,7 +65,6 @@ class _AmplitudeLengthScaleMixin(object):
           value=length_scale, name='length_scale', dtype=dtype)
     self._length_scale = _validate_arg_if_not_none(
         length_scale, tf.compat.v1.assert_positive, validate_args)
-    tf.debugging.assert_same_float_dtype([self.amplitude, self.length_scale])
     return dtype
 
   @property

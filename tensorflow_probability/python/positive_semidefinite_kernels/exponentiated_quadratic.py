@@ -85,8 +85,6 @@ class ExponentiatedQuadratic(psd_kernel.PositiveSemidefiniteKernel):
             value=length_scale, name='length_scale', dtype=dtype)
       self._length_scale = _validate_arg_if_not_none(
           length_scale, tf.compat.v1.assert_positive, validate_args)
-      tf.debugging.assert_same_float_dtype(
-          [self._amplitude, self._length_scale])
     super(ExponentiatedQuadratic, self).__init__(
         feature_ndims, dtype=dtype, name=name)
 
