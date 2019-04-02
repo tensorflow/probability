@@ -55,9 +55,9 @@ class ExponentiatedQuadraticTest(tf.test.TestCase, parameterized.TestCase):
       x = np.random.uniform(-1, 1, size=shape).astype(np.float32)
       y = np.random.uniform(-1, 1, size=shape).astype(np.float32)
       self.assertAllClose(
-          self.evaluate(k.apply(x, y)),
           amplitude ** 2 * np.exp(
-              -np.float32(.5) * np.sum((x - y)**2) / length_scale**2))
+              -np.float32(.5) * np.sum((x - y)**2) / length_scale**2),
+          self.evaluate(k.apply(x, y)))
 
   def testNoneShapes(self):
     k = psd_kernels.ExponentiatedQuadratic(
@@ -70,23 +70,24 @@ class ExponentiatedQuadraticTest(tf.test.TestCase, parameterized.TestCase):
     x = np.ones([4, 3], np.float32)
     y = np.ones([5, 3], np.float32)
 
-    self.assertAllEqual(k.matrix(x, y).shape, [4, 5])
+    self.assertAllEqual([4, 5], k.matrix(x, y).shape)
     self.assertAllEqual(
-        k.matrix(tf.stack([x]*2), tf.stack([y]*2)).shape,
-        [2, 4, 5])
+        [2, 4, 5],
+        k.matrix(tf.stack([x]*2), tf.stack([y]*2)).shape)
 
     k = psd_kernels.ExponentiatedQuadratic(
         amplitude=np.ones([2, 1, 1], np.float32),
         length_scale=np.ones([1, 3, 1], np.float32))
     self.assertAllEqual(
+        [2, 3, 2, 4, 5],
+        #`--'  |  `--'
+        #  |   |    `- matrix shape
+        #  |   `- from input batch shapes
+        #  `- from broadcasting kernel params
         k.matrix(
             tf.stack([x]*2),  # shape [2, 4, 3]
             tf.stack([y]*2)   # shape [2, 5, 3]
-        ).shape, [2, 3, 2, 4, 5])
-    #             `--'  |  `--'
-    #               |   |    `- matrix shape
-    #               |   `- from input batch shapes
-    #               `- from broadcasting kernel params
+        ).shape)
 
   def testValidateArgs(self):
     with self.assertRaises(tf.errors.InvalidArgumentError):

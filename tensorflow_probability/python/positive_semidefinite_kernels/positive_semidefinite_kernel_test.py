@@ -176,8 +176,8 @@ class PositiveSemidefiniteKernelTest(tf.test.TestCase, parameterized.TestCase):
       ('Shape [2, 1] kernel', [[1.], [2.]], [2, 1]))
   def testStaticBatchShape(self, params, shape):
     k = TestKernel(params)
-    self.assertAllEqual(k.batch_shape.as_list(), shape)
-    self.assertAllEqual(self.evaluate(k.batch_shape_tensor()), shape)
+    self.assertAllEqual(shape, k.batch_shape.as_list())
+    self.assertAllEqual(shape, self.evaluate(k.batch_shape_tensor()))
 
   @parameterized.named_parameters(
       ('Dynamic-shape [2] kernel', [1., 2.], [2]),
@@ -185,12 +185,12 @@ class PositiveSemidefiniteKernelTest(tf.test.TestCase, parameterized.TestCase):
   def testDynamicBatchShape(self, params, shape):
     tensor_params = tf.compat.v1.placeholder_with_default(params, shape=None)
     k = TestKernel(tensor_params)
-    self.assertAllEqual(self.evaluate(k.batch_shape_tensor()), shape)
+    self.assertAllEqual(shape, self.evaluate(k.batch_shape_tensor()))
 
   def testApplyOutputWithStaticShapes(self):
     k = TestKernel(PARAMS_0)  # batch_shape = []
     x, y, _ = self.createKernelInputs()
-    self.assertAllEqual(k.apply(x, y).shape, [3])
+    self.assertAllEqual([3], k.apply(x, y).shape)
 
     k = TestKernel(PARAMS_2)  # batch_shape = [2]
     with self.assertRaises((ValueError, tf.errors.InvalidArgumentError)):
@@ -200,10 +200,12 @@ class PositiveSemidefiniteKernelTest(tf.test.TestCase, parameterized.TestCase):
           y)  # shape [3, 3]
 
     k = TestKernel(PARAMS_21)  # batch_shape = [2, 1]
-    self.assertAllEqual(k.apply(
-        x,  # shape [3, 3]
-        y   # shape [3, 3]
-    ).shape, [2, 3])
+    self.assertAllEqual(
+        [2, 3],
+        k.apply(
+            x,  # shape [3, 3]
+            y   # shape [3, 3]
+        ).shape)
 
   def testApplyOutputWithDynamicShapes(self):
     params_2_dynamic = tf.compat.v1.placeholder_with_default(
@@ -223,21 +225,25 @@ class PositiveSemidefiniteKernelTest(tf.test.TestCase, parameterized.TestCase):
     apply_op = k.apply(
         x,  # shape [3, 3]
         y)  # shape [3, 3]
-    self.assertAllEqual(self.evaluate(apply_op).shape, [2, 3])
+    self.assertAllEqual([2, 3], self.evaluate(apply_op).shape)
 
   def testMatrixOutputWithStaticShapes(self):
     k = TestKernel(PARAMS_0)  # batch_shape = []
     x, _, z = self.createKernelInputs()
-    self.assertAllEqual(k.matrix(
-        x,  # shape [3, 3]
-        z   # shape [4, 3]
-    ).shape, [3, 4])
+    self.assertAllEqual(
+        [3, 4],
+        k.matrix(
+            x,  # shape [3, 3]
+            z   # shape [4, 3]
+        ).shape)
 
     k = TestKernel(PARAMS_2)  # batch_shape = [2]
-    self.assertAllEqual(k.matrix(
-        x,  # shape [3, 3]
-        z   # shape [4, 3]
-    ).shape, [2, 3, 4])
+    self.assertAllEqual(
+        [2, 3, 4],
+        k.matrix(
+            x,  # shape [3, 3]
+            z   # shape [4, 3]
+        ).shape)
 
     k = TestKernel(PARAMS_2)  # batch_shape = [2]
     batch_x, _, batch_z = self.createKernelInputs(batched=True)
@@ -250,11 +256,11 @@ class PositiveSemidefiniteKernelTest(tf.test.TestCase, parameterized.TestCase):
 
     k = TestKernel(PARAMS_21)  # batch_shape = [2, 1]
     self.assertAllEqual(
+        [2, 5, 3, 4],
         k.matrix(
             batch_x,  # shape = [5, 3, 3]
             batch_z   # shape = [5, 4, 3]
-        ).shape,
-        [2, 5, 3, 4])
+        ).shape)
 
   def testMatrixOutputWithDynamicShapes(self):
     params_2_dynamic = tf.compat.v1.placeholder_with_default(
@@ -264,7 +270,7 @@ class PositiveSemidefiniteKernelTest(tf.test.TestCase, parameterized.TestCase):
     apply_op = k.matrix(
         x,  # shape [3, 3]
         z)  # shape [4, 3]
-    self.assertAllEqual(self.evaluate(apply_op).shape, [2, 3, 4])
+    self.assertAllEqual([2, 3, 4], self.evaluate(apply_op).shape)
 
     params_21_dynamic = tf.compat.v1.placeholder_with_default(
         [[1.], [2.]], shape=None)
@@ -273,7 +279,7 @@ class PositiveSemidefiniteKernelTest(tf.test.TestCase, parameterized.TestCase):
     apply_op = k.matrix(
         batch_x,  # shape [5, 3, 3]
         batch_z)  # shape [5, 4, 3]
-    self.assertAllEqual(self.evaluate(apply_op).shape, [2, 5, 3, 4])
+    self.assertAllEqual([2, 5, 3, 4], self.evaluate(apply_op).shape)
 
   def testOperatorOverloads(self):
     k0 = TestKernel(PARAMS_0)
@@ -295,12 +301,12 @@ class PositiveSemidefiniteKernelTest(tf.test.TestCase, parameterized.TestCase):
 
     x, y, _ = self.createKernelInputs()
     sum_kernel = k0 + k1 + k2 + k21
-    self.assertAllEqual(sum_kernel.batch_shape, [2, 2])
-    self.assertEqual(sum_kernel.dtype, tf.float32)
+    self.assertAllEqual([2, 2], sum_kernel.batch_shape)
+    self.assertEqual(tf.float32, sum_kernel.dtype)
     self.assertAllEqual(
-        self.evaluate(sum_kernel.matrix(x, y)),
         sum([self.evaluate(k.matrix(x, y))
-             for k in sum_kernel.kernels]))
+             for k in sum_kernel.kernels]),
+        self.evaluate(sum_kernel.matrix(x, y)))
 
   def testDynamicShapesAndValuesOfSum(self):
     params_2_dynamic = tf.compat.v1.placeholder_with_default(
@@ -312,12 +318,12 @@ class PositiveSemidefiniteKernelTest(tf.test.TestCase, parameterized.TestCase):
 
     x, y, _ = self.createKernelInputs()
     sum_kernel = k2 + k21
-    self.assertEqual(sum_kernel.dtype, tf.float32)
-    self.assertAllEqual(self.evaluate(sum_kernel.batch_shape_tensor()), [2, 2])
+    self.assertEqual(tf.float32, sum_kernel.dtype)
+    self.assertAllEqual([2, 2], self.evaluate(sum_kernel.batch_shape_tensor()))
     self.assertAllEqual(
-        self.evaluate(sum_kernel.matrix(x, y)),
         sum([self.evaluate(k.matrix(x, y))
-             for k in sum_kernel.kernels]))
+             for k in sum_kernel.kernels]),
+        self.evaluate(sum_kernel.matrix(x, y)))
 
   def testStaticShapesAndValuesOfProduct(self):
     k0 = TestKernel(PARAMS_0)
@@ -327,14 +333,14 @@ class PositiveSemidefiniteKernelTest(tf.test.TestCase, parameterized.TestCase):
 
     x, y, _ = self.createKernelInputs()
     product_kernel = k0 * k1 * k2 * k21
-    self.assertEqual(product_kernel.dtype, tf.float32)
-    self.assertAllEqual(product_kernel.batch_shape, [2, 2])
+    self.assertEqual(tf.float32, product_kernel.dtype)
+    self.assertAllEqual([2, 2], product_kernel.batch_shape)
     self.assertAllEqual(
-        self.evaluate(product_kernel.matrix(x, y)),
         functools.reduce(
             operator.mul,
             [self.evaluate(k.matrix(x, y))
-             for k in product_kernel.kernels]))
+             for k in product_kernel.kernels]),
+        self.evaluate(product_kernel.matrix(x, y)))
 
   def testDynamicShapesAndValuesOfProduct(self):
     params_2_dynamic = tf.compat.v1.placeholder_with_default(
@@ -346,15 +352,15 @@ class PositiveSemidefiniteKernelTest(tf.test.TestCase, parameterized.TestCase):
 
     x, y, _ = self.createKernelInputs()
     product_kernel = k2 * k21
-    self.assertEqual(product_kernel.dtype, tf.float32)
+    self.assertEqual(tf.float32, product_kernel.dtype)
     self.assertAllEqual(
-        self.evaluate(product_kernel.batch_shape_tensor()), [2, 2])
+        [2, 2], self.evaluate(product_kernel.batch_shape_tensor()))
     self.assertAllEqual(
-        self.evaluate(product_kernel.matrix(x, y)),
         functools.reduce(
             operator.mul,
             [self.evaluate(k.matrix(x, y))
-             for k in product_kernel.kernels]))
+             for k in product_kernel.kernels]),
+        self.evaluate(product_kernel.matrix(x, y)))
 
 if __name__ == '__main__':
   tf.test.main()

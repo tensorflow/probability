@@ -138,8 +138,8 @@ class PolynomialTest(tf.test.TestCase, parameterized.TestCase):
         shift=shift,
         exponent=exponent,
         validate_args=True)
-    self.assertAllEqual(k.batch_shape.as_list(), shape)
-    self.assertAllEqual(self.evaluate(k.batch_shape_tensor()), shape)
+    self.assertAllEqual(shape, k.batch_shape.as_list())
+    self.assertAllEqual(shape, self.evaluate(k.batch_shape_tensor()))
 
   def testFloat32(self):
     # No exception expected
@@ -191,7 +191,7 @@ class PolynomialTest(tf.test.TestCase, parameterized.TestCase):
     x = np.ones(x_shape, np.float32)
     y = np.ones(y_shape, np.float32)
     self.assertAllEqual(
-        k.apply(x, y).shape, apply_shape)
+        apply_shape, k.apply(x, y).shape)
 
   @parameterized.named_parameters(
       dict(
@@ -225,22 +225,22 @@ class PolynomialTest(tf.test.TestCase, parameterized.TestCase):
         feature_ndims=feature_ndims)
     x = np.ones(x_shape, np.float32)
     y = np.ones(y_shape, np.float32)
-    self.assertAllEqual(
-        k.matrix(x, y).shape, matrix_shape)
+    self.assertAllEqual(matrix_shape, k.matrix(x, y).shape)
 
   def testShapesAreCorrectBroadcast(self):
     k = psd_kernels.Polynomial(
         bias_variance=np.ones([2, 1, 1], np.float32),
         slope_variance=np.ones([1, 3, 1], np.float32))
     self.assertAllEqual(
+        [2, 3, 2, 4, 5],
+        #`--'  |  `--'
+        #  |   |    `- matrix shape
+        #  |   `- from input batch shapes
+        #  `- from broadcasting kernel params
         k.matrix(
             np.ones([2, 4, 3], np.float32),
             np.ones([2, 5, 3], np.float32)
-        ).shape, [2, 3, 2, 4, 5])
-    #             `--'  |  `--'
-    #               |   |    `- matrix shape
-    #               |   `- from input batch shapes
-    #               `- from broadcasting kernel params
+        ).shape)
 
   def testValuesAreCorrect(self):
     bias_variance = 1.5
@@ -256,9 +256,9 @@ class PolynomialTest(tf.test.TestCase, parameterized.TestCase):
     x = np.random.uniform(-1, 1, size=[5, 3]).astype(np.float32)
     y = np.random.uniform(-1, 1, size=[4, 3]).astype(np.float32)
     self.assertAllClose(
-        self.evaluate(k.matrix(x, y)),
         (bias_variance ** 2 + slope_variance ** 2 *
-         ((x - shift).dot((y - shift).T)) ** exponent)
+         ((x - shift).dot((y - shift).T)) ** exponent),
+        self.evaluate(k.matrix(x, y))
     )
 
 
@@ -274,8 +274,7 @@ class LinearTest(tf.test.TestCase, parameterized.TestCase):
     k = psd_kernels.Linear()
     x = np.random.uniform(-1, 1, size=[5, 3]).astype(np.float32)
     y = np.random.uniform(-1, 1, size=[4, 3]).astype(np.float32)
-    self.assertAllClose(
-        self.evaluate(k.matrix(x, y)), x.dot(y.T))
+    self.assertAllClose(x.dot(y.T), self.evaluate(k.matrix(x, y)))
 
 
 if __name__ == '__main__':

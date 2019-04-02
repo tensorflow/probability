@@ -69,9 +69,9 @@ class RationalQuadraticTest(tf.test.TestCase, parameterized.TestCase):
       x = np.random.uniform(-1, 1, size=shape).astype(dtype)
       y = np.random.uniform(-1, 1, size=shape).astype(dtype)
       self.assertAllClose(
-          self.evaluate(k.apply(x, y)),
           self._rational_quadratic(
-              amplitude, length_scale, scale_mixture_rate, x, y))
+              amplitude, length_scale, scale_mixture_rate, x, y),
+          self.evaluate(k.apply(x, y)))
 
   def testNoneScaleMixture(self):
     amplitude = 5.
@@ -86,12 +86,12 @@ class RationalQuadraticTest(tf.test.TestCase, parameterized.TestCase):
     x = np.random.uniform(-1, 1, size=[5]).astype(np.float32)
     y = np.random.uniform(-1, 1, size=[5]).astype(np.float32)
     self.assertAllClose(
-        self.evaluate(k.apply(x, y)),
         # Ensure that a None value for scale_mixture_rate has the same semantics
         # as scale_mixture_rate=1.
         self._rational_quadratic(
             amplitude=amplitude,
-            length_scale=length_scale, scale_mixture_rate=1., x=x, y=y))
+            length_scale=length_scale, scale_mixture_rate=1., x=x, y=y),
+        self.evaluate(k.apply(x, y)))
 
   def testShapesAreCorrect(self):
     k = psd_kernels.RationalQuadratic(amplitude=1., length_scale=1.)
@@ -99,10 +99,10 @@ class RationalQuadraticTest(tf.test.TestCase, parameterized.TestCase):
     x = np.ones([4, 3], np.float32)
     y = np.ones([5, 3], np.float32)
 
-    self.assertAllEqual(k.matrix(x, y).shape, [4, 5])
+    self.assertAllEqual([4, 5], k.matrix(x, y).shape)
     self.assertAllEqual(
-        k.matrix(tf.stack([x]*2), tf.stack([y]*2)).shape,
-        [2, 4, 5])
+        [2, 4, 5],
+        k.matrix(tf.stack([x]*2), tf.stack([y]*2)).shape)
 
     k = psd_kernels.RationalQuadratic(
         amplitude=np.ones([2, 1, 1], np.float32),
@@ -110,14 +110,15 @@ class RationalQuadraticTest(tf.test.TestCase, parameterized.TestCase):
         scale_mixture_rate=np.ones([2, 1, 1, 1], np.float32))
 
     self.assertAllEqual(
+        [2, 2, 3, 2, 4, 5],
+        #`-----'  |  `--'
+        #  |      |    `- matrix shape
+        #  |      `- from input batch shapes
+        #  `- from broadcasting kernel params
         k.matrix(
             tf.stack([x]*2),  # shape [2, 4, 3]
             tf.stack([y]*2)   # shape [2, 5, 3]
-        ).shape, [2, 2, 3, 2, 4, 5])
-    #             `-----'  |  `--'
-    #               |      |    `- matrix shape
-    #               |      `- from input batch shapes
-    #               `- from broadcasting kernel params
+        ).shape)
 
   def testValidateArgs(self):
     with self.assertRaises(tf.errors.InvalidArgumentError):
