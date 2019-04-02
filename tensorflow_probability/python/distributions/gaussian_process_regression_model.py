@@ -559,13 +559,9 @@ class GaussianProcessRegressionModel(
     # "empty" observation data.
     if self.observation_index_points is None and self.observations is None:
       return True
-    ndims = self.kernel.feature_ndims
-    if (self.observation_index_points.shape[-ndims:].is_fully_defined() and
-        tf.compat.dimension_value(
-            self.observation_index_points.shape[-ndims]) == 0):
-      return True
-    if (self.observations.shape[-ndims:].is_fully_defined() and
-        tf.compat.dimension_value(self.observations.shape[-ndims]) == 0):
+    num_obs = tf.compat.dimension_value(
+        self.observation_index_points.shape[-(self.kernel.feature_ndims + 1)])
+    if num_obs is not None and num_obs == 0:
       return True
     return False
 

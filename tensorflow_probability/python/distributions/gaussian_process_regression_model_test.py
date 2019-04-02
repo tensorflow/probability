@@ -197,7 +197,7 @@ class _GaussianProcessRegressionModelTest(object):
     gprm_zero_shapes = tfd.GaussianProcessRegressionModel(
         kernel,
         index_points,
-        observation_index_points=tf.ones([5, 0], tf.float64),
+        observation_index_points=tf.ones([5, 0, 1], tf.float64),
         observations=tf.ones([5, 0], tf.float64),
         mean_fn=mean_fn,
         jitter=jitter)
