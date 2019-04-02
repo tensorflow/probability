@@ -74,32 +74,36 @@ class EndToEndTest(tf.test.TestCase):
   def setUp(self):
     self.encoded_size = 2
     self.input_shape = [2, 2, 1]
-    self.train_size = 100
-    self.test_size = 100
-    self.x = np.random.rand(
-        self.train_size, *self.input_shape).astype(np.float32)
-    self.x_test = np.random.rand(
-        self.test_size, *self.input_shape).astype(np.float32)
+    self.train_size = 10000
+    self.test_size = 1000
+    self.x = (np.random.rand(
+        self.train_size, *self.input_shape) > 0.75).astype(np.float32)
+    self.x_test = (np.random.rand(
+        self.test_size, *self.input_shape) > 0.75).astype(np.float32)
 
   def test_keras_sequential_api(self):
     """Test `DistributionLambda`s are composable via Keras `Sequential` API."""
 
+    prior_model = tfk.Sequential([
+        tfpl.VariableLayer(shape=[self.encoded_size]),
+        tfpl.DistributionLambda(
+            lambda t: tfd.Independent(tfd.Normal(loc=t, scale=1),  # pylint: disable=g-long-lambda
+                                      reinterpreted_batch_ndims=1)),
+    ])
+
     encoder_model = tfk.Sequential([
         tfkl.InputLayer(input_shape=self.input_shape),
         tfkl.Flatten(),
-        tfkl.Dense(10, activation='relu'),
         tfkl.Dense(tfpl.MultivariateNormalTriL.params_size(self.encoded_size)),
         tfpl.MultivariateNormalTriL(
             self.encoded_size,
             activity_regularizer=tfpl.KLDivergenceRegularizer(
-                tfd.Independent(tfd.Normal(loc=[0., 0], scale=1),
-                                reinterpreted_batch_ndims=1),
+                lambda: prior_model(0.),
                 weight=0.9)),  # "beta" as in beta-VAE.
     ])
 
     decoder_model = tfk.Sequential([
         tfkl.InputLayer(input_shape=[self.encoded_size]),
-        tfkl.Dense(10, activation='relu'),
         tfkl.Dense(tfpl.IndependentBernoulli.params_size(self.input_shape)),
         tfpl.IndependentBernoulli(self.input_shape, tfd.Bernoulli.logits),
     ])
@@ -107,10 +111,23 @@ class EndToEndTest(tf.test.TestCase):
     vae_model = tfk.Model(
         inputs=encoder_model.inputs,
         outputs=decoder_model(encoder_model.outputs[0]))
+
+    # Attach prior weights to model.
+    self.assertLen(vae_model.trainable_weights, 4)
+    vae_model._trainable_weights.extend(prior_model.trainable_variables)
+    self.assertLen(vae_model.trainable_weights, 4 + 1)
+
+    def accuracy(x, rv_x):
+      if hasattr(rv_x, '_tfp_distribution'):
+        rv_x = rv_x._tfp_distribution
+      return tf.reduce_mean(
+          input_tensor=tf.cast(tf.equal(x, rv_x.mode()), x.dtype),
+          axis=tf.range(-rv_x.event_shape.ndims, 0))
+
     vae_model.compile(
-        optimizer=tf.compat.v1.train.AdamOptimizer(),
+        optimizer=tf.compat.v2.optimizers.Adam(learning_rate=0.5),
         loss=lambda x, rv_x: -rv_x.log_prob(x),
-        metrics=[])
+        metrics=[accuracy])
     vae_model.fit(self.x, self.x,
                   batch_size=25,
                   epochs=1,
@@ -148,7 +165,7 @@ class EndToEndTest(tf.test.TestCase):
 
     vae_model = tfk.Model(inputs=images, outputs=decoded)
     vae_model.compile(
-        optimizer=tf.compat.v1.train.AdamOptimizer(),
+        optimizer=tf.compat.v2.optimizers.Adam(),
         loss=lambda x, rv_x: -rv_x.log_prob(x),
         metrics=[])
     vae_model.fit(self.x, self.x,
@@ -206,7 +223,7 @@ class EndToEndTest(tf.test.TestCase):
 
     vae_model = tfk.Model(inputs=images, outputs=decoded)
     vae_model.compile(
-        optimizer=tf.compat.v1.train.AdamOptimizer(),
+        optimizer=tf.compat.v2.optimizers.Adam(),
         loss=lambda x, rv_x: -rv_x.log_prob(x),
         metrics=[])
     vae_model.fit(self.x, self.x,
@@ -247,7 +264,7 @@ class EndToEndTest(tf.test.TestCase):
         inputs=encoder_model.inputs,
         outputs=decoder_model(encoder_model.outputs[0]))
     vae_model.compile(
-        optimizer=tf.compat.v1.train.AdamOptimizer(),
+        optimizer=tf.compat.v2.optimizers.Adam(),
         loss=lambda x, rv_x: -rv_x.log_prob(x),
         metrics=[])
     vae_model.fit(self.x, self.x,
@@ -414,7 +431,7 @@ class KLDivergenceAddLoss(tf.test.TestCase):
     self.assertNear(actual_kl_, approx_kl_, err=0.15)
 
     model.compile(
-        optimizer=tf.compat.v1.train.AdamOptimizer(),
+        optimizer=tf.compat.v2.optimizers.Adam(),
         loss=lambda x, dist: -dist.log_prob(x[0, :event_size]),
         metrics=[])
     model.fit(x, x,
@@ -475,7 +492,7 @@ class MultivariateNormalTriLTest(tf.test.TestCase):
 
     # Fit.
     model.compile(
-        optimizer=tf.compat.v1.train.AdamOptimizer(),
+        optimizer=tf.compat.v2.optimizers.Adam(),
         loss=lambda y, model: -model.log_prob(y),
         metrics=[])
     batch_size = 100
@@ -535,7 +552,7 @@ class OneHotCategoricalTest(tf.test.TestCase):
 
     # Fit.
     model.compile(
-        optimizer=tf.compat.v1.train.AdamOptimizer(learning_rate=0.5),
+        optimizer=tf.compat.v2.optimizers.Adam(learning_rate=0.5),
         loss=lambda y, model: -model.log_prob(y),
         metrics=[])
     batch_size = 100
@@ -617,7 +634,7 @@ class CategoricalMixtureOfOneHotCategoricalTest(tf.test.TestCase):
 
     # Fit.
     model.compile(
-        optimizer=tf.compat.v1.train.AdamOptimizer(learning_rate=0.5),
+        optimizer=tf.compat.v2.optimizers.Adam(learning_rate=0.5),
         loss=lambda y, model: -model.log_prob(y),
         metrics=[])
     batch_size = 100
@@ -794,7 +811,7 @@ class IndependentBernoulliTestStaticShape(tf.test.TestCase,
 
     # Fit.
     model.compile(
-        optimizer=tf.compat.v1.train.AdamOptimizer(learning_rate=0.5),
+        optimizer=tf.compat.v2.optimizers.Adam(learning_rate=0.5),
         loss=lambda y, model: -model.log_prob(y),
         metrics=[])
     batch_size = 100
@@ -976,7 +993,7 @@ class IndependentPoissonTestStaticShape(tf.test.TestCase,
 
     # Fit.
     model.compile(
-        optimizer=tf.compat.v1.train.AdamOptimizer(learning_rate=0.05),
+        optimizer=tf.compat.v2.optimizers.Adam(learning_rate=0.05),
         loss=lambda y, model: -model.log_prob(y),
         metrics=[])
     batch_size = 50
@@ -1154,7 +1171,7 @@ class _MixtureLogisticTest(_MixtureLayerTest):
     # Fit.
     batch_size = 100
     model.compile(
-        optimizer=tf.compat.v1.train.AdamOptimizer(learning_rate=0.02),
+        optimizer=tf.compat.v2.optimizers.Adam(learning_rate=0.02),
         loss=lambda y, model: -model.log_prob(y))
     model.fit(x, y,
               batch_size=batch_size,
@@ -1224,7 +1241,7 @@ class _MixtureNormalTest(_MixtureLayerTest):
     # Fit.
     batch_size = 100
     model.compile(
-        optimizer=tf.compat.v1.train.AdamOptimizer(learning_rate=0.02),
+        optimizer=tf.compat.v2.optimizers.Adam(learning_rate=0.02),
         loss=lambda y, model: -model.log_prob(y))
     model.fit(x, y,
               batch_size=batch_size,
@@ -1337,7 +1354,7 @@ class _MixtureSameFamilyTest(object):
     # Fit.
     batch_size = 100
     model.compile(
-        optimizer=tf.compat.v1.train.AdamOptimizer(learning_rate=0.02),
+        optimizer=tf.compat.v2.optimizers.Adam(learning_rate=0.02),
         loss=lambda y, model: -model.log_prob(y))
     model.fit(x, y,
               batch_size=batch_size,
@@ -1422,7 +1439,7 @@ class VariationalGaussianProcessEndToEnd(tf.test.TestCase):
     kl_weight = np.float64(batch_size) / n
     loss = lambda y, d: d.variational_loss(y, kl_weight=kl_weight)
     model.compile(
-        optimizer=tf.compat.v1.train.AdamOptimizer(learning_rate=0.02),
+        optimizer=tf.compat.v2.optimizers.Adam(learning_rate=0.02),
         loss=loss)
 
     # This should have no issues
