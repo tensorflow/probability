@@ -489,7 +489,7 @@ def warn_if_parameters_are_not_simple_tensors(params_dict):
   for param_name, param in params_dict.items():
     if not isinstance(param, tf.Tensor) and np.array(param).dtype == np.object:
       warnings.warn(
-          '`{}` is not a `tf.Tensor`, Python number of Numpy array. If this '
+          '`{}` is not a `tf.Tensor`, Python number, or Numpy array. If this '
           'parameter is mutable (e.g., a `tf.Variable`), then the '
           'behavior implied by `store_parameters_in_results` will silently '
           'change on 2019-08-01. Please consult the docstring for '
