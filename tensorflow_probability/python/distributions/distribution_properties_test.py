@@ -44,6 +44,11 @@ flags.DEFINE_enum('tf_mode', 'graph', ['eager', 'graph'],
 FLAGS = flags.FLAGS
 
 
+def hypothesis_max_examples():
+  # Use --test_env=TFP_HYPOTHESIS_MAX_EXAMPLES=1000 to get fuller coverage.
+  return int(os.environ.get('TFP_HYPOTHESIS_MAX_EXAMPLES', 20))
+
+
 def derandomize_hypothesis():
   # Use --test_env=TFP_DERANDOMIZE_HYPOTHESIS=0 to get random coverage.
   return bool(os.environ.get('TFP_DERANDOMIZE_HYPOTHESIS', 1))
@@ -612,6 +617,7 @@ class DistributionSlicingTest(tf.test.TestCase):
   @hp.given(hps.data())
   @hp.settings(
       deadline=None,
+      max_examples=hypothesis_max_examples(),
       suppress_health_check=[hp.HealthCheck.too_slow],
       derandomize=derandomize_hypothesis())
   def testDistributions(self, data):
