@@ -361,6 +361,8 @@ def fit_one_step(
     if learning_rate is not None:
       z *= learning_rate[..., tf.newaxis]
     z += predicted_linear_response_start
+    if offset is not None:
+      z -= offset
 
     # Compute "`w`", the per-sample weight.
     if dispersion is not None:
