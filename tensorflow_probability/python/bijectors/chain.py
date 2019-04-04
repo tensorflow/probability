@@ -22,6 +22,7 @@ import itertools
 
 import tensorflow as tf
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import distribution_util
 
 
 __all__ = [
@@ -238,6 +239,7 @@ class Chain(bijector.Bijector):
     else:
       event_shape = tf.shape(input=y)[tf.rank(y) - event_ndims:]
 
+    # TODO(b/129973548): Document and simplify.
     for b in self.bijectors:
       ildj += b.inverse_log_det_jacobian(
           y, event_ndims=event_ndims, **kwargs.get(b.name, {}))
@@ -248,10 +250,13 @@ class Chain(bijector.Bijector):
             event_shape.ndims)
       else:
         event_shape = b.inverse_event_shape_tensor(event_shape)
+        event_shape_ = distribution_util.maybe_get_static_value(event_shape)
         event_ndims = tf.size(input=event_shape)
         event_ndims_ = self._maybe_get_static_event_ndims(event_ndims)
-        if event_ndims_ is not None:
+
+        if event_ndims_ is not None and event_shape_ is not None:
           event_ndims = event_ndims_
+          event_shape = event_shape_
 
       y = b.inverse(y, **kwargs.get(b.name, {}))
     return ildj
@@ -277,6 +282,7 @@ class Chain(bijector.Bijector):
     else:
       event_shape = tf.shape(input=x)[tf.rank(x) - event_ndims:]
 
+    # TODO(b/129973548): Document and simplify.
     for b in reversed(self.bijectors):
       fldj += b.forward_log_det_jacobian(
           x, event_ndims=event_ndims, **kwargs.get(b.name, {}))
@@ -285,10 +291,13 @@ class Chain(bijector.Bijector):
         event_ndims = self._maybe_get_static_event_ndims(event_shape.ndims)
       else:
         event_shape = b.forward_event_shape_tensor(event_shape)
+        event_shape_ = distribution_util.maybe_get_static_value(event_shape)
         event_ndims = tf.size(input=event_shape)
         event_ndims_ = self._maybe_get_static_event_ndims(event_ndims)
-        if event_ndims_ is not None:
+
+        if event_ndims_ is not None and event_shape_ is not None:
           event_ndims = event_ndims_
+          event_shape = event_shape_
 
       x = b.forward(x, **kwargs.get(b.name, {}))
 

@@ -189,6 +189,51 @@ class ChainBijectorTest(tf.test.TestCase):
     self.assertTrue(ildj is not None)
     self.evaluate(ildj)
 
+  def testChainDynamicToStatic(self):
+    if tf.executing_eagerly():
+      return
+
+    def xform_dynamic(x):
+      return tf.compat.v1.placeholder_with_default(x, shape=None)
+
+    def xform_static(x):
+      x.set_shape([1])
+      return x
+
+    def ldj(_):
+      return tf.constant(0.)
+
+    # The issue was that the sample's shape was going in-and-out of being fully
+    # specified, causing internal consistency issues inside the bijector.
+    chain = tfb.Chain([
+        tfb.Inline(
+            inverse_log_det_jacobian_fn=ldj,
+            inverse_fn=xform_dynamic,
+            forward_min_event_ndims=0,
+            forward_log_det_jacobian_fn=ldj,
+            forward_fn=xform_dynamic),
+        tfb.Inline(
+            inverse_log_det_jacobian_fn=ldj,
+            inverse_fn=xform_static,
+            forward_min_event_ndims=0,
+            forward_log_det_jacobian_fn=ldj,
+            forward_fn=xform_static),
+        tfb.Inline(
+            inverse_log_det_jacobian_fn=ldj,
+            inverse_fn=xform_dynamic,
+            forward_min_event_ndims=0,
+            forward_log_det_jacobian_fn=ldj,
+            forward_fn=xform_dynamic)
+    ])
+
+    ildj = chain.inverse_log_det_jacobian([0.], event_ndims=0)
+    # The static shape information is lost on the account of the final bijector
+    # being dynamic.
+    self.assertFalse(ildj.shape.is_fully_defined())
+    fldj = chain.forward_log_det_jacobian([0.], event_ndims=0)
+    # Ditto.
+    self.assertFalse(fldj.shape.is_fully_defined())
+
 
 if __name__ == "__main__":
   tf.test.main()
