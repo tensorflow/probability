@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+from absl.testing import parameterized
 import numpy as np
 
 import tensorflow as tf
@@ -33,7 +34,7 @@ tfd = tfp.distributions
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SampleDistributionTest(tf.test.TestCase):
+class SampleDistributionTest(tf.test.TestCase, parameterized.TestCase):
 
   def test_everything_scalar(self):
     s = tfd.Sample(tfd.Normal(loc=0, scale=1), 5, validate_args=True)
@@ -160,6 +161,33 @@ class SampleDistributionTest(tf.test.TestCase):
     self.assertAllClose(
         *self.evaluate([expected_lp(y), actual_lp]),
         atol=0., rtol=1e-3)
+
+  @parameterized.parameters(
+      'mean',
+      'stddev',
+      'variance',
+      'mode',
+  )
+  def test_summary_statistic(self, attr):
+    sample_shape = [5, 4]
+    mvn = tfd.Independent(tfd.Normal(loc=tf.zeros([3, 2]), scale=1), 1)
+    d = tfd.Sample(mvn, sample_shape, validate_args=True)
+    self.assertEqual((3,), d.batch_shape)
+    expected_stat = (
+        getattr(mvn, attr)()[:, tf.newaxis, tf.newaxis, :] *
+        tf.ones([3, 5, 4, 2]))
+    actual_stat = getattr(d, attr)()
+    self.assertAllEqual(*self.evaluate([expected_stat, actual_stat]))
+
+  def test_entropy(self):
+    sample_shape = [3, 4]
+    mvn = tfd.Independent(tfd.Normal(loc=0, scale=[[0.25, 0.5]]), 1)
+    d = tfd.Sample(mvn, sample_shape, validate_args=True)
+    expected_entropy = 12 * tf.reduce_sum(
+        input_tensor=mvn.distribution.entropy(),
+        axis=-1)
+    actual_entropy = d.entropy()
+    self.assertAllEqual(*self.evaluate([expected_entropy, actual_entropy]))
 
 
 if __name__ == '__main__':

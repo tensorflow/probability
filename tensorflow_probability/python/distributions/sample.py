@@ -33,15 +33,18 @@ def _make_summary_statistic(attr):
   """Factory for implementing summary statistics, eg, mean, stddev, mode."""
   def _fn(self):
     """Implements summary statistic, eg, mean, stddev, mode."""
-    x = getattr(self, attr)
-    shape = tf.pad(
-        tensor=self.distribution.batch_shape_tensor(),
-        paddings=[[0, prefer_static.rank_from_shape(self.sample_shape)]],
-        constant_values=1)
+    x = getattr(self.distribution, attr)()
+    shape = prefer_static.concat([
+        self.distribution.batch_shape_tensor(),
+        prefer_static.ones(prefer_static.rank_from_shape(self.sample_shape),
+                           dtype=self.sample_shape.dtype),
+        self.distribution.event_shape_tensor(),
+    ], axis=0)
     x = tf.reshape(x, shape=shape)
     shape = prefer_static.concat([
         self.distribution.batch_shape_tensor(),
         self.sample_shape,
+        self.distribution.event_shape_tensor(),
     ], axis=0)
     return tf.broadcast_to(x, shape)
   return _fn
@@ -221,7 +224,7 @@ class Sample(distribution_lib.Distribution):
   def _entropy(self):
     h = self.distribution.entropy()
     n = prefer_static.reduce_prod(self.sample_shape)
-    return tf.cast(input_tensor=n, dtype=h.dtype) * h
+    return tf.cast(x=n, dtype=h.dtype) * h
 
   _mean = _make_summary_statistic('mean')
   _stddev = _make_summary_statistic('stddev')
