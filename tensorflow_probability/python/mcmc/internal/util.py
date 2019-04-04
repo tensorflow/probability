@@ -132,6 +132,9 @@ def choose(is_accepted, accepted, rejected, name=None):
 def safe_sum(x, alt_value=-np.inf, name=None):
   """Elementwise adds list members, replacing non-finite results with alt_value.
 
+  Typically the `alt_value` is chosen so the `MetropolisHastings`
+  `TransitionKernel` always rejects the proposal.
+
   Args:
     x: Python `list` of `Tensors` to elementwise add.
     alt_value: Python scalar used to replace any elementwise sums which would
@@ -152,27 +155,12 @@ def safe_sum(x, alt_value=-np.inf, name=None):
       raise TypeError('Expected list input.')
     if not x:
       raise ValueError('Input should not be empty.')
-    n = np.int64(len(x))
     in_shape = x[0].shape
     x = tf.stack(x, axis=-1)
-    # The sum is NaN if any element is NaN or we see both +Inf and -Inf.  Thus
-    # we will replace such rows with the `alt_value`. Typically the `alt_value`
-    # is chosen so the `MetropolisHastings` `TransitionKernel` always rejects
-    # the proposal.  rejection.
-    # Regarding the following float-comparisons, recall comparing with NaN is
-    # always False, i.e., we're implicitly capturing NaN and explicitly
-    # capturing +/- Inf.
-    is_sum_determinate = (
-        tf.reduce_all(input_tensor=tf.math.is_finite(x) | (x >= 0.), axis=-1)
-        & tf.reduce_all(input_tensor=tf.math.is_finite(x) | (x <= 0.), axis=-1))
-    is_sum_determinate = tf.tile(
-        is_sum_determinate[..., tf.newaxis],
-        multiples=tf.concat([tf.ones(tf.rank(x) - 1, dtype=tf.int64), [n]],
-                            axis=0))
-    alt_value = np.array(alt_value, x.dtype.as_numpy_dtype)
-    x = tf.where(is_sum_determinate, x,
-                 tf.fill(tf.shape(input=x), value=alt_value))
     x = tf.reduce_sum(input_tensor=x, axis=-1)
+    alt_value = np.array(alt_value, x.dtype.as_numpy_dtype)
+    alt_fill = tf.fill(tf.shape(input=x), value=alt_value)
+    x = tf.where(tf.math.is_finite(x), x, alt_fill)
     x.set_shape(x.shape.merge_with(in_shape))
     return x
 
