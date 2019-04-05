@@ -240,6 +240,7 @@ import matplotlib.pyplot as plt
 plt.plot(weights_prior_estimated_scale_)
 plt.ylabel('weights_prior_estimated_scale')
 plt.xlabel('iteration')
+plt.show()
 ```
 
 #### References
