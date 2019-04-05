@@ -350,7 +350,7 @@ def fit_with_hmc(model,
       Default value: `[]` (i.e., a single chain).
     num_variational_steps: Python `int` number of steps to run the variational
       optimization to determine the initial state and step sizes.
-      Default value: `200`.
+      Default value: `150`.
     variational_optimizer: Optional `tf.train.Optimizer` instance to use in
       the variational optimization. If `None`, defaults to
       `tf.train.AdamOptimizer(0.1)`.
