@@ -177,8 +177,8 @@ class _VectorStudentT(transformed_distribution.TransformedDistribution):
     parameters = dict(locals())
     graph_parents = [df, loc, scale_identity_multiplier, scale_diag,
                      scale_tril, scale_perturb_factor, scale_perturb_diag]
-    with tf.compat.v1.name_scope(name) as name:
-      with tf.compat.v1.name_scope("init", values=graph_parents):
+    with tf.compat.v2.name_scope(name) as name:
+      with tf.compat.v2.name_scope("init"):
         dtype = dtype_util.common_dtype(graph_parents, tf.float32)
         df = tf.convert_to_tensor(value=df, name="df", dtype=dtype)
         # The shape of the _VectorStudentT distribution is governed by the

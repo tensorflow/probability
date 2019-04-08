@@ -25,6 +25,7 @@ import tensorflow as tf
 from tensorflow_probability.python.bijectors import kumaraswamy as kumaraswamy_bijector
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import uniform
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 
@@ -146,8 +147,7 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.compat.v1.name_scope(
-        name, values=[concentration1, concentration0]) as name:
+    with tf.compat.v2.name_scope(name) as name:
       dtype = dtype_util.common_dtype([concentration1, concentration0],
                                       tf.float32)
       concentration1 = tf.convert_to_tensor(
@@ -225,11 +225,11 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
       return tf.where(is_defined, mode, nan)
 
     return distribution_util.with_dependencies([
-        tf.compat.v1.assert_less(
+        assert_util.assert_less(
             tf.ones([], dtype=self.concentration1.dtype),
             self.concentration1,
             message="Mode undefined for concentration1 <= 1."),
-        tf.compat.v1.assert_less(
+        assert_util.assert_less(
             tf.ones([], dtype=self.concentration0.dtype),
             self.concentration0,
             message="Mode undefined for concentration0 <= 1.")

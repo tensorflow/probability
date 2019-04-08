@@ -22,6 +22,7 @@ import tensorflow as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import multinomial
 from tensorflow_probability.python.distributions import seed_stream
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
@@ -196,8 +197,7 @@ class DirichletMultinomial(distribution.Distribution):
     # * We broadcast explicitly to include the effect of `counts` on
     #   `concentration` for calls that do not involve `counts`.
     parameters = dict(locals())
-    with tf.compat.v1.name_scope(
-        name, values=[total_count, concentration]) as name:
+    with tf.compat.v2.name_scope(name) as name:
       dtype = dtype_util.common_dtype([total_count, concentration], tf.float32)
       self._total_count = tf.convert_to_tensor(
           value=total_count, name="total_count", dtype=dtype)
@@ -331,7 +331,7 @@ class DirichletMultinomial(distribution.Distribution):
     concentration = distribution_util.embed_check_categorical_event_shape(
         concentration)
     return distribution_util.with_dependencies([
-        tf.compat.v1.assert_positive(
+        assert_util.assert_positive(
             concentration, message="Concentration parameter must be positive."),
     ], concentration)
 
@@ -341,7 +341,7 @@ class DirichletMultinomial(distribution.Distribution):
       return counts
     counts = distribution_util.embed_check_nonnegative_integer_form(counts)
     return distribution_util.with_dependencies([
-        tf.compat.v1.assert_equal(
+        assert_util.assert_equal(
             self.total_count,
             tf.reduce_sum(input_tensor=counts, axis=-1),
             message="counts last-dimension must sum to `self.total_count`"),

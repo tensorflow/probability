@@ -25,6 +25,7 @@ import tensorflow as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import HalfCauchy
 from tensorflow_probability.python.distributions.seed_stream import SeedStream
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 
@@ -137,12 +138,12 @@ class Horseshoe(distribution.Distribution):
         Default value: 'Horseshoe'.
     """
     parameters = dict(locals())
-    with tf.compat.v1.name_scope(name, values=[scale]) as name:
+    with tf.compat.v2.name_scope(name) as name:
       dtype = dtype_util.common_dtype([scale],
                                       preferred_dtype=tf.float32)
       scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
       with tf.control_dependencies(
-          [tf.compat.v1.assert_positive(scale)] if validate_args else []):
+          [assert_util.assert_positive(scale)] if validate_args else []):
         self._scale = tf.identity(
             scale, name="scale")
     self._half_cauchy = HalfCauchy(

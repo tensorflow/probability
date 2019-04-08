@@ -25,9 +25,12 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,
+
+
 tfd = tfp.distributions
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 def _det_ok_mask(x, det_bounds, input_output_cholesky=False):
@@ -133,7 +136,7 @@ class LKJTest(parameterized.TestCase, tf.test.TestCase):
     chk1 = st.assert_true_mean_equal_by_dkwm(
         importance_weights, low=0., high=importance_maxima + high_tolerance,
         expected=means, false_fail_rate=1e-6)
-    chk2 = tf.compat.v1.assert_less(
+    chk2 = assert_util.assert_less(
         st.min_discrepancy_of_true_means_detectable_by_dkwm(
             num_samples,
             low=0.,
@@ -241,7 +244,7 @@ class LKJTest(parameterized.TestCase, tf.test.TestCase):
         expected_low=lows,
         expected_high=highs,
         false_fail_rate=false_fail_rate)
-    check2 = tf.compat.v1.assert_less(
+    check2 = assert_util.assert_less(
         st.min_discrepancy_of_true_means_detectable_by_dkwm(
             num_samples,
             low=0.,
@@ -340,7 +343,7 @@ class LKJTest(parameterized.TestCase, tf.test.TestCase):
         samples=results, low=-1., high=1.,
         expected=mean,
         false_fail_rate=1e-6)
-    check2 = tf.compat.v1.assert_less(
+    check2 = assert_util.assert_less(
         st.min_discrepancy_of_true_means_detectable_by_dkwm(
             num_samples,
             low=-1.,

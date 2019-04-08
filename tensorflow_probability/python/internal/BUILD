@@ -35,10 +35,12 @@ py_library(
 )
 
 py_library(
-    name = "monte_carlo",
-    srcs = ["monte_carlo.py"],
+    name = "assert_util",
+    srcs = ["assert_util.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":dtype_util",
+        # numpy dep,
         # tensorflow dep,
     ],
 )
@@ -70,6 +72,7 @@ py_library(
     srcs = ["distribution_util.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":assert_util",
         ":dtype_util",
         ":prefer_static",
         ":reparameterization",
@@ -88,6 +91,15 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/math:gradient",
+    ],
+)
+
+py_library(
+    name = "monte_carlo",
+    srcs = ["monte_carlo.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
     ],
 )
 

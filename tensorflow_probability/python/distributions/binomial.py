@@ -19,6 +19,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
@@ -159,8 +160,7 @@ class Binomial(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.compat.v1.name_scope(
-        name, values=[total_count, logits, probs]) as name:
+    with tf.compat.v2.name_scope(name) as name:
       dtype = dtype_util.common_dtype([total_count, logits, probs], tf.float32)
       self._total_count = self._maybe_assert_valid_total_count(
           tf.convert_to_tensor(
@@ -261,7 +261,7 @@ class Binomial(distribution.Distribution):
     if not validate_args:
       return total_count
     return distribution_util.with_dependencies([
-        tf.compat.v1.assert_non_negative(
+        assert_util.assert_non_negative(
             total_count, message="total_count must be non-negative."),
         distribution_util.assert_integer_form(
             total_count,
@@ -274,7 +274,7 @@ class Binomial(distribution.Distribution):
       return counts
     counts = distribution_util.embed_check_nonnegative_integer_form(counts)
     return distribution_util.with_dependencies([
-        tf.compat.v1.assert_less_equal(
+        assert_util.assert_less_equal(
             counts,
             self.total_count,
             message="counts are not less than or equal to n."),

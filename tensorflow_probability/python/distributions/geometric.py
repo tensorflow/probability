@@ -22,6 +22,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import reparameterization
 
@@ -79,12 +80,12 @@ class Geometric(distribution.Distribution):
     """
 
     parameters = dict(locals())
-    with tf.compat.v1.name_scope(name, values=[logits, probs]) as name:
+    with tf.compat.v2.name_scope(name) as name:
       self._logits, self._probs = distribution_util.get_logits_and_probs(
           logits, probs, validate_args=validate_args, name=name)
 
       with tf.control_dependencies(
-          [tf.compat.v1.assert_positive(self._probs)] if validate_args else []):
+          [assert_util.assert_positive(self._probs)] if validate_args else []):
         self._probs = tf.identity(self._probs, name="probs")
 
     super(Geometric, self).__init__(
@@ -165,7 +166,7 @@ class Geometric(distribution.Distribution):
     probs = self._probs
     if self.validate_args:
       probs = distribution_util.with_dependencies([
-          tf.compat.v1.assert_less(
+          assert_util.assert_less(
               probs,
               tf.constant(1., probs.dtype),
               message="Entropy is undefined when logits = inf or probs = 1.")

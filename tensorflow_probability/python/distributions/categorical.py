@@ -177,7 +177,7 @@ class Categorical(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.compat.v1.name_scope(name, values=[logits, probs]) as name:
+    with tf.compat.v2.name_scope(name) as name:
       self._logits, self._probs = util.get_logits_and_probs(
           logits=logits,
           probs=probs,
@@ -196,7 +196,7 @@ class Categorical(distribution.Distribution):
             dtype=tf.int32,
             name="batch_rank")
       else:
-        with tf.compat.v1.name_scope(name="batch_rank"):
+        with tf.compat.v2.name_scope("batch_rank"):
           self._batch_rank = tf.rank(self._logits) - 1
 
       logits_shape = tf.shape(input=self._logits, name="logits_shape")
@@ -205,7 +205,7 @@ class Categorical(distribution.Distribution):
         self._num_categories = tf.convert_to_tensor(
             value=num_categories, dtype=tf.int32, name="num_categories")
       else:
-        with tf.compat.v1.name_scope(name="num_categories"):
+        with tf.compat.v2.name_scope("num_categories"):
           self._num_categories = logits_shape[self._batch_rank]
 
       if logits_shape_static[:-1].is_fully_defined():
@@ -214,7 +214,7 @@ class Categorical(distribution.Distribution):
             dtype=tf.int32,
             name="batch_shape")
       else:
-        with tf.compat.v1.name_scope(name="batch_shape"):
+        with tf.compat.v2.name_scope("batch_shape"):
           self._batch_shape_val = logits_shape[:-1]
     super(Categorical, self).__init__(
         dtype=dtype,
@@ -350,8 +350,7 @@ def _kl_categorical_categorical(a, b, name=None):
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.compat.v1.name_scope(
-      name, "kl_categorical_categorical", values=[a.logits, b.logits]):
+  with tf.compat.v2.name_scope(name or "kl_categorical_categorical"):
     # sum(probs log(probs / (1 - probs)))
     delta_log_probs1 = (tf.nn.log_softmax(a.logits) -
                         tf.nn.log_softmax(b.logits))

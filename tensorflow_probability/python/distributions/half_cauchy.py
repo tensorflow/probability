@@ -24,6 +24,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 
@@ -55,7 +56,7 @@ def check_arg_in_support(f):
     dist = args[0]
     x = args[1]
     with tf.control_dependencies([
-        tf.compat.v1.assert_greater_equal(
+        assert_util.assert_greater_equal(
             x, dist.loc, message="x is not in the support of the distribution")
     ] if dist.validate_args else []):
       return f(*args, **kwargs)
@@ -112,12 +113,12 @@ class HalfCauchy(distribution.Distribution):
       TypeError: if `loc` and `scale` have different `dtype`.
     """
     parameters = dict(locals())
-    with tf.compat.v1.name_scope(name, values=[loc, scale]) as name:
+    with tf.compat.v2.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, scale], preferred_dtype=tf.float32)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
       scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
       with tf.control_dependencies(
-          [tf.compat.v1.assert_positive(scale)] if validate_args else []):
+          [assert_util.assert_positive(scale)] if validate_args else []):
         self._loc = tf.identity(loc, name="loc")
         self._scale = tf.identity(scale, name="loc")
       tf.debugging.assert_same_float_dtype([self._loc, self._scale])
@@ -187,12 +188,12 @@ class HalfCauchy(distribution.Distribution):
 
   def _z(self, x):
     """Standardize input `x`."""
-    with tf.compat.v1.name_scope("standardize", values=[x]):
+    with tf.compat.v2.name_scope("standardize"):
       return (x - self.loc) / self.scale
 
   def _inv_z(self, z):
     """Reconstruct input `x` from a its normalized version."""
-    with tf.compat.v1.name_scope("reconstruct", values=[z]):
+    with tf.compat.v2.name_scope("reconstruct"):
       return z * self.scale + self.loc
 
   def _entropy(self):
@@ -240,8 +241,7 @@ class HalfCauchy(distribution.Distribution):
     Returns:
       `Tensor` representing an extension of `f(x)`.
     """
-    with tf.compat.v1.name_scope(
-        name="extend_support_with_default_value", values=[x]):
+    with tf.compat.v2.name_scope("extend_support_with_default_value"):
       x = tf.convert_to_tensor(value=x, dtype=self.dtype, name="x")
       loc = self.loc + tf.zeros_like(self.scale) + tf.zeros_like(x)
       x = x + tf.zeros_like(loc)

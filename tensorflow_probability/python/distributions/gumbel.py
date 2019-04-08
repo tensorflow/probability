@@ -27,6 +27,7 @@ from tensorflow_probability.python.bijectors import invert as invert_bijector
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import uniform
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 
@@ -128,12 +129,12 @@ class Gumbel(transformed_distribution.TransformedDistribution):
       TypeError: if loc and scale are different dtypes.
     """
     parameters = dict(locals())
-    with tf.compat.v1.name_scope(name, values=[loc, scale]) as name:
+    with tf.compat.v2.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, scale], preferred_dtype=tf.float32)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
       scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
       with tf.control_dependencies(
-          [tf.compat.v1.assert_positive(scale)] if validate_args else []):
+          [assert_util.assert_positive(scale)] if validate_args else []):
         loc = tf.identity(loc, name="loc")
         scale = tf.identity(scale, name="scale")
         tf.debugging.assert_same_float_dtype([loc, scale])
@@ -209,8 +210,7 @@ def _kl_gumbel_gumbel(a, b, name=None):
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.compat.v1.name_scope(name, "kl_gumbel_gumbel",
-                               [a.loc, b.loc, a.scale, b.scale]):
+  with tf.compat.v2.name_scope(name or "kl_gumbel_gumbel"):
     # Consistent with
     # http://www.mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 64
     # The paper uses beta to refer to scale and mu to refer to loc.

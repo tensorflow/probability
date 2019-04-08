@@ -26,6 +26,7 @@ import tensorflow as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
 
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
@@ -118,8 +119,7 @@ class GammaGamma(distribution.Distribution):
       TypeError: if `concentration` and `rate` are different dtypes.
     """
     parameters = dict(locals())
-    with tf.compat.v1.name_scope(
-        name, values=[concentration, mixing_concentration, mixing_rate]):
+    with tf.compat.v2.name_scope(name):
       dtype = dtype_util.common_dtype(
           [concentration, mixing_concentration, mixing_rate],
           preferred_dtype=tf.float32)
@@ -130,9 +130,9 @@ class GammaGamma(distribution.Distribution):
       mixing_rate = tf.convert_to_tensor(
           value=mixing_rate, name="mixing_rate", dtype=dtype)
       with tf.control_dependencies([
-          tf.compat.v1.assert_positive(concentration),
-          tf.compat.v1.assert_positive(mixing_concentration),
-          tf.compat.v1.assert_positive(mixing_rate),
+          assert_util.assert_positive(concentration),
+          assert_util.assert_positive(mixing_concentration),
+          assert_util.assert_positive(mixing_rate),
       ] if validate_args else []):
         self._concentration = tf.identity(concentration, name="concentration")
         self._mixing_concentration = tf.identity(
@@ -238,7 +238,7 @@ class GammaGamma(distribution.Distribution):
       return tf.where(self.mixing_concentration > 1., mean, nan)
     else:
       return distribution_util.with_dependencies([
-          tf.compat.v1.assert_less(
+          assert_util.assert_less(
               tf.ones([], self.dtype),
               self.mixing_concentration,
               message="mean undefined when `mixing_concentration` <= 1"),
@@ -262,7 +262,7 @@ class GammaGamma(distribution.Distribution):
       return tf.where(self.mixing_concentration > 2., variance, nan)
     else:
       return distribution_util.with_dependencies([
-          tf.compat.v1.assert_less(
+          assert_util.assert_less(
               tf.ones([], self.dtype) * 2.,
               self.mixing_concentration,
               message="variance undefined when `mixing_concentration` <= 2"),
@@ -273,5 +273,5 @@ class GammaGamma(distribution.Distribution):
     if not self.validate_args:
       return x
     return distribution_util.with_dependencies([
-        tf.compat.v1.assert_positive(x),
+        assert_util.assert_positive(x),
     ], x)

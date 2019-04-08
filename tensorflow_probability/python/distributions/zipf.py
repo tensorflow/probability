@@ -23,6 +23,7 @@ import tensorflow as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions.seed_stream import SeedStream
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 
@@ -97,7 +98,7 @@ class Zipf(distribution.Distribution):
       TypeError: if `power` is not `float` like.
     """
     parameters = dict(locals())
-    with tf.compat.v1.name_scope(name, values=[power]) as name:
+    with tf.compat.v2.name_scope(name) as name:
       power = tf.convert_to_tensor(
           value=power,
           name="power",
@@ -108,9 +109,8 @@ class Zipf(distribution.Distribution):
                 power.dtype.name))
       runtime_assertions = []
       if validate_args:
-        runtime_assertions += [
-            tf.compat.v1.assert_greater(power, tf.cast(1., power.dtype))
-        ]
+        runtime_assertions.append(assert_util.assert_greater(
+            power, np.ones([], power.dtype.as_numpy_dtype)))
       with tf.control_dependencies(runtime_assertions):
         self._power = tf.identity(power, name="power")
 

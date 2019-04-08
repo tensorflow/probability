@@ -27,6 +27,7 @@ from tensorflow_probability.python.distributions import chi2 as chi2_lib
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.distributions import seed_stream
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
@@ -152,14 +153,13 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
     if validate_args and not scale.is_positive_definite:
       raise ValueError("`scale` must be positive definite.")
 
-    with tf.compat.v1.name_scope(
-        name, values=[df, loc] + scale.graph_parents) as name:
+    with tf.compat.v2.name_scope(name) as name:
       dtype = dtype_util.common_dtype([df, loc, scale],
                                       preferred_dtype=tf.float32)
 
-      with tf.control_dependencies(
-          [tf.compat.v1.assert_positive(df, message="`df` must be positive."
-                                       )] if validate_args else []):
+      with tf.control_dependencies([
+          assert_util.assert_positive(df, message="`df` must be positive.")
+      ] if validate_args else []):
         self._df = tf.identity(
             tf.convert_to_tensor(value=df, dtype=dtype), name="df")
       self._loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
@@ -293,7 +293,7 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
                       tf.fill(tf.shape(input=mean), nan, name="nan"))
     else:
       with tf.control_dependencies([
-          tf.compat.v1.assert_less(
+          assert_util.assert_less(
               tf.cast(1., self.dtype),
               df,
               message="mean not defined for components of df <= 1"),
@@ -328,7 +328,7 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
                       tf.fill(tf.shape(input=statistic), nan, name="nan"))
     else:
       with tf.control_dependencies([
-          tf.compat.v1.assert_less(
+          assert_util.assert_less(
               tf.cast(1., self.dtype),
               df,
               message=statistic_name +

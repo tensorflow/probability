@@ -25,6 +25,7 @@ import tensorflow as tf
 from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import reparameterization
 
@@ -150,7 +151,7 @@ class Mixture(distribution.Distribution):
           "none of the components provide a static number of ndims")
 
     # Ensure that all batch and event ndims are consistent.
-    with tf.compat.v1.name_scope(name, values=[cat.logits]) as name:
+    with tf.compat.v2.name_scope(name) as name:
       num_components = cat.event_size
       static_num_components = tf.get_static_value(num_components)
       if static_num_components is None:
@@ -171,12 +172,12 @@ class Mixture(distribution.Distribution):
         check_message = ("components[%d] batch shape must match cat "
                          "batch shape")
         self._assertions = [
-            tf.compat.v1.assert_equal(
+            assert_util.assert_equal(
                 cat_batch_rank, batch_ranks[di], message=check_message % di)
             for di in range(len(components))
         ]
         self._assertions += [
-            tf.compat.v1.assert_equal(
+            assert_util.assert_equal(
                 cat_batch_shape, batch_shapes[di], message=check_message % di)
             for di in range(len(components))
         ]
@@ -482,7 +483,7 @@ class Mixture(distribution.Distribution):
     Returns:
       A lower bound on the Mixture's entropy.
     """
-    with self._name_scope(name, values=[self.cat.logits]):
+    with self._name_scope(name):
       with tf.control_dependencies(self._assertions):
         distribution_entropies = [d.entropy() for d in self.components]
         cat_probs = self._cat_probs(log_probs=False)

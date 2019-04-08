@@ -29,6 +29,7 @@ from tensorflow_probability.python.distributions import mvn_tril
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import seed_stream
 
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.ops.linalg import linear_operator_util
@@ -66,7 +67,7 @@ def _check_equal_shape(name,
         raise ValueError("{}: cannot infer target shape: no dynamic shape "
                          "specified and static shape {} is not fully defined".
                          format(name, static_target_shape))
-    return tf.compat.v1.assert_equal(
+    return assert_util.assert_equal(
         dynamic_shape,
         dynamic_target_shape,
         message=("{}: required shape {}".format(name, static_target_shape)))
@@ -139,14 +140,14 @@ def _augment_sample_shape(partial_batch_dist,
   runtime_assertions = []
   if validate_args:
     runtime_assertions.append(
-        tf.compat.v1.assert_greater_equal(
+        assert_util.assert_greater_equal(
             tf.convert_to_tensor(value=num_broadcast_dims, dtype=tf.int32),
             tf.zeros((), dtype=tf.int32),
             message=("Cannot broadcast distribution {} batch shape to "
                      "target batch shape with fewer dimensions.".format(
                          partial_batch_dist))))
     runtime_assertions.append(
-        tf.compat.v1.assert_equal(
+        assert_util.assert_equal(
             expected_partial_batch_shape,
             partial_batch_dist.batch_shape_tensor(),
             message=("Broadcasting is not supported; "
@@ -328,13 +329,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
 
     parameters = locals()
 
-    with tf.compat.v1.name_scope(
-        name,
-        values=[
-            num_timesteps, transition_matrix, transition_noise,
-            observation_matrix, observation_noise, initial_state_prior,
-            initial_step
-        ]) as name:
+    with tf.compat.v2.name_scope(name) as name:
 
       self.num_timesteps = tf.convert_to_tensor(
           value=num_timesteps, name="num_timesteps")
@@ -497,10 +492,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
         `batch_shape + [num_timesteps, latent_size, latent_size]`.
         which is of the same shape as filtered_covs.
     """
-    with tf.compat.v1.name_scope(
-        "backward_pass",
-        values=[filtered_means, filtered_covs, predicted_means,
-                predicted_covs]):
+    with tf.compat.v2.name_scope("backward_pass"):
       filtered_means = tf.convert_to_tensor(
           value=filtered_means, name="filtered_means")
       filtered_covs = tf.convert_to_tensor(
@@ -601,7 +593,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
   def _joint_sample_n(self, n, seed=None):
     """Draw a joint sample from the prior over latents and observations."""
 
-    with tf.compat.v1.name_scope("sample_n_joint"):
+    with tf.compat.v2.name_scope("sample_n_joint"):
       stream = seed_stream.SeedStream(
           seed, salt="LinearGaussianStateSpaceModel_sample_n_joint")
 
@@ -768,7 +760,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
          dimensions than `observation_means`.
     """
 
-    with tf.compat.v1.name_scope("forward_filter", values=[x]):
+    with tf.compat.v2.name_scope("forward_filter"):
       x = tf.convert_to_tensor(value=x, name="x")
       if mask is not None:
         mask = tf.convert_to_tensor(value=mask, name="mask", dtype_hint=tf.bool)
@@ -781,7 +773,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
       check_mask_shape_op = None
       if mask is not None:
         if mask.shape.ndims is None or x.shape.ndims is None:
-          check_mask_dims_op = tf.compat.v1.assert_greater_equal(
+          check_mask_dims_op = assert_util.assert_greater_equal(
               tf.rank(x),
               tf.rank(mask),
               message=("mask cannot have higher rank than x!"))
@@ -973,7 +965,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
          dimensions than `filtered_means`.
     """
 
-    with tf.compat.v1.name_scope("smooth", values=[x]):
+    with tf.compat.v2.name_scope("smooth"):
       x = tf.convert_to_tensor(value=x, name="x")
       (_, filtered_means, filtered_covs,
        predicted_means, predicted_covs, _, _) = self.forward_filter(
@@ -1000,7 +992,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
         observation_size]`
     """
 
-    with tf.compat.v1.name_scope("mean_joint"):
+    with tf.compat.v2.name_scope("mean_joint"):
 
       # The initial timestep is a special case, since we sample the
       # latent state from the prior rather than the transition model.
@@ -1060,7 +1052,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
         observation_size, observation_size]`
     """
 
-    with tf.compat.v1.name_scope("covariance_joint"):
+    with tf.compat.v2.name_scope("covariance_joint"):
 
       with tf.control_dependencies(self.runtime_assertions):
         initial_latent_cov = _broadcast_to_shape(
@@ -1120,8 +1112,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
         `[..., num_timesteps, observation_size, observation_size]`
     """
 
-    with tf.compat.v1.name_scope(
-        "latents_to_observations", values=[latent_means, latent_covs]):
+    with tf.compat.v2.name_scope("latents_to_observations"):
 
       pushforward_latents_step = build_pushforward_latents_step(
           self.get_observation_matrix_for_timestep,

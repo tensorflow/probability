@@ -39,8 +39,8 @@ def _add_diagonal_shift(matrix, shift):
 
 def _solve_cholesky_factored_system(
     cholesky_factor, rhs, name=None):
-  with tf.compat.v1.name_scope(name, '_solve_cholesky_factored_system',
-                               values=[cholesky_factor, rhs]) as scope:
+  with tf.compat.v2.name_scope(
+      name or '_solve_cholesky_factored_system') as scope:
     cholesky_factor = tf.convert_to_tensor(value=cholesky_factor,
                                            name='cholesky_factor')
     rhs = tf.convert_to_tensor(value=rhs, name='rhs')
@@ -50,8 +50,8 @@ def _solve_cholesky_factored_system(
 
 
 def _solve_cholesky_factored_system_vec(cholesky_factor, rhs, name=None):
-  with tf.compat.v1.name_scope(name, '_solve_cholesky_factored_system',
-                               values=[cholesky_factor, rhs]) as scope:
+  with tf.compat.v2.name_scope(
+      name or '_solve_cholesky_factored_system') as scope:
     cholesky_factor = tf.convert_to_tensor(
         value=cholesky_factor, name='cholesky_factor')
     rhs = tf.convert_to_tensor(value=rhs, name='rhs')
@@ -567,14 +567,8 @@ class VariationalGaussianProcess(
       ValueError: if `mean_fn` is not `None` and is not callable.
     """
     parameters = dict(locals())
-    with tf.compat.v1.name_scope(
-        name, 'VariationalGaussianProcess', values=[
-            index_points,
-            inducing_index_points,
-            variational_inducing_observations_loc,
-            variational_inducing_observations_scale,
-            observation_noise_variance,
-            jitter]) as name:
+    with tf.compat.v2.name_scope(
+        name or 'VariationalGaussianProcess') as name:
       dtype = dtype_util.common_dtype(
           [kernel,
            index_points,
@@ -631,13 +625,7 @@ class VariationalGaussianProcess(
       self._predictive_noise_variance = predictive_noise_variance
       self._jitter = jitter
 
-      with tf.compat.v1.name_scope(
-          'init', values=[index_points,
-                          inducing_index_points,
-                          variational_inducing_observations_loc,
-                          variational_inducing_observations_scale,
-                          observation_noise_variance,
-                          jitter]):
+      with tf.compat.v2.name_scope('init'):
         # We let t and z denote predictive and inducing index points, resp.
         kzz = _add_diagonal_shift(
             kernel.matrix(inducing_index_points, inducing_index_points),
@@ -780,11 +768,7 @@ class VariationalGaussianProcess(
          https://arxiv.org/abs/1309.6835
     """
 
-    with tf.compat.v1.name_scope(
-        name, 'variational_gp_loss', values=[
-            observations,
-            observation_index_points,
-            kl_weight]):
+    with tf.compat.v2.name_scope(name or 'variational_gp_loss'):
       if observation_index_points is None:
         observation_index_points = self._index_points
       observation_index_points = tf.convert_to_tensor(
@@ -923,12 +907,7 @@ class VariationalGaussianProcess(
          http://proceedings.mlr.press/v5/titsias09a/titsias09a.pdf
     """
 
-    with tf.compat.v1.name_scope(
-        name, 'optimal_variational_posterior',
-        values=[inducing_index_points,
-                observation_index_points,
-                observations,
-                observation_noise_variance]):
+    with tf.compat.v2.name_scope(name or 'optimal_variational_posterior'):
       dtype = dtype_util.common_dtype(
           [inducing_index_points,
            observation_index_points,

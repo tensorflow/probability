@@ -33,6 +33,7 @@ from tensorflow_probability.python.distributions import beta
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import seed_stream
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 
@@ -132,7 +133,7 @@ class LKJ(distribution.Distribution):
           'There are no negative-dimension correlation matrices.')
     parameters = dict(locals())
     self._input_output_cholesky = input_output_cholesky
-    with tf.compat.v1.name_scope(name, values=[dimension, concentration]):
+    with tf.compat.v2.name_scope(name):
       concentration = tf.convert_to_tensor(
           value=concentration,
           name='concentration',
@@ -141,7 +142,7 @@ class LKJ(distribution.Distribution):
       with tf.control_dependencies([
           # concentration >= 1
           # TODO(b/111451422) Generalize to concentration > 0.
-          tf.compat.v1.assert_non_negative(concentration - 1.),
+          assert_util.assert_non_negative(concentration - 1.),
       ] if validate_args else []):
         self._dimension = dimension
         self._concentration = tf.identity(concentration, name='concentration')
@@ -206,7 +207,7 @@ class LKJ(distribution.Distribution):
           'Cannot sample negative-dimension correlation matrices.')
     # Notation below: B is the batch shape, i.e., tf.shape(concentration)
     seed = seed_stream.SeedStream(seed, 'sample_lkj')
-    with tf.compat.v1.name_scope('sample_lkj', name, [self.concentration]):
+    with tf.compat.v2.name_scope('sample_lkj' or name):
       if not self.concentration.dtype.is_floating:
         raise TypeError('The concentration argument should have floating type,'
                         ' not {}'.format(self.concentration.dtype.name))
@@ -323,9 +324,9 @@ class LKJ(distribution.Distribution):
       msg = 'Input dimension mismatch: expected [..., {}, {}], got {}'.format(
           self.dimension, self.dimension, tf.shape(input=x))
       with tf.control_dependencies([
-          tf.compat.v1.assert_equal(
+          assert_util.assert_equal(
               tf.shape(input=x)[-2], self.dimension, message=msg),
-          tf.compat.v1.assert_equal(
+          assert_util.assert_equal(
               tf.shape(input=x)[-1], self.dimension, message=msg)
       ]):
         x = tf.identity(x)
@@ -335,19 +336,19 @@ class LKJ(distribution.Distribution):
     if not self.validate_args or self.input_output_cholesky:
       return x
     checks = [
-        tf.compat.v1.assert_less_equal(
+        assert_util.assert_less_equal(
             tf.cast(-1., dtype=x.dtype.base_dtype),
             x,
             message='Correlations must be >= -1.'),
-        tf.compat.v1.assert_less_equal(
+        assert_util.assert_less_equal(
             x,
             tf.cast(1., x.dtype.base_dtype),
             message='Correlations must be <= 1.'),
-        tf.compat.v1.assert_near(
+        assert_util.assert_near(
             tf.linalg.diag_part(x),
             tf.cast(1., x.dtype.base_dtype),
             message='Self-correlations must be = 1.'),
-        tf.compat.v1.assert_near(
+        assert_util.assert_near(
             x,
             tf.linalg.transpose(x),
             message='Correlation matrices must be symmetric')
@@ -378,8 +379,7 @@ class LKJ(distribution.Distribution):
         `x`, with respect to an LKJ distribution with parameter the
         corresponding element of `concentration`.
     """
-    with tf.compat.v1.name_scope('log_unnorm_prob_lkj', name,
-                                 [self.concentration]):
+    with tf.compat.v2.name_scope(name or 'log_unnorm_prob_lkj'):
       x = tf.convert_to_tensor(value=x, name='x')
       # The density is det(matrix) ** (concentration - 1).
       # Computing the determinant with `logdet` is usually fine, since
@@ -418,8 +418,7 @@ class LKJ(distribution.Distribution):
     """
     # The formula is from D. Lewandowski et al [1], p. 1999, from the
     # proof that eqs 16 and 17 are equivalent.
-    with tf.compat.v1.name_scope('log_normalization_lkj', name,
-                                 [self.concentration]):
+    with tf.compat.v2.name_scope(name or 'log_normalization_lkj'):
       logpi = np.log(np.pi)
       ans = tf.zeros_like(self.concentration)
       for k in range(1, self.dimension):

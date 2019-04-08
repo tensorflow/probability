@@ -26,6 +26,7 @@ import tensorflow as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
@@ -44,7 +45,7 @@ def _get_tol(tol, dtype, validate_args):
   tol = tf.convert_to_tensor(value=tol, dtype=dtype)
   if validate_args:
     tol = distribution_util.with_dependencies([
-        tf.compat.v1.assert_non_negative(
+        assert_util.assert_non_negative(
             tol, message="Argument 'tol' must be non-negative")
     ], tol)
   return tol
@@ -99,7 +100,7 @@ class _BaseDeterministic(distribution.Distribution):
     Raises:
       ValueError:  If `loc` is a scalar.
     """
-    with tf.compat.v1.name_scope(name, values=[loc, atol, rtol]) as name:
+    with tf.compat.v2.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, atol, rtol],
                                       preferred_dtype=tf.float32)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
@@ -110,7 +111,7 @@ class _BaseDeterministic(distribution.Distribution):
             raise ValueError(msg)
         else:
           loc = distribution_util.with_dependencies(
-              [tf.compat.v1.assert_rank_at_least(loc, 1, message=msg)], loc)
+              [assert_util.assert_rank_at_least(loc, 1, message=msg)], loc)
       self._loc = loc
       self._atol = _get_tol(atol, self._loc.dtype, validate_args)
       self._rtol = _get_tol(rtol, self._loc.dtype, validate_args)
@@ -385,8 +386,8 @@ class VectorDeterministic(_BaseDeterministic):
 
   def _prob(self, x):
     if self.validate_args:
-      is_vector_check = tf.compat.v1.assert_rank_at_least(x, 1)
-      right_vec_space_check = tf.compat.v1.assert_equal(
+      is_vector_check = assert_util.assert_rank_at_least(x, 1)
+      right_vec_space_check = assert_util.assert_equal(
           self.event_shape_tensor(),
           tf.gather(tf.shape(input=x),
                     tf.rank(x) - 1),
@@ -417,5 +418,5 @@ def _kl_deterministic_distribution(a, b, name=None):
   Returns:
     Batchwise `KL(a || b)`.
   """
-  with tf.compat.v1.name_scope(name, "kl_deterministic_distribution", [a.loc]):
+  with tf.compat.v2.name_scope(name or "kl_deterministic_distribution"):
     return -b.log_prob(a.loc)

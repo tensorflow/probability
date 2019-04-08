@@ -25,6 +25,7 @@ import tensorflow as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
@@ -105,8 +106,8 @@ class _WishartLinearOperator(distribution.Distribution):
     """
     parameters = dict(locals())
     self._input_output_cholesky = input_output_cholesky
-    with tf.compat.v1.name_scope(name) as name:
-      with tf.compat.v1.name_scope("init", values=[df, scale_operator]):
+    with tf.compat.v2.name_scope(name) as name:
+      with tf.compat.v2.name_scope("init"):
         if not scale_operator.dtype.is_floating:
           raise TypeError(
               "scale_operator.dtype=%s is not a floating-point type" %
@@ -141,7 +142,7 @@ class _WishartLinearOperator(distribution.Distribution):
                 "dimension of scale matrix (scale.dimension = %s)"
                 % (df_val, dim_val))
         elif validate_args:
-          assertions = tf.compat.v1.assert_less_equal(
+          assertions = assert_util.assert_less_equal(
               self._dimension,
               self._df,
               message=("Degrees of freedom (df = %s) cannot be "
@@ -411,7 +412,7 @@ class _WishartLinearOperator(distribution.Distribution):
 
   def _multi_gamma_sequence(self, a, p, name="multi_gamma_sequence"):
     """Creates sequence used in multivariate (di)gamma; shape = shape(a)+[p]."""
-    with self._name_scope(name, values=[a, p]):
+    with self._name_scope(name):
       # Linspace only takes scalars, so we'll add in the offset afterwards.
       seq = tf.linspace(
           tf.constant(0., dtype=self.dtype), 0.5 - 0.5 * p, tf.cast(
@@ -420,14 +421,14 @@ class _WishartLinearOperator(distribution.Distribution):
 
   def _multi_lgamma(self, a, p, name="multi_lgamma"):
     """Computes the log multivariate gamma function; log(Gamma_p(a))."""
-    with self._name_scope(name, values=[a, p]):
+    with self._name_scope(name):
       seq = self._multi_gamma_sequence(a, p)
       return (0.25 * p * (p - 1.) * math.log(math.pi) +
               tf.reduce_sum(input_tensor=tf.math.lgamma(seq), axis=[-1]))
 
   def _multi_digamma(self, a, p, name="multi_digamma"):
     """Computes the multivariate digamma function; Psi_p(a)."""
-    with self._name_scope(name, values=[a, p]):
+    with self._name_scope(name):
       seq = self._multi_gamma_sequence(a, p)
       return tf.reduce_sum(input_tensor=tf.math.digamma(seq), axis=[-1])
 
@@ -532,8 +533,8 @@ class Wishart(_WishartLinearOperator):
     """
     parameters = dict(locals())
 
-    with tf.compat.v1.name_scope(name) as name:
-      with tf.compat.v1.name_scope("init", values=[df, scale, scale_tril]):
+    with tf.compat.v2.name_scope(name) as name:
+      with tf.compat.v2.name_scope("init"):
         if (scale is None) == (scale_tril is None):
           raise ValueError("Must pass scale or scale_tril, but not both.")
 
@@ -549,10 +550,10 @@ class Wishart(_WishartLinearOperator):
               value=scale_tril, name="scale_tril", dtype=dtype)
           if validate_args:
             scale_tril = distribution_util.with_dependencies([
-                tf.compat.v1.assert_positive(
+                assert_util.assert_positive(
                     tf.linalg.diag_part(scale_tril),
                     message="scale_tril must be positive definite"),
-                tf.compat.v1.assert_equal(
+                assert_util.assert_equal(
                     tf.shape(input=scale_tril)[-1],
                     tf.shape(input=scale_tril)[-2],
                     message="scale_tril must be square")

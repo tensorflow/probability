@@ -23,6 +23,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.distributions import distribution as distribution_lib
+from tensorflow_probability.python.internal import assert_util
 from tensorflow.python.framework import tensor_util
 
 
@@ -100,7 +101,7 @@ class BatchReshape(distribution_lib.Distribution):
     """
     parameters = dict(locals())
     name = name or "BatchReshape" + distribution.name
-    with tf.compat.v1.name_scope(name, values=[batch_shape]) as name:
+    with tf.compat.v2.name_scope(name) as name:
       # The unexpanded batch shape may contain up to one dimension of -1.
       self._batch_shape_unexpanded = tf.convert_to_tensor(
           value=batch_shape, dtype=tf.int32, name="batch_shape")
@@ -271,7 +272,7 @@ class BatchReshape(distribution_lib.Distribution):
 
   def _validate_sample_arg(self, x):
     """Helper which validates sample arg, e.g., input to `log_prob`."""
-    with tf.compat.v1.name_scope(name="validate_sample_arg", values=[x]):
+    with tf.compat.v2.name_scope("validate_sample_arg"):
       x_ndims = (tf.rank(x) if x.shape.ndims is None else x.shape.ndims)
       event_ndims = (
           tf.size(input=self.event_shape_tensor())
@@ -291,7 +292,7 @@ class BatchReshape(distribution_lib.Distribution):
         ndims_assertion = []
       elif self.validate_args:
         ndims_assertion = [
-            tf.compat.v1.assert_greater_equal(
+            assert_util.assert_greater_equal(
                 x_ndims,
                 expected_batch_event_ndims,
                 message=("Broadcasting is not supported; too few "
@@ -338,7 +339,7 @@ class BatchReshape(distribution_lib.Distribution):
         # TF itself might raise an exception owing to this assertion being
         # ill-defined, ie, one cannot even compare different rank Tensors.
         with tf.control_dependencies(ndims_assertion):
-          shape_assertion = tf.compat.v1.assert_equal(
+          shape_assertion = assert_util.assert_equal(
               expected_batch_event_shape,
               actual_batch_event_shape,
               message=("Broadcasting is not supported; "
@@ -356,8 +357,7 @@ def calculate_reshape(original_shape, new_shape, validate=False, name=None):
   batch_shape_static = tensor_util.constant_value_as_shape(new_shape)
   if batch_shape_static.is_fully_defined():
     return np.int32(batch_shape_static.as_list()), batch_shape_static, []
-  with tf.compat.v1.name_scope(name, "calculate_reshape",
-                               [original_shape, new_shape]):
+  with tf.compat.v2.name_scope(name or "calculate_reshape"):
     original_size = tf.reduce_prod(input_tensor=original_shape)
     implicit_dim = tf.equal(new_shape, -1)
     size_implicit_dim = (
@@ -366,17 +366,17 @@ def calculate_reshape(original_shape, new_shape, validate=False, name=None):
     expanded_new_shape = tf.where(  # Assumes exactly one `-1`.
         implicit_dim, tf.fill(new_ndims, size_implicit_dim), new_shape)
     validations = [] if not validate else [
-        tf.compat.v1.assert_rank(
+        assert_util.assert_rank(
             original_shape, 1, message="Original shape must be a vector."),
-        tf.compat.v1.assert_rank(
+        assert_util.assert_rank(
             new_shape, 1, message="New shape must be a vector."),
-        tf.compat.v1.assert_less_equal(
+        assert_util.assert_less_equal(
             tf.math.count_nonzero(implicit_dim, dtype=tf.int32),
             1,
             message="At most one dimension can be unknown."),
-        tf.compat.v1.assert_positive(
+        assert_util.assert_positive(
             expanded_new_shape, message="Shape elements must be >=-1."),
-        tf.compat.v1.assert_equal(
+        assert_util.assert_equal(
             tf.reduce_prod(input_tensor=expanded_new_shape),
             original_size,
             message="Shape sizes do not match."),

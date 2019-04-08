@@ -175,9 +175,8 @@ class VectorExponentialDiag(velo.VectorExponentialLinearOperator):
       ValueError: if at most `scale_identity_multiplier` is specified.
     """
     parameters = dict(locals())
-    with tf.compat.v1.name_scope(name) as name:
-      with tf.compat.v1.name_scope(
-          "init", values=[loc, scale_diag, scale_identity_multiplier]):
+    with tf.compat.v2.name_scope(name) as name:
+      with tf.compat.v2.name_scope("init"):
         # No need to validate_args while making diag_scale.  The returned
         # LinearOperatorDiag has an assert_non_singular method that is called by
         # the Bijector.

@@ -68,8 +68,8 @@ def quadrature_scheme_lognormal_gauss_hermite(
     probs: (Batch of) length-`quadrature_size` vectors representing the
       weight associate with each `grid` value.
   """
-  with tf.compat.v1.name_scope(
-      name, "vector_diffeomixture_quadrature_gauss_hermite", [loc, scale]):
+  with tf.compat.v2.name_scope(
+      name or "vector_diffeomixture_quadrature_gauss_hermite"):
     grid, probs = np.polynomial.hermite.hermgauss(deg=quadrature_size)
     grid = grid.astype(loc.dtype.as_numpy_dtype)
     probs = probs.astype(loc.dtype.as_numpy_dtype)
@@ -107,8 +107,7 @@ def quadrature_scheme_lognormal_quantiles(
     probs: (Batch of) length-`quadrature_size` vectors representing the
       weight associate with each `grid` value.
   """
-  with tf.compat.v1.name_scope(name, "quadrature_scheme_lognormal_quantiles",
-                               [loc, scale]):
+  with tf.compat.v2.name_scope(name or "quadrature_scheme_lognormal_quantiles"):
     # Create a LogNormal distribution.
     dist = transformed_distribution.TransformedDistribution(
         distribution=normal.Normal(loc=loc, scale=scale),
@@ -254,7 +253,7 @@ class PoissonLogNormalQuadratureCompound(distribution.Distribution):
         `dtype`.
     """
     parameters = dict(locals())
-    with tf.compat.v1.name_scope(name, values=[loc, scale]) as name:
+    with tf.compat.v2.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, scale], tf.float32)
       if loc is not None:
         loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)

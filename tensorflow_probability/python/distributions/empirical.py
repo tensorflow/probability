@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util as util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.ops import gen_array_ops  # pylint: disable=g-direct-tensorflow-import
@@ -139,13 +140,13 @@ class Empirical(distribution.Distribution):
     """
 
     parameters = locals()
-    with tf.compat.v1.name_scope(name, values=[samples]):
+    with tf.compat.v2.name_scope(name):
       self._samples = tf.convert_to_tensor(value=samples, name='samples')
       self._event_ndims = event_ndims
       self._samples_axis = ((self.samples.shape.ndims or tf.rank(self.samples))
                             - self._event_ndims - 1)
       with tf.control_dependencies(
-          [tf.compat.v1.assert_rank_at_least(self._samples, event_ndims + 1)]):
+          [assert_util.assert_rank_at_least(self._samples, event_ndims + 1)]):
         samples_shape = util.prefer_static_shape(self._samples)
         self._num_samples = samples_shape[self._samples_axis]
 

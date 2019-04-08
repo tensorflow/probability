@@ -25,6 +25,7 @@ import tensorflow as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
@@ -79,14 +80,14 @@ class Pareto(distribution.Distribution):
         Default value: 'Pareto'.
     """
     parameters = dict(locals())
-    with tf.compat.v1.name_scope(name, values=[concentration, scale]):
+    with tf.compat.v2.name_scope(name):
       dtype = dtype_util.common_dtype([concentration, scale], tf.float32)
       self._concentration = tf.convert_to_tensor(
           value=concentration, name="concentration", dtype=dtype)
       self._scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
       with tf.control_dependencies([
-          tf.compat.v1.assert_positive(self._concentration),
-          tf.compat.v1.assert_positive(self._scale)
+          assert_util.assert_positive(self._concentration),
+          assert_util.assert_positive(self._scale)
       ] if validate_args else []):
         self._concentration = tf.identity(
             self._concentration, name="concentration")
@@ -133,7 +134,7 @@ class Pareto(distribution.Distribution):
 
   def _log_prob(self, x):
     with tf.control_dependencies([
-        tf.compat.v1.assert_greater_equal(
+        assert_util.assert_greater_equal(
             x,
             self.scale,
             message="x is not in the support of the distribution.")
@@ -148,7 +149,7 @@ class Pareto(distribution.Distribution):
 
   def _prob(self, x):
     with tf.control_dependencies([
-        tf.compat.v1.assert_greater_equal(
+        assert_util.assert_greater_equal(
             x,
             self.scale,
             message="x is not in the support of the distribution.")
@@ -257,9 +258,7 @@ def _kl_pareto_pareto(a, b, name=None):
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.compat.v1.name_scope(
-      name, "kl_pareto_pareto",
-      [a.concentration, b.concentration, a.scale, b.scale]):
+  with tf.compat.v2.name_scope(name or "kl_pareto_pareto"):
     # Consistent with
     # http://www.mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 55
     # Terminology is different from source to source for Pareto distributions.

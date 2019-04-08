@@ -166,11 +166,7 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
     """
     parameters = dict(locals())
 
-    with tf.compat.v1.name_scope(
-        name,
-        values=[
-            loc, scale_diag, scale_identity_multiplier, skewness, tailweight
-        ]) as name:
+    with tf.compat.v2.name_scope(name) as name:
       dtype = dtype_util.common_dtype(
           [loc, scale_diag, scale_identity_multiplier, skewness, tailweight],
           tf.float32)

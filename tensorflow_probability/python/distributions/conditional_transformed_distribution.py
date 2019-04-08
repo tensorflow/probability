@@ -66,7 +66,7 @@ class ConditionalTransformedDistribution(
     # We override `_call_sample_n` rather than `_sample_n` so we can ensure that
     # the result of `self.bijector.forward` is not modified (and thus caching
     # works).
-    with self._name_scope(name, values=[sample_shape]):
+    with self._name_scope(name):
       sample_shape = tf.convert_to_tensor(
           value=sample_shape, dtype=tf.int32, name="sample_shape")
       sample_shape, n = self._expand_sample_shape_to_vector(

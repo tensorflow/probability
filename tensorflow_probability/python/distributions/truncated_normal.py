@@ -24,6 +24,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
@@ -121,7 +122,7 @@ class TruncatedNormal(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.compat.v1.name_scope(name, values=[loc, scale, low, high]) as name:
+    with tf.compat.v2.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, scale, low, high], tf.float32)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
       scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
@@ -161,8 +162,8 @@ class TruncatedNormal(distribution.Distribution):
 
   def _validate(self):
     vops = [
-        tf.compat.v1.assert_positive(self._scale),
-        tf.compat.v1.assert_positive(self._high - self._low),
+        assert_util.assert_positive(self._scale),
+        assert_util.assert_positive(self._high - self._low),
         tf.compat.v1.verify_tensor_all_finite(self._high,
                                               "Upper bound not finite"),
         tf.compat.v1.verify_tensor_all_finite(self._low,

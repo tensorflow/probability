@@ -23,6 +23,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
@@ -153,16 +154,16 @@ class InverseGamma(distribution.Distribution):
     if rate is not None:
       scale = rate
     parameters = dict(locals())
-    with tf.compat.v1.name_scope(name, values=[concentration, scale]) as name:
+    with tf.compat.v2.name_scope(name) as name:
       dtype = dtype_util.common_dtype([concentration, scale],
                                       preferred_dtype=tf.float32)
       concentration = tf.convert_to_tensor(
           value=concentration, name="concentration", dtype=dtype)
       scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
       with tf.control_dependencies([
-          tf.compat.v1.assert_positive(
+          assert_util.assert_positive(
               concentration, message="Concentration must be positive."),
-          tf.compat.v1.assert_positive(
+          assert_util.assert_positive(
               scale, message="Scale must be positive."),
       ] if validate_args else []):
         self._concentration = tf.identity(concentration, name="concentration")
@@ -269,7 +270,7 @@ class InverseGamma(distribution.Distribution):
       return tf.where(self.concentration > 1., mean, nan)
     else:
       return distribution_util.with_dependencies([
-          tf.compat.v1.assert_less(
+          assert_util.assert_less(
               tf.ones([], self.dtype),
               self.concentration,
               message="mean undefined when any concentration <= 1"),
@@ -291,7 +292,7 @@ class InverseGamma(distribution.Distribution):
       return tf.where(self.concentration > 2., var, nan)
     else:
       return distribution_util.with_dependencies([
-          tf.compat.v1.assert_less(
+          assert_util.assert_less(
               tf.constant(2., dtype=self.dtype),
               self.concentration,
               message="variance undefined when any concentration <= 2"),
@@ -308,7 +309,7 @@ class InverseGamma(distribution.Distribution):
     if not self.validate_args:
       return x
     return distribution_util.with_dependencies([
-        tf.compat.v1.assert_positive(x),
+        assert_util.assert_positive(x),
     ], x)
 
 
@@ -329,7 +330,7 @@ class _InverseGammaWithSoftplusConcentrationScale(InverseGamma):
     if rate is not None:
       scale = rate
     parameters = dict(locals())
-    with tf.compat.v1.name_scope(name, values=[concentration, scale]) as name:
+    with tf.compat.v2.name_scope(name) as name:
       dtype = dtype_util.common_dtype([concentration, scale])
       concentration = tf.convert_to_tensor(
           value=concentration, name="softplus_concentration", dtype=dtype)

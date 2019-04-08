@@ -20,6 +20,7 @@ from __future__ import print_function
 import tensorflow as tf
 
 from tensorflow_probability.python.distributions import distribution as distribution_lib
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow.python.framework import tensor_util  # pylint: disable=g-direct-tensorflow-import
@@ -190,8 +191,7 @@ class TransformedDistribution(distribution_lib.Distribution):
     parameters = dict(locals()) if parameters is None else parameters
     name = name or (("" if bijector is None else bijector.name) +
                     distribution.name)
-    with tf.compat.v1.name_scope(
-        name, values=[event_shape, batch_shape]) as name:
+    with tf.compat.v2.name_scope(name) as name:
       # For convenience we define some handy constants.
       self._zero = tf.constant(0, dtype=tf.int32, name="zero")
       self._empty = tf.constant([], dtype=tf.int32, name="empty")
@@ -345,7 +345,7 @@ class TransformedDistribution(distribution_lib.Distribution):
     # We override `_call_sample_n` rather than `_sample_n` so we can ensure that
     # the result of `self.bijector.forward` is not modified (and thus caching
     # works).
-    with self._name_scope(name, values=[sample_shape]):
+    with self._name_scope(name):
       sample_shape = tf.convert_to_tensor(
           value=sample_shape, dtype=tf.int32, name="sample_shape")
       sample_shape, n = self._expand_sample_shape_to_vector(
@@ -580,7 +580,7 @@ class TransformedDistribution(distribution_lib.Distribution):
         raise ValueError("shape override must be a vector")
     elif validate_args:
       dynamic_assertions += [
-          tf.compat.v1.assert_rank(
+          assert_util.assert_rank(
               override_shape, 1, message="shape override must be a vector")
       ]
 
@@ -589,7 +589,7 @@ class TransformedDistribution(distribution_lib.Distribution):
         raise ValueError("shape override must have non-negative elements")
     elif validate_args:
       dynamic_assertions += [
-          tf.compat.v1.assert_non_negative(
+          assert_util.assert_non_negative(
               override_shape,
               message="shape override must have non-negative elements")
       ]
@@ -602,7 +602,7 @@ class TransformedDistribution(distribution_lib.Distribution):
         raise ValueError("base distribution not scalar")
     elif validate_args:
       dynamic_assertions += [
-          tf.compat.v1.assert_equal(
+          assert_util.assert_equal(
               is_both_nonscalar, False, message="base distribution not scalar")
       ]
 

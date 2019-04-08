@@ -26,6 +26,7 @@ from tensorflow_probability.python.bijectors import square as square_bijector
 from tensorflow_probability.python.distributions import chi2
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import transformed_distribution
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 
 
@@ -79,13 +80,13 @@ class Chi(transformed_distribution.TransformedDistribution):
         Default value: `'Chi'`.
     """
     parameters = dict(locals())
-    with tf.compat.v1.name_scope(name, values=[df]) as name:
+    with tf.compat.v2.name_scope(name) as name:
       df = tf.convert_to_tensor(
           value=df,
           name="df",
           dtype=dtype_util.common_dtype([df], preferred_dtype=tf.float32))
-      validation_assertions = [tf.compat.v1.assert_positive(df)
-                              ] if validate_args else []
+      validation_assertions = (
+          [assert_util.assert_positive(df)] if validate_args else [])
       with tf.control_dependencies(validation_assertions):
         self._df = tf.identity(df, name="df")
 
@@ -132,7 +133,7 @@ def _kl_chi_chi(a, b, name=None):
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.compat.v1.name_scope(name, "kl_chi_chi", [a.df, b.df]):
+  with tf.compat.v2.name_scope(name or "kl_chi_chi"):
     # Consistent with
     # https://mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 118
     # The paper introduces an additional scaling parameter; setting that

@@ -23,6 +23,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
@@ -99,15 +100,15 @@ class InverseGaussian(distribution.Distribution):
         Default value: 'InverseGaussian'.
     """
     parameters = dict(locals())
-    with tf.compat.v1.name_scope(name, values=[loc, concentration]):
+    with tf.compat.v2.name_scope(name):
       dtype = dtype_util.common_dtype([loc, concentration],
                                       preferred_dtype=tf.float32)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
       concentration = tf.convert_to_tensor(
           value=concentration, name="concentration", dtype=dtype)
       with tf.control_dependencies([
-          tf.compat.v1.assert_positive(loc),
-          tf.compat.v1.assert_positive(concentration)
+          assert_util.assert_positive(loc),
+          assert_util.assert_positive(concentration)
       ] if validate_args else []):
         self._loc = tf.identity(loc, name="loc")
         self._concentration = tf.identity(concentration, name="concentration")
@@ -167,7 +168,7 @@ class InverseGaussian(distribution.Distribution):
 
   def _log_prob(self, x):
     with tf.control_dependencies([
-        tf.compat.v1.assert_greater(
+        assert_util.assert_greater(
             x, tf.cast(0., x.dtype.base_dtype), message="x must be positive.")
     ] if self.validate_args else []):
 
@@ -178,7 +179,7 @@ class InverseGaussian(distribution.Distribution):
 
   def _cdf(self, x):
     with tf.control_dependencies([
-        tf.compat.v1.assert_greater(
+        assert_util.assert_greater(
             x, tf.cast(0., x.dtype.base_dtype), message="x must be positive.")
     ] if self.validate_args else []):
 

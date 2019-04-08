@@ -24,6 +24,7 @@ import tensorflow as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
@@ -141,14 +142,14 @@ class Gamma(distribution.Distribution):
       TypeError: if `concentration` and `rate` are different dtypes.
     """
     parameters = dict(locals())
-    with tf.compat.v1.name_scope(name, values=[concentration, rate]) as name:
+    with tf.compat.v2.name_scope(name) as name:
       dtype = dtype_util.common_dtype([concentration, rate], tf.float32)
       concentration = tf.convert_to_tensor(
           value=concentration, name="concentration", dtype=dtype)
       rate = tf.convert_to_tensor(value=rate, name="rate", dtype=dtype)
       with tf.control_dependencies([
-          tf.compat.v1.assert_positive(concentration),
-          tf.compat.v1.assert_positive(rate),
+          assert_util.assert_positive(concentration),
+          assert_util.assert_positive(rate),
       ] if validate_args else []):
         self._concentration = tf.identity(concentration)
         self._rate = tf.identity(rate)
@@ -253,7 +254,7 @@ class Gamma(distribution.Distribution):
       return tf.where(self.concentration > 1., mode, nan)
     else:
       return distribution_util.with_dependencies([
-          tf.compat.v1.assert_less(
+          assert_util.assert_less(
               tf.ones([], self.dtype),
               self.concentration,
               message="mode not defined when any concentration <= 1"),
@@ -264,7 +265,7 @@ class Gamma(distribution.Distribution):
     if not self.validate_args:
       return x
     return distribution_util.with_dependencies([
-        tf.compat.v1.assert_positive(x),
+        assert_util.assert_positive(x),
     ], x)
 
 
@@ -284,10 +285,7 @@ def _kl_gamma_gamma(g0, g1, name=None):
   Returns:
     kl_gamma_gamma: `Tensor`. The batchwise KL(g0 || g1).
   """
-  with tf.compat.v1.name_scope(
-      name,
-      "kl_gamma_gamma",
-      values=[g0.concentration, g0.rate, g1.concentration, g1.rate]):
+  with tf.compat.v2.name_scope(name or "kl_gamma_gamma"):
     # Result from:
     #   http://www.fil.ion.ucl.ac.uk/~wpenny/publications/densities.ps
     # For derivation see:

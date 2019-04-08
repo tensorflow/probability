@@ -25,6 +25,7 @@ import tensorflow as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import seed_stream
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import reparameterization
 
 
@@ -62,7 +63,7 @@ class Blockwise(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.compat.v1.name_scope(name) as name:
+    with tf.compat.v2.name_scope(name) as name:
       self._assertions = _maybe_validate_distributions(
           distributions, dtype_override, validate_args)
 
@@ -139,7 +140,7 @@ class Blockwise(distribution.Distribution):
         raise ValueError(message)
     elif self.validate_args:
       additional_assertions.append(
-          tf.compat.v1.assert_rank_at_least(x, 1, message=message))
+          assert_util.assert_rank_at_least(x, 1, message=message))
     with tf.control_dependencies(self._assertions + additional_assertions):
       event_sizes = [d.event_shape_tensor()[0] for d in self.distributions]
       xs = tf.split(x, event_sizes, axis=-1)
@@ -186,7 +187,7 @@ def _maybe_validate_distributions(distributions, dtype_override, validate_args):
                          'found event nimds: {}.'.format(d.event_shape.ndims))
     elif validate_args:
       assertions.append(
-          tf.compat.v1.assert_equal(
+          assert_util.assert_equal(
               1, tf.size(input=d.event_shape_tensor()),
               message='`Distribution` must be vector variate.'))
 
@@ -201,7 +202,7 @@ def _maybe_validate_distributions(distributions, dtype_override, validate_args):
                     else d.batch_shape_tensor()
                     for d in distributions]
     assertions.extend(
-        tf.compat.v1.assert_equal(  # pylint: disable=g-complex-comprehension
+        assert_util.assert_equal(  # pylint: disable=g-complex-comprehension
             b1, b2,
             message='Distribution `batch_shape`s must be identical.')
         for b1, b2 in zip(batch_shapes[1:], batch_shapes[:-1]))
@@ -242,11 +243,11 @@ def _kl_blockwise_blockwise(b0, b1, name=None):
   else:
     if b0.validate_args or b1.validate_args:
       assertions.extend(
-          tf.compat.v1.assert_equal(  # pylint: disable=g-complex-comprehension
+          assert_util.assert_equal(  # pylint: disable=g-complex-comprehension
               e1, e2, message=message)
           for e1, e2 in zip(b0_event_sizes, b1_event_sizes))
 
-  with tf.compat.v1.name_scope(name, 'kl_blockwise_blockwise'):
+  with tf.compat.v2.name_scope(name or 'kl_blockwise_blockwise'):
     with tf.control_dependencies(assertions):
       return sum([
           kullback_leibler.kl_divergence(d1, d2) for d1, d2 in zip(

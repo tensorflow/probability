@@ -24,6 +24,7 @@ import tensorflow as tf
 from tensorflow_probability.python.bijectors import exp as exp_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import transformed_distribution
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
@@ -156,8 +157,7 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.compat.v1.name_scope(
-        name, values=[logits, probs, temperature]) as name:
+    with tf.compat.v2.name_scope(name) as name:
 
       dtype = dtype_util.common_dtype([logits, probs, temperature], tf.float32)
       self._logits, self._probs = distribution_util.get_logits_and_probs(
@@ -169,7 +169,7 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
           dtype=dtype)
 
       with tf.control_dependencies(
-          [tf.compat.v1.assert_positive(temperature)] if validate_args else []):
+          [assert_util.assert_positive(temperature)] if validate_args else []):
         self._temperature = tf.convert_to_tensor(
             value=temperature, name="temperature", dtype=dtype)
         self._temperature_2d = tf.reshape(
@@ -182,10 +182,10 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
             dtype=tf.int32,
             name="batch_rank")
       else:
-        with tf.compat.v1.name_scope(name="batch_rank"):
+        with tf.compat.v2.name_scope("batch_rank"):
           self._batch_rank = tf.rank(self._logits) - 1
 
-      with tf.compat.v1.name_scope(name="event_size"):
+      with tf.compat.v2.name_scope("event_size"):
         self._event_size = tf.shape(input=self._logits)[-1]
 
     super(ExpRelaxedOneHotCategorical, self).__init__(
@@ -281,8 +281,8 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
     if not self.validate_args:
       return x
     return distribution_util.with_dependencies([
-        tf.compat.v1.assert_non_positive(x),
-        tf.compat.v1.assert_near(
+        assert_util.assert_non_positive(x),
+        assert_util.assert_near(
             tf.zeros([], dtype=self.dtype),
             tf.reduce_logsumexp(input_tensor=x, axis=[-1])),
     ], x)

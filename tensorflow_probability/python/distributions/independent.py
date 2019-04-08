@@ -24,6 +24,7 @@ import tensorflow as tf
 
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import prefer_static
 
 
@@ -115,7 +116,7 @@ class Independent(distribution_lib.Distribution):
     parameters = dict(locals())
     name = name or "Independent" + distribution.name
     self._distribution = distribution
-    with tf.compat.v1.name_scope(name) as name:
+    with tf.compat.v2.name_scope(name) as name:
       if reinterpreted_batch_ndims is None:
         reinterpreted_batch_ndims = self._get_default_reinterpreted_batch_ndims(
             distribution)
@@ -250,7 +251,7 @@ class Independent(distribution_lib.Distribution):
                              static_reinterpreted_batch_ndims, batch_ndims))
     elif validate_args:
       assertions.append(
-          tf.compat.v1.assert_less_equal(
+          assert_util.assert_less_equal(
               reinterpreted_batch_ndims,
               prefer_static.rank_from_shape(distribution.batch_shape_tensor,
                                             distribution.batch_shape),
@@ -315,10 +316,10 @@ def _kl_independent(a, b, name="kl_independent"):
   else:
     with tf.control_dependencies(
         [
-            tf.compat.v1.assert_equal(a.event_shape_tensor(),
-                                      b.event_shape_tensor()),
-            tf.compat.v1.assert_equal(p.event_shape_tensor(),
-                                      q.event_shape_tensor())
+            assert_util.assert_equal(a.event_shape_tensor(),
+                                     b.event_shape_tensor()),
+            assert_util.assert_equal(p.event_shape_tensor(),
+                                     q.event_shape_tensor())
         ]):
       num_reduce_dims = (
           prefer_static.rank_from_shape(

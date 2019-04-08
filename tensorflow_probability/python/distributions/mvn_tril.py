@@ -187,8 +187,8 @@ class MultivariateNormalTriL(
 
     if loc is None and scale_tril is None:
       raise ValueError("Must specify one or both of `loc`, `scale_tril`.")
-    with tf.compat.v1.name_scope(name) as name:
-      with tf.compat.v1.name_scope("init", values=[loc, scale_tril]):
+    with tf.compat.v2.name_scope(name) as name:
+      with tf.compat.v2.name_scope("init"):
         dtype = dtype_util.common_dtype([loc, scale_tril], tf.float32)
         loc = _convert_to_tensor(loc, name="loc", dtype=dtype)
         scale_tril = _convert_to_tensor(

@@ -25,6 +25,7 @@ import tensorflow as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 
@@ -135,18 +136,18 @@ class Triangular(distribution.Distribution):
         * `low > peak`.
     """
     parameters = locals()
-    with tf.compat.v1.name_scope(name, values=[low, high, peak]) as name:
+    with tf.compat.v2.name_scope(name) as name:
       dtype = dtype_util.common_dtype([low, high, peak], tf.float32)
       low = tf.convert_to_tensor(value=low, name="low", dtype=dtype)
       high = tf.convert_to_tensor(value=high, name="high", dtype=dtype)
       peak = tf.convert_to_tensor(value=peak, name="peak", dtype=dtype)
 
       with tf.control_dependencies([
-          tf.compat.v1.assert_less(
+          assert_util.assert_less(
               low, high, message="triangular not defined when low >= high."),
-          tf.compat.v1.assert_less_equal(
+          assert_util.assert_less_equal(
               low, peak, message="triangular not defined when low > peak."),
-          tf.compat.v1.assert_less_equal(
+          assert_util.assert_less_equal(
               peak, high, message="triangular not defined when peak > high."),
       ] if validate_args else []):
         self._low = tf.identity(low, name="low")
@@ -226,8 +227,8 @@ class Triangular(distribution.Distribution):
   def _prob(self, x):
     if self.validate_args:
       with tf.control_dependencies([
-          tf.compat.v1.assert_greater_equal(x, self.low),
-          tf.compat.v1.assert_less_equal(x, self.high)
+          assert_util.assert_greater_equal(x, self.low),
+          assert_util.assert_less_equal(x, self.high)
       ]):
         x = tf.identity(x)
 

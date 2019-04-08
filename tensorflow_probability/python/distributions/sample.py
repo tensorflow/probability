@@ -25,6 +25,7 @@ import tensorflow as tf
 
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import prefer_static
 
@@ -129,7 +130,7 @@ class Sample(distribution_lib.Distribution):
     parameters = dict(locals())
     name = name or 'Sample' + distribution.name
     self._distribution = distribution
-    with tf.compat.v1.name_scope(name) as name:
+    with tf.compat.v2.name_scope(name) as name:
       sample_shape = distribution_util.expand_to_vector(tf.convert_to_tensor(
           value=sample_shape, dtype_hint=tf.int32, name='sample_shape'))
       self._sample_shape = sample_shape
@@ -264,7 +265,7 @@ def _kl_sample(a, b, name='kl_sample'):
     if not np.array_equal(a_ss, b_ss):
       raise ValueError(msg)
   elif a.validate_args or b.validate_args:
-    assertions.append(tf.compat.v1.assert_equal(
+    assertions.append(assert_util.assert_equal(
         a.sample_shape, b.sample_shape, message=msg))
   with tf.control_dependencies(assertions):
     kl = kullback_leibler.kl_divergence(

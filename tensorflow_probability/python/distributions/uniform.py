@@ -24,6 +24,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
@@ -99,12 +100,12 @@ class Uniform(distribution.Distribution):
       InvalidArgumentError: if `low >= high` and `validate_args=False`.
     """
     parameters = dict(locals())
-    with tf.compat.v1.name_scope(name, values=[low, high]) as name:
+    with tf.compat.v2.name_scope(name) as name:
       dtype = dtype_util.common_dtype([low, high], tf.float32)
       low = tf.convert_to_tensor(value=low, name="low", dtype=dtype)
       high = tf.convert_to_tensor(value=high, name="high", dtype=dtype)
       with tf.control_dependencies([
-          tf.compat.v1.assert_less(
+          assert_util.assert_less(
               low, high, message="uniform not defined when low >= high.")
       ] if validate_args else []):
         self._low = tf.identity(low)
@@ -227,8 +228,7 @@ def _kl_uniform_uniform(a, b, name=None):
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.compat.v1.name_scope(name, "kl_uniform_uniform",
-                               [a.low, b.low, a.high, b.high]):
+  with tf.compat.v2.name_scope(name or "kl_uniform_uniform"):
     # Consistent with
     # http://www.mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 60
     # Watch out for the change in conventions--they use 'a' and 'b' to refer to

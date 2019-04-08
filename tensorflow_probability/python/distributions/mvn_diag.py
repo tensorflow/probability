@@ -194,9 +194,8 @@ class MultivariateNormalDiag(
       ValueError: if at most `scale_identity_multiplier` is specified.
     """
     parameters = dict(locals())
-    with tf.compat.v1.name_scope(name) as name:
-      with tf.compat.v1.name_scope(
-          "init", values=[loc, scale_diag, scale_identity_multiplier]):
+    with tf.compat.v2.name_scope(name) as name:
+      with tf.compat.v2.name_scope("init"):
         # No need to validate_args while making diag_scale.  The returned
         # LinearOperatorDiag has an assert_non_singular method that is called by
         # the Bijector.
@@ -235,7 +234,7 @@ class MultivariateNormalDiagWithSoftplusScale(MultivariateNormalDiag):
                allow_nan_stats=True,
                name="MultivariateNormalDiagWithSoftplusScale"):
     parameters = dict(locals())
-    with tf.compat.v1.name_scope(name, values=[scale_diag]) as name:
+    with tf.compat.v2.name_scope(name) as name:
       super(MultivariateNormalDiagWithSoftplusScale, self).__init__(
           loc=loc,
           scale_diag=tf.nn.softplus(scale_diag),

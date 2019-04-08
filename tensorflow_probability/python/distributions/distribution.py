@@ -449,7 +449,7 @@ class Distribution(_BaseDistribution):
         raise ValueError("Graph parent item %d is not a Tensor; %s." % (i, t))
     if not name or name[-1] != "/":  # `name` is not a name scope
       non_unique_name = name or type(self).__name__
-      with tf.compat.v1.name_scope(non_unique_name) as name:
+      with tf.compat.v2.name_scope(non_unique_name) as name:
         pass
     self._dtype = dtype
     self._reparameterization_type = reparameterization_type
@@ -478,7 +478,7 @@ class Distribution(_BaseDistribution):
     Returns:
       `dict` of parameter name to `Tensor` shapes.
     """
-    with tf.compat.v1.name_scope(name, values=[sample_shape]):
+    with tf.compat.v2.name_scope(name):
       return cls._param_shapes(sample_shape)
 
   @classmethod
@@ -784,7 +784,7 @@ class Distribution(_BaseDistribution):
 
   def _call_sample_n(self, sample_shape, seed, name, **kwargs):
     """Wrapper around _sample_n."""
-    with self._name_scope(name, values=[sample_shape]):
+    with self._name_scope(name):
       sample_shape = tf.convert_to_tensor(
           value=sample_shape, dtype=tf.int32, name="sample_shape")
       sample_shape, n = self._expand_sample_shape_to_vector(
@@ -814,7 +814,7 @@ class Distribution(_BaseDistribution):
 
   def _call_log_prob(self, value, name, **kwargs):
     """Wrapper around _log_prob."""
-    with self._name_scope(name, values=[value]):
+    with self._name_scope(name):
       value = _convert_to_tensor(
           value, name="value", preferred_dtype=self.dtype)
       if hasattr(self, "_log_prob"):
@@ -839,7 +839,7 @@ class Distribution(_BaseDistribution):
 
   def _call_prob(self, value, name, **kwargs):
     """Wrapper around _prob."""
-    with self._name_scope(name, values=[value]):
+    with self._name_scope(name):
       value = _convert_to_tensor(
           value, name="value", preferred_dtype=self.dtype)
       if hasattr(self, "_prob"):
@@ -864,7 +864,7 @@ class Distribution(_BaseDistribution):
 
   def _call_log_cdf(self, value, name, **kwargs):
     """Wrapper around _log_cdf."""
-    with self._name_scope(name, values=[value]):
+    with self._name_scope(name):
       value = _convert_to_tensor(
           value, name="value", preferred_dtype=self.dtype)
       if hasattr(self, "_log_cdf"):
@@ -899,7 +899,7 @@ class Distribution(_BaseDistribution):
 
   def _call_cdf(self, value, name, **kwargs):
     """Wrapper around _cdf."""
-    with self._name_scope(name, values=[value]):
+    with self._name_scope(name):
       value = _convert_to_tensor(
           value, name="value", preferred_dtype=self.dtype)
       if hasattr(self, "_cdf"):
@@ -935,7 +935,7 @@ class Distribution(_BaseDistribution):
 
   def _call_log_survival_function(self, value, name, **kwargs):
     """Wrapper around _log_survival_function."""
-    with self._name_scope(name, values=[value]):
+    with self._name_scope(name):
       value = _convert_to_tensor(
           value, name="value", preferred_dtype=self.dtype)
       try:
@@ -976,7 +976,7 @@ class Distribution(_BaseDistribution):
 
   def _call_survival_function(self, value, name, **kwargs):
     """Wrapper around _survival_function."""
-    with self._name_scope(name, values=[value]):
+    with self._name_scope(name):
       value = _convert_to_tensor(
           value, name="value", preferred_dtype=self.dtype)
       try:
@@ -1031,7 +1031,7 @@ class Distribution(_BaseDistribution):
         type(self).__name__))
 
   def _call_quantile(self, value, name, **kwargs):
-    with self._name_scope(name, values=[value]):
+    with self._name_scope(name):
       value = _convert_to_tensor(
           value, name="value", preferred_dtype=self.dtype)
       return self._quantile(value, **kwargs)
@@ -1266,13 +1266,10 @@ class Distribution(_BaseDistribution):
                 dtype=_str_dtype(self.dtype)))
 
   @contextlib.contextmanager
-  def _name_scope(self, name=None, values=None):
+  def _name_scope(self, name=None):
     """Helper function to standardize op scope."""
-    with tf.compat.v1.name_scope(self.name):
-      with tf.compat.v1.name_scope(
-          name,
-          values=(([] if values is None else values) +
-                  self._graph_parents)) as scope:
+    with tf.compat.v2.name_scope(self.name):
+      with tf.compat.v2.name_scope(name) as scope:
         yield scope
 
   def _expand_sample_shape_to_vector(self, x, name):

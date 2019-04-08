@@ -25,6 +25,7 @@ import tensorflow as tf
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import seed_stream
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
@@ -181,7 +182,7 @@ class JointDistributionSequential(distribution_lib.Distribution):
     """
     parameters = dict(locals())
     name = name or 'JointDistributionSequential'
-    with tf.compat.v1.name_scope(name) as name:
+    with tf.compat.v2.name_scope(name) as name:
       self._distribution_fn = distribution_fn
       [
           self._wrapped_distribution_fn,
@@ -323,7 +324,7 @@ class JointDistributionSequential(distribution_lib.Distribution):
         for each of `distribution_fn`.
     """
     seed = seed_stream.SeedStream('JointDistributionSequential', seed)
-    with self._name_scope(name, values=[sample_shape, seed, value]):
+    with self._name_scope(name):
       ds = []
       if value is None:
         xs = [None] * len(self._wrapped_distribution_fn)
@@ -368,7 +369,7 @@ class JointDistributionSequential(distribution_lib.Distribution):
       samples: a `tuple` of `Tensor`s with prepended dimensions `sample_shape`
         for each of `distribution_fn`.
     """
-    with self._name_scope(name, values=[sample_shape, seed, value]):
+    with self._name_scope(name):
       _, xs = self.sample_distributions(sample_shape, seed, value)
       return xs
 
@@ -393,7 +394,7 @@ class JointDistributionSequential(distribution_lib.Distribution):
     """
     if any(v is None for v in value):
       raise ValueError('No `value` part can be `None`.')
-    with self._name_scope(name, values=[value]):
+    with self._name_scope(name):
       return _maybe_check_wont_broadcast(
           (d.log_prob(x) for d, x
            in zip(*self.sample_distributions(value=value))),
@@ -414,7 +415,7 @@ class JointDistributionSequential(distribution_lib.Distribution):
     """
     if any(v is None for v in value):
       raise ValueError('No `value` part can be `None`.')
-    with self._name_scope(name, values=[value]):
+    with self._name_scope(name):
       return _maybe_check_wont_broadcast(
           (d.prob(x) for d, x
            in zip(*self.sample_distributions(value=value))),
@@ -660,7 +661,7 @@ def _maybe_check_wont_broadcast(parts, validate_args):
     if not all(a == b for a, b in zip(s[1:], s[:-1])):
       raise ValueError(msg)
     return parts
-  assertions = [tf.compat.v1.assert_equal(a, b, message=msg)
+  assertions = [assert_util.assert_equal(a, b, message=msg)
                 for a, b in zip(s[1:], s[:-1])]
   with tf.control_dependencies(assertions):
     return tuple(tf.identity(part) for part in parts)
@@ -697,6 +698,6 @@ def _kl_joint_joint(d0, d1, name=None):
     raise ValueError(
         'Can only compute KL divergence when all distributions are '
         'independent.')
-  with tf.compat.v1.name_scope(name, 'kl_joint_joint'):
+  with tf.compat.v2.name_scope(name or 'kl_joint_joint'):
     return sum(kullback_leibler.kl_divergence(d0_, d1_)
                for d0_, d1_ in zip(d0.distribution_fn, d1.distribution_fn))

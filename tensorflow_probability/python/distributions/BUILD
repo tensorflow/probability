@@ -141,6 +141,7 @@ py_library(
         ":distribution",
         ":kullback_leibler",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:reparameterization",
     ],
@@ -155,6 +156,7 @@ py_library(
         ":seed_stream",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
@@ -167,6 +169,7 @@ py_library(
     deps = [
         ":distribution",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
@@ -180,6 +183,7 @@ py_library(
         ":distribution",
         ":seed_stream",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:reparameterization",
     ],
 )
@@ -191,6 +195,7 @@ py_library(
         ":distribution",
         ":kullback_leibler",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:reparameterization",
     ],
@@ -203,6 +208,7 @@ py_library(
         ":distribution",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
     ],
@@ -219,6 +225,7 @@ py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:invert",
         "//tensorflow_probability/python/bijectors:square",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
@@ -229,6 +236,7 @@ py_library(
     deps = [
         ":gamma",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
@@ -249,6 +257,7 @@ py_library(
         ":conditional_distribution",
         ":transformed_distribution",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
@@ -261,6 +270,7 @@ py_library(
         ":kullback_leibler",
         # six dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
     ],
@@ -274,6 +284,7 @@ py_library(
         ":kullback_leibler",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
@@ -288,6 +299,7 @@ py_library(
         ":multinomial",
         ":seed_stream",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
@@ -304,6 +316,7 @@ py_library(
         # six dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions/internal:slicing",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
@@ -314,6 +327,7 @@ py_library(
     deps = [
         ":distribution",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:reparameterization",
     ],
 )
@@ -325,6 +339,7 @@ py_library(
         ":gamma",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
@@ -337,6 +352,7 @@ py_library(
         ":kullback_leibler",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
@@ -351,6 +367,7 @@ py_library(
         ":seed_stream",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
@@ -363,6 +380,7 @@ py_library(
     deps = [
         ":mvn_linear_operator",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
@@ -373,6 +391,7 @@ py_library(
     deps = [
         ":mvn_linear_operator",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
@@ -384,6 +403,7 @@ py_library(
         ":distribution",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:reparameterization",
     ],
@@ -399,6 +419,7 @@ py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:gumbel",
         "//tensorflow_probability/python/bijectors:invert",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
     ],
@@ -411,6 +432,7 @@ py_library(
         ":distribution",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
     ],
@@ -423,6 +445,7 @@ py_library(
         ":distribution",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:special_math",
@@ -437,6 +460,7 @@ py_library(
         ":distribution",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
     ],
 )
 
@@ -447,6 +471,7 @@ py_library(
         ":distribution",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
     ],
@@ -460,6 +485,7 @@ py_library(
         ":kullback_leibler",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:prefer_static",
     ],
 )
@@ -471,6 +497,7 @@ py_library(
         ":distribution",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
@@ -485,6 +512,7 @@ py_library(
         ":seed_stream",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
@@ -501,6 +529,7 @@ py_library(
         ":seed_stream",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
@@ -512,6 +541,7 @@ py_library(
     srcs = ["kullback_leibler.py"],
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
     ],
 )
 
@@ -524,6 +554,7 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:kumaraswamy",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
@@ -537,6 +568,7 @@ py_library(
         ":distribution",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:special_math",
@@ -551,6 +583,7 @@ py_library(
         ":mvn_tril",
         ":seed_stream",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:reparameterization",
     ],
@@ -566,6 +599,7 @@ py_library(
         ":seed_stream",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:test_case",
@@ -579,6 +613,7 @@ py_library(
         ":distribution",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
     ],
@@ -593,6 +628,7 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:exp",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
@@ -606,6 +642,7 @@ py_library(
         ":seed_stream",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:reparameterization",
     ],
@@ -619,6 +656,7 @@ py_library(
         ":seed_stream",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:reparameterization",
     ],
@@ -630,6 +668,7 @@ py_library(
     deps = [
         ":mvn_linear_operator",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
     ],
@@ -641,6 +680,7 @@ py_library(
     deps = [
         ":mvn_linear_operator",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
@@ -651,6 +691,7 @@ py_library(
     deps = [
         ":mvn_tril",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
@@ -664,6 +705,7 @@ py_library(
         ":transformed_distribution",
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:affine_linear_operator",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
@@ -674,6 +716,7 @@ py_library(
     deps = [
         ":mvn_linear_operator",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
     ],
@@ -689,6 +732,7 @@ py_library(
         ":seed_stream",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
@@ -702,6 +746,7 @@ py_library(
     deps = [
         ":distribution",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
@@ -715,6 +760,7 @@ py_library(
         ":distribution",
         ":seed_stream",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
@@ -728,6 +774,7 @@ py_library(
         ":distribution",
         ":kullback_leibler",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:special_math",
@@ -740,6 +787,7 @@ py_library(
     deps = [
         ":normal",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
     ],
 )
 
@@ -750,6 +798,7 @@ py_library(
         ":distribution",
         ":kullback_leibler",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:reparameterization",
     ],
@@ -762,6 +811,7 @@ py_library(
         ":distribution",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
@@ -774,6 +824,7 @@ py_library(
     deps = [
         ":distribution",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
@@ -793,6 +844,7 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:exp",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
@@ -806,6 +858,7 @@ py_library(
         ":distribution",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:reparameterization",
     ],
@@ -819,6 +872,7 @@ py_library(
         ":transformed_distribution",
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:sigmoid",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
     ],
@@ -833,6 +887,7 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:exp",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
@@ -847,6 +902,7 @@ py_library(
         ":kullback_leibler",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:prefer_static",
     ],
@@ -867,6 +923,7 @@ py_library(
         "//tensorflow_probability/python/bijectors:affine_scalar",
         "//tensorflow_probability/python/bijectors:chain",
         "//tensorflow_probability/python/bijectors:sinh_arcsinh",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
     ],
@@ -880,6 +937,7 @@ py_library(
         ":seed_stream",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
@@ -892,6 +950,7 @@ py_library(
     deps = [
         ":multivariate_student_t",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
@@ -904,6 +963,7 @@ py_library(
         ":seed_stream",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
     ],
@@ -917,6 +977,7 @@ py_library(
         ":sample",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:prefer_static",
     ],
@@ -929,6 +990,7 @@ py_library(
         ":distribution",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
@@ -942,6 +1004,7 @@ py_library(
     deps = [
         ":distribution",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
     ],
@@ -957,6 +1020,7 @@ py_library(
         ":normal",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
@@ -973,6 +1037,7 @@ py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:affine_linear_operator",
         "//tensorflow_probability/python/bijectors:softmax_centered",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:reparameterization",
     ],
@@ -984,6 +1049,7 @@ py_library(
     deps = [
         ":vector_exponential_linear_operator",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
@@ -996,6 +1062,7 @@ py_library(
         ":transformed_distribution",
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:affine_linear_operator",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
@@ -1006,6 +1073,7 @@ py_library(
     deps = [
         ":vector_laplace_linear_operator",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
     ],
@@ -1020,6 +1088,7 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:affine_linear_operator",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
@@ -1034,6 +1103,7 @@ py_library(
         "//tensorflow_probability/python/bijectors:affine",
         "//tensorflow_probability/python/bijectors:chain",
         "//tensorflow_probability/python/bijectors:sinh_arcsinh",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
     ],
@@ -1047,6 +1117,7 @@ py_library(
         ":transformed_distribution",
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:affine",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
     ],
@@ -1062,6 +1133,7 @@ py_library(
         ":seed_stream",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
@@ -1078,6 +1150,7 @@ py_library(
         ":seed_stream",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
     ],
@@ -1091,6 +1164,7 @@ py_library(
         ":seed_stream",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
@@ -1103,6 +1177,7 @@ py_library(
     deps = [
         ":distribution",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
     ],
@@ -1116,6 +1191,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
@@ -1129,6 +1205,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1140,6 +1217,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1151,6 +1229,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1164,6 +1243,7 @@ py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
     ],
 )
 
@@ -1173,6 +1253,7 @@ py_test(
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
     ],
 )
 
@@ -1184,6 +1265,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1196,6 +1278,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_case",
     ],
 )
@@ -1208,6 +1291,7 @@ py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1220,6 +1304,7 @@ py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1236,6 +1321,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1255,6 +1341,7 @@ py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
@@ -1268,6 +1355,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1280,6 +1368,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1291,6 +1380,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1303,6 +1393,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1314,6 +1405,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1326,6 +1418,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1337,6 +1430,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1349,6 +1443,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1361,6 +1456,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/positive_semidefinite_kernels",
     ],
 )
@@ -1373,6 +1469,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/positive_semidefinite_kernels",
     ],
 )
@@ -1386,6 +1483,7 @@ py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1399,6 +1497,7 @@ py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
@@ -1413,6 +1512,7 @@ py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
@@ -1426,6 +1526,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
@@ -1440,6 +1541,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1452,6 +1554,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
@@ -1466,6 +1569,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1478,6 +1582,7 @@ py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
@@ -1491,6 +1596,7 @@ py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1508,6 +1614,7 @@ py_test(
         ":kullback_leibler",
         ":normal",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
     ],
 )
 
@@ -1518,6 +1625,7 @@ py_test(
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1529,6 +1637,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1540,6 +1649,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1553,6 +1663,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
     ],
 )
 
@@ -1568,6 +1679,7 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/distributions/internal:statistical_testing",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1581,6 +1693,7 @@ py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1593,6 +1706,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1606,6 +1720,7 @@ py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1617,6 +1732,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
@@ -1629,6 +1745,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1641,6 +1758,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
@@ -1654,6 +1772,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1667,6 +1786,7 @@ py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
@@ -1681,6 +1801,7 @@ py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1694,6 +1815,7 @@ py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1710,6 +1832,7 @@ py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1723,6 +1846,7 @@ py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1734,6 +1858,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
@@ -1746,6 +1871,7 @@ py_test(
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
     ],
 )
 
@@ -1757,6 +1883,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1770,6 +1897,7 @@ py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
@@ -1784,6 +1912,7 @@ py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
@@ -1796,6 +1925,7 @@ py_test(
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1809,6 +1939,7 @@ py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
@@ -1823,6 +1954,7 @@ py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1836,6 +1968,7 @@ py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
     ],
 )
 
@@ -1847,6 +1980,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1858,6 +1992,7 @@ py_test(
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
     ],
 )
 
@@ -1869,6 +2004,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1880,6 +2016,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
@@ -1893,6 +2030,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/positive_semidefinite_kernels",
     ],
 )
@@ -1906,6 +2044,7 @@ py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1918,6 +2057,7 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/distributions/internal:statistical_testing",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
@@ -1933,6 +2073,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
@@ -1945,6 +2086,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1957,6 +2099,7 @@ py_test(
         #":distributions",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability",
     ],
 )
@@ -1969,6 +2112,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1981,6 +2125,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1993,6 +2138,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -2005,6 +2151,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -2018,6 +2165,7 @@ py_test(
         # numpy dep,
         # scipy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
     ],
 )
 
@@ -2030,6 +2178,7 @@ py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -2043,6 +2192,7 @@ py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
@@ -2057,6 +2207,7 @@ py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -2069,6 +2220,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],

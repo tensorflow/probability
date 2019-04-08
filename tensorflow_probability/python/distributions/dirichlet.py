@@ -24,6 +24,7 @@ import tensorflow as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
@@ -176,7 +177,7 @@ class Dirichlet(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.compat.v1.name_scope(name, values=[concentration]) as name:
+    with tf.compat.v2.name_scope(name) as name:
       self._concentration = self._maybe_assert_valid_concentration(
           tf.convert_to_tensor(
               value=concentration,
@@ -289,7 +290,7 @@ class Dirichlet(distribution.Distribution):
           tf.reduce_all(input_tensor=self.concentration > 1., axis=-1), mode,
           nan)
     return distribution_util.with_dependencies([
-        tf.compat.v1.assert_less(
+        assert_util.assert_less(
             tf.ones([], self.dtype),
             self.concentration,
             message="Mode undefined when any concentration <= 1"),
@@ -300,13 +301,13 @@ class Dirichlet(distribution.Distribution):
     if not validate_args:
       return concentration
     return distribution_util.with_dependencies([
-        tf.compat.v1.assert_positive(
+        assert_util.assert_positive(
             concentration, message="Concentration parameter must be positive."),
-        tf.compat.v1.assert_rank_at_least(
+        assert_util.assert_rank_at_least(
             concentration,
             1,
             message="Concentration parameter must have >=1 dimensions."),
-        tf.compat.v1.assert_less(
+        assert_util.assert_less(
             1,
             tf.shape(input=concentration)[-1],
             message="Concentration parameter must have event_size >= 2."),
@@ -317,8 +318,8 @@ class Dirichlet(distribution.Distribution):
     if not self.validate_args:
       return x
     return distribution_util.with_dependencies([
-        tf.compat.v1.assert_positive(x, message="samples must be positive"),
-        tf.compat.v1.assert_near(
+        assert_util.assert_positive(x, message="samples must be positive"),
+        assert_util.assert_near(
             tf.ones([], dtype=self.dtype),
             tf.reduce_sum(input_tensor=x, axis=-1),
             message="sample last-dimension must sum to `1`"),
@@ -341,10 +342,7 @@ def _kl_dirichlet_dirichlet(d1, d2, name=None):
   Returns:
     Batchwise KL(d1 || d2)
   """
-  with tf.compat.v1.name_scope(
-      name,
-      "kl_dirichlet_dirichlet",
-      values=[d1.concentration, d2.concentration]):
+  with tf.compat.v2.name_scope(name or "kl_dirichlet_dirichlet"):
     # The KL between Dirichlet distributions can be derived as follows. We have
     #
     #   Dir(x; a) = 1 / B(a) * prod_i[x[i]^(a[i] - 1)]

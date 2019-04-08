@@ -27,6 +27,7 @@ import tensorflow as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.distributions import seed_stream
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util as distribution_utils
 from tensorflow_probability.python.internal import reparameterization
 
@@ -158,7 +159,7 @@ class MixtureSameFamily(distribution.Distribution):
          Distributions. _arXiv_, 2016. https://arxiv.org/abs/1607.05690
     """
     parameters = dict(locals())
-    with tf.compat.v1.name_scope(name) as name:
+    with tf.compat.v2.name_scope(name) as name:
       self._mixture_distribution = mixture_distribution
       self._components_distribution = components_distribution
       self._runtime_assertions = []
@@ -179,7 +180,7 @@ class MixtureSameFamily(distribution.Distribution):
         raise ValueError("`mixture_distribution` must have scalar `event_dim`s")
       elif validate_args:
         self._runtime_assertions += [
-            tf.compat.v1.assert_equal(
+            assert_util.assert_equal(
                 tf.size(input=mixture_distribution.event_shape_tensor()),
                 0,
                 message="`mixture_distribution` must have scalar `event_dim`s"),
@@ -197,7 +198,7 @@ class MixtureSameFamily(distribution.Distribution):
         mdbs = mixture_distribution.batch_shape_tensor()
         cdbs = components_distribution.batch_shape_tensor()[:-1]
         self._runtime_assertions += [
-            tf.compat.v1.assert_equal(
+            assert_util.assert_equal(
                 distribution_utils.pick_vector(
                     mixture_distribution.is_scalar_batch(), cdbs, mdbs),
                 cdbs,
@@ -218,7 +219,7 @@ class MixtureSameFamily(distribution.Distribution):
         km = tf.shape(input=mixture_distribution.logits)[-1]
         kc = components_distribution.batch_shape_tensor()[-1]
         self._runtime_assertions += [
-            tf.compat.v1.assert_equal(
+            assert_util.assert_equal(
                 km,
                 kc,
                 message=("`mixture_distribution components` does not equal "
@@ -388,7 +389,7 @@ class MixtureSameFamily(distribution.Distribution):
       return mean_cond_var + var_cond_mean                   # [B, e, e]
 
   def _pad_sample_dims(self, x):
-    with tf.compat.v1.name_scope("pad_sample_dims", values=[x]):
+    with tf.compat.v2.name_scope("pad_sample_dims"):
       ndims = x.shape.ndims if x.shape.ndims is not None else tf.rank(x)
       shape = tf.shape(input=x)
       d = ndims - self._event_ndims
@@ -492,7 +493,7 @@ class MixtureSameFamily(distribution.Distribution):
       univariate_components = self._components_distribution
 
     with tf.control_dependencies([
-        tf.compat.v1.assert_equal(
+        assert_util.assert_equal(
             univariate_components.is_scalar_event(),
             True,
             message="`univariate_components` must have scalar event")
