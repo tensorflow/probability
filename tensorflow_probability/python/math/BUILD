@@ -130,10 +130,13 @@ py_test(
     name = "linalg_test",
     size = "small",
     srcs = ["linalg_test.py"],
+    shard_count = 3,
     deps = [
+        # hypothesis dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 

@@ -150,6 +150,7 @@ py_test(
 
 py_library(
     name = "test_case",
+    testonly = 1,
     srcs = ["test_case.py"],
     deps = [
         # numpy dep,
@@ -170,10 +171,12 @@ py_test(
 
 py_library(
     name = "test_util",
+    testonly = 1,
     srcs = ["test_util.py"],
     srcs_version = "PY2AND3",
     deps = [
         # absl/flags dep,
+        # hypothesis dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:seed_stream",

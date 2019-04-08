@@ -19,10 +19,14 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import numpy as np
+import hypothesis as hp
+from hypothesis import strategies as hps
+from hypothesis.extra import numpy as hpnp
 
+import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
@@ -111,6 +115,86 @@ class PinvTestStatic64CustomRcond(tf.test.TestCase, _PinvTest):
   dtype = np.float64
   use_static_shape = True
   use_default_rcond = False
+
+
+class _CholeskyExtend(tf.test.TestCase):
+
+  def testCholeskyExtension(self):
+    xs = np.random.random(7).astype(self.dtype)[:, tf.newaxis]
+    xs = tf.compat.v1.placeholder_with_default(
+        xs, shape=xs.shape if self.use_static_shape else None)
+    k = tfp.positive_semidefinite_kernels.MaternOneHalf()
+    mat = k.matrix(xs, xs)
+    chol = tf.linalg.cholesky(mat)
+
+    ys = np.random.random(3).astype(self.dtype)[:, tf.newaxis]
+    ys = tf.compat.v1.placeholder_with_default(
+        ys, shape=ys.shape if self.use_static_shape else None)
+
+    xsys = tf.concat([xs, ys], 0)
+    new_chol_expected = tf.linalg.cholesky(k.matrix(xsys, xsys))
+
+    new_chol = tfp.math.cholesky_concat(chol, k.matrix(xsys, ys))
+    self.assertAllClose(new_chol_expected, new_chol)
+
+  @hp.given(hps.data())
+  @hp.settings(deadline=None, max_examples=10,
+               derandomize=tfp_test_util.derandomize_hypothesis())
+  def testCholeskyExtensionRandomized(self, data):
+    jitter = lambda n: tf.linalg.eye(n, dtype=self.dtype) * 1e-5
+    target_bs = data.draw(hpnp.array_shapes())
+    prev_bs, new_bs = data.draw(tfp_test_util.broadcasting_shapes(target_bs, 2))
+    ones = tf.TensorShape([1] * len(target_bs))
+    smallest_shared_shp = tuple(np.min(
+        [tf.broadcast_static_shape(ones, shp).as_list()
+         for shp in [prev_bs, new_bs]],
+        axis=0))
+
+    z = data.draw(hps.integers(min_value=1, max_value=12))
+    n = data.draw(hps.integers(min_value=0, max_value=z - 1))
+    m = z - n
+
+    np.random.seed(data.draw(hps.integers(min_value=0, max_value=2**32 - 1)))
+    xs = np.random.uniform(size=smallest_shared_shp + (n,))
+    data.draw(hps.just(xs))
+    xs = (xs + np.zeros(prev_bs.as_list() + [n]))[..., np.newaxis]
+    xs = xs.astype(self.dtype)
+    xs = tf.compat.v1.placeholder_with_default(
+        xs, shape=xs.shape if self.use_static_shape else None)
+
+    k = tfp.positive_semidefinite_kernels.MaternOneHalf()
+    mat = k.matrix(xs, xs) + jitter(n)
+    chol = tf.linalg.cholesky(mat)
+
+    ys = np.random.uniform(size=smallest_shared_shp + (m,))
+    data.draw(hps.just(ys))
+    ys = (ys + np.zeros(new_bs.as_list() + [m]))[..., np.newaxis]
+    ys = ys.astype(self.dtype)
+    ys = tf.compat.v1.placeholder_with_default(
+        ys, shape=ys.shape if self.use_static_shape else None)
+
+    xsys = tf.concat([xs + tf.zeros(target_bs + (n, 1), dtype=self.dtype),
+                      ys + tf.zeros(target_bs + (m, 1), dtype=self.dtype)],
+                     axis=-2)
+    new_chol_expected = tf.linalg.cholesky(k.matrix(xsys, xsys) + jitter(z))
+
+    new_chol = tfp.math.cholesky_concat(
+        chol, k.matrix(xsys, ys) + jitter(z)[:, n:])
+    self.assertAllClose(new_chol_expected, new_chol, rtol=1e-5, atol=1e-5)
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class CholeskyExtend32Static(_CholeskyExtend):
+  dtype = np.float32
+  use_static_shape = True
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class CholeskyExtend64Dynamic(_CholeskyExtend):
+  dtype = np.float64
+  use_static_shape = False
+
+del _CholeskyExtend
 
 
 def make_tensor_hiding_attributes(value, hide_shape, hide_value=True):

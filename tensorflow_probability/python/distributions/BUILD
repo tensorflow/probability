@@ -589,7 +589,6 @@ py_library(
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
-        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 
@@ -1241,6 +1240,7 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 
@@ -1651,6 +1651,7 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 

@@ -34,6 +34,7 @@ import six
 import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.bijectors import hypothesis_testlib as bijector_hps
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfd = tfp.distributions
@@ -47,11 +48,6 @@ FLAGS = flags.FLAGS
 def hypothesis_max_examples():
   # Use --test_env=TFP_HYPOTHESIS_MAX_EXAMPLES=1000 to get fuller coverage.
   return int(os.environ.get('TFP_HYPOTHESIS_MAX_EXAMPLES', 20))
-
-
-def derandomize_hypothesis():
-  # Use --test_env=TFP_DERANDOMIZE_HYPOTHESIS=0 to get random coverage.
-  return bool(os.environ.get('TFP_DERANDOMIZE_HYPOTHESIS', 1))
 
 
 MUTEX_PARAMS = [
@@ -114,55 +110,6 @@ del instantiable_dists
 # pylint: disable=no-value-for-parameter
 
 
-def rank_only_shapes(mindims, maxdims):
-  return hps.integers(
-      min_value=mindims, max_value=maxdims).map(tf.TensorShape(None).with_rank)
-
-
-def compute_rank_and_fullsize_reqd(draw, batch_shape, current_batch_shape,
-                                   is_last_param):
-  """Returns a param rank and a list of bools for full-size-required by axis.
-
-  Args:
-    draw: Hypothesis data sampler.
-    batch_shape: Target broadcasted batch shape.
-    current_batch_shape: Broadcasted batch shape of params selected thus far.
-      This is ignored for non-last parameters.
-    is_last_param: bool indicator of whether this is the last param (in which
-      case, we must achieve the target batch_shape).
-
-  Returns:
-    param_batch_rank: Sampled rank for this parameter.
-    force_fullsize_dim: `param_batch_rank`-sized list of bool indicating whether
-      the corresponding axis of the parameter must be full-sized (True) or is
-      allowed to be 1 (i.e., broadcast) (False).
-  """
-  batch_rank = batch_shape.ndims
-  if is_last_param:
-    # We must force full size dim on any mismatched axes, and proper rank.
-    full_rank_current = tf.broadcast_static_shape(
-        current_batch_shape, tf.TensorShape([1] * batch_rank))
-    # Identify axes in which the target shape is not yet matched.
-    axis_is_mismatched = [
-        full_rank_current[i] != batch_shape[i] for i in range(batch_rank)
-    ]
-    min_rank = batch_rank
-    if current_batch_shape.ndims == batch_rank:
-      # Current rank might be already correct, but we could have a case like
-      # batch_shape=[4,3,2] and current_batch_shape=[4,1,2], in which case
-      # we must have at least 2 axes on this param's batch shape.
-      min_rank -= (axis_is_mismatched + [True]).index(True)
-    param_batch_rank = draw(rank_only_shapes(min_rank, batch_rank)).ndims
-    # Get the last param_batch_rank (possibly 0!) items.
-    force_fullsize_dim = axis_is_mismatched[batch_rank - param_batch_rank:]
-  else:
-    # There are remaining params to be drawn, so we will be able to force full
-    # size axes on subsequent params.
-    param_batch_rank = draw(rank_only_shapes(0, batch_rank)).ndims
-    force_fullsize_dim = [False] * param_batch_rank
-  return param_batch_rank, force_fullsize_dim
-
-
 @hps.composite
 def broadcasting_shapes(draw, batch_shape, param_names):
   """Draws a set of parameter batch shapes that broadcast to `batch_shape`.
@@ -182,30 +129,9 @@ def broadcasting_shapes(draw, batch_shape, param_names):
     param_batch_shapes: `dict` of `str->tf.TensorShape` where the set of
         shapes broadcast to `batch_shape`. The shapes are fully defined.
   """
-  batch_rank = batch_shape.ndims
-  result = {}
-  remaining_params = set(param_names)
-  current_batch_shape = tf.TensorShape([])
-  while remaining_params:
-    next_param = draw(hps.one_of(map(hps.just, remaining_params)))
-    remaining_params.remove(next_param)
-    param_batch_rank, force_fullsize_dim = compute_rank_and_fullsize_reqd(
-        draw,
-        batch_shape,
-        current_batch_shape,
-        is_last_param=not remaining_params)
-
-    # Get the last param_batch_rank (possibly 0!) dimensions.
-    param_batch_shape = batch_shape[batch_rank - param_batch_rank:].as_list()
-    for i, force_fullsize in enumerate(force_fullsize_dim):
-      if not force_fullsize and draw(hps.booleans()):
-        # Choose to make this param broadcast against some other param.
-        param_batch_shape[i] = 1
-    param_batch_shape = tf.TensorShape(param_batch_shape)
-    current_batch_shape = tf.broadcast_static_shape(current_batch_shape,
-                                                    param_batch_shape)
-    result[next_param] = param_batch_shape
-  return result
+  n = len(param_names)
+  return dict(zip(draw(hps.permutations(param_names)),
+                  draw(tfp_test_util.broadcasting_shapes(batch_shape, n))))
 
 
 @hps.composite
@@ -290,8 +216,8 @@ def stringify_slices(slices):
 
 @hps.composite
 def batch_shapes(draw, min_ndims=0, max_ndims=3, min_lastdimsize=1):
-  shape = draw(rank_only_shapes(min_ndims, max_ndims))
-  rank = shape.ndims
+  rank = draw(hps.integers(min_value=min_ndims, max_value=max_ndims))
+  shape = tf.TensorShape(None).with_rank(rank)
   if rank > 0:
 
     def resize_lastdim(x):
@@ -619,7 +545,7 @@ class DistributionSlicingTest(tf.test.TestCase):
       deadline=None,
       max_examples=hypothesis_max_examples(),
       suppress_health_check=[hp.HealthCheck.too_slow],
-      derandomize=derandomize_hypothesis())
+      derandomize=tfp_test_util.derandomize_hypothesis())
   def testDistributions(self, data):
     if tf.executing_eagerly() != (FLAGS.tf_mode == 'eager'): return
     self._run_test(data)

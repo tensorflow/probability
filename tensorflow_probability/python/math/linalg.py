@@ -26,10 +26,13 @@ import numpy as np
 
 import tensorflow as tf
 
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow.python.ops.linalg import linear_operator_util
 
 
 __all__ = [
+    'cholesky_concat',
     'lu_matrix_inverse',
     'lu_reconstruct',
     'lu_solve',
@@ -74,6 +77,64 @@ def matrix_rank(a, tol=None, validate_args=False, name=None):
       tol = (eps * tf.cast(m, a.dtype) *
              tf.reduce_max(input_tensor=s, axis=-1, keepdims=True))
     return tf.reduce_sum(input_tensor=tf.cast(s > tol, tf.int32), axis=-1)
+
+
+def cholesky_concat(chol, cols, name=None):
+  """Concatenates `chol @ chol.T` with additional rows and columns.
+
+  This operation is conceptually identical to:
+  ```python
+  def cholesky_concat_slow(chol, cols):  # cols shaped (n + m) x m = z x m
+    mat = tf.matmul(chol, chol, adjoint_b=True)  # batch of n x n
+    # Concat columns.
+    mat = tf.concat([mat, cols[..., :tf.shape(mat)[-2], :]], axis=-1)  # n x z
+    # Concat rows.
+    mat = tf.concat([mat, tf.linalg.matrix_transpose(cols)], axis=-2)  # z x z
+    return tf.linalg.cholesky(mat)
+  ```
+  but whereas `cholesky_concat_slow` would cost `O(z**3)` work,
+  `cholesky_concat` only costs `O(z**2 + m**3)` work.
+
+  The resulting (implicit) matrix must be symmetric and positive definite.
+  Thus, the bottom right `m x m` must be self-adjoint, and we do not require a
+  separate `rows` argument (which can be inferred from `conj(cols.T)`).
+
+  Args:
+    chol: Cholesky decomposition of `mat = chol @ chol.T`.
+    cols: The new columns whose first `n` rows we would like concatenated to the
+      right of `mat = chol @ chol.T`, and whose conjugate transpose we would
+      like concatenated to the bottom of `concat(mat, cols[:n,:])`. A `Tensor`
+      with final dims `(n+m, m)`. The first `n` rows are the top right rectangle
+      (their conjugate transpose forms the bottom left), and the bottom `m x m`
+      is self-adjoint.
+    name: Optional name for this op.
+
+  Returns:
+    chol_concat: The Cholesky decomposition of:
+      ```
+      [ [ mat  cols[:n, :] ]
+        [   conj(cols.T)   ] ]
+      ```
+  """
+  with tf.compat.v2.name_scope(name or 'cholesky_extend'):
+    dtype = dtype_util.common_dtype([chol, cols], preferred_dtype=tf.float32)
+    chol = tf.convert_to_tensor(value=chol, name='chol', dtype=dtype)
+    cols = tf.convert_to_tensor(value=cols, name='cols', dtype=dtype)
+    n = prefer_static.shape(chol)[-1]
+    mat_nm, mat_mm = cols[..., :n, :], cols[..., n:, :]
+    solved_nm = linear_operator_util.matrix_triangular_solve_with_broadcast(
+        chol, mat_nm)
+    lower_right_mm = tf.linalg.cholesky(
+        mat_mm - tf.matmul(solved_nm, solved_nm, adjoint_a=True))
+    lower_left_mn = tf.math.conj(tf.linalg.transpose(solved_nm))
+    out_batch = prefer_static.shape(solved_nm)[:-2]
+    chol = tf.broadcast_to(
+        chol,
+        tf.concat([out_batch, prefer_static.shape(chol)[-2:]], axis=0))
+    top_right_zeros_nm = tf.zeros_like(solved_nm)
+    return tf.concat([tf.concat([chol, top_right_zeros_nm], axis=-1),
+                      tf.concat([lower_left_mn, lower_right_mm], axis=-1)],
+                     axis=-2)
 
 
 def pinv(a, rcond=None, validate_args=False, name=None):
