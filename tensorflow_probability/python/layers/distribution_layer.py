@@ -257,6 +257,10 @@ class DistributionLambda(tf.keras.layers.Lambda):
     base_config = super(DistributionLambda, self).get_config()
     return dict(list(base_config.items()) + list(config.items()))
 
+  def _variable_creator(self, next_creator, **kwargs):
+    """Overrides `tfkl.Lambda` method causing error in weight initialization."""
+    return next_creator(**kwargs)
+
 
 # TODO(b/120160878): Add more shape validation logic to each layer. Consider
 # also adding additional functionality to help the user determine the

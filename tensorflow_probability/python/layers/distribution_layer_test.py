@@ -395,6 +395,40 @@ class DistributionLambdaSerializationTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
+class DistributionLambdaVariableCreation(tf.test.TestCase):
+
+  def test_variable_creation(self):
+    conv1 = tfkl.Convolution2D(filters=1, kernel_size=[1, 3])
+    conv2 = tfkl.Convolution2D(filters=1, kernel_size=[2, 1])
+    pad1 = tfkl.ZeroPadding2D(padding=((0, 0), (1, 1)))
+    pad2 = tfkl.ZeroPadding2D(padding=((1, 0), (0, 0)))
+
+    loc = tfk.Sequential([conv1, pad1])
+    scale = tfk.Sequential([conv2, pad2])
+
+    x = tfkl.Input(shape=(3, 3, 1))
+
+    normal = tfpl.DistributionLambda(
+        lambda x: tfd.Normal(loc=loc(x), scale=tf.exp(scale(x))))
+    normal._loc_net = loc
+    normal._scale_net = scale
+
+    model = tfk.Model(x, normal(x))  # pylint: disable=unused-variable
+    model.compile(
+        optimizer=tf.compat.v2.optimizers.Adam(),
+        loss=lambda x, rv_x: -rv_x.log_prob(x),
+        metrics=[])
+
+    x_train = np.random.rand(1000, 3, 3, 1).astype(np.float32)
+    x_test = np.random.rand(100, 3, 3, 1).astype(np.float32)
+    model.fit(x_train, x_train,
+              batch_size=25,
+              epochs=5,
+              steps_per_epoch=10,
+              validation_data=(x_test, x_test))
+
+
+@test_util.run_all_in_graph_and_eager_modes
 class KLDivergenceAddLoss(tf.test.TestCase):
 
   def test_approx_kl(self):
