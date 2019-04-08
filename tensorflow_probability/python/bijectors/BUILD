@@ -43,7 +43,6 @@ py_library(
         ":chain",
         ":cholesky_outer_product",
         ":cholesky_to_inv_cholesky",
-        ":conditional_bijector",
         ":discrete_cosine_transform",
         ":exp",
         ":expm1",
@@ -187,15 +186,6 @@ py_library(
         ":bijector",
         ":cholesky_outer_product",
         # tensorflow dep,
-    ],
-)
-
-py_library(
-    name = "conditional_bijector",
-    srcs = ["conditional_bijector.py"],
-    deps = [
-        ":bijector",
-        "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
 
@@ -346,7 +336,7 @@ py_library(
     name = "real_nvp",
     srcs = ["real_nvp.py"],
     deps = [
-        ":conditional_bijector",
+        ":bijector",
         # tensorflow dep,
     ],
 )

@@ -206,37 +206,38 @@ class Independent(distribution_lib.Distribution):
           [None] * int(self._static_reinterpreted_batch_ndims))
     return reinterpreted_batch_shape.concatenate(self.distribution.event_shape)
 
-  def _sample_n(self, n, seed):
+  def _sample_n(self, n, seed, **kwargs):
     with tf.control_dependencies(self._runtime_assertions):
-      return self.distribution.sample(sample_shape=n, seed=seed)
+      return self.distribution.sample(sample_shape=n, seed=seed, **kwargs)
 
-  def _log_prob(self, x):
+  def _log_prob(self, x, **kwargs):
     with tf.control_dependencies(self._runtime_assertions):
-      return self._reduce(tf.reduce_sum, self.distribution.log_prob(x))
+      return self._reduce(
+          tf.reduce_sum, self.distribution.log_prob(x, **kwargs))
 
-  def _log_cdf(self, x):
+  def _log_cdf(self, x, **kwargs):
     with tf.control_dependencies(self._runtime_assertions):
-      return self._reduce(tf.reduce_sum, self.distribution.log_cdf(x))
+      return self._reduce(tf.reduce_sum, self.distribution.log_cdf(x, **kwargs))
 
-  def _entropy(self):
+  def _entropy(self, **kwargs):
     with tf.control_dependencies(self._runtime_assertions):
-      return self._reduce(tf.reduce_sum, self.distribution.entropy())
+      return self._reduce(tf.reduce_sum, self.distribution.entropy(**kwargs))
 
-  def _mean(self):
+  def _mean(self, **kwargs):
     with tf.control_dependencies(self._runtime_assertions):
-      return self.distribution.mean()
+      return self.distribution.mean(**kwargs)
 
-  def _variance(self):
+  def _variance(self, **kwargs):
     with tf.control_dependencies(self._runtime_assertions):
-      return self.distribution.variance()
+      return self.distribution.variance(**kwargs)
 
-  def _stddev(self):
+  def _stddev(self, **kwargs):
     with tf.control_dependencies(self._runtime_assertions):
-      return self.distribution.stddev()
+      return self.distribution.stddev(**kwargs)
 
-  def _mode(self):
+  def _mode(self, **kwargs):
     with tf.control_dependencies(self._runtime_assertions):
-      return self.distribution.mode()
+      return self.distribution.mode(**kwargs)
 
   def _make_runtime_assertions(
       self, distribution, reinterpreted_batch_ndims, validate_args):

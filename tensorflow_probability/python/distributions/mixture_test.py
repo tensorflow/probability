@@ -70,37 +70,36 @@ def _mixture_stddev_np(pi_vector, mu_vector, sigma_vector):
 
 @contextlib.contextmanager
 def _test_capture_mvndiag_sample_outputs():
-  """Use monkey-patching to capture the output of an MVNDiag _call_sample_n."""
+  """Use monkey-patching to capture the output of an MVNDiag sample."""
   data_container = []
-  true_mvndiag_call_sample_n = (tfd.MultivariateNormalDiag._call_sample_n)
+  true_mvndiag_sample = tfd.MultivariateNormalDiag.sample
 
-  def _capturing_mvndiag_call_sample_n(
-      self, sample_shape, seed, name, **kwargs):
-    samples = true_mvndiag_call_sample_n(
-        self, sample_shape, seed, name, **kwargs)
+  def _capturing_mvndiag_sample(
+      self, sample_shape=(), seed=None, name="sample", **kwargs):
+    samples = true_mvndiag_sample(self, sample_shape, seed, name, **kwargs)
     data_container.append(samples)
     return samples
 
-  tfd.MultivariateNormalDiag._call_sample_n = (_capturing_mvndiag_call_sample_n)
+  tfd.MultivariateNormalDiag.sample = _capturing_mvndiag_sample
   yield data_container
-  tfd.MultivariateNormalDiag._call_sample_n = (true_mvndiag_call_sample_n)
+  tfd.MultivariateNormalDiag.sample = true_mvndiag_sample
 
 
 @contextlib.contextmanager
 def _test_capture_normal_sample_outputs():
-  """Use monkey-patching to capture the output of an Normal _call_sample_n."""
+  """Use monkey-patching to capture the output of an Normal sample."""
   data_container = []
-  true_normal_call_sample_n = tfd.Normal._call_sample_n
+  true_normal_sample = tfd.Normal.sample
 
-  def _capturing_normal_call_sample_n(self, sample_shape, seed, name, **kwargs):
-    samples = true_normal_call_sample_n(
-        self, sample_shape, seed, name, **kwargs)
+  def _capturing_normal_sample(
+      self, sample_shape=(), seed=None, name="sample", **kwargs):
+    samples = true_normal_sample(self, sample_shape, seed, name, **kwargs)
     data_container.append(samples)
     return samples
 
-  tfd.Normal._call_sample_n = _capturing_normal_call_sample_n
+  tfd.Normal.sample = _capturing_normal_sample
   yield data_container
-  tfd.Normal._call_sample_n = true_normal_call_sample_n
+  tfd.Normal.sample = true_normal_sample
 
 
 def make_univariate_mixture(batch_shape, num_components, use_static_graph):
@@ -111,9 +110,8 @@ def make_univariate_mixture(batch_shape, num_components, use_static_graph):
       1,
       dtype=tf.float32) - 50.
   components = [
-      tfd.Normal(
-          loc=tf.random.normal(batch_shape),
-          scale=10 * tf.random.uniform(batch_shape))
+      tfd.Normal(loc=tf.random.normal(batch_shape),
+                 scale=10 * tf.random.uniform(batch_shape))
       for _ in range(num_components)
   ]
   cat = tfd.Categorical(logits, dtype=tf.int32)

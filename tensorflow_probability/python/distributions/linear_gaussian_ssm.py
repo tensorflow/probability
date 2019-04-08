@@ -32,7 +32,7 @@ from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.ops.linalg import linear_operator_util
+from tensorflow.python.ops.linalg import linear_operator_util  # pylint: disable=g-direct-tensorflow-import
 
 tfl = tf.linalg
 
@@ -107,7 +107,7 @@ def _augment_sample_shape(partial_batch_dist,
   """
   full_ndims = distribution_util.prefer_static_shape(
       full_sample_and_batch_shape)[0]
-  partial_batch_ndims = (partial_batch_dist.batch_shape.ndims
+  partial_batch_ndims = (partial_batch_dist.batch_shape.ndims  # pylint: disable=g-long-ternary
                          if partial_batch_dist.batch_shape.ndims is not None
                          else distribution_util.prefer_static_shape(
                              partial_batch_dist.batch_shape_tensor())[0])
@@ -667,7 +667,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
 
     return latents, observations
 
-  # Stub reimplementation of log_prob so we can modify the docstring to include
+  # Stub reimplementation of _prob so we can modify the docstring to include
   # the mask.
   @distribution_util.AppendDocstring(kwargs_dict={
       "mask":
@@ -677,11 +677,11 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
       "dimensions must match or be broadcastable to `self.batch_shape`; any "
       "further dimensions must match or be broadcastable to the sample "
       "shape of `x`. Default value: `None`."})
-  def log_prob(self, value, mask=None, name="log_prob"):
-    return self._call_log_prob(value, name=name, mask=mask)
+  def _prob(self, x, mask=None):
+    return tf.exp(self._log_prob(x, mask=mask))
 
-  # Stub reimplementation of prob so we can modify the docstring to include the
-  # mask.
+  # Stub reimplementation of _log_prob so we can modify the docstring to include
+  # the mask.
   @distribution_util.AppendDocstring(kwargs_dict={
       "mask":
       "optional bool-type `Tensor` with rightmost dimension "
@@ -690,9 +690,6 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
       "dimensions must match or be broadcastable to `self.batch_shape`; any "
       "further dimensions must match or be broadcastable to the sample "
       "shape of `x`. Default value: `None`."})
-  def prob(self, value, mask=None, name="prob"):
-    return self._call_prob(value, name=name, mask=mask)
-
   def _log_prob(self, x, mask=None):
     log_likelihoods, _, _, _, _, _, _ = self.forward_filter(x, mask=mask)
 

@@ -26,11 +26,11 @@ from tensorflow_probability.python.bijectors.affine_linear_operator import Affin
 from tensorflow_probability.python.bijectors.affine_scalar import AffineScalar
 from tensorflow_probability.python.bijectors.batch_normalization import BatchNormalization
 from tensorflow_probability.python.bijectors.bijector import Bijector
+from tensorflow_probability.python.bijectors.bijector import ConditionalBijector
 from tensorflow_probability.python.bijectors.blockwise import Blockwise
 from tensorflow_probability.python.bijectors.chain import Chain
 from tensorflow_probability.python.bijectors.cholesky_outer_product import CholeskyOuterProduct
 from tensorflow_probability.python.bijectors.cholesky_to_inv_cholesky import CholeskyToInvCholesky
-from tensorflow_probability.python.bijectors.conditional_bijector import ConditionalBijector
 from tensorflow_probability.python.bijectors.discrete_cosine_transform import DiscreteCosineTransform
 from tensorflow_probability.python.bijectors.exp import Exp
 from tensorflow_probability.python.bijectors.expm1 import Expm1

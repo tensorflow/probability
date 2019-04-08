@@ -42,8 +42,6 @@ py_library(
         ":cauchy",
         ":chi",
         ":chi2",
-        ":conditional_distribution",
-        ":conditional_transformed_distribution",
         ":deterministic",
         ":dirichlet",
         ":dirichlet_multinomial",
@@ -239,27 +237,6 @@ py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
-    ],
-)
-
-py_library(
-    name = "conditional_distribution",
-    srcs = ["conditional_distribution.py"],
-    deps = [
-        ":distribution",
-        "//tensorflow_probability/python/internal:distribution_util",
-    ],
-)
-
-py_library(
-    name = "conditional_transformed_distribution",
-    srcs = ["conditional_transformed_distribution.py"],
-    deps = [
-        ":conditional_distribution",
-        ":transformed_distribution",
-        # tensorflow dep,
-        "//tensorflow_probability/python/internal:assert_util",
-        "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
 

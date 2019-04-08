@@ -32,11 +32,13 @@ import tensorflow as tf
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions.internal import slicing
 from tensorflow_probability.python.internal import distribution_util as util
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
     "Distribution",
+    "ConditionalDistribution",
 ]
 
 _DISTRIBUTION_PUBLIC_METHOD_WRAPPERS = [
@@ -796,7 +798,7 @@ class Distribution(_BaseDistribution):
       samples = self._set_sample_static_shape(samples, sample_shape)
       return samples
 
-  def sample(self, sample_shape=(), seed=None, name="sample"):
+  def sample(self, sample_shape=(), seed=None, name="sample", **kwargs):
     """Generate samples of the specified shape.
 
     Note that a call to `sample()` without arguments will generate a single
@@ -806,11 +808,12 @@ class Distribution(_BaseDistribution):
       sample_shape: 0D or 1D `int32` `Tensor`. Shape of the generated samples.
       seed: Python integer seed for RNG
       name: name to give to the op.
+      **kwargs: Named arguments forwarded to subclass implementation.
 
     Returns:
       samples: a `Tensor` with prepended dimensions `sample_shape`.
     """
-    return self._call_sample_n(sample_shape, seed, name)
+    return self._call_sample_n(sample_shape, seed, name, **kwargs)
 
   def _call_log_prob(self, value, name, **kwargs):
     """Wrapper around _log_prob."""
@@ -824,18 +827,19 @@ class Distribution(_BaseDistribution):
       raise NotImplementedError("log_prob is not implemented: {}".format(
           type(self).__name__))
 
-  def log_prob(self, value, name="log_prob"):
+  def log_prob(self, value, name="log_prob", **kwargs):
     """Log probability density/mass function.
 
     Args:
       value: `float` or `double` `Tensor`.
       name: Python `str` prepended to names of ops created by this function.
+      **kwargs: Named arguments forwarded to subclass implementation.
 
     Returns:
       log_prob: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
         values of type `self.dtype`.
     """
-    return self._call_log_prob(value, name)
+    return self._call_log_prob(value, name, **kwargs)
 
   def _call_prob(self, value, name, **kwargs):
     """Wrapper around _prob."""
@@ -849,18 +853,19 @@ class Distribution(_BaseDistribution):
       raise NotImplementedError("prob is not implemented: {}".format(
           type(self).__name__))
 
-  def prob(self, value, name="prob"):
+  def prob(self, value, name="prob", **kwargs):
     """Probability density/mass function.
 
     Args:
       value: `float` or `double` `Tensor`.
       name: Python `str` prepended to names of ops created by this function.
+      **kwargs: Named arguments forwarded to subclass implementation.
 
     Returns:
       prob: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
         values of type `self.dtype`.
     """
-    return self._call_prob(value, name)
+    return self._call_prob(value, name, **kwargs)
 
   def _call_log_cdf(self, value, name, **kwargs):
     """Wrapper around _log_cdf."""
@@ -874,7 +879,7 @@ class Distribution(_BaseDistribution):
       raise NotImplementedError("log_cdf is not implemented: {}".format(
           type(self).__name__))
 
-  def log_cdf(self, value, name="log_cdf"):
+  def log_cdf(self, value, name="log_cdf", **kwargs):
     """Log cumulative distribution function.
 
     Given random variable `X`, the cumulative distribution function `cdf` is:
@@ -890,12 +895,13 @@ class Distribution(_BaseDistribution):
     Args:
       value: `float` or `double` `Tensor`.
       name: Python `str` prepended to names of ops created by this function.
+      **kwargs: Named arguments forwarded to subclass implementation.
 
     Returns:
       logcdf: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
         values of type `self.dtype`.
     """
-    return self._call_log_cdf(value, name)
+    return self._call_log_cdf(value, name, **kwargs)
 
   def _call_cdf(self, value, name, **kwargs):
     """Wrapper around _cdf."""
@@ -909,7 +915,7 @@ class Distribution(_BaseDistribution):
       raise NotImplementedError("cdf is not implemented: {}".format(
           type(self).__name__))
 
-  def cdf(self, value, name="cdf"):
+  def cdf(self, value, name="cdf", **kwargs):
     """Cumulative distribution function.
 
     Given random variable `X`, the cumulative distribution function `cdf` is:
@@ -921,12 +927,13 @@ class Distribution(_BaseDistribution):
     Args:
       value: `float` or `double` `Tensor`.
       name: Python `str` prepended to names of ops created by this function.
+      **kwargs: Named arguments forwarded to subclass implementation.
 
     Returns:
       cdf: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
         values of type `self.dtype`.
     """
-    return self._call_cdf(value, name)
+    return self._call_cdf(value, name, **kwargs)
 
   def _log_survival_function(self, value):
     raise NotImplementedError(
@@ -946,7 +953,8 @@ class Distribution(_BaseDistribution):
         except NotImplementedError:
           raise original_exception
 
-  def log_survival_function(self, value, name="log_survival_function"):
+  def log_survival_function(self, value, name="log_survival_function",
+                            **kwargs):
     """Log survival function.
 
     Given random variable `X`, the survival function is defined:
@@ -963,12 +971,13 @@ class Distribution(_BaseDistribution):
     Args:
       value: `float` or `double` `Tensor`.
       name: Python `str` prepended to names of ops created by this function.
+      **kwargs: Named arguments forwarded to subclass implementation.
 
     Returns:
       `Tensor` of shape `sample_shape(x) + self.batch_shape` with values of type
         `self.dtype`.
     """
-    return self._call_log_survival_function(value, name)
+    return self._call_log_survival_function(value, name, **kwargs)
 
   def _survival_function(self, value):
     raise NotImplementedError("survival_function is not implemented: {}".format(
@@ -987,7 +996,7 @@ class Distribution(_BaseDistribution):
         except NotImplementedError:
           raise original_exception
 
-  def survival_function(self, value, name="survival_function"):
+  def survival_function(self, value, name="survival_function", **kwargs):
     """Survival function.
 
     Given random variable `X`, the survival function is defined:
@@ -1001,30 +1010,31 @@ class Distribution(_BaseDistribution):
     Args:
       value: `float` or `double` `Tensor`.
       name: Python `str` prepended to names of ops created by this function.
+      **kwargs: Named arguments forwarded to subclass implementation.
 
     Returns:
       `Tensor` of shape `sample_shape(x) + self.batch_shape` with values of type
         `self.dtype`.
     """
-    return self._call_survival_function(value, name)
+    return self._call_survival_function(value, name, **kwargs)
 
   def _entropy(self):
     raise NotImplementedError("entropy is not implemented: {}".format(
         type(self).__name__))
 
-  def entropy(self, name="entropy"):
+  def entropy(self, name="entropy", **kwargs):
     """Shannon entropy in nats."""
     with self._name_scope(name):
-      return self._entropy()
+      return self._entropy(**kwargs)
 
   def _mean(self):
     raise NotImplementedError("mean is not implemented: {}".format(
         type(self).__name__))
 
-  def mean(self, name="mean"):
+  def mean(self, name="mean", **kwargs):
     """Mean."""
     with self._name_scope(name):
-      return self._mean()
+      return self._mean(**kwargs)
 
   def _quantile(self, value):
     raise NotImplementedError("quantile is not implemented: {}".format(
@@ -1036,7 +1046,7 @@ class Distribution(_BaseDistribution):
           value, name="value", preferred_dtype=self.dtype)
       return self._quantile(value, **kwargs)
 
-  def quantile(self, value, name="quantile"):
+  def quantile(self, value, name="quantile", **kwargs):
     """Quantile function. Aka "inverse cdf" or "percent point function".
 
     Given random variable `X` and `p in [0, 1]`, the `quantile` is:
@@ -1048,18 +1058,19 @@ class Distribution(_BaseDistribution):
     Args:
       value: `float` or `double` `Tensor`.
       name: Python `str` prepended to names of ops created by this function.
+      **kwargs: Named arguments forwarded to subclass implementation.
 
     Returns:
       quantile: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
         values of type `self.dtype`.
     """
-    return self._call_quantile(value, name)
+    return self._call_quantile(value, name, **kwargs)
 
   def _variance(self):
     raise NotImplementedError("variance is not implemented: {}".format(
         type(self).__name__))
 
-  def variance(self, name="variance"):
+  def variance(self, name="variance", **kwargs):
     """Variance.
 
     Variance is defined as,
@@ -1073,6 +1084,7 @@ class Distribution(_BaseDistribution):
 
     Args:
       name: Python `str` prepended to names of ops created by this function.
+      **kwargs: Named arguments forwarded to subclass implementation.
 
     Returns:
       variance: Floating-point `Tensor` with shape identical to
@@ -1080,10 +1092,10 @@ class Distribution(_BaseDistribution):
     """
     with self._name_scope(name):
       try:
-        return self._variance()
+        return self._variance(**kwargs)
       except NotImplementedError as original_exception:
         try:
-          return tf.square(self._stddev())
+          return tf.square(self._stddev(**kwargs))
         except NotImplementedError:
           raise original_exception
 
@@ -1091,7 +1103,7 @@ class Distribution(_BaseDistribution):
     raise NotImplementedError("stddev is not implemented: {}".format(
         type(self).__name__))
 
-  def stddev(self, name="stddev"):
+  def stddev(self, name="stddev", **kwargs):
     """Standard deviation.
 
     Standard deviation is defined as,
@@ -1105,6 +1117,7 @@ class Distribution(_BaseDistribution):
 
     Args:
       name: Python `str` prepended to names of ops created by this function.
+      **kwargs: Named arguments forwarded to subclass implementation.
 
     Returns:
       stddev: Floating-point `Tensor` with shape identical to
@@ -1113,10 +1126,10 @@ class Distribution(_BaseDistribution):
 
     with self._name_scope(name):
       try:
-        return self._stddev()
+        return self._stddev(**kwargs)
       except NotImplementedError as original_exception:
         try:
-          return tf.sqrt(self._variance())
+          return tf.sqrt(self._variance(**kwargs))
         except NotImplementedError:
           raise original_exception
 
@@ -1124,7 +1137,7 @@ class Distribution(_BaseDistribution):
     raise NotImplementedError("covariance is not implemented: {}".format(
         type(self).__name__))
 
-  def covariance(self, name="covariance"):
+  def covariance(self, name="covariance", **kwargs):
     """Covariance.
 
     Covariance is (possibly) defined only for non-scalar-event distributions.
@@ -1154,6 +1167,7 @@ class Distribution(_BaseDistribution):
 
     Args:
       name: Python `str` prepended to names of ops created by this function.
+      **kwargs: Named arguments forwarded to subclass implementation.
 
     Returns:
       covariance: Floating-point `Tensor` with shape `[B1, ..., Bn, k', k']`
@@ -1161,16 +1175,16 @@ class Distribution(_BaseDistribution):
         `k' = reduce_prod(self.event_shape)`.
     """
     with self._name_scope(name):
-      return self._covariance()
+      return self._covariance(**kwargs)
 
   def _mode(self):
     raise NotImplementedError("mode is not implemented: {}".format(
         type(self).__name__))
 
-  def mode(self, name="mode"):
+  def mode(self, name="mode", **kwargs):
     """Mode."""
     with self._name_scope(name):
-      return self._mode()
+      return self._mode(**kwargs)
 
   def _cross_entropy(self, other):
     return kullback_leibler.cross_entropy(
@@ -1349,3 +1363,20 @@ def _str_dtype(x):
   str_ = lambda x_: x_.name if x_ else "<unknown>"
   return (str_(x) if x is None or hasattr(x, "name")
           else ("(" + ", ".join(map(str_, x)) + ")"))
+
+
+class ConditionalDistribution(Distribution):
+  """Distribution that supports intrinsic parameters (local latents).
+
+  Subclasses of this distribution may have additional keyword arguments passed
+  to their sample-based methods (i.e. `sample`, `log_prob`, etc.).
+  """
+
+  @deprecation.deprecated(
+      "2019-07-01",
+      "`ConditionalDistribution` is no longer required; `Distribution` "
+      "top-level functions now pass-through `**kwargs`.",
+      warn_once=True)
+
+  def __new__(cls, *args, **kwargs):  # pylint: disable=unused-argument
+    return super(ConditionalDistribution, cls).__new__(cls)

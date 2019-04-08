@@ -30,9 +30,11 @@ import six
 import tensorflow as tf
 
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     "Bijector",
+    "ConditionalBijector",
 ]
 
 
@@ -818,6 +820,7 @@ class Bijector(object):
     raise NotImplementedError("forward not implemented.")
 
   def _call_forward(self, x, name, **kwargs):
+    """Wraps call to _forward, allowing extra shared logic."""
     with self._name_scope(name, [x]):
       x = tf.convert_to_tensor(value=x, name="x")
       self._maybe_assert_dtype(x)
@@ -836,12 +839,13 @@ class Bijector(object):
         self._cache_by_x(mapping)
       return mapping.y
 
-  def forward(self, x, name="forward"):
+  def forward(self, x, name="forward", **kwargs):
     """Returns the forward `Bijector` evaluation, i.e., X = g(Y).
 
     Args:
       x: `Tensor`. The input to the "forward" evaluation.
       name: The name to give this op.
+      **kwargs: Named arguments forwarded to subclass implementation.
 
     Returns:
       `Tensor`.
@@ -851,13 +855,14 @@ class Bijector(object):
         `self.dtype`.
       NotImplementedError: if `_forward` is not implemented.
     """
-    return self._call_forward(x, name)
+    return self._call_forward(x, name, **kwargs)
 
   def _inverse(self, y):
     """Subclass implementation for `inverse` public function."""
     raise NotImplementedError("inverse not implemented")
 
   def _call_inverse(self, y, name, **kwargs):
+    """Wraps call to _inverse, allowing extra shared logic."""
     with self._name_scope(name, [y]):
       y = tf.convert_to_tensor(value=y, name="y")
       self._maybe_assert_dtype(y)
@@ -876,12 +881,13 @@ class Bijector(object):
         self._cache_by_y(mapping)
       return mapping.x
 
-  def inverse(self, y, name="inverse"):
+  def inverse(self, y, name="inverse", **kwargs):
     """Returns the inverse `Bijector` evaluation, i.e., X = g^{-1}(Y).
 
     Args:
       y: `Tensor`. The input to the "inverse" evaluation.
       name: The name to give this op.
+      **kwargs: Named arguments forwarded to subclass implementation.
 
     Returns:
       `Tensor`, if this bijector is injective.
@@ -893,7 +899,7 @@ class Bijector(object):
         `self.dtype`.
       NotImplementedError: if `_inverse` is not implemented.
     """
-    return self._call_inverse(y, name)
+    return self._call_inverse(y, name, **kwargs)
 
   def _compute_inverse_log_det_jacobian_with_caching(
       self, x, y, prefer_inverse_ldj_fn, event_ndims, kwargs):
@@ -1110,7 +1116,8 @@ class Bijector(object):
   def inverse_log_det_jacobian(self,
                                y,
                                event_ndims,
-                               name="inverse_log_det_jacobian"):
+                               name="inverse_log_det_jacobian",
+                               **kwargs):
     """Returns the (log o det o Jacobian o inverse)(y).
 
     Mathematically, returns: `log(det(dX/dY))(Y)`. (Recall that: `X=g^{-1}(Y)`.)
@@ -1126,6 +1133,7 @@ class Bijector(object):
         dimensions to produce a scalar Jacobian determinant for each event, i.e.
         it has shape `y.shape.ndims - event_ndims` dimensions.
       name: The name to give this op.
+      **kwargs: Named arguments forwarded to subclass implementation.
 
     Returns:
       ildj: `Tensor`, if this bijector is injective.
@@ -1138,7 +1146,7 @@ class Bijector(object):
         `self.dtype`.
       NotImplementedError: if `_inverse_log_det_jacobian` is not implemented.
     """
-    return self._call_inverse_log_det_jacobian(y, event_ndims, name)
+    return self._call_inverse_log_det_jacobian(y, event_ndims, name, **kwargs)
 
   def _call_forward_log_det_jacobian(self, x, event_ndims, name, **kwargs):
     """Wraps call to _forward_log_det_jacobian, allowing extra shared logic.
@@ -1183,7 +1191,8 @@ class Bijector(object):
   def forward_log_det_jacobian(self,
                                x,
                                event_ndims,
-                               name="forward_log_det_jacobian"):
+                               name="forward_log_det_jacobian",
+                               **kwargs):
     """Returns both the forward_log_det_jacobian.
 
     Args:
@@ -1194,6 +1203,7 @@ class Bijector(object):
         dimensions to produce a scalar Jacobian determinant for each event, i.e.
         it has shape `x.shape.ndims - event_ndims` dimensions.
       name: The name to give this op.
+      **kwargs: Named arguments forwarded to subclass implementation.
 
     Returns:
       `Tensor`, if this bijector is injective.
@@ -1206,7 +1216,7 @@ class Bijector(object):
         nor {`_inverse`, `_inverse_log_det_jacobian`} are implemented, or
         this is a non-injective bijector.
     """
-    return self._call_forward_log_det_jacobian(x, event_ndims, name)
+    return self._call_forward_log_det_jacobian(x, event_ndims, name, **kwargs)
 
   @contextlib.contextmanager
   def _name_scope(self, name=None, values=None):
@@ -1336,3 +1346,15 @@ class Bijector(object):
       event_ndims_ = int(event_ndims_)
 
     return event_ndims_
+
+
+class ConditionalBijector(Bijector):
+  """Conditional Bijector is a Bijector that allows intrinsic conditioning."""
+
+  @deprecation.deprecated(
+      "2019-07-01",
+      "`ConditionalBijector` is no longer required; `Bijector` "
+      "top-level functions now pass-through `**kwargs`.",
+      warn_once=True)
+  def __new__(cls, *args, **kwargs):  # pylint: disable=unused-argument
+    return super(ConditionalBijector, cls).__new__(cls)

@@ -32,9 +32,9 @@ from tensorflow_probability.python.internal import prefer_static
 
 def _make_summary_statistic(attr):
   """Factory for implementing summary statistics, eg, mean, stddev, mode."""
-  def _fn(self):
+  def _fn(self, **kwargs):
     """Implements summary statistic, eg, mean, stddev, mode."""
-    x = getattr(self.distribution, attr)()
+    x = getattr(self.distribution, attr)(**kwargs)
     shape = prefer_static.concat([
         self.distribution.batch_shape_tensor(),
         prefer_static.ones(prefer_static.rank_from_shape(self.sample_shape),
@@ -170,7 +170,7 @@ class Sample(distribution_lib.Distribution):
       return tf.TensorShape(None)
     return sample_shape.concatenate(self.distribution.event_shape)
 
-  def _sample_n(self, n, seed):
+  def _sample_n(self, n, seed, **kwargs):
     fake_sample_ndims = prefer_static.rank_from_shape(self.sample_shape)
     event_ndims = prefer_static.rank_from_shape(
         self.distribution.event_shape_tensor, self.distribution.event_shape)
@@ -185,10 +185,12 @@ class Sample(distribution_lib.Distribution):
                             1 + fake_sample_ndims + batch_ndims + event_ndims),
     ], axis=0)
     x = self.distribution.sample(
-        prefer_static.concat([[n], self.sample_shape], axis=0), seed=seed)
+        prefer_static.concat([[n], self.sample_shape], axis=0),
+        seed=seed,
+        **kwargs)
     return tf.transpose(a=x, perm=perm)
 
-  def _log_prob(self, x):
+  def _log_prob(self, x, **kwargs):
     batch_ndims = prefer_static.rank_from_shape(
         self.distribution.batch_shape_tensor,
         self.distribution.batch_shape)
@@ -217,13 +219,13 @@ class Sample(distribution_lib.Distribution):
         [sample_dims, extra_sample_dims, batch_dims, event_dims], axis=0)
     x = tf.transpose(a=x, perm=perm)
     # (3) Compute x's log_prob.
-    lp = self.distribution.log_prob(x)
+    lp = self.distribution.log_prob(x, **kwargs)
     # (4) Make the final reduction in x.
     axis = prefer_static.range(sample_ndims, sample_ndims + extra_sample_ndims)
     return tf.reduce_sum(input_tensor=lp, axis=axis)
 
-  def _entropy(self):
-    h = self.distribution.entropy()
+  def _entropy(self, **kwargs):
+    h = self.distribution.entropy(**kwargs)
     n = prefer_static.reduce_prod(self.sample_shape)
     return tf.cast(x=n, dtype=h.dtype) * h
 

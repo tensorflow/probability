@@ -24,7 +24,7 @@ import tensorflow as tf
 
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.internal import assert_util
-from tensorflow.python.framework import tensor_util
+from tensorflow.python.framework import tensor_util  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -141,9 +141,9 @@ class BatchReshape(distribution_lib.Distribution):
   def _event_shape(self):
     return self.distribution.event_shape
 
-  def _sample_n(self, n, seed=None):
+  def _sample_n(self, n, seed=None, **kwargs):
     with tf.control_dependencies(self._runtime_assertions):
-      x = self.distribution.sample(sample_shape=n, seed=seed)
+      x = self.distribution.sample(sample_shape=n, seed=seed, **kwargs)
       new_shape = tf.concat(
           [
               [n],
@@ -153,53 +153,59 @@ class BatchReshape(distribution_lib.Distribution):
           axis=0)
       return tf.reshape(x, new_shape)
 
-  def _log_prob(self, x):
+  def _log_prob(self, x, **kwargs):
     return self._call_reshape_input_output(
-        self.distribution.log_prob, x)
+        self.distribution.log_prob, x, extra_kwargs=kwargs)
 
-  def _prob(self, x):
+  def _prob(self, x, **kwargs):
     return self._call_reshape_input_output(
-        self.distribution.prob, x)
+        self.distribution.prob, x, extra_kwargs=kwargs)
 
-  def _log_cdf(self, x):
+  def _log_cdf(self, x, **kwargs):
     return self._call_reshape_input_output(
-        self.distribution.log_cdf, x)
+        self.distribution.log_cdf, x, extra_kwargs=kwargs)
 
-  def _cdf(self, x):
+  def _cdf(self, x, **kwargs):
     return self._call_reshape_input_output(
-        self.distribution.cdf, x)
+        self.distribution.cdf, x, extra_kwargs=kwargs)
 
-  def _log_survival_function(self, x):
+  def _log_survival_function(self, x, **kwargs):
     return self._call_reshape_input_output(
-        self.distribution.log_survival_function, x)
+        self.distribution.log_survival_function, x, extra_kwargs=kwargs)
 
-  def _survival_function(self, x):
+  def _survival_function(self, x, **kwargs):
     return self._call_reshape_input_output(
-        self.distribution.survival_function, x)
+        self.distribution.survival_function, x, extra_kwargs=kwargs)
 
-  def _entropy(self):
+  def _entropy(self, **kwargs):
     return self._call_and_reshape_output(
         self.distribution.entropy,
         [],
-        [tf.TensorShape([])])
+        [tf.TensorShape([])],
+        extra_kwargs=kwargs)
 
-  def _mean(self):
-    return self._call_and_reshape_output(self.distribution.mean)
+  def _mean(self, **kwargs):
+    return self._call_and_reshape_output(self.distribution.mean,
+                                         extra_kwargs=kwargs)
 
-  def _mode(self):
-    return self._call_and_reshape_output(self.distribution.mode)
+  def _mode(self, **kwargs):
+    return self._call_and_reshape_output(self.distribution.mode,
+                                         extra_kwargs=kwargs)
 
-  def _stddev(self):
-    return self._call_and_reshape_output(self.distribution.stddev)
+  def _stddev(self, **kwargs):
+    return self._call_and_reshape_output(self.distribution.stddev,
+                                         extra_kwargs=kwargs)
 
-  def _variance(self):
-    return self._call_and_reshape_output(self.distribution.variance)
+  def _variance(self, **kwargs):
+    return self._call_and_reshape_output(self.distribution.variance,
+                                         extra_kwargs=kwargs)
 
-  def _covariance(self):
+  def _covariance(self, **kwargs):
     return self._call_and_reshape_output(
         self.distribution.covariance,
         [self.event_shape_tensor()]*2,
-        [self.event_shape]*2)
+        [self.event_shape]*2,
+        extra_kwargs=kwargs)
 
   def _sample_shape(self, x):
     """Computes graph and static `sample_shape`."""
@@ -221,8 +227,11 @@ class BatchReshape(distribution_lib.Distribution):
       sample_shape = tf.shape(input=x)[:sample_ndims]
     return sample_shape, static_sample_shape
 
-  def _call_reshape_input_output(self, fn, x):
+  def _call_reshape_input_output(self, fn, x, extra_kwargs=None):
     """Calls `fn`, appropriately reshaping its input `x` and output."""
+    # Note: we take `extra_kwargs` as a dict rather than `**extra_kwargs`
+    # because it is possible the user provided extra kwargs would itself
+    # have `fn` and/or `x` as a key.
     with tf.control_dependencies(self._runtime_assertions +
                                  self._validate_sample_arg(x)):
       sample_shape, static_sample_shape = self._sample_shape(x)
@@ -233,7 +242,8 @@ class BatchReshape(distribution_lib.Distribution):
               self.event_shape_tensor(),
           ],
           axis=0)
-      result = fn(tf.reshape(x, old_shape))
+      x_reshape = tf.reshape(x, old_shape)
+      result = fn(x_reshape, **extra_kwargs) if extra_kwargs else fn(x_reshape)
       new_shape = tf.concat(
           [
               sample_shape,
@@ -250,8 +260,13 @@ class BatchReshape(distribution_lib.Distribution):
       self,
       fn,
       event_shape_list=None,
-      static_event_shape_list=None):
+      static_event_shape_list=None,
+      extra_kwargs=None):
     """Calls `fn` and appropriately reshapes its output."""
+    # Note: we take `extra_kwargs` as a dict rather than `**extra_kwargs`
+    # because it is possible the user provided extra kwargs would itself
+    # have `fn`, `event_shape_list`, `static_event_shape_list` and/or
+    # `extra_kwargs` as keys.
     with tf.control_dependencies(self._runtime_assertions):
       if event_shape_list is None:
         event_shape_list = [self._event_shape_tensor()]
@@ -259,7 +274,8 @@ class BatchReshape(distribution_lib.Distribution):
         static_event_shape_list = [self.event_shape]
       new_shape = tf.concat(
           [self._batch_shape_unexpanded] + event_shape_list, axis=0)
-      result = tf.reshape(fn(), new_shape)
+      result = tf.reshape(fn(**extra_kwargs) if extra_kwargs else fn(),
+                          new_shape)
       if (self.batch_shape.ndims is not None and
           self.event_shape.ndims is not None):
         event_shape = tf.TensorShape([])
@@ -365,7 +381,7 @@ def calculate_reshape(original_shape, new_shape, validate=False, name=None):
     new_ndims = tf.shape(input=new_shape)
     expanded_new_shape = tf.where(  # Assumes exactly one `-1`.
         implicit_dim, tf.fill(new_ndims, size_implicit_dim), new_shape)
-    validations = [] if not validate else [
+    validations = [] if not validate else [  # pylint: disable=g-long-ternary
         assert_util.assert_rank(
             original_shape, 1, message="Original shape must be a vector."),
         assert_util.assert_rank(

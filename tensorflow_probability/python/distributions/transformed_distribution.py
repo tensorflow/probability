@@ -24,8 +24,10 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow.python.framework import tensor_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
+    "ConditionalTransformedDistribution",
     "TransformedDistribution",
 ]
 
@@ -51,6 +53,12 @@ def _is_scalar_from_shape_tensor(shape):
   return prefer_static.equal(prefer_static.rank_from_shape(shape), 0)
 
 
+def _default_kwargs_split_fn(kwargs):
+  """Default `kwargs` `dict` getter."""
+  return (kwargs.get("distribution_kwargs", {}),
+          kwargs.get("bijector_kwargs", {}))
+
+
 class TransformedDistribution(distribution_lib.Distribution):
   """A Transformed Distribution.
 
@@ -69,12 +77,12 @@ class TransformedDistribution(distribution_lib.Distribution):
   `Distribution` associated with a random variable (rv) `X`.
 
   Write `cdf(Y=y)` for an absolutely continuous cumulative distribution function
-  of random variable `Y`; write the probability density function `pdf(Y=y) :=
-  d^k / (dy_1,...,dy_k) cdf(Y=y)` for its derivative wrt to `Y` evaluated at
-  `y`. Assume that `Y = g(X)` where `g` is a deterministic diffeomorphism,
-  i.e., a non-random, continuous, differentiable, and invertible function.
-  Write the inverse of `g` as `X = g^{-1}(Y)` and `(J o g)(x)` for the Jacobian
-  of `g` evaluated at `x`.
+  of random variable `Y`; write the probability density function
+  `pdf(Y=y) := d^k / (dy_1,...,dy_k) cdf(Y=y)` for its derivative wrt to `Y`
+  evaluated at `y`. Assume that `Y = g(X)` where `g` is a deterministic
+  diffeomorphism, i.e., a non-random, continuous, differentiable, and invertible
+  function.  Write the inverse of `g` as `X = g^{-1}(Y)` and `(J o g)(x)` for
+  the Jacobian of `g` evaluated at `x`.
 
   A `TransformedDistribution` implements the following operations:
 
@@ -165,6 +173,7 @@ class TransformedDistribution(distribution_lib.Distribution):
                bijector,
                batch_shape=None,
                event_shape=None,
+               kwargs_split_fn=_default_kwargs_split_fn,
                validate_args=False,
                parameters=None,
                name=None):
@@ -179,6 +188,12 @@ class TransformedDistribution(distribution_lib.Distribution):
         `batch_shape`; valid only if `distribution.is_scalar_batch()`.
       event_shape: `integer` vector `Tensor` which overrides `distribution`
         `event_shape`; valid only if `distribution.is_scalar_event()`.
+      kwargs_split_fn: Python `callable` which takes a kwargs `dict` and returns
+        a tuple of kwargs `dict`s for each of the `distribution` and `bijector`
+        parameters respectively.
+        Default value: `_default_kwargs_split_fn` (i.e.,
+            `lambda kwargs: (kwargs.get('distribution_kwargs', {}),
+                             kwargs.get('bijector_kwargs', {}))`)
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -192,6 +207,9 @@ class TransformedDistribution(distribution_lib.Distribution):
     name = name or (("" if bijector is None else bijector.name) +
                     distribution.name)
     with tf.compat.v2.name_scope(name) as name:
+      self._kwargs_split_fn = (_default_kwargs_split_fn
+                               if kwargs_split_fn is None
+                               else kwargs_split_fn)
       # For convenience we define some handy constants.
       self._zero = tf.constant(0, dtype=tf.int32, name="zero")
       self._empty = tf.constant([], dtype=tf.int32, name="empty")
@@ -329,14 +347,15 @@ class TransformedDistribution(distribution_lib.Distribution):
             if self._is_maybe_batch_override
             else self.distribution.batch_shape)
 
-  def _sample_n(self, n, seed=None):
+  def _sample_n(self, n, seed=None, **distribution_kwargs):
     sample_shape = prefer_static.concat([
         distribution_util.pick_vector(self._needs_rotation, self._empty, [n]),
         self._override_batch_shape,
         self._override_event_shape,
         distribution_util.pick_vector(self._needs_rotation, [n], self._empty),
     ], axis=0)
-    x = self.distribution.sample(sample_shape=sample_shape, seed=seed)
+    x = self.distribution.sample(sample_shape=sample_shape, seed=seed,
+                                 **distribution_kwargs)
     x = self._maybe_rotate_dims(x)
     # We'll apply the bijector in the `_call_sample_n` function.
     return x
@@ -351,10 +370,12 @@ class TransformedDistribution(distribution_lib.Distribution):
       sample_shape, n = self._expand_sample_shape_to_vector(
           sample_shape, "sample_shape")
 
+      distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
+
       # First, generate samples. We will possibly generate extra samples in the
       # event that we need to reinterpret the samples as part of the
       # event_shape.
-      x = self._sample_n(n, seed, **kwargs)
+      x = self._sample_n(n, seed, **distribution_kwargs)
 
       # Next, we reshape `x` into its final form. We do this prior to the call
       # to the bijector to ensure that the bijector caching works.
@@ -365,30 +386,36 @@ class TransformedDistribution(distribution_lib.Distribution):
       # Finally, we apply the bijector's forward transformation. For caching to
       # work, it is imperative that this is the last modification to the
       # returned result.
-      y = self.bijector.forward(x, **kwargs)
+      y = self.bijector.forward(x, **bijector_kwargs)
       y = self._set_sample_static_shape(y, sample_shape)
 
       return y
 
-  def _log_prob(self, y):
+  def _log_prob(self, y, **kwargs):
+    distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
+
     # For caching to work, it is imperative that the bijector is the first to
     # modify the input.
-    x = self.bijector.inverse(y)
+    x = self.bijector.inverse(y, **bijector_kwargs)
     event_ndims = self._maybe_get_static_event_ndims()
 
-    ildj = self.bijector.inverse_log_det_jacobian(y, event_ndims=event_ndims)
+    ildj = self.bijector.inverse_log_det_jacobian(
+        y, event_ndims=event_ndims, **bijector_kwargs)
     if self.bijector._is_injective:  # pylint: disable=protected-access
-      return self._finish_log_prob_for_one_fiber(y, x, ildj, event_ndims)
+      return self._finish_log_prob_for_one_fiber(
+          y, x, ildj, event_ndims, **distribution_kwargs)
 
     lp_on_fibers = [
-        self._finish_log_prob_for_one_fiber(y, x_i, ildj_i, event_ndims)
+        self._finish_log_prob_for_one_fiber(
+            y, x_i, ildj_i, event_ndims, **distribution_kwargs)
         for x_i, ildj_i in zip(x, ildj)]
     return tf.reduce_logsumexp(input_tensor=tf.stack(lp_on_fibers), axis=0)
 
-  def _finish_log_prob_for_one_fiber(self, y, x, ildj, event_ndims):
+  def _finish_log_prob_for_one_fiber(self, y, x, ildj, event_ndims,
+                                     **distribution_kwargs):
     """Finish computation of log_prob on one element of the inverse image."""
     x = self._maybe_rotate_dims(x, rotate_right=True)
-    log_prob = self.distribution.log_prob(x)
+    log_prob = self.distribution.log_prob(x, **distribution_kwargs)
     if self._is_maybe_event_override:
       log_prob = tf.reduce_sum(
           input_tensor=log_prob, axis=self._reduce_event_indices)
@@ -400,25 +427,30 @@ class TransformedDistribution(distribution_lib.Distribution):
               self.batch_shape))
     return log_prob
 
-  def _prob(self, y):
+  def _prob(self, y, **kwargs):
     if not hasattr(self.distribution, "_prob"):
-      return tf.exp(self.log_prob(y))
+      return tf.exp(self.log_prob(y, **kwargs))
+    distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
 
-    x = self.bijector.inverse(y)
+    x = self.bijector.inverse(y, **bijector_kwargs)
     event_ndims = self._maybe_get_static_event_ndims()
-    ildj = self.bijector.inverse_log_det_jacobian(y, event_ndims=event_ndims)
+    ildj = self.bijector.inverse_log_det_jacobian(
+        y, event_ndims=event_ndims, **bijector_kwargs)
     if self.bijector._is_injective:  # pylint: disable=protected-access
-      return self._finish_prob_for_one_fiber(y, x, ildj, event_ndims)
+      return self._finish_prob_for_one_fiber(
+          y, x, ildj, event_ndims, **distribution_kwargs)
 
     prob_on_fibers = [
-        self._finish_prob_for_one_fiber(y, x_i, ildj_i, event_ndims)
+        self._finish_prob_for_one_fiber(
+            y, x_i, ildj_i, event_ndims, **distribution_kwargs)
         for x_i, ildj_i in zip(x, ildj)]
     return sum(prob_on_fibers)
 
-  def _finish_prob_for_one_fiber(self, y, x, ildj, event_ndims):
+  def _finish_prob_for_one_fiber(self, y, x, ildj, event_ndims,
+                                 **distribution_kwargs):
     """Finish computation of prob on one element of the inverse image."""
     x = self._maybe_rotate_dims(x, rotate_right=True)
-    prob = self.distribution.prob(x)
+    prob = self.distribution.prob(x, **distribution_kwargs)
     if self._is_maybe_event_override:
       prob = tf.reduce_prod(input_tensor=prob, axis=self._reduce_event_indices)
     prob *= tf.exp(tf.cast(ildj, prob.dtype))
@@ -429,65 +461,71 @@ class TransformedDistribution(distribution_lib.Distribution):
               self.batch_shape))
     return prob
 
-  def _log_cdf(self, y):
+  def _log_cdf(self, y, **kwargs):
     if self._is_maybe_event_override:
       raise NotImplementedError("log_cdf is not implemented when overriding "
                                 "event_shape")
     if not self.bijector._is_injective:  # pylint: disable=protected-access
       raise NotImplementedError("log_cdf is not implemented when "
                                 "bijector is not injective.")
-    x = self.bijector.inverse(y)
-    return self.distribution.log_cdf(x)
+    distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
+    x = self.bijector.inverse(y, **bijector_kwargs)
+    return self.distribution.log_cdf(x, **distribution_kwargs)
 
-  def _cdf(self, y):
+  def _cdf(self, y, **kwargs):
     if self._is_maybe_event_override:
       raise NotImplementedError("cdf is not implemented when overriding "
                                 "event_shape")
     if not self.bijector._is_injective:  # pylint: disable=protected-access
       raise NotImplementedError("cdf is not implemented when "
                                 "bijector is not injective.")
-    x = self.bijector.inverse(y)
-    return self.distribution.cdf(x)
+    distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
+    x = self.bijector.inverse(y, **bijector_kwargs)
+    return self.distribution.cdf(x, **distribution_kwargs)
 
-  def _log_survival_function(self, y):
+  def _log_survival_function(self, y, **kwargs):
     if self._is_maybe_event_override:
       raise NotImplementedError("log_survival_function is not implemented when "
                                 "overriding event_shape")
     if not self.bijector._is_injective:  # pylint: disable=protected-access
       raise NotImplementedError("log_survival_function is not implemented when "
                                 "bijector is not injective.")
-    x = self.bijector.inverse(y)
-    return self.distribution.log_survival_function(x)
+    distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
+    x = self.bijector.inverse(y, **bijector_kwargs)
+    return self.distribution.log_survival_function(x, **distribution_kwargs)
 
-  def _survival_function(self, y):
+  def _survival_function(self, y, **kwargs):
     if self._is_maybe_event_override:
       raise NotImplementedError("survival_function is not implemented when "
                                 "overriding event_shape")
     if not self.bijector._is_injective:  # pylint: disable=protected-access
       raise NotImplementedError("survival_function is not implemented when "
                                 "bijector is not injective.")
-    x = self.bijector.inverse(y)
-    return self.distribution.survival_function(x)
+    distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
+    x = self.bijector.inverse(y, **bijector_kwargs)
+    return self.distribution.survival_function(x, **distribution_kwargs)
 
-  def _quantile(self, value):
+  def _quantile(self, value, **kwargs):
     if self._is_maybe_event_override:
       raise NotImplementedError("quantile is not implemented when overriding "
                                 "event_shape")
     if not self.bijector._is_injective:  # pylint: disable=protected-access
       raise NotImplementedError("quantile is not implemented when "
                                 "bijector is not injective.")
+    distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
     # x_q is the "qth quantile" of X iff q = P[X <= x_q].  Now, since X =
     # g^{-1}(Y), q = P[X <= x_q] = P[g^{-1}(Y) <= x_q] = P[Y <= g(x_q)],
     # implies the qth quantile of Y is g(x_q).
-    inv_cdf = self.distribution.quantile(value)
-    return self.bijector.forward(inv_cdf)
+    inv_cdf = self.distribution.quantile(value, **distribution_kwargs)
+    return self.bijector.forward(inv_cdf, **bijector_kwargs)
 
-  def _mean(self):
+  def _mean(self, **kwargs):
     if not self.bijector.is_constant_jacobian:
       raise NotImplementedError("mean is not implemented for non-affine "
                                 "bijectors")
 
-    x = self.distribution.mean()
+    distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
+    x = self.distribution.mean(**distribution_kwargs)
 
     if self._is_maybe_batch_override or self._is_maybe_event_override:
       # A batch (respectively event) shape override is only allowed if the batch
@@ -505,26 +543,27 @@ class TransformedDistribution(distribution_lib.Distribution):
            self.event_shape_tensor()], 0)
       x = tf.broadcast_to(x, new_shape)
 
-    y = self.bijector.forward(x)
+    y = self.bijector.forward(x, **bijector_kwargs)
 
     sample_shape = tf.convert_to_tensor(
         value=[], dtype=tf.int32, name="sample_shape")
     y = self._set_sample_static_shape(y, sample_shape)
     return y
 
-  def _entropy(self):
+  def _entropy(self, **kwargs):
     if not self.bijector.is_constant_jacobian:
       raise NotImplementedError("entropy is not implemented")
     if not self.bijector._is_injective:  # pylint: disable=protected-access
       raise NotImplementedError("entropy is not implemented when "
                                 "bijector is not injective.")
+    distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
     # Suppose Y = g(X) where g is a diffeomorphism and X is a continuous rv. It
     # can be shown that:
     #   H[Y] = H[X] + E_X[(log o abs o det o J o g)(X)].
     # If is_constant_jacobian then:
     #   E_X[(log o abs o det o J o g)(X)] = (log o abs o det o J o g)(c)
     # where c can by anything.
-    entropy = self.distribution.entropy()
+    entropy = self.distribution.entropy(**distribution_kwargs)
     if self._is_maybe_event_override:
       # H[X] = sum_i H[X_i] if X_i are mutually independent.
       # This means that a reduce_sum is a simple rescaling.
@@ -551,7 +590,7 @@ class TransformedDistribution(distribution_lib.Distribution):
         self.event_shape.ndims if self.event_shape.ndims is not None else
         tf.size(input=self.event_shape_tensor()))
     ildj = self.bijector.inverse_log_det_jacobian(
-        dummy, event_ndims=event_ndims)
+        dummy, event_ndims=event_ndims, **bijector_kwargs)
 
     entropy -= tf.cast(ildj, entropy.dtype)
     entropy.set_shape(self.batch_shape)
@@ -633,3 +672,16 @@ class TransformedDistribution(distribution_lib.Distribution):
       return event_ndims_
 
     return event_ndims
+
+
+class ConditionalTransformedDistribution(TransformedDistribution):
+  """A TransformedDistribution that allows intrinsic conditioning."""
+
+  @deprecation.deprecated(
+      "2019-07-01",
+      "`ConditionalTransformedDistribution` is no longer required; "
+      "`TransformedDistribution` top-level functions now pass-through "
+      "`**kwargs`.",
+      warn_once=True)
+  def __new__(cls, *args, **kwargs):  # pylint: disable=unused-argument
+    return super(ConditionalTransformedDistribution, cls).__new__(cls)

@@ -19,7 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from tensorflow_probability.python.bijectors import conditional_bijector
+from tensorflow_probability.python.bijectors import bijector
 
 
 __all__ = [
@@ -28,7 +28,7 @@ __all__ = [
 ]
 
 
-class RealNVP(conditional_bijector.ConditionalBijector):
+class RealNVP(bijector.Bijector):
   """RealNVP "affine coupling layer" for vector-valued events.
 
   Real NVP models a normalizing flow on a `D`-dimensional distribution via a
