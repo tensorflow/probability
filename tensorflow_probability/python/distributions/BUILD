@@ -64,6 +64,7 @@ py_library(
         ":inverse_gamma",
         ":inverse_gaussian",
         ":joint_distribution",
+        ":joint_distribution_sequential",
         ":kullback_leibler",
         ":kumaraswamy",
         ":laplace",
@@ -525,11 +526,20 @@ py_library(
     srcs = ["joint_distribution.py"],
     deps = [
         ":distribution",
-        ":kullback_leibler",
-        ":seed_stream",
-        # numpy dep,
+        # six dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
+    ],
+)
+
+py_library(
+    name = "joint_distribution_sequential",
+    srcs = ["joint_distribution_sequential.py"],
+    deps = [
+        ":joint_distribution",
+        ":kullback_leibler",
+        ":seed_stream",
+        # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
@@ -1619,9 +1629,9 @@ py_test(
 )
 
 py_test(
-    name = "joint_distribution_test",
+    name = "joint_distribution_sequential_test",
     size = "small",
-    srcs = ["joint_distribution_test.py"],
+    srcs = ["joint_distribution_sequential_test.py"],
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",
