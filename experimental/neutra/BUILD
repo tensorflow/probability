@@ -48,6 +48,7 @@ py_library(
 
 py_test(
     name = "neutra_kernel_test",
+    size = "medium",
     srcs = ["neutra_kernel_test.py"],
     deps = [
         ":neutra",

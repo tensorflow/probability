@@ -22,21 +22,29 @@ from __future__ import print_function
 import decorator
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow.python import pywrap_tensorflow as c_api  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.ops import control_flow_ops  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
 
 def _maybe_get_static_args(args):
-  flat_args = tf.compat.v2.nest.flatten(args)
+  flat_args = tf.nest.flatten(args)
   flat_args_ = [tf.get_static_value(a) for a in flat_args]
   all_static = all(arg is None or arg_ is not None
                    for arg, arg_ in zip(flat_args, flat_args_))
-  return tf.compat.v2.nest.pack_sequence_as(args, flat_args_), all_static
+  return tf.nest.pack_sequence_as(args, flat_args_), all_static
 
 
 def _prefer_static(original_fn, static_fn):
+  """Wraps original_fn, preferring to call static_fn when inputs are static."""
+  original_spec = tf_inspect.getfullargspec(original_fn)
+  static_spec = tf_inspect.getfullargspec(static_fn)
+  if original_spec != static_spec:
+    raise ValueError(
+        'Arg specs do not match: original={}, static={}, fn={}'.format(
+            original_spec, static_spec, original_fn))
   @decorator.decorator
   def wrap(wrapped_fn, *args, **kwargs):
     del wrapped_fn
@@ -48,6 +56,13 @@ def _prefer_static(original_fn, static_fn):
 
 
 def _copy_docstring(original_fn, new_fn):
+  """Wraps new_fn with the doc of original_fn."""
+  original_spec = tf_inspect.getfullargspec(original_fn)
+  new_spec = tf_inspect.getfullargspec(new_fn)
+  if original_spec != new_spec:
+    raise ValueError(
+        'Arg specs do not match: original={}, new={}, fn={}'.format(
+            original_spec, new_spec, original_fn))
   @decorator.decorator
   def wrap(wrapped_fn, *args, **kwargs):
     del wrapped_fn
@@ -162,7 +177,7 @@ def case(pred_fn_pairs, default=None, exclusive=False, name='smart_case'):
 
 concat = _prefer_static(
     tf.concat,
-    lambda values, axis, name=None: np.concatenate(values, axis))
+    lambda values, axis, name='concat': np.concatenate(values, axis))
 
 equal = _prefer_static(
     tf.equal,
@@ -249,7 +264,7 @@ shape = _copy_docstring(tf.shape, _shape)
 
 where = _prefer_static(
     tf.where,
-    lambda condition, x, y, name=None: np.where(condition, x, y))
+    lambda condition, x=None, y=None, name=None: np.where(condition, x, y))
 
 zeros = _prefer_static(
     tf.zeros,
