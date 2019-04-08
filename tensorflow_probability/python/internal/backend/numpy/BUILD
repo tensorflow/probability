@@ -119,3 +119,17 @@ py_library(
         "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
     ],
 )
+
+py_test(
+    name = "numpy_test",
+    srcs = ["numpy_test.py"],
+    deps = [
+        ":numpy",
+        # absl/testing:parameterized dep,
+        # hypothesis dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
