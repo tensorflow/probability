@@ -104,10 +104,10 @@ def make_simple_step_size_update_policy(num_adaptation_steps,
   if step_counter is None and num_adaptation_steps is not None:
     step_counter = tf.compat.v1.get_variable(
         name='step_size_adaptation_step_counter',
-        initializer=np.array(-1, dtype=np.int64),
+        initializer=np.array(-1, dtype=np.int32),
         # Specify the dtype for variable sharing to work correctly
         # (b/120599991).
-        dtype=tf.int64,
+        dtype=tf.int32,
         trainable=False,
         use_resource=True)
 
@@ -731,7 +731,7 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
 
       num_leapfrog_steps = tf.convert_to_tensor(
           value=self.num_leapfrog_steps,
-          dtype=tf.int64,
+          dtype=tf.int32,
           name='num_leapfrog_steps')
 
       [
@@ -744,7 +744,7 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
           cond=lambda i, *args: i < num_leapfrog_steps,
           body=lambda i, *args: [i + 1] + list(_leapfrog_one_step(*args)),
           loop_vars=[
-              tf.zeros([], tf.int64, name='iter'),
+              tf.zeros([], tf.int32, name='iter'),
               current_momentum_parts,
               current_state_parts,
               current_target_log_prob,
@@ -792,7 +792,7 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
                 self.step_size),
             num_leapfrog_steps=tf.convert_to_tensor(
                 value=self.num_leapfrog_steps,
-                dtype=tf.int64,
+                dtype=tf.int32,
                 name='num_leapfrog_steps'))
       else:
         return UncalibratedHamiltonianMonteCarloKernelResults(

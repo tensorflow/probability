@@ -163,16 +163,21 @@ class GradientTest(tf.test.TestCase):
 class SmartForLoopTest(tf.test.TestCase):
 
   def test_python_for_loop(self):
-    n = tf.constant(10, dtype=tf.int64)
-    counter = collections.Counter()
-    def body(x):
-      counter['body_calls'] += 1
-      return [x + 1]
+    counter = None
+    # Not @parameterized because the tf.constants would be executed outside the
+    # Eager mode that @test_util.run_all_in_graph_and_eager_modes creates, and
+    # TF is unhappy about that.
+    for n in [10, tf.constant(10, dtype=tf.int64),
+              tf.constant(10, dtype=tf.int32)]:
+      counter = collections.Counter()
+      def body(x):
+        counter['body_calls'] += 1
+        return [x + 1]
 
-    result = util.smart_for_loop(
-        loop_num_iter=n, body_fn=body, initial_loop_vars=[tf.constant(1)])
-    self.assertEqual(10, counter['body_calls'])
-    self.assertAllClose([11], self.evaluate(result))
+      result = util.smart_for_loop(
+          loop_num_iter=n, body_fn=body, initial_loop_vars=[tf.constant(1)])
+      self.assertEqual(10, counter['body_calls'])
+      self.assertAllClose([11], self.evaluate(result))
 
   def test_tf_while_loop(self):
     iters = 10

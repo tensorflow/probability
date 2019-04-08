@@ -311,7 +311,7 @@ class NeuTra(tfp.mcmc.TransitionKernel):
   def _num_leapfrog_steps(self, step_size):
     step_size = tf.convert_to_tensor(value=step_size)
     trajectory_length = np.float32(self._total_event_size)**0.25
-    return tf.cast(tf.math.ceil(trajectory_length / step_size), dtype=tf.int64)
+    return tf.cast(tf.math.ceil(trajectory_length / step_size), dtype=tf.int32)
 
   def _flatten_state(self, state):
     state_parts = tf.nest.flatten(state)

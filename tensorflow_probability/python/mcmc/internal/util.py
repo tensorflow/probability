@@ -271,16 +271,17 @@ def smart_for_loop(loop_num_iter, body_fn, initial_loop_vars,
   """
   with tf.compat.v1.name_scope(name, 'smart_for_loop',
                                [loop_num_iter, initial_loop_vars]):
-    loop_num_iter_ = tf.get_static_value(
-        tf.convert_to_tensor(
-            value=loop_num_iter, dtype=tf.int64, name='loop_num_iter'))
+    loop_num_iter_ = tf.get_static_value(loop_num_iter)
     if (loop_num_iter_ is None or tf.executing_eagerly() or
         control_flow_util.GraphOrParentsInXlaContext(
             tf.compat.v1.get_default_graph())):
+      # Cast to int32 to run the comparison against i in host memory,
+      # where while/LoopCond needs it.
+      loop_num_iter = tf.cast(loop_num_iter, dtype=tf.int32)
       return tf.while_loop(
           cond=lambda i, *args: i < loop_num_iter,
           body=lambda i, *args: [i + 1] + list(body_fn(*args)),
-          loop_vars=[np.int64(0)] + initial_loop_vars,
+          loop_vars=[np.int32(0)] + initial_loop_vars,
           parallel_iterations=parallel_iterations
       )[1:]
     result = initial_loop_vars

@@ -79,7 +79,7 @@ class SimpleStepSizeAdaptationResults(
       probability.
     adaptation_rate: Floating point scalar `Tensor`. Fraction by which to adjust
       the step size during each step.
-    step: Int64 scalar `Tensor`. The current step number as perceived by this
+    step: Int32 scalar `Tensor`. The current step number as perceived by this
       kernel. Increases by 1 for every call to `one_step`.
     new_step_size:  Floating point scalar `Tensor` or a list thereof (one for
       each `state_part`). Step size that will be passed to the inner kernel
@@ -265,7 +265,7 @@ class SimpleStepSizeAdaptation(kernel_base.TransitionKernel):
           value=adaptation_rate, dtype=dtype, name='adaptation_rate')
       num_adaptation_steps = tf.convert_to_tensor(
           value=num_adaptation_steps,
-          dtype=tf.int64,
+          dtype=tf.int32,
           name='num_adaptation_steps')
 
       target_accept_prob = _maybe_validate_target_accept_prob(
@@ -410,7 +410,7 @@ class SimpleStepSizeAdaptation(kernel_base.TransitionKernel):
 
       return SimpleStepSizeAdaptationResults(
           inner_results=inner_results,
-          step=tf.constant(0, dtype=tf.int64),
+          step=tf.constant(0, dtype=tf.int32),
           target_accept_prob=self.parameters['target_accept_prob'],
           adaptation_rate=self.parameters['adaptation_rate'],
           new_step_size=step_size)

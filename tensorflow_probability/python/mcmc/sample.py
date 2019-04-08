@@ -314,10 +314,10 @@ def sample_chain(
     num_results = tf.convert_to_tensor(
         value=num_results, dtype=tf.int32, name="num_results")
     num_burnin_steps = tf.convert_to_tensor(
-        value=num_burnin_steps, dtype=tf.int64, name="num_burnin_steps")
+        value=num_burnin_steps, dtype=tf.int32, name="num_burnin_steps")
     num_steps_between_results = tf.convert_to_tensor(
         value=num_steps_between_results,
-        dtype=tf.int64,
+        dtype=tf.int32,
         name="num_steps_between_results")
     current_state = tf.nest.map_structure(
         lambda x: tf.convert_to_tensor(value=x, name="current_state"),
@@ -353,7 +353,7 @@ def sample_chain(
             depth=num_results,
             on_value=1 + num_burnin_steps,
             off_value=1 + num_steps_between_results,
-            dtype=tf.int64),
+            dtype=tf.int32),
         # pylint: disable=g-long-lambda
         trace_fn=lambda state_and_results: (state_and_results[0],
                                             trace_fn(*state_and_results)),
