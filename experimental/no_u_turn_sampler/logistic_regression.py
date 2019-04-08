@@ -28,7 +28,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability import edward2 as ed
-from tensorflow_probability.opensource.experimental import no_u_turn_sampler
+from experimental import no_u_turn_sampler
 
 flags.DEFINE_integer(
     "max_steps",
