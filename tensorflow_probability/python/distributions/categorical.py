@@ -332,11 +332,6 @@ class Categorical(distribution.Distribution):
     return ret
 
 
-# TODO(b/117098119): Remove tf.distribution references once they're gone.
-@kullback_leibler.RegisterKL(Categorical,
-                             tf.compat.v1.distributions.Categorical)
-@kullback_leibler.RegisterKL(tf.compat.v1.distributions.Categorical,
-                             Categorical)
 @kullback_leibler.RegisterKL(Categorical, Categorical)
 def _kl_categorical_categorical(a, b, name=None):
   """Calculate the batched KL divergence KL(a || b) with a and b Categorical.

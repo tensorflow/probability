@@ -153,9 +153,6 @@ class Bernoulli(distribution.Distribution):
     return tf.cast(self.probs > 0.5, self.dtype)
 
 
-# TODO(b/117098119): Remove tf.distribution references once they're gone.
-@kullback_leibler.RegisterKL(Bernoulli, tf.compat.v1.distributions.Bernoulli)
-@kullback_leibler.RegisterKL(tf.compat.v1.distributions.Bernoulli, Bernoulli)
 @kullback_leibler.RegisterKL(Bernoulli, Bernoulli)
 def _kl_bernoulli_bernoulli(a, b, name=None):
   """Calculate the batched KL divergence KL(a || b) with a and b Bernoulli.

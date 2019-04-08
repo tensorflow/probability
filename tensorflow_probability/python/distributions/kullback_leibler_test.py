@@ -18,15 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import itertools
-
 import tensorflow as tf
-from tensorflow_probability.python.distributions import bernoulli
-from tensorflow_probability.python.distributions import beta
-from tensorflow_probability.python.distributions import categorical
-from tensorflow_probability.python.distributions import deterministic
-from tensorflow_probability.python.distributions import dirichlet
-from tensorflow_probability.python.distributions import gamma
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import normal
 from tensorflow.python.framework import test_util  # pylint:disable=g-direct-tensorflow-import
@@ -162,40 +154,6 @@ class KLTest(tf.test.TestCase):
 
   def testFunctionCrossEntropy(self):
     self._testIndirectRegistration(kullback_leibler.cross_entropy)
-
-  # TODO(b/117098119): Remove tf.distribution references once they're gone.
-  def testBackwardsCompatibilityAliases(self):
-    # Each element is a tuple(classes), tuple(args).
-    aliases = [
-        ((bernoulli.Bernoulli, tf.compat.v1.distributions.Bernoulli), (1.,)),
-        ((beta.Beta, tf.compat.v1.distributions.Beta), (1., 1.)),
-        ((categorical.Categorical, tf.compat.v1.distributions.Categorical),
-         ([1.0, 1.0],)),
-        ((dirichlet.Dirichlet, tf.compat.v1.distributions.Dirichlet), ([1.0],)),
-        ((gamma.Gamma, tf.compat.v1.distributions.Gamma), (1.0, 1.0)),
-        ((normal.Normal, tf.compat.v1.distributions.Normal), (1.0, 1.0)),
-    ]
-
-    for dists, args in aliases:
-      for class0, class1 in itertools.permutations(dists):
-        d0 = class0(*args)
-        d1 = class1(*args)
-        kullback_leibler.kl_divergence(d0, d1)
-        tf.compat.v1.distributions.kl_divergence(d0, d1)
-
-  def testBackwardsCompatibilityDeterministic(self):
-    tfp_normal = normal.Normal(0.0, 1.0)
-    tf_normal = tf.compat.v1.distributions.Normal(0.0, 1.0)
-    tfp_deterministic = deterministic.Deterministic(0.0)
-
-    kullback_leibler.kl_divergence(tfp_deterministic, tf_normal)
-    tf.compat.v1.distributions.kl_divergence(tfp_deterministic, tf_normal)
-    kullback_leibler.kl_divergence(tfp_deterministic, tfp_normal)
-    tf.compat.v1.distributions.kl_divergence(tfp_deterministic, tfp_normal)
-
-  def testBackwardsCompatibilityFallback(self):
-    tf_normal = tf.compat.v1.distributions.Normal(0.0, 1.0)
-    kullback_leibler.kl_divergence(tf_normal, tf_normal)
 
 
 if __name__ == "__main__":
