@@ -26,9 +26,18 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
 
 tfd = tfp.distributions
+
+
+class Dummy(object):
+  """Dummy object to ensure `tf_inspect.getfullargspec` works for `__init__`."""
+
+  # To ensure no code is keying on the unspecial name "self", we use "me".
+  def __init__(me, arg1, arg2, arg3=None, **named):  # pylint: disable=no-self-argument
+    pass
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -269,6 +278,13 @@ class JointDistributionSequentialTest(tf.test.TestCase, parameterized.TestCase):
     self.assertEqual(sample_shape * 3, x[5].shape)
     lp = d.log_prob(x)
     self.assertEqual(sample_shape * 3, lp.shape)
+
+  def test_argspec(self):
+    argspec = tf_inspect.getfullargspec(Dummy)
+    self.assertAllEqual(['me', 'arg1', 'arg2', 'arg3'], argspec.args)
+    self.assertIs(None, argspec.varargs)
+    self.assertIs('named', argspec.varkw)
+    self.assertAllEqual((None,), argspec.defaults)
 
 
 if __name__ == '__main__':
