@@ -28,7 +28,6 @@ import tensorflow as tf
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 
-
 __all__ = [
     'interp_regular_1d_grid',
     'batch_interp_regular_1d_grid',
@@ -229,7 +228,8 @@ def _interp_regular_1d_grid_impl(x,
         x_delta = (x_ref_max - x_ref_min) / (ny - 1)
         x_factor = expand_x_fn((x - x_ref_max) / x_delta, broadcast=True)
         y = tf.where(x_idx_unclipped > ny - 1,
-                     y_n1 + x_factor * (y_n1 - y_n2), y)
+                     y_n1 + x_factor * (y_n1 - y_n2),
+                     y)
       else:
         y = tf.where(x_idx_unclipped > ny - 1,
                      fill_value_above + tf.zeros_like(y), y)
@@ -286,8 +286,8 @@ def interp_regular_1d_grid(x,
       Default value: `-1`, the rightmost axis.
     fill_value:  Determines what values output should take for `x` values that
       are below `x_ref_min` or above `x_ref_max`. `Tensor` or one of the strings
-      "constant_extension" ==> Extend as constant function.
-      "extrapolate" ==> Extrapolate in a linear fashion.
+      "constant_extension" ==> Extend as constant function. "extrapolate" ==>
+      Extrapolate in a linear fashion.
       Default value: `"constant_extension"`
     fill_value_below:  Optional override of `fill_value` for `x < x_ref_min`.
     fill_value_above:  Optional override of `fill_value` for `x > x_ref_max`.
@@ -399,18 +399,18 @@ def batch_interp_regular_1d_grid(x,
   with leading dimensions in `x`, `x_ref_min`, `x_ref_max`.
 
   Args:
-    x: Numeric `Tensor` The x-coordinates of the interpolated output values
-      for each batch.  Shape broadcasts with `[A1, ..., AN, D]`, `N >= 0`.
-    x_ref_min:  `Tensor` of same `dtype` as `x`.  The minimum value of the
-      each batch of the (implicitly defined) reference `x_ref`.
-      Shape broadcasts with `[A1, ..., AN]`, `N >= 0`.
-    x_ref_max:  `Tensor` of same `dtype` as `x`.  The maximum value of the
-      each batch of the (implicitly defined) reference `x_ref`.
-      Shape broadcasts with `[A1, ..., AN]`, `N >= 0`.
+    x: Numeric `Tensor` The x-coordinates of the interpolated output values for
+      each batch.  Shape broadcasts with `[A1, ..., AN, D]`, `N >= 0`.
+    x_ref_min:  `Tensor` of same `dtype` as `x`.  The minimum value of the each
+      batch of the (implicitly defined) reference `x_ref`. Shape broadcasts with
+      `[A1, ..., AN]`, `N >= 0`.
+    x_ref_max:  `Tensor` of same `dtype` as `x`.  The maximum value of the each
+      batch of the (implicitly defined) reference `x_ref`. Shape broadcasts with
+      `[A1, ..., AN]`, `N >= 0`.
     y_ref:  `Tensor` of same `dtype` as `x`.  The reference output values.
       `y_ref.shape[:axis]` broadcasts with the batch shape `[A1, ..., AN]`, and
       `y_ref.shape[axis:]` is `[C, B1, ..., BM]`, so the trailing dimensions
-      index `C` reference values of a rank `M` `Tensor` (`M >= 0`).
+        index `C` reference values of a rank `M` `Tensor` (`M >= 0`).
     axis:  Scalar `Tensor` designating the dimension of `y_ref` that indexes
       values of the interpolation table.
       Default value: `-1`, the rightmost axis.
@@ -497,7 +497,6 @@ def batch_interp_regular_1d_grid(x,
       name=name or 'batch_interp_regular_1d_grid')
 
 
-# TODO(b/128682872) Use tf.batch_gather_nd if it is built.
 def batch_interp_regular_nd_grid(x,
                                  x_ref_min,
                                  x_ref_max,
@@ -519,22 +518,22 @@ def batch_interp_regular_nd_grid(x,
 
   ```
   [x_ref_min[0] + i * (x_ref_max[0] - x_ref_min[0]) / (C1 - 1),
-   x_ref_min[1] + i * (x_ref_max[1] - x_ref_min[1]) / (C2 - 1)]
+   x_ref_min[1] + j * (x_ref_max[1] - x_ref_min[1]) / (C2 - 1)]
   ```
 
   In the general case, dimensions to the left of `axis` in `y_ref` are broadcast
   with leading dimensions in `x`, `x_ref_min`, `x_ref_max`.
 
   Args:
-    x: Numeric `Tensor` The x-coordinates of the interpolated output values
-      for each batch.  Shape `[..., D, nd]`, designating [a batch of] `D`
+    x: Numeric `Tensor` The x-coordinates of the interpolated output values for
+      each batch.  Shape `[..., D, nd]`, designating [a batch of] `D`
       coordinates in `nd` space.  `D` must be `>= 1` and is not a batch dim.
     x_ref_min:  `Tensor` of same `dtype` as `x`.  The minimum values of the
       (implicitly defined) reference `x_ref`.  Shape `[..., nd]`.
     x_ref_max:  `Tensor` of same `dtype` as `x`.  The maximum values of the
       (implicitly defined) reference `x_ref`.  Shape `[..., nd]`.
-    y_ref:  `Tensor` of same `dtype` as `x`.  The reference output values.
-      Shape `[..., C1, ..., Cnd, B1,...,BM]`, designating [a batch of] reference
+    y_ref:  `Tensor` of same `dtype` as `x`.  The reference output values. Shape
+      `[..., C1, ..., Cnd, B1,...,BM]`, designating [a batch of] reference
       values indexed by `nd` dimensions, of a shape `[B1,...,BM]` valued
       function (for `M >= 0`).
     axis:  Scalar integer `Tensor`.  Dimensions `[axis, axis + nd)` of `y_ref`
@@ -595,7 +594,8 @@ def batch_interp_regular_nd_grid(x,
 
   """
   with tf.compat.v1.name_scope(
-      name, default_name='interp_regular_nd_grid',
+      name,
+      default_name='interp_regular_nd_grid',
       values=[x, x_ref_min, x_ref_max, y_ref, fill_value]):
     dtype = dtype_util.common_dtype([x, x_ref_min, x_ref_max, y_ref],
                                     preferred_dtype=tf.float32)
@@ -647,80 +647,64 @@ def batch_interp_regular_nd_grid(x,
             'Since dims `[axis, axis + nd)` index the interpolation table, we '
             'must have `axis + nd <= rank(y_ref)`.  Found: '
             '`axis`: {},  rank(y_ref): {}, and inferred `nd` from trailing '
-            'dimensions of `x_ref_min` to be {}.'.format(axis_, y_ref_rank_, nd)
-        )
-
-    # The "D" in the docstring.
-    num_interp_pts_per_batch = tf.shape(input=x)[-2]
+            'dimensions of `x_ref_min` to be {}.'.format(
+                axis_, y_ref_rank_, nd))
 
     x_batch_shape = tf.shape(input=x)[:-2]
     x_ref_min_batch_shape = tf.shape(input=x_ref_min)[:-1]
     x_ref_max_batch_shape = tf.shape(input=x_ref_max)[:-1]
     y_ref_batch_shape = tf.shape(input=y_ref)[:axis]
 
-    event_shape = tf.shape(input=y_ref)[axis + nd:]
-
     # Do a brute-force broadcast of batch dims (add zeros).
     batch_shape = y_ref_batch_shape
     for tensor in [x_batch_shape, x_ref_min_batch_shape, x_ref_max_batch_shape]:
       batch_shape = tf.broadcast_dynamic_shape(batch_shape, tensor)
+
     def _batch_of_zeros_with_rightmost_singletons(n_singletons):
       """Return Tensor of zeros with some singletons on the rightmost dims."""
       ones = tf.ones(shape=[n_singletons], dtype=tf.int32)
       return tf.zeros(shape=tf.concat([batch_shape, ones], axis=0), dtype=dtype)
+
     x += _batch_of_zeros_with_rightmost_singletons(n_singletons=2)
     x_ref_min += _batch_of_zeros_with_rightmost_singletons(n_singletons=1)
     x_ref_max += _batch_of_zeros_with_rightmost_singletons(n_singletons=1)
     y_ref += _batch_of_zeros_with_rightmost_singletons(
         n_singletons=tf.rank(y_ref) - axis)
 
-    def _flatten_batch(tensor):
-      n_batch_dims = tf.size(input=batch_shape)
-      return tf.reshape(
-          tensor,
-          shape=tf.concat([[-1], tf.shape(input=tensor)[n_batch_dims:]],
-                          axis=0))
-
-    def _interp_one_batch_member(values):
-      return _interp_regular_nd_grid_no_leading_dims(
-          values[0], values[1], values[2], values[3], nd, fill_value)
-
-    y = tf.map_fn(
-        _interp_one_batch_member,
-        elems=[
-            _flatten_batch(x),
-            _flatten_batch(x_ref_min),
-            _flatten_batch(x_ref_max),
-            _flatten_batch(y_ref)
-        ],
-        dtype=dtype)
-
-  return tf.reshape(
-      y,
-      shape=tf.concat([batch_shape, [num_interp_pts_per_batch], event_shape],
-                      axis=0))
+    return _batch_interp_with_gather_nd(
+        x=x,
+        x_ref_min=x_ref_min,
+        x_ref_max=x_ref_max,
+        y_ref=y_ref,
+        nd=nd,
+        fill_value=fill_value,
+        batch_dims=tf.get_static_value(tf.rank(x)) - 2)
 
 
-def _interp_regular_nd_grid_no_leading_dims(x, x_ref_min, x_ref_max, y_ref, nd,
-                                            fill_value):
-  """N-D interpolation that works without leading batch dims."""
+def _batch_interp_with_gather_nd(x, x_ref_min, x_ref_max, y_ref, nd, fill_value,
+                                 batch_dims):
+  """N-D interpolation that works with leading batch dims."""
   dtype = x.dtype
 
   # In this function,
-  # x.shape = [D, nd],
+  # x.shape = [A1, ..., An, D, nd], where n = batch_dims
   # and
-  # y_ref.shape = [C1, C2,..., Cnd, B1,...,BM]
-  # y_ref[i1,...,ind] is a shape [B1,...,BM] Tensor with the value at index
-  # [i1,...,ind] in the interpolation table.
+  # y_ref.shape = [A1, ..., An, C1, C2,..., Cnd, B1,...,BM]
+  # y_ref[A1, ..., An, i1,...,ind] is a shape [B1,...,BM] Tensor with the value
+  # at index [i1,...,ind] in the interpolation table.
+  #  and x_ref_max have shapes [A1, ..., An, nd].
 
   # ny[k] is number of y reference points in interp dim k.
-  ny = tf.cast(tf.shape(input=y_ref)[:nd], dtype)
+  ny = tf.cast(tf.shape(input=y_ref)[batch_dims:batch_dims + nd], dtype)
 
   # Map [x_ref_min, x_ref_max] to [0, ny - 1].
   # This is the (fractional) index of x.
-  # x_idx_unclipped[d, k] is the fractional index into dim k of interpolation
-  # table for the dth x value.
-  x_idx_unclipped = (ny - 1) * (x - x_ref_min) / (x_ref_max - x_ref_min)
+  # x_idx_unclipped[A1, ..., An, d, k] is the fractional index into dim k of
+  # interpolation table for the dth x value.
+  x_ref_min_expanded = tf.expand_dims(x_ref_min, axis=-2)
+  x_ref_max_expanded = tf.expand_dims(x_ref_max, axis=-2)
+  x_idx_unclipped = (ny - 1) * (x - x_ref_min_expanded) / (
+      x_ref_max_expanded - x_ref_min_expanded)
 
   # Wherever x is NaN, x_idx_unclipped will be NaN as well.
   # Keep track of the nan indices here (so we can impute NaN later).
@@ -729,7 +713,7 @@ def _interp_regular_nd_grid_no_leading_dims(x, x_ref_min, x_ref_max, y_ref, nd,
   x_idx_unclipped = tf.where(nan_idx, tf.zeros_like(x_idx_unclipped),
                              x_idx_unclipped)
 
-  # x_idx.shape = [D, nd]
+  # x_idx.shape = [A1, ..., An, D, nd]
   x_idx = tf.clip_by_value(x_idx_unclipped, tf.zeros((), dtype=dtype), ny - 1)
 
   # Get the index above and below x_idx.
@@ -754,31 +738,33 @@ def _interp_regular_nd_grid_no_leading_dims(x, x_ref_min, x_ref_max, y_ref, nd,
   idx_above_list = tf.unstack(idx_above_int32, axis=-1)
 
   # Use t to get a convex combination of the below/above values.
-  # t.shape = [D, nd]
+  # t.shape = [A1, ..., An, D, nd]
   t = x_idx - idx_below
 
   # x, and tensors shaped like x, need to be added to, and selected with
   # (using tf.where) the output y.  This requires appending singletons.
   def _expand_x_fn(tensor):
     # Reshape tensor to tensor.shape + [1] * M.
-    extended_shape = tf.concat(
-        [tf.shape(input=tensor),
-         tf.ones_like(tf.shape(input=y_ref)[nd:])],
-        axis=0)
+    extended_shape = tf.concat([
+        tf.shape(input=tensor),
+        tf.ones_like(tf.shape(input=y_ref)[batch_dims + nd:])
+    ],
+                               axis=0)
     return tf.reshape(tensor, extended_shape)
 
-  # Now, t.shape = [D, nd] + [1] * (rank(y_ref) - nd)
+  # Now, t.shape = [A1, ..., An, D, nd] + [1] * (rank(y_ref) - nd - batch_dims)
   t = _expand_x_fn(t)
   s = 1 - t
 
   # Re-insert NaN wherever x was NaN.
   nan_idx = _expand_x_fn(nan_idx)
-  t = tf.where(nan_idx, tf.fill(
-      tf.shape(input=t), tf.constant(np.nan, dtype)), t)
+  t = tf.where(nan_idx,
+               tf.fill(tf.shape(input=t), tf.constant(np.nan, dtype)),
+               t)
 
   terms = []
   # Our work above has located x's fractional index inside a cube of above/below
-  # indices.  The distance to the below indices is t, and to the above indices
+  # indices. The distance to the below indices is t, and to the above indices
   # is s.
   # Drawing lines from x to the cube walls, we get 2**nd smaller cubes. Each
   # term in the result is a product of a reference point, gathered from y_ref,
@@ -825,7 +811,10 @@ def _interp_regular_nd_grid_no_leading_dims(x, x_ref_min, x_ref_max, y_ref, nd,
             axis=ov_axis)
     )  # pyformat: disable
 
-    y_ref_pt = tf.gather_nd(y_ref, tf.stack(gather_from_y_ref_idx, axis=-1))
+    y_ref_pt = tf.gather_nd(
+        y_ref,
+        tf.stack(gather_from_y_ref_idx, axis=-1),
+        batch_dims=batch_dims)
 
     terms.append(y_ref_pt * opposite_volume)
 
