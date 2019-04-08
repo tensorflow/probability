@@ -34,6 +34,7 @@ py_library(
         ":polynomial",
         ":positive_semidefinite_kernel",
         ":rational_quadratic",
+        ":schur_complement",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/positive_semidefinite_kernels/internal",
     ],
@@ -167,6 +168,28 @@ py_test(
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "schur_complement",
+    srcs = ["schur_complement.py"],
+    deps = [
+        ":positive_semidefinite_kernel",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+    ],
+)
+
+py_test(
+    name = "schur_complement_test",
+    srcs = ["schur_complement_test.py"],
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],
