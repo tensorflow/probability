@@ -112,7 +112,7 @@ cholesky = utils.copy_docstring(
 
 cholesky_solve = utils.copy_docstring(
     tf.linalg.cholesky_solve,
-    lambda chol, rhs, name=None: scipy_linalg.cho_solve(chol, rhs))
+    lambda chol, rhs, name=None: scipy_linalg.cho_solve((chol, True), rhs))
 
 diag = utils.copy_docstring(
     tf.linalg.diag,

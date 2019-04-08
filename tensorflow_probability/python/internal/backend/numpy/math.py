@@ -158,9 +158,19 @@ def _bincount(arr, weights=None, minlength=None, maxlength=None,  # pylint: disa
 
 
 def _reduce_logsumexp(input_tensor, axis=None, keepdims=False, name=None):  # pylint: disable=unused-argument
-  m = np.max(input_tensor, axis, keepdims=True)
-  return m + np.log(np.sum(input_tensor - m, axis, keepdims=keepdims))
-
+  """Computes `log(sum(exp(input_tensor))) along the specified axis."""
+  try:
+    return scipy_special.logsumexp(input_tensor, axis=axis, keepdims=keepdims)
+  except NotImplementedError:
+    # We offer a non SP version just in case SP isn't installed and this
+    # because logsumexp is often used.
+    m = np.max(input_tensor, axis=axis, keepdims=True)
+    needs_zeroing = ~np.isfinite(m)
+    if needs_zeroing.ndim > 0:
+      m[needs_zeroing] = 0
+    elif needs_zeroing:
+      m = 0
+    return m + np.log(np.sum(input_tensor - m, axis=axis, keepdims=keepdims))
 
 # --- Begin Public Functions --------------------------------------------------
 
@@ -197,12 +207,14 @@ angle = utils.copy_docstring(
 argmax = utils.copy_docstring(
     tf.math.argmax,
     lambda input, axis=None, output_type=tf.int64, name=None: (  # pylint: disable=g-long-lambda
-        np.argmax(input, axis=axis).astype(utils.numpy_dtype(output_type))))
+        np.argmax(input, axis=0 if axis is None else axis)
+        .astype(utils.numpy_dtype(output_type))))
 
 argmin = utils.copy_docstring(
     tf.math.argmin,
     lambda input, axis=None, output_type=tf.int64, name=None: (  # pylint: disable=g-long-lambda
-        np.argmin(input, axis=axis).astype(utils.numpy_dtype(output_type))))
+        np.argmin(input, axis=0 if axis is None else axis)
+        .astype(utils.numpy_dtype(output_type))))
 
 asin = utils.copy_docstring(
     tf.math.asin,
@@ -214,11 +226,11 @@ asinh = utils.copy_docstring(
 
 atan = utils.copy_docstring(
     tf.math.atan,
-    lambda x, name=None: np.arctanh(x))
+    lambda x, name=None: np.arctan(x))
 
 atan2 = utils.copy_docstring(
     tf.math.atan2,
-    lambda x, name=None: np.arctan2(x))
+    lambda y, x, name=None: np.arctan2(y, x))
 
 atanh = utils.copy_docstring(
     tf.math.atanh,
@@ -272,7 +284,7 @@ cosh = utils.copy_docstring(
 count_nonzero = utils.copy_docstring(
     tf.math.count_nonzero,
     lambda input, axis=None, keepdims=None, dtype=tf.int64, name=None: (  # pylint: disable=g-long-lambda
-        np.count_nonzero(input, axis).astype(utils.numpy_dtype(dtype))))
+        np.cast[utils.numpy_dtype(dtype)](np.count_nonzero(input, axis))))
 
 cumprod = utils.copy_docstring(
     tf.math.cumprod,
@@ -357,15 +369,15 @@ imag = utils.copy_docstring(
 
 is_finite = utils.copy_docstring(
     tf.math.is_finite,
-    lambda x, name=None: np.isfinite)
+    lambda x, name=None: np.isfinite(x))
 
 is_inf = utils.copy_docstring(
     tf.math.is_inf,
-    lambda x, name=None: np.isinf)
+    lambda x, name=None: np.isinf(x))
 
 is_nan = utils.copy_docstring(
     tf.math.is_nan,
-    lambda x, name=None: np.isnan)
+    lambda x, name=None: np.isnan(x))
 
 # is_non_decreasing = utils.copy_docstring(
 #    tf.math.is_non_decreasing,
@@ -409,8 +421,9 @@ log_sigmoid = utils.copy_docstring(
 
 log_softmax = utils.copy_docstring(
     tf.math.log_softmax,
-    lambda logits, axis=None, name=None: (  # pylint: disable=g-long-lambda
-        np.subtract(logits, _reduce_logsumexp(logits, axis))))
+    lambda logits, axis=None, name=None: (np.subtract(  # pylint: disable=g-long-lambda
+        logits,
+        reduce_logsumexp(logits, -1 if axis is None else axis, keepdims=True))))
 
 logical_and = utils.copy_docstring(
     tf.math.logical_and,
@@ -587,12 +600,13 @@ sinh = utils.copy_docstring(
 
 softmax = utils.copy_docstring(
     tf.math.softmax,
-    lambda logits, axis=None, name=None: (  # pylint: disable=g-long-lambda
-        np.exp(np.subtract(logits, _reduce_logsumexp(logits, axis)))))
+    lambda logits, axis=None, name=None: np.exp(np.subtract(  # pylint: disable=g-long-lambda
+        logits,
+        reduce_logsumexp(logits, -1 if axis is None else axis, keepdims=True))))
 
 softplus = utils.copy_docstring(
     tf.math.softplus,
-    lambda x, name=None: np.log1p(np.exp(x)))
+    lambda x, name=None: np.log1p(np.exp(-np.abs(x))) + np.maximum(x, 0.))
 
 softsign = utils.copy_docstring(
     tf.math.softsign,

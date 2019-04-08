@@ -66,7 +66,7 @@ def _broadcast_static_shape(shape_x, shape_y):
 
 
 def _constant(value, dtype=None, shape=None, name='Const'):  # pylint: disable=unused-argument
-  x = np.array(value, dtype=utils.numpy_dtype(dtype))
+  x = np.array(value, dtype=utils.numpy_dtype(dtype or np.float))
   if shape is None:
     return x
   return np.reshape(x, shape)
