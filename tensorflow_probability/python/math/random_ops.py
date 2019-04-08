@@ -48,8 +48,13 @@ def random_rademacher(shape, dtype=tf.float32, seed=None, name=None):
       or `+1` chosen uniformly-at-random.
   """
   with tf.compat.v1.name_scope(name, 'random_rademacher', [shape, seed]):
+    # Choose the dtype to cause `2 * random_bernoulli - 1` to run in the same
+    # memory (host or device) as the downstream cast will want to put it.  The
+    # convention on GPU is that int32 are in host memory and int64 are in device
+    # memory.
+    generation_dtype = tf.int64 if tf.as_dtype(dtype) != tf.int32 else tf.int32
     random_bernoulli = tf.random.uniform(
-        shape, minval=0, maxval=2, dtype=tf.int32, seed=seed)
+        shape, minval=0, maxval=2, dtype=generation_dtype, seed=seed)
     return tf.cast(2 * random_bernoulli - 1, dtype)
 
 

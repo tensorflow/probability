@@ -459,14 +459,14 @@ class ConvVariational(object):
           tf.concat([batch_shape, tf.expand_dims(channels, 0)], 0),
           minval=0,
           maxval=2,
-          dtype=tf.int32,
+          dtype=tf.int64,
           seed=seed_stream())
       sign_input = tf.cast(2 * sign_input - 1, inputs.dtype)
       sign_output = tf.random.uniform(
           tf.concat([batch_shape, tf.expand_dims(filters, 0)], 0),
           minval=0,
           maxval=2,
-          dtype=tf.int32,
+          dtype=tf.int64,
           seed=seed_stream())
       sign_output = tf.cast(2 * sign_output - 1, inputs.dtype)
 
