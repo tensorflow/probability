@@ -67,22 +67,23 @@ class DynamicLinearRegressionStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
         return observation_matrix
 
       super(DynamicLinearRegressionStateSpaceModel, self).__init__(
-        num_timesteps=num_timesteps,
-        transition_matrix=tf.linalg.LinearOperatorIdentity(
-            num_rows=tf.shape(design_matrix)[-1],
-            dtype=dtype,
-            name='transition_matrix'),
-        transition_noise=tfd.MultivariateNormalDiag(
-            scale_diag=weights_scale[..., tf.newaxis], name='transition_noise'),
-        observation_matrix=observation_matrix_fn,
-        observation_noise=tfd.MultivariateNormalDiag(
-            scale_diag=observation_noise_scale[..., tf.newaxis],
-            name='observation_noise'),
-        initial_state_prior=initial_state_prior,
-        initial_step=initial_step,
-        allow_nan_stats=allow_nan_stats,
-        validate_args=validate_args,
-        name=name)
+          num_timesteps=num_timesteps,
+          transition_matrix=tf.linalg.LinearOperatorIdentity(
+              num_rows=tf.shape(design_matrix)[-1],
+              dtype=dtype,
+              name='transition_matrix'),
+          transition_noise=tfd.MultivariateNormalDiag(
+              scale_diag=weights_scale[..., tf.newaxis],
+              name='transition_noise'),
+          observation_matrix=observation_matrix_fn,
+          observation_noise=tfd.MultivariateNormalDiag(
+              scale_diag=observation_noise_scale[..., tf.newaxis],
+              name='observation_noise'),
+          initial_state_prior=initial_state_prior,
+          initial_step=initial_step,
+          allow_nan_stats=allow_nan_stats,
+          validate_args=validate_args,
+          name=name)
 
   @property
   def weights_scale(self):
