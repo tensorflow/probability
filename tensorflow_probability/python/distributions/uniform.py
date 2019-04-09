@@ -210,6 +210,8 @@ class Uniform(distribution.Distribution):
     return self.range() / math.sqrt(12.)
 
 
+@kullback_leibler.RegisterKL(Uniform, tf.compat.v1.distributions.Uniform)
+@kullback_leibler.RegisterKL(tf.compat.v1.distributions.Uniform, Uniform)
 @kullback_leibler.RegisterKL(Uniform, Uniform)
 def _kl_uniform_uniform(a, b, name=None):
   """Calculate the batched KL divergence KL(a || b) with a and b Uniform.
