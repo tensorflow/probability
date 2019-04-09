@@ -31,7 +31,7 @@ tfd = tfp.distributions
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class _DynamicRegressionStateSpaceModelTest(object):
+class _DynamicLinearRegressionStateSpaceModelTest(object):
 
   def test_basic_statistics_no_latent_variance(self):
     batch_shape = [1]
@@ -69,21 +69,21 @@ class _DynamicRegressionStateSpaceModelTest(object):
 
 @test_util.run_all_in_graph_and_eager_modes
 class DynamicRegressionStateSpaceModelTestStaticShape32(
-    tf.test.TestCase, _DynamicRegressionStateSpaceModelTest):
+    tf.test.TestCase, _DynamicLinearRegressionStateSpaceModelTest):
   dtype = np.float32
   use_static_shape = True
 
 
 @test_util.run_all_in_graph_and_eager_modes
 class DynamicRegressionStateSpaceModelTestDynamicShape32(
-    tf.test.TestCase, _DynamicRegressionStateSpaceModelTest):
+    tf.test.TestCase, _DynamicLinearRegressionStateSpaceModelTest):
   dtype = np.float32
   use_static_shape = False
 
 
 @test_util.run_all_in_graph_and_eager_modes
 class DynamicRegressionStateSpaceModelTestStaticShape64(
-    tf.test.TestCase, _DynamicRegressionStateSpaceModelTest):
+    tf.test.TestCase, _DynamicLinearRegressionStateSpaceModelTest):
   dtype = np.float64
   use_static_shape = True
 
