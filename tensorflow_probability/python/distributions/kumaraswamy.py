@@ -185,8 +185,8 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
   def _entropy(self):
     a = self.concentration1
     b = self.concentration0
-    return (1 - 1. / a) + (1 - 1. / b) * _harmonic_number(b) + tf.math.log(
-        a) + tf.math.log(b)
+    return (1 - 1. / b) + (1 - 1. / a) * _harmonic_number(b) - tf.math.log(
+        a) - tf.math.log(b)
 
   def _moment(self, n):
     """Compute the n'th (uncentered) moment."""
