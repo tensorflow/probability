@@ -50,6 +50,7 @@ py_test(
     name = "neutra_kernel_test",
     size = "medium",
     srcs = ["neutra_kernel_test.py"],
+    shard_count = 5,
     deps = [
         ":neutra",
         # absl/testing:parameterized dep,
