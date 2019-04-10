@@ -59,7 +59,7 @@ class DynamicLinearRegressionStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
           name='observation_noise_scale',
           dtype=dtype)
 
-      tf.debugging.assert_same_float_dtype([design_matrix, initial_state_prior])
+      num_features = tf.shape(design_matrix)[-1]
 
       def observation_matrix_fn(t):
         observation_matrix = tf.linalg.LinearOperatorFullMatrix(
@@ -72,11 +72,11 @@ class DynamicLinearRegressionStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
       super(DynamicLinearRegressionStateSpaceModel, self).__init__(
           num_timesteps=num_timesteps,
           transition_matrix=tf.linalg.LinearOperatorIdentity(
-              num_rows=tf.shape(design_matrix)[-1],
+              num_rows=num_features,
               dtype=dtype,
               name='transition_matrix'),
           transition_noise=tfd.MultivariateNormalDiag(
-              scale_diag=weights_scale[..., tf.newaxis],
+              scale_diag=tf.broadcast_to(weights_scale, [num_features]),
               name='transition_noise'),
           observation_matrix=observation_matrix_fn,
           observation_noise=tfd.MultivariateNormalDiag(
@@ -116,15 +116,15 @@ class DynamicLinearRegression(StructuralTimeSeries):
 
       # Default to a weakly-informative Normal(0., 10.) for the initital state
       if initial_weights_prior is None:
-        initial_weights_prior = tfd.Normal(
-            loc=tf.zeros([], dtype=dtype),
-            scale=10. * tf.ones([], dtype=dtype))
+        num_features = tf.shape(design_matrix)[-1]
+        initial_weights_prior = tfd.MultivariateNormalDiag(
+            scale_diag=10. * tf.ones([num_features], dtype=dtype))
 
       # Heuristic default priors. Overriding these may dramatically
       # change inference performance and results.
       if weights_scale_prior is None:
         if observed_time_series is None:
-          observed_stddev = 1.0
+          observed_stddev = tf.constant(1.0, dtype=dtype)
         else:
           _, observed_stddev, _ = sts_util.empirical_statistics(
               observed_time_series)
@@ -137,7 +137,7 @@ class DynamicLinearRegression(StructuralTimeSeries):
       self._initial_state_prior = initial_weights_prior
       self._design_matrix = design_matrix
 
-      super(DynamicLinearRegression).__init__(
+      super(DynamicLinearRegression, self).__init__(
           parameters=[
               Parameter('weights_scale', weights_scale_prior, tfb.Softplus())
           ],

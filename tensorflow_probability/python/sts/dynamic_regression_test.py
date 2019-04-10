@@ -22,6 +22,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python.sts import DynamicLinearRegression
 from tensorflow_probability.python.sts import DynamicLinearRegressionStateSpaceModel
 
 from tensorflow.python.framework import test_util
@@ -33,9 +34,6 @@ tfd = tfp.distributions
 class _DynamicLinearRegressionStateSpaceModelTest(object):
 
   def test_basic_statistics_no_latent_variance(self):
-    # Verify that when the latent variables have no initial or transition
-    # variance the model constructs a distribution with mean
-    # `matmul(design_matrix, initial_state_loc)` and stddev 0.
     batch_shape = [4, 3]
     num_timesteps = 10
     num_features = 2
@@ -96,6 +94,49 @@ class _DynamicLinearRegressionStateSpaceModelTest(object):
 
     self.assertAllEqual(batch_shape + [num_timesteps, num_features],
                         self.evaluate(means).shape)
+
+  def test_matrices_from_component(self):
+    num_timesteps = 4
+    num_features = 3
+    weights_scale = 1.23
+
+    design_matrix = self._build_placeholder(
+        np.random.randn(num_timesteps, num_features))
+
+    component = DynamicLinearRegression(design_matrix=design_matrix)
+
+    ssm = component.make_state_space_model(num_timesteps, [weights_scale])
+
+    for t in range(num_timesteps):
+
+      observation_matrix = self.evaluate(
+          ssm.get_observation_matrix_for_timestep(t).to_dense())
+
+      self.assertAllClose(self.evaluate(design_matrix[tf.newaxis, t]),
+                          observation_matrix)
+
+      observation_noise_mean = self.evaluate(
+          ssm.get_observation_noise_for_timestep(t).mean())
+      observation_noise_covariance = self.evaluate(
+          ssm.get_observation_noise_for_timestep(t).covariance())
+
+      self.assertAllClose([0.0], observation_noise_mean)
+      self.assertAllClose([[0.0]], observation_noise_covariance)
+
+      transition_matrix = self.evaluate(
+          ssm.get_transition_matrix_for_timestep(t).to_dense())
+
+      self.assertAllClose(np.eye(num_features), transition_matrix)
+
+      transition_noise_mean = self.evaluate(
+          ssm.get_transition_noise_for_timestep(t).mean())
+      transition_noise_covariance = self.evaluate(
+          ssm.get_transition_noise_for_timestep(t).covariance())
+
+      self.assertAllClose(np.zeros([num_features]),
+                          transition_noise_mean)
+      self.assertAllClose(np.square(weights_scale) * np.eye(num_features),
+                          transition_noise_covariance)
 
   def _build_placeholder(self, ndarray):
     ndarray = np.asarray(ndarray).astype(self.dtype)
