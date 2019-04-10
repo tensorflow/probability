@@ -402,9 +402,6 @@ class VectorDeterministic(_BaseDeterministic):
         dtype=self.dtype)
 
 
-# TODO(b/117098119): Remove tf.distribution references once they're gone.
-@kullback_leibler.RegisterKL(_BaseDeterministic,
-                             tf.compat.v1.distributions.Distribution)
 @kullback_leibler.RegisterKL(_BaseDeterministic, distribution.Distribution)
 def _kl_deterministic_distribution(a, b, name=None):
   """Calculate the batched KL divergence `KL(a || b)` with `a` Deterministic.

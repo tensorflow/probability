@@ -326,9 +326,6 @@ class Dirichlet(distribution.Distribution):
     ], x)
 
 
-# TODO(b/117098119): Remove tf.distribution references once they're gone.
-@kullback_leibler.RegisterKL(Dirichlet, tf.compat.v1.distributions.Dirichlet)
-@kullback_leibler.RegisterKL(tf.compat.v1.distributions.Dirichlet, Dirichlet)
 @kullback_leibler.RegisterKL(Dirichlet, Dirichlet)
 def _kl_dirichlet_dirichlet(d1, d2, name=None):
   """Batchwise KL divergence KL(d1 || d2) with d1 and d2 Dirichlet.

@@ -19,7 +19,6 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -85,12 +84,10 @@ def kl_divergence(distribution_a, distribution_b,
   """
   kl_fn = _registered_kl(type(distribution_a), type(distribution_b))
   if kl_fn is None:
-    # TODO(b/117098119): For backwards compatibility, we check TF's registry as
-    # well. This typically happens when this function is called on a pair of
-    # TF's distributions.
-    with deprecation.silence():
-      return tf.compat.v1.distributions.kl_divergence(distribution_a,
-                                                      distribution_b)
+    raise NotImplementedError(
+        "No KL(distribution_a || distribution_b) registered for distribution_a "
+        "type {} and distribution_b type {}".format(
+            type(distribution_a).__name__, type(distribution_b).__name__))
 
   with tf.compat.v2.name_scope("KullbackLeibler"):
     kl_t = kl_fn(distribution_a, distribution_b, name=name)
@@ -102,10 +99,12 @@ def kl_divergence(distribution_a, distribution_b,
 
     with tf.control_dependencies([
         tf.Assert(
-            tf.logical_not(tf.reduce_any(input_tensor=tf.math.is_nan(kl_t))), [
-                "KL calculation between %s and %s returned NaN values "
-                "(and was called with allow_nan_stats=False). Values:" %
-                (distribution_a.name, distribution_b.name), kl_t
+            tf.logical_not(tf.reduce_any(input_tensor=tf.math.is_nan(kl_t))),
+            [
+                ("KL calculation between {} and {} returned NaN values "
+                 "(and was called with allow_nan_stats=False). Values:".format(
+                     distribution_a.name, distribution_b.name)),
+                kl_t
             ])
     ]):
       return tf.identity(kl_t, name="checked_kl")
@@ -183,11 +182,4 @@ class RegisterKL(object):
                        % (self._key[0].__name__, self._key[1].__name__,
                           _DIVERGENCES[self._key]))
     _DIVERGENCES[self._key] = kl_fn
-    # TODO(b/117098119): For backwards compatibility, we register the
-    # distributions in both this registry and the deprecated TF's registry.
-    #
-    # Additionally, for distributions which have deprecated copies, we register
-    # all 3 combinations in their respective files (see test for the list).
-    with deprecation.silence():
-      tf.compat.v1.distributions.RegisterKL(*self._key)(kl_fn)
     return kl_fn

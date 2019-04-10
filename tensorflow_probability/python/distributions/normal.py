@@ -235,9 +235,6 @@ class Normal(distribution.Distribution):
       return z * self.scale + self.loc
 
 
-# TODO(b/117098119): Remove tf.distribution references once they're gone.
-@kullback_leibler.RegisterKL(Normal, tf.compat.v1.distributions.Normal)
-@kullback_leibler.RegisterKL(tf.compat.v1.distributions.Normal, Normal)
 @kullback_leibler.RegisterKL(Normal, Normal)
 def _kl_normal_normal(n_a, n_b, name=None):
   """Calculate the batched KL divergence KL(n_a || n_b) with n_a and n_b Normal.

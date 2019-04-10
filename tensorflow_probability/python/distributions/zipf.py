@@ -26,6 +26,8 @@ from tensorflow_probability.python.distributions.seed_stream import SeedStream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import reparameterization
+
 
 __all__ = [
     "Zipf",
@@ -118,7 +120,7 @@ class Zipf(distribution.Distribution):
     self._sample_maximum_iterations = sample_maximum_iterations
     super(Zipf, self).__init__(
         dtype=dtype,
-        reparameterization_type=tf.compat.v1.distributions.NOT_REPARAMETERIZED,
+        reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
         parameters=parameters,

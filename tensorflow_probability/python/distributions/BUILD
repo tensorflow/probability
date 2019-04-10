@@ -1602,6 +1602,7 @@ py_test(
         ":normal",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:reparameterization",
     ],
 )
 
