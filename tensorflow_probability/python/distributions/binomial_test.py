@@ -21,6 +21,7 @@ import numpy as np
 from scipy import stats
 import tensorflow as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 tfd = tfp.distributions
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
@@ -28,6 +29,9 @@ from tensorflow.python.framework import test_util  # pylint: disable=g-direct-te
 
 @test_util.run_all_in_graph_and_eager_modes
 class BinomialTest(tf.test.TestCase):
+
+  def setUp(self):
+    self._rng = np.random.RandomState(42)
 
   def testSimpleShapes(self):
     p = np.float32(np.random.beta(1, 1))
@@ -188,6 +192,48 @@ class BinomialTest(tf.test.TestCase):
     expected_modes = [1., 2, 7]
     self.assertEqual((3,), binom.mode().shape)
     self.assertAllClose(expected_modes, self.evaluate(binom.mode()))
+
+  def testSampleUnbiasedNonScalarBatch(self):
+    probs = self._rng.rand(4, 3).astype(np.float32)
+    counts = np.float32([4, 11., 20.])
+    dist = tfd.Binomial(total_count=counts, probs=probs)
+    n = int(1e5)
+    x = dist.sample(n, seed=tfp_test_util.test_seed())
+    sample_mean, sample_variance = tf.nn.moments(x=x, axes=0)
+    [
+        sample_mean_,
+        sample_variance_,
+    ] = self.evaluate([
+        sample_mean,
+        sample_variance,
+    ])
+    self.assertAllEqual([4, 3], sample_mean.shape)
+    self.assertAllClose(
+        stats.binom.mean(counts, probs), sample_mean_, atol=0., rtol=0.10)
+    self.assertAllEqual([4, 3], sample_variance.shape)
+    self.assertAllClose(
+        stats.binom.var(counts, probs), sample_variance_, atol=0., rtol=0.20)
+
+  def testSampleUnbiasedScalarBatch(self):
+    counts = np.float32(5.)
+    probs = self._rng.rand(4).astype(np.float32)
+    dist = tfd.Binomial(total_count=counts, probs=probs)
+    n = int(1e5)
+    x = dist.sample(n, seed=tfp_test_util.test_seed())
+    sample_mean, sample_variance = tf.nn.moments(x=x, axes=0)
+    [
+        sample_mean_,
+        sample_variance_,
+    ] = self.evaluate([
+        sample_mean,
+        sample_variance,
+    ])
+    self.assertAllEqual([4], sample_mean.shape)
+    self.assertAllClose(
+        stats.binom.mean(counts, probs), sample_mean_, atol=0., rtol=0.10)
+    self.assertAllEqual([4], sample_variance.shape)
+    self.assertAllClose(
+        stats.binom.var(counts, probs), sample_variance_, atol=0., rtol=0.20)
 
 
 if __name__ == "__main__":
