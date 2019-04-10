@@ -269,6 +269,9 @@ class Gamma(distribution.Distribution):
     ], x)
 
 
+# TODO(b/117098119): Remove tf.distribution references once they're gone.
+@kullback_leibler.RegisterKL(Gamma, tf.compat.v1.distributions.Gamma)
+@kullback_leibler.RegisterKL(tf.compat.v1.distributions.Gamma, Gamma)
 @kullback_leibler.RegisterKL(Gamma, Gamma)
 def _kl_gamma_gamma(g0, g1, name=None):
   """Calculate the batched KL divergence KL(g0 || g1) with g0 and g1 Gamma.

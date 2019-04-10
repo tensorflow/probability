@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 from absl.testing import parameterized
+import numpy as np
 import tensorflow as tf
 
 
@@ -238,6 +239,61 @@ class PreferStaticCaseTest(tf.test.TestCase):
                   (tf.constant(True), lambda: tf.constant(3))]
     z = prefer_static.case(conditions, default=lambda: raise_exception)
     self.assertEqual(self.evaluate(z), 3)
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class PreferStaticShapeTest(tf.test.TestCase):
+
+  def testShape(self):
+    vector_value = [0., 1.]
+
+    # case: numpy input
+    self.assertAllEqual(prefer_static.shape(np.array(vector_value)), [2])
+
+    # case: tensor input with static shape
+    self.assertAllEqual(prefer_static.shape(tf.constant(vector_value)), [2])
+
+    # case: tensor input with dynamic shape
+    if not tf.executing_eagerly():
+      shape = prefer_static.shape(input=tf.compat.v1.placeholder_with_default(
+          input=vector_value, shape=None))
+      self.assertAllEqual(self.evaluate(shape), [2])
+
+  def testRankFromShape(self):
+    shape = [2, 4, 3]
+    expected_rank = len(shape)
+    v_ndarray = np.ones(shape)
+
+    # case: shape_tensor is tuple
+    rank = prefer_static.rank_from_shape(
+        shape_tensor_fn=v_ndarray.shape)
+    self.assertEqual(rank, expected_rank)
+
+    # case: shape_tensor is ndarray
+    rank = prefer_static.rank_from_shape(
+        shape_tensor_fn=prefer_static.shape(v_ndarray))
+    self.assertEqual(rank, expected_rank)
+
+    # case: tensorshape is fully defined
+    v_tensor = tf.convert_to_tensor(value=v_ndarray)
+    rank = prefer_static.rank_from_shape(
+        shape_tensor_fn=prefer_static.shape(v_tensor),
+        tensorshape=v_tensor.shape)
+    self.assertEqual(rank, expected_rank)
+
+    if not tf.executing_eagerly():
+      # case: tensorshape is unknown, rank cannot be statically inferred
+      v_dynamic = tf.compat.v1.placeholder_with_default(
+          input=v_ndarray, shape=None)
+      rank = prefer_static.rank_from_shape(
+          shape_tensor_fn=lambda: prefer_static.shape(v_dynamic),
+          tensorshape=v_dynamic.shape)
+      self.assertEqual(self.evaluate(rank), expected_rank)
+
+      # case: tensorshape is not provided, rank cannot be statically inferred
+      rank = prefer_static.rank_from_shape(
+          shape_tensor_fn=lambda: prefer_static.shape(v_dynamic))
+      self.assertEqual(self.evaluate(rank), expected_rank)
 
 
 if __name__ == '__main__':

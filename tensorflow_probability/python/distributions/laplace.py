@@ -208,6 +208,8 @@ class Laplace(distribution.Distribution):
     return (x - self.loc) / self.scale
 
 
+@kullback_leibler.RegisterKL(Laplace, tf.compat.v1.distributions.Laplace)
+@kullback_leibler.RegisterKL(tf.compat.v1.distributions.Laplace, Laplace)
 @kullback_leibler.RegisterKL(Laplace, Laplace)
 def _kl_laplace_laplace(a, b, name=None):
   """Calculate the batched KL divergence KL(a || b) with a and b Laplace.

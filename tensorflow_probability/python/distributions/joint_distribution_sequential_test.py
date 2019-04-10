@@ -143,10 +143,9 @@ class JointDistributionSequentialTest(tf.test.TestCase, parameterized.TestCase):
 
   def test_norequired_args_maker(self):
     """Test that only non-default args are passed through."""
-    d = tfd.JointDistributionSequential([tfd.Normal(0., 1.), tfd.Bernoulli])
     with self.assertRaisesWithPredicateMatch(
         ValueError, 'Must pass probs or logits, but not both.'):
-      d.sample()
+      tfd.JointDistributionSequential([tfd.Normal(0., 1.), tfd.Bernoulli])
 
   def test_graph_resolution(self):
     d = tfd.JointDistributionSequential(
@@ -179,7 +178,8 @@ class JointDistributionSequentialTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.parameters(('covariance',))
   def test_notimplemented_summary_statistic(self, attr):
-    d = tfd.JointDistributionSequential([tfd.Normal(0., 1.), tfd.Bernoulli],
+    d = tfd.JointDistributionSequential([tfd.Normal(0., 1.),
+                                         tfd.Bernoulli(probs=0.5)],
                                         validate_args=True)
     with self.assertRaisesWithPredicateMatch(
         NotImplementedError,
@@ -191,7 +191,8 @@ class JointDistributionSequentialTest(tf.test.TestCase, parameterized.TestCase):
       'log_survival_function', 'survival_function',
   )
   def test_notimplemented_evaluative_statistic(self, attr):
-    d = tfd.JointDistributionSequential([tfd.Normal(0., 1.), tfd.Bernoulli],
+    d = tfd.JointDistributionSequential([tfd.Normal(0., 1.),
+                                         tfd.Bernoulli(probs=0.5)],
                                         validate_args=True)
     with self.assertRaisesWithPredicateMatch(
         NotImplementedError,
@@ -199,7 +200,7 @@ class JointDistributionSequentialTest(tf.test.TestCase, parameterized.TestCase):
       getattr(d, attr)([0.]*len(d.distribution_fn))
 
   def test_copy(self):
-    pgm = [tfd.Normal(0., 1.), tfd.Bernoulli]
+    pgm = [tfd.Normal(0., 1.), tfd.Bernoulli(probs=0.5)]
     d = tfd.JointDistributionSequential(pgm, validate_args=True)
     d_copy = d.copy()
     self.assertAllEqual(

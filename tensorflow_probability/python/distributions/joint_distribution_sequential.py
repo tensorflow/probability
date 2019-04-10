@@ -36,11 +36,11 @@ __all__ = [
 def _make_summary_statistic(attr):
   """Factory for making summary statistics, eg, mean, mode, stddev."""
   def _fn(self):
-    if not all(self._is_distribution_instance):  # pylint: disable=protected-access
+    if any(self._dist_fn_args):  # pylint: disable=protected-access
       raise ValueError(
-          'Can only compute ' + attr + 'when all distributions are '
-          'independent.')
-    return tuple(getattr(d, attr)() for d in self.distribution_fn)
+          'Can only compute ' + attr + ' when all distributions are '
+          'independent; {}'.format(self.distribution_fn))
+    return tuple(getattr(d(), attr)() for d in self._wrapped_dist_fn)  # pylint: disable=protected-access
   return _fn
 
 
@@ -183,18 +183,14 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
         Default value: `"JointDistributionSequential"`.
     """
     parameters = dict(locals())
-    name = name or 'JointDistributionSequential'
-    with tf.compat.v2.name_scope(name) as name:
-      self._distribution_fn = distribution_fn
-      [
-          self._wrapped_distribution_fn,
-          self._args,
-          self._is_distribution_instance,
-      ] = zip(*[_unify_call_signature(i, dist_fn)
-                for i, dist_fn in enumerate(distribution_fn)])
+    with tf.compat.v2.name_scope(name or 'JointDistributionSequential') as name:
+      self._dist_fn = distribution_fn
+      (self._wrapped_dist_fn, self._dist_fn_args) = zip(*[
+          _unify_call_signature(i, dist_fn)
+          for i, dist_fn in enumerate(distribution_fn)])
       self._most_recently_built_distributions = [
-          d if is_dist else None for d, is_dist
-          in zip(distribution_fn, self._is_distribution_instance)]
+          None if a else d() for d, a
+          in zip(self._wrapped_dist_fn, self._dist_fn_args)]
       self._always_use_specified_sample_shape = False
       super(JointDistributionSequential, self).__init__(
           dtype=tuple(
@@ -211,7 +207,7 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
 
   @property
   def distribution_fn(self):
-    return self._distribution_fn
+    return self._dist_fn
 
   @property
   def dtype(self):
@@ -247,10 +243,10 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
         of `distribution_fn`.
     """
     with self._name_scope(name):
-      if all(self._is_distribution_instance):
-        ds = self.distribution_fn
-      else:
+      if any(self._dist_fn_args):
         ds, _ = self.sample_distributions(seed=42)  # Const seed for maybe CSE.
+      else:
+        ds = tuple(d() for d in self._wrapped_dist_fn)
       return tuple(d.batch_shape_tensor() for d in ds)
 
   @property
@@ -282,10 +278,10 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
         of `distribution_fn`.
     """
     with self._name_scope(name):
-      if all(self._is_distribution_instance):
-        ds = self.distribution_fn
-      else:
+      if any(self._dist_fn_args):
         ds, _ = self.sample_distributions(seed=42)  # Const seed for maybe CSE.
+      else:
+        ds = tuple(d() for d in self._wrapped_dist_fn)
       return tuple(d.event_shape_tensor() for d in ds)
 
   @property
@@ -307,15 +303,15 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
     seed = seed_stream.SeedStream('JointDistributionSequential', seed)
     ds = []
     if value is None:
-      xs = [None] * len(self._wrapped_distribution_fn)
+      xs = [None] * len(self._wrapped_dist_fn)
     else:
       xs = list(value)
-      xs.extend([None]*(len(self._wrapped_distribution_fn) - len(xs)))
+      xs.extend([None]*(len(self._wrapped_dist_fn) - len(xs)))
     if len(xs) != len(self.distribution_fn):
       raise ValueError('Number of `xs`s must match number of '
                        'distributions.')
-    for i, (dist_fn, args) in enumerate(zip(self._wrapped_distribution_fn,
-                                            self._args)):
+    for i, (dist_fn, args) in enumerate(zip(self._wrapped_dist_fn,
+                                            self._dist_fn_args)):
       ds.append(dist_fn(*xs[:i]))  # Chain rule of probability.
       if xs[i] is None:
         # TODO(b/129364796): We should ignore args prefixed with `_`; this
@@ -368,15 +364,16 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
     """
     # TODO(b/129008220): Robustify this procedure. Eg, handle collisions better,
     # ignore args prefixed with `_`.
-    if distribution_names is None or any(n is None for n in self._args):
+    if distribution_names is None or any(self._dist_fn_args):
       distribution_names = _resolve_distribution_names(
-          self._args, distribution_names, leaf_name)
+          self._dist_fn_args, distribution_names, leaf_name)
     if len(set(distribution_names)) != len(distribution_names):
       raise ValueError('Distribution names must be unique: {}'.format(
           distribution_names))
     if len(distribution_names) != len(self.distribution_fn):
       raise ValueError('Distribution names must be 1:1 with `rvs`.')
-    return tuple(zip(distribution_names, self._args))
+    return tuple(zip(distribution_names,
+                     tuple(() if a is None else a for a in self._dist_fn_args)))
 
   _mean = _make_summary_statistic('mean')
   _mode = _make_summary_statistic('mode')
@@ -385,11 +382,11 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
 
   def _entropy(self):
     """Shannon entropy in nats."""
-    if not all(self._is_distribution_instance):
+    if any(self._dist_fn_args):
       raise ValueError(
           'Can only compute entropy when all distributions are independent.')
     return sum(joint_distribution_lib.maybe_check_wont_broadcast(
-        (d.entropy() for d in self.distribution_fn),
+        (d().entropy() for d in self._wrapped_dist_fn),
         self.validate_args))
 
   def _cross_entropy(self, other):
@@ -398,14 +395,13 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
       raise ValueError(
           'Can only compute cross entropy between `JointDistributionSequential`s '
           'with the same number of component distributions.')
-    if (not all(self._is_distribution_instance) or
-        not all(other._is_distribution_instance)):  # pylint: disable=protected-access
+    if any(self._dist_fn_args) or any(other._dist_fn_args):  # pylint: disable=protected-access
       raise ValueError(
           'Can only compute cross entropy when all component distributions '
           'are independent.')
     return sum(joint_distribution_lib.maybe_check_wont_broadcast(
-        (d0.cross_entropy(d1) for d0, d1
-         in zip(self.distribution_fn, other.distribution_fn)),
+        (d0().cross_entropy(d1()) for d0, d1
+         in zip(self._wrapped_dist_fn, other._wrapped_dist_fn)),  # pylint: disable=protected-access
         self.validate_args))
 
   def __getitem__(self, slices):
@@ -447,10 +443,8 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
       def _fn():
         return d()[slices]
       return _fn
-    for d, is_dist, args in zip(self.distribution_fn,
-                                self._is_distribution_instance,
-                                self._args):
-      if is_dist:
+    for d, args in zip(self.distribution_fn, self._dist_fn_args):
+      if args is None:
         dfn.append(d[slices])
       elif args:
         # Don't slice makers which have inputs; they'll be sliced via upstream.
@@ -471,10 +465,10 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
       is_scalar_event: `bool` scalar `Tensor`.
     """
     with self._name_scope(name):
-      if all(self._is_distribution_instance):
-        ds = self.distribution_fn
-      else:
+      if any(self._dist_fn_args):
         ds, _ = self.sample_distributions(seed=42)  # Const seed for maybe CSE.
+      else:
+        ds = tuple(d() for d in self._wrapped_dist_fn)
       # As an added optimization we could also check
       # self._most_recently_built_distributions.
       return tuple(None if d is None else d.is_scalar_event() for d in ds)
@@ -489,29 +483,56 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
       is_scalar_batch: `bool` scalar `Tensor`.
     """
     with self._name_scope(name):
-      if all(self._is_distribution_instance):
-        ds = self.distribution_fn
-      else:
+      if any(self._dist_fn_args):
         ds, _ = self.sample_distributions(seed=42)  # Const seed for maybe CSE.
+      else:
+        ds = tuple(d() for d in self._wrapped_dist_fn)
       # As an added optimization we could also check
       # self._most_recently_built_distributions.
       return tuple(None if d is None else d.is_scalar_batch() for d in ds)
 
 
 def _unify_call_signature(i, dist_fn):
-  """Relieves arg unpacking burden from call site."""
+  """Creates `wrapped_dist_fn` which calls `dist_fn` with all prev nodes.
+
+  Args:
+    i: Python `int` corresponding to position in topologically sorted DAG.
+    dist_fn: Python `callable` which takes a subset of previously constructed
+      distributions (in reverse order) and produces a new distribution instance.
+
+  Returns:
+    wrapped_dist_fn: Python `callable` which takes all previous distributions
+      (in non reverse order) and produces a  new distribution instance.
+    args: `tuple` of `str` representing the arg names of `dist_fn` (and in non
+      wrapped, "natural" order). `None` is returned only if the input is not a
+      `callable`.
+  """
   if distribution_util.is_distribution_instance(dist_fn):
-    return (lambda *_: dist_fn), (), True
+    return (lambda *_: dist_fn), None
+
   if not callable(dist_fn):
     raise TypeError('{} must be either `tfd.Distribution`-like or '
                     '`callable`.'.format(dist_fn))
+
   args = _get_required_args(dist_fn)
-  num_args = len(args)
+  if not args:
+    return (lambda *_: dist_fn()), ()
+
   @functools.wraps(dist_fn)
   def wrapped_dist_fn(*xs):
-    args = [] if i < 1 else xs[(i - 1)::-1]
-    return dist_fn(*args[:num_args])
-  return wrapped_dist_fn, args, False
+    """Calls `dist_fn` with reversed and truncated args."""
+    if i != len(xs):
+      raise ValueError(
+          'Internal Error: Unexpected number of inputs provided to {}-th '
+          'distribution maker (dist_fn: {}, expected: {}, saw: {}).'.format(
+              i, dist_fn, i, len(xs)))
+    if len(xs) < len(args):
+      raise ValueError(
+          'Internal Error: Too few inputs provided to {}-th distribution maker '
+          '(dist_fn: {}, expected: {}, saw: {}).'.format(
+              i, dist_fn, len(args), len(xs)))
+    return dist_fn(*reversed(xs[-len(args):]))
+  return wrapped_dist_fn, args
 
 
 def _resolve_distribution_names(dist_fn_args, dist_names, leaf_name):
@@ -532,7 +553,7 @@ def _resolve_distribution_names(dist_fn_args, dist_names, leaf_name):
   for i_ in range(len(dist_names)):
     i = n - i_ - 1
     if dist_names[i] is None:
-      dist_names[i] = leaf_name if j == 0 else '{}{}'.format(leaf_name, j)
+      dist_names[i] = leaf_name if j == 0 else leaf_name + str(j)
       j += 1
   return tuple(dist_names)
 
@@ -542,8 +563,7 @@ def _get_required_args(fn):
   argspec = tf_inspect.getfullargspec(fn)
   args = argspec.args
   if tf_inspect.isclass(fn):
-    # Remove the `self` arg.
-    args = args[1:]
+    args = args[1:]  # Remove the `self` arg.
   if argspec.defaults:
     # Remove the args which have defaults. By convention we only feed
     # *required args*. This means some distributions must always be wrapped
@@ -579,8 +599,8 @@ def _kl_joint_joint(d0, d1, name=None):
     raise ValueError(
         'Can only compute KL divergence between JointDistributionSequential '
         'distributions with the same number of component distributions.')
-  if (not all(d0._is_distribution_instance) or  # pylint: disable=protected-access
-      not all(d1._is_distribution_instance)):  # pylint: disable=protected-access
+  if (not all(a is None for a in d0._dist_fn_args) or  # pylint: disable=protected-access
+      not all(a is None for a in d1._dist_fn_args)):  # pylint: disable=protected-access
     raise ValueError(
         'Can only compute KL divergence when all distributions are '
         'independent.')

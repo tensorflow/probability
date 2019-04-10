@@ -98,10 +98,15 @@ def _get_static_predicate(pred):
 
 def rank_from_shape(shape_tensor_fn, tensorshape=None):
   """Computes `rank` given a `Tensor`'s `shape`."""
+
   if tensorshape is None:
     shape_tensor = (shape_tensor_fn() if callable(shape_tensor_fn)
                     else shape_tensor_fn)
-    ndims_ = shape_tensor.shape.num_elements()
+    if (hasattr(shape_tensor, 'shape') and
+        hasattr(shape_tensor.shape, 'num_elements')):
+      ndims_ = shape_tensor.shape.num_elements()
+    else:
+      ndims_ = len(shape_tensor)
     ndims_fn = lambda: tf.size(input=shape_tensor)
   else:
     ndims_ = tensorshape.ndims
@@ -257,8 +262,12 @@ reduce_sum = _prefer_static(
 
 
 def _shape(input, out_type=tf.int32, name=None):  # pylint: disable=redefined-builtin
-  if input.shape.is_fully_defined():
-    return np.array(input.shape.as_list()).astype(_numpy_dtype(out_type))
+  if not hasattr(input, 'shape'):
+    x = np.array(input)
+    input = tf.convert_to_tensor(value=input) if x.dtype is np.object else x
+  input_shape = tf.TensorShape(input.shape)
+  if input_shape.is_fully_defined():
+    return np.array(input_shape.as_list()).astype(_numpy_dtype(out_type))
   return tf.shape(input=input, out_type=out_type, name=name)
 shape = _copy_docstring(tf.shape, _shape)
 
