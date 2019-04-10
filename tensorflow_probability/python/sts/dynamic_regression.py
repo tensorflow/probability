@@ -20,9 +20,11 @@ from __future__ import print_function
 # Dependency imports
 import tensorflow as tf
 
+from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import dtype_util
 
+from tensorflow_probability.python.sts.internal import util as sts_util
 from tensorflow_probability.python.sts.structural_time_series import Parameter
 from tensorflow_probability.python.sts.structural_time_series import StructuralTimeSeries
 
@@ -40,10 +42,11 @@ class DynamicLinearRegressionStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
                allow_nan_stats=True,
                name=None):
 
-    with tf.compat.v1.name_scope(
-        name, 'DynamicLinearRegressionStateSpaceModel') as name:
+    with tf.compat.v1.name_scope(name, 'DynamicLinearRegressionStateSpaceModel',
+                                 values=[weights_scale]) as name:
 
-      dtype = initial_state_prior.dtype
+      dtype = dtype_util.common_dtype(
+          [design_matrix, weights_scale, initial_state_prior])
 
       design_matrix = tf.convert_to_tensor(
           value=design_matrix, name='design_matrix', dtype=dtype)
@@ -94,3 +97,75 @@ class DynamicLinearRegressionStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
   def observation_noise_scale(self):
     """Standard deviation of the observation noise."""
     return self._observation_noise_scale
+
+
+class DynamicLinearRegression(StructuralTimeSeries):
+
+  def __init__(self,
+               design_matrix,
+               weights_scale_prior=None,
+               initial_weights_prior=None,
+               observed_time_series=None,
+               name=None):
+
+    with tf.compat.v1.name_scope(
+        name, 'DynamicLinearRegression', values=[observed_time_series]) as name:
+
+      dtype = dtype_util.common_dtype(
+          [design_matrix, weights_scale_prior, initial_weights_prior])
+
+      # Default to a weakly-informative Normal(0., 10.) for the initital state
+      if initial_weights_prior is None:
+        initial_weights_prior = tfd.Normal(
+            loc=tf.zeros([], dtype=dtype),
+            scale=10. * tf.ones([], dtype=dtype))
+
+      # Heuristic default priors. Overriding these may dramatically
+      # change inference performance and results.
+      if weights_scale_prior is None:
+        if observed_time_series is None:
+          observed_stddev = 1.0
+        else:
+          _, observed_stddev, _ = sts_util.empirical_statistics(
+              observed_time_series)
+
+        weights_scale_prior = tfd.LogNormal(
+            loc=tf.math.log(.05 * observed_stddev),
+            scale=3.,
+            name='weights_scale_prior')
+
+      self._initial_state_prior = initial_weights_prior
+      self._design_matrix = design_matrix
+
+      super(DynamicLinearRegression).__init__(
+          parameters=[
+              Parameter('weights_scale', weights_scale_prior, tfb.Softplus())
+          ],
+          latent_size=tf.shape(design_matrix)[-1],
+          name=name)
+
+  @property
+  def initial_state_prior(self):
+    """Prior distribution on the initial latent state (level and scale)."""
+    return self._initial_state_prior
+
+  @property
+  def design_matrix(self):
+    """LinearOperator representing the design matrix."""
+    return self._design_matrix
+
+  def _make_state_space_model(self,
+                              num_timesteps,
+                              param_map,
+                              initial_state_prior=None,
+                              initial_step=0):
+
+    if initial_state_prior is None:
+      initial_state_prior = self.initial_state_prior
+
+    return DynamicLinearRegressionStateSpaceModel(
+        num_timesteps=num_timesteps,
+        design_matrix=self.design_matrix,
+        initial_state_prior=initial_state_prior,
+        initial_step=initial_step,
+        **param_map)
