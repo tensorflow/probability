@@ -114,9 +114,10 @@ class DynamicLinearRegression(StructuralTimeSeries):
       dtype = dtype_util.common_dtype(
           [design_matrix, weights_scale_prior, initial_weights_prior])
 
+      num_features = tf.shape(design_matrix)[-1]
+
       # Default to a weakly-informative Normal(0., 10.) for the initital state
       if initial_weights_prior is None:
-        num_features = tf.shape(design_matrix)[-1]
         initial_weights_prior = tfd.MultivariateNormalDiag(
             scale_diag=10. * tf.ones([num_features], dtype=dtype))
 
@@ -141,7 +142,7 @@ class DynamicLinearRegression(StructuralTimeSeries):
           parameters=[
               Parameter('weights_scale', weights_scale_prior, tfb.Softplus())
           ],
-          latent_size=tf.shape(design_matrix)[-1],
+          latent_size=num_features,
           name=name)
 
   @property
