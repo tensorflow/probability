@@ -108,7 +108,6 @@ class _DynamicLinearRegressionStateSpaceModelTest(object):
     ssm = component.make_state_space_model(num_timesteps, [weights_scale])
 
     for t in range(num_timesteps):
-
       observation_matrix = self.evaluate(
           ssm.get_observation_matrix_for_timestep(t).to_dense())
 
