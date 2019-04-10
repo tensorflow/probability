@@ -30,36 +30,72 @@ from tensorflow.python.ops.linalg import linear_operator_util
 tfd = tfp.distributions
 
 
-@test_util.run_all_in_graph_and_eager_modes
 class _DynamicLinearRegressionStateSpaceModelTest(object):
 
   def test_basic_statistics_no_latent_variance(self):
-    batch_shape = [1]
-    num_timesteps = 7
-    num_features = 3
+    # Verify that when the latent variables have no initial or transition
+    # variance the model constructs a distribution with mean
+    # `matmul(design_matrix, initial_state_loc)` and stddev 0.
+    batch_shape = [4, 3]
+    num_timesteps = 10
+    num_features = 2
     weights_scale = 0.
 
     design_matrix = self._build_placeholder(
         np.random.randn(*(batch_shape + [num_timesteps, num_features])))
 
-    initial_state_mean = self._build_placeholder(
+    initial_state_loc = self._build_placeholder(
         np.random.randn(*(batch_shape + [num_features])))
+    initial_state_scale = tf.zeros_like(initial_state_loc)
     initial_state_prior = tfd.MultivariateNormalDiag(
-        loc=initial_state_mean, scale_diag=tf.zeros_like(initial_state_mean))
+        loc=initial_state_loc, scale_diag=initial_state_scale)
 
     ssm = DynamicLinearRegressionStateSpaceModel(
         num_timesteps=num_timesteps,
         design_matrix=design_matrix,
         weights_scale=weights_scale,
-        initial_state_prior=initial_state_prior,
-    )
+        initial_state_prior=initial_state_prior)
 
     predicted_time_series = linear_operator_util.matmul_with_broadcast(
-        design_matrix, initial_state_mean[..., tf.newaxis])
+        design_matrix, initial_state_loc[..., tf.newaxis])
 
     self.assertAllEqual(self.evaluate(ssm.mean()), predicted_time_series)
     self.assertAllEqual(*self.evaluate((ssm.stddev(),
                                         tf.zeros_like(predicted_time_series))))
+
+  def test_initial_state_broadcasts_over_batch(self):
+    batch_shape = [4, 3]
+    num_timesteps = 10
+    num_features = 2
+    weights_scale = 1.
+
+    initial_state_loc = self._build_placeholder([0.1, -0.2])
+    initial_state_scale = self._build_placeholder([0.42, 0.314])
+
+    design_matrix = self._build_placeholder(
+        np.random.randn(*(batch_shape + [num_timesteps, num_features])))
+
+    initial_state_prior = tfd.MultivariateNormalDiag(
+        loc=initial_state_loc, scale_diag=initial_state_scale)
+
+    ssm = DynamicLinearRegressionStateSpaceModel(
+        num_timesteps=num_timesteps,
+        design_matrix=design_matrix,
+        weights_scale=weights_scale,
+        initial_state_prior=initial_state_prior)
+
+    sample = ssm.sample()
+
+    ll, means, *_ = ssm.forward_filter(sample)
+
+    self.assertAllEqual(batch_shape + [num_timesteps, 1],
+                        self.evaluate(sample).shape)
+
+    self.assertAllEqual(batch_shape + [num_timesteps],
+                        self.evaluate(ll).shape)
+
+    self.assertAllEqual(batch_shape + [num_timesteps, num_features],
+                        self.evaluate(means).shape)
 
   def _build_placeholder(self, ndarray):
     ndarray = np.asarray(ndarray).astype(self.dtype)

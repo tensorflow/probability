@@ -20,11 +20,9 @@ from __future__ import print_function
 # Dependency imports
 import tensorflow as tf
 
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import dtype_util
 
-from tensorflow_probability.python.sts.internal import util as sts_util
 from tensorflow_probability.python.sts.structural_time_series import Parameter
 from tensorflow_probability.python.sts.structural_time_series import StructuralTimeSeries
 
@@ -58,13 +56,15 @@ class DynamicLinearRegressionStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
           name='observation_noise_scale',
           dtype=dtype)
 
-      self._weights_scale = weights_scale
-      self._observation_noise_scale = observation_noise_scale
+      tf.debugging.assert_same_float_dtype([design_matrix, initial_state_prior])
 
       def observation_matrix_fn(t):
         observation_matrix = tf.linalg.LinearOperatorFullMatrix(
-            design_matrix[..., t, :], name='observation_matrix')
+            design_matrix[..., t, tf.newaxis, :], name='observation_matrix')
         return observation_matrix
+
+      self._weights_scale = weights_scale
+      self._observation_noise_scale = observation_noise_scale
 
       super(DynamicLinearRegressionStateSpaceModel, self).__init__(
           num_timesteps=num_timesteps,
