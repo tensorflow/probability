@@ -18,8 +18,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 
 
@@ -102,7 +104,7 @@ class PowerTransform(bijector.Bijector):
   def _maybe_assert_valid_x(self, x):
     if not self.validate_args or self.power == 0.:
       return x
-    is_valid = tf.compat.v1.assert_non_negative(
+    is_valid = assert_util.assert_non_negative(
         1. + self.power * x,
         message="Forward transformation input must be at least {}.".format(
             -1. / self.power))
@@ -111,6 +113,6 @@ class PowerTransform(bijector.Bijector):
   def _maybe_assert_valid_y(self, y):
     if not self.validate_args:
       return y
-    is_valid = tf.compat.v1.assert_positive(
+    is_valid = assert_util.assert_positive(
         y, message="Inverse transformation input must be greater than 0.")
     return distribution_util.with_dependencies([is_valid], y)

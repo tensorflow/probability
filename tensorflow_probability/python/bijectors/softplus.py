@@ -18,8 +18,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 
@@ -81,14 +83,14 @@ class Softplus(bijector.Bijector):
                hinge_softness=None,
                validate_args=False,
                name="softplus"):
-    with tf.compat.v1.name_scope(name, values=[hinge_softness]):
+    with tf.name_scope(name):
       if hinge_softness is None:
         self._hinge_softness = None
       else:
         self._hinge_softness = tf.convert_to_tensor(
             value=hinge_softness, name="hinge_softness")
         if validate_args:
-          nonzero_check = tf.compat.v1.assert_none_equal(
+          nonzero_check = assert_util.assert_none_equal(
               dtype_util.as_numpy_dtype(self._hinge_softness.dtype)(0),
               self.hinge_softness,
               message="hinge_softness must be non-zero")

@@ -21,9 +21,10 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
@@ -120,8 +121,7 @@ class Transpose(bijector.Bijector):
       NotImplementedError: if `rightmost_transposed_ndims` is not known prior to
         graph execution.
     """
-    with tf.compat.v1.name_scope(
-        name, values=[perm, rightmost_transposed_ndims]):
+    with tf.name_scope(name):
       if (rightmost_transposed_ndims is None) == (perm is None):
         raise ValueError('Must specify exactly one of '
                          '`rightmost_transposed_ndims` and `perm`.')
@@ -258,9 +258,7 @@ class Transpose(bijector.Bijector):
 def _maybe_validate_rightmost_transposed_ndims(
     rightmost_transposed_ndims, validate_args, name=None):
   """Checks that `rightmost_transposed_ndims` is valid."""
-  with tf.compat.v1.name_scope(name,
-                               'maybe_validate_rightmost_transposed_ndims',
-                               [rightmost_transposed_ndims]):
+  with tf.name_scope(name or 'maybe_validate_rightmost_transposed_ndims'):
     assertions = []
     if not dtype_util.is_integer(rightmost_transposed_ndims.dtype):
       raise TypeError('`rightmost_transposed_ndims` must be integer type.')
@@ -272,7 +270,7 @@ def _maybe_validate_rightmost_transposed_ndims(
                              tensorshape_util.rank(
                                  rightmost_transposed_ndims.shape)))
     elif validate_args:
-      assertions += [tf.compat.v1.assert_rank(rightmost_transposed_ndims, 0)]
+      assertions += [assert_util.assert_rank(rightmost_transposed_ndims, 0)]
 
     rightmost_transposed_ndims_ = tf.get_static_value(
         rightmost_transposed_ndims)
@@ -283,7 +281,7 @@ def _maybe_validate_rightmost_transposed_ndims(
             rightmost_transposed_ndims_))
     elif validate_args:
       assertions += [
-          tf.compat.v1.assert_non_negative(
+          assert_util.assert_non_negative(
               rightmost_transposed_ndims, message=msg)
       ]
 
@@ -292,7 +290,7 @@ def _maybe_validate_rightmost_transposed_ndims(
 
 def _maybe_validate_perm(perm, validate_args, name=None):
   """Checks that `perm` is valid."""
-  with tf.compat.v1.name_scope(name, 'maybe_validate_perm', [perm]):
+  with tf.name_scope(name or 'maybe_validate_perm'):
     assertions = []
     if not dtype_util.is_integer(perm.dtype):
       raise TypeError('`perm` must be integer type')
@@ -304,7 +302,7 @@ def _maybe_validate_perm(perm, validate_args, name=None):
             msg[:-1] +
             ', saw rank: {}.'.format(tensorshape_util.rank(perm.shape)))
     elif validate_args:
-      assertions += [tf.compat.v1.assert_rank(perm, 1, message=msg)]
+      assertions += [assert_util.assert_rank(perm, 1, message=msg)]
 
     perm_ = tf.get_static_value(perm)
     msg = '`perm` must be a valid permutation vector.'
@@ -313,7 +311,7 @@ def _maybe_validate_perm(perm, validate_args, name=None):
         raise ValueError(msg[:-1] + ', saw: {}.'.format(perm_))
     elif validate_args:
       assertions += [
-          tf.compat.v1.assert_equal(
+          assert_util.assert_equal(
               tf.sort(perm), tf.range(tf.size(input=perm)), message=msg)
       ]
 

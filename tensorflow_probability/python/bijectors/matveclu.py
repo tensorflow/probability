@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.math.linalg import lu_reconstruct
@@ -50,7 +50,7 @@ class MatvecLU(bijector.Bijector):
   ```python
   def trainable_lu_factorization(
       event_size, batch_shape=(), seed=None, dtype=tf.float32, name=None):
-    with tf.compat.v1.name_scope(name, 'trainable_lu_factorization',
+    with tf.name_scope(name, 'trainable_lu_factorization',
                        [event_size, batch_shape]):
       event_size = tf.convert_to_tensor(
           event_size, preferred_dtype=tf.int32, name='event_size')
@@ -118,8 +118,7 @@ class MatvecLU(bijector.Bijector):
       ValueError: If both/neither `channels` and `lower_upper`/`permutation` are
         specified.
     """
-    with tf.compat.v1.name_scope(name, 'MatvecLU',
-                                 [lower_upper, permutation]) as name:
+    with tf.name_scope(name or 'MatvecLU') as name:
       self._lower_upper = tf.convert_to_tensor(
           value=lower_upper, dtype_hint=tf.float32, name='lower_upper')
       self._permutation = tf.convert_to_tensor(

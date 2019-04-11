@@ -19,10 +19,11 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-import tensorflow as tf
+
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.bijectors import categorical_to_discrete
-
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 

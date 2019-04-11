@@ -18,8 +18,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 
@@ -280,7 +282,7 @@ class Affine(bijector.Bijector):
     if self._is_only_identity_multiplier:
       if validate_args:
         return distribution_util.with_dependencies([
-            tf.compat.v1.assert_none_equal(
+            assert_util.assert_none_equal(
                 identity_multiplier, tf.zeros([], identity_multiplier.dtype),
                 ["identity_multiplier should be non-zero."])
         ], identity_multiplier)

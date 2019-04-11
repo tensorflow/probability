@@ -18,9 +18,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 
 
@@ -97,7 +98,7 @@ class IteratedSigmoidCentered(bijector.Bijector):
   def _inverse_event_shape_tensor(self, output_shape):
     if self.validate_args:
       # It is not possible for a negative shape so we need only check <= 1.
-      dependencies = [tf.compat.v1.assert_greater(
+      dependencies = [assert_util.assert_greater(
           output_shape[-1], 1, message="Need last dimension greater than 1.")]
     else:
       dependencies = []

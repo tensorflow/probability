@@ -20,9 +20,11 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 
@@ -116,7 +118,7 @@ class SinhArcsinh(bijector.Bijector):
       tf.debugging.assert_same_float_dtype([self._skewness, self._tailweight])
       if validate_args:
         self._tailweight = distribution_util.with_dependencies([
-            tf.compat.v1.assert_positive(
+            assert_util.assert_positive(
                 self._tailweight,
                 message="Argument tailweight was not positive")
         ], self._tailweight)

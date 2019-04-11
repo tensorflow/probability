@@ -20,9 +20,10 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
@@ -85,9 +86,9 @@ class CholeskyOuterProduct(bijector.Bijector):
 
   def _forward(self, x):
     if self.validate_args:
-      is_matrix = tf.compat.v1.assert_rank_at_least(x, 2)
+      is_matrix = assert_util.assert_rank_at_least(x, 2)
       shape = tf.shape(input=x)
-      is_square = tf.compat.v1.assert_equal(shape[-2], shape[-1])
+      is_square = assert_util.assert_equal(shape[-2], shape[-1])
       x = distribution_util.with_dependencies([is_matrix, is_square], x)
     # For safety, explicitly zero-out the upper triangular part.
     x = tf.linalg.band_part(x, -1, 0)
@@ -145,15 +146,15 @@ class CholeskyOuterProduct(bijector.Bijector):
     diag = self._make_columnar(diag)
 
     if self.validate_args:
-      is_matrix = tf.compat.v1.assert_rank_at_least(
+      is_matrix = assert_util.assert_rank_at_least(
           x, 2, message="Input must be a (batch of) matrix.")
       shape = tf.shape(input=x)
-      is_square = tf.compat.v1.assert_equal(
+      is_square = assert_util.assert_equal(
           shape[-2],
           shape[-1],
           message="Input must be a (batch of) square matrix.")
       # Assuming lower-triangular means we only need check diag>0.
-      is_positive_definite = tf.compat.v1.assert_positive(
+      is_positive_definite = assert_util.assert_positive(
           diag, message="Input must be positive definite.")
       x = distribution_util.with_dependencies(
           [is_matrix, is_square, is_positive_definite], x)

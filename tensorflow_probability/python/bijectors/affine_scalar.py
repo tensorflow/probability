@@ -18,8 +18,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 
@@ -91,7 +93,7 @@ class AffineScalar(bijector.Bijector):
         self._scale = tf.convert_to_tensor(value=scale, name="scale")
         if validate_args:
           self._scale = distribution_util.with_dependencies([
-              tf.compat.v1.assert_none_equal(
+              assert_util.assert_none_equal(
                   self._scale, tf.zeros([], dtype=self._scale.dtype))
           ], self._scale)
 

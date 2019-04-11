@@ -18,9 +18,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector as bijector_base
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
@@ -162,9 +163,9 @@ def _validate_block_sizes(block_sizes, bijectors, validate_args):
     message = ('`block_sizes` must be `None`, or a vector of the same length '
                'as `bijectors`.')
     with tf.control_dependencies([
-        tf.compat.v1.assert_equal(
+        assert_util.assert_equal(
             tf.size(input=block_sizes), len(bijectors), message=message),
-        tf.compat.v1.assert_equal(tf.rank(block_sizes), 1)
+        assert_util.assert_equal(tf.rank(block_sizes), 1)
     ]):
       return tf.identity(block_sizes)
   else:

@@ -20,9 +20,11 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow.python.framework import tensor_util  # pylint: disable=g-direct-tensorflow-import
@@ -143,8 +145,7 @@ class Reshape(bijector.Bijector):
        has non-vector shape (`rank > 1`), or if their sizes do not
        match.
     """
-    with tf.compat.v1.name_scope(name, 'reshape',
-                                 [event_shape_out, event_shape_in]):
+    with tf.name_scope(name or 'reshape'):
       event_shape_out = tf.convert_to_tensor(
           value=event_shape_out, name='event_shape_out', dtype_hint=tf.int32)
       event_shape_in = tf.convert_to_tensor(
@@ -298,7 +299,7 @@ def _replace_event_shape_in_shape_tensor(
     explicit_event_shape_in = tf.boolean_mask(
         tensor=event_shape_in, mask=mask)
     additional_assertions.append(
-        tf.compat.v1.assert_equal(
+        assert_util.assert_equal(
             explicit_input_event_shape,
             explicit_event_shape_in,
             message='Input `event_shape` does not match `event_shape_in`.'))
@@ -394,7 +395,7 @@ def _maybe_check_valid_shape(shape, validate_args):
     if tensorshape_util.rank(shape.shape) > 1:
       raise ValueError(message.format(shape))
   elif validate_args:
-    assertions.append(tf.compat.v1.assert_less(
+    assertions.append(assert_util.assert_less(
         tf.rank(shape), 2, message=message.format(shape)))
 
   shape_ = tf.get_static_value(shape)
@@ -404,7 +405,7 @@ def _maybe_check_valid_shape(shape, validate_args):
     if sum(shape_ == -1) > 1:
       raise ValueError(message.format(shape))
   elif validate_args:
-    assertions.append(tf.compat.v1.assert_less(
+    assertions.append(assert_util.assert_less(
         tf.reduce_sum(input_tensor=tf.cast(tf.equal(shape, -1), tf.int32)),
         2,
         message=message.format(shape)))
@@ -414,7 +415,7 @@ def _maybe_check_valid_shape(shape, validate_args):
     if np.any(shape_ < -1):
       raise ValueError(message.format(shape))
   elif validate_args:
-    assertions.append(tf.compat.v1.assert_greater(
+    assertions.append(assert_util.assert_greater(
         shape, -2, message=message.format(shape)))
 
   return assertions

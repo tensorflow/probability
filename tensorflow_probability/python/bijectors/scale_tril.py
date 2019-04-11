@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import affine_scalar
 from tensorflow_probability.python.bijectors import chain
 from tensorflow_probability.python.bijectors import fill_triangular
@@ -101,7 +101,7 @@ class ScaleTriL(chain.Chain):
       name: Python `str` name given to ops managed by this object.
         Default value: `scale_tril`.
     """
-    with tf.compat.v1.name_scope(name, values=[diag_shift]) as name:
+    with tf.name_scope(name) as name:
       if diag_bijector is None:
         diag_bijector = softplus.Softplus(validate_args=validate_args)
 
