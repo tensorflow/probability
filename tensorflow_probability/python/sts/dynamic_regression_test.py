@@ -84,7 +84,7 @@ class _DynamicLinearRegressionStateSpaceModelTest(object):
 
     sample = ssm.sample()
 
-    ll, means, *_ = ssm.forward_filter(sample)
+    ll, means, _, _, _, _, _ = ssm.forward_filter(sample)
 
     self.assertAllEqual(batch_shape + [num_timesteps, 1],
                         self.evaluate(sample).shape)
