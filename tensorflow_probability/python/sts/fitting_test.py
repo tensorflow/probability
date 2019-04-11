@@ -107,7 +107,7 @@ class _HMCTests(object):
     samples_, kernel_results_ = self.evaluate((samples, kernel_results))
 
     acceptance_rate = np.mean(
-        kernel_results_.inner_results.is_accepted, axis=0)
+        kernel_results_.inner_results.inner_results.is_accepted, axis=0)
 
     posterior_means = {
         param.name: np.mean(param_draws, axis=0)
@@ -149,7 +149,7 @@ class _HMCTests(object):
     samples_, kernel_results_ = self.evaluate((samples, kernel_results))
 
     acceptance_rate = np.mean(
-        kernel_results_.inner_results.is_accepted, axis=0)
+        kernel_results_.inner_results.inner_results.is_accepted, axis=0)
 
     # Combining the samples from multiple chains into a single dimension allows
     # us to easily pass sampled parameters to downstream forecasting methods.
