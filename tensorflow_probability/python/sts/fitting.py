@@ -414,7 +414,7 @@ def fit_with_hmc(model,
     samples_, kernel_results_ = sess.run((samples, kernel_results))
 
   print("acceptance rate: {}".format(
-    np.mean(kernel_results_.inner_results.is_accepted, axis=0)))
+    np.mean(kernel_results_.inner_results.inner_results.is_accepted, axis=0)))
 
   # Plot the sampled traces for each parameter. If the chains have mixed, their
   # traces should all cover the same region of state space, frequently crossing
@@ -444,14 +444,14 @@ def fit_with_hmc(model,
 
   ```python
   transformed_hmc_kernel = mcmc.TransformedTransitionKernel(
-      inner_kernel=mcmc.HamiltonianMonteCarlo(
-          target_log_prob_fn=model.joint_log_prob(observed_time_series),
-          step_size=step_size,
-          num_leapfrog_steps=num_leapfrog_steps,
-          step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy(
-            num_adaptation_steps=num_adaptation_steps),
-          state_gradients_are_stopped=True,
-          seed=seed),
+      inner_kernel=mcmc.SimpleStepSizeAdaptation(
+          inner_kernel=mcmc.HamiltonianMonteCarlo(
+              target_log_prob_fn=model.joint_log_prob(observed_time_series),
+              step_size=step_size,
+              num_leapfrog_steps=num_leapfrog_steps,
+              state_gradients_are_stopped=True,
+              seed=seed),
+          num_adaptation_steps = int(0.8 * num_warmup_steps)),
       bijector=[param.bijector for param in model.parameters])
 
   # Initialize from a Uniform[-2, 2] distribution in unconstrained space.
@@ -514,46 +514,24 @@ def fit_with_hmc(model,
     observed_time_series = sts_util.pad_batch_dimension_for_multiple_chains(
         observed_time_series, model, chain_batch_shape=chain_batch_shape)
 
-    # When the initial step size depends on a variational optimization, we
-    # can't initialize step size variables before the optimization runs.
-    # Instead we initialize with a dummy value of the appropriate
-    # shape, then wrap the HMC chain with `control_dependencies` to ensure the
-    # variational step sizes are assigned before HMC actually runs.
-    step_size = [
-        tf.compat.v1.get_variable(
-            initializer=tf.zeros_like(
-                sample_uniform_initial_state(
-                    param,
-                    init_sample_shape=chain_batch_shape,
-                    return_constrained=False)),
-            name='{}_step_size'.format(param.name),
-            trainable=False,
-            use_resource=True)
-        for (param, ss) in zip(model.parameters, initial_step_size)
-    ]
-    step_size_init_op = tf.group([
-        tf.compat.v1.assign(ss, initial_ss)
-        for (ss, initial_ss) in zip(step_size, initial_step_size)
-    ])
-
     # Run HMC to sample from the posterior on parameters.
-    with tf.control_dependencies([step_size_init_op]):
-      samples, kernel_results = mcmc.sample_chain(
-          num_results=num_results,
-          current_state=initial_state,
-          num_burnin_steps=num_warmup_steps,
-          kernel=mcmc.TransformedTransitionKernel(
-              inner_kernel=mcmc.HamiltonianMonteCarlo(
-                  target_log_prob_fn=model.joint_log_prob(observed_time_series),
-                  step_size=step_size,
-                  num_leapfrog_steps=num_leapfrog_steps,
-                  step_size_update_fn=mcmc.make_simple_step_size_update_policy(
-                      num_adaptation_steps=int(num_warmup_steps * 0.8),
-                      decrement_multiplier=0.1,
-                      increment_multiplier=0.1),
-                  state_gradients_are_stopped=True,
-                  seed=seed()),
-              bijector=[param.bijector for param in model.parameters]),
-          parallel_iterations=1 if seed is not None else 10)
+    samples, kernel_results = mcmc.sample_chain(
+        num_results=num_results,
+        current_state=initial_state,
+        num_burnin_steps=num_warmup_steps,
+        kernel=mcmc.SimpleStepSizeAdaptation(
+            inner_kernel=mcmc.TransformedTransitionKernel(
+                inner_kernel=mcmc.HamiltonianMonteCarlo(
+                    target_log_prob_fn=model.joint_log_prob(
+                        observed_time_series),
+                    step_size=initial_step_size,
+                    num_leapfrog_steps=num_leapfrog_steps,
+                    state_gradients_are_stopped=True,
+                    seed=seed()),
+                bijector=[param.bijector for param in model.parameters]),
+            num_adaptation_steps=int(num_warmup_steps * 0.8),
+            adaptation_rate=tf.convert_to_tensor(
+                value=0.1, dtype=initial_state[0].dtype)),
+        parallel_iterations=1 if seed is not None else 10)
 
     return samples, kernel_results

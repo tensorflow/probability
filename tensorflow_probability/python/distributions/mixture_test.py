@@ -809,15 +809,6 @@ class MixtureTest(tf.test.TestCase):
     x_ = self.evaluate(gm.sample())
     self.assertAllEqual([], x_.shape)
 
-  # TODO(b/117098119): Remove tf.distribution references once they're gone.
-  def testBackwardsCompatibility(self):
-    tfd.Mixture(
-        cat=tf.compat.v1.distributions.Categorical(probs=[.3, .7]),
-        components=[
-            tf.compat.v1.distributions.Normal(1., 2.),
-            tf.compat.v1.distributions.Normal(2., 1.)
-        ])
-
 
 class MixtureStaticSampleTest(MixtureTest):
   use_static_graph = True

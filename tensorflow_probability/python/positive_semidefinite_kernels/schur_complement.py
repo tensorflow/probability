@@ -162,7 +162,7 @@ class SchurComplement(psd_kernel.PositiveSemidefiniteKernel):
   def __init__(self,
                base_kernel,
                fixed_inputs,
-               jitter=1e-6,
+               diag_shift=None,
                validate_args=False,
                name='SchurComplement'):
     """Construct a SchurComplement kernel instance.
@@ -188,9 +188,8 @@ class SchurComplement(psd_kernel.PositiveSemidefiniteKernel):
         decomposition of the k(Z, Z) matrix. The batch shape elements of
         `fixed_inputs` must be broadcast compatible with
         `base_kernel.batch_shape`.
-      jitter: A floating point scalar to be added to the diagonal of the
-        divisor_matrix before computing its Cholesky. This changes the math but
-        without it many typical systems will not be numerically invertible.
+      diag_shift: A floating point scalar to be added to the diagonal of the
+        divisor_matrix before computing its Cholesky.
       validate_args: If `True`, parameters are checked for validity despite
         possibly degrading runtime performance.
         Default value: `False`
@@ -208,9 +207,10 @@ class SchurComplement(psd_kernel.PositiveSemidefiniteKernel):
         # We create and store this matrix here, so that we get the caching
         # benefit when we later access its cholesky. If we computed the matrix
         # every time we needed the cholesky, the bijector cache wouldn't be hit.
-        self._divisor_matrix = _add_diagonal_shift(
-            base_kernel.matrix(fixed_inputs, fixed_inputs),
-            jitter)
+        self._divisor_matrix = base_kernel.matrix(fixed_inputs, fixed_inputs)
+        if diag_shift is not None:
+          self._divisor_matrix = _add_diagonal_shift(
+              self._divisor_matrix, diag_shift)
 
       self._cholesky_bijector = tfb.Invert(tfb.CholeskyOuterProduct())
     super(SchurComplement, self).__init__(

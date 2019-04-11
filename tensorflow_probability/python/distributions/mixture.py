@@ -113,9 +113,7 @@ class Mixture(distribution.Distribution):
         have matching static event shapes.
     """
     parameters = dict(locals())
-    # TODO(b/117098119): Remove tf.distribution references once they're gone.
-    if not isinstance(cat, categorical.Categorical) and not isinstance(
-        cat, tf.compat.v1.distributions.Categorical):
+    if not isinstance(cat, categorical.Categorical):
       raise TypeError("cat must be a Categorical distribution, but saw: %s" %
                       cat)
     if not components:
@@ -123,11 +121,7 @@ class Mixture(distribution.Distribution):
     if not isinstance(components, (list, tuple)):
       raise TypeError("components must be a list or tuple, but saw: %s" %
                       components)
-    # TODO(b/117098119): Remove tf.distribution references once they're gone.
-    if not all(
-        isinstance(c, distribution.Distribution) or
-        isinstance(cat, tf.compat.v1.distributions.Distribution)
-        for c in components):
+    if not all(isinstance(c, distribution.Distribution) for c in components):
       raise TypeError(
           "all entries in components must be Distribution instances"
           " but saw: %s" % components)

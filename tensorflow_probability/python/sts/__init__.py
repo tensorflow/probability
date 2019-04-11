@@ -33,6 +33,7 @@ from tensorflow_probability.python.sts.local_level import LocalLevelStateSpaceMo
 from tensorflow_probability.python.sts.local_linear_trend import LocalLinearTrend
 from tensorflow_probability.python.sts.local_linear_trend import LocalLinearTrendStateSpaceModel
 from tensorflow_probability.python.sts.regression import LinearRegression
+from tensorflow_probability.python.sts.regression import SparseLinearRegression
 from tensorflow_probability.python.sts.dynamic_regression import DynamicLinearRegression
 from tensorflow_probability.python.sts.dynamic_regression import DynamicLinearRegressionStateSpaceModel
 from tensorflow_probability.python.sts.seasonal import ConstrainedSeasonalStateSpaceModel
@@ -63,6 +64,7 @@ _allowed_symbols = [
     'SeasonalStateSpaceModel',
     'SemiLocalLinearTrend',
     'SemiLocalLinearTrendStateSpaceModel',
+    'SparseLinearRegression',
     'StructuralTimeSeries',
     'Sum',
     'build_factored_variational_loss',

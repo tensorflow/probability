@@ -29,6 +29,7 @@ from tensorflow_probability.python.sts import LocalLevel
 from tensorflow_probability.python.sts import LocalLinearTrend
 from tensorflow_probability.python.sts import Seasonal
 from tensorflow_probability.python.sts import SemiLocalLinearTrend
+from tensorflow_probability.python.sts import SparseLinearRegression
 from tensorflow_probability.python.sts import Sum
 from tensorflow_probability.python.sts.internal import util as sts_util
 
@@ -345,6 +346,30 @@ class LinearRegressionTest(tf.test.TestCase, _StsTestHarness):
     regression = LinearRegression(
         design_matrix=tf.random.normal([max_timesteps, num_features]),
         weights_prior=prior)
+    return Sum(components=[regression],
+               observed_time_series=observed_time_series)
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class SparseLinearRegressionTest(tf.test.TestCase, _StsTestHarness):
+
+  def _build_sts(self, observed_time_series=None):
+    max_timesteps = 100
+    num_features = 3
+
+    # LinearRegression components don't currently take an `observed_time_series`
+    # argument, so they can't infer a prior batch shape. This means we have to
+    # manually set the batch shape expected by the tests.
+    batch_shape = None
+    if observed_time_series is not None:
+      observed_time_series_tensor, _ = (
+          sts_util.canonicalize_observed_time_series_with_mask(
+              observed_time_series))
+      batch_shape = tf.shape(input=observed_time_series_tensor)[:-2]
+
+    regression = SparseLinearRegression(
+        design_matrix=tf.random.normal([max_timesteps, num_features]),
+        weights_batch_shape=batch_shape)
     return Sum(components=[regression],
                observed_time_series=observed_time_series)
 

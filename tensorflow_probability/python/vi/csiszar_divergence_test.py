@@ -25,6 +25,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow_probability.python.math.gradient import value_and_gradient
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
@@ -37,15 +38,6 @@ def tridiag(d, diag_value, offdiag_value):
   diag_mat = tf.eye(d) * (diag_value - offdiag_value)
   three_bands = tf.linalg.band_part(tf.fill([d, d], offdiag_value), 1, 1)
   return diag_mat + three_bands
-
-
-def _set_seed(seed):
-  """Helper which uses graph seed if using eager."""
-  # TODO(b/68017812): Deprecate once eager correctly supports seed.
-  if tf.executing_eagerly():
-    tf.compat.v1.set_random_seed(seed)
-    return None
-  return seed
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -483,19 +475,21 @@ class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
 
     p = tfd.Normal(loc=q.loc + 0.1, scale=q.scale - 0.2)
 
+    seed = tfp_test_util.test_seed()
+
     approx_kl = tfp.vi.monte_carlo_csiszar_f_divergence(
         f=tfp.vi.kl_forward,
         p_log_prob=p.log_prob,
         q=q,
-        num_draws=int(1e5),
-        seed=1)
+        num_draws=int(4e5),
+        seed=seed)
 
     approx_kl_self_normalized = tfp.vi.monte_carlo_csiszar_f_divergence(
         f=lambda logu: tfp.vi.kl_forward(logu, self_normalized=True),
         p_log_prob=p.log_prob,
         q=q,
-        num_draws=int(1e5),
-        seed=1)
+        num_draws=int(4e5),
+        seed=seed)
 
     exact_kl = tfd.kl_divergence(p, q)
 
@@ -503,10 +497,10 @@ class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
         approx_kl, approx_kl_self_normalized, exact_kl])
 
     self.assertAllClose(approx_kl_, exact_kl_,
-                        rtol=0.08, atol=0.)
+                        rtol=0.10, atol=0.)
 
     self.assertAllClose(approx_kl_self_normalized_, exact_kl_,
-                        rtol=0.02, atol=0.)
+                        rtol=0.06, atol=0.)
 
   def test_kl_reverse(self):
     q = tfd.Normal(
@@ -515,19 +509,21 @@ class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
 
     p = tfd.Normal(loc=q.loc + 0.1, scale=q.scale - 0.2)
 
+    seed = tfp_test_util.test_seed()
+
     approx_kl = tfp.vi.monte_carlo_csiszar_f_divergence(
         f=tfp.vi.kl_reverse,
         p_log_prob=p.log_prob,
         q=q,
-        num_draws=int(1e5),
-        seed=1)
+        num_draws=int(4.5e5),
+        seed=seed)
 
     approx_kl_self_normalized = tfp.vi.monte_carlo_csiszar_f_divergence(
         f=lambda logu: tfp.vi.kl_reverse(logu, self_normalized=True),
         p_log_prob=p.log_prob,
         q=q,
-        num_draws=int(1e5),
-        seed=1)
+        num_draws=int(4.5e5),
+        seed=seed)
 
     exact_kl = tfd.kl_divergence(q, p)
 
@@ -535,10 +531,10 @@ class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
         approx_kl, approx_kl_self_normalized, exact_kl])
 
     self.assertAllClose(approx_kl_, exact_kl_,
-                        rtol=0.07, atol=0.)
+                        rtol=0.13, atol=0.)
 
     self.assertAllClose(approx_kl_self_normalized_, exact_kl_,
-                        rtol=0.02, atol=0.)
+                        rtol=0.07, atol=0.)
 
   def test_kl_forward_multidim(self):
     d = 5  # Dimension
@@ -547,23 +543,25 @@ class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
         covariance_matrix=tridiag(d, diag_value=1, offdiag_value=0.5))
 
     # Variance is very high when approximating Forward KL, so we make
-    # scale_diag larger than in test_kl_reverse_multidim. This ensures q
+    # scale_diag large. This ensures q
     # "covers" p and thus Var_q[p/q] is smaller.
     q = tfd.MultivariateNormalDiag(scale_diag=[1.]*d)
+
+    seed = tfp_test_util.test_seed()
 
     approx_kl = tfp.vi.monte_carlo_csiszar_f_divergence(
         f=tfp.vi.kl_forward,
         p_log_prob=p.log_prob,
         q=q,
-        num_draws=int(1e5),
-        seed=1)
+        num_draws=int(6e5),
+        seed=seed)
 
     approx_kl_self_normalized = tfp.vi.monte_carlo_csiszar_f_divergence(
         f=lambda logu: tfp.vi.kl_forward(logu, self_normalized=True),
         p_log_prob=p.log_prob,
         q=q,
-        num_draws=int(1e5),
-        seed=1)
+        num_draws=int(6e5),
+        seed=seed)
 
     exact_kl = tfd.kl_divergence(p, q)
 
@@ -571,10 +569,10 @@ class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
         approx_kl, approx_kl_self_normalized, exact_kl])
 
     self.assertAllClose(approx_kl_, exact_kl_,
-                        rtol=0.06, atol=0.)
+                        rtol=0.14, atol=0.)
 
     self.assertAllClose(approx_kl_self_normalized_, exact_kl_,
-                        rtol=0.05, atol=0.)
+                        rtol=0.14, atol=0.)
 
   def test_kl_reverse_multidim(self):
     d = 5  # Dimension
@@ -582,21 +580,27 @@ class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
     p = tfd.MultivariateNormalFullCovariance(
         covariance_matrix=tridiag(d, diag_value=1, offdiag_value=0.5))
 
-    q = tfd.MultivariateNormalDiag(scale_diag=[0.5]*d)
+    # Variance is very high when approximating Reverse KL with self
+    # normalization, because we pick up a term E_q[p / q]. So we make
+    # scale_diag large. This ensures q "covers" p and thus Var_q[p/q] is
+    # smaller.
+    q = tfd.MultivariateNormalDiag(scale_diag=[1.]*d)
+
+    seed = tfp_test_util.test_seed()
 
     approx_kl = tfp.vi.monte_carlo_csiszar_f_divergence(
         f=tfp.vi.kl_reverse,
         p_log_prob=p.log_prob,
         q=q,
-        num_draws=int(3e5),
-        seed=12475)
+        num_draws=int(6e5),
+        seed=seed)
 
     approx_kl_self_normalized = tfp.vi.monte_carlo_csiszar_f_divergence(
         f=lambda logu: tfp.vi.kl_reverse(logu, self_normalized=True),
         p_log_prob=p.log_prob,
         q=q,
-        num_draws=int(3e5),
-        seed=12485)
+        num_draws=int(6e5),
+        seed=seed)
 
     exact_kl = tfd.kl_divergence(q, p)
 
@@ -607,7 +611,7 @@ class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
                         rtol=0.02, atol=0.)
 
     self.assertAllClose(approx_kl_self_normalized_, exact_kl_,
-                        rtol=0.08, atol=0.)
+                        rtol=0.14, atol=0.)
 
   def test_kl_jd(self):
     # By convolution, this two distributions should be the same after
@@ -622,32 +626,34 @@ class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
         tfd.Normal(0., tf.sqrt(2.))
     ])
 
+    seed = tfp_test_util.test_seed()
+
     forward_kl = tfp.vi.monte_carlo_csiszar_f_divergence(
         f=lambda logu: tfp.vi.kl_forward(logu, self_normalized=True),
         p_log_prob=p.log_prob,
         q=q,
         num_draws=int(3e5),
-        seed=12475)
+        seed=seed)
 
     reverse_kl = tfp.vi.monte_carlo_csiszar_f_divergence(
         f=lambda logu: tfp.vi.kl_reverse(logu, self_normalized=True),
         p_log_prob=p.log_prob,
         q=q,
         num_draws=int(3e5),
-        seed=12475)
+        seed=seed)
 
     [forward_kl_, reverse_kl_] = self.evaluate([forward_kl, reverse_kl])
 
-    self.assertAllClose(forward_kl_+reverse_kl_, 1., rtol=0.01, atol=0.)
+    self.assertAllClose(forward_kl_+reverse_kl_, 1., rtol=0.07, atol=0.)
 
   def test_score_trick(self):
     d = 5  # Dimension
-    num_draws = int(2e5)
-    seed = 23
+    num_draws = int(4.5e5)
+    seed = tfp_test_util.test_seed()
 
     # Variance is very high when approximating Forward KL, so we make
-    # scale_diag larger than in test_kl_reverse_multidim. This ensures q
-    # "covers" p and thus Var_q[p/q] is smaller.
+    # scale_diag large. This ensures q "covers" p and thus Var_q[p/q] is
+    # smaller.
     s = tf.constant(1.)
 
     def construct_monte_carlo_csiszar_f_divergence(
@@ -705,30 +711,30 @@ class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
 
     # Test average divergence.
     self.assertAllClose(approx_kl_, exact_kl_,
-                        rtol=0.02, atol=0.)
+                        rtol=0.04, atol=0.)
 
     self.assertAllClose(approx_kl_self_normalized_, exact_kl_,
                         rtol=0.08, atol=0.)
 
     self.assertAllClose(approx_kl_score_trick_, exact_kl_,
-                        rtol=0.02, atol=0.)
+                        rtol=0.04, atol=0.)
 
     self.assertAllClose(approx_kl_self_normalized_score_trick_, exact_kl_,
                         rtol=0.08, atol=0.)
 
     # Test average gradient-divergence.
     self.assertAllClose(approx_kl_grad_, exact_kl_grad_,
-                        rtol=0.007, atol=0.)
+                        rtol=0.04, atol=0.)
 
     self.assertAllClose(approx_kl_self_normalized_grad_, exact_kl_grad_,
-                        rtol=0.011, atol=0.)
+                        rtol=0.04, atol=0.)
 
     self.assertAllClose(approx_kl_score_trick_grad_, exact_kl_grad_,
-                        rtol=0.018, atol=0.)
+                        rtol=0.05, atol=0.)
 
     self.assertAllClose(
         approx_kl_self_normalized_score_trick_grad_, exact_kl_grad_,
-        rtol=0.017, atol=0.)
+        rtol=0.04, atol=0.)
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -904,7 +910,7 @@ class CsiszarVIMCOTest(test_case.TestCase):
     dims = 5  # Dimension
     num_draws = int(1e3)
     num_batch_draws = int(3)
-    seed = 81792
+    seed = tfp_test_util.test_seed()
 
     with tf.GradientTape(persistent=True) as tape:
       f = lambda logu: tfp.vi.kl_reverse(logu, self_normalized=False)
@@ -916,8 +922,8 @@ class CsiszarVIMCOTest(test_case.TestCase):
           covariance_matrix=tridiag(dims, diag_value=1, offdiag_value=0.5))
 
       # Variance is very high when approximating Forward KL, so we make
-      # scale_diag larger than in test_kl_reverse_multidim. This ensures q
-      # "covers" p and thus Var_q[p/q] is smaller.
+      # scale_diag large. This ensures q "covers" p and thus Var_q[p/q] is
+      # smaller.
       q = tfd.MultivariateNormalDiag(
           scale_diag=tf.tile([s], [dims]))
 
@@ -927,12 +933,13 @@ class CsiszarVIMCOTest(test_case.TestCase):
           q=q,
           num_draws=num_draws,
           num_batch_draws=num_batch_draws,
-          seed=_set_seed(seed))
+          seed=seed)
 
       # We want the seed to be the same since we will use computations
       # with the same underlying sample to show correctness of vimco.
-      x = q.sample(sample_shape=[num_draws, num_batch_draws],
-                   seed=_set_seed(seed))
+      if tf.executing_eagerly():
+        tf.compat.v1.set_random_seed(seed)
+      x = q.sample(sample_shape=[num_draws, num_batch_draws], seed=seed)
       x = tf.stop_gradient(x)
       logu = p.log_prob(x) - q.log_prob(x)
       f_log_sum_u = f(tfp.vi.csiszar_vimco_helper(logu)[0])
@@ -962,7 +969,7 @@ class CsiszarVIMCOTest(test_case.TestCase):
 
     # Test VIMCO loss is correct.
     self.assertAllClose(np_f(np_log_avg_u).mean(axis=0), vimco_,
-                        rtol=1e-4, atol=0.)
+                        rtol=1e-4, atol=1e-5)
 
     # Test gradient of VIMCO loss is correct.
     #
@@ -977,7 +984,7 @@ class CsiszarVIMCOTest(test_case.TestCase):
     # correctness of the zero-th order derivative (for each batch member).
     # Since `tfp.vi.csiszar_vimco_helper` itself does not manipulate any
     # gradient information, we can safely rely on TF.
-    self.assertAllClose(np_f(np_log_avg_u), f_log_sum_u_, rtol=2e-4, atol=0.)
+    self.assertAllClose(np_f(np_log_avg_u), f_log_sum_u_, rtol=1e-4, atol=1e-5)
     #
     # Regarding `jacobian_logqx_`, note that testing the gradient of
     # `q.log_prob` is outside the scope of this unit-test thus we may safely
@@ -993,7 +1000,7 @@ class CsiszarVIMCOTest(test_case.TestCase):
                 axis=0),
             axis=0))
 
-    self.assertAllClose(np_grad_vimco, grad_vimco_, rtol=3e-2, atol=1e-4)
+    self.assertAllClose(np_grad_vimco, grad_vimco_, rtol=0.03, atol=1e-3)
 
 
 if __name__ == "__main__":

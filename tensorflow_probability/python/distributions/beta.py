@@ -327,9 +327,6 @@ class Beta(distribution.Distribution):
     ], x)
 
 
-# TODO(b/117098119): Remove tf.distribution references once they're gone.
-@kullback_leibler.RegisterKL(Beta, tf.compat.v1.distributions.Beta)
-@kullback_leibler.RegisterKL(tf.compat.v1.distributions.Beta, Beta)
 @kullback_leibler.RegisterKL(Beta, Beta)
 def _kl_beta_beta(d1, d2, name=None):
   """Calculate the batchwise KL divergence KL(d1 || d2) with d1 and d2 Beta.

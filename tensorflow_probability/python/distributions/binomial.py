@@ -19,6 +19,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import multinomial
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
@@ -242,6 +243,31 @@ class Binomial(distribution.Distribution):
     counts = self._maybe_assert_valid_sample(counts)
     return (tf.math.lgamma(1. + self.total_count - counts) +
             tf.math.lgamma(1. + counts) - tf.math.lgamma(1. + self.total_count))
+
+  @distribution_util.AppendDocstring(_binomial_sample_note)
+  def _sample_n(self, n, seed=None):
+    # Need to create logits corresponding to [p, 1 - p].
+    # Note that for this distributions, logits corresponds to
+    # inverse sigmoid(p) while in multivariate distributions,
+    # such as multinomial this corresponds to log(p).
+    # Because of this, when we construct the logits for the multinomial
+    # sampler, we'll have to be careful.
+    # log(p) = log(sigmoid(logits)) = logits - softplus(logits)
+    # log(1 - p) = log(1 - sigmoid(logits)) = -softplus(logits)
+    # Because softmax is invariant to a constnat shift in all inputs,
+    # we can offset the logits by softplus(logits) so that we can use
+    # [logits, 0.] as our input.
+    logits = tf.stack(
+        [self.logits,
+         tf.zeros_like(self.logits)],
+        axis=-1)
+    return multinomial.draw_sample(
+        num_samples=n,
+        num_classes=2,
+        logits=logits,
+        num_trials=tf.cast(self.total_count, dtype=tf.int32),
+        dtype=self.dtype,
+        seed=seed)[..., 0]
 
   def _mean(self):
     return self.total_count * self.probs
