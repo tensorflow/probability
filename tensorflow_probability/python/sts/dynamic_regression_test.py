@@ -37,7 +37,7 @@ class _DynamicLinearRegressionStateSpaceModelTest(object):
     batch_shape = [4, 3]
     num_timesteps = 10
     num_features = 2
-    weights_scale = 0.
+    drift_scale = 0.
 
     design_matrix = self._build_placeholder(
         np.random.randn(*(batch_shape + [num_timesteps, num_features])))
@@ -51,7 +51,7 @@ class _DynamicLinearRegressionStateSpaceModelTest(object):
     ssm = DynamicLinearRegressionStateSpaceModel(
         num_timesteps=num_timesteps,
         design_matrix=design_matrix,
-        weights_scale=weights_scale,
+        drift_scale=drift_scale,
         initial_state_prior=initial_state_prior)
 
     predicted_time_series = linear_operator_util.matmul_with_broadcast(
@@ -65,7 +65,7 @@ class _DynamicLinearRegressionStateSpaceModelTest(object):
     batch_shape = [4, 3]
     num_timesteps = 10
     num_features = 2
-    weights_scale = 1.
+    drift_scale = 1.
 
     initial_state_loc = self._build_placeholder([0.1, -0.2])
     initial_state_scale = self._build_placeholder([0.42, 0.314])
@@ -79,7 +79,7 @@ class _DynamicLinearRegressionStateSpaceModelTest(object):
     ssm = DynamicLinearRegressionStateSpaceModel(
         num_timesteps=num_timesteps,
         design_matrix=design_matrix,
-        weights_scale=weights_scale,
+        drift_scale=drift_scale,
         initial_state_prior=initial_state_prior)
 
     sample = ssm.sample()
@@ -98,14 +98,14 @@ class _DynamicLinearRegressionStateSpaceModelTest(object):
   def test_matrices_from_component(self):
     num_timesteps = 4
     num_features = 3
-    weights_scale = 1.23
+    drift_scale = 1.23
 
     design_matrix = self._build_placeholder(
         np.random.randn(num_timesteps, num_features))
 
     component = DynamicLinearRegression(design_matrix=design_matrix)
 
-    ssm = component.make_state_space_model(num_timesteps, [weights_scale])
+    ssm = component.make_state_space_model(num_timesteps, [drift_scale])
 
     for t in range(num_timesteps):
       observation_matrix = self.evaluate(
@@ -134,7 +134,7 @@ class _DynamicLinearRegressionStateSpaceModelTest(object):
 
       self.assertAllClose(np.zeros([num_features]),
                           transition_noise_mean)
-      self.assertAllClose(np.square(weights_scale) * np.eye(num_features),
+      self.assertAllClose(np.square(drift_scale) * np.eye(num_features),
                           transition_noise_covariance)
 
   def _build_placeholder(self, ndarray):

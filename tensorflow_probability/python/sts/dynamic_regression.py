@@ -34,7 +34,7 @@ class DynamicLinearRegressionStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
   def __init__(self,
                num_timesteps,
                design_matrix,
-               weights_scale,
+               drift_scale,
                initial_state_prior,
                observation_noise_scale=0.,
                initial_step=0,
@@ -43,16 +43,16 @@ class DynamicLinearRegressionStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
                name=None):
 
     with tf.compat.v1.name_scope(name, 'DynamicLinearRegressionStateSpaceModel',
-                                 values=[weights_scale]) as name:
+                                 values=[drift_scale]) as name:
 
       dtype = dtype_util.common_dtype(
-          [design_matrix, weights_scale, initial_state_prior])
+          [design_matrix, drift_scale, initial_state_prior])
 
       design_matrix = tf.convert_to_tensor(
           value=design_matrix, name='design_matrix', dtype=dtype)
 
-      weights_scale = tf.convert_to_tensor(
-          value=weights_scale, name='weights_scale', dtype=dtype)
+      drift_scale = tf.convert_to_tensor(
+          value=drift_scale, name='drift_scale', dtype=dtype)
 
       observation_noise_scale = tf.convert_to_tensor(
           value=observation_noise_scale,
@@ -66,7 +66,7 @@ class DynamicLinearRegressionStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
             design_matrix[..., t, tf.newaxis, :], name='observation_matrix')
         return observation_matrix
 
-      self._weights_scale = weights_scale
+      self._drift_scale = drift_scale
       self._observation_noise_scale = observation_noise_scale
 
       super(DynamicLinearRegressionStateSpaceModel, self).__init__(
@@ -76,7 +76,7 @@ class DynamicLinearRegressionStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
               dtype=dtype,
               name='transition_matrix'),
           transition_noise=tfd.MultivariateNormalDiag(
-              scale_diag=tf.broadcast_to(weights_scale, [num_features]),
+              scale_diag=tf.broadcast_to(drift_scale, [num_features]),
               name='transition_noise'),
           observation_matrix=observation_matrix_fn,
           observation_noise=tfd.MultivariateNormalDiag(
@@ -89,9 +89,9 @@ class DynamicLinearRegressionStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
           name=name)
 
   @property
-  def weights_scale(self):
-    """Standard deviation of the weights transitions."""
-    return self._weights_scale
+  def drift_scale(self):
+    """Standard deviation of the drift in weights at each timestep."""
+    return self._drift_scale
 
   @property
   def observation_noise_scale(self):
@@ -103,7 +103,7 @@ class DynamicLinearRegression(StructuralTimeSeries):
 
   def __init__(self,
                design_matrix,
-               weights_scale_prior=None,
+               drift_scale_prior=None,
                initial_weights_prior=None,
                observed_time_series=None,
                name=None):
@@ -112,7 +112,7 @@ class DynamicLinearRegression(StructuralTimeSeries):
         name, 'DynamicLinearRegression', values=[observed_time_series]) as name:
 
       dtype = dtype_util.common_dtype(
-          [design_matrix, weights_scale_prior, initial_weights_prior])
+          [design_matrix, drift_scale_prior, initial_weights_prior])
 
       num_features = tf.shape(design_matrix)[-1]
 
@@ -123,24 +123,24 @@ class DynamicLinearRegression(StructuralTimeSeries):
 
       # Heuristic default priors. Overriding these may dramatically
       # change inference performance and results.
-      if weights_scale_prior is None:
+      if drift_scale_prior is None:
         if observed_time_series is None:
           observed_stddev = tf.constant(1.0, dtype=dtype)
         else:
           _, observed_stddev, _ = sts_util.empirical_statistics(
               observed_time_series)
 
-        weights_scale_prior = tfd.LogNormal(
+        drift_scale_prior = tfd.LogNormal(
             loc=tf.math.log(.05 * observed_stddev),
             scale=3.,
-            name='weights_scale_prior')
+            name='drift_scale_prior')
 
       self._initial_state_prior = initial_weights_prior
       self._design_matrix = design_matrix
 
       super(DynamicLinearRegression, self).__init__(
           parameters=[
-              Parameter('weights_scale', weights_scale_prior, tfb.Softplus())
+              Parameter('drift_scale', drift_scale_prior, tfb.Softplus())
           ],
           latent_size=num_features,
           name=name)
