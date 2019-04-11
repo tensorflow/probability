@@ -30,6 +30,7 @@ from tensorflow_probability.python.sts import LocalLinearTrend
 from tensorflow_probability.python.sts import Seasonal
 from tensorflow_probability.python.sts import SemiLocalLinearTrend
 from tensorflow_probability.python.sts import SparseLinearRegression
+from tensorflow_probability.python.sts import DynamicLinearRegression
 from tensorflow_probability.python.sts import Sum
 from tensorflow_probability.python.sts.internal import util as sts_util
 
@@ -372,6 +373,18 @@ class SparseLinearRegressionTest(tf.test.TestCase, _StsTestHarness):
         weights_batch_shape=batch_shape)
     return Sum(components=[regression],
                observed_time_series=observed_time_series)
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class DynamicLinearRegressionTest(tf.test.TestCase, _StsTestHarness):
+
+  def _build_sts(self, observed_time_series=None):
+    max_timesteps = 100
+    num_features = 3
+
+    return DynamicLinearRegression(
+        design_matrix=tf.random.normal([max_timesteps, num_features]),
+        observed_time_series=observed_time_series)
 
 
 if __name__ == '__main__':
