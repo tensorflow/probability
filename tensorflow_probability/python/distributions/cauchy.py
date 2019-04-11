@@ -20,7 +20,7 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
@@ -118,7 +118,7 @@ class Cauchy(distribution.Distribution):
       TypeError: if `loc` and `scale` have different `dtype`.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, scale], tf.float32)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
       scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
@@ -202,12 +202,12 @@ class Cauchy(distribution.Distribution):
 
   def _z(self, x):
     """Standardize input `x`."""
-    with tf.compat.v2.name_scope("standardize"):
+    with tf.name_scope("standardize"):
       return (x - self.loc) / self.scale
 
   def _inv_z(self, z):
     """Reconstruct input `x` from a its normalized version."""
-    with tf.compat.v2.name_scope("reconstruct"):
+    with tf.name_scope("reconstruct"):
       return z * self.scale + self.loc
 
   def _mean(self):

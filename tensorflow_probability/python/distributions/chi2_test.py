@@ -22,7 +22,7 @@ from __future__ import print_function
 import numpy as np
 from scipy import special
 from scipy import stats
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util as tfp_test_util

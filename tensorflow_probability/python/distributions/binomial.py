@@ -17,7 +17,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import multinomial
 from tensorflow_probability.python.internal import assert_util
@@ -161,7 +161,7 @@ class Binomial(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([total_count, logits, probs], tf.float32)
       self._total_count = self._maybe_assert_valid_total_count(
           tf.convert_to_tensor(

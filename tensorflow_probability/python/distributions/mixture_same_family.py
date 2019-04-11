@@ -22,7 +22,7 @@ import collections
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import independent
@@ -159,7 +159,7 @@ class MixtureSameFamily(distribution.Distribution):
          Distributions. _arXiv_, 2016. https://arxiv.org/abs/1607.05690
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       self._mixture_distribution = mixture_distribution
       self._components_distribution = components_distribution
       self._runtime_assertions = []
@@ -389,7 +389,7 @@ class MixtureSameFamily(distribution.Distribution):
       return mean_cond_var + var_cond_mean                   # [B, e, e]
 
   def _pad_sample_dims(self, x):
-    with tf.compat.v2.name_scope("pad_sample_dims"):
+    with tf.name_scope("pad_sample_dims"):
       ndims = x.shape.ndims if x.shape.ndims is not None else tf.rank(x)
       shape = tf.shape(input=x)
       d = ndims - self._event_ndims

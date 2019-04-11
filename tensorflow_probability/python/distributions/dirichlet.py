@@ -20,7 +20,7 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -177,7 +177,7 @@ class Dirichlet(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       self._concentration = self._maybe_assert_valid_concentration(
           tf.convert_to_tensor(
               value=concentration,
@@ -339,7 +339,7 @@ def _kl_dirichlet_dirichlet(d1, d2, name=None):
   Returns:
     Batchwise KL(d1 || d2)
   """
-  with tf.compat.v2.name_scope(name or "kl_dirichlet_dirichlet"):
+  with tf.name_scope(name or "kl_dirichlet_dirichlet"):
     # The KL between Dirichlet distributions can be derived as follows. We have
     #
     #   Dir(x; a) = 1 / B(a) * prod_i[x[i]^(a[i] - 1)]

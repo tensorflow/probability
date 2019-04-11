@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import distribution_util as util
@@ -65,7 +65,7 @@ class Bernoulli(distribution.Distribution):
       ValueError: If p and logits are passed, or if neither are passed.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       self._logits, self._probs = util.get_logits_and_probs(
           logits=logits,
           probs=probs,
@@ -166,7 +166,7 @@ def _kl_bernoulli_bernoulli(a, b, name=None):
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.compat.v2.name_scope(name or "kl_bernoulli_bernoulli"):
+  with tf.name_scope(name or "kl_bernoulli_bernoulli"):
     delta_probs0 = tf.nn.softplus(-b.logits) - tf.nn.softplus(-a.logits)
     delta_probs1 = tf.nn.softplus(b.logits) - tf.nn.softplus(a.logits)
     return (tf.sigmoid(a.logits) * delta_probs0

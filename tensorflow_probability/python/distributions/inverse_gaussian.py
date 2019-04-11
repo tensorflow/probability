@@ -20,7 +20,7 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import assert_util
@@ -100,7 +100,7 @@ class InverseGaussian(distribution.Distribution):
         Default value: 'InverseGaussian'.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name):
+    with tf.name_scope(name):
       dtype = dtype_util.common_dtype([loc, concentration],
                                       preferred_dtype=tf.float32)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)

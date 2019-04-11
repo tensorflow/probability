@@ -21,7 +21,7 @@ from __future__ import print_function
 import math
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
@@ -106,8 +106,8 @@ class _WishartLinearOperator(distribution.Distribution):
     """
     parameters = dict(locals())
     self._input_output_cholesky = input_output_cholesky
-    with tf.compat.v2.name_scope(name) as name:
-      with tf.compat.v2.name_scope("init"):
+    with tf.name_scope(name) as name:
+      with tf.name_scope("init"):
         if not scale_operator.dtype.is_floating:
           raise TypeError(
               "scale_operator.dtype=%s is not a floating-point type" %
@@ -533,8 +533,8 @@ class Wishart(_WishartLinearOperator):
     """
     parameters = dict(locals())
 
-    with tf.compat.v2.name_scope(name) as name:
-      with tf.compat.v2.name_scope("init"):
+    with tf.name_scope(name) as name:
+      with tf.name_scope("init"):
         if (scale is None) == (scale_tril is None):
           raise ValueError("Must pass scale or scale_tril, but not both.")
 

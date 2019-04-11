@@ -20,7 +20,7 @@ from __future__ import print_function
 
 import math
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
@@ -127,7 +127,7 @@ class Normal(distribution.Distribution):
       TypeError: if `loc` and `scale` have different `dtype`.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, scale], tf.float32)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
       scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
@@ -226,12 +226,12 @@ class Normal(distribution.Distribution):
 
   def _z(self, x):
     """Standardize input `x` to a unit normal."""
-    with tf.compat.v2.name_scope("standardize"):
+    with tf.name_scope("standardize"):
       return (x - self.loc) / self.scale
 
   def _inv_z(self, z):
     """Reconstruct input `x` from a its normalized version."""
-    with tf.compat.v2.name_scope("reconstruct"):
+    with tf.name_scope("reconstruct"):
       return z * self.scale + self.loc
 
 
@@ -248,7 +248,7 @@ def _kl_normal_normal(n_a, n_b, name=None):
   Returns:
     Batchwise KL(n_a || n_b)
   """
-  with tf.compat.v2.name_scope(name or "kl_normal_normal"):
+  with tf.name_scope(name or "kl_normal_normal"):
     one = tf.constant(1, dtype=n_a.dtype)
     two = tf.constant(2, dtype=n_a.dtype)
     half = tf.constant(0.5, dtype=n_a.dtype)

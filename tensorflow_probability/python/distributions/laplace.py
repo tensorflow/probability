@@ -22,7 +22,7 @@ import math
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -94,7 +94,7 @@ class Laplace(distribution.Distribution):
       TypeError: if `loc` and `scale` are of different dtype.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, scale], tf.float32)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
       scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
@@ -221,7 +221,7 @@ def _kl_laplace_laplace(a, b, name=None):
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.compat.v2.name_scope(name or "kl_laplace_laplace"):
+  with tf.name_scope(name or "kl_laplace_laplace"):
     # Consistent with
     # http://www.mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 38
     distance = tf.abs(a.loc - b.loc)

@@ -20,7 +20,7 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -142,7 +142,7 @@ class Gamma(distribution.Distribution):
       TypeError: if `concentration` and `rate` are different dtypes.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([concentration, rate], tf.float32)
       concentration = tf.convert_to_tensor(
           value=concentration, name="concentration", dtype=dtype)
@@ -282,7 +282,7 @@ def _kl_gamma_gamma(g0, g1, name=None):
   Returns:
     kl_gamma_gamma: `Tensor`. The batchwise KL(g0 || g1).
   """
-  with tf.compat.v2.name_scope(name or "kl_gamma_gamma"):
+  with tf.name_scope(name or "kl_gamma_gamma"):
     # Result from:
     #   http://www.fil.ion.ucl.ac.uk/~wpenny/publications/densities.ps
     # For derivation see:

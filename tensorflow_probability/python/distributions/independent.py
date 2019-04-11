@@ -20,7 +20,7 @@ from __future__ import print_function
 
 import collections
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -116,7 +116,7 @@ class Independent(distribution_lib.Distribution):
     parameters = dict(locals())
     name = name or "Independent" + distribution.name
     self._distribution = distribution
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       if reinterpreted_batch_ndims is None:
         reinterpreted_batch_ndims = self._get_default_reinterpreted_batch_ndims(
             distribution)

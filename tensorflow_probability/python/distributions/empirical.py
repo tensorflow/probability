@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util as util
@@ -140,7 +140,7 @@ class Empirical(distribution.Distribution):
     """
 
     parameters = locals()
-    with tf.compat.v2.name_scope(name):
+    with tf.name_scope(name):
       self._samples = tf.convert_to_tensor(value=samples, name='samples')
       self._event_ndims = event_ndims
       self._samples_axis = ((self.samples.shape.ndims or tf.rank(self.samples))

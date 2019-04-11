@@ -20,7 +20,7 @@ from __future__ import print_function
 
 import functools
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -63,7 +63,7 @@ class Blockwise(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       self._assertions = _maybe_validate_distributions(
           distributions, dtype_override, validate_args)
 
@@ -247,7 +247,7 @@ def _kl_blockwise_blockwise(b0, b1, name=None):
               e1, e2, message=message)
           for e1, e2 in zip(b0_event_sizes, b1_event_sizes))
 
-  with tf.compat.v2.name_scope(name or 'kl_blockwise_blockwise'):
+  with tf.name_scope(name or 'kl_blockwise_blockwise'):
     with tf.control_dependencies(assertions):
       return sum([
           kullback_leibler.kl_divergence(d1, d2) for d1, d2 in zip(

@@ -20,7 +20,7 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import exp as exp_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import transformed_distribution
@@ -157,7 +157,7 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
 
       dtype = dtype_util.common_dtype([logits, probs, temperature], tf.float32)
       self._logits, self._probs = distribution_util.get_logits_and_probs(
@@ -182,10 +182,10 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
             dtype=tf.int32,
             name="batch_rank")
       else:
-        with tf.compat.v2.name_scope("batch_rank"):
+        with tf.name_scope("batch_rank"):
           self._batch_rank = tf.rank(self._logits) - 1
 
-      with tf.compat.v2.name_scope("event_size"):
+      with tf.name_scope("event_size"):
         self._event_size = tf.shape(input=self._logits)[-1]
 
     super(ExpRelaxedOneHotCategorical, self).__init__(

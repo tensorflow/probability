@@ -17,7 +17,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.internal import assert_util
@@ -206,7 +206,7 @@ class TransformedDistribution(distribution_lib.Distribution):
     parameters = dict(locals()) if parameters is None else parameters
     name = name or (("" if bijector is None else bijector.name) +
                     distribution.name)
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       self._kwargs_split_fn = (_default_kwargs_split_fn
                                if kwargs_split_fn is None
                                else kwargs_split_fn)

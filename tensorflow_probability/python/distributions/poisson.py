@@ -19,7 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
@@ -88,7 +88,7 @@ class Poisson(distribution.Distribution):
       TypeError: if `log_rate` is not a float-type.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       if (rate is None) == (log_rate is None):
         raise ValueError("Must specify exactly one of `rate` and `log_rate`.")
       elif log_rate is None:

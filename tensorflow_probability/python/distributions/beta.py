@@ -20,7 +20,7 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -170,7 +170,7 @@ class Beta(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([concentration1, concentration0],
                                       tf.float32)
       self._concentration1 = self._maybe_assert_valid_concentration(
@@ -345,7 +345,7 @@ def _kl_beta_beta(d1, d2, name=None):
     fn2 = getattr(d2, fn)
     return (fn2 - fn1) if is_property else (fn2() - fn1())
 
-  with tf.compat.v2.name_scope(name or "kl_beta_beta"):
+  with tf.name_scope(name or "kl_beta_beta"):
     return (delta("_log_normalization", is_property=False) -
             tf.math.digamma(d1.concentration1) * delta("concentration1") -
             tf.math.digamma(d1.concentration0) * delta("concentration0") +

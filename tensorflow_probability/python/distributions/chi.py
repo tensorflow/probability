@@ -19,7 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import invert as invert_bijector
 from tensorflow_probability.python.bijectors import square as square_bijector
@@ -80,7 +80,7 @@ class Chi(transformed_distribution.TransformedDistribution):
         Default value: `'Chi'`.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       df = tf.convert_to_tensor(
           value=df,
           name="df",
@@ -133,7 +133,7 @@ def _kl_chi_chi(a, b, name=None):
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.compat.v2.name_scope(name or "kl_chi_chi"):
+  with tf.name_scope(name or "kl_chi_chi"):
     # Consistent with
     # https://mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 118
     # The paper introduces an additional scaling parameter; setting that

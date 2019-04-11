@@ -19,7 +19,7 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
@@ -80,7 +80,7 @@ class Geometric(distribution.Distribution):
     """
 
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       self._logits, self._probs = distribution_util.get_logits_and_probs(
           logits, probs, validate_args=validate_args, name=name)
 

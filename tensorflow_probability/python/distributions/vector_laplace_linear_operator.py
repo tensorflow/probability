@@ -20,7 +20,7 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import affine_linear_operator as affine_linear_operator_bijector
 from tensorflow_probability.python.distributions import laplace
@@ -195,7 +195,7 @@ class VectorLaplaceLinearOperator(
     if not scale.dtype.is_floating:
       raise TypeError("`scale` parameter must have floating-point dtype.")
 
-    with tf.compat.v2.name_scope(name):
+    with tf.name_scope(name):
       # Since expand_dims doesn't preserve constant-ness, we obtain the
       # non-dynamic value if possible.
       loc = loc if loc is None else tf.convert_to_tensor(

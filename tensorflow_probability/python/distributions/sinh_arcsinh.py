@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import affine_scalar as affine_scalar_bijector
 from tensorflow_probability.python.bijectors import chain as chain_bijector
 from tensorflow_probability.python.bijectors import sinh_arcsinh as sinh_arcsinh_bijector
@@ -135,7 +135,7 @@ class SinhArcsinh(transformed_distribution.TransformedDistribution):
     """
     parameters = dict(locals())
 
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, scale, skewness, tailweight],
                                       tf.float32)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)

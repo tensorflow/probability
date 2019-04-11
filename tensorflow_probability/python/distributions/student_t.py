@@ -20,7 +20,7 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
@@ -169,7 +169,7 @@ class StudentT(distribution.Distribution):
       TypeError: if loc and scale are different dtypes.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([df, loc, scale], tf.float32)
       df = tf.convert_to_tensor(value=df, name="df", dtype=dtype)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)

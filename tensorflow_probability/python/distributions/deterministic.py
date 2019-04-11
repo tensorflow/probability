@@ -22,7 +22,7 @@ import abc
 
 # Dependency imports
 import six
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -100,7 +100,7 @@ class _BaseDeterministic(distribution.Distribution):
     Raises:
       ValueError:  If `loc` is a scalar.
     """
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, atol, rtol],
                                       preferred_dtype=tf.float32)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
@@ -415,5 +415,5 @@ def _kl_deterministic_distribution(a, b, name=None):
   Returns:
     Batchwise `KL(a || b)`.
   """
-  with tf.compat.v2.name_scope(name or "kl_deterministic_distribution"):
+  with tf.name_scope(name or "kl_deterministic_distribution"):
     return -b.log_prob(a.loc)

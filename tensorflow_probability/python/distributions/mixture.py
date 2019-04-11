@@ -20,7 +20,7 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.distributions import distribution
@@ -145,7 +145,7 @@ class Mixture(distribution.Distribution):
           "none of the components provide a static number of ndims")
 
     # Ensure that all batch and event ndims are consistent.
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       num_components = cat.event_size
       static_num_components = tf.get_static_value(num_components)
       if static_num_components is None:

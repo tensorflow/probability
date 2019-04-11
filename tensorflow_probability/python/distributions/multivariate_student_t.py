@@ -20,7 +20,7 @@ from __future__ import print_function
 import functools
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math
 from tensorflow_probability.python.distributions import chi2 as chi2_lib
@@ -153,7 +153,7 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
     if validate_args and not scale.is_positive_definite:
       raise ValueError("`scale` must be positive definite.")
 
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([df, loc, scale],
                                       preferred_dtype=tf.float32)
 

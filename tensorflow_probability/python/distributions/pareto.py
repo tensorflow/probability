@@ -21,7 +21,7 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 
@@ -80,7 +80,7 @@ class Pareto(distribution.Distribution):
         Default value: 'Pareto'.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name):
+    with tf.name_scope(name):
       dtype = dtype_util.common_dtype([concentration, scale], tf.float32)
       self._concentration = tf.convert_to_tensor(
           value=concentration, name="concentration", dtype=dtype)
@@ -258,7 +258,7 @@ def _kl_pareto_pareto(a, b, name=None):
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.compat.v2.name_scope(name or "kl_pareto_pareto"):
+  with tf.name_scope(name or "kl_pareto_pareto"):
     # Consistent with
     # http://www.mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 55
     # Terminology is different from source to source for Pareto distributions.

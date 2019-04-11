@@ -20,7 +20,7 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -103,7 +103,7 @@ class HalfNormal(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       scale = tf.convert_to_tensor(
           value=scale,
           name="scale",
@@ -189,7 +189,7 @@ def _kl_half_normal_half_normal(a, b, name=None):
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.compat.v2.name_scope(name or "kl_half_normal_half_normal"):
+  with tf.name_scope(name or "kl_half_normal_half_normal"):
     # Consistent with
     # http://www.mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 119
     return (tf.math.log(b.scale) - tf.math.log(a.scale) +

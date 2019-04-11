@@ -21,7 +21,7 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -130,7 +130,7 @@ class Sample(distribution_lib.Distribution):
     parameters = dict(locals())
     name = name or 'Sample' + distribution.name
     self._distribution = distribution
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       sample_shape = distribution_util.expand_to_vector(tf.convert_to_tensor(
           value=sample_shape, dtype_hint=tf.int32, name='sample_shape'))
       self._sample_shape = sample_shape

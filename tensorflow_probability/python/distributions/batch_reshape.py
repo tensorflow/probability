@@ -20,7 +20,7 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.internal import assert_util
@@ -101,7 +101,7 @@ class BatchReshape(distribution_lib.Distribution):
     """
     parameters = dict(locals())
     name = name or "BatchReshape" + distribution.name
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       # The unexpanded batch shape may contain up to one dimension of -1.
       self._batch_shape_unexpanded = tf.convert_to_tensor(
           value=batch_shape, dtype=tf.int32, name="batch_shape")
@@ -288,7 +288,7 @@ class BatchReshape(distribution_lib.Distribution):
 
   def _validate_sample_arg(self, x):
     """Helper which validates sample arg, e.g., input to `log_prob`."""
-    with tf.compat.v2.name_scope("validate_sample_arg"):
+    with tf.name_scope("validate_sample_arg"):
       x_ndims = (tf.rank(x) if x.shape.ndims is None else x.shape.ndims)
       event_ndims = (
           tf.size(input=self.event_shape_tensor())
@@ -373,7 +373,7 @@ def calculate_reshape(original_shape, new_shape, validate=False, name=None):
   batch_shape_static = tensor_util.constant_value_as_shape(new_shape)
   if batch_shape_static.is_fully_defined():
     return np.int32(batch_shape_static.as_list()), batch_shape_static, []
-  with tf.compat.v2.name_scope(name or "calculate_reshape"):
+  with tf.name_scope(name or "calculate_reshape"):
     original_size = tf.reduce_prod(input_tensor=original_shape)
     implicit_dim = tf.equal(new_shape, -1)
     size_implicit_dim = (

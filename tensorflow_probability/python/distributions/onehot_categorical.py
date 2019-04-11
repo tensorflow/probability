@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
@@ -110,7 +110,7 @@ class OneHotCategorical(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       self._logits, self._probs = distribution_util.get_logits_and_probs(
           name=name, logits=logits, probs=probs, validate_args=validate_args,
           multidimensional=True)
@@ -122,10 +122,10 @@ class OneHotCategorical(distribution.Distribution):
             dtype=tf.int32,
             name="batch_rank")
       else:
-        with tf.compat.v2.name_scope("batch_rank"):
+        with tf.name_scope("batch_rank"):
           self._batch_rank = tf.rank(self._logits) - 1
 
-      with tf.compat.v2.name_scope("event_size"):
+      with tf.name_scope("event_size"):
         self._event_size = tf.shape(input=self._logits)[-1]
 
     super(OneHotCategorical, self).__init__(
@@ -247,7 +247,7 @@ def _kl_categorical_categorical(a, b, name=None):
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.compat.v2.name_scope(name or "kl_categorical_categorical"):
+  with tf.name_scope(name or "kl_categorical_categorical"):
     # sum(p ln(p / q))
     return tf.reduce_sum(
         input_tensor=tf.nn.softmax(a.logits) *

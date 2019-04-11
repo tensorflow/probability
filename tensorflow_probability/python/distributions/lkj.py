@@ -27,7 +27,7 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import beta
 from tensorflow_probability.python.distributions import distribution
@@ -133,7 +133,7 @@ class LKJ(distribution.Distribution):
           'There are no negative-dimension correlation matrices.')
     parameters = dict(locals())
     self._input_output_cholesky = input_output_cholesky
-    with tf.compat.v2.name_scope(name):
+    with tf.name_scope(name):
       concentration = tf.convert_to_tensor(
           value=concentration,
           name='concentration',
@@ -207,7 +207,7 @@ class LKJ(distribution.Distribution):
           'Cannot sample negative-dimension correlation matrices.')
     # Notation below: B is the batch shape, i.e., tf.shape(concentration)
     seed = seed_stream.SeedStream(seed, 'sample_lkj')
-    with tf.compat.v2.name_scope('sample_lkj' or name):
+    with tf.name_scope('sample_lkj' or name):
       if not self.concentration.dtype.is_floating:
         raise TypeError('The concentration argument should have floating type,'
                         ' not {}'.format(self.concentration.dtype.name))
@@ -379,7 +379,7 @@ class LKJ(distribution.Distribution):
         `x`, with respect to an LKJ distribution with parameter the
         corresponding element of `concentration`.
     """
-    with tf.compat.v2.name_scope(name or 'log_unnorm_prob_lkj'):
+    with tf.name_scope(name or 'log_unnorm_prob_lkj'):
       x = tf.convert_to_tensor(value=x, name='x')
       # The density is det(matrix) ** (concentration - 1).
       # Computing the determinant with `logdet` is usually fine, since
@@ -418,7 +418,7 @@ class LKJ(distribution.Distribution):
     """
     # The formula is from D. Lewandowski et al [1], p. 1999, from the
     # proof that eqs 16 and 17 are equivalent.
-    with tf.compat.v2.name_scope(name or 'log_normalization_lkj'):
+    with tf.name_scope(name or 'log_normalization_lkj'):
       logpi = np.log(np.pi)
       ans = tf.zeros_like(self.concentration)
       for k in range(1, self.dimension):

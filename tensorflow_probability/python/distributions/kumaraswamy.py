@@ -20,7 +20,7 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import kumaraswamy as kumaraswamy_bijector
 from tensorflow_probability.python.distributions import transformed_distribution
@@ -147,7 +147,7 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([concentration1, concentration0],
                                       tf.float32)
       concentration1 = tf.convert_to_tensor(

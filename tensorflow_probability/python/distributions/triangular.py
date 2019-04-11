@@ -21,7 +21,7 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
@@ -136,7 +136,7 @@ class Triangular(distribution.Distribution):
         * `low > peak`.
     """
     parameters = locals()
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([low, high, peak], tf.float32)
       low = tf.convert_to_tensor(value=low, name="low", dtype=dtype)
       high = tf.convert_to_tensor(value=high, name="high", dtype=dtype)

@@ -20,7 +20,7 @@ from __future__ import print_function
 
 import functools
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import joint_distribution as joint_distribution_lib
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -183,7 +183,7 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
         Default value: `"JointDistributionSequential"`.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name or 'JointDistributionSequential') as name:
+    with tf.name_scope(name or 'JointDistributionSequential') as name:
       self._dist_fn = distribution_fn
       (self._wrapped_dist_fn, self._dist_fn_args) = zip(*[
           _unify_call_signature(i, dist_fn)
@@ -604,6 +604,6 @@ def _kl_joint_joint(d0, d1, name=None):
     raise ValueError(
         'Can only compute KL divergence when all distributions are '
         'independent.')
-  with tf.compat.v2.name_scope(name or 'kl_jointseq_jointseq'):
+  with tf.name_scope(name or 'kl_jointseq_jointseq'):
     return sum(kullback_leibler.kl_divergence(d0_, d1_)
                for d0_, d1_ in zip(d0.distribution_fn, d1.distribution_fn))

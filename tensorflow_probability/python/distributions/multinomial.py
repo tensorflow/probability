@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
@@ -177,7 +177,7 @@ class Multinomial(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([total_count, logits, probs], tf.float32)
       self._total_count = tf.convert_to_tensor(
           value=total_count, name="total_count", dtype=dtype)
@@ -301,7 +301,7 @@ def draw_sample(num_samples, num_classes, logits, num_trials, dtype, seed):
   Returns:
     samples: Tensor of given dtype and shape [n] + batch_shape + [k].
   """
-  with tf.compat.v2.name_scope("multinomial.draw_sample"):
+  with tf.name_scope("multinomial.draw_sample"):
     # broadcast the num_trials and logits to same shape
     num_trials = tf.ones_like(
         logits[..., 0], dtype=num_trials.dtype) * num_trials

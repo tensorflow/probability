@@ -20,7 +20,7 @@ from __future__ import print_function
 
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import beta as beta_lib
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
@@ -165,7 +165,7 @@ class VonMisesFisher(distribution.Distribution):
       ValueError: For known-bad arguments, i.e. unsupported event dimension.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([mean_direction, concentration],
                                       tf.float32)
       mean_direction = tf.convert_to_tensor(

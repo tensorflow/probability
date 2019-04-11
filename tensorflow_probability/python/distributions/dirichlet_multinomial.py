@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import multinomial
 from tensorflow_probability.python.distributions import seed_stream
@@ -197,7 +197,7 @@ class DirichletMultinomial(distribution.Distribution):
     # * We broadcast explicitly to include the effect of `counts` on
     #   `concentration` for calls that do not involve `counts`.
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([total_count, concentration], tf.float32)
       self._total_count = tf.convert_to_tensor(
           value=total_count, name="total_count", dtype=dtype)

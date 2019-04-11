@@ -20,7 +20,7 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import exp as exp_bijector
 from tensorflow_probability.python.distributions import categorical
@@ -68,7 +68,7 @@ def quadrature_scheme_lognormal_gauss_hermite(
     probs: (Batch of) length-`quadrature_size` vectors representing the
       weight associate with each `grid` value.
   """
-  with tf.compat.v2.name_scope(
+  with tf.name_scope(
       name or "vector_diffeomixture_quadrature_gauss_hermite"):
     grid, probs = np.polynomial.hermite.hermgauss(deg=quadrature_size)
     grid = grid.astype(loc.dtype.as_numpy_dtype)
@@ -107,7 +107,7 @@ def quadrature_scheme_lognormal_quantiles(
     probs: (Batch of) length-`quadrature_size` vectors representing the
       weight associate with each `grid` value.
   """
-  with tf.compat.v2.name_scope(name or "quadrature_scheme_lognormal_quantiles"):
+  with tf.name_scope(name or "quadrature_scheme_lognormal_quantiles"):
     # Create a LogNormal distribution.
     dist = transformed_distribution.TransformedDistribution(
         distribution=normal.Normal(loc=loc, scale=scale),
@@ -253,7 +253,7 @@ class PoissonLogNormalQuadratureCompound(distribution.Distribution):
         `dtype`.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, scale], tf.float32)
       if loc is not None:
         loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)

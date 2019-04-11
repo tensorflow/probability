@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
@@ -221,8 +221,8 @@ class MultivariateNormalDiagPlusLowRank(
       return None if x is None else tf.convert_to_tensor(
           value=x, name=name, dtype=dtype)
 
-    with tf.compat.v2.name_scope(name) as name:
-      with tf.compat.v2.name_scope("init"):
+    with tf.name_scope(name) as name:
+      with tf.name_scope("init"):
         dtype = dtype_util.common_dtype([
             loc, scale_diag, scale_identity_multiplier, scale_perturb_factor,
             scale_perturb_diag

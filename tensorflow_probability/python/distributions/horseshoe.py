@@ -20,7 +20,7 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import HalfCauchy
@@ -138,7 +138,7 @@ class Horseshoe(distribution.Distribution):
         Default value: 'Horseshoe'.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([scale],
                                       preferred_dtype=tf.float32)
       scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)

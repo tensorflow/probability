@@ -21,7 +21,7 @@ from __future__ import print_function
 import math
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
@@ -116,7 +116,7 @@ class Logistic(distribution.Distribution):
       TypeError: if loc and scale are different dtypes.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, scale], preferred_dtype=tf.float32)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
       scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
@@ -223,5 +223,5 @@ class Logistic(distribution.Distribution):
 
   def _z(self, x):
     """Standardize input `x` to a unit logistic."""
-    with tf.compat.v2.name_scope("standardize"):
+    with tf.name_scope("standardize"):
       return (x - self.loc) / self.scale
