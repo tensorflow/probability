@@ -152,7 +152,7 @@ class DynamicLinearRegression(StructuralTimeSeries):
 
   @property
   def design_matrix(self):
-    """LinearOperator representing the design matrix."""
+    """Tensor representing the design matrix."""
     return self._design_matrix
 
   def _make_state_space_model(self,
