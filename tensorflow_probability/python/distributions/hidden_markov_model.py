@@ -18,12 +18,14 @@ from __future__ import absolute_import
 from __future__ import division
 
 import tensorflow as tf
+
 from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
 
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -166,8 +168,8 @@ class HiddenMarkovModel(distribution.Distribution):
       self._observation_distribution = observation_distribution
       self._transition_distribution = transition_distribution
 
-      if (initial_distribution.event_shape is not None
-          and initial_distribution.event_shape.ndims != 0):
+      if (initial_distribution.event_shape is not None and
+          tensorshape_util.rank(initial_distribution.event_shape) != 0):
         raise ValueError(
             "`initial_distribution` must have scalar `event_dim`s")
       elif validate_args:
@@ -179,8 +181,8 @@ class HiddenMarkovModel(distribution.Distribution):
                 "`event_dim`s")
         ]
 
-      if (transition_distribution.event_shape is not None
-          and transition_distribution.event_shape.ndims != 0):
+      if (transition_distribution.event_shape is not None and
+          tensorshape_util.rank(transition_distribution.event_shape) != 0):
         raise ValueError(
             "`transition_distribution` must have scalar `event_dim`s")
       elif validate_args:
@@ -192,8 +194,8 @@ class HiddenMarkovModel(distribution.Distribution):
                 "`event_dim`s")
         ]
 
-      if (transition_distribution.batch_shape is not None
-          and transition_distribution.batch_shape.ndims == 0):
+      if (transition_distribution.batch_shape is not None and
+          tensorshape_util.rank(transition_distribution.batch_shape) == 0):
         raise ValueError(
             "`transition_distribution` can't have scalar batches")
       elif validate_args:
@@ -205,8 +207,8 @@ class HiddenMarkovModel(distribution.Distribution):
                 "batches")
         ]
 
-      if (observation_distribution.batch_shape is not None
-          and observation_distribution.batch_shape.ndims == 0):
+      if (observation_distribution.batch_shape is not None and
+          tensorshape_util.rank(observation_distribution.batch_shape) == 0):
         raise ValueError(
             "`observation_distribution` can't have scalar batches")
       elif validate_args:

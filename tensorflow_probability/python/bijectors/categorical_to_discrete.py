@@ -24,6 +24,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
     'CategoricalToDiscrete',
@@ -126,15 +127,15 @@ def _maybe_check_valid_map_values(map_values, validate_args):
   assertions = []
 
   message = 'Rank of map_values must be 1.'
-  if map_values.shape.ndims is not None:
-    if map_values.shape.ndims != 1:
+  if tensorshape_util.rank(map_values.shape) is not None:
+    if tensorshape_util.rank(map_values.shape) != 1:
       raise ValueError(message)
   elif validate_args:
     assertions.append(tf.compat.v1.assert_rank(map_values, 1, message=message))
 
   message = 'Size of map_values must be greater than 0.'
-  if map_values.shape.num_elements() is not None:
-    if map_values.shape.num_elements() == 0:
+  if tensorshape_util.num_elements(map_values.shape) is not None:
+    if tensorshape_util.num_elements(map_values.shape) == 0:
       raise ValueError(message)
   elif validate_args:
     assertions.append(

@@ -29,6 +29,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util as distribution_utils
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensorshape_util
 
 from tensorflow.python.ops import array_ops  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.ops.parallel_for import gradients  # pylint: disable=g-direct-tensorflow-import
@@ -174,8 +175,8 @@ class MixtureSameFamily(distribution.Distribution):
             "`mixture_distribution.dtype` ({}) is not over integers".format(
                 dtype_util.name(mixture_distribution.dtype)))
 
-      if (mixture_distribution.event_shape.ndims is not None
-          and mixture_distribution.event_shape.ndims != 0):
+      if (tensorshape_util.rank(mixture_distribution.event_shape) is not None
+          and tensorshape_util.rank(mixture_distribution.event_shape) != 0):
         raise ValueError("`mixture_distribution` must have scalar `event_dim`s")
       elif validate_args:
         self._runtime_assertions += [
@@ -186,13 +187,17 @@ class MixtureSameFamily(distribution.Distribution):
         ]
 
       mdbs = mixture_distribution.batch_shape
-      cdbs = components_distribution.batch_shape.with_rank_at_least(1)[:-1]
-      if mdbs.is_fully_defined() and cdbs.is_fully_defined():
-        if mdbs.ndims != 0 and mdbs != cdbs:
+      cdbs = tensorshape_util.with_rank_at_least(
+          components_distribution.batch_shape, 1)[:-1]
+      if tensorshape_util.is_fully_defined(
+          mdbs) and tensorshape_util.is_fully_defined(cdbs):
+        if tensorshape_util.rank(mdbs) != 0 and mdbs != cdbs:
           raise ValueError(
               "`mixture_distribution.batch_shape` (`{}`) is not "
               "compatible with `components_distribution.batch_shape` "
-              "(`{}`)".format(mdbs.as_list(), cdbs.as_list()))
+              "(`{}`)".format(
+                  tensorshape_util.as_list(mdbs),
+                  tensorshape_util.as_list(cdbs)))
       elif validate_args:
         mdbs = mixture_distribution.batch_shape_tensor()
         cdbs = components_distribution.batch_shape_tensor()[:-1]
@@ -207,9 +212,11 @@ class MixtureSameFamily(distribution.Distribution):
         ]
 
       km = tf.compat.dimension_value(
-          mixture_distribution.logits.shape.with_rank_at_least(1)[-1])
+          tensorshape_util.with_rank_at_least(mixture_distribution.logits.shape,
+                                              1)[-1])
       kc = tf.compat.dimension_value(
-          components_distribution.batch_shape.with_rank_at_least(1)[-1])
+          tensorshape_util.with_rank_at_least(
+              components_distribution.batch_shape, 1)[-1])
       if km is not None and kc is not None and km != kc:
         raise ValueError("`mixture_distribution components` ({}) does not "
                          "equal `components_distribution.batch_shape[-1]` "
@@ -268,7 +275,7 @@ class MixtureSameFamily(distribution.Distribution):
 
     slices = (
         list(slices) if isinstance(slices, collections.Sequence) else [slices])
-    mixture_rank = self.mixture_distribution.batch_shape.ndims
+    mixture_rank = tensorshape_util.rank(self.mixture_distribution.batch_shape)
     if mixture_rank is None:
       raise NotImplementedError("Cannot slice MixtureSameFamily with unknown "
                                 "mixture_distribution rank")
@@ -292,7 +299,8 @@ class MixtureSameFamily(distribution.Distribution):
       return self.components_distribution.batch_shape_tensor()[:-1]
 
   def _batch_shape(self):
-    return self.components_distribution.batch_shape.with_rank_at_least(1)[:-1]
+    return tensorshape_util.with_rank_at_least(
+        self.components_distribution.batch_shape, 1)[:-1]
 
   def _event_shape_tensor(self):
     with tf.control_dependencies(self._runtime_assertions):
@@ -364,7 +372,7 @@ class MixtureSameFamily(distribution.Distribution):
       return mean_cond_var + var_cond_mean                   # [B, E]
 
   def _covariance(self):
-    static_event_ndims = self.event_shape.ndims
+    static_event_ndims = tensorshape_util.rank(self.event_shape)
     if static_event_ndims is not None and static_event_ndims != 1:
       # Covariance is defined only for vector distributions.
       raise NotImplementedError("covariance is not implemented")
@@ -389,7 +397,8 @@ class MixtureSameFamily(distribution.Distribution):
 
   def _pad_sample_dims(self, x):
     with tf.name_scope("pad_sample_dims"):
-      ndims = x.shape.ndims if x.shape.ndims is not None else tf.rank(x)
+      ndims = tensorshape_util.rank(
+          x.shape) if tensorshape_util.rank(x.shape) is not None else tf.rank(x)
       shape = tf.shape(input=x)
       d = ndims - self._event_ndims
       x = tf.reshape(x, shape=tf.concat([shape[:d], [1], shape[d:]], axis=0))
@@ -479,7 +488,7 @@ class MixtureSameFamily(distribution.Distribution):
       Result of the distributional transform
     """
 
-    if x.shape.ndims is None:
+    if tensorshape_util.rank(x.shape) is None:
       # tf.nn.softmax raises an error when applied to inputs of undefined rank.
       raise ValueError("Distributional transform does not support inputs of "
                        "undefined rank.")
@@ -517,7 +526,7 @@ class MixtureSameFamily(distribution.Distribution):
       # Logits of the posterior weights: log w_k + log prob_k (x_1, ..., x_i-1)
       log_posterior_weights_x = logits_mix_prob + cumsum_log_prob_x
 
-      component_axis = x.shape.ndims - self._event_ndims
+      component_axis = tensorshape_util.rank(x.shape) - self._event_ndims
       posterior_weights_x = tf.nn.softmax(log_posterior_weights_x,
                                           axis=component_axis)
       return tf.reduce_sum(

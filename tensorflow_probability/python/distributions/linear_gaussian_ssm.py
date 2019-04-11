@@ -28,10 +28,10 @@ from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.distributions import mvn_tril
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import seed_stream
-
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow.python.ops.linalg import linear_operator_util  # pylint: disable=g-direct-tensorflow-import
 
 tfl = tf.linalg
@@ -54,15 +54,16 @@ def _check_equal_shape(name,
   """Check that source and target shape match, statically if possible."""
 
   static_target_shape = tf.TensorShape(static_target_shape)
-  if static_shape.is_fully_defined() and static_target_shape.is_fully_defined():
+  if tensorshape_util.is_fully_defined(
+      static_shape) and tensorshape_util.is_fully_defined(static_target_shape):
     if static_shape != static_target_shape:
       raise ValueError("{}: required shape {} but found {}".
                        format(name, static_target_shape, static_shape))
     return None
   else:
     if dynamic_target_shape is None:
-      if static_target_shape.is_fully_defined():
-        dynamic_target_shape = static_target_shape.as_list()
+      if tensorshape_util.is_fully_defined(static_target_shape):
+        dynamic_target_shape = tensorshape_util.as_list(static_target_shape)
       else:
         raise ValueError("{}: cannot infer target shape: no dynamic shape "
                          "specified and static shape {} is not fully defined".
@@ -107,10 +108,11 @@ def _augment_sample_shape(partial_batch_dist,
   """
   full_ndims = distribution_util.prefer_static_shape(
       full_sample_and_batch_shape)[0]
-  partial_batch_ndims = (partial_batch_dist.batch_shape.ndims  # pylint: disable=g-long-ternary
-                         if partial_batch_dist.batch_shape.ndims is not None
-                         else distribution_util.prefer_static_shape(
-                             partial_batch_dist.batch_shape_tensor())[0])
+  partial_batch_ndims = (
+      tensorshape_util.rank(partial_batch_dist.batch_shape)  # pylint: disable=g-long-ternary
+      if tensorshape_util.rank(partial_batch_dist.batch_shape) is not None
+      else distribution_util.prefer_static_shape(
+          partial_batch_dist.batch_shape_tensor())[0])
 
   num_broadcast_dims = full_ndims - partial_batch_ndims
 
@@ -127,10 +129,10 @@ def _augment_sample_shape(partial_batch_dist,
                        "target batch shape with fewer dimensions"
                        .format(partial_batch_dist))
   if (expected_partial_batch_shape_static is not None and
-      partial_batch_dist.batch_shape.is_fully_defined()):
+      tensorshape_util.is_fully_defined(partial_batch_dist.batch_shape)):
     if (partial_batch_dist.batch_shape and
-        any(expected_partial_batch_shape_static !=
-            partial_batch_dist.batch_shape.as_list())):
+        any(expected_partial_batch_shape_static != tensorshape_util.as_list(
+            partial_batch_dist.batch_shape))):
       raise NotImplementedError("Broadcasting is not supported; "
                                 "unexpected batch shape "
                                 "(expected {}, saw {}).".format(
@@ -769,15 +771,17 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
       check_mask_dims_op = None
       check_mask_shape_op = None
       if mask is not None:
-        if mask.shape.ndims is None or x.shape.ndims is None:
+        if (tensorshape_util.rank(mask.shape) is None or
+            tensorshape_util.rank(x.shape) is None):
           check_mask_dims_op = assert_util.assert_greater_equal(
               tf.rank(x),
               tf.rank(mask),
               message=("mask cannot have higher rank than x!"))
-        elif mask.shape.ndims > x.shape.ndims:
+        elif tensorshape_util.rank(mask.shape) > tensorshape_util.rank(x.shape):
           raise ValueError(
-              "mask cannot have higher rank than x! ({} vs {})"
-              .format(mask.shape.ndims, x.shape.ndims))
+              "mask cannot have higher rank than x! ({} vs {})".format(
+                  tensorshape_util.rank(mask.shape),
+                  tensorshape_util.rank(x.shape)))
         check_mask_shape_op = _check_equal_shape(
             "mask", mask.shape[-1:], tf.shape(input=mask)[-1:],
             self.event_shape[-2:-1], self.event_shape_tensor()[-2:-1])
@@ -797,7 +801,8 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
       # event shape. But users can specify inputs that broadcast
       # batch dimensions, so we need to broadcast this against
       # self.batch_shape.
-      if self.batch_shape.is_fully_defined() and x.shape.is_fully_defined():
+      if tensorshape_util.is_fully_defined(
+          self.batch_shape) and tensorshape_util.is_fully_defined(x.shape):
         sample_and_batch_shape = tf.broadcast_static_shape(
             x.shape[:-2], self.batch_shape)
       else:
@@ -811,8 +816,8 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
       if mask is None:
         mask_sample_and_batch_shape = self.batch_shape_tensor()
       else:
-        if (self.batch_shape.is_fully_defined()
-            and mask.shape.is_fully_defined()):
+        if (tensorshape_util.is_fully_defined(self.batch_shape) and
+            tensorshape_util.is_fully_defined(mask.shape)):
           mask_sample_and_batch_shape = tf.broadcast_static_shape(
               mask.shape[:-1], self.batch_shape)
         else:

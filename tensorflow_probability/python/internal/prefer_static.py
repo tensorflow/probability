@@ -24,6 +24,7 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow.python import pywrap_tensorflow as c_api  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.ops import control_flow_ops  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
@@ -104,12 +105,12 @@ def rank_from_shape(shape_tensor_fn, tensorshape=None):
                     else shape_tensor_fn)
     if (hasattr(shape_tensor, 'shape') and
         hasattr(shape_tensor.shape, 'num_elements')):
-      ndims_ = shape_tensor.shape.num_elements()
+      ndims_ = tensorshape_util.num_elements(shape_tensor.shape)
     else:
       ndims_ = len(shape_tensor)
     ndims_fn = lambda: tf.size(input=shape_tensor)
   else:
-    ndims_ = tensorshape.ndims
+    ndims_ = tensorshape_util.rank(tensorshape)
     ndims_fn = lambda: tf.size(input=shape_tensor_fn()  # pylint: disable=g-long-lambda
                                if callable(shape_tensor_fn)
                                else shape_tensor_fn)
@@ -237,8 +238,9 @@ range = _prefer_static(  # pylint: disable=redefined-builtin
 rank = _copy_docstring(
     tf.rank,
     lambda input, name=None: (  # pylint: disable=redefined-builtin,g-long-lambda
-        tf.rank(input=input) if input.shape.ndims is None
-        else input.shape.ndims))
+        tf.rank(input=input)
+        if tensorshape_util.rank(input.shape) is None
+        else tensorshape_util.rank(input.shape)))
 
 reduce_all = _prefer_static(
     tf.reduce_all,
@@ -266,8 +268,9 @@ def _shape(input, out_type=tf.int32, name=None):  # pylint: disable=redefined-bu
     x = np.array(input)
     input = tf.convert_to_tensor(value=input) if x.dtype is np.object else x
   input_shape = tf.TensorShape(input.shape)
-  if input_shape.is_fully_defined():
-    return np.array(input_shape.as_list()).astype(_numpy_dtype(out_type))
+  if tensorshape_util.is_fully_defined(input.shape):
+    return np.array(tensorshape_util.as_list(input_shape)).astype(
+        _numpy_dtype(out_type))
   return tf.shape(input=input, out_type=out_type, name=name)
 shape = _copy_docstring(tf.shape, _shape)
 

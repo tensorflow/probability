@@ -19,10 +19,12 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 class Bernoulli(distribution.Distribution):
@@ -67,7 +69,10 @@ class Bernoulli(distribution.Distribution):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       self._logits, self._probs = distribution_util.get_logits_and_probs(
-          logits=logits, probs=probs, validate_args=validate_args, name=name)
+          logits=logits,
+          probs=probs,
+          validate_args=validate_args,
+          name=name)
     super(Bernoulli, self).__init__(
         dtype=dtype,
         reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
@@ -129,8 +134,8 @@ class Bernoulli(distribution.Distribution):
       return (tf.ones_like(event) * logits,
               tf.ones_like(logits) * event)
 
-    if not (event.shape.is_fully_defined() and
-            logits.shape.is_fully_defined() and
+    if not (tensorshape_util.is_fully_defined(event.shape) and
+            tensorshape_util.is_fully_defined(logits.shape) and
             event.shape == logits.shape):
       logits, event = _broadcast(logits, event)
     return -tf.nn.sigmoid_cross_entropy_with_logits(labels=event, logits=logits)

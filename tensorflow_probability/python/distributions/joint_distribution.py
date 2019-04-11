@@ -25,6 +25,8 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import tensorshape_util
+
 
 __all__ = [
     'JointDistribution',
@@ -181,7 +183,7 @@ def maybe_check_wont_broadcast(parts, validate_args):
     return parts
   msg = 'Broadcasting probably indicates an error in model specification.'
   s = tuple(part.shape for part in parts)
-  if all(s_.is_fully_defined() for s_ in s):
+  if all(tensorshape_util.is_fully_defined(s_) for s_ in s):
     if not all(a == b for a, b in zip(s[1:], s[:-1])):
       raise ValueError(msg)
     return parts

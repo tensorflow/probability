@@ -24,6 +24,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 _binomial_sample_note = """
@@ -226,9 +227,10 @@ class Binomial(distribution.Distribution):
   def _cdf(self, counts):
     counts = self._maybe_assert_valid_sample(counts)
     probs = self.probs
-    if not (counts.shape.is_fully_defined()
-            and self.probs.shape.is_fully_defined()
-            and counts.shape.is_compatible_with(self.probs.shape)):
+    if not (tensorshape_util.is_fully_defined(counts.shape) and
+            tensorshape_util.is_fully_defined(self.probs.shape) and
+            tensorshape_util.is_compatible_with(counts.shape,
+                                                self.probs.shape)):
       # If both shapes are well defined and equal, we skip broadcasting.
       probs += tf.zeros_like(counts)
       counts += tf.zeros_like(self.probs)

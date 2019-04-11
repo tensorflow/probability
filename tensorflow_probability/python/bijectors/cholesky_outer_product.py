@@ -25,6 +25,7 @@ import tensorflow as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -172,8 +173,8 @@ class CholeskyOuterProduct(bijector.Bijector):
 
     # We finally need to undo adding an extra column in non-scalar cases
     # where there is a single matrix as input.
-    if x.shape.ndims is not None:
-      if x.shape.ndims == 2:
+    if tensorshape_util.rank(x.shape) is not None:
+      if tensorshape_util.rank(x.shape) == 2:
         fldj = tf.squeeze(fldj, axis=-1)
       return fldj
 
@@ -201,8 +202,8 @@ class CholeskyOuterProduct(bijector.Bijector):
     Returns:
       columnar_x: `Tensor` with at least two dimensions.
     """
-    if x.shape.ndims is not None:
-      if x.shape.ndims == 1:
+    if tensorshape_util.rank(x.shape) is not None:
+      if tensorshape_util.rank(x.shape) == 1:
         x = x[tf.newaxis, :]
       return x
     shape = tf.shape(input=x)

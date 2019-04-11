@@ -21,9 +21,11 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 from scipy import stats
+
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
@@ -233,8 +235,9 @@ class MultivariateNormalDiagTest(test_case.TestCase):
             input=loc, shape=[None, None, 2]),
         scale_diag=tf.compat.v1.placeholder_with_default(
             input=scale_diag, shape=[None, None, 2]))
-    self.assertListEqual(mvn.batch_shape.as_list(), [None, None])
-    self.assertListEqual(mvn.event_shape.as_list(), [2])
+    self.assertListEqual(
+        tensorshape_util.as_list(mvn.batch_shape), [None, None])
+    self.assertListEqual(tensorshape_util.as_list(mvn.event_shape), [2])
 
   def testDynamicEventShape(self):
     if tf.executing_eagerly():
@@ -246,8 +249,8 @@ class MultivariateNormalDiagTest(test_case.TestCase):
             input=loc, shape=[2, 3, None]),
         scale_diag=tf.compat.v1.placeholder_with_default(
             input=scale_diag, shape=[2, 3, None]))
-    self.assertListEqual(mvn.batch_shape.as_list(), [2, 3])
-    self.assertListEqual(mvn.event_shape.as_list(), [None])
+    self.assertListEqual(tensorshape_util.as_list(mvn.batch_shape), [2, 3])
+    self.assertListEqual(tensorshape_util.as_list(mvn.event_shape), [None])
 
   def testKLDivIdenticalGradientDefined(self):
     dims = 3

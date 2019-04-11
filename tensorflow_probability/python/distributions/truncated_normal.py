@@ -29,7 +29,7 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import special_math
-from tensorflow.python.ops import random_ops
+from tensorflow.python.ops import random_ops  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [

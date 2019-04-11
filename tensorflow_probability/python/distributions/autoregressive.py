@@ -22,6 +22,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 class Autoregressive(distribution.Distribution):
@@ -141,7 +142,7 @@ class Autoregressive(distribution.Distribution):
 
     Raises:
       ValueError: if `num_steps` and
-        `distribution_fn(sample0).event_shape.num_elements()` are both `None`.
+        `num_elements(distribution_fn(sample0).event_shape)` are both `None`.
       ValueError: if `num_steps < 1`.
     """
     parameters = dict(locals())
@@ -151,7 +152,8 @@ class Autoregressive(distribution.Distribution):
       self._distribution0 = (distribution_fn() if sample0 is None
                              else distribution_fn(sample0))
       if num_steps is None:
-        num_steps = self._distribution0.event_shape.num_elements()
+        num_steps = tensorshape_util.num_elements(
+            self._distribution0.event_shape)
         if num_steps is None:
           raise ValueError("distribution_fn must generate a distribution "
                            "with fully known `event_shape`.")

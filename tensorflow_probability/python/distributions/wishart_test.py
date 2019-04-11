@@ -24,8 +24,9 @@ from scipy import linalg
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfd = tfp.distributions
 
@@ -81,9 +82,9 @@ class WishartTest(tf.test.TestCase):
     scale = [[[1., .5], [.5, 1.]]]  # A 1-batch of 2x2 scale operators
     df = [5, 6, 7]  # A 3-batch of degrees of freedom
     wish = tfp.distributions.Wishart(df=df, scale=scale)
-    self.assertAllEqual([2, 2], wish.event_shape.as_list())
+    self.assertAllEqual([2, 2], tensorshape_util.as_list(wish.event_shape))
     self.assertAllEqual([2, 2], self.evaluate(wish.event_shape_tensor()))
-    self.assertAllEqual([3], wish.batch_shape.as_list())
+    self.assertAllEqual([3], tensorshape_util.as_list(wish.batch_shape))
     self.assertAllEqual([3], self.evaluate(wish.batch_shape_tensor()))
     self.assertAllEqual([4, 3, 2, 2], wish.sample(sample_shape=(4,)).shape)
     self.assertAllEqual([4, 3, 2, 2],

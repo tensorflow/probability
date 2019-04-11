@@ -27,6 +27,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -55,10 +56,12 @@ def mixture_stddev(mixture_weight_vector, mean_vector, stddev_vector):
   Raises:
     ValueError: If the shapes of the input tensors are not as expected.
   """
-  mixture_weight_vector.shape.assert_has_rank(2)
-  if not mean_vector.shape.is_compatible_with(mixture_weight_vector.shape):
+  tensorshape_util.assert_has_rank(mixture_weight_vector.shape, 2)
+  if not tensorshape_util.is_compatible_with(mean_vector.shape,
+                                             mixture_weight_vector.shape):
     raise ValueError("Expecting means to have same shape as mixture weights.")
-  if not stddev_vector.shape.is_compatible_with(mixture_weight_vector.shape):
+  if not tensorshape_util.is_compatible_with(stddev_vector.shape,
+                                             mixture_weight_vector.shape):
     raise ValueError("Expecting stddevs to have same shape as mixture weights.")
 
   # Reshape the distribution parameters for batched vectorized dot products.
@@ -291,7 +294,7 @@ def shapes_from_loc_and_scale(loc, scale, name="shapes_from_loc_and_scale"):
 
   Args:
     loc: `Tensor` (already converted to tensor) or `None`. If `None`, or
-      loc.shape.ndims==0, both batch and event shape are determined by `scale`.
+      `rank(loc)==0`, both batch and event shape are determined by `scale`.
     scale:  A `LinearOperator` instance.
     name:  A string name to prepend to created ops.
 
@@ -303,7 +306,7 @@ def shapes_from_loc_and_scale(loc, scale, name="shapes_from_loc_and_scale"):
     ValueError:  If the last dimension of `loc` is determined statically to be
       different than the range of `scale`.
   """
-  if loc is not None and loc.shape.ndims == 0:
+  if loc is not None and tensorshape_util.rank(loc.shape) == 0:
     loc = None  # scalar loc is irrelevant to determining batch/event shape.
   with tf.compat.v2.name_scope(name):
     # Get event shape.
@@ -332,8 +335,10 @@ def shapes_from_loc_and_scale(loc, scale, name="shapes_from_loc_and_scale"):
     # Get batch shape.
     batch_shape = scale.batch_shape_tensor()
     if loc is not None:
-      loc_batch_shape = loc.shape.with_rank_at_least(1)[:-1]
-      if loc.shape.ndims is None or not loc_batch_shape.is_fully_defined():
+      loc_batch_shape = tensorshape_util.with_rank_at_least(loc.shape, 1)[:-1]
+      if tensorshape_util.rank(
+          loc.shape) is None or not tensorshape_util.is_fully_defined(
+              loc_batch_shape):
         loc_batch_shape = tf.shape(input=loc)[:-1]
       else:
         loc_batch_shape = tf.convert_to_tensor(
@@ -360,8 +365,8 @@ def get_broadcast_shape(*tensors):
   s_shape = tensors[0].shape
   for t in tensors[1:]:
     s_shape = tf.broadcast_static_shape(s_shape, t.shape)
-  if s_shape.is_fully_defined():
-    return s_shape.as_list()
+  if tensorshape_util.is_fully_defined(s_shape):
+    return tensorshape_util.as_list(s_shape)
 
   # Fallback on dynamic.
   d_shape = tf.shape(input=tensors[0])
@@ -477,8 +482,8 @@ def pad_mixture_dimensions(x, mixture_distribution, categorical_distribution,
   with tf.compat.v2.name_scope("pad_mix_dims"):
 
     def _get_ndims(d):
-      if d.batch_shape.ndims is not None:
-        return d.batch_shape.ndims
+      if tensorshape_util.rank(d.batch_shape) is not None:
+        return tensorshape_util.rank(d.batch_shape)
       return tf.shape(input=d.batch_shape_tensor())[0]
 
     dist_batch_ndims = _get_ndims(mixture_distribution)
@@ -957,7 +962,7 @@ def embed_check_categorical_event_shape(
       raise TypeError("Unable to validate size of unrecognized dtype "
                       "({}).".format(dtype_util.name(x_dtype)))
     try:
-      x_shape_static = x.shape.with_rank_at_least(1)
+      x_shape_static = tensorshape_util.with_rank_at_least(x.shape, 1)
     except ValueError:
       raise ValueError("A categorical-distribution parameter must have "
                        "at least 1 dimension.")
@@ -1232,7 +1237,7 @@ def rotate_transpose(x, shift, name="rotate_transpose"):
     # We do not assign back to preserve constant-ness.
     assert_util.assert_integer(shift)
     shift_value_static = tf.get_static_value(shift)
-    ndims = x.shape.ndims
+    ndims = tensorshape_util.rank(x.shape)
     if ndims is not None and shift_value_static is not None:
       if ndims < 2:
         return x
@@ -1345,8 +1350,8 @@ def prefer_static_broadcast_shape(shape1,
     def get_shape_tensor(s):
       if not isinstance(s, tf.TensorShape):
         return make_shape_tensor(s)
-      if s.is_fully_defined():
-        return make_shape_tensor(s.as_list())
+      if tensorshape_util.is_fully_defined(s):
+        return make_shape_tensor(tensorshape_util.as_list(s))
       raise ValueError("Cannot broadcast from partially "
                        "defined `TensorShape`.")
 
@@ -1496,7 +1501,8 @@ def fill_triangular(x, upper=False, name=None):
 
   with tf.compat.v2.name_scope(name or "fill_triangular"):
     x = tf.convert_to_tensor(value=x, name="x")
-    m = tf.compat.dimension_value(x.shape.with_rank_at_least(1)[-1])
+    m = tf.compat.dimension_value(
+        tensorshape_util.with_rank_at_least(x.shape, 1)[-1])
     if m is not None:
       # Formula derived by solving for n: m = n(n+1)/2.
       m = np.int32(m)
@@ -1513,8 +1519,8 @@ def fill_triangular(x, upper=False, name=None):
       # graph-execution cost; an error will be thrown from the reshape, below.
       n = tf.cast(
           tf.sqrt(0.25 + tf.cast(2 * m, dtype=tf.float32)), dtype=tf.int32)
-      static_final_shape = x.shape.with_rank_at_least(1)[:-1].concatenate(
-          [None, None])
+      static_final_shape = tensorshape_util.with_rank_at_least(
+          x.shape, 1)[:-1].concatenate([None, None])
 
     # Try it out in numpy:
     #  n = 3
@@ -1545,8 +1551,9 @@ def fill_triangular(x, upper=False, name=None):
     else:
       x_list = [x[..., n:], tf.reverse(x, axis=[ndims - 1])]
     new_shape = (
-        static_final_shape.as_list() if static_final_shape.is_fully_defined()
-        else tf.concat([tf.shape(input=x)[:-1], [n, n]], axis=0))
+        tensorshape_util.as_list(static_final_shape)
+        if tensorshape_util.is_fully_defined(static_final_shape) else tf.concat(
+            [tf.shape(input=x)[:-1], [n, n]], axis=0))
     x = tf.reshape(tf.concat(x_list, axis=-1), new_shape)
     x = tf.linalg.band_part(
         x, num_lower=(0 if upper else -1), num_upper=(-1 if upper else 0))
@@ -1594,7 +1601,8 @@ def fill_triangular_inverse(x, upper=False, name=None):
 
   with tf.compat.v2.name_scope(name or "fill_triangular_inverse"):
     x = tf.convert_to_tensor(value=x, name="x")
-    n = tf.compat.dimension_value(x.shape.with_rank_at_least(2)[-1])
+    n = tf.compat.dimension_value(
+        tensorshape_util.with_rank_at_least(x.shape, 2)[-1])
     if n is not None:
       n = np.int32(n)
       m = np.int32((n * (n + 1)) // 2)
@@ -1602,8 +1610,8 @@ def fill_triangular_inverse(x, upper=False, name=None):
     else:
       n = tf.shape(input=x)[-1]
       m = (n * (n + 1)) // 2
-      static_final_shape = x.shape.with_rank_at_least(2)[:-2].concatenate(
-          [None])
+      static_final_shape = tensorshape_util.with_rank_at_least(
+          x.shape, 2)[:-2].concatenate([None])
     ndims = prefer_static_rank(x)
     if upper:
       initial_elements = x[..., 0, :]
@@ -1846,7 +1854,8 @@ def dimension_size(x, axis):
   """Returns the size of a specific dimension."""
   # Since tf.gather isn't "constant-in, constant-out", we must first check the
   # static shape or fallback to dynamic shape.
-  s = tf.compat.dimension_value(x.shape.with_rank_at_least(np.abs(axis))[axis])
+  s = tf.compat.dimension_value(
+      tensorshape_util.with_rank_at_least(x.shape, np.abs(axis))[axis])
   if s is not None:
     return s
   return tf.shape(input=x)[axis]
@@ -1897,7 +1906,8 @@ def process_quadrature_grid_and_probs(quadrature_grid_and_probs,
 
     def _static_event_size(x):
       """Returns the static size of a specific dimension or `None`."""
-      return tf.compat.dimension_value(x.shape.with_rank_at_least(1)[-1])
+      return tf.compat.dimension_value(
+          tensorshape_util.with_rank_at_least(x.shape, 1)[-1])
 
     m, n = _static_event_size(probs), _static_event_size(grid)
     if m is not None and n is not None:
@@ -1954,7 +1964,8 @@ def pad(x, axis, front=False, back=False, value=0, count=1, name=None):
     if not front and not back:
       raise ValueError("At least one of `front`, `back` must be `True`.")
     ndims = (
-        x.shape.ndims if x.shape.ndims is not None else tf.rank(
+        tensorshape_util.rank(x.shape)
+        if tensorshape_util.rank(x.shape) is not None else tf.rank(
             x, name="ndims"))
     axis = tf.convert_to_tensor(value=axis, name="axis")
     axis_ = tf.get_static_value(axis)
@@ -1963,7 +1974,7 @@ def pad(x, axis, front=False, back=False, value=0, count=1, name=None):
       if axis < 0:
         axis = ndims + axis
       count_ = tf.get_static_value(count)
-      if axis_ >= 0 or x.shape.ndims is not None:
+      if axis_ >= 0 or tensorshape_util.rank(x.shape) is not None:
         head = x.shape[:axis]
         mid_dim_value = tf.compat.dimension_value(x.shape[axis])
         if count_ is None or mid_dim_value is None:
@@ -2116,7 +2127,7 @@ def expand_to_vector(x, tensor_name=None, op_name=None, validate_args=False):
   """
   with tf.compat.v2.name_scope(op_name or "expand_to_vector"):
     x = tf.convert_to_tensor(value=x, name="x")
-    ndims = x.shape.ndims
+    ndims = tensorshape_util.rank(x.shape)
 
     if ndims is None:
       # Maybe expand ndims from 0 to 1.

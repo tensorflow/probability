@@ -36,6 +36,7 @@ from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -314,12 +315,14 @@ class LKJ(distribution.Distribution):
   def _validate_dimension(self, x):
     x = tf.convert_to_tensor(value=x, name='x')
     if x.shape[-2:].is_fully_defined():
-      if x.shape.dims[-2] == x.shape.dims[-1] == self.dimension:
+      if (tensorshape_util.dims(x.shape)[-2] ==
+          tensorshape_util.dims(x.shape)[-1] ==
+          self.dimension):
         pass
       else:
         raise ValueError(
             'Input dimension mismatch: expected [..., {}, {}], got {}'.format(
-                self.dimension, self.dimension, x.shape.dims))
+                self.dimension, self.dimension, tensorshape_util.dims(x.shape)))
     elif self.validate_args:
       msg = 'Input dimension mismatch: expected [..., {}, {}], got {}'.format(
           self.dimension, self.dimension, tf.shape(input=x))

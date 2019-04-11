@@ -24,6 +24,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow.python.ops import gen_array_ops  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
@@ -144,8 +145,9 @@ class Empirical(distribution.Distribution):
     with tf.name_scope(name):
       self._samples = tf.convert_to_tensor(value=samples, name='samples')
       self._event_ndims = event_ndims
-      self._samples_axis = ((self.samples.shape.ndims or tf.rank(self.samples))
-                            - self._event_ndims - 1)
+      self._samples_axis = (
+          (tensorshape_util.rank(self.samples.shape) or tf.rank(self.samples)) -
+          self._event_ndims - 1)
       with tf.control_dependencies(
           [assert_util.assert_rank_at_least(self._samples, event_ndims + 1)]):
         samples_shape = distribution_util.prefer_static_shape(self._samples)
@@ -181,7 +183,7 @@ class Empirical(distribution.Distribution):
     return tf.shape(input=self.samples)[:self._samples_axis]
 
   def _batch_shape(self):
-    if self.samples.shape.ndims is None:
+    if tensorshape_util.rank(self.samples.shape) is None:
       return tf.TensorShape(None)
     return self.samples.shape[:self._samples_axis]
 
@@ -189,7 +191,7 @@ class Empirical(distribution.Distribution):
     return tf.shape(input=self.samples)[self._samples_axis + 1:]
 
   def _event_shape(self):
-    if self.samples.shape.ndims is None:
+    if tensorshape_util.rank(self.samples.shape) is None:
       return tf.TensorShape(None)
     return self.samples.shape[self._samples_axis + 1:]
 

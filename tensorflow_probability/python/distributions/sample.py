@@ -28,6 +28,7 @@ from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 def _make_summary_statistic(attr):
@@ -165,10 +166,11 @@ class Sample(distribution_lib.Distribution):
 
   def _event_shape(self):
     sample_shape = tf.TensorShape(tf.get_static_value(self.sample_shape))
-    if (sample_shape.ndims is None or
-        self.distribution.event_shape.ndims is None):
+    if (tensorshape_util.rank(sample_shape) is None or
+        tensorshape_util.rank(self.distribution.event_shape) is None):
       return tf.TensorShape(None)
-    return sample_shape.concatenate(self.distribution.event_shape)
+    return tensorshape_util.concatenate(sample_shape,
+                                        self.distribution.event_shape)
 
   def _sample_n(self, n, seed, **kwargs):
     fake_sample_ndims = prefer_static.rank_from_shape(self.sample_shape)

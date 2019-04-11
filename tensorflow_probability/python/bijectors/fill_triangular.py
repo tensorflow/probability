@@ -24,6 +24,7 @@ import tensorflow as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -99,7 +100,7 @@ class FillTriangular(bijector.Bijector):
       n = None
     else:
       n = vector_size_to_square_matrix_size(d, self.validate_args)
-    return batch_shape.concatenate([n, n])
+    return tensorshape_util.concatenate(batch_shape, [n, n])
 
   def _inverse_event_shape(self, output_shape):
     batch_shape, n1, n2 = (output_shape[:-2],
@@ -111,7 +112,7 @@ class FillTriangular(bijector.Bijector):
       raise ValueError("Matrix must be square. (saw [{}, {}])".format(n1, n2))
     else:
       m = n1 * (n1 + 1) / 2
-    return batch_shape.concatenate([m])
+    return tensorshape_util.concatenate(batch_shape, [m])
 
   def _forward_event_shape_tensor(self, input_shape_tensor):
     batch_shape, d = input_shape_tensor[:-1], input_shape_tensor[-1]

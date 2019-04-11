@@ -91,6 +91,7 @@ py_library(
         "//tensorflow_probability/python/distributions:transformed_distribution",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
@@ -119,6 +120,7 @@ py_library(
     deps = [
         ":bijector",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
@@ -149,6 +151,7 @@ py_library(
     deps = [
         ":bijector",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
@@ -158,7 +161,7 @@ py_library(
     deps = [
         ":bijector",
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
@@ -168,7 +171,9 @@ py_library(
     deps = [
         ":bijector",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
@@ -180,6 +185,8 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
@@ -190,6 +197,7 @@ py_library(
         ":bijector",
         ":cholesky_outer_product",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -237,6 +245,7 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
@@ -285,8 +294,10 @@ py_library(
     deps = [
         ":bijector",
         # numpy dep,
+        # six dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/math:numeric",
     ],
 )
@@ -327,6 +338,7 @@ py_library(
         ":bijector",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
@@ -346,6 +358,7 @@ py_library(
     deps = [
         ":bijector",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
@@ -366,6 +379,7 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
@@ -397,6 +411,7 @@ py_library(
         ":bijector",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
@@ -408,6 +423,7 @@ py_library(
         ":bijector",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
@@ -428,6 +444,7 @@ py_library(
     deps = [
         ":bijector",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
@@ -447,7 +464,6 @@ py_library(
     srcs = ["iterated_sigmoid_centered.py"],
     deps = [
         ":bijector",
-        # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
     ],
@@ -478,6 +494,9 @@ py_library(
         ":bijector",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
@@ -507,10 +526,12 @@ py_library(
     testonly = 1,
     srcs = ["hypothesis_testlib.py"],
     deps = [
+        # absl/logging dep,
         # hypothesis dep,
         # six dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
@@ -523,7 +544,7 @@ py_test(
         # numpy dep,
         # six dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability",
     ],
 )
 
@@ -596,6 +617,7 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
@@ -608,6 +630,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
@@ -619,6 +642,7 @@ py_test(
         ":bijectors",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
@@ -630,8 +654,8 @@ py_test(
         ":bijector_test_util",
         ":bijectors",
         # absl/testing:parameterized dep,
-        # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
@@ -712,6 +736,7 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
@@ -746,6 +771,7 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
@@ -758,6 +784,7 @@ py_test(
         ":bijectors",
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
@@ -818,6 +845,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
@@ -929,6 +957,7 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
@@ -977,6 +1006,7 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
@@ -1012,6 +1042,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 

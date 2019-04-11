@@ -23,6 +23,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
     'GaussianProcessRegressionModel',
@@ -572,7 +573,7 @@ class GaussianProcessRegressionModel(
            'broadcastable.')
     ndims = self.kernel.feature_ndims
     if (self.observation_index_points.shape[:-ndims].is_fully_defined() and
-        self.observations.shape.is_fully_defined()):
+        tensorshape_util.is_fully_defined(self.observations.shape)):
       index_point_count = self.observation_index_points.shape[:-ndims]
       observation_count = self.observations.shape
       try:

@@ -21,8 +21,11 @@ from __future__ import print_function
 # Dependency imports
 from absl.testing import parameterized
 import numpy as np
+
 import tensorflow as tf
 import tensorflow_probability as tfp
+
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -70,7 +73,8 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
       dist = make_categorical(
           batch_shape, tf.constant(
               10, dtype=tf.int32))
-      self.assertAllEqual(len(batch_shape), dist.batch_shape.ndims)
+      self.assertAllEqual(
+          len(batch_shape), tensorshape_util.rank(dist.batch_shape))
       self.assertAllEqual(batch_shape,
                           self.evaluate(dist.batch_shape_tensor()))
       self.assertAllEqual([], dist.event_shape)
@@ -414,11 +418,11 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
     dist = tfd.Categorical(tf.math.log(histograms))
 
     log_prob = dist.log_prob([0, 1])
-    self.assertEqual(2, log_prob.shape.ndims)
+    self.assertEqual(2, tensorshape_util.rank(log_prob.shape))
     self.assertAllEqual([1, 2], log_prob.shape)
 
     log_prob = dist.log_prob([[[1, 1], [1, 0]], [[1, 0], [0, 1]]])
-    self.assertEqual(3, log_prob.shape.ndims)
+    self.assertEqual(3, tensorshape_util.rank(log_prob.shape))
     self.assertAllEqual([2, 2, 2], log_prob.shape)
 
   def testLogPMFShapeNoBatch(self):
@@ -426,11 +430,11 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
     dist = tfd.Categorical(tf.math.log(histograms))
 
     log_prob = dist.log_prob(0)
-    self.assertEqual(0, log_prob.shape.ndims)
+    self.assertEqual(0, tensorshape_util.rank(log_prob.shape))
     self.assertAllEqual([], log_prob.shape)
 
     log_prob = dist.log_prob([[[1, 1], [1, 0]], [[1, 0], [0, 1]]])
-    self.assertEqual(3, log_prob.shape.ndims)
+    self.assertEqual(3, tensorshape_util.rank(log_prob.shape))
     self.assertAllEqual([2, 2, 2], log_prob.shape)
 
   def testMode(self):

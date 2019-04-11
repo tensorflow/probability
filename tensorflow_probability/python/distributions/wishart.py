@@ -29,6 +29,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
     "Wishart",
@@ -351,7 +352,8 @@ class _WishartLinearOperator(distribution.Distribution):
     # Set shape hints.
     # Try to merge what we know from the input x with what we know from the
     # parameters of this distribution.
-    if x.shape.ndims is not None and self.batch_shape.ndims is not None:
+    if tensorshape_util.rank(x.shape) is not None and tensorshape_util.rank(
+        self.batch_shape) is not None:
       log_prob.set_shape(
           tf.broadcast_static_shape(x.shape[:-2], self.batch_shape))
 

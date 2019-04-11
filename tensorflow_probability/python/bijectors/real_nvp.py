@@ -19,7 +19,9 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
+
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -168,7 +170,7 @@ class RealNVP(bijector.Bijector):
   def _cache_input_depth(self, x):
     if self._input_depth is None:
       self._input_depth = tf.compat.dimension_value(
-          x.shape.with_rank_at_least(1)[-1])
+          tensorshape_util.with_rank_at_least(x.shape, 1)[-1])
       if self._input_depth is None:
         raise NotImplementedError(
             "Rightmost dimension must be known prior to graph execution.")
@@ -277,7 +279,7 @@ def real_nvp_default_template(hidden_layers,
         raise NotImplementedError(
             "Conditioning not implemented in the default template.")
 
-      if x.shape.rank == 1:
+      if tensorshape_util.rank(x.shape) == 1:
         x = x[tf.newaxis, ...]
         reshape_output = lambda x: x[0]
       else:

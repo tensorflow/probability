@@ -24,8 +24,10 @@ from scipy.special import gamma
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
 tfd = tfp.distributions
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 def make_relaxed_categorical(batch_shape, num_classes, dtype=tf.float32):
@@ -142,7 +144,8 @@ class RelaxedOneHotCategoricalTest(tf.test.TestCase):
   def testShapes(self):
     for batch_shape in ([], [1], [2, 3, 4]):
       dist = make_relaxed_categorical(batch_shape, 10)
-      self.assertAllEqual(batch_shape, dist.batch_shape.as_list())
+      self.assertAllEqual(batch_shape,
+                          tensorshape_util.as_list(dist.batch_shape))
       self.assertAllEqual(batch_shape, self.evaluate(dist.batch_shape_tensor()))
       self.assertAllEqual([10], self.evaluate(dist.event_shape_tensor()))
       self.assertAllEqual([10], self.evaluate(dist.event_shape_tensor()))
@@ -150,7 +153,8 @@ class RelaxedOneHotCategoricalTest(tf.test.TestCase):
     for batch_shape in ([], [1], [2, 3, 4]):
       dist = make_relaxed_categorical(batch_shape,
                                       tf.constant(10, dtype=tf.int32))
-      self.assertAllEqual(len(batch_shape), dist.batch_shape.ndims)
+      self.assertAllEqual(
+          len(batch_shape), tensorshape_util.rank(dist.batch_shape))
       self.assertAllEqual(batch_shape, self.evaluate(dist.batch_shape_tensor()))
       self.assertAllEqual([10], self.evaluate(dist.event_shape_tensor()))
       self.assertAllEqual([10], self.evaluate(dist.event_shape_tensor()))

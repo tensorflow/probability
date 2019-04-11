@@ -20,9 +20,10 @@ from __future__ import print_function
 import numpy as np
 
 import tensorflow as tf
+
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import positive_semidefinite_kernels as psd_kernels
-
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -78,10 +79,11 @@ class _StudentTProcessTest(object):
       self.assertAllEqual(
           self.evaluate(samples).shape,
           sample_shape + batch_shape + event_shape)
-      self.assertIsNone(samples.shape.ndims)
-      self.assertIsNone(tp.batch_shape.ndims)
-      self.assertEqual(tp.event_shape.ndims, 1)
-      self.assertIsNone(tf.compat.dimension_value(tp.event_shape.dims[0]))
+      self.assertIsNone(tensorshape_util.rank(samples.shape))
+      self.assertIsNone(tensorshape_util.rank(tp.batch_shape))
+      self.assertEqual(tensorshape_util.rank(tp.event_shape), 1)
+      self.assertIsNone(
+          tf.compat.dimension_value(tensorshape_util.dims(tp.event_shape)[0]))
 
   def testVarianceAndCovarianceMatrix(self):
     df = np.float64(4.)

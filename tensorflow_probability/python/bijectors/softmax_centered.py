@@ -21,6 +21,7 @@ from __future__ import print_function
 import tensorflow as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -95,11 +96,11 @@ class SoftmaxCentered(bijector.Bijector):
     y = distribution_util.pad(x, axis=-1, back=True)
 
     # Set shape hints.
-    if x.shape.ndims is not None:
+    if tensorshape_util.rank(x.shape) is not None:
       last_dim = tf.compat.dimension_value(x.shape[-1])
       shape = x.shape[:-1].concatenate(
           None if last_dim is None else last_dim + 1)
-      y.shape.assert_is_compatible_with(shape)
+      tensorshape_util.assert_is_compatible_with(y.shape, shape)
       y.set_shape(shape)
 
     return tf.nn.softmax(y)
@@ -122,11 +123,11 @@ class SoftmaxCentered(bijector.Bijector):
     x = x[..., :-1] + log_normalization
 
     # Set shape hints.
-    if y.shape.ndims is not None:
+    if tensorshape_util.rank(y.shape) is not None:
       last_dim = tf.compat.dimension_value(y.shape[-1])
       shape = y.shape[:-1].concatenate(
           None if last_dim is None else last_dim - 1)
-      x.shape.assert_is_compatible_with(shape)
+      tensorshape_util.assert_is_compatible_with(x.shape, shape)
       x.set_shape(shape)
 
     return x

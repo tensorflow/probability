@@ -27,6 +27,7 @@ from tensorflow_probability.python.distributions import laplace
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -235,8 +236,8 @@ class VectorLaplaceLinearOperator(
     return super(VectorLaplaceLinearOperator, self)._prob(x)
 
   def _mean(self):
-    shape = self.batch_shape.concatenate(self.event_shape)
-    has_static_shape = shape.is_fully_defined()
+    shape = tensorshape_util.concatenate(self.batch_shape, self.event_shape)
+    has_static_shape = tensorshape_util.is_fully_defined(shape)
     if not has_static_shape:
       shape = tf.concat([
           self.batch_shape_tensor(),

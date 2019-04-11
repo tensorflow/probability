@@ -27,6 +27,7 @@ from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = ['VonMisesFisher']
@@ -185,7 +186,7 @@ class VonMisesFisher(distribution.Distribution):
               message='`mean_direction` must be unit-length')
       ] if validate_args else []
       static_event_dim = tf.compat.dimension_value(
-          mean_direction.shape.with_rank_at_least(1)[-1])
+          tensorshape_util.with_rank_at_least(mean_direction.shape, 1)[-1])
       if static_event_dim is not None and static_event_dim > 5:
         raise ValueError('vMF ndims > 5 is not currently supported')
       elif validate_args:
@@ -236,14 +237,15 @@ class VonMisesFisher(distribution.Distribution):
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(
-        self.mean_direction.shape.with_rank_at_least(1)[:-1],
+        tensorshape_util.with_rank_at_least(self.mean_direction.shape, 1)[:-1],
         self.concentration.shape)
 
   def _event_shape_tensor(self):
     return tf.shape(input=self.mean_direction)[-1:]
 
   def _event_shape(self):
-    return self.mean_direction.shape.with_rank_at_least(1)[-1:]
+    s = tensorshape_util.with_rank_at_least(self.mean_direction.shape, 1)
+    return s[-1:]
 
   def _log_prob(self, x):
     x = self._maybe_assert_valid_sample(x)

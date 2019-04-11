@@ -24,6 +24,7 @@ import tensorflow as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -32,7 +33,8 @@ __all__ = [
 
 
 def _use_static_shape(input_tensor, ndims):
-  return input_tensor.shape.is_fully_defined() and isinstance(ndims, int)
+  return (tensorshape_util.is_fully_defined(input_tensor.shape) and
+          isinstance(ndims, int))
 
 
 def _compute_min_event_ndims(bijector_list, compute_forward=True):
@@ -236,7 +238,7 @@ class Chain(bijector.Bijector):
         self.inverse_min_event_ndims)
 
     if _use_static_shape(y, event_ndims):
-      event_shape = y.shape[y.shape.ndims - event_ndims:]
+      event_shape = y.shape[tensorshape_util.rank(y.shape) - event_ndims:]
     else:
       event_shape = tf.shape(input=y)[tf.rank(y) - event_ndims:]
 
@@ -248,7 +250,7 @@ class Chain(bijector.Bijector):
       if _use_static_shape(y, event_ndims):
         event_shape = b.inverse_event_shape(event_shape)
         event_ndims = self._maybe_get_static_event_ndims(
-            event_shape.ndims)
+            tensorshape_util.rank(event_shape))
       else:
         event_shape = b.inverse_event_shape_tensor(event_shape)
         event_shape_ = distribution_util.maybe_get_static_value(event_shape)
@@ -279,7 +281,7 @@ class Chain(bijector.Bijector):
         self.forward_min_event_ndims)
 
     if _use_static_shape(x, event_ndims):
-      event_shape = x.shape[x.shape.ndims - event_ndims:]
+      event_shape = x.shape[tensorshape_util.rank(x.shape) - event_ndims:]
     else:
       event_shape = tf.shape(input=x)[tf.rank(x) - event_ndims:]
 
@@ -289,7 +291,8 @@ class Chain(bijector.Bijector):
           x, event_ndims=event_ndims, **kwargs.get(b.name, {}))
       if _use_static_shape(x, event_ndims):
         event_shape = b.forward_event_shape(event_shape)
-        event_ndims = self._maybe_get_static_event_ndims(event_shape.ndims)
+        event_ndims = self._maybe_get_static_event_ndims(
+            tensorshape_util.rank(event_shape))
       else:
         event_shape = b.forward_event_shape_tensor(event_shape)
         event_shape_ = distribution_util.maybe_get_static_value(event_shape)

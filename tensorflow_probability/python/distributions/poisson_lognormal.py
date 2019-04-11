@@ -32,6 +32,7 @@ from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -114,7 +115,7 @@ def quadrature_scheme_lognormal_quantiles(
         distribution=normal.Normal(loc=loc, scale=scale),
         bijector=exp_bijector.Exp(),
         validate_args=validate_args)
-    batch_ndims = dist.batch_shape.ndims
+    batch_ndims = tensorshape_util.rank(dist.batch_shape)
     if batch_ndims is None:
       batch_ndims = tf.shape(input=dist.batch_shape_tensor())[0]
 
@@ -138,7 +139,9 @@ def quadrature_scheme_lognormal_quantiles(
     # Compute grid as quantile midpoints.
     grid = (quantiles[..., :-1] + quantiles[..., 1:]) / 2.
     # Set shape hints.
-    grid.set_shape(dist.batch_shape.concatenate([quadrature_size]))
+    new_shape = tensorshape_util.concatenate(dist.batch_shape,
+                                             [quadrature_size])
+    grid.set_shape(new_shape)
 
     # By construction probs is constant, i.e., `1 / quadrature_size`. This is
     # important, because non-constant probs leads to non-reparameterizable
@@ -333,7 +336,7 @@ class PoissonLogNormalQuadratureCompound(distribution.Distribution):
   def _sample_n(self, n, seed=None):
     # Get ids as a [n, batch_size]-shaped matrix, unless batch_shape=[] then get
     # ids as a [n]-shaped vector.
-    batch_size = self.batch_shape.num_elements()
+    batch_size = tensorshape_util.num_elements(self.batch_shape)
     if batch_size is None:
       batch_size = tf.reduce_prod(input_tensor=self.batch_shape_tensor())
     # We need to "sample extra" from the mixture distribution if it doesn't

@@ -28,6 +28,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 class ExpRelaxedOneHotCategorical(distribution.Distribution):
@@ -175,10 +176,11 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
         self._temperature_2d = tf.reshape(
             self._temperature, [-1, 1], name="temperature_2d")
 
-      logits_shape_static = self._logits.shape.with_rank_at_least(1)
-      if logits_shape_static.ndims is not None:
+      logits_shape_static = tensorshape_util.with_rank_at_least(
+          self._logits.shape, 1)
+      if tensorshape_util.rank(logits_shape_static) is not None:
         self._batch_rank = tf.convert_to_tensor(
-            value=logits_shape_static.ndims - 1,
+            value=tensorshape_util.rank(logits_shape_static) - 1,
             dtype=tf.int32,
             name="batch_rank")
       else:
@@ -234,7 +236,7 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
     return tf.shape(input=self.logits)[-1:]
 
   def _event_shape(self):
-    return self.logits.shape.with_rank_at_least(1)[-1:]
+    return tensorshape_util.with_rank_at_least(self.logits.shape, 1)[-1:]
 
   def _sample_n(self, n, seed=None):
     # Uniform variates must be sampled from the open-interval `(0, 1)` rather
@@ -260,8 +262,8 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
     x = self._assert_valid_sample(x)
     # broadcast logits or x if need be.
     logits = self.logits
-    if (not x.shape.is_fully_defined() or
-        not logits.shape.is_fully_defined() or
+    if (not tensorshape_util.is_fully_defined(x.shape) or
+        not tensorshape_util.is_fully_defined(logits.shape) or
         x.shape != logits.shape):
       logits = tf.ones_like(x, dtype=logits.dtype) * logits
       x = tf.ones_like(logits, dtype=x.dtype) * x

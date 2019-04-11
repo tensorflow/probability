@@ -25,6 +25,7 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.distributions.von_mises_fisher import _bessel_ive
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -57,12 +58,13 @@ class VonMisesFisherTest(tfp_test_util.VectorDistributionTestHelpers,
         concentration=concentration,
         validate_args=True,
         allow_nan_stats=False)
-    self.assertEqual([5, 3], vmf.batch_shape.as_list())
-    self.assertEqual([2], vmf.event_shape.as_list())
+    self.assertEqual([5, 3], tensorshape_util.as_list(vmf.batch_shape))
+    self.assertEqual([2], tensorshape_util.as_list(vmf.event_shape))
     nsamples = 12000
     samples = vmf.sample(
         sample_shape=[nsamples], seed=tfp_test_util.test_seed())
-    self.assertEqual([nsamples, 5, 3, 2], samples.shape.as_list())
+    self.assertEqual([nsamples, 5, 3, 2],
+                     tensorshape_util.as_list(samples.shape))
     sample_mean = self.evaluate(samples).mean(axis=0)
     # Assert that positive-concentration distributions have samples with
     # the expected mean direction.
@@ -98,12 +100,13 @@ class VonMisesFisherTest(tfp_test_util.VectorDistributionTestHelpers,
         concentration=concentration,
         validate_args=True,
         allow_nan_stats=False)
-    self.assertEqual([5, 2], vmf.batch_shape.as_list())
-    self.assertEqual([3], vmf.event_shape.as_list())
+    self.assertEqual([5, 2], tensorshape_util.as_list(vmf.batch_shape))
+    self.assertEqual([3], tensorshape_util.as_list(vmf.event_shape))
     nsamples = int(2e4)
     samples = vmf.sample(
         sample_shape=[nsamples], seed=tfp_test_util.test_seed())
-    self.assertEqual([nsamples, 5, 2, 3], samples.shape.as_list())
+    self.assertEqual([nsamples, 5, 2, 3],
+                     tensorshape_util.as_list(samples.shape))
     sample_mean = self.evaluate(samples).mean(axis=0)
     # Assert that positive-concentration distributions have samples with
     # the expected mean direction.
@@ -142,7 +145,8 @@ class VonMisesFisherTest(tfp_test_util.VectorDistributionTestHelpers,
     dim = tf.compat.dimension_value(vmf.event_shape[-1])
     nsamples = 10
     # Sample some random points uniformly over the hypersphere using numpy.
-    sample_shape = [nsamples] + vmf.batch_shape.as_list() + [dim]
+    sample_shape = [nsamples] + tensorshape_util.as_list(
+        vmf.batch_shape) + [dim]
     uniforms = np.random.randn(*sample_shape)
     uniforms /= np.linalg.norm(uniforms, axis=-1, keepdims=True)
     uniforms = uniforms.astype(dtype_util.as_numpy_dtype(vmf.dtype))

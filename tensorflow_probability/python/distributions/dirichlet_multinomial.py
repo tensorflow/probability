@@ -26,6 +26,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
     "DirichletMultinomial",
@@ -245,7 +246,8 @@ class DirichletMultinomial(distribution.Distribution):
     return tf.shape(input=self._broadcasted_concentration)[:-1]
 
   def _batch_shape(self):
-    return self._broadcasted_concentration.shape.with_rank_at_least(1)[:-1]
+    return tensorshape_util.with_rank_at_least(
+        self._broadcasted_concentration.shape, 1)[:-1]
 
   def _event_shape_tensor(self):
     # Event shape depends only on concentration, not total_count.
@@ -253,7 +255,7 @@ class DirichletMultinomial(distribution.Distribution):
 
   def _event_shape(self):
     # Event shape depends only on concentration, not total_count.
-    return self.concentration.shape.with_rank_at_least(1)[-1:]
+    return tensorshape_util.with_rank_at_least(self.concentration.shape, 1)[-1:]
 
   def _sample_n(self, n, seed=None):
     seed = seed_stream.SeedStream(seed, "dirichlet_multinomial")

@@ -25,6 +25,7 @@ from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensorshape_util
 
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
@@ -41,15 +42,15 @@ def _broadcast_cat_event_and_params(event, params, base_dtype):
     raise TypeError("`value` should have integer `dtype` or "
                     "`self.dtype` ({})".format(base_dtype))
   shape_known_statically = (
-      params.shape.ndims is not None and
+      tensorshape_util.rank(params.shape) is not None and
       params.shape[:-1].is_fully_defined() and
-      event.shape.is_fully_defined())
+      tensorshape_util.is_fully_defined(event.shape))
   if not shape_known_statically or params.shape[:-1] != event.shape:
     params *= tf.ones_like(event[..., tf.newaxis],
                            dtype=params.dtype)
     params_shape = tf.shape(input=params)[:-1]
     event *= tf.ones(params_shape, dtype=event.dtype)
-    if params.shape.ndims is not None:
+    if tensorshape_util.rank(params.shape) is not None:
       event.set_shape(tf.TensorShape(params.shape[:-1]))
 
   return event, params
@@ -190,10 +191,11 @@ class Categorical(distribution.Distribution):
         self._logits = distribution_util.embed_check_categorical_event_shape(
             self._logits)
 
-      logits_shape_static = self._logits.shape.with_rank_at_least(1)
-      if logits_shape_static.ndims is not None:
+      logits_shape_static = tensorshape_util.with_rank_at_least(
+          self._logits.shape, 1)
+      if tensorshape_util.rank(logits_shape_static) is not None:
         self._batch_rank = tf.convert_to_tensor(
-            value=logits_shape_static.ndims - 1,
+            value=tensorshape_util.rank(logits_shape_static) - 1,
             dtype=tf.int32,
             name="batch_rank")
       else:
@@ -268,7 +270,7 @@ class Categorical(distribution.Distribution):
     return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
-    if self.logits.shape.ndims == 2:
+    if tensorshape_util.rank(self.logits.shape) == 2:
       logits_2d = self.logits
     else:
       logits_2d = tf.reshape(self.logits, [-1, self.num_categories])

@@ -30,6 +30,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
     "Deterministic",
@@ -106,8 +107,8 @@ class _BaseDeterministic(distribution.Distribution):
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
       if is_vector and validate_args:
         msg = "Argument loc must be at least rank 1."
-        if loc.shape.ndims is not None:
-          if loc.shape.ndims < 1:
+        if tensorshape_util.rank(loc.shape) is not None:
+          if tensorshape_util.rank(loc.shape) < 1:
             raise ValueError(msg)
         else:
           loc = distribution_util.with_dependencies(

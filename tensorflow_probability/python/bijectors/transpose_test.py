@@ -25,6 +25,7 @@ import tensorflow as tf
 
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -155,7 +156,7 @@ class _TransposeBijectorTest(object):
         shape_fn = getattr(b, '{}_event_shape'.format(direction))
         if (is_shape_static and self.is_static) or tf.executing_eagerly():
           result = shape_fn(shape)
-          self.assertTrue(result.is_fully_defined())
+          self.assertTrue(tensorshape_util.is_fully_defined(result))
           return result
         if is_shape_static:
           self.assertEqual(len(shape), shape_fn(shape).ndims)

@@ -25,11 +25,12 @@ import weakref
 import numpy as np
 
 import tensorflow as tf
-
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
+import tensorflow_probability as tfp
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+
+tfb = tfp.bijectors
+tfd = tfp.distributions
 
 
 @test_util.run_all_in_graph_and_eager_modes

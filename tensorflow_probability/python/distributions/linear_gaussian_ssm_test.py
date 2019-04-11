@@ -35,6 +35,7 @@ from tensorflow_probability.python.distributions.linear_gaussian_ssm import kalm
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import KalmanFilterState
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import linear_gaussian_update
 
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_case as tfp_test_case
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
@@ -396,38 +397,45 @@ class BatchTest(tf.test.TestCase):
     # lists.
     sample_shape = list(sample_shape)
 
-    self.assertEqual(model.event_shape.as_list(), event_shape)
-    self.assertEqual(model.batch_shape.as_list(), batch_shape)
+    self.assertEqual(tensorshape_util.as_list(model.event_shape), event_shape)
+    self.assertEqual(tensorshape_util.as_list(model.batch_shape), batch_shape)
 
     y = model.sample(sample_shape)
-    self.assertEqual(y.shape.as_list(),
-                     sample_shape + batch_shape + event_shape)
+    self.assertEqual(
+        tensorshape_util.as_list(y.shape),
+        sample_shape + batch_shape + event_shape)
 
     lp = model.log_prob(y)
-    self.assertEqual(lp.shape.as_list(), sample_shape + batch_shape)
+    self.assertEqual(
+        tensorshape_util.as_list(lp.shape), sample_shape + batch_shape)
 
     (posterior_means, posterior_covs) = model.posterior_marginals(y)
-    self.assertEqual(posterior_means.shape.as_list(),
-                     sample_shape + batch_shape + [num_timesteps, latent_size])
-    self.assertEqual(posterior_covs.shape.as_list(),
-                     batch_shape + [num_timesteps, latent_size, latent_size])
+    self.assertEqual(
+        tensorshape_util.as_list(posterior_means.shape),
+        sample_shape + batch_shape + [num_timesteps, latent_size])
+    self.assertEqual(
+        tensorshape_util.as_list(posterior_covs.shape),
+        batch_shape + [num_timesteps, latent_size, latent_size])
 
     # Try an argument with no batch shape to ensure we broadcast
     # correctly.
     unbatched_y = tf.random.normal(event_shape)
     lp = model.log_prob(unbatched_y)
-    self.assertEqual(lp.shape.as_list(), batch_shape)
+    self.assertEqual(tensorshape_util.as_list(lp.shape), batch_shape)
 
-    self.assertEqual(model.mean().shape.as_list(),
-                     batch_shape + event_shape)
-    self.assertEqual(model.variance().shape.as_list(),
-                     batch_shape + event_shape)
+    self.assertEqual(
+        tensorshape_util.as_list(model.mean().shape), batch_shape + event_shape)
+    self.assertEqual(
+        tensorshape_util.as_list(model.variance().shape),
+        batch_shape + event_shape)
 
     (posterior_means, posterior_covs) = model.posterior_marginals(unbatched_y)
-    self.assertEqual(posterior_means.shape.as_list(),
-                     batch_shape + [num_timesteps, latent_size])
-    self.assertEqual(posterior_covs.shape.as_list(),
-                     batch_shape + [num_timesteps, latent_size, latent_size])
+    self.assertEqual(
+        tensorshape_util.as_list(posterior_means.shape),
+        batch_shape + [num_timesteps, latent_size])
+    self.assertEqual(
+        tensorshape_util.as_list(posterior_covs.shape),
+        batch_shape + [num_timesteps, latent_size, latent_size])
 
   def testConstantBatchShape(self):
     """Simple case where all components have the same batch shape."""
@@ -709,10 +717,12 @@ class MissingObservationsTests(tfp_test_case.TestCase):
      _) = batch_model.forward_filter(
          x=observed_time_series, mask=mask)
     # Test that shapes are as expected, and are statically inferred.
-    self.assertAllEqual(filtered_means.shape.as_list(),
-                        batch_shape + [num_timesteps, 1])
-    self.assertAllEqual(filtered_covs.shape.as_list(),
-                        batch_shape + [num_timesteps, 1, 1])
+    self.assertAllEqual(
+        tensorshape_util.as_list(filtered_means.shape),
+        batch_shape + [num_timesteps, 1])
+    self.assertAllEqual(
+        tensorshape_util.as_list(filtered_covs.shape),
+        batch_shape + [num_timesteps, 1, 1])
 
     (log_likelihoods_, filtered_means_, filtered_covs_) = self.evaluate(
         (log_likelihoods, filtered_means, filtered_covs))
@@ -742,10 +752,12 @@ class MissingObservationsTests(tfp_test_case.TestCase):
     (log_likelihoods, filtered_means, filtered_covs, _, _, _,
      _) = model.forward_filter(
          x=observed_time_series, mask=mask)
-    self.assertAllEqual(filtered_means.shape.as_list(),
-                        sample_shape + [num_timesteps, 1])
-    self.assertAllEqual(filtered_covs.shape.as_list(),
-                        mask_sample_shape + [num_timesteps, 1, 1])
+    self.assertAllEqual(
+        tensorshape_util.as_list(filtered_means.shape),
+        sample_shape + [num_timesteps, 1])
+    self.assertAllEqual(
+        tensorshape_util.as_list(filtered_covs.shape),
+        mask_sample_shape + [num_timesteps, 1, 1])
 
     (log_likelihoods_, filtered_means_, filtered_covs_) = self.evaluate(
         (log_likelihoods, filtered_means, filtered_covs))

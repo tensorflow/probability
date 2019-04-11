@@ -33,6 +33,7 @@ from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions.internal import slicing
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
@@ -506,9 +507,9 @@ class Distribution(_BaseDistribution):
       ValueError: if `sample_shape` is a `TensorShape` and is not fully defined.
     """
     if isinstance(sample_shape, tf.TensorShape):
-      if not sample_shape.is_fully_defined():
+      if not tensorshape_util.is_fully_defined(sample_shape):
         raise ValueError("TensorShape sample_shape must be fully defined")
-      sample_shape = sample_shape.as_list()
+      sample_shape = tensorshape_util.as_list(sample_shape)
 
     params = cls.param_shapes(sample_shape)
 
@@ -691,9 +692,9 @@ class Distribution(_BaseDistribution):
       batch_shape: `Tensor`.
     """
     with self._name_scope(name):
-      if self.batch_shape.is_fully_defined():
+      if tensorshape_util.is_fully_defined(self.batch_shape):
         return tf.convert_to_tensor(
-            value=self.batch_shape.as_list(),
+            value=tensorshape_util.as_list(self.batch_shape),
             dtype=tf.int32,
             name="batch_shape")
       return self._batch_shape_tensor()
@@ -729,9 +730,9 @@ class Distribution(_BaseDistribution):
       event_shape: `Tensor`.
     """
     with self._name_scope(name):
-      if self.event_shape.is_fully_defined():
+      if tensorshape_util.is_fully_defined(self.event_shape):
         return tf.convert_to_tensor(
-            value=self.event_shape.as_list(),
+            value=tensorshape_util.as_list(self.event_shape),
             dtype=tf.int32,
             name="event_shape")
       return self._event_shape_tensor()
@@ -1302,10 +1303,10 @@ class Distribution(_BaseDistribution):
     # Set shape hints.
     sample_shape = tf.TensorShape(tf.get_static_value(sample_shape))
 
-    ndims = x.shape.ndims
-    sample_ndims = sample_shape.ndims
-    batch_ndims = self.batch_shape.ndims
-    event_ndims = self.event_shape.ndims
+    ndims = tensorshape_util.rank(x.shape)
+    sample_ndims = tensorshape_util.rank(sample_shape)
+    batch_ndims = tensorshape_util.rank(self.batch_shape)
+    event_ndims = tensorshape_util.rank(self.event_shape)
 
     # Infer rank(x).
     if (ndims is None and
@@ -1317,14 +1318,15 @@ class Distribution(_BaseDistribution):
 
     # Infer sample shape.
     if ndims is not None and sample_ndims is not None:
-      shape = sample_shape.concatenate([None]*(ndims - sample_ndims))
-      x.set_shape(x.shape.merge_with(shape))
+      shape = tensorshape_util.concatenate(sample_shape,
+                                           [None] * (ndims - sample_ndims))
+      x.set_shape(tensorshape_util.merge_with(x.shape, shape))
 
     # Infer event shape.
     if ndims is not None and event_ndims is not None:
       shape = tf.TensorShape(
           [None]*(ndims - event_ndims)).concatenate(self.event_shape)
-      x.set_shape(x.shape.merge_with(shape))
+      x.set_shape(tensorshape_util.merge_with(x.shape, shape))
 
     # Infer batch shape.
     if batch_ndims is not None:
@@ -1336,20 +1338,20 @@ class Distribution(_BaseDistribution):
       if sample_ndims is not None and event_ndims is not None:
         shape = tf.TensorShape([None]*sample_ndims).concatenate(
             self.batch_shape).concatenate([None]*event_ndims)
-        x.set_shape(x.shape.merge_with(shape))
+        x.set_shape(tensorshape_util.merge_with(x.shape, shape))
 
     return x
 
   def _is_scalar_helper(self, static_shape, dynamic_shape_fn):
     """Implementation for `is_scalar_batch` and `is_scalar_event`."""
-    if static_shape.ndims is not None:
-      return static_shape.ndims == 0
+    if tensorshape_util.rank(static_shape) is not None:
+      return tensorshape_util.rank(static_shape) == 0
     shape = dynamic_shape_fn()
     if tf.compat.dimension_value(shape.shape[0]) is not None:
       # If the static_shape is correctly written then we should never execute
       # this branch. We keep it just in case there's some unimagined corner
       # case.
-      return shape.shape.as_list() == [0]
+      return tensorshape_util.as_list(shape.shape) == [0]
     return tf.equal(tf.shape(input=shape)[0], 0)
 
 
