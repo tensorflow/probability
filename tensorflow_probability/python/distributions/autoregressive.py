@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
@@ -145,7 +145,7 @@ class Autoregressive(distribution.Distribution):
       ValueError: if `num_steps < 1`.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       self._distribution_fn = distribution_fn
       self._sample0 = sample0
       self._distribution0 = (distribution_fn() if sample0 is None
