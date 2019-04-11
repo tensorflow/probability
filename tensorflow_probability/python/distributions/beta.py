@@ -292,7 +292,7 @@ class Beta(distribution.Distribution):
     if self.allow_nan_stats:
       nan = tf.fill(
           self.batch_shape_tensor(),
-          np.array(np.nan, dtype=self.dtype.as_numpy_dtype()),
+          dtype_util.as_numpy_dtype(self.dtype)(np.nan),
           name="nan")
       is_defined = tf.logical_and(self.concentration1 > 1.,
                                   self.concentration0 > 1.)

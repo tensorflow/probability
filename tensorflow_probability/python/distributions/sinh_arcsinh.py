@@ -174,7 +174,7 @@ class SinhArcsinh(transformed_distribution.TransformedDistribution):
         f_noskew = f
       else:
         f_noskew = sinh_arcsinh_bijector.SinhArcsinh(
-            skewness=skewness.dtype.as_numpy_dtype(0.),
+            skewness=dtype_util.as_numpy_dtype(skewness.dtype)(0),
             tailweight=tailweight)
 
       # Make the AffineScalar bijector, Z --> loc + scale * Z (2 / F_0(2))

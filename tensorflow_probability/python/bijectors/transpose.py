@@ -24,7 +24,8 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow_probability.python.internal import distribution_util as util
+from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 
 __all__ = [
     'Transpose',
@@ -135,11 +136,10 @@ class Transpose(bijector.Bijector):
         if assertions:
           with tf.control_dependencies(assertions):
             rightmost_transposed_ndims = tf.identity(rightmost_transposed_ndims)
-        perm = tf.range(
-            start=util.prefer_static_value(rightmost_transposed_ndims) - 1,
-            limit=-1,
-            delta=-1,
-            name='perm')
+        perm_start = (
+            distribution_util.prefer_static_value(rightmost_transposed_ndims) -
+            1)
+        perm = tf.range(start=perm_start, limit=-1, delta=-1, name='perm')
       else:  # perm is not None:
         perm = tf.convert_to_tensor(value=perm, dtype=np.int32, name='perm')
         rightmost_transposed_ndims = tf.size(
@@ -236,13 +236,16 @@ class Transpose(bijector.Bijector):
 
   def _make_perm(self, x_rank, perm):
     sample_batch_ndims = (
-        util.prefer_static_value(x_rank) -
-        util.prefer_static_value(self.rightmost_transposed_ndims))
+        distribution_util.prefer_static_value(x_rank) -
+        distribution_util.prefer_static_value(self.rightmost_transposed_ndims))
     dtype = perm.dtype
     perm = tf.concat([
         tf.range(tf.cast(sample_batch_ndims, dtype)),
-        tf.cast(sample_batch_ndims + util.prefer_static_value(perm), dtype),
-    ], axis=0)
+        tf.cast(
+            sample_batch_ndims + distribution_util.prefer_static_value(perm),
+            dtype),
+    ],
+                     axis=0)
     return perm
 
   def _transpose(self, x, perm):
@@ -257,7 +260,7 @@ def _maybe_validate_rightmost_transposed_ndims(
                                'maybe_validate_rightmost_transposed_ndims',
                                [rightmost_transposed_ndims]):
     assertions = []
-    if not rightmost_transposed_ndims.dtype.is_integer:
+    if not dtype_util.is_integer(rightmost_transposed_ndims.dtype):
       raise TypeError('`rightmost_transposed_ndims` must be integer type.')
 
     if rightmost_transposed_ndims.shape.ndims is not None:
@@ -288,7 +291,7 @@ def _maybe_validate_perm(perm, validate_args, name=None):
   """Checks that `perm` is valid."""
   with tf.compat.v1.name_scope(name, 'maybe_validate_perm', [perm]):
     assertions = []
-    if not perm.dtype.is_integer:
+    if not dtype_util.is_integer(perm.dtype):
       raise TypeError('`perm` must be integer type')
 
     msg = '`perm` must be a vector.'

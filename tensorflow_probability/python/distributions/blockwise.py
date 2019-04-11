@@ -26,6 +26,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 
 
@@ -70,8 +71,10 @@ class Blockwise(distribution.Distribution):
       if dtype_override is not None:
         dtype = dtype_override
       else:
-        dtype = set(d.dtype.base_dtype for d in distributions
-                    if d.dtype is not None)
+        dtype = set(
+            dtype_util.base_dtype(d.dtype)
+            for d in distributions
+            if d.dtype is not None)
         if len(dtype) == 0:  # pylint: disable=g-explicit-length-test
           dtype = tf.float32
         elif len(dtype) == 1:
@@ -174,10 +177,14 @@ def _maybe_validate_distributions(distributions, dtype_override, validate_args):
                      'distributions.')
 
   if dtype_override is None:
-    dts = [d.dtype.base_dtype for d in distributions if d.dtype is not None]
+    dts = [
+        dtype_util.base_dtype(d.dtype)
+        for d in distributions
+        if d.dtype is not None
+    ]
     if dts[1:] != dts[:-1]:
-      raise TypeError('Distributions must have same dtype; '
-                      'found: {}.'.format(set(dt.name for dt in dts)))
+      raise TypeError('Distributions must have same dtype; found: {}.'.format(
+          set(dtype_util.name(dt) for dt in dts)))
 
   # Validate event_ndims.
   for d in distributions:

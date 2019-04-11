@@ -22,7 +22,8 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
-from tensorflow_probability.python.internal import distribution_util as util
+from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
@@ -30,9 +31,9 @@ from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tenso
 
 def _broadcast_cat_event_and_params(event, params, base_dtype):
   """Broadcasts the event or distribution parameters."""
-  if event.dtype.is_integer:
+  if dtype_util.is_integer(event.dtype):
     pass
-  elif event.dtype.is_floating:
+  elif dtype_util.is_floating(event.dtype):
     # When `validate_args=True` we've already ensured int/float casting
     # is closed.
     event = tf.cast(event, dtype=tf.int32)
@@ -178,7 +179,7 @@ class Categorical(distribution.Distribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name) as name:
-      self._logits, self._probs = util.get_logits_and_probs(
+      self._logits, self._probs = distribution_util.get_logits_and_probs(
           logits=logits,
           probs=probs,
           validate_args=validate_args,
@@ -186,7 +187,7 @@ class Categorical(distribution.Distribution):
           name=name)
 
       if validate_args:
-        self._logits = util.embed_check_categorical_event_shape(
+        self._logits = distribution_util.embed_check_categorical_event_shape(
             self._logits)
 
       logits_shape_static = self._logits.shape.with_rank_at_least(1)
@@ -271,7 +272,7 @@ class Categorical(distribution.Distribution):
       logits_2d = self.logits
     else:
       logits_2d = tf.reshape(self.logits, [-1, self.num_categories])
-    sample_dtype = tf.int64 if self.dtype.size > 4 else tf.int32
+    sample_dtype = tf.int64 if dtype_util.size(self.dtype) > 4 else tf.int32
     draws = tf.random.categorical(
         logits_2d, n, dtype=sample_dtype, seed=seed)
     draws = tf.reshape(
@@ -282,7 +283,7 @@ class Categorical(distribution.Distribution):
     k = tf.convert_to_tensor(value=k, name="k")
 
     k, probs = _broadcast_cat_event_and_params(
-        k, self.probs, base_dtype=self.dtype.base_dtype)
+        k, self.probs, base_dtype=dtype_util.base_dtype(self.dtype))
 
     # Since the lowest number in the support is 0, any k < 0 should be zero in
     # the output.
@@ -312,10 +313,10 @@ class Categorical(distribution.Distribution):
   def _log_prob(self, k):
     k = tf.convert_to_tensor(value=k, name="k")
     if self.validate_args:
-      k = util.embed_check_integer_casting_closed(
+      k = distribution_util.embed_check_integer_casting_closed(
           k, target_dtype=tf.int32)
     k, logits = _broadcast_cat_event_and_params(
-        k, self.logits, base_dtype=self.dtype.base_dtype)
+        k, self.logits, base_dtype=dtype_util.base_dtype(self.dtype))
 
     return -tf.nn.sparse_softmax_cross_entropy_with_logits(labels=k,
                                                            logits=logits)

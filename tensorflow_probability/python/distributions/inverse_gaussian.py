@@ -169,7 +169,9 @@ class InverseGaussian(distribution.Distribution):
   def _log_prob(self, x):
     with tf.control_dependencies([
         assert_util.assert_greater(
-            x, tf.cast(0., x.dtype.base_dtype), message="x must be positive.")
+            x,
+            dtype_util.as_numpy_dtype(x.dtype)(0),
+            message="x must be positive.")
     ] if self.validate_args else []):
 
       return (0.5 * (tf.math.log(self.concentration) - np.log(2. * np.pi) -
@@ -180,7 +182,9 @@ class InverseGaussian(distribution.Distribution):
   def _cdf(self, x):
     with tf.control_dependencies([
         assert_util.assert_greater(
-            x, tf.cast(0., x.dtype.base_dtype), message="x must be positive.")
+            x,
+            dtype_util.as_numpy_dtype(x.dtype)(0),
+            message="x must be positive.")
     ] if self.validate_args else []):
 
       return (

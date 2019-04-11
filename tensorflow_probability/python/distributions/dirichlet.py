@@ -284,7 +284,7 @@ class Dirichlet(distribution.Distribution):
     if self.allow_nan_stats:
       nan = tf.fill(
           tf.shape(input=mode),
-          np.array(np.nan, dtype=self.dtype.as_numpy_dtype()),
+          dtype_util.as_numpy_dtype(self.dtype)(np.nan),
           name="nan")
       return tf.where(
           tf.reduce_all(input_tensor=self.concentration > 1., axis=-1), mode,

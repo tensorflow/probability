@@ -23,7 +23,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
 
 from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import distribution_util as util
+from tensorflow_probability.python.internal import distribution_util
 
 
 __all__ = [
@@ -427,8 +427,8 @@ class HiddenMarkovModel(distribution.Distribution):
 
       # observations :: steps n batch_size inner_shape
 
-      observations = util.move_dimension(observations, 0,
-                                         1 + tf.size(input=batch_shape))
+      observations = distribution_util.move_dimension(
+          observations, 0, 1 + tf.size(input=batch_shape))
 
       # returned :: n batch_shape steps inner_shape
 
@@ -467,8 +467,8 @@ class HiddenMarkovModel(distribution.Distribution):
 
       # Move index into sequence of observations to front so we can apply
       # tf.foldl
-      working_obs = util.move_dimension(working_obs,
-                                        -1 - r, 0)[..., tf.newaxis]
+      working_obs = distribution_util.move_dimension(working_obs, -1 - r,
+                                                     0)[..., tf.newaxis]
       # working_obs :: num_steps batch_shape underlying_event_shape
       observation_probs = (
           self._observation_distribution.log_prob(working_obs))
@@ -686,9 +686,8 @@ class HiddenMarkovModel(distribution.Distribution):
                                                    axis=0))
           observation_rank = tf.rank(observations)
           underlying_event_rank = self._underlying_event_rank
-          observations = util.move_dimension(
-              observations,
-              observation_rank - underlying_event_rank - 1, 0)
+          observations = distribution_util.move_dimension(
+              observations, observation_rank - underlying_event_rank - 1, 0)
           observations = tf.expand_dims(
               observations,
               observation_rank - underlying_event_rank)
@@ -728,7 +727,7 @@ class HiddenMarkovModel(distribution.Distribution):
 
           log_likelihoods = forward_log_probs + backward_log_adjoint_probs
 
-          marginal_log_probs = util.move_dimension(
+          marginal_log_probs = distribution_util.move_dimension(
               log_likelihoods - total_log_prob[..., tf.newaxis], 0, -2)
 
           return categorical.Categorical(logits=marginal_log_probs)
@@ -842,9 +841,8 @@ class HiddenMarkovModel(distribution.Distribution):
                                                    axis=0))
           observation_rank = tf.rank(observations)
           underlying_event_rank = self._underlying_event_rank
-          observations = util.move_dimension(
-              observations,
-              observation_rank - underlying_event_rank - 1, 0)
+          observations = distribution_util.move_dimension(
+              observations, observation_rank - underlying_event_rank - 1, 0)
 
           # We need to compute the probability of each observation for
           # each possible state.
@@ -903,7 +901,7 @@ class HiddenMarkovModel(distribution.Distribution):
               reverse=True)
           most_likely_sequences = tf.concat([backward_scan, [most_likely_end]],
                                             axis=0)
-          return util.move_dimension(most_likely_sequences, 0, -1)
+          return distribution_util.move_dimension(most_likely_sequences, 0, -1)
 
 
 def _log_vector_matrix(vs, ms):
@@ -931,4 +929,4 @@ def _extract_log_probs(num_states, dist):
                       tf.concat([[num_states],
                                  tf.ones_like(dist.batch_shape_tensor())],
                                 axis=0))
-  return util.move_dimension(dist.log_prob(states), 0, -1)
+  return distribution_util.move_dimension(dist.log_prob(states), 0, -1)

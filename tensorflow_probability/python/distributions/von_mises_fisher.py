@@ -449,11 +449,11 @@ class VonMisesFisher(distribution.Distribution):
       with tf.control_dependencies([
           assert_util.assert_less_equal(
               samples_dim0,
-              self.dtype.as_numpy_dtype(1.01),
+              dtype_util.as_numpy_dtype(self.dtype)(1.01),
               data=[tf.nn.top_k(tf.reshape(samples_dim0, [-1]))[0]]),
           assert_util.assert_greater_equal(
               samples_dim0,
-              self.dtype.as_numpy_dtype(-1.01),
+              dtype_util.as_numpy_dtype(self.dtype)(-1.01),
               data=[-tf.nn.top_k(tf.reshape(-samples_dim0, [-1]))[0]])
       ]):
         samples_dim0 = tf.identity(samples_dim0)
@@ -477,7 +477,7 @@ class VonMisesFisher(distribution.Distribution):
           tf.reshape(tf.abs(1 - tf.linalg.norm(tensor=samples, axis=-1)), [-1]))
       with tf.control_dependencies([
           assert_util.assert_near(
-              self.dtype.as_numpy_dtype(0),
+              dtype_util.as_numpy_dtype(self.dtype)(0),
               worst,
               data=[
                   worst, idx,
@@ -497,7 +497,7 @@ class VonMisesFisher(distribution.Distribution):
           assert_util.assert_less(
               tf.linalg.norm(
                   tensor=self._rotate(basis) - self.mean_direction, axis=-1),
-              self.dtype.as_numpy_dtype(1e-5))
+              dtype_util.as_numpy_dtype(self.dtype)(1e-5))
       ]):
         return self._rotate(samples)
     return self._rotate(samples)

@@ -23,6 +23,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow.python.framework import tensor_util  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -375,9 +376,9 @@ def _replace_event_shape_in_tensorshape(
 
 def _maybe_check_valid_shape(shape, validate_args):
   """Check that a shape Tensor is int-type and otherwise sane."""
-  if not shape.dtype.is_integer:
+  if not dtype_util.is_integer(shape.dtype):
     raise TypeError('{} dtype ({}) should be `int`-like.'.format(
-        shape, shape.dtype.name))
+        shape, dtype_util.name(shape.dtype)))
 
   assertions = []
 

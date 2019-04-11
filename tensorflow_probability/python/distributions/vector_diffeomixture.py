@@ -30,6 +30,7 @@ from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow.python.ops.linalg import linear_operator_addition as linop_add_lib
 
@@ -79,18 +80,18 @@ def quadrature_scheme_softmaxnormal_gauss_hermite(
   with tf.name_scope(
       name or "quadrature_scheme_softmaxnormal_gauss_hermite"):
     normal_loc = tf.convert_to_tensor(value=normal_loc, name="normal_loc")
-    dt = normal_loc.dtype.base_dtype
+    npdt = dtype_util.as_numpy_dtype(normal_loc.dtype)
     normal_scale = tf.convert_to_tensor(
-        value=normal_scale, dtype=dt, name="normal_scale")
+        value=normal_scale, dtype=npdt, name="normal_scale")
 
     normal_scale = maybe_check_quadrature_param(
         normal_scale, "normal_scale", validate_args)
 
     grid, probs = np.polynomial.hermite.hermgauss(deg=quadrature_size)
-    grid = grid.astype(dt.dtype.as_numpy_dtype)
-    probs = probs.astype(dt.dtype.as_numpy_dtype)
+    grid = grid.astype(npdt)
+    probs = probs.astype(npdt)
     probs /= np.linalg.norm(probs, ord=1, keepdims=True)
-    probs = tf.convert_to_tensor(value=probs, name="probs", dtype=dt)
+    probs = tf.convert_to_tensor(value=probs, name="probs", dtype=npdt)
 
     grid = softmax(
         -distribution_util.pad(
@@ -137,7 +138,7 @@ def quadrature_scheme_softmaxnormal_quantiles(
   """
   with tf.name_scope(name or "softmax_normal_grid_and_probs"):
     normal_loc = tf.convert_to_tensor(value=normal_loc, name="normal_loc")
-    dt = normal_loc.dtype.base_dtype
+    dt = dtype_util.base_dtype(normal_loc.dtype)
     normal_scale = tf.convert_to_tensor(
         value=normal_scale, dtype=dt, name="normal_scale")
 
@@ -400,7 +401,7 @@ class VectorDiffeomixture(distribution_lib.Distribution):
         raise ValueError("loc/scale must be same-length lists "
                          "(or same-length list-like objects).")
 
-      dtype = scale[0].dtype.base_dtype
+      dtype = dtype_util.base_dtype(scale[0].dtype)
 
       loc = [
           tf.convert_to_tensor(value=loc_, dtype=dtype, name="loc{}".format(k))
@@ -411,10 +412,10 @@ class VectorDiffeomixture(distribution_lib.Distribution):
         if validate_args and not scale_.is_positive_definite:
           raise ValueError("scale[{}].is_positive_definite = {} != True".format(
               k, scale_.is_positive_definite))
-        if scale_.dtype.base_dtype != dtype:
+        if dtype_util.base_dtype(scale_.dtype) != dtype:
           raise TypeError(
               "dtype mismatch; scale[{}].base_dtype=\"{}\" != \"{}\"".format(
-                  k, scale_.dtype.base_dtype.name, dtype.name))
+                  k, dtype_util.name(scale_.dtype), dtype_util.name(dtype)))
 
       self._endpoint_affine = [
           affine_linear_operator_bijector.AffineLinearOperator(

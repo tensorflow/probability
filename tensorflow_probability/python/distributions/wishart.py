@@ -108,7 +108,7 @@ class _WishartLinearOperator(distribution.Distribution):
     self._input_output_cholesky = input_output_cholesky
     with tf.name_scope(name) as name:
       with tf.name_scope("init"):
-        if not scale_operator.dtype.is_floating:
+        if not dtype_util.is_floating(scale_operator.dtype):
           raise TypeError(
               "scale_operator.dtype=%s is not a floating-point type" %
               scale_operator.dtype)
@@ -225,7 +225,7 @@ class _WishartLinearOperator(distribution.Distribution):
     # ChiSquared(k) == Gamma(alpha=k/2, beta=1/2)
     expanded_df = self.df * tf.ones(
         self.scale_operator.batch_shape_tensor(),
-        dtype=self.df.dtype.base_dtype)
+        dtype=dtype_util.base_dtype(self.df.dtype))
 
     g = tf.random.gamma(
         shape=[n],

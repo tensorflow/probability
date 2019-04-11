@@ -21,6 +21,7 @@ from __future__ import print_function
 import tensorflow as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 
 
 __all__ = [
@@ -76,11 +77,11 @@ class Softsign(bijector.Bijector):
     is_valid = [
         tf.compat.v1.assert_greater(
             y,
-            tf.cast(-1., dtype=y.dtype.base_dtype),
+            dtype_util.as_numpy_dtype(y.dtype)(-1),
             message="Inverse transformation input must be greater than -1."),
         tf.compat.v1.assert_less(
             y,
-            tf.cast(1., dtype=y.dtype.base_dtype),
+            dtype_util.as_numpy_dtype(y.dtype)(1),
             message="Inverse transformation input must be less than 1.")
     ]
 

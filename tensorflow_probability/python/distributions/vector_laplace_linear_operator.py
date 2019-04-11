@@ -26,6 +26,7 @@ from tensorflow_probability.python.bijectors import affine_linear_operator as af
 from tensorflow_probability.python.distributions import laplace
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 
 
 __all__ = [
@@ -192,7 +193,7 @@ class VectorLaplaceLinearOperator(
     parameters = dict(locals())
     if scale is None:
       raise ValueError("Missing required `scale` parameter.")
-    if not scale.dtype.is_floating:
+    if not dtype_util.is_floating(scale.dtype):
       raise TypeError("`scale` parameter must have floating-point dtype.")
 
     with tf.name_scope(name):

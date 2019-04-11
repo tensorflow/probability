@@ -132,6 +132,7 @@ py_library(
     name = "special_math",
     srcs = ["special_math.py"],
     deps = [
+        ":dtype_util",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/math:gradient",
@@ -163,6 +164,7 @@ py_test(
     size = "small",
     srcs = ["test_case_test.py"],
     deps = [
+        ":dtype_util",
         ":test_case",
         # numpy dep,
         # tensorflow dep,
@@ -175,6 +177,7 @@ py_library(
     srcs = ["test_util.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":dtype_util",
         # absl/flags dep,
         # hypothesis dep,
         # numpy dep,

@@ -24,6 +24,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
@@ -366,7 +367,7 @@ class _VonMisesTest(object):
   def testVonMisesSampleAverageGradient(self):
     loc = self.make_tensor([1.] * 7)
     concentration = self.make_tensor(np.logspace(-3, 3, 7))
-    grad_ys = np.ones(7, self.dtype.as_numpy_dtype())
+    grad_ys = np.ones(7, dtype_util.as_numpy_dtype(self.dtype))
     n = 1000
 
     def loss(loc, concentration):
@@ -410,8 +411,8 @@ class _VonMisesTest(object):
 
   def testVonMisesSampleExtremeConcentration(self):
     loc = self.make_tensor([1., np.nan, 1.0, 1.0, np.nan])
-    min_value = np.finfo(self.dtype.as_numpy_dtype()).min
-    max_value = np.finfo(self.dtype.as_numpy_dtype()).max
+    min_value = np.finfo(dtype_util.as_numpy_dtype(self.dtype)).min
+    max_value = np.finfo(dtype_util.as_numpy_dtype(self.dtype)).max
     concentration = self.make_tensor([min_value, 1., max_value, np.nan, np.nan])
     von_mises = tfd.VonMises(loc, concentration)
 

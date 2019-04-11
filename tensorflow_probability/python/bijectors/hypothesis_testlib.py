@@ -26,6 +26,9 @@ import hypothesis.strategies as hps
 import six
 
 import tensorflow_probability as tfp
+
+from tensorflow_probability.python.internal import dtype_util
+
 tfb = tfp.bijectors
 
 SPECIAL_BIJECTORS = ['Invert']
@@ -172,7 +175,7 @@ def distribution_filter_for(bijector):
     additional_check = lambda dist: True
 
   def distribution_filter(dist):
-    if not dist.dtype.is_floating:
+    if not dtype_util.is_floating(dist.dtype):
       return False
     if bijector.forward_min_event_ndims > dist.event_shape.ndims:
       return False

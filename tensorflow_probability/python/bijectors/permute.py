@@ -24,6 +24,7 @@ import tensorflow as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 
 
 __all__ = [
@@ -83,7 +84,7 @@ class Permute(bijector.Bijector):
       name: Python `str`, name given to ops managed by this object.
 
     Raises:
-      TypeError: if `not permutation.dtype.is_integer`.
+      TypeError: if `not dtype_util.is_integer(permutation.dtype)`.
       ValueError: if `permutation` does not contain exactly one of each of
         `{0, 1, ..., d}`.
       NotImplementedError: if `axis` is not known prior to graph execution.
@@ -91,13 +92,13 @@ class Permute(bijector.Bijector):
     """
     with tf.compat.v1.name_scope(name, "permute", values=[permutation, axis]):
       axis = tf.convert_to_tensor(value=axis, name="axis")
-      if not axis.dtype.is_integer:
+      if not dtype_util.is_integer(axis.dtype):
         raise TypeError("axis.dtype ({}) should be `int`-like.".format(
-            axis.dtype.name))
+            dtype_util.name(axis.dtype)))
       permutation = tf.convert_to_tensor(value=permutation, name="permutation")
-      if not permutation.dtype.is_integer:
+      if not dtype_util.is_integer(permutation.dtype):
         raise TypeError("permutation.dtype ({}) should be `int`-like.".format(
-            permutation.dtype.name))
+            dtype_util.name(permutation.dtype)))
       p = tf.get_static_value(permutation)
       if p is not None:
         if set(p) != set(np.arange(p.size)):
@@ -149,7 +150,7 @@ class Permute(bijector.Bijector):
     # is_constant_jacobian = True for this bijector, hence the
     # `log_det_jacobian` need only be specified for a single input, as this will
     # be tiled to match `event_ndims`.
-    return tf.constant(0., dtype=y.dtype.base_dtype)
+    return tf.constant(0., dtype=dtype_util.base_dtype(y.dtype))
 
   def _forward_log_det_jacobian(self, x):
-    return tf.constant(0., dtype=x.dtype.base_dtype)
+    return tf.constant(0., dtype=dtype_util.base_dtype(x.dtype))

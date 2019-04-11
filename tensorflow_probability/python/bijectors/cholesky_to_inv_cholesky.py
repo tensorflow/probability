@@ -18,10 +18,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# Dependency imports
 import tensorflow as tf
+
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.bijectors.cholesky_outer_product import CholeskyOuterProduct
+from tensorflow_probability.python.internal import dtype_util
 
 
 __all__ = [
@@ -67,7 +68,9 @@ class CholeskyToInvCholesky(bijector.Bijector):
     with tf.control_dependencies(self._assertions(x)):
       x_shape = tf.shape(input=x)
       identity_matrix = tf.eye(
-          x_shape[-1], batch_shape=x_shape[:-2], dtype=x.dtype.base_dtype)
+          x_shape[-1],
+          batch_shape=x_shape[:-2],
+          dtype=dtype_util.base_dtype(x.dtype))
       # Note `matrix_triangular_solve` implicitly zeros upper triangular of `x`.
       y = tf.linalg.triangular_solve(x, identity_matrix)
       y = tf.matmul(y, y, adjoint_a=True)

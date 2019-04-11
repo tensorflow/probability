@@ -30,6 +30,7 @@ import six
 import tensorflow as tf
 
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
@@ -386,7 +387,7 @@ class Bijector(object):
           # The full log jacobian determinant would be tf.zero_like(x).
           # However, we circumvent materializing that, since the jacobian
           # calculation is input independent, and we specify it for one input.
-          return constant_op.constant(0., x.dtype.base_dtype)
+          return constant_op.constant(0., dtype_util.base_dtype(x.dtype))
 
       ```
 
@@ -1228,7 +1229,8 @@ class Bijector(object):
 
   def _maybe_assert_dtype(self, x):
     """Helper to check dtype when self.dtype is known."""
-    if self.dtype is not None and self.dtype.base_dtype != x.dtype.base_dtype:
+    if (self.dtype is not None and
+        not dtype_util.base_equal(self.dtype, x.dtype)):
       raise TypeError(
           "Input had dtype %s but expected %s." % (x.dtype, self.dtype))
 
@@ -1303,7 +1305,7 @@ class Bijector(object):
     event_ndims_ = tf.get_static_value(event_ndims)
     assertions = []
 
-    if not event_ndims.dtype.is_integer:
+    if not dtype_util.is_integer(event_ndims.dtype):
       raise ValueError("Expected integer dtype, got dtype {}".format(
           event_ndims.dtype))
 

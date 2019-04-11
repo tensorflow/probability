@@ -219,7 +219,7 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
     if self.allow_nan_stats:
       nan = tf.fill(
           self.batch_shape_tensor(),
-          np.array(np.nan, dtype=self.dtype.as_numpy_dtype),
+          dtype_util.as_numpy_dtype(self.dtype)(np.nan),
           name="nan")
       is_defined = (self.concentration1 > 1.) & (self.concentration0 > 1.)
       return tf.where(is_defined, mode, nan)

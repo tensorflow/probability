@@ -71,8 +71,9 @@ def quadrature_scheme_lognormal_gauss_hermite(
   with tf.name_scope(
       name or "vector_diffeomixture_quadrature_gauss_hermite"):
     grid, probs = np.polynomial.hermite.hermgauss(deg=quadrature_size)
-    grid = grid.astype(loc.dtype.as_numpy_dtype)
-    probs = probs.astype(loc.dtype.as_numpy_dtype)
+    npdt = dtype_util.as_numpy_dtype(loc.dtype)
+    grid = grid.astype(npdt)
+    probs = probs.astype(npdt)
     probs /= np.linalg.norm(probs, ord=1, keepdims=True)
     probs = tf.convert_to_tensor(value=probs, name="probs", dtype=loc.dtype)
     # The following maps the broadcast of `loc` and `scale` to each grid
@@ -263,10 +264,11 @@ class PoissonLogNormalQuadratureCompound(distribution.Distribution):
           loc, scale, quadrature_size, validate_args))
 
       dt = self._quadrature_grid.dtype
-      if dt.base_dtype != self._quadrature_probs.dtype.base_dtype:
+      if not dtype_util.base_equal(dt, self._quadrature_probs.dtype):
         raise TypeError("Quadrature grid dtype ({}) does not match quadrature "
                         "probs dtype ({}).".format(
-                            dt.name, self._quadrature_probs.dtype.name))
+                            dtype_util.name(dt),
+                            dtype_util.name(self._quadrature_probs.dtype)))
 
       self._distribution = poisson.Poisson(
           log_rate=self._quadrature_grid,

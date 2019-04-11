@@ -288,7 +288,7 @@ class StudentT(distribution.Distribution):
     mean = self.loc * tf.ones(self.batch_shape_tensor(),
                               dtype=self.dtype)
     if self.allow_nan_stats:
-      nan = np.array(np.nan, dtype=self.dtype.as_numpy_dtype())
+      nan = dtype_util.as_numpy_dtype(self.dtype)(np.nan)
       return tf.where(
           tf.greater(
               self.df,
@@ -322,14 +322,14 @@ class StudentT(distribution.Distribution):
     var = (tf.ones(self.batch_shape_tensor(), dtype=self.dtype) *
            tf.square(self.scale) * self.df / denom)
     # When 1 < df <= 2, variance is infinite.
-    inf = np.array(np.inf, dtype=self.dtype.as_numpy_dtype())
+    inf = dtype_util.as_numpy_dtype(self.dtype)(np.inf)
     result_where_defined = tf.where(
         self.df > tf.fill(self.batch_shape_tensor(), 2.),
         var,
         tf.fill(self.batch_shape_tensor(), inf, name="inf"))
 
     if self.allow_nan_stats:
-      nan = np.array(np.nan, dtype=self.dtype.as_numpy_dtype())
+      nan = dtype_util.as_numpy_dtype(self.dtype)(np.nan)
       return tf.where(
           tf.greater(
               self.df,

@@ -232,7 +232,7 @@ class VonMises(distribution.Distribution):
   def _sample_n(self, n, seed=None):
     # random_von_mises does not work for zero concentration, so round it up to
     # something very small.
-    tiny = np.finfo(self.dtype.as_numpy_dtype).tiny
+    tiny = np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny
     concentration = tf.maximum(self.concentration, tiny)
 
     sample_batch_shape = tf.concat([[n], self._batch_shape_tensor()], axis=0)

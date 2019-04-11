@@ -22,6 +22,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow.python.framework import tensor_util  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
@@ -569,7 +570,7 @@ class TransformedDistribution(distribution_lib.Distribution):
       # This means that a reduce_sum is a simple rescaling.
       entropy *= tf.cast(
           tf.reduce_prod(input_tensor=self._override_event_shape),
-          dtype=entropy.dtype.base_dtype)
+          dtype=dtype_util.base_dtype(entropy.dtype))
     if self._is_maybe_batch_override:
       new_shape = tf.concat([
           prefer_static.ones_like(self._override_batch_shape),
@@ -605,7 +606,7 @@ class TransformedDistribution(distribution_lib.Distribution):
     override_shape = tf.convert_to_tensor(
         value=override_shape, dtype=tf.int32, name=name)
 
-    if not override_shape.dtype.is_integer:
+    if not dtype_util.is_integer(override_shape.dtype):
       raise TypeError("shape override must be an integer")
 
     override_is_scalar = _is_scalar_from_shape_tensor(override_shape)

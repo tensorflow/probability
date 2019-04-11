@@ -287,8 +287,8 @@ class TruncatedNormal(distribution.Distribution):
         # tiny, eps are tolerance parameters to ensure we stay away from giving
         # a zero arg to the log CDF expression.
 
-        tiny = np.finfo(self.dtype.as_numpy_dtype).tiny
-        eps = np.finfo(self.dtype.as_numpy_dtype).eps
+        tiny = np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny
+        eps = np.finfo(dtype_util.as_numpy_dtype(self.dtype)).eps
         cdf_samples = tf.clip_by_value(cdf_samples, tiny, 1 - eps)
 
         du = tf.exp(0.5 * (std_samples**2 - upper_broadcast**2) +

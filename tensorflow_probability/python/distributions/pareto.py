@@ -187,7 +187,7 @@ class Pareto(distribution.Distribution):
         self.scale)
     infs = tf.fill(
         dims=tf.shape(input=broadcasted_concentration),
-        value=np.array(np.inf, dtype=self.dtype.as_numpy_dtype))
+        value=dtype_util.as_numpy_dtype(self.dtype)(np.inf))
 
     return tf.where(
         broadcasted_concentration > 1.,
@@ -201,7 +201,7 @@ class Pareto(distribution.Distribution):
     broadcasted_concentration = self.concentration + tf.zeros_like(self.scale)
     infs = tf.fill(
         dims=tf.shape(input=broadcasted_concentration),
-        value=np.array(np.inf, dtype=self.dtype.as_numpy_dtype))
+        value=dtype_util.as_numpy_dtype(self.dtype)(np.inf))
     return tf.where(
         broadcasted_concentration > 2.,
         self.scale ** 2 * self.concentration / (
@@ -241,7 +241,7 @@ class Pareto(distribution.Distribution):
     else:
       alt = tf.fill(
           dims=tf.shape(input=y),
-          value=np.array(alt, dtype=self.dtype.as_numpy_dtype))
+          value=dtype_util.as_numpy_dtype(self.dtype)(alt))
     return tf.where(is_invalid, alt, y)
 
 

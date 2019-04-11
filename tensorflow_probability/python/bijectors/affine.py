@@ -218,7 +218,7 @@ class Affine(bijector.Bijector):
 
       if scale is not None and not self._is_only_identity_multiplier:
         if (shift is not None and
-            shift.dtype.base_dtype != scale.dtype.base_dtype):
+            not dtype_util.base_equal(shift.dtype, scale.dtype)):
           raise TypeError(
               "shift.dtype({}) is incompatible with scale.dtype({}).".format(
                   shift.dtype, scale.dtype))
@@ -327,8 +327,8 @@ class Affine(bijector.Bijector):
     y = x
     if self._is_only_identity_multiplier:
       s = (
-          tf.math.conj(self._scale)
-          if self.adjoint and self._scale.dtype.is_complex else self._scale)
+          tf.math.conj(self._scale) if self.adjoint and
+          dtype_util.is_complex(self._scale.dtype) else self._scale)
       y *= s
       if self.shift is not None:
         return y + self.shift
@@ -346,8 +346,8 @@ class Affine(bijector.Bijector):
       x -= self.shift
     if self._is_only_identity_multiplier:
       s = (
-          tf.math.conj(self._scale)
-          if self.adjoint and self._scale.dtype.is_complex else self._scale)
+          tf.math.conj(self._scale) if self.adjoint and
+          dtype_util.is_complex(self._scale.dtype) else self._scale)
       return x / s
     # Solve fails if the op is singular so we may safely skip this assertion.
     x = self.scale.solvevec(x, adjoint=self.adjoint)

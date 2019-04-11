@@ -420,7 +420,8 @@ def maybe_check_scalar_distribution(distribution, expected_base_dtype,
   if distribution.dtype != expected_base_dtype:
     raise TypeError("dtype mismatch; "
                     "distribution.dtype=\"{}\" is not \"{}\"".format(
-                        distribution.dtype.name, expected_base_dtype.name))
+                        dtype_util.name(distribution.dtype),
+                        dtype_util.name(expected_base_dtype)))
 
   # Although `reparameterization_type` is a static property, we guard it by
   # `validate_args`. This allows users to use a `distribution` which is not
@@ -656,7 +657,7 @@ def assert_integer_form(x,
   """
   with tf.compat.v2.name_scope(name):
     x = tf.convert_to_tensor(value=x, name="x")
-    if x.dtype.is_integer:
+    if dtype_util.is_integer(x.dtype):
       return tf.no_op()
     message = message or "{} has non-integer components".format(x)
     if int_dtype is None:
@@ -665,9 +666,9 @@ def assert_integer_form(x,
             tf.float16: tf.int16,
             tf.float32: tf.int32,
             tf.float64: tf.int64,
-        }[x.dtype.base_dtype]
+        }[dtype_util.base_dtype(x.dtype)]
       except KeyError:
-        raise TypeError("Unrecognized type {}".format(x.dtype.name))
+        raise TypeError("Unrecognized type {}".format(dtype_util.name(x.dtype)))
     return assert_util.assert_equal(
         x,
         tf.cast(tf.cast(x, int_dtype), x.dtype),
@@ -692,7 +693,7 @@ def embed_check_nonnegative_integer_form(
         assert_util.assert_non_negative(
             x, message="'{}' must be non-negative.".format(x)),
     ]
-    if not x.dtype.is_integer:
+    if not dtype_util.is_integer(x.dtype):
       assertions += [
           assert_integer_form(
               x,
@@ -793,7 +794,7 @@ def get_logits_and_probs(logits=None,
 
     if probs is None:
       logits = tf.convert_to_tensor(value=logits, name="logits", dtype=dtype)
-      if not logits.dtype.is_floating:
+      if not dtype_util.is_floating(logits.dtype):
         raise TypeError("logits must having floating type.")
       # We can early return since we constructed probs and therefore know
       # they're valid.
@@ -804,7 +805,7 @@ def get_logits_and_probs(logits=None,
       return logits, tf.sigmoid(logits, name="probs")
 
     probs = tf.convert_to_tensor(value=probs, name="probs", dtype=dtype)
-    if not probs.dtype.is_floating:
+    if not dtype_util.is_floating(probs.dtype):
       raise TypeError("probs must having floating type.")
 
     if validate_args:
@@ -920,7 +921,7 @@ def embed_check_categorical_event_shape(
           tf.float16: int(2**11),   # Largest int as a float16.
           tf.float32: int(2**24),
           tf.float64: int(2**53),
-      }.get(categorical_param.dtype.base_dtype, 0))
+      }.get(dtype_util.base_dtype(categorical_param.dtype), 0))
   ```
 
   Args:
@@ -948,12 +949,13 @@ def embed_check_categorical_event_shape(
     # The chosen floating-point thresholds are 2**(1 + mantissa_bits).
     # For more details, see:
     # https://en.wikipedia.org/wiki/Floating-point_arithmetic#Internal_representation
-    x_dtype = x.dtype.base_dtype
+    x_dtype = dtype_util.base_dtype(x.dtype)
     max_event_size = (
-        _largest_integer_by_dtype(x_dtype) if x_dtype.is_floating else 0)
+        _largest_integer_by_dtype(x_dtype)
+        if dtype_util.is_floating(x_dtype) else 0)
     if max_event_size is 0:
       raise TypeError("Unable to validate size of unrecognized dtype "
-                      "({}).".format(x_dtype.name))
+                      "({}).".format(dtype_util.name(x_dtype)))
     try:
       x_shape_static = x.shape.with_rank_at_least(1)
     except ValueError:
@@ -967,7 +969,8 @@ def embed_check_categorical_event_shape(
       if event_size > max_event_size:
         raise ValueError("Number of classes exceeds `dtype` precision, i.e., "
                          "{} implies shape ({}) cannot exceed {}.".format(
-                             x_dtype.name, event_size, max_event_size))
+                             dtype_util.name(x_dtype), event_size,
+                             max_event_size))
       return x
     else:
       event_size = tf.shape(input=x, name="x_shape")[-1]
@@ -987,7 +990,7 @@ def embed_check_categorical_event_shape(
               max_event_size,
               message="Number of classes exceeds `dtype` precision, "
               "i.e., {} dtype cannot exceed {} shape.".format(
-                  x_dtype.name, max_event_size)),
+                  dtype_util.name(x_dtype), max_event_size)),
       ], x)
 
 
@@ -1028,18 +1031,20 @@ def embed_check_integer_casting_closed(x,
 
   with tf.compat.v2.name_scope(name):
     x = tf.convert_to_tensor(value=x, name="x")
-    if (not _is_integer_like_by_dtype(x.dtype) and not x.dtype.is_floating):
+    if (not _is_integer_like_by_dtype(x.dtype) and
+        not dtype_util.is_floating(x.dtype)):
       raise TypeError("{}.dtype must be floating- or "
-                      "integer-type.".format(x.dtype.name))
+                      "integer-type.".format(dtype_util.name(x.dtype)))
     if (not _is_integer_like_by_dtype(target_dtype) and
-        not target_dtype.is_floating):
+        not dtype_util.is_floating(target_dtype)):
       raise TypeError("target_dtype ({}) must be floating- or "
-                      "integer-type.".format(target_dtype.name))
+                      "integer-type.".format(dtype_util.name(target_dtype)))
     if (not _is_integer_like_by_dtype(x.dtype) and
         not _is_integer_like_by_dtype(target_dtype)):
       raise TypeError("At least one of {}.dtype ({}) and target_dtype ({}) "
-                      "must be integer-type.".format(x, x.dtype.name,
-                                                     target_dtype.name))
+                      "must be integer-type.".format(
+                          x, dtype_util.name(x.dtype),
+                          dtype_util.name(target_dtype)))
 
     assertions = []
     if assert_positive:
@@ -1052,7 +1057,7 @@ def embed_check_integer_casting_closed(x,
               x, message="Elements must be non-negative."),
       ]
 
-    if x.dtype.is_floating:
+    if dtype_util.is_floating(x.dtype):
       # Being here means _is_integer_like_by_dtype(target_dtype) = True.
       # Since this check implies the magnitude check below, we need only it.
       assertions += [
@@ -1060,7 +1065,7 @@ def embed_check_integer_casting_closed(x,
               x,
               int_dtype=target_dtype,
               message="Elements must be {}-equivalent.".format(
-                  target_dtype.name)),
+                  dtype_util.name(target_dtype))),
       ]
     else:
       if (_largest_integer_by_dtype(x.dtype) >
@@ -1823,7 +1828,7 @@ def softplus_inverse(x, name=None):
     # thus an `inf` in an unselected path results in `0*inf=nan`. We are careful
     # to overwrite `x` with ones only when we will never actually use this
     # value. Note that we use ones and not zeros since `log(expm1(0.)) = -inf`.
-    threshold = np.log(np.finfo(x.dtype.as_numpy_dtype).eps) + 2.
+    threshold = np.log(np.finfo(dtype_util.as_numpy_dtype(x.dtype)).eps) + 2.
     is_too_small = tf.less(x, np.exp(threshold))
     is_too_large = tf.greater(x, -threshold)
     too_small_value = tf.math.log(x)
@@ -1877,8 +1882,8 @@ def process_quadrature_grid_and_probs(quadrature_grid_and_probs,
   with tf.compat.v2.name_scope(name or "process_quadrature_grid_and_probs"):
     if quadrature_grid_and_probs is None:
       grid, probs = np.polynomial.hermite.hermgauss(deg=8)
-      grid = grid.astype(dtype.as_numpy_dtype)
-      probs = probs.astype(dtype.as_numpy_dtype)
+      grid = grid.astype(dtype_util.as_numpy_dtype(dtype))
+      probs = probs.astype(dtype_util.as_numpy_dtype(dtype))
       probs /= np.linalg.norm(probs, ord=1, keepdims=True)
       grid = tf.convert_to_tensor(value=grid, name="grid", dtype=dtype)
       probs = tf.convert_to_tensor(value=probs, name="probs", dtype=dtype)
@@ -1943,9 +1948,9 @@ def pad(x, axis, front=False, back=False, value=0, count=1, name=None):
     x = tf.convert_to_tensor(value=x, name="x")
     value = tf.convert_to_tensor(value=value, dtype=x.dtype, name="value")
     count = tf.convert_to_tensor(value=count, name="count")
-    if not count.dtype.is_integer:
+    if not dtype_util.is_integer(count.dtype):
       raise TypeError("`count.dtype` (`{}`) must be `int`-like.".format(
-          count.dtype.name))
+          dtype_util.name(count.dtype)))
     if not front and not back:
       raise ValueError("At least one of `front`, `back` must be `True`.")
     ndims = (
@@ -2130,7 +2135,7 @@ def expand_to_vector(x, tensor_name=None, op_name=None, validate_args=False):
       x_const = tf.get_static_value(x)
       if x_const is not None:
         return tf.convert_to_tensor(
-            value=np.array([x_const], dtype=x.dtype.as_numpy_dtype()),
+            value=dtype_util.as_numpy_dtype(x.dtype)([x_const]),
             name=tensor_name)
 
       else:

@@ -143,11 +143,11 @@ class Gumbel(transformed_distribution.TransformedDistribution):
 
       # Because the uniform sampler generates samples in `[0, 1)` this would
       # cause samples to lie in `(inf, -inf]` instead of `(inf, -inf)`. To fix
-      # this, we use `np.finfo(self.dtype.as_numpy_dtype.tiny`
+      # this, we use `np.finfo(dtype_util.as_numpy_dtype(self.dtype).tiny`
       # because it is the smallest, positive, "normal" number.
       super(Gumbel, self).__init__(
           distribution=uniform.Uniform(
-              low=np.finfo(dtype.as_numpy_dtype).tiny,
+              low=np.finfo(dtype_util.as_numpy_dtype(dtype)).tiny,
               high=tf.ones([], dtype=loc.dtype),
               allow_nan_stats=allow_nan_stats),
           # The Gumbel bijector encodes the quantile

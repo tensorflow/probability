@@ -22,10 +22,11 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow_probability.python.distributions.von_mises_fisher import _bessel_ive
-from tensorflow_probability.python.internal import test_util as tfp_test_util
 
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.distributions.von_mises_fisher import _bessel_ive
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -144,7 +145,7 @@ class VonMisesFisherTest(tfp_test_util.VectorDistributionTestHelpers,
     sample_shape = [nsamples] + vmf.batch_shape.as_list() + [dim]
     uniforms = np.random.randn(*sample_shape)
     uniforms /= np.linalg.norm(uniforms, axis=-1, keepdims=True)
-    uniforms = uniforms.astype(vmf.dtype.as_numpy_dtype)
+    uniforms = uniforms.astype(dtype_util.as_numpy_dtype(vmf.dtype))
     # Concatenate in some sampled points from the distribution under test.
     vmf_samples = vmf.sample(
         sample_shape=[nsamples], seed=tfp_test_util.test_seed())

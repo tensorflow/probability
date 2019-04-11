@@ -24,6 +24,7 @@ import six
 import tensorflow as tf
 
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.math.numeric import clip_by_value_preserve_gradient
 
 
@@ -397,7 +398,7 @@ def masked_dense(inputs,
         kernel_initializer=masked_initializer,
         kernel_constraint=lambda x: mask * x,
         name=name,
-        dtype=inputs.dtype.base_dtype,
+        dtype=dtype_util.base_dtype(inputs.dtype),
         _scope=name,
         _reuse=reuse,
         *args,  # pylint: disable=keyword-arg-before-vararg

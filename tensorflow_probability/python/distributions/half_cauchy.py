@@ -209,19 +209,19 @@ class HalfCauchy(distribution.Distribution):
   def _mean(self):
     if self.allow_nan_stats:
       return tf.fill(self.batch_shape_tensor(),
-                     self.dtype.as_numpy_dtype(np.nan))
+                     dtype_util.as_numpy_dtype(self.dtype)(np.nan))
     raise ValueError("`mean` is undefined for the half-Cauchy distribution.")
 
   def _stddev(self):
     if self.allow_nan_stats:
       return tf.fill(self.batch_shape_tensor(),
-                     self.dtype.as_numpy_dtype(np.nan))
+                     dtype_util.as_numpy_dtype(self.dtype)(np.nan))
     raise ValueError("`stddev` is undefined for the half-Cauchy distribution.")
 
   def _variance(self):
     if self.allow_nan_stats:
       return tf.fill(self.batch_shape_tensor(),
-                     self.dtype.as_numpy_dtype(np.nan))
+                     dtype_util.as_numpy_dtype(self.dtype)(np.nan))
     raise ValueError(
         "`variance` is undefined for the half-Cauchy distribution.")
 
@@ -255,5 +255,5 @@ class HalfCauchy(distribution.Distribution):
       else:
         default_value = tf.fill(
             dims=tf.shape(input=y),
-            value=np.array(default_value, dtype=self.dtype.as_numpy_dtype))
+            value=dtype_util.as_numpy_dtype(self.dtype)(default_value))
       return tf.where(x < loc, default_value, y)

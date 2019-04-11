@@ -170,15 +170,15 @@ class Logistic(distribution.Distribution):
 
   def _sample_n(self, n, seed=None):
     # Uniform variates must be sampled from the open-interval `(0, 1)` rather
-    # than `[0, 1)`. To do so, we use `np.finfo(self.dtype.as_numpy_dtype).tiny`
-    # because it is the smallest, positive, "normal" number. A "normal" number
-    # is such that the mantissa has an implicit leading 1. Normal, positive
-    # numbers x, y have the reasonable property that, `x + y >= max(x, y)`. In
-    # this case, a subnormal number (i.e., np.nextafter) can cause us to sample
-    # 0.
+    # than `[0, 1)`. To do so, we use
+    # `np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny` because it is the
+    # smallest, positive, "normal" number. A "normal" number is such that the
+    # mantissa has an implicit leading 1. Normal, positive numbers x, y have the
+    # reasonable property that, `x + y >= max(x, y)`. In this case, a subnormal
+    # number (i.e., np.nextafter) can cause us to sample 0.
     uniform = tf.random.uniform(
         shape=tf.concat([[n], self.batch_shape_tensor()], 0),
-        minval=np.finfo(self.dtype.as_numpy_dtype).tiny,
+        minval=np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny,
         maxval=1.,
         dtype=self.dtype,
         seed=seed)

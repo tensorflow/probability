@@ -27,7 +27,9 @@ import numpy as np
 import six
 
 import tensorflow as tf
+
 from tensorflow_probability.python.distributions import seed_stream
+from tensorflow_probability.python.internal import dtype_util
 
 __all__ = [
     'broadcasting_shapes',
@@ -384,9 +386,10 @@ class DiscreteScalarDistributionTestHelpers(object):
       hi = value_range[1]
       if nbins is None:
         nbins = tf.cast(hi - lo, dtype=tf.int32)
-      delta = (hi - lo) / tf.cast(nbins, dtype=value_range.dtype.base_dtype)
+      delta = (hi - lo) / tf.cast(
+          nbins, dtype=dtype_util.base_dtype(value_range.dtype))
       edges = tf.range(
-          start=lo, limit=hi, delta=delta, dtype=x.dtype.base_dtype)
+          start=lo, limit=hi, delta=delta, dtype=dtype_util.base_dtype(x.dtype))
       counts = tf.histogram_fixed_width(x, value_range=value_range, nbins=nbins)
       return counts, edges
 

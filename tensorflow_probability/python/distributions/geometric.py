@@ -24,6 +24,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 
 
@@ -125,7 +126,8 @@ class Geometric(distribution.Distribution):
 
   def _sample_n(self, n, seed=None):
     # Uniform variates must be sampled from the open-interval `(0, 1)` rather
-    # than `[0, 1)`. To do so, we use `np.finfo(self.dtype.as_numpy_dtype).tiny`
+    # than `[0, 1)`. To do so, we use
+    # `np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny`
     # because it is the smallest, positive, "normal" number. A "normal" number
     # is such that the mantissa has an implicit leading 1. Normal, positive
     # numbers x, y have the reasonable property that, `x + y >= max(x, y)`. In
@@ -133,7 +135,7 @@ class Geometric(distribution.Distribution):
     # 0.
     sampled = tf.random.uniform(
         tf.concat([[n], tf.shape(input=self._probs)], 0),
-        minval=np.finfo(self.dtype.as_numpy_dtype).tiny,
+        minval=np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny,
         maxval=1.,
         seed=seed,
         dtype=self.dtype)

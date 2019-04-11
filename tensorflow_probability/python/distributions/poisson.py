@@ -96,9 +96,9 @@ class Poisson(distribution.Distribution):
             value=rate,
             name="rate",
             dtype=dtype_util.common_dtype([rate], preferred_dtype=tf.float32))
-        if not rate.dtype.is_floating:
+        if not dtype_util.is_floating(rate.dtype):
           raise TypeError("rate.dtype ({}) is a not a float-type.".format(
-              rate.dtype.name))
+              dtype_util.name(rate.dtype)))
         with tf.control_dependencies(
             [assert_util.assert_positive(rate)] if validate_args else []):
           self._rate = tf.identity(rate, name="rate")
@@ -108,9 +108,9 @@ class Poisson(distribution.Distribution):
             value=log_rate,
             name="log_rate",
             dtype=dtype_util.common_dtype([log_rate], tf.float32))
-        if not log_rate.dtype.is_floating:
+        if not dtype_util.is_floating(log_rate.dtype):
           raise TypeError("log_rate.dtype ({}) is a not a float-type.".format(
-              log_rate.dtype.name))
+              dtype_util.name(log_rate.dtype)))
         self._rate = tf.exp(log_rate, name="rate")
         self._log_rate = tf.convert_to_tensor(value=log_rate, name="log_rate")
 
@@ -161,7 +161,7 @@ class Poisson(distribution.Distribution):
       # Ensure the gradient wrt `rate` is zero at non-integer points.
       neg_inf = tf.fill(
           tf.shape(input=log_probs),
-          value=np.array(-np.inf, dtype=log_probs.dtype.as_numpy_dtype))
+          value=dtype_util.as_numpy_dtype(log_probs.dtype)(-np.inf))
       log_probs = tf.where(tf.math.is_inf(log_probs), neg_inf, log_probs)
     return log_probs
 
@@ -188,8 +188,7 @@ class Poisson(distribution.Distribution):
     y = safe_x * self.log_rate - tf.math.lgamma(1. + safe_x)
     is_supported = tf.broadcast_to(tf.equal(x, safe_x), tf.shape(input=y))
     neg_inf = tf.fill(
-        tf.shape(input=y),
-        value=np.array(-np.inf, dtype=y.dtype.as_numpy_dtype))
+        tf.shape(input=y), value=dtype_util.as_numpy_dtype(y.dtype)(-np.inf))
     return tf.where(is_supported, y, neg_inf)
 
   def _mean(self):

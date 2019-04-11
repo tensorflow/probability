@@ -48,8 +48,8 @@ def _uniform_unit_norm(dimension, shape, dtype, seed):
   # This works because the Gaussian distribution is spherically symmetric.
   # raw shape: shape + [dimension]
   raw = normal.Normal(
-      loc=dtype.as_numpy_dtype(0.),
-      scale=dtype.as_numpy_dtype(1.)).sample(
+      loc=dtype_util.as_numpy_dtype(dtype)(0),
+      scale=dtype_util.as_numpy_dtype(dtype)(1)).sample(
           tf.concat([shape, [dimension]], axis=0), seed=seed())
   unit_norm = raw / tf.norm(tensor=raw, ord=2, axis=-1)[..., tf.newaxis]
   return unit_norm
@@ -208,9 +208,10 @@ class LKJ(distribution.Distribution):
     # Notation below: B is the batch shape, i.e., tf.shape(concentration)
     seed = seed_stream.SeedStream(seed, 'sample_lkj')
     with tf.name_scope('sample_lkj' or name):
-      if not self.concentration.dtype.is_floating:
-        raise TypeError('The concentration argument should have floating type,'
-                        ' not {}'.format(self.concentration.dtype.name))
+      if not dtype_util.is_floating(self.concentration.dtype):
+        raise TypeError(
+            'The concentration argument should have floating type, not '
+            '{}'.format(dtype_util.name(self.concentration.dtype)))
 
       concentration = _replicate(num_samples, self.concentration)
       concentration_shape = tf.shape(input=concentration)
@@ -301,8 +302,7 @@ class LKJ(distribution.Distribution):
       # these to ones.
       result = tf.linalg.set_diag(
           result,
-          tf.ones(
-              shape=tf.shape(input=result)[:-1], dtype=result.dtype.base_dtype))
+          tf.ones(shape=tf.shape(input=result)[:-1], dtype=result.dtype))
       # This sampling algorithm can produce near-PSD matrices on which standard
       # algorithms such as `tf.cholesky` or `tf.linalg.self_adjoint_eigvals`
       # fail. Specifically, as documented in b/116828694, around 2% of trials
@@ -337,16 +337,16 @@ class LKJ(distribution.Distribution):
       return x
     checks = [
         assert_util.assert_less_equal(
-            tf.cast(-1., dtype=x.dtype.base_dtype),
+            dtype_util.as_numpy_dtype(x.dtype)(-1),
             x,
             message='Correlations must be >= -1.'),
         assert_util.assert_less_equal(
             x,
-            tf.cast(1., x.dtype.base_dtype),
+            dtype_util.as_numpy_dtype(x.dtype)(1),
             message='Correlations must be <= 1.'),
         assert_util.assert_near(
             tf.linalg.diag_part(x),
-            tf.cast(1., x.dtype.base_dtype),
+            dtype_util.as_numpy_dtype(x.dtype)(1),
             message='Self-correlations must be = 1.'),
         assert_util.assert_near(
             x,

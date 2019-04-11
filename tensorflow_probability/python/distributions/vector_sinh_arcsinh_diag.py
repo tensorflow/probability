@@ -223,7 +223,7 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
         f_noskew = f
       else:
         f_noskew = sinh_arcsinh_bijector.SinhArcsinh(
-            skewness=skewness.dtype.as_numpy_dtype(0.),
+            skewness=dtype_util.as_numpy_dtype(skewness.dtype)(0.),
             tailweight=tailweight)
 
       # Make the Affine bijector, Z --> loc + C * Z.

@@ -19,7 +19,9 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
+
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import dtype_util
 
 
 __all__ = [
@@ -111,7 +113,8 @@ class MatrixInverseTriL(bijector.Bijector):
     #     det(J) = (-1)^(n^2) (det Z)^(2n)
     #            = (-1)^n (det X)^(-2n).
     with tf.control_dependencies(self._assertions(x)):
-      return (-2. * tf.cast(tf.shape(input=x)[-1], x.dtype.base_dtype) *
+      return (-2. *
+              tf.cast(tf.shape(input=x)[-1], dtype_util.base_dtype(x.dtype)) *
               tf.reduce_sum(
                   input_tensor=tf.math.log(tf.abs(tf.linalg.diag_part(x))),
                   axis=-1))

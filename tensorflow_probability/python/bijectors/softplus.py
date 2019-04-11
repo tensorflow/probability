@@ -21,6 +21,7 @@ from __future__ import print_function
 import tensorflow as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 
 
 __all__ = [
@@ -88,8 +89,7 @@ class Softplus(bijector.Bijector):
             value=hinge_softness, name="hinge_softness")
         if validate_args:
           nonzero_check = tf.compat.v1.assert_none_equal(
-              tf.convert_to_tensor(
-                  value=0, dtype=self._hinge_softness.dtype.base_dtype),
+              dtype_util.as_numpy_dtype(self._hinge_softness.dtype)(0),
               self.hinge_softness,
               message="hinge_softness must be non-zero")
           self._hinge_softness = distribution_util.with_dependencies(

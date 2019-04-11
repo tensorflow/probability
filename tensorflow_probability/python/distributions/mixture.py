@@ -27,6 +27,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 
 
@@ -317,12 +318,12 @@ class Mixture(distribution.Distribution):
           samples.append(self.components[c].sample(n, seed=stream()))
         x = tf.stack(samples,
                      -self._static_event_shape.ndims - 1)  # [n, B, k, E]
-        npdt = x.dtype.as_numpy_dtype
+        npdt = dtype_util.as_numpy_dtype(x.dtype)
         mask = tf.one_hot(
             indices=cat_samples,  # [n, B]
             depth=self._num_components,  # == k
-            on_value=np.ones([], dtype=npdt),
-            off_value=np.zeros([], dtype=npdt))  # [n, B, k]
+            on_value=npdt(1),
+            off_value=npdt(0))  # [n, B, k]
         mask = distribution_util.pad_mixture_dimensions(
             mask, self, self._cat,
             self._static_event_shape.ndims)                   # [n, B, k, [1]*e]

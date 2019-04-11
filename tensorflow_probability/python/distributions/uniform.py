@@ -238,4 +238,5 @@ def _kl_uniform_uniform(a, b, name=None):
     return tf.where((b.low <= a.low) & (a.high <= b.high),
                     tf.math.log(b.high - b.low) - tf.math.log(a.high - a.low),
                     tf.broadcast_to(
-                        dtype.as_numpy_dtype(np.inf), final_batch_shape))
+                        dtype_util.as_numpy_dtype(dtype)(np.inf),
+                        final_batch_shape))

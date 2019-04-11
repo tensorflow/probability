@@ -216,12 +216,12 @@ class Horseshoe(distribution.Distribution):
   def _stddev(self):
     if self.allow_nan_stats:
       return tf.fill(self.batch_shape_tensor(),
-                     self.dtype.as_numpy_dtype(np.nan))
+                     dtype_util.as_numpy_dtype(self.dtype)(np.nan))
     raise ValueError("`stddev` is undefined for Horseshoe distribution.")
 
   def _variance(self):
     if self.allow_nan_stats:
       return tf.fill(self.batch_shape_tensor(),
-                     self.dtype.as_numpy_dtype(np.nan))
+                     dtype_util.as_numpy_dtype(self.dtype)(np.nan))
     raise ValueError(
         "`variance` is undefined for Horseshoe distribution.")

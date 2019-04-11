@@ -24,6 +24,7 @@ import tensorflow as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 
 
 __all__ = [
@@ -162,7 +163,7 @@ class CholeskyOuterProduct(bijector.Bijector):
       p_float = tf.cast(p_int, dtype=x.dtype)
     else:
       p_int = tf.compat.dimension_value(x.shape[-1])
-      p_float = np.array(p_int, dtype=x.dtype.as_numpy_dtype)
+      p_float = dtype_util.as_numpy_dtype(x.dtype)(p_int)
     exponents = tf.linspace(p_float, 1., p_int)
 
     sum_weighted_log_diag = tf.squeeze(

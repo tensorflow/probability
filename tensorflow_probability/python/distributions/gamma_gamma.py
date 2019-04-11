@@ -233,7 +233,7 @@ class GammaGamma(distribution.Distribution):
     if self.allow_nan_stats:
       nan = tf.fill(
           self.batch_shape_tensor(),
-          np.array(np.nan, dtype=self.dtype.as_numpy_dtype()),
+          dtype_util.as_numpy_dtype(self.dtype)(np.nan),
           name="nan")
       return tf.where(self.mixing_concentration > 1., mean, nan)
     else:
@@ -257,7 +257,7 @@ class GammaGamma(distribution.Distribution):
     if self.allow_nan_stats:
       nan = tf.fill(
           self.batch_shape_tensor(),
-          np.array(np.nan, dtype=self.dtype.as_numpy_dtype()),
+          dtype_util.as_numpy_dtype(self.dtype)(np.nan),
           name="nan")
       return tf.where(self.mixing_concentration > 2., variance, nan)
     else:

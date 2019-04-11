@@ -23,6 +23,7 @@ import itertools
 import tensorflow as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 
 
 __all__ = [
@@ -226,7 +227,7 @@ class Chain(bijector.Bijector):
 
   def _inverse_log_det_jacobian(self, y, **kwargs):
     y = tf.convert_to_tensor(value=y, name="y")
-    ildj = tf.cast(0., dtype=y.dtype.base_dtype)
+    ildj = tf.cast(0., dtype=dtype_util.base_dtype(y.dtype))
 
     if not self.bijectors:
       return ildj
@@ -269,7 +270,7 @@ class Chain(bijector.Bijector):
   def _forward_log_det_jacobian(self, x, **kwargs):
     x = tf.convert_to_tensor(value=x, name="x")
 
-    fldj = tf.cast(0., dtype=x.dtype.base_dtype)
+    fldj = tf.cast(0., dtype=dtype_util.base_dtype(x.dtype))
 
     if not self.bijectors:
       return fldj

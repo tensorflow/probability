@@ -31,7 +31,8 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions.internal import slicing
-from tensorflow_probability.python.internal import distribution_util as util
+from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
@@ -140,12 +141,11 @@ def _convert_to_tensor(value, name=None, dtype=None, preferred_dtype=None):
     return tuple(_convert_to_tensor(v, name, d, p)
                  for v, d, p in zip(value, dtype, preferred_dtype))
   # TODO(b/116672045): Remove this function.
-  if (tf.executing_eagerly() and
-      preferred_dtype is not None and
-      dtype is None and
-      (preferred_dtype.is_integer or preferred_dtype.is_bool)):
+  if (tf.executing_eagerly() and preferred_dtype is not None and
+      dtype is None and (dtype_util.is_integer(preferred_dtype) or
+                         dtype_util.is_bool(preferred_dtype))):
     v = tf.convert_to_tensor(value=value, name=name)
-    if v.dtype.is_floating:
+    if dtype_util.is_floating(v.dtype):
       return v
   return tf.convert_to_tensor(
       value=value, name=name, dtype=dtype, dtype_hint=preferred_dtype)
@@ -287,7 +287,7 @@ class Distribution(_BaseDistribution):
   docstrings for their method specializations. For example:
 
   ```python
-  @util.AppendDocstring("Some other details.")
+  @distribution_util.AppendDocstring("Some other details.")
   def _log_prob(self, value):
     ...
   ```
@@ -1292,9 +1292,9 @@ class Distribution(_BaseDistribution):
     if x_static_val is None:
       prod = tf.reduce_prod(input_tensor=x)
     else:
-      prod = np.prod(x_static_val, dtype=x.dtype.as_numpy_dtype())
+      prod = np.prod(x_static_val, dtype=dtype_util.as_numpy_dtype(x.dtype))
 
-    x = util.expand_to_vector(x, tensor_name=name)
+    x = distribution_util.expand_to_vector(x, tensor_name=name)
     return x, prod
 
   def _set_sample_static_shape(self, x, sample_shape):

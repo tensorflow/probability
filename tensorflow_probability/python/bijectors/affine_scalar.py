@@ -135,6 +135,6 @@ class AffineScalar(bijector.Bijector):
     # `log_det_jacobian` need only be specified for a single input, as this will
     # be tiled to match `event_ndims`.
     if self.scale is None:
-      return tf.constant(0., dtype=x.dtype.base_dtype)
+      return tf.constant(0., dtype=dtype_util.base_dtype(x.dtype))
 
     return tf.math.log(tf.abs(self.scale))

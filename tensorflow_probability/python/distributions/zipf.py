@@ -105,10 +105,11 @@ class Zipf(distribution.Distribution):
           value=power,
           name="power",
           dtype=dtype_util.common_dtype([power], preferred_dtype=tf.float32))
-      if not power.dtype.is_floating or power.dtype.base_dtype is tf.float16:
+      if (not dtype_util.is_floating(power.dtype) or
+          dtype_util.base_equal(power.dtype, tf.float16)):
         raise TypeError(
             "power.dtype ({}) is not a supported `float` type.".format(
-                power.dtype.name))
+                dtype_util.name(power.dtype)))
       runtime_assertions = []
       if validate_args:
         runtime_assertions.append(assert_util.assert_greater(
@@ -202,8 +203,7 @@ class Zipf(distribution.Distribution):
     y = -self.power * tf.math.log(safe_x)
     is_supported = tf.broadcast_to(tf.equal(x, safe_x), tf.shape(input=y))
     neg_inf = tf.fill(
-        tf.shape(input=y),
-        value=np.array(-np.inf, dtype=y.dtype.as_numpy_dtype))
+        tf.shape(input=y), value=dtype_util.as_numpy_dtype(y.dtype)(-np.inf))
     return tf.where(is_supported, y, neg_inf)
 
   @distribution_util.AppendDocstring(
@@ -289,20 +289,17 @@ class Zipf(distribution.Distribution):
     )
     samples = samples + 1.
 
-    if self.validate_args and self.dtype.is_integer:
+    if self.validate_args and dtype_util.is_integer(self.dtype):
       samples = distribution_util.embed_check_integer_casting_closed(
           samples, target_dtype=self.dtype, assert_positive=True)
 
     samples = tf.cast(samples, self.dtype)
 
     if self.validate_args:
-      dt = self.dtype.as_numpy_dtype
-      if self.dtype.is_integer:
-        mask = tf.fill(shape, value=np.array(np.iinfo(dt).min, dtype=dt))
-        samples = tf.where(should_continue, mask, samples)
-      else:
-        mask = tf.fill(shape, value=np.array(np.nan, dtype=dt))
-        samples = tf.where(should_continue, mask, samples)
+      npdt = dtype_util.as_numpy_dtype(self.dtype)
+      v = npdt(dtype_util.min(npdt) if dtype_util.is_integer(npdt) else np.nan)
+      mask = tf.fill(shape, value=v)
+      samples = tf.where(should_continue, mask, samples)
 
     return samples
 
