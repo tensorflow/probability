@@ -23,17 +23,11 @@ import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 
 from tensorflow_probability.python.sts.internal import util as sts_util
 from tensorflow_probability.python.sts.structural_time_series import Parameter
 from tensorflow_probability.python.sts.structural_time_series import StructuralTimeSeries
-
-
-def _num_features(design_matrix):
-  """Determine the number of features from the design matrix"""
-  if tf.compat.dimension_value(design_matrix.shape[-1]) is None:
-    return design_matrix.shape_tensor()[-1]
-  return design_matrix.shape[-1]
 
 
 class DynamicLinearRegressionStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
@@ -66,7 +60,7 @@ class DynamicLinearRegressionStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
           name='observation_noise_scale',
           dtype=dtype)
 
-      num_features = _num_features(design_matrix)
+      num_features = prefer_static.shape(design_matrix)[-1]
 
       def observation_matrix_fn(t):
         observation_matrix = tf.linalg.LinearOperatorFullMatrix(
@@ -121,7 +115,7 @@ class DynamicLinearRegression(StructuralTimeSeries):
       dtype = dtype_util.common_dtype(
           [design_matrix, drift_scale_prior, initial_weights_prior])
 
-      num_features = _num_features(design_matrix)
+      num_features = prefer_static.shape(design_matrix)[-1]
 
       # Default to a weakly-informative Normal(0., 10.) for the initital state
       if initial_weights_prior is None:
