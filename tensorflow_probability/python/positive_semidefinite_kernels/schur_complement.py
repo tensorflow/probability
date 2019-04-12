@@ -103,13 +103,13 @@ class SchurComplement(psd_kernel.PositiveSemidefiniteKernel):
   Here's a simple example usage, with no particular motivation.
 
   ```python
-  from tensorflow_probability import positive_semidefinite_kernels as tfpk
+  from tensorflow_probability import positive_semidefinite_kernels as psd_kernel
 
-  base_kernel = tfpk.ExponentiatedQuadratic(amplitude=np.float64(1.))
+  base_kernel = psd_kernel.ExponentiatedQuadratic(amplitude=np.float64(1.))
   # 3 points in 1-dimensional space (shape [3, 1]).
   z = [[0.], [3.], [4.]]
 
-  schur_kernel = tfpk.SchurComplement(
+  schur_kernel = psd_kernel.SchurComplement(
       base_kernel=base_kernel,
       fixed_inputs=z)
 
@@ -125,13 +125,13 @@ class SchurComplement(psd_kernel.PositiveSemidefiniteKernel):
 
   ```python
   from tensorflow_probability import distributions as tfd
-  from tensorflow_probability import positive_semidefinite_kernels as tfpk
+  from tensorflow_probability import positive_semidefinite_kernels as psd_kernel
 
-  base_kernel = tfpk.ExponentiatedQuadratic(amplitude=np.float64(1.))
+  base_kernel = psd_kernel.ExponentiatedQuadratic(amplitude=np.float64(1.))
   observation_index_points = np.random.uniform(-1., 1., [50, 1])
   observations = np.sin(2 * np.pi * observation_index_points[..., 0])
 
-  posterior_kernel = tfpk.SchurComplement(
+  posterior_kernel = psd_kernel.SchurComplement(
       base_kernel=base_kernel,
       fixed_inputs=observation_index_points)
 
@@ -198,7 +198,19 @@ class SchurComplement(psd_kernel.PositiveSemidefiniteKernel):
     """
     with tf.compat.v1.name_scope(
         name, values=[base_kernel, fixed_inputs]) as name:
-      dtype = dtype_util.common_dtype([base_kernel, fixed_inputs], tf.float32)
+      # If the base_kernel doesn't have a specified dtype, we can't pass it off
+      # to common_dtype, which always expects `tf.as_dtype(dtype)` to work (and
+      # it doesn't if the given `dtype` is None.
+      # TODO(b/130421035): Consider changing common_dtype to allow Nones, and
+      # clean this up after.
+      #
+      # Thus, we spell out the logic
+      # here: use the dtype of `fixed_inputs` if possible. If base_kernel.dtype
+      # is not None, use the usual logic.
+      if base_kernel.dtype is None:
+        dtype = None if fixed_inputs is None else fixed_inputs.dtype
+      else:
+        dtype = dtype_util.common_dtype([base_kernel, fixed_inputs], tf.float32)
       self._base_kernel = base_kernel
       self._fixed_inputs = (None if fixed_inputs is None else
                             tf.convert_to_tensor(value=fixed_inputs,

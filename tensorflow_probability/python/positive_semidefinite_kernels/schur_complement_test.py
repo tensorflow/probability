@@ -154,6 +154,23 @@ class SchurComplementTest(tf.test.TestCase, parameterized.TestCase):
         self.evaluate(base_kernel.matrix(x, y)),
         self.evaluate(schur.matrix(x, y)))
 
+  def testBaseKernelNoneDtype(self):
+    # Test that we don't have problems when base_kernel has no explicit dtype
+    # (ie, params are all None), but fixed_inputs has a different dtype than the
+    # "common_dtype" default value of np.float32.
+    fixed_inputs = np.arange(3, dtype=np.float64).reshape([3, 1])
+
+    # Should raise when there's an explicit mismatch.
+    with self.assertRaises(TypeError):
+      schur_complement = tfpk.SchurComplement(
+          tfpk.ExponentiatedQuadratic(np.float32(1)),
+          fixed_inputs)
+
+    # Should not throw an exception when the kernel doesn't get an explicit
+    # dtype from its inputs.
+    schur_complement = tfpk.SchurComplement(
+        tfpk.ExponentiatedQuadratic(), fixed_inputs)
+    schur_complement.matrix(fixed_inputs, fixed_inputs)
 
 if __name__ == '__main__':
   tf.test.main()

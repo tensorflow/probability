@@ -20,7 +20,6 @@ from __future__ import print_function
 
 import numpy as np
 import tensorflow as tf
-from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.positive_semidefinite_kernels import positive_semidefinite_kernel as psd_kernel
 from tensorflow_probability.python.positive_semidefinite_kernels.internal import util
 
@@ -54,7 +53,8 @@ class _AmplitudeLengthScaleMixin(object):
     Returns:
       dtype: The common `DType` of the parameters.
     """
-    dtype = dtype_util.common_dtype([amplitude, length_scale], tf.float32)
+    dtype = util.maybe_get_common_dtype(
+        [amplitude, length_scale])
     if amplitude is not None:
       amplitude = tf.convert_to_tensor(
           value=amplitude, name='amplitude', dtype=dtype)
