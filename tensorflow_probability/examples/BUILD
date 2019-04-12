@@ -96,6 +96,9 @@ py_test(
     ],
     main = "grammar_vae.py",
     srcs_version = "PY2AND3",
+    tags = [
+        "no-oss-ci",  # TODO(b/130416369): re-enable after tensorboard is fixed
+    ],
     deps = [
         ":grammar_vae_lib",
     ],
@@ -139,7 +142,10 @@ py_test(
     ],
     main = "disentangled_vae.py",
     srcs_version = "PY2AND3",
-    tags = ["tf2-kokoro-broken"],
+    tags = [
+        "no-oss-ci",  # TODO(b/130416369): re-enable after tensorboard is fixed
+        "tf2-kokoro-broken",
+    ],
     deps = [
         ":disentangled_vae_lib",
     ],
