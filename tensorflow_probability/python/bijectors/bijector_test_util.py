@@ -274,7 +274,8 @@ def get_fldj_theoretical(bijector,
     output_to_unconstrained = identity_bijector.Identity()
 
   x = tf.convert_to_tensor(value=x)
-  x_unconstrained = input_to_unconstrained.forward(x)
+  x_unconstrained = 1 * input_to_unconstrained.forward(x)
+
   with tf.GradientTape(persistent=True) as tape:
     tape.watch(x_unconstrained)
     f_x = bijector.forward(input_to_unconstrained.inverse(x_unconstrained))

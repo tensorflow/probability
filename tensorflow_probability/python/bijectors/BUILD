@@ -857,6 +857,7 @@ py_test(
     size = "small",
     srcs = ["matrix_inverse_tril_test.py"],
     deps = [
+        ":bijector_test_util",
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
