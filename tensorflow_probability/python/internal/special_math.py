@@ -76,7 +76,7 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import dtype_util
 
@@ -133,7 +133,7 @@ def ndtr(x, name="ndtr"):
     TypeError: if `x` is not floating-type.
   """
 
-  with tf.compat.v2.name_scope(name):
+  with tf.name_scope(name):
     x = tf.convert_to_tensor(value=x, name="x")
     if dtype_util.as_numpy_dtype(x.dtype) not in [np.float32, np.float64]:
       raise TypeError(
@@ -174,7 +174,7 @@ def ndtri(p, name="ndtri"):
     TypeError: if `p` is not floating-type.
   """
 
-  with tf.compat.v2.name_scope(name):
+  with tf.name_scope(name):
     p = tf.convert_to_tensor(value=p, name="p")
     if dtype_util.as_numpy_dtype(p.dtype) not in [np.float32, np.float64]:
       raise TypeError(
@@ -345,7 +345,7 @@ def log_ndtr(x, series_order=3, name="log_ndtr"):
   if series_order > 30:
     raise ValueError("series_order must be <= 30.")
 
-  with tf.compat.v2.name_scope(name):
+  with tf.name_scope(name):
     x = tf.convert_to_tensor(value=x, name="x")
 
     if dtype_util.base_equal(x.dtype, tf.float64):
@@ -421,7 +421,7 @@ def erfinv(x, name="erfinv"):
     TypeError: if `x` is not floating-type.
   """
 
-  with tf.compat.v2.name_scope(name):
+  with tf.name_scope(name):
     x = tf.convert_to_tensor(value=x, name="x")
     if dtype_util.as_numpy_dtype(x.dtype) not in [np.float32, np.float64]:
       raise TypeError("x.dtype={} is not handled, see docstring for supported "
@@ -463,7 +463,7 @@ def log_cdf_laplace(x, name="log_cdf_laplace"):
     TypeError: if `x.dtype` is not handled.
   """
 
-  with tf.compat.v2.name_scope(name):
+  with tf.name_scope(name):
     x = tf.convert_to_tensor(value=x, name="x")
 
     # For x < 0, L(x) = 0.5 * exp{x} exactly, so Log[L(x)] = log(0.5) + x.

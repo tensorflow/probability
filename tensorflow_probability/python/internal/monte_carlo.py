@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 __all__ = [
     'expectation',
@@ -71,7 +71,7 @@ def expectation_importance_sampler(f,
       to batch shape of `q`, and `dtype` = `q.dtype`.
   """
   q = sampling_dist_q
-  with tf.compat.v2.name_scope(name):
+  with tf.name_scope(name):
     z = _get_samples(q, z, n, seed)
 
     log_p_z = log_p(z)
@@ -146,7 +146,7 @@ def expectation_importance_sampler_logspace(
       to batch shape of `q`, and `dtype` = `q.dtype`.
   """
   q = sampling_dist_q
-  with tf.compat.v2.name_scope(name):
+  with tf.name_scope(name):
     z = _get_samples(q, z, n, seed)
     log_values = log_f(z) + log_p(z) - q.log_prob(z)
     return _logspace_mean(log_values)
@@ -309,7 +309,7 @@ def expectation(f, samples, log_prob=None, use_reparametrization=True,
       `callable`.
   """
 
-  with tf.compat.v2.name_scope(name or 'expectation'):
+  with tf.name_scope(name or 'expectation'):
     if not callable(f):
       raise ValueError('`f` must be a callable function.')
     if use_reparametrization:
@@ -349,7 +349,7 @@ def _sample_max(values):
 
 def _get_samples(dist, z, n, seed):
   """Check args and return samples."""
-  with tf.compat.v2.name_scope('get_samples'):
+  with tf.name_scope('get_samples'):
     if (n is None) == (z is None):
       raise ValueError(
           'Must specify exactly one of arguments "n" and "z".  Found: '

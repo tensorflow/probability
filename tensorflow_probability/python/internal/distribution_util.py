@@ -21,7 +21,7 @@ from __future__ import print_function
 import functools
 import hashlib
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
@@ -138,7 +138,7 @@ def make_tril_scale(loc=None,
             message="diagonal part must be non-zero"),
     ], x)
 
-  with tf.compat.v2.name_scope(name or "make_tril_scale"):
+  with tf.name_scope(name or "make_tril_scale"):
 
     dtype = dtype_util.common_dtype(
         [loc, scale_tril, scale_diag, scale_identity_multiplier],
@@ -229,7 +229,7 @@ def make_diag_scale(loc=None,
             x, tf.zeros([], x.dtype), message="diagonal part must be non-zero")
     ], x)
 
-  with tf.compat.v2.name_scope(name or "make_diag_scale"):
+  with tf.name_scope(name or "make_diag_scale"):
     if dtype is None:
       dtype = dtype_util.common_dtype(
           [loc, scale_diag, scale_identity_multiplier],
@@ -308,7 +308,7 @@ def shapes_from_loc_and_scale(loc, scale, name="shapes_from_loc_and_scale"):
   """
   if loc is not None and tensorshape_util.rank(loc.shape) == 0:
     loc = None  # scalar loc is irrelevant to determining batch/event shape.
-  with tf.compat.v2.name_scope(name):
+  with tf.name_scope(name):
     # Get event shape.
     event_size = scale.range_dimension_tensor()
     event_size_ = tf.get_static_value(event_size)
@@ -440,7 +440,7 @@ def maybe_check_scalar_distribution(distribution, expected_base_dtype,
                      "distribution.reparameterization_type = \"{}\" "
                      "!= \"FULLY_REPARAMETERIZED\".".format(
                          distribution.reparameterization_type))
-  with tf.compat.v2.name_scope("check_distribution"):
+  with tf.name_scope("check_distribution"):
     assertions = []
 
     def check_is_scalar(is_scalar, name):
@@ -479,7 +479,7 @@ def pad_mixture_dimensions(x, mixture_distribution, categorical_distribution,
   Returns:
     A padded version of `x` that can broadcast with `categorical_distribution`.
   """
-  with tf.compat.v2.name_scope("pad_mix_dims"):
+  with tf.name_scope("pad_mix_dims"):
 
     def _get_ndims(d):
       if tensorshape_util.rank(d.batch_shape) is not None:
@@ -531,7 +531,7 @@ def pick_scalar_condition(pred, true_value, false_value, name=None):
       If the condition can be evaluated statically, the result returned is one
       of the input Python values, with no graph side effects.
   """
-  with tf.compat.v2.name_scope(name or "pick_scalar_condition"):
+  with tf.name_scope(name or "pick_scalar_condition"):
     pred = tf.convert_to_tensor(
         value=pred, dtype_hint=tf.bool, name="pred")
     true_value = tf.convert_to_tensor(value=true_value, name="true_value")
@@ -660,7 +660,7 @@ def assert_integer_form(x,
   Returns:
     Op raising `InvalidArgumentError` if `cast(x, int_dtype) != x`.
   """
-  with tf.compat.v2.name_scope(name):
+  with tf.name_scope(name):
     x = tf.convert_to_tensor(value=x, name="x")
     if dtype_util.is_integer(x.dtype):
       return tf.no_op()
@@ -692,7 +692,7 @@ def assert_symmetric(matrix):
 def embed_check_nonnegative_integer_form(
     x, name="embed_check_nonnegative_integer_form"):
   """Assert x is a non-negative tensor, and optionally of integers."""
-  with tf.compat.v2.name_scope(name):
+  with tf.name_scope(name):
     x = tf.convert_to_tensor(value=x, name="x")
     assertions = [
         assert_util.assert_non_negative(
@@ -793,7 +793,7 @@ def get_logits_and_probs(logits=None,
   """
   if dtype is None:
     dtype = dtype_util.common_dtype([probs, logits], preferred_dtype=tf.float32)
-  with tf.compat.v2.name_scope(name):
+  with tf.name_scope(name):
     if (probs is None) == (logits is None):
       raise ValueError("Must pass probs or logits, but not both.")
 
@@ -814,7 +814,7 @@ def get_logits_and_probs(logits=None,
       raise TypeError("probs must having floating type.")
 
     if validate_args:
-      with tf.compat.v2.name_scope("validate_probs"):
+      with tf.name_scope("validate_probs"):
         one = tf.constant(1., probs.dtype)
         dependencies = [assert_util.assert_non_negative(probs)]
         if multidimensional:
@@ -832,7 +832,7 @@ def get_logits_and_probs(logits=None,
           ]
         probs = with_dependencies(dependencies, probs)
 
-    with tf.compat.v2.name_scope("logits"):
+    with tf.name_scope("logits"):
       if multidimensional:
         # Here we don't compute the multidimensional case, in a manner
         # consistent with respect to the unidimensional case. We do so
@@ -943,7 +943,7 @@ def embed_check_categorical_event_shape(
     ValueError: if we can statically identify `categorical_param` as being too
       large (for being closed under int32/float casting).
   """
-  with tf.compat.v2.name_scope(name):
+  with tf.name_scope(name):
     x = tf.convert_to_tensor(value=categorical_param, name="categorical_param")
     # The size must not exceed both of:
     # - The largest possible int32 (since categorical values are presumed to be
@@ -1034,7 +1034,7 @@ def embed_check_integer_casting_closed(x,
     TypeError: if neither `x` nor `target_dtype` are integer-type.
   """
 
-  with tf.compat.v2.name_scope(name):
+  with tf.name_scope(name):
     x = tf.convert_to_tensor(value=x, name="x")
     if (not _is_integer_like_by_dtype(x.dtype) and
         not dtype_util.is_floating(x.dtype)):
@@ -1123,7 +1123,7 @@ def log_combinations(n, counts, name="log_combinations"):
   # In general, this is (sum counts)! / sum(counts!)
   # The sum should be along the last dimension of counts. This is the
   # "distribution" dimension. Here n a priori represents the sum of counts.
-  with tf.compat.v2.name_scope(name):
+  with tf.name_scope(name):
     n = tf.convert_to_tensor(value=n, name="n")
     counts = tf.convert_to_tensor(value=counts, name="counts")
     total_permutations = tf.math.lgamma(n + 1)
@@ -1183,7 +1183,7 @@ def matrix_diag_transform(matrix, transform=None, name=None):
   Returns:
     A `Tensor` with same shape and `dtype` as `matrix`.
   """
-  with tf.compat.v2.name_scope(name or "matrix_diag_transform"):
+  with tf.name_scope(name or "matrix_diag_transform"):
     matrix = tf.convert_to_tensor(value=matrix, name="matrix")
     if transform is None:
       return matrix
@@ -1231,7 +1231,7 @@ def rotate_transpose(x, shift, name="rotate_transpose"):
   Raises:
     TypeError: if shift is not integer type.
   """
-  with tf.compat.v2.name_scope(name):
+  with tf.name_scope(name):
     x = tf.convert_to_tensor(value=x, name="x")
     shift = tf.convert_to_tensor(value=shift, name="shift")
     # We do not assign back to preserve constant-ness.
@@ -1297,7 +1297,7 @@ def pick_vector(cond, true_vector, false_vector, name="pick_vector"):
     TypeError: if `cond` is not a constant and
       `true_vector.dtype != false_vector.dtype`
   """
-  with tf.compat.v2.name_scope(name):
+  with tf.name_scope(name):
     cond = tf.convert_to_tensor(
         value=cond, dtype_hint=tf.bool, name="cond")
     if cond.dtype != tf.bool:
@@ -1334,7 +1334,7 @@ def prefer_static_broadcast_shape(shape1,
     The broadcast shape, either as `TensorShape` (if broadcast can be done
       statically), or as a `Tensor`.
   """
-  with tf.compat.v2.name_scope(name):
+  with tf.name_scope(name):
 
     def make_shape_tensor(x):
       return tf.convert_to_tensor(value=x, name="shape", dtype=tf.int32)
@@ -1499,7 +1499,7 @@ def fill_triangular(x, upper=False, name=None):
     ValueError: if `x` cannot be mapped to a triangular matrix.
   """
 
-  with tf.compat.v2.name_scope(name or "fill_triangular"):
+  with tf.name_scope(name or "fill_triangular"):
     x = tf.convert_to_tensor(value=x, name="x")
     m = tf.compat.dimension_value(
         tensorshape_util.with_rank_at_least(x.shape, 1)[-1])
@@ -1599,7 +1599,7 @@ def fill_triangular_inverse(x, upper=False, name=None):
       (or upper) triangular elements from `x`.
   """
 
-  with tf.compat.v2.name_scope(name or "fill_triangular_inverse"):
+  with tf.name_scope(name or "fill_triangular_inverse"):
     x = tf.convert_to_tensor(value=x, name="x")
     n = tf.compat.dimension_value(
         tensorshape_util.with_rank_at_least(x.shape, 2)[-1])
@@ -1683,7 +1683,7 @@ def tridiag(below=None, diag=None, above=None, name=None):
       raise ValueError("Must specify at least one of `below`, `diag`, `above`.")
     return s
 
-  with tf.compat.v2.name_scope(name or "tridiag"):
+  with tf.name_scope(name or "tridiag"):
     if below is not None:
       below = tf.convert_to_tensor(value=below, name="below")
       below = tf.linalg.diag(_pad(below))[..., :-1, 1:]
@@ -1761,7 +1761,7 @@ def reduce_weighted_logsumexp(logx,
     lswe: The `log(abs(sum(weight * exp(x))))` reduced tensor.
     sign: (Optional) The sign of `sum(weight * exp(x))`.
   """
-  with tf.compat.v2.name_scope(name or "reduce_weighted_logsumexp"):
+  with tf.name_scope(name or "reduce_weighted_logsumexp"):
     logx = tf.convert_to_tensor(value=logx, name="logx")
     if w is None:
       lswe = tf.reduce_logsumexp(
@@ -1812,7 +1812,7 @@ def softplus_inverse(x, name=None):
   Returns:
     `Tensor`. Has the same type/shape as input `x`.
   """
-  with tf.compat.v2.name_scope(name or "softplus_inverse"):
+  with tf.name_scope(name or "softplus_inverse"):
     x = tf.convert_to_tensor(value=x, name="x")
     # We begin by deriving a more numerically stable softplus_inverse:
     # x = softplus(y) = Log[1 + exp{y}], (which means x > 0).
@@ -1888,7 +1888,7 @@ def process_quadrature_grid_and_probs(quadrature_grid_and_probs,
     ValueError: if `quadrature_grid_and_probs is not None` and
       `len(quadrature_grid_and_probs[0]) != len(quadrature_grid_and_probs[1])`
   """
-  with tf.compat.v2.name_scope(name or "process_quadrature_grid_and_probs"):
+  with tf.name_scope(name or "process_quadrature_grid_and_probs"):
     if quadrature_grid_and_probs is None:
       grid, probs = np.polynomial.hermite.hermgauss(deg=8)
       grid = grid.astype(dtype_util.as_numpy_dtype(dtype))
@@ -1954,7 +1954,7 @@ def pad(x, axis, front=False, back=False, value=0, count=1, name=None):
     ValueError: if both `front` and `back` are `False`.
     TypeError: if `count` is not `int`-like.
   """
-  with tf.compat.v2.name_scope(name or "pad"):
+  with tf.name_scope(name or "pad"):
     x = tf.convert_to_tensor(value=x, name="x")
     value = tf.convert_to_tensor(value=value, dtype=x.dtype, name="value")
     count = tf.convert_to_tensor(value=count, name="count")
@@ -2125,7 +2125,7 @@ def expand_to_vector(x, tensor_name=None, op_name=None, validate_args=False):
   Returns:
     vector: a 1-D `Tensor`.
   """
-  with tf.compat.v2.name_scope(op_name or "expand_to_vector"):
+  with tf.name_scope(op_name or "expand_to_vector"):
     x = tf.convert_to_tensor(value=x, name="x")
     ndims = tensorshape_util.rank(x.shape)
 
@@ -2183,7 +2183,7 @@ def with_dependencies(dependencies, output_tensor, name=None):
   """
   if tf.executing_eagerly():
     return output_tensor
-  with tf.compat.v2.name_scope(name or "control_dependency") as name:
+  with tf.name_scope(name or "control_dependency") as name:
     with tf.control_dependencies(d for d in dependencies if d is not None):
       output_tensor = tf.convert_to_tensor(value=output_tensor)
       if isinstance(output_tensor, tf.Tensor):
