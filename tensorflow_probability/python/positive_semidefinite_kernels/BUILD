@@ -179,6 +179,8 @@ py_library(
     deps = [
         ":positive_semidefinite_kernel",
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:cholesky_outer_product",
+        "//tensorflow_probability/python/bijectors:invert",
         "//tensorflow_probability/python/internal:dtype_util",
     ],
 )

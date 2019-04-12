@@ -19,7 +19,8 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python.bijectors import cholesky_outer_product
+from tensorflow_probability.python.bijectors import invert
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.positive_semidefinite_kernels import positive_semidefinite_kernel as psd_kernel
 
@@ -224,7 +225,8 @@ class SchurComplement(psd_kernel.PositiveSemidefiniteKernel):
           self._divisor_matrix = _add_diagonal_shift(
               self._divisor_matrix, diag_shift)
 
-      self._cholesky_bijector = tfb.Invert(tfb.CholeskyOuterProduct())
+      self._cholesky_bijector = invert.Invert(
+          cholesky_outer_product.CholeskyOuterProduct())
     super(SchurComplement, self).__init__(
         base_kernel.feature_ndims, dtype=dtype, name=name)
 
