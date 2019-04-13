@@ -18,7 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import mvn_tril
 from tensorflow_probability.python.internal import assert_util
@@ -172,7 +171,7 @@ class MultivariateNormalFullCovariance(mvn_tril.MultivariateNormalTriL):
             covariance_matrix = distribution_util.with_dependencies([
                 assert_util.assert_near(
                     covariance_matrix,
-                    tf1.matrix_transpose(covariance_matrix),
+                    tf.linalg.matrix_transpose(covariance_matrix),
                     message="Matrix was not symmetric")
             ], covariance_matrix)
           # No need to validate that covariance_matrix is non-singular.

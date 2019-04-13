@@ -595,7 +595,7 @@ def ensure_high_gt_low(low, high):
 
 
 def symmetric(x):
-  return (x + tf.linalg.transpose(x)) / 2
+  return (x + tf.linalg.matrix_transpose(x)) / 2
 
 
 def positive_definite(x):
