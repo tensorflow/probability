@@ -20,10 +20,13 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -83,9 +86,9 @@ class CholeskyOuterProduct(bijector.Bijector):
 
   def _forward(self, x):
     if self.validate_args:
-      is_matrix = tf.compat.v1.assert_rank_at_least(x, 2)
+      is_matrix = assert_util.assert_rank_at_least(x, 2)
       shape = tf.shape(input=x)
-      is_square = tf.compat.v1.assert_equal(shape[-2], shape[-1])
+      is_square = assert_util.assert_equal(shape[-2], shape[-1])
       x = distribution_util.with_dependencies([is_matrix, is_square], x)
     # For safety, explicitly zero-out the upper triangular part.
     x = tf.linalg.band_part(x, -1, 0)
@@ -143,15 +146,15 @@ class CholeskyOuterProduct(bijector.Bijector):
     diag = self._make_columnar(diag)
 
     if self.validate_args:
-      is_matrix = tf.compat.v1.assert_rank_at_least(
+      is_matrix = assert_util.assert_rank_at_least(
           x, 2, message="Input must be a (batch of) matrix.")
       shape = tf.shape(input=x)
-      is_square = tf.compat.v1.assert_equal(
+      is_square = assert_util.assert_equal(
           shape[-2],
           shape[-1],
           message="Input must be a (batch of) square matrix.")
       # Assuming lower-triangular means we only need check diag>0.
-      is_positive_definite = tf.compat.v1.assert_positive(
+      is_positive_definite = assert_util.assert_positive(
           diag, message="Input must be positive definite.")
       x = distribution_util.with_dependencies(
           [is_matrix, is_square, is_positive_definite], x)
@@ -162,7 +165,7 @@ class CholeskyOuterProduct(bijector.Bijector):
       p_float = tf.cast(p_int, dtype=x.dtype)
     else:
       p_int = tf.compat.dimension_value(x.shape[-1])
-      p_float = np.array(p_int, dtype=x.dtype.as_numpy_dtype)
+      p_float = dtype_util.as_numpy_dtype(x.dtype)(p_int)
     exponents = tf.linspace(p_float, 1., p_int)
 
     sum_weighted_log_diag = tf.squeeze(
@@ -171,8 +174,8 @@ class CholeskyOuterProduct(bijector.Bijector):
 
     # We finally need to undo adding an extra column in non-scalar cases
     # where there is a single matrix as input.
-    if x.shape.ndims is not None:
-      if x.shape.ndims == 2:
+    if tensorshape_util.rank(x.shape) is not None:
+      if tensorshape_util.rank(x.shape) == 2:
         fldj = tf.squeeze(fldj, axis=-1)
       return fldj
 
@@ -200,8 +203,8 @@ class CholeskyOuterProduct(bijector.Bijector):
     Returns:
       columnar_x: `Tensor` with at least two dimensions.
     """
-    if x.shape.ndims is not None:
-      if x.shape.ndims == 1:
+    if tensorshape_util.rank(x.shape) is not None:
+      if tensorshape_util.rank(x.shape) == 1:
         x = x[tf.newaxis, :]
       return x
     shape = tf.shape(input=x)

@@ -19,10 +19,11 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
     'GaussianProcessRegressionModel',
@@ -407,7 +408,7 @@ class GaussianProcessRegressionModel(
         - `mean_fn` is not `None` and not callable.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([
           index_points, observation_index_points, observations,
           observation_noise_variance, predictive_noise_variance, jitter
@@ -457,7 +458,7 @@ class GaussianProcessRegressionModel(
       self._mean_fn = mean_fn
       self._validate_args = validate_args
 
-      with tf.compat.v2.name_scope('init'):
+      with tf.name_scope('init'):
         (loc,
          covariance) = self._compute_marginal_distribution_loc_and_covariance()
         self._covariance_matrix = covariance
@@ -572,7 +573,7 @@ class GaussianProcessRegressionModel(
            'broadcastable.')
     ndims = self.kernel.feature_ndims
     if (self.observation_index_points.shape[:-ndims].is_fully_defined() and
-        self.observations.shape.is_fully_defined()):
+        tensorshape_util.is_fully_defined(self.observations.shape)):
       index_point_count = self.observation_index_points.shape[:-ndims]
       observation_count = self.observations.shape
       try:

@@ -21,6 +21,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -189,28 +190,29 @@ class DistributionTest(tf.test.TestCase):
     y = dist._set_sample_static_shape(x, sample_shape)
     # We use as_list since TensorShape comparison does not work correctly for
     # unknown values, ie, Dimension(None).
-    self.assertAllEqual([6, 7, 2, 3, 5], y.shape.as_list())
+    self.assertAllEqual([6, 7, 2, 3, 5], tensorshape_util.as_list(y.shape))
 
     x = tf.compat.v1.placeholder_with_default(
         input=np.ones((6, 7, 2, 3, 5), dtype=np.float32), shape=None)
     dist = fake_distribution(batch_shape=[None, 3], event_shape=[5])
     sample_shape = tf.convert_to_tensor(value=[6, 7], dtype=tf.int32)
     y = dist._set_sample_static_shape(x, sample_shape)
-    self.assertAllEqual([6, 7, None, 3, 5], y.shape.as_list())
+    self.assertAllEqual([6, 7, None, 3, 5], tensorshape_util.as_list(y.shape))
 
     x = tf.compat.v1.placeholder_with_default(
         input=np.ones((6, 7, 2, 3, 5), dtype=np.float32), shape=None)
     dist = fake_distribution(batch_shape=[None, 3], event_shape=[None])
     sample_shape = tf.convert_to_tensor(value=[6, 7], dtype=tf.int32)
     y = dist._set_sample_static_shape(x, sample_shape)
-    self.assertAllEqual([6, 7, None, 3, None], y.shape.as_list())
+    self.assertAllEqual([6, 7, None, 3, None],
+                        tensorshape_util.as_list(y.shape))
 
     x = tf.compat.v1.placeholder_with_default(
         input=np.ones((6, 7, 2, 3, 5), dtype=np.float32), shape=None)
     dist = fake_distribution(batch_shape=None, event_shape=None)
     sample_shape = tf.convert_to_tensor(value=[6, 7], dtype=tf.int32)
     y = dist._set_sample_static_shape(x, sample_shape)
-    self.assertTrue(y.shape.ndims is None)
+    self.assertIsNone(tensorshape_util.rank(y.shape))
 
     x = tf.compat.v1.placeholder_with_default(
         input=np.ones((6, 7, 2, 3, 5), dtype=np.float32), shape=None)
@@ -219,7 +221,7 @@ class DistributionTest(tf.test.TestCase):
     # early.
     sample_shape = tf.convert_to_tensor(value=[6, 7], dtype=tf.int32)
     y = dist._set_sample_static_shape(x, sample_shape)
-    self.assertTrue(y.shape.ndims is None)
+    self.assertIsNone(tensorshape_util.rank(y.shape))
 
   def testNameScopeWorksCorrectly(self):
     x = tfd.Normal(loc=0., scale=1., name="x")

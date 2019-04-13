@@ -22,8 +22,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
     'CategoricalToDiscrete',
@@ -56,7 +59,7 @@ class CategoricalToDiscrete(bijector.Bijector):
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
     """
-    with tf.compat.v1.name_scope(name, values=[map_values]):
+    with tf.name_scope(name):
       map_values = tf.convert_to_tensor(value=map_values, name='map_values')
       assertions = _maybe_check_valid_map_values(map_values, validate_args)
       if assertions:
@@ -73,7 +76,7 @@ class CategoricalToDiscrete(bijector.Bijector):
   def _forward(self, x):
     if self.validate_args:
       with tf.control_dependencies([
-          tf.compat.v1.assert_equal(
+          assert_util.assert_equal(
               (0 <= x) & (x < tf.size(input=self.map_values)),
               True,
               message='indices out of bound')
@@ -98,7 +101,7 @@ class CategoricalToDiscrete(bijector.Bijector):
     upper_cand_diff = tf.abs(flat_y - self._forward(upper_candidates))
     if self.validate_args:
       with tf.control_dependencies([
-          tf.compat.v1.assert_near(
+          assert_util.assert_near(
               tf.minimum(lower_cand_diff, upper_cand_diff),
               0,
               message='inverse value not found')
@@ -126,24 +129,24 @@ def _maybe_check_valid_map_values(map_values, validate_args):
   assertions = []
 
   message = 'Rank of map_values must be 1.'
-  if map_values.shape.ndims is not None:
-    if map_values.shape.ndims != 1:
+  if tensorshape_util.rank(map_values.shape) is not None:
+    if tensorshape_util.rank(map_values.shape) != 1:
       raise ValueError(message)
   elif validate_args:
-    assertions.append(tf.compat.v1.assert_rank(map_values, 1, message=message))
+    assertions.append(assert_util.assert_rank(map_values, 1, message=message))
 
   message = 'Size of map_values must be greater than 0.'
-  if map_values.shape.num_elements() is not None:
-    if map_values.shape.num_elements() == 0:
+  if tensorshape_util.num_elements(map_values.shape) is not None:
+    if tensorshape_util.num_elements(map_values.shape) == 0:
       raise ValueError(message)
   elif validate_args:
     assertions.append(
-        tf.compat.v1.assert_greater(
+        assert_util.assert_greater(
             tf.size(input=map_values), 0, message=message))
 
   if validate_args:
     assertions.append(
-        tf.compat.v1.assert_equal(
+        assert_util.assert_equal(
             tf.math.is_strictly_increasing(map_values),
             True,
             message='map_values is not strictly increasing.'))

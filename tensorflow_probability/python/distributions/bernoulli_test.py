@@ -26,6 +26,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -98,9 +99,10 @@ class BernoulliTest(tf.test.TestCase):
   def testShapes(self):
     for batch_shape in ([], [1], [2, 3, 4]):
       dist = make_bernoulli(batch_shape)
-      self.assertAllEqual(batch_shape, dist.batch_shape.as_list())
+      self.assertAllEqual(batch_shape,
+                          tensorshape_util.as_list(dist.batch_shape))
       self.assertAllEqual(batch_shape, self.evaluate(dist.batch_shape_tensor()))
-      self.assertAllEqual([], dist.event_shape.as_list())
+      self.assertAllEqual([], tensorshape_util.as_list(dist.event_shape))
       self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
 
   def testDtype(self):
@@ -241,8 +243,8 @@ class BernoulliTest(tf.test.TestCase):
     # In this test we're just interested in verifying there isn't a crash
     # owing to mismatched types. b/30940152
     dist = tfd.Bernoulli(np.log([.2, .4]))
-    self.assertAllEqual((1, 2), dist.sample(
-        1, seed=tfp_test_util.test_seed()).shape.as_list())
+    x = dist.sample(1, seed=tfp_test_util.test_seed())
+    self.assertAllEqual((1, 2), tensorshape_util.as_list(x.shape))
 
   def testNotReparameterized(self):
     p = tf.constant([0.2, 0.6])
@@ -327,7 +329,7 @@ class BernoulliSlicingTest(tf.test.TestCase):
   def testSlice(self):
     logits = self.evaluate(tf.random.normal([20, 3, 1, 5]))
     dist = tfd.Bernoulli(logits=logits)
-    batch_shape = dist.batch_shape.as_list()
+    batch_shape = tensorshape_util.as_list(dist.batch_shape)
     dist_noshape = tfd.Bernoulli(
         logits=tf.compat.v1.placeholder_with_default(logits, shape=None))
 
@@ -342,7 +344,7 @@ class BernoulliSlicingTest(tf.test.TestCase):
           if assert_static_shape or tf.executing_eagerly():
             self.assertAllEqual(bs, ds.batch_shape)
           else:
-            self.assertIsNone(ds.batch_shape.ndims)
+            self.assertIsNone(tensorshape_util.rank(ds.batch_shape))
           self.assertAllEqual(bs, self.evaluate(ds.batch_shape_tensor()))
           self.assertAllClose(prob, self.evaluate(ds.prob(0)))
 

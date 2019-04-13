@@ -21,7 +21,7 @@ from __future__ import print_function
 import math
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
@@ -29,6 +29,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
     "Wishart",
@@ -106,9 +107,9 @@ class _WishartLinearOperator(distribution.Distribution):
     """
     parameters = dict(locals())
     self._input_output_cholesky = input_output_cholesky
-    with tf.compat.v2.name_scope(name) as name:
-      with tf.compat.v2.name_scope("init"):
-        if not scale_operator.dtype.is_floating:
+    with tf.name_scope(name) as name:
+      with tf.name_scope("init"):
+        if not dtype_util.is_floating(scale_operator.dtype):
           raise TypeError(
               "scale_operator.dtype=%s is not a floating-point type" %
               scale_operator.dtype)
@@ -225,7 +226,7 @@ class _WishartLinearOperator(distribution.Distribution):
     # ChiSquared(k) == Gamma(alpha=k/2, beta=1/2)
     expanded_df = self.df * tf.ones(
         self.scale_operator.batch_shape_tensor(),
-        dtype=self.df.dtype.base_dtype)
+        dtype=dtype_util.base_dtype(self.df.dtype))
 
     g = tf.random.gamma(
         shape=[n],
@@ -351,7 +352,8 @@ class _WishartLinearOperator(distribution.Distribution):
     # Set shape hints.
     # Try to merge what we know from the input x with what we know from the
     # parameters of this distribution.
-    if x.shape.ndims is not None and self.batch_shape.ndims is not None:
+    if tensorshape_util.rank(x.shape) is not None and tensorshape_util.rank(
+        self.batch_shape) is not None:
       log_prob.set_shape(
           tf.broadcast_static_shape(x.shape[:-2], self.batch_shape))
 
@@ -533,8 +535,8 @@ class Wishart(_WishartLinearOperator):
     """
     parameters = dict(locals())
 
-    with tf.compat.v2.name_scope(name) as name:
-      with tf.compat.v2.name_scope("init"):
+    with tf.name_scope(name) as name:
+      with tf.name_scope("init"):
         if (scale is None) == (scale_tril is None):
           raise ValueError("Must pass scale or scale_tril, but not both.")
 

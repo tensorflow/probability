@@ -20,9 +20,10 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
-from tensorflow_probability.python import bijectors as tfb
 
+import tensorflow.compat.v2 as tf
+
+from tensorflow_probability.python import bijectors as tfb
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 

@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
@@ -194,8 +194,8 @@ class MultivariateNormalDiag(
       ValueError: if at most `scale_identity_multiplier` is specified.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
-      with tf.compat.v2.name_scope("init"):
+    with tf.name_scope(name) as name:
+      with tf.name_scope("init"):
         # No need to validate_args while making diag_scale.  The returned
         # LinearOperatorDiag has an assert_non_singular method that is called by
         # the Bijector.
@@ -234,7 +234,7 @@ class MultivariateNormalDiagWithSoftplusScale(MultivariateNormalDiag):
                allow_nan_stats=True,
                name="MultivariateNormalDiagWithSoftplusScale"):
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       super(MultivariateNormalDiagWithSoftplusScale, self).__init__(
           loc=loc,
           scale_diag=tf.nn.softplus(scale_diag),

@@ -20,9 +20,10 @@ from __future__ import print_function
 import numpy as np
 
 import tensorflow as tf
+
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import positive_semidefinite_kernels as psd_kernels
-
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -73,10 +74,11 @@ class _GaussianProcessTest(object):
       self.assertAllEqual(
           self.evaluate(samples).shape,
           sample_shape + batch_shape + event_shape)
-      self.assertIsNone(samples.shape.ndims)
-      self.assertIsNone(gp.batch_shape.ndims)
-      self.assertEqual(gp.event_shape.ndims, 1)
-      self.assertIsNone(tf.compat.dimension_value(gp.event_shape.dims[0]))
+      self.assertIsNone(tensorshape_util.rank(samples.shape))
+      self.assertIsNone(tensorshape_util.rank(gp.batch_shape))
+      self.assertEqual(tensorshape_util.rank(gp.event_shape), 1)
+      self.assertIsNone(
+          tf.compat.dimension_value(tensorshape_util.dims(gp.event_shape)[0]))
 
   def testVarianceAndCovarianceMatrix(self):
     amp = np.float64(.5)

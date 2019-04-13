@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import affine as affine_bijector
 from tensorflow_probability.python.bijectors import chain as chain_bijector
 from tensorflow_probability.python.bijectors import sinh_arcsinh as sinh_arcsinh_bijector
@@ -166,7 +166,7 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
     """
     parameters = dict(locals())
 
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype(
           [loc, scale_diag, scale_identity_multiplier, skewness, tailweight],
           tf.float32)
@@ -223,7 +223,7 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
         f_noskew = f
       else:
         f_noskew = sinh_arcsinh_bijector.SinhArcsinh(
-            skewness=skewness.dtype.as_numpy_dtype(0.),
+            skewness=dtype_util.as_numpy_dtype(skewness.dtype)(0.),
             tailweight=tailweight)
 
       # Make the Affine bijector, Z --> loc + C * Z.

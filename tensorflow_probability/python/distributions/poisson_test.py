@@ -19,9 +19,10 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 from scipy import stats
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 tfd = tfp.distributions
@@ -82,8 +83,8 @@ class PoissonTest(test_case.TestCase):
         x * poisson.log_rate - tf.math.lgamma(1. + x) - poisson.rate)
     neg_inf = tf.fill(
         tf.shape(input=expected_continuous_log_pmf),
-        value=np.array(
-            -np.inf, dtype=expected_continuous_log_pmf.dtype.as_numpy_dtype))
+        value=dtype_util.as_numpy_dtype(
+            expected_continuous_log_pmf.dtype)(-np.inf))
     expected_continuous_log_pmf = tf.where(x >= 0.,
                                            expected_continuous_log_pmf,
                                            neg_inf)

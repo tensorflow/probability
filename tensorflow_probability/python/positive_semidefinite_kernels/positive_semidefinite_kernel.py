@@ -25,7 +25,7 @@ import operator
 import six
 import tensorflow as tf
 
-from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.positive_semidefinite_kernels.internal import util
 
 
 __all__ = [
@@ -420,7 +420,7 @@ class PositiveSemidefiniteKernel(object):
     reshape the inputs and pass them to `apply`, e.g.:
 
     ```python
-    k = psd_kernels.SomeKernel()
+    k = tfpk.SomeKernel()
     t1 = tf.placeholder([4, 4, 3], tf.float32)
     t2 = tf.placeholder([5, 5, 3], tf.float32)
     k.apply(
@@ -590,7 +590,7 @@ class PositiveSemidefiniteKernel(object):
                                    if self.batch_shape.ndims is not None
                                    else ''),
                 feature_ndims=self.feature_ndims,
-                dtype=self.dtype.name))
+                dtype=None if self.dtype is None else self.dtype.name))
 
   def __repr__(self):
     return ('<tfp.positive_semidefinite_kernels.{type_name} '
@@ -602,7 +602,7 @@ class PositiveSemidefiniteKernel(object):
                 self_name=self.name,
                 batch_shape=self.batch_shape,
                 feature_ndims=self.feature_ndims,
-                dtype=self.dtype.name))
+                dtype=None if self.dtype is None else self.dtype.name))
 
 
 def _flatten_summand_list(kernels):
@@ -700,7 +700,8 @@ class _SumKernel(PositiveSemidefiniteKernel):
     # We have ensured the list is non-empty and all feature_ndims are the same.
     super(_SumKernel, self).__init__(
         feature_ndims=kernels[0].feature_ndims,
-        dtype=dtype_util.common_dtype(kernels),
+        dtype=util.maybe_get_common_dtype(
+            [None if k.dtype is None else k for k in kernels]),
         name=name)
 
   @property
@@ -767,7 +768,8 @@ class _ProductKernel(PositiveSemidefiniteKernel):
     # We have ensured the list is non-empty and all feature_ndims are the same.
     super(_ProductKernel, self).__init__(
         feature_ndims=kernels[0].feature_ndims,
-        dtype=dtype_util.common_dtype(kernels),
+        dtype=util.maybe_get_common_dtype(
+            [None if k.dtype is None else k for k in kernels]),
         name=name)
 
   @property

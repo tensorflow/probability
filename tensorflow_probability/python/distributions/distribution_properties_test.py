@@ -34,6 +34,7 @@ import six
 import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.bijectors import hypothesis_testlib as bijector_hps
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -277,7 +278,8 @@ def broadcasting_params(draw, dist_name, batch_shape, event_dim=None):
         value=draw(
             single_param(
                 constraint_for(dist_name, param),
-                param_batch_shape.as_list() + [event_dim] * param_event_rank)),
+                (tensorshape_util.as_list(param_batch_shape) +
+                 [event_dim] * param_event_rank))),
         dtype=tf.float32)
   return params_kwargs
 
@@ -289,7 +291,8 @@ def independents(draw, batch_shape=None, event_dim=None):
   if batch_shape is None:
     batch_shape = draw(batch_shapes(min_ndims=reinterpreted_batch_ndims))
   else:  # This independent adds some batch dims to its underlying distribution.
-    batch_shape = batch_shape.concatenate(
+    batch_shape = tensorshape_util.concatenate(
+        batch_shape,
         draw(
             batch_shapes(
                 min_ndims=reinterpreted_batch_ndims,
@@ -354,7 +357,8 @@ def mixtures_same_family(draw, batch_shape=None, event_dim=None):
     # Ensure the components dist has at least one batch dim (a component dim).
     batch_shape = draw(batch_shapes(min_ndims=1, min_lastdimsize=2))
   else:  # This mixture adds a batch dim to its underlying components dist.
-    batch_shape = batch_shape.concatenate(
+    batch_shape = tensorshape_util.concatenate(
+        batch_shape,
         draw(batch_shapes(min_ndims=1, max_ndims=1, min_lastdimsize=2)))
 
   component_dist, _ = distributions(
@@ -372,7 +376,7 @@ def mixtures_same_family(draw, batch_shape=None, event_dim=None):
       draw,
       dist_name='Categorical',
       batch_shape=mixture_batch_shape,
-      event_dim=batch_shape.as_list()[-1])
+      event_dim=tensorshape_util.as_list(batch_shape)[-1])
   logging.info(
       'mixture distribution: %s; parameters used: %s', mixture_dist,
       [k for k, v in six.iteritems(mixture_dist.parameters) if v is not None])
@@ -384,8 +388,9 @@ def mixtures_same_family(draw, batch_shape=None, event_dim=None):
 
 def assert_shapes_unchanged(target_shaped_dict, possibly_bcast_dict):
   for param, target_param_val in six.iteritems(target_shaped_dict):
-    np.testing.assert_array_equal(target_param_val.shape.as_list(),
-                                  possibly_bcast_dict[param].shape.as_list())
+    np.testing.assert_array_equal(
+        tensorshape_util.as_list(target_param_val.shape),
+        tensorshape_util.as_list(possibly_bcast_dict[param].shape))
 
 
 # TODO(b/128974935): Use hps.composite
@@ -482,7 +487,8 @@ class DistributionSlicingTest(tf.test.TestCase):
         (slices,))
     if Ellipsis not in sample_slices:
       sample_slices += (Ellipsis,)
-    sample_slices += tuple([slice(None)] * dist.event_shape.ndims)
+    sample_slices += tuple([slice(None)] *
+                           tensorshape_util.rank(dist.event_shape))
 
     # Report sub-sliced samples (on which we compare log_prob) to hypothesis.
     data.draw(hps.just(samples[sample_slices]))
@@ -571,12 +577,16 @@ def ensure_high_gt_low(low, high):
   """Returns a value with shape matching `high` and gt broadcastable `low`."""
   new_high = tf.maximum(low + tf.abs(low) * .1 + .1, high)
   reduce_dims = []
-  if new_high.shape.ndims > high.shape.ndims:
-    reduced_leading_axes = tf.range(new_high.shape.ndims - high.shape.ndims)
+  if (tensorshape_util.rank(new_high.shape) >
+      tensorshape_util.rank(high.shape)):
+    reduced_leading_axes = tf.range(
+        tensorshape_util.rank(new_high.shape) -
+        tensorshape_util.rank(high.shape))
     new_high = tf.math.reduce_max(
         input_tensor=new_high, axis=reduced_leading_axes)
   reduce_dims = [
-      d for d in range(high.shape.ndims) if high.shape[d] < new_high.shape[d]
+      d for d in range(tensorshape_util.rank(high.shape))
+      if high.shape[d] < new_high.shape[d]
   ]
   if reduce_dims:
     new_high = tf.math.reduce_max(
@@ -589,7 +599,7 @@ def symmetric(x):
 
 
 def positive_definite(x):
-  shp = x.shape.as_list()
+  shp = tensorshape_util.as_list(x.shape)
   psd = (tf.matmul(x, x, transpose_b=True) +
          .1 * tf.linalg.eye(shp[-1], batch_shape=shp[:-2]))
   return symmetric(psd)

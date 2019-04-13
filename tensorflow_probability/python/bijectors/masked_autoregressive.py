@@ -24,6 +24,8 @@ import six
 import tensorflow as tf
 
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math.numeric import clip_by_value_preserve_gradient
 
 
@@ -227,8 +229,9 @@ class MaskedAutoregressiveFlow(bijector.Bijector):
         name=name)
 
   def _forward(self, x):
-    static_event_size = x.shape.with_rank_at_least(
-        self._event_ndims)[-self._event_ndims:].num_elements()
+    static_event_size = tensorshape_util.num_elements(
+        tensorshape_util.with_rank_at_least(
+            x.shape, self._event_ndims)[-self._event_ndims:])
 
     if self._unroll_loop:
       if not static_event_size:
@@ -376,7 +379,7 @@ def masked_dense(inputs,
   """
   # TODO(b/67594795): Better support of dynamic shape.
   input_depth = tf.compat.dimension_value(
-      inputs.shape.with_rank_at_least(1)[-1])
+      tensorshape_util.with_rank_at_least(inputs.shape, 1)[-1])
   if input_depth is None:
     raise NotImplementedError(
         "Rightmost dimension must be known prior to graph execution.")
@@ -397,7 +400,7 @@ def masked_dense(inputs,
         kernel_initializer=masked_initializer,
         kernel_constraint=lambda x: mask * x,
         name=name,
-        dtype=inputs.dtype.base_dtype,
+        dtype=dtype_util.base_dtype(inputs.dtype),
         _scope=name,
         _reuse=reuse,
         *args,  # pylint: disable=keyword-arg-before-vararg
@@ -485,14 +488,15 @@ def masked_autoregressive_default_template(hidden_layers,
     def _fn(x):
       """MADE parameterized via `masked_autoregressive_default_template`."""
       # TODO(b/67594795): Better support of dynamic shape.
-      input_depth = tf.compat.dimension_value(x.shape.with_rank_at_least(1)[-1])
+      input_depth = tf.compat.dimension_value(
+          tensorshape_util.with_rank_at_least(x.shape, 1)[-1])
       if input_depth is None:
         raise NotImplementedError(
             "Rightmost dimension must be known prior to graph execution.")
       input_shape = (
-          np.int32(x.shape.as_list())
-          if x.shape.is_fully_defined() else tf.shape(input=x))
-      if x.shape.rank == 1:
+          np.int32(tensorshape_util.as_list(x.shape))
+          if tensorshape_util.is_fully_defined(x.shape) else tf.shape(input=x))
+      if tensorshape_util.rank(x.shape) == 1:
         x = x[tf.newaxis, ...]
       for i, units in enumerate(hidden_layers):
         x = masked_dense(
@@ -855,7 +859,7 @@ class AutoregressiveLayer(tf.keras.layers.Layer):
       x = tf.convert_to_tensor(value=x, dtype=self.dtype, name="x")
       input_shape = tf.shape(input=x)
       # TODO(b/67594795): Better support for dynamic shapes.
-      if x.shape.rank == 1:
+      if tensorshape_util.rank(x.shape) == 1:
         x = x[tf.newaxis, ...]
       return tf.reshape(self._network(x),
                         tf.concat([input_shape, [self._params]], axis=0))

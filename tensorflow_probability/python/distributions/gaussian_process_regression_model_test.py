@@ -22,6 +22,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import positive_semidefinite_kernels as psd_kernels
+from tensorflow_probability.python.internal import tensorshape_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
@@ -98,10 +99,11 @@ class _GaussianProcessRegressionModelTest(object):
       self.assertAllEqual(self.evaluate(gprm.event_shape_tensor()), event_shape)
       self.assertAllEqual(self.evaluate(samples).shape,
                           sample_shape + batch_shape + event_shape)
-      self.assertIsNone(samples.shape.ndims)
-      self.assertIsNone(gprm.batch_shape.ndims)
-      self.assertEqual(gprm.event_shape.ndims, 1)
-      self.assertIsNone(tf.compat.dimension_value(gprm.event_shape.dims[0]))
+      self.assertIsNone(tensorshape_util.rank(samples.shape))
+      self.assertIsNone(tensorshape_util.rank(gprm.batch_shape))
+      self.assertEqual(tensorshape_util.rank(gprm.event_shape), 1)
+      self.assertIsNone(
+          tf.compat.dimension_value(tensorshape_util.dims(gprm.event_shape)[0]))
 
   def testMeanVarianceAndCovariance(self):
     amp = np.float64(.5)

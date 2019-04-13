@@ -20,9 +20,12 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.distributions import uniform as uniform_distribution
+from tensorflow_probability.python.internal import dtype_util
 
 
 def assert_finite(array):
@@ -82,7 +85,7 @@ def assert_scalar_congruency(bijector,
   # Should be monotonic over this interval
   ten_x_pts = np.linspace(lower_x, upper_x, num=10).astype(np.float32)
   if bijector.dtype is not None:
-    ten_x_pts = ten_x_pts.astype(bijector.dtype.as_numpy_dtype)
+    ten_x_pts = ten_x_pts.astype(dtype_util.as_numpy_dtype(bijector.dtype))
   forward_on_10_pts = bijector.forward(ten_x_pts)
 
   # Set the lower/upper limits in the range of the bijector.
@@ -271,7 +274,8 @@ def get_fldj_theoretical(bijector,
     output_to_unconstrained = identity_bijector.Identity()
 
   x = tf.convert_to_tensor(value=x)
-  x_unconstrained = input_to_unconstrained.forward(x)
+  x_unconstrained = 1 * input_to_unconstrained.forward(x)
+
   with tf.GradientTape(persistent=True) as tape:
     tape.watch(x_unconstrained)
     f_x = bijector.forward(input_to_unconstrained.inverse(x_unconstrained))

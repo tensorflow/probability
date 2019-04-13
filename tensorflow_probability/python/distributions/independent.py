@@ -20,12 +20,13 @@ from __future__ import print_function
 
 import collections
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 class Independent(distribution_lib.Distribution):
@@ -116,7 +117,7 @@ class Independent(distribution_lib.Distribution):
     parameters = dict(locals())
     name = name or "Independent" + distribution.name
     self._distribution = distribution
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       if reinterpreted_batch_ndims is None:
         reinterpreted_batch_ndims = self._get_default_reinterpreted_batch_ndims(
             distribution)
@@ -178,10 +179,11 @@ class Independent(distribution_lib.Distribution):
 
   def _batch_shape(self):
     batch_shape = self.distribution.batch_shape
-    if (self._static_reinterpreted_batch_ndims is None
-        or batch_shape.ndims is None):
+    if (self._static_reinterpreted_batch_ndims is None or
+        tensorshape_util.rank(batch_shape) is None):
       return tf.TensorShape(None)
-    d = batch_shape.ndims - self._static_reinterpreted_batch_ndims
+    d = (tensorshape_util.rank(batch_shape) -
+         self._static_reinterpreted_batch_ndims)
     return batch_shape[:d]
 
   def _event_shape_tensor(self):
@@ -198,13 +200,15 @@ class Independent(distribution_lib.Distribution):
     batch_shape = self.distribution.batch_shape
     if self._static_reinterpreted_batch_ndims is None:
       return tf.TensorShape(None)
-    if batch_shape.ndims is not None:
+    if tensorshape_util.rank(batch_shape) is not None:
       reinterpreted_batch_shape = batch_shape[
-          batch_shape.ndims - self._static_reinterpreted_batch_ndims:]
+          tensorshape_util.rank(batch_shape) -
+          self._static_reinterpreted_batch_ndims:]
     else:
       reinterpreted_batch_shape = tf.TensorShape(
           [None] * int(self._static_reinterpreted_batch_ndims))
-    return reinterpreted_batch_shape.concatenate(self.distribution.event_shape)
+    return tensorshape_util.concatenate(reinterpreted_batch_shape,
+                                        self.distribution.event_shape)
 
   def _sample_n(self, n, seed, **kwargs):
     with tf.control_dependencies(self._runtime_assertions):
@@ -244,7 +248,7 @@ class Independent(distribution_lib.Distribution):
     assertions = []
     static_reinterpreted_batch_ndims = tf.get_static_value(
         reinterpreted_batch_ndims)
-    batch_ndims = distribution.batch_shape.ndims
+    batch_ndims = tensorshape_util.rank(distribution.batch_shape)
     if batch_ndims is not None and static_reinterpreted_batch_ndims is not None:
       if static_reinterpreted_batch_ndims > batch_ndims:
         raise ValueError("reinterpreted_batch_ndims({}) cannot exceed "
@@ -300,10 +304,12 @@ def _kl_independent(a, b, name="kl_independent"):
   # Given that the KL between two factored distributions is the sum, i.e.
   # KL(p1(x)p2(y) || q1(x)q2(y)) = KL(p1 || q1) + KL(q1 || q2), we compute
   # KL(p || q) and do a `reduce_sum` on the reinterpreted batch dimensions.
-  if a.event_shape.is_fully_defined() and b.event_shape.is_fully_defined():
+  if (tensorshape_util.is_fully_defined(a.event_shape) and
+      tensorshape_util.is_fully_defined(b.event_shape)):
     if a.event_shape == b.event_shape:
       if p.event_shape == q.event_shape:
-        num_reduce_dims = a.event_shape.ndims - p.event_shape.ndims
+        num_reduce_dims = (tensorshape_util.rank(a.event_shape) -
+                           tensorshape_util.rank(p.event_shape))
         reduce_dims = [-i - 1 for i in range(0, num_reduce_dims)]
 
         return tf.reduce_sum(

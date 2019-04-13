@@ -23,7 +23,7 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow as tf
 
-from tensorflow_probability import positive_semidefinite_kernels as psd_kernels
+from tensorflow_probability import positive_semidefinite_kernels as tfpk
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -31,10 +31,10 @@ from tensorflow.python.framework import test_util  # pylint: disable=g-direct-te
 class ExponentiatedQuadraticTest(tf.test.TestCase, parameterized.TestCase):
 
   def testMismatchedFloatTypesAreBad(self):
-    psd_kernels.ExponentiatedQuadratic(1, 1)  # Should be OK (float32 fallback).
-    psd_kernels.ExponentiatedQuadratic(np.float32(1.), 1.)  # Should be OK.
+    tfpk.ExponentiatedQuadratic(1, 1)  # Should be OK (float32 fallback).
+    tfpk.ExponentiatedQuadratic(np.float32(1.), 1.)  # Should be OK.
     with self.assertRaises(TypeError):
-      psd_kernels.ExponentiatedQuadratic(np.float32(1.), np.float64(1.))
+      tfpk.ExponentiatedQuadratic(np.float32(1.), np.float64(1.))
 
   @parameterized.parameters(
       {'feature_ndims': 1, 'dims': 3},
@@ -48,7 +48,7 @@ class ExponentiatedQuadraticTest(tf.test.TestCase, parameterized.TestCase):
     length_scale = .2
 
     np.random.seed(42)
-    k = psd_kernels.ExponentiatedQuadratic(
+    k = tfpk.ExponentiatedQuadratic(
         amplitude, length_scale, feature_ndims)
     shape = [dims] * feature_ndims
     for _ in range(5):
@@ -60,12 +60,12 @@ class ExponentiatedQuadraticTest(tf.test.TestCase, parameterized.TestCase):
           self.evaluate(k.apply(x, y)))
 
   def testNoneShapes(self):
-    k = psd_kernels.ExponentiatedQuadratic(
+    k = tfpk.ExponentiatedQuadratic(
         amplitude=np.reshape(np.arange(12.), [2, 3, 2]))
     self.assertEqual([2, 3, 2], k.batch_shape.as_list())
 
   def testShapesAreCorrect(self):
-    k = psd_kernels.ExponentiatedQuadratic(amplitude=1., length_scale=1.)
+    k = tfpk.ExponentiatedQuadratic(amplitude=1., length_scale=1.)
 
     x = np.ones([4, 3], np.float32)
     y = np.ones([5, 3], np.float32)
@@ -75,7 +75,7 @@ class ExponentiatedQuadraticTest(tf.test.TestCase, parameterized.TestCase):
         [2, 4, 5],
         k.matrix(tf.stack([x]*2), tf.stack([y]*2)).shape)
 
-    k = psd_kernels.ExponentiatedQuadratic(
+    k = tfpk.ExponentiatedQuadratic(
         amplitude=np.ones([2, 1, 1], np.float32),
         length_scale=np.ones([1, 3, 1], np.float32))
     self.assertAllEqual(
@@ -91,7 +91,7 @@ class ExponentiatedQuadraticTest(tf.test.TestCase, parameterized.TestCase):
 
   def testValidateArgs(self):
     with self.assertRaises(tf.errors.InvalidArgumentError):
-      k = psd_kernels.ExponentiatedQuadratic(-1., -1., validate_args=True)
+      k = tfpk.ExponentiatedQuadratic(-1., -1., validate_args=True)
       self.evaluate(k.amplitude)
 
     if not tf.executing_eagerly():
@@ -99,7 +99,7 @@ class ExponentiatedQuadraticTest(tf.test.TestCase, parameterized.TestCase):
         self.evaluate(k.length_scale)
 
     # But `None`'s are ok
-    k = psd_kernels.ExponentiatedQuadratic(None, None, validate_args=True)
+    k = tfpk.ExponentiatedQuadratic(None, None, validate_args=True)
     self.evaluate(k.apply([1.], [1.]))
 
 

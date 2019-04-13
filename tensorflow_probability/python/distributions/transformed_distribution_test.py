@@ -25,8 +25,9 @@ from scipy import stats
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
@@ -570,10 +571,10 @@ class ScalarToMultiTest(tf.test.TestCase):
         self.assertAllEqual(self.evaluate(mvn.batch_shape_tensor()),
                             batch_shape)
         if not shapes_are_dynamic:
-          self.assertAllEqual(mvn.event_shape.as_list(),
-                              event_shape)
-          self.assertAllEqual(mvn.batch_shape.as_list(),
-                              batch_shape)
+          self.assertAllEqual(
+              tensorshape_util.as_list(mvn.event_shape), event_shape)
+          self.assertAllEqual(
+              tensorshape_util.as_list(mvn.batch_shape), batch_shape)
 
         for sample_shape in ([3], []):
           sample_ = self.evaluate(mvn.sample(sample_shape))

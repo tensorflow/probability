@@ -23,10 +23,12 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
 tfd = tfp.distributions
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 class _MixtureSameFamilyTest(tfp_test_util.VectorDistributionTestHelpers):
@@ -274,7 +276,7 @@ class _MixtureSameFamilyTest(tfp_test_util.VectorDistributionTestHelpers):
 
   def _shape(self, x):
     if self.use_static_shape:
-      return x.shape.as_list()
+      return tensorshape_util.as_list(x.shape)
     else:
       return self.evaluate(tf.shape(input=x))
 

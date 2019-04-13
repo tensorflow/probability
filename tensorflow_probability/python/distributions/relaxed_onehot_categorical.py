@@ -20,7 +20,7 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import exp as exp_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import transformed_distribution
@@ -28,6 +28,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 class ExpRelaxedOneHotCategorical(distribution.Distribution):
@@ -157,7 +158,7 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
 
       dtype = dtype_util.common_dtype([logits, probs, temperature], tf.float32)
       self._logits, self._probs = distribution_util.get_logits_and_probs(
@@ -175,17 +176,18 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
         self._temperature_2d = tf.reshape(
             self._temperature, [-1, 1], name="temperature_2d")
 
-      logits_shape_static = self._logits.shape.with_rank_at_least(1)
-      if logits_shape_static.ndims is not None:
+      logits_shape_static = tensorshape_util.with_rank_at_least(
+          self._logits.shape, 1)
+      if tensorshape_util.rank(logits_shape_static) is not None:
         self._batch_rank = tf.convert_to_tensor(
-            value=logits_shape_static.ndims - 1,
+            value=tensorshape_util.rank(logits_shape_static) - 1,
             dtype=tf.int32,
             name="batch_rank")
       else:
-        with tf.compat.v2.name_scope("batch_rank"):
+        with tf.name_scope("batch_rank"):
           self._batch_rank = tf.rank(self._logits) - 1
 
-      with tf.compat.v2.name_scope("event_size"):
+      with tf.name_scope("event_size"):
         self._event_size = tf.shape(input=self._logits)[-1]
 
     super(ExpRelaxedOneHotCategorical, self).__init__(
@@ -234,21 +236,21 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
     return tf.shape(input=self.logits)[-1:]
 
   def _event_shape(self):
-    return self.logits.shape.with_rank_at_least(1)[-1:]
+    return tensorshape_util.with_rank_at_least(self.logits.shape, 1)[-1:]
 
   def _sample_n(self, n, seed=None):
     # Uniform variates must be sampled from the open-interval `(0, 1)` rather
-    # than `[0, 1)`. To do so, we use `np.finfo(self.dtype.as_numpy_dtype).tiny`
-    # because it is the smallest, positive, "normal" number. A "normal" number
-    # is such that the mantissa has an implicit leading 1. Normal, positive
-    # numbers x, y have the reasonable property that, `x + y >= max(x, y)`. In
-    # this case, a subnormal number (i.e., np.nextafter) can cause us to sample
-    # 0.
+    # than `[0, 1)`. To do so, we use
+    # `np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny` because it is the
+    # smallest, positive, "normal" number. A "normal" number is such that the
+    # mantissa has an implicit leading 1. Normal, positive numbers x, y have the
+    # reasonable property that, `x + y >= max(x, y)`. In this case, a subnormal
+    # number (i.e., np.nextafter) can cause us to sample 0.
     uniform_shape = tf.concat(
         [[n], self.batch_shape_tensor(), self.event_shape_tensor()], 0)
     uniform = tf.random.uniform(
         shape=uniform_shape,
-        minval=np.finfo(self.dtype.as_numpy_dtype).tiny,
+        minval=np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny,
         maxval=1.,
         dtype=self.dtype,
         seed=seed)
@@ -260,8 +262,8 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
     x = self._assert_valid_sample(x)
     # broadcast logits or x if need be.
     logits = self.logits
-    if (not x.shape.is_fully_defined() or
-        not logits.shape.is_fully_defined() or
+    if (not tensorshape_util.is_fully_defined(x.shape) or
+        not tensorshape_util.is_fully_defined(logits.shape) or
         x.shape != logits.shape):
       logits = tf.ones_like(x, dtype=logits.dtype) * logits
       x = tf.ones_like(logits, dtype=x.dtype) * x

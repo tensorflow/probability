@@ -26,6 +26,10 @@ import hypothesis.strategies as hps
 import six
 
 import tensorflow_probability as tfp
+
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensorshape_util
+
 tfb = tfp.bijectors
 
 SPECIAL_BIJECTORS = ['Invert']
@@ -166,15 +170,16 @@ def distribution_filter_for(bijector):
   if isinstance(bijector, tfb.CholeskyToInvCholesky):
 
     def additional_check(dist):
-      return (dist.event_shape.ndims == 2 and
+      return (tensorshape_util.rank(dist.event_shape) == 2 and
               int(dist.event_shape[0]) == int(dist.event_shape[1]))
   else:
     additional_check = lambda dist: True
 
   def distribution_filter(dist):
-    if not dist.dtype.is_floating:
+    if not dtype_util.is_floating(dist.dtype):
       return False
-    if bijector.forward_min_event_ndims > dist.event_shape.ndims:
+    if bijector.forward_min_event_ndims > tensorshape_util.rank(
+        dist.event_shape):
       return False
     return additional_check(dist)
 

@@ -21,11 +21,13 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 from scipy import stats
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
 tfd = tfp.distributions
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 rng = np.random.RandomState(42)
 
 
@@ -103,8 +105,8 @@ class MultivariateNormalFullCovarianceTest(tf.test.TestCase):
         mu, covariance, validate_args=True)
 
     # Shapes known at graph construction time.
-    self.assertEqual((2,), tuple(mvn.event_shape.as_list()))
-    self.assertEqual((3, 5), tuple(mvn.batch_shape.as_list()))
+    self.assertEqual((2,), tuple(tensorshape_util.as_list(mvn.event_shape)))
+    self.assertEqual((3, 5), tuple(tensorshape_util.as_list(mvn.batch_shape)))
 
     # Shapes known at runtime.
     self.assertEqual((2,), tuple(self.evaluate(mvn.event_shape_tensor())))

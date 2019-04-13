@@ -19,7 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import multivariate_student_t
 from tensorflow_probability.python.internal import assert_util
@@ -230,7 +230,7 @@ class StudentTProcess(
       ValueError: if `mean_fn` is not `None` and is not callable.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype(
           [df, index_points, jitter], tf.float32)
       df = tf.convert_to_tensor(value=df, dtype=dtype, name='df')
@@ -256,7 +256,7 @@ class StudentTProcess(
       self._mean_fn = mean_fn
       self._jitter = jitter
 
-      with tf.compat.v2.name_scope('init'):
+      with tf.name_scope('init'):
         kernel_matrix = _add_diagonal_shift(
             kernel.matrix(self.index_points, self.index_points),
             jitter)

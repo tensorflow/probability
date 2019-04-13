@@ -20,13 +20,15 @@ from __future__ import print_function
 
 import functools
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 class Blockwise(distribution.Distribution):
@@ -63,15 +65,17 @@ class Blockwise(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       self._assertions = _maybe_validate_distributions(
           distributions, dtype_override, validate_args)
 
       if dtype_override is not None:
         dtype = dtype_override
       else:
-        dtype = set(d.dtype.base_dtype for d in distributions
-                    if d.dtype is not None)
+        dtype = set(
+            dtype_util.base_dtype(d.dtype)
+            for d in distributions
+            if d.dtype is not None)
         if len(dtype) == 0:  # pylint: disable=g-explicit-length-test
           dtype = tf.float32
         elif len(dtype) == 1:
@@ -102,8 +106,9 @@ class Blockwise(distribution.Distribution):
     return self._distributions
 
   def _batch_shape(self):
-    return functools.reduce(lambda b, d: b.merge_with(d.batch_shape),
-                            self.distributions, tf.TensorShape(None))
+    return functools.reduce(
+        lambda b, d: tensorshape_util.merge_with(b, d.batch_shape),
+        self.distributions, tf.TensorShape(None))
 
   def _batch_shape_tensor(self):
     with tf.control_dependencies(self._assertions):
@@ -112,17 +117,21 @@ class Blockwise(distribution.Distribution):
       return self.distributions[0].batch_shape_tensor()
 
   def _event_shape(self):
-    event_size = [d.event_shape.num_elements() for d in self.distributions]
+    event_size = [
+        tensorshape_util.num_elements(d.event_shape) for d in self.distributions
+    ]
     if any(r is None for r in event_size):
       return tf.TensorShape([None])
     return tf.TensorShape([sum(event_size)])
 
   def _event_shape_tensor(self):
     with tf.control_dependencies(self._assertions):
-      event_sizes = [tf.reduce_prod(input_tensor=d.event_shape_tensor())  # pylint: disable=g-complex-comprehension
-                     if d.event_shape.num_elements() is None
-                     else d.event_shape.num_elements()
-                     for d in self._distributions]
+      event_sizes = [
+          tf.reduce_prod(input_tensor=d.event_shape_tensor())  # pylint: disable=g-complex-comprehension
+          if tensorshape_util.num_elements(d.event_shape) is None else
+          tensorshape_util.num_elements(d.event_shape)
+          for d in self._distributions
+      ]
       return tf.reduce_sum(input_tensor=event_sizes)[tf.newaxis]
 
   def _sample_n(self, n, seed=None):
@@ -135,8 +144,8 @@ class Blockwise(distribution.Distribution):
   def _log_prob(self, x):
     additional_assertions = []
     message = 'Input must have at least one dimension.'
-    if x.shape.ndims is not None:
-      if x.shape.ndims == 0:
+    if tensorshape_util.rank(x.shape) is not None:
+      if tensorshape_util.rank(x.shape) == 0:
         raise ValueError(message)
     elif self.validate_args:
       additional_assertions.append(
@@ -174,17 +183,22 @@ def _maybe_validate_distributions(distributions, dtype_override, validate_args):
                      'distributions.')
 
   if dtype_override is None:
-    dts = [d.dtype.base_dtype for d in distributions if d.dtype is not None]
+    dts = [
+        dtype_util.base_dtype(d.dtype)
+        for d in distributions
+        if d.dtype is not None
+    ]
     if dts[1:] != dts[:-1]:
-      raise TypeError('Distributions must have same dtype; '
-                      'found: {}.'.format(set(dt.name for dt in dts)))
+      raise TypeError('Distributions must have same dtype; found: {}.'.format(
+          set(dtype_util.name(dt) for dt in dts)))
 
   # Validate event_ndims.
   for d in distributions:
-    if d.event_shape.ndims is not None:
-      if d.event_shape.ndims != 1:
+    if tensorshape_util.rank(d.event_shape) is not None:
+      if tensorshape_util.rank(d.event_shape) != 1:
         raise ValueError('`Distribution` must be vector variate, '
-                         'found event nimds: {}.'.format(d.event_shape.ndims))
+                         'found event nimds: {}.'.format(
+                             tensorshape_util.rank(d.event_shape)))
     elif validate_args:
       assertions.append(
           assert_util.assert_equal(
@@ -192,15 +206,16 @@ def _maybe_validate_distributions(distributions, dtype_override, validate_args):
               message='`Distribution` must be vector variate.'))
 
   batch_shapes = [d.batch_shape for d in distributions]
-  if all(b.is_fully_defined() for b in batch_shapes):
+  if all(tensorshape_util.is_fully_defined(b) for b in batch_shapes):
     if batch_shapes[1:] != batch_shapes[:-1]:
       raise ValueError('Distributions must have the same `batch_shape`; '
                        'found: {}.'.format(batch_shapes))
   elif validate_args:
-    batch_shapes = [d.batch_shape.as_list()  # pylint: disable=g-complex-comprehension
-                    if d.batch_shape.is_fully_defined()
-                    else d.batch_shape_tensor()
-                    for d in distributions]
+    batch_shapes = [
+        tensorshape_util.as_list(d.batch_shape)  # pylint: disable=g-complex-comprehension
+        if tensorshape_util.is_fully_defined(d.batch_shape) else
+        d.batch_shape_tensor() for d in distributions
+    ]
     assertions.extend(
         assert_util.assert_equal(  # pylint: disable=g-complex-comprehension
             b1, b2,
@@ -247,7 +262,7 @@ def _kl_blockwise_blockwise(b0, b1, name=None):
               e1, e2, message=message)
           for e1, e2 in zip(b0_event_sizes, b1_event_sizes))
 
-  with tf.compat.v2.name_scope(name or 'kl_blockwise_blockwise'):
+  with tf.name_scope(name or 'kl_blockwise_blockwise'):
     with tf.control_dependencies(assertions):
       return sum([
           kullback_leibler.kl_divergence(d1, d2) for d1, d2 in zip(
@@ -255,6 +270,6 @@ def _kl_blockwise_blockwise(b0, b1, name=None):
 
 
 def _event_size(d):
-  if d.event_shape.num_elements() is not None:
-    return d.event_shape.num_elements()
+  if tensorshape_util.num_elements(d.event_shape) is not None:
+    return tensorshape_util.num_elements(d.event_shape)
   return tf.reduce_prod(input_tensor=d.event_shape_tensor())

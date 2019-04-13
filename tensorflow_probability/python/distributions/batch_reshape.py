@@ -20,10 +20,11 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow.python.framework import tensor_util  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -101,7 +102,7 @@ class BatchReshape(distribution_lib.Distribution):
     """
     parameters = dict(locals())
     name = name or "BatchReshape" + distribution.name
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       # The unexpanded batch shape may contain up to one dimension of -1.
       self._batch_shape_unexpanded = tf.convert_to_tensor(
           value=batch_shape, dtype=tf.int32, name="batch_shape")
@@ -209,20 +210,24 @@ class BatchReshape(distribution_lib.Distribution):
 
   def _sample_shape(self, x):
     """Computes graph and static `sample_shape`."""
-    x_ndims = (tf.rank(x) if x.shape.ndims is None else x.shape.ndims)
+    x_ndims = (
+        tf.rank(x) if tensorshape_util.rank(x.shape) is None else
+        tensorshape_util.rank(x.shape))
     event_ndims = (
         tf.size(input=self.event_shape_tensor())
-        if self.event_shape.ndims is None else self.event_shape.ndims)
+        if tensorshape_util.rank(self.event_shape) is None else
+        tensorshape_util.rank(self.event_shape))
     batch_ndims = (
         tf.size(input=self._batch_shape_unexpanded)
-        if self.batch_shape.ndims is None else self.batch_shape.ndims)
+        if tensorshape_util.rank(self.batch_shape) is None else
+        tensorshape_util.rank(self.batch_shape))
     sample_ndims = x_ndims - batch_ndims - event_ndims
     if isinstance(sample_ndims, int):
       static_sample_shape = x.shape[:sample_ndims]
     else:
       static_sample_shape = tf.TensorShape(None)
-    if static_sample_shape.is_fully_defined():
-      sample_shape = np.int32(static_sample_shape.as_list())
+    if tensorshape_util.is_fully_defined(static_sample_shape):
+      sample_shape = np.int32(tensorshape_util.as_list(static_sample_shape))
     else:
       sample_shape = tf.shape(input=x)[:sample_ndims]
     return sample_shape, static_sample_shape
@@ -250,10 +255,11 @@ class BatchReshape(distribution_lib.Distribution):
               self._batch_shape_unexpanded,
           ], axis=0)
       result = tf.reshape(result, new_shape)
-      if (static_sample_shape.ndims is not None and
-          self.batch_shape.ndims is not None):
-        new_shape = static_sample_shape.concatenate(self.batch_shape)
-        result.set_shape(result.shape.merge_with(new_shape))
+      if (tensorshape_util.rank(static_sample_shape) is not None and
+          tensorshape_util.rank(self.batch_shape) is not None):
+        new_shape = tensorshape_util.concatenate(static_sample_shape,
+                                                 self.batch_shape)
+        result.set_shape(tensorshape_util.merge_with(result.shape, new_shape))
       return result
 
   def _call_and_reshape_output(
@@ -276,26 +282,31 @@ class BatchReshape(distribution_lib.Distribution):
           [self._batch_shape_unexpanded] + event_shape_list, axis=0)
       result = tf.reshape(fn(**extra_kwargs) if extra_kwargs else fn(),
                           new_shape)
-      if (self.batch_shape.ndims is not None and
-          self.event_shape.ndims is not None):
+      if (tensorshape_util.rank(self.batch_shape) is not None and
+          tensorshape_util.rank(self.event_shape) is not None):
         event_shape = tf.TensorShape([])
         for rss in static_event_shape_list:
-          event_shape = event_shape.concatenate(rss)
-        static_shape = result.shape.merge_with(
-            self.batch_shape.concatenate(event_shape))
+          event_shape = tensorshape_util.concatenate(event_shape, rss)
+        static_shape = tensorshape_util.merge_with(
+            result.shape,
+            tensorshape_util.concatenate(self.batch_shape, event_shape))
         result.set_shape(static_shape)
       return result
 
   def _validate_sample_arg(self, x):
     """Helper which validates sample arg, e.g., input to `log_prob`."""
-    with tf.compat.v2.name_scope("validate_sample_arg"):
-      x_ndims = (tf.rank(x) if x.shape.ndims is None else x.shape.ndims)
+    with tf.name_scope("validate_sample_arg"):
+      x_ndims = (
+          tf.rank(x) if tensorshape_util.rank(x.shape) is None else
+          tensorshape_util.rank(x.shape))
       event_ndims = (
           tf.size(input=self.event_shape_tensor())
-          if self.event_shape.ndims is None else self.event_shape.ndims)
+          if tensorshape_util.rank(self.event_shape) is None else
+          tensorshape_util.rank(self.event_shape))
       batch_ndims = (
           tf.size(input=self._batch_shape_unexpanded)
-          if self.batch_shape.ndims is None else self.batch_shape.ndims)
+          if tensorshape_util.rank(self.batch_shape) is None else
+          tensorshape_util.rank(self.batch_shape))
       expected_batch_event_ndims = batch_ndims + event_ndims
 
       if (isinstance(x_ndims, int) and
@@ -316,10 +327,12 @@ class BatchReshape(distribution_lib.Distribution):
                 name="assert_batch_and_event_ndims_large_enough"),
         ]
 
-      if (self.batch_shape.is_fully_defined() and
-          self.event_shape.is_fully_defined()):
-        expected_batch_event_shape = np.int32(self.batch_shape.concatenate(
-            self.event_shape).as_list())
+      if (tensorshape_util.is_fully_defined(self.batch_shape) and
+          tensorshape_util.is_fully_defined(self.event_shape)):
+        expected_batch_event_shape = np.array(
+            tensorshape_util.as_list(
+                tensorshape_util.concatenate(self.batch_shape,
+                                             self.event_shape)), np.int32)
       else:
         expected_batch_event_shape = tf.concat(
             [
@@ -371,9 +384,10 @@ class BatchReshape(distribution_lib.Distribution):
 def calculate_reshape(original_shape, new_shape, validate=False, name=None):
   """Calculates the reshaped dimensions (replacing up to one -1 in reshape)."""
   batch_shape_static = tensor_util.constant_value_as_shape(new_shape)
-  if batch_shape_static.is_fully_defined():
-    return np.int32(batch_shape_static.as_list()), batch_shape_static, []
-  with tf.compat.v2.name_scope(name or "calculate_reshape"):
+  if tensorshape_util.is_fully_defined(batch_shape_static):
+    return np.int32(
+        tensorshape_util.as_list(batch_shape_static)), batch_shape_static, []
+  with tf.name_scope(name or "calculate_reshape"):
     original_size = tf.reduce_prod(input_tensor=original_shape)
     implicit_dim = tf.equal(new_shape, -1)
     size_implicit_dim = (
@@ -402,14 +416,16 @@ def calculate_reshape(original_shape, new_shape, validate=False, name=None):
 
 def validate_init_args_statically(distribution, batch_shape):
   """Helper to __init__ which makes or raises assertions."""
-  if batch_shape.shape.ndims is not None:
-    if batch_shape.shape.ndims != 1:
+  if tensorshape_util.rank(batch_shape.shape) is not None:
+    if tensorshape_util.rank(batch_shape.shape) != 1:
       raise ValueError("`batch_shape` must be a vector "
-                       "(saw rank: {}).".format(batch_shape.shape.ndims))
+                       "(saw rank: {}).".format(
+                           tensorshape_util.rank(batch_shape.shape)))
 
   batch_shape_static = tensor_util.constant_value_as_shape(batch_shape)
-  batch_size_static = batch_shape_static.num_elements()
-  dist_batch_size_static = distribution.batch_shape.num_elements()
+  batch_size_static = tensorshape_util.num_elements(batch_shape_static)
+  dist_batch_size_static = tensorshape_util.num_elements(
+      distribution.batch_shape)
 
   if batch_size_static is not None and dist_batch_size_static is not None:
     if batch_size_static != dist_batch_size_static:
@@ -417,7 +433,7 @@ def validate_init_args_statically(distribution, batch_shape):
                        "`distribution.batch_shape` size ({}).".format(
                            batch_size_static, dist_batch_size_static))
 
-  if batch_shape_static.dims is not None:
+  if tensorshape_util.dims(batch_shape_static) is not None:
     if any(
         tf.compat.dimension_value(dim) is not None and
         tf.compat.dimension_value(dim) < 1 for dim in batch_shape_static):

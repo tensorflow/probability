@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
@@ -187,8 +187,8 @@ class MultivariateNormalTriL(
 
     if loc is None and scale_tril is None:
       raise ValueError("Must specify one or both of `loc`, `scale_tril`.")
-    with tf.compat.v2.name_scope(name) as name:
-      with tf.compat.v2.name_scope("init"):
+    with tf.name_scope(name) as name:
+      with tf.name_scope("init"):
         dtype = dtype_util.common_dtype([loc, scale_tril], tf.float32)
         loc = _convert_to_tensor(loc, name="loc", dtype=dtype)
         scale_tril = _convert_to_tensor(

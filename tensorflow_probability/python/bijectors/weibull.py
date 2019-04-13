@@ -18,8 +18,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 
 
@@ -72,11 +74,11 @@ class Weibull(bijector.Bijector):
       tf.debugging.assert_same_float_dtype([self._scale, self._concentration])
       if validate_args:
         self._scale = distribution_util.with_dependencies([
-            tf.compat.v1.assert_positive(
+            assert_util.assert_positive(
                 self._scale, message="Argument scale was not positive")
         ], self._scale)
         self._concentration = distribution_util.with_dependencies([
-            tf.compat.v1.assert_positive(
+            assert_util.assert_positive(
                 self._concentration,
                 message="Argument concentration was not positive")
         ], self._concentration)
@@ -120,16 +122,16 @@ class Weibull(bijector.Bijector):
   def _maybe_assert_valid_x(self, x):
     if not self.validate_args:
       return x
-    is_valid = tf.compat.v1.assert_non_negative(
+    is_valid = assert_util.assert_non_negative(
         x, message="Forward transformation input must be at least 0.")
     return distribution_util.with_dependencies([is_valid], x)
 
   def _maybe_assert_valid_y(self, y):
     if not self.validate_args:
       return y
-    is_positive = tf.compat.v1.assert_non_negative(
+    is_positive = assert_util.assert_non_negative(
         y, message="Inverse transformation input must be greater than 0.")
-    less_than_one = tf.compat.v1.assert_less_equal(
+    less_than_one = assert_util.assert_less_equal(
         y,
         tf.constant(1., y.dtype),
         message="Inverse transformation input must be less than or equal to 1.")

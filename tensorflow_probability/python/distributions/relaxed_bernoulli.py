@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.distributions import logistic
 from tensorflow_probability.python.distributions import transformed_distribution
@@ -163,7 +163,7 @@ class RelaxedBernoulli(transformed_distribution.TransformedDistribution):
       ValueError: If both `probs` and `logits` are passed, or if neither.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([logits, probs, temperature], tf.float32)
       self._temperature = tf.convert_to_tensor(
           value=temperature, name="temperature", dtype=dtype)

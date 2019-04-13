@@ -17,12 +17,14 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow.python.framework import tensor_util  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
@@ -206,7 +208,7 @@ class TransformedDistribution(distribution_lib.Distribution):
     parameters = dict(locals()) if parameters is None else parameters
     name = name or (("" if bijector is None else bijector.name) +
                     distribution.name)
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       self._kwargs_split_fn = (_default_kwargs_split_fn
                                if kwargs_split_fn is None
                                else kwargs_split_fn)
@@ -289,12 +291,12 @@ class TransformedDistribution(distribution_lib.Distribution):
     if type(self) is not TransformedDistribution:  # pylint: disable=unidiomatic-typecheck
       return super(TransformedDistribution, self).__getitem__(slices)
 
-    if self.distribution.batch_shape.ndims is None:
+    if tensorshape_util.rank(self.distribution.batch_shape) is None:
       raise NotImplementedError(
           "Slicing TransformedDistribution with underlying distribution of "
           "unknown rank is not yet implemented")
     overrides = {}
-    if (self.distribution.batch_shape.ndims == 0 and
+    if (tensorshape_util.rank(self.distribution.batch_shape) == 0 and
         self.parameters.get("batch_shape", None) is not None):
       overrides["batch_shape"] = tf.shape(
           input=tf.zeros(self.parameters["batch_shape"])[slices])
@@ -423,7 +425,7 @@ class TransformedDistribution(distribution_lib.Distribution):
     if self._is_maybe_event_override and isinstance(event_ndims, int):
       log_prob.set_shape(
           tf.broadcast_static_shape(
-              y.shape.with_rank_at_least(1)[:-event_ndims],
+              tensorshape_util.with_rank_at_least(y.shape, 1)[:-event_ndims],
               self.batch_shape))
     return log_prob
 
@@ -457,7 +459,7 @@ class TransformedDistribution(distribution_lib.Distribution):
     if self._is_maybe_event_override and isinstance(event_ndims, int):
       prob.set_shape(
           tf.broadcast_static_shape(
-              y.shape.with_rank_at_least(1)[:-event_ndims],
+              tensorshape_util.with_rank_at_least(y.shape, 1)[:-event_ndims],
               self.batch_shape))
     return prob
 
@@ -569,7 +571,7 @@ class TransformedDistribution(distribution_lib.Distribution):
       # This means that a reduce_sum is a simple rescaling.
       entropy *= tf.cast(
           tf.reduce_prod(input_tensor=self._override_event_shape),
-          dtype=entropy.dtype.base_dtype)
+          dtype=dtype_util.base_dtype(entropy.dtype))
     if self._is_maybe_batch_override:
       new_shape = tf.concat([
           prefer_static.ones_like(self._override_batch_shape),
@@ -587,8 +589,9 @@ class TransformedDistribution(distribution_lib.Distribution):
             0),
         dtype=self.dtype)
     event_ndims = (
-        self.event_shape.ndims if self.event_shape.ndims is not None else
-        tf.size(input=self.event_shape_tensor()))
+        tensorshape_util.rank(self.event_shape)
+        if tensorshape_util.rank(self.event_shape) is not None else tf.size(
+            input=self.event_shape_tensor()))
     ildj = self.bijector.inverse_log_det_jacobian(
         dummy, event_ndims=event_ndims, **bijector_kwargs)
 
@@ -605,7 +608,7 @@ class TransformedDistribution(distribution_lib.Distribution):
     override_shape = tf.convert_to_tensor(
         value=override_shape, dtype=tf.int32, name=name)
 
-    if not override_shape.dtype.is_integer:
+    if not dtype_util.is_integer(override_shape.dtype):
       raise TypeError("shape override must be an integer")
 
     override_is_scalar = _is_scalar_from_shape_tensor(override_shape)
@@ -614,8 +617,8 @@ class TransformedDistribution(distribution_lib.Distribution):
 
     dynamic_assertions = []
 
-    if override_shape.shape.ndims is not None:
-      if override_shape.shape.ndims != 1:
+    if tensorshape_util.rank(override_shape.shape) is not None:
+      if tensorshape_util.rank(override_shape.shape) != 1:
         raise ValueError("shape override must be a vector")
     elif validate_args:
       dynamic_assertions += [
@@ -662,8 +665,8 @@ class TransformedDistribution(distribution_lib.Distribution):
     return tf.transpose(a=x, perm=perm)
 
   def _maybe_get_static_event_ndims(self):
-    if self.event_shape.ndims is not None:
-      return self.event_shape.ndims
+    if tensorshape_util.rank(self.event_shape) is not None:
+      return tensorshape_util.rank(self.event_shape)
 
     event_ndims = tf.size(input=self.event_shape_tensor())
     event_ndims_ = distribution_util.maybe_get_static_value(event_ndims)

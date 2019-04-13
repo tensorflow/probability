@@ -25,6 +25,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
@@ -155,8 +156,8 @@ class IndependentDistributionTest(tf.test.TestCase):
             scale=tf.compat.v1.placeholder_with_default(input=1., shape=None)),
         reinterpreted_batch_ndims=1)
     # Even though `event_shape` is not static, event_ndims must equal
-    # `reinterpreted_batch_ndims + distribution.event_shape.ndims`.
-    self.assertEqual(ind.event_shape.ndims, 1)
+    # `reinterpreted_batch_ndims + rank(distribution.event_shape)`.
+    self.assertEqual(tensorshape_util.rank(ind.event_shape), 1)
 
   def testKLRaises(self):
     ind1 = tfd.Independent(
@@ -294,7 +295,7 @@ class IndependentDistributionTest(tf.test.TestCase):
 
     Calling self.copy(distribution=sliced_underlying) without explicitly
     specifying reinterpreted_batch_ndims allowed the default fallback logic of
-    underlying.batch_shape.ndims-1 to take over, which we don't want in the
+    rank(underlying.batch_shape)-1 to take over, which we don't want in the
     slice case.
     """
     d = tfd.Independent(tfd.Bernoulli(logits=0))

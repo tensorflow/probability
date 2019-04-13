@@ -21,7 +21,7 @@ from __future__ import print_function
 # Dependency imports
 from absl import flags
 from absl.testing import flagsaver
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import test_util as tfp_test_util

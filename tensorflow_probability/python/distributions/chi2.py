@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import gamma
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
@@ -86,7 +86,7 @@ class Chi2(gamma.Gamma):
     # not true in the parent class "gamma."  therefore, passing
     # allow_nan_stats=True
     # through to the parent class results in unnecessary asserts.
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       df = tf.convert_to_tensor(
           value=df,
           name="df",
@@ -131,7 +131,7 @@ class Chi2WithAbsDf(Chi2):
                allow_nan_stats=True,
                name="Chi2WithAbsDf"):
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       super(Chi2WithAbsDf, self).__init__(
           df=tf.floor(tf.abs(df, name="abs_df"), name="floor_abs_df"),
           validate_args=validate_args,

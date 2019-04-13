@@ -18,9 +18,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import tensorflow.compat.v2 as tf
 
-import tensorflow as tf
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 
 
@@ -92,7 +93,7 @@ class Ordered(bijector.Bijector):
   def _maybe_assert_valid_x(self, x):
     if not self.validate_args:
       return x
-    is_valid = tf.compat.v1.assert_positive(
+    is_valid = assert_util.assert_positive(
         x[..., 1:] - x[..., :-1],
         message="Forward transformation input must be strictly increasing.")
     return distribution_util.with_dependencies([is_valid], x)

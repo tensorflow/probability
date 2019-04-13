@@ -21,13 +21,14 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 def _make_summary_statistic(attr):
@@ -130,7 +131,7 @@ class Sample(distribution_lib.Distribution):
     parameters = dict(locals())
     name = name or 'Sample' + distribution.name
     self._distribution = distribution
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       sample_shape = distribution_util.expand_to_vector(tf.convert_to_tensor(
           value=sample_shape, dtype_hint=tf.int32, name='sample_shape'))
       self._sample_shape = sample_shape
@@ -165,10 +166,11 @@ class Sample(distribution_lib.Distribution):
 
   def _event_shape(self):
     sample_shape = tf.TensorShape(tf.get_static_value(self.sample_shape))
-    if (sample_shape.ndims is None or
-        self.distribution.event_shape.ndims is None):
+    if (tensorshape_util.rank(sample_shape) is None or
+        tensorshape_util.rank(self.distribution.event_shape) is None):
       return tf.TensorShape(None)
-    return sample_shape.concatenate(self.distribution.event_shape)
+    return tensorshape_util.concatenate(sample_shape,
+                                        self.distribution.event_shape)
 
   def _sample_n(self, n, seed, **kwargs):
     fake_sample_ndims = prefer_static.rank_from_shape(self.sample_shape)

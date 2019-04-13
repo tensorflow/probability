@@ -20,14 +20,16 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 class Mixture(distribution.Distribution):
@@ -133,19 +135,22 @@ class Mixture(distribution.Distribution):
     static_event_shape = components[0].event_shape
     static_batch_shape = cat.batch_shape
     for di, d in enumerate(components):
-      if not static_batch_shape.is_compatible_with(d.batch_shape):
+      if not tensorshape_util.is_compatible_with(static_batch_shape,
+                                                 d.batch_shape):
         raise ValueError(
             "components[{}] batch shape must be compatible with cat "
             "shape and other component batch shapes".format(di))
-      static_event_shape = static_event_shape.merge_with(d.event_shape)
-      static_batch_shape = static_batch_shape.merge_with(d.batch_shape)
-    if static_event_shape.ndims is None:
+      static_event_shape = tensorshape_util.merge_with(static_event_shape,
+                                                       d.event_shape)
+      static_batch_shape = tensorshape_util.merge_with(static_batch_shape,
+                                                       d.batch_shape)
+    if tensorshape_util.rank(static_event_shape) is None:
       raise ValueError(
           "Expected to know rank(event_shape) from components, but "
           "none of the components provide a static number of ndims")
 
     # Ensure that all batch and event ndims are consistent.
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       num_components = cat.event_size
       static_num_components = tf.get_static_value(num_components)
       if static_num_components is None:
@@ -238,7 +243,7 @@ class Mixture(distribution.Distribution):
       The expanded tensor.
     """
     expanded_x = x
-    for _ in range(self.event_shape.ndims):
+    for _ in range(tensorshape_util.rank(self.event_shape)):
       expanded_x = tf.expand_dims(expanded_x, -1)
     return expanded_x
 
@@ -315,20 +320,20 @@ class Mixture(distribution.Distribution):
 
         for c in range(self.num_components):
           samples.append(self.components[c].sample(n, seed=stream()))
-        x = tf.stack(samples,
-                     -self._static_event_shape.ndims - 1)  # [n, B, k, E]
-        npdt = x.dtype.as_numpy_dtype
+        stack_axis = -1 - tensorshape_util.rank(self._static_event_shape)
+        x = tf.stack(samples, axis=stack_axis)  # [n, B, k, E]
+        npdt = dtype_util.as_numpy_dtype(x.dtype)
         mask = tf.one_hot(
             indices=cat_samples,  # [n, B]
             depth=self._num_components,  # == k
-            on_value=np.ones([], dtype=npdt),
-            off_value=np.zeros([], dtype=npdt))  # [n, B, k]
+            on_value=npdt(1),
+            off_value=npdt(0))  # [n, B, k]
         mask = distribution_util.pad_mixture_dimensions(
             mask, self, self._cat,
-            self._static_event_shape.ndims)                   # [n, B, k, [1]*e]
+            tensorshape_util.rank(self._static_event_shape))  # [n, B, k, [1]*e]
         return tf.reduce_sum(
             input_tensor=x * mask,
-            axis=-1 - self._static_event_shape.ndims)  # [n, B, E]
+            axis=stack_axis)  # [n, B, E]
 
     with tf.control_dependencies(self._assertions):
       n = tf.convert_to_tensor(value=n, name="n")
@@ -337,22 +342,23 @@ class Mixture(distribution.Distribution):
       cat_samples = self.cat.sample(n, seed=seed)
 
       static_samples_shape = cat_samples.shape
-      if static_samples_shape.is_fully_defined():
-        samples_shape = static_samples_shape.as_list()
-        samples_size = static_samples_shape.num_elements()
+      if tensorshape_util.is_fully_defined(static_samples_shape):
+        samples_shape = tensorshape_util.as_list(static_samples_shape)
+        samples_size = tensorshape_util.num_elements(static_samples_shape)
       else:
         samples_shape = tf.shape(input=cat_samples)
         samples_size = tf.size(input=cat_samples)
       static_batch_shape = self.batch_shape
-      if static_batch_shape.is_fully_defined():
-        batch_shape = static_batch_shape.as_list()
-        batch_size = static_batch_shape.num_elements()
+      if tensorshape_util.is_fully_defined(static_batch_shape):
+        batch_shape = tensorshape_util.as_list(static_batch_shape)
+        batch_size = tensorshape_util.num_elements(static_batch_shape)
       else:
         batch_shape = self.batch_shape_tensor()
         batch_size = tf.reduce_prod(input_tensor=batch_shape)
       static_event_shape = self.event_shape
-      if static_event_shape.is_fully_defined():
-        event_shape = np.array(static_event_shape.as_list(), dtype=np.int32)
+      if tensorshape_util.is_fully_defined(static_event_shape):
+        event_shape = np.array(
+            tensorshape_util.as_list(static_event_shape), dtype=np.int32)
       else:
         event_shape = self.event_shape_tensor()
 

@@ -21,7 +21,7 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 
@@ -80,7 +80,7 @@ class Pareto(distribution.Distribution):
         Default value: 'Pareto'.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name):
+    with tf.name_scope(name):
       dtype = dtype_util.common_dtype([concentration, scale], tf.float32)
       self._concentration = tf.convert_to_tensor(
           value=concentration, name="concentration", dtype=dtype)
@@ -187,7 +187,7 @@ class Pareto(distribution.Distribution):
         self.scale)
     infs = tf.fill(
         dims=tf.shape(input=broadcasted_concentration),
-        value=np.array(np.inf, dtype=self.dtype.as_numpy_dtype))
+        value=dtype_util.as_numpy_dtype(self.dtype)(np.inf))
 
     return tf.where(
         broadcasted_concentration > 1.,
@@ -201,7 +201,7 @@ class Pareto(distribution.Distribution):
     broadcasted_concentration = self.concentration + tf.zeros_like(self.scale)
     infs = tf.fill(
         dims=tf.shape(input=broadcasted_concentration),
-        value=np.array(np.inf, dtype=self.dtype.as_numpy_dtype))
+        value=dtype_util.as_numpy_dtype(self.dtype)(np.inf))
     return tf.where(
         broadcasted_concentration > 2.,
         self.scale ** 2 * self.concentration / (
@@ -241,7 +241,7 @@ class Pareto(distribution.Distribution):
     else:
       alt = tf.fill(
           dims=tf.shape(input=y),
-          value=np.array(alt, dtype=self.dtype.as_numpy_dtype))
+          value=dtype_util.as_numpy_dtype(self.dtype)(alt))
     return tf.where(is_invalid, alt, y)
 
 
@@ -258,7 +258,7 @@ def _kl_pareto_pareto(a, b, name=None):
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.compat.v2.name_scope(name or "kl_pareto_pareto"):
+  with tf.name_scope(name or "kl_pareto_pareto"):
     # Consistent with
     # http://www.mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 55
     # Terminology is different from source to source for Pareto distributions.

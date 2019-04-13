@@ -20,10 +20,13 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -99,7 +102,7 @@ class FillTriangular(bijector.Bijector):
       n = None
     else:
       n = vector_size_to_square_matrix_size(d, self.validate_args)
-    return batch_shape.concatenate([n, n])
+    return tensorshape_util.concatenate(batch_shape, [n, n])
 
   def _inverse_event_shape(self, output_shape):
     batch_shape, n1, n2 = (output_shape[:-2],
@@ -111,7 +114,7 @@ class FillTriangular(bijector.Bijector):
       raise ValueError("Matrix must be square. (saw [{}, {}])".format(n1, n2))
     else:
       m = n1 * (n1 + 1) / 2
-    return batch_shape.concatenate([m])
+    return tensorshape_util.concatenate(batch_shape, [m])
 
   def _forward_event_shape_tensor(self, input_shape_tensor):
     batch_shape, d = input_shape_tensor[:-1], input_shape_tensor[-1]
@@ -121,7 +124,7 @@ class FillTriangular(bijector.Bijector):
   def _inverse_event_shape_tensor(self, output_shape_tensor):
     batch_shape, n = output_shape_tensor[:-2], output_shape_tensor[-1]
     if self.validate_args:
-      is_square_matrix = tf.compat.v1.assert_equal(
+      is_square_matrix = assert_util.assert_equal(
           n, output_shape_tensor[-2], message="Matrix must be square.")
       with tf.control_dependencies([is_square_matrix]):
         n = tf.identity(n)
@@ -137,12 +140,11 @@ def vector_size_to_square_matrix_size(d, validate_args, name=None):
       raise ValueError("Vector length is not a triangular number.")
     return int(n)
   else:
-    with tf.compat.v1.name_scope(name, "vector_size_to_square_matrix_size",
-                                 [d]) as name:
+    with tf.name_scope(name or "vector_size_to_square_matrix_size") as name:
       n = (-1. + tf.sqrt(1 + 8. * tf.cast(d, dtype=tf.float32))) / 2.
       if validate_args:
         with tf.control_dependencies([
-            tf.compat.v1.assert_equal(
+            assert_util.assert_equal(
                 tf.cast(tf.cast(n, dtype=tf.int32), dtype=tf.float32),
                 n,
                 message="Vector length is not a triangular number")

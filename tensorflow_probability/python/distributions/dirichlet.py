@@ -20,7 +20,7 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -28,6 +28,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -177,7 +178,7 @@ class Dirichlet(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       self._concentration = self._maybe_assert_valid_concentration(
           tf.convert_to_tensor(
               value=concentration,
@@ -221,7 +222,7 @@ class Dirichlet(distribution.Distribution):
     return tf.shape(input=self.concentration)[-1:]
 
   def _event_shape(self):
-    return self.concentration.shape.with_rank_at_least(1)[-1:]
+    return tensorshape_util.with_rank_at_least(self.concentration.shape, 1)[-1:]
 
   def _sample_n(self, n, seed=None):
     gamma_sample = tf.random.gamma(
@@ -284,7 +285,7 @@ class Dirichlet(distribution.Distribution):
     if self.allow_nan_stats:
       nan = tf.fill(
           tf.shape(input=mode),
-          np.array(np.nan, dtype=self.dtype.as_numpy_dtype()),
+          dtype_util.as_numpy_dtype(self.dtype)(np.nan),
           name="nan")
       return tf.where(
           tf.reduce_all(input_tensor=self.concentration > 1., axis=-1), mode,
@@ -339,7 +340,7 @@ def _kl_dirichlet_dirichlet(d1, d2, name=None):
   Returns:
     Batchwise KL(d1 || d2)
   """
-  with tf.compat.v2.name_scope(name or "kl_dirichlet_dirichlet"):
+  with tf.name_scope(name or "kl_dirichlet_dirichlet"):
     # The KL between Dirichlet distributions can be derived as follows. We have
     #
     #   Dir(x; a) = 1 / B(a) * prod_i[x[i]^(a[i] - 1)]

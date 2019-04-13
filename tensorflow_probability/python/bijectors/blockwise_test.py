@@ -24,6 +24,7 @@ from absl.testing import parameterized
 import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
@@ -44,7 +45,7 @@ class BlockwiseBijectorTest(tf.test.TestCase, parameterized.TestCase):
     x = tf.cast([0.1, 0.2, 0.3, 0.4, 0.5, 0.6], dtype=tf.float32)
     for s in batch_shape:
       x = tf.expand_dims(x, 0)
-      x = tf.tile(x, [s] + [1] * (x.shape.ndims - 1))
+      x = tf.tile(x, [s] + [1] * (tensorshape_util.rank(x.shape) - 1))
     x = tf.compat.v1.placeholder_with_default(
         x, shape=None if dynamic_shape else x.shape)
 

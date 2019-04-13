@@ -20,7 +20,7 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import assert_util
@@ -100,7 +100,7 @@ class InverseGaussian(distribution.Distribution):
         Default value: 'InverseGaussian'.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name):
+    with tf.name_scope(name):
       dtype = dtype_util.common_dtype([loc, concentration],
                                       preferred_dtype=tf.float32)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
@@ -169,7 +169,9 @@ class InverseGaussian(distribution.Distribution):
   def _log_prob(self, x):
     with tf.control_dependencies([
         assert_util.assert_greater(
-            x, tf.cast(0., x.dtype.base_dtype), message="x must be positive.")
+            x,
+            dtype_util.as_numpy_dtype(x.dtype)(0),
+            message="x must be positive.")
     ] if self.validate_args else []):
 
       return (0.5 * (tf.math.log(self.concentration) - np.log(2. * np.pi) -
@@ -180,7 +182,9 @@ class InverseGaussian(distribution.Distribution):
   def _cdf(self, x):
     with tf.control_dependencies([
         assert_util.assert_greater(
-            x, tf.cast(0., x.dtype.base_dtype), message="x must be positive.")
+            x,
+            dtype_util.as_numpy_dtype(x.dtype)(0),
+            message="x must be positive.")
     ] if self.validate_args else []):
 
       return (

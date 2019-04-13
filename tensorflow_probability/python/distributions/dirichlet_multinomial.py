@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import multinomial
 from tensorflow_probability.python.distributions import seed_stream
@@ -26,6 +26,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
     "DirichletMultinomial",
@@ -197,7 +198,7 @@ class DirichletMultinomial(distribution.Distribution):
     # * We broadcast explicitly to include the effect of `counts` on
     #   `concentration` for calls that do not involve `counts`.
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([total_count, concentration], tf.float32)
       self._total_count = tf.convert_to_tensor(
           value=total_count, name="total_count", dtype=dtype)
@@ -245,7 +246,8 @@ class DirichletMultinomial(distribution.Distribution):
     return tf.shape(input=self._broadcasted_concentration)[:-1]
 
   def _batch_shape(self):
-    return self._broadcasted_concentration.shape.with_rank_at_least(1)[:-1]
+    return tensorshape_util.with_rank_at_least(
+        self._broadcasted_concentration.shape, 1)[:-1]
 
   def _event_shape_tensor(self):
     # Event shape depends only on concentration, not total_count.
@@ -253,7 +255,7 @@ class DirichletMultinomial(distribution.Distribution):
 
   def _event_shape(self):
     # Event shape depends only on concentration, not total_count.
-    return self.concentration.shape.with_rank_at_least(1)[-1:]
+    return tensorshape_util.with_rank_at_least(self.concentration.shape, 1)[-1:]
 
   def _sample_n(self, n, seed=None):
     seed = seed_stream.SeedStream(seed, "dirichlet_multinomial")

@@ -76,6 +76,7 @@ py_library(
         ":dtype_util",
         ":prefer_static",
         ":reparameterization",
+        ":tensorshape_util",
         # numpy dep,
         # tensorflow dep,
     ],
@@ -87,6 +88,7 @@ py_test(
     srcs = ["distribution_util_test.py"],
     deps = [
         ":distribution_util",
+        ":tensorshape_util",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
@@ -107,7 +109,9 @@ py_library(
     name = "prefer_static",
     srcs = ["prefer_static.py"],
     deps = [
+        ":tensorshape_util",
         # decorator dep,
+        # numpy dep,
         # tensorflow dep,
     ],
 )
@@ -132,9 +136,9 @@ py_library(
     name = "special_math",
     srcs = ["special_math.py"],
     deps = [
+        ":dtype_util",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/math:gradient",
     ],
 )
 
@@ -144,6 +148,16 @@ py_test(
     deps = [
         ":special_math",
         # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "tensorshape_util",
+    srcs = ["tensorshape_util.py"],
+    srcs_version = "PY2AND3",
+    deps = [
         # tensorflow dep,
     ],
 )
@@ -163,6 +177,7 @@ py_test(
     size = "small",
     srcs = ["test_case_test.py"],
     deps = [
+        ":dtype_util",
         ":test_case",
         # numpy dep,
         # tensorflow dep,
@@ -175,9 +190,11 @@ py_library(
     srcs = ["test_util.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":dtype_util",
         # absl/flags dep,
         # hypothesis dep,
         # numpy dep,
+        # six dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:seed_stream",
     ],

@@ -18,8 +18,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import dtype_util
 
 
 __all__ = [
@@ -95,7 +98,7 @@ class IteratedSigmoidCentered(bijector.Bijector):
   def _inverse_event_shape_tensor(self, output_shape):
     if self.validate_args:
       # It is not possible for a negative shape so we need only check <= 1.
-      dependencies = [tf.compat.v1.assert_greater(
+      dependencies = [assert_util.assert_greater(
           output_shape[-1], 1, message="Need last dimension greater than 1.")]
     else:
       dependencies = []
@@ -111,8 +114,10 @@ class IteratedSigmoidCentered(bijector.Bijector):
     # y_N = 1 - sum_{i=1 to N-1} y_i
     # TODO(b/128857065): The numerics can possibly be improved here with a
     # log-space computation.
-    offset = -tf.math.log(tf.cast(
-        tf.range(tf.shape(input=x)[-1], 0, delta=-1), dtype=x.dtype.base_dtype))
+    offset = -tf.math.log(
+        tf.cast(
+            tf.range(tf.shape(input=x)[-1], 0, delta=-1),
+            dtype=dtype_util.base_dtype(x.dtype)))
     z = tf.nn.sigmoid(x + offset)
     y = z * tf.math.cumprod(1 - z, axis=-1, exclusive=True)
     return tf.concat(
@@ -124,9 +129,10 @@ class IteratedSigmoidCentered(bijector.Bijector):
     # N = y.shape[-1]
     # z_k = y_k / (1 - sum_{i=1 to k-1} y_i)
     # x_k = logit(z_k) - log(1 / (N - k))
-    offset = tf.math.log(tf.cast(
-        tf.range(
-            tf.shape(input=y)[-1] - 1, 0, delta=-1), dtype=y.dtype.base_dtype))
+    offset = tf.math.log(
+        tf.cast(
+            tf.range(tf.shape(input=y)[-1] - 1, 0, delta=-1),
+            dtype=dtype_util.base_dtype(y.dtype)))
     z = y / (1. - tf.math.cumsum(y, axis=-1, exclusive=True))
     return tf.math.log(z[..., :-1]) - tf.math.log1p(-z[..., :-1]) + offset
 

@@ -22,7 +22,7 @@ import abc
 
 # Dependency imports
 import six
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -30,6 +30,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
     "Deterministic",
@@ -100,14 +101,14 @@ class _BaseDeterministic(distribution.Distribution):
     Raises:
       ValueError:  If `loc` is a scalar.
     """
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, atol, rtol],
                                       preferred_dtype=tf.float32)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
       if is_vector and validate_args:
         msg = "Argument loc must be at least rank 1."
-        if loc.shape.ndims is not None:
-          if loc.shape.ndims < 1:
+        if tensorshape_util.rank(loc.shape) is not None:
+          if tensorshape_util.rank(loc.shape) < 1:
             raise ValueError(msg)
         else:
           loc = distribution_util.with_dependencies(
@@ -415,5 +416,5 @@ def _kl_deterministic_distribution(a, b, name=None):
   Returns:
     Batchwise `KL(a || b)`.
   """
-  with tf.compat.v2.name_scope(name or "kl_deterministic_distribution"):
+  with tf.name_scope(name or "kl_deterministic_distribution"):
     return -b.log_prob(a.loc)

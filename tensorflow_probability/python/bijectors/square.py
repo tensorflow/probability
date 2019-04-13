@@ -20,9 +20,11 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 
 
@@ -78,6 +80,6 @@ class Square(bijector.Bijector):
   def _maybe_assert_valid(self, t):
     if not self.validate_args:
       return t
-    is_valid = tf.compat.v1.assert_non_negative(
+    is_valid = assert_util.assert_non_negative(
         t, message="All elements must be non-negative.")
     return distribution_util.with_dependencies([is_valid], t)

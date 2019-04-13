@@ -25,6 +25,8 @@ import numpy as np
 from scipy import stats
 import tensorflow as tf
 import tensorflow_probability as tfp
+
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -646,7 +648,7 @@ class MixtureTest(tf.test.TestCase):
     if fully_known_batch_shape:
       self.assertEqual((5, 2, 3, 4), samples.shape)
     else:
-      self.assertEqual([5, None, 3, 4], samples.shape.as_list())
+      self.assertEqual([5, None, 3, 4], tensorshape_util.as_list(samples.shape))
     cat_samples = dist.cat.sample(n, seed=_set_seed(123))
     sample_values, cat_sample_values, dist_sample_values = self.evaluate(
         [samples, cat_samples, component_samples])

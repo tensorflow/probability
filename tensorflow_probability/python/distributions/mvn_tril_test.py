@@ -26,8 +26,10 @@ from scipy import stats
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
 tfd = tfp.distributions
 
 
@@ -207,8 +209,8 @@ class MultivariateNormalTriLTest(tf.test.TestCase, parameterized.TestCase):
     mvn = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
 
     # Shapes known at graph construction time.
-    self.assertEqual((2,), tuple(mvn.event_shape.as_list()))
-    self.assertEqual((3, 5), tuple(mvn.batch_shape.as_list()))
+    self.assertEqual((2,), tuple(tensorshape_util.as_list(mvn.event_shape)))
+    self.assertEqual((3, 5), tuple(tensorshape_util.as_list(mvn.batch_shape)))
 
     # Shapes known at runtime.
     self.assertEqual((2,), tuple(self.evaluate(mvn.event_shape_tensor())))
@@ -464,7 +466,7 @@ class MultivariateNormalTriLSlicingTest(tf.test.TestCase,
     chol, _ = self._random_chol(7, 4, 1, 2, 2)
     chol[1, 1] = -chol[1, 1]
     dist = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
-    batch_shape = dist.batch_shape.as_list()
+    batch_shape = tensorshape_util.as_list(dist.batch_shape)
     probs = self.evaluate(dist.prob([0, 0]))
     for slicer in slicers:
       batch_shape = slicer(np.zeros(batch_shape)).shape
@@ -481,7 +483,7 @@ class MultivariateNormalTriLSlicingTest(tf.test.TestCase,
     slicer = make_slicer[44:-52:-3, tf.newaxis, -94::, tf.newaxis, 5, 1]
 
     dist = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
-    batch_shape = dist.batch_shape.as_list()
+    batch_shape = tensorshape_util.as_list(dist.batch_shape)
     probs = self.evaluate(dist.prob([0] * event_dim))
     batch_shape = slicer(np.zeros(batch_shape)).shape
     probs = slicer(probs)
@@ -508,7 +510,7 @@ class MultivariateNormalTriLSlicingTest(tf.test.TestCase,
     chol, _ = self._random_chol(7, 4, 2, 2)
     chol[1, 1] = -chol[1, 1]
     dist = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
-    batch_shape = dist.batch_shape.as_list()
+    batch_shape = tensorshape_util.as_list(dist.batch_shape)
     probs = self.evaluate(dist.prob([0, 0]))
     for slicer in slicers:
       batch_shape = slicer(np.zeros(batch_shape)).shape

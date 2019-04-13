@@ -24,6 +24,7 @@ import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -80,15 +81,15 @@ class _IteratedSigmoidCenteredBijectorTest(object):
     y = tf.TensorShape([5])
     bijector = tfb.IteratedSigmoidCentered(validate_args=True)
     self.assertAllEqual(y, bijector.forward_event_shape(x))
-    self.assertAllEqual(y.as_list(),
-                        self.evaluate(
-                            bijector.forward_event_shape_tensor(
-                                x.as_list())))
+    self.assertAllEqual(
+        tensorshape_util.as_list(y),
+        self.evaluate(
+            bijector.forward_event_shape_tensor(tensorshape_util.as_list(x))))
     self.assertAllEqual(x, bijector.inverse_event_shape(y))
-    self.assertAllEqual(x.as_list(),
-                        self.evaluate(
-                            bijector.inverse_event_shape_tensor(
-                                y.as_list())))
+    self.assertAllEqual(
+        tensorshape_util.as_list(x),
+        self.evaluate(
+            bijector.inverse_event_shape_tensor(tensorshape_util.as_list(y))))
 
   def testBijectiveAndFinite(self):
     iterated_sigmoid = tfb.IteratedSigmoidCentered()

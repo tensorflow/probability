@@ -20,13 +20,14 @@ from __future__ import print_function
 
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import beta as beta_lib
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = ['VonMisesFisher']
@@ -165,7 +166,7 @@ class VonMisesFisher(distribution.Distribution):
       ValueError: For known-bad arguments, i.e. unsupported event dimension.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([mean_direction, concentration],
                                       tf.float32)
       mean_direction = tf.convert_to_tensor(
@@ -185,7 +186,7 @@ class VonMisesFisher(distribution.Distribution):
               message='`mean_direction` must be unit-length')
       ] if validate_args else []
       static_event_dim = tf.compat.dimension_value(
-          mean_direction.shape.with_rank_at_least(1)[-1])
+          tensorshape_util.with_rank_at_least(mean_direction.shape, 1)[-1])
       if static_event_dim is not None and static_event_dim > 5:
         raise ValueError('vMF ndims > 5 is not currently supported')
       elif validate_args:
@@ -236,14 +237,15 @@ class VonMisesFisher(distribution.Distribution):
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(
-        self.mean_direction.shape.with_rank_at_least(1)[:-1],
+        tensorshape_util.with_rank_at_least(self.mean_direction.shape, 1)[:-1],
         self.concentration.shape)
 
   def _event_shape_tensor(self):
     return tf.shape(input=self.mean_direction)[-1:]
 
   def _event_shape(self):
-    return self.mean_direction.shape.with_rank_at_least(1)[-1:]
+    s = tensorshape_util.with_rank_at_least(self.mean_direction.shape, 1)
+    return s[-1:]
 
   def _log_prob(self, x):
     x = self._maybe_assert_valid_sample(x)
@@ -449,11 +451,11 @@ class VonMisesFisher(distribution.Distribution):
       with tf.control_dependencies([
           assert_util.assert_less_equal(
               samples_dim0,
-              self.dtype.as_numpy_dtype(1.01),
+              dtype_util.as_numpy_dtype(self.dtype)(1.01),
               data=[tf.nn.top_k(tf.reshape(samples_dim0, [-1]))[0]]),
           assert_util.assert_greater_equal(
               samples_dim0,
-              self.dtype.as_numpy_dtype(-1.01),
+              dtype_util.as_numpy_dtype(self.dtype)(-1.01),
               data=[-tf.nn.top_k(tf.reshape(-samples_dim0, [-1]))[0]])
       ]):
         samples_dim0 = tf.identity(samples_dim0)
@@ -477,7 +479,7 @@ class VonMisesFisher(distribution.Distribution):
           tf.reshape(tf.abs(1 - tf.linalg.norm(tensor=samples, axis=-1)), [-1]))
       with tf.control_dependencies([
           assert_util.assert_near(
-              self.dtype.as_numpy_dtype(0),
+              dtype_util.as_numpy_dtype(self.dtype)(0),
               worst,
               data=[
                   worst, idx,
@@ -497,7 +499,7 @@ class VonMisesFisher(distribution.Distribution):
           assert_util.assert_less(
               tf.linalg.norm(
                   tensor=self._rotate(basis) - self.mean_direction, axis=-1),
-              self.dtype.as_numpy_dtype(1e-5))
+              dtype_util.as_numpy_dtype(self.dtype)(1e-5))
       ]):
         return self._rotate(samples)
     return self._rotate(samples)

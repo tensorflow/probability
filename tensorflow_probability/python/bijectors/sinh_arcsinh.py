@@ -20,10 +20,13 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 
 __all__ = [
     "SinhArcsinh",
@@ -32,8 +35,9 @@ __all__ = [
 
 def _sqrtx2p1(x):
   """Implementation of `sqrt(1 + x**2)` which is stable despite large `x`."""
+  sqrt_eps = np.sqrt(np.finfo(dtype_util.as_numpy_dtype(x.dtype)).eps)
   return tf.where(
-      tf.abs(x) * np.sqrt(np.finfo(x.dtype.as_numpy_dtype).eps) <= 1.,
+      tf.abs(x) * sqrt_eps <= 1.,
       tf.sqrt(x**2. + 1.),
       # For large x, calculating x**2 can overflow. This can be alleviated by
       # considering:
@@ -114,7 +118,7 @@ class SinhArcsinh(bijector.Bijector):
       tf.debugging.assert_same_float_dtype([self._skewness, self._tailweight])
       if validate_args:
         self._tailweight = distribution_util.with_dependencies([
-            tf.compat.v1.assert_positive(
+            assert_util.assert_positive(
                 self._tailweight,
                 message="Argument tailweight was not positive")
         ], self._tailweight)

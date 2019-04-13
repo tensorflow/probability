@@ -20,7 +20,7 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import kumaraswamy as kumaraswamy_bijector
 from tensorflow_probability.python.distributions import transformed_distribution
@@ -147,7 +147,7 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([concentration1, concentration0],
                                       tf.float32)
       concentration1 = tf.convert_to_tensor(
@@ -185,8 +185,8 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
   def _entropy(self):
     a = self.concentration1
     b = self.concentration0
-    return (1 - 1. / a) + (1 - 1. / b) * _harmonic_number(b) + tf.math.log(
-        a) + tf.math.log(b)
+    return ((1 - 1. / b) + (1 - 1. / a) * _harmonic_number(b) -
+            tf.math.log(a) - tf.math.log(b))
 
   def _moment(self, n):
     """Compute the n'th (uncentered) moment."""
@@ -219,7 +219,7 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
     if self.allow_nan_stats:
       nan = tf.fill(
           self.batch_shape_tensor(),
-          np.array(np.nan, dtype=self.dtype.as_numpy_dtype),
+          dtype_util.as_numpy_dtype(self.dtype)(np.nan),
           name="nan")
       is_defined = (self.concentration1 > 1.) & (self.concentration0 > 1.)
       return tf.where(is_defined, mode, nan)

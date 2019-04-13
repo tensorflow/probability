@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -89,7 +89,7 @@ def kl_divergence(distribution_a, distribution_b,
         "type {} and distribution_b type {}".format(
             type(distribution_a).__name__, type(distribution_b).__name__))
 
-  with tf.compat.v2.name_scope("KullbackLeibler"):
+  with tf.name_scope("KullbackLeibler"):
     kl_t = kl_fn(distribution_a, distribution_b, name=name)
     if allow_nan_stats:
       return kl_t
@@ -137,7 +137,7 @@ def cross_entropy(ref, other,
     cross_entropy: `ref.dtype` `Tensor` with shape `[B1, ..., Bn]`
       representing `n` different calculations of (Shanon) cross entropy.
   """
-  with tf.compat.v2.name_scope(name or "cross_entropy"):
+  with tf.name_scope(name or "cross_entropy"):
     return ref.entropy() + kl_divergence(
         ref, other, allow_nan_stats=allow_nan_stats)
 

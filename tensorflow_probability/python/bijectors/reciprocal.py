@@ -18,10 +18,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# Dependency imports
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 
 __all__ = ["Reciprocal"]
@@ -76,6 +76,6 @@ class Reciprocal(bijector.Bijector):
   def _maybe_assert_valid(self, t):
     if not self.validate_args:
       return t
-    is_valid = tf.compat.v1.assert_none_equal(
+    is_valid = assert_util.assert_none_equal(
         t, 0., message="All elements must be non-zero.")
     return distribution_util.with_dependencies([is_valid], t)

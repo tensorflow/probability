@@ -21,10 +21,11 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 import tensorflow as tf
-from tensorflow_probability.python import bijectors as tfb
 
+from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 class ShapeChanging(tfb.Bijector):
@@ -81,12 +82,14 @@ class ChainBijectorTest(tf.test.TestCase):
     y = tf.TensorShape([2 + 1])
     self.assertAllEqual(y, chain.forward_event_shape(x))
     self.assertAllEqual(
-        y.as_list(),
-        self.evaluate(chain.forward_event_shape_tensor(x.as_list())))
+        tensorshape_util.as_list(y),
+        self.evaluate(
+            chain.forward_event_shape_tensor(tensorshape_util.as_list(x))))
     self.assertAllEqual(x, chain.inverse_event_shape(y))
     self.assertAllEqual(
-        x.as_list(),
-        self.evaluate(chain.inverse_event_shape_tensor(y.as_list())))
+        tensorshape_util.as_list(x),
+        self.evaluate(
+            chain.inverse_event_shape_tensor(tensorshape_util.as_list(y))))
 
   def testMinEventNdimsChain(self):
     chain = tfb.Chain([tfb.Exp(), tfb.Exp(), tfb.Exp()])
@@ -229,10 +232,10 @@ class ChainBijectorTest(tf.test.TestCase):
     ildj = chain.inverse_log_det_jacobian([0.], event_ndims=0)
     # The static shape information is lost on the account of the final bijector
     # being dynamic.
-    self.assertFalse(ildj.shape.is_fully_defined())
+    self.assertFalse(tensorshape_util.is_fully_defined(ildj.shape))
     fldj = chain.forward_log_det_jacobian([0.], event_ndims=0)
     # Ditto.
-    self.assertFalse(fldj.shape.is_fully_defined())
+    self.assertFalse(tensorshape_util.is_fully_defined(fldj.shape))
 
 
 if __name__ == "__main__":

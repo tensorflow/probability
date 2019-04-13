@@ -30,6 +30,8 @@ import six
 import tensorflow as tf
 
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
@@ -386,7 +388,7 @@ class Bijector(object):
           # The full log jacobian determinant would be tf.zero_like(x).
           # However, we circumvent materializing that, since the jacobian
           # calculation is input independent, and we specify it for one input.
-          return constant_op.constant(0., x.dtype.base_dtype)
+          return tf.constant(0., x.dtype)
 
       ```
 
@@ -1131,7 +1133,7 @@ class Bijector(object):
         transformed. Must be greater than or equal to
         `self.inverse_min_event_ndims`. The result is summed over the final
         dimensions to produce a scalar Jacobian determinant for each event, i.e.
-        it has shape `y.shape.ndims - event_ndims` dimensions.
+        it has shape `rank(y) - event_ndims` dimensions.
       name: The name to give this op.
       **kwargs: Named arguments forwarded to subclass implementation.
 
@@ -1201,7 +1203,7 @@ class Bijector(object):
         transformed. Must be greater than or equal to
         `self.forward_min_event_ndims`. The result is summed over the final
         dimensions to produce a scalar Jacobian determinant for each event, i.e.
-        it has shape `x.shape.ndims - event_ndims` dimensions.
+        it has shape `rank(x) - event_ndims` dimensions.
       name: The name to give this op.
       **kwargs: Named arguments forwarded to subclass implementation.
 
@@ -1228,7 +1230,8 @@ class Bijector(object):
 
   def _maybe_assert_dtype(self, x):
     """Helper to check dtype when self.dtype is known."""
-    if self.dtype is not None and self.dtype.base_dtype != x.dtype.base_dtype:
+    if (self.dtype is not None and
+        not dtype_util.base_equal(self.dtype, x.dtype)):
       raise TypeError(
           "Input had dtype %s but expected %s." % (x.dtype, self.dtype))
 
@@ -1303,12 +1306,12 @@ class Bijector(object):
     event_ndims_ = tf.get_static_value(event_ndims)
     assertions = []
 
-    if not event_ndims.dtype.is_integer:
+    if not dtype_util.is_integer(event_ndims.dtype):
       raise ValueError("Expected integer dtype, got dtype {}".format(
           event_ndims.dtype))
 
     if event_ndims_ is not None:
-      if event_ndims.shape.ndims != 0:
+      if tensorshape_util.rank(event_ndims.shape) != 0:
         raise ValueError("Expected scalar event_ndims, got shape {}".format(
             event_ndims.shape))
       if min_event_ndims > event_ndims_:
@@ -1320,10 +1323,10 @@ class Bijector(object):
           tf.compat.v1.assert_greater_equal(event_ndims, min_event_ndims)
       ]
 
-    if event_ndims.shape.is_fully_defined():
-      if event_ndims.shape.ndims != 0:
+    if tensorshape_util.is_fully_defined(event_ndims.shape):
+      if tensorshape_util.rank(event_ndims.shape) != 0:
         raise ValueError("Expected scalar shape, got ndims {}".format(
-            event_ndims.shape.ndims))
+            tensorshape_util.rank(event_ndims.shape)))
 
     elif self.validate_args:
       assertions += [

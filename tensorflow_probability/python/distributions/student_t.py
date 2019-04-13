@@ -20,7 +20,7 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
@@ -169,7 +169,7 @@ class StudentT(distribution.Distribution):
       TypeError: if loc and scale are different dtypes.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([df, loc, scale], tf.float32)
       df = tf.convert_to_tensor(value=df, name="df", dtype=dtype)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
@@ -288,7 +288,7 @@ class StudentT(distribution.Distribution):
     mean = self.loc * tf.ones(self.batch_shape_tensor(),
                               dtype=self.dtype)
     if self.allow_nan_stats:
-      nan = np.array(np.nan, dtype=self.dtype.as_numpy_dtype())
+      nan = dtype_util.as_numpy_dtype(self.dtype)(np.nan)
       return tf.where(
           tf.greater(
               self.df,
@@ -322,14 +322,14 @@ class StudentT(distribution.Distribution):
     var = (tf.ones(self.batch_shape_tensor(), dtype=self.dtype) *
            tf.square(self.scale) * self.df / denom)
     # When 1 < df <= 2, variance is infinite.
-    inf = np.array(np.inf, dtype=self.dtype.as_numpy_dtype())
+    inf = dtype_util.as_numpy_dtype(self.dtype)(np.inf)
     result_where_defined = tf.where(
         self.df > tf.fill(self.batch_shape_tensor(), 2.),
         var,
         tf.fill(self.batch_shape_tensor(), inf, name="inf"))
 
     if self.allow_nan_stats:
-      nan = np.array(np.nan, dtype=self.dtype.as_numpy_dtype())
+      nan = dtype_util.as_numpy_dtype(self.dtype)(np.nan)
       return tf.where(
           tf.greater(
               self.df,

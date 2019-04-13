@@ -18,10 +18,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# Dependency imports
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.bijectors.cholesky_outer_product import CholeskyOuterProduct
+from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import dtype_util
 
 
 __all__ = [
@@ -67,7 +69,9 @@ class CholeskyToInvCholesky(bijector.Bijector):
     with tf.control_dependencies(self._assertions(x)):
       x_shape = tf.shape(input=x)
       identity_matrix = tf.eye(
-          x_shape[-1], batch_shape=x_shape[:-2], dtype=x.dtype.base_dtype)
+          x_shape[-1],
+          batch_shape=x_shape[:-2],
+          dtype=dtype_util.base_dtype(x.dtype))
       # Note `matrix_triangular_solve` implicitly zeros upper triangular of `x`.
       y = tf.linalg.triangular_solve(x, identity_matrix)
       y = tf.matmul(y, y, adjoint_a=True)
@@ -105,15 +109,15 @@ class CholeskyToInvCholesky(bijector.Bijector):
     if not self.validate_args:
       return []
     x_shape = tf.shape(input=x)
-    is_matrix = tf.compat.v1.assert_rank_at_least(
+    is_matrix = assert_util.assert_rank_at_least(
         x, 2, message="Input must have rank at least 2.")
-    is_square = tf.compat.v1.assert_equal(
+    is_square = assert_util.assert_equal(
         x_shape[-2], x_shape[-1], message="Input must be a square matrix.")
     diag_part_x = tf.linalg.diag_part(x)
-    is_lower_triangular = tf.compat.v1.assert_equal(
+    is_lower_triangular = assert_util.assert_equal(
         tf.linalg.band_part(x, 0, -1),  # Preserves triu, zeros rest.
         tf.linalg.diag(diag_part_x),
         message="Input must be lower triangular.")
-    is_positive_diag = tf.compat.v1.assert_positive(
+    is_positive_diag = assert_util.assert_positive(
         diag_part_x, message="Input must have all positive diagonal entries.")
     return [is_matrix, is_square, is_lower_triangular, is_positive_diag]

@@ -139,7 +139,9 @@ py_test(
     ],
     main = "disentangled_vae.py",
     srcs_version = "PY2AND3",
-    tags = ["tf2-kokoro-broken"],
+    tags = [
+        "tf2-kokoro-broken",
+    ],
     deps = [
         ":disentangled_vae_lib",
     ],

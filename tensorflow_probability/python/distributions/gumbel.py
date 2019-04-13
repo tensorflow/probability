@@ -20,7 +20,7 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import gumbel as gumbel_bijector
 from tensorflow_probability.python.bijectors import invert as invert_bijector
@@ -129,7 +129,7 @@ class Gumbel(transformed_distribution.TransformedDistribution):
       TypeError: if loc and scale are different dtypes.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, scale], preferred_dtype=tf.float32)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
       scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
@@ -143,11 +143,11 @@ class Gumbel(transformed_distribution.TransformedDistribution):
 
       # Because the uniform sampler generates samples in `[0, 1)` this would
       # cause samples to lie in `(inf, -inf]` instead of `(inf, -inf)`. To fix
-      # this, we use `np.finfo(self.dtype.as_numpy_dtype.tiny`
+      # this, we use `np.finfo(dtype_util.as_numpy_dtype(self.dtype).tiny`
       # because it is the smallest, positive, "normal" number.
       super(Gumbel, self).__init__(
           distribution=uniform.Uniform(
-              low=np.finfo(dtype.as_numpy_dtype).tiny,
+              low=np.finfo(dtype_util.as_numpy_dtype(dtype)).tiny,
               high=tf.ones([], dtype=loc.dtype),
               allow_nan_stats=allow_nan_stats),
           # The Gumbel bijector encodes the quantile
@@ -210,7 +210,7 @@ def _kl_gumbel_gumbel(a, b, name=None):
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.compat.v2.name_scope(name or "kl_gumbel_gumbel"):
+  with tf.name_scope(name or "kl_gumbel_gumbel"):
     # Consistent with
     # http://www.mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 64
     # The paper uses beta to refer to scale and mu to refer to loc.

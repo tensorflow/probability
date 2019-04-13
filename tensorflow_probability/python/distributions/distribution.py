@@ -27,11 +27,13 @@ import decorator
 
 import numpy as np
 import six
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions.internal import slicing
-from tensorflow_probability.python.internal import distribution_util as util
+from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
@@ -140,12 +142,11 @@ def _convert_to_tensor(value, name=None, dtype=None, preferred_dtype=None):
     return tuple(_convert_to_tensor(v, name, d, p)
                  for v, d, p in zip(value, dtype, preferred_dtype))
   # TODO(b/116672045): Remove this function.
-  if (tf.executing_eagerly() and
-      preferred_dtype is not None and
-      dtype is None and
-      (preferred_dtype.is_integer or preferred_dtype.is_bool)):
+  if (tf.executing_eagerly() and preferred_dtype is not None and
+      dtype is None and (dtype_util.is_integer(preferred_dtype) or
+                         dtype_util.is_bool(preferred_dtype))):
     v = tf.convert_to_tensor(value=value, name=name)
-    if v.dtype.is_floating:
+    if dtype_util.is_floating(v.dtype):
       return v
   return tf.convert_to_tensor(
       value=value, name=name, dtype=dtype, dtype_hint=preferred_dtype)
@@ -287,7 +288,7 @@ class Distribution(_BaseDistribution):
   docstrings for their method specializations. For example:
 
   ```python
-  @util.AppendDocstring("Some other details.")
+  @distribution_util.AppendDocstring("Some other details.")
   def _log_prob(self, value):
     ...
   ```
@@ -451,7 +452,7 @@ class Distribution(_BaseDistribution):
         raise ValueError("Graph parent item %d is not a Tensor; %s." % (i, t))
     if not name or name[-1] != "/":  # `name` is not a name scope
       non_unique_name = name or type(self).__name__
-      with tf.compat.v2.name_scope(non_unique_name) as name:
+      with tf.name_scope(non_unique_name) as name:
         pass
     self._dtype = dtype
     self._reparameterization_type = reparameterization_type
@@ -480,7 +481,7 @@ class Distribution(_BaseDistribution):
     Returns:
       `dict` of parameter name to `Tensor` shapes.
     """
-    with tf.compat.v2.name_scope(name):
+    with tf.name_scope(name):
       return cls._param_shapes(sample_shape)
 
   @classmethod
@@ -506,9 +507,9 @@ class Distribution(_BaseDistribution):
       ValueError: if `sample_shape` is a `TensorShape` and is not fully defined.
     """
     if isinstance(sample_shape, tf.TensorShape):
-      if not sample_shape.is_fully_defined():
+      if not tensorshape_util.is_fully_defined(sample_shape):
         raise ValueError("TensorShape sample_shape must be fully defined")
-      sample_shape = sample_shape.as_list()
+      sample_shape = tensorshape_util.as_list(sample_shape)
 
     params = cls.param_shapes(sample_shape)
 
@@ -691,9 +692,9 @@ class Distribution(_BaseDistribution):
       batch_shape: `Tensor`.
     """
     with self._name_scope(name):
-      if self.batch_shape.is_fully_defined():
+      if tensorshape_util.is_fully_defined(self.batch_shape):
         return tf.convert_to_tensor(
-            value=self.batch_shape.as_list(),
+            value=tensorshape_util.as_list(self.batch_shape),
             dtype=tf.int32,
             name="batch_shape")
       return self._batch_shape_tensor()
@@ -729,9 +730,9 @@ class Distribution(_BaseDistribution):
       event_shape: `Tensor`.
     """
     with self._name_scope(name):
-      if self.event_shape.is_fully_defined():
+      if tensorshape_util.is_fully_defined(self.event_shape):
         return tf.convert_to_tensor(
-            value=self.event_shape.as_list(),
+            value=tensorshape_util.as_list(self.event_shape),
             dtype=tf.int32,
             name="event_shape")
       return self._event_shape_tensor()
@@ -1282,8 +1283,8 @@ class Distribution(_BaseDistribution):
   @contextlib.contextmanager
   def _name_scope(self, name=None):
     """Helper function to standardize op scope."""
-    with tf.compat.v2.name_scope(self.name):
-      with tf.compat.v2.name_scope(name) as scope:
+    with tf.name_scope(self.name):
+      with tf.name_scope(name) as scope:
         yield scope
 
   def _expand_sample_shape_to_vector(self, x, name):
@@ -1292,9 +1293,9 @@ class Distribution(_BaseDistribution):
     if x_static_val is None:
       prod = tf.reduce_prod(input_tensor=x)
     else:
-      prod = np.prod(x_static_val, dtype=x.dtype.as_numpy_dtype())
+      prod = np.prod(x_static_val, dtype=dtype_util.as_numpy_dtype(x.dtype))
 
-    x = util.expand_to_vector(x, tensor_name=name)
+    x = distribution_util.expand_to_vector(x, tensor_name=name)
     return x, prod
 
   def _set_sample_static_shape(self, x, sample_shape):
@@ -1302,10 +1303,10 @@ class Distribution(_BaseDistribution):
     # Set shape hints.
     sample_shape = tf.TensorShape(tf.get_static_value(sample_shape))
 
-    ndims = x.shape.ndims
-    sample_ndims = sample_shape.ndims
-    batch_ndims = self.batch_shape.ndims
-    event_ndims = self.event_shape.ndims
+    ndims = tensorshape_util.rank(x.shape)
+    sample_ndims = tensorshape_util.rank(sample_shape)
+    batch_ndims = tensorshape_util.rank(self.batch_shape)
+    event_ndims = tensorshape_util.rank(self.event_shape)
 
     # Infer rank(x).
     if (ndims is None and
@@ -1317,14 +1318,15 @@ class Distribution(_BaseDistribution):
 
     # Infer sample shape.
     if ndims is not None and sample_ndims is not None:
-      shape = sample_shape.concatenate([None]*(ndims - sample_ndims))
-      x.set_shape(x.shape.merge_with(shape))
+      shape = tensorshape_util.concatenate(sample_shape,
+                                           [None] * (ndims - sample_ndims))
+      x.set_shape(tensorshape_util.merge_with(x.shape, shape))
 
     # Infer event shape.
     if ndims is not None and event_ndims is not None:
       shape = tf.TensorShape(
           [None]*(ndims - event_ndims)).concatenate(self.event_shape)
-      x.set_shape(x.shape.merge_with(shape))
+      x.set_shape(tensorshape_util.merge_with(x.shape, shape))
 
     # Infer batch shape.
     if batch_ndims is not None:
@@ -1336,20 +1338,20 @@ class Distribution(_BaseDistribution):
       if sample_ndims is not None and event_ndims is not None:
         shape = tf.TensorShape([None]*sample_ndims).concatenate(
             self.batch_shape).concatenate([None]*event_ndims)
-        x.set_shape(x.shape.merge_with(shape))
+        x.set_shape(tensorshape_util.merge_with(x.shape, shape))
 
     return x
 
   def _is_scalar_helper(self, static_shape, dynamic_shape_fn):
     """Implementation for `is_scalar_batch` and `is_scalar_event`."""
-    if static_shape.ndims is not None:
-      return static_shape.ndims == 0
+    if tensorshape_util.rank(static_shape) is not None:
+      return tensorshape_util.rank(static_shape) == 0
     shape = dynamic_shape_fn()
     if tf.compat.dimension_value(shape.shape[0]) is not None:
       # If the static_shape is correctly written then we should never execute
       # this branch. We keep it just in case there's some unimagined corner
       # case.
-      return shape.shape.as_list() == [0]
+      return tensorshape_util.as_list(shape.shape) == [0]
     return tf.equal(tf.shape(input=shape)[0], 0)
 
 

@@ -13,7 +13,6 @@
 # limitations under the License.
 # ============================================================================
 """Install tensorflow_probability."""
-import datetime
 import os
 import sys
 
@@ -45,11 +44,7 @@ else:
 if release:
   project_name = 'tensorflow-probability'
 else:
-  # Nightly releases use date-based versioning of the form
-  # '0.0.1.dev20180305'
   project_name = 'tfp-nightly'
-  datestring = datetime.datetime.now().strftime('%Y%m%d')
-  __version__ += datestring
 
 
 class BinaryDistribution(Distribution):

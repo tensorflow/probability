@@ -21,7 +21,7 @@ from __future__ import print_function
 import functools
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
@@ -113,7 +113,7 @@ class HalfCauchy(distribution.Distribution):
       TypeError: if `loc` and `scale` have different `dtype`.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, scale], preferred_dtype=tf.float32)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
       scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
@@ -188,12 +188,12 @@ class HalfCauchy(distribution.Distribution):
 
   def _z(self, x):
     """Standardize input `x`."""
-    with tf.compat.v2.name_scope("standardize"):
+    with tf.name_scope("standardize"):
       return (x - self.loc) / self.scale
 
   def _inv_z(self, z):
     """Reconstruct input `x` from a its normalized version."""
-    with tf.compat.v2.name_scope("reconstruct"):
+    with tf.name_scope("reconstruct"):
       return z * self.scale + self.loc
 
   def _entropy(self):
@@ -209,19 +209,19 @@ class HalfCauchy(distribution.Distribution):
   def _mean(self):
     if self.allow_nan_stats:
       return tf.fill(self.batch_shape_tensor(),
-                     self.dtype.as_numpy_dtype(np.nan))
+                     dtype_util.as_numpy_dtype(self.dtype)(np.nan))
     raise ValueError("`mean` is undefined for the half-Cauchy distribution.")
 
   def _stddev(self):
     if self.allow_nan_stats:
       return tf.fill(self.batch_shape_tensor(),
-                     self.dtype.as_numpy_dtype(np.nan))
+                     dtype_util.as_numpy_dtype(self.dtype)(np.nan))
     raise ValueError("`stddev` is undefined for the half-Cauchy distribution.")
 
   def _variance(self):
     if self.allow_nan_stats:
       return tf.fill(self.batch_shape_tensor(),
-                     self.dtype.as_numpy_dtype(np.nan))
+                     dtype_util.as_numpy_dtype(self.dtype)(np.nan))
     raise ValueError(
         "`variance` is undefined for the half-Cauchy distribution.")
 
@@ -241,7 +241,7 @@ class HalfCauchy(distribution.Distribution):
     Returns:
       `Tensor` representing an extension of `f(x)`.
     """
-    with tf.compat.v2.name_scope("extend_support_with_default_value"):
+    with tf.name_scope("extend_support_with_default_value"):
       x = tf.convert_to_tensor(value=x, dtype=self.dtype, name="x")
       loc = self.loc + tf.zeros_like(self.scale) + tf.zeros_like(x)
       x = x + tf.zeros_like(loc)
@@ -255,5 +255,5 @@ class HalfCauchy(distribution.Distribution):
       else:
         default_value = tf.fill(
             dims=tf.shape(input=y),
-            value=np.array(default_value, dtype=self.dtype.as_numpy_dtype))
+            value=dtype_util.as_numpy_dtype(self.dtype)(default_value))
       return tf.where(x < loc, default_value, y)

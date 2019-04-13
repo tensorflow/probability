@@ -20,9 +20,11 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import special_math
 
@@ -77,9 +79,9 @@ class NormalCDF(bijector.Bijector):
   def _maybe_assert_valid_y(self, y):
     if not self.validate_args:
       return y
-    is_positive = tf.compat.v1.assert_non_negative(
+    is_positive = assert_util.assert_non_negative(
         y, message="Inverse transformation input must be greater than 0.")
-    less_than_one = tf.compat.v1.assert_less_equal(
+    less_than_one = assert_util.assert_less_equal(
         y,
         tf.constant(1., y.dtype),
         message="Inverse transformation input must be less than or equal to 1.")

@@ -20,7 +20,7 @@ from __future__ import print_function
 import functools
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math
 from tensorflow_probability.python.distributions import chi2 as chi2_lib
@@ -148,12 +148,12 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
       ValueError: if not `scale.is_positive_definite`.
     """
     parameters = dict(locals())
-    if not scale.dtype.is_floating:
+    if not dtype_util.is_floating(scale.dtype):
       raise TypeError("`scale` must have floating-point dtype.")
     if validate_args and not scale.is_positive_definite:
       raise ValueError("`scale` must be positive definite.")
 
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([df, loc, scale],
                                       preferred_dtype=tf.float32)
 
@@ -288,7 +288,7 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
     df = _broadcast_to_shape(self.df[..., tf.newaxis], tf.shape(input=mean))
 
     if self.allow_nan_stats:
-      nan = np.array(np.nan, dtype=self.dtype.as_numpy_dtype())
+      nan = dtype_util.as_numpy_dtype(self.dtype)(np.nan)
       return tf.where(df > 1., mean,
                       tf.fill(tf.shape(input=mean), nan, name="nan"))
     else:
@@ -318,12 +318,12 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
     denom = tf.where(df > 2., df - 2., tf.ones_like(df))
     statistic = statistic * df_factor_fn(df / denom)
     # When 1 < df <= 2, stddev/variance are infinite.
-    inf = np.array(np.inf, dtype=self.dtype.as_numpy_dtype())
+    inf = dtype_util.as_numpy_dtype(self.dtype)(np.inf)
     result_where_defined = tf.where(
         df > 2., statistic, tf.fill(tf.shape(input=statistic), inf, name="inf"))
 
     if self.allow_nan_stats:
-      nan = np.array(np.nan, dtype=self.dtype.as_numpy_dtype())
+      nan = dtype_util.as_numpy_dtype(self.dtype)(np.nan)
       return tf.where(df > 1., result_where_defined,
                       tf.fill(tf.shape(input=statistic), nan, name="nan"))
     else:

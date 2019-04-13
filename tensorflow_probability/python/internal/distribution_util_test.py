@@ -31,6 +31,7 @@ from tensorflow_probability.python.distributions import MixtureSameFamily
 from tensorflow_probability.python.distributions import MultivariateNormalDiag
 from tensorflow_probability.python.distributions import Normal
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math.gradient import value_and_gradient
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
@@ -449,7 +450,7 @@ class PadMixtureDimensionsTest(tf.test.TestCase):
 
     x = tf.constant([[1.0, 2.0], [3.0, 4.0]])
     x_pad = distribution_util.pad_mixture_dimensions(
-        x, gm, gm.cat, gm.event_shape.ndims)
+        x, gm, gm.cat, tensorshape_util.rank(gm.event_shape))
     x_out, x_pad_out = self.evaluate([x, x_pad])
 
     self.assertAllEqual(x_pad_out.shape, [2, 2])
@@ -463,7 +464,7 @@ class PadMixtureDimensionsTest(tf.test.TestCase):
 
     x = tf.constant([[1.0, 2.0], [3.0, 4.0]])
     x_pad = distribution_util.pad_mixture_dimensions(
-        x, gm, gm.mixture_distribution, gm.event_shape.ndims)
+        x, gm, gm.mixture_distribution, tensorshape_util.rank(gm.event_shape))
     x_out, x_pad_out = self.evaluate([x, x_pad])
 
     self.assertAllEqual(x_pad_out.shape, [2, 2, 1])
@@ -658,16 +659,20 @@ class TestMoveDimension(tf.test.TestCase):
     x = tf.random.normal(shape=[200, 30, 4, 1, 6])
 
     x_perm = distribution_util.move_dimension(x, 1, 1)
-    self.assertAllEqual(x_perm.shape.as_list(), [200, 30, 4, 1, 6])
+    self.assertAllEqual(
+        tensorshape_util.as_list(x_perm.shape), [200, 30, 4, 1, 6])
 
     x_perm = distribution_util.move_dimension(x, 0, 3)
-    self.assertAllEqual(x_perm.shape.as_list(), [30, 4, 1, 200, 6])
+    self.assertAllEqual(
+        tensorshape_util.as_list(x_perm.shape), [30, 4, 1, 200, 6])
 
     x_perm = distribution_util.move_dimension(x, 0, -2)
-    self.assertAllEqual(x_perm.shape.as_list(), [30, 4, 1, 200, 6])
+    self.assertAllEqual(
+        tensorshape_util.as_list(x_perm.shape), [30, 4, 1, 200, 6])
 
     x_perm = distribution_util.move_dimension(x, 4, 2)
-    self.assertAllEqual(x_perm.shape.as_list(), [200, 30, 6, 4, 1])
+    self.assertAllEqual(
+        tensorshape_util.as_list(x_perm.shape), [200, 30, 6, 4, 1])
 
   def test_move_dimension_dynamic_shape(self):
 
@@ -1167,7 +1172,8 @@ class RotateTransposeTest(tf.test.TestCase):
         y = distribution_util.rotate_transpose(x, shift)
         self.assertAllEqual(
             self._np_rotate_transpose(x, shift), self.evaluate(y))
-        self.assertAllEqual(np.roll(x.shape, shift), y.shape.as_list())
+        self.assertAllEqual(
+            np.roll(x.shape, shift), tensorshape_util.as_list(y.shape))
 
   def testRollDynamic(self):
     for x_value in (np.ones(1, dtype=np.float32),

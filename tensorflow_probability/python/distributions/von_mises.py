@@ -20,7 +20,7 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import normal
@@ -124,7 +124,7 @@ class VonMises(distribution.Distribution):
       TypeError: if loc and concentration are different dtypes.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, concentration],
                                       preferred_dtype=tf.float32)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
@@ -226,13 +226,13 @@ class VonMises(distribution.Distribution):
 
   def _z(self, x):
     """Standardize input `x` to a zero-loc von Mises."""
-    with tf.compat.v2.name_scope("standardize"):
+    with tf.name_scope("standardize"):
       return x - self.loc
 
   def _sample_n(self, n, seed=None):
     # random_von_mises does not work for zero concentration, so round it up to
     # something very small.
-    tiny = np.finfo(self.dtype.as_numpy_dtype).tiny
+    tiny = np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny
     concentration = tf.maximum(self.concentration, tiny)
 
     sample_batch_shape = tf.concat([[n], self._batch_shape_tensor()], axis=0)
@@ -259,7 +259,7 @@ def _kl_von_mises_von_mises(d1, d2, name=None):
   Returns:
     Batchwise KL(d1 || d2)
   """
-  with tf.compat.v2.name_scope(name or "kl_von_mises_von_mises"):
+  with tf.name_scope(name or "kl_von_mises_von_mises"):
     # The density of von Mises is (abbreviating the concentration for conc):
     #   vonMises(x; loc, conc) = exp(conc cos(x - loc)) / (2 pi I_0 (conc) )
     # We need two properties:

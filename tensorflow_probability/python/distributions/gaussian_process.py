@@ -19,7 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.internal import dtype_util
@@ -239,7 +239,7 @@ class GaussianProcess(mvn_linear_operator.MultivariateNormalLinearOperator):
       ValueError: if `mean_fn` is not `None` and is not callable.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype(
           [index_points, observation_noise_variance, jitter], tf.float32)
       index_points = tf.convert_to_tensor(
@@ -263,7 +263,7 @@ class GaussianProcess(mvn_linear_operator.MultivariateNormalLinearOperator):
       self._observation_noise_variance = observation_noise_variance
       self._jitter = jitter
 
-      with tf.compat.v2.name_scope('init'):
+      with tf.name_scope('init'):
         kernel_matrix = _add_diagonal_shift(
             kernel.matrix(self.index_points, self.index_points),
             jitter + observation_noise_variance)

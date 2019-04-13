@@ -20,8 +20,9 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python.bijectors import bijector_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
@@ -48,55 +49,40 @@ class MatrixInverseTriLBijectorTest(tf.test.TestCase):
                    [0.1, -1., 0.],
                    [0.3, 0.25, 0.5]], dtype=np.float32)
     x_inv_ = np.linalg.inv(x_)
-    expected_fldj_ = -6. * np.sum(np.log(np.abs(np.diag(x_))))
 
     y = inv.forward(x_)
     x_back = inv.inverse(x_inv_)
-    fldj = inv.forward_log_det_jacobian(x_, event_ndims=2)
-    ildj = inv.inverse_log_det_jacobian(x_inv_, event_ndims=2)
 
-    y_, x_back_, fldj_, ildj_ = self.evaluate([y, x_back, fldj, ildj])
+    y_, x_back_ = self.evaluate([y, x_back])
 
     self.assertAllClose(x_inv_, y_, atol=0., rtol=1e-5)
     self.assertAllClose(x_, x_back_, atol=0., rtol=1e-5)
-    self.assertNear(expected_fldj_, fldj_, err=1e-3)
-    self.assertNear(-expected_fldj_, ildj_, err=1e-3)
 
   def testOneByOneMatrix(self):
     inv = tfb.MatrixInverseTriL(validate_args=True)
     x_ = np.array([[5.]], dtype=np.float32)
     x_inv_ = np.array([[0.2]], dtype=np.float32)
-    expected_fldj_ = np.log(0.04)
 
     y = inv.forward(x_)
     x_back = inv.inverse(x_inv_)
-    fldj = inv.forward_log_det_jacobian(x_, event_ndims=2)
-    ildj = inv.inverse_log_det_jacobian(x_inv_, event_ndims=2)
 
-    y_, x_back_, fldj_, ildj_ = self.evaluate([y, x_back, fldj, ildj])
+    y_, x_back_ = self.evaluate([y, x_back])
 
     self.assertAllClose(x_inv_, y_, atol=0., rtol=1e-5)
     self.assertAllClose(x_, x_back_, atol=0., rtol=1e-5)
-    self.assertNear(expected_fldj_, fldj_, err=1e-3)
-    self.assertNear(-expected_fldj_, ildj_, err=1e-3)
 
   def testZeroByZeroMatrix(self):
     inv = tfb.MatrixInverseTriL(validate_args=True)
     x_ = np.eye(0, dtype=np.float32)
     x_inv_ = np.eye(0, dtype=np.float32)
-    expected_fldj_ = 0.
 
     y = inv.forward(x_)
     x_back = inv.inverse(x_inv_)
-    fldj = inv.forward_log_det_jacobian(x_, event_ndims=2)
-    ildj = inv.inverse_log_det_jacobian(x_inv_, event_ndims=2)
 
-    y_, x_back_, fldj_, ildj_ = self.evaluate([y, x_back, fldj, ildj])
+    y_, x_back_ = self.evaluate([y, x_back])
 
     self.assertAllClose(x_inv_, y_, atol=0., rtol=1e-5)
     self.assertAllClose(x_, x_back_, atol=0., rtol=1e-5)
-    self.assertNear(expected_fldj_, fldj_, err=1e-3)
-    self.assertNear(-expected_fldj_, ildj_, err=1e-3)
 
   def testBatch(self):
     # Test batch computation with input shape (2, 1, 2, 2), i.e. batch shape
@@ -107,20 +93,14 @@ class MatrixInverseTriLBijectorTest(tf.test.TestCase):
                    [[[4., 0.],
                      [5., -6.]]]], dtype=np.float32)
     x_inv_ = self._inv(x_)
-    expected_fldj_ = -4. * np.sum(
-        np.log(np.abs(np.diagonal(x_, axis1=-2, axis2=-1))), axis=-1)
 
     y = inv.forward(x_)
     x_back = inv.inverse(x_inv_)
-    fldj = inv.forward_log_det_jacobian(x_, event_ndims=2)
-    ildj = inv.inverse_log_det_jacobian(x_inv_, event_ndims=2)
 
-    y_, x_back_, fldj_, ildj_ = self.evaluate([y, x_back, fldj, ildj])
+    y_, x_back_ = self.evaluate([y, x_back])
 
     self.assertAllClose(x_inv_, y_, atol=0., rtol=1e-5)
     self.assertAllClose(x_, x_back_, atol=0., rtol=1e-5)
-    self.assertAllClose(expected_fldj_, fldj_, atol=0., rtol=1e-3)
-    self.assertAllClose(-expected_fldj_, ildj_, atol=0., rtol=1e-3)
 
   def testErrorOnInputRankTooLow(self):
     inv = tfb.MatrixInverseTriL(validate_args=True)
@@ -186,20 +166,21 @@ class MatrixInverseTriLBijectorTest(tf.test.TestCase):
     with self.assertRaisesOpError(nonsingular_error_msg):
       self.evaluate(inv.inverse_log_det_jacobian(x_, event_ndims=2))
 
-  # TODO(b/126613399): enable when MatrixInvTriL fldj is fixed
-  ## def testJacobian(self):
-  ##   bijector = tfb.MatrixInverseTriL()
-  ##   x_ = np.array([[[1./2., 0.],
-  ##                   [1., 1./3]],
-  ##                  [[1./3., 0.],
-  ##                   [2., 1.]]], dtype=np.float32)
-  ##   fldj = bijector.forward_log_det_jacobian(x_, event_ndims=2)
-  ##   fldj_theoretical = bijector_test_util.get_fldj_theoretical(
-  ##       bijector, x_, event_ndims=2,
-  ##       input_to_unconst_vec=tfb.Invert(tfb.FillTriangular()),
-  ##       output_to_unconst_vec=tfb.Invert(tfb.FillTriangular()))
-  ##   fldj_, fldj_theoretical_ = self.evaluate([fldj, fldj_theoretical])
-  ##   self.assertAllClose(fldj_, fldj_theoretical_)
+  def testJacobian(self):
+    bijector = tfb.MatrixInverseTriL()
+    batch_size = 5
+    for ndims in range(2, 5):
+      x_ = np.tril(
+          np.random.uniform(
+              -1., 1., size=[batch_size, ndims, ndims]).astype(np.float32))
+      fldj = bijector.forward_log_det_jacobian(x_, event_ndims=2)
+      fldj_theoretical = bijector_test_util.get_fldj_theoretical(
+          bijector, x_, event_ndims=2,
+          input_to_unconstrained=tfb.Invert(tfb.FillTriangular()),
+          output_to_unconstrained=tfb.Invert(tfb.FillTriangular()))
+      fldj_, fldj_theoretical_ = self.evaluate([fldj, fldj_theoretical])
+      self.assertAllClose(fldj_, fldj_theoretical_)
+
 
 if __name__ == "__main__":
   tf.test.main()

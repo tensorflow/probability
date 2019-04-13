@@ -18,8 +18,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 
 __all__ = [
@@ -111,7 +113,7 @@ class Kumaraswamy(bijector.Bijector):
     if not validate_args:
       return concentration
     return distribution_util.with_dependencies([
-        tf.compat.v1.assert_positive(
+        assert_util.assert_positive(
             concentration, message="Concentration parameter must be positive."),
     ], concentration)
 
@@ -119,9 +121,9 @@ class Kumaraswamy(bijector.Bijector):
     if not self.validate_args:
       return x
     return distribution_util.with_dependencies([
-        tf.compat.v1.assert_non_negative(
+        assert_util.assert_non_negative(
             x, message="sample must be non-negative"),
-        tf.compat.v1.assert_less_equal(
+        assert_util.assert_less_equal(
             x,
             tf.ones([], self.concentration0.dtype),
             message="sample must be no larger than `1`."),

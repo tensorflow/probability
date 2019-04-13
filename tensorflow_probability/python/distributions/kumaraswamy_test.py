@@ -272,8 +272,8 @@ class KumaraswamyTest(tf.test.TestCase):
       self.assertEqual(dist.entropy().shape, (3,))
       if not stats:
         return
-      expected_entropy = (1 - 1. / a) + (
-          1 - 1. / b) * _harmonic_number(b) + np.log(a * b)
+      expected_entropy = (1 - 1. / b) + (
+          1 - 1. / a) * _harmonic_number(b) - np.log(a * b)
       self.assertAllClose(expected_entropy, self.evaluate(dist.entropy()))
 
   def testKumaraswamySample(self):
