@@ -31,6 +31,96 @@ from tensorflow_probability.python.sts.structural_time_series import StructuralT
 
 
 class DynamicLinearRegressionStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
+  """State space model for a dynamic linear regression from provided covariates.
+
+  A state space model (SSM) posits a set of latent (unobserved) variables that
+  evolve over time with dynamics specified by a probabilistic transition model
+  `p(z[t+1] | z[t])`. At each timestep, we observe a value sampled from an
+  observation model conditioned on the current state, `p(x[t] | z[t])`. The
+  special case where both the transition and observation models are Gaussians
+  with mean specified as a linear function of the inputs, is known as a linear
+  Gaussian state space model and supports tractable exact probabilistic
+  calculations; see `tfp.distributions.LinearGaussianStateSpaceModel` for
+  details.
+
+  The dynamic linear regression model is a special case of a linear Gaussian SSM
+  and a generalization of linear regression. The model posits regression
+  `weights` which evolve via a Gaussian random walk:
+
+  ```
+  weights[t] ~ Normal(weights[t-1], drift_scale)
+  ```
+
+  The latent state (the weights) has dimension `num_features`, while the
+  parameters `drift_scale` and `observation_noise_scale` are each (a batch of)
+  scalars. The batch shape of this `Distribution` is the broadcast batch shape
+  of these parameters, the `initial_state_prior`, and the
+  `design_matrix`. `num_features` is determined from the last dimension of
+  `design_matrix` (equivalent to the number of columns in the design matrix in
+  linear regression).
+
+  #### Mathematical Details
+
+  The local level model implements a
+  `tfp.distributions.LinearGaussianStateSpaceModel` with `latent_size =
+  num_features` and `observation_size = 1` following the transition model:
+
+  ```
+  transition_matrix = eye(num_features)
+  transition_noise ~ Normal(0, diag([drift_scale]))
+  ```
+
+  which implements the evolution of `weights` described above. The observation
+  model is:
+
+  ```
+  observation_matrix[t] = design_matrix[t]
+  observation_noise ~ Normal(0, observation_noise_scale)
+  ```
+
+  #### Examples
+
+  Given `series1`, `series2` as `Tensors` each of shape `[num_timesteps] = [42]`
+  representing covariate time series, we create a dynamic regression model which
+  conditions on these via the following:
+
+  ```python
+  dynamic_regression_ssm = DynamicLinearRegressionStateSpaceModel(
+      num_timesteps=42,
+      design_matrix=tf.stack([series1, series2], axis=-1),
+      drift_scale=3.14,
+      initial_state_prior=tfd.MultivariateNormalDiag(scale_diag=[1., 2.]),
+      observation_noise_scale=1.)
+
+  y = dynamic_regression_ssm.sample()  # shape [42, 1]
+  lp = dynamic_regression_ssm.log_prob(y)  # scalar
+  ```
+
+  Passing additional parameter and `initial_state_prior` dimensions constructs a
+  batch of models, consider the following:
+
+  ```python
+  dynamic_regression_ssm = DynamicLinearRegressionStateSpaceModel(
+      num_timesteps=42,
+      design_matrix=tf.stack([series1, series2], axis=-1),
+      drift_scale=[3.14, 1.],
+      initial_state_prior=tfd.MultivariateNormalDiag(scale_diag=[1., 2.]),
+      observation_noise_scale=[1., 2.])
+
+  y = dynamic_regression_ssm.sample(3)  # shape [3, 2, 42, 1]
+  lp = dynamic_regression_ssm.log_prob(y)  # shape [3, 2]
+  ```
+
+  Which (effectively) constructs two independent state space models; the first
+  with `drift_scale = 3.14` and `observation_noise_scale = 1.`, the second with
+  `drift_scale = 1.` and `observation_noise_scale = 2.`. We then sample from
+  each of the models three times and calculate the log probability of each of
+  the samples under each of the models.
+
+  Similarly, it is also possible to add batch dimensions via the
+  `design_matrix`.
+
+  """
 
   def __init__(self,
                num_timesteps,
