@@ -162,7 +162,7 @@ def _uniform_correlation_like_matrix(num_rows, batch_shape, dtype, seed):
   # `matrix_band_part`.
   unifs = uniform.Uniform(-ones, ones).sample(batch_shape, seed=seed)
   tril = util.fill_triangular(unifs)
-  symmetric = tril + tf.linalg.transpose(tril)
+  symmetric = tril + tf.linalg.matrix_transpose(tril)
   diagonal_ones = tf.ones(
       shape=util.pad(batch_shape, axis=0, back=True, value=num_rows),
       dtype=dtype)

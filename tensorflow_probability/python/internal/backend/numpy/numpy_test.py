@@ -160,7 +160,7 @@ NUMPY_TEST_CASES = [
 
     # ArgSpec(args=['a', 'name', 'conjugate'], varargs=None, keywords=None,
     #         defaults=('matrix_transpose', False))
-    TestCase('linalg.transpose', [n_same_shape(n=1, min_dims=2)]),
+    TestCase('linalg.matrix_transpose', [n_same_shape(n=1, min_dims=2)]),
 
     # ArgSpec(args=['a', 'x', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))

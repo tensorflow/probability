@@ -27,7 +27,6 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import beta
@@ -354,7 +353,7 @@ class LKJ(distribution.Distribution):
             message='Self-correlations must be = 1.'),
         assert_util.assert_near(
             x,
-            tf1.matrix_transpose(x),
+            tf.linalg.matrix_transpose(x),
             message='Correlation matrices must be symmetric')
     ]
     with tf.control_dependencies(checks):

@@ -36,7 +36,7 @@ __all__ = [
     'diag_part',
     'matmul',
     'set_diag',
-    'transpose',
+    'matrix_transpose',
     'triangular_solve',
     # 'adjoint',
     # 'cross',
@@ -130,8 +130,8 @@ set_diag = utils.copy_docstring(
     tf.linalg.set_diag,
     _fill_diagonal)
 
-transpose = utils.copy_docstring(
-    tf.linalg.transpose,
+matrix_transpose = utils.copy_docstring(
+    tf.linalg.matrix_transpose,
     _matrix_transpose)
 
 triangular_solve = utils.copy_docstring(

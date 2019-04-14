@@ -21,7 +21,6 @@ from __future__ import print_function
 import functools
 import hashlib
 import numpy as np
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import assert_util
@@ -685,7 +684,7 @@ def assert_integer_form(x,
 
 
 def assert_symmetric(matrix):
-  matrix_t = tf1.matrix_transpose(matrix)
+  matrix_t = tf.linalg.matrix_transpose(matrix)
   return with_dependencies(
       [assert_util.assert_near(matrix, matrix_t)], matrix)
 

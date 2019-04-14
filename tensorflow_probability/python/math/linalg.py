@@ -126,7 +126,7 @@ def cholesky_concat(chol, cols, name=None):
         chol, mat_nm)
     lower_right_mm = tf.linalg.cholesky(
         mat_mm - tf.matmul(solved_nm, solved_nm, adjoint_a=True))
-    lower_left_mn = tf.math.conj(tf.linalg.transpose(solved_nm))
+    lower_left_mn = tf.math.conj(tf.linalg.matrix_transpose(solved_nm))
     out_batch = prefer_static.shape(solved_nm)[:-2]
     chol = tf.broadcast_to(
         chol,
