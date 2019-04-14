@@ -131,7 +131,8 @@ class RationalQuadratic(psd_kernel.PositiveSemidefiniteKernel):
       self._length_scale = _validate_arg_if_not_none(
           length_scale, tf.compat.v1.assert_positive, validate_args)
 
-    super(RationalQuadratic, self).__init__(feature_ndims, name)
+    super(RationalQuadratic, self).__init__(
+        feature_ndims, dtype=dtype, name=name)
 
   def _apply(self, x1, x2, param_expansion_ndims=0):
     difference = util.sum_rightmost_ndims_preserving_shape(
@@ -174,7 +175,7 @@ class RationalQuadratic(psd_kernel.PositiveSemidefiniteKernel):
 
   def _batch_shape(self):
     shape_list = [
-        x.shape for x in [
+        x.shape for x in [  # pylint: disable=g-complex-comprehension
             self.amplitude,
             self.scale_mixture_rate,
             self.length_scale
