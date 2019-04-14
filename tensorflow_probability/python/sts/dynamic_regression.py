@@ -133,38 +133,38 @@ class DynamicLinearRegressionStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
                validate_args=False,
                allow_nan_stats=True,
                name=None):
-  """State space model for a dynamic linear regression.
+    """State space model for a dynamic linear regression.
 
-  Args:
-    num_timesteps: Scalar `int` `Tensor` number of timesteps to model
-      with this distribution.
-    design_matrix: float `Tensor` of shape `concat([batch_shape,
-      [num_timesteps, num_features]])`.
-    drift_scale: Scalar (any additional dimensions are treated as batch
-      dimensions) `float` `Tensor` indicating the standard deviation of the
-      latent state transitions.
-    initial_state_prior: instance of `tfd.MultivariateNormal`
-      representing the prior distribution on latent states.  Must have
-      event shape `[num_features]`.
-    observation_noise_scale: Scalar (any additional dimensions are
-      treated as batch dimensions) `float` `Tensor` indicating the standard
-      deviation of the observation noise.
-      Default value: `0.`.
-    initial_step: scalar `int` `Tensor` specifying the starting timestep.
-      Default value: `0`.
-    validate_args: Python `bool`. Whether to validate input with asserts. If
-      `validate_args` is `False`, and the inputs are invalid, correct behavior
-      is not guaranteed.
-      Default value: `False`.
-    allow_nan_stats: Python `bool`. If `False`, raise an
-      exception if a statistic (e.g. mean/mode/etc...) is undefined for any
-      batch member. If `True`, batch members with valid parameters leading to
-      undefined statistics will return NaN for this statistic.
-      Default value: `True`.
-    name: Python `str` name prefixed to ops created by this class.
-      Default value: "DynamicLinearRegressionStateSpaceModel".
+    Args:
+      num_timesteps: Scalar `int` `Tensor` number of timesteps to model
+        with this distribution.
+      design_matrix: float `Tensor` of shape `concat([batch_shape,
+        [num_timesteps, num_features]])`.
+      drift_scale: Scalar (any additional dimensions are treated as batch
+        dimensions) `float` `Tensor` indicating the standard deviation of the
+        latent state transitions.
+      initial_state_prior: instance of `tfd.MultivariateNormal`
+        representing the prior distribution on latent states.  Must have
+        event shape `[num_features]`.
+      observation_noise_scale: Scalar (any additional dimensions are
+        treated as batch dimensions) `float` `Tensor` indicating the standard
+        deviation of the observation noise.
+        Default value: `0.`.
+      initial_step: scalar `int` `Tensor` specifying the starting timestep.
+        Default value: `0`.
+      validate_args: Python `bool`. Whether to validate input with asserts. If
+        `validate_args` is `False`, and the inputs are invalid, correct behavior
+        is not guaranteed.
+        Default value: `False`.
+      allow_nan_stats: Python `bool`. If `False`, raise an
+        exception if a statistic (e.g. mean/mode/etc...) is undefined for any
+        batch member. If `True`, batch members with valid parameters leading to
+        undefined statistics will return NaN for this statistic.
+        Default value: `True`.
+      name: Python `str` name prefixed to ops created by this class.
+        Default value: 'DynamicLinearRegressionStateSpaceModel'.
 
-  """
+      """
 
     with tf.compat.v1.name_scope(name, 'DynamicLinearRegressionStateSpaceModel',
                                  values=[drift_scale]) as name:
@@ -250,32 +250,32 @@ class DynamicLinearRegression(StructuralTimeSeries):
                initial_weights_prior=None,
                observed_time_series=None,
                name=None):
-  """Specify a dynamic linear regression.
+    """Specify a dynamic linear regression.
 
-  Args:
-    design_matrix: float `Tensor` of shape `concat([batch_shape,
-      [num_timesteps, num_features]])`.
-    drift_scale_prior: instance of `tfd.Distribution` specifying a prior on the
-      `drift_scale` parameter. If `None`, a heuristic default prior is
-      constructed based on the provided `observed_time_series`.
-      Default value: `None`.
-    initial_weights_prior: instance of `tfd.MultivariateNormal` representing the
-      prior distribution on the latent states (the regression weights). Must
-      have event shape `[num_features]`. If `None`, a weakly-informative
-      Normal(0., 10.) prior is used.
-      Default value: `None`.
-    observed_time_series: `float` `Tensor` of shape `batch_shape + [T, 1]`
-      (omitting the trailing unit dimension is also supported when `T > 1`),
-      specifying an observed time series. Any priors not explicitly set will be
-      given default values according to the scale of the observed time series
-      (or batch of time series). May optionally be an instance of
-      `tfp.sts.MaskedTimeSeries`, which includes a mask `Tensor` to specify
-      timesteps with missing observations.
-      Default value: `None`.
-    name: Python `str` for the name of this component.
-      Default value: "DynamicLinearRegression".
+    Args:
+      design_matrix: float `Tensor` of shape `concat([batch_shape,
+        [num_timesteps, num_features]])`.
+      drift_scale_prior: instance of `tfd.Distribution` specifying a prior on
+        the `drift_scale` parameter. If `None`, a heuristic default prior is
+        constructed based on the provided `observed_time_series`.
+        Default value: `None`.
+      initial_weights_prior: instance of `tfd.MultivariateNormal` representing
+        the prior distribution on the latent states (the regression weights).
+        Must have event shape `[num_features]`. If `None`, a weakly-informative
+        Normal(0., 10.) prior is used.
+        Default value: `None`.
+      observed_time_series: `float` `Tensor` of shape `batch_shape + [T, 1]`
+        (omitting the trailing unit dimension is also supported when `T > 1`),
+        specifying an observed time series. Any priors not explicitly set will
+        be given default values according to the scale of the observed time
+        series (or batch of time series). May optionally be an instance of
+        `tfp.sts.MaskedTimeSeries`, which includes a mask `Tensor` to specify
+        timesteps with missing observations.
+        Default value: `None`.
+      name: Python `str` for the name of this component.
+        Default value: 'DynamicLinearRegression'.
 
-  """
+    """
 
     with tf.compat.v1.name_scope(
         name, 'DynamicLinearRegression', values=[observed_time_series]) as name:
