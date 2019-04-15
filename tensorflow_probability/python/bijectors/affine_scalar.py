@@ -82,7 +82,7 @@ class AffineScalar(bijector.Bijector):
     self._name = name
     self._validate_args = validate_args
 
-    with self._name_scope("init", values=[scale, shift]):
+    with self._name_scope("init"):
       self._shift = shift
       self._scale = scale
 

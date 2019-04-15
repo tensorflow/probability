@@ -29,6 +29,7 @@ import numpy as np
 import six
 import tensorflow as tf
 
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
@@ -748,7 +749,7 @@ class Bijector(object):
       forward_event_shape_tensor: `Tensor`, `int32` vector indicating
         event-portion shape after applying `forward`.
     """
-    with self._name_scope(name, [input_shape]):
+    with self._name_scope(name):
       input_shape = tf.convert_to_tensor(
           value=input_shape, dtype=tf.int32, name="input_shape")
       return self._forward_event_shape_tensor(input_shape)
@@ -792,7 +793,7 @@ class Bijector(object):
       inverse_event_shape_tensor: `Tensor`, `int32` vector indicating
         event-portion shape after applying `inverse`.
     """
-    with self._name_scope(name, [output_shape]):
+    with self._name_scope(name):
       output_shape = tf.convert_to_tensor(
           value=output_shape, dtype=tf.int32, name="output_shape")
       return self._inverse_event_shape_tensor(output_shape)
@@ -823,7 +824,7 @@ class Bijector(object):
 
   def _call_forward(self, x, name, **kwargs):
     """Wraps call to _forward, allowing extra shared logic."""
-    with self._name_scope(name, [x]):
+    with self._name_scope(name):
       x = tf.convert_to_tensor(value=x, name="x")
       self._maybe_assert_dtype(x)
       if not self._is_injective:  # No caching for non-injective
@@ -865,7 +866,7 @@ class Bijector(object):
 
   def _call_inverse(self, y, name, **kwargs):
     """Wraps call to _inverse, allowing extra shared logic."""
-    with self._name_scope(name, [y]):
+    with self._name_scope(name):
       y = tf.convert_to_tensor(value=y, name="y")
       self._maybe_assert_dtype(y)
       if not self._is_injective:  # No caching for non-injective
@@ -1092,7 +1093,7 @@ class Bijector(object):
       ildj: the inverse log det jacobian at `y`. Also updates the cache as
         needed.
     """
-    with self._name_scope(name, [y]), tf.control_dependencies(
+    with self._name_scope(name), tf.control_dependencies(
         self._check_valid_event_ndims(
             min_event_ndims=self.inverse_min_event_ndims,
             event_ndims=event_ndims)):
@@ -1176,7 +1177,7 @@ class Bijector(object):
           "forward_log_det_jacobian cannot be implemented for non-injective "
           "transforms.")
 
-    with self._name_scope(name, [x]), tf.control_dependencies(
+    with self._name_scope(name), tf.control_dependencies(
         self._check_valid_event_ndims(
             min_event_ndims=self.forward_min_event_ndims,
             event_ndims=event_ndims)):
@@ -1221,11 +1222,10 @@ class Bijector(object):
     return self._call_forward_log_det_jacobian(x, event_ndims, name, **kwargs)
 
   @contextlib.contextmanager
-  def _name_scope(self, name=None, values=None):
+  def _name_scope(self, name=None):
     """Helper function to standardize op scope."""
-    with tf.compat.v1.name_scope(self.name):
-      with tf.compat.v1.name_scope(
-          name, values=(values or []) + self.graph_parents) as scope:
+    with tf.compat.v2.name_scope(self.name):
+      with tf.compat.v2.name_scope(name) as scope:
         yield scope
 
   def _maybe_assert_dtype(self, x):
@@ -1320,7 +1320,7 @@ class Bijector(object):
                                                        min_event_ndims))
     elif self.validate_args:
       assertions += [
-          tf.compat.v1.assert_greater_equal(event_ndims, min_event_ndims)
+          assert_util.assert_greater_equal(event_ndims, min_event_ndims)
       ]
 
     if tensorshape_util.is_fully_defined(event_ndims.shape):
@@ -1330,7 +1330,7 @@ class Bijector(object):
 
     elif self.validate_args:
       assertions += [
-          tf.compat.v1.assert_rank(event_ndims, 0, message="Expected scalar.")
+          assert_util.assert_rank(event_ndims, 0, message="Expected scalar.")
       ]
     return assertions
 

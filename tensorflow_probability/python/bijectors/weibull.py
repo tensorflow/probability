@@ -67,7 +67,7 @@ class Weibull(bijector.Bijector):
     self._graph_parents = []
     self._name = name
     self._validate_args = validate_args
-    with self._name_scope("init", values=[scale, concentration]):
+    with self._name_scope("init"):
       self._scale = tf.convert_to_tensor(value=scale, name="scale")
       self._concentration = tf.convert_to_tensor(
           value=concentration, name="concentration")

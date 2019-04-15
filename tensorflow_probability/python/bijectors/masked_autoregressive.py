@@ -393,8 +393,7 @@ def masked_dense(inputs,
   def masked_initializer(shape, dtype=None, partition_info=None):
     return mask * kernel_initializer(shape, dtype, partition_info)
 
-  with tf.compat.v1.name_scope(name, "masked_dense",
-                               [inputs, units, num_blocks]):
+  with tf.compat.v2.name_scope(name or "masked_dense"):
     layer = tf.compat.v1.layers.Dense(
         units,
         kernel_initializer=masked_initializer,
@@ -482,8 +481,7 @@ def masked_autoregressive_default_template(hidden_layers,
        Conference on Machine Learning_, 2015. https://arxiv.org/abs/1502.03509
   """
   name = name or "masked_autoregressive_default_template"
-  with tf.compat.v1.name_scope(
-      name, values=[log_scale_min_clip, log_scale_max_clip]):
+  with tf.compat.v2.name_scope(name):
 
     def _fn(x):
       """MADE parameterized via `masked_autoregressive_default_template`."""
@@ -570,7 +568,7 @@ class AutoregressiveLayer(tf.keras.layers.Layer):
   log_prob_ = distribution.log_prob(x_)
   model = tfk.Model(x_, log_prob_)
 
-  model.compile(optimizer=tf.compat.v1.train.AdamOptimizer(),
+  model.compile(optimizer=tf.compat.v2.optimizers.Adam(),
                 loss=lambda _, log_prob: -log_prob)
 
   batch_size = 25
@@ -630,7 +628,7 @@ class AutoregressiveLayer(tf.keras.layers.Layer):
       log_prob_ = distribution.log_prob(x_)
       model = tfk.Model(x_, log_prob_)
 
-      model.compile(optimizer=tf.compat.v1.train.AdamOptimizer(),
+      model.compile(optimizer=tf.compat.v2.optimizers.Adam(),
                     loss=lambda _, log_prob: -log_prob)
 
       batch_size = 10
@@ -688,7 +686,7 @@ class AutoregressiveLayer(tf.keras.layers.Layer):
       log_prob_ = distribution.log_prob(x_)
       model = tfk.Model(x_, log_prob_)
 
-      model.compile(optimizer=tf.compat.v1.train.AdamOptimizer(),
+      model.compile(optimizer=tf.compat.v2.optimizers.Adam(),
                     loss=lambda _, log_prob: -log_prob)
 
       batch_size = 10
@@ -855,7 +853,7 @@ class AutoregressiveLayer(tf.keras.layers.Layer):
 
   def call(self, x):
     """See tfkl.Layer.call."""
-    with tf.compat.v1.name_scope(self.name, "AutoregressiveLayer_call", [x]):
+    with tf.compat.v2.name_scope(self.name or "AutoregressiveLayer_call"):
       x = tf.convert_to_tensor(value=x, dtype=self.dtype, name="x")
       input_shape = tf.shape(input=x)
       # TODO(b/67594795): Better support for dynamic shapes.

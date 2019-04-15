@@ -18,9 +18,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import math
+# Dependency imports
+import numpy as np
 
 import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
@@ -205,12 +207,12 @@ class Normal(distribution.Distribution):
     return -0.5 * tf.square(self._z(x))
 
   def _log_normalization(self):
-    return 0.5 * math.log(2. * math.pi) + tf.math.log(self.scale)
+    return 0.5 * np.log(2. * np.pi) + tf.math.log(self.scale)
 
   def _entropy(self):
     # Use broadcasting rules to calculate the full broadcast scale.
     scale = self.scale * tf.ones_like(self.loc)
-    return 0.5 * math.log(2. * math.pi * math.e) + tf.math.log(scale)
+    return 0.5 * np.log(2. * np.pi * np.e) + tf.math.log(scale)
 
   def _mean(self):
     return self.loc * tf.ones_like(self.scale)

@@ -22,7 +22,7 @@ import collections
 import warnings
 
 import six
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 __all__ = ['batch_slice']
 

@@ -109,7 +109,7 @@ class SinhArcsinh(bijector.Bijector):
     self._graph_parents = []
     self._name = name
     self._validate_args = validate_args
-    with self._name_scope("init", values=[skewness, tailweight]):
+    with self._name_scope("init"):
       tailweight = 1. if tailweight is None else tailweight
       skewness = 0. if skewness is None else skewness
       self._skewness = tf.convert_to_tensor(value=skewness, name="skewness")

@@ -19,9 +19,9 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-
 import numpy as np
-import tensorflow as tf
+
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
@@ -122,7 +122,7 @@ class TruncatedNormal(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, scale, low, high], tf.float32)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
       scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
@@ -164,12 +164,10 @@ class TruncatedNormal(distribution.Distribution):
     vops = [
         assert_util.assert_positive(self._scale),
         assert_util.assert_positive(self._high - self._low),
-        tf.compat.v1.verify_tensor_all_finite(self._high,
-                                              "Upper bound not finite"),
-        tf.compat.v1.verify_tensor_all_finite(self._low,
-                                              "Lower bound not finite"),
-        tf.compat.v1.verify_tensor_all_finite(self._loc, "Loc not finite"),
-        tf.compat.v1.verify_tensor_all_finite(self._scale, "Scale not finite"),
+        assert_util.assert_finite(self._low, message="Lower bound not finite"),
+        assert_util.assert_finite(self._high, message="Upper bound not finite"),
+        assert_util.assert_finite(self._loc, message="Loc not finite"),
+        assert_util.assert_finite(self._scale, message="scale not finite"),
     ]
     return tf.group(*vops, name="ValidationOps")
 
