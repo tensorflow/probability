@@ -422,7 +422,7 @@ less_equal = utils.copy_docstring(
 
 lgamma = utils.copy_docstring(
     tf.math.lgamma,
-    lambda x, name=None: scipy_special.loggamma(x))
+    lambda x, name=None: real(scipy_special.loggamma(x)))
 
 log = utils.copy_docstring(
     tf.math.log,

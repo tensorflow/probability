@@ -63,18 +63,46 @@ class TestCase(dict):
 # different TensorFlow and numpy functions. See hypothesis.readthedocs.io for
 # mode detail.
 
-floats = functools.partial(
-    hps.floats, allow_nan=ALLOW_NAN, allow_infinity=ALLOW_INFINITY)
+
+def floats(min_value=-1e16,
+           max_value=1e16,
+           allow_nan=ALLOW_NAN,
+           allow_infinity=ALLOW_INFINITY):
+  return hps.floats(min_value, max_value, allow_nan, allow_infinity)
+
+
+def complex_numbers(min_magnitude=0.,
+                    max_magnitude=1e16,
+                    allow_nan=ALLOW_NAN,
+                    allow_infinity=ALLOW_INFINITY):
+  return hps.complex_numbers(
+      min_magnitude, max_magnitude, allow_nan, allow_infinity)
 
 
 @hps.composite
-def n_same_shape(
-    draw, n, min_dims=1, max_dims=5, dtype=None, elements=None):
+def non_zero_floats(draw, *args, **kwargs):
+  return draw(floats(*args, **kwargs).filter(lambda x: np.all(x != 0.)))
+
+positive_floats = functools.partial(floats, min_value=1e-6)
+
+
+@hps.composite
+def n_same_shape(draw,
+                 n,
+                 min_dims=1,
+                 max_dims=4,
+                 min_side=1,
+                 max_side=5,
+                 dtype=None,
+                 elements=None):
   if elements is None:
     elements = floats()
   if dtype is None:
     dtype = np.float
-  shape = draw(hnp.array_shapes(min_dims, max_dims))
+  shape = draw(hnp.array_shapes(min_dims, max_dims, min_side, max_side))
+
+  if isinstance(elements, (list, tuple)):
+    return tuple([draw(hnp.arrays(dtype, shape, elements=e)) for e in elements])
   array_strategy = hnp.arrays(dtype, shape, elements=elements)
   if n == 1:
     return draw(array_strategy)
@@ -117,13 +145,10 @@ def matmul_compatible_pair(
 
 @hps.composite
 def psd_matrix(draw, eps=1e-2):
-  x = draw(single_array(min_dims=2, max_dims=2, elements=floats(-1e3, 1e3)))
+  x = draw(single_array(
+      min_dims=2, max_dims=2, elements=floats(min_value=-1e3, max_value=1e3)))
   return x.dot(x.T) + eps * np.eye(x.shape[0])
 
-
-@hps.composite
-def nested(draw, strategies):
-  return tf.nest.map_structure(draw, strategies)
 
 # __Currently untested:__
 # math.bincount
@@ -138,7 +163,7 @@ def nested(draw, strategies):
 # broadcast_static_shape
 # math.zeta
 
-# TODO(jamieas): add tests for these fucntions.
+# TODO(jamieas): add tests for these functions.
 
 # pylint: disable=no-value-for-parameter
 
@@ -149,29 +174,15 @@ NUMPY_TEST_CASES = [
     #         varargs=None,
     #         keywords=None,
     #         defaults=(False, False, False, False, False, False, None))
-    TestCase('linalg.matmul', [
-        matmul_compatible_pair(
-            elements=floats(
-                min_value=-1e12,
-                max_value=1e12,
-                allow_nan=ALLOW_NAN,
-                allow_infinity=ALLOW_INFINITY))
-    ]),
+    TestCase('linalg.matmul', [matmul_compatible_pair()]),
 
-    # ArgSpec(args=['a', 'name', 'conjugate'], varargs=None, keywords=None,
-    #         defaults=('matrix_transpose', False))
-    TestCase('linalg.matrix_transpose', [n_same_shape(n=1, min_dims=2)]),
+    # ArgSpec(args=['a', 'name', 'conjugate'], varargs=None, keywords=None)
+    TestCase('linalg.matrix_transpose', [single_array(min_dims=2)]),
 
     # ArgSpec(args=['a', 'x', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
     TestCase('math.polygamma', [
-        n_same_shape(
-            n=2,
-            elements=floats(
-                min_value=0.01,
-                max_value=10.0,
-                allow_nan=ALLOW_NAN,
-                allow_infinity=ALLOW_INFINITY))
+        hps.tuples(hps.integers(0, 10).map(float), positive_floats()),
     ]),
 
     # ArgSpec(args=['arr', 'weights', 'minlength',
@@ -193,15 +204,15 @@ NUMPY_TEST_CASES = [
 
     # ArgSpec(args=['diagonal', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
-    TestCase('linalg.diag', [n_same_shape(n=1, max_dims=1)]),
+    TestCase('linalg.diag', [single_array(max_dims=1)]),
 
     # ArgSpec(args=['features', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
-    TestCase('math.softsign', [n_same_shape(n=1)]),
+    TestCase('math.softsign', [single_array()]),
 
     # ArgSpec(args=['input', 'axis', 'keepdims', 'dtype', 'name'], varargs=None,
     #         keywords=None, defaults=(None, None, tf.int64, None))
-    TestCase('math.count_nonzero', [n_same_shape(n=1)]),
+    TestCase('math.count_nonzero', [single_array()]),
 
     # ArgSpec(args=['input', 'axis', 'output_type', 'name'], varargs=None,
     #         keywords=None, defaults=(None, tf.int64, None))
@@ -216,21 +227,15 @@ NUMPY_TEST_CASES = [
 
     # ArgSpec(args=['input', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
-    TestCase('math.angle', [
-        n_same_shape(
-            n=1,
-            dtype=np.complex,
-            elements=hps.complex_numbers(min_magnitude=1e-06))
-    ]),
-    TestCase(
-        'math.imag',
-        [n_same_shape(n=1, dtype=np.complex, elements=hps.complex_numbers())]),
-    TestCase(
-        'math.real',
-        [n_same_shape(n=1, dtype=np.complex, elements=hps.complex_numbers())]),
+    TestCase('math.angle',
+             [single_array(dtype=np.complex, elements=complex_numbers())]),
+    TestCase('math.imag',
+             [single_array(dtype=np.complex, elements=complex_numbers())]),
+    TestCase('math.real',
+             [single_array(dtype=np.complex, elements=complex_numbers())]),
     TestCase('linalg.cholesky', [psd_matrix()]),
     TestCase('linalg.diag_part', []),
-    TestCase('identity', [n_same_shape(n=1)]),
+    TestCase('identity', [single_array()]),
 
     # ArgSpec(args=['input', 'num_lower', 'num_upper', 'name'], varargs=None,
     #         keywords=None, defaults=(None,))
@@ -242,12 +247,12 @@ NUMPY_TEST_CASES = [
 
     # ArgSpec(args=['input_tensor', 'axis', 'keepdims', 'name'], varargs=None,
     #         keywords=None, defaults=(None, False, None))
-    TestCase('math.reduce_all',
-             [array_and_axis(
-                 single_array(dtype=np.bool, elements=hps.booleans()))]),
-    TestCase('math.reduce_any',
-             [array_and_axis(
-                 single_array(dtype=np.bool, elements=hps.booleans()))]),
+    TestCase(
+        'math.reduce_all',
+        [array_and_axis(single_array(dtype=np.bool, elements=hps.booleans()))]),
+    TestCase(
+        'math.reduce_any',
+        [array_and_axis(single_array(dtype=np.bool, elements=hps.booleans()))]),
     TestCase('math.reduce_logsumexp', [array_and_axis(single_array())]),
     TestCase('math.reduce_max', [array_and_axis(single_array())]),
     TestCase('math.reduce_mean', [array_and_axis(single_array())]),
@@ -259,7 +264,7 @@ NUMPY_TEST_CASES = [
 
     # ArgSpec(args=['inputs', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
-    TestCase('math.add_n', [nested((n_same_shape(n=5),))]),
+    TestCase('math.add_n', [hps.tuples(n_same_shape(n=5))]),
 
     # ArgSpec(args=['inputs', 'shape', 'tensor_dtype', 'name'], varargs=None,
     #         keywords=None, defaults=(None, None, None))
@@ -268,8 +273,7 @@ NUMPY_TEST_CASES = [
     # ArgSpec(args=['logits', 'axis', 'name'], varargs=None, keywords=None,
     #         defaults=(None, None))
     TestCase('math.log_softmax', [
-        n_same_shape(
-            n=1,
+        single_array(
             elements=floats(
                 min_value=-1e6,
                 max_value=1e6,
@@ -277,8 +281,7 @@ NUMPY_TEST_CASES = [
                 allow_infinity=False))
     ]),
     TestCase('math.softmax', [
-        n_same_shape(
-            n=1,
+        single_array(
             elements=floats(
                 min_value=-1e6,
                 max_value=1e6,
@@ -297,109 +300,66 @@ NUMPY_TEST_CASES = [
 
     # ArgSpec(args=['value', 'dtype', 'dtype_hint', 'name'], varargs=None,
     #         keywords=None, defaults=(None, None, None))
-    TestCase('convert_to_tensor', [n_same_shape(n=1)]),
+    TestCase('convert_to_tensor', [single_array()]),
 
     # ArgSpec(args=['x', 'axis', 'exclusive', 'reverse', 'name'], varargs=None,
     #         keywords=None, defaults=(0, False, False, None))
-    TestCase('math.cumprod', [n_same_shape(n=1)]),
-    TestCase('math.cumsum', [n_same_shape(n=1)]),
+    TestCase('math.cumprod', [single_array()]),
+    TestCase('math.cumsum', [single_array()]),
 
     # ArgSpec(args=['x', 'name'], varargs=None, keywords=None, defaults=(None,))
-    TestCase('math.abs', [n_same_shape(n=1)]),
-    TestCase('math.acos', [n_same_shape(n=1)]),
-    TestCase('math.acosh', [n_same_shape(n=1)]),
-    TestCase('math.asin', [n_same_shape(n=1)]),
-    TestCase('math.asinh', [n_same_shape(n=1)]),
-    TestCase('math.atan', [n_same_shape(n=1)]),
-    TestCase('math.atanh', [n_same_shape(n=1)]),
-    TestCase('math.bessel_i0', [n_same_shape(n=1)]),
-    TestCase('math.bessel_i0e', [n_same_shape(n=1)]),
-    TestCase('math.bessel_i1', [n_same_shape(n=1)]),
-    TestCase('math.bessel_i1e', [n_same_shape(n=1)]),
-    TestCase('math.ceil', [n_same_shape(n=1)]),
+    TestCase('math.abs', [single_array()]),
+    TestCase('math.acos', [single_array(elements=floats(-1., 1.))]),
+    TestCase('math.acosh', [single_array(elements=positive_floats())]),
+    TestCase('math.asin', [single_array(elements=floats(-1., 1.))]),
+    TestCase('math.asinh', [single_array(elements=positive_floats())]),
+    TestCase('math.atan', [single_array()]),
+    TestCase('math.atanh', [single_array(elements=floats(-1., 1.))]),
+    TestCase('math.bessel_i0', [single_array(elements=floats(-50., 50.))]),
+    TestCase('math.bessel_i0e', [single_array(elements=floats(-50., 50.))]),
+    TestCase('math.bessel_i1', [single_array(elements=floats(-50., 50.))]),
+    TestCase('math.bessel_i1e', [single_array(elements=floats(-50., 50.))]),
+    TestCase('math.ceil', [single_array()]),
+    TestCase('math.conj',
+             [single_array(dtype=np.complex, elements=complex_numbers())]),
+    TestCase('math.cos', [single_array()]),
+    TestCase('math.cosh', [single_array(elements=floats(-100., 100.))]),
     TestCase(
-        'math.conj',
-        [n_same_shape(n=1, dtype=np.complex, elements=hps.complex_numbers())]),
-    TestCase('math.cos', [n_same_shape(n=1)]),
-    TestCase('math.cosh', [n_same_shape(n=1)]),
-    TestCase('math.digamma', [
-        n_same_shape(
-            n=1,
-            elements=floats(
-                min_value=1e-3,
-                max_value=1e8,
-                allow_nan=ALLOW_NAN,
-                allow_infinity=ALLOW_INFINITY)),
-        n_same_shape(
-            n=1,
-            elements=floats(
-                min_value=-1e8,
-                max_value=-1e-3,
-                allow_nan=ALLOW_NAN,
-                allow_infinity=ALLOW_INFINITY))
-    ]),
-    TestCase('math.erf', [n_same_shape(n=1)]),
-    TestCase('math.erfc', [n_same_shape(n=1)]),
-    TestCase('math.exp', [n_same_shape(n=1)]),
-    TestCase('math.expm1', [n_same_shape(n=1)]),
-    TestCase('math.floor', [n_same_shape(n=1)]),
-    TestCase('math.is_finite', [n_same_shape(n=1)]),
-    TestCase('math.is_inf', [n_same_shape(n=1)]),
-    TestCase('math.is_nan', [n_same_shape(n=1)]),
-    TestCase('math.lgamma', [
-        n_same_shape(
-            n=1,
-            elements=floats(
-                min_value=1e-08,
-                max_value=1e+32,
-                allow_nan=False,
-                allow_infinity=False))
-    ]),
-    TestCase('math.log', [
-        n_same_shape(
-            n=1,
-            elements=floats(
-                min_value=1e-08,
-                max_value=1e+32,
-                allow_nan=False,
-                allow_infinity=False))
-    ]),
-    TestCase('math.log1p', [
-        n_same_shape(
-            n=1,
-            elements=floats(
-                min_value=-0.99999999,
-                max_value=1e+32,
-                allow_nan=False,
-                allow_infinity=False))
-    ]),
-    TestCase('math.log_sigmoid', [
-        n_same_shape(
-            n=1,
-            elements=floats(
-                min_value=-100.0, allow_nan=False, allow_infinity=False))
-    ]),
+        'math.digamma',
+        [single_array(elements=non_zero_floats(min_value=-1e4, max_value=1e4))
+        ]),
+    TestCase('math.erf', [single_array()]),
+    TestCase('math.erfc', [single_array()]),
+    TestCase('math.exp', [single_array(
+        elements=floats(min_value=-1e3, max_value=1e3))]),
+    TestCase('math.expm1', [single_array(
+        elements=floats(min_value=-1e3, max_value=1e3))]),
+    TestCase('math.floor', [single_array()]),
+    TestCase('math.is_finite', [single_array()]),
+    TestCase('math.is_inf', [single_array()]),
+    TestCase('math.is_nan', [single_array()]),
+    TestCase('math.lgamma', [single_array(elements=positive_floats())]),
+    TestCase('math.log', [single_array(elements=positive_floats())]),
+    TestCase('math.log1p',
+             [single_array(elements=positive_floats().map(lambda x: x - 1.))]),
+    TestCase('math.log_sigmoid',
+             [single_array(elements=floats(min_value=-100.))]),
     TestCase('math.logical_not',
-             [n_same_shape(n=1, dtype=np.bool, elements=hps.booleans())]),
-    TestCase('math.negative', [n_same_shape(n=1)]),
-    TestCase('math.reciprocal', [n_same_shape(n=1)]),
-    TestCase('math.rint', [n_same_shape(n=1)]),
-    TestCase('math.round', [n_same_shape(n=1)]),
-    TestCase('math.rsqrt', [
-        n_same_shape(
-            n=1,
-            elements=floats(
-                min_value=1e-06, allow_nan=False, allow_infinity=False))
-    ]),
-    TestCase('math.sigmoid', [n_same_shape(n=1)]),
-    TestCase('math.sign', [n_same_shape(n=1)]),
-    TestCase('math.sin', [n_same_shape(n=1)]),
-    TestCase('math.sinh', [n_same_shape(n=1)]),
-    TestCase('math.softplus', [n_same_shape(n=1)]),
-    TestCase('math.sqrt', [n_same_shape(n=1)]),
-    TestCase('math.square', [n_same_shape(n=1)]),
-    TestCase('math.tan', [n_same_shape(n=1)]),
-    TestCase('math.tanh', [n_same_shape(n=1)]),
+             [single_array(dtype=np.bool, elements=hps.booleans())]),
+    TestCase('math.negative', [single_array()]),
+    TestCase('math.reciprocal', [single_array()]),
+    TestCase('math.rint', [single_array()]),
+    TestCase('math.round', [single_array()]),
+    TestCase('math.rsqrt', [single_array(elements=positive_floats())]),
+    TestCase('math.sigmoid', [single_array()]),
+    TestCase('math.sign', [single_array()]),
+    TestCase('math.sin', [single_array()]),
+    TestCase('math.sinh', [single_array(elements=floats(-100., 100.))]),
+    TestCase('math.softplus', [single_array()]),
+    TestCase('math.sqrt', [single_array(elements=positive_floats())]),
+    TestCase('math.square', [single_array()]),
+    TestCase('math.tan', [single_array()]),
+    TestCase('math.tanh', [single_array()]),
 
     # ArgSpec(args=['x', 'q', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
@@ -409,15 +369,12 @@ NUMPY_TEST_CASES = [
     #         defaults=(None,))
     TestCase('math.add', [n_same_shape(n=2)]),
     TestCase('math.atan2', [n_same_shape(n=2)]),
-    TestCase('math.divide', [n_same_shape(n=2)]),
+    TestCase('math.divide',
+             [n_same_shape(n=2, elements=[floats(), non_zero_floats()])]),
     TestCase('math.divide_no_nan', [n_same_shape(n=2)]),
     TestCase('math.equal', [n_same_shape(n=2)]),
-    TestCase('math.floordiv', [
-        n_same_shape(
-            n=2,
-            elements=floats(
-                min_value=1e-06, allow_nan=False, allow_infinity=False))
-    ]),
+    TestCase('math.floordiv',
+             [n_same_shape(n=2, elements=[floats(), non_zero_floats()])]),
     TestCase('math.greater', [n_same_shape(n=2)]),
     TestCase('math.greater_equal', [n_same_shape(n=2)]),
     TestCase('math.less', [n_same_shape(n=2)]),
@@ -433,12 +390,17 @@ NUMPY_TEST_CASES = [
     TestCase('math.multiply', [n_same_shape(n=2)]),
     TestCase('math.multiply_no_nan', [n_same_shape(n=2)]),
     TestCase('math.not_equal', [n_same_shape(n=2)]),
-    TestCase('math.pow', [n_same_shape(n=2)]),
+    TestCase('math.pow',
+             [n_same_shape(
+                 n=2, elements=[floats(-1e3, 1e3), floats(-10., 10.)])]),
     TestCase('math.squared_difference', [n_same_shape(n=2)]),
     TestCase('math.subtract', [n_same_shape(n=2)]),
-    TestCase('math.truediv', [n_same_shape(n=2)]),
-    TestCase('math.xdivy', [n_same_shape(n=2)]),
-    TestCase('math.xlogy', [n_same_shape(n=2)]),
+    TestCase('math.truediv',
+             [n_same_shape(n=2, elements=[floats(), non_zero_floats()])]),
+    TestCase('math.xdivy',
+             [n_same_shape(n=2, elements=[floats(), non_zero_floats()])]),
+    TestCase('math.xlogy',
+             [n_same_shape(n=2, elements=[floats(), positive_floats()])]),
 ]
 
 
@@ -475,6 +437,7 @@ class NumpyTest(test_case.TestCase, parameterized.TestCase):
         numpy_value = np_fn(*args)
         self.assertAllCloseAccordingToType(
             tensorflow_value, numpy_value, atol=atol)
+
       check_consistency(tensorflow_function, numpy_function)
 
 
