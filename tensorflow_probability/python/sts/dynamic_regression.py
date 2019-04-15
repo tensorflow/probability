@@ -62,7 +62,7 @@ class DynamicLinearRegressionStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
 
   #### Mathematical Details
 
-  The local level model implements a
+  The dynamic linear regression model implements a
   `tfp.distributions.LinearGaussianStateSpaceModel` with `latent_size =
   num_features` and `observation_size = 1` following the transition model:
 
@@ -81,7 +81,7 @@ class DynamicLinearRegressionStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
 
   #### Examples
 
-  Given `series1`, `series2` as `Tensors` each of shape `[num_timesteps] = [42]`
+  Given `series1`, `series2` as `Tensors` each of shape `[num_timesteps]`
   representing covariate time series, we create a dynamic regression model which
   conditions on these via the following:
 
