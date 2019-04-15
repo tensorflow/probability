@@ -43,6 +43,7 @@ from tensorflow_probability.python.mcmc.slice_sampler_kernel import SliceSampler
 from tensorflow_probability.python.mcmc.transformed_kernel import TransformedTransitionKernel
 
 __all__ = [
+    'CheckpointableStatesAndTrace',
     'HamiltonianMonteCarlo',
     'MetropolisAdjustedLangevinAlgorithm',
     'MetropolisHastings',
