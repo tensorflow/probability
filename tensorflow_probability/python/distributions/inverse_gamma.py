@@ -168,7 +168,7 @@ class InverseGamma(distribution.Distribution):
       ] if validate_args else []):
         self._concentration = tf.identity(concentration, name="concentration")
         self._scale = tf.identity(scale, name="scale")
-      tf.debugging.assert_same_float_dtype([self._concentration, self._scale])
+      dtype_util.assert_same_float_dtype([self._concentration, self._scale])
 
     super(InverseGamma, self).__init__(
         dtype=self._concentration.dtype,
@@ -305,7 +305,7 @@ class InverseGamma(distribution.Distribution):
     return self.scale / (1. + self.concentration)
 
   def _maybe_assert_valid_sample(self, x):
-    tf.debugging.assert_same_float_dtype(tensors=[x], dtype=self.dtype)
+    dtype_util.assert_same_float_dtype(tensors=[x], dtype=self.dtype)
     if not self.validate_args:
       return x
     return distribution_util.with_dependencies([

@@ -179,7 +179,7 @@ class StudentT(distribution.Distribution):
         self._df = tf.identity(df)
         self._loc = tf.identity(loc)
         self._scale = tf.identity(scale)
-        tf.debugging.assert_same_float_dtype((self._df, self._loc, self._scale))
+        dtype_util.assert_same_float_dtype((self._df, self._loc, self._scale))
     super(StudentT, self).__init__(
         dtype=self._scale.dtype,
         reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,

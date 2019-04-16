@@ -18,6 +18,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+# Dependency imports
+import numpy as np
+
 import tensorflow as tf
 
 
@@ -58,9 +61,16 @@ def assert_finite(x, data=None, summarize=None, message=None, name=None):
     ValueError:  If static checks determine `x` has wrong rank.
   """
   with tf.compat.v2.name_scope(name or 'assert_finite'):
-    return tf.compat.v1.assert_equal(
+    x_ = tf.get_static_value(x)
+    if x_ is not None:
+      if ~np.all(np.isfinite(x_)):
+        raise ValueError(message)
+      return x
+    assertion = tf.compat.v1.assert_equal(
         tf.math.is_finite(x), tf.ones_like(x, tf.bool),
         data=data, summarize=summarize, message=message)
+    with tf.control_dependencies([assertion]):
+      return tf.identity(x)
 
 
 def assert_rank_at_most(x, rank, data=None, summarize=None, message=None,

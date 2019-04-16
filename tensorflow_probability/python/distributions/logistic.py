@@ -124,7 +124,7 @@ class Logistic(distribution.Distribution):
           [assert_util.assert_positive(scale)] if validate_args else []):
         self._loc = tf.identity(loc, name="loc")
         self._scale = tf.identity(scale, name="scale")
-        tf.debugging.assert_same_float_dtype([self._loc, self._scale])
+        dtype_util.assert_same_float_dtype([self._loc, self._scale])
     super(Logistic, self).__init__(
         dtype=self._scale.dtype,
         reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,

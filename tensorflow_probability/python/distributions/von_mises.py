@@ -135,7 +135,7 @@ class VonMises(distribution.Distribution):
       ] if validate_args else []):
         self._loc = tf.identity(loc, name="loc")
         self._concentration = tf.identity(concentration, name="concentration")
-        tf.debugging.assert_same_float_dtype([self._loc, self._concentration])
+        dtype_util.assert_same_float_dtype([self._loc, self._concentration])
     super(VonMises, self).__init__(
         dtype=self._concentration.dtype,
         reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,

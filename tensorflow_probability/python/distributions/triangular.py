@@ -153,7 +153,7 @@ class Triangular(distribution.Distribution):
         self._low = tf.identity(low, name="low")
         self._high = tf.identity(high, name="high")
         self._peak = tf.identity(peak, name="peak")
-        tf.debugging.assert_same_float_dtype(
+        dtype_util.assert_same_float_dtype(
             [self._low, self._high, self._peak])
     super(Triangular, self).__init__(
         dtype=self._low.dtype,

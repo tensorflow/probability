@@ -137,7 +137,7 @@ class Gumbel(transformed_distribution.TransformedDistribution):
           [assert_util.assert_positive(scale)] if validate_args else []):
         loc = tf.identity(loc, name="loc")
         scale = tf.identity(scale, name="scale")
-        tf.debugging.assert_same_float_dtype([loc, scale])
+        dtype_util.assert_same_float_dtype([loc, scale])
         self._gumbel_bijector = gumbel_bijector.Gumbel(
             loc=loc, scale=scale, validate_args=validate_args)
 
