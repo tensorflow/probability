@@ -200,7 +200,8 @@ class DynamicLinearRegressionStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
               dtype=dtype,
               name='transition_matrix'),
           transition_noise=tfd.MultivariateNormalDiag(
-              scale_diag=tf.stack([drift_scale] * num_features, axis=-1),
+              scale_diag=(drift_scale[..., tf.newaxis] *
+                          tf.ones([num_features], dtype=dtype)),
               name='transition_noise'),
           observation_matrix=observation_matrix_fn,
           observation_noise=tfd.MultivariateNormalDiag(
