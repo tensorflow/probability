@@ -32,6 +32,7 @@ py_library(
     srcs = ["__init__.py"],
     deps = [
         ":array",
+        ":compat",
         ":control_flow",
         ":dtype",
         ":linalg",
@@ -47,6 +48,17 @@ py_library(
     srcs = ["array.py"],
     deps = [
         # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
+    ],
+)
+
+py_library(
+    name = "compat",
+    srcs = ["compat.py"],
+    deps = [
+        ":v1",
+        ":v2",
         # tensorflow dep,
         "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
     ],
@@ -133,5 +145,21 @@ py_test(
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "v1",
+    srcs = ["v1.py"],
+    deps = [
+        ":ops",
+    ],
+)
+
+py_library(
+    name = "v2",
+    srcs = ["v2.py"],
+    deps = [
+        ":ops",
     ],
 )
