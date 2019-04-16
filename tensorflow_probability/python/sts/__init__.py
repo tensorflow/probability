@@ -22,6 +22,8 @@ from tensorflow_probability.python.sts.autoregressive import Autoregressive
 from tensorflow_probability.python.sts.autoregressive import AutoregressiveStateSpaceModel
 from tensorflow_probability.python.sts.decomposition import decompose_by_component
 from tensorflow_probability.python.sts.decomposition import decompose_forecast_by_component
+from tensorflow_probability.python.sts.dynamic_regression import DynamicLinearRegression
+from tensorflow_probability.python.sts.dynamic_regression import DynamicLinearRegressionStateSpaceModel
 from tensorflow_probability.python.sts.fitting import build_factored_variational_loss
 from tensorflow_probability.python.sts.fitting import fit_with_hmc
 from tensorflow_probability.python.sts.fitting import sample_uniform_initial_state
@@ -34,8 +36,6 @@ from tensorflow_probability.python.sts.local_linear_trend import LocalLinearTren
 from tensorflow_probability.python.sts.local_linear_trend import LocalLinearTrendStateSpaceModel
 from tensorflow_probability.python.sts.regression import LinearRegression
 from tensorflow_probability.python.sts.regression import SparseLinearRegression
-from tensorflow_probability.python.sts.dynamic_regression import DynamicLinearRegression
-from tensorflow_probability.python.sts.dynamic_regression import DynamicLinearRegressionStateSpaceModel
 from tensorflow_probability.python.sts.seasonal import ConstrainedSeasonalStateSpaceModel
 from tensorflow_probability.python.sts.seasonal import Seasonal
 from tensorflow_probability.python.sts.seasonal import SeasonalStateSpaceModel
@@ -52,9 +52,9 @@ _allowed_symbols = [
     'Autoregressive',
     'AutoregressiveStateSpaceModel',
     'ConstrainedSeasonalStateSpaceModel',
-    'LinearRegression',
     'DynamicLinearRegression',
     'DynamicLinearRegressionStateSpaceModel',
+    'LinearRegression',
     'LocalLevel',
     'LocalLevelStateSpaceModel',
     'LocalLinearTrend',

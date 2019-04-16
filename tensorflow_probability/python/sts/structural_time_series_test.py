@@ -24,13 +24,13 @@ import tensorflow_probability as tfp
 
 
 from tensorflow_probability.python.sts import Autoregressive
+from tensorflow_probability.python.sts import DynamicLinearRegression
 from tensorflow_probability.python.sts import LinearRegression
 from tensorflow_probability.python.sts import LocalLevel
 from tensorflow_probability.python.sts import LocalLinearTrend
 from tensorflow_probability.python.sts import Seasonal
 from tensorflow_probability.python.sts import SemiLocalLinearTrend
 from tensorflow_probability.python.sts import SparseLinearRegression
-from tensorflow_probability.python.sts import DynamicLinearRegression
 from tensorflow_probability.python.sts import Sum
 from tensorflow_probability.python.sts.internal import util as sts_util
 

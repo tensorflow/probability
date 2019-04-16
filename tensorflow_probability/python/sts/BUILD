@@ -34,12 +34,12 @@ py_library(
     deps = [
         ":autoregressive",
         ":decomposition",
+        ":dynamic_regression",
         ":fitting",
         ":forecast",
         ":local_level",
         ":local_linear_trend",
         ":regression",
-        ":dynamic_regression",
         ":seasonal",
         ":semilocal_linear_trend",
         ":structural_time_series",
@@ -86,6 +86,28 @@ py_test(
     srcs = ["decomposition_test.py"],
     deps = [
         # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "dynamic_regression",
+    srcs = ["dynamic_regression.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/sts/internal",
+    ],
+)
+
+py_test(
+    name = "dynamic_regression_test",
+    size = "medium",
+    srcs = ["dynamic_regression_test.py"],
+    deps = [
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
@@ -198,28 +220,6 @@ py_test(
     name = "regression_test",
     size = "medium",
     srcs = ["regression_test.py"],
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-    ],
-)
-
-py_library(
-    name = "dynamic_regression",
-    srcs = ["dynamic_regression.py"],
-    srcs_version = "PY2AND3",
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability/python/sts/internal",
-    ],
-)
-
-py_test(
-    name = "dynamic_regression_test",
-    size = "medium",
-    srcs = ["dynamic_regression_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
