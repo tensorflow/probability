@@ -157,6 +157,25 @@ def _bincount(arr, weights=None, minlength=None, maxlength=None,  # pylint: disa
   return np.bincount(arr, weights, minlength).astype(utils.numpy_dtype(dtype))
 
 
+def _max_mask_non_finite(x, axis=-1, keepdims=False, mask=0):
+  """Returns `max` or `mask` if `max` is not finite."""
+  m = np.max(x, axis=axis, keepdims=keepdims)
+  needs_masking = ~np.isfinite(m)
+  if needs_masking.ndim > 0:
+    m[needs_masking] = mask
+  elif needs_masking:
+    m = mask
+  return m
+
+
+def _softmax(logits, axis=None, name=None):  # pylint: disable=unused-argument
+  axis = -1 if axis is None else axis
+  y = logits - _max_mask_non_finite(logits, axis=axis, keepdims=True)
+  np.exp(y, out=y)
+  y /= np.sum(y, axis=axis, keepdims=True)
+  return y
+
+
 def _reduce_logsumexp(input_tensor, axis=None, keepdims=False, name=None):  # pylint: disable=unused-argument
   """Computes `log(sum(exp(input_tensor))) along the specified axis."""
   try:
@@ -164,13 +183,11 @@ def _reduce_logsumexp(input_tensor, axis=None, keepdims=False, name=None):  # py
   except NotImplementedError:
     # We offer a non SP version just in case SP isn't installed and this
     # because logsumexp is often used.
-    m = np.max(input_tensor, axis=axis, keepdims=True)
-    needs_zeroing = ~np.isfinite(m)
-    if needs_zeroing.ndim > 0:
-      m[needs_zeroing] = 0
-    elif needs_zeroing:
-      m = 0
-    return m + np.log(np.sum(input_tensor - m, axis=axis, keepdims=keepdims))
+    m = _max_mask_non_finite(input_tensor, axis=axis, keepdims=True)
+    y = input_tensor - m
+    y = np.exp(y, out=y)
+    return m + np.log(np.sum(y, axis=axis, keepdims=keepdims))
+
 
 # --- Begin Public Functions --------------------------------------------------
 
@@ -405,7 +422,7 @@ less_equal = utils.copy_docstring(
 
 lgamma = utils.copy_docstring(
     tf.math.lgamma,
-    lambda x, name=None: scipy_special.loggamma(x))
+    lambda x, name=None: real(scipy_special.loggamma(x)))
 
 log = utils.copy_docstring(
     tf.math.log,
@@ -600,9 +617,7 @@ sinh = utils.copy_docstring(
 
 softmax = utils.copy_docstring(
     tf.math.softmax,
-    lambda logits, axis=None, name=None: np.exp(np.subtract(  # pylint: disable=g-long-lambda
-        logits,
-        reduce_logsumexp(logits, -1 if axis is None else axis, keepdims=True))))
+    _softmax)
 
 softplus = utils.copy_docstring(
     tf.math.softplus,

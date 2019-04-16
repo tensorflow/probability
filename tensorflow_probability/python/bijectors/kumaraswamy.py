@@ -65,7 +65,7 @@ class Kumaraswamy(bijector.Bijector):
     self._name = name
     self._validate_args = validate_args
 
-    with self._name_scope("init", values=[concentration1, concentration0]):
+    with self._name_scope("init"):
       concentration1 = self._maybe_assert_valid_concentration(
           tf.convert_to_tensor(value=concentration1, name="concentration1"),
           validate_args=validate_args)

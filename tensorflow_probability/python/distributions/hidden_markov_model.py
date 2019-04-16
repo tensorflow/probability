@@ -17,14 +17,14 @@
 from __future__ import absolute_import
 from __future__ import division
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
-
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensorshape_util
 
 
@@ -158,7 +158,7 @@ class HiddenMarkovModel(distribution.Distribution):
     parameters = dict(locals())
 
     # pylint: disable=protected-access
-    with tf.compat.v2.name_scope(name) as name:
+    with tf.name_scope(name) as name:
       self._runtime_assertions = []  # pylint: enable=protected-access
 
       if num_steps < 1:
@@ -270,8 +270,7 @@ class HiddenMarkovModel(distribution.Distribution):
       # pylint: disable=protected-access
       super(HiddenMarkovModel, self).__init__(
           dtype=self._observation_distribution.dtype,
-          reparameterization_type=tf.compat.v1.distributions
-          .NOT_REPARAMETERIZED,
+          reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
           parameters=parameters,
@@ -664,7 +663,7 @@ class HiddenMarkovModel(distribution.Distribution):
       have size `num_steps`.
     """
 
-    with tf.compat.v2.name_scope(name or "posterior_marginals"):
+    with tf.name_scope(name or "posterior_marginals"):
       with tf.control_dependencies(self._runtime_assertions):
         observation_tensor_shape = tf.shape(input=observations)
 
@@ -820,7 +819,7 @@ class HiddenMarkovModel(distribution.Distribution):
     ```
     """
 
-    with tf.compat.v2.name_scope(name or "posterior_mode"):
+    with tf.name_scope(name or "posterior_mode"):
       with tf.control_dependencies(self._runtime_assertions):
         observation_tensor_shape = tf.shape(input=observations)
 

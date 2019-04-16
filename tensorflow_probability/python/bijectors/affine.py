@@ -185,9 +185,7 @@ class Affine(bijector.Bijector):
                                          scale_diag is None and
                                          scale_perturb_factor is None)
 
-    with self._name_scope("init", values=[
-        shift, scale_identity_multiplier, scale_diag, scale_tril,
-        scale_perturb_diag, scale_perturb_factor]):
+    with self._name_scope("init"):
 
       if dtype is None:
         dtype = dtype_util.common_dtype([

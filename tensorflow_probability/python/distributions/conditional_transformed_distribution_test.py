@@ -35,7 +35,7 @@ class _ChooseLocation(tfp.bijectors.ConditionalBijector):
   def __init__(self, loc, name="ChooseLocation"):
     self._graph_parents = []
     self._name = name
-    with self._name_scope("init", values=[loc]):
+    with self._name_scope("init"):
       self._loc = tf.convert_to_tensor(value=loc, name="loc")
       super(_ChooseLocation, self).__init__(
           graph_parents=[self._loc],

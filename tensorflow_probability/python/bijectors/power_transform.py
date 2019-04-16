@@ -59,7 +59,7 @@ class PowerTransform(bijector.Bijector):
     self._graph_parents = []
     self._name = name
     self._validate_args = validate_args
-    with self._name_scope("init", values=[power]):
+    with self._name_scope("init"):
       power = tf.get_static_value(
           tf.convert_to_tensor(value=power, name="power"))
     if power is None or power < 0:

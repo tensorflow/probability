@@ -93,7 +93,7 @@ class AffineLinearOperator(bijector.Bijector):
     self._name = name
     self._validate_args = validate_args
     graph_parents = []
-    with self._name_scope("init", values=[shift]):
+    with self._name_scope("init"):
       # In the absence of `loc` and `scale`, we'll assume `dtype` is `float32`.
       dtype = tf.float32
 

@@ -100,7 +100,7 @@ class Blockwise(bijector_base.Bijector):
 
     self._bijectors = bijectors
 
-    with self._name_scope('init', values=[block_sizes]):
+    with self._name_scope('init'):
       if block_sizes is None:
         block_sizes = tf.ones(len(bijectors), dtype=tf.int32)
       self._block_sizes = tf.convert_to_tensor(
