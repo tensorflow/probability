@@ -57,8 +57,8 @@ class _DynamicLinearRegressionStateSpaceModelTest(object):
     predicted_time_series = linear_operator_util.matmul_with_broadcast(
         design_matrix, initial_state_loc[..., tf.newaxis])
 
-    self.assertAllEqual(self.evaluate(ssm.mean()), predicted_time_series)
-    self.assertAllEqual(*self.evaluate((ssm.stddev(),
+    self.assertAllClose(self.evaluate(ssm.mean()), predicted_time_series)
+    self.assertAllClose(*self.evaluate((ssm.stddev(),
                                         tf.zeros_like(predicted_time_series))))
 
   def test_initial_state_broadcasts_over_batch(self):
