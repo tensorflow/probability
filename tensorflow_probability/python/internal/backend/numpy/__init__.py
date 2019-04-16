@@ -21,6 +21,7 @@ from __future__ import print_function
 from tensorflow_probability.python.internal.backend.numpy import compat
 from tensorflow_probability.python.internal.backend.numpy import linalg
 from tensorflow_probability.python.internal.backend.numpy import math
+from tensorflow_probability.python.internal.backend.numpy import random_generators as random
 from tensorflow_probability.python.internal.backend.numpy import test
 from tensorflow_probability.python.internal.backend.numpy.array import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.control_flow import *  # pylint: disable=wildcard-import

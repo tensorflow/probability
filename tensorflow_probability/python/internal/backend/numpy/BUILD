@@ -39,6 +39,7 @@ py_library(
         ":math",
         ":misc",
         ":ops",
+        ":random_generators",
         ":test",
     ],
 )
@@ -126,6 +127,16 @@ py_library(
 )
 
 py_library(
+    name = "random_generators",
+    srcs = ["random_generators.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
+    ],
+)
+
+py_library(
     name = "test",
     srcs = ["test.py"],
     deps = [
@@ -153,6 +164,7 @@ py_library(
     srcs = ["v1.py"],
     deps = [
         ":ops",
+        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
     ],
 )
 
