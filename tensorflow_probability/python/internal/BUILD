@@ -39,7 +39,6 @@ py_library(
     srcs = ["assert_util.py"],
     srcs_version = "PY2AND3",
     deps = [
-        ":dtype_util",
         # numpy dep,
         # tensorflow dep,
     ],
@@ -149,7 +148,7 @@ py_test(
         ":special_math",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/math:gradient",
     ],
 )
 

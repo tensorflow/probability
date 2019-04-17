@@ -78,6 +78,7 @@ __all__ = [
     "BatchNormalization",
     "Bijector",
     "Blockwise",
+    # "CategoricalToDiscrete",  # Omitted pending further discussion.
     "Chain",
     "CholeskyOuterProduct",
     "CholeskyToInvCholesky",
