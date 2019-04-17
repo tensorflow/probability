@@ -72,7 +72,7 @@ def _copy_docstring(original_fn, new_fn):
 
 
 def _numpy_dtype(dtype):
-  return dtype.as_numpy_dtype if dtype else None
+  return dtype.as_numpy_dtype if hasattr(dtype, 'as_numpy_dtype') else dtype
 
 
 def _get_static_predicate(pred):

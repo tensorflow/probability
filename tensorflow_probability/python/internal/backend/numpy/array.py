@@ -102,7 +102,7 @@ def _zeros_like(input, dtype=None, name=None):  # pylint: disable=redefined-buil
 
 concat = utils.copy_docstring(
     tf.concat,
-    lambda values, axis, name=None: np.concatenate(values, axis))
+    lambda values, axis, name='concat': np.concatenate(values, axis))
 
 eye = utils.copy_docstring(
     tf.eye,
@@ -182,7 +182,7 @@ transpose = utils.copy_docstring(
 
 where = utils.copy_docstring(
     tf.where,
-    lambda condition, x, y, name=None: np.where(condition, x, y))
+    lambda condition, x=None, y=None, name=None: np.where(condition, x, y))
 
 zeros = utils.copy_docstring(
     tf.zeros,

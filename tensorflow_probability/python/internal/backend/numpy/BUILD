@@ -35,12 +35,15 @@ py_library(
         ":compat",
         ":control_flow",
         ":dtype",
+        ":keras",
         ":linalg",
         ":math",
         ":misc",
+        ":nn",
         ":ops",
         ":random_generators",
         ":test",
+        # tensorflow dep,
     ],
 )
 
@@ -85,6 +88,24 @@ py_library(
 )
 
 py_library(
+    name = "keras",
+    srcs = ["keras.py"],
+    deps = [
+        ":keras_layers",
+        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
+    ],
+)
+
+py_library(
+    name = "keras_layers",
+    srcs = ["keras_layers.py"],
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
+    ],
+)
+
+py_library(
     name = "linalg",
     srcs = ["linalg.py"],
     deps = [
@@ -109,6 +130,16 @@ py_library(
 py_library(
     name = "misc",
     srcs = ["misc.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
+    ],
+)
+
+py_library(
+    name = "nn",
+    srcs = ["nn.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,

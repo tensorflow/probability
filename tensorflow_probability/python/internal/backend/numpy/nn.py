@@ -27,38 +27,13 @@ from tensorflow_probability.python.internal.backend.numpy.internal import utils
 
 
 __all__ = [
-    'normal',
-    # 'all_candidate_sampler',
-    # 'categorical',
-    # 'experimental',
-    # 'fixed_unigram_candidate_sampler',
-    # 'gamma',
-    # 'learned_unigram_candidate_sampler',
-    # 'log_uniform_candidate_sampler',
-    # 'normal',
-    # 'poisson',
-    # 'set_seed',
-    # 'shuffle',
-    # 'stateless_categorical',
-    # 'stateless_normal',
-    # 'stateless_truncated_normal',
-    # 'stateless_uniform',
-    # 'truncated_normal',
-    # 'uniform',
-    # 'uniform_candidate_sampler',
+    'relu',
 ]
-
-
-def _normal(shape, mean=0.0, stddev=1.0, dtype=tf.float32, seed=None,
-            name=None):  # pylint: disable=unused-argument
-  rng = np.random if seed is None else np.random.RandomState(seed)
-  dtype = utils.common_dtype([mean, stddev], preferred_dtype=np.float32)
-  return rng.normal(loc=mean, scale=stddev, size=shape).astype(dtype)
 
 
 # --- Begin Public Functions --------------------------------------------------
 
 
-normal = utils.copy_docstring(
-    tf.random.normal,
-    _normal)
+relu = utils.copy_docstring(
+    tf.nn.relu,
+    lambda features, name=None: np.max(features, 0))
