@@ -23,6 +23,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 
 
 __all__ = [
@@ -71,7 +72,7 @@ class Weibull(bijector.Bijector):
       self._scale = tf.convert_to_tensor(value=scale, name="scale")
       self._concentration = tf.convert_to_tensor(
           value=concentration, name="concentration")
-      tf.debugging.assert_same_float_dtype([self._scale, self._concentration])
+      dtype_util.assert_same_float_dtype([self._scale, self._concentration])
       if validate_args:
         self._scale = distribution_util.with_dependencies([
             assert_util.assert_positive(

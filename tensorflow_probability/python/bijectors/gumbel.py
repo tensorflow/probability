@@ -23,6 +23,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 
 __all__ = [
     "Gumbel",
@@ -68,7 +69,7 @@ class Gumbel(bijector.Bijector):
     with self._name_scope("init"):
       self._loc = tf.convert_to_tensor(value=loc, name="loc")
       self._scale = tf.convert_to_tensor(value=scale, name="scale")
-      tf.debugging.assert_same_float_dtype([self._loc, self._scale])
+      dtype_util.assert_same_float_dtype([self._loc, self._scale])
       if validate_args:
         self._scale = distribution_util.with_dependencies([
             assert_util.assert_positive(

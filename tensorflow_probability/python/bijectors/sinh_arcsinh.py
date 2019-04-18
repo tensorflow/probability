@@ -115,7 +115,7 @@ class SinhArcsinh(bijector.Bijector):
       self._skewness = tf.convert_to_tensor(value=skewness, name="skewness")
       self._tailweight = tf.convert_to_tensor(
           value=tailweight, name="tailweight", dtype=self._skewness.dtype)
-      tf.debugging.assert_same_float_dtype([self._skewness, self._tailweight])
+      dtype_util.assert_same_float_dtype([self._skewness, self._tailweight])
       if validate_args:
         self._tailweight = distribution_util.with_dependencies([
             assert_util.assert_positive(
