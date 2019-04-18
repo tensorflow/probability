@@ -141,7 +141,7 @@ class Empirical(distribution.Distribution):
       ValueError: if the rank of `samples` < event_ndims + 1.
     """
 
-    parameters = locals()
+    parameters = dict(locals())
     with tf.name_scope(name):
       self._samples = tf.convert_to_tensor(value=samples, name='samples')
       self._event_ndims = event_ndims

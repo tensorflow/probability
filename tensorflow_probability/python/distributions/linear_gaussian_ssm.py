@@ -330,7 +330,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
       name: The name to give Ops created by the initializer.
     """
 
-    parameters = locals()
+    parameters = dict(locals())
 
     with tf.name_scope(name) as name:
 
