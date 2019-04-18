@@ -148,7 +148,7 @@ class GaussianProcess(mvn_linear_operator.MultivariateNormalLinearOperator):
       kernel=kernel,
       index_points=index_points,
       observation_noise_variance=.05)
-  noisy_samples = noise_gp.sample(10)
+  noisy_samples = noisy_gp.sample(10)
   # ==> 10 independently drawn, noisy joint samples at `index_points`
   ```
 
@@ -166,8 +166,8 @@ class GaussianProcess(mvn_linear_operator.MultivariateNormalLinearOperator):
 
   # Define a kernel with trainable parameters.
   kernel = psd_kernels.ExponentiatedQuadratic(
-      amplitude=tf.get_variable('amplitude', np.float32),
-      length_scale=tf.get_variable('length_scale', np.float32))
+      amplitude=tf.get_variable('amplitude', shape=(), dtype=np.float64),
+      length_scale=tf.get_variable('length_scale', shape=(), dtype=np.float64))
 
   gp = tfd.GaussianProcess(kernel, observed_index_points)
   neg_log_likelihood = -gp.log_prob(observed_values)
