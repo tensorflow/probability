@@ -110,7 +110,7 @@ class NeutraKernelTest(tf.test.TestCase, parameterized.TestCase):
         num_train_steps=1000,
         train_batch_size=64,
         seed=tfp_test_util.test_seed(),
-        unconstraining_bijector=(bijector, tfb.Identity()),
+        unconstraining_bijector=[bijector, tfb.Identity()],
     )
 
     chain_2d, chain_4d = tfp.mcmc.sample_chain(

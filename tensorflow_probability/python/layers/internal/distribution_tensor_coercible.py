@@ -124,7 +124,7 @@ def _value(self, dtype=None, name=None, as_ref=False):  # pylint: disable=g-doc-
             value=self._concrete_value,
             name=name or 'concrete_value',
             dtype=dtype,
-            preferred_dtype=self.dtype)
+            dtype_hint=self.dtype)
   return self._concrete_value
   # pylint: enable=protected-access
 

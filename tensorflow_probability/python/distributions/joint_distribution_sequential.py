@@ -39,8 +39,8 @@ def _make_summary_statistic(attr):
     if any(self._dist_fn_args):  # pylint: disable=protected-access
       raise ValueError(
           'Can only compute ' + attr + ' when all distributions are '
-          'independent; {}'.format(self.distribution_fn))
-    return tuple(getattr(d(), attr)() for d in self._wrapped_dist_fn)  # pylint: disable=protected-access
+          'independent; {}'.format(self.model))
+    return self._unflatten(getattr(d(), attr)() for d in self._dist_fn_wrapped)  # pylint: disable=protected-access
   return _fn
 
 
@@ -136,8 +136,9 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
 
   Regarding #2, in addition to using a function (or `lambda`), supplying a TFD
   "`class`" is also permissible, this also being a "Python `callable`." For
-  example, instead of writing `lambda n, g: tfd.Normal(loc=n, scale=g) ` one
-  could have simply written `tfd.Normal`.
+  example, instead of writing:
+  `lambda loc, scale: tfd.Normal(loc=loc, scale=scale)`
+  one could have simply written `tfd.Normal`.
 
   Notice that directly providing a `tfd.Distribution`-like instance means there
   cannot exist a (dynamic) dependency on other distributions; it is
@@ -161,19 +162,21 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
   unused dependency, e.g.,
   `lambda _ignore, actual_dependency: SomeDistribution(actual_dependency)`.
 
-  **Note**: unlike every other distribution in `tfp.distributions`,
-  `JointDistributionSequential.sample` returns a list of `Tensor`s rather than a
-  `Tensor`.  Accordingly `joint.batch_shape` returns a list of `TensorShape`s
-  for each of the distributions' batch shapes and `joint.batch_shape_tensor()`
-  returns a list of `Tensor`s for each of the distributions' event shapes. (Same
-  with `event_shape` analogues.)
+  **Note**: unlike other non-`JointDistribution` distributions in
+  `tfp.distributions`, `JointDistribution.sample` (and subclasses) return a
+  structure of  `Tensor`s rather than a `Tensor`.  A structure can be a `list`,
+  `tuple`, `dict`, `collections.namedtuple`, etc. Accordingly
+  `joint.batch_shape` returns a structure of `TensorShape`s for each of the
+  distributions' batch shapes and `joint.batch_shape_tensor()` returns a
+  structure of `Tensor`s for each of the distributions' event shapes. (Same with
+  `event_shape` analogues.)
   """
 
-  def __init__(self, distribution_fn, validate_args=False, name=None):
+  def __init__(self, model, validate_args=False, name=None):
     """Construct the `JointDistributionSequential` distribution.
 
     Args:
-      distribution_fn: Python list of either tfd.Distribution instances and/or
+      model: Python list of either tfd.Distribution instances and/or
         lambda functions which take the `k` previous distributions and returns a
         new tfd.Distribution instance.
       validate_args: Python `bool`.  Whether to validate input with asserts.
@@ -184,36 +187,38 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name or 'JointDistributionSequential') as name:
-      self._dist_fn = distribution_fn
-      (self._wrapped_dist_fn, self._dist_fn_args) = zip(*[
-          _unify_call_signature(i, dist_fn)
-          for i, dist_fn in enumerate(distribution_fn)])
+      self._original_model = model
+      self._build(model)
       self._most_recently_built_distributions = [
           None if a else d() for d, a
-          in zip(self._wrapped_dist_fn, self._dist_fn_args)]
+          in zip(self._dist_fn_wrapped, self._dist_fn_args)]
       self._always_use_specified_sample_shape = False
       super(JointDistributionSequential, self).__init__(
-          dtype=tuple(
-              None if d is None else d.dtype
-              for d in self._most_recently_built_distributions),
-          reparameterization_type=tuple(
-              None if d is None else d.reparameterization_type
-              for d in self._most_recently_built_distributions),
+          dtype=None,  # Ignored; we'll override.
+          reparameterization_type=None,  # Ignored; we'll override.
           validate_args=validate_args,
           allow_nan_stats=False,
           parameters=parameters,
           graph_parents=[],
           name=name)
 
+  def _build(self, model):
+    """Creates `dist_fn`, `dist_fn_wrapped`, `dist_fn_args`."""
+    self._dist_fn = model
+    self._dist_fn_wrapped, self._dist_fn_args = zip(*[
+        _unify_call_signature(i, dist_fn)
+        for i, dist_fn in enumerate(model)])
+
   @property
-  def distribution_fn(self):
-    return self._dist_fn
+  def model(self):
+    return self._original_model
 
   @property
   def dtype(self):
     """The `DType` of `Tensor`s handled by this `Distribution`."""
-    return tuple(None if d is None else d.dtype
-                 for d in self._most_recently_built_distributions)
+    return self._unflatten(
+        None if d is None else d.dtype
+        for d in self._most_recently_built_distributions)
 
   @property
   def reparameterization_type(self):
@@ -223,11 +228,12 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
     `tfd.FULLY_REPARAMETERIZED` or `tfd.NOT_REPARAMETERIZED`.
 
     Returns:
-      reparameterization_type: `tuple` of `ReparameterizationType` for each
-        `distribution_fn`.
+      reparameterization_type: `ReparameterizationType` of each distribution in
+        `type(model)`.
     """
-    return tuple(None if d is None else d.reparameterization_type
-                 for d in self._most_recently_built_distributions)
+    return self._unflatten(
+        None if d is None else d.reparameterization_type
+        for d in self._most_recently_built_distributions)
 
   def batch_shape_tensor(self, name='batch_shape_tensor'):
     """Shape of a single sample from a single event index as a 1-D `Tensor`.
@@ -239,15 +245,16 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
       name: name to give to the op
 
     Returns:
-      batch_shape: `tuple` of `Tensor`s representing the `batch_shape` for each
-        of `distribution_fn`.
+      batch_shape: `Tensor` representing batch shape of each distribution in
+        `type(model)`.
     """
     with self._name_scope(name):
       if any(self._dist_fn_args):
-        ds, _ = self.sample_distributions(seed=42)  # Const seed for maybe CSE.
+        # Const seed for maybe CSE.
+        ds = self._flatten(self.sample_distributions(seed=42)[0])
       else:
-        ds = tuple(d() for d in self._wrapped_dist_fn)
-      return tuple(d.batch_shape_tensor() for d in ds)
+        ds = tuple(d() for d in self._dist_fn_wrapped)
+      return self._unflatten(d.batch_shape_tensor() for d in ds)
 
   @property
   def batch_shape(self):
@@ -259,13 +266,14 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
     parameterizations of this distribution.
 
     Returns:
-      batch_shape: `tuple` of `TensorShape`s representing the `batch_shape` for
-        each of `distribution_fn`.
+      batch_shape: `TensorShape` representing batch shape of each distribution
+        in `type(model)`.
     """
     # The following cannot leak graph Tensors in eager because `batch_shape` is
     # a `TensorShape`.
-    return tuple(tf.TensorShape(None) if d is None else d.batch_shape
-                 for d in self._most_recently_built_distributions)
+    return self._unflatten(
+        tf.TensorShape(None) if d is None else d.batch_shape
+        for d in self._most_recently_built_distributions)
 
   def event_shape_tensor(self, name='event_shape_tensor'):
     """Shape of a single sample from a single batch as a 1-D int32 `Tensor`.
@@ -274,15 +282,16 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
       name: name to give to the op
 
     Returns:
-      event_shape: `tuple` of `Tensor`s representing the `event_shape` for each
-        of `distribution_fn`.
+      event_shape: `Tensor` representing event shape of each distribution in
+        `type(model)`.
     """
     with self._name_scope(name):
       if any(self._dist_fn_args):
-        ds, _ = self.sample_distributions(seed=42)  # Const seed for maybe CSE.
+        # Const seed for maybe CSE.
+        ds = self._flatten(self.sample_distributions(seed=42)[0])
       else:
-        ds = tuple(d() for d in self._wrapped_dist_fn)
-      return tuple(d.event_shape_tensor() for d in ds)
+        ds = tuple(d() for d in self._dist_fn_wrapped)
+      return self._unflatten(d.event_shape_tensor() for d in ds)
 
   @property
   def event_shape(self):
@@ -291,26 +300,32 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
     May be partially defined or unknown.
 
     Returns:
-      event_shape: `tuple` of `TensorShape`s representing the `event_shape` for
-        each of `distribution_fn`.
+      event_shape: `TensorShape` representing event shape of each distribution
+        in `type(model)`.
     """
     # The following cannot leak graph Tensors in eager because `batch_shape` is
     # a `TensorShape`.
-    return tuple(tf.TensorShape(None) if d is None else d.event_shape
-                 for d in self._most_recently_built_distributions)
+    return self._unflatten(
+        tf.TensorShape(None) if d is None else d.event_shape
+        for d in self._most_recently_built_distributions)
 
   def _sample_distributions(self, sample_shape=(), seed=None, value=None):
+    ds, xs = self._flat_sample_distributions(sample_shape, seed, value)
+    return self._unflatten(ds), self._unflatten(xs)
+
+  def _flat_sample_distributions(self, sample_shape=(), seed=None, value=None):
+    # This function additionally depends on:
+    #   self._dist_fn_wrapped
+    #   self._dist_fn_args
+    #   self._always_use_specified_sample_shape
+    #   self._most_recently_built_distributions
     seed = seed_stream.SeedStream('JointDistributionSequential', seed)
     ds = []
-    if value is None:
-      xs = [None] * len(self._wrapped_dist_fn)
-    else:
-      xs = list(value)
-      xs.extend([None]*(len(self._wrapped_dist_fn) - len(xs)))
-    if len(xs) != len(self.distribution_fn):
+    xs = list(self._flatten(value))
+    if len(xs) != len(self._dist_fn_wrapped):
       raise ValueError('Number of `xs`s must match number of '
                        'distributions.')
-    for i, (dist_fn, args) in enumerate(zip(self._wrapped_dist_fn,
+    for i, (dist_fn, args) in enumerate(zip(self._dist_fn_wrapped,
                                             self._dist_fn_args)):
       ds.append(dist_fn(*xs[:i]))  # Chain rule of probability.
       if xs[i] is None:
@@ -323,7 +338,11 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
       else:
         xs[i] = tf.convert_to_tensor(value=xs[i], dtype_hint=ds[-1].dtype)
         seed()  # Ensure reproducibility even when xs are (partially) set.
-    self._most_recently_built_distributions = ds
+    if value is None:
+      self._most_recently_built_distributions = ds
+    # Note: we could also resolve distributions up to the first non-`None` in
+    # `self._flatten(value)`, however we omit this feature for simplicity,
+    # speed, and because it has not yet been requested.
     return tuple(ds), tuple(xs)
 
   def _resolve_graph(self, distribution_names=None, leaf_name='x'):
@@ -334,10 +353,10 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
 
     Args:
       distribution_names: `list` of `str` or `None` names corresponding to each
-        of `distribution_fn` elements. (`None`s are expanding into the
+        of `model` elements. (`None`s are expanding into the
         appropriate `str`.)
       leaf_name: `str` used when no maker depends on a particular
-        `distribution_fn` element.
+        `model` element.
 
     Returns:
       graph: `tuple` of `(str tuple)` pairs representing the name of each
@@ -362,6 +381,9 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
     ```
 
     """
+    # This function additionally depends on:
+    #   self._dist_fn_args
+    #   self._dist_fn_wrapped
     # TODO(b/129008220): Robustify this procedure. Eg, handle collisions better,
     # ignore args prefixed with `_`.
     if distribution_names is None or any(self._dist_fn_args):
@@ -370,7 +392,7 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
     if len(set(distribution_names)) != len(distribution_names):
       raise ValueError('Distribution names must be unique: {}'.format(
           distribution_names))
-    if len(distribution_names) != len(self.distribution_fn):
+    if len(distribution_names) != len(self._dist_fn_wrapped):
       raise ValueError('Distribution names must be 1:1 with `rvs`.')
     return tuple(zip(distribution_names,
                      tuple(() if a is None else a for a in self._dist_fn_args)))
@@ -386,12 +408,12 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
       raise ValueError(
           'Can only compute entropy when all distributions are independent.')
     return sum(joint_distribution_lib.maybe_check_wont_broadcast(
-        (d().entropy() for d in self._wrapped_dist_fn),
+        (d().entropy() for d in self._dist_fn_wrapped),
         self.validate_args))
 
   def _cross_entropy(self, other):
     if (not isinstance(other, JointDistributionSequential) or
-        len(self.distribution_fn) != len(other.distribution_fn)):
+        len(self.model) != len(other.model)):
       raise ValueError(
           'Can only compute cross entropy between `JointDistributionSequential`s '
           'with the same number of component distributions.')
@@ -401,7 +423,7 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
           'are independent.')
     return sum(joint_distribution_lib.maybe_check_wont_broadcast(
         (d0().cross_entropy(d1()) for d0, d1
-         in zip(self._wrapped_dist_fn, other._wrapped_dist_fn)),  # pylint: disable=protected-access
+         in zip(self._dist_fn_wrapped, other._dist_fn_wrapped)),  # pylint: disable=protected-access
         self.validate_args))
 
   def __getitem__(self, slices):
@@ -443,7 +465,7 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
       def _fn():
         return d()[slices]
       return _fn
-    for d, args in zip(self.distribution_fn, self._dist_fn_args):
+    for d, args in zip(self._dist_fn, self._dist_fn_args):
       if args is None:
         dfn.append(d[slices])
       elif args:
@@ -453,7 +475,7 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
         # Makers which have no deps need slicing, just like distribution
         # instances.
         dfn.append(_sliced_maker(d))
-    return self.copy(distribution_fn=dfn)
+    return self.copy(model=self._unflatten(dfn))
 
   def is_scalar_event(self, name='is_scalar_event'):
     """Indicates that `event_shape == []`.
@@ -466,12 +488,14 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
     """
     with self._name_scope(name):
       if any(self._dist_fn_args):
-        ds, _ = self.sample_distributions(seed=42)  # Const seed for maybe CSE.
+        # Const seed for maybe CSE.
+        ds = self._flatten(self.sample_distributions(seed=42)[0])
       else:
-        ds = tuple(d() for d in self._wrapped_dist_fn)
+        ds = tuple(d() for d in self._dist_fn_wrapped)
       # As an added optimization we could also check
       # self._most_recently_built_distributions.
-      return tuple(None if d is None else d.is_scalar_event() for d in ds)
+      return self._unflatten(
+          None if d is None else d.is_scalar_event() for d in ds)
 
   def is_scalar_batch(self, name='is_scalar_batch'):
     """Indicates that `batch_shape == []`.
@@ -484,16 +508,27 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
     """
     with self._name_scope(name):
       if any(self._dist_fn_args):
-        ds, _ = self.sample_distributions(seed=42)  # Const seed for maybe CSE.
+        # Const seed for maybe CSE.
+        ds = self._flatten(self.sample_distributions(seed=42)[0])
       else:
-        ds = tuple(d() for d in self._wrapped_dist_fn)
+        ds = tuple(d() for d in self._dist_fn_wrapped)
       # As an added optimization we could also check
       # self._most_recently_built_distributions.
-      return tuple(None if d is None else d.is_scalar_batch() for d in ds)
+      return self._unflatten(
+          None if d is None else d.is_scalar_batch() for d in ds)
+
+  def _unflatten(self, xs):
+    return type(self.model)(xs)
+
+  def _flatten(self, xs):
+    if xs is None:
+      return (None,) * len(self._dist_fn_wrapped)
+    xs = tuple(xs)
+    return xs + (None,)*(len(self._dist_fn_args) - len(xs))
 
 
 def _unify_call_signature(i, dist_fn):
-  """Creates `wrapped_dist_fn` which calls `dist_fn` with all prev nodes.
+  """Creates `dist_fn_wrapped` which calls `dist_fn` with all prev nodes.
 
   Args:
     i: Python `int` corresponding to position in topologically sorted DAG.
@@ -501,7 +536,7 @@ def _unify_call_signature(i, dist_fn):
       distributions (in reverse order) and produces a new distribution instance.
 
   Returns:
-    wrapped_dist_fn: Python `callable` which takes all previous distributions
+    dist_fn_wrapped: Python `callable` which takes all previous distributions
       (in non reverse order) and produces a  new distribution instance.
     args: `tuple` of `str` representing the arg names of `dist_fn` (and in non
       wrapped, "natural" order). `None` is returned only if the input is not a
@@ -519,7 +554,7 @@ def _unify_call_signature(i, dist_fn):
     return (lambda *_: dist_fn()), ()
 
   @functools.wraps(dist_fn)
-  def wrapped_dist_fn(*xs):
+  def dist_fn_wrapped(*xs):
     """Calls `dist_fn` with reversed and truncated args."""
     if i != len(xs):
       raise ValueError(
@@ -532,7 +567,7 @@ def _unify_call_signature(i, dist_fn):
           '(dist_fn: {}, expected: {}, saw: {}).'.format(
               i, dist_fn, len(args), len(xs)))
     return dist_fn(*reversed(xs[-len(args):]))
-  return wrapped_dist_fn, args
+  return dist_fn_wrapped, args
 
 
 def _resolve_distribution_names(dist_fn_args, dist_names, leaf_name):
@@ -595,7 +630,7 @@ def _kl_joint_joint(d0, d1, name=None):
       dependency, i.e., when either joint distribution is not a collection of
       independent distributions.
   """
-  if len(d0.distribution_fn) != len(d1.distribution_fn):
+  if len(d0._dist_fn_wrapped) != len(d1._dist_fn_wrapped):  # pylint: disable=protected-access
     raise ValueError(
         'Can only compute KL divergence between JointDistributionSequential '
         'distributions with the same number of component distributions.')
@@ -605,5 +640,5 @@ def _kl_joint_joint(d0, d1, name=None):
         'Can only compute KL divergence when all distributions are '
         'independent.')
   with tf.name_scope(name or 'kl_jointseq_jointseq'):
-    return sum(kullback_leibler.kl_divergence(d0_, d1_)
-               for d0_, d1_ in zip(d0.distribution_fn, d1.distribution_fn))
+    return sum(kullback_leibler.kl_divergence(d0_(), d1_())
+               for d0_, d1_ in zip(d0._dist_fn_wrapped, d1._dist_fn_wrapped))  # pylint: disable=protected-access

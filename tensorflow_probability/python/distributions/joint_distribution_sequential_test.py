@@ -113,7 +113,7 @@ class JointDistributionSequentialTest(tf.test.TestCase, parameterized.TestCase):
         ],
         validate_args=True)
     expected_kl = sum(tfd.kl_divergence(d0_, d1_) for d0_, d1_
-                      in zip(d0.distribution_fn, d1.distribution_fn))
+                      in zip(d0.model, d1.model))
     actual_kl = tfd.kl_divergence(d0, d1)
     other_actual_kl = d0.kl_divergence(d1)
     expected_kl_, actual_kl_, other_actual_kl_ = self.evaluate([
@@ -136,7 +136,7 @@ class JointDistributionSequentialTest(tf.test.TestCase, parameterized.TestCase):
         validate_args=True)
     expected_xent = sum(
         d0_.cross_entropy(d1_) for d0_, d1_
-        in zip(d0.distribution_fn, d1.distribution_fn))
+        in zip(d0.model, d1.model))
     actual_xent = d0.cross_entropy(d1)
     expected_xent_, actual_xent_ = self.evaluate([expected_xent, actual_xent])
     self.assertNear(actual_xent_, expected_xent_, err=1e-5)
@@ -172,7 +172,7 @@ class JointDistributionSequentialTest(tf.test.TestCase, parameterized.TestCase):
     d = tfd.JointDistributionSequential(
         [tfd.Normal(0., 1.), tfd.Bernoulli(logits=0.)],
         validate_args=True)
-    expected = tuple(getattr(d_, attr)() for d_ in d.distribution_fn)
+    expected = tuple(getattr(d_, attr)() for d_ in d.model)
     actual = getattr(d, attr)()
     self.assertAllEqual(*self.evaluate([expected, actual]))
 
@@ -197,14 +197,14 @@ class JointDistributionSequentialTest(tf.test.TestCase, parameterized.TestCase):
     with self.assertRaisesWithPredicateMatch(
         NotImplementedError,
         attr + ' is not implemented: JointDistributionSequential'):
-      getattr(d, attr)([0.]*len(d.distribution_fn))
+      getattr(d, attr)([0.]*len(d.model))
 
   def test_copy(self):
     pgm = [tfd.Normal(0., 1.), tfd.Bernoulli(probs=0.5)]
     d = tfd.JointDistributionSequential(pgm, validate_args=True)
     d_copy = d.copy()
     self.assertAllEqual(
-        {'distribution_fn': pgm,
+        {'model': pgm,
          'validate_args': True,
          'name': None},
         d_copy.parameters)
@@ -279,6 +279,19 @@ class JointDistributionSequentialTest(tf.test.TestCase, parameterized.TestCase):
     self.assertEqual(sample_shape * 3, x[5].shape)
     lp = d.log_prob(x)
     self.assertEqual(sample_shape * 3, lp.shape)
+
+  def test_only_memoize_non_user_input(self):
+    d = tfd.JointDistributionSequential(
+        [
+            lambda: tfd.Bernoulli(logits=0.),
+            lambda c: tfd.Normal(loc=tf.cast(c, tf.float32), scale=1.),
+        ],
+        validate_args=True)
+    self.assertEqual([tf.int32, None], d.dtype)
+    d.sample(value=[1., None])  # For the *potential* side-effect
+    self.assertEqual([tf.int32, None], d.dtype)
+    d.sample()  # For the *actual* side-effect
+    self.assertEqual([tf.int32, tf.float32], d.dtype)
 
   def test_argspec(self):
     argspec = tf_inspect.getfullargspec(Dummy)

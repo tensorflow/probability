@@ -19,7 +19,6 @@ from __future__ import division
 from __future__ import print_function
 
 import abc
-import collections
 import contextlib
 import inspect
 import types
@@ -126,30 +125,48 @@ def _update_docstring(old_str, append_str):
     return old_str + "\n\n" + append_str
 
 
-def _convert_to_tensor(value, name=None, dtype=None, preferred_dtype=None):
-  """Converts to tensor avoiding an eager bug that loses float precision."""
-  if (isinstance(dtype, collections.Sequence) or
-      isinstance(preferred_dtype, collections.Sequence)):
+def _convert_to_tensor(value, dtype=None, dtype_hint=None, name=None):
+  """Converts the given `value` to a (structure of) `Tensor`.
+
+  This function converts Python objects of various types to a (structure of)
+  `Tensor` objects. It accepts `Tensor` objects, numpy arrays, Python lists, and
+  Python scalars. For example:
+
+  Args:
+    value: An object whose structure matches that of `dtype ` and/or
+      `dtype_hint` and for which each leaf has a registered `Tensor` conversion
+      function.
+    dtype: Optional (structure of) element type for the returned tensor. If
+      missing, the type is inferred from the type of `value`.
+    dtype_hint: Optional (structure of) element type for the returned tensor,
+      used when dtype is None. In some cases, a caller may not have a dtype in
+      mind when converting to a tensor, so dtype_hint can be used as a soft
+      preference.  If the conversion to `dtype_hint` is not possible, this
+      argument has no effect.
+    name: Optional name to use if a new `Tensor` is created.
+
+  Returns:
+    tensor: A (structure of) `Tensor` based on `value`.
+
+  Raises:
+    TypeError: If no conversion function is registered for `value` to `dtype`.
+    RuntimeError: If a registered conversion function returns an invalid value.
+    ValueError: If the `value` is a tensor not of given `dtype` in graph mode.
+  """
+  if (tf.nest.is_nested(dtype) or
+      tf.nest.is_nested(dtype_hint)):
     if dtype is None:
-      dtype = [None] * len(preferred_dtype)
-    if preferred_dtype is None:
-      preferred_dtype = [None] * len(dtype)
-    if len(value) != len(dtype) or len(dtype) != len(preferred_dtype):
-      raise ValueError(
-          "Number of input `value`s must match number of `dtype`s "
-          "(value:{}, dtype:{}, preferred_dtype:{}.".format(
-              len(value), len(dtype), len(preferred_dtype)))
-    return tuple(_convert_to_tensor(v, name, d, p)
-                 for v, d, p in zip(value, dtype, preferred_dtype))
-  # TODO(b/116672045): Remove this function.
-  if (tf.executing_eagerly() and preferred_dtype is not None and
-      dtype is None and (dtype_util.is_integer(preferred_dtype) or
-                         dtype_util.is_bool(preferred_dtype))):
-    v = tf.convert_to_tensor(value=value, name=name)
-    if dtype_util.is_floating(v.dtype):
-      return v
+      fn = lambda v, pd: tf.convert_to_tensor(v, dtype_hint=pd, name=name)
+      return tf.nest.map_structure(fn, value, dtype_hint)
+    elif dtype_hint is None:
+      fn = lambda v, d: tf.convert_to_tensor(v, dtype=d, name=name)
+      return tf.nest.map_structure(fn, value, dtype_hint)
+    else:
+      fn = lambda v, d, pd: tf.convert_to_tensor(  # pylint: disable=g-long-lambda
+          v, dtype=d, dtype_hint=pd, name=name)
+      return tf.nest.map_structure(fn, value, dtype, dtype_hint)
   return tf.convert_to_tensor(
-      value=value, name=name, dtype=dtype, dtype_hint=preferred_dtype)
+      value=value, dtype=dtype, dtype_hint=dtype_hint, name=name)
 
 
 def _remove_dict_keys_with_value(dict_, val):
@@ -820,7 +837,7 @@ class Distribution(_BaseDistribution):
     """Wrapper around _log_prob."""
     with self._name_scope(name):
       value = _convert_to_tensor(
-          value, name="value", preferred_dtype=self.dtype)
+          value, name="value", dtype_hint=self.dtype)
       if hasattr(self, "_log_prob"):
         return self._log_prob(value, **kwargs)
       if hasattr(self, "_prob"):
@@ -846,7 +863,7 @@ class Distribution(_BaseDistribution):
     """Wrapper around _prob."""
     with self._name_scope(name):
       value = _convert_to_tensor(
-          value, name="value", preferred_dtype=self.dtype)
+          value, name="value", dtype_hint=self.dtype)
       if hasattr(self, "_prob"):
         return self._prob(value, **kwargs)
       if hasattr(self, "_log_prob"):
@@ -872,7 +889,7 @@ class Distribution(_BaseDistribution):
     """Wrapper around _log_cdf."""
     with self._name_scope(name):
       value = _convert_to_tensor(
-          value, name="value", preferred_dtype=self.dtype)
+          value, name="value", dtype_hint=self.dtype)
       if hasattr(self, "_log_cdf"):
         return self._log_cdf(value, **kwargs)
       if hasattr(self, "_cdf"):
@@ -908,7 +925,7 @@ class Distribution(_BaseDistribution):
     """Wrapper around _cdf."""
     with self._name_scope(name):
       value = _convert_to_tensor(
-          value, name="value", preferred_dtype=self.dtype)
+          value, name="value", dtype_hint=self.dtype)
       if hasattr(self, "_cdf"):
         return self._cdf(value, **kwargs)
       if hasattr(self, "_log_cdf"):
@@ -945,7 +962,7 @@ class Distribution(_BaseDistribution):
     """Wrapper around _log_survival_function."""
     with self._name_scope(name):
       value = _convert_to_tensor(
-          value, name="value", preferred_dtype=self.dtype)
+          value, name="value", dtype_hint=self.dtype)
       try:
         return self._log_survival_function(value, **kwargs)
       except NotImplementedError as original_exception:
@@ -988,7 +1005,7 @@ class Distribution(_BaseDistribution):
     """Wrapper around _survival_function."""
     with self._name_scope(name):
       value = _convert_to_tensor(
-          value, name="value", preferred_dtype=self.dtype)
+          value, name="value", dtype_hint=self.dtype)
       try:
         return self._survival_function(value, **kwargs)
       except NotImplementedError as original_exception:
@@ -1044,7 +1061,7 @@ class Distribution(_BaseDistribution):
   def _call_quantile(self, value, name, **kwargs):
     with self._name_scope(name):
       value = _convert_to_tensor(
-          value, name="value", preferred_dtype=self.dtype)
+          value, name="value", dtype_hint=self.dtype)
       return self._quantile(value, **kwargs)
 
   def quantile(self, value, name="quantile", **kwargs):
