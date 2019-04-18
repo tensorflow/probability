@@ -61,15 +61,6 @@ __all__ = [
 ]
 
 
-def _eye(num_rows, num_columns=None, batch_shape=None,
-         dtype=tf.float32, name=None):  # pylint: disable=unused-argument
-  dt = utils.numpy_dtype(dtype)
-  x = np.eye(num_rows, num_columns).astype(dt)
-  if batch_shape is not None:
-    x *= np.ones(np.concatenate([batch_shape, [1, 1]], axis=0)).astype(dt)
-  return x
-
-
 def _ones_like(input, dtype=None, name=None):  # pylint: disable=redefined-builtin
   s = _shape(input)
   if isinstance(s, (np.ndarray, np.generic)):
@@ -103,10 +94,6 @@ def _zeros_like(input, dtype=None, name=None):  # pylint: disable=redefined-buil
 concat = utils.copy_docstring(
     tf.concat,
     lambda values, axis, name='concat': np.concatenate(values, axis))
-
-eye = utils.copy_docstring(
-    tf.eye,
-    _eye)
 
 expand_dims = utils.copy_docstring(
     tf.expand_dims,

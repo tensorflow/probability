@@ -34,9 +34,10 @@ __all__ = [
     'cholesky_solve',
     'diag',
     'diag_part',
+    'eye',
     'matmul',
-    'set_diag',
     'matrix_transpose',
+    'set_diag',
     'triangular_solve',
     # 'adjoint',
     # 'cross',
@@ -65,6 +66,15 @@ __all__ = [
     # 'trace',
     # 'tridiagonal_solve',
 ]
+
+
+def _eye(num_rows, num_columns=None, batch_shape=None,
+         dtype=tf.float32, name=None):  # pylint: disable=unused-argument
+  dt = utils.numpy_dtype(dtype)
+  x = np.eye(num_rows, num_columns).astype(dt)
+  if batch_shape is not None:
+    x *= np.ones(np.concatenate([batch_shape, [1, 1]], axis=0)).astype(dt)
+  return x
 
 
 def _fill_diagonal(input, diagonal, name=None):  # pylint: disable=unused-argument,redefined-builtin
@@ -121,6 +131,10 @@ diag = utils.copy_docstring(
 diag_part = utils.copy_docstring(
     tf.linalg.diag_part,
     lambda input, name=None: np.diagonal(input))
+
+eye = utils.copy_docstring(
+    tf.eye,
+    _eye)
 
 matmul = utils.copy_docstring(
     tf.linalg.matmul,

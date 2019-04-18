@@ -28,6 +28,7 @@ from tensorflow_probability.python.internal.backend.numpy.internal import utils
 
 __all__ = [
     'normal',
+    'uniform',
     # 'all_candidate_sampler',
     # 'categorical',
     # 'experimental',
@@ -35,7 +36,6 @@ __all__ = [
     # 'gamma',
     # 'learned_unigram_candidate_sampler',
     # 'log_uniform_candidate_sampler',
-    # 'normal',
     # 'poisson',
     # 'set_seed',
     # 'shuffle',
@@ -44,7 +44,6 @@ __all__ = [
     # 'stateless_truncated_normal',
     # 'stateless_uniform',
     # 'truncated_normal',
-    # 'uniform',
     # 'uniform_candidate_sampler',
 ]
 
@@ -52,8 +51,16 @@ __all__ = [
 def _normal(shape, mean=0.0, stddev=1.0, dtype=tf.float32, seed=None,
             name=None):  # pylint: disable=unused-argument
   rng = np.random if seed is None else np.random.RandomState(seed)
-  dtype = utils.common_dtype([mean, stddev], preferred_dtype=np.float32)
+  dtype = utils.common_dtype([mean, stddev], preferred_dtype=dtype)
   return rng.normal(loc=mean, scale=stddev, size=shape).astype(dtype)
+
+
+def _uniform(shape, minval=0, maxval=None, dtype=tf.float32, seed=None,
+             name=None):  # pylint: disable=unused-argument
+  rng = np.random if seed is None else np.random.RandomState(seed)
+  dtype = utils.common_dtype([minval, maxval], preferred_dtype=dtype)
+  maxval = 1 if maxval is None else maxval
+  return rng.uniform(low=minval, high=maxval, size=shape).astype(dtype)
 
 
 # --- Begin Public Functions --------------------------------------------------
@@ -62,3 +69,7 @@ def _normal(shape, mean=0.0, stddev=1.0, dtype=tf.float32, seed=None,
 normal = utils.copy_docstring(
     tf.random.normal,
     _normal)
+
+uniform = utils.copy_docstring(
+    tf.random.uniform,
+    _uniform)
