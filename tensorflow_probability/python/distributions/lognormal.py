@@ -35,8 +35,8 @@ class LogNormal(transformed_distribution.TransformedDistribution):
   """The log-normal distribution."""
 
   def __init__(self,
-               loc=None,
-               scale=None,
+               loc,
+               scale,
                validate_args=False,
                allow_nan_stats=True,
                name="LogNormal"):

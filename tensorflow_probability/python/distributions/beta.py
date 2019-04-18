@@ -144,8 +144,8 @@ class Beta(distribution.Distribution):
   """
 
   def __init__(self,
-               concentration1=None,
-               concentration0=None,
+               concentration1,
+               concentration0,
                validate_args=False,
                allow_nan_stats=True,
                name="Beta"):
