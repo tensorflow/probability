@@ -153,7 +153,7 @@ class Gamma(distribution.Distribution):
       ] if validate_args else []):
         self._concentration = tf.identity(concentration)
         self._rate = tf.identity(rate)
-        tf.debugging.assert_same_float_dtype([self._concentration, self._rate])
+        dtype_util.assert_same_float_dtype([self._concentration, self._rate])
     super(Gamma, self).__init__(
         dtype=dtype,
         validate_args=validate_args,
@@ -261,7 +261,7 @@ class Gamma(distribution.Distribution):
       ], mode)
 
   def _maybe_assert_valid_sample(self, x):
-    tf.debugging.assert_same_float_dtype(tensors=[x], dtype=self.dtype)
+    dtype_util.assert_same_float_dtype(tensors=[x], dtype=self.dtype)
     if not self.validate_args:
       return x
     return distribution_util.with_dependencies([

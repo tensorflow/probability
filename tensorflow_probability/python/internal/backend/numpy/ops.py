@@ -24,6 +24,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.internal.backend.numpy.internal import utils
+from tensorflow.python.ops.unconnected_gradients import UnconnectedGradients  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'broadcast_dynamic_shape',
@@ -33,6 +34,7 @@ __all__ = [
     'constant',
     'control_dependencies',
     'convert_to_tensor',
+    'custom_gradient',
     'executing_eagerly',
     'get_static_value',
     'group',
@@ -41,6 +43,7 @@ __all__ = [
     'name_scope',
     'newaxis',
     'stop_gradient',
+    'GradientTape',
     'TensorShape',
     # 'gradients',
 ]
@@ -80,7 +83,33 @@ def _control_dependencies(control_inputs):
   return _NullContext()
 
 
+def _convert_to_tensor(value, dtype=None, dtype_hint=None, name=None):  # pylint: disable=unused-argument
+  assert not tf.is_tensor(value)
+  return np.array(value, dtype=utils.numpy_dtype(dtype or dtype_hint))
+
+
 # --- Begin Public Functions --------------------------------------------------
+
+
+class GradientTape(object):
+  """tf.GradientTape stub."""
+
+  def __init__(self, persistent=False, watch_accessed_variables=True):  # pylint: disable=unused-argument
+    pass
+
+  def __enter__(self):
+    return self
+
+  def __exit__(self, typ, value, traceback):  # pylint: disable=unused-argument
+    pass
+
+  def watch(self, tensor):  # pylint: disable=unused-argument
+    pass
+
+  def gradient(self, target, sources, output_gradients=None,  # pylint: disable=unused-argument
+               unconnected_gradients=UnconnectedGradients.NONE):  # pylint: disable=unused-argument
+    return sources
+
 
 broadcast_dynamic_shape = utils.copy_docstring(
     tf.broadcast_dynamic_shape,
@@ -108,8 +137,11 @@ control_dependencies = utils.copy_docstring(
 
 convert_to_tensor = utils.copy_docstring(
     tf.convert_to_tensor,
-    lambda value, dtype=None, dtype_hint=None, name=None: (  # pylint: disable=g-long-lambda
-        np.array(value, dtype=utils.numpy_dtype(dtype or dtype_hint))))
+    _convert_to_tensor)
+
+custom_gradient = utils.copy_docstring(
+    tf.custom_gradient,
+    lambda f: f)
 
 executing_eagerly = utils.copy_docstring(
     tf.executing_eagerly,
@@ -131,7 +163,47 @@ is_tensor = utils.copy_docstring(
     tf.is_tensor,
     lambda x: isinstance(x, (np.ndarray, np.generic)))
 
-name_scope = lambda name, *args, **kwargs: _NullContext()
+
+class name_scope(object):  # pylint: disable=invalid-name
+  """A context manager for use when defining a Python op.
+
+  This context manager pushes a name scope, which will make the name of all
+  operations added within it have a prefix.
+
+  For example, to define a new Python op called `my_op`:
+
+  ```python
+  def my_op(a, b, c, name=None):
+    with tf.name_scope("MyOp") as scope:
+      a = tf.convert_to_tensor(a, name="a")
+      b = tf.convert_to_tensor(b, name="b")
+      c = tf.convert_to_tensor(c, name="c")
+      # Define some computation that uses `a`, `b`, and `c`.
+      return foo_op(..., name=scope)
+  ```
+
+  When executed, the Tensors `a`, `b`, `c`, will have names `MyOp/a`, `MyOp/b`,
+  and `MyOp/c`.
+
+  If the scope name already exists, the name will be made unique by appending
+  `_n`. For example, calling `my_op` the second time will generate `MyOp_1/a`,
+  etc.
+  """
+
+  @property
+  def name(self):
+    return self._name
+
+  def __init__(self, name, *args, **kwargs):
+    del args, kwargs
+    self._name = name
+
+  def __enter__(self):
+    return self._name
+
+  def __exit__(self, type_arg, value_arg, traceback_arg):
+    return False  # False values do not suppress exceptions.
+
 
 newaxis = np.newaxis
 

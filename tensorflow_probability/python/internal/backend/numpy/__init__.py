@@ -19,8 +19,11 @@ from __future__ import division
 from __future__ import print_function
 
 from tensorflow_probability.python.internal.backend.numpy import compat
+from tensorflow_probability.python.internal.backend.numpy import keras
 from tensorflow_probability.python.internal.backend.numpy import linalg
 from tensorflow_probability.python.internal.backend.numpy import math
+from tensorflow_probability.python.internal.backend.numpy import nn
+from tensorflow_probability.python.internal.backend.numpy import random_generators as random
 from tensorflow_probability.python.internal.backend.numpy import test
 from tensorflow_probability.python.internal.backend.numpy.array import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.control_flow import *  # pylint: disable=wildcard-import
@@ -28,5 +31,6 @@ from tensorflow_probability.python.internal.backend.numpy.dtype import *  # pyli
 from tensorflow_probability.python.internal.backend.numpy.math import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.misc import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.ops import *  # pylint: disable=wildcard-import
+from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 matmul = linalg.matmul

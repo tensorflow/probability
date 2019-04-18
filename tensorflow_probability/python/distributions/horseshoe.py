@@ -23,7 +23,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
-from tensorflow_probability.python.distributions import HalfCauchy
+from tensorflow_probability.python.distributions import half_cauchy
 from tensorflow_probability.python.distributions.seed_stream import SeedStream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
@@ -146,7 +146,7 @@ class Horseshoe(distribution.Distribution):
           [assert_util.assert_positive(scale)] if validate_args else []):
         self._scale = tf.identity(
             scale, name="scale")
-    self._half_cauchy = HalfCauchy(
+    self._half_cauchy = half_cauchy.HalfCauchy(
         loc=tf.zeros([], dtype=dtype),
         scale=tf.ones([], dtype=dtype),
         allow_nan_stats=True)

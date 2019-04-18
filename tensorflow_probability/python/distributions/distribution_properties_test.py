@@ -34,6 +34,7 @@ import six
 import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.bijectors import hypothesis_testlib as bijector_hps
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
@@ -239,7 +240,7 @@ def single_param(constraint_fn, param_shape):
   float32s = hps.floats(-200, 200, allow_nan=False, allow_infinity=False)
 
   def mapper(x):
-    result = tf.debugging.assert_all_finite(
+    result = assert_util.assert_finite(
         constraint_fn(tf.convert_to_tensor(value=x)),
         message='param non-finite')
     if tf.executing_eagerly():

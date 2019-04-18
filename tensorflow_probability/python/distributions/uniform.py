@@ -110,7 +110,7 @@ class Uniform(distribution.Distribution):
       ] if validate_args else []):
         self._low = tf.identity(low)
         self._high = tf.identity(high)
-        tf.debugging.assert_same_float_dtype([self._low, self._high])
+        dtype_util.assert_same_float_dtype([self._low, self._high])
     super(Uniform, self).__init__(
         dtype=self._low.dtype,
         reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,

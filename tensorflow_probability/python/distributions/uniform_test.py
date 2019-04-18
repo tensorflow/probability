@@ -22,12 +22,12 @@ import importlib
 
 # Dependency imports
 import numpy as np
+
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.distributions import uniform as uniform_lib
 from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfd = tfp.distributions
 
@@ -50,7 +50,7 @@ class UniformTest(tf.test.TestCase):
   def testUniformRange(self):
     a = 3.0
     b = 10.0
-    uniform = uniform_lib.Uniform(low=a, high=b)
+    uniform = tfd.Uniform(low=a, high=b)
     self.assertAllClose(a, self.evaluate(uniform.low))
     self.assertAllClose(b, self.evaluate(uniform.high))
     self.assertAllClose(b - a, self.evaluate(uniform.range()))
@@ -58,7 +58,7 @@ class UniformTest(tf.test.TestCase):
   def testUniformPDF(self):
     a = tf.constant([-3.0] * 5 + [15.0])
     b = tf.constant([11.0] * 5 + [20.0])
-    uniform = uniform_lib.Uniform(low=a, high=b)
+    uniform = tfd.Uniform(low=a, high=b)
 
     a_v = -3.0
     b_v = 11.0
@@ -82,7 +82,7 @@ class UniformTest(tf.test.TestCase):
   def testUniformShape(self):
     a = tf.constant([-3.0] * 5)
     b = tf.constant(11.0)
-    uniform = uniform_lib.Uniform(low=a, high=b)
+    uniform = tfd.Uniform(low=a, high=b)
 
     self.assertEqual(self.evaluate(uniform.batch_shape_tensor()), (5,))
     self.assertEqual(uniform.batch_shape, tf.TensorShape([5]))
@@ -92,7 +92,7 @@ class UniformTest(tf.test.TestCase):
   def testUniformPDFWithScalarEndpoint(self):
     a = tf.constant([0.0, 5.0])
     b = tf.constant(10.0)
-    uniform = uniform_lib.Uniform(low=a, high=b)
+    uniform = tfd.Uniform(low=a, high=b)
 
     x = np.array([0.0, 8.0], dtype=np.float32)
     expected_pdf = np.array([1.0 / (10.0 - 0.0), 1.0 / (10.0 - 5.0)])
@@ -108,7 +108,7 @@ class UniformTest(tf.test.TestCase):
     b_v = 11.0
     x = np.array([-2.5, 2.5, 4.0, 0.0, 10.99, 12.0], dtype=np.float32)
 
-    uniform = uniform_lib.Uniform(low=a, high=b)
+    uniform = tfd.Uniform(low=a, high=b)
 
     def _expected_cdf():
       cdf = (x - a_v) / (b_v - a_v)
@@ -125,7 +125,7 @@ class UniformTest(tf.test.TestCase):
   def testUniformQuantile(self):
     low = tf.reshape(tf.linspace(0., 1., 6), [2, 1, 3])
     high = tf.reshape(tf.linspace(1.5, 2.5, 6), [1, 2, 3])
-    uniform = uniform_lib.Uniform(low=low, high=high)
+    uniform = tfd.Uniform(low=low, high=high)
     expected_quantiles = tf.reshape(tf.linspace(1.01, 1.49, 24), [2, 2, 2, 3])
     cumulative_densities = uniform.cdf(expected_quantiles)
     actual_quantiles = uniform.quantile(cumulative_densities)
@@ -135,7 +135,7 @@ class UniformTest(tf.test.TestCase):
   def testUniformEntropy(self):
     a_v = np.array([1.0, 1.0, 1.0])
     b_v = np.array([[1.5, 2.0, 3.0]])
-    uniform = uniform_lib.Uniform(low=a_v, high=b_v)
+    uniform = tfd.Uniform(low=a_v, high=b_v)
 
     expected_entropy = np.log(b_v - a_v)
     self.assertAllClose(expected_entropy, self.evaluate(uniform.entropy()))
@@ -146,7 +146,7 @@ class UniformTest(tf.test.TestCase):
 
     with self.assertRaisesWithPredicateMatch(
         tf.errors.InvalidArgumentError, "x < y"):
-      uniform = uniform_lib.Uniform(low=a_v, high=b_v, validate_args=True)
+      uniform = tfd.Uniform(low=a_v, high=b_v, validate_args=True)
       self.evaluate(uniform.low)
 
   def testUniformSample(self):
@@ -156,7 +156,7 @@ class UniformTest(tf.test.TestCase):
     a2_v = 4.0
     b_v = 13.0
     n = tf.constant(100000)
-    uniform = uniform_lib.Uniform(low=a, high=b)
+    uniform = tfd.Uniform(low=a, high=b)
 
     samples = uniform.sample(n, seed=tfp_test_util.test_seed())
     sample_values = self.evaluate(samples)
@@ -178,7 +178,7 @@ class UniformTest(tf.test.TestCase):
     a = tf.constant([a_v] * batch_size)
     b = tf.constant([b_v] * batch_size)
 
-    uniform = uniform_lib.Uniform(low=a, high=b)
+    uniform = tfd.Uniform(low=a, high=b)
 
     n_v = 100000
     n = tf.constant(n_v)
@@ -202,7 +202,7 @@ class UniformTest(tf.test.TestCase):
   def testUniformMean(self):
     a = 10.0
     b = 100.0
-    uniform = uniform_lib.Uniform(low=a, high=b)
+    uniform = tfd.Uniform(low=a, high=b)
     if not stats:
       return
     s_uniform = stats.uniform(loc=a, scale=b - a)
@@ -211,7 +211,7 @@ class UniformTest(tf.test.TestCase):
   def testUniformVariance(self):
     a = 10.0
     b = 100.0
-    uniform = uniform_lib.Uniform(low=a, high=b)
+    uniform = tfd.Uniform(low=a, high=b)
     if not stats:
       return
     s_uniform = stats.uniform(loc=a, scale=b - a)
@@ -220,7 +220,7 @@ class UniformTest(tf.test.TestCase):
   def testUniformStd(self):
     a = 10.0
     b = 100.0
-    uniform = uniform_lib.Uniform(low=a, high=b)
+    uniform = tfd.Uniform(low=a, high=b)
     if not stats:
       return
     s_uniform = stats.uniform(loc=a, scale=b - a)
@@ -229,7 +229,7 @@ class UniformTest(tf.test.TestCase):
   def testUniformNans(self):
     a = 10.0
     b = [11.0, 100.0]
-    uniform = uniform_lib.Uniform(low=a, high=b)
+    uniform = tfd.Uniform(low=a, high=b)
 
     no_nans = tf.constant(1.0)
     nans = tf.constant(0.0) / tf.constant(0.0)
@@ -245,7 +245,7 @@ class UniformTest(tf.test.TestCase):
   def testUniformSamplePdf(self):
     a = 10.0
     b = [11.0, 100.0]
-    uniform = uniform_lib.Uniform(a, b)
+    uniform = tfd.Uniform(a, b)
     self.assertTrue(
         self.evaluate(
             tf.reduce_all(input_tensor=uniform.prob(uniform.sample(10)) > 0)))
@@ -253,7 +253,7 @@ class UniformTest(tf.test.TestCase):
   def testUniformBroadcasting(self):
     a = 10.0
     b = [11.0, 20.0]
-    uniform = uniform_lib.Uniform(a, b)
+    uniform = tfd.Uniform(a, b)
 
     pdf = uniform.prob([[10.5, 11.5], [9.0, 19.0], [10.5, 21.0]])
     expected_pdf = np.array([[1.0, 0.1], [0.0, 0.1], [1.0, 0.0]])
@@ -262,7 +262,7 @@ class UniformTest(tf.test.TestCase):
   def testUniformSampleWithShape(self):
     a = 10.0
     b = [11.0, 20.0]
-    uniform = uniform_lib.Uniform(a, b)
+    uniform = tfd.Uniform(a, b)
 
     pdf = uniform.prob(uniform.sample((2, 3)))
     # pylint: disable=bad-continuation
@@ -281,13 +281,13 @@ class UniformTest(tf.test.TestCase):
     a = tf.constant(0.1)
     b = tf.constant(0.8)
     _, [grad_a, grad_b] = tfp.math.value_and_gradient(
-        lambda a_, b_: uniform_lib.Uniform(a_, b_).sample(100),
+        lambda a_, b_: tfd.Uniform(a_, b_).sample(100),
         [a, b])
     self.assertIsNotNone(grad_a)
     self.assertIsNotNone(grad_b)
 
   def testUniformFloat64(self):
-    uniform = uniform_lib.Uniform(
+    uniform = tfd.Uniform(
         low=np.float64(0.), high=np.float64(1.))
 
     self.assertAllClose(
@@ -309,8 +309,8 @@ class UniformTest(tf.test.TestCase):
     a_high = np.array([1.0] * batch_size)
     b_low = -2.0 * np.arange(1, batch_size + 1)
     b_high = np.array([2.0] * batch_size)
-    a = uniform_lib.Uniform(low=a_low, high=a_high)
-    b = uniform_lib.Uniform(low=b_low, high=b_high)
+    a = tfd.Uniform(low=a_low, high=a_high)
+    b = tfd.Uniform(low=b_low, high=b_high)
 
     true_kl = np.log(b_high - b_low) - np.log(a_high - a_low)
 
@@ -340,8 +340,8 @@ class UniformTest(tf.test.TestCase):
     a_high = np.array([1.0, 2.0, 2.0])
     b_low = np.array([0.0] * 3)
     b_high = np.array([1.0] * 3)
-    a = uniform_lib.Uniform(low=a_low, high=a_high)
-    b = uniform_lib.Uniform(low=b_low, high=b_high)
+    a = tfd.Uniform(low=a_low, high=a_high)
+    b = tfd.Uniform(low=b_low, high=b_high)
 
     # Since 'a' can be sampled to give points outside the support of 'b',
     # the KL Divergence is infinite.

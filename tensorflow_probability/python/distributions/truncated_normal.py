@@ -128,7 +128,7 @@ class TruncatedNormal(distribution.Distribution):
       scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
       low = tf.convert_to_tensor(value=low, name="low", dtype=dtype)
       high = tf.convert_to_tensor(value=high, name="high", dtype=dtype)
-      tf.debugging.assert_same_float_dtype([loc, scale, low, high])
+      dtype_util.assert_same_float_dtype([loc, scale, low, high])
 
       self._broadcast_batch_shape = distribution_util.get_broadcast_shape(
           loc, scale, low, high)

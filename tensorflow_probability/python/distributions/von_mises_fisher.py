@@ -199,7 +199,7 @@ class VonMisesFisher(distribution.Distribution):
       with tf.control_dependencies(assertions):
         self._mean_direction = tf.identity(mean_direction)
         self._concentration = tf.identity(concentration)
-      tf.debugging.assert_same_float_dtype(
+      dtype_util.assert_same_float_dtype(
           [self._mean_direction, self._concentration])
       # mean_direction is always reparameterized.
       # concentration is only for event_dim==3, via an inversion sampler.

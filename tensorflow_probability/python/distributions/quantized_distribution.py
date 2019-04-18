@@ -25,6 +25,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution as distributions
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 
 
@@ -273,7 +274,7 @@ class QuantizedDistribution(distributions.Distribution):
       if high is not None:
         high = tf.convert_to_tensor(
             value=high, name="high", dtype=distribution.dtype)
-      tf.debugging.assert_same_float_dtype(
+      dtype_util.assert_same_float_dtype(
           tensors=[self.distribution, low, high])
 
       # We let QuantizedDistribution access _graph_parents since this class is

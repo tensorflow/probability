@@ -25,6 +25,8 @@ import tensorflow as tf
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
+
 
 __all__ = [
     'TransformedTransitionKernel',
@@ -201,7 +203,8 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
           event_ndims=event_ndims)
 
     inner_kernel_kwargs.update(target_log_prob_fn=new_target_log_prob)
-    self._inner_kernel = type(inner_kernel)(**inner_kernel_kwargs)
+    with deprecation.silence():
+      self._inner_kernel = type(inner_kernel)(**inner_kernel_kwargs)
 
   @property
   def inner_kernel(self):

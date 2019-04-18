@@ -26,6 +26,7 @@ import tensorflow.compat.v2 as tf
 
 __all__ = [
     'as_numpy_dtype',
+    'assert_same_float_dtype',
     'base_dtype',
     'base_equal',
     'common_dtype',
@@ -144,3 +145,84 @@ def size(dtype):
   if hasattr(dtype, 'size'):
     return dtype.size
   return np.dtype(dtype).itemsize
+
+
+def _assert_same_base_type(items, expected_type=None):
+  r"""Asserts all items are of the same base type.
+
+  Args:
+    items: List of graph items (e.g., `Variable`, `Tensor`, `SparseTensor`,
+        `Operation`, or `IndexedSlices`). Can include `None` elements, which
+        will be ignored.
+    expected_type: Expected type. If not specified, assert all items are
+        of the same base type.
+
+  Returns:
+    Validated type, or none if neither expected_type nor items provided.
+
+  Raises:
+    ValueError: If any types do not match.
+  """
+  original_expected_type = expected_type
+  mismatch = False
+  for item in items:
+    if item is not None:
+      item_type = base_dtype(item.dtype)
+      if not expected_type:
+        expected_type = item_type
+      elif expected_type != item_type:
+        mismatch = True
+        break
+  if mismatch:
+    # Loop back through and build up an informative error message (this is very
+    # slow, so we don't do it unless we found an error above).
+    expected_type = original_expected_type
+    original_item_str = None
+    get_name = lambda x: x.name if hasattr(x, 'name') else str(x)
+    for item in items:
+      if item is not None:
+        item_type = base_dtype(item.dtype)
+        if not expected_type:
+          expected_type = item_type
+          original_item_str = get_name(item)
+        elif expected_type != item_type:
+          raise ValueError(
+              '{}, type={}, must be of the same type ({}){}.'.format(
+                  get_name(item),
+                  item_type,
+                  expected_type,
+                  ((' as {}'.format(original_item_str))
+                   if original_item_str else '')))
+    return expected_type  # Should be unreachable
+  else:
+    return expected_type
+
+
+def assert_same_float_dtype(tensors=None, dtype=None):
+  """Validate and return float type based on `tensors` and `dtype`.
+
+  For ops such as matrix multiplication, inputs and weights must be of the
+  same float type. This function validates that all `tensors` are the same type,
+  validates that type is `dtype` (if supplied), and returns the type. Type must
+  be a floating point type. If neither `tensors` nor `dtype` is supplied,
+  the function will return `dtypes.float32`.
+
+  Args:
+    tensors: Tensors of input values. Can include `None` elements, which will
+      be ignored.
+    dtype: Expected type.
+
+  Returns:
+    Validated type.
+
+  Raises:
+    ValueError: if neither `tensors` nor `dtype` is supplied, or result is not
+      float, or the common type of the inputs is not a floating point type.
+  """
+  if tensors:
+    dtype = _assert_same_base_type(tensors, dtype)
+  if not dtype:
+    dtype = tf.float32
+  elif not is_floating(dtype):
+    raise ValueError('Expected floating point type, got {}.'.format(dtype))
+  return dtype

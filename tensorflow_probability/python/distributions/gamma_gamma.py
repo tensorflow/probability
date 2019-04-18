@@ -139,7 +139,7 @@ class GammaGamma(distribution.Distribution):
             mixing_concentration, name="mixing_concentration")
         self._mixing_rate = tf.identity(mixing_rate, name="mixing_rate")
 
-      tf.debugging.assert_same_float_dtype(
+      dtype_util.assert_same_float_dtype(
           [self._concentration, self._mixing_concentration, self._mixing_rate])
 
     super(GammaGamma, self).__init__(
@@ -269,7 +269,7 @@ class GammaGamma(distribution.Distribution):
       ], variance)
 
   def _maybe_assert_valid_sample(self, x):
-    tf.debugging.assert_same_float_dtype(tensors=[x], dtype=self.dtype)
+    dtype_util.assert_same_float_dtype(tensors=[x], dtype=self.dtype)
     if not self.validate_args:
       return x
     return distribution_util.with_dependencies([

@@ -578,9 +578,7 @@ py_test(
     size = "small",
     srcs = ["bijector_test.py"],
     deps = [
-        ":bijectors",
         # numpy dep,
-        # six dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],
@@ -667,8 +665,6 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:dtype_util",
-        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
@@ -847,6 +843,7 @@ py_test(
         ":bijectors",
         ":masked_autoregressive",
         # numpy dep,
+        # six dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/internal:test_util",

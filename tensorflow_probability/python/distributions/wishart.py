@@ -120,7 +120,7 @@ class _WishartLinearOperator(distribution.Distribution):
         self._scale_operator = scale_operator
         self._df = tf.convert_to_tensor(
             value=df, dtype=scale_operator.dtype, name="df")
-        tf.debugging.assert_same_float_dtype([self._df, self._scale_operator])
+        dtype_util.assert_same_float_dtype([self._df, self._scale_operator])
         if tf.compat.dimension_value(self._scale_operator.shape[-1]) is None:
           self._dimension = tf.cast(
               self._scale_operator.domain_dimension_tensor(),

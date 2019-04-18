@@ -112,7 +112,7 @@ class InverseGaussian(distribution.Distribution):
       ] if validate_args else []):
         self._loc = tf.identity(loc, name="loc")
         self._concentration = tf.identity(concentration, name="concentration")
-      tf.debugging.assert_same_float_dtype([self._loc, self._concentration])
+      dtype_util.assert_same_float_dtype([self._loc, self._concentration])
     super(InverseGaussian, self).__init__(
         dtype=self._loc.dtype,
         reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
