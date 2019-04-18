@@ -304,9 +304,9 @@ class _GaussianProcessRegressionModelTest(object):
     event_shape_1 = [5]
     event_shape_2 = [10]
 
-    self.assertEqual(gprm1.mean_fn, gprm2.mean_fn)
-    self.assertIsInstance(gprm1.kernel, psd_kernels.ExponentiatedQuadratic)
-    self.assertIsInstance(gprm2.kernel, psd_kernels.ExpSinSquared)
+    self.assertIsInstance(gprm1.kernel.base_kernel,
+                          psd_kernels.ExponentiatedQuadratic)
+    self.assertIsInstance(gprm2.kernel.base_kernel, psd_kernels.ExpSinSquared)
 
     if self.is_static or tf.executing_eagerly():
       self.assertAllEqual(gprm1.batch_shape, gprm2.batch_shape)

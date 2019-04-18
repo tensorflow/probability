@@ -385,7 +385,7 @@ py_library(
         ":mvn_linear_operator",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
-        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/positive_semidefinite_kernels",
     ],
 )
 
