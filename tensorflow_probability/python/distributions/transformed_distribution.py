@@ -207,7 +207,7 @@ class TransformedDistribution(distribution_lib.Distribution):
     """
     parameters = dict(locals()) if parameters is None else parameters
     name = name or (("" if bijector is None else bijector.name) +
-                    distribution.name)
+                    (distribution.name or ""))
     with tf.name_scope(name) as name:
       self._kwargs_split_fn = (_default_kwargs_split_fn
                                if kwargs_split_fn is None
