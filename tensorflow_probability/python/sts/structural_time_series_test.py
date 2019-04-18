@@ -24,6 +24,7 @@ import tensorflow_probability as tfp
 
 
 from tensorflow_probability.python.sts import Autoregressive
+from tensorflow_probability.python.sts import DynamicLinearRegression
 from tensorflow_probability.python.sts import LinearRegression
 from tensorflow_probability.python.sts import LocalLevel
 from tensorflow_probability.python.sts import LocalLinearTrend
@@ -372,6 +373,18 @@ class SparseLinearRegressionTest(tf.test.TestCase, _StsTestHarness):
         weights_batch_shape=batch_shape)
     return Sum(components=[regression],
                observed_time_series=observed_time_series)
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class DynamicLinearRegressionTest(tf.test.TestCase, _StsTestHarness):
+
+  def _build_sts(self, observed_time_series=None):
+    max_timesteps = 100
+    num_features = 3
+
+    return DynamicLinearRegression(
+        design_matrix=tf.random.normal([max_timesteps, num_features]),
+        observed_time_series=observed_time_series)
 
 
 if __name__ == '__main__':

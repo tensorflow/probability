@@ -22,6 +22,8 @@ from tensorflow_probability.python.sts.autoregressive import Autoregressive
 from tensorflow_probability.python.sts.autoregressive import AutoregressiveStateSpaceModel
 from tensorflow_probability.python.sts.decomposition import decompose_by_component
 from tensorflow_probability.python.sts.decomposition import decompose_forecast_by_component
+from tensorflow_probability.python.sts.dynamic_regression import DynamicLinearRegression
+from tensorflow_probability.python.sts.dynamic_regression import DynamicLinearRegressionStateSpaceModel
 from tensorflow_probability.python.sts.fitting import build_factored_variational_loss
 from tensorflow_probability.python.sts.fitting import fit_with_hmc
 from tensorflow_probability.python.sts.fitting import sample_uniform_initial_state
@@ -50,6 +52,8 @@ _allowed_symbols = [
     'Autoregressive',
     'AutoregressiveStateSpaceModel',
     'ConstrainedSeasonalStateSpaceModel',
+    'DynamicLinearRegression',
+    'DynamicLinearRegressionStateSpaceModel',
     'LinearRegression',
     'LocalLevel',
     'LocalLevelStateSpaceModel',
