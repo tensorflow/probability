@@ -15,6 +15,7 @@
 # Description:
 #   Functional MCMC API.
 
+# [internal] load python3.bzl
 # [internal] load pytype.bzl
 
 licenses(["notice"])  # Apache 2.0

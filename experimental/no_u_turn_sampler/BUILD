@@ -15,6 +15,8 @@
 # Description:
 #   TensorFlow Eager kernel for one No U-Turn Sampler trajectory.
 
+# [internal] load python3.bzl
+
 licenses(["notice"])  # Apache 2.0
 
 package(
