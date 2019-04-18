@@ -91,12 +91,12 @@ class PoissonTest(test_case.TestCase):
     expected_continuous_pmf = tf.exp(expected_continuous_log_pmf)
 
     log_pmf = poisson.log_prob(x)
-    self.assertEqual(log_pmf.get_shape(), (batch_size,))
+    self.assertEqual((batch_size,), log_pmf.shape)
     self.assertAllClose(self.evaluate(log_pmf),
                         self.evaluate(expected_continuous_log_pmf))
 
     pmf = poisson.prob(x)
-    self.assertEqual(pmf.get_shape(), (batch_size,))
+    self.assertEqual((batch_size,), pmf.shape)
     self.assertAllClose(self.evaluate(pmf),
                         self.evaluate(expected_continuous_pmf))
 

@@ -140,10 +140,10 @@ class Mixture(distribution.Distribution):
         raise ValueError(
             "components[{}] batch shape must be compatible with cat "
             "shape and other component batch shapes".format(di))
-      static_event_shape = tensorshape_util.merge_with(static_event_shape,
-                                                       d.event_shape)
-      static_batch_shape = tensorshape_util.merge_with(static_batch_shape,
-                                                       d.batch_shape)
+      static_event_shape = tensorshape_util.merge_with(
+          static_event_shape, d.event_shape)
+      static_batch_shape = tensorshape_util.merge_with(
+          static_batch_shape, d.batch_shape)
     if tensorshape_util.rank(static_event_shape) is None:
       raise ValueError(
           "Expected to know rank(event_shape) from components, but "
@@ -440,8 +440,9 @@ class Mixture(distribution.Distribution):
       ret = tf.reshape(
           lhs_flat_ret, tf.concat(
               [samples_shape, self.event_shape_tensor()], 0))
-      ret.set_shape(
-          tf.TensorShape(static_samples_shape).concatenate(self.event_shape))
+      tensorshape_util.set_shape(
+          ret,
+          tensorshape_util.concatenate(static_samples_shape, self.event_shape))
       return ret
 
   def entropy_lower_bound(self, name="entropy_lower_bound"):

@@ -141,7 +141,7 @@ def quadrature_scheme_lognormal_quantiles(
     # Set shape hints.
     new_shape = tensorshape_util.concatenate(dist.batch_shape,
                                              [quadrature_size])
-    grid.set_shape(new_shape)
+    tensorshape_util.set_shape(grid, new_shape)
 
     # By construction probs is constant, i.e., `1 / quadrature_size`. This is
     # important, because non-constant probs leads to non-reparameterizable

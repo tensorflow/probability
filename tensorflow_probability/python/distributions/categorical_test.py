@@ -358,7 +358,7 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
     dist = tfd.Categorical(tf.math.log(histograms) - 50.)
     n = 10000
     samples = dist.sample(n, seed=tfp_test_util.test_seed())
-    samples.set_shape([n, 1, 2])
+    tensorshape_util.set_shape(samples, [n, 1, 2])
     self.assertEqual(samples.dtype, tf.int32)
     sample_values = self.evaluate(samples)
     self.assertFalse(np.any(sample_values < 0))

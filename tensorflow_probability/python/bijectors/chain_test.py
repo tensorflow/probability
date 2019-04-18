@@ -200,7 +200,7 @@ class ChainBijectorTest(tf.test.TestCase):
       return tf.compat.v1.placeholder_with_default(x, shape=None)
 
     def xform_static(x):
-      x.set_shape([1])
+      tensorshape_util.set_shape(x, [1])
       return x
 
     def ldj(_):

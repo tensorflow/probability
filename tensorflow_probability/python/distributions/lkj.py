@@ -447,6 +447,6 @@ class LKJ(distribution.Distribution):
         num_rows=self.dimension, batch_shape=batch,
         dtype=self.concentration.dtype)
     # set_shape only necessary because tf.eye doesn't do it itself: b/111413915
-    answer.set_shape(
-        answer.shape[:-2].concatenate([self.dimension, self.dimension]))
+    shape = answer.shape[:-2].concatenate([self.dimension, self.dimension])
+    tensorshape_util.set_shape(answer, shape)
     return answer

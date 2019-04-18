@@ -354,7 +354,8 @@ class _WishartLinearOperator(distribution.Distribution):
     # parameters of this distribution.
     if tensorshape_util.rank(x.shape) is not None and tensorshape_util.rank(
         self.batch_shape) is not None:
-      log_prob.set_shape(
+      tensorshape_util.set_shape(
+          log_prob,
           tf.broadcast_static_shape(x.shape[:-2], self.batch_shape))
 
     return log_prob

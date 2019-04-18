@@ -230,7 +230,7 @@ class BernoulliTest(tf.test.TestCase):
     dist = tfd.Bernoulli(probs=p)
     n = 100000
     samples = dist.sample(n)
-    samples.set_shape([n, 2])
+    tensorshape_util.set_shape(samples, [n, 2])
     self.assertEqual(samples.dtype, tf.int32)
     sample_values = self.evaluate(samples)
     self.assertTrue(np.all(sample_values >= 0))

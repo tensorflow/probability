@@ -180,14 +180,15 @@ def quadrature_scheme_softmaxnormal_quantiles(
       # Cyclically permute left by one.
       perm = tf.concat([tf.range(1, 1 + batch_ndims), [0]], axis=0)
       quantiles = tf.transpose(a=quantiles, perm=perm)
-      quantiles.set_shape(_get_final_shape(quadrature_size + 1))
+      tensorshape_util.set_shape(
+          quantiles, _get_final_shape(quadrature_size + 1))
       return quantiles
     quantiles = _compute_quantiles()
 
     # Compute grid as quantile midpoints.
     grid = (quantiles[..., :-1] + quantiles[..., 1:]) / 2.
     # Set shape hints.
-    grid.set_shape(_get_final_shape(quadrature_size))
+    tensorshape_util.set_shape(grid, _get_final_shape(quadrature_size))
 
     # By construction probs is constant, i.e., `1 / quadrature_size`. This is
     # important, because non-constant probs leads to non-reparameterizable
@@ -749,8 +750,8 @@ class VectorDiffeomixture(distribution_lib.Distribution):
         self.distribution.mean(),  # A scalar.
         shape=tf.ones_like(single_draw_shape, dtype=tf.int32))
     m = tf.tile(m, multiples=single_draw_shape)
-    m.set_shape(
-        tensorshape_util.concatenate(self.batch_shape, self.event_shape))
+    tensorshape_util.set_shape(
+        m, tensorshape_util.concatenate(self.batch_shape, self.event_shape))
     return m
 
   def _expand_mix_distribution_probs(self):

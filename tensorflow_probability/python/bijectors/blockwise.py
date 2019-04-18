@@ -121,14 +121,14 @@ class Blockwise(bijector_base.Bijector):
     split_x = tf.split(x, self.block_sizes, axis=-1, num=len(self.bijectors))
     split_y = [b.forward(x_) for b, x_ in zip(self.bijectors, split_x)]
     y = tf.concat(split_y, axis=-1)
-    y.set_shape(tensorshape_util.merge_with(y.shape, x.shape))
+    tensorshape_util.set_shape(y, x.shape)
     return y
 
   def _inverse(self, y):
     split_y = tf.split(y, self.block_sizes, axis=-1, num=len(self.bijectors))
     split_x = [b.inverse(y_) for b, y_ in zip(self.bijectors, split_y)]
     x = tf.concat(split_x, axis=-1)
-    x.set_shape(tensorshape_util.merge_with(x.shape, y.shape))
+    tensorshape_util.set_shape(x, y.shape)
     return x
 
   def _forward_log_det_jacobian(self, x):

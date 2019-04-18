@@ -1331,19 +1331,19 @@ class Distribution(_BaseDistribution):
         batch_ndims is not None and
         event_ndims is not None):
       ndims = sample_ndims + batch_ndims + event_ndims
-      x.set_shape([None] * ndims)
+      tensorshape_util.set_shape(x, [None] * ndims)
 
     # Infer sample shape.
     if ndims is not None and sample_ndims is not None:
       shape = tensorshape_util.concatenate(sample_shape,
                                            [None] * (ndims - sample_ndims))
-      x.set_shape(tensorshape_util.merge_with(x.shape, shape))
+      tensorshape_util.set_shape(x, shape)
 
     # Infer event shape.
     if ndims is not None and event_ndims is not None:
       shape = tf.TensorShape(
           [None]*(ndims - event_ndims)).concatenate(self.event_shape)
-      x.set_shape(tensorshape_util.merge_with(x.shape, shape))
+      tensorshape_util.set_shape(x, shape)
 
     # Infer batch shape.
     if batch_ndims is not None:
@@ -1355,7 +1355,7 @@ class Distribution(_BaseDistribution):
       if sample_ndims is not None and event_ndims is not None:
         shape = tf.TensorShape([None]*sample_ndims).concatenate(
             self.batch_shape).concatenate([None]*event_ndims)
-        x.set_shape(tensorshape_util.merge_with(x.shape, shape))
+        tensorshape_util.set_shape(x, shape)
 
     return x
 

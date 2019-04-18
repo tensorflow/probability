@@ -1557,7 +1557,7 @@ def fill_triangular(x, upper=False, name=None):
     x = tf.reshape(tf.concat(x_list, axis=-1), new_shape)
     x = tf.linalg.band_part(
         x, num_lower=(0 if upper else -1), num_upper=(-1 if upper else 0))
-    x.set_shape(static_final_shape)
+    tensorshape_util.set_shape(x, static_final_shape)
     return x
 
 
@@ -1626,7 +1626,7 @@ def fill_triangular_inverse(x, upper=False, name=None):
         consolidated_matrix,
         tf.concat([tf.shape(input=x)[:-2], [n * (n - 1)]], axis=0))
     y = tf.concat([initial_elements, end_sequence[..., :m - n]], axis=-1)
-    y.set_shape(static_final_shape)
+    tensorshape_util.set_shape(y, static_final_shape)
     return y
 
 
@@ -1998,7 +1998,7 @@ def pad(x, axis, front=False, back=False, value=0, count=1, name=None):
             dtype=tf.int32),
         constant_values=value)
     if final_shape is not None:
-      x.set_shape(final_shape)
+      tensorshape_util.set_shape(x, final_shape)
     return x
 
 

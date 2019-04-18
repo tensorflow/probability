@@ -423,7 +423,8 @@ class TransformedDistribution(distribution_lib.Distribution):
           input_tensor=log_prob, axis=self._reduce_event_indices)
     log_prob += tf.cast(ildj, log_prob.dtype)
     if self._is_maybe_event_override and isinstance(event_ndims, int):
-      log_prob.set_shape(
+      tensorshape_util.set_shape(
+          log_prob,
           tf.broadcast_static_shape(
               tensorshape_util.with_rank_at_least(y.shape, 1)[:-event_ndims],
               self.batch_shape))
@@ -457,7 +458,8 @@ class TransformedDistribution(distribution_lib.Distribution):
       prob = tf.reduce_prod(input_tensor=prob, axis=self._reduce_event_indices)
     prob *= tf.exp(tf.cast(ildj, prob.dtype))
     if self._is_maybe_event_override and isinstance(event_ndims, int):
-      prob.set_shape(
+      tensorshape_util.set_shape(
+          prob,
           tf.broadcast_static_shape(
               tensorshape_util.with_rank_at_least(y.shape, 1)[:-event_ndims],
               self.batch_shape))
@@ -596,7 +598,7 @@ class TransformedDistribution(distribution_lib.Distribution):
         dummy, event_ndims=event_ndims, **bijector_kwargs)
 
     entropy -= tf.cast(ildj, entropy.dtype)
-    entropy.set_shape(self.batch_shape)
+    tensorshape_util.set_shape(entropy, self.batch_shape)
     return entropy
 
   def _maybe_validate_shape_override(self, override_shape, base_is_scalar,

@@ -51,7 +51,7 @@ def _broadcast_cat_event_and_params(event, params, base_dtype):
     params_shape = tf.shape(input=params)[:-1]
     event *= tf.ones(params_shape, dtype=event.dtype)
     if tensorshape_util.rank(params.shape) is not None:
-      event.set_shape(tf.TensorShape(params.shape[:-1]))
+      tensorshape_util.set_shape(event, params.shape[:-1])
 
   return event, params
 
@@ -331,7 +331,7 @@ class Categorical(distribution.Distribution):
   def _mode(self):
     ret = tf.argmax(input=self.logits, axis=self._batch_rank)
     ret = tf.cast(ret, self.dtype)
-    ret.set_shape(self.batch_shape)
+    tensorshape_util.set_shape(ret, self.batch_shape)
     return ret
 
 

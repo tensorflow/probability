@@ -131,7 +131,8 @@ def make_multivariate_mixture(batch_shape, num_components, event_shape,
       -1,
       1,
       dtype=tf.float32) - 50.
-  logits.set_shape(tf.TensorShape(batch_shape).concatenate(num_components))
+  tensorshape_util.set_shape(
+      logits, tensorshape_util.concatenate(batch_shape, num_components))
   static_batch_and_event_shape = (
       tf.TensorShape(batch_shape).concatenate(event_shape))
   event_shape = tf.convert_to_tensor(value=event_shape, dtype=tf.int32)
@@ -140,8 +141,8 @@ def make_multivariate_mixture(batch_shape, num_components, event_shape,
   def create_component():
     loc = tf.random.normal(batch_and_event_shape)
     scale_diag = 10 * tf.random.uniform(batch_and_event_shape)
-    loc.set_shape(static_batch_and_event_shape)
-    scale_diag.set_shape(static_batch_and_event_shape)
+    tensorshape_util.set_shape(loc, static_batch_and_event_shape)
+    tensorshape_util.set_shape(scale_diag, static_batch_and_event_shape)
     return tfd.MultivariateNormalDiag(loc=loc, scale_diag=scale_diag)
   components = [create_component() for _ in range(num_components)]
   cat = tfd.Categorical(logits, dtype=tf.int32)

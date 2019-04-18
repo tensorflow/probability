@@ -195,7 +195,7 @@ class Reshape(bijector.Bijector):
         self._event_shape_out,
         self.validate_args)
     y = tf.reshape(x, output_shape)
-    y.set_shape(tensorshape_util.merge_with(y.shape, output_tensorshape))
+    tensorshape_util.set_shape(y, output_tensorshape)
     return y
 
   def _inverse(self, y):
@@ -205,7 +205,7 @@ class Reshape(bijector.Bijector):
         self._event_shape_in,
         self.validate_args)
     x = tf.reshape(y, output_shape)
-    x.set_shape(tensorshape_util.merge_with(x.shape, output_tensorshape))
+    tensorshape_util.set_shape(x, output_tensorshape)
     return x
 
   def _inverse_log_det_jacobian(self, y):

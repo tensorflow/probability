@@ -215,7 +215,7 @@ class OneHotCategorical(distribution.Distribution):
   def _mode(self):
     ret = tf.argmax(input=self.logits, axis=self._batch_rank)
     ret = tf.one_hot(ret, self.event_size, dtype=self.dtype)
-    ret.set_shape(self.logits.shape)
+    tensorshape_util.set_shape(ret, self.logits.shape)
     return ret
 
   def _covariance(self):

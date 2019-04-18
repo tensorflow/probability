@@ -31,6 +31,7 @@ __all__ = [
     'merge_with',
     'num_elements',
     'rank',
+    'set_shape',
     'with_rank_at_least',
 ]
 
@@ -182,6 +183,21 @@ def merge_with(x, other):
   return type(x)(tf.TensorShape(x).merge_with(other))
 
 
+def num_elements(x):
+  """Returns the total number of elements, or `None` for incomplete shapes.
+
+  For more details, see `help(tf.TensorShape.num_elements)`.
+
+  Args:
+    x: object representing a shape; convertible to `tf.TensorShape`.
+
+  Returns:
+    num_elements: `int` representing the total number of elements implied by
+      shape `x`.
+  """
+  return tf.TensorShape(x).num_elements()
+
+
 def rank(x):
   """Returns the rank of this shape, or `None` if it is unspecified.
 
@@ -196,19 +212,46 @@ def rank(x):
   return tf.TensorShape(x).rank
 
 
-def num_elements(x):
-  """Returns the total number of elements, or `None` for incomplete shapes.
+def set_shape(tensor, shape):
+  """Updates the shape of this tensor.
 
-  For more details, see `help(tf.TensorShape.num_elements)`.
+  This method can be called multiple times, and will merge the given
+  `shape` with the current shape of this tensor. It can be used to
+  provide additional information about the shape of this tensor that
+  cannot be inferred from the graph alone. For example, this can be used
+  to provide additional information about the shapes of images:
+
+  ```python
+  _, image_data = tf.TFRecordReader(...).read(...)
+  image = tf.image.decode_png(image_data, channels=3)
+
+  # The height and width dimensions of `image` are data dependent, and
+  # cannot be computed without executing the op.
+  print(image.shape)
+  ==> TensorShape([Dimension(None), Dimension(None), Dimension(3)])
+
+  # We know that each image in this dataset is 28 x 28 pixels.
+  image.set_shape([28, 28, 3])
+  print(image.shape)
+  ==> TensorShape([Dimension(28), Dimension(28), Dimension(3)])
+  ```
+
+  NOTE: This shape is not enforced at runtime. Setting incorrect shapes can
+  result in inconsistencies between the statically-known graph and the runtime
+  value of tensors. For runtime validation of the shape, use `tf.ensure_shape`
+  instead.
 
   Args:
-    x: object representing a shape; convertible to `tf.TensorShape`.
+    tensor: `Tensor` which will have its static shape set.
+    shape: A `TensorShape` representing the shape of this tensor, a
+    `TensorShapeProto`, a list, a tuple, or None.
 
-  Returns:
-    num_elements: `int` representing the total number of elements implied by
-      shape `x`.
+  Raises:
+    ValueError: If `shape` is not compatible with the current shape of
+      this tensor.
   """
-  return tf.TensorShape(x).num_elements()
+  if hasattr(tensor, 'set_shape'):
+    tensor.set_shape(shape)
 
 
 def with_rank_at_least(x, rank):  # pylint: disable=redefined-outer-name

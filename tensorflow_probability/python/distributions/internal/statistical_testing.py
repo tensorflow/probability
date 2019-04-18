@@ -132,6 +132,7 @@ import tensorflow as tf
 from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
     'assert_true_cdf_equal_by_dkwm',
@@ -510,7 +511,7 @@ def _batch_sort_vector(x, ascending=True, name=None):
       y = -y
     else:
       y, _ = tf.nn.top_k(x, k=n, sorted=True)
-    y.set_shape(x.shape)
+    tensorshape_util.set_shape(y, x.shape)
     return y
 
 

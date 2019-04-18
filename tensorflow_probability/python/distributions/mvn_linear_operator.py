@@ -335,5 +335,6 @@ def _kl_brute_force(a, b, name=None):
         0.5 * (-tf.cast(a.scale.domain_dimension_tensor(), a.dtype) +
                squared_frobenius_norm(b_inv_a) + squared_frobenius_norm(
                    b.scale.solve((b.mean() - a.mean())[..., tf.newaxis]))))
-    kl_div.set_shape(tf.broadcast_static_shape(a.batch_shape, b.batch_shape))
+    tensorshape_util.set_shape(
+        kl_div, tf.broadcast_static_shape(a.batch_shape, b.batch_shape))
     return kl_div

@@ -259,7 +259,7 @@ class BatchReshape(distribution_lib.Distribution):
           tensorshape_util.rank(self.batch_shape) is not None):
         new_shape = tensorshape_util.concatenate(static_sample_shape,
                                                  self.batch_shape)
-        result.set_shape(tensorshape_util.merge_with(result.shape, new_shape))
+        tensorshape_util.set_shape(result, new_shape)
       return result
 
   def _call_and_reshape_output(
@@ -287,10 +287,9 @@ class BatchReshape(distribution_lib.Distribution):
         event_shape = tf.TensorShape([])
         for rss in static_event_shape_list:
           event_shape = tensorshape_util.concatenate(event_shape, rss)
-        static_shape = tensorshape_util.merge_with(
-            result.shape,
-            tensorshape_util.concatenate(self.batch_shape, event_shape))
-        result.set_shape(static_shape)
+        static_shape = tensorshape_util.concatenate(
+            self.batch_shape, event_shape)
+        tensorshape_util.set_shape(result, static_shape)
       return result
 
   def _validate_sample_arg(self, x):
