@@ -24,6 +24,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import positive_semidefinite_kernels as tfpk
 from tensorflow_probability.python.distributions import gaussian_process
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
     'GaussianProcessRegressionModel',
@@ -87,8 +88,9 @@ def _validate_observation_data(
   """
   # Check that observation index points and observation counts broadcast.
   ndims = kernel.feature_ndims
-  if (observation_index_points.shape[:-ndims].is_fully_defined() and
-      observations.shape.is_fully_defined()):
+  if (tensorshape_util.is_fully_defined(
+      observation_index_points.shape[:-ndims]) and
+      tensorshape_util.is_fully_defined(observations.shape)):
     index_point_count = observation_index_points.shape[:-ndims]
     observation_count = observations.shape
     try:

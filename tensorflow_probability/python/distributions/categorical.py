@@ -43,7 +43,7 @@ def _broadcast_cat_event_and_params(event, params, base_dtype):
                     "`self.dtype` ({})".format(base_dtype))
   shape_known_statically = (
       tensorshape_util.rank(params.shape) is not None and
-      params.shape[:-1].is_fully_defined() and
+      tensorshape_util.is_fully_defined(params.shape[:-1]) and
       tensorshape_util.is_fully_defined(event.shape))
   if not shape_known_statically or params.shape[:-1] != event.shape:
     params *= tf.ones_like(event[..., tf.newaxis],
@@ -211,7 +211,7 @@ class Categorical(distribution.Distribution):
         with tf.name_scope("num_categories"):
           self._num_categories = logits_shape[self._batch_rank]
 
-      if logits_shape_static[:-1].is_fully_defined():
+      if tensorshape_util.is_fully_defined(logits_shape_static[:-1]):
         self._batch_shape_val = tf.constant(
             logits_shape_static[:-1].as_list(),
             dtype=tf.int32,

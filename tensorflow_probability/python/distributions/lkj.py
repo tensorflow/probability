@@ -314,7 +314,7 @@ class LKJ(distribution.Distribution):
 
   def _validate_dimension(self, x):
     x = tf.convert_to_tensor(value=x, name='x')
-    if x.shape[-2:].is_fully_defined():
+    if tensorshape_util.is_fully_defined(x.shape[-2:]):
       if (tensorshape_util.dims(x.shape)[-2] ==
           tensorshape_util.dims(x.shape)[-1] ==
           self.dimension):

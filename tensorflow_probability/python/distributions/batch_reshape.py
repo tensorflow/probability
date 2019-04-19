@@ -226,7 +226,7 @@ class BatchReshape(distribution_lib.Distribution):
     else:
       static_sample_shape = tf.TensorShape(None)
     if tensorshape_util.is_fully_defined(static_sample_shape):
-      sample_shape = np.int32(tensorshape_util.as_list(static_sample_shape))
+      sample_shape = np.int32(static_sample_shape)
     else:
       sample_shape = tf.shape(input=x)[:sample_ndims]
     return sample_shape, static_sample_shape
@@ -327,10 +327,8 @@ class BatchReshape(distribution_lib.Distribution):
 
       if (tensorshape_util.is_fully_defined(self.batch_shape) and
           tensorshape_util.is_fully_defined(self.event_shape)):
-        expected_batch_event_shape = np.array(
-            tensorshape_util.as_list(
-                tensorshape_util.concatenate(self.batch_shape,
-                                             self.event_shape)), np.int32)
+        expected_batch_event_shape = np.int32(
+            tensorshape_util.concatenate(self.batch_shape, self.event_shape))
       else:
         expected_batch_event_shape = tf.concat(
             [
@@ -342,8 +340,8 @@ class BatchReshape(distribution_lib.Distribution):
       if isinstance(sample_ndims, int):
         sample_ndims = max(sample_ndims, 0)
       if (isinstance(sample_ndims, int) and
-          x.shape[sample_ndims:].is_fully_defined()):
-        actual_batch_event_shape = np.int32(x.shape[sample_ndims:].as_list())
+          tensorshape_util.is_fully_defined(x.shape[sample_ndims:])):
+        actual_batch_event_shape = np.int32(x.shape[sample_ndims:])
       else:
         sample_ndims = tf.maximum(sample_ndims, 0)
         actual_batch_event_shape = tf.shape(input=x)[sample_ndims:]
@@ -383,8 +381,7 @@ def calculate_reshape(original_shape, new_shape, validate=False, name=None):
   """Calculates the reshaped dimensions (replacing up to one -1 in reshape)."""
   batch_shape_static = tensorshape_util.constant_value_as_shape(new_shape)
   if tensorshape_util.is_fully_defined(batch_shape_static):
-    return np.int32(
-        tensorshape_util.as_list(batch_shape_static)), batch_shape_static, []
+    return np.int32(batch_shape_static), batch_shape_static, []
   with tf.name_scope(name or "calculate_reshape"):
     original_size = tf.reduce_prod(input_tensor=original_shape)
     implicit_dim = tf.equal(new_shape, -1)
