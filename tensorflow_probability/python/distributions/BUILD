@@ -62,6 +62,7 @@ py_library(
         ":inverse_gamma",
         ":inverse_gaussian",
         ":joint_distribution",
+        ":joint_distribution_coroutine",
         ":joint_distribution_named",
         ":joint_distribution_sequential",
         ":kullback_leibler",
@@ -528,6 +529,18 @@ py_library(
 py_library(
     name = "joint_distribution",
     srcs = ["joint_distribution.py"],
+    deps = [
+        ":distribution",
+        # six dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+    ],
+)
+
+py_library(
+    name = "joint_distribution_coroutine",
+    srcs = ["joint_distribution_coroutine.py"],
     deps = [
         ":distribution",
         # six dep,
@@ -1630,6 +1643,17 @@ py_test(
         ":normal",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:reparameterization",
+    ],
+)
+
+py_test(
+    name = "joint_distribution_coroutine_test",
+    size = "small",
+    srcs = ["joint_distribution_coroutine_test.py"],
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
