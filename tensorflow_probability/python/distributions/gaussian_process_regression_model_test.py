@@ -126,8 +126,7 @@ class _GaussianProcessRegressionModelTest(object):
         (jitter + observation_noise_variance) * np.eye(num_obs))
 
     expected_predictive_covariance_no_noise = (
-        k_xx_ - np.dot(k_xn_, np.linalg.solve(k_nn_plus_noise_, k_xn_.T)) +
-        np.eye(num_test) * jitter)
+        k_xx_ - np.dot(k_xn_, np.linalg.solve(k_nn_plus_noise_, k_xn_.T)))
 
     expected_predictive_covariance_with_noise = (
         expected_predictive_covariance_no_noise +

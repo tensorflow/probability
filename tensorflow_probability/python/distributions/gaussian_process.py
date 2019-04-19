@@ -18,11 +18,17 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import warnings
+
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import mvn_linear_operator
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import reparameterization
 
 __all__ = [
     'GaussianProcess',
@@ -34,7 +40,7 @@ def _add_diagonal_shift(matrix, shift):
       matrix, tf.linalg.diag_part(matrix) + shift, name='add_diagonal_shift')
 
 
-class GaussianProcess(mvn_linear_operator.MultivariateNormalLinearOperator):
+class GaussianProcess(distribution.Distribution):
   """Marginal distribution of a Gaussian process at finitely many points.
 
   A Gaussian process (GP) is an indexed collection of random variables, any
@@ -188,7 +194,7 @@ class GaussianProcess(mvn_linear_operator.MultivariateNormalLinearOperator):
 
   def __init__(self,
                kernel,
-               index_points,
+               index_points=None,
                mean_fn=None,
                observation_noise_variance=0.,
                jitter=1e-6,
@@ -242,8 +248,9 @@ class GaussianProcess(mvn_linear_operator.MultivariateNormalLinearOperator):
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype(
           [index_points, observation_noise_variance, jitter], tf.float32)
-      index_points = tf.convert_to_tensor(
-          value=index_points, dtype=dtype, name='index_points')
+      if index_points is not None:
+        index_points = tf.convert_to_tensor(
+            value=index_points, dtype=dtype, name='index_points')
       jitter = tf.convert_to_tensor(value=jitter, dtype=dtype, name='jitter')
       observation_noise_variance = tf.convert_to_tensor(
           value=observation_noise_variance,
@@ -263,25 +270,100 @@ class GaussianProcess(mvn_linear_operator.MultivariateNormalLinearOperator):
       self._observation_noise_variance = observation_noise_variance
       self._jitter = jitter
 
+      graph_parents = [observation_noise_variance, jitter]
+      if index_points is not None: graph_parents.append(index_points)
+
       with tf.name_scope('init'):
-        kernel_matrix = _add_diagonal_shift(
-            kernel.matrix(self.index_points, self.index_points),
-            jitter + observation_noise_variance)
-        self._covariance_matrix = kernel_matrix
-
-        scale = tf.linalg.LinearOperatorLowerTriangular(
-            tf.linalg.cholesky(kernel_matrix),
-            is_non_singular=True,
-            name='GaussianProcessScaleLinearOperator')
-
         super(GaussianProcess, self).__init__(
-            loc=mean_fn(index_points),
-            scale=scale,
+            dtype=dtype,
+            reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
             validate_args=validate_args,
             allow_nan_stats=allow_nan_stats,
+            parameters=parameters,
+            graph_parents=graph_parents,
             name=name)
-        self._parameters = parameters
-        self._graph_parents = [index_points, jitter]
+
+  def _is_univariate_marginal(self, index_points):
+    """True if the given index_points would yield a univariate marginal.
+
+    Args:
+      index_points: the set of index set locations at which to compute the
+      marginal Gaussian distribution. If this set is of size 1, the marginal is
+      univariate.
+
+    Returns:
+      is_univariate: Boolean indicating whether the marginal is univariate or
+      multivariate. In the case of dynamic shape in the number of index points,
+      defaults to "multivariate" since that's the best we can do.
+    """
+    num_index_points = tf.compat.dimension_value(
+        index_points.shape[-(self.kernel.feature_ndims + 1)])
+    if num_index_points is None:
+      warnings.warn(
+          'Unable to detect statically whether the number of index_points is '
+          '1. As a result, defaulting to treating the marginal GP at '
+          '`index_points` as a multivariate Gaussian. This makes some methods, '
+          'like `cdf` unavailable.')
+    return num_index_points == 1
+
+  def _compute_covariance(self, index_points):
+    kernel_matrix = self.kernel.matrix(index_points, index_points)
+    if self._is_univariate_marginal(index_points):
+      # kernel_matrix thus has shape [..., 1, 1]; squeeze off the last dims and
+      # tack on the observation noise variance.
+      return (tf.squeeze(kernel_matrix, axis=[-2, -1]) +
+              self.observation_noise_variance)
+    else:
+      return _add_diagonal_shift(
+          kernel_matrix, self.observation_noise_variance)
+
+  def get_marginal_distribution(self, index_points=None):
+    """Compute the marginal of this GP over function values at `index_points`.
+
+    Args:
+      index_points: `float` `Tensor` representing finite (batch of) vector(s) of
+        points in the index set over which the GP is defined. Shape has the form
+        `[b1, ..., bB, e, f1, ..., fF]` where `F` is the number of feature
+        dimensions and must equal `kernel.feature_ndims` and `e` is the number
+        (size) of index points in each batch. Ultimately this distribution
+        corresponds to a `e`-dimensional multivariate normal. The batch shape
+        must be broadcastable with `kernel.batch_shape` and any batch dims
+        yielded by `mean_fn`.
+
+    Returns:
+      marginal: a `Normal` or `MultivariateNormalLinearOperator` distribution,
+        according to whether `index_points` consists of one or many index
+        points, respectively.
+    """
+    with self._name_scope('get_marginal_distribution'):
+      # TODO(cgs): consider caching the result here, keyed on `index_points`.
+      index_points = self._get_index_points(index_points)
+      covariance = self._compute_covariance(index_points)
+      loc = self._mean_fn(index_points)
+      # If we're sure the number of index points is 1, we can just construct a
+      # scalar Normal. This has computational benefits and supports things like
+      # CDF that aren't otherwise straightforward to provide.
+      if self._is_univariate_marginal(index_points):
+        scale = tf.sqrt(covariance)
+        # `loc` has a trailing 1 in the shape; squeeze it.
+        loc = tf.squeeze(loc, axis=-1)
+        return normal.Normal(
+            loc=loc,
+            scale=scale,
+            validate_args=self._validate_args,
+            allow_nan_stats=self._allow_nan_stats,
+            name='marginal_distribution')
+      else:
+        scale = tf.linalg.LinearOperatorLowerTriangular(
+            tf.linalg.cholesky(_add_diagonal_shift(covariance, self.jitter)),
+            is_non_singular=True,
+            name='GaussianProcessScaleLinearOperator')
+        return mvn_linear_operator.MultivariateNormalLinearOperator(
+            loc=loc,
+            scale=scale,
+            validate_args=self._validate_args,
+            allow_nan_stats=self._allow_nan_stats,
+            name='marginal_distribution')
 
   @property
   def mean_fn(self):
@@ -303,5 +385,181 @@ class GaussianProcess(mvn_linear_operator.MultivariateNormalLinearOperator):
   def jitter(self):
     return self._jitter
 
-  def _covariance(self):
-    return self._covariance_matrix
+  def _get_index_points(self, index_points=None):
+    """Return `index_points` if not None, else `self._index_points`.
+
+    Args:
+      index_points: if given, this is what is returned; else,
+      `self._index_points`
+
+    Returns:
+      index_points: the given arg, if not None, else the class member
+      `self._index_points`.
+
+    Rases:
+      ValueError: if `index_points` and `self._index_points` are both `None`.
+    """
+    if self._index_points is None and index_points is None:
+      raise ValueError(
+          'This GaussianProcess instance was not instantiated with a value for '
+          'index_points. One must therefore be provided when calling sample, '
+          'log_prob, and other such methods. In particular, one can\'t compute '
+          'KL divergences to/from an instance of `GaussianProccess` with '
+          'unspecified `index_points` directly. Instead, use the '
+          '`get_marginal_distribution` function, which takes `index_points` as '
+          'an argument and returns a `Normal` or '
+          '`MultivariateNormalLinearOperator` instance, whose KL can be '
+          'computed.')
+    return index_points if index_points is not None else self._index_points
+
+  def _log_prob(self, value, index_points=None):
+    return self.get_marginal_distribution(index_points).log_prob(value)
+
+  def _batch_shape_tensor(self, index_points=None):
+    return self.get_marginal_distribution(index_points).batch_shape_tensor()
+
+  def _batch_shape(self, index_points=None):
+    return self.get_marginal_distribution(index_points).batch_shape
+
+  def _event_shape_tensor(self, index_points=None):
+    return self.get_marginal_distribution(index_points).event_shape_tensor()
+
+  def _event_shape(self, index_points=None):
+    return self.get_marginal_distribution(index_points).event_shape
+
+  def _sample_n(self, n, seed=None, index_points=None):
+    return self.get_marginal_distribution(index_points).sample(n, seed=seed)
+
+  def _log_survival_function(self, value, index_points=None):
+    return self.get_marginal_distribution(
+        index_points).log_survival_function(value)
+
+  def _survival_function(self, value, index_points=None):
+    return self.get_marginal_distribution(index_points).survival_function(value)
+
+  def _log_cdf(self, value, index_points=None):
+    return self.get_marginal_distribution(index_points).log_cdf(value)
+
+  def _entropy(self, index_points=None):
+    return self.get_marginal_distribution(index_points).entropy()
+
+  def _mean(self, index_points=None):
+    return self.get_marginal_distribution(index_points).mean()
+
+  def _quantile(self, value, index_points=None):
+    return self.get_marginal_distribution(index_points).quantile(value)
+
+  def _variance(self, index_points=None):
+    index_points = self._get_index_points(index_points)
+
+    kernel_diag = self.kernel.apply(index_points, index_points)
+    if self._is_univariate_marginal(index_points):
+      return (tf.squeeze(kernel_diag, axis=[-1]) +
+              self.observation_noise_variance)
+    else:
+      return kernel_diag + self.observation_noise_variance
+
+  def _covariance(self, index_points=None):
+    # Using the result of get_marginal_distribution would involve an extra
+    # matmul, and possibly even an unneceesary cholesky first. We can avoid that
+    # by going straight through the kernel function.
+    return self._compute_covariance(self._get_index_points(index_points))
+
+  def _mode(self, index_points=None):
+    return self.get_marginal_distribution(index_points).mode()
+
+
+def _assert_kl_compatible(marginal, other):
+  if ((isinstance(marginal, normal.Normal) and
+       isinstance(other, normal.Normal)) or
+      (isinstance(marginal,
+                  mvn_linear_operator.MultivariateNormalLinearOperator) and
+       isinstance(other,
+                  mvn_linear_operator.MultivariateNormalLinearOperator))):
+    return
+  raise ValueError(
+      'Attempting to compute KL between a GP marginal and a distribution of '
+      'incompatible type. GP marginal has type {} and other distribution has '
+      'type {}.'.format(type(marginal), type(other)))
+
+
+def _kl_gp_compatible(gp, compatible, name):
+  with tf.name_scope(name):
+    marginal = gp.get_marginal_distribution()
+    _assert_kl_compatible(marginal, compatible)
+    return kullback_leibler.kl_divergence(marginal, compatible)
+
+
+def _kl_compatible_gp(compatible, gp, name):
+  with tf.name_scope(name):
+    marginal = gp.get_marginal_distribution()
+    _assert_kl_compatible(marginal, compatible)
+    return kullback_leibler.kl_divergence(compatible, marginal)
+
+
+@kullback_leibler.RegisterKL(GaussianProcess, normal.Normal)
+def _kl_gp_normal(gp, n, name=None):
+  """Calculate the batched KL divergence KL(gp || n).
+
+  Args:
+    gp: instance of a GaussianProcess distribution object.
+    n: instance of a Normal distribution object.
+    name: (optional) Name to use for created operations.
+      default is 'kl_gp_normal'.
+
+  Returns:
+    Batchwise KL(gp || n)
+  """
+  return _kl_gp_compatible(gp, n, name or 'kl_gp_normal')
+
+
+@kullback_leibler.RegisterKL(
+    GaussianProcess, mvn_linear_operator.MultivariateNormalLinearOperator)
+def _kl_gp_mvn(gp, mvn, name=None):
+  """Calculate the batched KL divergence KL(gp || mvn).
+
+  Args:
+    gp: instance of a GaussianProcess distribution object.
+    mvn: instance of a multivariate Normal distribution object (any subclass of
+      MultivariateNormalLinearOperator)
+    name: (optional) Name to use for created operations.
+      default is 'kl_gp_mvn'.
+
+  Returns:
+    Batchwise KL(gp || mvn)
+  """
+  return _kl_gp_compatible(gp, mvn, name or 'kl_gp_mvn')
+
+
+@kullback_leibler.RegisterKL(normal.Normal, GaussianProcess)
+def _kl_normal_gp(n, gp, name=None):
+  """Calculate the batched KL divergence KL(gp || n).
+
+  Args:
+    n: instance of a Normal distribution object.
+    gp: instance of a GaussianProcess distribution object.
+    name: (optional) Name to use for created operations.
+      default is 'kl_normal_gp'.
+
+  Returns:
+    Batchwise KL(n || gp)
+  """
+  return _kl_compatible_gp(n, gp, name or 'kl_normal_gp')
+
+
+@kullback_leibler.RegisterKL(
+    mvn_linear_operator.MultivariateNormalLinearOperator, GaussianProcess)
+def _kl_mvn_gp(mvn, gp, name=None):
+  """Calculate the batched KL divergence KL(mvn || gp).
+
+  Args:
+    mvn: instance of a multivariate Normal distribution object (any subclass of
+      MultivariateNormalLinearOperator)
+    gp: instance of a GaussianProcess distribution object.
+    name: (optional) Name to use for created operations.
+      default is 'kl_mvn_gp'.
+
+  Returns:
+    Batchwise KL(mvn || gp)
+  """
+  return _kl_compatible_gp(mvn, gp, name or 'kl_mvn_gp')

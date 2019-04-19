@@ -390,7 +390,7 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
 
   def __init__(self,
                kernel,
-               index_points,
+               index_points=None,
                observation_index_points=None,
                observations=None,
                observation_noise_variance=0.,
@@ -480,8 +480,9 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
           index_points, observation_index_points, observations,
           observation_noise_variance, predictive_noise_variance, jitter
       ], tf.float32)
-      index_points = tf.convert_to_tensor(
-          value=index_points, name='index_points', dtype=dtype)
+      if index_points is not None:
+        index_points = tf.convert_to_tensor(
+            value=index_points, dtype=dtype, name='index_points')
       observation_index_points = (None if observation_index_points is None else
                                   tf.convert_to_tensor(
                                       value=observation_index_points,
@@ -551,10 +552,11 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
             return mean_fn(x) + k_x_obs_linop.matvec(
                 chol_linop.solvevec(chol_linop.solvevec(diff), adjoint=True))
 
-        graph_parents = [index_points, observation_noise_variance, jitter]
+        graph_parents = [observation_noise_variance, jitter]
         def _maybe_append(x):
           if x is not None:
             graph_parents.append(x)
+        _maybe_append(index_points)
         _maybe_append(observation_index_points)
         _maybe_append(observations)
 

@@ -373,7 +373,9 @@ py_library(
     name = "gaussian_process",
     srcs = ["gaussian_process.py"],
     deps = [
+        ":kullback_leibler",
         ":mvn_linear_operator",
+        ":normal",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
     ],
