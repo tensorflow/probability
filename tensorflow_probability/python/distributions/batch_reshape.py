@@ -25,7 +25,6 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow.python.framework import tensor_util  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -382,7 +381,7 @@ class BatchReshape(distribution_lib.Distribution):
 
 def calculate_reshape(original_shape, new_shape, validate=False, name=None):
   """Calculates the reshaped dimensions (replacing up to one -1 in reshape)."""
-  batch_shape_static = tensor_util.constant_value_as_shape(new_shape)
+  batch_shape_static = tensorshape_util.constant_value_as_shape(new_shape)
   if tensorshape_util.is_fully_defined(batch_shape_static):
     return np.int32(
         tensorshape_util.as_list(batch_shape_static)), batch_shape_static, []
@@ -421,7 +420,7 @@ def validate_init_args_statically(distribution, batch_shape):
                        "(saw rank: {}).".format(
                            tensorshape_util.rank(batch_shape.shape)))
 
-  batch_shape_static = tensor_util.constant_value_as_shape(batch_shape)
+  batch_shape_static = tensorshape_util.constant_value_as_shape(batch_shape)
   batch_size_static = tensorshape_util.num_elements(batch_shape_static)
   dist_batch_size_static = tensorshape_util.num_elements(
       distribution.batch_shape)

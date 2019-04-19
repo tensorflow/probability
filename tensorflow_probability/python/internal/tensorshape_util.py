@@ -20,11 +20,14 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow.python.framework import tensor_util  # pylint: disable=g-direct-tensorflow-import
+
 __all__ = [
     'as_list',
     'assert_has_rank',
     'assert_is_compatible_with',
     'concatenate',
+    'constant_value_as_shape',
     'dims',
     'is_compatible_with',
     'is_fully_defined',
@@ -111,6 +114,31 @@ def concatenate(x, other):
       dimensions in `x` and `other`.
   """
   return type(x)(tf.TensorShape(x).concatenate(other))
+
+
+def constant_value_as_shape(tensor):  # pylint: disable=invalid-name
+  """A version of `constant_value()` that returns a `TensorShape`.
+
+  This version should be used when a constant tensor value is
+  interpreted as a (possibly partial) shape, e.g. in the shape
+  function for `tf.reshape()`. By explicitly requesting a
+  `TensorShape` as the return value, it is possible to represent
+  unknown dimensions; by contrast, `constant_value()` is
+  all-or-nothing.
+
+  Args:
+    tensor: The rank-0 or rank-1 Tensor to be evaluated.
+
+  Returns:
+    A `TensorShape` based on the constant value of the given `tensor`.
+
+  Raises:
+    ValueError: If the shape is rank-0 and is not statically known to be -1.
+  """
+  shape = tf.get_static_value(tensor)
+  if shape is not None:
+    return [None if dim == -1 else dim for dim in shape]
+  return tensor_util.constant_value_as_shape(tensor)
 
 
 def dims(x):

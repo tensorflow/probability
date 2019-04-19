@@ -25,7 +25,6 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow.python.framework import tensor_util  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
@@ -320,7 +319,7 @@ class TransformedDistribution(distribution_lib.Distribution):
     # Since the `bijector` may change the `event_shape`, we then forward what we
     # know to the bijector. This allows the `bijector` to have final say in the
     # `event_shape`.
-    static_override = tensor_util.constant_value_as_shape(
+    static_override = tensorshape_util.constant_value_as_shape(
         self._override_event_shape)
     return self.bijector.forward_event_shape(
         static_override
@@ -343,7 +342,7 @@ class TransformedDistribution(distribution_lib.Distribution):
     # the `bijector` doesn't get to alter the `batch_shape`. Recall that
     # `batch_shape` is a property of a distribution while `event_shape` is
     # shared between both the `distribution` instance and the `bijector`.
-    static_override = tensor_util.constant_value_as_shape(
+    static_override = tensorshape_util.constant_value_as_shape(
         self._override_batch_shape)
     return (static_override
             if self._is_maybe_batch_override

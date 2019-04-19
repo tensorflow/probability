@@ -27,7 +27,6 @@ from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow.python.framework import tensor_util  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -260,7 +259,7 @@ def _replace_event_shape_in_shape_tensor(
       `event_shape_out`.
   """
   output_tensorshape, is_validated = _replace_event_shape_in_tensorshape(
-      tensor_util.constant_value_as_shape(input_shape),
+      tensorshape_util.constant_value_as_shape(input_shape),
       event_shape_in,
       event_shape_out)
 
@@ -372,7 +371,8 @@ def _replace_event_shape_in_tensorshape(
           'Input `event_shape` does not match `event_shape_in`. '
           '({} vs {}).'.format(input_event_shape_, event_shape_in_))
 
-  event_tensorshape_out = tensor_util.constant_value_as_shape(event_shape_out)
+  event_tensorshape_out = tensorshape_util.constant_value_as_shape(
+      event_shape_out)
   if tensorshape_util.rank(event_tensorshape_out) is None:
     output_tensorshape = tf.TensorShape(None)
   else:
