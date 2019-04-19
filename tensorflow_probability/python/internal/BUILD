@@ -105,6 +105,27 @@ py_library(
 )
 
 py_library(
+    name = "nest_util",
+    srcs = ["nest_util.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "nest_util_test",
+    size = "small",
+    srcs = ["nest_util_test.py"],
+    deps = [
+        ":nest_util",
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_library(
     name = "prefer_static",
     srcs = ["prefer_static.py"],
     deps = [
