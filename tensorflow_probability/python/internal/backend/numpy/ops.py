@@ -45,6 +45,7 @@ __all__ = [
     'stop_gradient',
     'GradientTape',
     'TensorShape',
+    'Variable',
     # 'gradients',
 ]
 
@@ -212,3 +213,10 @@ stop_gradient = utils.copy_docstring(
     lambda input, name=None: np.array(input))
 
 TensorShape = tf.TensorShape
+
+
+def Variable(initial_value=None, trainable=True, validate_shape=True,  # pylint: disable=unused-argument,invalid-name
+             caching_device=None, name=None, variable_def=None, dtype=None,  # pylint: disable=unused-argument
+             import_scope=None, constraint=None):  # pylint: disable=unused-argument
+  assert constraint is None
+  return np.array(initial_value, dtype=dtype or np.float32)

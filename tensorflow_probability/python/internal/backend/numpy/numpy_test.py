@@ -151,17 +151,28 @@ def psd_matrix(draw, eps=1e-2):
 
 
 # __Currently untested:__
-# math.bincount
-# math.polyval
-# linalg.set_diag
-# linalg.diag_part
-# linalg.band_part
-# broadcast_to
-# math.accumulate_n
-# linalg.triangular_solve
 # broadcast_dynamic_shape
 # broadcast_static_shape
+# broadcast_to
+# linalg.band_part
+# linalg.diag_part
+# linalg.set_diag
+# linalg.triangular_solve
+# math.accumulate_n
+# math.betainc
+# math.bincount
+# math.igamma
+# math.igammac
+# math.lbeta
+# math.polyval
 # math.zeta
+# random.categorical
+# random.gamma
+# random.normal
+# random.poisson
+# random.set_seed
+# random.uniform
+
 
 # TODO(jamieas): add tests for these functions.
 

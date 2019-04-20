@@ -24,10 +24,17 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.internal.backend.numpy.internal import utils
+from tensorflow_probability.python.internal.backend.numpy.math import log_softmax
+from tensorflow_probability.python.internal.backend.numpy.math import softmax
+from tensorflow_probability.python.internal.backend.numpy.math import softplus
 
 
 __all__ = [
+    'log_softmax',
     'relu',
+    'softmax',
+    'softplus',
+    # 'sigmoid_cross_entropy_with_logits',
 ]
 
 

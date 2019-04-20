@@ -47,7 +47,7 @@ __all__ = [
     'bessel_i0e',
     'bessel_i1',
     'bessel_i1e',
-    # 'betainc',
+    'betainc',
     'bincount',
     'ceil',
     # 'confusion_matrix',
@@ -69,8 +69,8 @@ __all__ = [
     'floordiv',
     'greater',
     'greater_equal',
-    # 'igamma',
-    # 'igammac',
+    'igamma',
+    'igammac',
     'imag',
     # 'in_top_k',
     # 'invert_permutation',
@@ -80,7 +80,7 @@ __all__ = [
     # 'is_non_decreasing',
     # 'is_strictly_increasing',
     # 'l2_normalize',
-    # 'lbeta',
+    'lbeta',
     'less',
     'less_equal',
     'lgamma',
@@ -152,14 +152,26 @@ __all__ = [
 ]
 
 
+def _astuple(x):
+  try:
+    return tuple(x)
+  except TypeError:
+    return x
+
+
 def _bincount(arr, weights=None, minlength=None, maxlength=None,  # pylint: disable=unused-argument
               dtype=tf.int32, name=None):  # pylint: disable=unused-argument
   return np.bincount(arr, weights, minlength).astype(utils.numpy_dtype(dtype))
 
 
+def _lbeta(x, name=None):  # pylint: disable=unused-argument
+  x = np.array(x)
+  return scipy_special.betaln(x[..., 0], x[..., 1])
+
+
 def _max_mask_non_finite(x, axis=-1, keepdims=False, mask=0):
   """Returns `max` or `mask` if `max` is not finite."""
-  m = np.max(x, axis=axis, keepdims=keepdims)
+  m = np.max(x, axis=_astuple(axis), keepdims=keepdims)
   needs_masking = ~np.isfinite(m)
   if needs_masking.ndim > 0:
     m[needs_masking] = mask
@@ -172,21 +184,22 @@ def _softmax(logits, axis=None, name=None):  # pylint: disable=unused-argument
   axis = -1 if axis is None else axis
   y = logits - _max_mask_non_finite(logits, axis=axis, keepdims=True)
   np.exp(y, out=y)
-  y /= np.sum(y, axis=axis, keepdims=True)
+  y /= np.sum(y, axis=_astuple(axis), keepdims=True)
   return y
 
 
 def _reduce_logsumexp(input_tensor, axis=None, keepdims=False, name=None):  # pylint: disable=unused-argument
   """Computes `log(sum(exp(input_tensor))) along the specified axis."""
   try:
-    return scipy_special.logsumexp(input_tensor, axis=axis, keepdims=keepdims)
+    return scipy_special.logsumexp(
+        input_tensor, axis=_astuple(axis), keepdims=keepdims)
   except NotImplementedError:
     # We offer a non SP version just in case SP isn't installed and this
     # because logsumexp is often used.
     m = _max_mask_non_finite(input_tensor, axis=axis, keepdims=True)
     y = input_tensor - m
     y = np.exp(y, out=y)
-    return m + np.log(np.sum(y, axis=axis, keepdims=keepdims))
+    return m + np.log(np.sum(y, axis=_astuple(axis), keepdims=keepdims))
 
 
 # --- Begin Public Functions --------------------------------------------------
@@ -224,13 +237,13 @@ angle = utils.copy_docstring(
 argmax = utils.copy_docstring(
     tf.math.argmax,
     lambda input, axis=None, output_type=tf.int64, name=None: (  # pylint: disable=g-long-lambda
-        np.argmax(input, axis=0 if axis is None else axis)
+        np.argmax(input, axis=0 if axis is None else _astuple(axis))
         .astype(utils.numpy_dtype(output_type))))
 
 argmin = utils.copy_docstring(
     tf.math.argmin,
     lambda input, axis=None, output_type=tf.int64, name=None: (  # pylint: disable=g-long-lambda
-        np.argmin(input, axis=0 if axis is None else axis)
+        np.argmin(input, axis=0 if axis is None else _astuple(axis))
         .astype(utils.numpy_dtype(output_type))))
 
 asin = utils.copy_docstring(
@@ -269,9 +282,9 @@ bessel_i1e = utils.copy_docstring(
     tf.math.bessel_i1e,
     lambda x, name=None: scipy_special.i1e(x))
 
-# betainc = utils.copy_docstring(
-#     tf.math.betainc,
-#     lambda betainc(a, b, x, name=None): scipy_special.betainc(...))
+betainc = utils.copy_docstring(
+    tf.math.betainc,
+    lambda a, b, x, name=None: scipy_special.betainc(a, b, x))
 
 bincount = utils.copy_docstring(
     tf.math.bincount,
@@ -306,12 +319,12 @@ count_nonzero = utils.copy_docstring(
 cumprod = utils.copy_docstring(
     tf.math.cumprod,
     lambda x, axis=0, exclusive=False, reverse=False, name=None: (  # pylint: disable=g-long-lambda
-        np.cumprod(x, axis)))
+        np.cumprod(x, _astuple(axis))))
 
 cumsum = utils.copy_docstring(
     tf.math.cumsum,
     lambda x, axis=0, exclusive=False, reverse=False, name=None: (  # pylint: disable=g-long-lambda
-        np.cumsum(x, axis)))
+        np.cumsum(x, _astuple(axis))))
 
 digamma = utils.copy_docstring(
     tf.math.digamma,
@@ -364,13 +377,13 @@ greater_equal = utils.copy_docstring(
     tf.math.greater_equal,
     lambda x, y, name=None: np.greater_equal(x, y))
 
-# igamma = utils.copy_docstring(
-#     tf.math.igamma,
-#     lambda a, x, name=None: scipy_special.gammainc)
+igamma = utils.copy_docstring(
+    tf.math.igamma,
+    lambda a, x, name=None: scipy_special.gammainc(a, x))
 
-# igammac = utils.copy_docstring(
-#     tf.math.igammac,
-#     lambda a, x, name=None: scipy_special.gammainc)
+igammac = utils.copy_docstring(
+    tf.math.igammac,
+    lambda a, x, name=None: scipy_special.gammaincc(a, x))
 
 imag = utils.copy_docstring(
     tf.math.imag,
@@ -408,9 +421,9 @@ is_nan = utils.copy_docstring(
 #     tf.math.l2_normalize,
 #     lambda x, axis=None, epsilon=1e-12, name=None: np.l2_normalize)
 
-# lbeta = utils.copy_docstring(
-#     tf.math.lbeta,
-#     lambda x, name=None: np.lbeta(x))
+lbeta = utils.copy_docstring(
+    tf.math.lbeta,
+    _lbeta)
 
 less = utils.copy_docstring(
     tf.math.less,
@@ -512,12 +525,12 @@ reciprocal = utils.copy_docstring(
 reduce_all = utils.copy_docstring(
     tf.math.reduce_all,
     lambda input_tensor, axis=None, keepdims=False, name=None: (  # pylint: disable=g-long-lambda
-        np.all(input_tensor, axis, keepdims=keepdims)))
+        np.all(input_tensor, _astuple(axis), keepdims=keepdims)))
 
 reduce_any = utils.copy_docstring(
     tf.math.reduce_any,
     lambda input_tensor, axis=None, keepdims=False, name=None: (  # pylint: disable=g-long-lambda
-        np.any(input_tensor, axis, keepdims=keepdims)))
+        np.any(input_tensor, _astuple(axis), keepdims=keepdims)))
 
 # reduce_euclidean_norm = utils.copy_docstring(
 #     tf.math.reduce_euclidean_norm,
@@ -531,37 +544,37 @@ reduce_logsumexp = utils.copy_docstring(
 reduce_max = utils.copy_docstring(
     tf.math.reduce_max,
     lambda input_tensor, axis=None, keepdims=False, name=None: (  # pylint: disable=g-long-lambda
-        np.max(input_tensor, axis, keepdims=keepdims)))
+        np.max(input_tensor, _astuple(axis), keepdims=keepdims)))
 
 reduce_mean = utils.copy_docstring(
     tf.math.reduce_mean,
     lambda input_tensor, axis=None, keepdims=False, name=None: (  # pylint: disable=g-long-lambda
-        np.mean(input_tensor, axis, keepdims=keepdims)))
+        np.mean(input_tensor, _astuple(axis), keepdims=keepdims)))
 
 reduce_min = utils.copy_docstring(
     tf.math.reduce_min,
     lambda input_tensor, axis=None, keepdims=False, name=None: (  # pylint: disable=g-long-lambda
-        np.min(input_tensor, axis, keepdims=keepdims)))
+        np.min(input_tensor, _astuple(axis), keepdims=keepdims)))
 
 reduce_prod = utils.copy_docstring(
     tf.math.reduce_prod,
     lambda input_tensor, axis=None, keepdims=False, name=None: (  # pylint: disable=g-long-lambda
-        np.prod(input_tensor, axis, keepdims=keepdims)))
+        np.prod(input_tensor, _astuple(axis), keepdims=keepdims)))
 
 reduce_std = utils.copy_docstring(
     tf.math.reduce_std,
     lambda input_tensor, axis=None, keepdims=False, name=None: (  # pylint: disable=g-long-lambda
-        np.std(input_tensor, axis, keepdims=keepdims)))
+        np.std(input_tensor, _astuple(axis), keepdims=keepdims)))
 
 reduce_sum = utils.copy_docstring(
     tf.math.reduce_sum,
     lambda input_tensor, axis=None, keepdims=False, name=None: (  # pylint: disable=g-long-lambda
-        np.sum(input_tensor, axis, keepdims=keepdims)))
+        np.sum(input_tensor, _astuple(axis), keepdims=keepdims)))
 
 reduce_variance = utils.copy_docstring(
     tf.math.reduce_variance,
     lambda input_tensor, axis=None, keepdims=False, name=None: (  # pylint: disable=g-long-lambda
-        np.var(input_tensor, axis, keepdims=keepdims)))
+        np.var(input_tensor, _astuple(axis), keepdims=keepdims)))
 
 rint = utils.copy_docstring(
     tf.math.rint,

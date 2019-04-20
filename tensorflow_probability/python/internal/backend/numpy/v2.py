@@ -19,8 +19,10 @@ from __future__ import division
 from __future__ import print_function
 
 from tensorflow_probability.python.internal.backend.numpy.ops import name_scope
+from tensorflow_probability.python.internal.backend.numpy.ops import Variable
 
 
 __all__ = [
     'name_scope',
+    'Variable',
 ]

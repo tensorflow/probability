@@ -35,3 +35,4 @@ from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-i
 
 eye = linalg.eye
 matmul = linalg.matmul
+Variable = compat.v2.Variable

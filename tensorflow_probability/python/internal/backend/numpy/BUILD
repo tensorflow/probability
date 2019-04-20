@@ -141,6 +141,7 @@ py_library(
     name = "nn",
     srcs = ["nn.py"],
     deps = [
+        ":math",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
@@ -161,6 +162,7 @@ py_library(
     name = "random_generators",
     srcs = ["random_generators.py"],
     deps = [
+        ":math",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal/backend/numpy/internal:utils",

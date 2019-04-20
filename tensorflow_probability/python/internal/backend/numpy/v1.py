@@ -42,6 +42,7 @@ __all__ = [
     'assert_positive',
     'assert_rank',
     'assert_rank_at_least',
+    'global_variables_initializer',
     'name_scope',
     'placeholder_with_default',
     'set_random_seed',
@@ -70,6 +71,10 @@ assert_rank_at_least = tf.compat.v1.assert_rank_at_least
 placeholder_with_default = utils.copy_docstring(
     tf.compat.v1.placeholder_with_default,
     lambda input, shape, name=None: np.array(input).reshape(shape))  # pylint: disable=redefined-builtin,unused-argument
+
+global_variables_initializer = utils.copy_docstring(
+    tf.compat.v1.global_variables_initializer,
+    lambda: None)
 
 set_random_seed = utils.copy_docstring(
     tf.compat.v1.set_random_seed,
