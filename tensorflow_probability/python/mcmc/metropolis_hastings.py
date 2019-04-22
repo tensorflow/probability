@@ -81,7 +81,7 @@ class MetropolisHastings(kernel_base.TransitionKernel):
   Metropolis-Hastings algorithm, i.e.,
 
   ```none
-  accept_prob(x' | x) = p(x') / p(x) (g(x|x') / g(x|x'))
+  accept_prob(x' | x) = p(x') / p(x) (g(x|x') / g(x'|x))
 
   where,
     p  represents the target distribution,
