@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import collections
+
 # Dependency imports
 from absl.testing import parameterized
 
@@ -299,6 +301,13 @@ class JointDistributionSequentialTest(tf.test.TestCase, parameterized.TestCase):
     self.assertIs(None, argspec.varargs)
     self.assertIs('named', argspec.varkw)
     self.assertAllEqual((None,), argspec.defaults)
+
+  def test_invalid_structure_raises_error(self):
+    with self.assertRaisesWithPredicateMatch(
+        TypeError, 'Unable to unflatten like `model` with type "model".'):
+      tfd.JointDistributionSequential(collections.namedtuple('model', 'a b')(
+          a=tfd.Normal(0, 1),
+          b=tfd.Normal(1, 2)))
 
 
 if __name__ == '__main__':

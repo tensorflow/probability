@@ -18,8 +18,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import collections
+
 from tensorflow_probability.python.distributions import joint_distribution_sequential
 from tensorflow_probability.python.internal import distribution_util
+
 
 __all__ = [
     'JointDistributionNamed',
@@ -139,6 +142,15 @@ class JointDistributionNamed(
   distributions' batch shapes and `joint.batch_shape_tensor()` returns a
   structure of `Tensor`s for each of the distributions' event shapes. (Same with
   `event_shape` analogues.)
+
+  **Note**: unlike other non-`JointDistribution` distributions in
+  `tfp.distributions`, `JointDistributionNamed.sample` (and subclasses) return a
+  structure of  `Tensor`s rather than a `Tensor`.  A structure can be anything
+  which is convertible to `dict`. This can be a `dict`,
+  `collections.namedtuple`, etc. Accordingly `joint.batch_shape` returns a
+  structure of `TensorShape`s for each of the distributions' batch shapes and
+  `joint.batch_shape_tensor()` returns a structure of `Tensor`s for each of the
+  distributions' event shapes. (Same with `event_shape` analogues.)
   """
 
   def __init__(self, model, validate_args=False, name=None):
@@ -146,18 +158,22 @@ class JointDistributionNamed(
 
     Args:
       model: Python `dict` or `namedtuple` of distribution-making functions each
-        with required args corresponding only to other keys in the `dict`.
+        with required args corresponding only to other keys.
       validate_args: Python `bool`.  Whether to validate input with asserts.
         If `validate_args` is `False`, and the inputs are invalid,
         correct behavior is not guaranteed.
+        Default value: `False`.
       name: The name for ops managed by the distribution.
-        Default value: `"JointDistributionNamed"`.
+        Default value: `None` (i.e., `"JointDistributionNamed"`).
     """
     super(JointDistributionNamed, self).__init__(
         model, validate_args, name or 'JointDistributionNamed')
 
   def _build(self, model):
     """Creates `dist_fn`, `dist_fn_wrapped`, `dist_fn_args`, `dist_fn_name`."""
+    if not _is_dict_like(model):
+      raise TypeError('`model` must be convertible to `dict` (saw: {}).'.format(
+          type(model).__name__))
     [
         self._dist_fn,
         self._dist_fn_wrapped,
@@ -167,7 +183,7 @@ class JointDistributionNamed(
 
   def _unflatten(self, xs):
     kwargs = dict(zip(self._dist_fn_name, tuple(xs)))
-    return type(self._original_model)(**kwargs)
+    return type(self.model)(**kwargs)
 
   def _flatten(self, xs):
     if xs is None:
@@ -238,9 +254,7 @@ def _prob_chain_rule_flatten(named_makers):
       kwargs.pop('_', None)
       return dist_fn(**kwargs)
     return _fn
-  named_makers = (named_makers._asdict()
-                  if hasattr(named_makers, '_asdict')
-                  else dict(named_makers))
+  named_makers = _convert_to_dict(named_makers)
   g = {k: (None if distribution_util.is_distribution_instance(v)
            else joint_distribution_sequential._get_required_args(v))  # pylint: disable=protected-access
        for k, v in named_makers.items()}
@@ -251,3 +265,17 @@ def _prob_chain_rule_flatten(named_makers):
                           for (name, parents) in g)
   dist_fn = tuple(named_makers.get(n) for n in dist_fn_name)
   return dist_fn, dist_fn_wrapped, dist_fn_args, dist_fn_name
+
+
+def _is_dict_like(x):
+  """Returns `True` if input is convertible to `dict`, `False` otherwise."""
+  if hasattr(x, '_asdict'):
+    return True
+  return isinstance(x, collections.Mapping)
+
+
+def _convert_to_dict(x):
+  """Converts input to `dict`."""
+  if hasattr(x, '_asdict'):
+    return x._asdict()
+  return dict(x)

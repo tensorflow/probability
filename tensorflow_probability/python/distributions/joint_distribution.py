@@ -54,33 +54,133 @@ class JointDistribution(distribution_lib.Distribution):
 
   #### Subclass Requirements
 
-  Subclasses typically implement:
+  Subclasses implement:
 
-  - `_sample_distributions`: returns two `tuple`s: the first being an ordered
-      sequence of `Distribution`-like instances the second being a sequence of
-      `Tensor` samples, each one drawn from its corresponding
-      `Distribution`-like instance.
+  - `_flat_sample_distributions`: returns two `list`-likes: the first being a
+    sequence of `Distribution`-like instances the second being a sequence of
+    `Tensor` samples, each one drawn from its corresponding `Distribution`-like
+    instance.
 
-  Subclasses also implement standard `Distribution` members:
+  - `_flatten`: takes a structured input and returns a sequence.
 
-  - `dtype`
-  - `reparameterization_type`
-  - `batch_shape_tensor`
-  - `batch_shape`
-  - `event_shape_tensor`
-  - `event_shape`
-  - `__getitem__`
-  - `is_scalar_event`
-  - `is_scalar_batch`
+  - `_unflatten`: takes a sequence and returns a structure matching the
+    semantics of the `JointDistribution` subclass.
 
-  Unlike usual `Distribution` subclasses, `JointDistribution` subclasses
-  override the `Distribution` public-level functions so the subclass can return
-  a `tuple` of values, one for each component `Distribution`-like instance.
+  Subclasses initialize:
+
+  - `_most_recently_built_distributions`: an iterable sequence of distributions
+    which are known at `__init__` or `None`.
   """
 
+  @property
+  def model(self):
+    return self._model
+
   @abc.abstractmethod
-  def _sample_distributions(self, sample_shape=(), seed=None, value=None):
+  def _flat_sample_distributions(self, sample_shape=(), seed=None, value=None):
     raise NotImplementedError()
+
+  @abc.abstractmethod
+  def _unflatten(self, xs):
+    raise NotImplementedError()
+
+  @abc.abstractmethod
+  def _flatten(self, xs):
+    raise NotImplementedError()
+
+  @property
+  def dtype(self):
+    """The `DType` of `Tensor`s handled by this `Distribution`."""
+    if self._most_recently_built_distributions is None:
+      return None
+    return self._unflatten(
+        None if d is None else d.dtype
+        for d in self._most_recently_built_distributions)
+
+  @property
+  def reparameterization_type(self):
+    """Describes how samples from the distribution are reparameterized.
+
+    Currently this is one of the static instances
+    `tfd.FULLY_REPARAMETERIZED` or `tfd.NOT_REPARAMETERIZED`.
+
+    Returns:
+      reparameterization_type: `ReparameterizationType` of each distribution in
+        `model`.
+    """
+    if self._most_recently_built_distributions is None:
+      return None
+    return self._unflatten(
+        None if d is None else d.reparameterization_type
+        for d in self._most_recently_built_distributions)
+
+  @property
+  def batch_shape(self):
+    """Shape of a single sample from a single event index as a `TensorShape`.
+
+    May be partially defined or unknown.
+
+    The batch dimensions are indexes into independent, non-identical
+    parameterizations of this distribution.
+
+    Returns:
+      batch_shape: `tuple` of `TensorShape`s representing the `batch_shape` for
+        each distribution in `model`.
+    """
+    # The following cannot leak graph Tensors in eager because `batch_shape` is
+    # a `TensorShape`.
+    if self._most_recently_built_distributions is None:
+      return None
+    return self._unflatten(
+        tf.TensorShape(None) if d is None else d.batch_shape
+        for d in self._most_recently_built_distributions)
+
+  def batch_shape_tensor(self, name='batch_shape_tensor'):
+    """Shape of a single sample from a single event index as a 1-D `Tensor`.
+
+    The batch dimensions are indexes into independent, non-identical
+    parameterizations of this distribution.
+
+    Args:
+      name: name to give to the op
+
+    Returns:
+      batch_shape: `Tensor` representing batch shape of each distribution in
+        `model`.
+    """
+    with self._name_scope(name):
+      return self._unflatten(self._map_attr_over_dists('batch_shape_tensor')[1])
+
+  @property
+  def event_shape(self):
+    """Shape of a single sample from a single batch as a `TensorShape`.
+
+    May be partially defined or unknown.
+
+    Returns:
+      event_shape: `tuple` of `TensorShape`s representing the `event_shape` for
+        each distribution in `model`.
+    """
+    # The following cannot leak graph Tensors in eager because `batch_shape` is
+    # a `TensorShape`.
+    if self._most_recently_built_distributions is None:
+      return None
+    return self._unflatten(
+        tf.TensorShape(None) if d is None else d.event_shape
+        for d in self._most_recently_built_distributions)
+
+  def event_shape_tensor(self, name='event_shape_tensor'):
+    """Shape of a single sample from a single batch as a 1-D int32 `Tensor`.
+
+    Args:
+      name: name to give to the op
+
+    Returns:
+      event_shape: `tuple` of `Tensor`s representing the `event_shape` for each
+        distribution in `model`.
+    """
+    with self._name_scope(name):
+      return self._unflatten(self._map_attr_over_dists('event_shape_tensor')[1])
 
   def sample_distributions(self, sample_shape=(), seed=None, value=None,
                            name='sample_distributions'):
@@ -105,7 +205,8 @@ class JointDistribution(distribution_lib.Distribution):
         for each of `distribution_fn`.
     """
     with self._name_scope(name):
-      return self._sample_distributions(sample_shape, seed, value)
+      ds, xs = self._call_flat_sample_distributions(sample_shape, seed, value)
+      return self._unflatten(ds), self._unflatten(xs)
 
   def log_prob_parts(self, value, name='log_prob_parts'):
     """Log probability density/mass function.
@@ -122,8 +223,8 @@ class JointDistribution(distribution_lib.Distribution):
         each `distribution_fn` evaluated at each corresponding `value`.
     """
     with self._name_scope(name):
-      return tf.nest.pack_sequence_as(
-          *self._compute_flat_measure('log_prob', value))
+      _, xs = self._map_measure_over_dists('log_prob', value)
+      return self._unflatten(xs)
 
   def prob_parts(self, value, name='prob_parts'):
     """Log probability density/mass function.
@@ -139,11 +240,36 @@ class JointDistribution(distribution_lib.Distribution):
         each `distribution_fn` evaluated at each corresponding `value`.
     """
     with self._name_scope(name):
-      return tf.nest.pack_sequence_as(
-          *self._compute_flat_measure('prob', value))
+      _, xs = self._map_measure_over_dists('prob', value)
+      return self._unflatten(xs)
+
+  def is_scalar_event(self, name='is_scalar_event'):
+    """Indicates that `event_shape == []`.
+
+    Args:
+      name: Python `str` prepended to names of ops created by this function.
+
+    Returns:
+      is_scalar_event: `bool` scalar `Tensor` for each distribution in `model`.
+    """
+    with self._name_scope(name):
+      return self._unflatten(self._map_attr_over_dists('is_scalar_event')[1])
+
+  def is_scalar_batch(self, name='is_scalar_batch'):
+    """Indicates that `batch_shape == []`.
+
+    Args:
+      name: Python `str` prepended to names of ops created by this function.
+
+    Returns:
+      is_scalar_batch: `bool` scalar `Tensor` for each distribution in `model`.
+    """
+    with self._name_scope(name):
+      return self._unflatten(self._map_attr_over_dists('is_scalar_batch')[1])
 
   def _log_prob(self, value):
-    return sum(self._compute_flat_measure('log_prob', value)[1])
+    _, xs = self._map_measure_over_dists('log_prob', value)
+    return sum(xs)
 
   @distribution_util.AppendDocstring(kwargs_dict={
       'value': ('`Tensor`s structured like `type(model)` used to parameterize '
@@ -152,16 +278,32 @@ class JointDistribution(distribution_lib.Distribution):
                 'corresponding distribution. Default value: `None` '
                 '(i.e., draw a sample from each distribution).')})
   def _sample_n(self, sample_shape, seed, value=None):
-    return self._sample_distributions(sample_shape, seed, value)[1]
+    _, xs = self._call_flat_sample_distributions(sample_shape, seed, value)
+    return self._unflatten(xs)
 
-  def _compute_flat_measure(self, attr, value):
+  def _map_measure_over_dists(self, attr, value):
     if any(x is None for x in tf.nest.flatten(value)):
       raise ValueError('No `value` part can be `None`; saw: {}.'.format(value))
-    ds, xs = self.sample_distributions(value=value)
+    ds, xs = self._call_flat_sample_distributions(value=value)
     return ds, maybe_check_wont_broadcast(
-        (getattr(d, attr)(x) for d, x
-         in zip(tf.nest.flatten(ds), tf.nest.flatten(xs))),
+        (getattr(d, attr)(x) for d, x in zip(ds, xs)),
         self.validate_args)
+
+  def _map_attr_over_dists(self, attr):
+    if (not self._most_recently_built_distributions or
+        any(d is None for d in self._most_recently_built_distributions)):
+      # Same seed to help CSE.
+      ds, _ = self._call_flat_sample_distributions(seed=42)
+    else:
+      ds = self._most_recently_built_distributions
+    return ds, (None if d is None else getattr(d, attr)() for d in ds)
+
+  def _call_flat_sample_distributions(
+      self, sample_shape=(), seed=None, value=None):
+    ds, xs = self._flat_sample_distributions(sample_shape, seed, value)
+    if not value:
+      self._most_recently_built_distributions = ds
+    return ds, xs
 
   # We need to bypass base Distribution reshaping/validation logic so we
   # tactically implement a few of the `_call_*` redirectors.  We don't want to

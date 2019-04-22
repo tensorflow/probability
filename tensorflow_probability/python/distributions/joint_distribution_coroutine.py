@@ -152,148 +152,25 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
       self._model = model
       self._most_recently_built_distributions = None
       super(JointDistributionCoroutine, self).__init__(
-          dtype=None,
-          reparameterization_type=None,
+          dtype=None,  # Ignored; we'll override.
+          reparameterization_type=None,  # Ignored; we'll override.
           validate_args=validate_args,
           allow_nan_stats=False,
           parameters=parameters,
           graph_parents=[],
           name=name)
 
-  @property
-  def model(self):
-    return self._model
-
-  @property
-  def dtype(self):
-    """The `DType` of `Tensor`s handled by this `Distribution`."""
-    if self._most_recently_built_distributions is None:
-      return None
-    return tuple(None if d is None else d.dtype
-                 for d in self._most_recently_built_distributions)
-
-  @property
-  def reparameterization_type(self):
-    """Describes how samples from the distribution are reparameterized.
-
-    Currently this is one of the static instances
-    `tfd.FULLY_REPARAMETERIZED` or `tfd.NOT_REPARAMETERIZED`.
-
-    Returns:
-      reparameterization_type: `tuple` of `ReparameterizationType` for each
-        `model`.
-    """
-    return tuple(None if d is None else d.reparameterization_type
-                 for d in self._most_recently_built_distributions)
-
-  def batch_shape_tensor(self, name='batch_shape_tensor'):
-    """Shape of a single sample from a single event index as a 1-D `Tensor`.
-
-    The batch dimensions are indexes into independent, non-identical
-    parameterizations of this distribution.
-
-    Args:
-      name: name to give to the op
-
-    Returns:
-      batch_shape: `tuple` of `Tensor`s representing the `batch_shape` for each
-        of `model`.
-    """
-    with self._name_scope(name):
-      ds, _ = self.sample_distributions(seed=42)  # Same seed to help CSE
-      return tuple(d.batch_shape_tensor() for d in ds)
-
-  @property
-  def batch_shape(self):
-    """Shape of a single sample from a single event index as a `TensorShape`.
-
-    May be partially defined or unknown.
-
-    The batch dimensions are indexes into independent, non-identical
-    parameterizations of this distribution.
-
-    Returns:
-      batch_shape: `tuple` of `TensorShape`s representing the `batch_shape` for
-        each of `model`.
-    """
-    # The following cannot leak graph Tensors in eager because `batch_shape` is
-    # a `TensorShape`.
-    if self._most_recently_built_distributions is None:
-      return tf.TensorShape(None)
-    return tuple(tf.TensorShape(None) if d is None else d.batch_shape
-                 for d in self._most_recently_built_distributions)
-
-  def event_shape_tensor(self, name='event_shape_tensor'):
-    """Shape of a single sample from a single batch as a 1-D int32 `Tensor`.
-
-    Args:
-      name: name to give to the op
-
-    Returns:
-      event_shape: `tuple` of `Tensor`s representing the `event_shape` for each
-        of `model`.
-    """
-    with self._name_scope(name):
-      ds, _ = self.sample_distributions(seed=42)  # Same seed to help CSE
-      return tuple(d.event_shape_tensor() for d in ds)
-
-  @property
-  def event_shape(self):
-    """Shape of a single sample from a single batch as a `TensorShape`.
-
-    May be partially defined or unknown.
-
-    Returns:
-      event_shape: `tuple` of `TensorShape`s representing the `event_shape` for
-        each of `model`.
-    """
-    # The following cannot leak graph Tensors in eager because `batch_shape` is
-    # a `TensorShape`.
-    if self._most_recently_built_distributions is None:
-      return tf.TensorShape(None)
-    return tuple(tf.TensorShape(None) if d is None else d.event_shape
-                 for d in self._most_recently_built_distributions)
-
-  # TODO(b/130736837): move to base class
-  def is_scalar_event(self, name='is_scalar_event'):
-    """Indicates that `event_shape == []`.
-
-    Args:
-      name: Python `str` prepended to names of ops created by this function.
-
-    Returns:
-      is_scalar_event: `bool` scalar `Tensor`.
-    """
-    with self._name_scope(name):
-      ds, _ = self.sample_distributions(seed=42)  # Same seed to help CSE.
-      return tuple(None if d is None else d.is_scalar_event() for d in ds)
-
-  def is_scalar_batch(self, name='is_scalar_batch'):
-    """Indicates that `batch_shape == []`.
-
-    Args:
-      name: Python `str` prepended to names of ops created by this function.
-
-    Returns:
-      is_scalar_batch: `bool` scalar `Tensor`.
-    """
-    with self._name_scope(name):
-      ds, _ = self.sample_distributions(seed=42)  # Same seed to help CSE.
-      return tuple(None if d is None else d.is_scalar_batch() for d in ds)
-
-  def _sample_distributions(self, sample_shape=(), seed=None, value=None):
+  def _flat_sample_distributions(self, sample_shape=(), seed=None, value=None):
     """Executes `model`, creating both samples and distributions."""
     ds = []
     values_out = []
     seed = seed_stream.SeedStream('JointDistributionCoroutine', seed)
     gen = self._model()
-
     index = 0
     d = next(gen)
     try:
       while True:
         actual_distribution = d.distribution if isinstance(d, self.Root) else d
-
         ds.append(actual_distribution)
         if (value is not None and len(value) > index and
             value[index] is not None):
@@ -304,15 +181,14 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
               sample_shape=sample_shape if isinstance(d, self.Root) else (),
               seed=seed())
         values_out.append(next_value)
-
         index += 1
-
         d = gen.send(next_value)
-
     except StopIteration:
       pass
+    return ds, values_out
 
-    if not value:
-      self._most_recently_built_distributions = ds
+  def _unflatten(self, xs):
+    return tuple(xs)
 
-    return tuple(ds), tuple(values_out)
+  def _flatten(self, xs):
+    return tuple(xs)
