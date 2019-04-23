@@ -34,9 +34,16 @@ tfb = tfp.bijectors
 
 SPECIAL_BIJECTORS = ['Invert']
 
+# INSTANTIABLE_BIJECTORS is a map from str->(BijectorClass,)
+INSTANTIABLE_BIJECTORS = None
+
 
 def instantiable_bijectors():
   """Identifies bijectors that are trivially instantiable."""
+  global INSTANTIABLE_BIJECTORS
+  if INSTANTIABLE_BIJECTORS is not None:
+    return INSTANTIABLE_BIJECTORS
+
   result = {}
   for (bijector_name, bijector_class) in six.iteritems(tfb.__dict__):
     if (not inspect.isclass(bijector_class) or
@@ -60,12 +67,8 @@ def instantiable_bijectors():
 
   for bijector_name in sorted(result):
     logging.warning('Supported bijector: tfb.%s', bijector_name)
-  return result
-
-
-# INSTANTIABLE_BIJECTORS is a map from str->(BijectorClass,)
-INSTANTIABLE_BIJECTORS = instantiable_bijectors()
-del instantiable_bijectors
+  INSTANTIABLE_BIJECTORS = result
+  return INSTANTIABLE_BIJECTORS
 
 
 class Support(object):
@@ -86,9 +89,14 @@ class Support(object):
 
 BijectorSupport = collections.namedtuple('BijectorSupport', 'forward,inverse')
 
+BIJECTOR_SUPPORTS = None
+
 
 def bijector_supports():
-  """Returns a dict of bijector supports for each of INSTANTIABLE_BIJECTORS."""
+  """Returns a dict of support mappings for each instantiable bijector."""
+  global BIJECTOR_SUPPORTS
+  if BIJECTOR_SUPPORTS is not None:
+    return BIJECTOR_SUPPORTS
   supports = {
       'CholeskyOuterProduct':
           BijectorSupport(Support.MATRIX_LOWER_TRIL_POSITIVE_DEFINITE,
@@ -135,34 +143,31 @@ def bijector_supports():
           BijectorSupport(Support.SCALAR_UNCONSTRAINED,
                           Support.SCALAR_IN_NEG1_1),
   }
-  missing_keys = set(INSTANTIABLE_BIJECTORS.keys()) - set(supports.keys())
-  unexpected_keys = set(supports.keys()) - set(INSTANTIABLE_BIJECTORS.keys())
+  missing_keys = set(instantiable_bijectors().keys()) - set(supports.keys())
+  unexpected_keys = set(supports.keys()) - set(instantiable_bijectors().keys())
   if missing_keys:
     raise ValueError('Missing bijector supports: {}'.format(missing_keys))
   if unexpected_keys:
     raise ValueError('Unexpected bijector names: {}'.format(unexpected_keys))
-  return supports
-
-
-BIJECTOR_SUPPORTS = bijector_supports()
-del bijector_supports
+  BIJECTOR_SUPPORTS = supports
+  return BIJECTOR_SUPPORTS
 
 
 # TODO(b/128974935): Use hps.composite
 # @hps.composite
 def unconstrained_bijectors(draw):
   """Draws bijectors which can act on [numerically] unconstrained events."""
-  bijector_names = hps.one_of(map(hps.just, INSTANTIABLE_BIJECTORS.keys()))
+  bijector_names = hps.one_of(map(hps.just, instantiable_bijectors().keys()))
   bijector_name = draw(
       bijector_names.filter(lambda b: (  # pylint: disable=g-long-lambda
-          b == 'Invert' or 'UNCONSTRAINED' in BIJECTOR_SUPPORTS[b].forward)))
+          b == 'Invert' or 'UNCONSTRAINED' in bijector_supports()[b].forward)))
   if bijector_name == 'Invert':
     underlying = draw(
-        bijector_names.filter(lambda b: 'UNCONSTRAINED' in BIJECTOR_SUPPORTS[b].
-                              inverse))
-    underlying = INSTANTIABLE_BIJECTORS[underlying][0](validate_args=True)
+        bijector_names.filter(
+            lambda b: 'UNCONSTRAINED' in bijector_supports()[b].inverse))
+    underlying = instantiable_bijectors()[underlying][0](validate_args=True)
     return tfb.Invert(underlying, validate_args=True)
-  return INSTANTIABLE_BIJECTORS[bijector_name][0](validate_args=True)
+  return instantiable_bijectors()[bijector_name][0](validate_args=True)
 
 
 def distribution_filter_for(bijector):
