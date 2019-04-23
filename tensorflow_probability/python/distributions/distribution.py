@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import abc
+import collections
 import contextlib
 import inspect
 import types
@@ -1372,16 +1373,60 @@ class Distribution(_BaseDistribution):
     return tf.equal(tf.shape(input=shape)[0], 0)
 
 
+class _PrettyDict(dict):
+  """`dict` with stable `repr`, `str`."""
+
+  def __str__(self):
+    pairs = (": ".join([str(k), str(v)]) for k, v in sorted(self.items()))
+    return "{" + ", ".join(pairs) + "}"
+
+  def __repr__(self):
+    pairs = (": ".join([repr(k), repr(v)]) for k, v in sorted(self.items()))
+    return "{" + ", ".join(pairs) + "}"
+
+
+def _recursively_replace_dict_for_pretty_dict(x):
+  """Recursively replace `dict`s with `_PrettyDict`."""
+  # We use "PrettyDict" because collections.OrderedDict repr/str has the word
+  # "OrderedDict" in it. We only want to print "OrderedDict" if in fact the
+  # input really is an OrderedDict.
+  if isinstance(x, dict):
+    return _PrettyDict({
+        k: _recursively_replace_dict_for_pretty_dict(v)
+        for k, v in x.items()})
+  if (isinstance(x, collections.Sequence) and
+      not isinstance(x, six.string_types)):
+    args = (_recursively_replace_dict_for_pretty_dict(x_) for x_ in x)
+    is_named_tuple = (isinstance(x, tuple) and
+                      hasattr(x, "_asdict") and
+                      hasattr(x, "_fields"))
+    return type(x)(*args) if is_named_tuple else type(x)(args)
+  if isinstance(x, collections.Mapping):
+    return type(x)(**{k: _recursively_replace_dict_for_pretty_dict(v)
+                      for k, v in x.items()})
+  return x
+
+
 def _str_tensorshape(x):
-  str_ = lambda x_: str(x_) if x_ is not None else "<unknown>"
-  return (str_(x) if x is None or hasattr(x, "ndims")
-          else ("(" + ", ".join(map(str_, x)) + ")")).replace("None", "?")
+  def _str(s):
+    if tensorshape_util.rank(s) is None:
+      return "<unknown>"
+    return str(tensorshape_util.as_list(s)).replace("None", "?")
+  # Because Python2 `dict`s are unordered, we must replace them with
+  # `PrettyDict`s so __str__, __repr__ are deterministic.
+  x = _recursively_replace_dict_for_pretty_dict(x)
+  return str(tf.nest.map_structure(_str, x)).replace("'", "")
 
 
 def _str_dtype(x):
-  str_ = lambda x_: x_.name if x_ else "<unknown>"
-  return (str_(x) if x is None or hasattr(x, "name")
-          else ("(" + ", ".join(map(str_, x)) + ")"))
+  def _str(s):
+    if s is None:
+      return "<unknown>"
+    return dtype_util.name(s)
+  # Because Python2 `dict`s are unordered, we must replace them with
+  # `PrettyDict`s so __str__, __repr__ are deterministic.
+  x = _recursively_replace_dict_for_pretty_dict(x)
+  return str(tf.nest.map_structure(_str, x)).replace("'", "")
 
 
 class ConditionalDistribution(Distribution):
