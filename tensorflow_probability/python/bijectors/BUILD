@@ -579,6 +579,7 @@ py_test(
     size = "small",
     srcs = ["bijector_test.py"],
     deps = [
+        # mock dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",

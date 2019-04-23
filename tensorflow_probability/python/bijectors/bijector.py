@@ -129,6 +129,78 @@ class _Mapping(
     return x
 
 
+class WeakKeyDefaultDict(dict):
+  """`WeakKeyDictionary` which always adds `defaultdict(dict)` in getitem."""
+
+  # Q:Why not subclass `collections.defaultdict`?
+  # Subclassing collections.defaultdict means we have a more complicated `repr`,
+  # `str` which makes debugging the bijector cache more tedious. Additionally it
+  # means we need to think about passing through __init__ args but manually
+  # specifying the `default_factory`. That is, just overriding `__missing__`
+  # ends up being a lot cleaner.
+
+  # Q:Why not subclass `weakref.WeakKeyDictionary`?
+  # `weakref.WeakKeyDictionary` has an even worse `repr`, `str` than
+  # collections.defaultdict. Plus, since we want explicit control over how the
+  # keys are created we need to override __getitem__ which is the only feature
+  # of `weakref.WeakKeyDictionary` we're using.
+
+  # This is the "WeakKey" part.
+  def __getitem__(self, key):
+    weak_key = HashableWeakRef(key, lambda w: self.pop(w, None))
+    return super(WeakKeyDefaultDict, self).__getitem__(weak_key)
+
+  # This is the "DefaultDict" part.
+  def __missing__(self, key):
+    assert isinstance(key, HashableWeakRef)  # Can't happen.
+    return super(WeakKeyDefaultDict, self).setdefault(key, {})
+
+  # Everything that follows is only useful to help make debugging easier.
+
+  def __contains__(self, key):
+    return super(WeakKeyDefaultDict, self).__contains__(HashableWeakRef(key))
+
+  # We don't want mutation except through __getitem__.
+
+  def __setitem__(self, *args, **kwargs):
+    raise NotImplementedError()
+
+  def update(self, *args, **kwargs):
+    raise NotImplementedError()
+
+  def setdefault(self, *args, **kwargs):
+    raise NotImplementedError()
+
+
+class HashableWeakRef(weakref.ref):
+  """weakref.ref which makes np.array objects hashable."""
+
+  def __hash__(self):
+    x = self()
+    if not isinstance(x, np.ndarray):
+      return hash(x)
+    # Note: The following logic can never be reached by the public API because
+    # the bijector base class always calls `convert_to_tensor` before accessing
+    # the cache.
+    x.flags.writeable = False
+    return hash(str(x.__array_interface__) + str(id(x)))
+
+  def __repr__(self):
+    return repr(self())
+
+  def __str__(self):
+    return str(self())
+
+  def __eq__(self, other):
+    x = self()
+    if isinstance(x, np.ndarray):
+      y = other()
+      return (isinstance(y, np.ndarray) and
+              x.__array_interface__ == y.__array_interface__ and
+              id(x) == id(y))
+    return super(HashableWeakRef, self).__eq__(other)
+
+
 @six.add_metaclass(abc.ABCMeta)
 class Bijector(object):
   r"""Interface for transformations of a `Distribution` sample.
@@ -568,8 +640,8 @@ class Bijector(object):
     self._constant_ildj = {}
     self._validate_args = validate_args
     self._dtype = dtype
-    self._from_y = weakref.WeakKeyDictionary()
-    self._from_x = weakref.WeakKeyDictionary()
+    self._from_y = WeakKeyDefaultDict()
+    self._from_x = WeakKeyDefaultDict()
     if name:
       self._name = name
     else:
@@ -1243,7 +1315,7 @@ class Bijector(object):
         mapping=self._lookup(mapping.x, mapping.y, mapping.kwargs))
     if mapping.x is None:
       raise ValueError("Caching expects x to be known, i.e., not None.")
-    self._from_x.setdefault(mapping.x, {})[mapping.subkey] = mapping.remove("x")
+    self._from_x[mapping.x][mapping.subkey] = mapping.remove("x")
 
   def _cache_by_y(self, mapping):
     """Helper which stores new mapping info in the inverse dict."""
@@ -1253,15 +1325,13 @@ class Bijector(object):
         mapping=self._lookup(mapping.x, mapping.y, mapping.kwargs))
     if mapping.y is None:
       raise ValueError("Caching expects y to be known, i.e., not None.")
-    self._from_y.setdefault(mapping.y, {})[mapping.subkey] = mapping.remove("y")
+    self._from_y[mapping.y][mapping.subkey] = mapping.remove("y")
 
   def _cache_update(self, mapping):
     """Helper which updates only those cached entries that already exist."""
-    if (mapping.x is not None and
-        mapping.subkey in self._from_x.get(mapping.x, {})):
+    if mapping.x is not None and mapping.subkey in self._from_x[mapping.x]:
       self._cache_by_x(mapping)
-    if (mapping.y is not None and
-        mapping.subkey in self._from_y.get(mapping.y, {})):
+    if mapping.y is not None and mapping.subkey in self._from_y[mapping.y]:
       self._cache_by_y(mapping)
 
   def _lookup(self, x=None, y=None, kwargs=None):
@@ -1270,10 +1340,10 @@ class Bijector(object):
     subkey = mapping.subkey
     if x is not None:
       # We removed x at caching time. Add it back if we lookup successfully.
-      mapping = self._from_x.get(x, {}).get(subkey, mapping).merge(x=x)
+      mapping = self._from_x[x].get(subkey, mapping).merge(x=x)
     if y is not None:
       # We removed y at caching time. Add it back if we lookup successfully.
-      mapping = self._from_y.get(y, {}).get(subkey, mapping).merge(y=y)
+      mapping = self._from_y[y].get(subkey, mapping).merge(y=y)
     return mapping
 
   def _reduce_jacobian_det_over_event(

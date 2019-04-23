@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import functools
+import importlib
 import weakref
 
 # Dependency imports
@@ -31,6 +32,18 @@ from tensorflow.python.framework import test_util  # pylint: disable=g-direct-te
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
+
+
+def try_import(name):
+  try:
+    return importlib.import_module(name)
+  except ImportError as e:
+    tf.compat.v1.logging.warning(
+        "Could not import {}: {}.".format(name, str(e)))
+    return None
+
+
+mock = try_import("mock")
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -428,6 +441,42 @@ class BijectorConstILDJLeakTest(tf.test.TestCase):
     call_fldj()
     call_fldj()
     self.assertLen(bij._constant_ildj, 3)
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class NumpyArrayCaching(tf.test.TestCase):
+
+  def test_caches(self):
+    if mock is None:
+      return
+
+    x_ = np.array([[-0.1, 0.2], [0.3, -0.4]], np.float32)
+    y_ = np.exp(x_)
+    b = tfb.Exp()
+
+    # We will intercept calls to TF to ensure np.array objects don't get
+    # converted to tf.Tensor objects.
+
+    with mock.patch.object(tf, "convert_to_tensor", return_value=x_):
+      with mock.patch.object(tf.compat.v2, "exp", return_value=y_):
+        y = b.forward(x_)
+        self.assertIsInstance(y, np.ndarray)
+        self.assertAllEqual([x_], [k() for k in b._from_x.keys()])
+
+    with mock.patch.object(tf, "convert_to_tensor", return_value=y_):
+      with mock.patch.object(tf.compat.v2.math, "log", return_value=x_):
+        x = b.inverse(y_)
+        self.assertIsInstance(x, np.ndarray)
+        self.assertIs(x, b.inverse(y))
+        self.assertAllEqual([y_], [k() for k in b._from_y.keys()])
+
+    yt_ = y_.T
+    xt_ = x_.T
+    with mock.patch.object(tf, "convert_to_tensor", return_value=yt_):
+      with mock.patch.object(tf.compat.v2.math, "log", return_value=xt_):
+        xt = b.inverse(yt_)
+        self.assertIsNot(x, xt)
+        self.assertIs(xt_, xt)
 
 
 if __name__ == "__main__":
