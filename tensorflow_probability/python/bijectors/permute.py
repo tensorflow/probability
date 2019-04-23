@@ -27,6 +27,7 @@ from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -142,11 +143,15 @@ class Permute(bijector.Bijector):
     return self._axis
 
   def _forward(self, x):
-    return tf.gather(x, self.permutation, axis=self.axis)
+    y = tf.gather(x, self.permutation, axis=self.axis)
+    tensorshape_util.set_shape(y, x.shape)
+    return y
 
   def _inverse(self, y):
-    return tf.gather(
+    x = tf.gather(
         y, tf.math.invert_permutation(self.permutation), axis=self.axis)
+    tensorshape_util.set_shape(x, y.shape)
+    return x
 
   def _inverse_log_det_jacobian(self, y):
     # is_constant_jacobian = True for this bijector, hence the

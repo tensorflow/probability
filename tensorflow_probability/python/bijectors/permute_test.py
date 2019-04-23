@@ -92,6 +92,19 @@ class PermuteBijectorTest(tf.test.TestCase):
         bijector, x, y, eval_func=self.evaluate, event_ndims=2, rtol=1e-6,
         atol=0)
 
+  def testPreservesShape(self):
+    # TODO(b/131157549, b/131124359): Test should not be needed. Consider
+    # deleting when underlying issue with constant eager tensors is fixed.
+    permutation = [2, 1, 0]
+    x = tf.keras.Input((3,), batch_size=None)
+    bijector = tfb.Permute(permutation=permutation, axis=-1, validate_args=True)
+
+    y = bijector.forward(x)
+    self.assertAllEqual(y.shape.as_list(), [None, 3])
+
+    inverse_y = bijector.inverse(x)
+    self.assertAllEqual(inverse_y.shape.as_list(), [None, 3])
+
 
 if __name__ == "__main__":
   tf.test.main()
