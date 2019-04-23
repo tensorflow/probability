@@ -35,6 +35,7 @@ py_library(
         ":compat",
         ":control_flow",
         ":dtype",
+        ":errors",
         ":keras",
         ":linalg",
         ":math",
@@ -84,6 +85,14 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
+    ],
+)
+
+py_library(
+    name = "errors",
+    srcs = ["errors.py"],
+    deps = [
+        # tensorflow dep,
     ],
 )
 

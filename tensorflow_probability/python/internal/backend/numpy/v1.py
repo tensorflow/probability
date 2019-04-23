@@ -49,6 +49,13 @@ __all__ = [
 ]
 
 
+def _placeholder_with_default(input, shape, name=None):  # pylint: disable=redefined-builtin,unused-argument
+  x = np.array(input)
+  if shape is None or any(s is None for s in shape):
+    return x
+  return np.reshape(x, shape)
+
+
 # --- Begin Public Functions --------------------------------------------------
 
 
@@ -70,7 +77,7 @@ assert_rank_at_least = tf.compat.v1.assert_rank_at_least
 
 placeholder_with_default = utils.copy_docstring(
     tf.compat.v1.placeholder_with_default,
-    lambda input, shape, name=None: np.array(input).reshape(shape))  # pylint: disable=redefined-builtin,unused-argument
+    _placeholder_with_default)
 
 global_variables_initializer = utils.copy_docstring(
     tf.compat.v1.global_variables_initializer,
