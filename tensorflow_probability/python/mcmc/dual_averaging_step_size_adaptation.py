@@ -7,7 +7,7 @@ from __future__ import print_function
 import collections
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.mcmc import kernel as kernel_base
@@ -78,9 +78,8 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
   ):
     inner_kernel = mcmc_util.enable_store_parameters_in_results(inner_kernel)
 
-    with tf.compat.v1.name_scope(
-        mcmc_util.make_name(name, 'simple_step_size_adaptation', '__init__'),
-        values=[target_accept_prob, gamma, t0, kappa, num_adaptation_steps],
+    with tf.name_scope(
+        mcmc_util.make_name(name, 'simple_step_size_adaptation', '__init__')
     ) as name:
       dtype = dtype_util.common_dtype([target_accept_prob, gamma, t0, kappa],
                                       tf.float32)
@@ -138,13 +137,9 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
     return self._parameters
 
   def one_step(self, current_state, previous_kernel_results):
-    with tf.compat.v1.name_scope(
-        name=mcmc_util.make_name(
-            self.name, 'simple_step_size_adaptation', 'one_step'
-        ),
-        values=[current_state, previous_kernel_results],
-    ):
-
+    with tf.name_scope(
+        mcmc_util.make_name(self.name, 'simple_step_size_adaptation',
+                            'one_step')):
       # Set the step_size.
       inner_results = self.step_size_setter_fn(
           previous_kernel_results.inner_results,
@@ -251,11 +246,9 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
           new_step_size=new_step_size)
 
   def bootstrap_results(self, init_state):
-    with tf.compat.v1.name_scope(
-        name=mcmc_util.make_name(self.name, 'simple_step_size_adaptation',
-                                 'bootstrap_results'),
-        values=[init_state]):
-
+    with tf.name_scope(
+        mcmc_util.make_name(self.name, 'simple_step_size_adaptation',
+                            'bootstrap_results')):
       inner_results = self.inner_kernel.bootstrap_results(init_state)
       step_size = self.step_size_getter_fn(inner_results)
 
@@ -281,10 +274,10 @@ def _maybe_validate_target_accept_prob(target_accept_prob, validate_args):
   if not validate_args:
     return target_accept_prob
   with tf.control_dependencies([
-      tf.compat.v1.assert_positive(
+      tf.assert_positive(
           target_accept_prob, message='`target_accept_prob` must be > 0.'
       ),
-      tf.compat.v1.assert_less(
+      tf.assert_less(
           target_accept_prob,
           tf.ones_like(target_accept_prob),
           message='`target_accept_prob` must be < 1.'),
