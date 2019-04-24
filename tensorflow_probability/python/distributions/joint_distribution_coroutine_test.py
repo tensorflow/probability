@@ -444,7 +444,7 @@ class JointDistributionCoroutineTest(tf.test.TestCase):
 
     self.assertAllClose(*self.evaluate([log_prob, expected_log_prob]))
 
-  def test_dtype_hint_structures_output(self):
+  def test_sample_dtype_structures_output(self):
     def noncentered_horseshoe_prior(num_features):
       scale_variance = yield Root(
           tfd.InverseGamma(0.5, 0.5))
@@ -455,9 +455,9 @@ class JointDistributionCoroutineTest(tf.test.TestCase):
           tfd.Sample(tfd.Normal(0., 1.), num_features))
       yield tfd.Independent(tfd.Deterministic(weights_noncentered * scale),
                             reinterpreted_batch_ndims=1)
-    # Currently dtype_hint is only used for `tf.nest.pack_structure_as`. In the
-    # future we may use it for error checking and/or casting.
-    dtype_hint = collections.namedtuple('Model', [
+    # Currently sample_dtype is only used for `tf.nest.pack_structure_as`. In
+    # the future we may use it for error checking and/or casting.
+    sample_dtype = collections.namedtuple('Model', [
         'scale_variance',
         'scale_noncentered',
         'weights_noncentered',
@@ -465,13 +465,13 @@ class JointDistributionCoroutineTest(tf.test.TestCase):
     ])(*([None]*4))
     joint = tfd.JointDistributionCoroutine(
         lambda: noncentered_horseshoe_prior(4),
-        dtype_hint=dtype_hint,
+        sample_dtype=sample_dtype,
         validate_args=True)
-    self.assertAllEqual(sorted(dtype_hint._fields),
+    self.assertAllEqual(sorted(sample_dtype._fields),
                         sorted(joint.sample()._fields))
     ds, xs = joint.sample_distributions([2, 3])
-    tf.nest.assert_same_structure(dtype_hint, ds)
-    tf.nest.assert_same_structure(dtype_hint, xs)
+    tf.nest.assert_same_structure(sample_dtype, ds)
+    tf.nest.assert_same_structure(sample_dtype, xs)
     self.assertEqual([3, 4], joint.log_prob(joint.sample([3, 4])).shape)
 
 
