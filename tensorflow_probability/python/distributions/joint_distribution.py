@@ -59,7 +59,8 @@ class JointDistribution(distribution_lib.Distribution):
   - `_flat_sample_distributions`: returns two `list`-likes: the first being a
     sequence of `Distribution`-like instances the second being a sequence of
     `Tensor` samples, each one drawn from its corresponding `Distribution`-like
-    instance.
+    instance. The optional `value` argument is either `None` or a `list`-like
+    with the same `len` as either of the results.
 
   - `_flatten`: takes a structured input and returns a sequence.
 
@@ -300,6 +301,8 @@ class JointDistribution(distribution_lib.Distribution):
 
   def _call_flat_sample_distributions(
       self, sample_shape=(), seed=None, value=None):
+    if value is not None:
+      value = self._flatten(value)
     ds, xs = self._flat_sample_distributions(sample_shape, seed, value)
     if not value:
       self._most_recently_built_distributions = ds

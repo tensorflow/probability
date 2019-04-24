@@ -24,6 +24,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import joint_distribution as joint_distribution_lib
 from tensorflow_probability.python.distributions import seed_stream
+from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -134,12 +135,17 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
     """Wrapper for coroutine distributions which lack distribution parents."""
     __slots__ = ()
 
-  def __init__(self, model, validate_args=False, name=None):
+  def __init__(self, model, dtype_hint=None, validate_args=False, name=None):
     """Construct the `JointDistributionCoroutine` distribution.
 
     Args:
       model: A generator that yields a sequence of `tfd.Distribution`-like
         instances.
+      dtype_hint: Output from this distribution will be structured like
+        `tf.nest.pack_sequence_as(dtype_hint, list_)`. `dtype_hint` is only used
+        for `tf.nest.pack_sequence_as` structuring of outputs, never casting or
+        error checking.
+        Default value: `None` (i.e., `tuple`).
       validate_args: Python `bool`.  Whether to validate input with asserts.
         If `validate_args` is `False`, and the inputs are invalid,
         correct behavior is not guaranteed.
@@ -149,6 +155,7 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name or 'JointDistributionCoroutine') as name:
+      self._dtype_hint = dtype_hint
       self._model = model
       self._most_recently_built_distributions = None
       super(JointDistributionCoroutine, self).__init__(
@@ -188,7 +195,11 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
     return ds, values_out
 
   def _unflatten(self, xs):
-    return tuple(xs)
+    if self._dtype_hint is None:
+      return tuple(xs)
+    return tf.nest.pack_sequence_as(self._dtype_hint, xs)
 
   def _flatten(self, xs):
-    return tuple(xs)
+    if self._dtype_hint is None:
+      return tuple(xs)
+    return nest.flatten_up_to(self._dtype_hint, xs)

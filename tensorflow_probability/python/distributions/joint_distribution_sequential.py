@@ -224,7 +224,7 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
     #   self._always_use_specified_sample_shape
     seed = seed_stream.SeedStream('JointDistributionSequential', seed)
     ds = []
-    xs = list(self._flatten(value))
+    xs = [None]*len(self._dist_fn_wrapped) if value is None else list(value)
     if len(xs) != len(self._dist_fn_wrapped):
       raise ValueError('Number of `xs`s must match number of '
                        'distributions.')
