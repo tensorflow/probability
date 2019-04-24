@@ -115,7 +115,7 @@ model.mean()  # shape [7], elements approach 9.0
 
 # The log pdf of a week of temperature 0 is:
 
-model.log_prob(tfp.zeros(shape=[7]))
+model.log_prob(tf.zeros(shape=[7]))
 ```
 
 #### References
