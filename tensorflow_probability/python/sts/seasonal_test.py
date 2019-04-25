@@ -150,6 +150,73 @@ class _SeasonalStateSpaceModelTest(tf.test.TestCase):
       # At the end of each year, allow the effects to drift.
       current_drift_variance += drift_scale**2
 
+  def test_month_of_year_with_leap_day_example(self):
+
+    num_days_per_month = np.array(
+        [[31, 28, 31, 30, 30, 31, 31, 31, 30, 31, 30, 31],
+         [31, 29, 31, 30, 30, 31, 31, 31, 30, 31, 30, 31],  # year with leap day
+         [31, 28, 31, 30, 30, 31, 31, 31, 30, 31, 30, 31],
+         [31, 28, 31, 30, 30, 31, 31, 31, 30, 31, 30, 31]])
+
+    # put wildly different near-deterministic priors on the effect for each
+    # month, so we can easily distinguish the months and diagnose off-by-one
+    # errors.
+    monthly_effect_prior_means = np.linspace(-1000, 1000, 12)
+    monthly_effect_prior_scales = 0.1 * np.ones(12)
+    drift_scale = 0.3
+    observation_noise_scale = 0.1
+    num_timesteps = 365 * 6 + 2   # 1.5 cycles of 4 years with leap days.
+    initial_step = 22
+
+    month_of_year = SeasonalStateSpaceModel(
+        num_timesteps=num_timesteps,
+        num_seasons=12,
+        num_steps_per_season=num_days_per_month,
+        drift_scale=self._build_placeholder(drift_scale),
+        observation_noise_scale=observation_noise_scale,
+        initial_state_prior=tfd.MultivariateNormalDiag(
+            loc=self._build_placeholder(monthly_effect_prior_means),
+            scale_diag=self._build_placeholder(monthly_effect_prior_scales)),
+        initial_step=initial_step)
+
+    sampled_series_, prior_mean_, prior_variance_ = self.evaluate(
+        (month_of_year.sample()[..., 0],
+         month_of_year.mean()[..., 0],
+         month_of_year.variance()[..., 0]))
+
+    # For each month, ensure the mean (and samples) of each day matches the
+    # expected effect for that month, and that the variances all match
+    # including expected drift from year to year
+    current_idx = -initial_step  # start at beginning of year
+    current_drift_variance = 0.
+    for i in range(6):  # loop over the 1.5 cycles of the 4 years
+      for (num_days_in_month, prior_effect_mean, prior_effect_scale) in zip(
+          num_days_per_month[i % 4],
+          monthly_effect_prior_means,
+          monthly_effect_prior_scales):
+
+        month_indices = range(current_idx, current_idx + num_days_in_month)
+        current_idx += num_days_in_month
+
+        # Trim any indices outside of the observed window.
+        month_indices = [idx for idx in month_indices
+                         if 0 <= idx < num_timesteps]
+
+        if month_indices:
+          ones = np.ones(len(month_indices))
+          self.assertAllClose(sampled_series_[month_indices],
+                              prior_effect_mean * ones, atol=20.)
+          self.assertAllClose(prior_mean_[month_indices],
+                              prior_effect_mean * ones, atol=1e-4)
+          self.assertAllClose(prior_variance_[month_indices],
+                              (prior_effect_scale**2 +
+                               current_drift_variance +
+                               observation_noise_scale**2) * ones,
+                              atol=1e-4)
+
+      # At the end of each year, allow the effects to drift.
+      current_drift_variance += drift_scale**2
+
   def test_batch_shape(self):
     batch_shape = [3, 2]
     partial_batch_shape = [2]

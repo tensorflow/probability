@@ -49,7 +49,11 @@ seasonal_init_args = """
         Default value: 0.
       num_steps_per_season: Python `int` number of steps in each
         season. This may be either a scalar (shape `[]`), in which case all
-        seasons have the same length, or a NumPy array of shape `[num_seasons]`.
+        seasons have the same length, or a NumPy array of shape `[num_seasons]`,
+        in which seasons have different length, but remain constant around
+        different cycles, or a NumPy array of shape `[num_cycles, num_seasons]`,
+        in which num_steps_per_season for each season also varies in different
+        cycle (e.g., a 4 years cycle with leap day).
         Default value: 1.
       initial_step: Optional scalar `int` `Tensor` specifying the starting
         timestep.
@@ -164,9 +168,26 @@ class SeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
     ```
 
     Note that we've used `initial_step=22` to denote that the model begins
-    on January 23 (steps are zero-indexed). A general implementation of
-    month-of-year seasonality would require additional logic; this
-    version works over time periods not involving a leap year.
+    on January 23 (steps are zero-indexed). This version works over time periods
+    not involving a leap year. A general implementation of month-of-year
+    seasonality would require additional logic:
+
+    ```python
+    num_days_per_month = np.array(
+      [[31, 28, 31, 30, 30, 31, 31, 31, 30, 31, 30, 31],
+       [31, 29, 31, 30, 30, 31, 31, 31, 30, 31, 30, 31],  # year with leap day
+       [31, 28, 31, 30, 30, 31, 31, 31, 30, 31, 30, 31],
+       [31, 28, 31, 30, 30, 31, 31, 31, 30, 31, 30, 31]])
+
+    month_of_year = SeasonalStateSpaceModel(
+      num_timesteps=4 * 365 + 2,  # 8 years with leap days
+      num_seasons=12,
+      drift_scale=0.1,
+      initial_state_prior=tfd.MultivariateNormalDiag(
+        scale_diag=tf.ones([12], dtype=tf.float32)),
+      num_steps_per_season=num_days_per_month,
+      initial_step=22)
+    ```
 
   """
 
@@ -203,13 +224,15 @@ class SeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
 
       # Coerce `num_steps_per_season` to a canonical form, an array of
       # `num_seasons` integers.
-      num_steps_per_season = np.asarray(num_steps_per_season)
-      if not num_steps_per_season.shape:
+      num_steps_per_season = np.squeeze(np.asarray(num_steps_per_season))
+      if num_steps_per_season.ndim == 0:  # scalar case
         num_steps_per_season = np.tile(num_steps_per_season, num_seasons)
-      elif num_steps_per_season.shape != (num_seasons,):
+      elif ((num_steps_per_season.ndim <= 2)  # 1D and 2D case
+            and (num_steps_per_season.shape[-1] != num_seasons)):
         raise ValueError('num_steps_per_season must either be scalar (shape [])'
-                         ' or have length [num_seasons] = [{}] (saw: shape {})'.
-                         format(num_seasons, num_steps_per_season.shape))
+                         ' or have the last dimension equal to [num_seasons] = '
+                         '[{}] (saw: shape {})'.format(
+                             num_seasons, num_steps_per_season.shape))
 
       is_last_day_of_season = build_is_last_day_of_season(num_steps_per_season)
 
@@ -343,7 +366,7 @@ class ConstrainedSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
       num_seasons=7,
       drift_scale=0.1,
       initial_state_prior=tfd.MultivariateNormalDiag(
-        scale_diag=tf.ones([7], dtype=tf.float32),
+        scale_diag=tf.ones([7-1], dtype=tf.float32)),
       num_steps_per_season=24)
     ```
 
@@ -356,15 +379,32 @@ class ConstrainedSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
       num_seasons=12,
       drift_scale=0.1,
       initial_state_prior=tfd.MultivariateNormalDiag(
-        scale_diag=tf.ones([12], dtype=tf.float32)),
+        scale_diag=tf.ones([12-1], dtype=tf.float32)),
       num_steps_per_season=[31, 28, 31, 30, 30, 31, 31, 31, 30, 31, 30, 31],
       initial_step=22)
     ```
 
     Note that we've used `initial_step=22` to denote that the model begins
-    on January 23 (steps are zero-indexed). A general implementation of
-    month-of-year seasonality would require additional logic; this
-    version works over time periods not involving a leap year.
+    on January 23 (steps are zero-indexed). This version works over time periods
+    not involving a leap year. A general implementation of month-of-year
+    seasonality would require additional logic:
+
+    ```python
+    num_days_per_month = np.array(
+      [[31, 28, 31, 30, 30, 31, 31, 31, 30, 31, 30, 31],
+       [31, 29, 31, 30, 30, 31, 31, 31, 30, 31, 30, 31],  # year with leap day
+       [31, 28, 31, 30, 30, 31, 31, 31, 30, 31, 30, 31],
+       [31, 28, 31, 30, 30, 31, 31, 31, 30, 31, 30, 31]])
+
+    month_of_year = ConstrainedSeasonalStateSpaceModel(
+      num_timesteps=4 * 365 + 2,  # 8 years with leap days
+      num_seasons=12,
+      drift_scale=0.1,
+      initial_state_prior=tfd.MultivariateNormalDiag(
+        scale_diag=tf.ones([12-1], dtype=tf.float32)),
+      num_steps_per_season=num_days_per_month,
+      initial_step=22)
+    ```
   """
 
   def __init__(self,
@@ -399,13 +439,15 @@ class ConstrainedSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
 
       # Coerce `num_steps_per_season` to a canonical form, an array of
       # `num_seasons` integers.
-      num_steps_per_season = np.asarray(num_steps_per_season)
-      if not num_steps_per_season.shape:
+      num_steps_per_season = np.squeeze(np.asarray(num_steps_per_season))
+      if num_steps_per_season.ndim == 0:  # scalar case
         num_steps_per_season = np.tile(num_steps_per_season, num_seasons)
-      elif num_steps_per_season.shape != (num_seasons,):
+      elif ((num_steps_per_season.ndim <= 2)  # 1D and 2D case
+            and (num_steps_per_season.shape[-1] != num_seasons)):
         raise ValueError('num_steps_per_season must either be scalar (shape [])'
-                         ' or have length [num_seasons] = [{}] (saw: shape {})'.
-                         format(num_seasons, num_steps_per_season.shape))
+                         ' or have the last dimension equal to [num_seasons] = '
+                         '[{}] (saw: shape {})'.format(
+                             num_seasons, num_steps_per_season.shape))
 
       is_last_day_of_season = build_is_last_day_of_season(num_steps_per_season)
 
@@ -471,7 +513,7 @@ class ConstrainedSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
 def build_is_last_day_of_season(num_steps_per_season):
   """Build utility method to compute whether the season is changing."""
   num_steps_per_cycle = np.sum(num_steps_per_season)
-  changepoints = np.cumsum(num_steps_per_season) - 1
+  changepoints = np.cumsum(np.ravel(num_steps_per_season)) - 1
   def is_last_day_of_season(t):
     t_ = dist_util.maybe_get_static_value(t)
     if t_ is not None:  # static case
@@ -692,9 +734,24 @@ class Seasonal(StructuralTimeSeries):
     name='month_of_year')
   ```
 
-  Note that a general implementation of month-of-year seasonality would require
-  additional logic; this version works over time periods not involving a leap
-  year.
+  Note that this version works over time periods not involving a leap year. A
+  general implementation of month-of-year seasonality would require additional
+  logic:
+
+  ```python
+  num_days_per_month = np.array(
+    [[31, 28, 31, 30, 30, 31, 31, 31, 30, 31, 30, 31],
+     [31, 29, 31, 30, 30, 31, 31, 31, 30, 31, 30, 31],  # year with leap day
+     [31, 28, 31, 30, 30, 31, 31, 31, 30, 31, 30, 31],
+     [31, 28, 31, 30, 30, 31, 31, 31, 30, 31, 30, 31]])
+
+  month_of_year = tfp.sts.Seasonal(
+    num_seasons=12,
+    num_steps_per_season=num_days_per_month,
+    drift_scale_prior=tfd.LogNormal(loc=-1., scale=0.1),
+    initial_effect_prior=tfd.Normal(loc=0., scale=5.),
+    name='month_of_year')
+  ```
 
   A model representing both day-of-week and hour-of-day seasonality, on hourly
   data:
@@ -728,7 +785,11 @@ class Seasonal(StructuralTimeSeries):
       num_seasons: Scalar Python `int` number of seasons.
       num_steps_per_season: Python `int` number of steps in each
         season. This may be either a scalar (shape `[]`), in which case all
-        seasons have the same length, or a NumPy array of shape `[num_seasons]`.
+        seasons have the same length, or a NumPy array of shape `[num_seasons]`,
+        in which seasons have different length, but remain constant around
+        different cycles, or a NumPy array of shape `[num_cycles, num_seasons]`,
+        in which num_steps_per_season for each season also varies in different
+        cycle (e.g., a 4 years cycle with leap day).
         Default value: 1.
       drift_scale_prior: optional `tfd.Distribution` instance specifying a prior
         on the `drift_scale` parameter. If `None`, a heuristic default prior is
