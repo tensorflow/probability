@@ -148,7 +148,7 @@ class BatchNormalization(bijector.Bijector):
     """
     # Scale must be positive.
     g_constraint = lambda x: tf.nn.relu(x) + 1e-6
-    self.batchnorm = batchnorm_layer or tf.compat.v1.layers.BatchNormalization(
+    self.batchnorm = batchnorm_layer or tf.keras.layers.BatchNormalization(
         gamma_constraint=g_constraint)
     self._validate_bn_layer(self.batchnorm)
     self._training = training
@@ -171,7 +171,8 @@ class BatchNormalization(bijector.Bijector):
       `tf.layers.BatchNormalization`, or if `batchnorm_layer.renorm=True` or
       if `batchnorm_layer.virtual_batch_size` is specified.
     """
-    if not isinstance(layer, tf.compat.v1.layers.BatchNormalization):
+    if (not isinstance(layer, tf.keras.layers.BatchNormalization) and
+        not isinstance(layer, tf.compat.v1.layers.BatchNormalization)):
       raise ValueError(
           "batchnorm_layer must be an instance of BatchNormalization layer.")
     if layer.renorm:
