@@ -93,7 +93,7 @@ class JointDistribution(distribution_lib.Distribution):
   def dtype(self):
     """The `DType` of `Tensor`s handled by this `Distribution`."""
     if self._most_recently_built_distributions is None:
-      return None
+      return super(JointDistribution, self).dtype
     return self._unflatten(
         None if d is None else d.dtype
         for d in self._most_recently_built_distributions)
@@ -305,7 +305,7 @@ class JointDistribution(distribution_lib.Distribution):
       value = self._flatten(value)
     ds, xs = self._flat_sample_distributions(sample_shape, seed, value)
     if not value:
-      self._most_recently_built_distributions = ds
+      self._most_recently_built_distributions = tuple(ds)
     return ds, xs
 
   # We need to bypass base Distribution reshaping/validation logic so we

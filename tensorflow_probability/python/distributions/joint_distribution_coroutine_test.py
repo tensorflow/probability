@@ -474,6 +474,41 @@ class JointDistributionCoroutineTest(tf.test.TestCase):
     tf.nest.assert_same_structure(sample_dtype, xs)
     self.assertEqual([3, 4], joint.log_prob(joint.sample([3, 4])).shape)
 
+  def test_repr_with_custom_sample_dtype(self):
+    def model():
+      s = yield tfd.JointDistributionCoroutine.Root(
+          tfd.Sample(tfd.InverseGamma(2, 2), 100))
+      yield tfd.Independent(tfd.Normal(0, s), 1)
+    sd = collections.namedtuple('Model', ['s', 'w'])(None, None)
+    m = tfd.JointDistributionCoroutine(model, sample_dtype=sd)
+    self.assertEqual(
+        ('tfp.distributions.JointDistributionCoroutine('
+         '"JointDistributionCoroutine/",'
+         ' dtype=Model(s=<unknown>, w=<unknown>))'),
+        str(m))
+    self.assertEqual(
+        ('<tfp.distributions.JointDistributionCoroutine'
+         ' \'JointDistributionCoroutine/\''
+         ' batch_shape=<unknown>'
+         ' event_shape=<unknown>'
+         ' dtype=Model(s=<unknown>, w=<unknown>)>'),
+        repr(m))
+    m.sample()
+    self.assertEqual(
+        ('tfp.distributions.JointDistributionCoroutine('
+         '"JointDistributionCoroutine/",'
+         ' batch_shape=Model(s=[], w=[]),'
+         ' event_shape=Model(s=[100], w=[100]),'
+         ' dtype=Model(s=float32, w=float32))'),
+        str(m))
+    self.assertEqual(
+        ('<tfp.distributions.JointDistributionCoroutine'
+         ' \'JointDistributionCoroutine/\''
+         ' batch_shape=Model(s=[], w=[])'
+         ' event_shape=Model(s=[100], w=[100])'
+         ' dtype=Model(s=float32, w=float32)>'),
+        repr(m))
+
 
 if __name__ == '__main__':
   tf.test.main()

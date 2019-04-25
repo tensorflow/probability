@@ -159,7 +159,7 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
       self._model = model
       self._most_recently_built_distributions = None
       super(JointDistributionCoroutine, self).__init__(
-          dtype=None,  # Ignored; we'll override.
+          dtype=sample_dtype,
           reparameterization_type=None,  # Ignored; we'll override.
           validate_args=validate_args,
           allow_nan_stats=False,
@@ -197,7 +197,8 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
   def _unflatten(self, xs):
     if self._sample_dtype is None:
       return tuple(xs)
-    return tf.nest.pack_sequence_as(self._sample_dtype, xs)
+    # Cast `xs` as `tuple` so we can handle generators.
+    return tf.nest.pack_sequence_as(self._sample_dtype, tuple(xs))
 
   def _flatten(self, xs):
     if self._sample_dtype is None:

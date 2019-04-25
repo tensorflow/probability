@@ -1275,16 +1275,20 @@ class Distribution(_BaseDistribution):
       maybe_event_shape = ", event_shape=" + _str_tensorshape(self.event_shape)
     else:
       maybe_event_shape = ""
+    if self.dtype is not None:
+      maybe_dtype = ", dtype=" + _str_dtype(self.dtype)
+    else:
+      maybe_dtype = ""
     return ("tfp.distributions.{type_name}("
             "\"{self_name}\""
             "{maybe_batch_shape}"
             "{maybe_event_shape}"
-            ", dtype={dtype})".format(
+            "{maybe_dtype})".format(
                 type_name=type(self).__name__,
                 self_name=self.name or "<unknown>",
                 maybe_batch_shape=maybe_batch_shape,
                 maybe_event_shape=maybe_event_shape,
-                dtype=_str_dtype(self.dtype)))
+                maybe_dtype=maybe_dtype))
 
   def __repr__(self):
     return ("<tfp.distributions.{type_name} "
