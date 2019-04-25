@@ -78,49 +78,60 @@ class GeneratedRandomVariablesTest(parameterized.TestCase, tf.test.TestCase):
     dist = tfd.Bernoulli(logits)
     self.assertEqual(rv.distribution.sample(n).shape, dist.sample(n).shape)
 
+  # Note: we must defer creation of any tensors until after tf.test.main().
   @parameterized.named_parameters(
       {"testcase_name": "0d_bernoulli",
-       "rv": ed.Bernoulli(probs=0.5),
+       "cls": ed.Bernoulli,
+       "args_kwargs": lambda: ((), dict(probs=0.5)),
        "sample_shape": [],
        "batch_shape": [],
        "event_shape": []},
       {"testcase_name": "2d_bernoulli",
-       "rv": ed.Bernoulli(tf.zeros([2, 3])),
+       "cls": ed.Bernoulli,
+       "args_kwargs": lambda: ((tf.zeros([2, 3]),), {}),
        "sample_shape": [],
        "batch_shape": [2, 3],
        "event_shape": []},
       {"testcase_name": "2x0d_bernoulli",
-       "rv": ed.Bernoulli(probs=0.5, sample_shape=2),
+       "cls": ed.Bernoulli,
+       "args_kwargs": lambda: ((), dict(probs=0.5, sample_shape=2)),
        "sample_shape": [2],
        "batch_shape": [],
        "event_shape": []},
       {"testcase_name": "2x1d_bernoulli",
-       "rv": ed.Bernoulli(probs=0.5, sample_shape=[2, 1]),
+       "cls": ed.Bernoulli,
+       "args_kwargs": lambda: ((), dict(probs=0.5, sample_shape=[2, 1])),
        "sample_shape": [2, 1],
        "batch_shape": [],
        "event_shape": []},
       {"testcase_name": "3d_dirichlet",
-       "rv": ed.Dirichlet(tf.zeros(3)),
+       "cls": ed.Dirichlet,
+       "args_kwargs": lambda: ((tf.zeros(3),), {}),
        "sample_shape": [],
        "batch_shape": [],
        "event_shape": [3]},
       {"testcase_name": "2x3d_dirichlet",
-       "rv": ed.Dirichlet(tf.zeros([2, 3])),
+       "cls": ed.Dirichlet,
+       "args_kwargs": lambda: ((tf.zeros([2, 3]),), {}),
        "sample_shape": [],
        "batch_shape": [2],
        "event_shape": [3]},
       {"testcase_name": "1x3d_dirichlet",
-       "rv": ed.Dirichlet(tf.zeros(3), sample_shape=1),
+       "cls": ed.Dirichlet,
+       "args_kwargs": lambda: ((tf.zeros(3),), dict(sample_shape=1)),
        "sample_shape": [1],
        "batch_shape": [],
        "event_shape": [3]},
       {"testcase_name": "2x1x3d_dirichlet",
-       "rv": ed.Dirichlet(tf.zeros(3), sample_shape=[2, 1]),
+       "cls": ed.Dirichlet,
+       "args_kwargs": lambda: ((tf.zeros(3),), dict(sample_shape=[2, 1])),
        "sample_shape": [2, 1],
        "batch_shape": [],
        "event_shape": [3]},
   )
-  def testShape(self, rv, sample_shape, batch_shape, event_shape):
+  def testShape(self, cls, args_kwargs, sample_shape, batch_shape, event_shape):
+    args, kwargs = args_kwargs()
+    rv = cls(*args, **kwargs)
     self.assertEqual(rv.shape, sample_shape + batch_shape + event_shape)
     self.assertEqual(rv.sample_shape, sample_shape)
     self.assertEqual(rv.distribution.batch_shape, batch_shape)
