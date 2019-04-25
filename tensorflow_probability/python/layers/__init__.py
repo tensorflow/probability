@@ -43,12 +43,14 @@ from tensorflow_probability.python.layers.distribution_layer import Multivariate
 from tensorflow_probability.python.layers.distribution_layer import OneHotCategorical
 from tensorflow_probability.python.layers.distribution_layer import VariationalGaussianProcess
 from tensorflow_probability.python.layers.initializers import BlockwiseInitializer
+from tensorflow_probability.python.layers.masked_autoregressive import AutoregressiveTransform
 from tensorflow_probability.python.layers.util import default_loc_scale_fn
 from tensorflow_probability.python.layers.util import default_mean_field_normal_fn
 from tensorflow_probability.python.layers.util import default_multivariate_normal_fn
 from tensorflow_probability.python.layers.variable_input import VariableLayer
 
 _allowed_symbols = [
+    'AutoregressiveTransform',
     'BlockwiseInitializer',
     'CategoricalMixtureOfOneHotCategorical',
     'Convolution1DFlipout',

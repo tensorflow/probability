@@ -37,6 +37,7 @@ py_library(
         ":dense_variational_v2",
         ":distribution_layer",
         ":initializers",
+        ":masked_autoregressive",
         ":util",
         ":variable_input",
     ],
@@ -157,6 +158,28 @@ py_test(
     name = "initializers_test",
     srcs = ["initializers_test.py"],
     deps = [
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "masked_autoregressive",
+    srcs = ["masked_autoregressive.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/distributions",
+    ],
+)
+
+py_test(
+    name = "masked_autoregressive_test",
+    size = "medium",
+    srcs = ["masked_autoregressive_test.py"],
+    deps = [
+        # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],
