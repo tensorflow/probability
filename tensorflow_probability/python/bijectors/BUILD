@@ -43,6 +43,7 @@ py_library(
         ":chain",
         ":cholesky_outer_product",
         ":cholesky_to_inv_cholesky",
+        ":cumsum",
         ":discrete_cosine_transform",
         ":exp",
         ":expm1",
@@ -553,11 +554,12 @@ py_library(
     name = "bijector_test_util",
     srcs = ["bijector_test_util.py"],
     deps = [
-        ":identity",
+        ":reshape",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:uniform",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
@@ -572,6 +574,15 @@ py_library(
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
+    ],
+)
+
+py_library(
+    name = "cumsum",
+    srcs = ["cumsum.py"],
+    deps = [
+        ":bijector",
+        # tensorflow dep,
     ],
 )
 
@@ -1095,6 +1106,18 @@ py_test(
         ":bijectors",
         # numpy dep,
         # scipy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "cumsum_test",
+    size = "small",
+    srcs = ["cumsum_test.py"],
+    deps = [
+        ":bijector_test_util",
+        ":bijectors",
+        # numpy dep,
         # tensorflow dep,
     ],
 )
