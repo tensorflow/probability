@@ -1263,8 +1263,8 @@ def rotate_transpose(x, shift, name="rotate_transpose"):
       # independently from the array upon which it operates (like python).
       ndims = tf.rank(x)
       shift = tf.where(
-          tf.less(shift, 0), tf.mod(-shift, ndims),
-          ndims - tf.mod(shift, ndims))
+          tf.less(shift, 0), -shift % ndims,
+          ndims - shift % ndims)
       first = tf.range(0, shift)
       last = tf.range(shift, ndims)
       perm = tf.concat([last, first], 0)
