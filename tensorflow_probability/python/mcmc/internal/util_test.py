@@ -377,9 +377,13 @@ tf.register_tensor_conversion_function(
 
 class SimpleTensorWarningTest(tf.test.TestCase, parameterized.TestCase):
 
-  @parameterized.parameters([[tf.Variable(0)], [tf.compat.v2.Variable(0)],
-                             [TensorConvertible()]])
-  def testWarn(self, tensor):
+  # We must defer creating the TF objects until the body of the test.
+  # pylint: disable=unnecessary-lambda
+  @parameterized.parameters([[lambda: tf.Variable(0)],
+                             [lambda: tf.compat.v2.Variable(0)],
+                             [lambda: TensorConvertible()]])
+  def testWarn(self, tensor_callable):
+    tensor = tensor_callable()
     warnings.simplefilter('always')
     with warnings.catch_warnings(record=True) as triggered:
       util.warn_if_parameters_are_not_simple_tensors({'a': tensor})
