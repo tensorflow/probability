@@ -484,14 +484,14 @@ class JointDistributionCoroutineTest(tf.test.TestCase):
     self.assertEqual(
         ('tfp.distributions.JointDistributionCoroutine('
          '"JointDistributionCoroutine/",'
-         ' dtype=Model(s=<unknown>, w=<unknown>))'),
+         ' dtype=Model(s=?, w=?))'),
         str(m))
     self.assertEqual(
         ('<tfp.distributions.JointDistributionCoroutine'
          ' \'JointDistributionCoroutine/\''
-         ' batch_shape=<unknown>'
-         ' event_shape=<unknown>'
-         ' dtype=Model(s=<unknown>, w=<unknown>)>'),
+         ' batch_shape=?'
+         ' event_shape=?'
+         ' dtype=Model(s=?, w=?)>'),
         repr(m))
     m.sample()
     self.assertEqual(

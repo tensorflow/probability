@@ -1414,7 +1414,7 @@ def _recursively_replace_dict_for_pretty_dict(x):
 def _str_tensorshape(x):
   def _str(s):
     if tensorshape_util.rank(s) is None:
-      return "<unknown>"
+      return "?"
     return str(tensorshape_util.as_list(s)).replace("None", "?")
   # Because Python2 `dict`s are unordered, we must replace them with
   # `PrettyDict`s so __str__, __repr__ are deterministic.
@@ -1425,7 +1425,7 @@ def _str_tensorshape(x):
 def _str_dtype(x):
   def _str(s):
     if s is None:
-      return "<unknown>"
+      return "?"
     return dtype_util.name(s)
   # Because Python2 `dict`s are unordered, we must replace them with
   # `PrettyDict`s so __str__, __repr__ are deterministic.

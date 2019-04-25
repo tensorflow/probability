@@ -208,7 +208,7 @@ class DistributionStrReprTest(tf.test.TestCase):
         repr(exp),
         "<tfp.distributions.Exponential"
         " 'Exponential/'"
-        " batch_shape=<unknown>"
+        " batch_shape=?"
         " event_shape=[]"
         " dtype=float32>")
 
@@ -244,49 +244,49 @@ class DistributionStrReprTest(tf.test.TestCase):
     self.assertEqual(
         str(TupleDistribution()),
         "tfp.distributions.TupleDistribution(\"TupleDistribution\","
-        " batch_shape=(<unknown>, <unknown>, [?, 2]),"
-        " event_shape=(<unknown>, [3, ?], <unknown>),"
-        " dtype=(float16, <unknown>, int32))")
+        " batch_shape=(?, ?, [?, 2]),"
+        " event_shape=(?, [3, ?], ?),"
+        " dtype=(float16, ?, int32))")
 
   def testReprWorksCorrectlyTupleDistribution(self):
     self.assertEqual(
         repr(TupleDistribution()),
         "<tfp.distributions.TupleDistribution 'TupleDistribution'"
-        " batch_shape=(<unknown>, <unknown>, [?, 2])"
-        " event_shape=(<unknown>, [3, ?], <unknown>)"
-        " dtype=(float16, <unknown>, int32)>")
+        " batch_shape=(?, ?, [?, 2])"
+        " event_shape=(?, [3, ?], ?)"
+        " dtype=(float16, ?, int32)>")
 
   def testStrWorksCorrectlyDictDistribution(self):
     self.assertEqual(
         str(DictDistribution()),
         "tfp.distributions.DictDistribution(\"DictDistribution\","
-        " batch_shape={a: <unknown>, b: <unknown>, c: [?, 2]},"
-        " event_shape={a: <unknown>, b: [3, ?], c: <unknown>},"
-        " dtype={a: float16, b: <unknown>, c: int32})")
+        " batch_shape={a: ?, b: ?, c: [?, 2]},"
+        " event_shape={a: ?, b: [3, ?], c: ?},"
+        " dtype={a: float16, b: ?, c: int32})")
 
   def testReprWorksCorrectlyDictDistribution(self):
     self.assertEqual(
         repr(DictDistribution()),
         "<tfp.distributions.DictDistribution 'DictDistribution'"
-        " batch_shape={a: <unknown>, b: <unknown>, c: [?, 2]}"
-        " event_shape={a: <unknown>, b: [3, ?], c: <unknown>}"
-        " dtype={a: float16, b: <unknown>, c: int32}>")
+        " batch_shape={a: ?, b: ?, c: [?, 2]}"
+        " event_shape={a: ?, b: [3, ?], c: ?}"
+        " dtype={a: float16, b: ?, c: int32}>")
 
   def testStrWorksCorrectlyNamedTupleDistribution(self):
     self.assertEqual(
         str(NamedTupleDistribution()),
         "tfp.distributions.NamedTupleDistribution(\"NamedTupleDistribution\","
-        " batch_shape=MyType(a=<unknown>, b=<unknown>, c=[?, 2]),"
-        " event_shape=MyType(a=<unknown>, b=[3, ?], c=<unknown>),"
-        " dtype=MyType(a=float16, b=<unknown>, c=int32))")
+        " batch_shape=MyType(a=?, b=?, c=[?, 2]),"
+        " event_shape=MyType(a=?, b=[3, ?], c=?),"
+        " dtype=MyType(a=float16, b=?, c=int32))")
 
   def testReprWorksCorrectlyNamedTupleDistribution(self):
     self.assertEqual(
         repr(NamedTupleDistribution()),
         "<tfp.distributions.NamedTupleDistribution 'NamedTupleDistribution'"
-        " batch_shape=MyType(a=<unknown>, b=<unknown>, c=[?, 2])"
-        " event_shape=MyType(a=<unknown>, b=[3, ?], c=<unknown>)"
-        " dtype=MyType(a=float16, b=<unknown>, c=int32)>")
+        " batch_shape=MyType(a=?, b=?, c=[?, 2])"
+        " event_shape=MyType(a=?, b=[3, ?], c=?)"
+        " dtype=MyType(a=float16, b=?, c=int32)>")
 
 
 @test_util.run_all_in_graph_and_eager_modes
