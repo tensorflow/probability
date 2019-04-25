@@ -379,9 +379,9 @@ class SimpleTensorWarningTest(tf.test.TestCase, parameterized.TestCase):
 
   # We must defer creating the TF objects until the body of the test.
   # pylint: disable=unnecessary-lambda
-  @parameterized.parameters([[lambda: tf.Variable(0)],
-                             [lambda: tf.compat.v2.Variable(0)],
-                             [lambda: TensorConvertible()]])
+  @parameterized.parameters([lambda: tf.Variable(0)],
+                            [lambda: tf.compat.v2.Variable(0)],
+                            [lambda: TensorConvertible()])
   def testWarn(self, tensor_callable):
     tensor = tensor_callable()
     warnings.simplefilter('always')
@@ -391,8 +391,10 @@ class SimpleTensorWarningTest(tf.test.TestCase, parameterized.TestCase):
         any('Please consult the docstring' in str(warning.message)
             for warning in triggered))
 
-  @parameterized.parameters([[1.], [np.array(1.)], [tf.constant(1.)]])
-  def testNoWarn(self, tensor):
+  @parameterized.parameters(
+      [lambda: 1.], [lambda: np.array(1.)], [lambda: tf.constant(1.)])
+  def testNoWarn(self, tensor_callable):
+    tensor = tensor_callable()
     warnings.simplefilter('always')
     with warnings.catch_warnings(record=True) as triggered:
       util.warn_if_parameters_are_not_simple_tensors({'a': tensor})
