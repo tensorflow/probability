@@ -228,7 +228,7 @@ class MaskedAutoregressiveFlow(bijector.Bijector):
         validate_args=validate_args,
         name=name)
 
-  def _forward(self, x):
+  def _forward(self, x, **kwargs):
     static_event_size = tensorshape_util.num_elements(
         tensorshape_util.with_rank_at_least(
             x.shape, self._event_ndims)[-self._event_ndims:])
@@ -242,7 +242,7 @@ class MaskedAutoregressiveFlow(bijector.Bijector):
       y = tf.zeros_like(x, name="y0")
 
       for _ in range(static_event_size):
-        shift, log_scale = self._shift_and_log_scale_fn(y)
+        shift, log_scale = self._shift_and_log_scale_fn(y, **kwargs)
         # next_y = scale * x + shift
         next_y = x
         if log_scale is not None:
@@ -256,7 +256,7 @@ class MaskedAutoregressiveFlow(bijector.Bijector):
         input_tensor=tf.shape(input=x)[-self._event_ndims:])
     y0 = tf.zeros_like(x, name="y0")
     # call the template once to ensure creation
-    _ = self._shift_and_log_scale_fn(y0)
+    _ = self._shift_and_log_scale_fn(y0, **kwargs)
     def _loop_body(index, y0):
       """While-loop body for autoregression calculation."""
       # Set caching device to avoid re-getting the tf.Variable for every while
@@ -264,7 +264,7 @@ class MaskedAutoregressiveFlow(bijector.Bijector):
       with tf.compat.v1.variable_scope(tf.compat.v1.get_variable_scope()) as vs:
         if vs.caching_device is None and not tf.executing_eagerly():
           vs.set_caching_device(lambda op: op.device)
-        shift, log_scale = self._shift_and_log_scale_fn(y0)
+        shift, log_scale = self._shift_and_log_scale_fn(y0, **kwargs)
       y = x
       if log_scale is not None:
         y *= tf.exp(log_scale)
@@ -282,8 +282,8 @@ class MaskedAutoregressiveFlow(bijector.Bijector):
         maximum_iterations=static_event_size)
     return y
 
-  def _inverse(self, y):
-    shift, log_scale = self._shift_and_log_scale_fn(y)
+  def _inverse(self, y, **kwargs):
+    shift, log_scale = self._shift_and_log_scale_fn(y, **kwargs)
     x = y
     if shift is not None:
       x -= shift
@@ -291,8 +291,8 @@ class MaskedAutoregressiveFlow(bijector.Bijector):
       x *= tf.exp(-log_scale)
     return x
 
-  def _inverse_log_det_jacobian(self, y):
-    _, log_scale = self._shift_and_log_scale_fn(y)
+  def _inverse_log_det_jacobian(self, y, **kwargs):
+    _, log_scale = self._shift_and_log_scale_fn(y, **kwargs)
     if log_scale is None:
       return tf.constant(0., dtype=y.dtype, name="ildj")
     return -tf.reduce_sum(
