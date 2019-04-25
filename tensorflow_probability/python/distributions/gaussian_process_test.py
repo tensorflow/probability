@@ -198,6 +198,8 @@ class _GaussianProcessTest(object):
                         self.evaluate(gp.covariance(index_points=index_points)))
     self.assertAllClose(np.diag(expected_covariance),
                         self.evaluate(gp.variance(index_points=index_points)))
+    self.assertAllClose(np.sqrt(np.diag(expected_covariance)),
+                        self.evaluate(gp.stddev(index_points=index_points)))
 
     # Calling mean with no index_points should raise an Error
     with self.assertRaises(ValueError):

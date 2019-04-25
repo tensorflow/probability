@@ -449,6 +449,9 @@ class GaussianProcess(distribution.Distribution):
   def _quantile(self, value, index_points=None):
     return self.get_marginal_distribution(index_points).quantile(value)
 
+  def _stddev(self, index_points=None):
+    return tf.sqrt(self._variance(index_points=index_points))
+
   def _variance(self, index_points=None):
     index_points = self._get_index_points(index_points)
 
