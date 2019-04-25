@@ -120,9 +120,11 @@ py_library(
     ],
     srcs_version = "PY2AND3",
     deps = [
+        # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
@@ -130,7 +132,7 @@ py_test(
     name = "linalg_test",
     size = "small",
     srcs = ["linalg_test.py"],
-    shard_count = 3,
+    shard_count = 5,
     deps = [
         # hypothesis dep,
         # numpy dep,

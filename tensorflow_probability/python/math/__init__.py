@@ -30,6 +30,7 @@ from tensorflow_probability.python.math.linalg import lu_reconstruct
 from tensorflow_probability.python.math.linalg import lu_solve
 from tensorflow_probability.python.math.linalg import matrix_rank
 from tensorflow_probability.python.math.linalg import pinv
+from tensorflow_probability.python.math.linalg import pivoted_cholesky
 from tensorflow_probability.python.math.linalg import sparse_or_dense_matmul
 from tensorflow_probability.python.math.linalg import sparse_or_dense_matvecmul
 from tensorflow_probability.python.math.numeric import clip_by_value_preserve_gradient
@@ -57,6 +58,7 @@ _allowed_symbols = [
     'lu_solve',
     'matrix_rank',
     'pinv',
+    'pivoted_cholesky',
     'random_rademacher',
     'random_rayleigh',
     'secant_root',
