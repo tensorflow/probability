@@ -48,6 +48,7 @@ py_library(
         ":distribution",
         ":empirical",
         ":exponential",
+        ":finite_discrete",
         ":gamma",
         ":gamma_gamma",
         ":gaussian_process",
@@ -337,6 +338,16 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
+    ],
+)
+
+py_library(
+    name = "finite_discrete",
+    srcs = ["finite_discrete.py"],
+    deps = [
+        ":transformed_distribution",
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:categorical_to_discrete",
     ],
 )
 
@@ -1464,6 +1475,17 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_test(
+    name = "finite_discrete_test",
+    srcs = ["finite_discrete_test.py"],
+    deps = [
+        ":finite_discrete",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
     ],
 )
 

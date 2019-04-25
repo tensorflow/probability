@@ -618,6 +618,11 @@ def fix_wishart(d):
   return dict(d, df=tf.maximum(df, tf.cast(scale.shape[-1], df.dtype)))
 
 
+def generate_outcomes(d):
+  size = tf.shape(input=d.get('probs', d.get('logits', None)))[-1]
+  return dict(d, outcomes=tf.linspace(-1.0, 1.0, size))
+
+
 CONSTRAINTS = {
     'atol':
         tf.nn.softplus,
@@ -700,6 +705,10 @@ CONSTRAINTS = {
         fix_wishart,
     'Zipf':
         lambda d: dict(d, dtype=tf.float32),
+    'FiniteDiscrete.probs':
+        tf.nn.softmax,
+    'FiniteDiscrete':
+        generate_outcomes,
 }
 
 

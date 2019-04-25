@@ -38,6 +38,7 @@ from tensorflow_probability.python.distributions.distribution import Conditional
 from tensorflow_probability.python.distributions.distribution import Distribution
 from tensorflow_probability.python.distributions.empirical import Empirical
 from tensorflow_probability.python.distributions.exponential import Exponential
+from tensorflow_probability.python.distributions.finite_discrete import FiniteDiscrete
 from tensorflow_probability.python.distributions.gamma import Gamma
 from tensorflow_probability.python.distributions.gamma_gamma import GammaGamma
 from tensorflow_probability.python.distributions.gaussian_process import GaussianProcess

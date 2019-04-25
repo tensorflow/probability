@@ -978,7 +978,7 @@ def embed_check_categorical_event_shape(
                              max_event_size))
       return x
     else:
-      event_size = tf.shape(input=x, name="x_shape")[-1]
+      event_size = tf.shape(input=x, out_type=tf.int64, name="x_shape")[-1]
       return with_dependencies([
           assert_util.assert_rank_at_least(
               x,
@@ -992,7 +992,7 @@ def embed_check_categorical_event_shape(
                        "least 2 events.")),
           assert_util.assert_less_equal(
               event_size,
-              max_event_size,
+              tf.convert_to_tensor(max_event_size, dtype=tf.int64),
               message="Number of classes exceeds `dtype` precision, "
               "i.e., {} dtype cannot exceed {} shape.".format(
                   dtype_util.name(x_dtype), max_event_size)),
