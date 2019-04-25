@@ -319,36 +319,41 @@ class RandomVariableTest(parameterized.TestCase, tf.test.TestCase):
       self.assertGreater(sess.run(y, feed_dict={x_ph: 100.0}), 5.0)
       self.assertRaises(tf.errors.InvalidArgumentError, sess.run, y)
 
+  # Note: we must defer creation of any tensors until after tf.test.main().
+  # pylint: disable=g-long-lambda
   @parameterized.parameters(
-      {"rv": ed.RandomVariable(tfd.Bernoulli(probs=0.5)),
+      {"rv": lambda: ed.RandomVariable(tfd.Bernoulli(probs=0.5)),
        "sample_shape": [],
        "batch_shape": [],
        "event_shape": []},
-      {"rv": ed.RandomVariable(tfd.Bernoulli(tf.zeros([2, 3]))),
+      {"rv": lambda: ed.RandomVariable(tfd.Bernoulli(tf.zeros([2, 3]))),
        "sample_shape": [],
        "batch_shape": [2, 3],
        "event_shape": []},
-      {"rv": ed.RandomVariable(tfd.Bernoulli(probs=0.5), sample_shape=2),
+      {"rv": lambda: ed.RandomVariable(tfd.Bernoulli(probs=0.5),
+                                       sample_shape=2),
        "sample_shape": [2],
        "batch_shape": [],
        "event_shape": []},
-      {"rv": ed.RandomVariable(tfd.Bernoulli(probs=0.5), sample_shape=[2, 1]),
+      {"rv": lambda: ed.RandomVariable(tfd.Bernoulli(probs=0.5),
+                                       sample_shape=[2, 1]),
        "sample_shape": [2, 1],
        "batch_shape": [],
        "event_shape": []},
-      {"rv": ed.RandomVariable(tfd.Bernoulli(probs=0.5),
-                               sample_shape=tf.constant([2])),
+      {"rv": lambda: ed.RandomVariable(tfd.Bernoulli(probs=0.5),
+                                       sample_shape=tf.constant([2])),
        "sample_shape": [2],
        "batch_shape": [],
        "event_shape": []},
-      {"rv": ed.RandomVariable(tfd.Bernoulli(probs=0.5),
-                               sample_shape=tf.constant([2, 4])),
+      {"rv": lambda: ed.RandomVariable(tfd.Bernoulli(probs=0.5),
+                                       sample_shape=tf.constant([2, 4])),
        "sample_shape": [2, 4],
        "batch_shape": [],
        "event_shape": []},
   )
-
+  # pylint: enable=g-long-lambda
   def testShape(self, rv, sample_shape, batch_shape, event_shape):
+    rv = rv()
     self.assertEqual(rv.shape, sample_shape + batch_shape + event_shape)
     self.assertEqual(rv.shape, rv.shape)
     self.assertEqual(rv.sample_shape, sample_shape)
