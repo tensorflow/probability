@@ -192,6 +192,8 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
   import tensorflow as tf
   import tensorflow_probability as tfp
 
+  tf.enable_eager_execution()
+
   # Target distribution is proportional to: `exp(-x (1 + x))`.
   def unnormalized_log_prob(x):
     return -x - x**2.
@@ -207,20 +209,25 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
       num_adaptation_steps=int(num_burnin_steps * 0.8))
 
   # Run the chain (with burn-in).
-  samples, is_accepted = tfp.mcmc.sample_chain(
-      num_results=num_results,
-      num_burnin_steps=num_burnin_steps,
-      current_state=1.,
-      kernel=adaptive_hmc,
-      trace_fn=lambda _, pkr: pkr.inner_results.is_accepted)
+  @tf.function
+  def run_chain():
+    # Run the chain (with burn-in).
+    samples, is_accepted = tfp.mcmc.sample_chain(
+        num_results=num_results,
+        num_burnin_steps=num_burnin_steps,
+        current_state=1.,
+        kernel=adaptive_hmc,
+        trace_fn=lambda _, pkr: pkr.inner_results.is_accepted)
 
-  sample_mean = tf.reduce_mean(samples)
-  sample_stddev = tf.math.reduce_std(samples)
-  is_accepted = tf.reduce_mean(is_accepted)
+    sample_mean = tf.reduce_mean(samples)
+    sample_stddev = tf.math.reduce_std(samples)
+    is_accepted = tf.reduce_mean(tf.cast(is_accepted, dtype=tf.float32))
+    return sample_mean, sample_stddev, is_accepted
+
+  sample_mean, sample_stddev, is_accepted = run_chain()
 
   print('mean:{:.4f}  stddev:{:.4f}  acceptance:{:.4f}'.format(
-      samples_mean.numpy(), sample_stddev.numpy(), is_accepted.numpy()))
-  # mean:-0.5003  stddev:0.7711  acceptance:0.6240
+      sample_mean.numpy(), sample_stddev.numpy(), is_accepted.numpy()))
   ```
 
   ##### Estimate parameters of a more complicated posterior.
@@ -252,6 +259,8 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
   import tensorflow as tf
   import tensorflow_probability as tfp
   import numpy as np
+
+  tf.enable_eager_execution()
 
   tfd = tfp.distributions
 
@@ -291,23 +300,28 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
 
   optimizer = tf.compat.v2.optimizers.SGD(learning_rate=0.01)
 
+  @tf.function
   def mcem_iter(weights_chain_start, step_size):
     with tf.GradientTape() as tape:
-      prior = self.make_weights_prior(dims, log_sigma)
+      tape.watch(log_sigma)
+      prior = make_weights_prior(dims, log_sigma)
 
       def unnormalized_posterior_log_prob(w):
-        likelihood = self.make_response_likelihood(w, x)
+        likelihood = make_response_likelihood(w, x)
         return (
             prior.log_prob(w) +
             tf.reduce_sum(
                 input_tensor=likelihood.log_prob(y), axis=-1))  # [m]
 
-        def trace_fn(_, pkr):
-          return (pkr.inner_results.log_accept_ratio,
-                  pkr.inner_results.accepted_results.step_size)
+      def trace_fn(_, pkr):
+        return (
+            pkr.inner_results.log_accept_ratio,
+            pkr.inner_results.accepted_results.target_log_prob,
+            pkr.inner_results.accepted_results.step_size)
 
       num_results = 2
-      weights, (log_accept_ratio, step_size) = tfp.mcmc.sample_chain(
+      weights, (
+          log_accept_ratio, target_log_prob, step_size) = tfp.mcmc.sample_chain(
           num_results=num_results,
           num_burnin_steps=0,
           current_state=weights_chain_start,
@@ -325,8 +339,7 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
 
       # We do an optimization step to propagate `log_sigma` after two HMC
       # steps to propagate `weights`.
-      loss = -tf.reduce_mean(
-          input_tensor=kernel_results.accepted_results.target_log_prob)
+      loss = -tf.reduce_mean(input_tensor=target_log_prob)
 
     avg_acceptance_ratio = tf.reduce_mean(
         input_tensor=tf.exp(tf.minimum(log_accept_ratio, 0.)))
