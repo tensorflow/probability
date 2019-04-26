@@ -223,7 +223,7 @@ def sample_halton_sequence(dim,
     # about. Noting that all a_i < b by definition of place value expansion,
     # we see that taking the elements mod b of the above vector produces the
     # place value expansion coefficients.
-    coeffs = tf.floor_div(indices, weights)
+    coeffs = tf.math.floordiv(indices, weights)
     coeffs *= 1. - tf.cast(weight_mask, dtype)
     coeffs %= radixes
     if not randomized:

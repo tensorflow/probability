@@ -520,7 +520,7 @@ def build_is_last_day_of_season(num_steps_per_season):
       step_in_cycle = t_ % num_steps_per_cycle
       return any(step_in_cycle == changepoints)
     else:
-      step_in_cycle = tf.floormod(t, num_steps_per_cycle)
+      step_in_cycle = tf.math.floormod(t, num_steps_per_cycle)
       return tf.reduce_any(
           input_tensor=tf.equal(step_in_cycle, changepoints))
   return is_last_day_of_season
