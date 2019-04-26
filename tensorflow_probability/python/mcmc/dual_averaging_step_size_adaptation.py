@@ -56,7 +56,7 @@ def _get_differing_dims(a, b):
 class DualAveragingStepSizeAdaptationResults(
     collections.namedtuple(
         'DualAveragingStepSizeAdaptationResults',
-        'inner_results, target_accept_prob, mu, gamma, t0, kappa, error_sum, '
+        'inner_results, target_accept_prob, mu, exploration_shrinkage, initial_t, decay_rate, error_sum, '
         'log_averaging_step, step, new_step_size')):
   __slots__ = ()
 
@@ -67,27 +67,26 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
       inner_kernel,
       num_adaptation_steps,
       target_accept_prob=0.75,
-      gamma=0.05,
-      t0=10.0,
-      kappa=0.75,
+      exploration_shrinkage=0.05,
+      initial_t=10.0,
+      decay_rate=0.75,
       step_size_setter_fn=_hmc_like_step_size_setter_fn,
       step_size_getter_fn=_hmc_like_step_size_getter_fn,
       log_accept_prob_getter_fn=_hmc_like_log_accept_prob_getter_fn,
       validate_args=False,
-      name=None,
-  ):
+      name=None):
     inner_kernel = mcmc_util.enable_store_parameters_in_results(inner_kernel)
 
     with tf.name_scope(
         mcmc_util.make_name(name, 'simple_step_size_adaptation', '__init__')
     ) as name:
-      dtype = dtype_util.common_dtype([target_accept_prob, gamma, t0, kappa],
+      dtype = dtype_util.common_dtype([target_accept_prob, exploration_shrinkage, initial_t, decay_rate],
                                       tf.float32)
       target_accept_prob = tf.convert_to_tensor(
           value=target_accept_prob, dtype=dtype, name='target_accept_prob')
-      gamma = tf.convert_to_tensor(value=gamma, dtype=dtype, name='gamma')
-      t0 = tf.convert_to_tensor(value=t0, dtype=dtype, name='t0')
-      kappa = tf.convert_to_tensor(value=kappa, dtype=dtype, name='kappa')
+      exploration_shrinkage = tf.convert_to_tensor(value=exploration_shrinkage, dtype=dtype, name='exploration_shrinkage')
+      initial_t = tf.convert_to_tensor(value=initial_t, dtype=dtype, name='initial_t')
+      decay_rate = tf.convert_to_tensor(value=decay_rate, dtype=dtype, name='decay_rate')
       num_adaptation_steps = tf.convert_to_tensor(
           value=num_adaptation_steps,
           dtype=tf.int32,
@@ -100,9 +99,9 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
         inner_kernel=inner_kernel,
         num_adaptation_steps=num_adaptation_steps,
         target_accept_prob=target_accept_prob,
-        gamma=gamma,
-        t0=t0,
-        kappa=kappa,
+        exploration_shrinkage=exploration_shrinkage,
+        initial_t=initial_t,
+        decay_rate=decay_rate,
         step_size_setter_fn=step_size_setter_fn,
         step_size_getter_fn=step_size_getter_fn,
         log_accept_prob_getter_fn=log_accept_prob_getter_fn,
@@ -209,15 +208,15 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
         reduced_log_accept_prob = _reduce_logmeanexp(
             reduced_log_accept_prob, reduce_indices, keepdims=True)
 
-        t0 = previous_kernel_results.t0
-        t = t0 + tf.cast(previous_kernel_results.step, t0.dtype)
+        initial_t = previous_kernel_results.initial_t
+        t = initial_t + tf.cast(previous_kernel_results.step, initial_t.dtype)
         new_error_sum = (previous_kernel_results.error_sum +
                          target_accept_prob -
                          tf.math.exp(reduced_log_accept_prob))
         log_step = (
             previous_kernel_results.mu -
-            new_error_sum / (tf.math.sqrt(t) * previous_kernel_results.gamma))
-        eta = tf.math.pow(t, -previous_kernel_results.kappa)
+            new_error_sum / (tf.math.sqrt(t) * previous_kernel_results.exploration_shrinkage))
+        eta = tf.math.pow(t, -previous_kernel_results.decay_rate)
         new_log_averaging_step = (
             eta * log_step +
             (1 - eta) * previous_kernel_results.log_averaging_step)
@@ -232,10 +231,7 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
                 tf.where(
                     previous_kernel_results.step > self.num_adaptation_steps,
                     step_size_part,
-                    tf.math.exp(new_log_averaging_step)
-                )
-            )
-        )
+                    tf.math.exp(new_log_averaging_step))))
       new_step_size = tf.nest.pack_sequence_as(step_size, new_step_size_parts)
 
       return new_state, previous_kernel_results._replace(
@@ -257,13 +253,12 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
           step=tf.constant(0, dtype=tf.int32),
           target_accept_prob=self.parameters['target_accept_prob'],
           mu=tf.math.log(10 * step_size),
-          gamma=self.parameters['gamma'],
-          t0=self.parameters['t0'],
-          kappa=self.parameters['kappa'],
+          exploration_shrinkage=self.parameters['exploration_shrinkage'],
+          initial_t=self.parameters['initial_t'],
+          decay_rate=self.parameters['decay_rate'],
           error_sum=tf.constant(0., dtype=tf.float32),
           log_averaging_step=tf.constant(0., dtype=tf.float32),
-          new_step_size=step_size,
-      )
+          new_step_size=step_size)
 
   def is_calibrated(self):
     return self.inner_kernel.is_calibrated()
@@ -280,7 +275,6 @@ def _maybe_validate_target_accept_prob(target_accept_prob, validate_args):
       tf.assert_less(
           target_accept_prob,
           tf.ones_like(target_accept_prob),
-          message='`target_accept_prob` must be < 1.'),
-  ]):
+          message='`target_accept_prob` must be < 1.')]):
     return tf.identity(target_accept_prob)
 
