@@ -867,36 +867,29 @@ class HMCAdaptiveStepSize(tf.test.TestCase):
     tf.compat.v1.random.set_random_seed(10014)
     np.random.seed(10014)
 
-  def test_multiple_step_sizes(self):
+  def test_multiple_step_sizes_different_ranks(self):
     num_results = 5
-    initial_step_sizes = [1e-5, 1e-4]
-    initial_state = [0., 0.]
+
+    # Ignoring adaptation (or assuming that adaptation is performed using
+    # a wrapper class like SimpleStepSizeAdaptation), test that we can
+    # construct and run an HMC kernel with state parts and matching per-element
+    # step sizes of varying rank.
+    initial_step_sizes = [1e-5, [1e-4, 1e-3]]  # Scalar and vector state parts.
+    initial_state = [0., [0., 0.]]
     dtype = np.float32
 
-    step_size = [
-        tf.compat.v2.Variable(initial_value=np.array(initial_step_size, dtype),
-                              name='step_size', trainable=False)
-        for initial_step_size in initial_step_sizes]
-    step_counter = tf.compat.v2.Variable(
-        name='step_size_adaptation_step_counter1',
-        initial_value=np.array(-1, dtype=np.int32),
-        trainable=False)
-
     def target_log_prob_fn(x1, x2):
-      return tf.reduce_sum(
-          input_tensor=tfd.Normal(dtype(0.), dtype(1.)).log_prob([x1, x2]))
+      d = tfd.Normal(dtype(0.), dtype(1.))
+      return d.log_prob(x1) + tf.reduce_sum(input_tensor=d.log_prob(x2))
 
-    _, kernel_results = tfp.mcmc.sample_chain(
+    samples, _ = tfp.mcmc.sample_chain(
         num_results=num_results,
         num_burnin_steps=0,
         current_state=[dtype(x) for x in initial_state],
         kernel=tfp.mcmc.HamiltonianMonteCarlo(
             target_log_prob_fn=target_log_prob_fn,
             num_leapfrog_steps=2,
-            step_size=step_size,
-            step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy(
-                num_adaptation_steps=None,
-                step_counter=step_counter),
+            step_size=initial_step_sizes,
             state_gradients_are_stopped=True,
             seed=_set_seed(252)),
         parallel_iterations=1)
@@ -904,12 +897,7 @@ class HMCAdaptiveStepSize(tf.test.TestCase):
     init_op = tf.compat.v1.global_variables_initializer()
     self.evaluate(init_op)
 
-    step_size_ = self.evaluate(kernel_results.extra.step_size_assign)
-
-    # We apply the same adjustment to each step size in the list, so
-    # the starting ratio of step sizes should match the final ratio.
-    self.assertNear(step_size_[0][0]/step_size_[1][0],
-                    step_size_[0][-1]/step_size_[1][-1], err=1e-4)
+    _ = self.evaluate(samples)
 
   def test_multiple_step_sizes_different_dtype(self):
     num_results = 5

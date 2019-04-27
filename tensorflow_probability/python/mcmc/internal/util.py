@@ -474,9 +474,15 @@ def enable_store_parameters_in_results(kernel):
   return kernel
 
 
+def _is_tensor_like(param):
+  if is_list_like(param):
+    return all([_is_tensor_like(p) for p in param])
+  return isinstance(param, tf.Tensor) or (np.array(param).dtype != np.object)
+
+
 def warn_if_parameters_are_not_simple_tensors(params_dict):
   for param_name, param in params_dict.items():
-    if not isinstance(param, tf.Tensor) and np.array(param).dtype == np.object:
+    if not _is_tensor_like(param):
       warnings.warn(
           '`{}` is not a `tf.Tensor`, Python number, or Numpy array. If this '
           'parameter is mutable (e.g., a `tf.Variable`), then the '
