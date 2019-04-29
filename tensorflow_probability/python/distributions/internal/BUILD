@@ -100,6 +100,7 @@ py_library(
 py_binary(
     name = "correlation_matrix_volumes",
     srcs = ["correlation_matrix_volumes.py"],
+    python_version = "PY2",
     deps = [
         ":correlation_matrix_volumes_py",
         ":init",
