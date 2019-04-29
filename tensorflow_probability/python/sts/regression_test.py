@@ -27,7 +27,6 @@ from tensorflow_probability.python.sts import SparseLinearRegression
 from tensorflow_probability.python.sts import Sum
 
 from tensorflow.python.framework import test_util
-from tensorflow.python.ops.linalg import linear_operator_util
 from tensorflow.python.platform import test
 
 tfl = tf.linalg
@@ -49,7 +48,7 @@ class _LinearRegressionTest(tf.test.TestCase):
     linear_regression = LinearRegression(design_matrix=design_matrix)
     true_weights = self._build_placeholder(
         np.random.randn(*(batch_shape + [num_features])))
-    predicted_time_series = linear_operator_util.matmul_with_broadcast(
+    predicted_time_series = tf.linalg.matmul(
         design_matrix, true_weights[..., tf.newaxis])
 
     ssm = linear_regression.make_state_space_model(
@@ -69,7 +68,7 @@ class _LinearRegressionTest(tf.test.TestCase):
         np.random.randn(*(batch_shape + [num_timesteps, num_features])))
 
     true_weights = self._build_placeholder([4., -3.])
-    predicted_time_series = linear_operator_util.matmul_with_broadcast(
+    predicted_time_series = tf.linalg.matmul(
         design_matrix, true_weights[..., tf.newaxis])
 
     linear_regression = LinearRegression(

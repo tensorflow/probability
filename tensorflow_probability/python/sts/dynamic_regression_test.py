@@ -26,7 +26,6 @@ from tensorflow_probability.python.sts import DynamicLinearRegression
 from tensorflow_probability.python.sts import DynamicLinearRegressionStateSpaceModel
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.ops.linalg import linear_operator_util  # pylint: disable=g-direct-tensorflow-import
 
 tfd = tfp.distributions
 
@@ -54,7 +53,7 @@ class _DynamicLinearRegressionStateSpaceModelTest(object):
         drift_scale=drift_scale,
         initial_state_prior=initial_state_prior)
 
-    predicted_time_series = linear_operator_util.matmul_with_broadcast(
+    predicted_time_series = tf.linalg.matmul(
         design_matrix, initial_state_loc[..., tf.newaxis])
 
     self.assertAllEqual(self.evaluate(ssm.mean()), predicted_time_series)

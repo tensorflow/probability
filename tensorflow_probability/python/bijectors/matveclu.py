@@ -25,9 +25,6 @@ from tensorflow_probability.python.math.linalg import lu_reconstruct
 from tensorflow_probability.python.math.linalg import lu_solve
 
 
-from tensorflow.python.ops.linalg import linear_operator_util
-
-
 __all__ = [
     'MatvecLU'
 ]
@@ -141,8 +138,7 @@ class MatvecLU(bijector.Bijector):
     w = lu_reconstruct(lower_upper=self.lower_upper,
                        perm=self.permutation,
                        validate_args=self.validate_args)
-    return linear_operator_util.matmul_with_broadcast(
-        w, x[..., tf.newaxis])[..., 0]
+    return tf.linalg.matvec(w, x)
 
   def _inverse(self, y):
     return lu_solve(

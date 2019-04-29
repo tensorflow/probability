@@ -33,14 +33,8 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow.python.ops.linalg import linear_operator_util  # pylint: disable=g-direct-tensorflow-import
 
 tfl = tf.linalg
-
-# The built-in tf.matmul doesn't broadcast batch dimensions, so we
-# need to use `matmul_with_broadcast` throughout to ensure we support
-# batching.
-_matmul = linear_operator_util.matmul_with_broadcast
 
 
 def _broadcast_to_shape(x, shape):
@@ -1265,14 +1259,15 @@ def backward_smoothing_update(filtered_mean,
   gain_transpose = tf.linalg.cholesky_solve(predicted_cov_chol, tmp_gain_cov)
 
   posterior_mean = (filtered_mean +
-                    _matmul(gain_transpose,
-                            next_posterior_mean - predicted_mean,
-                            adjoint_a=True))
+                    tf.linalg.matmul(gain_transpose,
+                                     next_posterior_mean - predicted_mean,
+                                     adjoint_a=True))
   posterior_cov = (
       filtered_cov +
-      _matmul(gain_transpose,
-              _matmul(next_posterior_cov - predicted_cov, gain_transpose),
-              adjoint_a=True))
+      tf.linalg.matmul(gain_transpose,
+                       tf.linalg.matmul(
+                           next_posterior_cov - predicted_cov, gain_transpose),
+                       adjoint_a=True))
 
   return (posterior_mean, posterior_cov)
 
@@ -1483,8 +1478,8 @@ def linear_gaussian_update(
   # Compute the posterior mean, incorporating the observation.
   #  u* = u + K (x_observed - x_expected)
   posterior_mean = (prior_mean +
-                    _matmul(gain_transpose, x_observed - x_expected,
-                            adjoint_a=True))
+                    tf.linalg.matmul(gain_transpose, x_observed - x_expected,
+                                     adjoint_a=True))
 
   # For the posterior covariance, we could use the simple update
   #  P* = P - K * H * P
@@ -1498,10 +1493,12 @@ def linear_gaussian_update(
   tmp_term = -observation_matrix.matmul(gain_transpose, adjoint=True)  # -K * H
   tmp_term = tf.linalg.set_diag(tmp_term, tf.linalg.diag_part(tmp_term) + 1)
   posterior_cov = (
-      _matmul(tmp_term, _matmul(prior_cov, tmp_term), adjoint_a=True)
-      + _matmul(gain_transpose,
-                _matmul(observation_noise.covariance(), gain_transpose),
-                adjoint_a=True))
+      tf.linalg.matmul(
+          tmp_term, tf.linalg.matmul(prior_cov, tmp_term), adjoint_a=True)
+      + tf.linalg.matmul(gain_transpose,
+                         tf.linalg.matmul(
+                             observation_noise.covariance(), gain_transpose),
+                         adjoint_a=True))
 
   if observation_size_is_static_and_scalar:
     # A plain Normal would have event shape `[]`; wrapping with Independent
