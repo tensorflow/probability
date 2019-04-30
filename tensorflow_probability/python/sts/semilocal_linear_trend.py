@@ -174,8 +174,11 @@ class SemiLocalLinearTrendStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
         Default value: "SemiLocalLinearTrendStateSpaceModel".
     """
 
-    with tf.name_scope(name, 'SemiLocalLinearTrendStateSpaceModel', values=[
-        level_scale, slope_mean, slope_scale, autoregressive_coef]) as name:
+    with tf.compat.v1.name_scope(
+        name,
+        'SemiLocalLinearTrendStateSpaceModel',
+        values=[level_scale, slope_mean, slope_scale,
+                autoregressive_coef]) as name:
 
       dtype = initial_state_prior.dtype
 
@@ -363,7 +366,9 @@ class SemiLocalLinearTrend(StructuralTimeSeries):
         `batch_shape + [T, 1]` (omitting the trailing unit dimension is also
         supported when `T > 1`), specifying an observed time series.
         Any priors not explicitly set will be given default values according to
-        the scale of the observed time series (or batch of time series).
+        the scale of the observed time series (or batch of time series). May
+        optionally be an instance of `tfp.sts.MaskedTimeSeries`, which includes
+        a mask `Tensor` to specify timesteps with missing observations.
         Default value: `None`.
       constrain_ar_coef_stationary: if `True`, perform inference using a
         parameterization that restricts `autoregressive_coef` to the interval
@@ -380,11 +385,11 @@ class SemiLocalLinearTrend(StructuralTimeSeries):
         Default value: 'SemiLocalLinearTrend'.
     """
 
-    with tf.name_scope(
+    with tf.compat.v1.name_scope(
         name, 'SemiLocalLinearTrend', values=[observed_time_series]) as name:
 
       if observed_time_series is not None:
-        observed_stddev, observed_initial = sts_util.empirical_statistics(
+        _, observed_stddev, observed_initial = sts_util.empirical_statistics(
             observed_time_series)
       else:
         observed_stddev, observed_initial = 1., 0.

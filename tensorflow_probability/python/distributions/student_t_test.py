@@ -26,6 +26,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfd = tfp.distributions
@@ -161,7 +162,7 @@ class StudentTTest(tf.test.TestCase):
     sigma_v = np.sqrt(10.)
     n = tf.constant(200000)
     student = tfd.StudentT(df=df, loc=mu, scale=sigma)
-    samples = student.sample(n, seed=123456)
+    samples = student.sample(n, seed=tfp_test_util.test_seed())
     sample_values = self.evaluate(samples)
     n_val = 200000
     self.assertEqual(sample_values.shape, (n_val,))
@@ -176,14 +177,15 @@ class StudentTTest(tf.test.TestCase):
     mu = tf.constant(3.)
     sigma = tf.constant(math.sqrt(10.))
     n = tf.constant(100)
+    seed = tfp_test_util.test_seed()
 
-    tf.compat.v1.set_random_seed(654321)
+    tf.compat.v1.set_random_seed(seed)
     student = tfd.StudentT(df=df, loc=mu, scale=sigma, name="student_t1")
-    samples1 = self.evaluate(student.sample(n, seed=123456))
+    samples1 = self.evaluate(student.sample(n, seed=seed))
 
-    tf.compat.v1.set_random_seed(654321)
+    tf.compat.v1.set_random_seed(seed)
     student2 = tfd.StudentT(df=df, loc=mu, scale=sigma, name="student_t2")
-    samples2 = self.evaluate(student2.sample(n, seed=123456))
+    samples2 = self.evaluate(student2.sample(n, seed=seed))
 
     self.assertAllClose(samples1, samples2)
 
@@ -192,7 +194,7 @@ class StudentTTest(tf.test.TestCase):
     df = tf.constant(df_v)
     n = tf.constant(200000)
     student = tfd.StudentT(df=df, loc=1., scale=1.)
-    samples = student.sample(n, seed=123456)
+    samples = student.sample(n, seed=tfp_test_util.test_seed())
     sample_values = self.evaluate(samples)
     n_val = 200000
     self.assertEqual(sample_values.shape, (n_val, 4))
@@ -209,7 +211,7 @@ class StudentTTest(tf.test.TestCase):
     sigma_v = [np.sqrt(10.), np.sqrt(15.)]
     n = tf.constant(200000)
     student = tfd.StudentT(df=df, loc=mu, scale=sigma)
-    samples = student.sample(n, seed=123456)
+    samples = student.sample(n, seed=tfp_test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (200000, batch_size, 2))
     self.assertAllClose(
@@ -405,7 +407,7 @@ class StudentTTest(tf.test.TestCase):
   def testPdfOfSample(self):
     student = tfd.StudentT(df=3., loc=np.pi, scale=1.)
     num = 20000
-    samples = student.sample(num, seed=123456)
+    samples = student.sample(num, seed=tfp_test_util.test_seed())
     pdfs = student.prob(samples)
     mean = student.mean()
     mean_pdf = student.prob(student.mean())
@@ -441,7 +443,7 @@ class StudentTTest(tf.test.TestCase):
     self.assertAllEqual([2, 2], student.batch_shape)
     self.assertAllEqual([2, 2], self.evaluate(student.batch_shape_tensor()))
     num = 50000
-    samples = student.sample(num, seed=123456)
+    samples = student.sample(num, seed=tfp_test_util.test_seed())
     pdfs = student.prob(samples)
     sample_vals, pdf_vals = self.evaluate([samples, pdfs])
     self.assertEqual(samples.shape, (num, 2, 2))

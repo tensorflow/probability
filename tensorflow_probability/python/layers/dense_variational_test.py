@@ -395,13 +395,13 @@ class DenseVariational(tf.test.TestCase):
       sign_input = tf.random.uniform([batch_size, in_size],
                                      minval=0,
                                      maxval=2,
-                                     dtype=tf.int32,
+                                     dtype=tf.int64,
                                      seed=stream())
       sign_input = tf.cast(2 * sign_input - 1, inputs.dtype)
       sign_output = tf.random.uniform([batch_size, out_size],
                                       minval=0,
                                       maxval=2,
-                                      dtype=tf.int32,
+                                      dtype=tf.int64,
                                       seed=stream())
       sign_output = tf.cast(2 * sign_output - 1, inputs.dtype)
       perturbed_inputs = tf.matmul(

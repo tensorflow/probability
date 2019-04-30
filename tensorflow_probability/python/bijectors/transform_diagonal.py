@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 
 __all__ = [
@@ -62,12 +62,16 @@ class TransformDiagonal(bijector.Bijector):
         dtype=diag_bijector.dtype,
         name=name)
 
+  @property
+  def diag_bijector(self):
+    return self._diag_bijector
+
   def _forward(self, x):
-    diag = self._diag_bijector.forward(tf.linalg.diag_part(x))
+    diag = self.diag_bijector.forward(tf.linalg.diag_part(x))
     return tf.linalg.set_diag(x, diag)
 
   def _inverse(self, y):
-    diag = self._diag_bijector.inverse(tf.linalg.diag_part(y))
+    diag = self.diag_bijector.inverse(tf.linalg.diag_part(y))
     return tf.linalg.set_diag(y, diag)
 
   def _forward_log_det_jacobian(self, x):
@@ -95,9 +99,9 @@ class TransformDiagonal(bijector.Bijector):
     # Note that for elementwise operations (exp, softplus, etc) the
     # first block of the Jacobian will itself be a diagonal matrix,
     # but our implementation does not require this to be true.
-    return self._diag_bijector.forward_log_det_jacobian(
+    return self.diag_bijector.forward_log_det_jacobian(
         tf.linalg.diag_part(x), event_ndims=1)
 
   def _inverse_log_det_jacobian(self, y):
-    return self._diag_bijector.inverse_log_det_jacobian(
+    return self.diag_bijector.inverse_log_det_jacobian(
         tf.linalg.diag_part(y), event_ndims=1)

@@ -20,10 +20,15 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
+
 import tensorflow as tf
 import tensorflow_probability as tfp
+
+from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
 tfd = tfp.distributions
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 def make_onehot_categorical(batch_shape, num_classes, dtype=tf.int32):
@@ -56,9 +61,10 @@ class OneHotCategoricalTest(tf.test.TestCase):
   def testShapes(self):
     for batch_shape in ([], [1], [2, 3, 4]):
       dist = make_onehot_categorical(batch_shape, 10)
-      self.assertAllEqual(batch_shape, dist.batch_shape.as_list())
+      self.assertAllEqual(batch_shape,
+                          tensorshape_util.as_list(dist.batch_shape))
       self.assertAllEqual(batch_shape, self.evaluate(dist.batch_shape_tensor()))
-      self.assertAllEqual([10], dist.event_shape.as_list())
+      self.assertAllEqual([10], tensorshape_util.as_list(dist.event_shape))
       self.assertAllEqual([10], self.evaluate(dist.event_shape_tensor()))
       # event_shape is available as a constant because the shape is
       # known at graph build time.
@@ -67,9 +73,10 @@ class OneHotCategoricalTest(tf.test.TestCase):
     for batch_shape in ([], [1], [2, 3, 4]):
       dist = make_onehot_categorical(batch_shape, tf.constant(
           10, dtype=tf.int32))
-      self.assertAllEqual(len(batch_shape), dist.batch_shape.ndims)
+      self.assertAllEqual(
+          len(batch_shape), tensorshape_util.rank(dist.batch_shape))
       self.assertAllEqual(batch_shape, self.evaluate(dist.batch_shape_tensor()))
-      self.assertAllEqual([10], dist.event_shape.as_list())
+      self.assertAllEqual([10], tensorshape_util.as_list(dist.event_shape))
       self.assertEqual(10, self.evaluate(dist.event_shape_tensor()))
 
   def testDtype(self):
@@ -127,7 +134,7 @@ class OneHotCategoricalTest(tf.test.TestCase):
     probs = [[[0.2, 0.8], [0.4, 0.6]]]
     dist = tfd.OneHotCategorical(tf.math.log(probs) - 50.)
     n = 100
-    samples = dist.sample(n, seed=123)
+    samples = dist.sample(n, seed=tfp_test_util.test_seed())
     self.assertEqual(samples.dtype, tf.int32)
     sample_values = self.evaluate(samples)
     self.assertAllEqual([n, 1, 2, 2], sample_values.shape)
@@ -137,7 +144,7 @@ class OneHotCategoricalTest(tf.test.TestCase):
   def testSampleWithSampleShape(self):
     probs = [[[0.2, 0.8], [0.4, 0.6]]]
     dist = tfd.OneHotCategorical(tf.math.log(probs) - 50.)
-    samples = dist.sample((100, 100), seed=123)
+    samples = dist.sample((100, 100), seed=tfp_test_util.test_seed())
     prob = dist.prob(samples)
     prob_val = self.evaluate(prob)
     self.assertAllClose(
@@ -163,7 +170,7 @@ class OneHotCategoricalTest(tf.test.TestCase):
 
         kl_actual = tfd.kl_divergence(p, q)
         kl_same = tfd.kl_divergence(p, p)
-        x = p.sample(int(2e4), seed=0)
+        x = p.sample(int(2e4), seed=tfp_test_util.test_seed())
         x = tf.cast(x, dtype=tf.float32)
         # Compute empirical KL(p||q).
         kl_sample = tf.reduce_mean(
@@ -180,7 +187,7 @@ class OneHotCategoricalTest(tf.test.TestCase):
     logits = self._rng.rand(4, 3, 2).astype(np.float32)
     dist = tfd.OneHotCategorical(logits=logits)
     n = int(3e3)
-    x = dist.sample(n, seed=0)
+    x = dist.sample(n, seed=tfp_test_util.test_seed())
     x = tf.cast(x, dtype=tf.float32)
     sample_mean = tf.reduce_mean(input_tensor=x, axis=0)
     x_centered = tf.transpose(a=x - sample_mean, perm=[1, 2, 3, 0])
@@ -206,7 +213,7 @@ class OneHotCategoricalTest(tf.test.TestCase):
     logits = self._rng.rand(3).astype(np.float32)
     dist = tfd.OneHotCategorical(logits=logits)
     n = int(1e4)
-    x = dist.sample(n, seed=0)
+    x = dist.sample(n, seed=tfp_test_util.test_seed())
     x = tf.cast(x, dtype=tf.float32)
     sample_mean = tf.reduce_mean(input_tensor=x, axis=0)  # elementwise mean
     x_centered = x - sample_mean

@@ -21,13 +21,15 @@ from __future__ import print_function
 import math
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
     "Wishart",
@@ -106,8 +108,8 @@ class _WishartLinearOperator(distribution.Distribution):
     parameters = dict(locals())
     self._input_output_cholesky = input_output_cholesky
     with tf.name_scope(name) as name:
-      with tf.name_scope("init", values=[df, scale_operator]):
-        if not scale_operator.dtype.is_floating:
+      with tf.name_scope("init"):
+        if not dtype_util.is_floating(scale_operator.dtype):
           raise TypeError(
               "scale_operator.dtype=%s is not a floating-point type" %
               scale_operator.dtype)
@@ -118,7 +120,7 @@ class _WishartLinearOperator(distribution.Distribution):
         self._scale_operator = scale_operator
         self._df = tf.convert_to_tensor(
             value=df, dtype=scale_operator.dtype, name="df")
-        tf.debugging.assert_same_float_dtype([self._df, self._scale_operator])
+        dtype_util.assert_same_float_dtype([self._df, self._scale_operator])
         if tf.compat.dimension_value(self._scale_operator.shape[-1]) is None:
           self._dimension = tf.cast(
               self._scale_operator.domain_dimension_tensor(),
@@ -135,13 +137,13 @@ class _WishartLinearOperator(distribution.Distribution):
           df_val = np.asarray(df_val)
           if not df_val.shape:
             df_val = [df_val]
-          if any(df_val < dim_val):
+          if np.any(df_val < dim_val):
             raise ValueError(
                 "Degrees of freedom (df = %s) cannot be less than "
                 "dimension of scale matrix (scale.dimension = %s)"
                 % (df_val, dim_val))
         elif validate_args:
-          assertions = tf.compat.v1.assert_less_equal(
+          assertions = assert_util.assert_less_equal(
               self._dimension,
               self._df,
               message=("Degrees of freedom (df = %s) cannot be "
@@ -224,7 +226,7 @@ class _WishartLinearOperator(distribution.Distribution):
     # ChiSquared(k) == Gamma(alpha=k/2, beta=1/2)
     expanded_df = self.df * tf.ones(
         self.scale_operator.batch_shape_tensor(),
-        dtype=self.df.dtype.base_dtype)
+        dtype=dtype_util.base_dtype(self.df.dtype))
 
     g = tf.random.gamma(
         shape=[n],
@@ -243,7 +245,7 @@ class _WishartLinearOperator(distribution.Distribution):
     # Complexity: O(nbk**2)
     perm = tf.concat([tf.range(1, ndims), [0]], 0)
     x = tf.transpose(a=x, perm=perm)
-    shape = tf.concat([batch_shape, [event_shape[0]], [-1]], 0)
+    shape = tf.concat([batch_shape, [event_shape[0]], [event_shape[1] * n]], 0)
     x = tf.reshape(x, shape)
 
     # Complexity: O(nbM) where M is the complexity of the operator solving a
@@ -273,10 +275,17 @@ class _WishartLinearOperator(distribution.Distribution):
 
     batch_shape = self.batch_shape_tensor()
     event_shape = self.event_shape_tensor()
+    x_ndims = tf.rank(input=x_sqrt)
+    num_singleton_axes_to_prepend = (
+        tf.maximum(tf.size(input=batch_shape) + 2, x_ndims) - x_ndims)
+    x_with_prepended_singletons_shape = tf.concat([
+        tf.ones([num_singleton_axes_to_prepend], dtype=tf.int32),
+        tf.shape(input=x_sqrt)], 0)
+    x_sqrt = tf.reshape(x_sqrt, x_with_prepended_singletons_shape)
     ndims = tf.rank(x_sqrt)
     # sample_ndims = ndims - batch_ndims - event_ndims
-    sample_ndims = ndims - tf.shape(input=batch_shape)[0] - 2
-    sample_shape = tf.strided_slice(tf.shape(input=x_sqrt), [0], [sample_ndims])
+    sample_ndims = ndims - tf.size(input=batch_shape) - 2
+    sample_shape = tf.shape(input=x_sqrt)[:sample_ndims]
 
     # We need to be able to pre-multiply each matrix by its corresponding
     # batch scale matrix. Since a Distribution Tensor supports multiple
@@ -294,19 +303,26 @@ class _WishartLinearOperator(distribution.Distribution):
     perm = tf.concat([tf.range(sample_ndims, ndims),
                       tf.range(0, sample_ndims)], 0)
     scale_sqrt_inv_x_sqrt = tf.transpose(a=scale_sqrt_inv_x_sqrt, perm=perm)
-    shape = tf.concat((batch_shape,
-                       (tf.cast(self.dimension, dtype=tf.int32), -1)), 0)
+    last_dim_size = (
+        tf.cast(self.dimension, dtype=tf.int32) *
+        tf.reduce_prod(
+            input_tensor=x_with_prepended_singletons_shape[:sample_ndims]))
+    shape = tf.concat(
+        [x_with_prepended_singletons_shape[sample_ndims:-2],
+         [tf.cast(self.dimension, dtype=tf.int32), last_dim_size]],
+        axis=0)
     scale_sqrt_inv_x_sqrt = tf.reshape(scale_sqrt_inv_x_sqrt, shape)
 
     # Complexity: O(nbM*k) where M is the complexity of the operator solving a
     # vector system. For LinearOperatorLowerTriangular, each solve is O(k**2) so
     # this step has complexity O(nbk^3).
-    scale_sqrt_inv_x_sqrt = self.scale_operator.solve(
-        scale_sqrt_inv_x_sqrt)
+    scale_sqrt_inv_x_sqrt = self.scale_operator.solve(scale_sqrt_inv_x_sqrt)
 
     # Undo make batch-op ready.
     # Complexity: O(nbk**2)
-    shape = tf.concat([batch_shape, event_shape, sample_shape], 0)
+    shape = tf.concat(
+        [tf.shape(input=scale_sqrt_inv_x_sqrt)[:-2], event_shape, sample_shape],
+        axis=0)
     scale_sqrt_inv_x_sqrt = tf.reshape(scale_sqrt_inv_x_sqrt, shape)
     perm = tf.concat([
         tf.range(ndims - sample_ndims, ndims),
@@ -334,15 +350,13 @@ class _WishartLinearOperator(distribution.Distribution):
                 self.log_normalization())
 
     # Set shape hints.
-    # Try to merge what we know from the input then what we know from the
+    # Try to merge what we know from the input x with what we know from the
     # parameters of this distribution.
-    if x.shape.ndims is not None:
-      log_prob.set_shape(x.shape[:-2])
-    if (log_prob.shape.ndims is not None and
-        self.batch_shape.ndims is not None and
-        self.batch_shape.ndims > 0):
-      log_prob.shape[-self.batch_shape.ndims:].merge_with(
-          self.batch_shape)
+    if tensorshape_util.rank(x.shape) is not None and tensorshape_util.rank(
+        self.batch_shape) is not None:
+      tensorshape_util.set_shape(
+          log_prob,
+          tf.broadcast_static_shape(x.shape[:-2], self.batch_shape))
 
     return log_prob
 
@@ -401,7 +415,7 @@ class _WishartLinearOperator(distribution.Distribution):
 
   def _multi_gamma_sequence(self, a, p, name="multi_gamma_sequence"):
     """Creates sequence used in multivariate (di)gamma; shape = shape(a)+[p]."""
-    with self._name_scope(name, values=[a, p]):
+    with self._name_scope(name):
       # Linspace only takes scalars, so we'll add in the offset afterwards.
       seq = tf.linspace(
           tf.constant(0., dtype=self.dtype), 0.5 - 0.5 * p, tf.cast(
@@ -410,14 +424,14 @@ class _WishartLinearOperator(distribution.Distribution):
 
   def _multi_lgamma(self, a, p, name="multi_lgamma"):
     """Computes the log multivariate gamma function; log(Gamma_p(a))."""
-    with self._name_scope(name, values=[a, p]):
+    with self._name_scope(name):
       seq = self._multi_gamma_sequence(a, p)
       return (0.25 * p * (p - 1.) * math.log(math.pi) +
               tf.reduce_sum(input_tensor=tf.math.lgamma(seq), axis=[-1]))
 
   def _multi_digamma(self, a, p, name="multi_digamma"):
     """Computes the multivariate digamma function; Psi_p(a)."""
-    with self._name_scope(name, values=[a, p]):
+    with self._name_scope(name):
       seq = self._multi_gamma_sequence(a, p)
       return tf.reduce_sum(input_tensor=tf.math.digamma(seq), axis=[-1])
 
@@ -523,7 +537,7 @@ class Wishart(_WishartLinearOperator):
     parameters = dict(locals())
 
     with tf.name_scope(name) as name:
-      with tf.name_scope("init", values=[df, scale, scale_tril]):
+      with tf.name_scope("init"):
         if (scale is None) == (scale_tril is None):
           raise ValueError("Must pass scale or scale_tril, but not both.")
 
@@ -539,10 +553,10 @@ class Wishart(_WishartLinearOperator):
               value=scale_tril, name="scale_tril", dtype=dtype)
           if validate_args:
             scale_tril = distribution_util.with_dependencies([
-                tf.compat.v1.assert_positive(
+                assert_util.assert_positive(
                     tf.linalg.diag_part(scale_tril),
                     message="scale_tril must be positive definite"),
-                tf.compat.v1.assert_equal(
+                assert_util.assert_equal(
                     tf.shape(input=scale_tril)[-1],
                     tf.shape(input=scale_tril)[-2],
                     message="scale_tril must be square")
@@ -560,3 +574,7 @@ class Wishart(_WishartLinearOperator):
           allow_nan_stats=allow_nan_stats,
           name=name)
     self._parameters = parameters
+
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(df=0, scale=2, scale_tril=2)

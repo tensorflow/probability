@@ -195,7 +195,7 @@ class StructuralTimeSeries(object):
     seed = distributions.SeedStream(
         seed, salt='StructuralTimeSeries_prior_sample')
 
-    with tf.name_scope(
+    with tf.compat.v1.name_scope(
         'prior_sample',
         values=[num_timesteps, params_sample_shape, trajectories_sample_shape]):
       param_samples = [
@@ -217,7 +217,9 @@ class StructuralTimeSeries(object):
         `1` dimension is optional if `num_timesteps > 1`), where
         `batch_shape` should match `self.batch_shape` (the broadcast batch
         shape of all priors on parameters for this structural time series
-        model).
+        model). May optionally be an instance of `tfp.sts.MaskedTimeSeries`,
+        which includes a mask `Tensor` to specify timesteps with missing
+        observations.
 
     Returns:
      log_joint_fn: A function taking a `Tensor` argument for each model
@@ -230,10 +232,14 @@ class StructuralTimeSeries(object):
        inference.
     """
 
-    with tf.name_scope('joint_log_prob', values=[observed_time_series]):
-      observed_time_series = tf.convert_to_tensor(value=observed_time_series)
-      observed_time_series = sts_util.maybe_expand_trailing_dim(
+    with tf.compat.v1.name_scope(
+        'joint_log_prob', values=[observed_time_series]):
+      [
+          observed_time_series,
+          mask
+      ] = sts_util.canonicalize_observed_time_series_with_mask(
           observed_time_series)
+
       num_timesteps = distribution_util.prefer_static_value(
           tf.shape(input=observed_time_series))[-2]
 
@@ -250,7 +256,7 @@ class StructuralTimeSeries(object):
         # log_prob on observations.
         lgssm = self.make_state_space_model(
             param_vals=param_vals, num_timesteps=num_timesteps)
-        observation_lp = lgssm.log_prob(observed_time_series)
+        observation_lp = lgssm.log_prob(observed_time_series, mask=mask)
 
         # Sum over likelihoods from iid observations. Without this sum,
         # adding `param_lp + observation_lp` would broadcast the param priors

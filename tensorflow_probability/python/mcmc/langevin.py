@@ -29,7 +29,7 @@ from tensorflow_probability.python.math import diag_jacobian
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import metropolis_hastings
 
-from tensorflow_probability.python.mcmc import util as mcmc_util
+from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
 
 __all__ = [
@@ -483,15 +483,16 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
 
   @mcmc_util.set_doc(MetropolisAdjustedLangevinAlgorithm.one_step.__doc__)
   def one_step(self, current_state, previous_kernel_results):
-    with tf.name_scope(
+    with tf.compat.v1.name_scope(
         name=mcmc_util.make_name(self.name, 'mala', 'one_step'),
-        values=[self.step_size,
-                current_state,
-                previous_kernel_results.target_log_prob,
-                previous_kernel_results.grads_target_log_prob,
-                previous_kernel_results.volatility,
-                previous_kernel_results.diffusion_drift]):
-      with tf.name_scope('initialize'):
+        values=[
+            self.step_size, current_state,
+            previous_kernel_results.target_log_prob,
+            previous_kernel_results.grads_target_log_prob,
+            previous_kernel_results.volatility,
+            previous_kernel_results.diffusion_drift
+        ]):
+      with tf.compat.v1.name_scope('initialize'):
         # Prepare input arguments to be passed to `_euler_method`.
         [
             current_state_parts,
@@ -585,7 +586,7 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
   @mcmc_util.set_doc(
       MetropolisAdjustedLangevinAlgorithm.bootstrap_results.__doc__)
   def bootstrap_results(self, init_state):
-    with tf.name_scope(
+    with tf.compat.v1.name_scope(
         name=mcmc_util.make_name(self.name, 'mala', 'bootstrap_results'),
         values=[init_state]):
       init_state_parts = (list(init_state)
@@ -670,10 +671,10 @@ def _euler_method(random_draw_parts,
       state(s) of the Markov chain(s) at each result step. Has same shape as
       input `current_state_parts`.
   """
-  with tf.name_scope(
-      name, 'mala_euler_method',
-      [random_draw_parts, state_parts, drift_parts,
-       step_size_parts, volatility_parts]):
+  with tf.compat.v1.name_scope(name, 'mala_euler_method', [
+      random_draw_parts, state_parts, drift_parts, step_size_parts,
+      volatility_parts
+  ]):
     proposed_state_parts = []
     for random_draw, state, drift, step_size, volatility in zip(
         random_draw_parts,
@@ -725,10 +726,9 @@ def _get_drift(step_size_parts, volatility_parts, grads_volatility,
       input `current_state_parts`.
   """
 
-  with tf.name_scope(
-      name, 'mala_get_drift',
-      [step_size_parts, volatility_parts, grads_volatility,
-       grads_target_log_prob]):
+  with tf.compat.v1.name_scope(name, 'mala_get_drift', [
+      step_size_parts, volatility_parts, grads_volatility, grads_target_log_prob
+  ]):
 
     drift_parts = []
 
@@ -805,16 +805,11 @@ def _compute_log_acceptance_correction(current_state_parts,
       acceptance-correction.  (See docstring for mathematical definition.)
   """
 
-  with tf.name_scope(
-      name, 'compute_log_acceptance_correction',
-      [current_state_parts,
-       proposed_state_parts,
-       current_volatility_parts,
-       proposed_volatility_parts,
-       current_drift_parts,
-       proposed_drift_parts,
-       step_size_parts,
-       independent_chain_ndims]):
+  with tf.compat.v1.name_scope(name, 'compute_log_acceptance_correction', [
+      current_state_parts, proposed_state_parts, current_volatility_parts,
+      proposed_volatility_parts, current_drift_parts, proposed_drift_parts,
+      step_size_parts, independent_chain_ndims
+  ]):
 
     proposed_log_density_parts = []
     dual_log_density_parts = []

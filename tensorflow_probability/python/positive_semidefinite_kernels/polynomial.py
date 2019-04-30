@@ -23,7 +23,6 @@ import functools
 
 
 import tensorflow as tf
-from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.positive_semidefinite_kernels import positive_semidefinite_kernel as psd_kernel
 from tensorflow_probability.python.positive_semidefinite_kernels.internal import util
 
@@ -122,10 +121,10 @@ class Polynomial(psd_kernel.PositiveSemidefiniteKernel):
       name: Python `str` name prefixed to Ops created by this class.
         Default Value: `'Polynomial'`
     """
-    with tf.name_scope(name, values=[
-        bias_variance, slope_variance, shift, exponent]):
-      dtype = dtype_util.common_dtype(
-          [bias_variance, slope_variance, shift, exponent], tf.float32)
+    with tf.compat.v1.name_scope(
+        name, values=[bias_variance, slope_variance, shift, exponent]):
+      dtype = util.maybe_get_common_dtype(
+          [bias_variance, slope_variance, shift, exponent])
       if bias_variance is not None:
         bias_variance = tf.convert_to_tensor(
             value=bias_variance, name='bias_variance', dtype=dtype)
@@ -144,9 +143,6 @@ class Polynomial(psd_kernel.PositiveSemidefiniteKernel):
             value=exponent, name='exponent', dtype=dtype)
       self._exponent = _validate_arg_if_not_none(
           exponent, tf.compat.v1.assert_positive, validate_args)
-      tf.debugging.assert_same_float_dtype([
-          self._bias_variance, self._slope_variance, self._shift, self._exponent
-      ])
     super(Polynomial, self).__init__(
         feature_ndims, dtype=dtype, name=name)
 

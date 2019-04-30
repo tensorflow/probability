@@ -111,7 +111,7 @@ class LocalLinearTrendStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
     lp = linear_trend_model.log_prob(y) # has shape [5, 10, 10]
     ```
 
-    """
+  """
 
   def __init__(self,
                num_timesteps,
@@ -156,8 +156,8 @@ class LocalLinearTrendStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
         Default value: "LocalLinearTrendStateSpaceModel".
     """
 
-    with tf.name_scope(name, 'LocalLinearTrendStateSpaceModel',
-                       [level_scale, slope_scale]) as name:
+    with tf.compat.v1.name_scope(name, 'LocalLinearTrendStateSpaceModel',
+                                 [level_scale, slope_scale]) as name:
 
       # The initial state prior determines the dtype of sampled values.
       # Other model parameters must have the same dtype.
@@ -274,18 +274,20 @@ class LocalLinearTrend(StructuralTimeSeries):
         `batch_shape + [T, 1]` (omitting the trailing unit dimension is also
         supported when `T > 1`), specifying an observed time series.
         Any priors not explicitly set will be given default values according to
-        the scale of the observed time series (or batch of time series).
+        the scale of the observed time series (or batch of time series). May
+        optionally be an instance of `tfp.sts.MaskedTimeSeries`, which includes
+        a mask `Tensor` to specify timesteps with missing observations.
         Default value: `None`.
       name: the name of this model component.
         Default value: 'LocalLinearTrend'.
     """
 
-    with tf.name_scope(
+    with tf.compat.v1.name_scope(
         name, 'LocalLinearTrend', values=[observed_time_series]) as name:
 
-      observed_stddev, observed_initial = (
+      _, observed_stddev, observed_initial = (
           sts_util.empirical_statistics(observed_time_series)
-          if observed_time_series is not None else (1., 0.))
+          if observed_time_series is not None else (0., 1., 0.))
 
       # Heuristic default priors. Overriding these may dramatically
       # change inference performance and results.

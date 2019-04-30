@@ -83,12 +83,14 @@ def kernel(target_log_prob_fn,
   if not tf.executing_eagerly():
     raise NotImplementedError("`kernel` is only available in Eager mode.")
 
-  with tf.name_scope(name,
-                     default_name="nuts_kernel",
-                     values=[current_state, step_size, seed,
-                             current_target_log_prob,
-                             current_grads_target_log_prob]):
-    with tf.name_scope("initialize"):
+  with tf.compat.v1.name_scope(
+      name,
+      default_name="nuts_kernel",
+      values=[
+          current_state, step_size, seed, current_target_log_prob,
+          current_grads_target_log_prob
+      ]):
+    with tf.compat.v1.name_scope("initialize"):
       current_state = [tf.convert_to_tensor(value=s) for s in current_state]
       step_size = [tf.convert_to_tensor(value=s) for s in step_size]
       value_and_gradients_fn = lambda *args: tfp.math.value_and_gradient(  # pylint: disable=g-long-lambda
@@ -507,7 +509,7 @@ def _log_joint(current_target_log_prob, current_momentum):
 
 def _random_bernoulli(shape, probs, dtype=tf.int32, seed=None, name=None):
   """Returns samples from a Bernoulli distribution."""
-  with tf.name_scope(name, "random_bernoulli", [shape, probs]):
+  with tf.compat.v1.name_scope(name, "random_bernoulli", [shape, probs]):
     probs = tf.convert_to_tensor(value=probs)
     random_uniform = tf.random.uniform(shape, dtype=probs.dtype, seed=seed)
     return tf.cast(tf.less(random_uniform, probs), dtype)

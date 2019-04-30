@@ -16,7 +16,11 @@ tfp.util.externalize_variables_as_args(
 )
 ```
 
-"Converts variables within a callable into explicit args.
+"Converts variables within a callable into explicit args. (deprecated)
+
+Warning: THIS FUNCTION IS DEPRECATED. It will be removed after 2019-02-28.
+Instructions for updating:
+`externalize_variables_as_args` will not be supported with TF 2.0
 
 Makes a new callable from `fn` which has arguments `list(fn_args) +
 list(ancestor_variables)`. If `ancestor_variables` is not specified, it is

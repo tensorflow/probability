@@ -20,11 +20,12 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import seed_stream
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
@@ -143,8 +144,8 @@ class Beta(distribution.Distribution):
   """
 
   def __init__(self,
-               concentration1=None,
-               concentration0=None,
+               concentration1,
+               concentration0,
                validate_args=False,
                allow_nan_stats=True,
                name="Beta"):
@@ -169,7 +170,7 @@ class Beta(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[concentration1, concentration0]) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([concentration1, concentration0],
                                       tf.float32)
       self._concentration1 = self._maybe_assert_valid_concentration(
@@ -180,8 +181,6 @@ class Beta(distribution.Distribution):
           tf.convert_to_tensor(
               value=concentration0, name="concentration0", dtype=dtype),
           validate_args)
-      tf.debugging.assert_same_float_dtype(
-          [self._concentration1, self._concentration0])
       self._total_concentration = self._concentration1 + self._concentration0
     super(Beta, self).__init__(
         dtype=dtype,
@@ -197,9 +196,12 @@ class Beta(distribution.Distribution):
 
   @staticmethod
   def _param_shapes(sample_shape):
-    return dict(
-        zip(["concentration1", "concentration0"],
-            [tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)] * 2))
+    s = tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)
+    return dict(concentration1=s, concentration0=s)
+
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(concentration1=0, concentration0=0)
 
   @property
   def concentration1(self):
@@ -290,17 +292,17 @@ class Beta(distribution.Distribution):
     if self.allow_nan_stats:
       nan = tf.fill(
           self.batch_shape_tensor(),
-          np.array(np.nan, dtype=self.dtype.as_numpy_dtype()),
+          dtype_util.as_numpy_dtype(self.dtype)(np.nan),
           name="nan")
       is_defined = tf.logical_and(self.concentration1 > 1.,
                                   self.concentration0 > 1.)
       return tf.where(is_defined, mode, nan)
     return distribution_util.with_dependencies([
-        tf.compat.v1.assert_less(
+        assert_util.assert_less(
             tf.ones([], dtype=self.dtype),
             self.concentration1,
             message="Mode undefined for concentration1 <= 1."),
-        tf.compat.v1.assert_less(
+        assert_util.assert_less(
             tf.ones([], dtype=self.dtype),
             self.concentration0,
             message="Mode undefined for concentration0 <= 1.")
@@ -311,7 +313,7 @@ class Beta(distribution.Distribution):
     if not validate_args:
       return concentration
     return distribution_util.with_dependencies([
-        tf.compat.v1.assert_positive(
+        assert_util.assert_positive(
             concentration, message="Concentration parameter must be positive."),
     ], concentration)
 
@@ -320,16 +322,11 @@ class Beta(distribution.Distribution):
     if not self.validate_args:
       return x
     return distribution_util.with_dependencies([
-        tf.compat.v1.assert_positive(x, message="sample must be positive"),
-        tf.compat.v1.assert_less(
-            x, tf.ones([], self.dtype),
-            message="sample must be less than `1`."),
+        assert_util.assert_positive(x, message="sample must be positive"),
+        assert_util.assert_less(x, 1., message="sample must be less than `1`."),
     ], x)
 
 
-# TODO(b/117098119): Remove tf.distribution references once they're gone.
-@kullback_leibler.RegisterKL(Beta, tf.compat.v1.distributions.Beta)
-@kullback_leibler.RegisterKL(tf.compat.v1.distributions.Beta, Beta)
 @kullback_leibler.RegisterKL(Beta, Beta)
 def _kl_beta_beta(d1, d2, name=None):
   """Calculate the batchwise KL divergence KL(d1 || d2) with d1 and d2 Beta.
@@ -347,14 +344,8 @@ def _kl_beta_beta(d1, d2, name=None):
     fn1 = getattr(d1, fn)
     fn2 = getattr(d2, fn)
     return (fn2 - fn1) if is_property else (fn2() - fn1())
-  with tf.name_scope(name, "kl_beta_beta", values=[
-      d1.concentration1,
-      d1.concentration0,
-      d1.total_concentration,
-      d2.concentration1,
-      d2.concentration0,
-      d2.total_concentration,
-  ]):
+
+  with tf.name_scope(name or "kl_beta_beta"):
     return (delta("_log_normalization", is_property=False) -
             tf.math.digamma(d1.concentration1) * delta("concentration1") -
             tf.math.digamma(d1.concentration0) * delta("concentration0") +

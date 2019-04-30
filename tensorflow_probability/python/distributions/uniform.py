@@ -21,9 +21,10 @@ from __future__ import print_function
 import math
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
@@ -99,17 +100,17 @@ class Uniform(distribution.Distribution):
       InvalidArgumentError: if `low >= high` and `validate_args=False`.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[low, high]) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([low, high], tf.float32)
       low = tf.convert_to_tensor(value=low, name="low", dtype=dtype)
       high = tf.convert_to_tensor(value=high, name="high", dtype=dtype)
       with tf.control_dependencies([
-          tf.compat.v1.assert_less(
+          assert_util.assert_less(
               low, high, message="uniform not defined when low >= high.")
       ] if validate_args else []):
         self._low = tf.identity(low)
         self._high = tf.identity(high)
-        tf.debugging.assert_same_float_dtype([self._low, self._high])
+        dtype_util.assert_same_float_dtype([self._low, self._high])
     super(Uniform, self).__init__(
         dtype=self._low.dtype,
         reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
@@ -125,6 +126,10 @@ class Uniform(distribution.Distribution):
     return dict(
         zip(("low", "high"),
             ([tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)] * 2)))
+
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(low=0, high=0)
 
   @property
   def low(self):
@@ -205,8 +210,6 @@ class Uniform(distribution.Distribution):
     return self.range() / math.sqrt(12.)
 
 
-@kullback_leibler.RegisterKL(Uniform, tf.compat.v1.distributions.Uniform)
-@kullback_leibler.RegisterKL(tf.compat.v1.distributions.Uniform, Uniform)
 @kullback_leibler.RegisterKL(Uniform, Uniform)
 def _kl_uniform_uniform(a, b, name=None):
   """Calculate the batched KL divergence KL(a || b) with a and b Uniform.
@@ -223,8 +226,7 @@ def _kl_uniform_uniform(a, b, name=None):
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.name_scope(name, "kl_uniform_uniform",
-                     [a.low, b.low, a.high, b.high]):
+  with tf.name_scope(name or "kl_uniform_uniform"):
     # Consistent with
     # http://www.mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 60
     # Watch out for the change in conventions--they use 'a' and 'b' to refer to
@@ -236,4 +238,5 @@ def _kl_uniform_uniform(a, b, name=None):
     return tf.where((b.low <= a.low) & (a.high <= b.high),
                     tf.math.log(b.high - b.low) - tf.math.log(a.high - a.low),
                     tf.broadcast_to(
-                        dtype.as_numpy_dtype(np.inf), final_batch_shape))
+                        dtype_util.as_numpy_dtype(dtype)(np.inf),
+                        final_batch_shape))

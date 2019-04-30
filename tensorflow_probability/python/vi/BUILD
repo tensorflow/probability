@@ -52,10 +52,12 @@ py_test(
     name = "csiszar_divergence_test",
     size = "medium",
     srcs = ["csiszar_divergence_test.py"],
+    shard_count = 5,
     deps = [
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )

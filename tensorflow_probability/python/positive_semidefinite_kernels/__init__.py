@@ -27,6 +27,7 @@ from tensorflow_probability.python.positive_semidefinite_kernels.polynomial impo
 from tensorflow_probability.python.positive_semidefinite_kernels.polynomial import Polynomial
 from tensorflow_probability.python.positive_semidefinite_kernels.positive_semidefinite_kernel import PositiveSemidefiniteKernel
 from tensorflow_probability.python.positive_semidefinite_kernels.rational_quadratic import RationalQuadratic
+from tensorflow_probability.python.positive_semidefinite_kernels.schur_complement import SchurComplement
 
 from tensorflow.python.util.all_util import remove_undocumented
 
@@ -38,8 +39,9 @@ _allowed_symbols = [
     'MaternOneHalf',
     'MaternThreeHalves',
     'Polynomial',
-    'RationalQuadratic',
     'PositiveSemidefiniteKernel',
+    'RationalQuadratic',
+    'SchurComplement',
 ]
 
 remove_undocumented(__name__, _allowed_symbols)

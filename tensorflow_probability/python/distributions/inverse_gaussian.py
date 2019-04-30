@@ -20,9 +20,10 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
@@ -99,19 +100,19 @@ class InverseGaussian(distribution.Distribution):
         Default value: 'InverseGaussian'.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[loc, concentration]):
+    with tf.name_scope(name):
       dtype = dtype_util.common_dtype([loc, concentration],
                                       preferred_dtype=tf.float32)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
       concentration = tf.convert_to_tensor(
           value=concentration, name="concentration", dtype=dtype)
       with tf.control_dependencies([
-          tf.compat.v1.assert_positive(loc),
-          tf.compat.v1.assert_positive(concentration)
+          assert_util.assert_positive(loc),
+          assert_util.assert_positive(concentration)
       ] if validate_args else []):
         self._loc = tf.identity(loc, name="loc")
         self._concentration = tf.identity(concentration, name="concentration")
-      tf.debugging.assert_same_float_dtype([self._loc, self._concentration])
+      dtype_util.assert_same_float_dtype([self._loc, self._concentration])
     super(InverseGaussian, self).__init__(
         dtype=self._loc.dtype,
         reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
@@ -120,6 +121,10 @@ class InverseGaussian(distribution.Distribution):
         parameters=parameters,
         graph_parents=[self._loc, self._concentration],
         name=name)
+
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(loc=0, concentration=0)
 
   @property
   def loc(self):
@@ -163,8 +168,10 @@ class InverseGaussian(distribution.Distribution):
 
   def _log_prob(self, x):
     with tf.control_dependencies([
-        tf.compat.v1.assert_greater(
-            x, tf.cast(0., x.dtype.base_dtype), message="x must be positive.")
+        assert_util.assert_greater(
+            x,
+            dtype_util.as_numpy_dtype(x.dtype)(0),
+            message="x must be positive.")
     ] if self.validate_args else []):
 
       return (0.5 * (tf.math.log(self.concentration) - np.log(2. * np.pi) -
@@ -174,8 +181,10 @@ class InverseGaussian(distribution.Distribution):
 
   def _cdf(self, x):
     with tf.control_dependencies([
-        tf.compat.v1.assert_greater(
-            x, tf.cast(0., x.dtype.base_dtype), message="x must be positive.")
+        assert_util.assert_greater(
+            x,
+            dtype_util.as_numpy_dtype(x.dtype)(0),
+            message="x must be positive.")
     ] if self.validate_args else []):
 
       return (

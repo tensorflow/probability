@@ -20,10 +20,11 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
@@ -141,18 +142,18 @@ class Gamma(distribution.Distribution):
       TypeError: if `concentration` and `rate` are different dtypes.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[concentration, rate]) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([concentration, rate], tf.float32)
       concentration = tf.convert_to_tensor(
           value=concentration, name="concentration", dtype=dtype)
       rate = tf.convert_to_tensor(value=rate, name="rate", dtype=dtype)
       with tf.control_dependencies([
-          tf.compat.v1.assert_positive(concentration),
-          tf.compat.v1.assert_positive(rate),
+          assert_util.assert_positive(concentration),
+          assert_util.assert_positive(rate),
       ] if validate_args else []):
         self._concentration = tf.identity(concentration)
         self._rate = tf.identity(rate)
-        tf.debugging.assert_same_float_dtype([self._concentration, self._rate])
+        dtype_util.assert_same_float_dtype([self._concentration, self._rate])
     super(Gamma, self).__init__(
         dtype=dtype,
         validate_args=validate_args,
@@ -167,6 +168,10 @@ class Gamma(distribution.Distribution):
     return dict(
         zip(("concentration", "rate"),
             ([tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)] * 2)))
+
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(concentration=0, rate=0)
 
   @property
   def concentration(self):
@@ -244,29 +249,26 @@ class Gamma(distribution.Distribution):
     if self.allow_nan_stats:
       nan = tf.fill(
           self.batch_shape_tensor(),
-          np.array(np.nan, dtype=self.dtype.as_numpy_dtype()),
+          dtype_util.as_numpy_dtype(self.dtype)(np.nan),
           name="nan")
       return tf.where(self.concentration > 1., mode, nan)
     else:
       return distribution_util.with_dependencies([
-          tf.compat.v1.assert_less(
+          assert_util.assert_less(
               tf.ones([], self.dtype),
               self.concentration,
               message="mode not defined when any concentration <= 1"),
       ], mode)
 
   def _maybe_assert_valid_sample(self, x):
-    tf.debugging.assert_same_float_dtype(tensors=[x], dtype=self.dtype)
+    dtype_util.assert_same_float_dtype(tensors=[x], dtype=self.dtype)
     if not self.validate_args:
       return x
     return distribution_util.with_dependencies([
-        tf.compat.v1.assert_positive(x),
+        assert_util.assert_positive(x),
     ], x)
 
 
-# TODO(b/117098119): Remove tf.distribution references once they're gone.
-@kullback_leibler.RegisterKL(Gamma, tf.compat.v1.distributions.Gamma)
-@kullback_leibler.RegisterKL(tf.compat.v1.distributions.Gamma, Gamma)
 @kullback_leibler.RegisterKL(Gamma, Gamma)
 def _kl_gamma_gamma(g0, g1, name=None):
   """Calculate the batched KL divergence KL(g0 || g1) with g0 and g1 Gamma.
@@ -280,8 +282,7 @@ def _kl_gamma_gamma(g0, g1, name=None):
   Returns:
     kl_gamma_gamma: `Tensor`. The batchwise KL(g0 || g1).
   """
-  with tf.name_scope(name, "kl_gamma_gamma", values=[
-      g0.concentration, g0.rate, g1.concentration, g1.rate]):
+  with tf.name_scope(name or "kl_gamma_gamma"):
     # Result from:
     #   http://www.fil.ion.ucl.ac.uk/~wpenny/publications/densities.ps
     # For derivation see:

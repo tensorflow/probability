@@ -63,6 +63,9 @@ https://github.com/tensorflow/probability/blob/master/STYLE_GUIDE.md#tensorflow-
    "`Distribution` shape semantics" whereas `sample` returns a `Tensor` with
    "Distribution shape semantics."
 
+   - *Exception*: `tfd.JointDistribution` takes/returns a `list`-like of
+     `Tensor`s.
+
 7. A `Distribution`'s `event_ndims` must be known statically. For example,
    `Wishart` has `event_ndims=2`, `MultivariateNormalDiag` has `event_ndims=1`,
    `Normal` has `event_ndims=0`, `Categorical` has `event_ndims=0` and

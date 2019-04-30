@@ -20,9 +20,10 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 
@@ -117,15 +118,15 @@ class Cauchy(distribution.Distribution):
       TypeError: if `loc` and `scale` have different `dtype`.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[loc, scale]) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, scale], tf.float32)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
       scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
       with tf.control_dependencies(
-          [tf.compat.v1.assert_positive(scale)] if validate_args else []):
+          [assert_util.assert_positive(scale)] if validate_args else []):
         self._loc = tf.identity(loc)
         self._scale = tf.identity(scale)
-        tf.debugging.assert_same_float_dtype([self._loc, self._scale])
+        dtype_util.assert_same_float_dtype([self._loc, self._scale])
     super(Cauchy, self).__init__(
         dtype=self._scale.dtype,
         reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
@@ -140,6 +141,10 @@ class Cauchy(distribution.Distribution):
     return dict(
         zip(("loc", "scale"),
             ([tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)] * 2)))
+
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(loc=0, scale=0)
 
   @property
   def loc(self):
@@ -197,24 +202,24 @@ class Cauchy(distribution.Distribution):
 
   def _z(self, x):
     """Standardize input `x`."""
-    with tf.name_scope("standardize", values=[x]):
+    with tf.name_scope("standardize"):
       return (x - self.loc) / self.scale
 
   def _inv_z(self, z):
     """Reconstruct input `x` from a its normalized version."""
-    with tf.name_scope("reconstruct", values=[z]):
+    with tf.name_scope("reconstruct"):
       return z * self.scale + self.loc
 
   def _mean(self):
     if self.allow_nan_stats:
       return tf.fill(self.batch_shape_tensor(),
-                     self.dtype.as_numpy_dtype(np.nan))
+                     dtype_util.as_numpy_dtype(self.dtype)(np.nan))
     else:
       raise ValueError("`mean` is undefined for Cauchy distribution.")
 
   def _stddev(self):
     if self.allow_nan_stats:
       return tf.fill(self.batch_shape_tensor(),
-                     self.dtype.as_numpy_dtype(np.nan))
+                     dtype_util.as_numpy_dtype(self.dtype)(np.nan))
     else:
       raise ValueError("`stddev` is undefined for Cauchy distribution.")

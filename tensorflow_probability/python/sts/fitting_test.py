@@ -107,7 +107,7 @@ class _HMCTests(object):
     samples_, kernel_results_ = self.evaluate((samples, kernel_results))
 
     acceptance_rate = np.mean(
-        kernel_results_.inner_results.is_accepted, axis=0)
+        kernel_results_.inner_results.inner_results.is_accepted, axis=0)
 
     posterior_means = {
         param.name: np.mean(param_draws, axis=0)
@@ -126,8 +126,16 @@ class _HMCTests(object):
     num_timesteps = 5
     num_results = 6
     num_chains = 4
-    observed_time_series = self._build_tensor(np.random.randn(
-        *(batch_shape + [num_timesteps])))
+
+    # Use an observation mask to additionally test that masks are
+    # threaded through the HMC (and VI) APIs.
+    observed_time_series_ = np.random.randn(
+        *(batch_shape + [num_timesteps]))
+    observed_time_series = tfp.sts.MaskedTimeSeries(
+        self._build_tensor(observed_time_series_),
+        is_missing=self._build_tensor([False, True, False, False, True],
+                                      dtype=np.bool))
+
     model = self._build_model(observed_time_series)
     samples, kernel_results = tfp.sts.fit_with_hmc(
         model,
@@ -141,7 +149,7 @@ class _HMCTests(object):
     samples_, kernel_results_ = self.evaluate((samples, kernel_results))
 
     acceptance_rate = np.mean(
-        kernel_results_.inner_results.is_accepted, axis=0)
+        kernel_results_.inner_results.inner_results.is_accepted, axis=0)
 
     # Combining the samples from multiple chains into a single dimension allows
     # us to easily pass sampled parameters to downstream forecasting methods.
@@ -174,19 +182,20 @@ class _HMCTests(object):
     else:
       return list(self.evaluate(distribution.event_shape_tensor()))
 
-  def _build_tensor(self, ndarray):
+  def _build_tensor(self, ndarray, dtype=None):
     """Convert a numpy array to a TF placeholder.
 
     Args:
       ndarray: any object convertible to a numpy array via `np.asarray()`.
+      dtype: optional `dtype`.
 
     Returns:
       placeholder: a TensorFlow `placeholder` with default value given by the
-      provided `ndarray`, dtype given by `self.dtype`, and shape specified
-      statically only if `self.use_static_shape` is `True`.
+      provided `ndarray`, dtype given by `self.dtype` (if not specified), and
+      shape specified statically only if `self.use_static_shape` is `True`.
     """
 
-    ndarray = np.asarray(ndarray).astype(self.dtype)
+    ndarray = np.asarray(ndarray).astype(self.dtype if dtype is None else dtype)
     return tf.compat.v1.placeholder_with_default(
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 

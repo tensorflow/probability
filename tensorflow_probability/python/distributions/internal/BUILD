@@ -28,19 +28,16 @@ package(
 exports_files(["LICENSE"])
 
 py_library(
-    name = "internal",
+    name = "init",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
-    deps = [
-        ":moving_stats",
-        ":statistical_testing",
-    ],
 )
 
 py_library(
     name = "moving_stats",
     srcs = ["moving_stats.py"],
     deps = [
+        ":init",
         # tensorflow dep,
     ],
 )
@@ -63,9 +60,12 @@ py_library(
     name = "statistical_testing",
     srcs = ["statistical_testing.py"],
     deps = [
+        ":init",
         # tensorflow dep,
+        "//tensorflow_probability/python/distributions:seed_stream",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
@@ -79,6 +79,7 @@ py_test(
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -88,7 +89,9 @@ py_library(
         "correlation_matrix_volumes_lib.py",
     ],
     deps = [
+        ":init",
         # numpy dep,
+        # tensorflow dep,
         "//tensorflow_probability/python/distributions:uniform",
         "//tensorflow_probability/python/internal:distribution_util",
     ],
@@ -96,11 +99,11 @@ py_library(
 
 py_binary(
     name = "correlation_matrix_volumes",
-    srcs = [
-        "correlation_matrix_volumes.py",
-    ],
+    srcs = ["correlation_matrix_volumes.py"],
+    python_version = "PY2",
     deps = [
         ":correlation_matrix_volumes_py",
+        ":init",
         # absl:app dep,
         # absl/flags dep,
     ],
@@ -119,5 +122,25 @@ py_test(
         ":correlation_matrix_volumes_py",
         ":statistical_testing",
         # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "slicing",
+    srcs = ["slicing.py"],
+    deps = [
+        ":init",
+        # six dep,
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "slicing_test",
+    srcs = ["slicing_test.py"],
+    deps = [
+        ":slicing",
+        # tensorflow dep,
     ],
 )

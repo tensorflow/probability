@@ -21,10 +21,11 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
@@ -79,14 +80,14 @@ class Pareto(distribution.Distribution):
         Default value: 'Pareto'.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[concentration, scale]):
+    with tf.name_scope(name):
       dtype = dtype_util.common_dtype([concentration, scale], tf.float32)
       self._concentration = tf.convert_to_tensor(
           value=concentration, name="concentration", dtype=dtype)
       self._scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
       with tf.control_dependencies([
-          tf.compat.v1.assert_positive(self._concentration),
-          tf.compat.v1.assert_positive(self._scale)
+          assert_util.assert_positive(self._concentration),
+          assert_util.assert_positive(self._scale)
       ] if validate_args else []):
         self._concentration = tf.identity(
             self._concentration, name="concentration")
@@ -99,6 +100,10 @@ class Pareto(distribution.Distribution):
         parameters=parameters,
         graph_parents=[self._concentration, self._scale],
         name=name)
+
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(concentration=0, scale=0)
 
   @property
   def scale(self):
@@ -129,7 +134,7 @@ class Pareto(distribution.Distribution):
 
   def _log_prob(self, x):
     with tf.control_dependencies([
-        tf.compat.v1.assert_greater_equal(
+        assert_util.assert_greater_equal(
             x,
             self.scale,
             message="x is not in the support of the distribution.")
@@ -144,7 +149,7 @@ class Pareto(distribution.Distribution):
 
   def _prob(self, x):
     with tf.control_dependencies([
-        tf.compat.v1.assert_greater_equal(
+        assert_util.assert_greater_equal(
             x,
             self.scale,
             message="x is not in the support of the distribution.")
@@ -182,7 +187,7 @@ class Pareto(distribution.Distribution):
         self.scale)
     infs = tf.fill(
         dims=tf.shape(input=broadcasted_concentration),
-        value=np.array(np.inf, dtype=self.dtype.as_numpy_dtype))
+        value=dtype_util.as_numpy_dtype(self.dtype)(np.inf))
 
     return tf.where(
         broadcasted_concentration > 1.,
@@ -196,7 +201,7 @@ class Pareto(distribution.Distribution):
     broadcasted_concentration = self.concentration + tf.zeros_like(self.scale)
     infs = tf.fill(
         dims=tf.shape(input=broadcasted_concentration),
-        value=np.array(np.inf, dtype=self.dtype.as_numpy_dtype))
+        value=dtype_util.as_numpy_dtype(self.dtype)(np.inf))
     return tf.where(
         broadcasted_concentration > 2.,
         self.scale ** 2 * self.concentration / (
@@ -236,7 +241,7 @@ class Pareto(distribution.Distribution):
     else:
       alt = tf.fill(
           dims=tf.shape(input=y),
-          value=np.array(alt, dtype=self.dtype.as_numpy_dtype))
+          value=dtype_util.as_numpy_dtype(self.dtype)(alt))
     return tf.where(is_invalid, alt, y)
 
 
@@ -253,8 +258,7 @@ def _kl_pareto_pareto(a, b, name=None):
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.name_scope(name, "kl_pareto_pareto",
-                     [a.concentration, b.concentration, a.scale, b.scale]):
+  with tf.name_scope(name or "kl_pareto_pareto"):
     # Consistent with
     # http://www.mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 55
     # Terminology is different from source to source for Pareto distributions.

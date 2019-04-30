@@ -25,6 +25,9 @@ import operator
 import six
 import tensorflow as tf
 
+from tensorflow_probability.python.positive_semidefinite_kernels.internal import util
+
+
 __all__ = [
     'PositiveSemidefiniteKernel',
 ]
@@ -148,7 +151,7 @@ class PositiveSemidefiniteKernel(object):
     self._feature_ndims = feature_ndims
     self._dtype = dtype
     if not name or name[-1] != '/':  # `name` is not a name scope
-      name = tf.name_scope(name or type(self).__name__).name
+      name = tf.compat.v1.name_scope(name or type(self).__name__).name
     self._name = name
 
   @property
@@ -219,21 +222,21 @@ class PositiveSemidefiniteKernel(object):
         `Tensor` which evaluates to a vector of integers which are the
         fully-broadcast shapes of the kernel parameters.
     """
-    with tf.name_scope(self._name):
+    with tf.compat.v1.name_scope(self._name):
       if self.batch_shape.is_fully_defined():
         return tf.convert_to_tensor(
             value=self.batch_shape.as_list(),
             dtype=tf.int32,
             name='batch_shape')
-      with tf.name_scope('batch_shape_tensor'):
+      with tf.compat.v1.name_scope('batch_shape_tensor'):
         return self._batch_shape_tensor()
 
   @contextlib.contextmanager
   def _name_scope(self, name=None, values=None):
     """Helper function to standardize op scope."""
-    with tf.name_scope(self.name):
+    with tf.compat.v1.name_scope(self.name):
       values = [] if values is None else values
-      with tf.name_scope(name, values=values) as scope:
+      with tf.compat.v1.name_scope(name, values=values) as scope:
         yield scope
 
   def apply(self, x1, x2):
@@ -417,7 +420,7 @@ class PositiveSemidefiniteKernel(object):
     reshape the inputs and pass them to `apply`, e.g.:
 
     ```python
-    k = psd_kernels.SomeKernel()
+    k = tfpk.SomeKernel()
     t1 = tf.placeholder([4, 4, 3], tf.float32)
     t2 = tf.placeholder([5, 5, 3], tf.float32)
     k.apply(
@@ -587,7 +590,7 @@ class PositiveSemidefiniteKernel(object):
                                    if self.batch_shape.ndims is not None
                                    else ''),
                 feature_ndims=self.feature_ndims,
-                dtype=self.dtype.name))
+                dtype=None if self.dtype is None else self.dtype.name))
 
   def __repr__(self):
     return ('<tfp.positive_semidefinite_kernels.{type_name} '
@@ -599,7 +602,7 @@ class PositiveSemidefiniteKernel(object):
                 self_name=self.name,
                 batch_shape=self.batch_shape,
                 feature_ndims=self.feature_ndims,
-                dtype=self.dtype.name))
+                dtype=None if self.dtype is None else self.dtype.name))
 
 
 def _flatten_summand_list(kernels):
@@ -695,8 +698,11 @@ class _SumKernel(PositiveSemidefiniteKernel):
     if name is None:
       name = 'SumKernel'
     # We have ensured the list is non-empty and all feature_ndims are the same.
-    super(_SumKernel, self).__init__(feature_ndims=kernels[0].feature_ndims,
-                                     name=name)
+    super(_SumKernel, self).__init__(
+        feature_ndims=kernels[0].feature_ndims,
+        dtype=util.maybe_get_common_dtype(
+            [None if k.dtype is None else k for k in kernels]),
+        name=name)
 
   @property
   def kernels(self):
@@ -760,8 +766,11 @@ class _ProductKernel(PositiveSemidefiniteKernel):
     if name is None:
       name = 'ProductKernel'
     # We have ensured the list is non-empty and all feature_ndims are the same.
-    super(_ProductKernel, self).__init__(feature_ndims=kernels[0].feature_ndims,
-                                         name=name)
+    super(_ProductKernel, self).__init__(
+        feature_ndims=kernels[0].feature_ndims,
+        dtype=util.maybe_get_common_dtype(
+            [None if k.dtype is None else k for k in kernels]),
+        name=name)
 
   @property
   def kernels(self):

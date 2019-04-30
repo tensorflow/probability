@@ -23,8 +23,12 @@ import numpy as np
 from scipy import linalg
 import tensorflow as tf
 import tensorflow_probability as tfp
+
+from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
 tfd = tfp.distributions
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 def make_pd(start, n):
@@ -78,9 +82,9 @@ class WishartTest(tf.test.TestCase):
     scale = [[[1., .5], [.5, 1.]]]  # A 1-batch of 2x2 scale operators
     df = [5, 6, 7]  # A 3-batch of degrees of freedom
     wish = tfp.distributions.Wishart(df=df, scale=scale)
-    self.assertAllEqual([2, 2], wish.event_shape.as_list())
+    self.assertAllEqual([2, 2], tensorshape_util.as_list(wish.event_shape))
     self.assertAllEqual([2, 2], self.evaluate(wish.event_shape_tensor()))
-    self.assertAllEqual([3], wish.batch_shape.as_list())
+    self.assertAllEqual([3], tensorshape_util.as_list(wish.batch_shape))
     self.assertAllEqual([3], self.evaluate(wish.batch_shape_tensor()))
     self.assertAllEqual([4, 3, 2, 2], wish.sample(sample_shape=(4,)).shape)
     self.assertAllEqual([4, 3, 2, 2],
@@ -129,30 +133,39 @@ class WishartTest(tf.test.TestCase):
     w = tfd.Wishart(df, scale_tril=chol_scale)
     self.assertAllEqual(wishart_var(df, scale), self.evaluate(w.variance()))
 
+  def testSamplingEmptyDist(self):
+    w = tfd.Wishart(df=[1], scale_tril=[[1.]], validate_args=True)
+    self.evaluate(w[:0].sample())
+
+  def testLogProbEmptyDist(self):
+    w = tfd.Wishart(df=[1], scale_tril=[[1.]], validate_args=True)
+    self.evaluate(w[:0].log_prob([[1.]]))
+
   def testSampleWithSameSeed(self):
     if tf.executing_eagerly():
       return
     scale = make_pd(1., 2)
     df = 4
+    seed = tfp_test_util.test_seed()
 
     chol_w = tfd.Wishart(
         df, scale_tril=chol(scale), input_output_cholesky=False)
 
-    x = self.evaluate(chol_w.sample(1, seed=42))
+    x = self.evaluate(chol_w.sample(1, seed=seed))
     chol_x = [chol(x[0])]
 
     full_w = tfd.Wishart(df, scale, input_output_cholesky=False)
-    self.assertAllClose(x, self.evaluate(full_w.sample(1, seed=42)))
+    self.assertAllClose(x, self.evaluate(full_w.sample(1, seed=seed)))
 
     chol_w_chol = tfd.Wishart(
         df, scale_tril=chol(scale), input_output_cholesky=True)
-    self.assertAllClose(chol_x, self.evaluate(chol_w_chol.sample(1, seed=42)))
-    eigen_values = tf.linalg.diag_part(chol_w_chol.sample(1000, seed=42))
+    self.assertAllClose(chol_x, self.evaluate(chol_w_chol.sample(1, seed=seed)))
+    eigen_values = tf.linalg.diag_part(chol_w_chol.sample(1000, seed=seed))
     np.testing.assert_array_less(0., self.evaluate(eigen_values))
 
     full_w_chol = tfd.Wishart(df, scale=scale, input_output_cholesky=True)
-    self.assertAllClose(chol_x, self.evaluate(full_w_chol.sample(1, seed=42)))
-    eigen_values = tf.linalg.diag_part(full_w_chol.sample(1000, seed=42))
+    self.assertAllClose(chol_x, self.evaluate(full_w_chol.sample(1, seed=seed)))
+    eigen_values = tf.linalg.diag_part(full_w_chol.sample(1000, seed=seed))
     np.testing.assert_array_less(0., self.evaluate(eigen_values))
 
   def testSample(self):
@@ -160,7 +173,7 @@ class WishartTest(tf.test.TestCase):
     df = 4.
     chol_w = tfd.Wishart(
         df=df, scale_tril=chol(make_pd(1., 3)), input_output_cholesky=False)
-    x = chol_w.sample(10000, seed=42)
+    x = chol_w.sample(10000, seed=tfp_test_util.test_seed(hardcoded_seed=42))
     self.assertAllEqual((10000, 3, 3), x.shape)
 
     moment1_estimate = self.evaluate(tf.reduce_mean(input_tensor=x, axis=[0]))
@@ -180,22 +193,23 @@ class WishartTest(tf.test.TestCase):
   def testSampleMultipleTimes(self):
     df = 4.
     n_val = 100
+    seed = tfp_test_util.test_seed()
 
-    tf.compat.v1.set_random_seed(654321)
+    tf.compat.v1.set_random_seed(seed)
     chol_w1 = tfd.Wishart(
         df=df,
         scale_tril=chol(make_pd(1., 3)),
         input_output_cholesky=False,
         name="wishart1")
-    samples1 = self.evaluate(chol_w1.sample(n_val, seed=123456))
+    samples1 = self.evaluate(chol_w1.sample(n_val, seed=seed))
 
-    tf.compat.v1.set_random_seed(654321)
+    tf.compat.v1.set_random_seed(seed)
     chol_w2 = tfd.Wishart(
         df=df,
         scale_tril=chol(make_pd(1., 3)),
         input_output_cholesky=False,
         name="wishart2")
-    samples2 = self.evaluate(chol_w2.sample(n_val, seed=123456))
+    samples2 = self.evaluate(chol_w2.sample(n_val, seed=seed))
 
     self.assertAllClose(samples1, samples2)
 
@@ -396,11 +410,55 @@ class WishartTest(tf.test.TestCase):
     scale = np.reshape(np.concatenate([scale, scale, scale], axis=0),
                        batch_shape + [dims, dims])
     wishart = tfd.Wishart(df=5, scale=scale)
-    x = wishart.sample(sample_shape, seed=42)
+    x = wishart.sample(sample_shape, seed=tfp_test_util.test_seed())
     x_ = self.evaluate(x)
     expected_shape = sample_shape + batch_shape + [dims, dims]
     self.assertAllEqual(expected_shape, x.shape)
     self.assertAllEqual(expected_shape, x_.shape)
+
+  def testLogProbBroadcastsX(self):
+    dims = 2
+    batch_shape = [2, 3]
+    scale = np.float32([
+        [[1., 0.5],
+         [0.5, 1.]],
+        [[0.5, 0.25],
+         [0.25, 0.75]],
+    ])
+    scale = np.reshape(np.concatenate([scale, scale, scale], axis=0),
+                       batch_shape + [dims, dims])
+    wishart = tfd.Wishart(df=5, scale=scale)
+    x = np.random.randn(dims, dims)
+    x = np.matmul(x, x.T)
+    lp = wishart.log_prob(x)
+    lp_bc = wishart.log_prob(x * np.ones([2, 3, 1, 1]))
+    lp_, lp_bc_ = self.evaluate([lp, lp_bc])
+    self.assertAllEqual(batch_shape, lp.shape)
+    self.assertAllEqual(batch_shape, lp_.shape)
+    self.assertAllEqual(batch_shape, lp_bc.shape)
+    self.assertAllEqual(batch_shape, lp_bc_.shape)
+    self.assertAllClose(lp_bc_, lp_)
+
+  def testLogProbBroadcastOverDfInsideMixture(self):
+    dims = 2
+    scale = np.float32([[0.5, 0.25],  #
+                        [0.25, 0.75]])
+    df = np.arange(3., 8., dtype=np.float32)
+    dist = tfd.MixtureSameFamily(
+        components_distribution=tfd.Wishart(df=df, scale=scale),
+        mixture_distribution=tfd.Categorical(logits=tf.zeros(df.shape)))
+    x = np.random.randn(dims, dims)
+    x = np.matmul(x, x.T)
+    lp = dist.log_prob(x)
+    lp_ = self.evaluate(lp)
+    self.assertAllEqual([], dist.batch_shape)
+    self.assertAllEqual([], lp.shape)
+    self.assertAllEqual([], lp_.shape)
+
+  def testStaticAssertNonFlatDfDoesntRaise(self):
+    # Check we don't get ValueError: The truth value of an array with more than
+    # one element is ambiguous. Use a.any() or a.all()
+    tfd.Wishart(df=[[2., 2]], scale=make_pd(1., 2), validate_args=True)
 
 
 if __name__ == "__main__":

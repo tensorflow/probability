@@ -20,8 +20,11 @@ from __future__ import print_function
 
 import itertools
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -30,7 +33,8 @@ __all__ = [
 
 
 def _use_static_shape(input_tensor, ndims):
-  return input_tensor.shape.is_fully_defined() and isinstance(ndims, int)
+  return (tensorshape_util.is_fully_defined(input_tensor.shape) and
+          isinstance(ndims, int))
 
 
 def _compute_min_event_ndims(bijector_list, compute_forward=True):
@@ -225,7 +229,7 @@ class Chain(bijector.Bijector):
 
   def _inverse_log_det_jacobian(self, y, **kwargs):
     y = tf.convert_to_tensor(value=y, name="y")
-    ildj = tf.cast(0., dtype=y.dtype.base_dtype)
+    ildj = tf.cast(0., dtype=dtype_util.base_dtype(y.dtype))
 
     if not self.bijectors:
       return ildj
@@ -234,10 +238,11 @@ class Chain(bijector.Bijector):
         self.inverse_min_event_ndims)
 
     if _use_static_shape(y, event_ndims):
-      event_shape = y.shape[y.shape.ndims - event_ndims:]
+      event_shape = y.shape[tensorshape_util.rank(y.shape) - event_ndims:]
     else:
       event_shape = tf.shape(input=y)[tf.rank(y) - event_ndims:]
 
+    # TODO(b/129973548): Document and simplify.
     for b in self.bijectors:
       ildj += b.inverse_log_det_jacobian(
           y, event_ndims=event_ndims, **kwargs.get(b.name, {}))
@@ -245,13 +250,16 @@ class Chain(bijector.Bijector):
       if _use_static_shape(y, event_ndims):
         event_shape = b.inverse_event_shape(event_shape)
         event_ndims = self._maybe_get_static_event_ndims(
-            event_shape.ndims)
+            tensorshape_util.rank(event_shape))
       else:
         event_shape = b.inverse_event_shape_tensor(event_shape)
+        event_shape_ = distribution_util.maybe_get_static_value(event_shape)
         event_ndims = tf.size(input=event_shape)
         event_ndims_ = self._maybe_get_static_event_ndims(event_ndims)
-        if event_ndims_ is not None:
+
+        if event_ndims_ is not None and event_shape_ is not None:
           event_ndims = event_ndims_
+          event_shape = event_shape_
 
       y = b.inverse(y, **kwargs.get(b.name, {}))
     return ildj
@@ -264,7 +272,7 @@ class Chain(bijector.Bijector):
   def _forward_log_det_jacobian(self, x, **kwargs):
     x = tf.convert_to_tensor(value=x, name="x")
 
-    fldj = tf.cast(0., dtype=x.dtype.base_dtype)
+    fldj = tf.cast(0., dtype=dtype_util.base_dtype(x.dtype))
 
     if not self.bijectors:
       return fldj
@@ -273,22 +281,27 @@ class Chain(bijector.Bijector):
         self.forward_min_event_ndims)
 
     if _use_static_shape(x, event_ndims):
-      event_shape = x.shape[x.shape.ndims - event_ndims:]
+      event_shape = x.shape[tensorshape_util.rank(x.shape) - event_ndims:]
     else:
       event_shape = tf.shape(input=x)[tf.rank(x) - event_ndims:]
 
+    # TODO(b/129973548): Document and simplify.
     for b in reversed(self.bijectors):
       fldj += b.forward_log_det_jacobian(
           x, event_ndims=event_ndims, **kwargs.get(b.name, {}))
       if _use_static_shape(x, event_ndims):
         event_shape = b.forward_event_shape(event_shape)
-        event_ndims = self._maybe_get_static_event_ndims(event_shape.ndims)
+        event_ndims = self._maybe_get_static_event_ndims(
+            tensorshape_util.rank(event_shape))
       else:
         event_shape = b.forward_event_shape_tensor(event_shape)
+        event_shape_ = distribution_util.maybe_get_static_value(event_shape)
         event_ndims = tf.size(input=event_shape)
         event_ndims_ = self._maybe_get_static_event_ndims(event_ndims)
-        if event_ndims_ is not None:
+
+        if event_ndims_ is not None and event_shape_ is not None:
           event_ndims = event_ndims_
+          event_shape = event_shape_
 
       x = b.forward(x, **kwargs.get(b.name, {}))
 

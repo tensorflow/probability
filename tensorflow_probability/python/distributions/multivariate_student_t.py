@@ -20,13 +20,14 @@ from __future__ import print_function
 import functools
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math
 from tensorflow_probability.python.distributions import chi2 as chi2_lib
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.distributions import seed_stream
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
@@ -147,18 +148,18 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
       ValueError: if not `scale.is_positive_definite`.
     """
     parameters = dict(locals())
-    if not scale.dtype.is_floating:
+    if not dtype_util.is_floating(scale.dtype):
       raise TypeError("`scale` must have floating-point dtype.")
     if validate_args and not scale.is_positive_definite:
       raise ValueError("`scale` must be positive definite.")
 
-    with tf.name_scope(name, values=[df, loc] + scale.graph_parents) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([df, loc, scale],
                                       preferred_dtype=tf.float32)
 
-      with tf.control_dependencies(
-          [tf.compat.v1.assert_positive(df, message="`df` must be positive."
-                                       )] if validate_args else []):
+      with tf.control_dependencies([
+          assert_util.assert_positive(df, message="`df` must be positive.")
+      ] if validate_args else []):
         self._df = tf.identity(
             tf.convert_to_tensor(value=df, dtype=dtype), name="df")
       self._loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
@@ -287,12 +288,12 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
     df = _broadcast_to_shape(self.df[..., tf.newaxis], tf.shape(input=mean))
 
     if self.allow_nan_stats:
-      nan = np.array(np.nan, dtype=self.dtype.as_numpy_dtype())
+      nan = dtype_util.as_numpy_dtype(self.dtype)(np.nan)
       return tf.where(df > 1., mean,
                       tf.fill(tf.shape(input=mean), nan, name="nan"))
     else:
       with tf.control_dependencies([
-          tf.compat.v1.assert_less(
+          assert_util.assert_less(
               tf.cast(1., self.dtype),
               df,
               message="mean not defined for components of df <= 1"),
@@ -317,17 +318,17 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
     denom = tf.where(df > 2., df - 2., tf.ones_like(df))
     statistic = statistic * df_factor_fn(df / denom)
     # When 1 < df <= 2, stddev/variance are infinite.
-    inf = np.array(np.inf, dtype=self.dtype.as_numpy_dtype())
+    inf = dtype_util.as_numpy_dtype(self.dtype)(np.inf)
     result_where_defined = tf.where(
         df > 2., statistic, tf.fill(tf.shape(input=statistic), inf, name="inf"))
 
     if self.allow_nan_stats:
-      nan = np.array(np.nan, dtype=self.dtype.as_numpy_dtype())
+      nan = dtype_util.as_numpy_dtype(self.dtype)(np.nan)
       return tf.where(df > 1., result_where_defined,
                       tf.fill(tf.shape(input=statistic), nan, name="nan"))
     else:
       with tf.control_dependencies([
-          tf.compat.v1.assert_less(
+          assert_util.assert_less(
               tf.cast(1., self.dtype),
               df,
               message=statistic_name +

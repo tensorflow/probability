@@ -22,11 +22,15 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+
+from tensorflow_probability.python.sts import Autoregressive
+from tensorflow_probability.python.sts import DynamicLinearRegression
 from tensorflow_probability.python.sts import LinearRegression
 from tensorflow_probability.python.sts import LocalLevel
 from tensorflow_probability.python.sts import LocalLinearTrend
 from tensorflow_probability.python.sts import Seasonal
 from tensorflow_probability.python.sts import SemiLocalLinearTrend
+from tensorflow_probability.python.sts import SparseLinearRegression
 from tensorflow_probability.python.sts import Sum
 from tensorflow_probability.python.sts.internal import util as sts_util
 
@@ -183,6 +187,27 @@ class _StsTestHarness(object):
     lp = self.evaluate(log_joint_fn(*batch_shaped_parameters))
     self.assertEqual(tf.TensorShape(full_batch_shape), lp.shape)
 
+  def test_log_joint_with_missing_observations(self):
+    # Test that this component accepts MaskedTimeSeries inputs. In most
+    # cases, it is sufficient that the component accesses only
+    # `empirical_statistics(observed_time_series)`.
+    observed_time_series = np.array(
+        [1.0, 2.0, -1000., 0.4, np.nan, 1000., 4.2, np.inf]).astype(np.float32)
+    observation_mask = np.array(
+        [False, False, True, False, True, True, False, True]).astype(np.bool)
+    masked_time_series = tfp.sts.MaskedTimeSeries(observed_time_series,
+                                                  is_missing=observation_mask)
+
+    model = self._build_sts(observed_time_series=masked_time_series)
+
+    log_joint_fn = model.joint_log_prob(
+        observed_time_series=masked_time_series)
+    lp = self.evaluate(
+        log_joint_fn(*[p.prior.sample() for p in model.parameters]))
+
+    self.assertEqual(tf.TensorShape([]), lp.shape)
+    self.assertTrue(np.isfinite(lp))
+
   def test_prior_sample(self):
     model = self._build_sts()
     ys, param_samples = model.prior_sample(
@@ -219,6 +244,13 @@ class _StsTestHarness(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
+class AutoregressiveTest(tf.test.TestCase, _StsTestHarness):
+
+  def _build_sts(self, observed_time_series=None):
+    return Autoregressive(order=3, observed_time_series=observed_time_series)
+
+
+@test_util.run_all_in_graph_and_eager_modes
 class LocalLevelTest(tf.test.TestCase, _StsTestHarness):
 
   def _build_sts(self, observed_time_series=None):
@@ -238,14 +270,25 @@ class SeasonalTest(tf.test.TestCase, _StsTestHarness):
   def _build_sts(self, observed_time_series=None):
     # Note that a Seasonal model with `num_steps_per_season > 1` would have
     # deterministic dependence between timesteps, so evaluating `log_prob` of an
-    # arbitary time series leads to Cholesky decomposition errors unless the
+    # arbitrary time series leads to Cholesky decomposition errors unless the
     # model also includes an observation noise component (which it would in
     # practice, but this test harness attempts to test the component in
     # isolation). The `num_steps_per_season=1` case tested here will not suffer
     # from this issue.
     return Seasonal(num_seasons=7,
                     num_steps_per_season=1,
-                    observed_time_series=observed_time_series)
+                    observed_time_series=observed_time_series,
+                    constrain_mean_effect_to_zero=False)
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class SeasonalWithZeroMeanConstraintTest(tf.test.TestCase, _StsTestHarness):
+
+  def _build_sts(self, observed_time_series=None):
+    return Seasonal(num_seasons=7,
+                    num_steps_per_season=1,
+                    observed_time_series=observed_time_series,
+                    constrain_mean_effect_to_zero=True)
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -293,9 +336,10 @@ class LinearRegressionTest(tf.test.TestCase, _StsTestHarness):
     # argument, so they can't infer a prior batch shape. This means we have to
     # manually set the batch shape expected by the tests.
     if observed_time_series is not None:
-      observed_time_series = sts_util.maybe_expand_trailing_dim(
-          observed_time_series)
-      batch_shape = observed_time_series.shape[:-2]
+      observed_time_series_tensor, _ = (
+          sts_util.canonicalize_observed_time_series_with_mask(
+              observed_time_series))
+      batch_shape = tf.shape(input=observed_time_series_tensor)[:-2]
       prior = tfd.TransformedDistribution(prior, tfb.Identity(),
                                           event_shape=[num_features],
                                           batch_shape=batch_shape)
@@ -305,6 +349,42 @@ class LinearRegressionTest(tf.test.TestCase, _StsTestHarness):
         weights_prior=prior)
     return Sum(components=[regression],
                observed_time_series=observed_time_series)
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class SparseLinearRegressionTest(tf.test.TestCase, _StsTestHarness):
+
+  def _build_sts(self, observed_time_series=None):
+    max_timesteps = 100
+    num_features = 3
+
+    # LinearRegression components don't currently take an `observed_time_series`
+    # argument, so they can't infer a prior batch shape. This means we have to
+    # manually set the batch shape expected by the tests.
+    batch_shape = None
+    if observed_time_series is not None:
+      observed_time_series_tensor, _ = (
+          sts_util.canonicalize_observed_time_series_with_mask(
+              observed_time_series))
+      batch_shape = tf.shape(input=observed_time_series_tensor)[:-2]
+
+    regression = SparseLinearRegression(
+        design_matrix=tf.random.normal([max_timesteps, num_features]),
+        weights_batch_shape=batch_shape)
+    return Sum(components=[regression],
+               observed_time_series=observed_time_series)
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class DynamicLinearRegressionTest(tf.test.TestCase, _StsTestHarness):
+
+  def _build_sts(self, observed_time_series=None):
+    max_timesteps = 100
+    num_features = 3
+
+    return DynamicLinearRegression(
+        design_matrix=tf.random.normal([max_timesteps, num_features]),
+        observed_time_series=observed_time_series)
 
 
 if __name__ == '__main__':

@@ -20,13 +20,15 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -176,7 +178,7 @@ class Dirichlet(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[concentration]) as name:
+    with tf.name_scope(name) as name:
       self._concentration = self._maybe_assert_valid_concentration(
           tf.convert_to_tensor(
               value=concentration,
@@ -195,6 +197,10 @@ class Dirichlet(distribution.Distribution):
         graph_parents=[self._concentration,
                        self._total_concentration],
         name=name)
+
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(concentration=1)
 
   @property
   def concentration(self):
@@ -216,7 +222,7 @@ class Dirichlet(distribution.Distribution):
     return tf.shape(input=self.concentration)[-1:]
 
   def _event_shape(self):
-    return self.concentration.shape.with_rank_at_least(1)[-1:]
+    return tensorshape_util.with_rank_at_least(self.concentration.shape, 1)[-1:]
 
   def _sample_n(self, n, seed=None):
     gamma_sample = tf.random.gamma(
@@ -279,13 +285,13 @@ class Dirichlet(distribution.Distribution):
     if self.allow_nan_stats:
       nan = tf.fill(
           tf.shape(input=mode),
-          np.array(np.nan, dtype=self.dtype.as_numpy_dtype()),
+          dtype_util.as_numpy_dtype(self.dtype)(np.nan),
           name="nan")
       return tf.where(
           tf.reduce_all(input_tensor=self.concentration > 1., axis=-1), mode,
           nan)
     return distribution_util.with_dependencies([
-        tf.compat.v1.assert_less(
+        assert_util.assert_less(
             tf.ones([], self.dtype),
             self.concentration,
             message="Mode undefined when any concentration <= 1"),
@@ -296,13 +302,13 @@ class Dirichlet(distribution.Distribution):
     if not validate_args:
       return concentration
     return distribution_util.with_dependencies([
-        tf.compat.v1.assert_positive(
+        assert_util.assert_positive(
             concentration, message="Concentration parameter must be positive."),
-        tf.compat.v1.assert_rank_at_least(
+        assert_util.assert_rank_at_least(
             concentration,
             1,
             message="Concentration parameter must have >=1 dimensions."),
-        tf.compat.v1.assert_less(
+        assert_util.assert_less(
             1,
             tf.shape(input=concentration)[-1],
             message="Concentration parameter must have event_size >= 2."),
@@ -313,17 +319,14 @@ class Dirichlet(distribution.Distribution):
     if not self.validate_args:
       return x
     return distribution_util.with_dependencies([
-        tf.compat.v1.assert_positive(x, message="samples must be positive"),
-        tf.compat.v1.assert_near(
+        assert_util.assert_positive(x, message="samples must be positive"),
+        assert_util.assert_near(
             tf.ones([], dtype=self.dtype),
             tf.reduce_sum(input_tensor=x, axis=-1),
             message="sample last-dimension must sum to `1`"),
     ], x)
 
 
-# TODO(b/117098119): Remove tf.distribution references once they're gone.
-@kullback_leibler.RegisterKL(Dirichlet, tf.compat.v1.distributions.Dirichlet)
-@kullback_leibler.RegisterKL(tf.compat.v1.distributions.Dirichlet, Dirichlet)
 @kullback_leibler.RegisterKL(Dirichlet, Dirichlet)
 def _kl_dirichlet_dirichlet(d1, d2, name=None):
   """Batchwise KL divergence KL(d1 || d2) with d1 and d2 Dirichlet.
@@ -337,8 +340,7 @@ def _kl_dirichlet_dirichlet(d1, d2, name=None):
   Returns:
     Batchwise KL(d1 || d2)
   """
-  with tf.name_scope(name, "kl_dirichlet_dirichlet", values=[
-      d1.concentration, d2.concentration]):
+  with tf.name_scope(name or "kl_dirichlet_dirichlet"):
     # The KL between Dirichlet distributions can be derived as follows. We have
     #
     #   Dir(x; a) = 1 / B(a) * prod_i[x[i]^(a[i] - 1)]

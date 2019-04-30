@@ -13,7 +13,7 @@ testing static shape).
 import tensorflow as tf
 tfe = tf.contrib.eager
 
-class _DistributionTest(object):
+class _DistributionTest(tf.test.TestCase):
 
   @tfe.run_test_in_graph_and_eager_modes
   def testSomething(self):
@@ -25,13 +25,15 @@ class _DistributionTest(object):
     [...] = self.evaluate([...])
     ...
 
-class DistributionTest_StaticShape(tf.test.TestCase, _DistributionTest):
+class DistributionTest_StaticShape(_DistributionTest):
   dtype = np.float32
   use_static_shape = True
 
-class DistributionTest_DynamicShape(tf.test.TestCase, _DistributionTest):
+class DistributionTest_DynamicShape(_DistributionTest):
   dtype = np.float32
   use_static_shape = False
+
+del _DistributionTest  # Don't run tests for the base class.
 ```
 
 
@@ -44,7 +46,7 @@ multiple input `Tensors`, factoring out the placeholder creation can help
 avoid boilerplate and improve readability. For example,
 
 ```python
-class _DistributionTest(object):
+class _DistributionTest(tf.test.TestCase):
 
   @tfe.run_test_in_graph_and_eager_modes
   def testSomething(self):
@@ -62,13 +64,15 @@ class _DistributionTest(object):
     return tf.placeholder_with_default(
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
-class DistributionTest_StaticShape(tf.test.TestCase, _DistributionTest):
+class DistributionTest_StaticShape(_DistributionTest):
   dtype = np.float32
   use_static_shape = True
 
-class DistributionTest_DynamicShape(tf.test.TestCase, _DistributionTest):
+class DistributionTest_DynamicShape(_DistributionTest):
   dtype = np.float32
   use_static_shape = False
+
+del _DistributionTest  # Don't run tests for the base class.
 ```
 
 These ideas can be extended as appropriate. For example, in the [`Reshape`
@@ -83,7 +87,7 @@ respectively appropriate check, i.e.,
 import tensorflow as tf
 tfe = tf.contrib.eager
 
-class _DistributionTest(object):
+class _DistributionTest(tf.test.TestCase):
 
   @tfe.run_test_in_graph_and_eager_modes
   def testSomething(self):
@@ -94,15 +98,17 @@ class _DistributionTest(object):
       [...] = self.evaluate(something_that_might_throw_exception([...]))
     ...
 
-class DistributionTest_StaticShape(test.TestCase, _DistributionTest):
+class DistributionTest_StaticShape(_DistributionTest):
   ...
   def assertRaisesError(self, msg):
     return self.assertRaisesRegexp(Exception, msg)
 
-class DistributionTest_DynamicShape(test.TestCase, _DistributionTest):
+class DistributionTest_DynamicShape(_DistributionTest):
   ...
   def assertRaisesError(self, msg):
     return self.assertRaisesOpError(msg)
+
+del _DistributionTest  # Don't run tests for the base class.
 ```
 
 
@@ -117,3 +123,53 @@ Helper class to test vector-event distributions.
 Helper class to test scalar variate distributions over integers (or Booleans).
 
 [DiscreteScalarDistributionTestHelpers](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/internal/test_util.py#L32) ([Example Use](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/poisson_lognormal_test.py#L34))
+
+## Testing notebooks
+
+Some notebooks involve expensive computation, like running a bunch of
+inference steps. To test them, we prefer to short-circuit the expensive parts.
+This can be done using Colab's template functionality:
+
+1. Use a templated param to control the expensive computation, e.g., the number
+   of inference steps.
+2. Set the param in the notebook to whatever large value actually generates the
+   desired results.
+3. In the BUILD file, add a test rule that uses the `template_params` argument
+   to set the value to something much smaller and more tractable.
+
+For example, in the notebook you might write
+
+```python
+# Allow the number of optimization steps to be overridden by a test harness.
+num_steps = 1000  # @param { isTemplate: true}
+num_steps = int(num_steps)  # Enforce correct type when overridden.
+
+for step in range(num_steps):
+  # do expensive inference step
+```
+
+and then add a BUILD test rule that looks like this:
+
+```
+colab_notebook_test(
+    name = "your_colab_test",
+    colab_binary = ":lite_notebook",
+    default_cell_diff = "ignore",
+    default_cell_timeout = "600s",
+    ipynb = "YourColab.ipynb",
+    tags = [
+        "cuda",
+        "noasan",
+        "nomsan",
+        "notsan",
+        "requires-gpu-sm35",
+    ],
+    template_params = ["num_steps=2"],  # Avoid long optimization.
+)
+```
+
+The test still tests that the code executes correctly, but executes 500x faster!
+
+An unfortunate gotcha with this approach is that `template_params` appears to
+pass all its arguments as strings, so you have to manually convert them to the
+correct type in the Python code. (as demonstrated above).

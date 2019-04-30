@@ -20,9 +20,12 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python import bijectors as tfb
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -54,7 +57,7 @@ class InlineBijectorTest(tf.test.TestCase):
   def testShapeGetters(self):
     bijector = tfb.Inline(
         forward_event_shape_tensor_fn=lambda x: tf.concat((x, [1]), 0),
-        forward_event_shape_fn=lambda x: x.as_list() + [1],
+        forward_event_shape_fn=lambda x: tensorshape_util.as_list(x) + [1],
         inverse_event_shape_tensor_fn=lambda x: x[:-1],
         inverse_event_shape_fn=lambda x: x[:-1],
         forward_min_event_ndims=0,
@@ -63,12 +66,14 @@ class InlineBijectorTest(tf.test.TestCase):
     y = tf.TensorShape([1, 2, 3, 1])
     self.assertAllEqual(y, bijector.forward_event_shape(x))
     self.assertAllEqual(
-        y.as_list(),
-        self.evaluate(bijector.forward_event_shape_tensor(x.as_list())))
+        tensorshape_util.as_list(y),
+        self.evaluate(
+            bijector.forward_event_shape_tensor(tensorshape_util.as_list(x))))
     self.assertAllEqual(x, bijector.inverse_event_shape(y))
     self.assertAllEqual(
-        x.as_list(),
-        self.evaluate(bijector.inverse_event_shape_tensor(y.as_list())))
+        tensorshape_util.as_list(x),
+        self.evaluate(
+            bijector.inverse_event_shape_tensor(tensorshape_util.as_list(y))))
 
 
 if __name__ == "__main__":

@@ -19,13 +19,14 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import invert as invert_bijector
 from tensorflow_probability.python.bijectors import square as square_bijector
 from tensorflow_probability.python.distributions import chi2
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import transformed_distribution
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 
 
@@ -78,22 +79,28 @@ class Chi(transformed_distribution.TransformedDistribution):
       name: Python `str` name prefixed to Ops created by this class.
         Default value: `'Chi'`.
     """
-    with tf.name_scope(name, values=[df]) as name:
+    parameters = dict(locals())
+    with tf.name_scope(name) as name:
       df = tf.convert_to_tensor(
           value=df,
           name="df",
           dtype=dtype_util.common_dtype([df], preferred_dtype=tf.float32))
-      validation_assertions = [tf.compat.v1.assert_positive(df)
-                              ] if validate_args else []
+      validation_assertions = (
+          [assert_util.assert_positive(df)] if validate_args else [])
       with tf.control_dependencies(validation_assertions):
         self._df = tf.identity(df, name="df")
 
       super(Chi, self).__init__(
           distribution=chi2.Chi2(df=self._df,
                                  validate_args=validate_args,
-                                 allow_nan_stats=allow_nan_stats,
-                                 name=name),
-          bijector=invert_bijector.Invert(square_bijector.Square()))
+                                 allow_nan_stats=allow_nan_stats),
+          bijector=invert_bijector.Invert(square_bijector.Square()),
+          parameters=parameters,
+          name=name)
+
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(df=0)
 
   @property
   def df(self):
@@ -126,7 +133,7 @@ def _kl_chi_chi(a, b, name=None):
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.name_scope(name, "kl_chi_chi", [a.df, b.df]):
+  with tf.name_scope(name or "kl_chi_chi"):
     # Consistent with
     # https://mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 118
     # The paper introduces an additional scaling parameter; setting that

@@ -20,9 +20,10 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 tfd = tfp.distributions
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
@@ -53,7 +54,7 @@ class LogNormalTest(tf.test.TestCase):
   def testLogNormalSample(self):
     loc, scale = 1.5, 0.4
     dist = tfd.LogNormal(loc=loc, scale=scale)
-    samples = self.evaluate(dist.sample(6000, seed=1234))
+    samples = self.evaluate(dist.sample(6000, seed=tfp_test_util.test_seed()))
     self.assertAllClose(np.mean(samples),
                         self.evaluate(dist.mean()),
                         atol=0.1)

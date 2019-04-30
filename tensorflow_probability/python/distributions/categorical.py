@@ -18,18 +18,23 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
-from tensorflow_probability.python.internal import distribution_util as util
+from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensorshape_util
+
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 def _broadcast_cat_event_and_params(event, params, base_dtype):
   """Broadcasts the event or distribution parameters."""
-  if event.dtype.is_integer:
+  if dtype_util.is_integer(event.dtype):
     pass
-  elif event.dtype.is_floating:
+  elif dtype_util.is_floating(event.dtype):
     # When `validate_args=True` we've already ensured int/float casting
     # is closed.
     event = tf.cast(event, dtype=tf.int32)
@@ -37,26 +42,26 @@ def _broadcast_cat_event_and_params(event, params, base_dtype):
     raise TypeError("`value` should have integer `dtype` or "
                     "`self.dtype` ({})".format(base_dtype))
   shape_known_statically = (
-      params.shape.ndims is not None and
-      params.shape[:-1].is_fully_defined() and
-      event.shape.is_fully_defined())
+      tensorshape_util.rank(params.shape) is not None and
+      tensorshape_util.is_fully_defined(params.shape[:-1]) and
+      tensorshape_util.is_fully_defined(event.shape))
   if not shape_known_statically or params.shape[:-1] != event.shape:
     params *= tf.ones_like(event[..., tf.newaxis],
                            dtype=params.dtype)
     params_shape = tf.shape(input=params)[:-1]
     event *= tf.ones(params_shape, dtype=event.dtype)
-    if params.shape.ndims is not None:
-      event.set_shape(tf.TensorShape(params.shape[:-1]))
+    if tensorshape_util.rank(params.shape) is not None:
+      tensorshape_util.set_shape(event, params.shape[:-1])
 
   return event, params
 
 
 class Categorical(distribution.Distribution):
-  """Categorical distribution.
+  """Categorical distribution over integers.
 
   The Categorical distribution is parameterized by either probabilities or
   log-probabilities of a set of `K` classes. It is defined over the integers
-  `{0, 1, ..., K}`.
+  `{0, 1, ..., K-1}`.
 
   The Categorical distribution is closely related to the `OneHotCategorical` and
   `Multinomial` distributions.  The Categorical distribution can be intuited as
@@ -174,8 +179,8 @@ class Categorical(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[logits, probs]) as name:
-      self._logits, self._probs = util.get_logits_and_probs(
+    with tf.name_scope(name) as name:
+      self._logits, self._probs = distribution_util.get_logits_and_probs(
           logits=logits,
           probs=probs,
           validate_args=validate_args,
@@ -183,35 +188,36 @@ class Categorical(distribution.Distribution):
           name=name)
 
       if validate_args:
-        self._logits = util.embed_check_categorical_event_shape(
+        self._logits = distribution_util.embed_check_categorical_event_shape(
             self._logits)
 
-      logits_shape_static = self._logits.shape.with_rank_at_least(1)
-      if logits_shape_static.ndims is not None:
+      logits_shape_static = tensorshape_util.with_rank_at_least(
+          self._logits.shape, 1)
+      if tensorshape_util.rank(logits_shape_static) is not None:
         self._batch_rank = tf.convert_to_tensor(
-            value=logits_shape_static.ndims - 1,
+            value=tensorshape_util.rank(logits_shape_static) - 1,
             dtype=tf.int32,
             name="batch_rank")
       else:
-        with tf.name_scope(name="batch_rank"):
+        with tf.name_scope("batch_rank"):
           self._batch_rank = tf.rank(self._logits) - 1
 
       logits_shape = tf.shape(input=self._logits, name="logits_shape")
-      event_size = tf.compat.dimension_value(logits_shape_static[-1])
-      if event_size is not None:
-        self._event_size = tf.convert_to_tensor(
-            value=event_size, dtype=tf.int32, name="event_size")
+      num_categories = tf.compat.dimension_value(logits_shape_static[-1])
+      if num_categories is not None:
+        self._num_categories = tf.convert_to_tensor(
+            value=num_categories, dtype=tf.int32, name="num_categories")
       else:
-        with tf.name_scope(name="event_size"):
-          self._event_size = logits_shape[self._batch_rank]
+        with tf.name_scope("num_categories"):
+          self._num_categories = logits_shape[self._batch_rank]
 
-      if logits_shape_static[:-1].is_fully_defined():
+      if tensorshape_util.is_fully_defined(logits_shape_static[:-1]):
         self._batch_shape_val = tf.constant(
             logits_shape_static[:-1].as_list(),
             dtype=tf.int32,
             name="batch_shape")
       else:
-        with tf.name_scope(name="batch_shape"):
+        with tf.name_scope("batch_shape"):
           self._batch_shape_val = logits_shape[:-1]
     super(Categorical, self).__init__(
         dtype=dtype,
@@ -223,10 +229,23 @@ class Categorical(distribution.Distribution):
                        self._probs],
         name=name)
 
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(logits=1, probs=1)
+
   @property
+  @deprecation.deprecated(
+      "2019-05-19", "The `event_size` property is deprecated.  Use "
+      "`num_categories` instead.  They have the same value, but `event_size` "
+      "is misnamed.")
   def event_size(self):
-    """Scalar `int32` tensor: the number of classes."""
-    return self._event_size
+    """Scalar `int32` tensor: the number of categories."""
+    return self._num_categories
+
+  @property
+  def num_categories(self):
+    """Scalar `int32` tensor: the number of categories."""
+    return self._num_categories
 
   @property
   def logits(self):
@@ -251,11 +270,11 @@ class Categorical(distribution.Distribution):
     return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
-    if self.logits.shape.ndims == 2:
+    if tensorshape_util.rank(self.logits.shape) == 2:
       logits_2d = self.logits
     else:
-      logits_2d = tf.reshape(self.logits, [-1, self.event_size])
-    sample_dtype = tf.int64 if self.dtype.size > 4 else tf.int32
+      logits_2d = tf.reshape(self.logits, [-1, self.num_categories])
+    sample_dtype = tf.int64 if dtype_util.size(self.dtype) > 4 else tf.int32
     draws = tf.random.categorical(
         logits_2d, n, dtype=sample_dtype, seed=seed)
     draws = tf.reshape(
@@ -264,53 +283,58 @@ class Categorical(distribution.Distribution):
 
   def _cdf(self, k):
     k = tf.convert_to_tensor(value=k, name="k")
-    if self.validate_args:
-      k = util.embed_check_integer_casting_closed(
-          k, target_dtype=tf.int32)
 
     k, probs = _broadcast_cat_event_and_params(
-        k, self.probs, base_dtype=self.dtype.base_dtype)
+        k, self.probs, base_dtype=dtype_util.base_dtype(self.dtype))
 
-    # batch-flatten everything in order to use `sequence_mask()`.
-    batch_flattened_probs = tf.reshape(probs,
-                                       (-1, self._event_size))
-    batch_flattened_k = tf.reshape(k, [-1])
+    # Since the lowest number in the support is 0, any k < 0 should be zero in
+    # the output.
+    should_be_zero = k < 0
 
-    to_sum_over = tf.where(
-        tf.sequence_mask(batch_flattened_k, self._event_size),
-        batch_flattened_probs,
-        tf.zeros_like(batch_flattened_probs))
-    batch_flattened_cdf = tf.reduce_sum(input_tensor=to_sum_over, axis=-1)
-    # Reshape back to the shape of the argument.
-    return tf.reshape(batch_flattened_cdf, tf.shape(input=k))
+    # Will use k as an index in the gather below, so clip it to {0,...,K-1}.
+    k = tf.clip_by_value(tf.cast(k, tf.int32), 0, self.num_categories - 1)
+
+    batch_shape = tf.shape(input=k)
+
+    # tf.gather(..., batch_dims=batch_dims) requires static batch_dims kwarg, so
+    # to handle the case where the batch shape is dynamic, flatten the batch
+    # dims (so we know batch_dims=1).
+    k_flat_batch = tf.reshape(k, [-1])
+    probs_flat_batch = tf.reshape(
+        probs, tf.concat(([-1], [self.num_categories]), axis=0))
+
+    cdf_flat = tf.gather(
+        tf.cumsum(probs_flat_batch, axis=-1),
+        k_flat_batch[..., tf.newaxis],
+        batch_dims=1)
+
+    cdf = tf.reshape(cdf_flat, shape=batch_shape)
+
+    return tf.where(should_be_zero, tf.zeros_like(cdf), cdf)
 
   def _log_prob(self, k):
     k = tf.convert_to_tensor(value=k, name="k")
     if self.validate_args:
-      k = util.embed_check_integer_casting_closed(
+      k = distribution_util.embed_check_integer_casting_closed(
           k, target_dtype=tf.int32)
     k, logits = _broadcast_cat_event_and_params(
-        k, self.logits, base_dtype=self.dtype.base_dtype)
+        k, self.logits, base_dtype=dtype_util.base_dtype(self.dtype))
 
     return -tf.nn.sparse_softmax_cross_entropy_with_logits(labels=k,
                                                            logits=logits)
 
   def _entropy(self):
     return -tf.reduce_sum(
-        input_tensor=tf.nn.log_softmax(self.logits) * self.probs, axis=-1)
+        input_tensor=tf.math.multiply_no_nan(
+            tf.nn.log_softmax(self.logits), self.probs), axis=-1)
 
   def _mode(self):
     ret = tf.argmax(input=self.logits, axis=self._batch_rank)
     ret = tf.cast(ret, self.dtype)
-    ret.set_shape(self.batch_shape)
+    tensorshape_util.set_shape(ret, self.batch_shape)
     return ret
 
 
-# TODO(b/117098119): Remove tf.distribution references once they're gone.
-@kullback_leibler.RegisterKL(Categorical,
-                             tf.compat.v1.distributions.Categorical)
-@kullback_leibler.RegisterKL(tf.compat.v1.distributions.Categorical,
-                             Categorical)
 @kullback_leibler.RegisterKL(Categorical, Categorical)
 def _kl_categorical_categorical(a, b, name=None):
   """Calculate the batched KL divergence KL(a || b) with a and b Categorical.
@@ -324,8 +348,7 @@ def _kl_categorical_categorical(a, b, name=None):
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.name_scope(name, "kl_categorical_categorical",
-                     values=[a.logits, b.logits]):
+  with tf.name_scope(name or "kl_categorical_categorical"):
     # sum(probs log(probs / (1 - probs)))
     delta_log_probs1 = (tf.nn.log_softmax(a.logits) -
                         tf.nn.log_softmax(b.logits))

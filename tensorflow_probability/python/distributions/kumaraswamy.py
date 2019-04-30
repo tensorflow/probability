@@ -20,14 +20,14 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import kumaraswamy as kumaraswamy_bijector
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import uniform
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import reparameterization
 
 __all__ = [
     "Kumaraswamy",
@@ -121,8 +121,8 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
   """
 
   def __init__(self,
-               concentration1=None,
-               concentration0=None,
+               concentration1=1.,
+               concentration0=1.,
                validate_args=False,
                allow_nan_stats=True,
                name="Kumaraswamy"):
@@ -146,7 +146,8 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
         more of the statistic's batch members are undefined.
       name: Python `str` name prefixed to Ops created by this class.
     """
-    with tf.name_scope(name, values=[concentration1, concentration0]) as name:
+    parameters = dict(locals())
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([concentration1, concentration0],
                                       tf.float32)
       concentration1 = tf.convert_to_tensor(
@@ -164,8 +165,12 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
             validate_args=validate_args),
         batch_shape=distribution_util.get_broadcast_shape(
             concentration1, concentration0),
+        parameters=parameters,
         name=name)
-    self._reparameterization_type = reparameterization.FULLY_REPARAMETERIZED
+
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(concentration1=0, concentration0=0)
 
   @property
   def concentration1(self):
@@ -180,8 +185,8 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
   def _entropy(self):
     a = self.concentration1
     b = self.concentration0
-    return (1 - 1. / a) + (1 - 1. / b) * _harmonic_number(b) + tf.math.log(
-        a) + tf.math.log(b)
+    return ((1 - 1. / b) + (1 - 1. / a) * _harmonic_number(b) -
+            tf.math.log(a) - tf.math.log(b))
 
   def _moment(self, n):
     """Compute the n'th (uncentered) moment."""
@@ -214,17 +219,17 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
     if self.allow_nan_stats:
       nan = tf.fill(
           self.batch_shape_tensor(),
-          np.array(np.nan, dtype=self.dtype.as_numpy_dtype),
+          dtype_util.as_numpy_dtype(self.dtype)(np.nan),
           name="nan")
       is_defined = (self.concentration1 > 1.) & (self.concentration0 > 1.)
       return tf.where(is_defined, mode, nan)
 
     return distribution_util.with_dependencies([
-        tf.compat.v1.assert_less(
+        assert_util.assert_less(
             tf.ones([], dtype=self.concentration1.dtype),
             self.concentration1,
             message="Mode undefined for concentration1 <= 1."),
-        tf.compat.v1.assert_less(
+        assert_util.assert_less(
             tf.ones([], dtype=self.concentration0.dtype),
             self.concentration0,
             message="Mode undefined for concentration0 <= 1.")

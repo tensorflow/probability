@@ -89,7 +89,7 @@ class VariationalSGD(tf.compat.v2.optimizers.Optimizer):
                use_single_learning_rate=False,
                name=None):
     default_name = 'VariationalSGD'
-    with tf.name_scope(name, default_name, [
+    with tf.compat.v1.name_scope(name, default_name, [
         max_learning_rate, preconditioner_decay_rate, batch_size, burnin,
         burnin_max_learning_rate
     ]):

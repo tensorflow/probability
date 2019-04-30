@@ -18,10 +18,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 class Autoregressive(distribution.Distribution):
@@ -70,14 +71,15 @@ class Autoregressive(distribution.Distribution):
 
   ```python
   tfd = tfp.distributions
+  tfb = tfp.bijectors
 
-  def normal_fn(self, event_size):
-    n = event_size * (event_size + 1) / 2
+  def _normal_fn(event_size):
+    n = event_size * (event_size + 1) // 2
     p = tf.Variable(tfd.Normal(loc=0., scale=1.).sample(n))
-    affine = tfd.bijectors.Affine(
+    affine = tfb.Affine(
         scale_tril=tfd.fill_triangular(0.25 * p))
     def _fn(samples):
-      scale = tf.exp(affine.forward(samples)).eval()
+      scale = tf.exp(affine.forward(samples))
       return tfd.Independent(
           tfd.Normal(loc=0., scale=scale, validate_args=True),
           reinterpreted_batch_ndims=1)
@@ -85,8 +87,8 @@ class Autoregressive(distribution.Distribution):
 
   batch_and_event_shape = [3, 2, 4]
   sample0 = tf.zeros(batch_and_event_shape)
-  ar = autoregressive_lib.Autoregressive(
-      self._normal_fn(batch_and_event_shape[-1]), sample0)
+  ar = tfd.Autoregressive(
+      _normal_fn(batch_and_event_shape[-1]), sample0)
   x = ar.sample([6, 5])
   # ==> x.shape = [6, 5, 3, 2, 4]
   prob_x = ar.prob(x)
@@ -140,7 +142,7 @@ class Autoregressive(distribution.Distribution):
 
     Raises:
       ValueError: if `num_steps` and
-        `distribution_fn(sample0).event_shape.num_elements()` are both `None`.
+        `num_elements(distribution_fn(sample0).event_shape)` are both `None`.
       ValueError: if `num_steps < 1`.
     """
     parameters = dict(locals())
@@ -150,7 +152,8 @@ class Autoregressive(distribution.Distribution):
       self._distribution0 = (distribution_fn() if sample0 is None
                              else distribution_fn(sample0))
       if num_steps is None:
-        num_steps = self._distribution0.event_shape.num_elements()
+        num_steps = tensorshape_util.num_elements(
+            self._distribution0.event_shape)
         if num_steps is None:
           raise ValueError("distribution_fn must generate a distribution "
                            "with fully known `event_shape`.")
@@ -198,11 +201,14 @@ class Autoregressive(distribution.Distribution):
     seed = seed_stream.SeedStream(seed, salt="Autoregressive")()
     samples = self.distribution0.sample(n, seed=seed)
     for _ in range(self._num_steps):
+      # pylint: disable=not-callable
       samples = self.distribution_fn(samples).sample(seed=seed)
     return samples
 
   def _log_prob(self, value):
+    # pylint: disable=not-callable
     return self.distribution_fn(value).log_prob(value)
 
   def _prob(self, value):
+    # pylint: disable=not-callable
     return self.distribution_fn(value).prob(value)

@@ -18,14 +18,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.math.linalg import lu_reconstruct
 from tensorflow_probability.python.math.linalg import lu_solve
-
-
-from tensorflow.python.ops.linalg import linear_operator_util
 
 
 __all__ = [
@@ -118,7 +115,7 @@ class MatvecLU(bijector.Bijector):
       ValueError: If both/neither `channels` and `lower_upper`/`permutation` are
         specified.
     """
-    with tf.name_scope(name, 'MatvecLU', [lower_upper, permutation]) as name:
+    with tf.name_scope(name or 'MatvecLU') as name:
       self._lower_upper = tf.convert_to_tensor(
           value=lower_upper, dtype_hint=tf.float32, name='lower_upper')
       self._permutation = tf.convert_to_tensor(
@@ -141,8 +138,7 @@ class MatvecLU(bijector.Bijector):
     w = lu_reconstruct(lower_upper=self.lower_upper,
                        perm=self.permutation,
                        validate_args=self.validate_args)
-    return linear_operator_util.matmul_with_broadcast(
-        w, x[..., tf.newaxis])[..., 0]
+    return tf.linalg.matvec(w, x)
 
   def _inverse(self, y):
     return lu_solve(

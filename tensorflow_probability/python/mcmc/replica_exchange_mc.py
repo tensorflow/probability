@@ -24,7 +24,7 @@ import tensorflow as tf
 
 from tensorflow_probability.python import distributions
 from tensorflow_probability.python.mcmc import kernel as kernel_base
-from tensorflow_probability.python.mcmc import util as mcmc_util
+from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
 __all__ = [
     'ReplicaExchangeMC',
@@ -333,7 +333,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
     # Key difficulty:  The type of exchanges differs from one call to the
     # next...even the number of exchanges can differ.
     # As a result, exchanges must happen dynamically, in while loops.
-    with tf.name_scope(
+    with tf.compat.v1.name_scope(
         name=mcmc_util.make_name(self.name, 'remc', 'one_step'),
         values=[current_state, previous_kernel_results]):
 
@@ -420,7 +420,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
                             exchange_proposed_n, sampled_replica_states,
                             sampled_replica_results):
     """Get list of TensorArrays holding exchanged states, and zeros."""
-    with tf.name_scope('get_exchanged_states'):
+    with tf.compat.v1.name_scope('get_exchanged_states'):
 
       target_log_probs = []
       for replica in range(self.num_replica):
@@ -459,7 +459,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
 
       def _swap(is_exchange_accepted, x, y):
         """Swap batches of x, y where accepted."""
-        with tf.name_scope('swap_where_exchange_accepted'):
+        with tf.compat.v1.name_scope('swap_where_exchange_accepted'):
           new_x = mcmc_util.choose(is_exchange_accepted, y, x)
           new_y = mcmc_util.choose(is_exchange_accepted, x, y)
         return new_x, new_y
@@ -499,7 +499,8 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
 
   def _insert_old_states_where_no_exchange_was_proposed(
       self, no_exchange_proposed, old_states, exchanged_states):
-    with tf.name_scope('insert_old_states_where_no_exchange_was_proposed'):
+    with tf.compat.v1.name_scope(
+        'insert_old_states_where_no_exchange_was_proposed'):
 
       def cond(j, unused_exchanged_states):
         return j < tf.size(input=no_exchange_proposed)
@@ -527,7 +528,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
         `Tensor`s representing internal calculations made within this function.
         This inculdes replica states.
     """
-    with tf.name_scope(
+    with tf.compat.v1.name_scope(
         name=mcmc_util.make_name(self.name, 'remc', 'bootstrap_results'),
         values=[init_state]):
       replica_results = [

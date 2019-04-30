@@ -27,6 +27,7 @@ from tensorflow_probability.python.layers.conv_variational import Convolution3DR
 from tensorflow_probability.python.layers.dense_variational import DenseFlipout
 from tensorflow_probability.python.layers.dense_variational import DenseLocalReparameterization
 from tensorflow_probability.python.layers.dense_variational import DenseReparameterization
+from tensorflow_probability.python.layers.dense_variational_v2 import DenseVariational
 from tensorflow_probability.python.layers.distribution_layer import CategoricalMixtureOfOneHotCategorical
 from tensorflow_probability.python.layers.distribution_layer import DistributionLambda
 from tensorflow_probability.python.layers.distribution_layer import IndependentBernoulli
@@ -40,11 +41,17 @@ from tensorflow_probability.python.layers.distribution_layer import MixtureNorma
 from tensorflow_probability.python.layers.distribution_layer import MixtureSameFamily
 from tensorflow_probability.python.layers.distribution_layer import MultivariateNormalTriL
 from tensorflow_probability.python.layers.distribution_layer import OneHotCategorical
+from tensorflow_probability.python.layers.distribution_layer import VariationalGaussianProcess
+from tensorflow_probability.python.layers.initializers import BlockwiseInitializer
+from tensorflow_probability.python.layers.masked_autoregressive import AutoregressiveTransform
 from tensorflow_probability.python.layers.util import default_loc_scale_fn
 from tensorflow_probability.python.layers.util import default_mean_field_normal_fn
 from tensorflow_probability.python.layers.util import default_multivariate_normal_fn
+from tensorflow_probability.python.layers.variable_input import VariableLayer
 
 _allowed_symbols = [
+    'AutoregressiveTransform',
+    'BlockwiseInitializer',
     'CategoricalMixtureOfOneHotCategorical',
     'Convolution1DFlipout',
     'Convolution1DReparameterization',
@@ -55,6 +62,7 @@ _allowed_symbols = [
     'DenseFlipout',
     'DenseLocalReparameterization',
     'DenseReparameterization',
+    'DenseVariational',
     'DistributionLambda',
     'IndependentBernoulli',
     'IndependentLogistic',
@@ -67,6 +75,7 @@ _allowed_symbols = [
     'MixtureSameFamily',
     'MultivariateNormalTriL',
     'OneHotCategorical',
+    'VariableLayer',
     'default_loc_scale_fn',
     'default_mean_field_normal_fn',
     'default_multivariate_normal_fn',

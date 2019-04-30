@@ -20,10 +20,12 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
-from tensorflow_probability.python import bijectors as tfb
 
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+import tensorflow.compat.v2 as tf
+
+from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -57,21 +59,25 @@ class FillTriangularBijectorTest(tf.test.TestCase):
 
     x = tf.ones(shape=x_shape, dtype=tf.float32)
     y_ = b.forward(x)
-    self.assertAllEqual(y_.shape.as_list(), y_shape.as_list())
+    self.assertAllEqual(
+        tensorshape_util.as_list(y_.shape), tensorshape_util.as_list(y_shape))
     x_ = b.inverse(y_)
-    self.assertAllEqual(x_.shape.as_list(), x_shape.as_list())
+    self.assertAllEqual(
+        tensorshape_util.as_list(x_.shape), tensorshape_util.as_list(x_shape))
 
     y_shape_ = b.forward_event_shape(x_shape)
-    self.assertAllEqual(y_shape_.as_list(), y_shape.as_list())
+    self.assertAllEqual(
+        tensorshape_util.as_list(y_shape_), tensorshape_util.as_list(y_shape))
     x_shape_ = b.inverse_event_shape(y_shape)
-    self.assertAllEqual(x_shape_.as_list(), x_shape.as_list())
+    self.assertAllEqual(
+        tensorshape_util.as_list(x_shape_), tensorshape_util.as_list(x_shape))
 
     y_shape_tensor = self.evaluate(
-        b.forward_event_shape_tensor(x_shape.as_list()))
-    self.assertAllEqual(y_shape_tensor, y_shape.as_list())
+        b.forward_event_shape_tensor(tensorshape_util.as_list(x_shape)))
+    self.assertAllEqual(y_shape_tensor, tensorshape_util.as_list(y_shape))
     x_shape_tensor = self.evaluate(
-        b.inverse_event_shape_tensor(y_shape.as_list()))
-    self.assertAllEqual(x_shape_tensor, x_shape.as_list())
+        b.inverse_event_shape_tensor(tensorshape_util.as_list(y_shape)))
+    self.assertAllEqual(x_shape_tensor, tensorshape_util.as_list(x_shape))
 
   def testShapeError(self):
 
@@ -81,13 +87,15 @@ class FillTriangularBijectorTest(tf.test.TestCase):
     with self.assertRaisesRegexp(ValueError, "is not a triangular number"):
       b.forward_event_shape(x_shape_bad)
     with self.assertRaisesOpError("is not a triangular number"):
-      self.evaluate(b.forward_event_shape_tensor(x_shape_bad.as_list()))
+      self.evaluate(
+          b.forward_event_shape_tensor(tensorshape_util.as_list(x_shape_bad)))
 
     y_shape_bad = tf.TensorShape([5, 4, 3, 2])
     with self.assertRaisesRegexp(ValueError, "Matrix must be square"):
       b.inverse_event_shape(y_shape_bad)
     with self.assertRaisesOpError("Matrix must be square"):
-      self.evaluate(b.inverse_event_shape_tensor(y_shape_bad.as_list()))
+      self.evaluate(
+          b.inverse_event_shape_tensor(tensorshape_util.as_list(y_shape_bad)))
 
 
 if __name__ == "__main__":

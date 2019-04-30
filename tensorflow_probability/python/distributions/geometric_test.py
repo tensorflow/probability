@@ -24,6 +24,7 @@ from scipy import stats
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 tfd = tfp.distributions
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
@@ -171,7 +172,7 @@ class GeometricTest(tf.test.TestCase):
     n = tf.constant(100000)
     geom = tfd.Geometric(probs=probs)
 
-    samples = geom.sample(n, seed=12345)
+    samples = geom.sample(n, seed=tfp_test_util.test_seed())
     self.assertEqual([100000, 2], samples.shape)
 
     sample_values = self.evaluate(samples)
@@ -194,7 +195,7 @@ class GeometricTest(tf.test.TestCase):
     geom = tfd.Geometric(probs=probs)
 
     n = 400000
-    samples = geom.sample(n, seed=12345)
+    samples = geom.sample(n, seed=tfp_test_util.test_seed())
     self.assertEqual([n, batch_size, 2], samples.shape)
 
     sample_values = self.evaluate(samples)

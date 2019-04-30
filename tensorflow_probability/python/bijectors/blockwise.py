@@ -18,8 +18,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.bijectors import bijector as bijector_base
+from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
     'Blockwise',
@@ -97,7 +100,7 @@ class Blockwise(bijector_base.Bijector):
 
     self._bijectors = bijectors
 
-    with self._name_scope('init', values=[block_sizes]):
+    with self._name_scope('init'):
       if block_sizes is None:
         block_sizes = tf.ones(len(bijectors), dtype=tf.int32)
       self._block_sizes = tf.convert_to_tensor(
@@ -118,14 +121,14 @@ class Blockwise(bijector_base.Bijector):
     split_x = tf.split(x, self.block_sizes, axis=-1, num=len(self.bijectors))
     split_y = [b.forward(x_) for b, x_ in zip(self.bijectors, split_x)]
     y = tf.concat(split_y, axis=-1)
-    y.set_shape(y.shape.merge_with(x.shape))
+    tensorshape_util.set_shape(y, x.shape)
     return y
 
   def _inverse(self, y):
     split_y = tf.split(y, self.block_sizes, axis=-1, num=len(self.bijectors))
     split_x = [b.inverse(y_) for b, y_ in zip(self.bijectors, split_y)]
     x = tf.concat(split_x, axis=-1)
-    x.set_shape(x.shape.merge_with(y.shape))
+    tensorshape_util.set_shape(x, y.shape)
     return x
 
   def _forward_log_det_jacobian(self, x):
@@ -148,9 +151,9 @@ class Blockwise(bijector_base.Bijector):
 def _validate_block_sizes(block_sizes, bijectors, validate_args):
   """Helper to validate block sizes."""
   block_sizes_shape = block_sizes.shape
-  if block_sizes_shape.is_fully_defined():
-    if block_sizes_shape.ndims != 1 or (block_sizes_shape.num_elements() !=
-                                        len(bijectors)):
+  if tensorshape_util.is_fully_defined(block_sizes_shape):
+    if (tensorshape_util.rank(block_sizes_shape) != 1 or
+        (tensorshape_util.num_elements(block_sizes_shape) != len(bijectors))):
       raise ValueError(
           '`block_sizes` must be `None`, or a vector of the same length as '
           '`bijectors`. Got a `Tensor` with shape {} and `bijectors` of '
@@ -160,9 +163,9 @@ def _validate_block_sizes(block_sizes, bijectors, validate_args):
     message = ('`block_sizes` must be `None`, or a vector of the same length '
                'as `bijectors`.')
     with tf.control_dependencies([
-        tf.compat.v1.assert_equal(
+        assert_util.assert_equal(
             tf.size(input=block_sizes), len(bijectors), message=message),
-        tf.compat.v1.assert_equal(tf.rank(block_sizes), 1)
+        assert_util.assert_equal(tf.rank(block_sizes), 1)
     ]):
       return tf.identity(block_sizes)
   else:

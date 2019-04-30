@@ -24,9 +24,10 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
 from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 tfd = tfp.distributions
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 class _TriangularTest(object):
@@ -288,7 +289,7 @@ class _TriangularTest(object):
     peak = np.array([0.] * 4, dtype=self._dtype)
     tri = self._create_triangular_dist(low, high, peak)
     num_samples = int(3e6)
-    samples = tri.sample(num_samples, seed=123)
+    samples = tri.sample(num_samples, seed=tfp_test_util.test_seed())
 
     detectable_discrepancies = self.evaluate(
         st.min_discrepancy_of_true_means_detectable_by_dkwm(
@@ -309,7 +310,7 @@ class _TriangularTest(object):
     peak = (high - low) / 3 + low
     tri = tfd.Triangular(low=low, high=high, peak=peak)
     n = int(100e3)
-    samples = tri.sample(n, seed=123456)
+    samples = tri.sample(n, seed=tfp_test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n, 1, 20))
     self.assertEqual(sample_values.shape, (n, 1, 20))
@@ -325,7 +326,7 @@ class _TriangularTest(object):
     peak = (high - low) / 3 + low
     tri = tfd.Triangular(low=low, high=high, peak=peak)
     n = int(100e3)
-    samples = tri.sample(n, seed=123456)
+    samples = tri.sample(n, seed=tfp_test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n, 1, 20))
     self.assertEqual(sample_values.shape, (n, 1, 20))

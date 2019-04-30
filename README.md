@@ -190,7 +190,11 @@ uphold this code.
 
 ## References
 
+If you use TensorFlow Probability in a paper, please cite: 
+
 + _TensorFlow Distributions._ Joshua V. Dillon, Ian Langmore, Dustin Tran,
 Eugene Brevdo, Srinivas Vasudevan, Dave Moore, Brian Patton, Alex Alemi, Matt
 Hoffman, Rif A. Saurous.
 [arXiv preprint arXiv:1711.10604, 2017](https://arxiv.org/abs/1711.10604).
+
+(We're aware there's a lot more to TensorFlow Probability than Distributions, but the Distributions paper lays out our vision and is a fine thing to cite for now.)

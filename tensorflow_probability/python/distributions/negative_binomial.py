@@ -18,10 +18,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
@@ -89,7 +90,7 @@ class NegativeBinomial(distribution.Distribution):
     """
 
     parameters = dict(locals())
-    with tf.name_scope(name, values=[total_count, logits, probs]) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([total_count, logits, probs],
                                       preferred_dtype=tf.float32)
       self._logits, self._probs = distribution_util.get_logits_and_probs(
@@ -97,7 +98,7 @@ class NegativeBinomial(distribution.Distribution):
       total_count = tf.convert_to_tensor(
           value=total_count, name="total_count", dtype=dtype)
       with tf.control_dependencies(
-          [tf.compat.v1.assert_positive(total_count)] if validate_args else []):
+          [assert_util.assert_positive(total_count)] if validate_args else []):
         self._total_count = tf.identity(total_count, name="total_count")
 
     super(NegativeBinomial, self).__init__(
@@ -108,6 +109,10 @@ class NegativeBinomial(distribution.Distribution):
         parameters=parameters,
         graph_parents=[self._total_count, self._probs, self._logits],
         name=name)
+
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(total_count=0, logits=0, probs=0)
 
   @property
   def total_count(self):

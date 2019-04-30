@@ -209,14 +209,14 @@ def main(argv):
   # pass of the probabilistic layers. They are cheap but noisy
   # predictions.
   predictions = tf.argmax(input=logits, axis=1)
-  with tf.name_scope("train"):
+  with tf.compat.v1.name_scope("train"):
     train_accuracy, train_accuracy_update_op = tf.compat.v1.metrics.accuracy(
         labels=labels, predictions=predictions)
     opt = tf.compat.v1.train.AdamOptimizer(FLAGS.learning_rate)
     train_op = opt.minimize(loss)
     update_step_op = tf.compat.v1.assign(t, t + 1)
 
-  with tf.name_scope("valid"):
+  with tf.compat.v1.name_scope("valid"):
     valid_accuracy, valid_accuracy_update_op = tf.compat.v1.metrics.accuracy(
         labels=labels, predictions=predictions)
 

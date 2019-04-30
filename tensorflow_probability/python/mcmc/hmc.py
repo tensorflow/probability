@@ -28,8 +28,8 @@ from tensorflow_probability.python import distributions
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import metropolis_hastings
-from tensorflow_probability.python.mcmc import util as mcmc_util
-
+from tensorflow_probability.python.mcmc.internal import util as mcmc_util
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'HamiltonianMonteCarlo',
@@ -55,6 +55,8 @@ HamiltonianMonteCarloExtraKernelResults = collections.namedtuple(
     ])
 
 
+@deprecation.deprecated('2019-05-22',
+                        'Use tfp.mcmc.SimpleStepSizeAdaptation instead.')
 def make_simple_step_size_update_policy(num_adaptation_steps,
                                         target_rate=0.75,
                                         decrement_multiplier=0.01,
@@ -102,10 +104,10 @@ def make_simple_step_size_update_policy(num_adaptation_steps,
   if step_counter is None and num_adaptation_steps is not None:
     step_counter = tf.compat.v1.get_variable(
         name='step_size_adaptation_step_counter',
-        initializer=np.array(-1, dtype=np.int64),
+        initializer=np.array(-1, dtype=np.int32),
         # Specify the dtype for variable sharing to work correctly
         # (b/120599991).
-        dtype=tf.int64,
+        dtype=tf.int32,
         trainable=False,
         use_resource=True)
 
@@ -190,44 +192,42 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
   import tensorflow as tf
   import tensorflow_probability as tfp
 
+  tf.enable_eager_execution()
+
   # Target distribution is proportional to: `exp(-x (1 + x))`.
   def unnormalized_log_prob(x):
     return -x - x**2.
 
-  # Create state to hold updated `step_size`.
-  step_size = tf.get_variable(
-      name='step_size',
-      initializer=1.,
-      use_resource=True,  # For TFE compatibility.
-      trainable=False)
-
   # Initialize the HMC transition kernel.
   num_results = int(10e3)
   num_burnin_steps = int(1e3)
-  hmc = tfp.mcmc.HamiltonianMonteCarlo(
-      target_log_prob_fn=unnormalized_log_prob,
-      num_leapfrog_steps=3,
-      step_size=step_size,
-      step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy(
-        num_adaptation_steps=int(num_burnin_steps * 0.8)))
+  adaptive_hmc = tfp.mcmc.SimpleStepSizeAdaptation(
+      tfp.mcmc.HamiltonianMonteCarlo(
+          target_log_prob_fn=unnormalized_log_prob,
+          num_leapfrog_steps=3,
+          step_size=1.),
+      num_adaptation_steps=int(num_burnin_steps * 0.8))
 
   # Run the chain (with burn-in).
-  samples, kernel_results = tfp.mcmc.sample_chain(
-      num_results=num_results,
-      num_burnin_steps=num_burnin_steps,
-      current_state=1.,
-      kernel=hmc)
+  @tf.function
+  def run_chain():
+    # Run the chain (with burn-in).
+    samples, is_accepted = tfp.mcmc.sample_chain(
+        num_results=num_results,
+        num_burnin_steps=num_burnin_steps,
+        current_state=1.,
+        kernel=adaptive_hmc,
+        trace_fn=lambda _, pkr: pkr.inner_results.is_accepted)
 
-  # Initialize all constructed variables.
-  init_op = tf.global_variables_initializer()
+    sample_mean = tf.reduce_mean(samples)
+    sample_stddev = tf.math.reduce_std(samples)
+    is_accepted = tf.reduce_mean(tf.cast(is_accepted, dtype=tf.float32))
+    return sample_mean, sample_stddev, is_accepted
 
-  with tf.Session() as sess:
-    init_op.run()
-    samples_, kernel_results_ = sess.run([samples, kernel_results])
+  sample_mean, sample_stddev, is_accepted = run_chain()
 
   print('mean:{:.4f}  stddev:{:.4f}  acceptance:{:.4f}'.format(
-      samples_.mean(), samples_.std(), kernel_results_.is_accepted.mean()))
-  # mean:-0.5003  stddev:0.7711  acceptance:0.6240
+      sample_mean.numpy(), sample_stddev.numpy(), is_accepted.numpy()))
   ```
 
   ##### Estimate parameters of a more complicated posterior.
@@ -259,6 +259,8 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
   import tensorflow as tf
   import tensorflow_probability as tfp
   import numpy as np
+
+  tf.enable_eager_execution()
 
   tfd = tfp.distributions
 
@@ -293,55 +295,61 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
   y, x, _ = make_training_data(
       num_samples, dims, weights_prior_true_scale)
 
-  step_size = tf.compat.v2.Variable(
-      name='step_size', initial_value=np.array(0.03, dtype), trainable=False)
-
   log_sigma = tf.compat.v2.Variable(
       name='log_sigma', initial_value=np.array(0, dtype))
 
   optimizer = tf.compat.v2.optimizers.SGD(learning_rate=0.01)
 
-  def mcem_iter(weights_chain_start):
+  @tf.function
+  def mcem_iter(weights_chain_start, step_size):
     with tf.GradientTape() as tape:
-      prior = self.make_weights_prior(dims, log_sigma)
+      tape.watch(log_sigma)
+      prior = make_weights_prior(dims, log_sigma)
 
       def unnormalized_posterior_log_prob(w):
-        likelihood = self.make_response_likelihood(w, x)
+        likelihood = make_response_likelihood(w, x)
         return (
             prior.log_prob(w) +
             tf.reduce_sum(
                 input_tensor=likelihood.log_prob(y), axis=-1))  # [m]
 
+      def trace_fn(_, pkr):
+        return (
+            pkr.inner_results.log_accept_ratio,
+            pkr.inner_results.accepted_results.target_log_prob,
+            pkr.inner_results.accepted_results.step_size)
+
       num_results = 2
-      weights, kernel_results = tfp.mcmc.sample_chain(
+      weights, (
+          log_accept_ratio, target_log_prob, step_size) = tfp.mcmc.sample_chain(
           num_results=num_results,
           num_burnin_steps=0,
           current_state=weights_chain_start,
-          kernel=tfp.mcmc.HamiltonianMonteCarlo(
-              target_log_prob_fn=unnormalized_posterior_log_prob,
-              num_leapfrog_steps=2,
-              step_size=step_size,
-              step_size_update_fn=(
-                  tfp.mcmc.make_simple_step_size_update_policy(
-                      num_adaptation_steps=None)),
-              state_gradients_are_stopped=True,
-          ),
+          kernel=tfp.mcmc.SimpleStepSizeAdaptation(
+              tfp.mcmc.HamiltonianMonteCarlo(
+                  target_log_prob_fn=unnormalized_posterior_log_prob,
+                  num_leapfrog_steps=2,
+                  step_size=step_size,
+                  state_gradients_are_stopped=True,
+              ),
+              # Adapt for the entirety of the trajectory.
+              num_adaptation_steps=2),
+          trace_fn=trace_fn,
           parallel_iterations=1)
 
       # We do an optimization step to propagate `log_sigma` after two HMC
       # steps to propagate `weights`.
-      loss = -tf.reduce_mean(
-          input_tensor=kernel_results.accepted_results.target_log_prob)
+      loss = -tf.reduce_mean(input_tensor=target_log_prob)
 
     avg_acceptance_ratio = tf.reduce_mean(
-        input_tensor=tf.exp(tf.minimum(kernel_results.log_accept_ratio, 0.)))
+        input_tensor=tf.exp(tf.minimum(log_accept_ratio, 0.)))
 
-    train_op = optimizer.apply_gradients(
+    optimizer.apply_gradients(
         [[tape.gradient(loss, log_sigma), log_sigma]])
 
     weights_prior_estimated_scale = tf.exp(log_sigma)
-    return (train_op, weights_prior_estimated_scale, weights[-1], loss,
-            step_size, avg_acceptance_ratio)
+    return (weights_prior_estimated_scale, weights[-1], loss,
+            step_size[-1], avg_acceptance_ratio)
 
   num_iters = int(40)
 
@@ -349,16 +357,16 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
   weights_ = np.zeros([num_iters + 1, dims], dtype)
   loss_ = np.zeros([num_iters], dtype)
   weights_[0] = np.random.randn(dims).astype(dtype)
+  step_size_ = 0.03
 
   for iter_ in range(num_iters):
     [
-        _,
         weights_prior_estimated_scale_[iter_],
         weights_[iter_ + 1],
         loss_[iter_],
         step_size_,
         avg_acceptance_ratio_,
-    ] = mcem_iter(weights_[iter_])
+    ] = mcem_iter(weights_[iter_], step_size_)
     tf.compat.v1.logging.vlog(
         1, ('iter:{:>2}  loss:{: 9.3f}  scale:{:.3f}  '
             'step_size:{:.4f}  avg_acceptance_ratio:{:.4f}').format(
@@ -382,6 +390,9 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
        (1999), no. 1, 94--128. https://projecteuclid.org/euclid.aos/1018031103
   """
 
+  @deprecation.deprecated_args(
+      '2019-05-22', 'The `step_size_update_fn` argument is deprecated. Use '
+      '`tfp.mcmc.SimpleStepSizeAdaptation` instead.', 'step_size_update_fn')
   def __init__(self,
                target_log_prob_fn,
                step_size,
@@ -606,6 +617,9 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
                                 'not currently supported. To run in Eager '
                                 'mode with a seed, use `tf.set_random_seed`.')
     self._seed_stream = distributions.SeedStream(seed, 'hmc_one_step')
+    if not store_parameters_in_results:
+      mcmc_util.warn_if_parameters_are_not_simple_tensors(
+          dict(step_size=step_size, num_leapfrog_steps=num_leapfrog_steps))
     self._parameters = dict(
         target_log_prob_fn=target_log_prob_fn,
         step_size=step_size,
@@ -677,13 +691,13 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
 
   @mcmc_util.set_doc(HamiltonianMonteCarlo.one_step.__doc__)
   def one_step(self, current_state, previous_kernel_results):
-    with tf.name_scope(
+    with tf.compat.v1.name_scope(
         name=mcmc_util.make_name(self.name, 'hmc', 'one_step'),
-        values=[self.step_size,
-                self.num_leapfrog_steps,
-                current_state,
-                previous_kernel_results.target_log_prob,
-                previous_kernel_results.grads_target_log_prob]):
+        values=[
+            self.step_size, self.num_leapfrog_steps, current_state,
+            previous_kernel_results.target_log_prob,
+            previous_kernel_results.grads_target_log_prob
+        ]):
       if self._store_parameters_in_results:
         step_size = previous_kernel_results.step_size
         num_leapfrog_steps = previous_kernel_results.num_leapfrog_steps
@@ -730,7 +744,7 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
 
       num_leapfrog_steps = tf.convert_to_tensor(
           value=self.num_leapfrog_steps,
-          dtype=tf.int64,
+          dtype=tf.int32,
           name='num_leapfrog_steps')
 
       [
@@ -743,7 +757,7 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
           cond=lambda i, *args: i < num_leapfrog_steps,
           body=lambda i, *args: [i + 1] + list(_leapfrog_one_step(*args)),
           loop_vars=[
-              tf.zeros([], tf.int64, name='iter'),
+              tf.zeros([], tf.int32, name='iter'),
               current_momentum_parts,
               current_state_parts,
               current_target_log_prob,
@@ -765,7 +779,7 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
 
   @mcmc_util.set_doc(HamiltonianMonteCarlo.bootstrap_results.__doc__)
   def bootstrap_results(self, init_state):
-    with tf.name_scope(
+    with tf.compat.v1.name_scope(
         name=mcmc_util.make_name(self.name, 'hmc', 'bootstrap_results'),
         values=[init_state]):
       if not mcmc_util.is_list_like(init_state):
@@ -791,7 +805,7 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
                 self.step_size),
             num_leapfrog_steps=tf.convert_to_tensor(
                 value=self.num_leapfrog_steps,
-                dtype=tf.int64,
+                dtype=tf.int32,
                 name='num_leapfrog_steps'))
       else:
         return UncalibratedHamiltonianMonteCarloKernelResults(
@@ -971,11 +985,11 @@ def _leapfrog_integrator_one_step(
   # So using per-variable step sizes in HMC will give results that are
   # exactly identical to explicitly using a diagonal mass matrix.
 
-  with tf.name_scope(
-      name, 'hmc_leapfrog_integrator_one_step',
-      [independent_chain_ndims, step_sizes,
-       current_momentum_parts, current_state_parts,
-       current_target_log_prob, current_target_log_prob_grad_parts]):
+  with tf.compat.v1.name_scope(name, 'hmc_leapfrog_integrator_one_step', [
+      independent_chain_ndims, step_sizes, current_momentum_parts,
+      current_state_parts, current_target_log_prob,
+      current_target_log_prob_grad_parts
+  ]):
 
     # Step 1: Update momentum.
     proposed_momentum_parts = [
@@ -1113,7 +1127,7 @@ def _compute_log_acceptance_correction(current_momentums,
     log_acceptance_correction: `Tensor` representing the `log`
       acceptance-correction.  (See docstring for mathematical definition.)
   """
-  with tf.name_scope(
+  with tf.compat.v1.name_scope(
       name, 'compute_log_acceptance_correction',
       [independent_chain_ndims, current_momentums, proposed_momentums]):
     log_current_kinetic, log_proposed_kinetic = [], []

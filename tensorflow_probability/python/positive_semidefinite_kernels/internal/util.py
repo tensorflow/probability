@@ -22,9 +22,11 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 
 __all__ = [
     'pad_shape_right_with_ones',
+    'maybe_get_common_dtype',
     'sum_rightmost_ndims_preserving_shape',
 ]
 
@@ -139,7 +141,7 @@ def sqrt_with_finite_grads(x, name=None):
   the sqrt (as opposed to just using the max floating point value) to avoid
   potential overflow when combining this value with others downstream.
   """
-  with tf.name_scope(name, 'sqrt_with_finite_grads', [x]):
+  with tf.compat.v1.name_scope(name, 'sqrt_with_finite_grads', [x]):
     x = tf.convert_to_tensor(value=x, name='x')
     if not x.dtype.is_floating:
       raise TypeError('Input `x` must be floating type.')
@@ -150,3 +152,21 @@ def sqrt_with_finite_grads(x, name=None):
           0.5 * tf.math.rsqrt(x))
       return grad_ys * safe_grads
     return tf.sqrt(x), grad
+
+
+def maybe_get_common_dtype(arg_list):
+  """Return common dtype of arg_list, or None.
+
+  Args:
+    arg_list: an iterable of items which are either `None` or have a `dtype`
+      property.
+
+  Returns:
+    dtype: The common dtype of items in `arg_list`, or `None` if the list is
+      empty or all items are `None`.
+  """
+  # Note that `all` defaults to `True` if `arg_list` is empty.
+  if all(a is None for a in arg_list):
+    return None
+  return dtype_util.common_dtype(arg_list, tf.float32)
+

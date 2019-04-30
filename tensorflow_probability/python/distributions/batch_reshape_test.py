@@ -20,9 +20,11 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
+
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfd = tfp.distributions
@@ -62,6 +64,7 @@ class _BatchReshapeTest(object):
       return
 
     dims = 2
+    seed = tfp_test_util.test_seed()
     new_batch_shape = [4]
     old_batch_shape = [2, 2]
     wishart, reshape_wishart = self.make_wishart(
@@ -71,9 +74,9 @@ class _BatchReshapeTest(object):
     event_shape = reshape_wishart.event_shape_tensor()
 
     expected_sample_shape = [3, 1] + new_batch_shape + [dims, dims]
-    x = wishart.sample([3, 1], seed=42)
+    x = wishart.sample([3, 1], seed=seed)
     expected_sample = tf.reshape(x, expected_sample_shape)
-    actual_sample = reshape_wishart.sample([3, 1], seed=42)
+    actual_sample = reshape_wishart.sample([3, 1], seed=seed)
 
     expected_log_prob_shape = [3, 1] + new_batch_shape
     expected_log_prob = tf.reshape(wishart.log_prob(x), expected_log_prob_shape)
@@ -197,6 +200,8 @@ class _BatchReshapeTest(object):
       # document that the test is not intended to run in eager mode.
       return
 
+    seed = tfp_test_util.test_seed()
+
     new_batch_shape = [2, 2]
     old_batch_shape = [4]
 
@@ -207,9 +212,9 @@ class _BatchReshapeTest(object):
     event_shape = reshape_normal.event_shape_tensor()
 
     expected_sample_shape = new_batch_shape
-    x = normal.sample(seed=52)
+    x = normal.sample(seed=seed)
     expected_sample = tf.reshape(x, expected_sample_shape)
-    actual_sample = reshape_normal.sample(seed=52)
+    actual_sample = reshape_normal.sample(seed=seed)
 
     expected_log_prob_shape = new_batch_shape
     expected_log_prob = tf.reshape(normal.log_prob(x), expected_log_prob_shape)
@@ -329,6 +334,7 @@ class _BatchReshapeTest(object):
       return
 
     dims = 3
+    seed = tfp_test_util.test_seed()
     new_batch_shape = [2, 1]
     old_batch_shape = [2]
     mvn, reshape_mvn = self.make_mvn(
@@ -338,9 +344,9 @@ class _BatchReshapeTest(object):
     event_shape = reshape_mvn.event_shape_tensor()
 
     expected_sample_shape = [3] + new_batch_shape + [dims]
-    x = mvn.sample(3, seed=62)
+    x = mvn.sample(3, seed=seed)
     expected_sample = tf.reshape(x, expected_sample_shape)
-    actual_sample = reshape_mvn.sample(3, seed=62)
+    actual_sample = reshape_mvn.sample(3, seed=seed)
 
     expected_log_prob_shape = [3] + new_batch_shape
     expected_log_prob = tf.reshape(mvn.log_prob(x), expected_log_prob_shape)

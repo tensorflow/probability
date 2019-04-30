@@ -19,7 +19,9 @@ from __future__ import print_function
 
 # pylint: disable=unused-import,line-too-long,g-importing-member
 
+from tensorflow_probability.python.stats.quantiles import count_integers
 from tensorflow_probability.python.stats.quantiles import find_bins
+from tensorflow_probability.python.stats.quantiles import histogram
 from tensorflow_probability.python.stats.quantiles import percentile
 from tensorflow_probability.python.stats.quantiles import quantiles
 from tensorflow_probability.python.stats.sample_stats import auto_correlation
@@ -35,10 +37,12 @@ from tensorflow.python.util.all_util import remove_undocumented
 
 __all__ = [
     'auto_correlation',
+    'count_integers',
     'cholesky_covariance',
     'correlation',
     'covariance',
     'find_bins',
+    'histogram',
     'percentile',
     'quantiles',
     'stddev',

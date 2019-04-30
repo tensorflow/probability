@@ -20,12 +20,14 @@ from __future__ import print_function
 
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import beta as beta_lib
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = ['VonMisesFisher']
@@ -164,7 +166,7 @@ class VonMisesFisher(distribution.Distribution):
       ValueError: For known-bad arguments, i.e. unsupported event dimension.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[mean_direction, concentration]) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([mean_direction, concentration],
                                       tf.float32)
       mean_direction = tf.convert_to_tensor(
@@ -172,24 +174,24 @@ class VonMisesFisher(distribution.Distribution):
       concentration = tf.convert_to_tensor(
           value=concentration, name='concentration', dtype=dtype)
       assertions = [
-          tf.compat.v1.assert_non_negative(
+          assert_util.assert_non_negative(
               concentration, message='`concentration` must be non-negative'),
-          tf.compat.v1.assert_greater(
+          assert_util.assert_greater(
               tf.shape(input=mean_direction)[-1],
               1,
               message='`mean_direction` may not have scalar event shape'),
-          tf.compat.v1.assert_near(
+          assert_util.assert_near(
               1.,
               tf.linalg.norm(tensor=mean_direction, axis=-1),
               message='`mean_direction` must be unit-length')
       ] if validate_args else []
       static_event_dim = tf.compat.dimension_value(
-          mean_direction.shape.with_rank_at_least(1)[-1])
+          tensorshape_util.with_rank_at_least(mean_direction.shape, 1)[-1])
       if static_event_dim is not None and static_event_dim > 5:
         raise ValueError('vMF ndims > 5 is not currently supported')
       elif validate_args:
         assertions += [
-            tf.compat.v1.assert_less_equal(
+            assert_util.assert_less_equal(
                 tf.shape(input=mean_direction)[-1],
                 5,
                 message='vMF ndims > 5 is not currently supported')
@@ -197,7 +199,7 @@ class VonMisesFisher(distribution.Distribution):
       with tf.control_dependencies(assertions):
         self._mean_direction = tf.identity(mean_direction)
         self._concentration = tf.identity(concentration)
-      tf.debugging.assert_same_float_dtype(
+      dtype_util.assert_same_float_dtype(
           [self._mean_direction, self._concentration])
       # mean_direction is always reparameterized.
       # concentration is only for event_dim==3, via an inversion sampler.
@@ -213,6 +215,10 @@ class VonMisesFisher(distribution.Distribution):
           parameters=parameters,
           graph_parents=[self._mean_direction, self._concentration],
           name=name)
+
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(mean_direction=1, concentration=0)
 
   @property
   def mean_direction(self):
@@ -231,14 +237,15 @@ class VonMisesFisher(distribution.Distribution):
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(
-        self.mean_direction.shape.with_rank_at_least(1)[:-1],
+        tensorshape_util.with_rank_at_least(self.mean_direction.shape, 1)[:-1],
         self.concentration.shape)
 
   def _event_shape_tensor(self):
     return tf.shape(input=self.mean_direction)[-1:]
 
   def _event_shape(self):
-    return self.mean_direction.shape.with_rank_at_least(1)[-1:]
+    s = tensorshape_util.with_rank_at_least(self.mean_direction.shape, 1)
+    return s[-1:]
 
   def _log_prob(self, x):
     x = self._maybe_assert_valid_sample(x)
@@ -280,11 +287,11 @@ class VonMisesFisher(distribution.Distribution):
     if not self.validate_args:
       return samples
     with tf.control_dependencies([
-        tf.compat.v1.assert_near(
+        assert_util.assert_near(
             1.,
             tf.linalg.norm(tensor=samples, axis=-1),
             message='samples must be unit length'),
-        tf.compat.v1.assert_equal(
+        assert_util.assert_equal(
             tf.shape(input=samples)[-1:],
             self.event_shape_tensor(),
             message=('samples must have innermost dimension matching that of '
@@ -442,13 +449,13 @@ class VonMisesFisher(distribution.Distribution):
       # Verify samples are w/in -1, 1, with useful error output tensors (top
       # value rather than all values).
       with tf.control_dependencies([
-          tf.compat.v1.assert_less_equal(
+          assert_util.assert_less_equal(
               samples_dim0,
-              self.dtype.as_numpy_dtype(1.01),
+              dtype_util.as_numpy_dtype(self.dtype)(1.01),
               data=[tf.nn.top_k(tf.reshape(samples_dim0, [-1]))[0]]),
-          tf.compat.v1.assert_greater_equal(
+          assert_util.assert_greater_equal(
               samples_dim0,
-              self.dtype.as_numpy_dtype(-1.01),
+              dtype_util.as_numpy_dtype(self.dtype)(-1.01),
               data=[-tf.nn.top_k(tf.reshape(-samples_dim0, [-1]))[0]])
       ]):
         samples_dim0 = tf.identity(samples_dim0)
@@ -471,8 +478,8 @@ class VonMisesFisher(distribution.Distribution):
       worst, idx = tf.nn.top_k(
           tf.reshape(tf.abs(1 - tf.linalg.norm(tensor=samples, axis=-1)), [-1]))
       with tf.control_dependencies([
-          tf.compat.v1.assert_near(
-              self.dtype.as_numpy_dtype(0),
+          assert_util.assert_near(
+              dtype_util.as_numpy_dtype(self.dtype)(0),
               worst,
               data=[
                   worst, idx,
@@ -489,10 +496,10 @@ class VonMisesFisher(distribution.Distribution):
       basis = tf.cast(tf.concat([[1.], tf.zeros([event_dim - 1])], axis=0),
                       self.dtype)
       with tf.control_dependencies([
-          tf.compat.v1.assert_less(
+          assert_util.assert_less(
               tf.linalg.norm(
                   tensor=self._rotate(basis) - self.mean_direction, axis=-1),
-              self.dtype.as_numpy_dtype(1e-5))
+              dtype_util.as_numpy_dtype(self.dtype)(1e-5))
       ]):
         return self._rotate(samples)
     return self._rotate(samples)

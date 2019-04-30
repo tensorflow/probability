@@ -63,8 +63,18 @@ class MovingReduceMeanVarianceTest(tf.test.TestCase):
     # can work out that the variance is multiplied by a factor of
     # (1-decay)/(1+decay); that is, the effective sample size is
     # (1+decay)/(1-decay).  To assure low flakiness, set the tolerance
-    # to > 4 * stddev.
+    # to > 4 * stddev.  We compute:
+    # `4 * stddev = 4 * true_stddev * sqrt((1-decay)/(1+decay))
+    #             = 4 * true_stddev * sqrt(0.001/1.999)
+    #             = 4 * [1.1, 0.5]  * 0.0223
+    #             < 0.1`
+    # so `atol=0.15` ensures failures are highly unlikely.
     self.assertAllClose(true_mean, mean_var_, atol=0.15)
+    # The tolerance for the variance is more annoying to derive.  The handwave
+    # justiying `atol=0.15` goes like this: The variance is the mean of the
+    # square; so one would think the variance of the estimator of the variance
+    # is around the square of the variance.  Since the variance is around 1,
+    # that square doesn't matter, and the same tolerance should do.  </handwave>
     self.assertAllClose(true_stddev**2., variance_var_, atol=0.15)
 
     # Change the mean, var then update some more. Moving averages should

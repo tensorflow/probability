@@ -304,14 +304,15 @@ class MultivariateStudentTTestFloat32StaticShape(
         [[2., -1.],
          [-1., 2.]]))
     # pyformat: enable
-    tf.compat.v1.set_random_seed(2)
+    seed = tfp_test_util.test_seed()
+    tf.compat.v1.set_random_seed(seed)
     dist1 = tfd.MultivariateStudentTLinearOperator(
         loc=[1., 2.], df=5., scale=scale)
-    samples1 = self.evaluate(dist1.sample(100, seed=1))
-    tf.compat.v1.set_random_seed(2)
+    samples1 = self.evaluate(dist1.sample(100, seed=seed))
+    tf.compat.v1.set_random_seed(seed)
     dist2 = tfd.MultivariateStudentTLinearOperator(
         loc=[1., 2.], df=5., scale=scale)
-    samples2 = self.evaluate(dist2.sample(100, seed=1))
+    samples2 = self.evaluate(dist2.sample(100, seed=seed))
     self.assertAllClose(samples1, samples2)
 
   def testSamplingFullyReparameterized(self):
@@ -332,7 +333,7 @@ class MultivariateStudentTTestFloat32StaticShape(
         loc=self._input([0., 0.]),
         df=self._input([1e-1, 1e-5, 1e-10, 1e-20]),
         scale=scale)
-    samples = dist.sample(int(2e5), seed=1)
+    samples = dist.sample(int(2e5), seed=tfp_test_util.test_seed())
     log_probs = dist.log_prob(samples)
     samples, log_probs = self.evaluate([samples, log_probs])
     self.assertTrue(np.all(np.isfinite(samples)))

@@ -40,7 +40,7 @@ def value_and_gradient(f, xs, use_gradient_tape=False, name=None):
     xs: Python list of parameters of f for which to differentiate. (Can also
       be single `Tensor`.)
     use_gradient_tape: Python `bool` indicating that `tf.GradientTape`
-      should be used regardles of `tf.executing_eagerly()` status.
+      should be used regardless of `tf.executing_eagerly()` status.
       Default value: `False`.
     name: Python `str` name prefixed to ops created by this function.
       Default value: `None` (i.e., `'value_and_gradient'`).
@@ -49,7 +49,7 @@ def value_and_gradient(f, xs, use_gradient_tape=False, name=None):
     y: `y = f(*xs)`.
     dydx: Gradient of `y` wrt each of `xs`.
   """
-  with tf.name_scope(name, 'value_and_gradient', [xs]):
+  with tf.compat.v1.name_scope(name, 'value_and_gradient', [xs]):
     is_xs_list_like = isinstance(xs, (tuple, list))
     if not is_xs_list_like:
       xs = [xs]

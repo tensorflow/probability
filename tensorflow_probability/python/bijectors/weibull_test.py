@@ -21,7 +21,7 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 from scipy import stats
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util

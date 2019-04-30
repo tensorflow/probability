@@ -197,7 +197,7 @@ class LearnableMultivariateNormalDiag(tf.keras.Model):
         distribution.
     """
     super(LearnableMultivariateNormalDiag, self).__init__()
-    with tf.name_scope(self._name):
+    with tf.compat.v1.name_scope(self._name):
       self.dimensions = dimensions
       self._mean = tf.compat.v2.Variable(
           tf.random.normal([dimensions], stddev=0.1), name="mean")
@@ -225,7 +225,7 @@ class LearnableMultivariateNormalDiag(tf.keras.Model):
       dimensions].
     """
     del inputs  # unused
-    with tf.name_scope(self._name):
+    with tf.compat.v1.name_scope(self._name):
       return tfd.MultivariateNormalDiag(self.loc, self.scale_diag)
 
   @property
@@ -1012,7 +1012,7 @@ def visualize_qualitative_analysis(inputs, model, samples=1, batch_size=3,
   """
   average = lambda dist: tf.reduce_mean(
       input_tensor=dist.mean(), axis=0)  # avg over samples
-  with tf.name_scope("val_reconstruction"):
+  with tf.compat.v1.name_scope("val_reconstruction"):
     reconstruct = functools.partial(model.reconstruct, inputs=inputs,
                                     samples=samples)
     visualize_reconstruction(inputs, average(reconstruct()))
@@ -1025,7 +1025,7 @@ def visualize_qualitative_analysis(inputs, model, samples=1, batch_size=3,
     visualize_reconstruction(inputs, average(reconstruct(swap_dynamic=True)),
                              name="swap_dynamic")
 
-  with tf.name_scope("generation"):
+  with tf.compat.v1.name_scope("generation"):
     generate = functools.partial(model.generate, batch_size=batch_size,
                                  length=length, samples=samples)
     image_summary(average(generate(fix_static=True)), "fix_static")
@@ -1041,7 +1041,7 @@ def summarize_dist_params(dist, name, name_scope="dist_params"):
     name: The name of the distribution.
     name_scope: The name scope of this summary.
   """
-  with tf.name_scope(name_scope):
+  with tf.compat.v1.name_scope(name_scope):
     tf.compat.v2.summary.histogram(
         name="{}/{}".format(name, "mean"),
         data=dist.mean(),
@@ -1066,12 +1066,12 @@ def summarize_mean_in_nats_and_bits(inputs, units, name,
     bits_name_scope: The name scope of the bits summary.
   """
   mean = tf.reduce_mean(input_tensor=inputs)
-  with tf.name_scope(nats_name_scope):
+  with tf.compat.v1.name_scope(nats_name_scope):
     tf.compat.v2.summary.scalar(
         name,
         mean,
         step=tf.compat.v1.train.get_or_create_global_step())
-  with tf.name_scope(bits_name_scope):
+  with tf.compat.v1.name_scope(bits_name_scope):
     tf.compat.v2.summary.scalar(
         name,
         mean / units / tf.math.log(2.),
@@ -1160,7 +1160,7 @@ def main(argv):
             input_tensor=likelihood.log_prob(inputs), axis=-1)  # sum time
 
         if FLAGS.enable_debug_logging:
-          with tf.name_scope("log_probs"):
+          with tf.compat.v1.name_scope("log_probs"):
             summarize_mean_in_nats_and_bits(
                 static_prior_log_prob, FLAGS.latent_size_static, "static_prior")
             summarize_mean_in_nats_and_bits(
@@ -1190,7 +1190,7 @@ def main(argv):
       grads, global_norm = tf.clip_by_global_norm(grads, FLAGS.clip_norm)
       grads_and_vars = list(zip(grads, model.variables))  # allow reuse in py3
       if FLAGS.enable_debug_logging:
-        with tf.name_scope("grads"):
+        with tf.compat.v1.name_scope("grads"):
           tf.compat.v2.summary.scalar(
               "global_norm_grads",
               global_norm,
@@ -1200,12 +1200,12 @@ def main(argv):
               tf.linalg.global_norm(grads),
               step=tf.compat.v1.train.get_or_create_global_step())
         for grad, var in grads_and_vars:
-          with tf.name_scope("grads"):
+          with tf.compat.v1.name_scope("grads"):
             tf.compat.v2.summary.histogram(
                 "{}/grad".format(var.name),
                 data=grad,
                 step=tf.compat.v1.train.get_or_create_global_step())
-          with tf.name_scope("vars"):
+          with tf.compat.v1.name_scope("vars"):
             tf.compat.v2.summary.histogram(
                 var.name,
                 data=var,

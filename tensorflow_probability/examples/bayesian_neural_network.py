@@ -230,7 +230,7 @@ def main(argv):
   # Build a Bayesian LeNet5 network. We use the Flipout Monte Carlo estimator
   # for the convolution and fully-connected layers: this enables lower
   # variance stochastic gradients than naive reparameterization.
-  with tf.name_scope("bayesian_neural_net", values=[images]):
+  with tf.compat.v1.name_scope("bayesian_neural_net", values=[images]):
     neural_net = tf.keras.Sequential([
         tfp.layers.Convolution2DFlipout(6,
                                         kernel_size=5,
@@ -284,7 +284,7 @@ def main(argv):
     qmeans.append(q.mean())
     qstds.append(q.stddev())
 
-  with tf.name_scope("train"):
+  with tf.compat.v1.name_scope("train"):
     optimizer = tf.compat.v1.train.AdamOptimizer(
         learning_rate=FLAGS.learning_rate)
     train_op = optimizer.minimize(elbo_loss)

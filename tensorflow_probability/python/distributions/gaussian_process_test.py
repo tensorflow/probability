@@ -20,9 +20,10 @@ from __future__ import print_function
 import numpy as np
 
 import tensorflow as tf
+
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import positive_semidefinite_kernels as psd_kernels
-
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -73,10 +74,11 @@ class _GaussianProcessTest(object):
       self.assertAllEqual(
           self.evaluate(samples).shape,
           sample_shape + batch_shape + event_shape)
-      self.assertIsNone(samples.shape.ndims)
-      self.assertIsNone(gp.batch_shape.ndims)
-      self.assertEqual(gp.event_shape.ndims, 1)
-      self.assertIsNone(tf.compat.dimension_value(gp.event_shape.dims[0]))
+      self.assertIsNone(tensorshape_util.rank(samples.shape))
+      self.assertIsNone(tensorshape_util.rank(gp.batch_shape))
+      self.assertEqual(tensorshape_util.rank(gp.event_shape), 1)
+      self.assertIsNone(
+          tf.compat.dimension_value(tensorshape_util.dims(gp.event_shape)[0]))
 
   def testVarianceAndCovarianceMatrix(self):
     amp = np.float64(.5)
@@ -100,7 +102,7 @@ class _GaussianProcessTest(object):
     expected_covariance = (
         _kernel_fn(np.expand_dims(index_points, 0),
                    np.expand_dims(index_points, 1)) +
-        (observation_noise_variance + jitter) * np.eye(10))
+        observation_noise_variance * np.eye(10))
 
     self.assertAllClose(expected_covariance,
                         self.evaluate(gp.covariance()))
@@ -163,6 +165,58 @@ class _GaussianProcessTest(object):
       self.assertEqual(self.evaluate(gp1.jitter), self.evaluate(gp2.jitter))
       self.assertAllEqual(self.evaluate(gp1.index_points), index_points_1)
       self.assertAllEqual(self.evaluate(gp2.index_points), index_points_2)
+
+  def testLateBindingIndexPoints(self):
+    amp = np.float64(.5)
+    len_scale = np.float64(.2)
+    kernel = psd_kernels.ExponentiatedQuadratic(amp, len_scale)
+    mean_fn = lambda x: x[:, 0]**2
+    jitter = np.float64(1e-4)
+    observation_noise_variance = np.float64(3e-3)
+
+    gp = tfd.GaussianProcess(
+        kernel=kernel,
+        mean_fn=mean_fn,
+        observation_noise_variance=observation_noise_variance,
+        jitter=jitter)
+
+    index_points = np.random.uniform(-1., 1., [10, 1])
+
+    expected_mean = mean_fn(index_points)
+    self.assertAllClose(expected_mean,
+                        self.evaluate(gp.mean(index_points=index_points)))
+
+    def _kernel_fn(x, y):
+      return amp ** 2 * np.exp(-.5 * (np.squeeze((x - y)**2)) / (len_scale**2))
+
+    expected_covariance = (
+        _kernel_fn(np.expand_dims(index_points, -3),
+                   np.expand_dims(index_points, -2)) +
+        observation_noise_variance * np.eye(10))
+
+    self.assertAllClose(expected_covariance,
+                        self.evaluate(gp.covariance(index_points=index_points)))
+    self.assertAllClose(np.diag(expected_covariance),
+                        self.evaluate(gp.variance(index_points=index_points)))
+    self.assertAllClose(np.sqrt(np.diag(expected_covariance)),
+                        self.evaluate(gp.stddev(index_points=index_points)))
+
+    # Calling mean with no index_points should raise an Error
+    with self.assertRaises(ValueError):
+      gp.mean()
+
+  def testMarginalHasCorrectTypes(self):
+    gp = tfd.GaussianProcess(kernel=psd_kernels.ExponentiatedQuadratic())
+
+    self.assertIsInstance(
+        gp.get_marginal_distribution(
+            index_points=np.ones([1, 1], dtype=np.float32)),
+        tfd.Normal)
+
+    self.assertIsInstance(
+        gp.get_marginal_distribution(
+            index_points=np.ones([10, 1], dtype=np.float32)),
+        tfd.MultivariateNormalLinearOperator)
 
 
 @test_util.run_all_in_graph_and_eager_modes

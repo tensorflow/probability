@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import vector_exponential_linear_operator as velo
 from tensorflow_probability.python.internal import distribution_util
 
@@ -176,8 +176,7 @@ class VectorExponentialDiag(velo.VectorExponentialLinearOperator):
     """
     parameters = dict(locals())
     with tf.name_scope(name) as name:
-      with tf.name_scope(
-          "init", values=[loc, scale_diag, scale_identity_multiplier]):
+      with tf.name_scope("init"):
         # No need to validate_args while making diag_scale.  The returned
         # LinearOperatorDiag has an assert_non_singular method that is called by
         # the Bijector.
@@ -194,3 +193,7 @@ class VectorExponentialDiag(velo.VectorExponentialLinearOperator):
         allow_nan_stats=allow_nan_stats,
         name=name)
     self._parameters = parameters
+
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(loc=1, scale_diag=1, scale_identity_multiplier=0)

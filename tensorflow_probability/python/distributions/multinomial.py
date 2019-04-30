@@ -18,11 +18,14 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -175,7 +178,7 @@ class Multinomial(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[total_count, logits, probs]) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([total_count, logits, probs], tf.float32)
       self._total_count = tf.convert_to_tensor(
           value=total_count, name="total_count", dtype=dtype)
@@ -200,6 +203,10 @@ class Multinomial(distribution.Distribution):
         graph_parents=[self._total_count, self._logits, self._probs],
         name=name)
 
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(total_count=0, logits=1, probs=1)
+
   @property
   def total_count(self):
     """Number of trials used to construct a sample."""
@@ -219,13 +226,13 @@ class Multinomial(distribution.Distribution):
     return tf.shape(input=self._mean_val)[:-1]
 
   def _batch_shape(self):
-    return self._mean_val.shape.with_rank_at_least(1)[:-1]
+    return tensorshape_util.with_rank_at_least(self._mean_val.shape, 1)[:-1]
 
   def _event_shape_tensor(self):
     return tf.shape(input=self._mean_val)[-1:]
 
   def _event_shape(self):
-    return self._mean_val.shape.with_rank_at_least(1)[-1:]
+    return tensorshape_util.with_rank_at_least(self._mean_val.shape, 1)[-1:]
 
   def _sample_n(self, n, seed=None):
     n_draws = tf.cast(self.total_count, dtype=tf.int32)
@@ -268,7 +275,7 @@ class Multinomial(distribution.Distribution):
       return counts
     counts = distribution_util.embed_check_nonnegative_integer_form(counts)
     return distribution_util.with_dependencies([
-        tf.compat.v1.assert_equal(
+        assert_util.assert_equal(
             self.total_count,
             tf.reduce_sum(input_tensor=counts, axis=-1),
             message="counts must sum to `self.total_count`"),
@@ -295,9 +302,7 @@ def draw_sample(num_samples, num_classes, logits, num_trials, dtype, seed):
   Returns:
     samples: Tensor of given dtype and shape [n] + batch_shape + [k].
   """
-  with tf.name_scope(
-      None, "multinomial.draw_sample",
-      [num_samples, num_classes, logits, num_trials]):
+  with tf.name_scope("multinomial.draw_sample"):
     # broadcast the num_trials and logits to same shape
     num_trials = tf.ones_like(
         logits[..., 0], dtype=num_trials.dtype) * num_trials

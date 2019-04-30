@@ -47,9 +47,14 @@ def random_rademacher(shape, dtype=tf.float32, seed=None, name=None):
     rademacher: `Tensor` with specified `shape` and `dtype` consisting of `-1`
       or `+1` chosen uniformly-at-random.
   """
-  with tf.name_scope(name, 'random_rademacher', [shape, seed]):
+  with tf.compat.v1.name_scope(name, 'random_rademacher', [shape, seed]):
+    # Choose the dtype to cause `2 * random_bernoulli - 1` to run in the same
+    # memory (host or device) as the downstream cast will want to put it.  The
+    # convention on GPU is that int32 are in host memory and int64 are in device
+    # memory.
+    generation_dtype = tf.int64 if tf.as_dtype(dtype) != tf.int32 else tf.int32
     random_bernoulli = tf.random.uniform(
-        shape, minval=0, maxval=2, dtype=tf.int32, seed=seed)
+        shape, minval=0, maxval=2, dtype=generation_dtype, seed=seed)
     return tf.cast(2 * random_bernoulli - 1, dtype)
 
 
@@ -81,7 +86,7 @@ def random_rayleigh(shape, scale=None, dtype=tf.float32, seed=None, name=None):
     rayleigh: `Tensor` with specified `shape` and `dtype` consisting of positive
       real values drawn from a Rayleigh distribution with specified `scale`.
   """
-  with tf.name_scope(name, 'random_rayleigh', [shape, scale, seed]):
+  with tf.compat.v1.name_scope(name, 'random_rayleigh', [shape, scale, seed]):
     if scale is not None:
       # Its important to expand the shape to match scale's, otherwise we won't
       # have independent draws.

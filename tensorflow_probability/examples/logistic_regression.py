@@ -168,7 +168,7 @@ def main(argv):
   # parameterized by logits from a single linear layer. We use the Flipout
   # Monte Carlo estimator for the layer: this enables lower variance
   # stochastic gradients than naive reparameterization.
-  with tf.name_scope("logistic_regression", values=[features]):
+  with tf.compat.v1.name_scope("logistic_regression", values=[features]):
     layer = tfp.layers.DenseFlipout(
         units=1,
         activation=None,
@@ -189,7 +189,7 @@ def main(argv):
   accuracy, accuracy_update_op = tf.compat.v1.metrics.accuracy(
       labels=labels, predictions=predictions)
 
-  with tf.name_scope("train"):
+  with tf.compat.v1.name_scope("train"):
     optimizer = tf.compat.v1.train.AdamOptimizer(
         learning_rate=FLAGS.learning_rate)
     train_op = optimizer.minimize(elbo_loss)

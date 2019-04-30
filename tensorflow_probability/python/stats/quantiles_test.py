@@ -28,6 +28,66 @@ rng = np.random.RandomState(0)
 
 
 @test_util.run_all_in_graph_and_eager_modes
+class BincountTest(tf.test.TestCase):
+
+  def test_like_tf_math_bincount_if_axis_is_none(self):
+    arr = rng.randint(0, 10, size=(2, 3, 4)).astype(np.int32)
+    tf_counts, tfp_counts = self.evaluate(
+        [tf.math.bincount(arr),
+         tfp.stats.count_integers(arr)])
+    self.assertAllEqual(tf_counts, tfp_counts)
+
+  def test_like_tf_math_bincount_if_axis_is_all_the_dims(self):
+    arr = rng.randint(0, 10, size=(2, 3, 4)).astype(np.int32)
+    tf_counts, tfp_counts = self.evaluate(
+        [tf.math.bincount(arr),
+         tfp.stats.count_integers(arr, axis=[0, 1, 2])])
+    self.assertAllEqual(tf_counts, tfp_counts)
+
+  def test_3d_arr_axis_1_neg1_no_weights(self):
+    arr = rng.randint(0, 10, size=(2, 3, 4)).astype(np.int32)
+    counts = tfp.stats.count_integers(
+        arr, weights=None, axis=[1, -1], minlength=10)
+
+    # The first index will be length 10, but it isn't known statically because
+    # bincount needs to figure out how many bins are filled (even if minlength
+    # and maxlength are both specified).
+    self.assertAllEqual([2], counts.shape[1:])
+
+    counts_, counts_0_, counts_1_ = self.evaluate([
+        counts,
+        tf.math.bincount(arr[0], minlength=10),
+        tf.math.bincount(arr[1], minlength=10),
+    ])
+
+    self.assertAllEqual([10, 2], counts_.shape)
+
+    self.assertAllClose(counts_0_, counts_[:, 0])
+    self.assertAllClose(counts_1_, counts_[:, 1])
+
+  def test_2d_arr_axis_0_yes_weights(self):
+    arr = rng.randint(0, 4, size=(3, 2)).astype(np.int32)
+    weights = rng.rand(3, 2)
+    counts = tfp.stats.count_integers(arr, weights=weights, axis=0, minlength=4)
+
+    # The first index will be length 4, but it isn't known statically because
+    # bincount needs to figure out how many bins are filled (even if minlength
+    # and maxlength are both specified).
+    self.assertAllEqual([2], counts.shape[1:])
+
+    counts_, counts_0_, counts_1_ = self.evaluate([
+        counts,
+        tf.math.bincount(arr[:, 0], weights=weights[:, 0], minlength=4),
+        tf.math.bincount(arr[:, 1], weights=weights[:, 1], minlength=4),
+    ])
+
+    self.assertAllEqual([4, 2], counts_.shape)
+
+    self.assertAllClose(counts_0_, counts_[:, 0])
+    self.assertAllClose(counts_1_, counts_[:, 1])
+
+
+@test_util.run_all_in_graph_and_eager_modes
 class FindBinsTest(tf.test.TestCase):
 
   def test_1d_array_no_extend_lower_and_upper_dtype_int64(self):
@@ -132,6 +192,166 @@ class FindBinsTest(tf.test.TestCase):
     edges = [2.]
     with self.assertRaisesRegexp(ValueError, '1 or more bin'):
       tfp.stats.find_bins(x, edges)
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class HistogramTest(tf.test.TestCase):
+
+  def test_uniform_dist_in_1d_specify_extend_interval_and_dtype(self):
+    n_samples = 1000
+    x = rng.rand(n_samples)
+
+    counts = tfp.stats.histogram(
+        x,
+        edges=[-1., 0., 0.25, 0.5, 0.75, 0.9],
+        # Lowest intervals are [-1, 0), [0, 0.25), [0.25, 0.5)
+        extend_lower_interval=False,
+        # Highest intervals are [0.5, 0.75), [0.75, inf).  Note the 0.9 is
+        # effectively ignored because we extend the upper interval.
+        extend_upper_interval=True,
+        dtype=tf.int32)
+
+    self.assertAllEqual((5,), counts.shape)
+    self.assertDTypeEqual(counts, np.int32)
+
+    self.assertAllClose(
+        [
+            # [-1.0, 0.0)      [0.0, 0.25)    [0.25, 0.5)
+            0. * n_samples, 0.25 * n_samples, 0.25 * n_samples,
+            # [0.5, 0.75)     [0.75, inf)  (the inf due to extension).
+            0.25 * n_samples, 0.25 * n_samples],
+        self.evaluate(counts),
+        # Standard error for each count is Sqrt[p * (1 - p) / (p * N)],
+        # which is approximately Sqrt[1 / (p * N)].  Bound by 4 times this,
+        # which means an unseeded test fails with probability 3e-5.
+        rtol=4 / np.sqrt(0.25 * n_samples))
+
+  def test_2d_uniform_reduce_axis_0(self):
+    n_samples = 1000
+
+    # Shape [n_samples, 2]
+    x = np.stack([rng.rand(n_samples), 1 + rng.rand(n_samples)], axis=-1)
+
+    # Intervals are:
+    edges = np.float64([-1., 0., 0.5, 1.0, 1.5, 2.0, 2.5])
+
+    counts = tfp.stats.histogram(x, edges=edges, axis=0)
+
+    self.assertAllEqual((6, 2), counts.shape)
+    self.assertDTypeEqual(counts, np.float64)
+
+    # x[:, 0] ~ Uniform(0, 1)
+    event_0_expected_counts = [
+        #     [-1, 0)          [0, 0.5)         [0.5, 1)
+        0.0 * n_samples, 0.5 * n_samples, 0.5 * n_samples,
+        #     [1, 1.5)         [1.5, 2)         [2, 2.5]
+        0.0 * n_samples, 0.0 * n_samples, 0.0 * n_samples,
+    ]
+
+    # x[:, 1] ~ Uniform(1, 2)
+    event_1_expected_counts = [
+        #     [-1, 0)          [0, 0.5)         [0.5, 1)
+        0.0 * n_samples, 0.0 * n_samples, 0.0 * n_samples,
+        #     [1, 1.5)         [1.5, 2)         [2, 2.5]
+        0.5 * n_samples, 0.5 * n_samples, 0.0 * n_samples,
+    ]
+
+    expected_counts = np.stack([event_0_expected_counts,
+                                event_1_expected_counts], axis=-1)
+
+    self.assertAllClose(
+        expected_counts,
+        self.evaluate(counts),
+        # Standard error for each count is Sqrt[p * (1 - p) / (p * N)],
+        # which is approximately Sqrt[1 / (p * N)].  Bound by 4 times this,
+        # which means an unseeded test fails with probability 3e-5.
+        rtol=4 / np.sqrt(0.25 * n_samples))
+
+  def test_2d_uniform_reduce_axis_1_and_change_dtype(self):
+    n_samples = 1000
+
+    # Shape [2, n_samples]
+    x = np.stack([rng.rand(n_samples), 1 + rng.rand(n_samples)], axis=0)
+
+    # Intervals are:
+    edges = np.float64([-1., 0., 0.5, 1.0, 1.5, 2.0, 2.5])
+
+    counts = tfp.stats.histogram(x, edges=edges, axis=1, dtype=np.float32)
+
+    self.assertAllEqual((6, 2), counts.shape)
+    self.assertDTypeEqual(counts, np.float32)
+
+    # x[:, 0] ~ Uniform(0, 1)
+    event_0_expected_counts = [
+        #     [-1, 0)          [0, 0.5)         [0.5, 1)
+        0.0 * n_samples, 0.5 * n_samples, 0.5 * n_samples,
+        #     [1, 1.5)         [1.5, 2)         [2, 2.5]
+        0.0 * n_samples, 0.0 * n_samples, 0.0 * n_samples,
+    ]
+
+    # x[:, 1] ~ Uniform(1, 2)
+    event_1_expected_counts = [
+        #     [-1, 0)          [0, 0.5)         [0.5, 1)
+        0.0 * n_samples, 0.0 * n_samples, 0.0 * n_samples,
+        #     [1, 1.5)         [1.5, 2)         [2, 2.5]
+        0.5 * n_samples, 0.5 * n_samples, 0.0 * n_samples,
+    ]
+
+    expected_counts = np.stack([event_0_expected_counts,
+                                event_1_expected_counts], axis=-1)
+
+    self.assertAllClose(
+        expected_counts,
+        self.evaluate(counts),
+        # Standard error for each count is Sqrt[p * (1 - p) / (p * N)],
+        # which is approximately Sqrt[1 / (p * N)].  Bound by 4 times this,
+        # which means an unseeded test fails with probability 3e-5.
+        rtol=4 / np.sqrt(0.25 * n_samples))
+
+  def test_2d_uniform_reduce_axis_0_edges_is_2d(self):
+    n_samples = 1000
+
+    # Shape [n_samples, 2]
+    x = np.stack([rng.rand(n_samples), 1 + rng.rand(n_samples)], axis=-1)
+
+    # Intervals are:
+    edges = np.float64([
+        # Edges for x[:, 0]
+        [0.0, 0.2, 0.7, 1.0],
+        # Edges for x[:, 1]
+        [1.1, 1.3, 2.0, 3.0],
+    ])
+    # Now, edges.shape = [4, 2], so edges[:, i] is for x[:, i], i = 0, 1.
+    edges = edges.T
+
+    counts = tfp.stats.histogram(
+        x, edges=edges, axis=0, extend_lower_interval=True)
+
+    self.assertAllEqual((3, 2), counts.shape)
+    self.assertDTypeEqual(counts, np.float64)
+
+    # x[:, 0] ~ Uniform(0, 1)
+    event_0_expected_counts = [
+        #     (-inf, 0.2)         [0.2, 0.7)       [0.7, 1)
+        0.2 * n_samples, 0.5 * n_samples, 0.3 * n_samples,
+    ]
+
+    # x[:, 1] ~ Uniform(1, 2)
+    event_1_expected_counts = [
+        #     (-inf, 1.3)       [1.3, 2.0)       [2.0, 3.0)
+        0.3 * n_samples, 0.7 * n_samples, 0.0 * n_samples,
+    ]
+
+    expected_counts = np.stack([event_0_expected_counts,
+                                event_1_expected_counts], axis=-1)
+
+    self.assertAllClose(
+        expected_counts,
+        self.evaluate(counts),
+        # Standard error for each count is Sqrt[p * (1 - p) / (p * N)],
+        # which is approximately Sqrt[1 / (p * N)].  Bound by 4 times this,
+        # which means an unseeded test fails with probability 3e-5.
+        rtol=4 / np.sqrt(0.25 * n_samples))
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -305,6 +525,25 @@ class PercentileTestWithLowerInterpolation(tf.test.TestCase):
       self.assertEqual(tf.int32, pct.dtype)
       self.assertAllEqual((), pct.shape)
       self.assertAllClose(expected_percentile, self.evaluate(pct))
+
+  def test_nan_propagation(self):
+    qs = [0, 10, 20, 49, 50, 51, 60, 80, 100]
+    for xs in [[float('nan'), 1.0],
+               [1.0, float('nan')],
+               [1.0, 2.0, 3.0, 4.0, float('nan')],
+               [1.0, float('nan'), 2.0, 3.0, 4.0]]:
+      # Test each percentile individually
+      for q in qs:
+        expected_percentile = np.percentile(
+            xs, q=q, interpolation=self._interpolation)
+        self.assertTrue(np.isnan(expected_percentile))
+        pct = tfp.stats.percentile(xs, q=q, interpolation=self._interpolation)
+        self.assertTrue(self.evaluate(tf.math.is_nan(pct)))
+      # Test vector percentile as well
+      expected_percentiles = np.percentile(
+          xs, q=qs, interpolation=self._interpolation)
+      pcts = tfp.stats.percentile(xs, q=qs, interpolation=self._interpolation)
+      self.assertAllEqual(expected_percentiles, pcts)
 
 
 class PercentileTestWithLinearInterpolation(

@@ -23,10 +23,12 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
 tfd = tfp.distributions
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 class _MixtureSameFamilyTest(tfp_test_util.VectorDistributionTestHelpers):
@@ -38,7 +40,7 @@ class _MixtureSameFamilyTest(tfp_test_util.VectorDistributionTestHelpers):
         components_distribution=tfd.Normal(
             loc=self._build_tensor([-1., 1]),
             scale=self._build_tensor([0.1, 0.5])))
-    x = gm.sample([4, 5], seed=42)
+    x = gm.sample([4, 5], seed=tfp_test_util.test_seed())
     log_prob_x = gm.log_prob(x)
     self.assertAllEqual([4, 5], self._shape(x))
     self.assertAllEqual([4, 5], self._shape(log_prob_x))
@@ -50,7 +52,7 @@ class _MixtureSameFamilyTest(tfp_test_util.VectorDistributionTestHelpers):
         components_distribution=tfd.Normal(
             loc=self._build_tensor([[-1., 1]]),
             scale=self._build_tensor([[0.1, 0.5]])))
-    x = gm.sample([4, 5], seed=42)
+    x = gm.sample([4, 5], seed=tfp_test_util.test_seed())
     log_prob_x = gm.log_prob(x)
     self.assertAllEqual([4, 5, 1], self._shape(x))
     self.assertAllEqual([4, 5, 1], self._shape(log_prob_x))
@@ -61,7 +63,7 @@ class _MixtureSameFamilyTest(tfp_test_util.VectorDistributionTestHelpers):
     bm = tfd.MixtureSameFamily(
         mixture_distribution=tfd.Categorical(probs=mix_probs),
         components_distribution=tfd.Bernoulli(probs=bern_probs))
-    x = bm.sample([4, 5], seed=42)
+    x = bm.sample([4, 5], seed=tfp_test_util.test_seed())
     log_prob_x = bm.log_prob(x)
     x_ = self.evaluate(x)
     self.assertAllEqual([4, 5, 2], self._shape(x))
@@ -74,7 +76,7 @@ class _MixtureSameFamilyTest(tfp_test_util.VectorDistributionTestHelpers):
         probs=[0.3, 0.7],
         loc=[[-1., 1], [1, -1]],
         scale_identity_multiplier=[1., 0.5])
-    x = gm.sample([4, 5], seed=42)
+    x = gm.sample([4, 5], seed=tfp_test_util.test_seed())
     log_prob_x = gm.log_prob(x)
     self.assertAllEqual([4, 5, 2], self._shape(x))
     self.assertAllEqual([4, 5], self._shape(log_prob_x))
@@ -84,7 +86,7 @@ class _MixtureSameFamilyTest(tfp_test_util.VectorDistributionTestHelpers):
         probs=[0.3, 0.7],
         loc=[[[-1., 1], [1, -1]], [[0., 1], [1, 0]]],
         scale_identity_multiplier=[1., 0.5])
-    x = gm.sample([4, 5], seed=42)
+    x = gm.sample([4, 5], seed=tfp_test_util.test_seed())
     log_prob_x = gm.log_prob(x)
     self.assertAllEqual([4, 5, 2, 2], self._shape(x))
     self.assertAllEqual([4, 5, 2], self._shape(log_prob_x))
@@ -108,7 +110,7 @@ class _MixtureSameFamilyTest(tfp_test_util.VectorDistributionTestHelpers):
         components_distribution=tfd.Normal(
             loc=self._build_tensor([-1., 1]),
             scale=self._build_tensor([0.1, 0.5])))
-    x = gm.sample(10, seed=42)
+    x = gm.sample(10, seed=tfp_test_util.test_seed())
     actual_log_cdf = gm.log_cdf(x)
     expected_log_cdf = tf.reduce_logsumexp(
         input_tensor=(gm.mixture_distribution.logits +
@@ -177,7 +179,7 @@ class _MixtureSameFamilyTest(tfp_test_util.VectorDistributionTestHelpers):
 
     def sample_estimate(*parameters):
       mixture = mixture_func(*parameters)
-      values = mixture.sample(num_samples, seed=8791)
+      values = mixture.sample(num_samples, seed=tfp_test_util.test_seed())
       if function == "variance":
         values = tf.math.squared_difference(values, mixture.mean())
       return tf.reduce_mean(input_tensor=values, axis=0)
@@ -262,21 +264,19 @@ class _MixtureSameFamilyTest(tfp_test_util.VectorDistributionTestHelpers):
           num_samples=10000)
 
   def testDeterministicSampling(self):
-    # Note that we are not guaranteed to return the same
-    # answer when executing eagerly, because sampling with the same seed is not
-    # idempotent.
-    if tf.executing_eagerly():
-      return
+    seed = tfp_test_util.test_seed()
+    tf.compat.v1.set_random_seed(seed)
     dist = tfd.MixtureSameFamily(
         mixture_distribution=tfd.Categorical(logits=[0., 0.]),
         components_distribution=tfd.Normal(loc=[0., 200.], scale=[1., 1.]))
-    sample_1 = self.evaluate(dist.sample([100], seed=1))
-    sample_2 = self.evaluate(dist.sample([100], seed=1))
+    sample_1 = self.evaluate(dist.sample([100], seed=seed))
+    tf.compat.v1.set_random_seed(seed)
+    sample_2 = self.evaluate(dist.sample([100], seed=seed))
     self.assertAllClose(sample_1, sample_2)
 
   def _shape(self, x):
     if self.use_static_shape:
-      return x.shape.as_list()
+      return tensorshape_util.as_list(x.shape)
     else:
       return self.evaluate(tf.shape(input=x))
 

@@ -20,10 +20,11 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
@@ -168,17 +169,17 @@ class StudentT(distribution.Distribution):
       TypeError: if loc and scale are different dtypes.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[df, loc, scale]) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([df, loc, scale], tf.float32)
       df = tf.convert_to_tensor(value=df, name="df", dtype=dtype)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
       scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
       with tf.control_dependencies(
-          [tf.compat.v1.assert_positive(df)] if validate_args else []):
+          [assert_util.assert_positive(df)] if validate_args else []):
         self._df = tf.identity(df)
         self._loc = tf.identity(loc)
         self._scale = tf.identity(scale)
-        tf.debugging.assert_same_float_dtype((self._df, self._loc, self._scale))
+        dtype_util.assert_same_float_dtype((self._df, self._loc, self._scale))
     super(StudentT, self).__init__(
         dtype=self._scale.dtype,
         reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
@@ -193,6 +194,10 @@ class StudentT(distribution.Distribution):
     return dict(
         zip(("df", "loc", "scale"),
             ([tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)] * 3)))
+
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(df=0, loc=0, scale=0)
 
   @property
   def df(self):
@@ -283,7 +288,7 @@ class StudentT(distribution.Distribution):
     mean = self.loc * tf.ones(self.batch_shape_tensor(),
                               dtype=self.dtype)
     if self.allow_nan_stats:
-      nan = np.array(np.nan, dtype=self.dtype.as_numpy_dtype())
+      nan = dtype_util.as_numpy_dtype(self.dtype)(np.nan)
       return tf.where(
           tf.greater(
               self.df,
@@ -292,7 +297,7 @@ class StudentT(distribution.Distribution):
           tf.fill(self.batch_shape_tensor(), nan, name="nan"))
     else:
       return distribution_util.with_dependencies([
-          tf.compat.v1.assert_less(
+          assert_util.assert_less(
               tf.ones([], dtype=self.dtype),
               self.df,
               message="mean not defined for components of df <= 1"),
@@ -317,14 +322,14 @@ class StudentT(distribution.Distribution):
     var = (tf.ones(self.batch_shape_tensor(), dtype=self.dtype) *
            tf.square(self.scale) * self.df / denom)
     # When 1 < df <= 2, variance is infinite.
-    inf = np.array(np.inf, dtype=self.dtype.as_numpy_dtype())
+    inf = dtype_util.as_numpy_dtype(self.dtype)(np.inf)
     result_where_defined = tf.where(
         self.df > tf.fill(self.batch_shape_tensor(), 2.),
         var,
         tf.fill(self.batch_shape_tensor(), inf, name="inf"))
 
     if self.allow_nan_stats:
-      nan = np.array(np.nan, dtype=self.dtype.as_numpy_dtype())
+      nan = dtype_util.as_numpy_dtype(self.dtype)(np.nan)
       return tf.where(
           tf.greater(
               self.df,
@@ -333,7 +338,7 @@ class StudentT(distribution.Distribution):
           tf.fill(self.batch_shape_tensor(), nan, name="nan"))
     else:
       return distribution_util.with_dependencies([
-          tf.compat.v1.assert_less(
+          assert_util.assert_less(
               tf.ones([], dtype=self.dtype),
               self.df,
               message="variance not defined for components of df <= 1"),

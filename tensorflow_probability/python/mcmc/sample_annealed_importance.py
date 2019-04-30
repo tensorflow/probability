@@ -23,7 +23,7 @@ import collections
 import numpy as np
 
 import tensorflow as tf
-from tensorflow_probability.python.mcmc import util as mcmc_util
+from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
 
 __all__ = [
@@ -118,7 +118,7 @@ def sample_annealed_importance_chain(
   dims = 20
   dtype = np.float32
 
-  proposal = tfd.MultivatiateNormalDiag(
+  proposal = tfd.MultivariateNormalDiag(
      loc=tf.zeros([dims], dtype=dtype))
 
   target = tfd.TransformedDistribution(
@@ -189,9 +189,8 @@ def sample_annealed_importance_chain(
   ```
 
   """
-  with tf.name_scope(
-      name, "sample_annealed_importance_chain",
-      [num_steps, current_state]):
+  with tf.compat.v1.name_scope(name, "sample_annealed_importance_chain",
+                               [num_steps, current_state]):
     num_steps = tf.convert_to_tensor(
         value=num_steps, dtype=tf.int32, name="num_steps")
     if mcmc_util.is_list_like(current_state):

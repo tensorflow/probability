@@ -20,7 +20,7 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
@@ -56,7 +56,7 @@ class TanhBijectorTest(tf.test.TestCase):
         n=int(10e4))
 
   def testBijectiveAndFinite(self):
-    x = np.linspace(-10., 10., 100).astype(np.float64)
+    x = np.linspace(-100., 100., 100).astype(np.float64)
     eps = 1e-3
     y = np.linspace(-1. + eps, 1. - eps, 100).astype(np.float64)
     bijector_test_util.assert_bijective_and_finite(

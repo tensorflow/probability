@@ -20,11 +20,14 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
+
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-tfd = tfp.distributions
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+
+tfd = tfp.distributions
 rng = np.random.RandomState(123)
 
 
@@ -42,9 +45,10 @@ class SinhArcsinhTest(tf.test.TestCase):
     norm_pdf, sasnorm_pdf = self.evaluate([norm.prob(x), sasnorm.prob(x)])
     self.assertAllClose(norm_pdf, sasnorm_pdf)
 
-    norm_samps, sasnorm_samps = self.evaluate(
-        [norm.sample(10000, seed=0),
-         sasnorm.sample(10000, seed=0)])
+    norm_samps, sasnorm_samps = self.evaluate([
+        norm.sample(10000, seed=tfp_test_util.test_seed()),
+        sasnorm.sample(10000, seed=tfp_test_util.test_seed())
+    ])
     self.assertAllClose(loc, sasnorm_samps.mean(axis=0), atol=0.1)
     self.assertAllClose(
         norm_samps.mean(axis=0), sasnorm_samps.mean(axis=0), atol=0.1)
@@ -78,9 +82,10 @@ class SinhArcsinhTest(tf.test.TestCase):
     lap_pdf, saslap_pdf = self.evaluate([lap.prob(x), saslap.prob(x)])
     self.assertAllClose(lap_pdf, saslap_pdf)
 
-    lap_samps, saslap_samps = self.evaluate(
-        [lap.sample(10000, seed=0),
-         saslap.sample(10000, seed=0)])
+    lap_samps, saslap_samps = self.evaluate([
+        lap.sample(10000, seed=tfp_test_util.test_seed()),
+        saslap.sample(10000, seed=tfp_test_util.test_seed())
+    ])
     self.assertAllClose(loc, saslap_samps.mean(axis=0), atol=0.1)
     self.assertAllClose(
         lap_samps.mean(axis=0), saslap_samps.mean(axis=0), atol=0.1)
@@ -102,9 +107,10 @@ class SinhArcsinhTest(tf.test.TestCase):
 
     # 0.1% quantile and 99.9% quantile are outliers, and should be more
     # extreme in the normal.  The 97.772% quantiles should be the same.
-    norm_samps, sasnorm_samps = self.evaluate(
-        [norm.sample(int(5e5), seed=1),
-         sasnorm.sample(int(5e5), seed=1)])
+    norm_samps, sasnorm_samps = self.evaluate([
+        norm.sample(int(5e5), seed=tfp_test_util.test_seed()),
+        sasnorm.sample(int(5e5), seed=tfp_test_util.test_seed())
+    ])
     np.testing.assert_array_less(
         np.percentile(norm_samps, 0.1, axis=0),
         np.percentile(sasnorm_samps, 0.1, axis=0))
@@ -137,9 +143,10 @@ class SinhArcsinhTest(tf.test.TestCase):
 
     # 0.1% quantile and 99.9% quantile are outliers, and should be more
     # extreme in the sasnormal.  The 97.772% quantiles should be the same.
-    norm_samps, sasnorm_samps = self.evaluate(
-        [norm.sample(int(5e5), seed=2),
-         sasnorm.sample(int(5e5), seed=2)])
+    norm_samps, sasnorm_samps = self.evaluate([
+        norm.sample(int(5e5), seed=tfp_test_util.test_seed()),
+        sasnorm.sample(int(5e5), seed=tfp_test_util.test_seed())
+    ])
     np.testing.assert_array_less(
         np.percentile(sasnorm_samps, 0.1, axis=0),
         np.percentile(norm_samps, 0.1, axis=0))
@@ -164,7 +171,8 @@ class SinhArcsinhTest(tf.test.TestCase):
     sasnorm = tfd.SinhArcsinh(
         loc=loc, scale=scale, skewness=3.0, validate_args=True)
 
-    sasnorm_samps = self.evaluate(sasnorm.sample(10000, seed=4))
+    sasnorm_samps = self.evaluate(
+        sasnorm.sample(10000, seed=tfp_test_util.test_seed()))
     np.testing.assert_array_less(loc, sasnorm_samps.mean(axis=0))
 
   def test_pdf_reflected_for_negative_skewness(self):

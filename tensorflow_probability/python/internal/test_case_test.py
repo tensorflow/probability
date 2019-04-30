@@ -22,6 +22,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -32,8 +33,8 @@ class _TestCaseTest(object):
     np.random.seed(932)
 
   def test_assert_all_finite_input_finite(self):
-    minval = tf.constant(self.dtype.min, dtype=self.dtype)
-    maxval = tf.constant(self.dtype.max, dtype=self.dtype)
+    minval = tf.constant(dtype_util.min(self.dtype), dtype=self.dtype)
+    maxval = tf.constant(dtype_util.max(self.dtype), dtype=self.dtype)
 
     # This tests if the minimum value for the dtype is detected as finite.
     self.assertAllFinite(minval)
@@ -94,7 +95,7 @@ class _TestCaseTest(object):
       self.assertAllNan(a)
 
   def test_assert_all_nan_input_numpy_rand(self):
-    a = np.random.rand(10, 10, 10).astype(self.dtype.as_numpy_dtype)
+    a = np.random.rand(10, 10, 10).astype(dtype_util.as_numpy_dtype(self.dtype))
     with self.assertRaisesRegexp(AssertionError, "Arrays are not equal"):
       self.assertAllNan(a)
 
@@ -105,7 +106,8 @@ class _TestCaseTest(object):
       self.assertAllNan(a)
 
   def test_assert_all_nan_input_placeholder_with_default(self):
-    all_nan = np.full((10, 10, 10), np.nan).astype(self.dtype.as_numpy_dtype)
+    all_nan = np.full((10, 10, 10),
+                      np.nan).astype(dtype_util.as_numpy_dtype(self.dtype))
     a = tf.compat.v1.placeholder_with_default(
         input=all_nan, shape=all_nan.shape)
     self.assertAllNan(a)

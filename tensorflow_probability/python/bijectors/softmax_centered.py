@@ -18,9 +18,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -66,7 +69,7 @@ class SoftmaxCentered(bijector.Bijector):
         name=name)
 
   def _forward_event_shape(self, input_shape):
-    if input_shape.ndims is None or input_shape[-1] is None:
+    if not input_shape[-1:].is_fully_defined():
       return input_shape
     return input_shape[:-1].concatenate(input_shape[-1] + 1)
 
@@ -74,7 +77,7 @@ class SoftmaxCentered(bijector.Bijector):
     return tf.concat([input_shape[:-1], [input_shape[-1] + 1]], axis=0)
 
   def _inverse_event_shape(self, output_shape):
-    if output_shape.ndims is None or output_shape[-1] is None:
+    if not output_shape[-1:].is_fully_defined():
       return output_shape
     if output_shape[-1] <= 1:
       raise ValueError("output_shape[-1] = %d <= 1" % output_shape[-1])
@@ -83,7 +86,7 @@ class SoftmaxCentered(bijector.Bijector):
   def _inverse_event_shape_tensor(self, output_shape):
     if self.validate_args:
       # It is not possible for a negative shape so we need only check <= 1.
-      is_greater_one = tf.compat.v1.assert_greater(
+      is_greater_one = assert_util.assert_greater(
           output_shape[-1], 1, message="Need last dimension greater than 1.")
       output_shape = distribution_util.with_dependencies(
           [is_greater_one], output_shape)
@@ -95,12 +98,12 @@ class SoftmaxCentered(bijector.Bijector):
     y = distribution_util.pad(x, axis=-1, back=True)
 
     # Set shape hints.
-    if x.shape.ndims is not None:
+    if tensorshape_util.rank(x.shape) is not None:
       last_dim = tf.compat.dimension_value(x.shape[-1])
-      shape = x.shape[:-1].concatenate(
+      shape = tensorshape_util.concatenate(
+          x.shape[:-1],
           None if last_dim is None else last_dim + 1)
-      y.shape.assert_is_compatible_with(shape)
-      y.set_shape(shape)
+      tensorshape_util.set_shape(y, shape)
 
     return tf.nn.softmax(y)
 
@@ -122,12 +125,12 @@ class SoftmaxCentered(bijector.Bijector):
     x = x[..., :-1] + log_normalization
 
     # Set shape hints.
-    if y.shape.ndims is not None:
+    if tensorshape_util.rank(y.shape) is not None:
       last_dim = tf.compat.dimension_value(y.shape[-1])
-      shape = y.shape[:-1].concatenate(
+      shape = tensorshape_util.concatenate(
+          y.shape[:-1],
           None if last_dim is None else last_dim - 1)
-      x.shape.assert_is_compatible_with(shape)
-      x.set_shape(shape)
+      tensorshape_util.set_shape(x, shape)
 
     return x
 

@@ -20,7 +20,7 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import exp as exp_bijector
 from tensorflow_probability.python.distributions import categorical
@@ -32,6 +32,7 @@ from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -68,11 +69,12 @@ def quadrature_scheme_lognormal_gauss_hermite(
     probs: (Batch of) length-`quadrature_size` vectors representing the
       weight associate with each `grid` value.
   """
-  with tf.name_scope(name, "vector_diffeomixture_quadrature_gauss_hermite",
-                     [loc, scale]):
+  with tf.name_scope(
+      name or "vector_diffeomixture_quadrature_gauss_hermite"):
     grid, probs = np.polynomial.hermite.hermgauss(deg=quadrature_size)
-    grid = grid.astype(loc.dtype.as_numpy_dtype)
-    probs = probs.astype(loc.dtype.as_numpy_dtype)
+    npdt = dtype_util.as_numpy_dtype(loc.dtype)
+    grid = grid.astype(npdt)
+    probs = probs.astype(npdt)
     probs /= np.linalg.norm(probs, ord=1, keepdims=True)
     probs = tf.convert_to_tensor(value=probs, name="probs", dtype=loc.dtype)
     # The following maps the broadcast of `loc` and `scale` to each grid
@@ -107,14 +109,13 @@ def quadrature_scheme_lognormal_quantiles(
     probs: (Batch of) length-`quadrature_size` vectors representing the
       weight associate with each `grid` value.
   """
-  with tf.name_scope(name, "quadrature_scheme_lognormal_quantiles",
-                     [loc, scale]):
+  with tf.name_scope(name or "quadrature_scheme_lognormal_quantiles"):
     # Create a LogNormal distribution.
     dist = transformed_distribution.TransformedDistribution(
         distribution=normal.Normal(loc=loc, scale=scale),
         bijector=exp_bijector.Exp(),
         validate_args=validate_args)
-    batch_ndims = dist.batch_shape.ndims
+    batch_ndims = tensorshape_util.rank(dist.batch_shape)
     if batch_ndims is None:
       batch_ndims = tf.shape(input=dist.batch_shape_tensor())[0]
 
@@ -138,7 +139,9 @@ def quadrature_scheme_lognormal_quantiles(
     # Compute grid as quantile midpoints.
     grid = (quantiles[..., :-1] + quantiles[..., 1:]) / 2.
     # Set shape hints.
-    grid.set_shape(dist.batch_shape.concatenate([quadrature_size]))
+    new_shape = tensorshape_util.concatenate(dist.batch_shape,
+                                             [quadrature_size])
+    tensorshape_util.set_shape(grid, new_shape)
 
     # By construction probs is constant, i.e., `1 / quadrature_size`. This is
     # important, because non-constant probs leads to non-reparameterizable
@@ -254,7 +257,7 @@ class PoissonLogNormalQuadratureCompound(distribution.Distribution):
         `dtype`.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[loc, scale]) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, scale], tf.float32)
       if loc is not None:
         loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
@@ -264,10 +267,11 @@ class PoissonLogNormalQuadratureCompound(distribution.Distribution):
           loc, scale, quadrature_size, validate_args))
 
       dt = self._quadrature_grid.dtype
-      if dt.base_dtype != self._quadrature_probs.dtype.base_dtype:
+      if not dtype_util.base_equal(dt, self._quadrature_probs.dtype):
         raise TypeError("Quadrature grid dtype ({}) does not match quadrature "
                         "probs dtype ({}).".format(
-                            dt.name, self._quadrature_probs.dtype.name))
+                            dtype_util.name(dt),
+                            dtype_util.name(self._quadrature_probs.dtype)))
 
       self._distribution = poisson.Poisson(
           log_rate=self._quadrature_grid,
@@ -332,7 +336,7 @@ class PoissonLogNormalQuadratureCompound(distribution.Distribution):
   def _sample_n(self, n, seed=None):
     # Get ids as a [n, batch_size]-shaped matrix, unless batch_shape=[] then get
     # ids as a [n]-shaped vector.
-    batch_size = self.batch_shape.num_elements()
+    batch_size = tensorshape_util.num_elements(self.batch_shape)
     if batch_size is None:
       batch_size = tf.reduce_prod(input_tensor=self.batch_shape_tensor())
     # We need to "sample extra" from the mixture distribution if it doesn't
@@ -420,7 +424,7 @@ class PoissonLogNormalQuadratureCompound(distribution.Distribution):
 
 def concat_vectors(*args):
   """Concatenates input vectors, statically if possible."""
-  args_ = [distribution_util.static_value(x) for x in args]
+  args_ = [tf.get_static_value(x) for x in args]
   if any(vec is None for vec in args_):
     return tf.concat(args, axis=0)
   return [val for vec in args_ for val in vec]

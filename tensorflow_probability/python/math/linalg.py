@@ -26,17 +26,298 @@ import numpy as np
 
 import tensorflow as tf
 
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow.python.ops.linalg import linear_operator_util
 
 
 __all__ = [
+    'cholesky_concat',
     'lu_matrix_inverse',
     'lu_reconstruct',
     'lu_solve',
+    'matrix_rank',
     'pinv',
+    'pivoted_cholesky',
     'sparse_or_dense_matmul',
     'sparse_or_dense_matvecmul',
 ]
+
+
+def matrix_rank(a, tol=None, validate_args=False, name=None):
+  """Compute the matrix rank; the number of non-zero SVD singular values.
+
+  Arguments:
+    a: (Batch of) `float`-like matrix-shaped `Tensor`(s) which are to be
+      pseudo-inverted.
+    tol: Threshold below which the singular value is counted as "zero".
+      Default value: `None` (i.e., `eps * max(rows, cols) * max(singular_val)`).
+    validate_args: When `True`, additional assertions might be embedded in the
+      graph.
+      Default value: `False` (i.e., no graph assertions are added).
+    name: Python `str` prefixed to ops created by this function.
+      Default value: "matrix_rank".
+
+  Returns:
+    matrix_rank: (Batch of) `int32` scalars representing the number of non-zero
+      singular values.
+  """
+  with tf.compat.v1.name_scope(name, 'matrix_rank', [a, tol]):
+    a = tf.convert_to_tensor(value=a, dtype_hint=tf.float32, name='a')
+    assertions = _maybe_validate_matrix(a, validate_args)
+    if assertions:
+      with tf.control_dependencies(assertions):
+        a = tf.identity(a)
+    s = tf.linalg.svd(a, compute_uv=False)
+    if tol is None:
+      if a.shape[-2:].is_fully_defined():
+        m = np.max(a.shape[-2:].as_list())
+      else:
+        m = tf.reduce_max(input_tensor=tf.shape(input=a)[-2:])
+      eps = np.finfo(a.dtype.as_numpy_dtype).eps
+      tol = (eps * tf.cast(m, a.dtype) *
+             tf.reduce_max(input_tensor=s, axis=-1, keepdims=True))
+    return tf.reduce_sum(input_tensor=tf.cast(s > tol, tf.int32), axis=-1)
+
+
+def cholesky_concat(chol, cols, name=None):
+  """Concatenates `chol @ chol.T` with additional rows and columns.
+
+  This operation is conceptually identical to:
+  ```python
+  def cholesky_concat_slow(chol, cols):  # cols shaped (n + m) x m = z x m
+    mat = tf.matmul(chol, chol, adjoint_b=True)  # batch of n x n
+    # Concat columns.
+    mat = tf.concat([mat, cols[..., :tf.shape(mat)[-2], :]], axis=-1)  # n x z
+    # Concat rows.
+    mat = tf.concat([mat, tf.linalg.matrix_transpose(cols)], axis=-2)  # z x z
+    return tf.linalg.cholesky(mat)
+  ```
+  but whereas `cholesky_concat_slow` would cost `O(z**3)` work,
+  `cholesky_concat` only costs `O(z**2 + m**3)` work.
+
+  The resulting (implicit) matrix must be symmetric and positive definite.
+  Thus, the bottom right `m x m` must be self-adjoint, and we do not require a
+  separate `rows` argument (which can be inferred from `conj(cols.T)`).
+
+  Args:
+    chol: Cholesky decomposition of `mat = chol @ chol.T`.
+    cols: The new columns whose first `n` rows we would like concatenated to the
+      right of `mat = chol @ chol.T`, and whose conjugate transpose we would
+      like concatenated to the bottom of `concat(mat, cols[:n,:])`. A `Tensor`
+      with final dims `(n+m, m)`. The first `n` rows are the top right rectangle
+      (their conjugate transpose forms the bottom left), and the bottom `m x m`
+      is self-adjoint.
+    name: Optional name for this op.
+
+  Returns:
+    chol_concat: The Cholesky decomposition of:
+      ```
+      [ [ mat  cols[:n, :] ]
+        [   conj(cols.T)   ] ]
+      ```
+  """
+  with tf.compat.v2.name_scope(name or 'cholesky_extend'):
+    dtype = dtype_util.common_dtype([chol, cols], preferred_dtype=tf.float32)
+    chol = tf.convert_to_tensor(value=chol, name='chol', dtype=dtype)
+    cols = tf.convert_to_tensor(value=cols, name='cols', dtype=dtype)
+    n = prefer_static.shape(chol)[-1]
+    mat_nm, mat_mm = cols[..., :n, :], cols[..., n:, :]
+    solved_nm = linear_operator_util.matrix_triangular_solve_with_broadcast(
+        chol, mat_nm)
+    lower_right_mm = tf.linalg.cholesky(
+        mat_mm - tf.matmul(solved_nm, solved_nm, adjoint_a=True))
+    lower_left_mn = tf.math.conj(tf.linalg.matrix_transpose(solved_nm))
+    out_batch = prefer_static.shape(solved_nm)[:-2]
+    chol = tf.broadcast_to(
+        chol,
+        tf.concat([out_batch, prefer_static.shape(chol)[-2:]], axis=0))
+    top_right_zeros_nm = tf.zeros_like(solved_nm)
+    return tf.concat([tf.concat([chol, top_right_zeros_nm], axis=-1),
+                      tf.concat([lower_left_mn, lower_right_mm], axis=-1)],
+                     axis=-2)
+
+
+def _swap_m_with_i(vecs, m, i):
+  """Swaps `m` and `i` on axis -1. (Helper for pivoted_cholesky.)
+
+  Given a batch of int64 vectors `vecs`, scalar index `m`, and compatibly shaped
+  per-vector indices `i`, this function swaps elements `m` and `i` in each
+  vector. For the use-case below, these are permutation vectors.
+
+  Args:
+    vecs: Vectors on which we perform the swap, int64 `Tensor`.
+    m: Scalar int64 `Tensor`, the index into which the `i`th element is going.
+    i: Batch int64 `Tensor`, shaped like vecs.shape[:-1] + [1]; the index into
+      which the `m`th element is going.
+
+  Returns:
+    vecs: The updated vectors.
+  """
+  vecs = tf.convert_to_tensor(value=vecs, dtype=tf.int64, name='vecs')
+  m = tf.convert_to_tensor(value=m, dtype=tf.int64, name='m')
+  i = tf.convert_to_tensor(value=i, dtype=tf.int64, name='i')
+  trailing_elts = tf.broadcast_to(
+      tf.range(m + 1,
+               prefer_static.shape(vecs, out_type=tf.int64)[-1]),
+      prefer_static.shape(vecs[..., m + 1:]))
+  shp = prefer_static.shape(trailing_elts)
+  trailing_elts = tf.where(
+      tf.equal(trailing_elts, tf.broadcast_to(i, shp)),
+      tf.broadcast_to(tf.gather(vecs, [m], axis=-1), shp),
+      tf.broadcast_to(vecs[..., m + 1:], shp))
+  # TODO(bjp): Could we use tensor_scatter_nd_update?
+  vecs_shape = vecs.shape
+  vecs = tf.concat([
+      vecs[..., :m],
+      tf.gather(vecs, i, batch_dims=prefer_static.rank(vecs) - 1), trailing_elts
+  ], axis=-1)
+  tensorshape_util.set_shape(vecs, vecs_shape)
+  return vecs
+
+
+def _invert_permutation(perm):  # TODO(b/130217510): Remove this function.
+  return tf.cast(
+      tf.math.top_k(perm, k=prefer_static.shape(perm)[-1],
+                    sorted=True).indices[..., ::-1], perm.dtype)
+
+
+def pivoted_cholesky(matrix, max_rank, diag_rtol=1e-3, name=None):
+  """Computes the (partial) pivoted cholesky decomposition of `matrix`.
+
+  The pivoted Cholesky is a low rank approximation of the Cholesky decomposition
+  of `matrix`, i.e. as described in [(Harbrecht et al., 2012)][1]. The
+  currently-worst-approximated diagonal element is selected as the pivot at each
+  iteration. This yields from a `[B1...Bn, N, N]` shaped `matrix` a `[B1...Bn,
+  N, K]` shaped rank-`K` approximation `lr` such that `lr @ lr.T ~= matrix`.
+  Note that, unlike the Cholesky decomposition, `lr` is not triangular even in
+  a rectangular-matrix sense. However, under a permutation it could be made
+  triangular (it has one more zero in each column as you move to the right).
+
+  Such a matrix can be useful as a preconditioner for conjugate gradient
+  optimization, i.e. as in [(Wang et al. 2019)][2], as matmuls and solves can be
+  cheaply done via the Woodbury matrix identity, as implemented by
+  `tf.linalg.LinearOperatorLowRankUpdate`.
+
+  Args:
+    matrix: Floating point `Tensor` batch of symmetric, positive definite
+      matrices.
+    max_rank: Scalar `int` `Tensor`, the rank at which to truncate the
+      approximation.
+    diag_rtol: Scalar floating point `Tensor` (same dtype as `matrix`). If the
+      errors of all diagonal elements of `lr @ lr.T` are each lower than
+      `element * diag_rtol`, iteration is permitted to terminate early.
+    name: Optional name for the op.
+
+  Returns:
+    lr: Low rank pivoted Cholesky approximation of `matrix`.
+
+  #### References
+
+  [1]: H Harbrecht, M Peters, R Schneider. On the low-rank approximation by the
+       pivoted Cholesky decomposition. _Applied numerical mathematics_,
+       62(4):428-440, 2012.
+
+  [2]: K. A. Wang et al. Exact Gaussian Processes on a Million Data Points.
+       _arXiv preprint arXiv:1903.08114_, 2019. https://arxiv.org/abs/1903.08114
+  """
+  with tf.compat.v2.name_scope(name or 'pivoted_cholesky'):
+    dtype = dtype_util.common_dtype([matrix, diag_rtol],
+                                    preferred_dtype=tf.float32)
+    matrix = tf.convert_to_tensor(value=matrix, name='matrix', dtype=dtype)
+    if tensorshape_util.rank(matrix.shape) is None:
+      raise NotImplementedError('Rank of `matrix` must be known statically')
+
+    max_rank = tf.convert_to_tensor(
+        value=max_rank, name='max_rank', dtype=tf.int64)
+    max_rank = tf.minimum(max_rank,
+                          prefer_static.shape(matrix, out_type=tf.int64)[-1])
+    diag_rtol = tf.convert_to_tensor(
+        value=diag_rtol, dtype=dtype, name='diag_rtol')
+    matrix_diag = tf.linalg.diag_part(matrix)
+    # matrix is P.D., therefore all matrix_diag > 0, so we don't need abs.
+    orig_error = tf.reduce_max(input_tensor=matrix_diag, axis=-1)
+
+    def cond(m, pchol, perm, matrix_diag):
+      """Condition for `tf.while_loop` continuation."""
+      del pchol
+      del perm
+      error = tf.linalg.norm(tensor=matrix_diag, ord=1, axis=-1)
+      max_err = tf.reduce_max(input_tensor=error / orig_error)
+      return (m < max_rank) & (tf.equal(m, 0) | (max_err > diag_rtol))
+
+    batch_dims = tensorshape_util.rank(matrix.shape) - 2
+    def batch_gather(params, indices, axis=-1):
+      return tf.gather(params, indices, axis=axis, batch_dims=batch_dims)
+
+    def body(m, pchol, perm, matrix_diag):
+      """Body of a single `tf.while_loop` iteration."""
+      # Here is roughly a numpy, non-batched version of what's going to happen.
+      # (See also Algorithm 1 of Harbrecht et al.)
+      # 1: maxi = np.argmax(matrix_diag[perm[m:]]) + m
+      # 2: maxval = matrix_diag[perm][maxi]
+      # 3: perm[m], perm[maxi] = perm[maxi], perm[m]
+      # 4: row = matrix[perm[m]][perm[m + 1:]]
+      # 5: row -= np.sum(pchol[:m][perm[m + 1:]] * pchol[:m][perm[m]]], axis=-2)
+      # 6: pivot = np.sqrt(maxval); row /= pivot
+      # 7: row = np.concatenate([[[pivot]], row], -1)
+      # 8: matrix_diag[perm[m:]] -= row**2
+      # 9: pchol[m, perm[m:]] = row
+
+      # Find the maximal position of the (remaining) permuted diagonal.
+      # Steps 1, 2 above.
+      permuted_diag = batch_gather(matrix_diag, perm[..., m:])
+      maxi = tf.argmax(
+          input=permuted_diag, axis=-1, output_type=tf.int64)[..., tf.newaxis]
+      maxval = batch_gather(permuted_diag, maxi)
+      maxi = maxi + m
+      maxval = maxval[..., 0]
+      # Update perm: Swap perm[...,m] with perm[...,maxi]. Step 3 above.
+      perm = _swap_m_with_i(perm, m, maxi)
+      # Step 4.
+      row = batch_gather(matrix, perm[..., m:m + 1], axis=-2)
+      row = batch_gather(row, perm[..., m + 1:])
+      # Step 5.
+      prev_rows = pchol[..., :m, :]
+      prev_rows_perm_m_onward = batch_gather(prev_rows, perm[..., m + 1:])
+      prev_rows_pivot_col = batch_gather(prev_rows, perm[..., m:m + 1])
+      row -= tf.reduce_sum(
+          input_tensor=prev_rows_perm_m_onward * prev_rows_pivot_col,
+          axis=-2)[..., tf.newaxis, :]
+      # Step 6.
+      pivot = tf.sqrt(maxval)[..., tf.newaxis, tf.newaxis]
+      # Step 7.
+      row = tf.concat([pivot, row / pivot], axis=-1)
+      # TODO(b/130899118): Pad grad fails with int64 paddings.
+      # Step 8.
+      paddings = tf.concat([
+          tf.zeros([prefer_static.rank(pchol) - 1, 2], dtype=tf.int32),
+          [[tf.cast(m, tf.int32), 0]]], axis=0)
+      diag_update = tf.pad(tensor=row**2, paddings=paddings)[..., 0, :]
+      reverse_perm = _invert_permutation(perm)
+      matrix_diag -= batch_gather(diag_update, reverse_perm)
+      # Step 9.
+      row = tf.pad(tensor=row, paddings=paddings)
+      # TODO(bjp): Defer the reverse permutation all-at-once at the end?
+      row = batch_gather(row, reverse_perm)
+      pchol_shape = pchol.shape
+      pchol = tf.concat([pchol[..., :m, :], row, pchol[..., m + 1:, :]],
+                        axis=-2)
+      tensorshape_util.set_shape(pchol, pchol_shape)
+      return m + 1, pchol, perm, matrix_diag
+
+    m = np.int64(0)
+    pchol = tf.zeros_like(matrix[..., :max_rank, :])
+    matrix_shape = prefer_static.shape(matrix, out_type=tf.int64)
+    perm = tf.broadcast_to(
+        prefer_static.range(matrix_shape[-1]), matrix_shape[:-1])
+    _, pchol, _, _ = tf.while_loop(
+        cond=cond, body=body, loop_vars=(m, pchol, perm, matrix_diag))
+    pchol = tf.linalg.matrix_transpose(pchol)
+    tensorshape_util.set_shape(
+        pchol, tensorshape_util.concatenate(matrix_diag.shape, [None]))
+    return pchol
 
 
 def pinv(a, rcond=None, validate_args=False, name=None):
@@ -108,20 +389,12 @@ def pinv(a, rcond=None, validate_args=False, name=None):
   [1]: G. Strang. "Linear Algebra and Its Applications, 2nd Ed." Academic Press,
        Inc., 1980, pp. 139-142.
   """
-  with tf.name_scope(name, 'pinv', [a, rcond]):
+  with tf.compat.v1.name_scope(name, 'pinv', [a, rcond]):
     a = tf.convert_to_tensor(value=a, name='a')
 
-    if not a.dtype.is_floating:
-      raise TypeError('Input `a` must have `float`-like `dtype` '
-                      '(saw {}).'.format(a.dtype.name))
-    if a.shape.ndims is not None:
-      if a.shape.ndims < 2:
-        raise ValueError('Input `a` must have at least 2 dimensions '
-                         '(saw: {}).'.format(a.shape.ndims))
-    elif validate_args:
-      assert_rank_at_least_2 = tf.compat.v1.assert_rank_at_least(
-          a, rank=2, message='Input `a` must have at least 2 dimensions.')
-      with tf.control_dependencies([assert_rank_at_least_2]):
+    assertions = _maybe_validate_matrix(a, validate_args)
+    if assertions:
+      with tf.control_dependencies(assertions):
         a = tf.identity(a)
 
     dtype = a.dtype.as_numpy_dtype
@@ -216,7 +489,7 @@ def lu_solve(lower_upper, perm, rhs,
 
   """
 
-  with tf.name_scope(name, 'lu_solve', [lower_upper, perm, rhs]):
+  with tf.compat.v1.name_scope(name, 'lu_solve', [lower_upper, perm, rhs]):
     lower_upper = tf.convert_to_tensor(
         value=lower_upper, dtype_hint=tf.float32, name='lower_upper')
     perm = tf.convert_to_tensor(value=perm, dtype_hint=tf.int32, name='perm')
@@ -316,7 +589,7 @@ def lu_matrix_inverse(lower_upper, perm, validate_args=False, name=None):
 
   """
 
-  with tf.name_scope(name, 'lu_matrix_inverse', [lower_upper, perm]):
+  with tf.compat.v1.name_scope(name, 'lu_matrix_inverse', [lower_upper, perm]):
     lower_upper = tf.convert_to_tensor(
         value=lower_upper, dtype_hint=tf.float32, name='lower_upper')
     perm = tf.convert_to_tensor(value=perm, dtype_hint=tf.int32, name='perm')
@@ -365,7 +638,7 @@ def lu_reconstruct(lower_upper, perm, validate_args=False, name=None):
   ```
 
   """
-  with tf.name_scope(name, 'lu_reconstruct', [lower_upper, perm]):
+  with tf.compat.v1.name_scope(name, 'lu_reconstruct', [lower_upper, perm]):
     lower_upper = tf.convert_to_tensor(
         value=lower_upper, dtype_hint=tf.float32, name='lower_upper')
     perm = tf.convert_to_tensor(value=perm, dtype_hint=tf.int32, name='perm')
@@ -489,8 +762,8 @@ def sparse_or_dense_matmul(sparse_or_dense_a,
     `dense_b` is adjointed through `kwargs` then the shape is adjusted
     accordingly.
   """
-  with tf.name_scope(name, 'sparse_or_dense_matmul',
-                     [sparse_or_dense_a, dense_b]):
+  with tf.compat.v1.name_scope(name, 'sparse_or_dense_matmul',
+                               [sparse_or_dense_a, dense_b]):
     dense_b = tf.convert_to_tensor(
         value=dense_b, dtype_hint=tf.float32, name='dense_b')
 
@@ -540,8 +813,8 @@ def sparse_or_dense_matvecmul(sparse_or_dense_matrix,
     product: A dense (batch of) vector-shaped Tensor of the same batch shape and
     dtype as `sparse_or_dense_matrix` and `dense_vector`.
   """
-  with tf.name_scope(name, 'sparse_or_dense_matvecmul',
-                     [sparse_or_dense_matrix, dense_vector]):
+  with tf.compat.v1.name_scope(name, 'sparse_or_dense_matvecmul',
+                               [sparse_or_dense_matrix, dense_vector]):
     dense_vector = tf.convert_to_tensor(
         value=dense_vector, dtype_hint=tf.float32, name='dense_vector')
     return tf.squeeze(
@@ -620,3 +893,19 @@ def _sparse_block_diag(sp_a):
   dense_shape = sp_a_shape[0] * sp_a_shape[1:]
   return tf.SparseTensor(
       indices=indices, values=sp_a.values, dense_shape=dense_shape)
+
+
+def _maybe_validate_matrix(a, validate_args):
+  """Checks that input is a `float` matrix."""
+  assertions = []
+  if not a.dtype.is_floating:
+    raise TypeError('Input `a` must have `float`-like `dtype` '
+                    '(saw {}).'.format(a.dtype.name))
+  if a.shape.ndims is not None:
+    if a.shape.ndims < 2:
+      raise ValueError('Input `a` must have at least 2 dimensions '
+                       '(saw: {}).'.format(a.shape.ndims))
+  elif validate_args:
+    assertions.append(tf.compat.v1.assert_rank_at_least(
+        a, rank=2, message='Input `a` must have at least 2 dimensions.'))
+  return assertions

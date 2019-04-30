@@ -18,13 +18,15 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import multinomial
 from tensorflow_probability.python.distributions import seed_stream
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
     "DirichletMultinomial",
@@ -196,7 +198,7 @@ class DirichletMultinomial(distribution.Distribution):
     # * We broadcast explicitly to include the effect of `counts` on
     #   `concentration` for calls that do not involve `counts`.
     parameters = dict(locals())
-    with tf.name_scope(name, values=[total_count, concentration]) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([total_count, concentration], tf.float32)
       self._total_count = tf.convert_to_tensor(
           value=total_count, name="total_count", dtype=dtype)
@@ -221,6 +223,10 @@ class DirichletMultinomial(distribution.Distribution):
         graph_parents=[self._total_count, self._concentration],
         name=name)
 
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(total_count=0, concentration=1)
+
   @property
   def total_count(self):
     """Number of trials used to construct a sample."""
@@ -240,7 +246,8 @@ class DirichletMultinomial(distribution.Distribution):
     return tf.shape(input=self._broadcasted_concentration)[:-1]
 
   def _batch_shape(self):
-    return self._broadcasted_concentration.shape.with_rank_at_least(1)[:-1]
+    return tensorshape_util.with_rank_at_least(
+        self._broadcasted_concentration.shape, 1)[:-1]
 
   def _event_shape_tensor(self):
     # Event shape depends only on concentration, not total_count.
@@ -248,7 +255,7 @@ class DirichletMultinomial(distribution.Distribution):
 
   def _event_shape(self):
     # Event shape depends only on concentration, not total_count.
-    return self.concentration.shape.with_rank_at_least(1)[-1:]
+    return tensorshape_util.with_rank_at_least(self.concentration.shape, 1)[-1:]
 
   def _sample_n(self, n, seed=None):
     seed = seed_stream.SeedStream(seed, "dirichlet_multinomial")
@@ -326,7 +333,7 @@ class DirichletMultinomial(distribution.Distribution):
     concentration = distribution_util.embed_check_categorical_event_shape(
         concentration)
     return distribution_util.with_dependencies([
-        tf.compat.v1.assert_positive(
+        assert_util.assert_positive(
             concentration, message="Concentration parameter must be positive."),
     ], concentration)
 
@@ -336,7 +343,7 @@ class DirichletMultinomial(distribution.Distribution):
       return counts
     counts = distribution_util.embed_check_nonnegative_integer_form(counts)
     return distribution_util.with_dependencies([
-        tf.compat.v1.assert_equal(
+        assert_util.assert_equal(
             self.total_count,
             tf.reduce_sum(input_tensor=counts, axis=-1),
             message="counts last-dimension must sum to `self.total_count`"),

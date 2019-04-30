@@ -20,10 +20,11 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import special_math
@@ -102,13 +103,13 @@ class HalfNormal(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[scale]) as name:
+    with tf.name_scope(name) as name:
       scale = tf.convert_to_tensor(
           value=scale,
           name="scale",
           dtype=dtype_util.common_dtype([scale], preferred_dtype=tf.float32))
       with tf.control_dependencies(
-          [tf.compat.v1.assert_positive(scale)] if validate_args else []):
+          [assert_util.assert_positive(scale)] if validate_args else []):
         self._scale = tf.identity(scale, name="scale")
     super(HalfNormal, self).__init__(
         dtype=self._scale.dtype,
@@ -122,6 +123,10 @@ class HalfNormal(distribution.Distribution):
   @staticmethod
   def _param_shapes(sample_shape):
     return {"scale": tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)}
+
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(scale=0)
 
   @property
   def scale(self):
@@ -184,8 +189,7 @@ def _kl_half_normal_half_normal(a, b, name=None):
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.name_scope(name, "kl_half_normal_half_normal",
-                     [a.scale, b.scale]):
+  with tf.name_scope(name or "kl_half_normal_half_normal"):
     # Consistent with
     # http://www.mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 119
     return (tf.math.log(b.scale) - tf.math.log(a.scale) +

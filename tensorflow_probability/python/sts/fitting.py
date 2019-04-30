@@ -62,47 +62,6 @@ def sample_uniform_initial_state(parameter,
     return uniform_initializer
 
 
-def pad_batch_dimension_for_multiple_chains(observed_time_series,
-                                            model,
-                                            chain_batch_shape):
-  """"Expand the observed time series with extra batch dimension(s)."""
-
-  # Running with multiple chains introduces an extra batch dimension. In
-  # general we also need to pad the observed time series with a matching batch
-  # dimension.
-  #
-  # For example, suppose our model has batch shape [3, 4] and
-  # the observed time series has shape `concat([[5], [3, 4], [100])`,
-  # corresponding to `sample_shape`, `batch_shape`, and `num_timesteps`
-  # respectively. The model will produce distributions with batch shape
-  # `concat([chain_batch_shape, [3, 4]])`, so we pad `observed_time_series` to
-  # have matching shape `[5, 1, 3, 4, 100]`, where the added `1` dimension
-  # between the sample and batch shapes will broadcast to `chain_batch_shape`.
-
-  observed_time_series = sts_util.maybe_expand_trailing_dim(
-      observed_time_series)  # Guarantee `event_ndims=2`
-  event_ndims = 2  # event_shape = [num_timesteps, observation_size=1]
-
-  model_batch_ndims = (
-      model.batch_shape.ndims if model.batch_shape.ndims is not None else
-      tf.shape(input=model.batch_shape_tensor())[0])
-
-  # Compute ndims from chain_batch_shape.
-  chain_batch_shape = tf.convert_to_tensor(
-      value=chain_batch_shape, name='chain_batch_shape', dtype=tf.int32)
-  if not chain_batch_shape.shape.is_fully_defined():
-    raise ValueError('Batch shape must have static rank. (given: {})'.format(
-        chain_batch_shape))
-  if chain_batch_shape.shape.ndims == 0:  # expand int `k` to `[k]`.
-    chain_batch_shape = chain_batch_shape[tf.newaxis]
-  chain_batch_ndims = tf.compat.dimension_value(chain_batch_shape.shape[0])
-
-  for _ in range(chain_batch_ndims):
-    observed_time_series = tf.expand_dims(
-        observed_time_series, -(model_batch_ndims + event_ndims + 1))
-  return observed_time_series
-
-
 def _build_trainable_posterior(param, initial_loc_fn):
   """Built a transformed-normal variational dist over a parameter's support."""
   loc = tf.compat.v1.get_variable(
@@ -165,7 +124,9 @@ def build_factored_variational_loss(model,
     observed_time_series: `float` `Tensor` of shape
       `concat([sample_shape, model.batch_shape, [num_timesteps, 1]]) where
       `sample_shape` corresponds to i.i.d. observations, and the trailing `[1]`
-      dimension may (optionally) be omitted if `num_timesteps > 1`.
+      dimension may (optionally) be omitted if `num_timesteps > 1`. May
+      optionally be an instance of `tfp.sts.MaskedTimeSeries`, which includes
+      a mask `Tensor` to specify timesteps with missing observations.
     init_batch_shape: Batch shape (Python `tuple`, `list`, or `int`) of initial
       states to optimize in parallel.
       Default value: `()`. (i.e., just run a single optimization).
@@ -265,10 +226,9 @@ def build_factored_variational_loss(model,
 
   """
 
-  with tf.name_scope(name, 'build_factored_variational_loss',
-                     values=[observed_time_series]) as name:
-    observed_time_series = tf.convert_to_tensor(
-        value=observed_time_series, name='observed_time_series')
+  with tf.compat.v1.name_scope(
+      name, 'build_factored_variational_loss',
+      values=[observed_time_series]) as name:
     seed = tfd.SeedStream(
         seed, salt='StructuralTimeSeries_build_factored_variational_loss')
 
@@ -287,7 +247,7 @@ def build_factored_variational_loss(model,
     # Multiple initializations (similar to HMC chains) manifest as an extra
     # param batch dimension, so we need to add corresponding batch dimension(s)
     # to `observed_time_series`.
-    observed_time_series = pad_batch_dimension_for_multiple_chains(
+    observed_time_series = sts_util.pad_batch_dimension_for_multiple_chains(
         observed_time_series, model, chain_batch_shape=init_batch_shape)
 
     # Construct the variational bound.
@@ -314,9 +274,12 @@ def _minimize_in_graph(build_loss_fn, num_steps=200, optimizer=None):
         build_loss_fn if tf.executing_eagerly() else build_loss_fn())
     return tf.tuple(tensors=[tf.add(step, 1)], control_inputs=[train_op])
 
-  return tf.while_loop(cond=lambda step: step < num_steps,
-                       body=train_loop_body,
-                       loop_vars=[tf.constant(0)])
+  minimize_op = tf.compat.v1.while_loop(
+      cond=lambda step: step < num_steps,
+      body=train_loop_body,
+      loop_vars=[tf.constant(0)],
+      return_same_structure=True)[0]  # Always return a single op.
+  return minimize_op
 
 
 def fit_with_hmc(model,
@@ -356,7 +319,9 @@ def fit_with_hmc(model,
     observed_time_series: `float` `Tensor` of shape
       `concat([sample_shape, model.batch_shape, [num_timesteps, 1]]) where
       `sample_shape` corresponds to i.i.d. observations, and the trailing `[1]`
-      dimension may (optionally) be omitted if `num_timesteps > 1`.
+      dimension may (optionally) be omitted if `num_timesteps > 1`. May
+      optionally be an instance of `tfp.sts.MaskedTimeSeries`, which includes
+      a mask `Tensor` to specify timesteps with missing observations.
     num_results: Integer number of Markov chain draws.
       Default value: `100`.
     num_warmup_steps: Integer number of steps to take before starting to
@@ -385,7 +350,7 @@ def fit_with_hmc(model,
       Default value: `[]` (i.e., a single chain).
     num_variational_steps: Python `int` number of steps to run the variational
       optimization to determine the initial state and step sizes.
-      Default value: `200`.
+      Default value: `150`.
     variational_optimizer: Optional `tf.train.Optimizer` instance to use in
       the variational optimization. If `None`, defaults to
       `tf.train.AdamOptimizer(0.1)`.
@@ -449,7 +414,7 @@ def fit_with_hmc(model,
     samples_, kernel_results_ = sess.run((samples, kernel_results))
 
   print("acceptance rate: {}".format(
-    np.mean(kernel_results_.inner_results.is_accepted, axis=0)))
+    np.mean(kernel_results_.inner_results.inner_results.is_accepted, axis=0)))
 
   # Plot the sampled traces for each parameter. If the chains have mixed, their
   # traces should all cover the same region of state space, frequently crossing
@@ -479,14 +444,14 @@ def fit_with_hmc(model,
 
   ```python
   transformed_hmc_kernel = mcmc.TransformedTransitionKernel(
-      inner_kernel=mcmc.HamiltonianMonteCarlo(
-          target_log_prob_fn=model.joint_log_prob(observed_time_series),
-          step_size=step_size,
-          num_leapfrog_steps=num_leapfrog_steps,
-          step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy(
-            num_adaptation_steps=num_adaptation_steps),
-          state_gradients_are_stopped=True,
-          seed=seed),
+      inner_kernel=mcmc.SimpleStepSizeAdaptation(
+          inner_kernel=mcmc.HamiltonianMonteCarlo(
+              target_log_prob_fn=model.joint_log_prob(observed_time_series),
+              step_size=step_size,
+              num_leapfrog_steps=num_leapfrog_steps,
+              state_gradients_are_stopped=True,
+              seed=seed),
+          num_adaptation_steps = int(0.8 * num_warmup_steps)),
       bijector=[param.bijector for param in model.parameters])
 
   # Initialize from a Uniform[-2, 2] distribution in unconstrained space.
@@ -509,10 +474,8 @@ def fit_with_hmc(model,
        https://arxiv.org/abs/1411.6669
 
   """
-  with tf.name_scope(name, 'fit_with_hmc',
-                     values=[observed_time_series]) as name:
-    observed_time_series = tf.convert_to_tensor(
-        value=observed_time_series, name='observed_time_series')
+  with tf.compat.v1.name_scope(
+      name, 'fit_with_hmc', values=[observed_time_series]) as name:
     seed = tfd.SeedStream(seed, salt='StructuralTimeSeries_fit_with_hmc')
 
     # Initialize state and step sizes from a variational posterior if not
@@ -548,49 +511,27 @@ def fit_with_hmc(model,
 
     # Multiple chains manifest as an extra param batch dimension, so we need to
     # add a corresponding batch dimension to `observed_time_series`.
-    observed_time_series = pad_batch_dimension_for_multiple_chains(
+    observed_time_series = sts_util.pad_batch_dimension_for_multiple_chains(
         observed_time_series, model, chain_batch_shape=chain_batch_shape)
 
-    # When the initial step size depends on a variational optimization, we
-    # can't initialize step size variables before the optimization runs.
-    # Instead we initialize with a dummy value of the appropriate
-    # shape, then wrap the HMC chain with `control_dependencies` to ensure the
-    # variational step sizes are assigned before HMC actually runs.
-    step_size = [
-        tf.compat.v1.get_variable(
-            initializer=tf.zeros_like(
-                sample_uniform_initial_state(
-                    param,
-                    init_sample_shape=chain_batch_shape,
-                    return_constrained=False)),
-            name='{}_step_size'.format(param.name),
-            trainable=False,
-            use_resource=True)
-        for (param, ss) in zip(model.parameters, initial_step_size)
-    ]
-    step_size_init_op = tf.group([
-        tf.compat.v1.assign(ss, initial_ss)
-        for (ss, initial_ss) in zip(step_size, initial_step_size)
-    ])
-
     # Run HMC to sample from the posterior on parameters.
-    with tf.control_dependencies([step_size_init_op]):
-      samples, kernel_results = mcmc.sample_chain(
-          num_results=num_results,
-          current_state=initial_state,
-          num_burnin_steps=num_warmup_steps,
-          kernel=mcmc.TransformedTransitionKernel(
-              inner_kernel=mcmc.HamiltonianMonteCarlo(
-                  target_log_prob_fn=model.joint_log_prob(observed_time_series),
-                  step_size=step_size,
-                  num_leapfrog_steps=num_leapfrog_steps,
-                  step_size_update_fn=mcmc.make_simple_step_size_update_policy(
-                      num_adaptation_steps=int(num_warmup_steps * 0.8),
-                      decrement_multiplier=0.1,
-                      increment_multiplier=0.1),
-                  state_gradients_are_stopped=True,
-                  seed=seed()),
-              bijector=[param.bijector for param in model.parameters]),
-          parallel_iterations=1 if seed is not None else 10)
+    samples, kernel_results = mcmc.sample_chain(
+        num_results=num_results,
+        current_state=initial_state,
+        num_burnin_steps=num_warmup_steps,
+        kernel=mcmc.SimpleStepSizeAdaptation(
+            inner_kernel=mcmc.TransformedTransitionKernel(
+                inner_kernel=mcmc.HamiltonianMonteCarlo(
+                    target_log_prob_fn=model.joint_log_prob(
+                        observed_time_series),
+                    step_size=initial_step_size,
+                    num_leapfrog_steps=num_leapfrog_steps,
+                    state_gradients_are_stopped=True,
+                    seed=seed()),
+                bijector=[param.bijector for param in model.parameters]),
+            num_adaptation_steps=int(num_warmup_steps * 0.8),
+            adaptation_rate=tf.convert_to_tensor(
+                value=0.1, dtype=initial_state[0].dtype)),
+        parallel_iterations=1 if seed is not None else 10)
 
     return samples, kernel_results

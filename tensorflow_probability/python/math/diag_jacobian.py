@@ -121,7 +121,7 @@ def diag_jacobian(xs,
     ValueError: if lists `xs` and `ys` have different length or both `ys` and
       `fn` are `None`, or `fn` is None in the eager execution mode.
   """
-  with tf.name_scope(name, 'jacobians_diag', [xs, ys]):
+  with tf.compat.v1.name_scope(name, 'jacobians_diag', [xs, ys]):
     if sample_shape is None:
       sample_shape = [1]
     # Output Jacobian diagonal

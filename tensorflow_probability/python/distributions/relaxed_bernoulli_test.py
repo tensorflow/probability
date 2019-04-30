@@ -21,10 +21,14 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 import scipy.special
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+
+from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
 tfd = tfp.distributions
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -73,9 +77,10 @@ class RelaxedBernoulliTest(tf.test.TestCase):
       temperature = 1.0
       p = np.random.random(batch_shape).astype(np.float32)
       dist = tfd.RelaxedBernoulli(temperature, probs=p)
-      self.assertAllEqual(batch_shape, dist.batch_shape.as_list())
+      self.assertAllEqual(batch_shape,
+                          tensorshape_util.as_list(dist.batch_shape))
       self.assertAllEqual(batch_shape, self.evaluate(dist.batch_shape_tensor()))
-      self.assertAllEqual([], dist.event_shape.as_list())
+      self.assertAllEqual([], tensorshape_util.as_list(dist.event_shape))
       self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
 
   def testZeroTemperature(self):
@@ -127,7 +132,7 @@ class RelaxedBernoulliTest(tf.test.TestCase):
     p = [0.2, 0.6, 0.5]
     dist = tfd.RelaxedBernoulli(temperature, probs=p)
     n = 10000
-    samples = dist.sample(n, seed=123)
+    samples = dist.sample(n, seed=tfp_test_util.test_seed())
     self.assertEqual(samples.dtype, tf.float32)
     sample_values = self.evaluate(samples)
     self.assertTrue(np.all(sample_values >= 0))

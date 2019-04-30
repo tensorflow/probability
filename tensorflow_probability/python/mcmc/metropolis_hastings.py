@@ -25,7 +25,7 @@ import tensorflow as tf
 
 from tensorflow_probability.python import distributions
 from tensorflow_probability.python.mcmc import kernel as kernel_base
-from tensorflow_probability.python.mcmc import util as mcmc_util
+from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
 
 __all__ = [
@@ -81,7 +81,7 @@ class MetropolisHastings(kernel_base.TransitionKernel):
   Metropolis-Hastings algorithm, i.e.,
 
   ```none
-  accept_prob(x' | x) = p(x') / p(x) (g(x|x') / g(x|x'))
+  accept_prob(x' | x) = p(x') / p(x) (g(x|x') / g(x'|x))
 
   where,
     p  represents the target distribution,
@@ -182,7 +182,7 @@ class MetropolisHastings(kernel_base.TransitionKernel):
       ValueError: if `inner_kernel` results doesn't contain the member
         "target_log_prob".
     """
-    with tf.name_scope(
+    with tf.compat.v1.name_scope(
         name=mcmc_util.make_name(self.name, 'mh', 'one_step'),
         values=[current_state, previous_kernel_results]):
       # Take one inner step.
@@ -259,7 +259,7 @@ class MetropolisHastings(kernel_base.TransitionKernel):
       ValueError: if `inner_kernel` results doesn't contain the member
         "target_log_prob".
     """
-    with tf.name_scope(
+    with tf.compat.v1.name_scope(
         name=mcmc_util.make_name(self.name, 'mh', 'bootstrap_results'),
         values=[init_state]):
       pkr = self.inner_kernel.bootstrap_results(init_state)

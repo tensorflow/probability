@@ -18,8 +18,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import dtype_util
 
 
 __all__ = [
@@ -77,7 +79,7 @@ class DiscreteCosineTransform(bijector.Bijector):
     return tf.signal.idct(y, type=self._dct_type, norm='ortho')
 
   def _inverse_log_det_jacobian(self, y):
-    return tf.constant(0., dtype=y.dtype.base_dtype)
+    return tf.constant(0., dtype=dtype_util.base_dtype(y.dtype))
 
   def _forward_log_det_jacobian(self, x):
-    return tf.constant(0., dtype=x.dtype.base_dtype)
+    return tf.constant(0., dtype=dtype_util.base_dtype(x.dtype))

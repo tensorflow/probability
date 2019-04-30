@@ -29,11 +29,22 @@ import numpy as np
 import six
 import tensorflow as tf
 
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     "Bijector",
+    "ConditionalBijector",
 ]
+
+
+def _get_current_graph():
+  if tf.executing_eagerly():
+    return None
+  return tf.compat.v1.get_default_graph()
 
 
 class _Mapping(
@@ -116,6 +127,78 @@ class _Mapping(
       return tuple(map(self._deep_tuple, x))
 
     return x
+
+
+class WeakKeyDefaultDict(dict):
+  """`WeakKeyDictionary` which always adds `defaultdict(dict)` in getitem."""
+
+  # Q:Why not subclass `collections.defaultdict`?
+  # Subclassing collections.defaultdict means we have a more complicated `repr`,
+  # `str` which makes debugging the bijector cache more tedious. Additionally it
+  # means we need to think about passing through __init__ args but manually
+  # specifying the `default_factory`. That is, just overriding `__missing__`
+  # ends up being a lot cleaner.
+
+  # Q:Why not subclass `weakref.WeakKeyDictionary`?
+  # `weakref.WeakKeyDictionary` has an even worse `repr`, `str` than
+  # collections.defaultdict. Plus, since we want explicit control over how the
+  # keys are created we need to override __getitem__ which is the only feature
+  # of `weakref.WeakKeyDictionary` we're using.
+
+  # This is the "WeakKey" part.
+  def __getitem__(self, key):
+    weak_key = HashableWeakRef(key, lambda w: self.pop(w, None))
+    return super(WeakKeyDefaultDict, self).__getitem__(weak_key)
+
+  # This is the "DefaultDict" part.
+  def __missing__(self, key):
+    assert isinstance(key, HashableWeakRef)  # Can't happen.
+    return super(WeakKeyDefaultDict, self).setdefault(key, {})
+
+  # Everything that follows is only useful to help make debugging easier.
+
+  def __contains__(self, key):
+    return super(WeakKeyDefaultDict, self).__contains__(HashableWeakRef(key))
+
+  # We don't want mutation except through __getitem__.
+
+  def __setitem__(self, *args, **kwargs):
+    raise NotImplementedError()
+
+  def update(self, *args, **kwargs):
+    raise NotImplementedError()
+
+  def setdefault(self, *args, **kwargs):
+    raise NotImplementedError()
+
+
+class HashableWeakRef(weakref.ref):
+  """weakref.ref which makes np.array objects hashable."""
+
+  def __hash__(self):
+    x = self()
+    if not isinstance(x, np.ndarray):
+      return hash(x)
+    # Note: The following logic can never be reached by the public API because
+    # the bijector base class always calls `convert_to_tensor` before accessing
+    # the cache.
+    x.flags.writeable = False
+    return hash(str(x.__array_interface__) + str(id(x)))
+
+  def __repr__(self):
+    return repr(self())
+
+  def __str__(self):
+    return str(self())
+
+  def __eq__(self, other):
+    x = self()
+    if isinstance(x, np.ndarray):
+      y = other()
+      return (isinstance(y, np.ndarray) and
+              x.__array_interface__ == y.__array_interface__ and
+              id(x) == id(y))
+    return super(HashableWeakRef, self).__eq__(other)
 
 
 @six.add_metaclass(abc.ABCMeta)
@@ -378,7 +461,7 @@ class Bijector(object):
           # The full log jacobian determinant would be tf.zero_like(x).
           # However, we circumvent materializing that, since the jacobian
           # calculation is input independent, and we specify it for one input.
-          return constant_op.constant(0., x.dtype.base_dtype)
+          return tf.constant(0., x.dtype)
 
       ```
 
@@ -553,11 +636,12 @@ class Bijector(object):
     self._forward_min_event_ndims = forward_min_event_ndims
     self._inverse_min_event_ndims = inverse_min_event_ndims
     self._is_constant_jacobian = is_constant_jacobian
-    self._constant_ildj = None
+    # Keyed by the current graph.
+    self._constant_ildj = {}
     self._validate_args = validate_args
     self._dtype = dtype
-    self._from_y = weakref.WeakKeyDictionary()
-    self._from_x = weakref.WeakKeyDictionary()
+    self._from_y = WeakKeyDefaultDict()
+    self._from_x = WeakKeyDefaultDict()
     if name:
       self._name = name
     else:
@@ -684,7 +768,13 @@ class Bijector(object):
     from tensorflow_probability.python.distributions import distribution  # pylint: disable=g-import-not-at-top
     from tensorflow_probability.python.distributions import transformed_distribution  # pylint: disable=g-import-not-at-top
 
-    if isinstance(value, transformed_distribution.TransformedDistribution):
+    # TODO(b/128841942): Handle Conditional distributions and bijectors.
+    if type(value) is transformed_distribution.TransformedDistribution:  # pylint: disable=unidiomatic-typecheck
+      # We cannot accept subclasses with different constructors here, because
+      # subclass constructors may accept constructor arguments TD doesn't know
+      # how to handle. e.g. `TypeError: __init__() got an unexpected keyword
+      # argument 'allow_nan_stats'` when doing
+      # `tfb.Identity()(tfd.Chi(df=1., allow_nan_stats=True))`.
       new_kwargs = value.parameters
       new_kwargs.update(kwargs)
       new_kwargs["name"] = name or new_kwargs.get("name", None)
@@ -731,7 +821,7 @@ class Bijector(object):
       forward_event_shape_tensor: `Tensor`, `int32` vector indicating
         event-portion shape after applying `forward`.
     """
-    with self._name_scope(name, [input_shape]):
+    with self._name_scope(name):
       input_shape = tf.convert_to_tensor(
           value=input_shape, dtype=tf.int32, name="input_shape")
       return self._forward_event_shape_tensor(input_shape)
@@ -775,7 +865,7 @@ class Bijector(object):
       inverse_event_shape_tensor: `Tensor`, `int32` vector indicating
         event-portion shape after applying `inverse`.
     """
-    with self._name_scope(name, [output_shape]):
+    with self._name_scope(name):
       output_shape = tf.convert_to_tensor(
           value=output_shape, dtype=tf.int32, name="output_shape")
       return self._inverse_event_shape_tensor(output_shape)
@@ -798,14 +888,15 @@ class Bijector(object):
       inverse_event_shape_tensor: `TensorShape` indicating event-portion shape
         after applying `inverse`. Possibly unknown.
     """
-    return self._inverse_event_shape(output_shape)
+    return self._inverse_event_shape(tf.TensorShape(output_shape))
 
   def _forward(self, x):
     """Subclass implementation for `forward` public function."""
     raise NotImplementedError("forward not implemented.")
 
   def _call_forward(self, x, name, **kwargs):
-    with self._name_scope(name, [x]):
+    """Wraps call to _forward, allowing extra shared logic."""
+    with self._name_scope(name):
       x = tf.convert_to_tensor(value=x, name="x")
       self._maybe_assert_dtype(x)
       if not self._is_injective:  # No caching for non-injective
@@ -823,12 +914,13 @@ class Bijector(object):
         self._cache_by_x(mapping)
       return mapping.y
 
-  def forward(self, x, name="forward"):
+  def forward(self, x, name="forward", **kwargs):
     """Returns the forward `Bijector` evaluation, i.e., X = g(Y).
 
     Args:
       x: `Tensor`. The input to the "forward" evaluation.
       name: The name to give this op.
+      **kwargs: Named arguments forwarded to subclass implementation.
 
     Returns:
       `Tensor`.
@@ -838,14 +930,15 @@ class Bijector(object):
         `self.dtype`.
       NotImplementedError: if `_forward` is not implemented.
     """
-    return self._call_forward(x, name)
+    return self._call_forward(x, name, **kwargs)
 
   def _inverse(self, y):
     """Subclass implementation for `inverse` public function."""
     raise NotImplementedError("inverse not implemented")
 
   def _call_inverse(self, y, name, **kwargs):
-    with self._name_scope(name, [y]):
+    """Wraps call to _inverse, allowing extra shared logic."""
+    with self._name_scope(name):
       y = tf.convert_to_tensor(value=y, name="y")
       self._maybe_assert_dtype(y)
       if not self._is_injective:  # No caching for non-injective
@@ -863,12 +956,13 @@ class Bijector(object):
         self._cache_by_y(mapping)
       return mapping.x
 
-  def inverse(self, y, name="inverse"):
+  def inverse(self, y, name="inverse", **kwargs):
     """Returns the inverse `Bijector` evaluation, i.e., X = g^{-1}(Y).
 
     Args:
       y: `Tensor`. The input to the "inverse" evaluation.
       name: The name to give this op.
+      **kwargs: Named arguments forwarded to subclass implementation.
 
     Returns:
       `Tensor`, if this bijector is injective.
@@ -880,20 +974,7 @@ class Bijector(object):
         `self.dtype`.
       NotImplementedError: if `_inverse` is not implemented.
     """
-    return self._call_inverse(y, name)
-
-  def _has_inverse_log_det_jacobian_def(self):
-    return hasattr(self, "_inverse_log_det_jacobian")
-
-  def _has_forward_log_det_jacobian_def(self):
-    return hasattr(self, "_forward_log_det_jacobian")
-
-  def _check_has_log_det_jacobian_def(self):
-    if not (self._has_inverse_log_det_jacobian_def() or
-            self._has_forward_log_det_jacobian_def()):
-      raise NotImplementedError(
-          "Neither _forward_log_det_jacobian nor _inverse_log_det_jacobian "
-          "is implemented. One or the other is required.")
+    return self._call_inverse(y, name, **kwargs)
 
   def _compute_inverse_log_det_jacobian_with_caching(
       self, x, y, prefer_inverse_ldj_fn, event_ndims, kwargs):
@@ -952,14 +1033,18 @@ class Bijector(object):
         Also updates the cache as needed.
     """
     # Ensure at least one of _inverse/_forward_log_det_jacobian is defined.
-    self._check_has_log_det_jacobian_def()
+    if not (hasattr(self, "_inverse_log_det_jacobian") or
+            hasattr(self, "_forward_log_det_jacobian")):
+      raise NotImplementedError(
+          "Neither _forward_log_det_jacobian nor _inverse_log_det_jacobian "
+          "is implemented. One or the other is required.")
 
     # Use inverse_log_det_jacobian if either
     #   1. it is preferred to *and* we are able, or
     #   2. forward ldj fn isn't implemented (so we have no choice).
     use_inverse_ldj_fn = (
-        (prefer_inverse_ldj_fn and self._has_inverse_log_det_jacobian_def()) or
-        not self._has_forward_log_det_jacobian_def())
+        (prefer_inverse_ldj_fn and hasattr(self, "_inverse_log_det_jacobian"))
+        or not hasattr(self, "_forward_log_det_jacobian"))
 
     if use_inverse_ldj_fn:
       tensor_to_use = y if y is not None else self.forward(x, **kwargs)
@@ -1047,14 +1132,15 @@ class Bijector(object):
       ildj: the (un-reduce_sum'ed) value of the ILDJ for the specified input.
         Also updates the cache as needed.
     """
-    if self._constant_ildj is not None:
-      return self._constant_ildj
+    current_graph = _get_current_graph()
+    if current_graph in self._constant_ildj:
+      return self._constant_ildj[current_graph]
 
     if use_inverse_ldj_fn:
       ildj = self._inverse_log_det_jacobian(tensor_to_use, **kwargs)
     else:
       ildj = -self._forward_log_det_jacobian(tensor_to_use, **kwargs)
-    self._constant_ildj = ildj
+    self._constant_ildj[current_graph] = ildj
     return ildj
 
   def _call_inverse_log_det_jacobian(self, y, event_ndims, name, **kwargs):
@@ -1079,7 +1165,7 @@ class Bijector(object):
       ildj: the inverse log det jacobian at `y`. Also updates the cache as
         needed.
     """
-    with self._name_scope(name, [y]), tf.control_dependencies(
+    with self._name_scope(name), tf.control_dependencies(
         self._check_valid_event_ndims(
             min_event_ndims=self.inverse_min_event_ndims,
             event_ndims=event_ndims)):
@@ -1089,9 +1175,10 @@ class Bijector(object):
       if not self._is_injective:
         ildjs = self._inverse_log_det_jacobian(y, **kwargs)
         return tuple(
-            self._reduce_jacobian_det_over_event(
-                tf.shape(
-                    input=y), ildj, self.inverse_min_event_ndims, event_ndims)
+            self._reduce_jacobian_det_over_event(  # pylint: disable=g-complex-comprehension
+                tf.shape(input=y),
+                ildj,
+                self.inverse_min_event_ndims, event_ndims)
             for ildj in ildjs)
 
       return self._compute_inverse_log_det_jacobian_with_caching(
@@ -1104,7 +1191,8 @@ class Bijector(object):
   def inverse_log_det_jacobian(self,
                                y,
                                event_ndims,
-                               name="inverse_log_det_jacobian"):
+                               name="inverse_log_det_jacobian",
+                               **kwargs):
     """Returns the (log o det o Jacobian o inverse)(y).
 
     Mathematically, returns: `log(det(dX/dY))(Y)`. (Recall that: `X=g^{-1}(Y)`.)
@@ -1118,8 +1206,9 @@ class Bijector(object):
         transformed. Must be greater than or equal to
         `self.inverse_min_event_ndims`. The result is summed over the final
         dimensions to produce a scalar Jacobian determinant for each event, i.e.
-        it has shape `y.shape.ndims - event_ndims` dimensions.
+        it has shape `rank(y) - event_ndims` dimensions.
       name: The name to give this op.
+      **kwargs: Named arguments forwarded to subclass implementation.
 
     Returns:
       ildj: `Tensor`, if this bijector is injective.
@@ -1132,7 +1221,7 @@ class Bijector(object):
         `self.dtype`.
       NotImplementedError: if `_inverse_log_det_jacobian` is not implemented.
     """
-    return self._call_inverse_log_det_jacobian(y, event_ndims, name)
+    return self._call_inverse_log_det_jacobian(y, event_ndims, name, **kwargs)
 
   def _call_forward_log_det_jacobian(self, x, event_ndims, name, **kwargs):
     """Wraps call to _forward_log_det_jacobian, allowing extra shared logic.
@@ -1160,7 +1249,7 @@ class Bijector(object):
           "forward_log_det_jacobian cannot be implemented for non-injective "
           "transforms.")
 
-    with self._name_scope(name, [x]), tf.control_dependencies(
+    with self._name_scope(name), tf.control_dependencies(
         self._check_valid_event_ndims(
             min_event_ndims=self.forward_min_event_ndims,
             event_ndims=event_ndims)):
@@ -1177,7 +1266,8 @@ class Bijector(object):
   def forward_log_det_jacobian(self,
                                x,
                                event_ndims,
-                               name="forward_log_det_jacobian"):
+                               name="forward_log_det_jacobian",
+                               **kwargs):
     """Returns both the forward_log_det_jacobian.
 
     Args:
@@ -1186,8 +1276,9 @@ class Bijector(object):
         transformed. Must be greater than or equal to
         `self.forward_min_event_ndims`. The result is summed over the final
         dimensions to produce a scalar Jacobian determinant for each event, i.e.
-        it has shape `x.shape.ndims - event_ndims` dimensions.
+        it has shape `rank(x) - event_ndims` dimensions.
       name: The name to give this op.
+      **kwargs: Named arguments forwarded to subclass implementation.
 
     Returns:
       `Tensor`, if this bijector is injective.
@@ -1200,19 +1291,19 @@ class Bijector(object):
         nor {`_inverse`, `_inverse_log_det_jacobian`} are implemented, or
         this is a non-injective bijector.
     """
-    return self._call_forward_log_det_jacobian(x, event_ndims, name)
+    return self._call_forward_log_det_jacobian(x, event_ndims, name, **kwargs)
 
   @contextlib.contextmanager
-  def _name_scope(self, name=None, values=None):
+  def _name_scope(self, name=None):
     """Helper function to standardize op scope."""
-    with tf.name_scope(self.name):
-      with tf.name_scope(
-          name, values=(values or []) + self.graph_parents) as scope:
+    with tf.compat.v2.name_scope(self.name):
+      with tf.compat.v2.name_scope(name) as scope:
         yield scope
 
   def _maybe_assert_dtype(self, x):
     """Helper to check dtype when self.dtype is known."""
-    if self.dtype is not None and self.dtype.base_dtype != x.dtype.base_dtype:
+    if (self.dtype is not None and
+        not dtype_util.base_equal(self.dtype, x.dtype)):
       raise TypeError(
           "Input had dtype %s but expected %s." % (x.dtype, self.dtype))
 
@@ -1224,7 +1315,7 @@ class Bijector(object):
         mapping=self._lookup(mapping.x, mapping.y, mapping.kwargs))
     if mapping.x is None:
       raise ValueError("Caching expects x to be known, i.e., not None.")
-    self._from_x.setdefault(mapping.x, {})[mapping.subkey] = mapping.remove("x")
+    self._from_x[mapping.x][mapping.subkey] = mapping.remove("x")
 
   def _cache_by_y(self, mapping):
     """Helper which stores new mapping info in the inverse dict."""
@@ -1234,15 +1325,13 @@ class Bijector(object):
         mapping=self._lookup(mapping.x, mapping.y, mapping.kwargs))
     if mapping.y is None:
       raise ValueError("Caching expects y to be known, i.e., not None.")
-    self._from_y.setdefault(mapping.y, {})[mapping.subkey] = mapping.remove("y")
+    self._from_y[mapping.y][mapping.subkey] = mapping.remove("y")
 
   def _cache_update(self, mapping):
     """Helper which updates only those cached entries that already exist."""
-    if (mapping.x is not None and
-        mapping.subkey in self._from_x.get(mapping.x, {})):
+    if mapping.x is not None and mapping.subkey in self._from_x[mapping.x]:
       self._cache_by_x(mapping)
-    if (mapping.y is not None and
-        mapping.subkey in self._from_y.get(mapping.y, {})):
+    if mapping.y is not None and mapping.subkey in self._from_y[mapping.y]:
       self._cache_by_y(mapping)
 
   def _lookup(self, x=None, y=None, kwargs=None):
@@ -1251,10 +1340,10 @@ class Bijector(object):
     subkey = mapping.subkey
     if x is not None:
       # We removed x at caching time. Add it back if we lookup successfully.
-      mapping = self._from_x.get(x, {}).get(subkey, mapping).merge(x=x)
+      mapping = self._from_x[x].get(subkey, mapping).merge(x=x)
     if y is not None:
       # We removed y at caching time. Add it back if we lookup successfully.
-      mapping = self._from_y.get(y, {}).get(subkey, mapping).merge(y=y)
+      mapping = self._from_y[y].get(subkey, mapping).merge(y=y)
     return mapping
 
   def _reduce_jacobian_det_over_event(
@@ -1287,12 +1376,12 @@ class Bijector(object):
     event_ndims_ = tf.get_static_value(event_ndims)
     assertions = []
 
-    if not event_ndims.dtype.is_integer:
+    if not dtype_util.is_integer(event_ndims.dtype):
       raise ValueError("Expected integer dtype, got dtype {}".format(
           event_ndims.dtype))
 
     if event_ndims_ is not None:
-      if event_ndims.shape.ndims != 0:
+      if tensorshape_util.rank(event_ndims.shape) != 0:
         raise ValueError("Expected scalar event_ndims, got shape {}".format(
             event_ndims.shape))
       if min_event_ndims > event_ndims_:
@@ -1301,17 +1390,17 @@ class Bijector(object):
                                                        min_event_ndims))
     elif self.validate_args:
       assertions += [
-          tf.compat.v1.assert_greater_equal(event_ndims, min_event_ndims)
+          assert_util.assert_greater_equal(event_ndims, min_event_ndims)
       ]
 
-    if event_ndims.shape.is_fully_defined():
-      if event_ndims.shape.ndims != 0:
+    if tensorshape_util.is_fully_defined(event_ndims.shape):
+      if tensorshape_util.rank(event_ndims.shape) != 0:
         raise ValueError("Expected scalar shape, got ndims {}".format(
-            event_ndims.shape.ndims))
+            tensorshape_util.rank(event_ndims.shape)))
 
     elif self.validate_args:
       assertions += [
-          tf.compat.v1.assert_rank(event_ndims, 0, message="Expected scalar.")
+          assert_util.assert_rank(event_ndims, 0, message="Expected scalar.")
       ]
     return assertions
 
@@ -1330,3 +1419,15 @@ class Bijector(object):
       event_ndims_ = int(event_ndims_)
 
     return event_ndims_
+
+
+class ConditionalBijector(Bijector):
+  """Conditional Bijector is a Bijector that allows intrinsic conditioning."""
+
+  @deprecation.deprecated(
+      "2019-07-01",
+      "`ConditionalBijector` is no longer required; `Bijector` "
+      "top-level functions now pass-through `**kwargs`.",
+      warn_once=True)
+  def __new__(cls, *args, **kwargs):  # pylint: disable=unused-argument
+    return super(ConditionalBijector, cls).__new__(cls)

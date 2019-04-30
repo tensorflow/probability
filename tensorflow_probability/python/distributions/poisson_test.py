@@ -19,10 +19,12 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 from scipy import stats
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 tfd = tfp.distributions
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
@@ -81,20 +83,20 @@ class PoissonTest(test_case.TestCase):
         x * poisson.log_rate - tf.math.lgamma(1. + x) - poisson.rate)
     neg_inf = tf.fill(
         tf.shape(input=expected_continuous_log_pmf),
-        value=np.array(
-            -np.inf, dtype=expected_continuous_log_pmf.dtype.as_numpy_dtype))
+        value=dtype_util.as_numpy_dtype(
+            expected_continuous_log_pmf.dtype)(-np.inf))
     expected_continuous_log_pmf = tf.where(x >= 0.,
                                            expected_continuous_log_pmf,
                                            neg_inf)
     expected_continuous_pmf = tf.exp(expected_continuous_log_pmf)
 
     log_pmf = poisson.log_prob(x)
-    self.assertEqual(log_pmf.get_shape(), (batch_size,))
+    self.assertEqual((batch_size,), log_pmf.shape)
     self.assertAllClose(self.evaluate(log_pmf),
                         self.evaluate(expected_continuous_log_pmf))
 
     pmf = poisson.prob(x)
-    self.assertEqual(pmf.get_shape(), (batch_size,))
+    self.assertEqual((batch_size,), pmf.shape)
     self.assertAllClose(self.evaluate(pmf),
                         self.evaluate(expected_continuous_pmf))
 
@@ -265,7 +267,7 @@ class PoissonTest(test_case.TestCase):
     # within `k` std. deviations of actual up to rtol precision.
     n = int(100e3)
     poisson = self._make_poisson(rate=lam)
-    samples = poisson.sample(n, seed=123456)
+    samples = poisson.sample(n, seed=tfp_test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n,))
     self.assertEqual(sample_values.shape, (n,))
@@ -279,7 +281,7 @@ class PoissonTest(test_case.TestCase):
     # Choosing `n >= (k/rtol)**2, roughly ensures our sample mean should be
     # within `k` std. deviations of actual up to rtol precision.
     n = int(100e3)
-    samples = poisson.sample(n, seed=123456)
+    samples = poisson.sample(n, seed=tfp_test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n, 1, 50))
     self.assertEqual(sample_values.shape, (n, 1, 50))
@@ -293,7 +295,7 @@ class PoissonTest(test_case.TestCase):
     # variance should be within `k` std. deviations of actual up to rtol
     # precision.
     n = int(300e3)
-    samples = poisson.sample(n, seed=123456)
+    samples = poisson.sample(n, seed=tfp_test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n, 1, 10))
     self.assertEqual(sample_values.shape, (n, 1, 10))

@@ -63,9 +63,9 @@ du.reduce_weighted_logsumexp(x, w, axis=[0, 1])
 
 * <b>`logx`</b>: The tensor to reduce. Should have numeric type.
 * <b>`w`</b>: The weight tensor. Should have numeric type identical to `logx`.
-* <b>`axis`</b>: The dimensions to reduce. If `None` (the default),
-    reduces all dimensions. Must be in the range
-    `[-rank(input_tensor), rank(input_tensor))`.
+* <b>`axis`</b>: The dimensions to reduce. If `None` (the default), reduces all
+    dimensions. Must be in the range `[-rank(input_tensor),
+    rank(input_tensor))`.
 * <b>`keep_dims`</b>: If true, retains reduced dimensions with length 1.
 * <b>`return_sign`</b>: If `True`, returns the sign of the result.
 * <b>`name`</b>: A name for the operation (optional).

@@ -144,8 +144,8 @@ class LocalLevelStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
         Default value: "LocalLevelStateSpaceModel".
     """
 
-    with tf.name_scope(
-        name, 'LocalLevelStateSpaceModel', [level_scale]) as name:
+    with tf.compat.v1.name_scope(name, 'LocalLevelStateSpaceModel',
+                                 [level_scale]) as name:
 
       # The initial state prior determines the dtype of sampled values.
       # Other model parameters must have the same dtype.
@@ -226,24 +226,22 @@ class LocalLevel(StructuralTimeSeries):
         `batch_shape + [T, 1]` (omitting the trailing unit dimension is also
         supported when `T > 1`), specifying an observed time series.
         Any priors not explicitly set will be given default values according to
-        the scale of the observed time series (or batch of time series).
+        the scale of the observed time series (or batch of time series). May
+        optionally be an instance of `tfp.sts.MaskedTimeSeries`, which includes
+        a mask `Tensor` to specify timesteps with missing observations.
         Default value: `None`.
       name: the name of this model component.
         Default value: 'LocalLevel'.
     """
 
-    with tf.name_scope(
+    with tf.compat.v1.name_scope(
         name, 'LocalLevel', values=[observed_time_series]) as name:
 
       dtype = dtype_util.common_dtype([level_scale_prior, initial_level_prior])
 
       if level_scale_prior is None or initial_level_prior is None:
         if observed_time_series is not None:
-          observed_time_series = tf.convert_to_tensor(
-              value=observed_time_series,
-              dtype=dtype,
-              name='observed_time_series')
-          observed_stddev, observed_initial = (
+          _, observed_stddev, observed_initial = (
               sts_util.empirical_statistics(observed_time_series))
         else:
           observed_stddev, observed_initial = (tf.convert_to_tensor(

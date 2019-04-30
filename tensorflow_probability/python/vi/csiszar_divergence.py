@@ -92,7 +92,7 @@ def amari_alpha(logu, alpha=1., self_normalized=False, name=None):
     TypeError: if `alpha` is `None` or a `Tensor`.
     TypeError: if `self_normalized` is `None` or a `Tensor`.
   """
-  with tf.name_scope(name, "amari_alpha", [logu]):
+  with tf.compat.v1.name_scope(name, "amari_alpha", [logu]):
     if alpha is None or tf.is_tensor(alpha):
       raise TypeError("`alpha` cannot be `None` or `Tensor` type.")
     if (self_normalized is None or tf.is_tensor(self_normalized)):
@@ -162,7 +162,7 @@ def kl_reverse(logu, self_normalized=False, name=None):
     TypeError: if `self_normalized` is `None` or a `Tensor`.
   """
 
-  with tf.name_scope(name, "kl_reverse", [logu]):
+  with tf.compat.v1.name_scope(name, "kl_reverse", [logu]):
     return amari_alpha(logu, alpha=0., self_normalized=self_normalized)
 
 
@@ -210,7 +210,7 @@ def kl_forward(logu, self_normalized=False, name=None):
     TypeError: if `self_normalized` is `None` or a `Tensor`.
   """
 
-  with tf.name_scope(name, "kl_forward", [logu]):
+  with tf.compat.v1.name_scope(name, "kl_forward", [logu]):
     return amari_alpha(logu, alpha=1., self_normalized=self_normalized)
 
 
@@ -263,7 +263,7 @@ def jensen_shannon(logu, self_normalized=False, name=None):
       evaluated at `u = exp(logu)`.
   """
 
-  with tf.name_scope(name, "jensen_shannon", [logu]):
+  with tf.compat.v1.name_scope(name, "jensen_shannon", [logu]):
     logu = tf.convert_to_tensor(value=logu, name="logu")
     npdt = logu.dtype.as_numpy_dtype
     y = tf.nn.softplus(logu)
@@ -317,7 +317,7 @@ def arithmetic_geometric(logu, self_normalized=False, name=None):
       Csiszar-function evaluated at `u = exp(logu)`.
   """
 
-  with tf.name_scope(name, "arithmetic_geometric", [logu]):
+  with tf.compat.v1.name_scope(name, "arithmetic_geometric", [logu]):
     logu = tf.convert_to_tensor(value=logu, name="logu")
     y = tf.nn.softplus(logu) - 0.5 * logu
     if self_normalized:
@@ -352,7 +352,7 @@ def total_variation(logu, name=None):
       evaluated at `u = exp(logu)`.
   """
 
-  with tf.name_scope(name, "total_variation", [logu]):
+  with tf.compat.v1.name_scope(name, "total_variation", [logu]):
     logu = tf.convert_to_tensor(value=logu, name="logu")
     return 0.5 * tf.abs(tf.math.expm1(logu))
 
@@ -384,7 +384,7 @@ def pearson(logu, name=None):
       `u = exp(logu)`.
   """
 
-  with tf.name_scope(name, "pearson", [logu]):
+  with tf.compat.v1.name_scope(name, "pearson", [logu]):
     logu = tf.convert_to_tensor(value=logu, name="logu")
     return tf.square(tf.math.expm1(logu))
 
@@ -419,7 +419,7 @@ def squared_hellinger(logu, name=None):
       evaluated at `u = exp(logu)`.
   """
 
-  with tf.name_scope(name, "squared_hellinger", [logu]):
+  with tf.compat.v1.name_scope(name, "squared_hellinger", [logu]):
     logu = tf.convert_to_tensor(value=logu, name="logu")
     return pearson(0.5 * logu)
 
@@ -454,7 +454,7 @@ def triangular(logu, name=None):
       at `u = exp(logu)`.
   """
 
-  with tf.name_scope(name, "triangular", [logu]):
+  with tf.compat.v1.name_scope(name, "triangular", [logu]):
     logu = tf.convert_to_tensor(value=logu, name="logu")
     return pearson(logu) / (1. + tf.exp(logu))
 
@@ -491,7 +491,7 @@ def t_power(logu, t, self_normalized=False, name=None):
     t_power_of_u: `float`-like `Tensor` of the Csiszar-function evaluated
       at `u = exp(logu)`.
   """
-  with tf.name_scope(name, "t_power", [logu, t]):
+  with tf.compat.v1.name_scope(name, "t_power", [logu, t]):
     logu = tf.convert_to_tensor(value=logu, name="logu")
     t = tf.convert_to_tensor(value=t, dtype=logu.dtype.base_dtype, name="t")
     fu = tf.math.expm1(t * logu)
@@ -542,7 +542,7 @@ def log1p_abs(logu, name=None):
       at `u = exp(logu)`.
   """
 
-  with tf.name_scope(name, "log1p_abs", [logu]):
+  with tf.compat.v1.name_scope(name, "log1p_abs", [logu]):
     logu = tf.convert_to_tensor(value=logu, name="logu")
     return tf.math.expm1(tf.abs(logu))
 
@@ -580,7 +580,7 @@ def jeffreys(logu, name=None):
       at `u = exp(logu)`.
   """
 
-  with tf.name_scope(name, "jeffreys", [logu]):
+  with tf.compat.v1.name_scope(name, "jeffreys", [logu]):
     logu = tf.convert_to_tensor(value=logu, name="logu")
     return 0.5 * tf.math.expm1(logu) * logu
 
@@ -612,7 +612,7 @@ def chi_square(logu, name=None):
       at `u = exp(logu)`.
   """
 
-  with tf.name_scope(name, "chi_square", [logu]):
+  with tf.compat.v1.name_scope(name, "chi_square", [logu]):
     logu = tf.convert_to_tensor(value=logu, name="logu")
     return tf.math.expm1(2. * logu)
 
@@ -653,7 +653,7 @@ def modified_gan(logu, self_normalized=False, name=None):
       at `u = exp(logu)`.
   """
 
-  with tf.name_scope(name, "chi_square", [logu]):
+  with tf.compat.v1.name_scope(name, "chi_square", [logu]):
     logu = tf.convert_to_tensor(value=logu, name="logu")
     y = tf.nn.softplus(logu) - logu
     if self_normalized:
@@ -705,7 +705,7 @@ def dual_csiszar_function(logu, csiszar_function, name=None):
       `f` at `u = exp(logu)`.
   """
 
-  with tf.name_scope(name, "dual_csiszar_function", [logu]):
+  with tf.compat.v1.name_scope(name, "dual_csiszar_function", [logu]):
     return tf.exp(logu) * csiszar_function(-logu)
 
 
@@ -774,7 +774,7 @@ def symmetrized_csiszar_function(logu, csiszar_function, name=None):
       symmetrization of `g` evaluated at `u = exp(logu)`.
   """
 
-  with tf.name_scope(name, "symmetrized_csiszar_function", [logu]):
+  with tf.compat.v1.name_scope(name, "symmetrized_csiszar_function", [logu]):
     logu = tf.convert_to_tensor(value=logu, name="logu")
     return 0.5 * (csiszar_function(logu)
                   + dual_csiszar_function(logu, csiszar_function))
@@ -881,12 +881,16 @@ def monte_carlo_csiszar_f_divergence(
       to parameters) is valid.
     TypeError: if `p_log_prob` is not a Python `callable`.
   """
-  with tf.name_scope(name, "monte_carlo_csiszar_f_divergence", [num_draws]):
+  reparameterization_types = tf.nest.flatten(q.reparameterization_type)
+  with tf.compat.v1.name_scope(name, "monte_carlo_csiszar_f_divergence",
+                               [num_draws]):
     if use_reparametrization is None:
-      use_reparametrization = (q.reparameterization_type
-                               == tfd.FULLY_REPARAMETERIZED)
+      use_reparametrization = all(
+          reparameterization_type == tfd.FULLY_REPARAMETERIZED
+          for reparameterization_type in reparameterization_types)
     elif (use_reparametrization and
-          q.reparameterization_type != tfd.FULLY_REPARAMETERIZED):
+          any(reparameterization_type != tfd.FULLY_REPARAMETERIZED
+              for reparameterization_type in reparameterization_types)):
       # TODO(jvdillon): Consider only raising an exception if the gradient is
       # requested.
       raise ValueError(
@@ -975,7 +979,8 @@ def csiszar_vimco(f,
        objectives. In _International Conference on Machine Learning_, 2016.
        https://arxiv.org/abs/1602.06725
   """
-  with tf.name_scope(name, "csiszar_vimco", [num_draws, num_batch_draws]):
+  with tf.compat.v1.name_scope(name, "csiszar_vimco",
+                               [num_draws, num_batch_draws]):
     if num_draws < 2:
       raise ValueError("Must specify num_draws > 1.")
     stop = tf.stop_gradient  # For readability.
@@ -1030,7 +1035,7 @@ def csiszar_vimco_helper(logu, name=None):
       ```
 
   """
-  with tf.name_scope(name, "csiszar_vimco_helper", [logu]):
+  with tf.compat.v1.name_scope(name, "csiszar_vimco_helper", [logu]):
     logu = tf.convert_to_tensor(value=logu, name="logu")
 
     n = tf.compat.dimension_value(logu.shape.with_rank_at_least(1)[0])

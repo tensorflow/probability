@@ -42,6 +42,7 @@ py_library(
         ":sample",
         ":sample_annealed_importance",
         ":sample_halton_sequence",
+        ":simple_step_size_adaptation",
         ":slice_sampler_kernel",
         ":transformed_kernel",
     ],
@@ -76,9 +77,9 @@ py_library(
     deps = [
         ":kernel",
         ":metropolis_hastings",
-        ":util",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/mcmc/internal",
     ],
 )
 
@@ -103,8 +104,8 @@ py_library(
     deps = [
         ":kernel",
         ":metropolis_hastings",
-        ":util",
         "//tensorflow_probability/python/math:diag_jacobian",
+        "//tensorflow_probability/python/mcmc/internal",
     ],
 )
 
@@ -135,9 +136,9 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         ":kernel",
-        ":util",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/mcmc/internal",
     ],
 )
 
@@ -159,8 +160,8 @@ py_library(
     deps = [
         ":kernel",
         ":metropolis_hastings",
-        ":util",
         # tensorflow dep,
+        "//tensorflow_probability/python/mcmc/internal",
     ],
 )
 
@@ -181,9 +182,9 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         ":kernel",
-        ":util",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/mcmc/internal",
     ],
 )
 
@@ -205,9 +206,9 @@ py_library(
     srcs = ["sample.py"],
     srcs_version = "PY2AND3",
     deps = [
-        ":util",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/mcmc/internal",
     ],
 )
 
@@ -228,9 +229,9 @@ py_library(
     srcs = ["sample_annealed_importance.py"],
     srcs_version = "PY2AND3",
     deps = [
-        ":util",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/mcmc/internal",
     ],
 )
 
@@ -274,18 +275,8 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         ":kernel",
-        ":slice_sampler_utils",
-        ":util",
         # tensorflow dep,
-    ],
-)
-
-py_library(
-    name = "slice_sampler_utils",
-    srcs = ["slice_sampler_utils.py"],
-    srcs_version = "PY2AND3",
-    deps = [
-        # tensorflow dep,
+        "//tensorflow_probability/python/mcmc/internal",
     ],
 )
 
@@ -296,10 +287,10 @@ py_test(
     srcs = ["slice_sampler_test.py"],
     shard_count = 6,
     deps = [
-        ":slice_sampler_utils",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/mcmc/internal",
     ],
 )
 
@@ -308,10 +299,10 @@ py_library(
     srcs = ["transformed_kernel.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":kernel",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/mcmc:kernel",
-        "//tensorflow_probability/python/mcmc:util",
+        "//tensorflow_probability/python/mcmc/internal",
     ],
 )
 
@@ -323,26 +314,6 @@ py_test(
     shard_count = 4,
     deps = [
         # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-    ],
-)
-
-py_library(
-    name = "util",
-    srcs = ["util.py"],
-    srcs_version = "PY2AND3",
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-    ],
-)
-
-py_test(
-    name = "util_test",
-    size = "small",
-    srcs = ["util_test.py"],
-    deps = [
         # tensorflow dep,
         "//tensorflow_probability",
     ],
@@ -379,6 +350,29 @@ py_test(
         ":eight_schools_hmc",
         # tensorflow dep,
         "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "simple_step_size_adaptation",
+    srcs = ["simple_step_size_adaptation.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":kernel",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/mcmc/internal",
+    ],
+)
+
+py_test(
+    name = "simple_step_size_adaptation_test",
+    srcs = ["simple_step_size_adaptation_test.py"],
+    deps = [
+        # absl/testing:parameterized dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 

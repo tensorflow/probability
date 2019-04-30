@@ -22,13 +22,26 @@ import collections
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.optimizer import linesearch
 
-# A namedtuple to hold a function value, directional derivative and the
-# full gradient. To be used with the linesearch method.
+# A namedtuple to hold the point at which a line function is evaluated, the
+# value of the function, directional derivative, and full gradient evaluated
+# evaluated at that point. To be used with the linesearch method.
 ValueAndGradient = collections.namedtuple('ValueAndGradient',
-                                          ['f', 'df', 'full_gradient'])
+                                          ['x', 'f', 'df', 'full_gradient'])
+
+
+def converged_any(converged, failed):
+  """Condition to stop when any batch member converges, or all have failed."""
+  return (tf.reduce_any(input_tensor=converged) |
+          tf.reduce_all(input_tensor=failed))
+
+
+def converged_all(converged, failed):
+  """Condition to stop when all batch members have converged or failed."""
+  return tf.reduce_all(input_tensor=converged | failed)
 
 
 def get_initial_state_args(value_and_gradients_function,
@@ -67,9 +80,10 @@ def get_initial_state_args(value_and_gradients_function,
       f0, df0 = value_and_gradients_function(initial_position)
   else:
     f0, df0 = value_and_gradients_function(initial_position)
+  converged = norm(df0, dims=1) < grad_tolerance
   return dict(
-      converged=_check_within_tolerance(df0, grad_tolerance),
-      failed=tf.convert_to_tensor(value=False),
+      converged=converged,
+      failed=tf.zeros_like(converged),  # i.e. False.
       num_iterations=tf.convert_to_tensor(value=0),
       num_objective_evaluations=tf.convert_to_tensor(value=1),
       position=initial_position,
@@ -78,7 +92,8 @@ def get_initial_state_args(value_and_gradients_function,
 
 
 def line_search_step(state, value_and_gradients_function, search_direction,
-                     grad_tolerance, f_relative_tolerance, x_tolerance):
+                     grad_tolerance, f_relative_tolerance, x_tolerance,
+                     stopping_condition):
   """Performs the line search step of the BFGS search procedure.
 
   Uses hager_zhang line search procedure to compute a suitable step size
@@ -92,23 +107,29 @@ def line_search_step(state, value_and_gradients_function, search_direction,
       `objective_value`, `objective_gradient`, `num_iterations`,
       `num_objective_evaluations`, `converged` and `failed`.
     value_and_gradients_function: A Python callable that accepts a point as a
-      real `Tensor` and returns a tuple of two tensors of the same dtype: the
-      objective function value, a real scalar `Tensor`, and its derivative, a
-      `Tensor` with the same shape as the input to the function.
-    search_direction: A real `Tensor` of the same shape as the `state.position`.
-      The direction along which to perform line search.
+      real `Tensor` of shape `[..., n]` and returns a tuple of two tensors of
+      the same dtype: the objective function value, a real `Tensor` of shape
+      `[...]`, and its derivative, another real `Tensor` of shape `[..., n]`.
+    search_direction: A real `Tensor` of shape `[..., n]`. The direction along
+      which to perform line search.
     grad_tolerance: Scalar `Tensor` of real dtype. Specifies the gradient
       tolerance for the procedure.
     f_relative_tolerance: Scalar `Tensor` of real dtype. Specifies the
       tolerance for the relative change in the objective value.
     x_tolerance: Scalar `Tensor` of real dtype. Specifies the tolerance for the
       change in the position.
-
+    stopping_condition: A Python function that takes as input two Boolean
+      tensors of shape `[...]`, and returns a Boolean scalar tensor. The input
+      tensors are `converged` and `failed`, indicating the current status of
+      each respective batch member; the return value states whether the
+      algorithm should stop.
   Returns:
     A copy of the input state with the following fields updated:
-      converged: True if the convergence criteria has been met.
-      failed: True if the line search procedure failed to converge, or if
-        either the updated gradient or objective function are no longer finite.
+      converged: a Boolean `Tensor` of shape `[...]` indicating whether the
+        convergence criteria has been met.
+      failed: a Boolean `Tensor` of shape `[...]` indicating whether the line
+        search procedure failed to converge, or if either the updated gradient
+        or objective function are no longer finite.
       num_iterations: Increased by 1.
       num_objective_evaluations: Increased by the number of times that the
         objective function got evaluated.
@@ -116,34 +137,45 @@ def line_search_step(state, value_and_gradients_function, search_direction,
         updated by computing the new position and evaluating the objective
         function at that position.
   """
-  dtype = state.position.dtype.base_dtype
   line_search_value_grad_func = _restrict_along_direction(
       value_and_gradients_function, state.position, search_direction)
-  derivative_at_start_pt = tf.reduce_sum(input_tensor=state.objective_gradient *
-                                         search_direction)
+  derivative_at_start_pt = tf.reduce_sum(
+      input_tensor=state.objective_gradient * search_direction, axis=-1)
+  val_0 = ValueAndGradient(x=_broadcast(0, state.position),
+                           f=state.objective_value,
+                           df=derivative_at_start_pt,
+                           full_gradient=state.objective_gradient)
+  inactive = state.failed | state.converged
   ls_result = linesearch.hager_zhang(
       line_search_value_grad_func,
-      initial_step_size=tf.convert_to_tensor(value=1, dtype=dtype),
-      objective_at_zero=state.objective_value,
-      grad_objective_at_zero=derivative_at_start_pt)
+      initial_step_size=_broadcast(1, state.position),
+      value_at_zero=val_0,
+      converged=inactive)  # No search needed for these.
 
   state_after_ls = update_fields(
       state,
-      failed=~ls_result.converged,  # Fail if line search failed to converge.
+      failed=state.failed | ~ls_result.converged,
       num_iterations=state.num_iterations + 1,
       num_objective_evaluations=(
           state.num_objective_evaluations + ls_result.func_evals))
 
   def _do_update_position():
+    # For inactive batch members `left.x` is zero. However, their
+    # `search_direction` might also be undefined, so we can't rely on
+    # multiplication by zero to produce a `position_delta` of zero.
+    position_delta = tf.where(
+        inactive,
+        tf.zeros_like(search_direction),
+        search_direction * tf.expand_dims(ls_result.left.x, axis=-1))
     return _update_position(
         state_after_ls,
-        search_direction * ls_result.left_pt,
-        ls_result.full_result.f,
-        ls_result.full_result.full_gradient,  # Extract gradient
+        position_delta,
+        ls_result.left.f,
+        ls_result.left.full_gradient,
         grad_tolerance, f_relative_tolerance, x_tolerance)
 
   return prefer_static.cond(
-      state_after_ls.failed,
+      stopping_condition(state.converged, state.failed),
       true_fn=lambda: state_after_ls,
       false_fn=_do_update_position)
 
@@ -184,11 +216,11 @@ def _restrict_along_direction(value_and_gradients_function,
   direction. This is equivalent to computing `dg/dt` in the definition above.
 
   Args:
-    value_and_gradients_function: Callable accepting a single `Tensor` argument
-      of real dtype and returning a tuple of a scalar real `Tensor` and a
-      `Tensor` of same shape as the input argument. The multivariate function
-      whose restriction is to be computed. The output values of the callable are
-      the function value and the gradients at the input argument.
+    value_and_gradients_function: Callable accepting a single real `Tensor`
+      argument of shape `[..., n]` and returning a tuple of a real `Tensor` of
+      shape `[...]` and a real `Tensor` of shape `[..., n]`. The multivariate
+      function whose restriction is to be computed. The output values of the
+      callable are the function value and the gradients at the input argument.
     position: `Tensor` of real dtype and shape consumable by
       `value_and_gradients_function`. Corresponds to `x0` in the definition
       above.
@@ -197,20 +229,27 @@ def _restrict_along_direction(value_and_gradients_function,
       be a unit vector.
 
   Returns:
-    restricted_value_and_gradients_func: A callable accepting a scalar tensor
-      of same dtype as `position` and returning a tuple of `Tensors`. The
-      input tensor is the parameter along the direction labelled `t` above. The
-      first element of the return tuple is a scalar `Tensor` containing
-      the value of the function at the point `position + t * direction`. The
-      second element is the derivative at `position + t * direction` which is
-      also a scalar `Tensor` of the same dtype as `position`.
+    restricted_value_and_gradients_func: A callable accepting a tensor of shape
+      broadcastable to `[...]` and same dtype as `position` and returning a
+      namedtuple of `Tensors`. The input tensor is the parameter along the
+      direction labelled `t` above. The return value contains fields:
+        x: A real `Tensor` of shape `[...]`. The input value `t` where the line
+          function was evaluated, after any necessary broadcasting.
+        f: A real `Tensor` of shape `[...]` containing the value of the
+          function at the point `position + t * direction`.
+        df: A real `Tensor` of shape `[...]` containing the derivative at
+          `position + t * direction`.
+        full_gradient: A real `Tensor` of shape `[..., n]`, the full gradient
+          of the original `value_and_gradients_function`.
   """
   def _restricted_func(t):
-    pt = position + t * direction
+    t = _broadcast(t, position)
+    pt = position + tf.expand_dims(t, axis=-1) * direction
     objective_value, gradient = value_and_gradients_function(pt)
     return ValueAndGradient(
+        x=t,
         f=objective_value,
-        df=tf.reduce_sum(input_tensor=gradient * direction),
+        df=tf.reduce_sum(input_tensor=gradient * direction, axis=-1),
         full_gradient=gradient)
 
   return _restricted_func
@@ -224,28 +263,47 @@ def _update_position(state,
                      f_relative_tolerance,
                      x_tolerance):
   """Updates the state advancing its position by a given position_delta."""
+  failed = state.failed | ~tf.math.is_finite(next_objective) | ~tf.reduce_all(
+      input_tensor=tf.math.is_finite(next_gradient), axis=-1)
+
   next_position = state.position + position_delta
-  converged = _check_convergence(state.position,
-                                 next_position,
-                                 state.objective_value,
-                                 next_objective,
-                                 next_gradient,
-                                 grad_tolerance,
-                                 f_relative_tolerance,
-                                 x_tolerance)
+  converged = ~failed & _check_convergence(state.position,
+                                           next_position,
+                                           state.objective_value,
+                                           next_objective,
+                                           next_gradient,
+                                           grad_tolerance,
+                                           f_relative_tolerance,
+                                           x_tolerance)
   return update_fields(
       state,
-      converged=converged,
-      failed=~_is_finite(next_objective, next_gradient),
-      num_objective_evaluations=state.num_objective_evaluations,
+      converged=state.converged | converged,
+      failed=failed,
       position=next_position,
       objective_value=next_objective,
       objective_gradient=next_gradient)
 
 
-def _check_within_tolerance(value, tolerance):
-  """Checks whether the given value is below the supplied tolerance."""
-  return tf.norm(tensor=value, ord=np.inf) <= tolerance
+def norm(value, dims, order=None):
+  """Compute the norm of the given (possibly batched) value.
+
+  Args:
+    value: A `Tensor` of real dtype.
+    dims: An Python integer with the number of non-batching dimensions in the
+      value, i.e. `dims=0` (scalars), `dims=1` (vectors), `dims=2` (matrices).
+    order: Order of the norm, defaults to `np.inf`.
+  """
+  if dims == 0:
+    return tf.math.abs(value)
+  elif dims == 1:
+    axis = -1
+  elif dims == 2:
+    axis = [-1, -2]
+  else:
+    ValueError(dims)
+  if order is None:
+    order = np.inf
+  return tf.norm(tensor=value, axis=axis, ord=order)
 
 
 def _check_convergence(current_position,
@@ -257,27 +315,26 @@ def _check_convergence(current_position,
                        f_relative_tolerance,
                        x_tolerance):
   """Checks if the algorithm satisfies the convergence criteria."""
-  grad_converged = _check_within_tolerance(next_gradient, grad_tolerance)
-  x_converged = _check_within_tolerance(next_position - current_position,
-                                        x_tolerance)
-  f_converged = _check_within_tolerance(
-      next_objective - current_objective,
-      f_relative_tolerance * current_objective)
+  grad_converged = norm(next_gradient, dims=1) <= grad_tolerance
+  x_converged = norm(next_position - current_position, dims=1) <= x_tolerance
+  f_converged = (norm(next_objective - current_objective, dims=0) <=
+                 f_relative_tolerance * current_objective)
   return grad_converged | x_converged | f_converged
 
 
-def _is_finite(arg1, *args):
-  """Checks if the supplied tensors are finite.
+def _broadcast(value, target):
+  """Broadcast a value to match the batching dimensions of a target.
+
+  If necessary the value is converted into a tensor. Both value and target
+  should be of the same dtype.
 
   Args:
-    arg1: A numeric `Tensor`.
-    *args: (Optional) Other `Tensors` to check for finiteness.
+    value: A value to broadcast.
+    target: A `Tensor` of shape [b1, ..., bn, d].
 
   Returns:
-    is_finite: Scalar boolean `Tensor` indicating whether all the supplied
-      tensors are finite.
+    A `Tensor` of shape [b1, ..., bn] and same dtype as the target.
   """
-  finite = tf.reduce_all(input_tensor=tf.math.is_finite(arg1))
-  for arg in args:
-    finite = finite & tf.reduce_all(input_tensor=tf.math.is_finite(arg))
-  return finite
+  return tf.broadcast_to(
+      tf.convert_to_tensor(value=value, dtype=target.dtype),
+      distribution_util.prefer_static_shape(target)[:-1])

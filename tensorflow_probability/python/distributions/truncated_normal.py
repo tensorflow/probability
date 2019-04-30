@@ -19,16 +19,17 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-
 import numpy as np
-import tensorflow as tf
+
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import special_math
-from tensorflow.python.ops import random_ops
+from tensorflow.python.ops import random_ops  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -121,13 +122,13 @@ class TruncatedNormal(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[loc, scale, low, high]) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, scale, low, high], tf.float32)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
       scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
       low = tf.convert_to_tensor(value=low, name="low", dtype=dtype)
       high = tf.convert_to_tensor(value=high, name="high", dtype=dtype)
-      tf.debugging.assert_same_float_dtype([loc, scale, low, high])
+      dtype_util.assert_same_float_dtype([loc, scale, low, high])
 
       self._broadcast_batch_shape = distribution_util.get_broadcast_shape(
           loc, scale, low, high)
@@ -161,14 +162,12 @@ class TruncatedNormal(distribution.Distribution):
 
   def _validate(self):
     vops = [
-        tf.compat.v1.assert_positive(self._scale),
-        tf.compat.v1.assert_positive(self._high - self._low),
-        tf.compat.v1.verify_tensor_all_finite(self._high,
-                                              "Upper bound not finite"),
-        tf.compat.v1.verify_tensor_all_finite(self._low,
-                                              "Lower bound not finite"),
-        tf.compat.v1.verify_tensor_all_finite(self._loc, "Loc not finite"),
-        tf.compat.v1.verify_tensor_all_finite(self._scale, "Scale not finite"),
+        assert_util.assert_positive(self._scale),
+        assert_util.assert_positive(self._high - self._low),
+        assert_util.assert_finite(self._low, message="Lower bound not finite"),
+        assert_util.assert_finite(self._high, message="Upper bound not finite"),
+        assert_util.assert_finite(self._loc, message="Loc not finite"),
+        assert_util.assert_finite(self._scale, message="scale not finite"),
     ]
     return tf.group(*vops, name="ValidationOps")
 
@@ -196,6 +195,10 @@ class TruncatedNormal(distribution.Distribution):
             "scale": shape,
             "high": shape,
             "low": shape}
+
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(loc=0, scale=0, low=0, high=0)
 
   @property
   def loc(self):
@@ -282,8 +285,8 @@ class TruncatedNormal(distribution.Distribution):
         # tiny, eps are tolerance parameters to ensure we stay away from giving
         # a zero arg to the log CDF expression.
 
-        tiny = np.finfo(self.dtype.as_numpy_dtype).tiny
-        eps = np.finfo(self.dtype.as_numpy_dtype).eps
+        tiny = np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny
+        eps = np.finfo(dtype_util.as_numpy_dtype(self.dtype)).eps
         cdf_samples = tf.clip_by_value(cdf_samples, tiny, 1 - eps)
 
         du = tf.exp(0.5 * (std_samples**2 - upper_broadcast**2) +

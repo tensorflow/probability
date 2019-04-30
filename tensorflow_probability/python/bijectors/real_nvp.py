@@ -19,7 +19,9 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from tensorflow_probability.python.bijectors import conditional_bijector
+
+from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -28,7 +30,7 @@ __all__ = [
 ]
 
 
-class RealNVP(conditional_bijector.ConditionalBijector):
+class RealNVP(bijector.Bijector):
   """RealNVP "affine coupling layer" for vector-valued events.
 
   Real NVP models a normalizing flow on a `D`-dimensional distribution via a
@@ -168,7 +170,7 @@ class RealNVP(conditional_bijector.ConditionalBijector):
   def _cache_input_depth(self, x):
     if self._input_depth is None:
       self._input_depth = tf.compat.dimension_value(
-          x.shape.with_rank_at_least(1)[-1])
+          tensorshape_util.with_rank_at_least(x.shape, 1)[-1])
       if self._input_depth is None:
         raise NotImplementedError(
             "Rightmost dimension must be known prior to graph execution.")
@@ -269,7 +271,7 @@ def real_nvp_default_template(hidden_layers,
        Processing Systems_, 2017. https://arxiv.org/abs/1705.07057
   """
 
-  with tf.name_scope(name, "real_nvp_default_template"):
+  with tf.compat.v2.name_scope(name or "real_nvp_default_template"):
 
     def _fn(x, output_units, **condition_kwargs):
       """Fully connected MLP parameterized via `real_nvp_template`."""
@@ -277,7 +279,7 @@ def real_nvp_default_template(hidden_layers,
         raise NotImplementedError(
             "Conditioning not implemented in the default template.")
 
-      if x.shape.rank == 1:
+      if tensorshape_util.rank(x.shape) == 1:
         x = x[tf.newaxis, ...]
         reshape_output = lambda x: x[0]
       else:

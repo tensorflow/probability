@@ -28,20 +28,27 @@ tfd = tfp.distributions
 
 class _ForecastTest(object):
 
-  def _build_model(self, observed_time_series):
+  def _build_model(self, observed_time_series,
+                   prior_batch_shape=(),
+                   constant_offset=None):
     seasonal = tfp.sts.Seasonal(
         num_seasons=4,
         observed_time_series=observed_time_series,
-        initial_effect_prior=tfd.Normal(loc=self._build_tensor(0.),
-                                        scale=self._build_tensor(1.)),
+        initial_effect_prior=tfd.Normal(
+            loc=self._build_tensor(np.zeros(prior_batch_shape)),
+            scale=self._build_tensor(1.)),
+        constrain_mean_effect_to_zero=False,  # Simplifies analysis.
         name='seasonal')
     return tfp.sts.Sum(components=[seasonal],
+                       constant_offset=constant_offset,
                        observed_time_series=observed_time_series)
 
   def test_one_step_predictive_correctness(self):
     observed_time_series_ = np.array([1., -1., -3., 4., 0.5, 2., 1., 3.])
     observed_time_series = self._build_tensor(observed_time_series_)
-    model = self._build_model(observed_time_series)
+    model = self._build_model(
+        observed_time_series,
+        constant_offset=0.)  # Simplifies analytic calculations.
 
     drift_scale = 0.1
     observation_noise_scale = 0.01
@@ -83,7 +90,8 @@ class _ForecastTest(object):
     batch_shape = [3, 2]
     observed_time_series = self._build_tensor(np.random.randn(
         *(batch_shape + [num_timesteps])))
-    model = self._build_model(observed_time_series)
+    model = self._build_model(observed_time_series,
+                              prior_batch_shape=batch_shape[1:])
     prior_samples = [param.prior.sample(num_param_samples)
                      for param in model.parameters]
 
@@ -102,7 +110,9 @@ class _ForecastTest(object):
   def test_forecast_correctness(self):
     observed_time_series_ = np.array([1., -1., -3., 4.])
     observed_time_series = self._build_tensor(observed_time_series_)
-    model = self._build_model(observed_time_series)
+    model = self._build_model(
+        observed_time_series,
+        constant_offset=0.)  # Simplifies analytic calculations.
 
     drift_scale = 0.1
     observation_noise_scale = 0.01
@@ -179,7 +189,12 @@ class _ForecastTest(object):
     batch_shape = [3, 2]
     observed_time_series = self._build_tensor(np.random.randn(
         *(batch_shape + [num_timesteps])))
-    model = self._build_model(observed_time_series)
+
+    # By not passing a constant offset, we test that the default behavior
+    # (setting constant offset to the observed mean) works when the observed
+    # time series has batch shape.
+    model = self._build_model(observed_time_series,
+                              prior_batch_shape=batch_shape[1:])
     prior_samples = [param.prior.sample(num_param_samples)
                      for param in model.parameters]
 
@@ -198,19 +213,57 @@ class _ForecastTest(object):
     self.assertAllEqual(forecast_mean_.shape,
                         batch_shape + [num_steps_forecast])
 
-  def _build_tensor(self, ndarray):
+  def test_methods_handle_masked_inputs(self):
+    num_param_samples = 5
+    num_timesteps = 4
+    num_steps_forecast = 2
+
+    # Build a time series with `NaN`s that will propagate if not properly
+    # masked.
+    observed_time_series_ = np.random.randn(num_timesteps)
+    is_missing_ = np.random.randn(num_timesteps) > 0
+    observed_time_series_[is_missing_] = np.nan
+    observed_time_series = tfp.sts.MaskedTimeSeries(
+        self._build_tensor(observed_time_series_),
+        is_missing=self._build_tensor(is_missing_, dtype=np.bool))
+
+    model = self._build_model(observed_time_series)
+    prior_samples = [param.prior.sample(num_param_samples)
+                     for param in model.parameters]
+
+    forecast_dist = tfp.sts.forecast(model, observed_time_series,
+                                     parameter_samples=prior_samples,
+                                     num_steps_forecast=num_steps_forecast)
+
+    forecast_mean_, forecast_stddev_ = self.evaluate((
+        forecast_dist.mean(),
+        forecast_dist.stddev()))
+    self.assertTrue(np.all(np.isfinite(forecast_mean_)))
+    self.assertTrue(np.all(np.isfinite(forecast_stddev_)))
+
+    onestep_dist = tfp.sts.one_step_predictive(
+        model, observed_time_series,
+        parameter_samples=prior_samples)
+    onestep_mean_, onestep_stddev_ = self.evaluate((
+        onestep_dist.mean(),
+        onestep_dist.stddev()))
+    self.assertTrue(np.all(np.isfinite(onestep_mean_)))
+    self.assertTrue(np.all(np.isfinite(onestep_stddev_)))
+
+  def _build_tensor(self, ndarray, dtype=None):
     """Convert a numpy array to a TF placeholder.
 
     Args:
       ndarray: any object convertible to a numpy array via `np.asarray()`.
+      dtype: optional `dtype`.
 
     Returns:
       placeholder: a TensorFlow `placeholder` with default value given by the
-      provided `ndarray`, dtype given by `self.dtype`, and shape specified
-      statically only if `self.use_static_shape` is `True`.
+      provided `ndarray`, dtype given by `self.dtype` (if not specified), and
+      shape specified statically only if `self.use_static_shape` is `True`.
     """
 
-    ndarray = np.asarray(ndarray).astype(self.dtype)
+    ndarray = np.asarray(ndarray).astype(self.dtype if dtype is None else dtype)
     return tf.compat.v1.placeholder_with_default(
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 

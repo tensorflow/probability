@@ -19,7 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 
 
@@ -55,14 +55,14 @@ class Tanh(bijector.Bijector):
   def _inverse(self, y):
     return tf.atanh(y)
 
-  def _inverse_log_det_jacobian(self, y):
-    return -tf.math.log1p(-tf.square(y))
+  # We implicitly rely on _forward_log_det_jacobian rather than explicitly
+  # implement _inverse_log_det_jacobian since directly using
+  # `-tf.math.log1p(-tf.square(y))` has lower numerical precision.
 
   def _forward_log_det_jacobian(self, x):
     #  This formula is mathematically equivalent to
     #  `tf.log1p(-tf.square(tf.tanh(x)))`, however this code is more numerically
     #  stable.
-
     #  Derivation:
     #    log(1 - tanh(x)^2)
     #    = log(sech(x)^2)

@@ -18,8 +18,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 
@@ -183,9 +185,7 @@ class Affine(bijector.Bijector):
                                          scale_diag is None and
                                          scale_perturb_factor is None)
 
-    with self._name_scope("init", values=[
-        shift, scale_identity_multiplier, scale_diag, scale_tril,
-        scale_perturb_diag, scale_perturb_factor]):
+    with self._name_scope("init"):
 
       if dtype is None:
         dtype = dtype_util.common_dtype([
@@ -218,7 +218,7 @@ class Affine(bijector.Bijector):
 
       if scale is not None and not self._is_only_identity_multiplier:
         if (shift is not None and
-            shift.dtype.base_dtype != scale.dtype.base_dtype):
+            not dtype_util.base_equal(shift.dtype, scale.dtype)):
           raise TypeError(
               "shift.dtype({}) is incompatible with scale.dtype({}).".format(
                   shift.dtype, scale.dtype))
@@ -280,7 +280,7 @@ class Affine(bijector.Bijector):
     if self._is_only_identity_multiplier:
       if validate_args:
         return distribution_util.with_dependencies([
-            tf.compat.v1.assert_none_equal(
+            assert_util.assert_none_equal(
                 identity_multiplier, tf.zeros([], identity_multiplier.dtype),
                 ["identity_multiplier should be non-zero."])
         ], identity_multiplier)
@@ -327,8 +327,8 @@ class Affine(bijector.Bijector):
     y = x
     if self._is_only_identity_multiplier:
       s = (
-          tf.math.conj(self._scale)
-          if self.adjoint and self._scale.dtype.is_complex else self._scale)
+          tf.math.conj(self._scale) if self.adjoint and
+          dtype_util.is_complex(self._scale.dtype) else self._scale)
       y *= s
       if self.shift is not None:
         return y + self.shift
@@ -346,8 +346,8 @@ class Affine(bijector.Bijector):
       x -= self.shift
     if self._is_only_identity_multiplier:
       s = (
-          tf.math.conj(self._scale)
-          if self.adjoint and self._scale.dtype.is_complex else self._scale)
+          tf.math.conj(self._scale) if self.adjoint and
+          dtype_util.is_complex(self._scale.dtype) else self._scale)
       return x / s
     # Solve fails if the op is singular so we may safely skip this assertion.
     x = self.scale.solvevec(x, adjoint=self.adjoint)

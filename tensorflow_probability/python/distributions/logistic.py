@@ -21,9 +21,10 @@ from __future__ import print_function
 import math
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 
@@ -115,15 +116,15 @@ class Logistic(distribution.Distribution):
       TypeError: if loc and scale are different dtypes.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[loc, scale]) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, scale], preferred_dtype=tf.float32)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
       scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
       with tf.control_dependencies(
-          [tf.compat.v1.assert_positive(scale)] if validate_args else []):
+          [assert_util.assert_positive(scale)] if validate_args else []):
         self._loc = tf.identity(loc, name="loc")
         self._scale = tf.identity(scale, name="scale")
-        tf.debugging.assert_same_float_dtype([self._loc, self._scale])
+        dtype_util.assert_same_float_dtype([self._loc, self._scale])
     super(Logistic, self).__init__(
         dtype=self._scale.dtype,
         reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
@@ -138,6 +139,10 @@ class Logistic(distribution.Distribution):
     return dict(
         zip(("loc", "scale"),
             ([tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)] * 2)))
+
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(loc=0, scale=0)
 
   @property
   def loc(self):
@@ -165,15 +170,15 @@ class Logistic(distribution.Distribution):
 
   def _sample_n(self, n, seed=None):
     # Uniform variates must be sampled from the open-interval `(0, 1)` rather
-    # than `[0, 1)`. To do so, we use `np.finfo(self.dtype.as_numpy_dtype).tiny`
-    # because it is the smallest, positive, "normal" number. A "normal" number
-    # is such that the mantissa has an implicit leading 1. Normal, positive
-    # numbers x, y have the reasonable property that, `x + y >= max(x, y)`. In
-    # this case, a subnormal number (i.e., np.nextafter) can cause us to sample
-    # 0.
+    # than `[0, 1)`. To do so, we use
+    # `np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny` because it is the
+    # smallest, positive, "normal" number. A "normal" number is such that the
+    # mantissa has an implicit leading 1. Normal, positive numbers x, y have the
+    # reasonable property that, `x + y >= max(x, y)`. In this case, a subnormal
+    # number (i.e., np.nextafter) can cause us to sample 0.
     uniform = tf.random.uniform(
         shape=tf.concat([[n], self.batch_shape_tensor()], 0),
-        minval=np.finfo(self.dtype.as_numpy_dtype).tiny,
+        minval=np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny,
         maxval=1.,
         dtype=self.dtype,
         seed=seed)
@@ -218,5 +223,5 @@ class Logistic(distribution.Distribution):
 
   def _z(self, x):
     """Standardize input `x` to a unit logistic."""
-    with tf.name_scope("standardize", values=[x]):
+    with tf.name_scope("standardize"):
       return (x - self.loc) / self.scale

@@ -24,8 +24,10 @@ from scipy.special import gamma
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
 tfd = tfp.distributions
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 def make_relaxed_categorical(batch_shape, num_classes, dtype=tf.float32):
@@ -62,6 +64,20 @@ class ExpRelaxedOneHotCategoricalTest(tf.test.TestCase):
     self.assertAllClose(expected_pdf, pdf)
 
 
+def analytical_pdf(x, temperature, logits):
+  # analytical density of RelaxedOneHotCategorical
+  temperature = np.reshape(temperature, (-1, 1))
+  if len(x.shape) == 1:
+    x = np.expand_dims(x, 0)
+  k = logits.shape[-1]
+  p = np.exp(logits) / np.sum(np.exp(logits), axis=-1, keepdims=True)
+  term1 = gamma(k) * np.power(temperature, k-1)
+  term2 = np.sum(p / (np.power(x, temperature)), axis=-1, keepdims=True)
+  term3 = np.prod(p / (np.power(x, temperature+1)), axis=-1, keepdims=True)
+  expected_pdf = term1 * np.power(term2, -k) * term3
+  return expected_pdf
+
+
 @test_util.run_all_in_graph_and_eager_modes
 class RelaxedOneHotCategoricalTest(tf.test.TestCase):
 
@@ -72,6 +88,13 @@ class RelaxedOneHotCategoricalTest(tf.test.TestCase):
     # check p for ExpRelaxed base distribution
     self.assertAllClose(logits, self.evaluate(dist._distribution.logits))
     self.assertAllEqual([3], dist._distribution.logits.shape)
+
+  def testParamBroadcasting(self):
+    temperature = [1.0, 1.4]
+    logits = [2.0, 3.0, -4.0]
+    dist = tfd.RelaxedOneHotCategorical(temperature, logits)
+    self.assertAllEqual([2], dist.batch_shape)
+    self.assertAllEqual([3], dist.event_shape)
 
   def testSample(self):
     temperature = 1.4
@@ -92,19 +115,6 @@ class RelaxedOneHotCategoricalTest(tf.test.TestCase):
     self.assertAllEqual([5, 4, 1, 3], self.evaluate(dist.sample(5)).shape)
 
   def testPdf(self):
-    def analytical_pdf(x, temperature, logits):
-      # analytical density of RelaxedOneHotCategorical
-      temperature = np.reshape(temperature, (-1, 1))
-      if len(x.shape) == 1:
-        x = np.expand_dims(x, 0)
-      k = logits.shape[1]
-      p = np.exp(logits)/np.sum(np.exp(logits), axis=1, keepdims=True)
-      term1 = gamma(k)*np.power(temperature, k-1)
-      term2 = np.sum(p/(np.power(x, temperature)), axis=1, keepdims=True)
-      term3 = np.prod(p/(np.power(x, temperature+1)), axis=1, keepdims=True)
-      expected_pdf = term1*np.power(term2, -k)*term3
-      return expected_pdf
-
     temperature = .4
     logits = np.array([[.3, .1, .4]]).astype(np.float32)
     dist = tfd.RelaxedOneHotCategorical(temperature, logits)
@@ -122,10 +132,20 @@ class RelaxedOneHotCategoricalTest(tf.test.TestCase):
     expected_pdf = analytical_pdf(x, temperatures, logits)
     self.assertAllClose(expected_pdf.flatten(), pdf, rtol=1e-4)
 
+    # broadcast logits over temparatures
+    logits = np.array([.3, .1, .4]).astype(np.float32)
+    temperatures = np.array([0.4, 2.3]).astype(np.float32)
+    dist = tfd.RelaxedOneHotCategorical(temperatures, logits)
+    x = self.evaluate(dist.sample())
+    pdf = self.evaluate(dist.prob(x))
+    expected_pdf = analytical_pdf(x, temperatures, logits)
+    self.assertAllClose(expected_pdf.flatten(), pdf, rtol=1e-4)
+
   def testShapes(self):
     for batch_shape in ([], [1], [2, 3, 4]):
       dist = make_relaxed_categorical(batch_shape, 10)
-      self.assertAllEqual(batch_shape, dist.batch_shape.as_list())
+      self.assertAllEqual(batch_shape,
+                          tensorshape_util.as_list(dist.batch_shape))
       self.assertAllEqual(batch_shape, self.evaluate(dist.batch_shape_tensor()))
       self.assertAllEqual([10], self.evaluate(dist.event_shape_tensor()))
       self.assertAllEqual([10], self.evaluate(dist.event_shape_tensor()))
@@ -133,7 +153,8 @@ class RelaxedOneHotCategoricalTest(tf.test.TestCase):
     for batch_shape in ([], [1], [2, 3, 4]):
       dist = make_relaxed_categorical(batch_shape,
                                       tf.constant(10, dtype=tf.int32))
-      self.assertAllEqual(len(batch_shape), dist.batch_shape.ndims)
+      self.assertAllEqual(
+          len(batch_shape), tensorshape_util.rank(dist.batch_shape))
       self.assertAllEqual(batch_shape, self.evaluate(dist.batch_shape_tensor()))
       self.assertAllEqual([10], self.evaluate(dist.event_shape_tensor()))
       self.assertAllEqual([10], self.evaluate(dist.event_shape_tensor()))

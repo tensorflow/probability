@@ -87,7 +87,7 @@ landing_page:
       buttons:
       - label: Read on TensorFlow blog
         path: https://medium.com/tensorflow/an-introduction-to-probabilistic-programming-now-available-in-tensorflow-probability-6dcc003ca29e
-    - heading: "An Introductory Analysis using TensorFlow Probability"
+    - heading: "Analyzing errors in financial models with TFP"
       image_path: /resources/images/tf-logo-card-16x9.png
       path: https://medium.com/tensorflow/the-trinity-of-errors-in-financial-models-an-introductory-analysis-using-tensorflow-probability-9fdefb4d283d
       buttons:

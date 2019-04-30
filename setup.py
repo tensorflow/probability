@@ -13,7 +13,6 @@
 # limitations under the License.
 # ============================================================================
 """Install tensorflow_probability."""
-import datetime
 import os
 import sys
 
@@ -31,6 +30,8 @@ from version import __version__  # pylint: disable=g-import-not-at-top
 REQUIRED_PACKAGES = [
     'six >= 1.10.0',
     'numpy >= 1.13.3',
+    'decorator',
+    'cloudpickle >= 0.6.1',
 ]
 
 if '--release' in sys.argv:
@@ -43,11 +44,7 @@ else:
 if release:
   project_name = 'tensorflow-probability'
 else:
-  # Nightly releases use date-based versioning of the form
-  # '0.0.1.dev20180305'
   project_name = 'tfp-nightly'
-  datestring = datetime.datetime.now().strftime('%Y%m%d')
-  __version__ += datestring
 
 
 class BinaryDistribution(Distribution):

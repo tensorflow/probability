@@ -17,11 +17,14 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import multinomial
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 _binomial_sample_note = """
@@ -159,7 +162,7 @@ class Binomial(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[total_count, logits, probs]) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([total_count, logits, probs], tf.float32)
       self._total_count = self._maybe_assert_valid_total_count(
           tf.convert_to_tensor(
@@ -179,6 +182,10 @@ class Binomial(distribution.Distribution):
         parameters=parameters,
         graph_parents=[self._total_count, self._logits, self._probs],
         name=name)
+
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(total_count=0, logits=0, probs=0)
 
   @property
   def total_count(self):
@@ -220,9 +227,10 @@ class Binomial(distribution.Distribution):
   def _cdf(self, counts):
     counts = self._maybe_assert_valid_sample(counts)
     probs = self.probs
-    if not (counts.shape.is_fully_defined()
-            and self.probs.shape.is_fully_defined()
-            and counts.shape.is_compatible_with(self.probs.shape)):
+    if not (tensorshape_util.is_fully_defined(counts.shape) and
+            tensorshape_util.is_fully_defined(self.probs.shape) and
+            tensorshape_util.is_compatible_with(counts.shape,
+                                                self.probs.shape)):
       # If both shapes are well defined and equal, we skip broadcasting.
       probs += tf.zeros_like(counts)
       counts += tf.zeros_like(self.probs)
@@ -237,6 +245,31 @@ class Binomial(distribution.Distribution):
     counts = self._maybe_assert_valid_sample(counts)
     return (tf.math.lgamma(1. + self.total_count - counts) +
             tf.math.lgamma(1. + counts) - tf.math.lgamma(1. + self.total_count))
+
+  @distribution_util.AppendDocstring(_binomial_sample_note)
+  def _sample_n(self, n, seed=None):
+    # Need to create logits corresponding to [p, 1 - p].
+    # Note that for this distributions, logits corresponds to
+    # inverse sigmoid(p) while in multivariate distributions,
+    # such as multinomial this corresponds to log(p).
+    # Because of this, when we construct the logits for the multinomial
+    # sampler, we'll have to be careful.
+    # log(p) = log(sigmoid(logits)) = logits - softplus(logits)
+    # log(1 - p) = log(1 - sigmoid(logits)) = -softplus(logits)
+    # Because softmax is invariant to a constnat shift in all inputs,
+    # we can offset the logits by softplus(logits) so that we can use
+    # [logits, 0.] as our input.
+    logits = tf.stack(
+        [self.logits,
+         tf.zeros_like(self.logits)],
+        axis=-1)
+    return multinomial.draw_sample(
+        num_samples=n,
+        num_classes=2,
+        logits=logits,
+        num_trials=tf.cast(self.total_count, dtype=tf.int32),
+        dtype=self.dtype,
+        seed=seed)[..., 0]
 
   def _mean(self):
     return self.total_count * self.probs
@@ -256,7 +289,7 @@ class Binomial(distribution.Distribution):
     if not validate_args:
       return total_count
     return distribution_util.with_dependencies([
-        tf.compat.v1.assert_non_negative(
+        assert_util.assert_non_negative(
             total_count, message="total_count must be non-negative."),
         distribution_util.assert_integer_form(
             total_count,
@@ -269,7 +302,7 @@ class Binomial(distribution.Distribution):
       return counts
     counts = distribution_util.embed_check_nonnegative_integer_form(counts)
     return distribution_util.with_dependencies([
-        tf.compat.v1.assert_less_equal(
+        assert_util.assert_less_equal(
             counts,
             self.total_count,
             message="counts are not less than or equal to n."),

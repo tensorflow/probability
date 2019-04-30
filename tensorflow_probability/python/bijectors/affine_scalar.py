@@ -18,8 +18,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 
@@ -80,7 +82,7 @@ class AffineScalar(bijector.Bijector):
     self._name = name
     self._validate_args = validate_args
 
-    with self._name_scope("init", values=[scale, shift]):
+    with self._name_scope("init"):
       self._shift = shift
       self._scale = scale
 
@@ -91,7 +93,7 @@ class AffineScalar(bijector.Bijector):
         self._scale = tf.convert_to_tensor(value=scale, name="scale")
         if validate_args:
           self._scale = distribution_util.with_dependencies([
-              tf.compat.v1.assert_none_equal(
+              assert_util.assert_none_equal(
                   self._scale, tf.zeros([], dtype=self._scale.dtype))
           ], self._scale)
 
@@ -135,6 +137,6 @@ class AffineScalar(bijector.Bijector):
     # `log_det_jacobian` need only be specified for a single input, as this will
     # be tiled to match `event_ndims`.
     if self.scale is None:
-      return tf.constant(0., dtype=x.dtype.base_dtype)
+      return tf.constant(0., dtype=dtype_util.base_dtype(x.dtype))
 
     return tf.math.log(tf.abs(self.scale))

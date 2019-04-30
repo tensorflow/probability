@@ -18,9 +18,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import tensorflow.compat.v2 as tf
 
-import tensorflow as tf
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 
 
@@ -60,29 +61,6 @@ class Ordered(bijector.Bijector):
         validate_args=validate_args,
         name=name)
 
-  def _forward_event_shape(self, input_shape):
-    if input_shape.ndims is None or input_shape[-1] is None:
-      return input_shape
-    return tf.TensorShape([input_shape[-1]])
-
-  def _forward_event_shape_tensor(self, input_shape):
-    return (input_shape[-1])[..., tf.newaxis]
-
-  def _inverse_event_shape(self, output_shape):
-    if output_shape.ndims is None or output_shape[-1] is None:
-      return output_shape
-    if output_shape[-1] <= 1:
-      raise ValueError("output_shape[-1] = %d <= 1" % output_shape[-1])
-    return tf.TensorShape([output_shape[-1]])
-
-  def _inverse_event_shape_tensor(self, output_shape):
-    if self.validate_args:
-      is_greater_one = tf.compat.v1.assert_greater(
-          output_shape[-1], 1, message="Need last dimension greater than 1.")
-      output_shape = distribution_util.with_dependencies(
-          [is_greater_one], output_shape)
-    return (output_shape[-1])[..., tf.newaxis]
-
   def _forward(self, x):
     x = self._maybe_assert_valid_x(x)
     y0 = x[..., 0, tf.newaxis]
@@ -115,7 +93,7 @@ class Ordered(bijector.Bijector):
   def _maybe_assert_valid_x(self, x):
     if not self.validate_args:
       return x
-    is_valid = tf.compat.v1.assert_positive(
+    is_valid = assert_util.assert_positive(
         x[..., 1:] - x[..., :-1],
         message="Forward transformation input must be strictly increasing.")
     return distribution_util.with_dependencies([is_valid], x)

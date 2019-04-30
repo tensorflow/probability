@@ -24,10 +24,12 @@ import itertools
 # Dependency imports
 from absl.testing import parameterized
 import numpy as np
+
 import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 from tensorflow.python.ops import gradient_checker_v2  # pylint: disable=g-direct-tensorflow-import
 
@@ -177,7 +179,7 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase,
     ub = [[1.0, 11.0], [5., 20.]]
     dist = tfd.TruncatedNormal(
         loc=[[0., 10.], [0., 10.]], scale=[[1., 1.], [5., 5.]], low=lb, high=ub)
-    x = self.evaluate(dist.sample(n, seed=4))
+    x = self.evaluate(dist.sample(n, seed=tfp_test_util.test_seed()))
     self.assertEqual(x.shape, (n, 2, 2))
 
     means = np.mean(x, axis=0)
@@ -200,7 +202,7 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase,
   def testMomentsEmpirically(self, loc, scale, low, high):
     n = int(2e5)
     dist = tfd.TruncatedNormal(loc=loc, scale=scale, low=low, high=high)
-    x = self.evaluate(dist.sample(n, seed=1))
+    x = self.evaluate(dist.sample(n, seed=tfp_test_util.test_seed()))
     empirical_mean = np.mean(x)
     empirical_var = np.var(x)
     expected_mean = self.evaluate(dist.mean())
@@ -255,7 +257,8 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase,
       dist = tfd.TruncatedNormal(loc=loc, scale=scale, low=low, high=high)
 
       n = int(2e5)
-      return tf.reduce_mean(input_tensor=tf.abs(dist.sample(n, seed=6)))
+      return tf.reduce_mean(
+          input_tensor=tf.abs(dist.sample(n, seed=tfp_test_util.test_seed())))
 
     err = gradient_checker_v2.max_error(
         *gradient_checker_v2.compute_gradient(
@@ -359,7 +362,8 @@ class TruncatedNormalTestCompareWithNormal(_TruncatedNormalTestCase,
     self.assertAllGreaterEqual(truncated_samples, lb)
     self.assertAllLessEqual(truncated_samples, ub)
 
-    normal_samples = self.evaluate(normal_dist.sample(n, seed=2)).flatten()
+    normal_samples = self.evaluate(normal_dist.sample(
+        n, seed=tfp_test_util.test_seed())).flatten()
     # Rejection sample the normal distribution
     rejection_samples = normal_samples[normal_samples >= lb]
     rejection_samples = rejection_samples[rejection_samples <= ub]
@@ -420,7 +424,8 @@ if stats:
     def testSampling(self, loc, scale, low, high):
       n = int(1000000)
       tf_dist, sp_dist = self.constructDists(loc, scale, low, high)
-      tf_samples = self.evaluate(tf_dist.sample(n, seed=3)).flatten()
+      tf_samples = self.evaluate(tf_dist.sample(
+          n, seed=tfp_test_util.test_seed())).flatten()
       self.assertAllGreaterEqual(tf_samples, low)
       self.assertAllLessEqual(tf_samples, high)
 

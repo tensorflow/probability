@@ -18,11 +18,14 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 class OneHotCategorical(distribution.Distribution):
@@ -109,22 +112,23 @@ class OneHotCategorical(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[logits, probs]) as name:
+    with tf.name_scope(name) as name:
       self._logits, self._probs = distribution_util.get_logits_and_probs(
           name=name, logits=logits, probs=probs, validate_args=validate_args,
           multidimensional=True)
 
-      logits_shape_static = self._logits.shape.with_rank_at_least(1)
-      if logits_shape_static.ndims is not None:
+      logits_shape_static = tensorshape_util.with_rank_at_least(
+          self._logits.shape, 1)
+      if tensorshape_util.rank(logits_shape_static) is not None:
         self._batch_rank = tf.convert_to_tensor(
-            value=logits_shape_static.ndims - 1,
+            value=tensorshape_util.rank(logits_shape_static) - 1,
             dtype=tf.int32,
             name="batch_rank")
       else:
-        with tf.name_scope(name="batch_rank"):
+        with tf.name_scope("batch_rank"):
           self._batch_rank = tf.rank(self._logits) - 1
 
-      with tf.name_scope(name="event_size"):
+      with tf.name_scope("event_size"):
         self._event_size = tf.shape(input=self._logits)[-1]
 
     super(OneHotCategorical, self).__init__(
@@ -135,6 +139,10 @@ class OneHotCategorical(distribution.Distribution):
         parameters=parameters,
         graph_parents=[self._logits, self._probs],
         name=name)
+
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(logits=1, probs=1)
 
   @property
   def event_size(self):
@@ -161,12 +169,12 @@ class OneHotCategorical(distribution.Distribution):
     return tf.shape(input=self.logits)[-1:]
 
   def _event_shape(self):
-    return self.logits.shape.with_rank_at_least(1)[-1:]
+    return tensorshape_util.with_rank_at_least(self.logits.shape, 1)[-1:]
 
   def _sample_n(self, n, seed=None):
     sample_shape = tf.concat([[n], tf.shape(input=self.logits)], 0)
     logits = self.logits
-    if logits.shape.ndims == 2:
+    if tensorshape_util.rank(logits.shape) == 2:
       logits_2d = logits
     else:
       logits_2d = tf.reshape(logits, [-1, self.event_size])
@@ -177,11 +185,12 @@ class OneHotCategorical(distribution.Distribution):
     return ret
 
   def _log_prob(self, x):
+    x = tf.cast(x, self.logits.dtype)
     x = self._assert_valid_sample(x)
     # broadcast logits or x if need be.
     logits = self.logits
-    if (not x.shape.is_fully_defined() or
-        not logits.shape.is_fully_defined() or
+    if (not tensorshape_util.is_fully_defined(x.shape) or
+        not tensorshape_util.is_fully_defined(logits.shape) or
         x.shape != logits.shape):
       logits = tf.ones_like(x, dtype=logits.dtype) * logits
       x = tf.ones_like(logits, dtype=x.dtype) * x
@@ -206,7 +215,7 @@ class OneHotCategorical(distribution.Distribution):
   def _mode(self):
     ret = tf.argmax(input=self.logits, axis=self._batch_rank)
     ret = tf.one_hot(ret, self.event_size, dtype=self.dtype)
-    ret.set_shape(self.logits.shape)
+    tensorshape_util.set_shape(ret, self.logits.shape)
     return ret
 
   def _covariance(self):
@@ -221,9 +230,9 @@ class OneHotCategorical(distribution.Distribution):
     if not self.validate_args:
       return x
     return distribution_util.with_dependencies([
-        tf.compat.v1.assert_non_positive(x),
-        tf.compat.v1.assert_near(
-            tf.zeros([], dtype=self.dtype),
+        assert_util.assert_non_positive(x),
+        assert_util.assert_near(
+            tf.zeros([], dtype=self.logits.dtype),
             tf.reduce_logsumexp(input_tensor=x, axis=[-1])),
     ], x)
 
@@ -241,8 +250,7 @@ def _kl_categorical_categorical(a, b, name=None):
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.name_scope(
-      name, "kl_categorical_categorical", values=[a.logits, b.logits]):
+  with tf.name_scope(name or "kl_categorical_categorical"):
     # sum(p ln(p / q))
     return tf.reduce_sum(
         input_tensor=tf.nn.softmax(a.logits) *

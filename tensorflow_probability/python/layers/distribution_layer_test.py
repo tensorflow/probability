@@ -74,35 +74,36 @@ class EndToEndTest(tf.test.TestCase):
   def setUp(self):
     self.encoded_size = 2
     self.input_shape = [2, 2, 1]
-    self.train_size = 100
-    self.test_size = 100
-    self.x = np.random.rand(
-        self.train_size, *self.input_shape).astype(np.float32)
-    self.x_test = np.random.rand(
-        self.test_size, *self.input_shape).astype(np.float32)
-
-  # TODO(b/120307671): Once this bug is resolved, use
-  # `activity_regularizer=tfpl.KLDivergenceRegularizer` instead of
-  # `KLDivergenceAddLoss`.
+    self.train_size = 10000
+    self.test_size = 1000
+    self.x = (np.random.rand(
+        self.train_size, *self.input_shape) > 0.75).astype(np.float32)
+    self.x_test = (np.random.rand(
+        self.test_size, *self.input_shape) > 0.75).astype(np.float32)
 
   def test_keras_sequential_api(self):
     """Test `DistributionLambda`s are composable via Keras `Sequential` API."""
 
+    prior_model = tfk.Sequential([
+        tfpl.VariableLayer(shape=[self.encoded_size]),
+        tfpl.DistributionLambda(
+            lambda t: tfd.Independent(tfd.Normal(loc=t, scale=1),  # pylint: disable=g-long-lambda
+                                      reinterpreted_batch_ndims=1)),
+    ])
+
     encoder_model = tfk.Sequential([
         tfkl.InputLayer(input_shape=self.input_shape),
         tfkl.Flatten(),
-        tfkl.Dense(10, activation='relu'),
         tfkl.Dense(tfpl.MultivariateNormalTriL.params_size(self.encoded_size)),
-        tfpl.MultivariateNormalTriL(self.encoded_size),
-        tfpl.KLDivergenceAddLoss(
-            tfd.Independent(tfd.Normal(loc=[0., 0], scale=1),
-                            reinterpreted_batch_ndims=1),
-            weight=self.train_size),
+        tfpl.MultivariateNormalTriL(
+            self.encoded_size,
+            activity_regularizer=tfpl.KLDivergenceRegularizer(
+                lambda: prior_model(0.),
+                weight=0.9)),  # "beta" as in beta-VAE.
     ])
 
     decoder_model = tfk.Sequential([
         tfkl.InputLayer(input_shape=[self.encoded_size]),
-        tfkl.Dense(10, activation='relu'),
         tfkl.Dense(tfpl.IndependentBernoulli.params_size(self.input_shape)),
         tfpl.IndependentBernoulli(self.input_shape, tfd.Bernoulli.logits),
     ])
@@ -110,10 +111,23 @@ class EndToEndTest(tf.test.TestCase):
     vae_model = tfk.Model(
         inputs=encoder_model.inputs,
         outputs=decoder_model(encoder_model.outputs[0]))
+
+    # Attach prior weights to model.
+    self.assertLen(vae_model.trainable_weights, 4)
+    vae_model._trainable_weights.extend(prior_model.trainable_variables)
+    self.assertLen(vae_model.trainable_weights, 4 + 1)
+
+    def accuracy(x, rv_x):
+      if hasattr(rv_x, '_tfp_distribution'):
+        rv_x = rv_x._tfp_distribution
+      return tf.reduce_mean(
+          input_tensor=tf.cast(tf.equal(x, rv_x.mode()), x.dtype),
+          axis=tf.range(-rv_x.event_shape.ndims, 0))
+
     vae_model.compile(
-        optimizer=tf.compat.v1.train.AdamOptimizer(),
+        optimizer=tf.compat.v2.optimizers.Adam(learning_rate=0.5),
         loss=lambda x, rv_x: -rv_x.log_prob(x),
-        metrics=[])
+        metrics=[accuracy])
     vae_model.fit(self.x, self.x,
                   batch_size=25,
                   epochs=1,
@@ -136,7 +150,7 @@ class EndToEndTest(tf.test.TestCase):
         tfpl.KLDivergenceAddLoss(
             tfd.Independent(tfd.Normal(loc=[0., 0], scale=1),
                             reinterpreted_batch_ndims=1),
-            weight=self.train_size),
+            weight=0.9),  # "beta" as in beta-VAE.
     ]
 
     decoder_model = [
@@ -151,7 +165,7 @@ class EndToEndTest(tf.test.TestCase):
 
     vae_model = tfk.Model(inputs=images, outputs=decoded)
     vae_model.compile(
-        optimizer=tf.compat.v1.train.AdamOptimizer(),
+        optimizer=tf.compat.v2.optimizers.Adam(),
         loss=lambda x, rv_x: -rv_x.log_prob(x),
         metrics=[])
     vae_model.fit(self.x, self.x,
@@ -180,7 +194,7 @@ class EndToEndTest(tf.test.TestCase):
             tfpl.KLDivergenceAddLoss(
                 tfd.Independent(tfd.Normal(loc=tf.zeros(encoded_size), scale=1),
                                 reinterpreted_batch_ndims=1),
-                weight=train_size),
+                weight=0.9),  # "beta" as in beta-VAE.
         ]
 
       def call(self, inputs):
@@ -209,7 +223,7 @@ class EndToEndTest(tf.test.TestCase):
 
     vae_model = tfk.Model(inputs=images, outputs=decoded)
     vae_model.compile(
-        optimizer=tf.compat.v1.train.AdamOptimizer(),
+        optimizer=tf.compat.v2.optimizers.Adam(),
         loss=lambda x, rv_x: -rv_x.log_prob(x),
         metrics=[])
     vae_model.fit(self.x, self.x,
@@ -234,7 +248,7 @@ class EndToEndTest(tf.test.TestCase):
             # TODO(b/119756336): Due to eager/graph Jacobian graph caching bug
             # we add here the capability for deferred construction of the prior.
             lambda: tfd.MultivariateNormalDiag(loc=tf.zeros(self.encoded_size)),
-            weight=self.train_size),
+            weight=0.9),  # "beta" as in beta-VAE.
     ])
 
     decoder_model = tfk.Sequential([
@@ -250,7 +264,7 @@ class EndToEndTest(tf.test.TestCase):
         inputs=encoder_model.inputs,
         outputs=decoder_model(encoder_model.outputs[0]))
     vae_model.compile(
-        optimizer=tf.compat.v1.train.AdamOptimizer(),
+        optimizer=tf.compat.v2.optimizers.Adam(),
         loss=lambda x, rv_x: -rv_x.log_prob(x),
         metrics=[])
     vae_model.fit(self.x, self.x,
@@ -261,6 +275,157 @@ class EndToEndTest(tf.test.TestCase):
     yhat = vae_model(tf.convert_to_tensor(value=self.x_test))
     self.assertIsInstance(yhat, tfd.Independent)
     self.assertIsInstance(yhat.distribution, tfd.Bernoulli)
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class DistributionLambdaSerializationTest(tf.test.TestCase):
+
+  def assertSerializable(self, model, batch_size=1):
+    """Assert that a model can be saved/loaded via Keras Model.save/load_model.
+
+    Arguments:
+      model: A Keras model that outputs a `tfd.Distribution`.
+      batch_size: The batch size to use when checking that the model produces
+        the same results as a serialized/deserialized copy.  Default value: 1.
+    """
+    batch_shape = [batch_size]
+
+    input_shape = batch_shape + model.input.shape[1:].as_list()
+    dtype = model.input.dtype.as_numpy_dtype()
+
+    model_file = self.create_tempfile()
+    model.save(model_file.full_path)
+    model_copy = tfk.models.load_model(model_file.full_path)
+
+    x = np.random.uniform(-3., 3., input_shape).astype(dtype)
+
+    model_x_mean = self.evaluate(model(x).mean())
+    self.assertAllEqual(model_x_mean, self.evaluate(model_copy(x).mean()))
+
+    output_shape = model_x_mean.shape
+    y = np.random.uniform(0., 1., output_shape).astype(dtype)
+
+    self.assertAllEqual(self.evaluate(model(x).log_prob(y)),
+                        self.evaluate(model_copy(x).log_prob(y)))
+
+  def assertExportable(self, model, batch_size=1):
+    """Assert a Keras model supports export_saved_model/load_from_saved_model.
+
+    Arguments:
+      model: A Keras model with Tensor output.
+      batch_size: The batch size to use when checking that the model produces
+        the same results as a serialized/deserialized copy.  Default value: 1.
+    """
+    batch_shape = [batch_size]
+
+    input_shape = batch_shape + model.input.shape[1:].as_list()
+    dtype = model.input.dtype.as_numpy_dtype()
+
+    model_dir = self.create_tempdir()
+    tfk.experimental.export_saved_model(model, model_dir.full_path)
+    model_copy = tfk.experimental.load_from_saved_model(model_dir.full_path)
+
+    x = np.random.uniform(-3., 3., input_shape).astype(dtype)
+    self.assertAllEqual(self.evaluate(model(x)), self.evaluate(model_copy(x)))
+    self.assertAllEqual(model.predict(x), model_copy.predict(x))
+
+  def test_serialization(self):
+    model = tfk.Sequential([
+        tfkl.Dense(2, input_shape=(5,)),
+        # pylint: disable=g-long-lambda
+        tfpl.DistributionLambda(lambda t: tfd.Normal(
+            loc=t[..., 0:1], scale=tf.exp(t[..., 1:2])))
+    ])
+    self.assertSerializable(model)
+
+    model = tfk.Sequential([
+        tfkl.Dense(2, input_shape=(5,)),
+        # pylint: disable=g-long-lambda
+        tfpl.DistributionLambda(lambda t: tfd.Normal(
+            loc=t[..., 0:1], scale=tf.exp(t[..., 1:2]))),
+        tfkl.Lambda(lambda d: d.mean() + d.stddev())
+    ])
+    self.assertExportable(model, batch_size=4)
+
+  @staticmethod
+  def _make_distribution(t):
+    return tfpl.MixtureSameFamily.new(t, 3, tfpl.IndependentNormal([2]))
+
+  def test_serialization_static_method(self):
+    model = tfk.Sequential([
+        tfkl.Dense(15, input_shape=(5,)),
+        tfpl.DistributionLambda(
+            # pylint: disable=unnecessary-lambda
+            lambda t: DistributionLambdaSerializationTest._make_distribution(t))
+    ])
+    model.compile(optimizer='adam', loss='mse')
+    self.assertSerializable(model, batch_size=3)
+
+    model = tfk.Sequential([
+        tfkl.Dense(15, input_shape=(5,)),
+        tfpl.DistributionLambda(
+            DistributionLambdaSerializationTest._make_distribution,
+            convert_to_tensor_fn=tfd.Distribution.mean),
+        tfkl.Lambda(lambda x: x + 1.)
+    ])
+    model.compile(optimizer='adam', loss='mse')
+    self.assertExportable(model)
+
+  def test_serialization_closure_over_lambdas_tensors_and_numpy_array(self):
+    num_components = np.array(3)
+    one = tf.convert_to_tensor(value=1)
+    mk_ind_norm = lambda event_shape: tfpl.IndependentNormal(event_shape + one)
+    def make_distribution(t):
+      return tfpl.MixtureSameFamily.new(
+          t, num_components, mk_ind_norm(1))
+
+    model = tfk.Sequential([
+        tfkl.Dense(15, input_shape=(5,)),
+        tfpl.DistributionLambda(make_distribution)
+    ])
+    self.assertSerializable(model, batch_size=4)
+
+    model = tfk.Sequential([
+        tfkl.Dense(15, input_shape=(5,)),
+        # pylint: disable=unnecessary-lambda
+        tfpl.DistributionLambda(lambda t: make_distribution(t)),
+        tfkl.Lambda(lambda d: d.mean() + d.stddev())
+    ])
+    self.assertExportable(model, batch_size=2)
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class DistributionLambdaVariableCreation(tf.test.TestCase):
+
+  def test_variable_creation(self):
+    conv1 = tfkl.Convolution2D(filters=1, kernel_size=[1, 3])
+    conv2 = tfkl.Convolution2D(filters=1, kernel_size=[2, 1])
+    pad1 = tfkl.ZeroPadding2D(padding=((0, 0), (1, 1)))
+    pad2 = tfkl.ZeroPadding2D(padding=((1, 0), (0, 0)))
+
+    loc = tfk.Sequential([conv1, pad1])
+    scale = tfk.Sequential([conv2, pad2])
+
+    x = tfkl.Input(shape=(3, 3, 1))
+
+    normal = tfpl.DistributionLambda(
+        lambda x: tfd.Normal(loc=loc(x), scale=tf.exp(scale(x))))
+    normal._loc_net = loc
+    normal._scale_net = scale
+
+    model = tfk.Model(x, normal(x))  # pylint: disable=unused-variable
+    model.compile(
+        optimizer=tf.compat.v2.optimizers.Adam(),
+        loss=lambda x, rv_x: -rv_x.log_prob(x),
+        metrics=[])
+
+    x_train = np.random.rand(1000, 3, 3, 1).astype(np.float32)
+    x_test = np.random.rand(100, 3, 3, 1).astype(np.float32)
+    model.fit(x_train, x_train,
+              batch_size=25,
+              epochs=5,
+              steps_per_epoch=10,
+              validation_data=(x_test, x_test))
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -300,7 +465,7 @@ class KLDivergenceAddLoss(tf.test.TestCase):
     self.assertNear(actual_kl_, approx_kl_, err=0.15)
 
     model.compile(
-        optimizer=tf.compat.v1.train.AdamOptimizer(),
+        optimizer=tf.compat.v2.optimizers.Adam(),
         loss=lambda x, dist: -dist.log_prob(x[0, :event_size]),
         metrics=[])
     model.fit(x, x,
@@ -361,7 +526,7 @@ class MultivariateNormalTriLTest(tf.test.TestCase):
 
     # Fit.
     model.compile(
-        optimizer=tf.compat.v1.train.AdamOptimizer(),
+        optimizer=tf.compat.v2.optimizers.Adam(),
         loss=lambda y, model: -model.log_prob(y),
         metrics=[])
     batch_size = 100
@@ -421,7 +586,7 @@ class OneHotCategoricalTest(tf.test.TestCase):
 
     # Fit.
     model.compile(
-        optimizer=tf.compat.v1.train.AdamOptimizer(learning_rate=0.5),
+        optimizer=tf.compat.v2.optimizers.Adam(learning_rate=0.5),
         loss=lambda y, model: -model.log_prob(y),
         metrics=[])
     batch_size = 100
@@ -503,7 +668,7 @@ class CategoricalMixtureOfOneHotCategoricalTest(tf.test.TestCase):
 
     # Fit.
     model.compile(
-        optimizer=tf.compat.v1.train.AdamOptimizer(learning_rate=0.5),
+        optimizer=tf.compat.v2.optimizers.Adam(learning_rate=0.5),
         loss=lambda y, model: -model.log_prob(y),
         metrics=[])
     batch_size = 100
@@ -579,6 +744,61 @@ class _IndependentLayerTest(object):
     x = layer(t)
     self._check_distribution(t, x, batch_shape)
 
+  def test_serialization(self):
+    event_shape = []
+    params_size = self.layer_class.params_size(event_shape)
+    batch_shape = [4, 1]
+
+    low = self._build_tensor(-3., dtype=self.dtype)
+    high = self._build_tensor(3., dtype=self.dtype)
+    x = self.evaluate(tfd.Uniform(low, high).sample(
+        batch_shape + [params_size], seed=42))
+
+    model = tfk.Sequential([
+        tfkl.Dense(params_size, input_shape=(params_size,), dtype=self.dtype),
+        self.layer_class(event_shape, validate_args=True),
+    ])
+
+    model_file = self.create_tempfile()
+    model.save(model_file.full_path)
+    model_copy = tfk.models.load_model(model_file.full_path)
+
+    self.assertAllEqual(self.evaluate(model(x).mean()),
+                        self.evaluate(model_copy(x).mean()))
+
+    self.assertEqual(self.dtype, model(x).mean().dtype.as_numpy_dtype)
+
+    ones = np.ones([7] + batch_shape + event_shape, dtype=self.dtype)
+    self.assertAllEqual(self.evaluate(model(x).log_prob(ones)),
+                        self.evaluate(model_copy(x).log_prob(ones)))
+
+  def test_model_export(self):
+    event_shape = [3, 2]
+    params_size = self.layer_class.params_size(event_shape)
+    batch_shape = [4]
+
+    low = self._build_tensor(-3., dtype=self.dtype)
+    high = self._build_tensor(3., dtype=self.dtype)
+    x = self.evaluate(tfd.Uniform(low, high).sample(
+        batch_shape + [params_size], seed=42))
+
+    model = tfk.Sequential([
+        tfkl.Dense(params_size, input_shape=(params_size,), dtype=self.dtype),
+        self.layer_class(event_shape, validate_args=True,
+                         convert_to_tensor_fn='mean'),
+        # NOTE: For TensorFlow to be able to serialize the graph (i.e., for
+        # serving), the model must output a Tensor and not a Distribution.
+        tfkl.Dense(1),
+    ])
+    model.compile(optimizer='adam', loss='mse')
+
+    model_dir = self.create_tempdir()
+    tfk.experimental.export_saved_model(model, model_dir.full_path)
+    model_copy = tfk.experimental.load_from_saved_model(model_dir.full_path)
+
+    self.assertAllEqual(self.evaluate(model(x)), self.evaluate(model_copy(x)))
+    self.assertEqual(self.dtype, model(x).dtype.as_numpy_dtype)
+
 
 @test_util.run_all_in_graph_and_eager_modes
 class _IndependentBernoulliTest(_IndependentLayerTest):
@@ -625,7 +845,7 @@ class IndependentBernoulliTestStaticShape(tf.test.TestCase,
 
     # Fit.
     model.compile(
-        optimizer=tf.compat.v1.train.AdamOptimizer(learning_rate=0.5),
+        optimizer=tf.compat.v2.optimizers.Adam(learning_rate=0.5),
         loss=lambda y, model: -model.log_prob(y),
         metrics=[])
     batch_size = 100
@@ -807,7 +1027,7 @@ class IndependentPoissonTestStaticShape(tf.test.TestCase,
 
     # Fit.
     model.compile(
-        optimizer=tf.compat.v1.train.AdamOptimizer(learning_rate=0.05),
+        optimizer=tf.compat.v2.optimizers.Adam(learning_rate=0.05),
         loss=lambda y, model: -model.log_prob(y),
         metrics=[])
     batch_size = 50
@@ -881,6 +1101,63 @@ class _MixtureLayerTest(object):
     x = layer(t)
     self._check_distribution(t, x, batch_shape)
 
+  def test_serialization(self):
+    n = 3
+    event_shape = []
+    params_size = self.layer_class.params_size(n, event_shape)
+    batch_shape = [4, 1]
+
+    low = self._build_tensor(-3., dtype=self.dtype)
+    high = self._build_tensor(3., dtype=self.dtype)
+    x = self.evaluate(tfd.Uniform(low, high).sample(
+        batch_shape + [params_size], seed=42))
+
+    model = tfk.Sequential([
+        tfkl.Dense(params_size, input_shape=(params_size,), dtype=self.dtype),
+        self.layer_class(n, event_shape, validate_args=True),
+    ])
+
+    model_file = self.create_tempfile()
+    model.save(model_file.full_path)
+    model_copy = tfk.models.load_model(model_file.full_path)
+
+    self.assertAllEqual(self.evaluate(model(x).mean()),
+                        self.evaluate(model_copy(x).mean()))
+
+    self.assertEqual(self.dtype, model(x).mean().dtype.as_numpy_dtype)
+
+    ones = np.ones([7] + batch_shape + event_shape, dtype=self.dtype)
+    self.assertAllEqual(self.evaluate(model(x).log_prob(ones)),
+                        self.evaluate(model_copy(x).log_prob(ones)))
+
+  def test_model_export(self):
+    n = 5
+    event_shape = [3, 2]
+    params_size = self.layer_class.params_size(n, event_shape)
+    batch_shape = [4]
+
+    low = self._build_tensor(-3., dtype=self.dtype)
+    high = self._build_tensor(3., dtype=self.dtype)
+    x = self.evaluate(tfd.Uniform(low, high).sample(
+        batch_shape + [params_size], seed=42))
+
+    model = tfk.Sequential([
+        tfkl.Dense(params_size, input_shape=(params_size,), dtype=self.dtype),
+        self.layer_class(n, event_shape, validate_args=True,
+                         convert_to_tensor_fn='mean'),
+        # NOTE: For TensorFlow to be able to serialize the graph (i.e., for
+        # serving), the model must output a Tensor and not a Distribution.
+        tfkl.Dense(1),
+    ])
+    model.compile(optimizer='adam', loss='mse')
+
+    model_dir = self.create_tempdir()
+    tfk.experimental.export_saved_model(model, model_dir.full_path)
+    model_copy = tfk.experimental.load_from_saved_model(model_dir.full_path)
+
+    self.assertAllEqual(self.evaluate(model(x)), self.evaluate(model_copy(x)))
+    self.assertEqual(self.dtype, model(x).dtype.as_numpy_dtype)
+
 
 @test_util.run_all_in_graph_and_eager_modes
 class _MixtureLogisticTest(_MixtureLayerTest):
@@ -928,7 +1205,7 @@ class _MixtureLogisticTest(_MixtureLayerTest):
     # Fit.
     batch_size = 100
     model.compile(
-        optimizer=tf.compat.v1.train.AdamOptimizer(learning_rate=0.02),
+        optimizer=tf.compat.v2.optimizers.Adam(learning_rate=0.02),
         loss=lambda y, model: -model.log_prob(y))
     model.fit(x, y,
               batch_size=batch_size,
@@ -998,7 +1275,7 @@ class _MixtureNormalTest(_MixtureLayerTest):
     # Fit.
     batch_size = 100
     model.compile(
-        optimizer=tf.compat.v1.train.AdamOptimizer(learning_rate=0.02),
+        optimizer=tf.compat.v2.optimizers.Adam(learning_rate=0.02),
         loss=lambda y, model: -model.log_prob(y))
     model.fit(x, y,
               batch_size=batch_size,
@@ -1111,7 +1388,7 @@ class _MixtureSameFamilyTest(object):
     # Fit.
     batch_size = 100
     model.compile(
-        optimizer=tf.compat.v1.train.AdamOptimizer(learning_rate=0.02),
+        optimizer=tf.compat.v2.optimizers.Adam(learning_rate=0.02),
         loss=lambda y, model: -model.log_prob(y))
     model.fit(x, y,
               batch_size=batch_size,
@@ -1133,6 +1410,100 @@ class MixtureSameFamilyTestStaticShape(tf.test.TestCase,
                                        _MixtureSameFamilyTest):
   dtype = np.float64
   use_static_shape = True
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class VariationalGaussianProcessEndToEnd(tf.test.TestCase):
+
+  def testEndToEnd(self):
+    np.random.seed(43)
+    dtype = np.float64
+
+    n = 1000
+    w0 = 0.125
+    b0 = 5.
+    x_range = [-20, 60]
+
+    def s(x):
+      g = (x - x_range[0]) / (x_range[1] - x_range[0])
+      return 3*(0.25 + g**2.)
+
+    x = (x_range[1] - x_range[0]) * np.random.rand(n) + x_range[0]
+    eps = np.random.randn(n) * s(x)
+    y = (w0 * x * (1 + np.sin(x)) + b0) + eps
+    x0 = np.linspace(*x_range, num=1000)
+
+    class KernelFn(tf.keras.layers.Layer):
+
+      def __init__(self, **kwargs):
+        super(KernelFn, self).__init__(**kwargs)
+
+        self._amplitude = self.add_variable(
+            initializer=tf.compat.v1.initializers.constant(.54),
+            dtype=dtype,
+            name='amplitude')
+
+      def call(self, x):
+        return x
+
+      @property
+      def kernel(self):
+        return tfp.positive_semidefinite_kernels.ExponentiatedQuadratic(
+            amplitude=tf.nn.softplus(self._amplitude))
+
+    num_inducing_points = 50
+    model = tf.keras.Sequential([
+        tf.keras.layers.InputLayer(input_shape=[1], dtype=dtype),
+        tf.keras.layers.Dense(1, kernel_initializer='Ones', use_bias=False,
+                              activation=None),
+        tfp.layers.VariationalGaussianProcess(
+            num_inducing_points=num_inducing_points,
+            kernel_provider=KernelFn(),
+            inducing_index_points_initializer=(
+                tf.compat.v1.initializers.constant(
+                    np.linspace(*x_range,
+                                num=num_inducing_points,
+                                dtype=dtype)[..., np.newaxis]))),
+    ])
+
+    if not tf.executing_eagerly():
+      self.evaluate(tf.compat.v1.global_variables_initializer())
+
+    batch_size = 64
+    kl_weight = np.float64(batch_size) / n
+    loss = lambda y, d: d.variational_loss(y, kl_weight=kl_weight)
+    model.compile(
+        optimizer=tf.compat.v2.optimizers.Adam(learning_rate=0.02),
+        loss=loss)
+
+    # This should have no issues
+    model.fit(x, y, epochs=5, batch_size=batch_size, verbose=False)
+
+    vgp = model(x0[..., None])
+    num_samples = 7
+    samples_ = self.evaluate(vgp.sample(num_samples))
+    self.assertAllEqual(samples_.shape, (7, 1000, 1))
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class JointDistributionLayer(tf.test.TestCase):
+
+  def test_works(self):
+    x = tf.keras.Input(shape=())
+    y = tfp.layers.VariableLayer(shape=[2, 4, 3], dtype=tf.float32)(x)
+    y = tf.keras.layers.Dense(5, use_bias=False)(y)
+    y = tfp.layers.DistributionLambda(
+        lambda t: tfd.JointDistributionSequential([  # pylint: disable=g-long-lambda
+            tfd.Gamma(t[..., 0], t[..., 1]),
+            tfd.Normal(t[..., 2], 1),
+            lambda m, s: tfd.Normal(loc=m, scale=s),
+        ]),
+    )(y)
+    m = tf.keras.Model(x, y)
+    dist = m(0.)
+    self.assertIsInstance(dist, tfd.JointDistributionSequential)
+    # Check the weights.
+    self.assertEqual(2, len(m.weights))
 
 
 if __name__ == '__main__':

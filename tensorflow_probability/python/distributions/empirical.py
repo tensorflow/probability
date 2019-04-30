@@ -18,10 +18,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution
-from tensorflow_probability.python.internal import distribution_util as util
+from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow.python.ops import gen_array_ops  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
@@ -31,9 +34,16 @@ __all__ = [
 
 def _broadcast_event_and_samples(event, samples, event_ndims):
   """Broadcasts the event or samples."""
-  samples_shape = tf.shape(input=samples)[:-event_ndims - 1]
+  # This is the shape of self.samples, without the samples axis, i.e. the shape
+  # of the result of a call to dist.sample(). This way we can broadcast it with
+  # event to get a properly-sized event, then add the singleton dim back at
+  # -event_ndims - 1.
+  samples_shape = tf.concat(
+      [tf.shape(input=samples)[:-event_ndims - 1],
+       tf.shape(input=samples)[tf.rank(samples) - event_ndims:]],
+      axis=0)
   event *= tf.ones(samples_shape, dtype=event.dtype)
-  event = tf.expand_dims(event, axis=-event_ndims-1)
+  event = tf.expand_dims(event, axis=-event_ndims - 1)
   samples *= tf.ones_like(event, dtype=samples.dtype)
 
   return event, samples
@@ -131,15 +141,16 @@ class Empirical(distribution.Distribution):
       ValueError: if the rank of `samples` < event_ndims + 1.
     """
 
-    parameters = locals()
-    with tf.name_scope(name, values=[samples]):
+    parameters = dict(locals())
+    with tf.name_scope(name):
       self._samples = tf.convert_to_tensor(value=samples, name='samples')
       self._event_ndims = event_ndims
-      self._samples_axis = ((self.samples.shape.ndims or tf.rank(self.samples))
-                            - self._event_ndims - 1)
+      self._samples_axis = (
+          (tensorshape_util.rank(self.samples.shape) or tf.rank(self.samples)) -
+          self._event_ndims - 1)
       with tf.control_dependencies(
-          [tf.compat.v1.assert_rank_at_least(self._samples, event_ndims + 1)]):
-        samples_shape = util.prefer_static_shape(self._samples)
+          [assert_util.assert_rank_at_least(self._samples, event_ndims + 1)]):
+        samples_shape = distribution_util.prefer_static_shape(self._samples)
         self._num_samples = samples_shape[self._samples_axis]
 
     super(Empirical, self).__init__(
@@ -155,6 +166,9 @@ class Empirical(distribution.Distribution):
   def _param_shapes(sample_shape):
     return {'samples': tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)}
 
+  def _params_event_ndims(self):
+    return dict(samples=self._event_ndims + 1)
+
   @property
   def samples(self):
     """Distribution parameter."""
@@ -169,7 +183,7 @@ class Empirical(distribution.Distribution):
     return tf.shape(input=self.samples)[:self._samples_axis]
 
   def _batch_shape(self):
-    if self.samples.shape.ndims is None:
+    if tensorshape_util.rank(self.samples.shape) is None:
       return tf.TensorShape(None)
     return self.samples.shape[:self._samples_axis]
 
@@ -177,7 +191,7 @@ class Empirical(distribution.Distribution):
     return tf.shape(input=self.samples)[self._samples_axis + 1:]
 
   def _event_shape(self):
-    if self.samples.shape.ndims is None:
+    if tensorshape_util.rank(self.samples.shape) is None:
       return tf.TensorShape(None)
     return self.samples.shape[self._samples_axis + 1:]
 
@@ -247,6 +261,8 @@ class Empirical(distribution.Distribution):
 
     entropy = tf.map_fn(_get_entropy, samples)
     entropy_shape = self.batch_shape_tensor()
+    if dtype_util.is_floating(self.dtype):
+      entropy = tf.cast(entropy, self.dtype)
     return tf.reshape(entropy, entropy_shape)
 
   def _cdf(self, event):
@@ -256,10 +272,12 @@ class Empirical(distribution.Distribution):
     cdf = tf.reduce_sum(
         input_tensor=tf.cast(
             tf.reduce_all(
-                input_tensor=samples - event <= 0,
+                input_tensor=samples <= event,
                 axis=tf.range(-self._event_ndims, 0)),
             dtype=tf.int32),
         axis=-1) / self.num_samples
+    if dtype_util.is_floating(self.dtype):
+      cdf = tf.cast(cdf, self.dtype)
     return cdf
 
   def _prob(self, event):
@@ -273,4 +291,6 @@ class Empirical(distribution.Distribution):
                 axis=tf.range(-self._event_ndims, 0)),
             dtype=tf.int32),
         axis=-1) / self.num_samples
+    if dtype_util.is_floating(self.dtype):
+      prob = tf.cast(prob, self.dtype)
     return prob

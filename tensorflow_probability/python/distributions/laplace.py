@@ -22,10 +22,11 @@ import math
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import special_math
@@ -93,15 +94,15 @@ class Laplace(distribution.Distribution):
       TypeError: if `loc` and `scale` are of different dtype.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[loc, scale]) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, scale], tf.float32)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
       scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
       with tf.control_dependencies(
-          [tf.compat.v1.assert_positive(scale)] if validate_args else []):
+          [assert_util.assert_positive(scale)] if validate_args else []):
         self._loc = tf.identity(loc)
         self._scale = tf.identity(scale)
-        tf.debugging.assert_same_float_dtype([self._loc, self._scale])
+        dtype_util.assert_same_float_dtype([self._loc, self._scale])
       super(Laplace, self).__init__(
           dtype=dtype,
           reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
@@ -116,6 +117,10 @@ class Laplace(distribution.Distribution):
     return dict(
         zip(("loc", "scale"),
             ([tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)] * 2)))
+
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(loc=0, scale=0)
 
   @property
   def loc(self):
@@ -145,14 +150,14 @@ class Laplace(distribution.Distribution):
     shape = tf.concat([[n], self.batch_shape_tensor()], 0)
     # Uniform variates must be sampled from the open-interval `(-1, 1)` rather
     # than `[-1, 1)`. In the case of `(0, 1)` we'd use
-    # `np.finfo(self.dtype.as_numpy_dtype).tiny` because it is the smallest,
-    # positive, "normal" number. However, the concept of subnormality exists
-    # only at zero; here we need the smallest usable number larger than -1,
-    # i.e., `-1 + eps/2`.
+    # `np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny` because it is the
+    # smallest, positive, "normal" number. However, the concept of subnormality
+    # exists only at zero; here we need the smallest usable number larger than
+    # -1, i.e., `-1 + eps/2`.
+    dt = dtype_util.as_numpy_dtype(self.dtype)
     uniform_samples = tf.random.uniform(
         shape=shape,
-        minval=np.nextafter(
-            self.dtype.as_numpy_dtype(-1.), self.dtype.as_numpy_dtype(0.)),
+        minval=np.nextafter(dt(-1.), dt(1.)),
         maxval=1.,
         dtype=self.dtype,
         seed=seed)
@@ -203,8 +208,6 @@ class Laplace(distribution.Distribution):
     return (x - self.loc) / self.scale
 
 
-@kullback_leibler.RegisterKL(Laplace, tf.compat.v1.distributions.Laplace)
-@kullback_leibler.RegisterKL(tf.compat.v1.distributions.Laplace, Laplace)
 @kullback_leibler.RegisterKL(Laplace, Laplace)
 def _kl_laplace_laplace(a, b, name=None):
   """Calculate the batched KL divergence KL(a || b) with a and b Laplace.
@@ -218,8 +221,7 @@ def _kl_laplace_laplace(a, b, name=None):
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.name_scope(name, "kl_laplace_laplace",
-                     [a.loc, b.loc, a.scale, b.scale]):
+  with tf.name_scope(name or "kl_laplace_laplace"):
     # Consistent with
     # http://www.mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 38
     distance = tf.abs(a.loc - b.loc)

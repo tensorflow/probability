@@ -357,7 +357,8 @@ class ReshapeBijectorTestDynamic(tf.test.TestCase, _ReshapeBijectorTest):
         bijector.forward_event_shape(tf.TensorShape(None)).ndims)
 
   def testInputOutputMismatchOpError(self):
-    self._testInputOutputMismatchOpError("Input to reshape is a tensor with")
+    self._testInputOutputMismatchOpError(
+        "(Input to reshape|Cannot reshape a tensor with)")
 
   def testMultipleUnspecifiedDimensionsOpError(self):
     with self.assertRaisesError("must have at most one `-1`."):

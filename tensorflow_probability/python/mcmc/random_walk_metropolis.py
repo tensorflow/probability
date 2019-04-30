@@ -26,7 +26,7 @@ import tensorflow as tf
 from tensorflow_probability.python import distributions
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import metropolis_hastings
-from tensorflow_probability.python.mcmc import util as mcmc_util
+from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
 
 __all__ = [
@@ -87,8 +87,8 @@ def random_walk_normal_fn(scale=1., name=None):
     Raises:
       ValueError: if `scale` does not broadcast with `state_parts`.
     """
-    with tf.name_scope(name, 'random_walk_normal_fn',
-                       values=[state_parts, scale, seed]):
+    with tf.compat.v1.name_scope(
+        name, 'random_walk_normal_fn', values=[state_parts, scale, seed]):
       scales = scale if mcmc_util.is_list_like(scale) else [scale]
       if len(scales) == 1:
         scales *= len(state_parts)
@@ -149,8 +149,8 @@ def random_walk_uniform_fn(scale=1., name=None):
     Raises:
       ValueError: if `scale` does not broadcast with `state_parts`.
     """
-    with tf.name_scope(name, 'random_walk_uniform_fn',
-                       values=[state_parts, scale, seed]):
+    with tf.compat.v1.name_scope(
+        name, 'random_walk_uniform_fn', values=[state_parts, scale, seed]):
       scales = scale if mcmc_util.is_list_like(scale) else [scale]
       if len(scales) == 1:
         scales *= len(state_parts)
@@ -502,12 +502,12 @@ class UncalibratedRandomWalk(kernel_base.TransitionKernel):
 
   @mcmc_util.set_doc(RandomWalkMetropolis.one_step.__doc__)
   def one_step(self, current_state, previous_kernel_results):
-    with tf.name_scope(
+    with tf.compat.v1.name_scope(
         name=mcmc_util.make_name(self.name, 'rwm', 'one_step'),
-        values=[self.seed,
-                current_state,
-                previous_kernel_results.target_log_prob]):
-      with tf.name_scope('initialize'):
+        values=[
+            self.seed, current_state, previous_kernel_results.target_log_prob
+        ]):
+      with tf.compat.v1.name_scope('initialize'):
         if mcmc_util.is_list_like(current_state):
           current_state_parts = list(current_state)
         else:
@@ -537,7 +537,8 @@ class UncalibratedRandomWalk(kernel_base.TransitionKernel):
 
   @mcmc_util.set_doc(RandomWalkMetropolis.bootstrap_results.__doc__)
   def bootstrap_results(self, init_state):
-    with tf.name_scope(self.name, 'rwm_bootstrap_results', [init_state]):
+    with tf.compat.v1.name_scope(self.name, 'rwm_bootstrap_results',
+                                 [init_state]):
       if not mcmc_util.is_list_like(init_state):
         init_state = [init_state]
       init_state = [tf.convert_to_tensor(value=x) for x in init_state]

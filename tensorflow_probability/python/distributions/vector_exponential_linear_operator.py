@@ -18,11 +18,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import affine_linear_operator as affine_linear_operator_bijector
 from tensorflow_probability.python.distributions import exponential
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = ["VectorExponentialLinearOperator"]
 
@@ -175,10 +177,10 @@ class VectorExponentialLinearOperator(
     parameters = dict(locals())
     if scale is None:
       raise ValueError("Missing required `scale` parameter.")
-    if not scale.dtype.is_floating:
+    if not dtype_util.is_floating(scale.dtype):
       raise TypeError("`scale` parameter must have floating-point dtype.")
 
-    with tf.name_scope(name, values=[loc] + scale.graph_parents) as name:
+    with tf.name_scope(name) as name:
       # Since expand_dims doesn't preserve constant-ness, we obtain the
       # non-dynamic value if possible.
       loc = loc if loc is None else tf.convert_to_tensor(
@@ -275,8 +277,8 @@ class VectorExponentialLinearOperator(
 
   def _mode_mean_shape(self):
     """Shape for the mode/mean Tensors."""
-    shape = self.batch_shape.concatenate(self.event_shape)
-    has_static_shape = shape.is_fully_defined()
+    shape = tensorshape_util.concatenate(self.batch_shape, self.event_shape)
+    has_static_shape = tensorshape_util.is_fully_defined(shape)
     if not has_static_shape:
       shape = tf.concat([
           self.batch_shape_tensor(),

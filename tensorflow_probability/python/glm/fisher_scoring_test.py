@@ -33,7 +33,7 @@ class FitTestFast(tf.test.TestCase):
   dtype = np.float32
   fast = True
 
-  def make_dataset(self, n, d, link, scale=1.):
+  def make_dataset(self, n, d, link, offset=None, scale=1.):
     seed = tfd.SeedStream(
         seed=213356351, salt='tfp.glm.fisher_scoring_test')
     model_coefficients = tfd.Uniform(
@@ -47,6 +47,8 @@ class FitTestFast(tf.test.TestCase):
     scale = tf.convert_to_tensor(value=scale, dtype=self.dtype)
     linear_response = tf.tensordot(
         model_matrix, model_coefficients, axes=[[1], [0]])
+    if offset is not None:
+      linear_response += offset
     if link == 'linear':
       response = tfd.Normal(loc=linear_response, scale=scale).sample(
           seed=seed())
@@ -160,6 +162,43 @@ class FitTestFast(tf.test.TestCase):
             fast_unsafe_numerics=self.fast,
             maximum_iterations=10))
     self.assertTrue(is_converged)
+
+  def testOffsetWorksCorrectly(self):
+    n = int(1e5)
+    offset = tf.fill([n], 1.0)
+    [
+        model_matrix,
+        response,
+        model_coefficients_true,
+        linear_response_true,
+    ] = self.make_dataset(
+        n=n, d=3, link='probit', offset=offset)
+    model_coefficients, linear_response, is_converged, _ = tfp.glm.fit(
+        model_matrix,
+        response,
+        tfp.glm.BernoulliNormalCDF(),
+        offset=offset,
+        fast_unsafe_numerics=self.fast,
+        maximum_iterations=20)
+    [
+        model_coefficients_,
+        linear_response_,
+        is_converged_,
+        model_coefficients_true_,
+        linear_response_true_,
+    ] = self.evaluate([
+        model_coefficients,
+        linear_response,
+        is_converged,
+        model_coefficients_true,
+        linear_response_true,
+    ])
+
+    self.assertTrue(is_converged_)
+    avg_response_diff = np.mean(linear_response_ - linear_response_true_)
+    self.assertNear(0., avg_response_diff, err=3e-3)
+    self.assertAllClose(
+        model_coefficients_true_, model_coefficients_, atol=0.03, rtol=0.15)
 
 
 class FitTestSlow(FitTestFast):

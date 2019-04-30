@@ -18,8 +18,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import dtype_util
 
 
 __all__ = [
@@ -91,19 +93,19 @@ class AffineLinearOperator(bijector.Bijector):
     self._name = name
     self._validate_args = validate_args
     graph_parents = []
-    with self._name_scope("init", values=[shift]):
+    with self._name_scope("init"):
       # In the absence of `loc` and `scale`, we'll assume `dtype` is `float32`.
       dtype = tf.float32
 
       if shift is not None:
         shift = tf.convert_to_tensor(value=shift, name="shift")
         graph_parents += [shift]
-        dtype = shift.dtype.base_dtype
+        dtype = dtype_util.base_dtype(shift.dtype)
       self._shift = shift
 
       if scale is not None:
         if (shift is not None and
-            shift.dtype.base_dtype != scale.dtype.base_dtype):
+            not dtype_util.base_equal(shift.dtype, scale.dtype)):
           raise TypeError(
               "shift.dtype({}) is incompatible with scale.dtype({}).".format(
                   shift.dtype, scale.dtype))
@@ -113,7 +115,7 @@ class AffineLinearOperator(bijector.Bijector):
           raise ValueError("Scale matrix must be non-singular.")
         graph_parents += scale.graph_parents
         if scale.dtype is not None:
-          dtype = scale.dtype.base_dtype
+          dtype = dtype_util.base_dtype(scale.dtype)
       self._scale = scale
       self._adjoint = adjoint
       super(AffineLinearOperator, self).__init__(
@@ -163,7 +165,7 @@ class AffineLinearOperator(bijector.Bijector):
     # `log_det_jacobian` need only be specified for a single input, as this will
     # be tiled to match `event_ndims`.
     if self.scale is None:
-      return tf.constant(0., dtype=x.dtype.base_dtype)
+      return tf.constant(0., dtype=dtype_util.base_dtype(x.dtype))
 
     with tf.control_dependencies(self._maybe_collect_assertions()
                                  if self.validate_args else []):

@@ -408,7 +408,7 @@ class _ConvVariational(tf.keras.layers.Layer):
     divergence = tf.identity(
         divergence_fn(posterior, prior, posterior_tensor),
         name=name)
-    self.add_loss(divergence)
+    self.add_loss(lambda: divergence)
 
 
 class _ConvReparameterization(_ConvVariational):

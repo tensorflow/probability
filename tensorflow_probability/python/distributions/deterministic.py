@@ -22,18 +22,34 @@ import abc
 
 # Dependency imports
 import six
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
     "Deterministic",
     "VectorDeterministic",
 ]
+
+
+def _get_tol(tol, dtype, validate_args):
+  """Gets a Tensor of type `dtype`, 0 if `tol` is None, validation optional."""
+  if tol is None:
+    return tf.convert_to_tensor(value=0, dtype=dtype)
+
+  tol = tf.convert_to_tensor(value=tol, dtype=dtype)
+  if validate_args:
+    tol = distribution_util.with_dependencies([
+        assert_util.assert_non_negative(
+            tol, message="Argument 'tol' must be non-negative")
+    ], tol)
+  return tol
 
 
 @six.add_metaclass(abc.ABCMeta)
@@ -47,6 +63,7 @@ class _BaseDeterministic(distribution.Distribution):
                is_vector=False,
                validate_args=False,
                allow_nan_stats=True,
+               parameters=None,
                name="_BaseDeterministic"):
     """Initialize a batch of `_BaseDeterministic` distributions.
 
@@ -78,25 +95,27 @@ class _BaseDeterministic(distribution.Distribution):
         (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
         result is undefined. When `False`, an exception is raised if one or
         more of the statistic's batch members are undefined.
+      parameters: Dict of locals to facilitate copy construction.
       name: Python `str` name prefixed to Ops created by this class.
 
     Raises:
       ValueError:  If `loc` is a scalar.
     """
-    parameters = dict(locals())
-    with tf.name_scope(name, values=[loc, atol, rtol]) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, atol, rtol],
                                       preferred_dtype=tf.float32)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
       if is_vector and validate_args:
         msg = "Argument loc must be at least rank 1."
-        if loc.shape.ndims is not None:
-          if loc.shape.ndims < 1:
+        if tensorshape_util.rank(loc.shape) is not None:
+          if tensorshape_util.rank(loc.shape) < 1:
             raise ValueError(msg)
         else:
           loc = distribution_util.with_dependencies(
-              [tf.compat.v1.assert_rank_at_least(loc, 1, message=msg)], loc)
+              [assert_util.assert_rank_at_least(loc, 1, message=msg)], loc)
       self._loc = loc
+      self._atol = _get_tol(atol, self._loc.dtype, validate_args)
+      self._rtol = _get_tol(rtol, self._loc.dtype, validate_args)
 
       super(_BaseDeterministic, self).__init__(
           dtype=self._loc.dtype,
@@ -104,28 +123,14 @@ class _BaseDeterministic(distribution.Distribution):
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
           parameters=parameters,
-          graph_parents=[self._loc],
+          graph_parents=[self._loc, self._atol, self._rtol],
           name=name)
 
-      self._atol = self._get_tol(atol)
-      self._rtol = self._get_tol(rtol)
       # Avoid using the large broadcast with self.loc if possible.
       if rtol is None:
         self._slack = self.atol
       else:
         self._slack = self.atol + self.rtol * tf.abs(self.loc)
-
-  def _get_tol(self, tol):
-    if tol is None:
-      return tf.convert_to_tensor(value=0, dtype=self.loc.dtype)
-
-    tol = tf.convert_to_tensor(value=tol, dtype=self.loc.dtype)
-    if self.validate_args:
-      tol = distribution_util.with_dependencies([
-          tf.compat.v1.assert_non_negative(
-              tol, message="Argument 'tol' must be non-negative")
-      ], tol)
-    return tol
 
   @property
   def loc(self):
@@ -154,16 +159,12 @@ class _BaseDeterministic(distribution.Distribution):
   def _mode(self):
     return self.mean()
 
-  def _sample_n(self, n, seed=None):  # pylint: disable=unused-arg
-    n_static = tf.get_static_value(tf.convert_to_tensor(value=n))
-    if n_static is not None and self.loc.shape.ndims is not None:
-      ones = [1] * self.loc.shape.ndims
-      multiples = [n_static] + ones
-    else:
-      ones = tf.ones_like(tf.shape(input=self.loc))
-      multiples = tf.concat(([n], ones), axis=0)
-
-    return tf.tile(self.loc[tf.newaxis, ...], multiples=multiples)
+  def _sample_n(self, n, seed=None):
+    del seed  # unused
+    return tf.broadcast_to(
+        self.loc,
+        tf.concat([[n], self.batch_shape_tensor(), self.event_shape_tensor()],
+                  axis=0))
 
 
 class Deterministic(_BaseDeterministic):
@@ -242,19 +243,26 @@ class Deterministic(_BaseDeterministic):
         more of the statistic's batch members are undefined.
       name: Python `str` name prefixed to Ops created by this class.
     """
+    parameters = dict(locals())
     super(Deterministic, self).__init__(
         loc,
         atol=atol,
         rtol=rtol,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
+        parameters=parameters,
         name=name)
 
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(loc=0, atol=0, rtol=0)
+
   def _batch_shape_tensor(self):
-    return tf.shape(input=self.loc)
+    return tf.broadcast_dynamic_shape(
+        tf.shape(input=self.loc), tf.shape(input=self._slack))
 
   def _batch_shape(self):
-    return self.loc.shape
+    return tf.broadcast_static_shape(self.loc.shape, self._slack.shape)
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
@@ -349,6 +357,7 @@ class VectorDeterministic(_BaseDeterministic):
         more of the statistic's batch members are undefined.
       name: Python `str` name prefixed to Ops created by this class.
     """
+    parameters = dict(locals())
     super(VectorDeterministic, self).__init__(
         loc,
         atol=atol,
@@ -356,13 +365,19 @@ class VectorDeterministic(_BaseDeterministic):
         is_vector=True,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
+        parameters=parameters,
         name=name)
 
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(loc=1, atol=1, rtol=1)
+
   def _batch_shape_tensor(self):
-    return tf.shape(input=self.loc)[:-1]
+    return tf.broadcast_dynamic_shape(
+        tf.shape(input=self.loc), tf.shape(input=self._slack))[:-1]
 
   def _batch_shape(self):
-    return self.loc.shape[:-1]
+    return tf.broadcast_static_shape(self.loc.shape, self._slack.shape)[:-1]
 
   def _event_shape_tensor(self):
     return tf.shape(input=self.loc)[-1:]
@@ -372,8 +387,8 @@ class VectorDeterministic(_BaseDeterministic):
 
   def _prob(self, x):
     if self.validate_args:
-      is_vector_check = tf.compat.v1.assert_rank_at_least(x, 1)
-      right_vec_space_check = tf.compat.v1.assert_equal(
+      is_vector_check = assert_util.assert_rank_at_least(x, 1)
+      right_vec_space_check = assert_util.assert_equal(
           self.event_shape_tensor(),
           tf.gather(tf.shape(input=x),
                     tf.rank(x) - 1),
@@ -388,9 +403,6 @@ class VectorDeterministic(_BaseDeterministic):
         dtype=self.dtype)
 
 
-# TODO(b/117098119): Remove tf.distribution references once they're gone.
-@kullback_leibler.RegisterKL(_BaseDeterministic,
-                             tf.compat.v1.distributions.Distribution)
 @kullback_leibler.RegisterKL(_BaseDeterministic, distribution.Distribution)
 def _kl_deterministic_distribution(a, b, name=None):
   """Calculate the batched KL divergence `KL(a || b)` with `a` Deterministic.
@@ -404,5 +416,5 @@ def _kl_deterministic_distribution(a, b, name=None):
   Returns:
     Batchwise `KL(a || b)`.
   """
-  with tf.name_scope(name, "kl_deterministic_distribution", [a.loc]):
+  with tf.name_scope(name or "kl_deterministic_distribution"):
     return -b.log_prob(a.loc)

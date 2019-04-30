@@ -76,7 +76,8 @@ def custom_gradient(fx, gx, x, fx_gx_manually_stopped=False, name=None):
     if fx_gx_manually_stopped:
       return x
     return tf.stop_gradient(x)
-  with tf.name_scope(name, 'custom_gradient', [fx, gx, x]):
+
+  with tf.compat.v1.name_scope(name, 'custom_gradient', [fx, gx, x]):
     fx = tf.convert_to_tensor(value=fx, name='fx')
     # We don't want to bother eagerly computing `gx` since we may not even need
     # it.

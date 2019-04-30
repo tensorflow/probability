@@ -20,9 +20,11 @@ import importlib
 
 # Dependency imports
 import numpy as np
+
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 tfd = tfp.distributions
@@ -212,7 +214,7 @@ class GammaTest(tf.test.TestCase):
     beta = tf.constant(beta_v)
     n = 100000
     gamma = tfd.Gamma(concentration=alpha, rate=beta)
-    samples = gamma.sample(n, seed=137)
+    samples = gamma.sample(n, seed=tfp_test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n,))
     self.assertEqual(sample_values.shape, (n,))
@@ -235,7 +237,7 @@ class GammaTest(tf.test.TestCase):
     beta = tf.constant(beta_v)
     n = 100000
     gamma = tfd.Gamma(concentration=alpha, rate=beta)
-    samples = gamma.sample(n, seed=137)
+    samples = gamma.sample(n, seed=tfp_test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n,))
     self.assertEqual(sample_values.shape, (n,))
@@ -265,7 +267,7 @@ class GammaTest(tf.test.TestCase):
     beta_v = np.array([np.arange(1, 11, dtype=np.float32)]).T  # 10 x 1
     gamma = tfd.Gamma(concentration=alpha_v, rate=beta_v)
     n = 10000
-    samples = gamma.sample(n, seed=137)
+    samples = gamma.sample(n, seed=tfp_test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n, 10, 100))
     self.assertEqual(sample_values.shape, (n, 10, 100))
@@ -304,7 +306,7 @@ class GammaTest(tf.test.TestCase):
   def testGammaPdfOfSampleMultiDims(self):
     gamma = tfd.Gamma(concentration=[7., 11.], rate=[[5.], [6.]])
     num = 50000
-    samples = gamma.sample(num, seed=137)
+    samples = gamma.sample(num, seed=tfp_test_util.test_seed())
     pdfs = gamma.prob(samples)
     sample_vals, pdf_vals = self.evaluate([samples, pdfs])
     self.assertEqual(samples.shape, (num, 2, 2))
@@ -360,7 +362,7 @@ class GammaTest(tf.test.TestCase):
     # Build graph.
     g0 = tfd.Gamma(concentration=alpha0, rate=beta0)
     g1 = tfd.Gamma(concentration=alpha1, rate=beta1)
-    x = g0.sample(int(1e4), seed=0)
+    x = g0.sample(int(1e4), seed=tfp_test_util.test_seed())
     kl_sample = tf.reduce_mean(
         input_tensor=g0.log_prob(x) - g1.log_prob(x), axis=0)
     kl_actual = tfd.kl_divergence(g0, g1)

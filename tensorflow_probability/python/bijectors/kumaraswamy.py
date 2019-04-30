@@ -18,8 +18,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 
 __all__ = [
@@ -42,8 +44,8 @@ class Kumaraswamy(bijector.Bijector):
   """
 
   def __init__(self,
-               concentration1=None,
-               concentration0=None,
+               concentration1=1.,
+               concentration0=1.,
                validate_args=False,
                name="kumaraswamy"):
     """Instantiates the `Kumaraswamy` bijector.
@@ -63,7 +65,7 @@ class Kumaraswamy(bijector.Bijector):
     self._name = name
     self._validate_args = validate_args
 
-    with self._name_scope("init", values=[concentration1, concentration0]):
+    with self._name_scope("init"):
       concentration1 = self._maybe_assert_valid_concentration(
           tf.convert_to_tensor(value=concentration1, name="concentration1"),
           validate_args=validate_args)
@@ -111,7 +113,7 @@ class Kumaraswamy(bijector.Bijector):
     if not validate_args:
       return concentration
     return distribution_util.with_dependencies([
-        tf.compat.v1.assert_positive(
+        assert_util.assert_positive(
             concentration, message="Concentration parameter must be positive."),
     ], concentration)
 
@@ -119,9 +121,9 @@ class Kumaraswamy(bijector.Bijector):
     if not self.validate_args:
       return x
     return distribution_util.with_dependencies([
-        tf.compat.v1.assert_non_negative(
+        assert_util.assert_non_negative(
             x, message="sample must be non-negative"),
-        tf.compat.v1.assert_less_equal(
+        assert_util.assert_less_equal(
             x,
             tf.ones([], self.concentration0.dtype),
             message="sample must be no larger than `1`."),

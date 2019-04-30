@@ -26,9 +26,9 @@ import tensorflow as tf
 from tensorflow_probability.python import distributions
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.mcmc import kernel as kernel_base
-from tensorflow_probability.python.mcmc import slice_sampler_utils as ssu
 
-from tensorflow_probability.python.mcmc import util as mcmc_util
+from tensorflow_probability.python.mcmc.internal import slice_sampler_utils as ssu
+from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
 
 __all__ = [
@@ -280,12 +280,13 @@ class SliceSampler(kernel_base.TransitionKernel):
         `current_state`.
       TypeError: if `not target_log_prob.dtype.is_floating`.
     """
-    with tf.name_scope(
+    with tf.compat.v1.name_scope(
         name=mcmc_util.make_name(self.name, 'slice', 'one_step'),
-        values=[self.step_size, self.max_doublings, self._seed_stream,
-                current_state,
-                previous_kernel_results.target_log_prob]):
-      with tf.name_scope('initialize'):
+        values=[
+            self.step_size, self.max_doublings, self._seed_stream,
+            current_state, previous_kernel_results.target_log_prob
+        ]):
+      with tf.compat.v1.name_scope('initialize'):
         [
             current_state_parts,
             step_sizes,
@@ -335,7 +336,7 @@ class SliceSampler(kernel_base.TransitionKernel):
       ]
 
   def bootstrap_results(self, init_state):
-    with tf.name_scope(
+    with tf.compat.v1.name_scope(
         name=mcmc_util.make_name(self.name, 'slice', 'bootstrap_results'),
         values=[init_state]):
       if not mcmc_util.is_list_like(init_state):
@@ -429,10 +430,10 @@ def _sample_next(target_log_prob_fn,
     lower_bounds: `Tensor` of batch shape and the dtype of the input state. The
       lower bounds of the slices along the sampling direction.
   """
-  with tf.name_scope(
-      name, 'sample_next',
-      [current_state_parts, step_sizes, max_doublings, current_target_log_prob,
-       batch_rank]):
+  with tf.compat.v1.name_scope(name, 'sample_next', [
+      current_state_parts, step_sizes, max_doublings, current_target_log_prob,
+      batch_rank
+  ]):
     # First step: Choose a random direction.
     # Direction is a list of tensors. The i'th tensor should have the same shape
     # as the i'th state part.

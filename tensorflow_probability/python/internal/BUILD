@@ -35,10 +35,11 @@ py_library(
 )
 
 py_library(
-    name = "monte_carlo",
-    srcs = ["monte_carlo.py"],
+    name = "assert_util",
+    srcs = ["assert_util.py"],
     srcs_version = "PY2AND3",
     deps = [
+        # numpy dep,
         # tensorflow dep,
     ],
 )
@@ -70,9 +71,11 @@ py_library(
     srcs = ["distribution_util.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":assert_util",
         ":dtype_util",
         ":prefer_static",
         ":reparameterization",
+        ":tensorshape_util",
         # numpy dep,
         # tensorflow dep,
     ],
@@ -84,6 +87,7 @@ py_test(
     srcs = ["distribution_util_test.py"],
     deps = [
         ":distribution_util",
+        ":tensorshape_util",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
@@ -92,9 +96,42 @@ py_test(
 )
 
 py_library(
+    name = "monte_carlo",
+    srcs = ["monte_carlo.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "nest_util",
+    srcs = ["nest_util.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "nest_util_test",
+    size = "small",
+    srcs = ["nest_util_test.py"],
+    deps = [
+        ":nest_util",
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_library(
     name = "prefer_static",
     srcs = ["prefer_static.py"],
     deps = [
+        ":tensorshape_util",
+        # decorator dep,
+        # numpy dep,
         # tensorflow dep,
     ],
 )
@@ -119,9 +156,9 @@ py_library(
     name = "special_math",
     srcs = ["special_math.py"],
     deps = [
+        ":dtype_util",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/math:gradient",
     ],
 )
 
@@ -132,11 +169,22 @@ py_test(
         ":special_math",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/math:gradient",
+    ],
+)
+
+py_library(
+    name = "tensorshape_util",
+    srcs = ["tensorshape_util.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
     ],
 )
 
 py_library(
     name = "test_case",
+    testonly = 1,
     srcs = ["test_case.py"],
     deps = [
         # numpy dep,
@@ -149,6 +197,7 @@ py_test(
     size = "small",
     srcs = ["test_case_test.py"],
     deps = [
+        ":dtype_util",
         ":test_case",
         # numpy dep,
         # tensorflow dep,
@@ -157,10 +206,29 @@ py_test(
 
 py_library(
     name = "test_util",
+    testonly = 1,
     srcs = ["test_util.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":dtype_util",
+        # absl/flags dep,
+        # hypothesis dep,
         # numpy dep,
+        # six dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/distributions:seed_stream",
+    ],
+)
+
+py_test(
+    name = "test_util_test",
+    size = "small",
+    srcs = ["test_util_test.py"],
+    deps = [
+        ":test_util",
+        # absl/flags dep,
+        # absl/testing:flagsaver dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions:seed_stream",
     ],
 )

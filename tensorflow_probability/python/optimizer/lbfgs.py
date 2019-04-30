@@ -86,6 +86,7 @@ def minimize(value_and_gradients_function,
              initial_inverse_hessian_estimate=None,
              max_iterations=50,
              parallel_iterations=1,
+             stopping_condition=None,
              name=None):
   """Applies the L-BFGS algorithm to minimize a differentiable function.
 
@@ -132,12 +133,14 @@ def minimize(value_and_gradients_function,
     value_and_gradients_function:  A Python callable that accepts a point as a
       real `Tensor` and returns a tuple of `Tensor`s of real dtype containing
       the value of the function and its gradient at that point. The function
-      to be minimized. The first component of the return value should be a
-      real scalar `Tensor`. The second component (the gradient) should have the
-      same shape as the input value to the function.
-    initial_position: `Tensor` of real dtype. The starting point of the search
-      procedure. Should be a point at which the function value and the gradient
-      norm are finite.
+      to be minimized. The input is of shape `[..., n]`, where `n` is the size
+      of the domain of input points, and all others are batching dimensions.
+      The first component of the return value is a real `Tensor` of matching
+      shape `[...]`. The second component (the gradient) is also of shape
+      `[..., n]` like the input value to the function.
+    initial_position: Real `Tensor` of shape `[..., n]`. The starting point, or
+      points when using batching dimensions, of the search procedure. At these
+      points the function value and the gradient norm should be finite.
     num_correction_pairs: Positive integer. Specifies the maximum number of
       (position_delta, gradient_delta) correction pairs to keep as implicit
       approximation of the Hessian matrix.
@@ -152,9 +155,17 @@ def minimize(value_and_gradients_function,
       than this value, the algorithm is stopped.
     initial_inverse_hessian_estimate: None. Option currently not supported.
     max_iterations: Scalar positive int32 `Tensor`. The maximum number of
-      iterations for BFGS updates.
+      iterations for L-BFGS updates.
     parallel_iterations: Positive integer. The number of iterations allowed to
       run in parallel.
+    stopping_condition: (Optional) A Python function that takes as input two
+      Boolean tensors of shape `[...]`, and returns a Boolean scalar tensor.
+      The input tensors are `converged` and `failed`, indicating the current
+      status of each respective batch member; the return value states whether
+      the algorithm should stop. The default is tfp.optimizer.converged_all
+      which only stops when all batch members have either converged or failed.
+      An alternative is tfp.optimizer.converged_any which stops as soon as one
+      batch member has converged, or when all have failed.
     name: (Optional) Python str. The name prefixed to the ops created by this
       function. If not supplied, the default name 'minimize' is used.
 
@@ -190,8 +201,10 @@ def minimize(value_and_gradients_function,
     raise NotImplementedError(
         'Support of initial_inverse_hessian_estimate arg not yet implemented')
 
-  with tf.name_scope(name, 'minimize', [initial_position,
-                                        tolerance]):
+  if stopping_condition is None:
+    stopping_condition = bfgs_utils.converged_all
+
+  with tf.compat.v1.name_scope(name, 'minimize', [initial_position, tolerance]):
     initial_position = tf.convert_to_tensor(
         value=initial_position, name='initial_position')
     dtype = initial_position.dtype.base_dtype
@@ -207,14 +220,12 @@ def minimize(value_and_gradients_function,
     # The `state` here is a `LBfgsOptimizerResults` tuple with values for the
     # current state of the algorithm computation.
     def _cond(state):
-      """Stopping condition for the algorithm."""
-      should_stop = (state.converged | state.failed |
-                     (state.num_iterations >= max_iterations))
-      return ~should_stop
+      """Continue if iterations remain and stopping condition is not met."""
+      return ((state.num_iterations < max_iterations) &
+              tf.logical_not(stopping_condition(state.converged, state.failed)))
 
     def _body(current_state):
       """Main optimization loop."""
-
       search_direction = _get_search_direction(current_state)
 
       # TODO(b/120134934): Check if the derivative at the start point is not
@@ -224,24 +235,18 @@ def minimize(value_and_gradients_function,
       next_state = bfgs_utils.line_search_step(
           current_state,
           value_and_gradients_function, search_direction,
-          tolerance, f_relative_tolerance, x_tolerance)
-
-      def _update_inv_hessian():
-        position_delta = next_state.position - current_state.position
-        gradient_delta = (
-            next_state.objective_gradient - current_state.objective_gradient)
-        return bfgs_utils.update_fields(
-            next_state,
-            position_deltas=_stack_append(current_state.position_deltas,
-                                          position_delta),
-            gradient_deltas=_stack_append(current_state.gradient_deltas,
-                                          gradient_delta))
+          tolerance, f_relative_tolerance, x_tolerance, stopping_condition)
 
       # If not failed or converged, update the Hessian estimate.
-      state_after_inv_hessian_update = prefer_static.cond(
-          next_state.converged | next_state.failed,
-          lambda: next_state,
-          _update_inv_hessian)
+      should_update = ~(next_state.converged | next_state.failed)
+      state_after_inv_hessian_update = bfgs_utils.update_fields(
+          next_state,
+          position_deltas=_queue_push(
+              current_state.position_deltas, should_update,
+              next_state.position - current_state.position),
+          gradient_deltas=_queue_push(
+              current_state.gradient_deltas, should_update,
+              next_state.objective_gradient - current_state.objective_gradient))
       return [state_after_inv_hessian_update]
 
     initial_state = _get_initial_state(value_and_gradients_function,
@@ -264,8 +269,8 @@ def _get_initial_state(value_and_gradients_function,
       value_and_gradients_function,
       initial_position,
       tolerance)
-  empty_stack = _make_empty_stack_like(initial_position, num_correction_pairs)
-  init_args.update(position_deltas=empty_stack, gradient_deltas=empty_stack)
+  empty_queue = _make_empty_queue_for(num_correction_pairs, initial_position)
+  init_args.update(position_deltas=empty_queue, gradient_deltas=empty_queue)
   return LBfgsOptimizerResults(**init_args)
 
 
@@ -319,13 +324,15 @@ def _get_search_direction(state):
 
     # Pre-compute all `inv_rho[i]`s.
     inv_rhos = tf.reduce_sum(
-        input_tensor=gradient_deltas * position_deltas, axis=1)
+        input_tensor=gradient_deltas * position_deltas, axis=-1)
 
     def first_loop(acc, args):
       _, q_direction = acc
       position_delta, gradient_delta, inv_rho = args
-      alpha = tf.reduce_sum(input_tensor=position_delta * q_direction) / inv_rho
-      return (alpha, q_direction - alpha * gradient_delta)
+      alpha = tf.reduce_sum(
+          input_tensor=position_delta * q_direction, axis=-1) / inv_rho
+      direction_delta = tf.expand_dims(alpha, axis=-1) * gradient_delta
+      return (alpha, q_direction - direction_delta)
 
     # Run first loop body computing and collecting `alpha[i]`s, while also
     # computing the updated `q_direction` at each step.
@@ -336,14 +343,16 @@ def _get_search_direction(state):
 
     # We use `H^0_k = gamma_k * I` as an estimate for the initial inverse
     # hessian for the k-th iteration; then `r_direction = H^0_k * q_direction`.
-    gamma_k = inv_rhos[-1] / tf.reduce_sum(input_tensor=gradient_deltas[-1] *
-                                           gradient_deltas[-1])
-    r_direction = gamma_k * q_directions[0]
+    gamma_k = inv_rhos[-1] / tf.reduce_sum(
+        input_tensor=gradient_deltas[-1] * gradient_deltas[-1], axis=-1)
+    r_direction = tf.expand_dims(gamma_k, axis=-1) * q_directions[0]
 
     def second_loop(r_direction, args):
       alpha, position_delta, gradient_delta, inv_rho = args
-      beta = tf.reduce_sum(input_tensor=gradient_delta * r_direction) / inv_rho
-      return r_direction + (alpha - beta) * position_delta
+      beta = tf.reduce_sum(
+          input_tensor=gradient_delta * r_direction, axis=-1) / inv_rho
+      direction_delta = tf.expand_dims(alpha - beta, axis=-1) * position_delta
+      return r_direction + direction_delta
 
     # Finally, run second loop body computing the updated `r_direction` at each
     # step.
@@ -357,56 +366,101 @@ def _get_search_direction(state):
                             _two_loop_algorithm)
 
 
-def _make_empty_stack_like(element, k):
-  """Creates a `tf.Tensor` suitable to hold k element-shaped vectors.
+def _make_empty_queue_for(k, element):
+  """Creates a `tf.Tensor` suitable to hold `k` element-shaped tensors.
 
   For example:
 
   ```python
-    element = tf.constant([1., 2., 3., 4., 5.])
+    element = tf.constant([[0., 1., 2., 3., 4.],
+                           [5., 6., 7., 8., 9.]])
 
-    _make_empty_stack_like(element, 3)
-    # => [[0., 0., 0., 0., 0.],
-    #     [0., 0., 0., 0., 0.],
-    #     [0., 0., 0., 0., 0.]]
+    # A queue capable of holding 3 elements.
+    _make_empty_queue_for(3, element)
+    # => [[[ 0.,  0.,  0.,  0.,  0.],
+    #      [ 0.,  0.,  0.,  0.,  0.]],
+    #
+    #     [[ 0.,  0.,  0.,  0.,  0.],
+    #      [ 0.,  0.,  0.,  0.,  0.]],
+    #
+    #     [[ 0.,  0.,  0.,  0.,  0.],
+    #      [ 0.,  0.,  0.,  0.,  0.]]]
   ```
 
   Args:
+    k: A positive scalar integer, number of elements that each queue will hold.
     element: A `tf.Tensor`, only its shape and dtype information are relevant.
-    k: A positive scalar integer `tf.Tensor`.
 
   Returns:
-    A zero-filed `Tensor` of shape `(k, ) + tf.shape(element)` and dtype same
+    A zero-filed `tf.Tensor` of shape `(k,) + tf.shape(element)` and same dtype
     as `element`.
   """
-  stack_shape = tf.concat(
+  queue_shape = tf.concat(
       [[k], distribution_util.prefer_static_shape(element)], axis=0)
-  return tf.zeros(stack_shape, dtype=element.dtype.base_dtype)
+  return tf.zeros(queue_shape, dtype=element.dtype.base_dtype)
 
 
-def _stack_append(stack, element):
-  """Appends a new `element` at the top of the `stack` and drops the bottom one.
+def _queue_push(queue, should_update, new_vecs):
+  """Conditionally push new vectors into a batch of first-in-first-out queues.
+
+  The `queue` of shape `[k, ..., n]` can be thought of as a batch of queues,
+  each holding `k` n-D vectors; while `new_vecs` of shape `[..., n]` is a
+  fresh new batch of n-D vectors. The `should_update` batch of Boolean scalars,
+  i.e. shape `[...]`, indicates batch members whose corresponding n-D vector in
+  `new_vecs` should be added at the back of its queue, pushing out the
+  corresponding n-D vector from the front. Batch members in `new_vecs` for
+  which `should_update` is False are ignored.
+
+  Note: the choice of placing `k` at the dimension 0 of the queue is
+  constrained by the L-BFGS two-loop algorithm above. The algorithm uses
+  tf.scan to iterate over the `k` correction pairs simulatneously across all
+  batches, and tf.scan itself can only iterate over dimension 0.
 
   For example:
 
   ```python
-    stack = tf.constant([[0., 0., 0., 0., 0.],
-                         [1., 2., 3., 4., 5.],
-                         [5., 4., 3., 2., 1.]])
+    k, b, n = (3, 2, 5)
+    queue = tf.reshape(tf.range(30), (k, b, n))
+    # => [[[ 0,  1,  2,  3,  4],
+    #      [ 5,  6,  7,  8,  9]],
+    #
+    #     [[10, 11, 12, 13, 14],
+    #      [15, 16, 17, 18, 19]],
+    #
+    #     [[20, 21, 22, 23, 24],
+    #      [25, 26, 27, 28, 29]]]
 
-    element = tf.constant([1., 2., 3., 2., 1.])
+    element = tf.reshape(tf.range(30, 40), (b, n))
+    # => [[30, 31, 32, 33, 34],
+          [35, 36, 37, 38, 39]]
 
-    _stack_append(stack, element)
-    # => [[1., 2., 3., 4., 5.],
-    #     [5., 4., 3., 2., 1.],
-    #     [1., 2., 3., 2., 1.]]
+    should_update = tf.constant([True, False])  # Shape: (b,)
+
+    _queue_add(should_update, queue, element)
+    # => [[[10, 11, 12, 13, 14],
+    #      [ 5,  6,  7,  8,  9]],
+    #
+    #     [[20, 21, 22, 23, 24],
+    #      [15, 16, 17, 18, 19]],
+    #
+    #     [[30, 31, 32, 33, 34],
+    #      [25, 26, 27, 28, 29]]]
   ```
 
   Args:
-    stack: A `tf.Tensor` of shape (k, d1, ..., dn).
-    element: A `tf.Tensor` of shape (d1, ..., dn).
+    queue: A `tf.Tensor` of shape `[k, ..., n]`; a batch of queues each with
+      `k` n-D vectors.
+    should_update: A Boolean `tf.Tensor` of shape `[...]` indicating batch
+      members where new vectors should be added to their queues.
+    new_vecs: A `tf.Tensor` of shape `[..., n]`; a batch of n-D vectors to add
+      at the end of their respective queues, pushing out the first element from
+      each.
 
   Returns:
-    A new `tf.Tensor`, of the same shape as the input `stack`.
+    A new `tf.Tensor` of shape `[k, ..., n]`.
   """
-  return tf.concat([stack[1:], [element]], axis=0)
+  new_queue = tf.concat([queue[1:], [new_vecs]], axis=0)
+  update_pattern = tf.broadcast_to(
+      should_update[tf.newaxis, ..., tf.newaxis],
+      distribution_util.prefer_static_shape(queue))
+  return tf.where(update_pattern, new_queue, queue)

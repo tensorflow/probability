@@ -38,17 +38,18 @@ from tensorflow_probability.python.mcmc.sample import sample_chain
 from tensorflow_probability.python.mcmc.sample import StatesAndTrace
 from tensorflow_probability.python.mcmc.sample_annealed_importance import sample_annealed_importance_chain
 from tensorflow_probability.python.mcmc.sample_halton_sequence import sample_halton_sequence
+from tensorflow_probability.python.mcmc.simple_step_size_adaptation import SimpleStepSizeAdaptation
 from tensorflow_probability.python.mcmc.slice_sampler_kernel import SliceSampler
 from tensorflow_probability.python.mcmc.transformed_kernel import TransformedTransitionKernel
 
-from tensorflow.python.util.all_util import remove_undocumented
-
-_allowed_symbols = [
+__all__ = [
+    'CheckpointableStatesAndTrace',
     'HamiltonianMonteCarlo',
     'MetropolisAdjustedLangevinAlgorithm',
     'MetropolisHastings',
     'RandomWalkMetropolis',
     'ReplicaExchangeMC',
+    'SimpleStepSizeAdaptation',
     'SliceSampler',
     'StatesAndTrace',
     'TransformedTransitionKernel',
@@ -66,5 +67,3 @@ _allowed_symbols = [
     'sample_chain',
     'sample_halton_sequence',
 ]
-
-remove_undocumented(__name__, _allowed_symbols)

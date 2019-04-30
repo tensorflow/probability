@@ -20,7 +20,7 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
@@ -60,7 +60,7 @@ class ScaleTriLBijectorTest(tf.test.TestCase):
     self.assertAllEqual(y.shape, batch_shape + [3, 3])
 
     x_ = self.evaluate(b.inverse(y))
-    self.assertAllClose(x, x_)
+    self.assertAllClose(x, x_, rtol=1e-5)
 
     fldj = self.evaluate(b.forward_log_det_jacobian(x, event_ndims=1))
     ildj = self.evaluate(b.inverse_log_det_jacobian(y, event_ndims=2))

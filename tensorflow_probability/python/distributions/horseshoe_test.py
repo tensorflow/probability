@@ -24,8 +24,9 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
-
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+
 tfd = tfp.distributions
 
 
@@ -74,7 +75,7 @@ class _HorseshoeTest(object):
     n = 100000
     dist = tfd.Horseshoe(scale=scale)
 
-    sample = dist.sample(n, seed=1)
+    sample = dist.sample(n, seed=tfp_test_util.test_seed())
     self.assertEqual(self.evaluate(sample).shape, (n,))
 
     scale_mle = self._scale_mle(
@@ -98,7 +99,7 @@ class _HorseshoeTest(object):
     n = 100000
     dist = tfd.Horseshoe(scale=scale)
 
-    sample = dist.sample(n, seed=2)
+    sample = dist.sample(n, seed=tfp_test_util.test_seed())
     self.assertEqual(self.evaluate(sample).shape, (n, batch_size, 2))
     template = tf.ones_like(scale)
     scale_candidates = tf.stack(
@@ -166,9 +167,9 @@ class _HorseshoeTest(object):
     x = self._test_param(np.linspace(.1, 10.1, 11).reshape((-1, 1)))
     horseshoe_log_pdf = self.evaluate(horseshoe.log_prob(x))
     num_mc_samples = int(1.5e6)
+    seed = tfp_test_util.test_seed(hardcoded_seed=23145, set_eager_seed=False)
     sigmas = tf.reshape(scale, [-1, 1]) * tfd.HalfCauchy(
-        self.dtype(0.), self.dtype(1.)).sample(
-            num_mc_samples, seed=23145)
+        self.dtype(0.), self.dtype(1.)).sample(num_mc_samples, seed=seed)
     monte_carlo_horseshoe = tfd.MixtureSameFamily(
         tfd.Categorical(logits=self._test_param(np.zeros(num_mc_samples))),
         tfd.Normal(self.dtype(0.), sigmas))

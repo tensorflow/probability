@@ -46,7 +46,9 @@ def one_step_predictive(model, observed_time_series, parameter_samples):
     observed_time_series: `float` `Tensor` of shape
       `concat([sample_shape, model.batch_shape, [num_timesteps, 1]]) where
       `sample_shape` corresponds to i.i.d. observations, and the trailing `[1]`
-      dimension may (optionally) be omitted if `num_timesteps > 1`.
+      dimension may (optionally) be omitted if `num_timesteps > 1`. May
+      optionally be an instance of `tfp.sts.MaskedTimeSeries` including a
+      mask `Tensor` to encode the locations of missing observations.
     parameter_samples: Python `list` of `Tensors` representing posterior samples
       of model parameters, with shapes `[concat([[num_posterior_draws],
       param.prior.batch_shape, param.prior.event_shape]) for param in
@@ -142,12 +144,13 @@ def one_step_predictive(model, observed_time_series, parameter_samples):
 
   """
 
-  with tf.name_scope('one_step_predictive',
-                     values=[observed_time_series,
-                             parameter_samples]):
-    observed_time_series = tf.convert_to_tensor(
-        value=observed_time_series, name='observed_time_series')
-    observed_time_series = sts_util.maybe_expand_trailing_dim(
+  with tf.compat.v1.name_scope(
+      'one_step_predictive', values=[observed_time_series, parameter_samples]):
+
+    [
+        observed_time_series,
+        is_missing
+    ] = sts_util.canonicalize_observed_time_series_with_mask(
         observed_time_series)
 
     # Run filtering over the training timesteps to extract the
@@ -157,37 +160,13 @@ def one_step_predictive(model, observed_time_series, parameter_samples):
     lgssm = model.make_state_space_model(
         num_timesteps=num_timesteps, param_vals=parameter_samples)
     (_, _, _, _, _, observation_means, observation_covs
-    ) = lgssm.forward_filter(observed_time_series)
+    ) = lgssm.forward_filter(observed_time_series, mask=is_missing)
 
-    # Construct the predictive distribution by mixing over posterior draws.
-    # Unfortunately this requires some shenanigans with shapes. The predictive
-    # parameters have shape
-    #   `concat([
-    #      [num_posterior_draws],
-    #      observed_time_series.sample_shape,
-    #      lgssm.batch_shape,
-    #      lgssm.event_shape  # => [num_timesteps, 1]
-    #    ]`
-    # Because MixtureSameFamily mixes over the rightmost batch dimension,
-    # we need to move the `num_posterior_draws` dimension to be rightmost
-    # in the batch shape. This requires use of `Independent` (to preserve
-    # `num_timesteps` as part of the event shape) and `move_dimension`.
-    # TODO(b/120245392): enhance `MixtureSameFamily` to reduce along an
-    # arbitrary axis, and eliminate `move_dimension` calls here.
-    predictions = tfd.Independent(
-        distribution=tfd.Normal(
-            loc=dist_util.move_dimension(observation_means[..., 0], 0, -2),
-            scale=tf.sqrt(dist_util.move_dimension(
-                observation_covs[..., 0, 0], 0, -2))),
-        reinterpreted_batch_ndims=1)
-
-    num_posterior_draws = dist_util.prefer_static_value(
-        tf.shape(input=observation_means))[0]
-    return tfd.MixtureSameFamily(
-        mixture_distribution=tfd.Categorical(
-            logits=tf.zeros([num_posterior_draws],
-                            dtype=predictions.dtype)),
-        components_distribution=predictions)
+    # Squeeze dims to convert from LGSSM's event shape `[num_timesteps, 1]`
+    # to a scalar time series.
+    return sts_util.mix_over_posterior_draws(
+        means=observation_means[..., 0],
+        variances=observation_covs[..., 0, 0])
 
 
 def forecast(model,
@@ -206,7 +185,9 @@ def forecast(model,
     observed_time_series: `float` `Tensor` of shape
       `concat([sample_shape, model.batch_shape, [num_timesteps, 1]])` where
       `sample_shape` corresponds to i.i.d. observations, and the trailing `[1]`
-      dimension may (optionally) be omitted if `num_timesteps > 1`.
+      dimension may (optionally) be omitted if `num_timesteps > 1`. May
+      optionally be an instance of `tfp.sts.MaskedTimeSeries` including a
+      mask `Tensor` to encode the locations of missing observations.
     parameter_samples: Python `list` of `Tensors` representing posterior samples
       of model parameters, with shapes `[concat([[num_posterior_draws],
       param.prior.batch_shape, param.prior.event_shape]) for param in
@@ -305,13 +286,13 @@ def forecast(model,
 
   """
 
-  with tf.name_scope('forecast',
-                     values=[observed_time_series,
-                             parameter_samples,
-                             num_steps_forecast]):
-    observed_time_series = tf.convert_to_tensor(
-        value=observed_time_series, name='observed_time_series')
-    observed_time_series = sts_util.maybe_expand_trailing_dim(
+  with tf.compat.v1.name_scope(
+      'forecast',
+      values=[observed_time_series, parameter_samples, num_steps_forecast]):
+    [
+        observed_time_series,
+        mask
+    ] = sts_util.canonicalize_observed_time_series_with_mask(
         observed_time_series)
 
     # Run filtering over the observed timesteps to extract the
@@ -324,7 +305,7 @@ def forecast(model,
     observed_data_ssm = model.make_state_space_model(
         num_timesteps=num_observed_steps, param_vals=parameter_samples)
     (_, _, _, predictive_means, predictive_covs, _, _
-    ) = observed_data_ssm.forward_filter(observed_time_series)
+    ) = observed_data_ssm.forward_filter(observed_time_series, mask=mask)
 
     # Build a batch of state-space models over the forecast period. Because
     # we'll use MixtureSameFamily to mix over the posterior draws, we need to
@@ -342,11 +323,36 @@ def forecast(model,
         loc=dist_util.move_dimension(predictive_means[..., -1, :], 0, -2),
         covariance_matrix=dist_util.move_dimension(
             predictive_covs[..., -1, :, :], 0, -3))
-    forecast_ssm = model.make_state_space_model(
+
+    # Ugly hack: because we moved `num_posterior_draws` to the trailing (rather
+    # than leading) dimension of parameters, the parameter batch shapes no
+    # longer broadcast against the `constant_offset` attribute used in `sts.Sum`
+    # models. We fix this by manually adding an extra broadcasting dim to
+    # `constant_offset` if present.
+    # The root cause of this hack is that we mucked with param dimensions above
+    # and are now passing params that are 'invalid' in the sense that they don't
+    # match the shapes of the model's param priors. The fix (as above) will be
+    # to update MixtureSameFamily so we can avoid changing param dimensions
+    # altogether.
+    # TODO(b/120245392): enhance `MixtureSameFamily` to reduce along an
+    # arbitrary axis, and eliminate this hack.
+    kwargs = {}
+    if hasattr(model, 'constant_offset'):
+      kwargs['constant_offset'] = tf.convert_to_tensor(
+          value=model.constant_offset,
+          dtype=forecast_prior.dtype)[..., tf.newaxis]
+
+    # We assume that any STS model that has a `constant_offset` attribute
+    # will allow it to be overridden as a kwarg. This is currently just
+    # `sts.Sum`.
+    # TODO(b/120245392): when kwargs hack is removed, switch back to calling
+    # the public version of `_make_state_space_model`.
+    forecast_ssm = model._make_state_space_model(  # pylint: disable=protected-access
         num_timesteps=num_steps_forecast,
-        param_vals=parameter_samples_with_reordered_batch_dimension,
+        param_map=parameter_samples_with_reordered_batch_dimension,
         initial_state_prior=forecast_prior,
-        initial_step=num_observed_steps)
+        initial_step=num_observed_steps,
+        **kwargs)
 
     num_posterior_draws = dist_util.prefer_static_value(
         forecast_ssm.batch_shape_tensor())[-1]

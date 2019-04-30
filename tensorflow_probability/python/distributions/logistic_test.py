@@ -21,11 +21,13 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 from scipy import stats
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-tfd = tfp.distributions
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+
+tfd = tfp.distributions
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -142,7 +144,8 @@ class LogisticTest(tf.test.TestCase):
     loc = [3.0, 4.0, 2.0]
     scale = 1.0
     dist = tfd.Logistic(loc, scale)
-    sample = dist.sample(seed=100)
+    sample = dist.sample(
+        seed=tfp_test_util.test_seed(hardcoded_seed=100, set_eager_seed=False))
     self.assertEqual(sample.shape, (3,))
     self.assertAllClose(
         self.evaluate(sample), [6.22460556, 3.79602098, 2.05084133])

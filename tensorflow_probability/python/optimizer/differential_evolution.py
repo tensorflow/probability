@@ -171,11 +171,9 @@ def one_step(
     next_population_values: A `Tensor` of same shape and dtype as input
       `population_values`. The function values for the `next_population`.
   """
-  with tf.name_scope(name, 'one_step',
-                     [population,
-                      population_values,
-                      differential_weight,
-                      crossover_prob]):
+  with tf.compat.v1.name_scope(
+      name, 'one_step',
+      [population, population_values, differential_weight, crossover_prob]):
     population, _ = _ensure_list(population)
     if population_values is None:
       population_values = objective_function(*population)
@@ -370,18 +368,14 @@ def minimize(objective_function,
     raise ValueError('Only one of initial population or initial position '
                      'should be specified')
 
-  with tf.name_scope(name,
-                     default_name='minimize',
-                     values=[
-                         initial_population,
-                         initial_position,
-                         population_size,
-                         population_stddev,
-                         max_iterations,
-                         func_tolerance,
-                         position_tolerance,
-                         differential_weight,
-                         crossover_prob]):
+  with tf.compat.v1.name_scope(
+      name,
+      default_name='minimize',
+      values=[
+          initial_population, initial_position, population_size,
+          population_stddev, max_iterations, func_tolerance, position_tolerance,
+          differential_weight, crossover_prob
+      ]):
     (
         was_iterable,
         population,
@@ -740,7 +734,8 @@ def _get_mixing_indices(size, seed=None, name=None):
     samples without replacement between 0 and size - 1 (inclusive) with the
     `i`th row not including the number `i`.
   """
-  with tf.name_scope(name, default_name='get_mixing_indices', values=[size]):
+  with tf.compat.v1.name_scope(
+      name, default_name='get_mixing_indices', values=[size]):
     size = tf.convert_to_tensor(value=size)
     dtype = size.dtype
     seed_stream = distributions.SeedStream(seed, salt='get_mixing_indices')

@@ -27,6 +27,7 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.distributions import exponential as exponential_lib
 
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 tfd = tfp.distributions
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
@@ -138,7 +139,7 @@ class ExponentialTest(tf.test.TestCase):
     n = tf.constant(100000)
     exponential = exponential_lib.Exponential(rate=lam)
 
-    samples = exponential.sample(n, seed=137)
+    samples = exponential.sample(n, seed=tfp_test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(sample_values.shape, (100000, 2))
     self.assertFalse(np.any(sample_values < 0.0))
@@ -157,7 +158,7 @@ class ExponentialTest(tf.test.TestCase):
     exponential = exponential_lib.Exponential(rate=lam)
 
     n = 100000
-    samples = exponential.sample(n, seed=138)
+    samples = exponential.sample(n, seed=tfp_test_util.test_seed())
     self.assertEqual(samples.shape, (n, batch_size, 2))
 
     sample_values = self.evaluate(samples)
@@ -196,7 +197,7 @@ class ExponentialTest(tf.test.TestCase):
 
     kl = tfd.kl_divergence(a, b)
 
-    x = a.sample(int(4e5), seed=0)
+    x = a.sample(int(4e5), seed=tfp_test_util.test_seed())
     kl_sample = tf.reduce_mean(
         input_tensor=a.log_prob(x) - b.log_prob(x), axis=0)
 

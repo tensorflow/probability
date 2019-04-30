@@ -18,8 +18,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 
 __all__ = [
@@ -90,7 +92,7 @@ class AbsoluteValue(bijector.Bijector):
   def _inverse(self, y):
     if self.validate_args:
       y = distribution_util.with_dependencies([
-          tf.compat.v1.assert_non_negative(
+          assert_util.assert_non_negative(
               y, message="Argument y was negative")
       ], y)
     return -y, y
@@ -102,7 +104,7 @@ class AbsoluteValue(bijector.Bijector):
     zeros = tf.constant(0., dtype=y.dtype)
     if self.validate_args:
       zeros = distribution_util.with_dependencies([
-          tf.compat.v1.assert_non_negative(
+          assert_util.assert_non_negative(
               y, message="Argument y was negative")
       ], zeros)
     return zeros, zeros

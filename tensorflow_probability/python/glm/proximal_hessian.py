@@ -213,7 +213,7 @@ def fit_sparse_one_step(model_matrix,
       tolerance,
       learning_rate,
   ]
-  with tf.name_scope(name, 'fit_sparse_one_step', graph_deps):
+  with tf.compat.v1.name_scope(name, 'fit_sparse_one_step', graph_deps):
     predicted_linear_response = sparse_or_dense_matvecmul(
         model_matrix, model_coefficients_start)
     g, h_middle = _grad_neg_log_likelihood_and_fim(
@@ -468,7 +468,7 @@ def fit_sparse(model_matrix,
       tolerance,
       learning_rate,
   ]
-  with tf.name_scope(name, 'fit_sparse', graph_deps):
+  with tf.compat.v1.name_scope(name, 'fit_sparse', graph_deps):
     # TODO(b/111922388): Include dispersion and offset parameters.
     def _grad_neg_log_likelihood_and_fim_fn(x):
       predicted_linear_response = sparse_or_dense_matvecmul(model_matrix, x)
@@ -513,7 +513,7 @@ def _fit_sparse_exact_hessian(  # pylint: disable = missing-docstring
       tolerance,
       learning_rate,
   ]
-  with tf.name_scope(name, 'fit_sparse_exact_hessian', graph_deps):
+  with tf.compat.v1.name_scope(name, 'fit_sparse_exact_hessian', graph_deps):
     # TODO(b/111922388): Include dispersion and offset parameters.
     def _neg_log_likelihood(x):
       predicted_linear_response = sparse_or_dense_matvecmul(model_matrix, x)

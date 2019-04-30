@@ -289,7 +289,7 @@ def secant_root(objective_fn,
     return (next_position, value_at_next_position, num_iterations, next_step,
             is_finished)
 
-  with tf.name_scope(
+  with tf.compat.v1.name_scope(
       name, 'secant_root',
       [position, next_position, value_at_position, max_iterations]):
 

@@ -94,6 +94,16 @@ class DeterministicTest(tf.test.TestCase):
     self.assertAllEqual((2, 2), prob.shape)
     self.assertAllEqual(expected_prob, self.evaluate(prob))
 
+  def testProbWithRTolBcastsLoc(self):
+    loc = [100., 200.]
+    rtol = [[0.01], [0.02]]
+    x = [[102., 201.9], [99.1, 205.]]
+    deterministic = tfd.Deterministic(loc, rtol=rtol)
+    expected_prob = [[0., 1.], [1., 0.]]
+    prob = deterministic.prob(x)
+    self.assertAllEqual((2, 2), prob.shape)
+    self.assertAllEqual(expected_prob, self.evaluate(prob))
+
   def testProbWithNonzeroRTolIntegerType(self):
     loc = [[10, 10, 10], [10, 10, 10]]
     x = [[10, 20, 30], [10, 20, 30]]
@@ -149,6 +159,15 @@ class DeterministicTest(tf.test.TestCase):
           np.zeros(sample_shape + (2,)).astype(np.float32),
           self.evaluate(sample))
 
+  def testSampleWithBatchAtol(self):
+    deterministic = tfd.Deterministic(0., atol=[.1, .1])
+    for sample_shape in [(), (4,)]:
+      sample = deterministic.sample(sample_shape)
+      self.assertAllEqual(sample_shape + (2,), sample.shape)
+      self.assertAllClose(
+          np.zeros(sample_shape + (2,)).astype(np.float32),
+          self.evaluate(sample))
+
   def testSampleDynamicWithBatchDims(self):
     loc = tf.compat.v1.placeholder_with_default(input=[0., 0], shape=[2])
 
@@ -194,6 +213,18 @@ class DeterministicTest(tf.test.TestCase):
 
 
 class VectorDeterministicTest(tf.test.TestCase):
+
+  def testParamBroadcasts(self):
+    loc = rng.rand(2, 1, 4)
+    atol = np.abs(rng.rand(2, 3, 1))
+    rtol = np.abs(rng.rand(7, 2, 3, 1))
+    deterministic = tfd.VectorDeterministic(loc, atol=atol, rtol=rtol)
+
+    self.assertAllEqual(
+        self.evaluate(deterministic.batch_shape_tensor()), (7, 2, 3))
+    self.assertAllEqual(deterministic.batch_shape, (7, 2, 3))
+    self.assertAllEqual(self.evaluate(deterministic.event_shape_tensor()), [4])
+    self.assertEqual(deterministic.event_shape, tf.TensorShape([4]))
 
   def testShape(self):
     loc = rng.rand(2, 3, 4)
@@ -247,6 +278,17 @@ class VectorDeterministicTest(tf.test.TestCase):
     loc = [[0., 1.], [2., 3.], [4., 5.]]
     x = [[0., 1.], [1.9, 3.], [3.99, 5.]]
     deterministic = tfd.VectorDeterministic(loc, atol=0.05)
+    expected_prob = [1., 0., 1.]
+    prob = deterministic.prob(x)
+    self.assertAllEqual((3,), prob.shape)
+    self.assertAllEqual(expected_prob, self.evaluate(prob))
+
+  def testProbWithATolBcastsLoc(self):
+    # 3 batch of deterministics on R^2.
+    loc = [0., 1.]
+    atol = [[0.02], [0.03], [0.05]]
+    x = [[0., .99], [0.04, 1.], [0., 1.045]]
+    deterministic = tfd.VectorDeterministic(loc, atol=atol)
     expected_prob = [1., 0., 1.]
     prob = deterministic.prob(x)
     self.assertAllEqual((3,), prob.shape)

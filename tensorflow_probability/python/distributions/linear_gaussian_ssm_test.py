@@ -30,10 +30,12 @@ from tensorflow_probability.python.distributions.linear_gaussian_ssm import buil
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import build_kalman_cov_step
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import build_kalman_filter_step
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import build_kalman_mean_step
+from tensorflow_probability.python.distributions.linear_gaussian_ssm import build_pushforward_latents_step
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import kalman_transition
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import KalmanFilterState
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import linear_gaussian_update
 
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_case as tfp_test_case
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
@@ -81,7 +83,7 @@ class _IIDNormalTest(object):
 
     return model
 
-  def test_iid_normal_sample(self):
+  def testIIDNormalSample(self):
     num_timesteps = 10
     latent_size = 3
     observation_size = 2
@@ -113,7 +115,7 @@ class _IIDNormalTest(object):
                             np.ones(result_shape) * marginal_variance,
                             rtol=5*stderr_variance)
 
-  def test_iid_normal_logprob(self):
+  def testIIDNormalLogprob(self):
 
     # In the case where the latent states are iid normal (achieved by
     # setting the transition matrix to zero, so there's no dependence
@@ -218,7 +220,7 @@ class SanityChecks(tf.test.TestCase):
     self.assertAllClose(mean_[..., 0], expected_observations)
     self.assertAllClose(sample_[..., 0], expected_observations)
 
-  def test_variance(self):
+  def testVariance(self):
 
     num_timesteps = 5
     prior_scale = 17.
@@ -249,7 +251,7 @@ class SanityChecks(tf.test.TestCase):
     variance_ = self.evaluate(model.variance())
     self.assertAllClose(variance_[..., 0], observation_variance)
 
-  def test_time_varying_operators(self):
+  def testTimeVaryingOperators(self):
 
     num_timesteps = 5
     prior_mean = 1.3
@@ -298,7 +300,7 @@ class SanityChecks(tf.test.TestCase):
     lp_ = self.evaluate(model.log_prob(sample_))
     self.assertGreater(lp_, 0.)
 
-  def test_time_varying_noise(self):
+  def testTimeVaryingNoise(self):
 
     num_timesteps = 5
     prior_mean = 0.
@@ -395,40 +397,47 @@ class BatchTest(tf.test.TestCase):
     # lists.
     sample_shape = list(sample_shape)
 
-    self.assertEqual(model.event_shape.as_list(), event_shape)
-    self.assertEqual(model.batch_shape.as_list(), batch_shape)
+    self.assertEqual(tensorshape_util.as_list(model.event_shape), event_shape)
+    self.assertEqual(tensorshape_util.as_list(model.batch_shape), batch_shape)
 
     y = model.sample(sample_shape)
-    self.assertEqual(y.shape.as_list(),
-                     sample_shape + batch_shape + event_shape)
+    self.assertEqual(
+        tensorshape_util.as_list(y.shape),
+        sample_shape + batch_shape + event_shape)
 
     lp = model.log_prob(y)
-    self.assertEqual(lp.shape.as_list(), sample_shape + batch_shape)
+    self.assertEqual(
+        tensorshape_util.as_list(lp.shape), sample_shape + batch_shape)
 
     (posterior_means, posterior_covs) = model.posterior_marginals(y)
-    self.assertEqual(posterior_means.shape.as_list(),
-                     sample_shape + batch_shape + [num_timesteps, latent_size])
-    self.assertEqual(posterior_covs.shape.as_list(),
-                     batch_shape + [num_timesteps, latent_size, latent_size])
+    self.assertEqual(
+        tensorshape_util.as_list(posterior_means.shape),
+        sample_shape + batch_shape + [num_timesteps, latent_size])
+    self.assertEqual(
+        tensorshape_util.as_list(posterior_covs.shape),
+        batch_shape + [num_timesteps, latent_size, latent_size])
 
     # Try an argument with no batch shape to ensure we broadcast
     # correctly.
     unbatched_y = tf.random.normal(event_shape)
     lp = model.log_prob(unbatched_y)
-    self.assertEqual(lp.shape.as_list(), batch_shape)
+    self.assertEqual(tensorshape_util.as_list(lp.shape), batch_shape)
 
-    self.assertEqual(model.mean().shape.as_list(),
-                     batch_shape + event_shape)
-    self.assertEqual(model.variance().shape.as_list(),
-                     batch_shape + event_shape)
+    self.assertEqual(
+        tensorshape_util.as_list(model.mean().shape), batch_shape + event_shape)
+    self.assertEqual(
+        tensorshape_util.as_list(model.variance().shape),
+        batch_shape + event_shape)
 
     (posterior_means, posterior_covs) = model.posterior_marginals(unbatched_y)
-    self.assertEqual(posterior_means.shape.as_list(),
-                     batch_shape + [num_timesteps, latent_size])
-    self.assertEqual(posterior_covs.shape.as_list(),
-                     batch_shape + [num_timesteps, latent_size, latent_size])
+    self.assertEqual(
+        tensorshape_util.as_list(posterior_means.shape),
+        batch_shape + [num_timesteps, latent_size])
+    self.assertEqual(
+        tensorshape_util.as_list(posterior_covs.shape),
+        batch_shape + [num_timesteps, latent_size, latent_size])
 
-  def test_constant_batch_shape(self):
+  def testConstantBatchShape(self):
     """Simple case where all components have the same batch shape."""
     num_timesteps = 5
     latent_size = 3
@@ -451,7 +460,7 @@ class BatchTest(tf.test.TestCase):
     self._sanity_check_shapes(model, batch_shape, event_shape,
                               num_timesteps, latent_size)
 
-  def test_broadcast_batch_shape(self):
+  def testBroadcastBatchShape(self):
     """Broadcasting when only one component has batch shape."""
 
     num_timesteps = 5
@@ -500,6 +509,32 @@ class BatchTest(tf.test.TestCase):
     self._sanity_check_shapes(model, batch_shape, event_shape,
                               num_timesteps, latent_size)
 
+  def testLatentsToObservationsWorksWithBatchShape(self):
+    num_timesteps = 5
+    latent_size = 3
+    observation_size = 2
+    batch_shape = [3, 4]
+
+    model = self._build_random_model(num_timesteps,
+                                     latent_size,
+                                     observation_size,
+                                     prior_batch_shape=batch_shape,
+                                     transition_matrix_batch_shape=batch_shape,
+                                     transition_noise_batch_shape=batch_shape,
+                                     observation_matrix_batch_shape=batch_shape,
+                                     observation_noise_batch_shape=batch_shape)
+    latent_means, observation_means = model._joint_mean()
+    latent_covs, observation_covs = model._joint_covariances()
+    (pushforward_means, pushforward_covs) = model.latents_to_observations(
+        latent_means, latent_covs)
+
+    (observation_means_, observation_covs_,
+     pushforward_means_, pushforward_covs_) = self.evaluate((
+         observation_means, observation_covs,
+         pushforward_means, pushforward_covs))
+    self.assertAllClose(pushforward_means_, observation_means_)
+    self.assertAllClose(pushforward_covs_, observation_covs_)
+
 
 class MissingObservationsTests(tfp_test_case.TestCase):
 
@@ -534,16 +569,26 @@ class MissingObservationsTests(tfp_test_case.TestCase):
             observation_matrix, observation_noise,
             initial_state_prior, model)
 
-  def testForwardFilterWithMask(self):
+  def testForwardFilterWithDynamicShapeMask(self):
     (_, transition_matrix, _,
      observation_matrix, observation_noise,
      initial_state_prior, model) = self.make_model()
 
-    observed_time_series = np.array(
+    observed_time_series_ = np.array(
         [1.0, 2.0, -1000., 0.4, np.nan, 1000., 4.2, np.inf]).astype(np.float32)
-    observed_time_series = observed_time_series[..., np.newaxis]
-    observation_mask = np.array(
+    observed_time_series_ = observed_time_series_[..., np.newaxis]
+    observation_mask_ = np.array(
         [False, False, True, False, True, True, False, True]).astype(np.bool)
+
+    # Pass inputs with dynamic shape. Ideally we would run all tests with
+    # both static and dynamic shape, but since LGSSM tests are unusually
+    # heavyweight, we split the load: this test uses dynamic shape and others
+    # use static shape, so we expect to catch any pervasive problems with both
+    # approaches.
+    observed_time_series = tf.compat.v1.placeholder_with_default(
+        input=observed_time_series_, shape=None)
+    observation_mask = tf.compat.v1.placeholder_with_default(
+        input=observation_mask_, shape=None)
 
     # In a random walk, skipping a timestep just adds variance, so we can
     # construct a model of the four 'unmasked' timesteps by directly collapsing
@@ -576,15 +621,15 @@ class MissingObservationsTests(tfp_test_case.TestCase):
      predicted_covs_collapsed_, observation_means_collapsed_,
      observation_covs_collapsed_) = self.evaluate(
          collapsed_model.forward_filter(
-             x=observed_time_series[~observation_mask]))
+             x=observed_time_series[~observation_mask_]))
 
-    self.assertAllClose(log_likelihoods_[~observation_mask],
+    self.assertAllClose(log_likelihoods_[~observation_mask_],
                         log_likelihoods_collapsed_)
-    self.assertAllEqual(log_likelihoods_[observation_mask],
-                        np.zeros(log_likelihoods_[observation_mask].shape))
-    self.assertAllClose(filtered_means_[~observation_mask],
+    self.assertAllEqual(log_likelihoods_[observation_mask_],
+                        np.zeros(log_likelihoods_[observation_mask_].shape))
+    self.assertAllClose(filtered_means_[~observation_mask_],
                         filtered_means_collapsed_)
-    self.assertAllClose(filtered_covs_[~observation_mask],
+    self.assertAllClose(filtered_covs_[~observation_mask_],
                         filtered_covs_collapsed_)
 
     # Check the predictive distributions over latents at the final timestep.
@@ -595,16 +640,16 @@ class MissingObservationsTests(tfp_test_case.TestCase):
     self.assertAllClose(predicted_covs_[-1],
                         predicted_covs_collapsed_[-1])
 
-    self.assertAllClose(observation_means_[~observation_mask],
+    self.assertAllClose(observation_means_[~observation_mask_],
                         observation_means_collapsed_)
-    self.assertAllClose(observation_covs_[~observation_mask],
+    self.assertAllClose(observation_covs_[~observation_mask_],
                         observation_covs_collapsed_)
 
     # Also test that auxiliary methods `log_prob` and `posterior_marginals`
     # pass the mask through correctly.
     lp_, lp_collapsed_ = self.evaluate((
         model.log_prob(observed_time_series, mask=observation_mask),
-        collapsed_model.log_prob(observed_time_series[~observation_mask])))
+        collapsed_model.log_prob(observed_time_series[~observation_mask_])))
     self.assertAllClose(lp_, lp_collapsed_)
 
     ((posterior_means_, posterior_covs_),
@@ -612,10 +657,10 @@ class MissingObservationsTests(tfp_test_case.TestCase):
          model.posterior_marginals(
              observed_time_series, mask=observation_mask),
          collapsed_model.posterior_marginals(
-             observed_time_series[~observation_mask])))
-    self.assertAllClose(posterior_means_[~observation_mask],
+             observed_time_series[~observation_mask_])))
+    self.assertAllClose(posterior_means_[~observation_mask_],
                         posterior_means_collapsed_)
-    self.assertAllClose(posterior_covs_[~observation_mask],
+    self.assertAllClose(posterior_covs_[~observation_mask_],
                         posterior_covs_collapsed_)
 
   def testGradientsOfMaskedNaNsAreFinite(self):
@@ -672,10 +717,12 @@ class MissingObservationsTests(tfp_test_case.TestCase):
      _) = batch_model.forward_filter(
          x=observed_time_series, mask=mask)
     # Test that shapes are as expected, and are statically inferred.
-    self.assertAllEqual(filtered_means.shape.as_list(),
-                        batch_shape + [num_timesteps, 1])
-    self.assertAllEqual(filtered_covs.shape.as_list(),
-                        batch_shape + [num_timesteps, 1, 1])
+    self.assertAllEqual(
+        tensorshape_util.as_list(filtered_means.shape),
+        batch_shape + [num_timesteps, 1])
+    self.assertAllEqual(
+        tensorshape_util.as_list(filtered_covs.shape),
+        batch_shape + [num_timesteps, 1, 1])
 
     (log_likelihoods_, filtered_means_, filtered_covs_) = self.evaluate(
         (log_likelihoods, filtered_means, filtered_covs))
@@ -705,10 +752,12 @@ class MissingObservationsTests(tfp_test_case.TestCase):
     (log_likelihoods, filtered_means, filtered_covs, _, _, _,
      _) = model.forward_filter(
          x=observed_time_series, mask=mask)
-    self.assertAllEqual(filtered_means.shape.as_list(),
-                        sample_shape + [num_timesteps, 1])
-    self.assertAllEqual(filtered_covs.shape.as_list(),
-                        mask_sample_shape + [num_timesteps, 1, 1])
+    self.assertAllEqual(
+        tensorshape_util.as_list(filtered_means.shape),
+        sample_shape + [num_timesteps, 1])
+    self.assertAllEqual(
+        tensorshape_util.as_list(filtered_covs.shape),
+        mask_sample_shape + [num_timesteps, 1, 1])
 
     (log_likelihoods_, filtered_means_, filtered_covs_) = self.evaluate(
         (log_likelihoods, filtered_means, filtered_covs))
@@ -1175,6 +1224,29 @@ class _KalmanStepsTest(object):
     self.assertAllClose(obs_cov,
                         np.dot(self.observation_matrix,
                                np.dot(new_cov, self.observation_matrix.T)) +
+                        np.diag(self.observation_noise_scale_diag**2))
+
+  def testPushforwardLatentsStepIsCorrect(self):
+
+    latent_mean_ = np.asarray([1.1, -3.], dtype=np.float32)[..., np.newaxis]
+    latent_cov_ = np.asarray([[.5, -.2], [-.2, .9]], dtype=np.float32)
+    latent_mean_tensor = self.build_tensor(latent_mean_)
+    latent_cov_tensor = self.build_tensor(latent_cov_)
+
+    pushforward_step = build_pushforward_latents_step(
+        self.get_observation_matrix_for_timestep,
+        self.get_observation_noise_for_timestep)
+    obs_mean, obs_cov = self.evaluate(
+        pushforward_step(_=None,  # Loop body ignores previous observations.
+                         latent_t_mean_cov=(
+                             0, latent_mean_tensor, latent_cov_tensor)))
+
+    self.assertAllClose(obs_mean,
+                        np.dot(self.observation_matrix, latent_mean_) +
+                        self.observation_bias[:, np.newaxis])
+    self.assertAllClose(obs_cov,
+                        np.dot(self.observation_matrix,
+                               np.dot(latent_cov_, self.observation_matrix.T)) +
                         np.diag(self.observation_noise_scale_diag**2))
 
 

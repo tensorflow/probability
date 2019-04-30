@@ -20,10 +20,13 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow.python.framework import tensor_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -141,19 +144,21 @@ class Reshape(bijector.Bijector):
        has non-vector shape (`rank > 1`), or if their sizes do not
        match.
     """
-    with tf.name_scope(name, 'reshape', [event_shape_out, event_shape_in]):
+    with tf.name_scope(name or 'reshape'):
       event_shape_out = tf.convert_to_tensor(
           value=event_shape_out, name='event_shape_out', dtype_hint=tf.int32)
       event_shape_in = tf.convert_to_tensor(
           value=event_shape_in, name='event_shape_in', dtype_hint=tf.int32)
 
-      forward_min_event_ndims_ = event_shape_in.shape.num_elements()
+      forward_min_event_ndims_ = tensorshape_util.num_elements(
+          event_shape_in.shape)
       if forward_min_event_ndims_ is None:
         raise NotImplementedError(
             '`event_shape_in` `size` must be statically known. For dynamic '
             'support, please contact `tfprobability@tensorflow.org`.')
 
-      inverse_min_event_ndims_ = event_shape_out.shape.num_elements()
+      inverse_min_event_ndims_ = tensorshape_util.num_elements(
+          event_shape_out.shape)
       if inverse_min_event_ndims_ is None:
         raise NotImplementedError(
             '`event_shape_out` `size` must be statically known. For dynamic '
@@ -189,7 +194,7 @@ class Reshape(bijector.Bijector):
         self._event_shape_out,
         self.validate_args)
     y = tf.reshape(x, output_shape)
-    y.set_shape(y.shape.merge_with(output_tensorshape))
+    tensorshape_util.set_shape(y, output_tensorshape)
     return y
 
   def _inverse(self, y):
@@ -199,7 +204,7 @@ class Reshape(bijector.Bijector):
         self._event_shape_in,
         self.validate_args)
     x = tf.reshape(y, output_shape)
-    x.set_shape(x.shape.merge_with(output_tensorshape))
+    tensorshape_util.set_shape(x, output_tensorshape)
     return x
 
   def _inverse_log_det_jacobian(self, y):
@@ -254,7 +259,7 @@ def _replace_event_shape_in_shape_tensor(
       `event_shape_out`.
   """
   output_tensorshape, is_validated = _replace_event_shape_in_tensorshape(
-      tensor_util.constant_value_as_shape(input_shape),
+      tensorshape_util.constant_value_as_shape(input_shape),
       event_shape_in,
       event_shape_out)
 
@@ -264,7 +269,7 @@ def _replace_event_shape_in_shape_tensor(
       map(tf.identity, (event_shape_in, event_shape_out))
       if validate_args else ())
 
-  if (output_tensorshape.is_fully_defined() and
+  if (tensorshape_util.is_fully_defined(output_tensorshape) and
       (is_validated or not validate_args)):
     with tf.control_dependencies(validation_dependencies):
       output_shape = tf.convert_to_tensor(
@@ -272,9 +277,10 @@ def _replace_event_shape_in_shape_tensor(
     return output_shape, output_tensorshape
 
   with tf.control_dependencies(validation_dependencies):
-    event_shape_in_ndims = (tf.size(input=event_shape_in)
-                            if event_shape_in.shape.num_elements() is None
-                            else event_shape_in.shape.num_elements())
+    event_shape_in_ndims = (
+        tf.size(input=event_shape_in)
+        if tensorshape_util.num_elements(event_shape_in.shape) is None else
+        tensorshape_util.num_elements(event_shape_in.shape))
     input_non_event_shape, input_event_shape = tf.split(
         input_shape, num_or_size_splits=[-1, event_shape_in_ndims])
 
@@ -292,7 +298,7 @@ def _replace_event_shape_in_shape_tensor(
     explicit_event_shape_in = tf.boolean_mask(
         tensor=event_shape_in, mask=mask)
     additional_assertions.append(
-        tf.compat.v1.assert_equal(
+        assert_util.assert_equal(
             explicit_input_event_shape,
             explicit_event_shape_in,
             message='Input `event_shape` does not match `event_shape_in`.'))
@@ -332,15 +338,17 @@ def _replace_event_shape_in_tensorshape(
       are not compatible. "Compatible" here means that they are identical on
       any dims that are not -1 in `event_shape_in`.
   """
-  event_shape_in_ndims = event_shape_in.shape.num_elements()
-  if input_tensorshape.ndims is None or event_shape_in_ndims is None:
+  event_shape_in_ndims = tensorshape_util.num_elements(event_shape_in.shape)
+  if tensorshape_util.rank(
+      input_tensorshape) is None or event_shape_in_ndims is None:
     return tf.TensorShape(None), False  # Not is_validated.
 
-  input_non_event_ndims = input_tensorshape.ndims - event_shape_in_ndims
+  input_non_event_ndims = tensorshape_util.rank(
+      input_tensorshape) - event_shape_in_ndims
   if input_non_event_ndims < 0:
     raise ValueError(
         'Input has fewer ndims ({}) than event shape ndims ({}).'.format(
-            input_tensorshape.ndims, event_shape_in_ndims))
+            tensorshape_util.rank(input_tensorshape), event_shape_in_ndims))
 
   input_non_event_tensorshape = input_tensorshape[:input_non_event_ndims]
   input_event_tensorshape = input_tensorshape[input_non_event_ndims:]
@@ -350,8 +358,9 @@ def _replace_event_shape_in_tensorshape(
   # `event_shape_in`. Note that our validations at construction time ensure
   # there is at most one such entry in `event_shape_in`.
   event_shape_in_ = tf.get_static_value(event_shape_in)
-  is_validated = (input_event_tensorshape.is_fully_defined() and
-                  event_shape_in_ is not None)
+  is_validated = (
+      tensorshape_util.is_fully_defined(input_event_tensorshape) and
+      event_shape_in_ is not None)
   if is_validated:
     input_event_shape_ = np.int32(input_event_tensorshape)
     mask = event_shape_in_ >= 0
@@ -362,30 +371,31 @@ def _replace_event_shape_in_tensorshape(
           'Input `event_shape` does not match `event_shape_in`. '
           '({} vs {}).'.format(input_event_shape_, event_shape_in_))
 
-  event_tensorshape_out = tensor_util.constant_value_as_shape(event_shape_out)
-  if event_tensorshape_out.ndims is None:
+  event_tensorshape_out = tensorshape_util.constant_value_as_shape(
+      event_shape_out)
+  if tensorshape_util.rank(event_tensorshape_out) is None:
     output_tensorshape = tf.TensorShape(None)
   else:
-    output_tensorshape = input_non_event_tensorshape.concatenate(
-        event_tensorshape_out)
+    output_tensorshape = tensorshape_util.concatenate(
+        input_non_event_tensorshape, event_tensorshape_out)
 
   return output_tensorshape, is_validated
 
 
 def _maybe_check_valid_shape(shape, validate_args):
   """Check that a shape Tensor is int-type and otherwise sane."""
-  if not shape.dtype.is_integer:
+  if not dtype_util.is_integer(shape.dtype):
     raise TypeError('{} dtype ({}) should be `int`-like.'.format(
-        shape, shape.dtype.name))
+        shape, dtype_util.name(shape.dtype)))
 
   assertions = []
 
   message = '`{}` rank should be <= 1.'
-  if shape.shape.ndims is not None:
-    if shape.shape.ndims > 1:
+  if tensorshape_util.rank(shape.shape) is not None:
+    if tensorshape_util.rank(shape.shape) > 1:
       raise ValueError(message.format(shape))
   elif validate_args:
-    assertions.append(tf.compat.v1.assert_less(
+    assertions.append(assert_util.assert_less(
         tf.rank(shape), 2, message=message.format(shape)))
 
   shape_ = tf.get_static_value(shape)
@@ -395,7 +405,7 @@ def _maybe_check_valid_shape(shape, validate_args):
     if sum(shape_ == -1) > 1:
       raise ValueError(message.format(shape))
   elif validate_args:
-    assertions.append(tf.compat.v1.assert_less(
+    assertions.append(assert_util.assert_less(
         tf.reduce_sum(input_tensor=tf.cast(tf.equal(shape, -1), tf.int32)),
         2,
         message=message.format(shape)))
@@ -405,7 +415,7 @@ def _maybe_check_valid_shape(shape, validate_args):
     if np.any(shape_ < -1):
       raise ValueError(message.format(shape))
   elif validate_args:
-    assertions.append(tf.compat.v1.assert_greater(
+    assertions.append(assert_util.assert_greater(
         shape, -2, message=message.format(shape)))
 
   return assertions

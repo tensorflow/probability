@@ -20,6 +20,8 @@ from __future__ import print_function
 
 from tensorflow_probability.python.optimizer import linesearch
 from tensorflow_probability.python.optimizer.bfgs import minimize as bfgs_minimize
+from tensorflow_probability.python.optimizer.bfgs_utils import converged_all
+from tensorflow_probability.python.optimizer.bfgs_utils import converged_any
 from tensorflow_probability.python.optimizer.differential_evolution import minimize as differential_evolution_minimize
 from tensorflow_probability.python.optimizer.differential_evolution import one_step as differential_evolution_one_step
 from tensorflow_probability.python.optimizer.lbfgs import minimize as lbfgs_minimize
@@ -31,9 +33,11 @@ from tensorflow_probability.python.optimizer.sgld import StochasticGradientLange
 from tensorflow_probability.python.optimizer.variational_sgd import VariationalSGD
 
 
-from tensorflow.python.util.all_util import remove_undocumented
+from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
 _allowed_symbols = [
+    'converged_all',
+    'converged_any',
     'bfgs_minimize',
     'differential_evolution_minimize',
     'differential_evolution_one_step',

@@ -19,10 +19,12 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 
 
@@ -79,12 +81,12 @@ class Geometric(distribution.Distribution):
     """
 
     parameters = dict(locals())
-    with tf.name_scope(name, values=[logits, probs]) as name:
+    with tf.name_scope(name) as name:
       self._logits, self._probs = distribution_util.get_logits_and_probs(
           logits, probs, validate_args=validate_args, name=name)
 
       with tf.control_dependencies(
-          [tf.compat.v1.assert_positive(self._probs)] if validate_args else []):
+          [assert_util.assert_positive(self._probs)] if validate_args else []):
         self._probs = tf.identity(self._probs, name="probs")
 
     super(Geometric, self).__init__(
@@ -95,6 +97,10 @@ class Geometric(distribution.Distribution):
         parameters=parameters,
         graph_parents=[self._probs, self._logits],
         name=name)
+
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(logits=0, probs=0)
 
   @property
   def logits(self):
@@ -120,7 +126,8 @@ class Geometric(distribution.Distribution):
 
   def _sample_n(self, n, seed=None):
     # Uniform variates must be sampled from the open-interval `(0, 1)` rather
-    # than `[0, 1)`. To do so, we use `np.finfo(self.dtype.as_numpy_dtype).tiny`
+    # than `[0, 1)`. To do so, we use
+    # `np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny`
     # because it is the smallest, positive, "normal" number. A "normal" number
     # is such that the mantissa has an implicit leading 1. Normal, positive
     # numbers x, y have the reasonable property that, `x + y >= max(x, y)`. In
@@ -128,7 +135,7 @@ class Geometric(distribution.Distribution):
     # 0.
     sampled = tf.random.uniform(
         tf.concat([[n], tf.shape(input=self._probs)], 0),
-        minval=np.finfo(self.dtype.as_numpy_dtype).tiny,
+        minval=np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny,
         maxval=1.,
         seed=seed,
         dtype=self.dtype)
@@ -161,7 +168,7 @@ class Geometric(distribution.Distribution):
     probs = self._probs
     if self.validate_args:
       probs = distribution_util.with_dependencies([
-          tf.compat.v1.assert_less(
+          assert_util.assert_less(
               probs,
               tf.constant(1., probs.dtype),
               message="Entropy is undefined when logits = inf or probs = 1.")

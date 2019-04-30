@@ -33,7 +33,7 @@ tfb = tfp.bijectors
 
 
 FakeInnerKernelResults = collections.namedtuple(
-    'FakeInnerKernelResults', [])
+    'FakeInnerKernelResults', ['target_log_prob'])
 
 
 def _maybe_seed(seed):
@@ -61,7 +61,8 @@ class FakeInnerKernel(tfp.mcmc.TransitionKernel):
     pass
 
   def bootstrap_results(self, init_state):
-    return FakeInnerKernelResults()
+    return FakeInnerKernelResults(
+        target_log_prob=self._parameters['target_log_prob_fn'](init_state))
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -282,6 +283,25 @@ class TransformedTransitionKernelTest(tf.test.TestCase):
     self.assertNear(np.log(2.), automatic_pkr.transformed_state, err=1e-6)
     self.assertAllClose(
         [4., 5.], manual_pkr.transformed_state, atol=0., rtol=1e-6)
+
+  def test_copy_works(self):
+    def fake_target_log_prob(x):
+      return -x**2 / 2.
+
+    transformed = tfp.mcmc.TransformedTransitionKernel(
+        inner_kernel=FakeInnerKernel(target_log_prob_fn=fake_target_log_prob),
+        bijector=tfb.AffineScalar(2.))
+
+    transformed_copy = tfp.mcmc.TransformedTransitionKernel(
+        **transformed.parameters)
+
+    pkr, pkr_copy = self.evaluate([
+        transformed.bootstrap_results(1.),
+        transformed_copy.bootstrap_results(1.)
+    ])
+
+    self.assertAllClose(pkr.inner_results.target_log_prob,
+                        pkr_copy.inner_results.target_log_prob)
 
 
 if __name__ == '__main__':

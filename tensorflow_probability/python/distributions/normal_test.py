@@ -27,9 +27,8 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
-
-
 tfd = tfp.distributions
 
 
@@ -487,7 +486,7 @@ class NormalTest(test_case.TestCase):
     kl_expected = ((mu_a - mu_b)**2 / (2 * sigma_b**2) + 0.5 * (
         (sigma_a**2 / sigma_b**2) - 1 - 2 * np.log(sigma_a / sigma_b)))
 
-    x = n_a.sample(int(1e5), seed=0)
+    x = n_a.sample(int(1e5), seed=tfp_test_util.test_seed())
     kl_sample = tf.reduce_mean(
         input_tensor=n_a.log_prob(x) - n_b.log_prob(x), axis=0)
     kl_sample_ = self.evaluate(kl_sample)

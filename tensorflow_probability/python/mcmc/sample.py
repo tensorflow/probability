@@ -26,7 +26,7 @@ import warnings
 # Dependency imports
 
 import tensorflow as tf
-from tensorflow_probability.python.mcmc import util as mcmc_util
+from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
 
 __all__ = [
@@ -308,16 +308,16 @@ def sample_chain(
   if not kernel.is_calibrated:
     warnings.warn("supplied `TransitionKernel` is not calibrated. Markov "
                   "chain may not converge to intended target distribution.")
-  with tf.name_scope(
+  with tf.compat.v1.name_scope(
       name, "mcmc_sample_chain",
       [num_results, num_burnin_steps, num_steps_between_results]):
     num_results = tf.convert_to_tensor(
         value=num_results, dtype=tf.int32, name="num_results")
     num_burnin_steps = tf.convert_to_tensor(
-        value=num_burnin_steps, dtype=tf.int64, name="num_burnin_steps")
+        value=num_burnin_steps, dtype=tf.int32, name="num_burnin_steps")
     num_steps_between_results = tf.convert_to_tensor(
         value=num_steps_between_results,
-        dtype=tf.int64,
+        dtype=tf.int32,
         name="num_steps_between_results")
     current_state = tf.nest.map_structure(
         lambda x: tf.convert_to_tensor(value=x, name="current_state"),
@@ -353,7 +353,7 @@ def sample_chain(
             depth=num_results,
             on_value=1 + num_burnin_steps,
             off_value=1 + num_steps_between_results,
-            dtype=tf.int64),
+            dtype=tf.int32),
         # pylint: disable=g-long-lambda
         trace_fn=lambda state_and_results: (state_and_results[0],
                                             trace_fn(*state_and_results)),

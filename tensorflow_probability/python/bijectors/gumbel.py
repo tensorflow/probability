@@ -18,9 +18,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 
 __all__ = [
     "Gumbel",
@@ -63,13 +66,13 @@ class Gumbel(bijector.Bijector):
     self._graph_parents = []
     self._name = name
     self._validate_args = validate_args
-    with self._name_scope("init", values=[loc, scale]):
+    with self._name_scope("init"):
       self._loc = tf.convert_to_tensor(value=loc, name="loc")
       self._scale = tf.convert_to_tensor(value=scale, name="scale")
-      tf.debugging.assert_same_float_dtype([self._loc, self._scale])
+      dtype_util.assert_same_float_dtype([self._loc, self._scale])
       if validate_args:
         self._scale = distribution_util.with_dependencies([
-            tf.compat.v1.assert_positive(
+            assert_util.assert_positive(
                 self._scale, message="Argument scale was not positive")
         ], self._scale)
 
@@ -107,9 +110,9 @@ class Gumbel(bijector.Bijector):
   def _maybe_assert_valid_y(self, y):
     if not self.validate_args:
       return y
-    is_positive = tf.compat.v1.assert_non_negative(
+    is_positive = assert_util.assert_non_negative(
         y, message="Inverse transformation input must be greater than 0.")
-    less_than_one = tf.compat.v1.assert_less_equal(
+    less_than_one = assert_util.assert_less_equal(
         y,
         tf.constant(1., y.dtype),
         message="Inverse transformation input must be less than or equal to 1.")
