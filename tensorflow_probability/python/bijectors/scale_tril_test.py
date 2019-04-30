@@ -43,28 +43,28 @@ class ScaleTriLBijectorTest(tf.test.TestCase):
         diag_bijector=tfb.Exp(), diag_shift=shift)
 
     y_ = self.evaluate(b.forward(x))
-    self.assertAllClose(y, y_)
+    self.assertAllClose(y, y_, rtol=1e-4)
 
     x_ = self.evaluate(b.inverse(y))
-    self.assertAllClose(x, x_)
+    self.assertAllClose(x, x_, rtol=1e-4)
 
   def testInvertible(self):
 
     # Generate random inputs from an unconstrained space, with
     # event size 6 to specify 3x3 triangular matrices.
     batch_shape = [2, 1]
-    x = np.float32(np.random.randn(*(batch_shape + [6])))
+    x = np.float32(self._rng.randn(*(batch_shape + [6])))
     b = tfb.ScaleTriL(
         diag_bijector=tfb.Softplus(), diag_shift=3.14159)
     y = self.evaluate(b.forward(x))
     self.assertAllEqual(y.shape, batch_shape + [3, 3])
 
     x_ = self.evaluate(b.inverse(y))
-    self.assertAllClose(x, x_, rtol=1e-5)
+    self.assertAllClose(x, x_, rtol=1e-4)
 
     fldj = self.evaluate(b.forward_log_det_jacobian(x, event_ndims=1))
     ildj = self.evaluate(b.inverse_log_det_jacobian(y, event_ndims=2))
-    self.assertAllClose(fldj, -ildj)
+    self.assertAllClose(fldj, -ildj, rtol=1e-4)
 
 if __name__ == "__main__":
   tf.test.main()
