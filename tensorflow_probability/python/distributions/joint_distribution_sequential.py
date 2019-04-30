@@ -111,9 +111,9 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
   # (Notice the 1:1 correspondence between "math" and "code".)
 
   x = joint.sample()
-  # ==> A length-5 list of tfd.Distribution instances
+  # ==> A length-5 list of Tensors
   joint.log_prob(x)
-  # ==> A scalar `Tensor` representing the total log prob under all four
+  # ==> A scalar `Tensor` representing the total log prob under all five
   #     distributions.
 
   joint._resolve_graph()
