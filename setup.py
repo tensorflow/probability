@@ -72,11 +72,20 @@ class BinaryDistribution(Distribution):
   def has_ext_modules(self):
     return False
 
+description_kwargs = {}
+if use_gpu:
+  description_kwargs['description'] = (
+      'DEPRECATED, please use tensorflow-probability or tfp-nightly')
+  description_kwargs['long_description'] = (
+      'To select a GPU build, use a GPU flavor of TensorFlow, '
+      'i.e. tensorflow-gpu or tf-nightly-gpu')
+else:
+  description_kwargs['description'] = (
+      'Probabilistic modeling and statistical inference in TensorFlow')
+ 
 setup(
     name=project_name,
     version=__version__,
-    description='Probabilistic modeling and statistical '
-                'inference in TensorFlow',
     author='Google LLC',
     author_email='no-reply@google.com',
     url='http://github.com/tensorflow/probability',
@@ -112,4 +121,5 @@ setup(
         'Topic :: Software Development :: Libraries :: Python Modules',
     ],
     keywords='tensorflow probability statistics bayesian machine learning',
+    **description_kwargs
 )
