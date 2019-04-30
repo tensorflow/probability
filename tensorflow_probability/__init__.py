@@ -20,3 +20,11 @@
 # from tensorflow_probability.google import staging  # DisableOnExport
 from tensorflow_probability.python import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.version import __version__
+
+import warnings
+warnings.warn('You are using a deprecated pip package for '
+              'TensorFlow Probability, please use '
+              'tensorflow-probability or tfp-nightly.')
+import sys as _sys
+for symbol in '_sys', 'warnings':
+  delattr(_sys.modules[__name__], symbol)
