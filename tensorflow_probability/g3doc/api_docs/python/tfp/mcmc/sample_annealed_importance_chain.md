@@ -90,7 +90,7 @@ num_chains = 100
 dims = 20
 dtype = np.float32
 
-proposal = tfd.MultivatiateNormalDiag(
+proposal = tfd.MultivariateNormalDiag(
    loc=tf.zeros([dims], dtype=dtype))
 
 target = tfd.TransformedDistribution(
