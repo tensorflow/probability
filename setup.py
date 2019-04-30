@@ -53,11 +53,16 @@ class BinaryDistribution(Distribution):
   def has_ext_modules(self):
     return False
 
+with open('README.md', 'r') as fh:
+  long_description = fh.read()
+
 setup(
     name=project_name,
     version=__version__,
     description='Probabilistic modeling and statistical '
                 'inference in TensorFlow',
+    long_description=long_description,
+    long_description_content_type='text/markdown',
     author='Google LLC',
     author_email='no-reply@google.com',
     url='http://github.com/tensorflow/probability',
