@@ -32,11 +32,9 @@ class _CumsumBijectorTest(tf.test.TestCase):
   """Tests correctness of the cumsum bijector."""
 
   def testInvalidAxis(self):
-    with self.assertRaisesRegexp(ValueError,
-                                 "`axis` must be a negative integer."):
+    with self.assertRaisesRegexp(ValueError, "`axis` needs to be negative."):
       tfb.Cumsum(axis=0)
-    with self.assertRaisesRegexp(ValueError,
-                                 "`axis` must be a negative integer."):
+    with self.assertRaisesRegexp(TypeError, "`axis` is not an `int`."):
       tfb.Cumsum(axis=-1.)
 
   def testBijector(self):

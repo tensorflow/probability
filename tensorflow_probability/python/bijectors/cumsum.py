@@ -68,10 +68,13 @@ class Cumsum(bijector.Bijector):
       name: Python `str` name given to ops managed by this object.
 
     Raises:
-      ValueError: If `axis` is not a negative `int`.
+      TypeError: if `axis` is not an `int`.
+      ValueError: if `axis` is not negative.
     """
-    if not isinstance(axis, int) or axis >= 0:
-      raise ValueError("`axis` must be a negative integer.")
+    if not isinstance(axis, int):
+      raise TypeError("`axis` is not an `int`.")
+    if axis >= 0:
+      raise ValueError("`axis` needs to be negative.")
     self._axis = axis
 
     super(Cumsum, self).__init__(
