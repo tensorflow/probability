@@ -17,7 +17,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# pylint: disable=unused-import,line-too-long,g-importing-member
+# pylint: disable=unused-import,line-too-long,g-importing-member,g-bad-import-order
 
 from tensorflow_probability.python.distributions.autoregressive import Autoregressive
 from tensorflow_probability.python.distributions.batch_reshape import BatchReshape
@@ -126,10 +126,12 @@ from tensorflow_probability.python.internal.reparameterization import FULLY_REPA
 from tensorflow_probability.python.internal.reparameterization import NOT_REPARAMETERIZED
 from tensorflow_probability.python.internal.reparameterization import ReparameterizationType
 
-kl_divergence.__doc__ += summarize_registered_kls()
+import sys as _sys
+kl_divergence.__doc__ += summarize_registered_kls(_sys.modules[__name__])
 del summarize_registered_kls
+del _sys
 
-# pylint: enable=unused-import,wildcard-import,line-too-long,g-importing-member
+# pylint: enable=unused-import,wildcard-import,line-too-long,g-importing-member,g-bad-import-order
 
 __all__ = [
     'Cauchy',

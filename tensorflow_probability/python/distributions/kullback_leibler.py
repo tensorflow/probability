@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import inspect
+
 import tensorflow.compat.v2 as tf
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
@@ -186,13 +188,41 @@ class RegisterKL(object):
     return kl_fn
 
 
-def summarize_registered_kls():
+def summarize_registered_kls(distributions_module):
   """Returns a str of registered KLs, to append to the doc for kl_divergence."""
-  ps, qs = zip(*((p.__name__, q.__name__) for p, q in _DIVERGENCES.keys()))
+  dist_classes = []
+  for attr in dir(distributions_module):
+    value = getattr(distributions_module, attr)
+    if (inspect.isclass(value) and
+        issubclass(value, distributions_module.Distribution)):
+      dist_classes.append(value)
+
+  maxdists = 6  # Only show up to N subclasses per p/q.
+  ps, qs = [], []
+  for p, q in sorted(_DIVERGENCES,
+                     key=lambda p_q: (p_q[0].__name__, p_q[1].__name__)):
+    subps = sorted([d for d in dist_classes if issubclass(d, p) and d is not p],
+                   key=lambda d: d.__name__)
+    subqs = sorted([d for d in dist_classes if issubclass(d, q) and d is not q],
+                   key=lambda d: d.__name__)
+    ps.append(p.__name__)
+    for subp in subps[:maxdists]:
+      ps.append("{} +".format(subp.__name__))
+    if len(subps) > maxdists:
+      ps.append("{} more +".format(len(subps) - maxdists))
+    ps.extend([""] * (len(subqs[:maxdists + 1]) - len(subps[:maxdists + 1])))
+
+    qs.append(q.__name__)
+    for subq in subqs[:maxdists]:
+      qs.append("+ {}".format(subq.__name__))
+    if len(subqs) > maxdists:
+      qs.append("+ {} more".format(len(subqs) - maxdists))
+    qs.extend([""] * (len(subps[:maxdists + 1]) - len(subqs[:maxdists + 1])))
   maxp = max(map(len, ps))
   rows = []
-  for p, q in [("distribution_a", "distribution_b")] + sorted(zip(ps, qs)):
-    rows.append("{}{} || {}".format(" " * (maxp - len(p)), p, q))
+  for p, q in [("distribution_a", "distribution_b")] + list(zip(ps, qs)):
+    rows.append("{}{} {} {}".format(
+        " " * (maxp - len(p)), p, "  " if "+" in (p + q) else "||", q))
   return """
   Built-in KL(distribution_a || distribution_b) registrations:
   {}
