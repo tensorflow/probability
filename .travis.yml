@@ -37,7 +37,9 @@ jobs:
 # of python versions x SHARD will be expanded and run in parallel.
 python:
   - "2.7"
-  - "3.6"
+  - "3.4"
+virtualenv:
+  system_site_packages: true
 env:
   global:
     - NUM_SHARDS=3
