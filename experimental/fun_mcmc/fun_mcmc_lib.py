@@ -181,7 +181,7 @@ def maybe_broadcast_structure(from_structure: Any, to_structure: Any) -> Any:
 def transform_log_prob_fn(log_prob_fn: PotentialFn,
                           bijector: BijectorNest,
                           init_state: State = None
-                         ) -> Union[PotentialFn, Tuple[PotentialFn, State]]:
+                         ) -> Any:
   """Transforms a log-prob function using a bijector.
 
   This takes a log-prob function and creates a new log-prob function that now
@@ -299,6 +299,7 @@ def leapfrog_step(leapfrog_step_state: LeapFrogStepState,
 def metropolis_hastings_step(current_state: State,
                              proposed_state: State,
                              energy_change: FloatTensor,
+                             log_uniform: FloatTensor = None,
                              seed=None) -> Tuple[State, tf.Tensor, tf.Tensor]:
   """Metropolis-Hastings step.
 
@@ -311,6 +312,8 @@ def metropolis_hastings_step(current_state: State,
     current_state: Current state.
     proposed_state: Proposed state.
     energy_change: E(proposed_state) - E(previous_state).
+    log_uniform: Optional logarithm of a uniformly distributed random sample in
+      [0, 1]. It is used to accept/reject the current and proposed state.
     seed: For reproducibility.
 
   Returns:
@@ -333,11 +336,12 @@ def metropolis_hastings_step(current_state: State,
 
   log_accept_ratio = -energy_change
 
-  log_uniform = tf.math.log(
-      tf.random.uniform(
-          shape=tf.shape(input=log_accept_ratio),
-          dtype=log_accept_ratio.dtype.base_dtype,
-          seed=seed))
+  if log_uniform is None:
+    log_uniform = tf.math.log(
+        tf.random.uniform(
+            shape=tf.shape(input=log_accept_ratio),
+            dtype=log_accept_ratio.dtype.base_dtype,
+            seed=seed))
   is_accepted = log_uniform < log_accept_ratio
 
   next_state = mcmc_util.choose(
@@ -368,6 +372,7 @@ def hamiltonian_monte_carlo(
     momentum_sample_fn: MomentumSampleFn = None,
     leapfrog_trace_fn: Callable[[LeapFrogStepState, LeapFrogStepExtras],
                                 TensorNest] = lambda *args: (),
+    log_uniform: FloatTensor = None,
     seed=None,
 ) -> Tuple[HamiltonianMonteCarloState, HamiltonianMonteCarloExtra]:
   """Hamiltonian Monte Carlo `TransitionOperator`.
@@ -422,6 +427,8 @@ def hamiltonian_monte_carlo(
     kinetic_energy_fn: Kinetic energy function.
     momentum_sample_fn: Sampler for the momentum.
     leapfrog_trace_fn: Trace function for the leapfrog integrator.
+    log_uniform: Optional logarithm of a uniformly distributed random sample in
+      [0, 1], used for the MH accept/reject step.
     seed: For reproducibility.
 
   Returns:
@@ -507,7 +514,11 @@ def hamiltonian_monte_carlo(
 
   energy_change = proposed_energy - current_energy
   hmc_state, is_accepted, _ = metropolis_hastings_step(
-      current_state, proposed_state, energy_change, seed=seed)
+      current_state,
+      proposed_state,
+      energy_change,
+      log_uniform=log_uniform,
+      seed=seed)
 
   hmc_state = hmc_state  # type: HamiltonianMonteCarloState
   return hmc_state, HamiltonianMonteCarloExtra(

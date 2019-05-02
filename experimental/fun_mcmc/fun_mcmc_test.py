@@ -156,6 +156,22 @@ class FunMCMCTest(tf.test.TestCase, parameterized.TestCase):
     self.assertAllEqual(1., accepted)
     self.assertAllEqual(False, is_accepted)
 
+    accepted, is_accepted, _ = fun_mcmc.metropolis_hastings_step(
+        current_state=None,
+        proposed_state=1.,
+        log_uniform=-10.,
+        energy_change=-np.log(0.5))
+    self.assertAllEqual(1., accepted)
+    self.assertAllEqual(True, is_accepted)
+
+    accepted, is_accepted, _ = fun_mcmc.metropolis_hastings_step(
+        current_state=None,
+        proposed_state=1.,
+        log_uniform=0.,
+        energy_change=-np.log(0.5))
+    self.assertAllEqual(1., accepted)
+    self.assertAllEqual(False, is_accepted)
+
     accepted, _, _ = fun_mcmc.metropolis_hastings_step(
         current_state=tf.zeros(1000),
         proposed_state=tf.ones(1000),
