@@ -28,6 +28,7 @@ _DIVERGENCES = {}
 __all__ = [
     "RegisterKL",
     "kl_divergence",
+    "summarize_registered_kls",
 ]
 
 
@@ -183,3 +184,18 @@ class RegisterKL(object):
                           _DIVERGENCES[self._key]))
     _DIVERGENCES[self._key] = kl_fn
     return kl_fn
+
+
+def summarize_registered_kls():
+  """Returns a str of registered KLs, to append to the doc for kl_divergence."""
+  ps, qs = zip(*((p.__name__, q.__name__) for p, q in _DIVERGENCES.keys()))
+  maxp = max(map(len, ps))
+  rows = []
+  for p, q in [("distribution_a", "distribution_b")] + sorted(zip(ps, qs)):
+    rows.append("{}{} || {}".format(" " * (maxp - len(p)), p, q))
+  return """
+  Built-in KL(distribution_a || distribution_b) registrations:
+  {}
+  {}
+  {}
+  """.format(rows[0], "=" * max(map(len, rows)), "\n  ".join(rows[1:]))
