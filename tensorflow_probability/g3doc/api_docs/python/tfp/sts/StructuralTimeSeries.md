@@ -16,9 +16,15 @@
 
 ## Class `StructuralTimeSeries`
 
-
-
 Base class for structural time series models.
+
+
+
+
+
+Defined in [`python/sts/structural_time_series.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/sts/structural_time_series.py).
+
+<!-- Placeholder for "Used in" -->
 
 A StructuralTimeSeries object represents a declarative specification of a
 structural time series model, including priors on model parameters.
@@ -113,7 +119,9 @@ Build the joint density `log p(params) + log p(y|params)` as a callable.
     `1` dimension is optional if `num_timesteps > 1`), where
     `batch_shape` should match `self.batch_shape` (the broadcast batch
     shape of all priors on parameters for this structural time series
-    model).
+    model). May optionally be an instance of <a href="../../tfp/sts/MaskedTimeSeries.md"><code>tfp.sts.MaskedTimeSeries</code></a>,
+    which includes a mask `Tensor` to specify timesteps with missing
+    observations.
 
 
 #### Returns:

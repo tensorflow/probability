@@ -5,6 +5,8 @@
 
 # tfp.monte_carlo.expectation
 
+Computes the Monte-Carlo approximation of `E_p[f(X)]`.
+
 ``` python
 tfp.monte_carlo.expectation(
     f,
@@ -17,7 +19,11 @@ tfp.monte_carlo.expectation(
 )
 ```
 
-Computes the Monte-Carlo approximation of `E_p[f(X)]`.
+
+
+Defined in [`python/monte_carlo/expectation.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/monte_carlo/expectation.py).
+
+<!-- Placeholder for "Used in" -->
 
 This function computes the Monte-Carlo approximation of an expectation, i.e.,
 

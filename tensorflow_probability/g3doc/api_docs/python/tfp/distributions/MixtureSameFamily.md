@@ -11,7 +11,9 @@
 <meta itemprop="property" content="parameters"/>
 <meta itemprop="property" content="reparameterization_type"/>
 <meta itemprop="property" content="validate_args"/>
+<meta itemprop="property" content="__getitem__"/>
 <meta itemprop="property" content="__init__"/>
+<meta itemprop="property" content="__iter__"/>
 <meta itemprop="property" content="batch_shape_tensor"/>
 <meta itemprop="property" content="cdf"/>
 <meta itemprop="property" content="copy"/>
@@ -41,9 +43,15 @@
 
 ## Class `MixtureSameFamily`
 
+Mixture (same-family) distribution.
+
 Inherits From: [`Distribution`](../../tfp/distributions/Distribution.md)
 
-Mixture (same-family) distribution.
+
+
+Defined in [`python/distributions/mixture_same_family.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/mixture_same_family.py).
+
+<!-- Placeholder for "Used in" -->
 
 The `MixtureSameFamily` distribution implements a (batch of) mixture
 distribution where all components are from different parameterizations of the
@@ -111,6 +119,7 @@ plt.contour(grid[..., 0], grid[..., 1], gm.prob(grid).eval());
 __init__(
     mixture_distribution,
     components_distribution,
+    reparameterize=False,
     validate_args=False,
     allow_nan_stats=True,
     name='MixtureSameFamily'
@@ -128,6 +137,19 @@ Construct a `MixtureSameFamily` distribution.
     `batch_shape` matching `components_distribution.batch_shape[:-1]`.
 * <b>`components_distribution`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a>-like instance.
     Right-most batch dimension indexes components.
+* <b>`reparameterize`</b>: Python `bool`, default `False`. Whether to reparameterize
+    samples of the distribution using implicit reparameterization gradients
+    [(Figurnov et al., 2018)][1]. The gradients for the mixture logits are
+    equivalent to the ones described by [(Graves, 2016)][2]. The gradients
+    for the components parameters are also computed using implicit
+    reparameterization (as opposed to ancestral sampling), meaning that
+    all components are updated every step.
+    Only works when:
+      (1) components_distribution is fully reparameterized;
+      (2) components_distribution is either a scalar distribution or
+      fully factorized (tfd.Independent applied to a scalar distribution);
+      (3) batch shape has a known rank.
+    Experimental, may be slow and produce infs/NaNs.
 * <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
     parameters are checked for validity despite possibly degrading runtime
     performance. When `False` invalid inputs may silently render incorrect
@@ -141,13 +163,22 @@ Construct a `MixtureSameFamily` distribution.
 
 #### Raises:
 
-* <b>`ValueError`</b>: `if not mixture_distribution.dtype.is_integer`.
+* <b>`ValueError`</b>: `if not dtype_util.is_integer(mixture_distribution.dtype)`.
 * <b>`ValueError`</b>: if mixture_distribution does not have scalar `event_shape`.
 * <b>`ValueError`</b>: if `mixture_distribution.batch_shape` and
     `components_distribution.batch_shape[:-1]` are both fully defined and
     the former is neither scalar nor equal to the latter.
 * <b>`ValueError`</b>: if `mixture_distribution` categories does not equal
     `components_distribution` rightmost batch shape.
+
+#### References
+
+[1]: Michael Figurnov, Shakir Mohamed and Andriy Mnih. Implicit
+     reparameterization gradients. In _Neural Information Processing
+     Systems_, 2018. https://arxiv.org/abs/1805.08498
+
+[2]: Alex Graves. Stochastic Backpropagation through Mixture Density
+     Distributions. _arXiv_, 2016. https://arxiv.org/abs/1607.05690
 
 
 
@@ -231,6 +262,22 @@ Python `bool` indicating possibly expensive checks are enabled.
 
 ## Methods
 
+<h3 id="__getitem__"><code>__getitem__</code></h3>
+
+``` python
+__getitem__(slices)
+```
+
+
+
+<h3 id="__iter__"><code>__iter__</code></h3>
+
+``` python
+__iter__()
+```
+
+
+
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
 
 ``` python
@@ -256,7 +303,8 @@ parameterizations of this distribution.
 ``` python
 cdf(
     value,
-    name='cdf'
+    name='cdf',
+    **kwargs
 )
 ```
 
@@ -272,6 +320,7 @@ cdf(x) := P[X <= x]
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -305,7 +354,10 @@ initialization arguments.
 <h3 id="covariance"><code>covariance</code></h3>
 
 ``` python
-covariance(name='covariance')
+covariance(
+    name='covariance',
+    **kwargs
+)
 ```
 
 Covariance.
@@ -338,6 +390,7 @@ length-`k'` vector.
 #### Args:
 
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -382,7 +435,10 @@ where `F` denotes the support of the random variable `X ~ P`.
 <h3 id="entropy"><code>entropy</code></h3>
 
 ``` python
-entropy(name='entropy')
+entropy(
+    name='entropy',
+    **kwargs
+)
 ```
 
 Shannon entropy in nats.
@@ -479,7 +535,8 @@ denotes (Shannon) cross entropy, and `H[.]` denotes (Shannon) entropy.
 ``` python
 log_cdf(
     value,
-    name='log_cdf'
+    name='log_cdf',
+    **kwargs
 )
 ```
 
@@ -499,6 +556,7 @@ a more accurate answer than simply taking the logarithm of the `cdf` when
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -511,7 +569,8 @@ a more accurate answer than simply taking the logarithm of the `cdf` when
 ``` python
 log_prob(
     value,
-    name='log_prob'
+    name='log_prob',
+    **kwargs
 )
 ```
 
@@ -521,6 +580,7 @@ Log probability density/mass function.
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -533,7 +593,8 @@ Log probability density/mass function.
 ``` python
 log_survival_function(
     value,
-    name='log_survival_function'
+    name='log_survival_function',
+    **kwargs
 )
 ```
 
@@ -554,6 +615,7 @@ survival function, which are more accurate than `1 - cdf(x)` when `x >> 1`.
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -564,7 +626,10 @@ survival function, which are more accurate than `1 - cdf(x)` when `x >> 1`.
 <h3 id="mean"><code>mean</code></h3>
 
 ``` python
-mean(name='mean')
+mean(
+    name='mean',
+    **kwargs
+)
 ```
 
 Mean.
@@ -572,7 +637,10 @@ Mean.
 <h3 id="mode"><code>mode</code></h3>
 
 ``` python
-mode(name='mode')
+mode(
+    name='mode',
+    **kwargs
+)
 ```
 
 Mode.
@@ -645,7 +713,8 @@ constant-valued tensors when constant values are fed.
 ``` python
 prob(
     value,
-    name='prob'
+    name='prob',
+    **kwargs
 )
 ```
 
@@ -655,6 +724,7 @@ Probability density/mass function.
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -667,7 +737,8 @@ Probability density/mass function.
 ``` python
 quantile(
     value,
-    name='quantile'
+    name='quantile',
+    **kwargs
 )
 ```
 
@@ -683,6 +754,7 @@ quantile(p) := x such that P[X <= x] == p
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -696,7 +768,8 @@ quantile(p) := x such that P[X <= x] == p
 sample(
     sample_shape=(),
     seed=None,
-    name='sample'
+    name='sample',
+    **kwargs
 )
 ```
 
@@ -710,6 +783,7 @@ sample.
 * <b>`sample_shape`</b>: 0D or 1D `int32` `Tensor`. Shape of the generated samples.
 * <b>`seed`</b>: Python integer seed for RNG
 * <b>`name`</b>: name to give to the op.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -719,7 +793,10 @@ sample.
 <h3 id="stddev"><code>stddev</code></h3>
 
 ``` python
-stddev(name='stddev')
+stddev(
+    name='stddev',
+    **kwargs
+)
 ```
 
 Standard deviation.
@@ -736,6 +813,7 @@ denotes expectation, and `stddev.shape = batch_shape + event_shape`.
 #### Args:
 
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -748,7 +826,8 @@ denotes expectation, and `stddev.shape = batch_shape + event_shape`.
 ``` python
 survival_function(
     value,
-    name='survival_function'
+    name='survival_function',
+    **kwargs
 )
 ```
 
@@ -766,6 +845,7 @@ survival_function(x) = P[X > x]
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -776,7 +856,10 @@ survival_function(x) = P[X > x]
 <h3 id="variance"><code>variance</code></h3>
 
 ``` python
-variance(name='variance')
+variance(
+    name='variance',
+    **kwargs
+)
 ```
 
 Variance.
@@ -793,6 +876,7 @@ denotes expectation, and `Var.shape = batch_shape + event_shape`.
 #### Args:
 
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:

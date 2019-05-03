@@ -5,6 +5,8 @@
 
 # tfp.stats.variance
 
+Estimate variance using samples.
+
 ``` python
 tfp.stats.variance(
     x,
@@ -14,7 +16,11 @@ tfp.stats.variance(
 )
 ```
 
-Estimate variance using samples.
+
+
+Defined in [`python/stats/sample_stats.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/stats/sample_stats.py).
+
+<!-- Placeholder for "Used in" -->
 
 Given `N` samples of scalar valued random variable `X`, variance may
 be estimated as

@@ -5,15 +5,21 @@
 
 # tfp.trainable_distributions.bernoulli
 
+Constructs a trainable `tfd.Bernoulli` distribution.
+
 ``` python
 tfp.trainable_distributions.bernoulli(
     x,
-    layer_fn=tf.layers.dense,
+    layer_fn=tf.compat.v1.layers.dense,
     name=None
 )
 ```
 
-Constructs a trainable `tfd.Bernoulli` distribution.
+
+
+Defined in [`python/trainable_distributions/trainable_distributions_lib.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/trainable_distributions/trainable_distributions_lib.py).
+
+<!-- Placeholder for "Used in" -->
 
 This function creates a Bernoulli distribution parameterized by logits.
 Using default args, this function is mathematically equivalent to:

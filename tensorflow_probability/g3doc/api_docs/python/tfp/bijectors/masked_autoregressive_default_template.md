@@ -5,6 +5,8 @@
 
 # tfp.bijectors.masked_autoregressive_default_template
 
+Build the Masked Autoregressive Density Estimator (Germain et al., 2015).
+
 ``` python
 tfp.bijectors.masked_autoregressive_default_template(
     hidden_layers,
@@ -19,7 +21,11 @@ tfp.bijectors.masked_autoregressive_default_template(
 )
 ```
 
-Build the Masked Autoregressive Density Estimator (Germain et al., 2015).
+
+
+Defined in [`python/bijectors/masked_autoregressive.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/bijectors/masked_autoregressive.py).
+
+<!-- Placeholder for "Used in" -->
 
 This will be wrapped in a make_template to ensure the variables are only
 created once. It takes the input and returns the `loc` ("mu" in [Germain et

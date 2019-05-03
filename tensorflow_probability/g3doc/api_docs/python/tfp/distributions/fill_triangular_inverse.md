@@ -5,6 +5,8 @@
 
 # tfp.distributions.fill_triangular_inverse
 
+Creates a vector from a (batch of) triangular matrix.
+
 ``` python
 tfp.distributions.fill_triangular_inverse(
     x,
@@ -13,7 +15,11 @@ tfp.distributions.fill_triangular_inverse(
 )
 ```
 
-Creates a vector from a (batch of) triangular matrix.
+
+
+Defined in [`python/internal/distribution_util.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/internal/distribution_util.py).
+
+<!-- Placeholder for "Used in" -->
 
 The vector is created from the lower-triangular or upper-triangular portion
 depending on the value of the parameter `upper`.

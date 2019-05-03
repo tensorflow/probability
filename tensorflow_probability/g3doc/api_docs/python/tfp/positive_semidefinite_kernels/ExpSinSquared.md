@@ -22,9 +22,15 @@
 
 ## Class `ExpSinSquared`
 
+Exponentiated Sine Squared Kernel.
+
 Inherits From: [`PositiveSemidefiniteKernel`](../../tfp/positive_semidefinite_kernels/PositiveSemidefiniteKernel.md)
 
-Exponentiated Sine Squared Kernel.
+
+
+Defined in [`python/positive_semidefinite_kernels/exp_sin_squared.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/positive_semidefinite_kernels/exp_sin_squared.py).
+
+<!-- Placeholder for "Used in" -->
 
 Also known as the "Periodic" kernel, this kernel, when
 parameterizing a Gaussian Process, results in random functions that are
@@ -360,7 +366,7 @@ a `Tensor` of shape `[e1, e2, e3, e4]`. To do this, one should instead
 reshape the inputs and pass them to `apply`, e.g.:
 
 ```python
-k = psd_kernels.SomeKernel()
+k = tfpk.SomeKernel()
 t1 = tf.placeholder([4, 4, 3], tf.float32)
 t2 = tf.placeholder([5, 5, 3], tf.float32)
 k.apply(

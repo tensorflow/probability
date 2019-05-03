@@ -12,9 +12,15 @@
 
 ## Class `GammaSoftplus`
 
+`Gamma(concentration=1, rate=1 / mean)` where
+
 Inherits From: [`ExponentialFamily`](../../tfp/glm/ExponentialFamily.md)
 
-`Gamma(concentration=1, rate=1 / mean)` where
+
+
+Defined in [`python/glm/family.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/glm/family.py).
+
+<!-- Placeholder for "Used in" -->
 `mean = softplus(matmul(X, weights))`.
 
 <h2 id="__init__"><code>__init__</code></h2>

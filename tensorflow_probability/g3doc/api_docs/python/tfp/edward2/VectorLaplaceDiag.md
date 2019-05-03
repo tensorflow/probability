@@ -5,6 +5,8 @@
 
 # tfp.edward2.VectorLaplaceDiag
 
+Create a random variable for VectorLaplaceDiag.
+
 ``` python
 tfp.edward2.VectorLaplaceDiag(
     *args,
@@ -12,7 +14,11 @@ tfp.edward2.VectorLaplaceDiag(
 )
 ```
 
-Create a random variable for VectorLaplaceDiag.
+
+
+Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
+
+<!-- Placeholder for "Used in" -->
 
 See VectorLaplaceDiag for more details.
 

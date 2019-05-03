@@ -11,9 +11,15 @@
 
 ## Class `SeedStream`
 
-
-
 Local PRNG for amplifying seed entropy into seeds for base operations.
+
+
+
+
+
+Defined in [`python/distributions/seed_stream.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/seed_stream.py).
+
+<!-- Placeholder for "Used in" -->
 
 Writing sampling code which correctly sets the pseudo-random number
 generator (PRNG) seed is surprisingly difficult.  This class serves as

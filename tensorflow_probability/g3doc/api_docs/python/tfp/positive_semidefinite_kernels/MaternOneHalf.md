@@ -21,9 +21,15 @@
 
 ## Class `MaternOneHalf`
 
+Matern Kernel with parameter 1/2.
+
 Inherits From: [`PositiveSemidefiniteKernel`](../../tfp/positive_semidefinite_kernels/PositiveSemidefiniteKernel.md)
 
-Matern Kernel with parameter 1/2.
+
+
+Defined in [`python/positive_semidefinite_kernels/matern.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/positive_semidefinite_kernels/matern.py).
+
+<!-- Placeholder for "Used in" -->
 
 This kernel is part of the Matern family of kernels, with parameter 1/2.
 Also known as the Exponential or Laplacian Kernel, a Gaussian process
@@ -353,7 +359,7 @@ a `Tensor` of shape `[e1, e2, e3, e4]`. To do this, one should instead
 reshape the inputs and pass them to `apply`, e.g.:
 
 ```python
-k = psd_kernels.SomeKernel()
+k = tfpk.SomeKernel()
 t1 = tf.placeholder([4, 4, 3], tf.float32)
 t2 = tf.placeholder([5, 5, 3], tf.float32)
 k.apply(

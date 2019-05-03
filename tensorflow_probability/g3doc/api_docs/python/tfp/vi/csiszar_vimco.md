@@ -5,6 +5,8 @@
 
 # tfp.vi.csiszar_vimco
 
+Use VIMCO to lower the variance of gradient[csiszar_function(Avg(logu))].
+
 ``` python
 tfp.vi.csiszar_vimco(
     f,
@@ -17,7 +19,11 @@ tfp.vi.csiszar_vimco(
 )
 ```
 
-Use VIMCO to lower the variance of gradient[csiszar_function(Avg(logu))].
+
+
+Defined in [`python/vi/csiszar_divergence.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/vi/csiszar_divergence.py).
+
+<!-- Placeholder for "Used in" -->
 
 This function generalizes VIMCO [(Mnih and Rezende, 2016)][1] to Csiszar
 f-Divergences.

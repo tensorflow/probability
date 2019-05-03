@@ -19,9 +19,15 @@
 
 ## Class `UncalibratedLangevin`
 
+Runs one step of Uncalibrated Langevin discretized diffusion.
+
 Inherits From: [`TransitionKernel`](../../tfp/mcmc/TransitionKernel.md)
 
-Runs one step of Uncalibrated Langevin discretized diffusion.
+
+
+Defined in [`python/mcmc/langevin.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/langevin.py).
+
+<!-- Placeholder for "Used in" -->
 
 The class generates a Langevin proposal using `_euler_method` function and
 also computes helper `UncalibratedLangevinKernelResults` for the next

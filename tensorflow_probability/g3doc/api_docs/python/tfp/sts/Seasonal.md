@@ -2,6 +2,7 @@
 <meta itemprop="name" content="tfp.sts.Seasonal" />
 <meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="batch_shape"/>
+<meta itemprop="property" content="constrain_mean_effect_to_zero"/>
 <meta itemprop="property" content="initial_state_prior"/>
 <meta itemprop="property" content="latent_size"/>
 <meta itemprop="property" content="name"/>
@@ -19,9 +20,15 @@
 
 ## Class `Seasonal`
 
+Formal representation of a seasonal effect model.
+
 Inherits From: [`StructuralTimeSeries`](../../tfp/sts/StructuralTimeSeries.md)
 
-Formal representation of a seasonal effect model.
+
+
+Defined in [`python/sts/seasonal.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/sts/seasonal.py).
+
+<!-- Placeholder for "Used in" -->
 
 A seasonal effect model posits a fixed set of recurring, discrete 'seasons',
 each of which is active for a fixed number of timesteps and, while active,
@@ -63,9 +70,24 @@ month_of_year = tfp.sts.Seasonal(
   name='month_of_year')
 ```
 
-Note that a general implementation of month-of-year seasonality would require
-additional logic; this version works over time periods not involving a leap
-year.
+Note that this version works over time periods not involving a leap year. A
+general implementation of month-of-year seasonality would require additional
+logic:
+
+```python
+num_days_per_month = np.array(
+  [[31, 28, 31, 30, 30, 31, 31, 31, 30, 31, 30, 31],
+   [31, 29, 31, 30, 30, 31, 31, 31, 30, 31, 30, 31],  # year with leap day
+   [31, 28, 31, 30, 30, 31, 31, 31, 30, 31, 30, 31],
+   [31, 28, 31, 30, 30, 31, 31, 31, 30, 31, 30, 31]])
+
+month_of_year = tfp.sts.Seasonal(
+  num_seasons=12,
+  num_steps_per_season=num_days_per_month,
+  drift_scale_prior=tfd.LogNormal(loc=-1., scale=0.1),
+  initial_effect_prior=tfd.Normal(loc=0., scale=5.),
+  name='month_of_year')
+```
 
 A model representing both day-of-week and hour-of-day seasonality, on hourly
 data:
@@ -91,6 +113,7 @@ __init__(
     num_steps_per_season=1,
     drift_scale_prior=None,
     initial_effect_prior=None,
+    constrain_mean_effect_to_zero=True,
     observed_time_series=None,
     name=None
 )
@@ -103,7 +126,11 @@ Specify a seasonal effects model.
 * <b>`num_seasons`</b>: Scalar Python `int` number of seasons.
 * <b>`num_steps_per_season`</b>: Python `int` number of steps in each
     season. This may be either a scalar (shape `[]`), in which case all
-    seasons have the same length, or a NumPy array of shape `[num_seasons]`.
+    seasons have the same length, or a NumPy array of shape `[num_seasons]`,
+    in which seasons have different length, but remain constant around
+    different cycles, or a NumPy array of shape `[num_cycles, num_seasons]`,
+    in which num_steps_per_season for each season also varies in different
+    cycle (e.g., a 4 years cycle with leap day).
     Default value: 1.
 * <b>`drift_scale_prior`</b>: optional `tfd.Distribution` instance specifying a prior
     on the `drift_scale` parameter. If `None`, a heuristic default prior is
@@ -118,11 +145,20 @@ Specify a seasonal effects model.
     heuristic default prior is constructed based on the provided
     `observed_time_series`.
     Default value: `None`.
+* <b>`constrain_mean_effect_to_zero`</b>: if `True`, use a model parameterization
+    that constrains the mean effect across all seasons to be zero. This
+    constraint is generally helpful in identifying the contributions of
+    different model components and can lead to more interpretable
+    posterior decompositions. It may be undesirable if you plan to directly
+    examine the latent space of the underlying state space model.
+    Default value: `True`.
 * <b>`observed_time_series`</b>: optional `float` `Tensor` of shape
     `batch_shape + [T, 1]` (omitting the trailing unit dimension is also
     supported when `T > 1`), specifying an observed time series.
     Any priors not explicitly set will be given default values according to
-    the scale of the observed time series (or batch of time series).
+    the scale of the observed time series (or batch of time series). May
+    optionally be an instance of <a href="../../tfp/sts/MaskedTimeSeries.md"><code>tfp.sts.MaskedTimeSeries</code></a>, which includes
+    a mask `Tensor` to specify timesteps with missing observations.
     Default value: `None`.
 * <b>`name`</b>: the name of this model component.
     Default value: 'Seasonal'.
@@ -142,6 +178,10 @@ Static batch shape of models represented by this component.
     derived state space models, i.e.,
     `self.make_state_space_model(...).batch_shape`. It may be partially
     defined or unknown.
+
+<h3 id="constrain_mean_effect_to_zero"><code>constrain_mean_effect_to_zero</code></h3>
+
+Whether to constrain the mean effect to zero.
 
 <h3 id="initial_state_prior"><code>initial_state_prior</code></h3>
 
@@ -201,7 +241,9 @@ Build the joint density `log p(params) + log p(y|params)` as a callable.
     `1` dimension is optional if `num_timesteps > 1`), where
     `batch_shape` should match `self.batch_shape` (the broadcast batch
     shape of all priors on parameters for this structural time series
-    model).
+    model). May optionally be an instance of <a href="../../tfp/sts/MaskedTimeSeries.md"><code>tfp.sts.MaskedTimeSeries</code></a>,
+    which includes a mask `Tensor` to specify timesteps with missing
+    observations.
 
 
 #### Returns:

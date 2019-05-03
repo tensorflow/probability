@@ -5,6 +5,8 @@
 
 # tfp.distributions.assign_moving_mean_variance
 
+Compute exponentially weighted moving {mean,variance} of a streaming value.
+
 ``` python
 tfp.distributions.assign_moving_mean_variance(
     mean_var,
@@ -15,13 +17,17 @@ tfp.distributions.assign_moving_mean_variance(
 )
 ```
 
-Compute exponentially weighted moving {mean,variance} of a streaming value.
+
+
+Defined in [`python/distributions/internal/moving_stats.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/internal/moving_stats.py).
+
+<!-- Placeholder for "Used in" -->
 
 The `value` updated exponentially weighted moving `mean_var` and
 `variance_var` are given by the following recurrence relations:
 
 ```python
-variance_var = decay * (variance_var + (1-decay) * (value - mean_var)**2)
+variance_var = decay * (variance_var + (1 - decay) * (value - mean_var)**2)
 mean_var     = decay * mean_var + (1 - decay) * value
 ```
 
@@ -29,6 +35,7 @@ Note: `mean_var` is updated *after* `variance_var`, i.e., `variance_var` uses
 the lag-1 mean.
 
 For derivation justification, see [Finch (2009; Eq. 143)][1].
+Parameterization: Finch's `alpha` is `1 - decay`.
 
 #### Args:
 

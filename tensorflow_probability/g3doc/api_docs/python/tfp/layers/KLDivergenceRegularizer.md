@@ -10,9 +10,20 @@
 
 ## Class `KLDivergenceRegularizer`
 
-
-
 Regularizer that adds a KL divergence penalty to the model loss.
+
+
+
+### Aliases:
+
+* Class `tfp.layers.KLDivergenceRegularizer`
+* Class `tfp.layers.distribution_layer.KLDivergenceRegularizer`
+
+
+
+Defined in [`python/layers/distribution_layer.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/layers/distribution_layer.py).
+
+<!-- Placeholder for "Used in" -->
 
 When using Monte Carlo approximation (e.g., `use_exact=False`), it is presumed
 that the input distribution's concretization (i.e.,

@@ -3,22 +3,20 @@
 <meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="allow_nan_stats"/>
 <meta itemprop="property" content="batch_shape"/>
-<meta itemprop="property" content="bijector"/>
-<meta itemprop="property" content="distribution"/>
 <meta itemprop="property" content="dtype"/>
 <meta itemprop="property" content="event_shape"/>
 <meta itemprop="property" content="index_points"/>
 <meta itemprop="property" content="jitter"/>
 <meta itemprop="property" content="kernel"/>
-<meta itemprop="property" content="loc"/>
 <meta itemprop="property" content="mean_fn"/>
 <meta itemprop="property" content="name"/>
 <meta itemprop="property" content="observation_noise_variance"/>
 <meta itemprop="property" content="parameters"/>
 <meta itemprop="property" content="reparameterization_type"/>
-<meta itemprop="property" content="scale"/>
 <meta itemprop="property" content="validate_args"/>
+<meta itemprop="property" content="__getitem__"/>
 <meta itemprop="property" content="__init__"/>
+<meta itemprop="property" content="__iter__"/>
 <meta itemprop="property" content="batch_shape_tensor"/>
 <meta itemprop="property" content="cdf"/>
 <meta itemprop="property" content="copy"/>
@@ -26,6 +24,7 @@
 <meta itemprop="property" content="cross_entropy"/>
 <meta itemprop="property" content="entropy"/>
 <meta itemprop="property" content="event_shape_tensor"/>
+<meta itemprop="property" content="get_marginal_distribution"/>
 <meta itemprop="property" content="is_scalar_batch"/>
 <meta itemprop="property" content="is_scalar_event"/>
 <meta itemprop="property" content="kl_divergence"/>
@@ -48,9 +47,15 @@
 
 ## Class `GaussianProcess`
 
-Inherits From: [`MultivariateNormalLinearOperator`](../../tfp/distributions/MultivariateNormalLinearOperator.md)
-
 Marginal distribution of a Gaussian process at finitely many points.
+
+Inherits From: [`Distribution`](../../tfp/distributions/Distribution.md)
+
+
+
+Defined in [`python/distributions/gaussian_process.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/gaussian_process.py).
+
+<!-- Placeholder for "Used in" -->
 
 A Gaussian process (GP) is an indexed collection of random variables, any
 finite collection of which are jointly Gaussian. While this definition applies
@@ -163,7 +168,7 @@ noisy_gp = tfd.GaussianProcess(
     kernel=kernel,
     index_points=index_points,
     observation_noise_variance=.05)
-noisy_samples = noise_gp.sample(10)
+noisy_samples = noisy_gp.sample(10)
 # ==> 10 independently drawn, noisy joint samples at `index_points`
 ```
 
@@ -181,8 +186,8 @@ observed_values = f(observed_index_points)
 
 # Define a kernel with trainable parameters.
 kernel = psd_kernels.ExponentiatedQuadratic(
-    amplitude=tf.get_variable('amplitude', np.float32),
-    length_scale=tf.get_variable('length_scale', np.float32))
+    amplitude=tf.get_variable('amplitude', shape=(), dtype=np.float64),
+    length_scale=tf.get_variable('length_scale', shape=(), dtype=np.float64))
 
 gp = tfd.GaussianProcess(kernel, observed_index_points)
 neg_log_likelihood = -gp.log_prob(observed_values)
@@ -204,7 +209,7 @@ with tf.Session() as sess:
 ``` python
 __init__(
     kernel,
-    index_points,
+    index_points=None,
     mean_fn=None,
     observation_noise_variance=0.0,
     jitter=1e-06,
@@ -293,14 +298,6 @@ parameterizations of this distribution.
 
 * <b>`batch_shape`</b>: `TensorShape`, possibly unknown.
 
-<h3 id="bijector"><code>bijector</code></h3>
-
-Function transforming x => y.
-
-<h3 id="distribution"><code>distribution</code></h3>
-
-Base distribution, p(x).
-
 <h3 id="dtype"><code>dtype</code></h3>
 
 The `DType` of `Tensor`s handled by this `Distribution`.
@@ -326,10 +323,6 @@ May be partially defined or unknown.
 <h3 id="kernel"><code>kernel</code></h3>
 
 
-
-<h3 id="loc"><code>loc</code></h3>
-
-The `loc` `Tensor` in `Y = scale @ X + loc`.
 
 <h3 id="mean_fn"><code>mean_fn</code></h3>
 
@@ -358,10 +351,6 @@ Currently this is one of the static instances
 
 An instance of `ReparameterizationType`.
 
-<h3 id="scale"><code>scale</code></h3>
-
-The `scale` `LinearOperator` in `Y = scale @ X + loc`.
-
 <h3 id="validate_args"><code>validate_args</code></h3>
 
 Python `bool` indicating possibly expensive checks are enabled.
@@ -369,6 +358,49 @@ Python `bool` indicating possibly expensive checks are enabled.
 
 
 ## Methods
+
+<h3 id="__getitem__"><code>__getitem__</code></h3>
+
+``` python
+__getitem__(slices)
+```
+
+Slices the batch axes of this distribution, returning a new instance.
+
+```python
+b = tfd.Bernoulli(logits=tf.zeros([3, 5, 7, 9]))
+b.batch_shape  # => [3, 5, 7, 9]
+b2 = b[:, tf.newaxis, ..., -2:, 1::2]
+b2.batch_shape  # => [3, 1, 5, 2, 4]
+
+x = tf.random.normal([5, 3, 2, 2])
+cov = tf.matmul(x, x, transpose_b=True)
+chol = tf.cholesky(cov)
+loc = tf.random.normal([4, 1, 3, 1])
+mvn = tfd.MultivariateNormalTriL(loc, chol)
+mvn.batch_shape  # => [4, 5, 3]
+mvn.event_shape  # => [2]
+mvn2 = mvn[:, 3:, ..., ::-1, tf.newaxis]
+mvn2.batch_shape  # => [4, 2, 3, 1]
+mvn2.event_shape  # => [2]
+```
+
+#### Args:
+
+* <b>`slices`</b>: slices from the [] operator
+
+
+#### Returns:
+
+* <b>`dist`</b>: A new `tfd.Distribution` instance with sliced parameters.
+
+<h3 id="__iter__"><code>__iter__</code></h3>
+
+``` python
+__iter__()
+```
+
+
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
 
@@ -395,7 +427,8 @@ parameterizations of this distribution.
 ``` python
 cdf(
     value,
-    name='cdf'
+    name='cdf',
+    **kwargs
 )
 ```
 
@@ -411,6 +444,7 @@ cdf(x) := P[X <= x]
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -444,7 +478,10 @@ initialization arguments.
 <h3 id="covariance"><code>covariance</code></h3>
 
 ``` python
-covariance(name='covariance')
+covariance(
+    name='covariance',
+    **kwargs
+)
 ```
 
 Covariance.
@@ -477,6 +514,7 @@ length-`k'` vector.
 #### Args:
 
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -521,7 +559,10 @@ where `F` denotes the support of the random variable `X ~ P`.
 <h3 id="entropy"><code>entropy</code></h3>
 
 ``` python
-entropy(name='entropy')
+entropy(
+    name='entropy',
+    **kwargs
+)
 ```
 
 Shannon entropy in nats.
@@ -542,6 +583,32 @@ Shape of a single sample from a single batch as a 1-D int32 `Tensor`.
 #### Returns:
 
 * <b>`event_shape`</b>: `Tensor`.
+
+<h3 id="get_marginal_distribution"><code>get_marginal_distribution</code></h3>
+
+``` python
+get_marginal_distribution(index_points=None)
+```
+
+Compute the marginal of this GP over function values at `index_points`.
+
+#### Args:
+
+* <b>`index_points`</b>: `float` `Tensor` representing finite (batch of) vector(s) of
+    points in the index set over which the GP is defined. Shape has the form
+    `[b1, ..., bB, e, f1, ..., fF]` where `F` is the number of feature
+    dimensions and must equal `kernel.feature_ndims` and `e` is the number
+    (size) of index points in each batch. Ultimately this distribution
+    corresponds to a `e`-dimensional multivariate normal. The batch shape
+    must be broadcastable with `kernel.batch_shape` and any batch dims
+    yielded by `mean_fn`.
+
+
+#### Returns:
+
+* <b>`marginal`</b>: a `Normal` or `MultivariateNormalLinearOperator` distribution,
+    according to whether `index_points` consists of one or many index
+    points, respectively.
 
 <h3 id="is_scalar_batch"><code>is_scalar_batch</code></h3>
 
@@ -618,7 +685,8 @@ denotes (Shannon) cross entropy, and `H[.]` denotes (Shannon) entropy.
 ``` python
 log_cdf(
     value,
-    name='log_cdf'
+    name='log_cdf',
+    **kwargs
 )
 ```
 
@@ -638,6 +706,7 @@ a more accurate answer than simply taking the logarithm of the `cdf` when
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -650,32 +719,18 @@ a more accurate answer than simply taking the logarithm of the `cdf` when
 ``` python
 log_prob(
     value,
-    name='log_prob'
+    name='log_prob',
+    **kwargs
 )
 ```
 
 Log probability density/mass function.
 
-
-Additional documentation from `MultivariateNormalLinearOperator`:
-
-`value` is a batch vector with compatible shape if `value` is a `Tensor` whose
-shape can be broadcast up to either:
-
-```python
-self.batch_shape + self.event_shape
-```
-
-or
-
-```python
-[M1, ..., Mm] + self.batch_shape + self.event_shape
-```
-
 #### Args:
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -688,7 +743,8 @@ or
 ``` python
 log_survival_function(
     value,
-    name='log_survival_function'
+    name='log_survival_function',
+    **kwargs
 )
 ```
 
@@ -709,6 +765,7 @@ survival function, which are more accurate than `1 - cdf(x)` when `x >> 1`.
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -719,7 +776,10 @@ survival function, which are more accurate than `1 - cdf(x)` when `x >> 1`.
 <h3 id="mean"><code>mean</code></h3>
 
 ``` python
-mean(name='mean')
+mean(
+    name='mean',
+    **kwargs
+)
 ```
 
 Mean.
@@ -727,7 +787,10 @@ Mean.
 <h3 id="mode"><code>mode</code></h3>
 
 ``` python
-mode(name='mode')
+mode(
+    name='mode',
+    **kwargs
+)
 ```
 
 Mode.
@@ -800,32 +863,18 @@ constant-valued tensors when constant values are fed.
 ``` python
 prob(
     value,
-    name='prob'
+    name='prob',
+    **kwargs
 )
 ```
 
 Probability density/mass function.
 
-
-Additional documentation from `MultivariateNormalLinearOperator`:
-
-`value` is a batch vector with compatible shape if `value` is a `Tensor` whose
-shape can be broadcast up to either:
-
-```python
-self.batch_shape + self.event_shape
-```
-
-or
-
-```python
-[M1, ..., Mm] + self.batch_shape + self.event_shape
-```
-
 #### Args:
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -838,7 +887,8 @@ or
 ``` python
 quantile(
     value,
-    name='quantile'
+    name='quantile',
+    **kwargs
 )
 ```
 
@@ -854,6 +904,7 @@ quantile(p) := x such that P[X <= x] == p
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -867,7 +918,8 @@ quantile(p) := x such that P[X <= x] == p
 sample(
     sample_shape=(),
     seed=None,
-    name='sample'
+    name='sample',
+    **kwargs
 )
 ```
 
@@ -881,6 +933,7 @@ sample.
 * <b>`sample_shape`</b>: 0D or 1D `int32` `Tensor`. Shape of the generated samples.
 * <b>`seed`</b>: Python integer seed for RNG
 * <b>`name`</b>: name to give to the op.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -890,7 +943,10 @@ sample.
 <h3 id="stddev"><code>stddev</code></h3>
 
 ``` python
-stddev(name='stddev')
+stddev(
+    name='stddev',
+    **kwargs
+)
 ```
 
 Standard deviation.
@@ -907,6 +963,7 @@ denotes expectation, and `stddev.shape = batch_shape + event_shape`.
 #### Args:
 
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -919,7 +976,8 @@ denotes expectation, and `stddev.shape = batch_shape + event_shape`.
 ``` python
 survival_function(
     value,
-    name='survival_function'
+    name='survival_function',
+    **kwargs
 )
 ```
 
@@ -937,6 +995,7 @@ survival_function(x) = P[X > x]
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -947,7 +1006,10 @@ survival_function(x) = P[X > x]
 <h3 id="variance"><code>variance</code></h3>
 
 ``` python
-variance(name='variance')
+variance(
+    name='variance',
+    **kwargs
+)
 ```
 
 Variance.
@@ -964,6 +1026,7 @@ denotes expectation, and `Var.shape = batch_shape + event_shape`.
 #### Args:
 
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:

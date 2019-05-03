@@ -5,6 +5,8 @@
 
 # tfp.edward2.GammaGamma
 
+Create a random variable for GammaGamma.
+
 ``` python
 tfp.edward2.GammaGamma(
     *args,
@@ -12,7 +14,11 @@ tfp.edward2.GammaGamma(
 )
 ```
 
-Create a random variable for GammaGamma.
+
+
+Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
+
+<!-- Placeholder for "Used in" -->
 
 See GammaGamma for more details.
 

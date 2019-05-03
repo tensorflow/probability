@@ -10,8 +10,11 @@
 <meta itemprop="property" content="parameters"/>
 <meta itemprop="property" content="rate"/>
 <meta itemprop="property" content="reparameterization_type"/>
+<meta itemprop="property" content="scale"/>
 <meta itemprop="property" content="validate_args"/>
+<meta itemprop="property" content="__getitem__"/>
 <meta itemprop="property" content="__init__"/>
+<meta itemprop="property" content="__iter__"/>
 <meta itemprop="property" content="batch_shape_tensor"/>
 <meta itemprop="property" content="cdf"/>
 <meta itemprop="property" content="copy"/>
@@ -41,12 +44,18 @@
 
 ## Class `InverseGamma`
 
-Inherits From: [`Distribution`](../../tfp/distributions/Distribution.md)
-
 InverseGamma distribution.
 
+Inherits From: [`Distribution`](../../tfp/distributions/Distribution.md)
+
+
+
+Defined in [`python/distributions/inverse_gamma.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/inverse_gamma.py).
+
+<!-- Placeholder for "Used in" -->
+
 The `InverseGamma` distribution is defined over positive real numbers using
-parameters `concentration` (aka "alpha") and `rate` (aka "beta").
+parameters `concentration` (aka "alpha") and `scale` (aka "beta").
 
 #### Mathematical Details
 
@@ -60,7 +69,7 @@ Z = Gamma(alpha) beta**-alpha
 where:
 
 * `concentration = alpha`,
-* `rate = beta`,
+* `scale = beta`,
 * `Z` is the normalizing constant, and,
 * `Gamma` is the [gamma function](
   https://en.wikipedia.org/wiki/Gamma_function).
@@ -102,8 +111,8 @@ Implicit Reparameterization Gradients, 2018](https://arxiv.org/abs/1805.08498)
 
 ```python
 tfd = tfp.distributions
-dist = tfd.InverseGamma(concentration=3.0, rate=2.0)
-dist2 = tfd.InverseGamma(concentration=[3.0, 4.0], rate=[2.0, 3.0])
+dist = tfd.InverseGamma(concentration=3.0, scale=2.0)
+dist2 = tfd.InverseGamma(concentration=[3.0, 4.0], scale=[2.0, 3.0])
 ```
 
 Compute the gradients of samples w.r.t. the parameters:
@@ -111,37 +120,38 @@ Compute the gradients of samples w.r.t. the parameters:
 ```python
 tfd = tfp.distributions
 concentration = tf.constant(3.0)
-rate = tf.constant(2.0)
-dist = tfd.InverseGamma(concentration, rate)
+scale = tf.constant(2.0)
+dist = tfd.InverseGamma(concentration, scale)
 samples = dist.sample(5)  # Shape [5]
 loss = tf.reduce_mean(tf.square(samples))  # Arbitrary loss function
 # Unbiased stochastic gradients of the loss function
-grads = tf.gradients(loss, [concentration, rate])
+grads = tf.gradients(loss, [concentration, scale])
 ```
 
 <h2 id="__init__"><code>__init__</code></h2>
 
 ``` python
 __init__(
-    concentration,
-    rate,
-    validate_args=False,
-    allow_nan_stats=True,
-    name='InverseGamma'
+    *args,
+    **kwargs
 )
 ```
 
-Construct InverseGamma with `concentration` and `rate` parameters.
+Construct InverseGamma with `concentration` and `scale` parameters. (deprecated arguments)
 
-The parameters `concentration` and `rate` must be shaped in a way that
-supports broadcasting (e.g. `concentration + rate` is a valid operation).
+Warning: SOME ARGUMENTS ARE DEPRECATED: `(rate)`. They will be removed after 2019-05-08.
+Instructions for updating:
+The `rate` parameter is deprecated. Use `scale` instead.The `rate` parameter was always interpreted as a `scale` parameter, but erroneously misnamed.
+
+The parameters `concentration` and `scale` must be shaped in a way that
+supports broadcasting (e.g. `concentration + scale` is a valid operation).
 
 #### Args:
 
 * <b>`concentration`</b>: Floating point tensor, the concentration params of the
     distribution(s). Must contain only positive values.
-* <b>`rate`</b>: Floating point tensor, the inverse scale params of the
-    distribution(s). Must contain only positive values.
+* <b>`scale`</b>: Floating point tensor, the scale params of the distribution(s).
+    Must contain only positive values.
 * <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
     parameters are checked for validity despite possibly degrading runtime
     performance. When `False` invalid inputs may silently render incorrect
@@ -150,13 +160,14 @@ supports broadcasting (e.g. `concentration + rate` is a valid operation).
     (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
     result is undefined. When `False`, an exception is raised if one or
     more of the statistic's batch members are undefined.
+* <b>`rate`</b>: Deprecated (mis-named) alias for `scale`.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
 
 
 
 #### Raises:
 
-* <b>`TypeError`</b>: if `concentration` and `rate` are different dtypes.
+* <b>`TypeError`</b>: if `concentration` and `scale` are different dtypes.
 
 
 
@@ -219,7 +230,11 @@ Dictionary of parameters used to instantiate this `Distribution`.
 
 <h3 id="rate"><code>rate</code></h3>
 
-Rate parameter.
+Scale parameter. (deprecated)
+
+Warning: THIS FUNCTION IS DEPRECATED. It will be removed after 2019-05-08.
+Instructions for updating:
+The `rate` parameter is deprecated. Use `scale` instead.The `rate` parameter was always interpreted as a `scale`parameter, but erroneously misnamed.
 
 <h3 id="reparameterization_type"><code>reparameterization_type</code></h3>
 
@@ -232,6 +247,10 @@ Currently this is one of the static instances
 
 An instance of `ReparameterizationType`.
 
+<h3 id="scale"><code>scale</code></h3>
+
+Scale parameter.
+
 <h3 id="validate_args"><code>validate_args</code></h3>
 
 Python `bool` indicating possibly expensive checks are enabled.
@@ -239,6 +258,49 @@ Python `bool` indicating possibly expensive checks are enabled.
 
 
 ## Methods
+
+<h3 id="__getitem__"><code>__getitem__</code></h3>
+
+``` python
+__getitem__(slices)
+```
+
+Slices the batch axes of this distribution, returning a new instance.
+
+```python
+b = tfd.Bernoulli(logits=tf.zeros([3, 5, 7, 9]))
+b.batch_shape  # => [3, 5, 7, 9]
+b2 = b[:, tf.newaxis, ..., -2:, 1::2]
+b2.batch_shape  # => [3, 1, 5, 2, 4]
+
+x = tf.random.normal([5, 3, 2, 2])
+cov = tf.matmul(x, x, transpose_b=True)
+chol = tf.cholesky(cov)
+loc = tf.random.normal([4, 1, 3, 1])
+mvn = tfd.MultivariateNormalTriL(loc, chol)
+mvn.batch_shape  # => [4, 5, 3]
+mvn.event_shape  # => [2]
+mvn2 = mvn[:, 3:, ..., ::-1, tf.newaxis]
+mvn2.batch_shape  # => [4, 2, 3, 1]
+mvn2.event_shape  # => [2]
+```
+
+#### Args:
+
+* <b>`slices`</b>: slices from the [] operator
+
+
+#### Returns:
+
+* <b>`dist`</b>: A new `tfd.Distribution` instance with sliced parameters.
+
+<h3 id="__iter__"><code>__iter__</code></h3>
+
+``` python
+__iter__()
+```
+
+
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
 
@@ -265,7 +327,8 @@ parameterizations of this distribution.
 ``` python
 cdf(
     value,
-    name='cdf'
+    name='cdf',
+    **kwargs
 )
 ```
 
@@ -281,6 +344,7 @@ cdf(x) := P[X <= x]
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -314,7 +378,10 @@ initialization arguments.
 <h3 id="covariance"><code>covariance</code></h3>
 
 ``` python
-covariance(name='covariance')
+covariance(
+    name='covariance',
+    **kwargs
+)
 ```
 
 Covariance.
@@ -347,6 +414,7 @@ length-`k'` vector.
 #### Args:
 
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -391,7 +459,10 @@ where `F` denotes the support of the random variable `X ~ P`.
 <h3 id="entropy"><code>entropy</code></h3>
 
 ``` python
-entropy(name='entropy')
+entropy(
+    name='entropy',
+    **kwargs
+)
 ```
 
 Shannon entropy in nats.
@@ -488,7 +559,8 @@ denotes (Shannon) cross entropy, and `H[.]` denotes (Shannon) entropy.
 ``` python
 log_cdf(
     value,
-    name='log_cdf'
+    name='log_cdf',
+    **kwargs
 )
 ```
 
@@ -508,6 +580,7 @@ a more accurate answer than simply taking the logarithm of the `cdf` when
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -520,7 +593,8 @@ a more accurate answer than simply taking the logarithm of the `cdf` when
 ``` python
 log_prob(
     value,
-    name='log_prob'
+    name='log_prob',
+    **kwargs
 )
 ```
 
@@ -530,6 +604,7 @@ Log probability density/mass function.
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -542,7 +617,8 @@ Log probability density/mass function.
 ``` python
 log_survival_function(
     value,
-    name='log_survival_function'
+    name='log_survival_function',
+    **kwargs
 )
 ```
 
@@ -563,6 +639,7 @@ survival function, which are more accurate than `1 - cdf(x)` when `x >> 1`.
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -573,7 +650,10 @@ survival function, which are more accurate than `1 - cdf(x)` when `x >> 1`.
 <h3 id="mean"><code>mean</code></h3>
 
 ``` python
-mean(name='mean')
+mean(
+    name='mean',
+    **kwargs
+)
 ```
 
 Mean.
@@ -581,21 +661,24 @@ Mean.
 Additional documentation from `InverseGamma`:
 
 The mean of an inverse gamma distribution is
-`rate / (concentration - 1)`, when `concentration > 1`, and `NaN`
+`scale / (concentration - 1)`, when `concentration > 1`, and `NaN`
 otherwise. If `self.allow_nan_stats` is `False`, an exception will be
 raised rather than returning `NaN`
 
 <h3 id="mode"><code>mode</code></h3>
 
 ``` python
-mode(name='mode')
+mode(
+    name='mode',
+    **kwargs
+)
 ```
 
 Mode.
 
 Additional documentation from `InverseGamma`:
 
-The mode of an inverse gamma distribution is `rate / (concentration +
+The mode of an inverse gamma distribution is `scale / (concentration +
 1)`.
 
 <h3 id="param_shapes"><code>param_shapes</code></h3>
@@ -666,7 +749,8 @@ constant-valued tensors when constant values are fed.
 ``` python
 prob(
     value,
-    name='prob'
+    name='prob',
+    **kwargs
 )
 ```
 
@@ -676,6 +760,7 @@ Probability density/mass function.
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -688,7 +773,8 @@ Probability density/mass function.
 ``` python
 quantile(
     value,
-    name='quantile'
+    name='quantile',
+    **kwargs
 )
 ```
 
@@ -704,6 +790,7 @@ quantile(p) := x such that P[X <= x] == p
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -717,7 +804,8 @@ quantile(p) := x such that P[X <= x] == p
 sample(
     sample_shape=(),
     seed=None,
-    name='sample'
+    name='sample',
+    **kwargs
 )
 ```
 
@@ -731,6 +819,7 @@ sample.
 * <b>`sample_shape`</b>: 0D or 1D `int32` `Tensor`. Shape of the generated samples.
 * <b>`seed`</b>: Python integer seed for RNG
 * <b>`name`</b>: name to give to the op.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -740,7 +829,10 @@ sample.
 <h3 id="stddev"><code>stddev</code></h3>
 
 ``` python
-stddev(name='stddev')
+stddev(
+    name='stddev',
+    **kwargs
+)
 ```
 
 Standard deviation.
@@ -757,6 +849,7 @@ denotes expectation, and `stddev.shape = batch_shape + event_shape`.
 #### Args:
 
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -769,7 +862,8 @@ denotes expectation, and `stddev.shape = batch_shape + event_shape`.
 ``` python
 survival_function(
     value,
-    name='survival_function'
+    name='survival_function',
+    **kwargs
 )
 ```
 
@@ -787,6 +881,7 @@ survival_function(x) = P[X > x]
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -797,7 +892,10 @@ survival_function(x) = P[X > x]
 <h3 id="variance"><code>variance</code></h3>
 
 ``` python
-variance(name='variance')
+variance(
+    name='variance',
+    **kwargs
+)
 ```
 
 Variance.
@@ -821,6 +919,7 @@ than returning `NaN`.
 #### Args:
 
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:

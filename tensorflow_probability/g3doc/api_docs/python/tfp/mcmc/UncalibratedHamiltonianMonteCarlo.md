@@ -18,9 +18,15 @@
 
 ## Class `UncalibratedHamiltonianMonteCarlo`
 
+Runs one step of Uncalibrated Hamiltonian Monte Carlo.
+
 Inherits From: [`TransitionKernel`](../../tfp/mcmc/TransitionKernel.md)
 
-Runs one step of Uncalibrated Hamiltonian Monte Carlo.
+
+
+Defined in [`python/mcmc/hmc.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/hmc.py).
+
+<!-- Placeholder for "Used in" -->
 
 Warning: this kernel will not result in a chain which converges to the
 `target_log_prob`. To get a convergent MCMC, use `HamiltonianMonteCarlo(...)`
@@ -38,6 +44,7 @@ __init__(
     num_leapfrog_steps,
     state_gradients_are_stopped=False,
     seed=None,
+    store_parameters_in_results=False,
     name=None
 )
 ```
@@ -62,11 +69,12 @@ Initializes this transition kernel.
     new state be run through `tf.stop_gradient`. This is particularly useful
     when combining optimization over samples from the HMC chain.
     Default value: `False` (i.e., do not apply `stop_gradient`).
-* <b>`step_size_update_fn`</b>: Python `callable` taking current `step_size`
-    (typically a `tf.Variable`) and `kernel_results` (typically
-    `collections.namedtuple`) and returns updated step_size (`Tensor`s).
-    Default value: `None` (i.e., do not update `step_size` automatically).
 * <b>`seed`</b>: Python integer to seed the random number generator.
+* <b>`store_parameters_in_results`</b>: If `True`, then `step_size` and
+    `num_leapfrog_steps` are written to and read from eponymous fields in
+    the kernel results objects returned from `one_step` and
+    `bootstrap_results`. This allows wrapper kernels to adjust those
+    parameters on the fly.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this function.
     Default value: `None` (i.e., 'hmc_kernel').
 
@@ -84,7 +92,17 @@ Initializes this transition kernel.
 
 <h3 id="num_leapfrog_steps"><code>num_leapfrog_steps</code></h3>
 
+Returns the num_leapfrog_steps parameter.
 
+If `store_parameters_in_results` argument to the initializer was set to
+`True`, this only returns the value of the `num_leapfrog_steps` placed in
+the kernel results by the `bootstrap_results` method. The actual
+`num_leapfrog_steps` in that situation is governed by the
+`previous_kernel_results` argument to `one_step` method.
+
+#### Returns:
+
+* <b>`num_leapfrog_steps`</b>: An integer `Tensor`.
 
 <h3 id="parameters"><code>parameters</code></h3>
 
@@ -100,7 +118,17 @@ Return `dict` of ``__init__`` arguments and their values.
 
 <h3 id="step_size"><code>step_size</code></h3>
 
+Returns the step_size parameter.
 
+If `store_parameters_in_results` argument to the initializer was set to
+`True`, this only returns the value of the `step_size` placed in the kernel
+results by the `bootstrap_results` method. The actual step size in that
+situation is governed by the `previous_kernel_results` argument to
+`one_step` method.
+
+#### Returns:
+
+* <b>`step_size`</b>: A floating point `Tensor` or a list of such `Tensors`.
 
 <h3 id="target_log_prob_fn"><code>target_log_prob_fn</code></h3>
 

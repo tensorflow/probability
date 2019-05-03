@@ -12,9 +12,15 @@
 
 ## Class `LogNormal`
 
+`LogNormal(loc=log(mean) - log(2) / 2, scale=sqrt(log(2)))` where
+
 Inherits From: [`ExponentialFamily`](../../tfp/glm/ExponentialFamily.md)
 
-`LogNormal(loc=log(mean) - log(2) / 2, scale=sqrt(log(2)))` where
+
+
+Defined in [`python/glm/family.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/glm/family.py).
+
+<!-- Placeholder for "Used in" -->
 `mean = exp(matmul(X, weights))`.
 
 <h2 id="__init__"><code>__init__</code></h2>

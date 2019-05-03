@@ -5,6 +5,8 @@
 
 # tfp.math.lu_reconstruct
 
+The inverse LU decomposition, `X == lu_reconstruct(*tf.linalg.lu(X))`.
+
 ``` python
 tfp.math.lu_reconstruct(
     lower_upper,
@@ -14,7 +16,11 @@ tfp.math.lu_reconstruct(
 )
 ```
 
-The inverse LU decomposition, `X == lu_reconstruct(*tf.linalg.lu(X))`.
+
+
+Defined in [`python/math/linalg.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/math/linalg.py).
+
+<!-- Placeholder for "Used in" -->
 
 #### Args:
 

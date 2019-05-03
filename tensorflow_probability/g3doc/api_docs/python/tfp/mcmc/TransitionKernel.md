@@ -10,9 +10,15 @@
 
 ## Class `TransitionKernel`
 
-
-
 Base class for all MCMC `TransitionKernel`s.
+
+
+
+
+
+Defined in [`python/mcmc/kernel.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/kernel.py).
+
+<!-- Placeholder for "Used in" -->
 
 This class defines the minimal requirements to efficiently implement a Markov
 chain Monte Carlo (MCMC) transition kernel. A transition kernel returns a new

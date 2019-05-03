@@ -16,9 +16,15 @@
 
 ## Class `UncalibratedRandomWalk`
 
+Generate proposal for the Random Walk Metropolis algorithm.
+
 Inherits From: [`TransitionKernel`](../../tfp/mcmc/TransitionKernel.md)
 
-Generate proposal for the Random Walk Metropolis algorithm.
+
+
+Defined in [`python/mcmc/random_walk_metropolis.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/random_walk_metropolis.py).
+
+<!-- Placeholder for "Used in" -->
 
 Warning: this kernel will not result in a chain which converges to the
 `target_log_prob`. To get a convergent MCMC, use

@@ -5,6 +5,8 @@
 
 # tfp.edward2.Cauchy
 
+Create a random variable for Cauchy.
+
 ``` python
 tfp.edward2.Cauchy(
     *args,
@@ -12,7 +14,11 @@ tfp.edward2.Cauchy(
 )
 ```
 
-Create a random variable for Cauchy.
+
+
+Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
+
+<!-- Placeholder for "Used in" -->
 
 See Cauchy for more details.
 

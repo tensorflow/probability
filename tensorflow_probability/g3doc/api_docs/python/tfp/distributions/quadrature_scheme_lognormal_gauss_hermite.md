@@ -5,6 +5,8 @@
 
 # tfp.distributions.quadrature_scheme_lognormal_gauss_hermite
 
+Use Gauss-Hermite quadrature to form quadrature on positive-reals.
+
 ``` python
 tfp.distributions.quadrature_scheme_lognormal_gauss_hermite(
     loc,
@@ -15,7 +17,11 @@ tfp.distributions.quadrature_scheme_lognormal_gauss_hermite(
 )
 ```
 
-Use Gauss-Hermite quadrature to form quadrature on positive-reals.
+
+
+Defined in [`python/distributions/poisson_lognormal.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/poisson_lognormal.py).
+
+<!-- Placeholder for "Used in" -->
 
 Note: for a given `quadrature_size`, this method is generally less accurate
 than `quadrature_scheme_lognormal_quantiles`.

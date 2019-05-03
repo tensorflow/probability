@@ -5,6 +5,8 @@
 
 # tfp.distributions.normal_conjugates_known_scale_posterior
 
+Posterior Normal distribution with conjugate prior on the mean.
+
 ``` python
 tfp.distributions.normal_conjugates_known_scale_posterior(
     prior,
@@ -14,7 +16,11 @@ tfp.distributions.normal_conjugates_known_scale_posterior(
 )
 ```
 
-Posterior Normal distribution with conjugate prior on the mean.
+
+
+Defined in [`python/distributions/normal_conjugate_posteriors.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/normal_conjugate_posteriors.py).
+
+<!-- Placeholder for "Used in" -->
 
 This model assumes that `n` observations (with sum `s`) come from a
 Normal with unknown mean `loc` (described by the Normal `prior`)

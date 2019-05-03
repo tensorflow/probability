@@ -5,6 +5,8 @@
 
 # tfp.sts.build_factored_variational_loss
 
+Build a loss function for variational inference in STS models.
+
 ``` python
 tfp.sts.build_factored_variational_loss(
     model,
@@ -15,7 +17,11 @@ tfp.sts.build_factored_variational_loss(
 )
 ```
 
-Build a loss function for variational inference in STS models.
+
+
+Defined in [`python/sts/fitting.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/sts/fitting.py).
+
+<!-- Placeholder for "Used in" -->
 
 Variational inference searches for the distribution within some family of
 approximate posteriors that minimizes a divergence between the approximate
@@ -46,7 +52,9 @@ divergence encourages choosing a single mode) or dependence between variables.
 * <b>`observed_time_series`</b>: `float` `Tensor` of shape
     `concat([sample_shape, model.batch_shape, [num_timesteps, 1]]) where
     `sample_shape` corresponds to i.i.d. observations, and the trailing `[1]`
-    dimension may (optionally) be omitted if `num_timesteps > 1`.
+    dimension may (optionally) be omitted if `num_timesteps > 1`. May
+    optionally be an instance of <a href="../../tfp/sts/MaskedTimeSeries.md"><code>tfp.sts.MaskedTimeSeries</code></a>, which includes
+    a mask `Tensor` to specify timesteps with missing observations.
 * <b>`init_batch_shape`</b>: Batch shape (Python `tuple`, `list`, or `int`) of initial
     states to optimize in parallel.
     Default value: `()`. (i.e., just run a single optimization).

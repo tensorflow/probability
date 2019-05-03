@@ -5,6 +5,8 @@
 
 # tfp.math.batch_interp_regular_1d_grid
 
+Linear `1-D` interpolation on a regular (constant spacing) grid.
+
 ``` python
 tfp.math.batch_interp_regular_1d_grid(
     x,
@@ -20,7 +22,11 @@ tfp.math.batch_interp_regular_1d_grid(
 )
 ```
 
-Linear `1-D` interpolation on a regular (constant spacing) grid.
+
+
+Defined in [`python/math/interpolation.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/math/interpolation.py).
+
+<!-- Placeholder for "Used in" -->
 
 Given [batch of] reference values, this function computes a piecewise linear
 interpolant and evaluates it on a [batch of] of new `x` values.
@@ -42,20 +48,20 @@ with leading dimensions in `x`, `x_ref_min`, `x_ref_max`.
 
 #### Args:
 
-* <b>`x`</b>: Numeric `Tensor` The x-coordinates of the interpolated output values
-    for each batch.  Shape broadcasts with `[A1, ..., AN, D]`, `N >= 0`.
-* <b>`x_ref_min`</b>:  `Tensor` of same `dtype` as `x`.  The minimum value of the
-    each batch of the (implicitly defined) reference `x_ref`.
-    Shape broadcasts with `[A1, ..., AN]`, `N >= 0`.
-* <b>`x_ref_max`</b>:  `Tensor` of same `dtype` as `x`.  The maximum value of the
-    each batch of the (implicitly defined) reference `x_ref`.
-    Shape broadcasts with `[A1, ..., AN]`, `N >= 0`.
+* <b>`x`</b>: Numeric `Tensor` The x-coordinates of the interpolated output values for
+    each batch.  Shape broadcasts with `[A1, ..., AN, D]`, `N >= 0`.
+* <b>`x_ref_min`</b>:  `Tensor` of same `dtype` as `x`.  The minimum value of the each
+    batch of the (implicitly defined) reference `x_ref`. Shape broadcasts with
+    `[A1, ..., AN]`, `N >= 0`.
+* <b>`x_ref_max`</b>:  `Tensor` of same `dtype` as `x`.  The maximum value of the each
+    batch of the (implicitly defined) reference `x_ref`. Shape broadcasts with
+    `[A1, ..., AN]`, `N >= 0`.
 * <b>`y_ref`</b>:  `Tensor` of same `dtype` as `x`.  The reference output values.
     `y_ref.shape[:axis]` broadcasts with the batch shape `[A1, ..., AN]`, and
     `y_ref.shape[axis:]` is `[C, B1, ..., BM]`, so the trailing dimensions
-    index `C` reference values of a rank `M` `Tensor` (`M >= 0`).
+      index `C` reference values of a rank `M` `Tensor` (`M >= 0`).
 * <b>`axis`</b>:  Scalar `Tensor` designating the dimension of `y_ref` that indexes
-    values of the interpolation variable.
+    values of the interpolation table.
     Default value: `-1`, the rightmost axis.
 * <b>`fill_value`</b>:  Determines what values output should take for `x` values that
     are below `x_ref_min` or above `x_ref_max`. `Tensor` or one of the strings

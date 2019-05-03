@@ -5,11 +5,18 @@
 
 # tfp.layers.default_mean_field_normal_fn
 
+Creates a function to build Normal distributions with trainable params.
+
+### Aliases:
+
+* `tfp.layers.default_mean_field_normal_fn`
+* `tfp.layers.util.default_mean_field_normal_fn`
+
 ``` python
 tfp.layers.default_mean_field_normal_fn(
     is_singular=False,
-    loc_initializer=tf.random_normal_initializer(stddev=0.1),
-    untransformed_scale_initializer=tf.random_normal_initializer(mean=-3.0, stddev=0.1),
+    loc_initializer=tf.compat.v1.initializers.random_normal(stddev=0.1),
+    untransformed_scale_initializer=tf.compat.v1.initializers.random_normal(mean=-3.0, stddev=0.1),
     loc_regularizer=None,
     untransformed_scale_regularizer=None,
     loc_constraint=None,
@@ -17,7 +24,11 @@ tfp.layers.default_mean_field_normal_fn(
 )
 ```
 
-Creates a function to build Normal distributions with trainable params.
+
+
+Defined in [`python/layers/util.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/layers/util.py).
+
+<!-- Placeholder for "Used in" -->
 
 This function produces a closure which produces `tfd.Normal`
 parameterized by a loc` and `scale` each created using `tf.get_variable`.

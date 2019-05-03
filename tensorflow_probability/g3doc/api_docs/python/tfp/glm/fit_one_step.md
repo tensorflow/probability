@@ -5,6 +5,8 @@
 
 # tfp.glm.fit_one_step
 
+Runs one step of Fisher scoring.
+
 ``` python
 tfp.glm.fit_one_step(
     model_matrix,
@@ -21,7 +23,11 @@ tfp.glm.fit_one_step(
 )
 ```
 
-Runs one step of Fisher scoring.
+
+
+Defined in [`python/glm/fisher_scoring.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/glm/fisher_scoring.py).
+
+<!-- Placeholder for "Used in" -->
 
 #### Args:
 

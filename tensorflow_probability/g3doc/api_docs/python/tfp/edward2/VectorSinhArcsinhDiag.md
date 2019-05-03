@@ -5,6 +5,8 @@
 
 # tfp.edward2.VectorSinhArcsinhDiag
 
+Create a random variable for VectorSinhArcsinhDiag.
+
 ``` python
 tfp.edward2.VectorSinhArcsinhDiag(
     *args,
@@ -12,7 +14,11 @@ tfp.edward2.VectorSinhArcsinhDiag(
 )
 ```
 
-Create a random variable for VectorSinhArcsinhDiag.
+
+
+Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
+
+<!-- Placeholder for "Used in" -->
 
 See VectorSinhArcsinhDiag for more details.
 

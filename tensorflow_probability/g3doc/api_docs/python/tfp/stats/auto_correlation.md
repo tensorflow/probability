@@ -5,6 +5,8 @@
 
 # tfp.stats.auto_correlation
 
+Auto correlation along one axis.
+
 ``` python
 tfp.stats.auto_correlation(
     x,
@@ -16,7 +18,11 @@ tfp.stats.auto_correlation(
 )
 ```
 
-Auto correlation along one axis.
+
+
+Defined in [`python/stats/sample_stats.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/stats/sample_stats.py).
+
+<!-- Placeholder for "Used in" -->
 
 Given a `1-D` wide sense stationary (WSS) sequence `X`, the auto correlation
 `RXX` may be defined as  (with `E` expectation and `Conj` complex conjugate)

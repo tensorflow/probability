@@ -5,6 +5,8 @@
 
 # tfp.stats.quantiles
 
+Compute quantiles of `x` along `axis`.
+
 ``` python
 tfp.stats.quantiles(
     x,
@@ -17,7 +19,11 @@ tfp.stats.quantiles(
 )
 ```
 
-Compute quantiles of `x` along `axis`.
+
+
+Defined in [`python/stats/quantiles.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/stats/quantiles.py).
+
+<!-- Placeholder for "Used in" -->
 
 The quantiles of a distribution are cut points dividing the range into
 intervals with equal probabilities.
@@ -34,34 +40,14 @@ speaking, equal number of sample points lie in the `num_quantiles` intervals
 The exact number of data points in each interval depends on the size of
 `x` (e.g. whether the size is divisible by `n`) and the `interpolation` kwarg.
 
-
-```python
-# Get quartiles of x with various interpolation choices.
-x = [0.,  1.,   2.,   3.,   4.,   5.,   6.,   7.,   8.,   9.,  10.]
-
-tfp.stats.quantiles(x, num_quantiles=4, interpolation='nearest')
-==> [  0.,   2.,   5.,   8.,  10.]
-
-tfp.stats.quantiles(x, num_quantiles=4, interpolation='linear')
-==> [  0. ,   2.5,   5. ,   7.5,  10. ]
-
-tfp.stats.quantiles(x, num_quantiles=4, interpolation='lower')
-==> [  0.,   2.,   5.,   7.,  10.]
-
-# Get deciles of columns of an R x C data set.
-data = load_my_columnar_data(...)
-tfp.stats.quantiles(data, num_quantiles=10)
-==> Shape [11, C] Tensor
-```
-
 #### Args:
 
-* <b>`x`</b>:  Floating point `N-D` `Tensor` with `N > 0`.  If `axis` is not `None`,
+* <b>`x`</b>:  Numeric `N-D` `Tensor` with `N > 0`.  If `axis` is not `None`,
     `x` must have statically known number of dimensions.
 * <b>`num_quantiles`</b>:  Scalar `integer` `Tensor`.  The number of intervals the
     returned `num_quantiles + 1` cut points divide the range into.
 * <b>`axis`</b>:  Optional `0-D` or `1-D` integer `Tensor` with constant values. The
-    axis that hold independent samples over which to return the desired
+    axis that index independent samples over which to return the desired
     percentile.  If `None` (the default), treat every dimension as a sample
     dimension, returning a scalar.
 * <b>`interpolation `</b>: {'nearest', 'linear', 'lower', 'higher', 'midpoint'}.
@@ -92,3 +78,24 @@ tfp.stats.quantiles(data, num_quantiles=10)
 
 * <b>`ValueError`</b>:  If argument 'interpolation' is not an allowed type.
 * <b>`ValueError`</b>:  If interpolation type not compatible with `dtype`.
+
+#### Examples
+
+```python
+# Get quartiles of x with various interpolation choices.
+x = [0.,  1.,   2.,   3.,   4.,   5.,   6.,   7.,   8.,   9.,  10.]
+
+tfp.stats.quantiles(x, num_quantiles=4, interpolation='nearest')
+==> [  0.,   2.,   5.,   8.,  10.]
+
+tfp.stats.quantiles(x, num_quantiles=4, interpolation='linear')
+==> [  0. ,   2.5,   5. ,   7.5,  10. ]
+
+tfp.stats.quantiles(x, num_quantiles=4, interpolation='lower')
+==> [  0.,   2.,   5.,   7.,  10.]
+
+# Get deciles of columns of an R x C data set.
+data = load_my_columnar_data(...)
+tfp.stats.quantiles(data, num_quantiles=10)
+==> Shape [11, C] Tensor
+```

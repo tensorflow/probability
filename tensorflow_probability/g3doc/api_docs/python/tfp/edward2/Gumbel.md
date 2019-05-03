@@ -5,6 +5,8 @@
 
 # tfp.edward2.Gumbel
 
+Create a random variable for Gumbel.
+
 ``` python
 tfp.edward2.Gumbel(
     *args,
@@ -12,7 +14,11 @@ tfp.edward2.Gumbel(
 )
 ```
 
-Create a random variable for Gumbel.
+
+
+Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
+
+<!-- Placeholder for "Used in" -->
 
 See Gumbel for more details.
 

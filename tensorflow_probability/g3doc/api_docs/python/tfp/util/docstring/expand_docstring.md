@@ -5,11 +5,17 @@
 
 # tfp.util.docstring.expand_docstring
 
+Decorator to programmatically expand the docstring.
+
 ``` python
 tfp.util.docstring.expand_docstring(**kwargs)
 ```
 
-Decorator to programmatically expand the docstring.
+
+
+Defined in [`python/util/docstring.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/util/docstring.py).
+
+<!-- Placeholder for "Used in" -->
 
 #### Args:
 

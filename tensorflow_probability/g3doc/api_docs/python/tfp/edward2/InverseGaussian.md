@@ -5,6 +5,8 @@
 
 # tfp.edward2.InverseGaussian
 
+Create a random variable for InverseGaussian.
+
 ``` python
 tfp.edward2.InverseGaussian(
     *args,
@@ -12,7 +14,11 @@ tfp.edward2.InverseGaussian(
 )
 ```
 
-Create a random variable for InverseGaussian.
+
+
+Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
+
+<!-- Placeholder for "Used in" -->
 
 See InverseGaussian for more details.
 

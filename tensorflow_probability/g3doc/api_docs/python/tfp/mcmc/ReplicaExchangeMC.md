@@ -18,9 +18,15 @@
 
 ## Class `ReplicaExchangeMC`
 
+Runs one step of the Replica Exchange Monte Carlo.
+
 Inherits From: [`TransitionKernel`](../../tfp/mcmc/TransitionKernel.md)
 
-Runs one step of the Replica Exchange Monte Carlo.
+
+
+Defined in [`python/mcmc/replica_exchange_mc.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/replica_exchange_mc.py).
+
+<!-- Placeholder for "Used in" -->
 
 [Replica Exchange Monte Carlo](
 https://en.wikipedia.org/wiki/Parallel_tempering) is a Markov chain
@@ -144,8 +150,7 @@ __init__(
     make_kernel_fn,
     exchange_proposed_fn=default_exchange_proposed_fn(1.0),
     seed=None,
-    name=None,
-    **kwargs
+    name=None
 )
 ```
 
@@ -168,7 +173,6 @@ Instantiates this object.
     Default value: `None` (i.e., no seed).
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this function.
     Default value: `None` (i.e., "remc_kernel").
-* <b>`**kwargs`</b>: Arguments for `make_kernel_fn`.
 
 
 #### Raises:

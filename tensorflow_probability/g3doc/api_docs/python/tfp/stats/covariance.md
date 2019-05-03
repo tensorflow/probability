@@ -5,6 +5,8 @@
 
 # tfp.stats.covariance
 
+Sample covariance between observations indexed by `event_axis`.
+
 ``` python
 tfp.stats.covariance(
     x,
@@ -16,7 +18,11 @@ tfp.stats.covariance(
 )
 ```
 
-Sample covariance between observations indexed by `event_axis`.
+
+
+Defined in [`python/stats/sample_stats.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/stats/sample_stats.py).
+
+<!-- Placeholder for "Used in" -->
 
 Given `N` samples of scalar random variables `X` and `Y`, covariance may be
 estimated as

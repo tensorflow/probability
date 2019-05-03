@@ -5,6 +5,8 @@
 
 # tfp.edward2.Multinomial
 
+Create a random variable for Multinomial.
+
 ``` python
 tfp.edward2.Multinomial(
     *args,
@@ -12,7 +14,11 @@ tfp.edward2.Multinomial(
 )
 ```
 
-Create a random variable for Multinomial.
+
+
+Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
+
+<!-- Placeholder for "Used in" -->
 
 See Multinomial for more details.
 

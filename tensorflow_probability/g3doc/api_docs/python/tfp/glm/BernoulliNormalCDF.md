@@ -12,9 +12,15 @@
 
 ## Class `BernoulliNormalCDF`
 
+`Bernoulli(probs=mean)` where
+
 Inherits From: [`ExponentialFamily`](../../tfp/glm/ExponentialFamily.md)
 
-`Bernoulli(probs=mean)` where
+
+
+Defined in [`python/glm/family.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/glm/family.py).
+
+<!-- Placeholder for "Used in" -->
 `mean = Normal(0, 1).cdf(matmul(X, weights))`.
 
 <h2 id="__init__"><code>__init__</code></h2>

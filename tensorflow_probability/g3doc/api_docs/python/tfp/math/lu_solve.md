@@ -5,6 +5,8 @@
 
 # tfp.math.lu_solve
 
+Solves systems of linear eqns `A X = RHS`, given LU factorizations.
+
 ``` python
 tfp.math.lu_solve(
     lower_upper,
@@ -15,7 +17,11 @@ tfp.math.lu_solve(
 )
 ```
 
-Solves systems of linear eqns `A X = RHS`, given LU factorizations.
+
+
+Defined in [`python/math/linalg.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/math/linalg.py).
+
+<!-- Placeholder for "Used in" -->
 
 Note: this function does not verify the implied matrix is actually invertible
 nor is this condition checked even when `validate_args=True`.

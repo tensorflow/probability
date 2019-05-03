@@ -5,6 +5,8 @@
 
 # tfp.vi.csiszar_vimco_helper
 
+Helper to `csiszar_vimco`; computes `log_avg_u`, `log_sooavg_u`.
+
 ``` python
 tfp.vi.csiszar_vimco_helper(
     logu,
@@ -12,7 +14,11 @@ tfp.vi.csiszar_vimco_helper(
 )
 ```
 
-Helper to `csiszar_vimco`; computes `log_avg_u`, `log_sooavg_u`.
+
+
+Defined in [`python/vi/csiszar_divergence.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/vi/csiszar_divergence.py).
+
+<!-- Placeholder for "Used in" -->
 
 `axis = 0` of `logu` is presumed to correspond to iid samples from `q`, i.e.,
 

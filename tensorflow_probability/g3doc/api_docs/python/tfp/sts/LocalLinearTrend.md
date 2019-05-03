@@ -17,9 +17,15 @@
 
 ## Class `LocalLinearTrend`
 
+Formal representation of a local linear trend model.
+
 Inherits From: [`StructuralTimeSeries`](../../tfp/sts/StructuralTimeSeries.md)
 
-Formal representation of a local linear trend model.
+
+
+Defined in [`python/sts/local_linear_trend.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/sts/local_linear_trend.py).
+
+<!-- Placeholder for "Used in" -->
 
 The local linear trend model posits a `level` and `slope`, each
 evolving via a Gaussian random walk:
@@ -77,7 +83,9 @@ Specify a local linear trend model.
     `batch_shape + [T, 1]` (omitting the trailing unit dimension is also
     supported when `T > 1`), specifying an observed time series.
     Any priors not explicitly set will be given default values according to
-    the scale of the observed time series (or batch of time series).
+    the scale of the observed time series (or batch of time series). May
+    optionally be an instance of <a href="../../tfp/sts/MaskedTimeSeries.md"><code>tfp.sts.MaskedTimeSeries</code></a>, which includes
+    a mask `Tensor` to specify timesteps with missing observations.
     Default value: `None`.
 * <b>`name`</b>: the name of this model component.
     Default value: 'LocalLinearTrend'.
@@ -148,7 +156,9 @@ Build the joint density `log p(params) + log p(y|params)` as a callable.
     `1` dimension is optional if `num_timesteps > 1`), where
     `batch_shape` should match `self.batch_shape` (the broadcast batch
     shape of all priors on parameters for this structural time series
-    model).
+    model). May optionally be an instance of <a href="../../tfp/sts/MaskedTimeSeries.md"><code>tfp.sts.MaskedTimeSeries</code></a>,
+    which includes a mask `Tensor` to specify timesteps with missing
+    observations.
 
 
 #### Returns:

@@ -5,6 +5,8 @@
 
 # tfp.math.diag_jacobian
 
+Computes diagonal of the Jacobian matrix of `ys=fn(xs)` wrt `xs`.
+
 ``` python
 tfp.math.diag_jacobian(
     xs,
@@ -16,7 +18,11 @@ tfp.math.diag_jacobian(
 )
 ```
 
-Computes diagonal of the Jacobian matrix of `ys=fn(xs)` wrt `xs`.
+
+
+Defined in [`python/math/diag_jacobian.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/math/diag_jacobian.py).
+
+<!-- Placeholder for "Used in" -->
 
   If `ys` is a tensor or a list of tensors of the form `(ys_1, .., ys_n)` and
   `xs` is of the form `(xs_1, .., xs_n)`, the function `jacobians_diag`
@@ -54,12 +60,7 @@ with tf.Session(graph=tf.Graph()) as sess:
   sample_shape = [3, 5]
   state = [tf.ones(sample_shape + [2], dtype=dtype),
            tf.ones(sample_shape + [1], dtype=dtype)]
-  fn_val = target_fn(*state)
-  grad_fn = tfe.gradients_function(target_fn)
-  if tfe.executing_eagerly():
-    grads = grad_fn(*state)
-  else:
-    grads = tf.gradients(fn_val, state)
+  fn_val, grads = tfp.math.value_and_gradient(target_fn, state)
 
   # We can either pass the `sample_shape` of the `state` or not, which impacts
   # computational speed of `diag_jacobian`

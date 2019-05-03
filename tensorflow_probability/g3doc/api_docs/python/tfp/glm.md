@@ -7,6 +7,13 @@
 
 TensorFlow Probability GLM python package.
 
+
+
+Defined in [`python/glm/__init__.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/glm/__init__.py).
+
+<!-- Placeholder for "Used in" -->
+
+
 ## Classes
 
 [`class Bernoulli`](../tfp/glm/Bernoulli.md): `Bernoulli(probs=mean)` where `mean = sigmoid(matmul(X, weights))`.
@@ -44,6 +51,4 @@ TensorFlow Probability GLM python package.
 [`fit_sparse(...)`](../tfp/glm/fit_sparse.md): Fits a GLM using coordinate-wise FIM-informed proximal gradient descent.
 
 [`fit_sparse_one_step(...)`](../tfp/glm/fit_sparse_one_step.md): One step of (the outer loop of) the GLM fitting algorithm.
-
-[`soft_threshold(...)`](../tfp/glm/soft_threshold.md): Soft Thresholding operator.
 

@@ -5,6 +5,8 @@
 
 # tfp.edward2.MultivariateNormalFullCovariance
 
+Create a random variable for MultivariateNormalFullCovariance.
+
 ``` python
 tfp.edward2.MultivariateNormalFullCovariance(
     *args,
@@ -12,7 +14,11 @@ tfp.edward2.MultivariateNormalFullCovariance(
 )
 ```
 
-Create a random variable for MultivariateNormalFullCovariance.
+
+
+Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
+
+<!-- Placeholder for "Used in" -->
 
 See MultivariateNormalFullCovariance for more details.
 

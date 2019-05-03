@@ -7,6 +7,13 @@
 
 Bijector Ops.
 
+
+
+Defined in [`python/bijectors/__init__.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/bijectors/__init__.py).
+
+<!-- Placeholder for "Used in" -->
+
+
 ## Classes
 
 [`class AbsoluteValue`](../tfp/bijectors/AbsoluteValue.md): Computes `Y = g(X) = Abs(X)`, element-wise.
@@ -17,9 +24,13 @@ Bijector Ops.
 
 [`class AffineScalar`](../tfp/bijectors/AffineScalar.md): Compute `Y = g(X; shift, scale) = scale * X + shift`.
 
+[`class AutoregressiveLayer`](../tfp/bijectors/AutoregressiveLayer.md): Masked Autoencoder for Distribution Estimation [Germain et al. (2015)][1].
+
 [`class BatchNormalization`](../tfp/bijectors/BatchNormalization.md): Compute `Y = g(X) s.t. X = g^-1(Y) = (Y - mean(Y)) / std(Y)`.
 
 [`class Bijector`](../tfp/bijectors/Bijector.md): Interface for transformations of a `Distribution` sample.
+
+[`class Blockwise`](../tfp/bijectors/Blockwise.md): Bijector which applies a list of bijectors to blocks of a `Tensor`.
 
 [`class Chain`](../tfp/bijectors/Chain.md): Bijector which applies a sequence of bijectors.
 
@@ -28,6 +39,8 @@ Bijector Ops.
 [`class CholeskyToInvCholesky`](../tfp/bijectors/CholeskyToInvCholesky.md): Maps the Cholesky factor of `M` to the Cholesky factor of `M^{-1}`.
 
 [`class ConditionalBijector`](../tfp/bijectors/ConditionalBijector.md): Conditional Bijector is a Bijector that allows intrinsic conditioning.
+
+[`class Cumsum`](../tfp/bijectors/Cumsum.md): Computes the cumulative sum of a tensor along a specified axis.
 
 [`class DiscreteCosineTransform`](../tfp/bijectors/DiscreteCosineTransform.md): Compute `Y = g(X) = DCT(X)`, where DCT type is indicated by the `type` arg.
 
@@ -44,6 +57,8 @@ Bijector Ops.
 [`class Inline`](../tfp/bijectors/Inline.md): Bijector constructed from custom callables.
 
 [`class Invert`](../tfp/bijectors/Invert.md): Bijector which inverts another Bijector.
+
+[`class IteratedSigmoidCentered`](../tfp/bijectors/IteratedSigmoidCentered.md): Bijector which applies a Stick Breaking procedure.
 
 [`class Kumaraswamy`](../tfp/bijectors/Kumaraswamy.md): Compute `Y = g(X) = (1 - (1 - X)**(1 / b))**(1 / a), X in [0, 1]`.
 

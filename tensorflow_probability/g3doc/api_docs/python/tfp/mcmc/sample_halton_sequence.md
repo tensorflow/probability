@@ -5,6 +5,8 @@
 
 # tfp.mcmc.sample_halton_sequence
 
+Returns a sample from the `dim` dimensional Halton sequence.
+
 ``` python
 tfp.mcmc.sample_halton_sequence(
     dim,
@@ -17,7 +19,11 @@ tfp.mcmc.sample_halton_sequence(
 )
 ```
 
-Returns a sample from the `dim` dimensional Halton sequence.
+
+
+Defined in [`python/mcmc/sample_halton_sequence.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/sample_halton_sequence.py).
+
+<!-- Placeholder for "Used in" -->
 
 Warning: The sequence elements take values only between 0 and 1. Care must be
 taken to appropriately transform the domain of a function if it differs from

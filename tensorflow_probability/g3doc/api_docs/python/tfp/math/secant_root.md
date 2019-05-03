@@ -5,6 +5,8 @@
 
 # tfp.math.secant_root
 
+Finds root(s) of a function of single variable using the secant method.
+
 ``` python
 tfp.math.secant_root(
     objective_fn,
@@ -20,7 +22,11 @@ tfp.math.secant_root(
 )
 ```
 
-Finds root(s) of a function of single variable using the secant method.
+
+
+Defined in [`python/math/root_search.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/math/root_search.py).
+
+<!-- Placeholder for "Used in" -->
 
 The [secant method](https://en.wikipedia.org/wiki/Secant_method) is a
 root-finding algorithm that uses a succession of roots of secant lines to

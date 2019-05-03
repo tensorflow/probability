@@ -5,6 +5,8 @@
 
 # tfp.edward2.Triangular
 
+Create a random variable for Triangular.
+
 ``` python
 tfp.edward2.Triangular(
     *args,
@@ -12,7 +14,11 @@ tfp.edward2.Triangular(
 )
 ```
 
-Create a random variable for Triangular.
+
+
+Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
+
+<!-- Placeholder for "Used in" -->
 
 See Triangular for more details.
 

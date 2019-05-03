@@ -5,6 +5,8 @@
 
 # tfp.distributions.quadrature_scheme_lognormal_quantiles
 
+Use LogNormal quantiles to form quadrature on positive-reals.
+
 ``` python
 tfp.distributions.quadrature_scheme_lognormal_quantiles(
     loc,
@@ -15,7 +17,11 @@ tfp.distributions.quadrature_scheme_lognormal_quantiles(
 )
 ```
 
-Use LogNormal quantiles to form quadrature on positive-reals.
+
+
+Defined in [`python/distributions/poisson_lognormal.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/poisson_lognormal.py).
+
+<!-- Placeholder for "Used in" -->
 
 #### Args:
 

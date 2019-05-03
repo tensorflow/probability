@@ -5,6 +5,8 @@
 
 # tfp.edward2.HiddenMarkovModel
 
+Create a random variable for HiddenMarkovModel.
+
 ``` python
 tfp.edward2.HiddenMarkovModel(
     *args,
@@ -12,7 +14,11 @@ tfp.edward2.HiddenMarkovModel(
 )
 ```
 
-Create a random variable for HiddenMarkovModel.
+
+
+Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
+
+<!-- Placeholder for "Used in" -->
 
 See HiddenMarkovModel for more details.
 

@@ -14,7 +14,9 @@
 <meta itemprop="property" content="reparameterization_type"/>
 <meta itemprop="property" content="transition_distribution"/>
 <meta itemprop="property" content="validate_args"/>
+<meta itemprop="property" content="__getitem__"/>
 <meta itemprop="property" content="__init__"/>
+<meta itemprop="property" content="__iter__"/>
 <meta itemprop="property" content="batch_shape_tensor"/>
 <meta itemprop="property" content="cdf"/>
 <meta itemprop="property" content="copy"/>
@@ -33,6 +35,7 @@
 <meta itemprop="property" content="param_shapes"/>
 <meta itemprop="property" content="param_static_shapes"/>
 <meta itemprop="property" content="posterior_marginals"/>
+<meta itemprop="property" content="posterior_mode"/>
 <meta itemprop="property" content="prob"/>
 <meta itemprop="property" content="quantile"/>
 <meta itemprop="property" content="sample"/>
@@ -45,9 +48,15 @@
 
 ## Class `HiddenMarkovModel`
 
+Hidden Markov model distribution.
+
 Inherits From: [`Distribution`](../../tfp/distributions/Distribution.md)
 
-Hidden Markov model distribution.
+
+
+Defined in [`python/distributions/hidden_markov_model.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/hidden_markov_model.py).
+
+<!-- Placeholder for "Used in" -->
 
 The `HiddenMarkovModel` distribution implements a (batch of) hidden
 Markov models where the initial states, transition probabilities
@@ -269,6 +278,49 @@ Python `bool` indicating possibly expensive checks are enabled.
 
 ## Methods
 
+<h3 id="__getitem__"><code>__getitem__</code></h3>
+
+``` python
+__getitem__(slices)
+```
+
+Slices the batch axes of this distribution, returning a new instance.
+
+```python
+b = tfd.Bernoulli(logits=tf.zeros([3, 5, 7, 9]))
+b.batch_shape  # => [3, 5, 7, 9]
+b2 = b[:, tf.newaxis, ..., -2:, 1::2]
+b2.batch_shape  # => [3, 1, 5, 2, 4]
+
+x = tf.random.normal([5, 3, 2, 2])
+cov = tf.matmul(x, x, transpose_b=True)
+chol = tf.cholesky(cov)
+loc = tf.random.normal([4, 1, 3, 1])
+mvn = tfd.MultivariateNormalTriL(loc, chol)
+mvn.batch_shape  # => [4, 5, 3]
+mvn.event_shape  # => [2]
+mvn2 = mvn[:, 3:, ..., ::-1, tf.newaxis]
+mvn2.batch_shape  # => [4, 2, 3, 1]
+mvn2.event_shape  # => [2]
+```
+
+#### Args:
+
+* <b>`slices`</b>: slices from the [] operator
+
+
+#### Returns:
+
+* <b>`dist`</b>: A new `tfd.Distribution` instance with sliced parameters.
+
+<h3 id="__iter__"><code>__iter__</code></h3>
+
+``` python
+__iter__()
+```
+
+
+
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
 
 ``` python
@@ -294,7 +346,8 @@ parameterizations of this distribution.
 ``` python
 cdf(
     value,
-    name='cdf'
+    name='cdf',
+    **kwargs
 )
 ```
 
@@ -310,6 +363,7 @@ cdf(x) := P[X <= x]
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -343,7 +397,10 @@ initialization arguments.
 <h3 id="covariance"><code>covariance</code></h3>
 
 ``` python
-covariance(name='covariance')
+covariance(
+    name='covariance',
+    **kwargs
+)
 ```
 
 Covariance.
@@ -376,6 +433,7 @@ length-`k'` vector.
 #### Args:
 
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -420,7 +478,10 @@ where `F` denotes the support of the random variable `X ~ P`.
 <h3 id="entropy"><code>entropy</code></h3>
 
 ``` python
-entropy(name='entropy')
+entropy(
+    name='entropy',
+    **kwargs
+)
 ```
 
 Shannon entropy in nats.
@@ -517,7 +578,8 @@ denotes (Shannon) cross entropy, and `H[.]` denotes (Shannon) entropy.
 ``` python
 log_cdf(
     value,
-    name='log_cdf'
+    name='log_cdf',
+    **kwargs
 )
 ```
 
@@ -537,6 +599,7 @@ a more accurate answer than simply taking the logarithm of the `cdf` when
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -549,7 +612,8 @@ a more accurate answer than simply taking the logarithm of the `cdf` when
 ``` python
 log_prob(
     value,
-    name='log_prob'
+    name='log_prob',
+    **kwargs
 )
 ```
 
@@ -559,6 +623,7 @@ Log probability density/mass function.
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -571,7 +636,8 @@ Log probability density/mass function.
 ``` python
 log_survival_function(
     value,
-    name='log_survival_function'
+    name='log_survival_function',
+    **kwargs
 )
 ```
 
@@ -592,6 +658,7 @@ survival function, which are more accurate than `1 - cdf(x)` when `x >> 1`.
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -602,7 +669,10 @@ survival function, which are more accurate than `1 - cdf(x)` when `x >> 1`.
 <h3 id="mean"><code>mean</code></h3>
 
 ``` python
-mean(name='mean')
+mean(
+    name='mean',
+    **kwargs
+)
 ```
 
 Mean.
@@ -610,7 +680,10 @@ Mean.
 <h3 id="mode"><code>mode</code></h3>
 
 ``` python
-mode(name='mode')
+mode(
+    name='mode',
+    **kwargs
+)
 ```
 
 Mode.
@@ -681,7 +754,10 @@ constant-valued tensors when constant values are fed.
 <h3 id="posterior_marginals"><code>posterior_marginals</code></h3>
 
 ``` python
-posterior_marginals(observations)
+posterior_marginals(
+    observations,
+    name=None
+)
 ```
 
 Compute marginal posterior distribution for each state.
@@ -691,9 +767,9 @@ conditional probability that the hidden Markov model was in
 each possible state given the observations that were made
 at each time step.
 So if the hidden states are `z[0],...,z[num_steps - 1]` and
-the observations are `x[0],...,x[num_steps - 1]`, then
-this function computes `P(z[i] | x[0],...,x[num_steps - 1])`
-for all `i` from `0` to `num_steps-1`.
+the observations are `x[0], ..., x[num_steps - 1]`, then
+this function computes `P(z[i] | x[0], ..., x[num_steps - 1])`
+for all `i` from `0` to `num_steps - 1`.
 
 This operation is sometimes called smoothing. It uses a form
 of the forward-backward algorithm.
@@ -705,24 +781,24 @@ from the model.
 #### Args:
 
 * <b>`observations`</b>: A tensor representing a batch of observations
-  made on the hidden Markov model.  The rightmost dimension
-  of this tensor gives the steps in a sequence of observations
-  from a single sample from the hidden Markov model. The size
-  of this dimension should match the `num_steps` parameter
-  of the hidden Markov model object. The other dimensions are
-  the dimensions of the batch and these are broadcast with
-  the hidden Markov model's parameters.
+    made on the hidden Markov model.  The rightmost dimension of this tensor
+    gives the steps in a sequence of observations from a single sample from
+    the hidden Markov model. The size of this dimension should match the
+    `num_steps` parameter of the hidden Markov model object. The other
+    dimensions are the dimensions of the batch and these are broadcast with
+    the hidden Markov model's parameters.
+* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
+    Default value: "HiddenMarkovModel".
 
 
 #### Returns:
 
-A `Categorical` distribution object representing the marginal
-probability of the hidden Markov model being in each state at
-each step. The rightmost dimension of the `Categorical`
-distributions batch will equal the `num_steps` parameter
-providing one marginal distribution for each step. The
-other dimensions are the dimensions corresponding to the
-batch of observations.
+* <b>`posterior_marginal`</b>: A `Categorical` distribution object representing the
+    marginal probability of the hidden Markov model being in each state at
+    each step. The rightmost dimension of the `Categorical` distributions
+    batch will equal the `num_steps` parameter providing one marginal
+    distribution for each step. The other dimensions are the dimensions
+    corresponding to the batch of observations.
 
 
 #### Raises:
@@ -730,12 +806,111 @@ batch of observations.
 * <b>`ValueError`</b>: if rightmost dimension of `observations` does not
   have size `num_steps`.
 
+<h3 id="posterior_mode"><code>posterior_mode</code></h3>
+
+``` python
+posterior_mode(
+    observations,
+    name=None
+)
+```
+
+Compute maximum likelihood sequence of hidden states.
+
+When this function is provided with a sequence of observations
+`x[0], ..., x[num_steps - 1]`, it returns the sequence of hidden
+states `z[0], ..., z[num_steps - 1]`, drawn from the underlying
+Markov chain, that is most likely to yield those observations.
+
+It uses the [Viterbi algorithm](
+https://en.wikipedia.org/wiki/Viterbi_algorithm).
+
+Note: the behavior of this function is undefined if the
+`observations` argument represents impossible observations
+from the model.
+
+Note: if there isn't a unique most likely sequence then one
+of the equally most likely sequences is chosen.
+
+#### Args:
+
+* <b>`observations`</b>: A tensor representing a batch of observations made on the
+    hidden Markov model.  The rightmost dimensions of this tensor correspond
+    to the dimensions of the observation distributions of the underlying
+    Markov chain.  The next dimension from the right indexes the steps in a
+    sequence of observations from a single sample from the hidden Markov
+    model.  The size of this dimension should match the `num_steps`
+    parameter of the hidden Markov model object.  The other dimensions are
+    the dimensions of the batch and these are broadcast with the hidden
+    Markov model's parameters.
+* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
+    Default value: "HiddenMarkovModel".
+
+
+#### Returns:
+
+* <b>`posterior_mode`</b>: A `Tensor` representing the most likely sequence of hidden
+    states. The rightmost dimension of this tensor will equal the
+    `num_steps` parameter providing one hidden state for each step. The
+    other dimensions are those of the batch.
+
+
+#### Raises:
+
+* <b>`ValueError`</b>: if the `observations` tensor does not consist of
+  sequences of `num_steps` observations.
+
+#### Examples
+
+```python
+tfd = tfp.distributions
+
+# A simple weather model.
+
+# Represent a cold day with 0 and a hot day with 1.
+# Suppose the first day of a sequence has a 0.8 chance of being cold.
+
+initial_distribution = tfd.Categorical(probs=[0.8, 0.2])
+
+# Suppose a cold day has a 30% chance of being followed by a hot day
+# and a hot day has a 20% chance of being followed by a cold day.
+
+transition_distribution = tfd.Categorical(probs=[[0.7, 0.3],
+                                                 [0.2, 0.8]])
+
+# Suppose additionally that on each day the temperature is
+# normally distributed with mean and standard deviation 0 and 5 on
+# a cold day and mean and standard deviation 15 and 10 on a hot day.
+
+observation_distribution = tfd.Normal(loc=[0., 15.], scale=[5., 10.])
+
+# This gives the hidden Markov model:
+
+model = tfd.HiddenMarkovModel(
+    initial_distribution=initial_distribution,
+    transition_distribution=transition_distribution,
+    observation_distribution=observation_distribution,
+    num_steps=7)
+
+# Suppose we observe gradually rising temperatures over a week:
+temps = [-2., 0., 2., 4., 6., 8., 10.]
+
+# We can now compute the most probable sequence of hidden states:
+
+model.posterior_mode(temps)
+
+# The result is [0 0 0 0 0 1 1] telling us that the transition
+# from "cold" to "hot" most likely happened between the
+# 5th and 6th days.
+```
+
 <h3 id="prob"><code>prob</code></h3>
 
 ``` python
 prob(
     value,
-    name='prob'
+    name='prob',
+    **kwargs
 )
 ```
 
@@ -745,6 +920,7 @@ Probability density/mass function.
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -757,7 +933,8 @@ Probability density/mass function.
 ``` python
 quantile(
     value,
-    name='quantile'
+    name='quantile',
+    **kwargs
 )
 ```
 
@@ -773,6 +950,7 @@ quantile(p) := x such that P[X <= x] == p
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -786,7 +964,8 @@ quantile(p) := x such that P[X <= x] == p
 sample(
     sample_shape=(),
     seed=None,
-    name='sample'
+    name='sample',
+    **kwargs
 )
 ```
 
@@ -800,6 +979,7 @@ sample.
 * <b>`sample_shape`</b>: 0D or 1D `int32` `Tensor`. Shape of the generated samples.
 * <b>`seed`</b>: Python integer seed for RNG
 * <b>`name`</b>: name to give to the op.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -809,7 +989,10 @@ sample.
 <h3 id="stddev"><code>stddev</code></h3>
 
 ``` python
-stddev(name='stddev')
+stddev(
+    name='stddev',
+    **kwargs
+)
 ```
 
 Standard deviation.
@@ -826,6 +1009,7 @@ denotes expectation, and `stddev.shape = batch_shape + event_shape`.
 #### Args:
 
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -838,7 +1022,8 @@ denotes expectation, and `stddev.shape = batch_shape + event_shape`.
 ``` python
 survival_function(
     value,
-    name='survival_function'
+    name='survival_function',
+    **kwargs
 )
 ```
 
@@ -856,6 +1041,7 @@ survival_function(x) = P[X > x]
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -866,7 +1052,10 @@ survival_function(x) = P[X > x]
 <h3 id="variance"><code>variance</code></h3>
 
 ``` python
-variance(name='variance')
+variance(
+    name='variance',
+    **kwargs
+)
 ```
 
 Variance.
@@ -883,6 +1072,7 @@ denotes expectation, and `Var.shape = batch_shape + event_shape`.
 #### Args:
 
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:

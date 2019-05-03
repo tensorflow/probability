@@ -5,6 +5,8 @@
 
 # tfp.edward2.Deterministic
 
+Create a random variable for Deterministic.
+
 ``` python
 tfp.edward2.Deterministic(
     *args,
@@ -12,7 +14,11 @@ tfp.edward2.Deterministic(
 )
 ```
 
-Create a random variable for Deterministic.
+
+
+Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
+
+<!-- Placeholder for "Used in" -->
 
 See Deterministic for more details.
 

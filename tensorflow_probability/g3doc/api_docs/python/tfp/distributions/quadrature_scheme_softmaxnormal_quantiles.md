@@ -5,6 +5,8 @@
 
 # tfp.distributions.quadrature_scheme_softmaxnormal_quantiles
 
+Use SoftmaxNormal quantiles to form quadrature on `K - 1` simplex.
+
 ``` python
 tfp.distributions.quadrature_scheme_softmaxnormal_quantiles(
     normal_loc,
@@ -15,7 +17,11 @@ tfp.distributions.quadrature_scheme_softmaxnormal_quantiles(
 )
 ```
 
-Use SoftmaxNormal quantiles to form quadrature on `K - 1` simplex.
+
+
+Defined in [`python/distributions/vector_diffeomixture.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/vector_diffeomixture.py).
+
+<!-- Placeholder for "Used in" -->
 
 A `SoftmaxNormal` random variable `Y` may be generated via
 

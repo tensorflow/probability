@@ -5,6 +5,8 @@
 
 # tfp.optimizer.differential_evolution_minimize
 
+Applies the Differential evolution algorithm to minimize a function.
+
 ``` python
 tfp.optimizer.differential_evolution_minimize(
     objective_function,
@@ -22,7 +24,11 @@ tfp.optimizer.differential_evolution_minimize(
 )
 ```
 
-Applies the Differential evolution algorithm to minimize a function.
+
+
+Defined in [`python/optimizer/differential_evolution.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/optimizer/differential_evolution.py).
+
+<!-- Placeholder for "Used in" -->
 
 Differential Evolution is an evolutionary optimization algorithm which works
 on a set of candidate solutions called the population. It iteratively

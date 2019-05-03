@@ -26,9 +26,15 @@
 
 ## Class `AffineScalar`
 
+Compute `Y = g(X; shift, scale) = scale * X + shift`.
+
 Inherits From: [`Bijector`](../../tfp/bijectors/Bijector.md)
 
-Compute `Y = g(X; shift, scale) = scale * X + shift`.
+
+
+Defined in [`python/bijectors/affine_scalar.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/bijectors/affine_scalar.py).
+
+<!-- Placeholder for "Used in" -->
 
 Examples:
 
@@ -191,7 +197,8 @@ tfb.Exp()([-1., 0., 1.])
 ``` python
 forward(
     x,
-    name='forward'
+    name='forward',
+    **kwargs
 )
 ```
 
@@ -201,6 +208,7 @@ Returns the forward `Bijector` evaluation, i.e., X = g(Y).
 
 * <b>`x`</b>: `Tensor`. The input to the "forward" evaluation.
 * <b>`name`</b>: The name to give this op.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -264,7 +272,8 @@ Shape of a single sample from a single batch as an `int32` 1D `Tensor`.
 forward_log_det_jacobian(
     x,
     event_ndims,
-    name='forward_log_det_jacobian'
+    name='forward_log_det_jacobian',
+    **kwargs
 )
 ```
 
@@ -277,8 +286,9 @@ Returns both the forward_log_det_jacobian.
     transformed. Must be greater than or equal to
     `self.forward_min_event_ndims`. The result is summed over the final
     dimensions to produce a scalar Jacobian determinant for each event, i.e.
-    it has shape `x.shape.ndims - event_ndims` dimensions.
+    it has shape `rank(x) - event_ndims` dimensions.
 * <b>`name`</b>: The name to give this op.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -300,7 +310,8 @@ Returns both the forward_log_det_jacobian.
 ``` python
 inverse(
     y,
-    name='inverse'
+    name='inverse',
+    **kwargs
 )
 ```
 
@@ -310,6 +321,7 @@ Returns the inverse `Bijector` evaluation, i.e., X = g^{-1}(Y).
 
 * <b>`y`</b>: `Tensor`. The input to the "inverse" evaluation.
 * <b>`name`</b>: The name to give this op.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -375,7 +387,8 @@ Shape of a single sample from a single batch as an `int32` 1D `Tensor`.
 inverse_log_det_jacobian(
     y,
     event_ndims,
-    name='inverse_log_det_jacobian'
+    name='inverse_log_det_jacobian',
+    **kwargs
 )
 ```
 
@@ -393,8 +406,9 @@ evaluated at `g^{-1}(y)`.
     transformed. Must be greater than or equal to
     `self.inverse_min_event_ndims`. The result is summed over the final
     dimensions to produce a scalar Jacobian determinant for each event, i.e.
-    it has shape `y.shape.ndims - event_ndims` dimensions.
+    it has shape `rank(y) - event_ndims` dimensions.
 * <b>`name`</b>: The name to give this op.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:

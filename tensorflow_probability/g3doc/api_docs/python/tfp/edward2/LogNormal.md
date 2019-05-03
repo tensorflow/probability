@@ -5,6 +5,8 @@
 
 # tfp.edward2.LogNormal
 
+Create a random variable for LogNormal.
+
 ``` python
 tfp.edward2.LogNormal(
     *args,
@@ -12,7 +14,11 @@ tfp.edward2.LogNormal(
 )
 ```
 
-Create a random variable for LogNormal.
+
+
+Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
+
+<!-- Placeholder for "Used in" -->
 
 See LogNormal for more details.
 

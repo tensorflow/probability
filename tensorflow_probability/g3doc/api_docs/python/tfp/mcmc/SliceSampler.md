@@ -17,9 +17,15 @@
 
 ## Class `SliceSampler`
 
+Runs one step of the slice sampler using a hit and run approach.
+
 Inherits From: [`TransitionKernel`](../../tfp/mcmc/TransitionKernel.md)
 
-Runs one step of the slice sampler using a hit and run approach.
+
+
+Defined in [`python/mcmc/slice_sampler_kernel.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/slice_sampler_kernel.py).
+
+<!-- Placeholder for "Used in" -->
 
 Slice Sampling is a Markov Chain Monte Carlo (MCMC) algorithm based, as stated
 by [Neal (2003)][1], on the observation that "...one can sample from a

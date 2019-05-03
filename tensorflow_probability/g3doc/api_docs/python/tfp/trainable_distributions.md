@@ -7,6 +7,13 @@
 
 Support for trainable distributions.
 
+
+
+Defined in [`python/trainable_distributions/__init__.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/trainable_distributions/__init__.py).
+
+<!-- Placeholder for "Used in" -->
+
+
 ## Functions
 
 [`bernoulli(...)`](../tfp/trainable_distributions/bernoulli.md): Constructs a trainable `tfd.Bernoulli` distribution.

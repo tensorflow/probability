@@ -7,6 +7,13 @@
 
 Methods and objectives for variational inference.
 
+
+
+Defined in [`python/vi/__init__.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/vi/__init__.py).
+
+<!-- Placeholder for "Used in" -->
+
+
 ## Functions
 
 [`amari_alpha(...)`](../tfp/vi/amari_alpha.md): The Amari-alpha Csiszar-function in log-space.

@@ -5,6 +5,8 @@
 
 # tfp.edward2.Binomial
 
+Create a random variable for Binomial.
+
 ``` python
 tfp.edward2.Binomial(
     *args,
@@ -12,7 +14,11 @@ tfp.edward2.Binomial(
 )
 ```
 
-Create a random variable for Binomial.
+
+
+Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
+
+<!-- Placeholder for "Used in" -->
 
 See Binomial for more details.
 

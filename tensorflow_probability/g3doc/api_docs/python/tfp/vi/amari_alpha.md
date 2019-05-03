@@ -5,6 +5,8 @@
 
 # tfp.vi.amari_alpha
 
+The Amari-alpha Csiszar-function in log-space.
+
 ``` python
 tfp.vi.amari_alpha(
     logu,
@@ -14,7 +16,11 @@ tfp.vi.amari_alpha(
 )
 ```
 
-The Amari-alpha Csiszar-function in log-space.
+
+
+Defined in [`python/vi/csiszar_divergence.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/vi/csiszar_divergence.py).
+
+<!-- Placeholder for "Used in" -->
 
 A Csiszar-function is a member of,
 

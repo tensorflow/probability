@@ -5,17 +5,23 @@
 
 # tfp.trainable_distributions.normal
 
+Constructs a trainable `tfd.Normal` distribution.
+
 ``` python
 tfp.trainable_distributions.normal(
     x,
-    layer_fn=tf.layers.dense,
+    layer_fn=tf.compat.v1.layers.dense,
     loc_fn=(lambda x: x),
     scale_fn=1.0,
     name=None
 )
 ```
 
-Constructs a trainable `tfd.Normal` distribution.
+
+
+Defined in [`python/trainable_distributions/trainable_distributions_lib.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/trainable_distributions/trainable_distributions_lib.py).
+
+<!-- Placeholder for "Used in" -->
 
 
 This function creates a Normal distribution parameterized by loc and scale.

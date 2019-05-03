@@ -9,7 +9,9 @@
 <meta itemprop="property" content="parameters"/>
 <meta itemprop="property" content="reparameterization_type"/>
 <meta itemprop="property" content="validate_args"/>
+<meta itemprop="property" content="__getitem__"/>
 <meta itemprop="property" content="__init__"/>
+<meta itemprop="property" content="__iter__"/>
 <meta itemprop="property" content="backward_smoothing_pass"/>
 <meta itemprop="property" content="batch_shape_tensor"/>
 <meta itemprop="property" content="cdf"/>
@@ -22,6 +24,7 @@
 <meta itemprop="property" content="is_scalar_batch"/>
 <meta itemprop="property" content="is_scalar_event"/>
 <meta itemprop="property" content="kl_divergence"/>
+<meta itemprop="property" content="latents_to_observations"/>
 <meta itemprop="property" content="log_cdf"/>
 <meta itemprop="property" content="log_prob"/>
 <meta itemprop="property" content="log_survival_function"/>
@@ -42,9 +45,15 @@
 
 ## Class `LinearGaussianStateSpaceModel`
 
+Observation distribution from a linear Gaussian state space model.
+
 Inherits From: [`Distribution`](../../tfp/distributions/Distribution.md)
 
-Observation distribution from a linear Gaussian state space model.
+
+
+Defined in [`python/distributions/linear_gaussian_ssm.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/linear_gaussian_ssm.py).
+
+<!-- Placeholder for "Used in" -->
 
 The state space model, sometimes called a Kalman filter, posits a
 latent state vector `z_t` of dimension `latent_size` that evolves
@@ -291,6 +300,49 @@ Python `bool` indicating possibly expensive checks are enabled.
 
 ## Methods
 
+<h3 id="__getitem__"><code>__getitem__</code></h3>
+
+``` python
+__getitem__(slices)
+```
+
+Slices the batch axes of this distribution, returning a new instance.
+
+```python
+b = tfd.Bernoulli(logits=tf.zeros([3, 5, 7, 9]))
+b.batch_shape  # => [3, 5, 7, 9]
+b2 = b[:, tf.newaxis, ..., -2:, 1::2]
+b2.batch_shape  # => [3, 1, 5, 2, 4]
+
+x = tf.random.normal([5, 3, 2, 2])
+cov = tf.matmul(x, x, transpose_b=True)
+chol = tf.cholesky(cov)
+loc = tf.random.normal([4, 1, 3, 1])
+mvn = tfd.MultivariateNormalTriL(loc, chol)
+mvn.batch_shape  # => [4, 5, 3]
+mvn.event_shape  # => [2]
+mvn2 = mvn[:, 3:, ..., ::-1, tf.newaxis]
+mvn2.batch_shape  # => [4, 2, 3, 1]
+mvn2.event_shape  # => [2]
+```
+
+#### Args:
+
+* <b>`slices`</b>: slices from the [] operator
+
+
+#### Returns:
+
+* <b>`dist`</b>: A new `tfd.Distribution` instance with sliced parameters.
+
+<h3 id="__iter__"><code>__iter__</code></h3>
+
+``` python
+__iter__()
+```
+
+
+
 <h3 id="backward_smoothing_pass"><code>backward_smoothing_pass</code></h3>
 
 ``` python
@@ -363,7 +415,8 @@ parameterizations of this distribution.
 ``` python
 cdf(
     value,
-    name='cdf'
+    name='cdf',
+    **kwargs
 )
 ```
 
@@ -379,6 +432,7 @@ cdf(x) := P[X <= x]
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -412,7 +466,10 @@ initialization arguments.
 <h3 id="covariance"><code>covariance</code></h3>
 
 ``` python
-covariance(name='covariance')
+covariance(
+    name='covariance',
+    **kwargs
+)
 ```
 
 Covariance.
@@ -445,6 +502,7 @@ length-`k'` vector.
 #### Args:
 
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -489,7 +547,10 @@ where `F` denotes the support of the random variable `X ~ P`.
 <h3 id="entropy"><code>entropy</code></h3>
 
 ``` python
-entropy(name='entropy')
+entropy(
+    name='entropy',
+    **kwargs
+)
 ```
 
 Shannon entropy in nats.
@@ -514,7 +575,10 @@ Shape of a single sample from a single batch as a 1-D int32 `Tensor`.
 <h3 id="forward_filter"><code>forward_filter</code></h3>
 
 ``` python
-forward_filter(x)
+forward_filter(
+    x,
+    mask=None
+)
 ```
 
 Run a Kalman filter over a provided sequence of outputs.
@@ -535,6 +599,13 @@ depend only on the model itself. This means that the mean values have shape
     `self.event_shape`. Additional dimensions must match or be
     broadcastable to `self.batch_shape`; any further dimensions
     are interpreted as a sample shape.
+* <b>`mask`</b>: optional bool-type `Tensor` with rightmost dimension
+    `[num_timesteps]`; `True` values specify that the value of `x`
+    at that timestep is masked, i.e., not conditioned on. Additional
+    dimensions must match or be broadcastable to `self.batch_shape`; any
+    further dimensions must match or be broadcastable to the sample
+    shape of `x`.
+    Default value: `None`.
 
 
 #### Returns:
@@ -547,23 +618,30 @@ depend only on the model itself. This means that the mean values have shape
     `sample_shape(x) + batch_shape + [num_timesteps, latent_size]`.
 * <b>`filtered_covs`</b>: Covariances of the per-timestep filtered marginal
      distributions p(z_t | x_{:t}), as a Tensor of shape
-    `batch_shape + [num_timesteps, latent_size, latent_size]`.
+    `sample_shape(mask) + batch_shape + [num_timesteps, latent_size,
+    latent_size]`. Note that the covariances depend only on the model and
+    the mask, not on the data, so this may have fewer dimensions than
+    `filtered_means`.
 * <b>`predicted_means`</b>: Means of the per-timestep predictive
      distributions over latent states, p(z_{t+1} | x_{:t}), as a
      Tensor of shape `sample_shape(x) + batch_shape +
      [num_timesteps, latent_size]`.
 * <b>`predicted_covs`</b>: Covariances of the per-timestep predictive
      distributions over latent states, p(z_{t+1} | x_{:t}), as a
-     Tensor of shape `batch_shape + [num_timesteps, latent_size,
-     latent_size]`.
+     Tensor of shape `sample_shape(mask) + batch_shape +
+     [num_timesteps, latent_size, latent_size]`. Note that the covariances
+     depend only on the model and the mask, not on the data, so this may
+     have fewer dimensions than `predicted_means`.
 * <b>`observation_means`</b>: Means of the per-timestep predictive
      distributions over observations, p(x_{t} | x_{:t-1}), as a
      Tensor of shape `sample_shape(x) + batch_shape +
      [num_timesteps, observation_size]`.
 * <b>`observation_covs`</b>: Covariances of the per-timestep predictive
      distributions over observations, p(x_{t} | x_{:t-1}), as a
-     Tensor of shape `batch_shape + [num_timesteps,
-     observation_size, observation_size]`.
+     Tensor of shape `sample_shape(mask) + batch_shape + [num_timesteps,
+     observation_size, observation_size]`. Note that the covariances depend
+     only on the model and the mask, not on the data, so this may have fewer
+     dimensions than `observation_means`.
 
 <h3 id="is_scalar_batch"><code>is_scalar_batch</code></h3>
 
@@ -635,12 +713,38 @@ denotes (Shannon) cross entropy, and `H[.]` denotes (Shannon) entropy.
     representing `n` different calculations of the Kullback-Leibler
     divergence.
 
+<h3 id="latents_to_observations"><code>latents_to_observations</code></h3>
+
+``` python
+latents_to_observations(
+    latent_means,
+    latent_covs
+)
+```
+
+Push latent means and covariances forward through the observation model.
+
+#### Args:
+
+* <b>`latent_means`</b>: float `Tensor` of shape `[..., num_timesteps, latent_size]`
+* <b>`latent_covs`</b>: float `Tensor` of shape
+    `[..., num_timesteps, latent_size, latent_size]`.
+
+
+#### Returns:
+
+* <b>`observation_means`</b>: float `Tensor` of shape
+    `[..., num_timesteps, observation_size]`
+* <b>`observation_covs`</b>: float `Tensor` of shape
+    `[..., num_timesteps, observation_size, observation_size]`
+
 <h3 id="log_cdf"><code>log_cdf</code></h3>
 
 ``` python
 log_cdf(
     value,
-    name='log_cdf'
+    name='log_cdf',
+    **kwargs
 )
 ```
 
@@ -660,6 +764,7 @@ a more accurate answer than simply taking the logarithm of the `cdf` when
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -672,16 +777,25 @@ a more accurate answer than simply taking the logarithm of the `cdf` when
 ``` python
 log_prob(
     value,
-    name='log_prob'
+    name='log_prob',
+    **kwargs
 )
 ```
 
 Log probability density/mass function.
 
+
+Additional documentation from `LinearGaussianStateSpaceModel`:
+
+##### `kwargs`:
+
+*  `mask`: optional bool-type `Tensor` with rightmost dimension `[num_timesteps]`; `True` values specify that the value of `x` at that timestep is masked, i.e., not conditioned on. Additional dimensions must match or be broadcastable to `self.batch_shape`; any further dimensions must match or be broadcastable to the sample shape of `x`. Default value: `None`.
+
 #### Args:
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -694,7 +808,8 @@ Log probability density/mass function.
 ``` python
 log_survival_function(
     value,
-    name='log_survival_function'
+    name='log_survival_function',
+    **kwargs
 )
 ```
 
@@ -715,6 +830,7 @@ survival function, which are more accurate than `1 - cdf(x)` when `x >> 1`.
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -725,7 +841,10 @@ survival function, which are more accurate than `1 - cdf(x)` when `x >> 1`.
 <h3 id="mean"><code>mean</code></h3>
 
 ``` python
-mean(name='mean')
+mean(
+    name='mean',
+    **kwargs
+)
 ```
 
 Mean.
@@ -733,7 +852,10 @@ Mean.
 <h3 id="mode"><code>mode</code></h3>
 
 ``` python
-mode(name='mode')
+mode(
+    name='mode',
+    **kwargs
+)
 ```
 
 Mode.
@@ -804,7 +926,10 @@ constant-valued tensors when constant values are fed.
 <h3 id="posterior_marginals"><code>posterior_marginals</code></h3>
 
 ``` python
-posterior_marginals(x)
+posterior_marginals(
+    x,
+    mask=None
+)
 ```
 
 Run a Kalman smoother to return posterior mean and cov.
@@ -837,6 +962,13 @@ where `x` is an observation sequence.
     `self.event_shape`. Additional dimensions must match or be
     broadcastable to `self.batch_shape`; any further dimensions
     are interpreted as a sample shape.
+* <b>`mask`</b>: optional bool-type `Tensor` with rightmost dimension
+    `[num_timesteps]`; `True` values specify that the value of `x`
+    at that timestep is masked, i.e., not conditioned on. Additional
+    dimensions must match or be broadcastable to `self.batch_shape`; any
+    further dimensions must match or be broadcastable to the sample
+    shape of `x`.
+    Default value: `None`.
 
 
 #### Returns:
@@ -847,24 +979,35 @@ where `x` is an observation sequence.
      [num_timesteps, observation_size]`.
 * <b>`smoothed_covs`</b>: Covariances of the per-timestep smoothed
      distributions over latent states, p(x_{t} | x_{:T}), as a
-     Tensor of shape `batch_shape + [num_timesteps,
-     observation_size, observation_size]`.
+     Tensor of shape `sample_shape(mask) + batch_shape + [num_timesteps,
+     observation_size, observation_size]`. Note that the covariances depend
+     only on the model and the mask, not on the data, so this may have fewer
+     dimensions than `filtered_means`.
 
 <h3 id="prob"><code>prob</code></h3>
 
 ``` python
 prob(
     value,
-    name='prob'
+    name='prob',
+    **kwargs
 )
 ```
 
 Probability density/mass function.
 
+
+Additional documentation from `LinearGaussianStateSpaceModel`:
+
+##### `kwargs`:
+
+*  `mask`: optional bool-type `Tensor` with rightmost dimension `[num_timesteps]`; `True` values specify that the value of `x` at that timestep is masked, i.e., not conditioned on. Additional dimensions must match or be broadcastable to `self.batch_shape`; any further dimensions must match or be broadcastable to the sample shape of `x`. Default value: `None`.
+
 #### Args:
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -877,7 +1020,8 @@ Probability density/mass function.
 ``` python
 quantile(
     value,
-    name='quantile'
+    name='quantile',
+    **kwargs
 )
 ```
 
@@ -893,6 +1037,7 @@ quantile(p) := x such that P[X <= x] == p
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -906,7 +1051,8 @@ quantile(p) := x such that P[X <= x] == p
 sample(
     sample_shape=(),
     seed=None,
-    name='sample'
+    name='sample',
+    **kwargs
 )
 ```
 
@@ -920,6 +1066,7 @@ sample.
 * <b>`sample_shape`</b>: 0D or 1D `int32` `Tensor`. Shape of the generated samples.
 * <b>`seed`</b>: Python integer seed for RNG
 * <b>`name`</b>: name to give to the op.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -929,7 +1076,10 @@ sample.
 <h3 id="stddev"><code>stddev</code></h3>
 
 ``` python
-stddev(name='stddev')
+stddev(
+    name='stddev',
+    **kwargs
+)
 ```
 
 Standard deviation.
@@ -946,6 +1096,7 @@ denotes expectation, and `stddev.shape = batch_shape + event_shape`.
 #### Args:
 
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -958,7 +1109,8 @@ denotes expectation, and `stddev.shape = batch_shape + event_shape`.
 ``` python
 survival_function(
     value,
-    name='survival_function'
+    name='survival_function',
+    **kwargs
 )
 ```
 
@@ -976,6 +1128,7 @@ survival_function(x) = P[X > x]
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -986,7 +1139,10 @@ survival_function(x) = P[X > x]
 <h3 id="variance"><code>variance</code></h3>
 
 ``` python
-variance(name='variance')
+variance(
+    name='variance',
+    **kwargs
+)
 ```
 
 Variance.
@@ -1003,6 +1159,7 @@ denotes expectation, and `Var.shape = batch_shape + event_shape`.
 #### Args:
 
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:

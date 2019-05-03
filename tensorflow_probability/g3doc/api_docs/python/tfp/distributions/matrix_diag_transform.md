@@ -5,6 +5,8 @@
 
 # tfp.distributions.matrix_diag_transform
 
+Transform diagonal of [batch-]matrix, leave rest of matrix unchanged.
+
 ``` python
 tfp.distributions.matrix_diag_transform(
     matrix,
@@ -13,7 +15,11 @@ tfp.distributions.matrix_diag_transform(
 )
 ```
 
-Transform diagonal of [batch-]matrix, leave rest of matrix unchanged.
+
+
+Defined in [`python/internal/distribution_util.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/internal/distribution_util.py).
+
+<!-- Placeholder for "Used in" -->
 
 Create a trainable covariance defined by a Cholesky factor:
 

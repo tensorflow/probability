@@ -5,6 +5,8 @@
 
 # tfp.edward2.MultivariateNormalDiagPlusLowRank
 
+Create a random variable for MultivariateNormalDiagPlusLowRank.
+
 ``` python
 tfp.edward2.MultivariateNormalDiagPlusLowRank(
     *args,
@@ -12,7 +14,11 @@ tfp.edward2.MultivariateNormalDiagPlusLowRank(
 )
 ```
 
-Create a random variable for MultivariateNormalDiagPlusLowRank.
+
+
+Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
+
+<!-- Placeholder for "Used in" -->
 
 See MultivariateNormalDiagPlusLowRank for more details.
 

@@ -5,6 +5,8 @@
 
 # tfp.math.pinv
 
+Compute the Moore-Penrose pseudo-inverse of a matrix.
+
 ``` python
 tfp.math.pinv(
     a,
@@ -14,7 +16,11 @@ tfp.math.pinv(
 )
 ```
 
-Compute the Moore-Penrose pseudo-inverse of a matrix.
+
+
+Defined in [`python/math/linalg.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/math/linalg.py).
+
+<!-- Placeholder for "Used in" -->
 
 Calculate the [generalized inverse of a matrix](
 https://en.wikipedia.org/wiki/Moore%E2%80%93Penrose_inverse) using its

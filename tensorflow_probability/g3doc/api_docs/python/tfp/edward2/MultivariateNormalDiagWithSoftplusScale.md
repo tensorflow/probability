@@ -5,6 +5,8 @@
 
 # tfp.edward2.MultivariateNormalDiagWithSoftplusScale
 
+Create a random variable for MultivariateNormalDiagWithSoftplusScale.
+
 ``` python
 tfp.edward2.MultivariateNormalDiagWithSoftplusScale(
     *args,
@@ -12,7 +14,11 @@ tfp.edward2.MultivariateNormalDiagWithSoftplusScale(
 )
 ```
 
-Create a random variable for MultivariateNormalDiagWithSoftplusScale.
+
+
+Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
+
+<!-- Placeholder for "Used in" -->
 
 See MultivariateNormalDiagWithSoftplusScale for more details.
 
@@ -21,3 +27,9 @@ See MultivariateNormalDiagWithSoftplusScale for more details.
   RandomVariable.
 
 #### Original Docstring for Distribution
+
+DEPRECATED FUNCTION
+
+Warning: THIS FUNCTION IS DEPRECATED. It will be removed after 2019-06-05.
+Instructions for updating:
+MultivariateNormalDiagWithSoftplusScale is deprecated, use MultivariateNormalDiag(loc=loc, scale_diag=tf.nn.softplus(scale_diag)) instead.

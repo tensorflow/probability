@@ -5,6 +5,8 @@
 
 # tfp.edward2.GaussianProcess
 
+Create a random variable for GaussianProcess.
+
 ``` python
 tfp.edward2.GaussianProcess(
     *args,
@@ -12,7 +14,11 @@ tfp.edward2.GaussianProcess(
 )
 ```
 
-Create a random variable for GaussianProcess.
+
+
+Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
+
+<!-- Placeholder for "Used in" -->
 
 See GaussianProcess for more details.
 

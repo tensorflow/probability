@@ -25,9 +25,15 @@
 
 ## Class `Invert`
 
+Bijector which inverts another Bijector.
+
 Inherits From: [`Bijector`](../../tfp/bijectors/Bijector.md)
 
-Bijector which inverts another Bijector.
+
+
+Defined in [`python/bijectors/invert.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/bijectors/invert.py).
+
+<!-- Placeholder for "Used in" -->
 
 Example Use: [ExpGammaDistribution (see Background & Context)](
 https://reference.wolfram.com/language/ref/ExpGammaDistribution.html)

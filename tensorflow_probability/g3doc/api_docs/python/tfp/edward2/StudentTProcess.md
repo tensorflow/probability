@@ -5,6 +5,8 @@
 
 # tfp.edward2.StudentTProcess
 
+Create a random variable for StudentTProcess.
+
 ``` python
 tfp.edward2.StudentTProcess(
     *args,
@@ -12,7 +14,11 @@ tfp.edward2.StudentTProcess(
 )
 ```
 
-Create a random variable for StudentTProcess.
+
+
+Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
+
+<!-- Placeholder for "Used in" -->
 
 See StudentTProcess for more details.
 

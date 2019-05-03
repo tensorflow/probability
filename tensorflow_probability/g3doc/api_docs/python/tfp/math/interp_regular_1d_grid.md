@@ -5,6 +5,8 @@
 
 # tfp.math.interp_regular_1d_grid
 
+Linear `1-D` interpolation on a regular (constant spacing) grid.
+
 ``` python
 tfp.math.interp_regular_1d_grid(
     x,
@@ -20,7 +22,11 @@ tfp.math.interp_regular_1d_grid(
 )
 ```
 
-Linear `1-D` interpolation on a regular (constant spacing) grid.
+
+
+Defined in [`python/math/interpolation.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/math/interpolation.py).
+
+<!-- Placeholder for "Used in" -->
 
 Given reference values, this function computes a piecewise linear interpolant
 and evaluates it on a new set of `x` values.
@@ -56,7 +62,7 @@ These shape semantics are equivalent to `scipy.interpolate.interp1d`.
 * <b>`y_ref`</b>:  `N-D` `Tensor` (`N > 0`) of same `dtype` as `x`. The reference
     output values.
 * <b>`axis`</b>:  Scalar `Tensor` designating the dimension of `y_ref` that indexes
-    values of the interpolation variable.
+    values of the interpolation table.
     Default value: `-1`, the rightmost axis.
 * <b>`fill_value`</b>:  Determines what values output should take for `x` values that
     are below `x_ref_min` or above `x_ref_max`. `Tensor` or one of the strings

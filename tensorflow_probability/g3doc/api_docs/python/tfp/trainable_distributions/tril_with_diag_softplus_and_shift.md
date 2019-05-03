@@ -5,6 +5,8 @@
 
 # tfp.trainable_distributions.tril_with_diag_softplus_and_shift
 
+Converts (batch of) vectors to (batch of) lower-triangular scale matrices.
+
 ``` python
 tfp.trainable_distributions.tril_with_diag_softplus_and_shift(
     x,
@@ -13,7 +15,11 @@ tfp.trainable_distributions.tril_with_diag_softplus_and_shift(
 )
 ```
 
-Converts (batch of) vectors to (batch of) lower-triangular scale matrices.
+
+
+Defined in [`python/trainable_distributions/trainable_distributions_lib.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/trainable_distributions/trainable_distributions_lib.py).
+
+<!-- Placeholder for "Used in" -->
 
 #### Args:
 

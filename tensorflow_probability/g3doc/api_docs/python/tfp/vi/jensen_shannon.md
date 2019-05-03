@@ -5,6 +5,8 @@
 
 # tfp.vi.jensen_shannon
 
+The Jensen-Shannon Csiszar-function in log-space.
+
 ``` python
 tfp.vi.jensen_shannon(
     logu,
@@ -13,7 +15,11 @@ tfp.vi.jensen_shannon(
 )
 ```
 
-The Jensen-Shannon Csiszar-function in log-space.
+
+
+Defined in [`python/vi/csiszar_divergence.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/vi/csiszar_divergence.py).
+
+<!-- Placeholder for "Used in" -->
 
 A Csiszar-function is a member of,
 

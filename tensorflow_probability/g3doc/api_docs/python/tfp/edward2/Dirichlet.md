@@ -5,6 +5,8 @@
 
 # tfp.edward2.Dirichlet
 
+Create a random variable for Dirichlet.
+
 ``` python
 tfp.edward2.Dirichlet(
     *args,
@@ -12,7 +14,11 @@ tfp.edward2.Dirichlet(
 )
 ```
 
-Create a random variable for Dirichlet.
+
+
+Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
+
+<!-- Placeholder for "Used in" -->
 
 See Dirichlet for more details.
 

@@ -5,6 +5,8 @@
 
 # tfp.edward2.Wishart
 
+Create a random variable for Wishart.
+
 ``` python
 tfp.edward2.Wishart(
     *args,
@@ -12,7 +14,11 @@ tfp.edward2.Wishart(
 )
 ```
 
-Create a random variable for Wishart.
+
+
+Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
+
+<!-- Placeholder for "Used in" -->
 
 See Wishart for more details.
 

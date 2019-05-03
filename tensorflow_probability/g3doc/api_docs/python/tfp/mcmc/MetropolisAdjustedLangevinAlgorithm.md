@@ -18,9 +18,15 @@
 
 ## Class `MetropolisAdjustedLangevinAlgorithm`
 
+Runs one step of Metropolis-adjusted Langevin algorithm.
+
 Inherits From: [`TransitionKernel`](../../tfp/mcmc/TransitionKernel.md)
 
-Runs one step of Metropolis-adjusted Langevin algorithm.
+
+
+Defined in [`python/mcmc/langevin.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/langevin.py).
+
+<!-- Placeholder for "Used in" -->
 
 Metropolis-adjusted Langevin algorithm (MALA) is a Markov chain Monte Carlo
 (MCMC) algorithm that takes a step of a discretised Langevin diffusion as a

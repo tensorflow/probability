@@ -5,6 +5,8 @@
 
 # tfp.glm.fit_sparse
 
+Fits a GLM using coordinate-wise FIM-informed proximal gradient descent.
+
 ``` python
 tfp.glm.fit_sparse(
     model_matrix,
@@ -21,7 +23,11 @@ tfp.glm.fit_sparse(
 )
 ```
 
-Fits a GLM using coordinate-wise FIM-informed proximal gradient descent.
+
+
+Defined in [`python/glm/proximal_hessian.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/glm/proximal_hessian.py).
+
+<!-- Placeholder for "Used in" -->
 
 This function uses a L1- and L2-regularized, second-order quasi-Newton method
 to find maximum-likelihood parameters for the given model and observed data.

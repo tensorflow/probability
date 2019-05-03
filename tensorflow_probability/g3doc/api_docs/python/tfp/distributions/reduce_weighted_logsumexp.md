@@ -5,6 +5,8 @@
 
 # tfp.distributions.reduce_weighted_logsumexp
 
+Computes `log(abs(sum(weight * exp(elements across tensor dimensions))))`.
+
 ``` python
 tfp.distributions.reduce_weighted_logsumexp(
     logx,
@@ -16,7 +18,11 @@ tfp.distributions.reduce_weighted_logsumexp(
 )
 ```
 
-Computes `log(abs(sum(weight * exp(elements across tensor dimensions))))`.
+
+
+Defined in [`python/internal/distribution_util.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/internal/distribution_util.py).
+
+<!-- Placeholder for "Used in" -->
 
 If all weights `w` are known to be positive, it is more efficient to directly
 use `reduce_logsumexp`, i.e., `tf.reduce_logsumexp(logx + tf.log(w))` is more

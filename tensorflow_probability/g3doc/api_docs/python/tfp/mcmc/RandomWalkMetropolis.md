@@ -16,9 +16,15 @@
 
 ## Class `RandomWalkMetropolis`
 
+Runs one step of the RWM algorithm with symmetric proposal.
+
 Inherits From: [`TransitionKernel`](../../tfp/mcmc/TransitionKernel.md)
 
-Runs one step of the RWM algorithm with symmetric proposal.
+
+
+Defined in [`python/mcmc/random_walk_metropolis.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/random_walk_metropolis.py).
+
+<!-- Placeholder for "Used in" -->
 
 Random Walk Metropolis is a gradient-free Markov chain Monte Carlo
 (MCMC) algorithm. The algorithm involves a proposal generating step

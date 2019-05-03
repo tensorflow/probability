@@ -5,6 +5,8 @@
 
 # tfp.edward2.Beta
 
+Create a random variable for Beta.
+
 ``` python
 tfp.edward2.Beta(
     *args,
@@ -12,7 +14,11 @@ tfp.edward2.Beta(
 )
 ```
 
-Create a random variable for Beta.
+
+
+Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
+
+<!-- Placeholder for "Used in" -->
 
 See Beta for more details.
 

@@ -5,11 +5,17 @@
 
 # tfp.edward2.make_log_joint_fn
 
+Takes Edward probabilistic program and returns its log joint function.
+
 ``` python
 tfp.edward2.make_log_joint_fn(model)
 ```
 
-Takes Edward probabilistic program and returns its log joint function.
+
+
+Defined in [`python/edward2/program_transformations.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/program_transformations.py).
+
+<!-- Placeholder for "Used in" -->
 
 #### Args:
 

@@ -5,6 +5,8 @@
 
 # tfp.distributions.softplus_inverse
 
+Computes the inverse softplus, i.e., x = softplus_inverse(softplus(x)).
+
 ``` python
 tfp.distributions.softplus_inverse(
     x,
@@ -12,7 +14,11 @@ tfp.distributions.softplus_inverse(
 )
 ```
 
-Computes the inverse softplus, i.e., x = softplus_inverse(softplus(x)).
+
+
+Defined in [`python/internal/distribution_util.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/internal/distribution_util.py).
+
+<!-- Placeholder for "Used in" -->
 
 Mathematically this op is equivalent to:
 

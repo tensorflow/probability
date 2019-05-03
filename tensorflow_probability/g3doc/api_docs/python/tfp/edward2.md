@@ -7,6 +7,12 @@
 
 Edward2 probabilistic programming language.
 
+
+
+Defined in [`python/edward2/__init__.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/__init__.py).
+
+<!-- Placeholder for "Used in" -->
+
 For user guides, see:
 
 + [Overview](
@@ -28,17 +34,21 @@ For user guides, see:
 
 [`Beta(...)`](../tfp/edward2/Beta.md): Create a random variable for Beta.
 
-[`BetaWithSoftplusConcentration(...)`](../tfp/edward2/BetaWithSoftplusConcentration.md): Create a random variable for BetaWithSoftplusConcentration.
-
 [`Binomial(...)`](../tfp/edward2/Binomial.md): Create a random variable for Binomial.
+
+[`Blockwise(...)`](../tfp/edward2/Blockwise.md): Create a random variable for Blockwise.
 
 [`Categorical(...)`](../tfp/edward2/Categorical.md): Create a random variable for Categorical.
 
 [`Cauchy(...)`](../tfp/edward2/Cauchy.md): Create a random variable for Cauchy.
 
+[`Chi(...)`](../tfp/edward2/Chi.md): Create a random variable for Chi.
+
 [`Chi2(...)`](../tfp/edward2/Chi2.md): Create a random variable for Chi2.
 
 [`Chi2WithAbsDf(...)`](../tfp/edward2/Chi2WithAbsDf.md): Create a random variable for Chi2WithAbsDf.
+
+[`ConditionalDistribution(...)`](../tfp/edward2/ConditionalDistribution.md): Create a random variable for ConditionalDistribution.
 
 [`ConditionalTransformedDistribution(...)`](../tfp/edward2/ConditionalTransformedDistribution.md): Create a random variable for ConditionalTransformedDistribution.
 
@@ -48,17 +58,19 @@ For user guides, see:
 
 [`DirichletMultinomial(...)`](../tfp/edward2/DirichletMultinomial.md): Create a random variable for DirichletMultinomial.
 
+[`Distribution(...)`](../tfp/edward2/Distribution.md): Create a random variable for Distribution.
+
+[`Empirical(...)`](../tfp/edward2/Empirical.md): Create a random variable for Empirical.
+
 [`ExpRelaxedOneHotCategorical(...)`](../tfp/edward2/ExpRelaxedOneHotCategorical.md): Create a random variable for ExpRelaxedOneHotCategorical.
 
 [`Exponential(...)`](../tfp/edward2/Exponential.md): Create a random variable for Exponential.
 
-[`ExponentialWithSoftplusRate(...)`](../tfp/edward2/ExponentialWithSoftplusRate.md): Create a random variable for ExponentialWithSoftplusRate.
+[`FiniteDiscrete(...)`](../tfp/edward2/FiniteDiscrete.md): Create a random variable for FiniteDiscrete.
 
 [`Gamma(...)`](../tfp/edward2/Gamma.md): Create a random variable for Gamma.
 
 [`GammaGamma(...)`](../tfp/edward2/GammaGamma.md): Create a random variable for GammaGamma.
-
-[`GammaWithSoftplusConcentrationRate(...)`](../tfp/edward2/GammaWithSoftplusConcentrationRate.md): Create a random variable for GammaWithSoftplusConcentrationRate.
 
 [`GaussianProcess(...)`](../tfp/edward2/GaussianProcess.md): Create a random variable for GaussianProcess.
 
@@ -80,17 +92,21 @@ For user guides, see:
 
 [`InverseGamma(...)`](../tfp/edward2/InverseGamma.md): Create a random variable for InverseGamma.
 
-[`InverseGammaWithSoftplusConcentrationRate(...)`](../tfp/edward2/InverseGammaWithSoftplusConcentrationRate.md): Create a random variable for InverseGammaWithSoftplusConcentrationRate.
-
 [`InverseGaussian(...)`](../tfp/edward2/InverseGaussian.md): Create a random variable for InverseGaussian.
+
+[`JointDistribution(...)`](../tfp/edward2/JointDistribution.md): Create a random variable for JointDistribution.
+
+[`JointDistributionCoroutine(...)`](../tfp/edward2/JointDistributionCoroutine.md): Create a random variable for JointDistributionCoroutine.
+
+[`JointDistributionNamed(...)`](../tfp/edward2/JointDistributionNamed.md): Create a random variable for JointDistributionNamed.
+
+[`JointDistributionSequential(...)`](../tfp/edward2/JointDistributionSequential.md): Create a random variable for JointDistributionSequential.
 
 [`Kumaraswamy(...)`](../tfp/edward2/Kumaraswamy.md): Create a random variable for Kumaraswamy.
 
 [`LKJ(...)`](../tfp/edward2/LKJ.md): Create a random variable for LKJ.
 
 [`Laplace(...)`](../tfp/edward2/Laplace.md): Create a random variable for Laplace.
-
-[`LaplaceWithSoftplusScale(...)`](../tfp/edward2/LaplaceWithSoftplusScale.md): Create a random variable for LaplaceWithSoftplusScale.
 
 [`LinearGaussianStateSpaceModel(...)`](../tfp/edward2/LinearGaussianStateSpaceModel.md): Create a random variable for LinearGaussianStateSpaceModel.
 
@@ -122,8 +138,6 @@ For user guides, see:
 
 [`Normal(...)`](../tfp/edward2/Normal.md): Create a random variable for Normal.
 
-[`NormalWithSoftplusScale(...)`](../tfp/edward2/NormalWithSoftplusScale.md): Create a random variable for NormalWithSoftplusScale.
-
 [`OneHotCategorical(...)`](../tfp/edward2/OneHotCategorical.md): Create a random variable for OneHotCategorical.
 
 [`Pareto(...)`](../tfp/edward2/Pareto.md): Create a random variable for Pareto.
@@ -138,13 +152,13 @@ For user guides, see:
 
 [`RelaxedOneHotCategorical(...)`](../tfp/edward2/RelaxedOneHotCategorical.md): Create a random variable for RelaxedOneHotCategorical.
 
+[`Sample(...)`](../tfp/edward2/Sample.md): Create a random variable for Sample.
+
 [`SinhArcsinh(...)`](../tfp/edward2/SinhArcsinh.md): Create a random variable for SinhArcsinh.
 
 [`StudentT(...)`](../tfp/edward2/StudentT.md): Create a random variable for StudentT.
 
 [`StudentTProcess(...)`](../tfp/edward2/StudentTProcess.md): Create a random variable for StudentTProcess.
-
-[`StudentTWithAbsDfSoftplusScale(...)`](../tfp/edward2/StudentTWithAbsDfSoftplusScale.md): Create a random variable for StudentTWithAbsDfSoftplusScale.
 
 [`TransformedDistribution(...)`](../tfp/edward2/TransformedDistribution.md): Create a random variable for TransformedDistribution.
 
@@ -153,6 +167,8 @@ For user guides, see:
 [`TruncatedNormal(...)`](../tfp/edward2/TruncatedNormal.md): Create a random variable for TruncatedNormal.
 
 [`Uniform(...)`](../tfp/edward2/Uniform.md): Create a random variable for Uniform.
+
+[`VariationalGaussianProcess(...)`](../tfp/edward2/VariationalGaussianProcess.md): Create a random variable for VariationalGaussianProcess.
 
 [`VectorDeterministic(...)`](../tfp/edward2/VectorDeterministic.md): Create a random variable for VectorDeterministic.
 

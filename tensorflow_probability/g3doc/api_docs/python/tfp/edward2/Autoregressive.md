@@ -5,6 +5,8 @@
 
 # tfp.edward2.Autoregressive
 
+Create a random variable for Autoregressive.
+
 ``` python
 tfp.edward2.Autoregressive(
     *args,
@@ -12,7 +14,11 @@ tfp.edward2.Autoregressive(
 )
 ```
 
-Create a random variable for Autoregressive.
+
+
+Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
+
+<!-- Placeholder for "Used in" -->
 
 See Autoregressive for more details.
 
@@ -53,5 +59,5 @@ Construct an `Autoregressive` distribution.
 #### Raises:
 
 * <b>`ValueError`</b>: if `num_steps` and
-    `distribution_fn(sample0).event_shape.num_elements()` are both `None`.
+    `num_elements(distribution_fn(sample0).event_shape)` are both `None`.
 * <b>`ValueError`</b>: if `num_steps < 1`.

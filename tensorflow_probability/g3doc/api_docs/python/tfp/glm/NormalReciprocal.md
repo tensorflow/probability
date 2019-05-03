@@ -12,9 +12,16 @@
 
 ## Class `NormalReciprocal`
 
+`Normal(loc=mean, scale=1)` where `mean = 1 / matmul(X, weights)`.
+
 Inherits From: [`ExponentialFamily`](../../tfp/glm/ExponentialFamily.md)
 
-`Normal(loc=mean, scale=1)` where `mean = 1 / matmul(X, weights)`.
+
+
+Defined in [`python/glm/family.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/glm/family.py).
+
+<!-- Placeholder for "Used in" -->
+
 
 <h2 id="__init__"><code>__init__</code></h2>
 

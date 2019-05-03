@@ -5,6 +5,8 @@
 
 # tfp.edward2.MultivariateNormalLinearOperator
 
+Create a random variable for MultivariateNormalLinearOperator.
+
 ``` python
 tfp.edward2.MultivariateNormalLinearOperator(
     *args,
@@ -12,7 +14,11 @@ tfp.edward2.MultivariateNormalLinearOperator(
 )
 ```
 
-Create a random variable for MultivariateNormalLinearOperator.
+
+
+Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
+
+<!-- Placeholder for "Used in" -->
 
 See MultivariateNormalLinearOperator for more details.
 

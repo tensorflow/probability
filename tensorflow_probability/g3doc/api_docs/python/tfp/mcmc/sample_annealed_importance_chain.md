@@ -5,6 +5,8 @@
 
 # tfp.mcmc.sample_annealed_importance_chain
 
+Runs annealed importance sampling (AIS) to estimate normalizing constants.
+
 ``` python
 tfp.mcmc.sample_annealed_importance_chain(
     num_steps,
@@ -17,7 +19,11 @@ tfp.mcmc.sample_annealed_importance_chain(
 )
 ```
 
-Runs annealed importance sampling (AIS) to estimate normalizing constants.
+
+
+Defined in [`python/mcmc/sample_annealed_importance.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/sample_annealed_importance.py).
+
+<!-- Placeholder for "Used in" -->
 
 This function uses an MCMC transition operator (e.g., Hamiltonian Monte Carlo)
 to sample from a series of distributions that slowly interpolates between

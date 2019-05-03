@@ -5,6 +5,8 @@
 
 # tfp.optimizer.nelder_mead_minimize
 
+Minimum of the objective function using the Nelder Mead simplex algorithm.
+
 ``` python
 tfp.optimizer.nelder_mead_minimize(
     objective_function,
@@ -26,7 +28,11 @@ tfp.optimizer.nelder_mead_minimize(
 )
 ```
 
-Minimum of the objective function using the Nelder Mead simplex algorithm.
+
+
+Defined in [`python/optimizer/nelder_mead.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/optimizer/nelder_mead.py).
+
+<!-- Placeholder for "Used in" -->
 
 Performs an unconstrained minimization of a (possibly non-smooth) function
 using the Nelder Mead simplex method. Nelder Mead method does not support

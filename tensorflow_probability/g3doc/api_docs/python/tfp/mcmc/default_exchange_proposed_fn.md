@@ -5,11 +5,17 @@
 
 # tfp.mcmc.default_exchange_proposed_fn
 
+Default exchange proposal function, for replica exchange MC.
+
 ``` python
 tfp.mcmc.default_exchange_proposed_fn(prob_exchange)
 ```
 
-Default exchange proposal function, for replica exchange MC.
+
+
+Defined in [`python/mcmc/replica_exchange_mc.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/replica_exchange_mc.py).
+
+<!-- Placeholder for "Used in" -->
 
 With probability `prob_exchange` propose combinations of replica for exchange.
 When exchanging, create combinations of adjacent replicas in

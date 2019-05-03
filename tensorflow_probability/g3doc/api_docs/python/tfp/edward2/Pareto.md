@@ -5,6 +5,8 @@
 
 # tfp.edward2.Pareto
 
+Create a random variable for Pareto.
+
 ``` python
 tfp.edward2.Pareto(
     *args,
@@ -12,7 +14,11 @@ tfp.edward2.Pareto(
 )
 ```
 
-Create a random variable for Pareto.
+
+
+Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
+
+<!-- Placeholder for "Used in" -->
 
 See Pareto for more details.
 

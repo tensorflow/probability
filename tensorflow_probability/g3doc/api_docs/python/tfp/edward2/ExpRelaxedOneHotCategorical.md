@@ -5,6 +5,8 @@
 
 # tfp.edward2.ExpRelaxedOneHotCategorical
 
+Create a random variable for ExpRelaxedOneHotCategorical.
+
 ``` python
 tfp.edward2.ExpRelaxedOneHotCategorical(
     *args,
@@ -12,7 +14,11 @@ tfp.edward2.ExpRelaxedOneHotCategorical(
 )
 ```
 
-Create a random variable for ExpRelaxedOneHotCategorical.
+
+
+Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
+
+<!-- Placeholder for "Used in" -->
 
 See ExpRelaxedOneHotCategorical for more details.
 

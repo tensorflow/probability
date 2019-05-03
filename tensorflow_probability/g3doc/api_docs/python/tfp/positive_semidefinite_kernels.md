@@ -7,6 +7,13 @@
 
 Positive-semidefinite kernels package.
 
+
+
+Defined in [`python/positive_semidefinite_kernels/__init__.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/positive_semidefinite_kernels/__init__.py).
+
+<!-- Placeholder for "Used in" -->
+
+
 ## Classes
 
 [`class ExpSinSquared`](../tfp/positive_semidefinite_kernels/ExpSinSquared.md): Exponentiated Sine Squared Kernel.
@@ -26,4 +33,6 @@ Positive-semidefinite kernels package.
 [`class PositiveSemidefiniteKernel`](../tfp/positive_semidefinite_kernels/PositiveSemidefiniteKernel.md): Abstract base class for positive semi-definite kernel functions.
 
 [`class RationalQuadratic`](../tfp/positive_semidefinite_kernels/RationalQuadratic.md): RationalQuadratic Kernel.
+
+[`class SchurComplement`](../tfp/positive_semidefinite_kernels/SchurComplement.md): The SchurComplement kernel.
 

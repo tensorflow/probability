@@ -5,6 +5,8 @@
 
 # tfp.optimizer.differential_evolution_one_step
 
+Performs one step of the differential evolution algorithm.
+
 ``` python
 tfp.optimizer.differential_evolution_one_step(
     objective_function,
@@ -17,7 +19,11 @@ tfp.optimizer.differential_evolution_one_step(
 )
 ```
 
-Performs one step of the differential evolution algorithm.
+
+
+Defined in [`python/optimizer/differential_evolution.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/optimizer/differential_evolution.py).
+
+<!-- Placeholder for "Used in" -->
 
 #### Args:
 

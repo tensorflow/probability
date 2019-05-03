@@ -9,6 +9,13 @@
 
 Tools for probabilistic reasoning in TensorFlow.
 
+
+
+Defined in [`__init__.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/__init__.py).
+
+<!-- Placeholder for "Used in" -->
+
+
 ## Modules
 
 [`bijectors`](./tfp/bijectors.md) module: Bijector Ops.

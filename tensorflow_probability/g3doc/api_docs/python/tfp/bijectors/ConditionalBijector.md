@@ -10,6 +10,7 @@
 <meta itemprop="property" content="validate_args"/>
 <meta itemprop="property" content="__call__"/>
 <meta itemprop="property" content="__init__"/>
+<meta itemprop="property" content="__new__"/>
 <meta itemprop="property" content="forward"/>
 <meta itemprop="property" content="forward_event_shape"/>
 <meta itemprop="property" content="forward_event_shape_tensor"/>
@@ -24,9 +25,16 @@
 
 ## Class `ConditionalBijector`
 
+Conditional Bijector is a Bijector that allows intrinsic conditioning.
+
 Inherits From: [`Bijector`](../../tfp/bijectors/Bijector.md)
 
-Conditional Bijector is a Bijector that allows intrinsic conditioning.
+
+
+Defined in [`python/bijectors/bijector.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/bijectors/bijector.py).
+
+<!-- Placeholder for "Used in" -->
+
 
 <h2 id="__init__"><code>__init__</code></h2>
 
@@ -82,6 +90,22 @@ See `Bijector` subclass docstring for more details and specific examples.
     `inverse_min_event_ndims` are specified, or if either of them is
     negative.
 * <b>`ValueError`</b>:  If a member of `graph_parents` is not a `Tensor`.
+
+<h2 id="__new__"><code>__new__</code></h2>
+
+``` python
+@staticmethod
+__new__(
+    *args,
+    **kwargs
+)
+```
+
+DEPRECATED FUNCTION
+
+Warning: THIS FUNCTION IS DEPRECATED. It will be removed after 2019-07-01.
+Instructions for updating:
+`ConditionalBijector` is no longer required; `Bijector` top-level functions now pass-through `**kwargs`.
 
 
 
@@ -186,14 +210,31 @@ tfb.Exp()([-1., 0., 1.])
 
 ``` python
 forward(
-    *args,
+    x,
+    name='forward',
     **kwargs
 )
 ```
 
-##### `kwargs`:
+Returns the forward `Bijector` evaluation, i.e., X = g(Y).
 
-*  `**condition_kwargs`: Named arguments forwarded to subclass implementation.
+#### Args:
+
+* <b>`x`</b>: `Tensor`. The input to the "forward" evaluation.
+* <b>`name`</b>: The name to give this op.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
+
+
+#### Returns:
+
+`Tensor`.
+
+
+#### Raises:
+
+* <b>`TypeError`</b>: if `self.dtype` is specified and `x.dtype` is not
+    `self.dtype`.
+* <b>`NotImplementedError`</b>: if `_forward` is not implemented.
 
 <h3 id="forward_event_shape"><code>forward_event_shape</code></h3>
 
@@ -243,27 +284,72 @@ Shape of a single sample from a single batch as an `int32` 1D `Tensor`.
 
 ``` python
 forward_log_det_jacobian(
-    *args,
+    x,
+    event_ndims,
+    name='forward_log_det_jacobian',
     **kwargs
 )
 ```
 
-##### `kwargs`:
+Returns both the forward_log_det_jacobian.
 
-*  `**condition_kwargs`: Named arguments forwarded to subclass implementation.
+#### Args:
+
+* <b>`x`</b>: `Tensor`. The input to the "forward" Jacobian determinant evaluation.
+* <b>`event_ndims`</b>: Number of dimensions in the probabilistic events being
+    transformed. Must be greater than or equal to
+    `self.forward_min_event_ndims`. The result is summed over the final
+    dimensions to produce a scalar Jacobian determinant for each event, i.e.
+    it has shape `rank(x) - event_ndims` dimensions.
+* <b>`name`</b>: The name to give this op.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
+
+
+#### Returns:
+
+`Tensor`, if this bijector is injective.
+  If not injective this is not implemented.
+
+
+#### Raises:
+
+* <b>`TypeError`</b>: if `self.dtype` is specified and `y.dtype` is not
+    `self.dtype`.
+* <b>`NotImplementedError`</b>: if neither `_forward_log_det_jacobian`
+    nor {`_inverse`, `_inverse_log_det_jacobian`} are implemented, or
+    this is a non-injective bijector.
 
 <h3 id="inverse"><code>inverse</code></h3>
 
 ``` python
 inverse(
-    *args,
+    y,
+    name='inverse',
     **kwargs
 )
 ```
 
-##### `kwargs`:
+Returns the inverse `Bijector` evaluation, i.e., X = g^{-1}(Y).
 
-*  `**condition_kwargs`: Named arguments forwarded to subclass implementation.
+#### Args:
+
+* <b>`y`</b>: `Tensor`. The input to the "inverse" evaluation.
+* <b>`name`</b>: The name to give this op.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
+
+
+#### Returns:
+
+`Tensor`, if this bijector is injective.
+  If not injective, returns the k-tuple containing the unique
+  `k` points `(x1, ..., xk)` such that `g(xi) = y`.
+
+
+#### Raises:
+
+* <b>`TypeError`</b>: if `self.dtype` is specified and `y.dtype` is not
+    `self.dtype`.
+* <b>`NotImplementedError`</b>: if `_inverse` is not implemented.
 
 <h3 id="inverse_event_shape"><code>inverse_event_shape</code></h3>
 
@@ -313,14 +399,45 @@ Shape of a single sample from a single batch as an `int32` 1D `Tensor`.
 
 ``` python
 inverse_log_det_jacobian(
-    *args,
+    y,
+    event_ndims,
+    name='inverse_log_det_jacobian',
     **kwargs
 )
 ```
 
-##### `kwargs`:
+Returns the (log o det o Jacobian o inverse)(y).
 
-*  `**condition_kwargs`: Named arguments forwarded to subclass implementation.
+Mathematically, returns: `log(det(dX/dY))(Y)`. (Recall that: `X=g^{-1}(Y)`.)
+
+Note that `forward_log_det_jacobian` is the negative of this function,
+evaluated at `g^{-1}(y)`.
+
+#### Args:
+
+* <b>`y`</b>: `Tensor`. The input to the "inverse" Jacobian determinant evaluation.
+* <b>`event_ndims`</b>: Number of dimensions in the probabilistic events being
+    transformed. Must be greater than or equal to
+    `self.inverse_min_event_ndims`. The result is summed over the final
+    dimensions to produce a scalar Jacobian determinant for each event, i.e.
+    it has shape `rank(y) - event_ndims` dimensions.
+* <b>`name`</b>: The name to give this op.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
+
+
+#### Returns:
+
+* <b>`ildj`</b>: `Tensor`, if this bijector is injective.
+    If not injective, returns the tuple of local log det
+    Jacobians, `log(det(Dg_i^{-1}(y)))`, where `g_i` is the restriction
+    of `g` to the `ith` partition `Di`.
+
+
+#### Raises:
+
+* <b>`TypeError`</b>: if `self.dtype` is specified and `y.dtype` is not
+    `self.dtype`.
+* <b>`NotImplementedError`</b>: if `_inverse_log_det_jacobian` is not implemented.
 
 
 

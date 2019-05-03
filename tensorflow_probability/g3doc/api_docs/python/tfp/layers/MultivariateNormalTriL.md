@@ -8,18 +8,22 @@
 <meta itemprop="property" content="input_mask"/>
 <meta itemprop="property" content="input_shape"/>
 <meta itemprop="property" content="losses"/>
+<meta itemprop="property" content="metrics"/>
 <meta itemprop="property" content="name"/>
+<meta itemprop="property" content="name_scope"/>
 <meta itemprop="property" content="non_trainable_variables"/>
 <meta itemprop="property" content="non_trainable_weights"/>
 <meta itemprop="property" content="output"/>
 <meta itemprop="property" content="output_mask"/>
 <meta itemprop="property" content="output_shape"/>
+<meta itemprop="property" content="submodules"/>
 <meta itemprop="property" content="trainable_variables"/>
 <meta itemprop="property" content="trainable_weights"/>
 <meta itemprop="property" content="updates"/>
 <meta itemprop="property" content="variables"/>
 <meta itemprop="property" content="weights"/>
 <meta itemprop="property" content="__call__"/>
+<meta itemprop="property" content="__delattr__"/>
 <meta itemprop="property" content="__init__"/>
 <meta itemprop="property" content="__setattr__"/>
 <meta itemprop="property" content="apply"/>
@@ -41,15 +45,27 @@
 <meta itemprop="property" content="new"/>
 <meta itemprop="property" content="params_size"/>
 <meta itemprop="property" content="set_weights"/>
+<meta itemprop="property" content="with_name_scope"/>
 </div>
 
 # tfp.layers.MultivariateNormalTriL
 
 ## Class `MultivariateNormalTriL`
 
+A `d`-variate MVNTriL Keras layer from `d + d * (d + 1) // 2` params.
+
 Inherits From: [`DistributionLambda`](../../tfp/layers/DistributionLambda.md)
 
-A `d`-variate MVNTriL Keras layer from `d + d * (d + 1) // 2` params.
+### Aliases:
+
+* Class `tfp.layers.MultivariateNormalTriL`
+* Class `tfp.layers.distribution_layer.MultivariateNormalTriL`
+
+
+
+Defined in [`python/layers/distribution_layer.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/layers/distribution_layer.py).
+
+<!-- Placeholder for "Used in" -->
 
 Typical choices for `convert_to_tensor_fn` include:
 
@@ -214,9 +230,17 @@ propagate gradients back to the corresponding variables.
 
 A list of tensors.
 
+<h3 id="metrics"><code>metrics</code></h3>
+
+
+
 <h3 id="name"><code>name</code></h3>
 
 
+
+<h3 id="name_scope"><code>name_scope</code></h3>
+
+Returns a `tf.name_scope` instance for this class.
 
 <h3 id="non_trainable_variables"><code>non_trainable_variables</code></h3>
 
@@ -280,6 +304,26 @@ Output shape, as an integer shape tuple
 * <b>`AttributeError`</b>: if the layer has no defined output shape.
 * <b>`RuntimeError`</b>: if called in Eager mode.
 
+<h3 id="submodules"><code>submodules</code></h3>
+
+Sequence of all sub-modules.
+
+Submodules are modules which are properties of this module, or found as
+properties of modules which are properties of this module (and so on).
+
+>>> a = tf.Module()
+>>> b = tf.Module()
+>>> c = tf.Module()
+>>> a.b = b
+>>> b.c = c
+>>> assert list(a.submodules) == [b, c]
+>>> assert list(b.submodules) == [c]
+>>> assert list(c.submodules) == []
+
+#### Returns:
+
+A sequence of all submodules.
+
 <h3 id="trainable_variables"><code>trainable_variables</code></h3>
 
 
@@ -322,6 +366,14 @@ __call__(
     *args,
     **kwargs
 )
+```
+
+
+
+<h3 id="__delattr__"><code>__delattr__</code></h3>
+
+``` python
+__delattr__(name)
 ```
 
 
@@ -440,7 +492,36 @@ from_config(
 get_config()
 ```
 
+Returns the config of this layer.
 
+This Layer's `make_distribution_fn` is serialized via a library built on
+Python pickle.  This serialization of Python functions is provided for
+convenience, but:
+
+  1. The use of this format for long-term storage of models is discouraged.
+     In particular, it may not be possible to deserialize in a different
+     version of Python.
+
+  2. While serialization is generally supported for lambdas, local
+     functions, and static methods (and closures over these constructs),
+     complex functions may fail to serialize.
+
+  3. `Tensor` objects (and functions referencing `Tensor` objects) can only
+     be serialized when the tensor value is statically known.  (Such Tensors
+     are serialized as numpy arrays.)
+
+Instead of relying on `DistributionLambda.get_config`, consider subclassing
+`DistributionLambda` and directly implementing Keras serialization via
+`get_config` / `from_config`.
+
+NOTE: At the moment, `DistributionLambda` can only be serialized if the
+`convert_to_tensor_fn` is a serializable Keras object (i.e., implements
+`get_config`) or one of the standard values:
+ - `Distribution.sample` (or `"sample"`)
+ - `Distribution.mean` (or `"mean"`)
+ - `Distribution.mode` (or `"mode"`)
+ - `Distribution.stddev` (or `"stddev"`)
+ - `Distribution.variance` (or `"variance"`)
 
 <h3 id="get_input_at"><code>get_input_at</code></h3>
 
@@ -531,11 +612,6 @@ Retrieves losses relevant to a specific set of inputs.
 
 List of loss tensors of the layer that depend on `inputs`.
 
-
-#### Raises:
-
-* <b>`RuntimeError`</b>: If called in Eager mode.
-
 <h3 id="get_output_at"><code>get_output_at</code></h3>
 
 ``` python
@@ -625,11 +701,6 @@ Retrieves updates relevant to a specific set of inputs.
 
 List of update ops of the layer that depend on `inputs`.
 
-
-#### Raises:
-
-* <b>`RuntimeError`</b>: If called in Eager mode.
-
 <h3 id="get_weights"><code>get_weights</code></h3>
 
 ``` python
@@ -689,6 +760,42 @@ Sets the weights of the layer, from Numpy arrays.
 
 * <b>`ValueError`</b>: If the provided weights list does not match the
         layer's specifications.
+
+<h3 id="with_name_scope"><code>with_name_scope</code></h3>
+
+``` python
+with_name_scope(
+    cls,
+    method
+)
+```
+
+Decorator to automatically enter the module name scope.
+
+>>> class MyModule(tf.Module):
+...   @tf.Module.with_name_scope
+...   def __call__(self, x):
+...     if not hasattr(self, 'w'):
+...       self.w = tf.Variable(tf.random.normal([x.shape[1], 64]))
+...     return tf.matmul(x, self.w)
+
+Using the above module would produce `tf.Variable`s and `tf.Tensor`s whose
+names included the module name:
+
+>>> mod = MyModule()
+>>> mod(tf.ones([8, 32]))
+<tf.Tensor: ...>
+>>> mod.w
+<tf.Variable ...'my_module/w:0'>
+
+#### Args:
+
+* <b>`method`</b>: The method to wrap.
+
+
+#### Returns:
+
+The original method wrapped such that it enters the module's name scope.
 
 
 

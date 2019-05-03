@@ -5,6 +5,8 @@
 
 # tfp.glm.fit
 
+Runs multiple Fisher scoring steps.
+
 ``` python
 tfp.glm.fit(
     model_matrix,
@@ -23,7 +25,11 @@ tfp.glm.fit(
 )
 ```
 
-Runs multiple Fisher scoring steps.
+
+
+Defined in [`python/glm/fisher_scoring.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/glm/fisher_scoring.py).
+
+<!-- Placeholder for "Used in" -->
 
 #### Args:
 

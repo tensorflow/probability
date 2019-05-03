@@ -5,6 +5,8 @@
 
 # tfp.distributions.tridiag
 
+Creates a matrix with values set above, below, and on the diagonal.
+
 ``` python
 tfp.distributions.tridiag(
     below=None,
@@ -14,7 +16,11 @@ tfp.distributions.tridiag(
 )
 ```
 
-Creates a matrix with values set above, below, and on the diagonal.
+
+
+Defined in [`python/internal/distribution_util.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/internal/distribution_util.py).
+
+<!-- Placeholder for "Used in" -->
 
 Example:
 

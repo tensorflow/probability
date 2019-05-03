@@ -5,16 +5,22 @@
 
 # tfp.trainable_distributions.poisson
 
+Constructs a trainable `tfd.Poisson` distribution.
+
 ``` python
 tfp.trainable_distributions.poisson(
     x,
-    layer_fn=tf.layers.dense,
+    layer_fn=tf.compat.v1.layers.dense,
     log_rate_fn=(lambda x: x),
     name=None
 )
 ```
 
-Constructs a trainable `tfd.Poisson` distribution.
+
+
+Defined in [`python/trainable_distributions/trainable_distributions_lib.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/trainable_distributions/trainable_distributions_lib.py).
+
+<!-- Placeholder for "Used in" -->
 
 This function creates a Poisson distribution parameterized by log rate.
 Using default args, this function is mathematically equivalent to:

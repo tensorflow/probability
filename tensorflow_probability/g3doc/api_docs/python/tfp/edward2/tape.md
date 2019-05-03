@@ -5,6 +5,8 @@
 
 # tfp.edward2.tape
 
+Context manager for recording interceptable executions onto a tape.
+
 ``` python
 tfp.edward2.tape(
     *args,
@@ -12,7 +14,7 @@ tfp.edward2.tape(
 )
 ```
 
-Context manager for recording interceptable executions onto a tape.
+<!-- Placeholder for "Used in" -->
 
 Similar to `tf.GradientTape`, operations are recorded if they are executed
 within this context manager. In addition, the operation must be registered

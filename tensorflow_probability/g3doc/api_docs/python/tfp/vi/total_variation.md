@@ -5,6 +5,8 @@
 
 # tfp.vi.total_variation
 
+The Total Variation Csiszar-function in log-space.
+
 ``` python
 tfp.vi.total_variation(
     logu,
@@ -12,7 +14,11 @@ tfp.vi.total_variation(
 )
 ```
 
-The Total Variation Csiszar-function in log-space.
+
+
+Defined in [`python/vi/csiszar_divergence.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/vi/csiszar_divergence.py).
+
+<!-- Placeholder for "Used in" -->
 
 A Csiszar-function is a member of,
 

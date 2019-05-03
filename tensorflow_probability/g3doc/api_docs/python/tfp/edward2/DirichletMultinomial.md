@@ -5,6 +5,8 @@
 
 # tfp.edward2.DirichletMultinomial
 
+Create a random variable for DirichletMultinomial.
+
 ``` python
 tfp.edward2.DirichletMultinomial(
     *args,
@@ -12,7 +14,11 @@ tfp.edward2.DirichletMultinomial(
 )
 ```
 
-Create a random variable for DirichletMultinomial.
+
+
+Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
+
+<!-- Placeholder for "Used in" -->
 
 See DirichletMultinomial for more details.
 

@@ -5,6 +5,8 @@
 
 # tfp.edward2.as_random_variable
 
+Wrap an existing distribution as a traceable random variable.
+
 ``` python
 tfp.edward2.as_random_variable(
     distribution,
@@ -13,7 +15,11 @@ tfp.edward2.as_random_variable(
 )
 ```
 
-Wrap an existing distribution as a traceable random variable.
+
+
+Defined in [`python/edward2/generated_random_variables.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/generated_random_variables.py).
+
+<!-- Placeholder for "Used in" -->
 
 This enables the use of custom or user-provided distributions in
 Edward models. Unlike a bare `RandomVariable` object, this method

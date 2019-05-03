@@ -5,6 +5,8 @@
 
 # tfp.bijectors.real_nvp_default_template
 
+Build a scale-and-shift function using a multi-layer neural network.
+
 ``` python
 tfp.bijectors.real_nvp_default_template(
     hidden_layers,
@@ -16,7 +18,11 @@ tfp.bijectors.real_nvp_default_template(
 )
 ```
 
-Build a scale-and-shift function using a multi-layer neural network.
+
+
+Defined in [`python/bijectors/real_nvp.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/bijectors/real_nvp.py).
+
+<!-- Placeholder for "Used in" -->
 
 This will be wrapped in a make_template to ensure the variables are only
 created once. It takes the `d`-dimensional input x[0:d] and returns the `D-d`

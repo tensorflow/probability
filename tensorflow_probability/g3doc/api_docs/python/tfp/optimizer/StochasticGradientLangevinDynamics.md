@@ -1,27 +1,40 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.optimizer.StochasticGradientLangevinDynamics" />
 <meta itemprop="path" content="Stable" />
+<meta itemprop="property" content="iterations"/>
 <meta itemprop="property" content="variable_scope"/>
+<meta itemprop="property" content="weights"/>
+<meta itemprop="property" content="__getattribute__"/>
 <meta itemprop="property" content="__init__"/>
+<meta itemprop="property" content="__setattr__"/>
+<meta itemprop="property" content="add_slot"/>
+<meta itemprop="property" content="add_weight"/>
 <meta itemprop="property" content="apply_gradients"/>
-<meta itemprop="property" content="compute_gradients"/>
-<meta itemprop="property" content="get_name"/>
+<meta itemprop="property" content="from_config"/>
+<meta itemprop="property" content="get_config"/>
+<meta itemprop="property" content="get_gradients"/>
 <meta itemprop="property" content="get_slot"/>
 <meta itemprop="property" content="get_slot_names"/>
+<meta itemprop="property" content="get_updates"/>
+<meta itemprop="property" content="get_weights"/>
 <meta itemprop="property" content="minimize"/>
+<meta itemprop="property" content="set_weights"/>
 <meta itemprop="property" content="variables"/>
-<meta itemprop="property" content="GATE_GRAPH"/>
-<meta itemprop="property" content="GATE_NONE"/>
-<meta itemprop="property" content="GATE_OP"/>
 </div>
 
 # tfp.optimizer.StochasticGradientLangevinDynamics
 
 ## Class `StochasticGradientLangevinDynamics`
 
-
-
 An optimizer module for stochastic gradient Langevin dynamics.
+
+
+
+
+
+Defined in [`python/optimizer/sgld.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/optimizer/sgld.py).
+
+<!-- Placeholder for "Used in" -->
 
 This implements the preconditioned Stochastic Gradient Langevin Dynamics
 optimizer [(Li et al., 2016)][1]. The optimization variable is regarded as a
@@ -55,40 +68,40 @@ with tf.Session(graph=tf.Graph()) as sess:
   true_cov = dtype([[1, 0.25, 0.25], [0.25, 1, 0.25], [0.25, 0.25, 1]])
   # Loss is defined through the Cholesky decomposition
   chol = tf.linalg.cholesky(true_cov)
-  var_1 = tf.get_variable(
-      'var_1', initializer=[1., 1.])
-  var_2 = tf.get_variable(
-      'var_2', initializer=[1.])
 
-  var = tf.concat([var_1, var_2], axis=-1)
-  # Partially defined loss function
-  loss_part = tf.cholesky_solve(chol, tf.expand_dims(var, -1))
-  # Loss function
-  loss = 0.5 * tf.linalg.matvec(loss_part, var, transpose_a=True)
+  var_1 = tf.compat.v2.Variable(name='var_1', initial_value=[1., 1.])
+  var_2 = tf.compat.v2.Variable(name='var_2', initial_value=[1.])
+
+  def loss_fn():
+    var = tf.concat([var_1, var_2], axis=-1)
+    loss_part = tf.linalg.cholesky_solve(chol, tf.expand_dims(var, -1))
+    return tf.linalg.matvec(loss_part, var, transpose_a=True)
 
   # Set up the learning rate with a polynomial decay
-  global_step = tf.Variable(0, trainable=False)
+  step = tf.compat.v2.Variable(0, dtype=tf.int64)
   starter_learning_rate = .3
   end_learning_rate = 1e-4
   decay_steps = 1e4
-  learning_rate = tf.train.polynomial_decay(starter_learning_rate,
-                                            global_step, decay_steps,
-                                            end_learning_rate, power=1.)
+  learning_rate = tf.compat.v1.train.polynomial_decay(
+      starter_learning_rate,
+      step,
+      decay_steps,
+      end_learning_rate,
+      power=1.)
 
   # Set up the optimizer
   optimizer_kernel = tfp.optimizer.StochasticGradientLangevinDynamics(
       learning_rate=learning_rate, preconditioner_decay_rate=0.99)
+  optimizer_kernel.iterations = step
+  optimizer = optimizer_kernel.minimize(loss_fn, var_list=[var_1, var_2])
 
-  optimizer = optimizer_kernel.minimize(loss)
-
-  init = tf.global_variables_initializer()
   # Number of training steps
   training_steps = 5000
   # Record the steps as and treat them as samples
   samples = [np.zeros([training_steps, 2]), np.zeros([training_steps, 1])]
-  sess.run(init)
+  sess.run(tf.compat.v1.global_variables_initializer())
   for step in range(training_steps):
-    sess.run([optimizer, loss])
+    sess.run(optimizer)
     sample = [sess.run(var_1), sess.run(var_2)]
     samples[0][step, :] = sample[0]
     samples[1][step, :] = sample[1]
@@ -121,9 +134,6 @@ with tf.Session(graph=tf.Graph()) as sess:
 * <b>`parallel_iterations`</b>: the number of coordinates for which the gradients of
       the preconditioning matrix can be computed in parallel. Must be a
       positive integer.
-* <b>`variable_scope`</b>: Variable scope used for calls to `tf.get_variable`.
-    If `None`, a new variable scope is created using name
-    `tf.get_default_graph().unique_name(name or default_name)`.
 
 
 #### Raises:
@@ -149,8 +159,7 @@ __init__(
     burnin=25,
     diagonal_bias=1e-08,
     name=None,
-    parallel_iterations=10,
-    variable_scope=None
+    parallel_iterations=10
 )
 ```
 
@@ -160,20 +169,74 @@ __init__(
 
 ## Properties
 
+<h3 id="iterations"><code>iterations</code></h3>
+
+Variable. The number of training steps this Optimizer has run.
+
 <h3 id="variable_scope"><code>variable_scope</code></h3>
 
 Variable scope of all calls to `tf.get_variable`.
 
+<h3 id="weights"><code>weights</code></h3>
+
+Returns variables of this Optimizer based on the order created.
+
 
 
 ## Methods
+
+<h3 id="__getattribute__"><code>__getattribute__</code></h3>
+
+``` python
+__getattribute__(name)
+```
+
+Overridden to support hyperparameter access.
+
+<h3 id="__setattr__"><code>__setattr__</code></h3>
+
+``` python
+__setattr__(
+    name,
+    value
+)
+```
+
+Override setattr to support dynamic hyperparameter setting.
+
+<h3 id="add_slot"><code>add_slot</code></h3>
+
+``` python
+add_slot(
+    var,
+    slot_name,
+    initializer='zeros'
+)
+```
+
+Add a new slot variable for `var`.
+
+<h3 id="add_weight"><code>add_weight</code></h3>
+
+``` python
+add_weight(
+    name,
+    shape,
+    dtype=None,
+    initializer='zeros',
+    trainable=None,
+    synchronization=tf_variables.VariableSynchronization.AUTO,
+    aggregation=tf_variables.VariableAggregation.NONE
+)
+```
+
+
 
 <h3 id="apply_gradients"><code>apply_gradients</code></h3>
 
 ``` python
 apply_gradients(
     grads_and_vars,
-    global_step=None,
     name=None
 )
 ```
@@ -185,12 +248,9 @@ applies gradients.
 
 #### Args:
 
-* <b>`grads_and_vars`</b>: List of (gradient, variable) pairs as returned by
-    `compute_gradients()`.
-* <b>`global_step`</b>: Optional `Variable` to increment by one after the
-    variables have been updated.
-* <b>`name`</b>: Optional name for the returned operation.  Default to the
-    name passed to the `Optimizer` constructor.
+* <b>`grads_and_vars`</b>: List of (gradient, variable) pairs.
+* <b>`name`</b>: Optional name for the returned operation.  Default to the name
+    passed to the `Optimizer` constructor.
 
 
 #### Returns:
@@ -203,102 +263,80 @@ was not None, that operation also increments `global_step`.
 
 * <b>`TypeError`</b>: If `grads_and_vars` is malformed.
 * <b>`ValueError`</b>: If none of the variables have gradients.
-* <b>`RuntimeError`</b>: If you should use `_distributed_apply()` instead.
 
-<h3 id="compute_gradients"><code>compute_gradients</code></h3>
+<h3 id="from_config"><code>from_config</code></h3>
 
 ``` python
-compute_gradients(
-    loss,
-    var_list=None,
-    gate_gradients=GATE_OP,
-    aggregation_method=None,
-    colocate_gradients_with_ops=False,
-    grad_loss=None
+from_config(
+    cls,
+    config,
+    custom_objects=None
 )
 ```
 
-Compute gradients of `loss` for the variables in `var_list`.
+Creates an optimizer from its config.
 
-This is the first part of `minimize()`.  It returns a list
-of (gradient, variable) pairs where "gradient" is the gradient
-for "variable".  Note that "gradient" can be a `Tensor`, an
-`IndexedSlices`, or `None` if there is no gradient for the
-given variable.
+This method is the reverse of `get_config`,
+capable of instantiating the same optimizer from the config
+dictionary.
 
-#### Args:
+#### Arguments:
 
-* <b>`loss`</b>: A Tensor containing the value to minimize or a callable taking
-    no arguments which returns the value to minimize. When eager execution
-    is enabled it must be a callable.
-* <b>`var_list`</b>: Optional list or tuple of `tf.Variable` to update to minimize
-    `loss`.  Defaults to the list of variables collected in the graph
-    under the key `GraphKeys.TRAINABLE_VARIABLES`.
-* <b>`gate_gradients`</b>: How to gate the computation of gradients.  Can be
-    `GATE_NONE`, `GATE_OP`, or `GATE_GRAPH`.
-* <b>`aggregation_method`</b>: Specifies the method used to combine gradient terms.
-    Valid values are defined in the class `AggregationMethod`.
-* <b>`colocate_gradients_with_ops`</b>: If True, try colocating gradients with
-    the corresponding op.
-* <b>`grad_loss`</b>: Optional. A `Tensor` holding the gradient computed for `loss`.
+* <b>`config`</b>: A Python dictionary, typically the output of get_config.
+* <b>`custom_objects`</b>: A Python dictionary mapping names to additional Python
+      objects used to create this optimizer, such as a function used for a
+      hyperparameter.
 
 
 #### Returns:
 
-A list of (gradient, variable) pairs. Variable is always present, but
-gradient can be `None`.
+An optimizer instance.
+
+<h3 id="get_config"><code>get_config</code></h3>
+
+``` python
+get_config()
+```
+
+
+
+<h3 id="get_gradients"><code>get_gradients</code></h3>
+
+``` python
+get_gradients(
+    loss,
+    params
+)
+```
+
+Returns gradients of `loss` with respect to `params`.
+
+#### Arguments:
+
+* <b>`loss`</b>: Loss tensor.
+* <b>`params`</b>: List of variables.
+
+
+#### Returns:
+
+List of gradient tensors.
 
 
 #### Raises:
 
-* <b>`TypeError`</b>: If `var_list` contains anything else than `Variable` objects.
-* <b>`ValueError`</b>: If some arguments are invalid.
-* <b>`RuntimeError`</b>: If called with eager execution enabled and `loss` is
-    not callable.
-
-
-
-#### Eager Compatibility
-When eager execution is enabled, `gate_gradients`, `aggregation_method`,
-and `colocate_gradients_with_ops` are ignored.
-
-
-
-<h3 id="get_name"><code>get_name</code></h3>
-
-``` python
-get_name()
-```
-
-
+* <b>`ValueError`</b>: In case any gradient cannot be computed (e.g. if gradient
+    function not implemented).
 
 <h3 id="get_slot"><code>get_slot</code></h3>
 
 ``` python
 get_slot(
     var,
-    name
+    slot_name
 )
 ```
 
-Return a slot named `name` created for `var` by the Optimizer.
 
-Some `Optimizer` subclasses use additional variables.  For example
-`Momentum` and `Adagrad` use variables to accumulate updates.  This method
-gives access to these `Variable` objects if for some reason you need them.
-
-Use `get_slot_names()` to get the list of slot names created by the
-`Optimizer`.
-
-#### Args:
-
-* <b>`var`</b>: A variable passed to `minimize()` or `apply_gradients()`.
-* <b>`name`</b>: A string.
-
-
-#### Returns:
-
-The `Variable` for the slot if it was created, `None` otherwise.
 
 <h3 id="get_slot_names"><code>get_slot_names</code></h3>
 
@@ -306,52 +344,55 @@ The `Variable` for the slot if it was created, `None` otherwise.
 get_slot_names()
 ```
 
-Return a list of the names of slots created by the `Optimizer`.
+A list of names for this optimizer's slots.
 
-See `get_slot()`.
+<h3 id="get_updates"><code>get_updates</code></h3>
 
-#### Returns:
+``` python
+get_updates(
+    loss,
+    params
+)
+```
 
-A list of strings.
+
+
+<h3 id="get_weights"><code>get_weights</code></h3>
+
+``` python
+get_weights()
+```
+
+
 
 <h3 id="minimize"><code>minimize</code></h3>
 
 ``` python
 minimize(
     loss,
-    global_step=None,
-    var_list=None,
-    gate_gradients=GATE_OP,
-    aggregation_method=None,
-    colocate_gradients_with_ops=False,
-    name=None,
-    grad_loss=None
+    var_list,
+    grad_loss=None,
+    name=None
 )
 ```
 
-Add operations to minimize `loss` by updating `var_list`.
+Minimize `loss` by updating `var_list`.
 
-This method simply combines calls `compute_gradients()` and
+This method simply computes gradient using `tf.GradientTape` and calls
 `apply_gradients()`. If you want to process the gradient before applying
-them call `compute_gradients()` and `apply_gradients()` explicitly instead
+then call `tf.GradientTape` and `apply_gradients()` explicitly instead
 of using this function.
 
 #### Args:
 
-* <b>`loss`</b>: A `Tensor` containing the value to minimize.
-* <b>`global_step`</b>: Optional `Variable` to increment by one after the
-    variables have been updated.
-* <b>`var_list`</b>: Optional list or tuple of `Variable` objects to update to
-    minimize `loss`.  Defaults to the list of variables collected in
-    the graph under the key `GraphKeys.TRAINABLE_VARIABLES`.
-* <b>`gate_gradients`</b>: How to gate the computation of gradients.  Can be
-    `GATE_NONE`, `GATE_OP`, or  `GATE_GRAPH`.
-* <b>`aggregation_method`</b>: Specifies the method used to combine gradient terms.
-    Valid values are defined in the class `AggregationMethod`.
-* <b>`colocate_gradients_with_ops`</b>: If True, try colocating gradients with
-    the corresponding op.
-* <b>`name`</b>: Optional name for the returned operation.
+* <b>`loss`</b>: A callable taking no arguments which returns the value to minimize.
+* <b>`var_list`</b>: list or tuple of `Variable` objects to update to minimize
+    `loss`, or a callable returning the list or tuple of `Variable` objects.
+    Use callable when the variable list would otherwise be incomplete before
+    `minimize` since the variables are created at the first time `loss` is
+    called.
 * <b>`grad_loss`</b>: Optional. A `Tensor` holding the gradient computed for `loss`.
+* <b>`name`</b>: Optional name for the returned operation.
 
 
 #### Returns:
@@ -364,16 +405,11 @@ was not `None`, that operation also increments `global_step`.
 
 * <b>`ValueError`</b>: If some of the variables are not `Variable` objects.
 
+<h3 id="set_weights"><code>set_weights</code></h3>
 
-
-#### Eager Compatibility
-When eager execution is enabled, `loss` should be a Python function that
-takes no arguments and computes the value to be minimized. Minimization (and
-gradient computation) is done with respect to the elements of `var_list` if
-not None, else with respect to any trainable variables created during the
-execution of the `loss` function. `gate_gradients`, `aggregation_method`,
-`colocate_gradients_with_ops` and `grad_loss` are ignored when eager
-execution is enabled.
+``` python
+set_weights(weights)
+```
 
 
 
@@ -383,22 +419,7 @@ execution is enabled.
 variables()
 ```
 
-A list of variables which encode the current state of `Optimizer`.
-
-Includes slot variables and additional global variables created by the
-optimizer in the current default graph.
-
-#### Returns:
-
-A list of variables.
+Returns variables of this Optimizer based on the order created.
 
 
-
-## Class Members
-
-<h3 id="GATE_GRAPH"><code>GATE_GRAPH</code></h3>
-
-<h3 id="GATE_NONE"><code>GATE_NONE</code></h3>
-
-<h3 id="GATE_OP"><code>GATE_OP</code></h3>
 

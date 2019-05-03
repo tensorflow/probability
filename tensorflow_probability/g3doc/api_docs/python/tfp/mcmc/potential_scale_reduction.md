@@ -5,6 +5,8 @@
 
 # tfp.mcmc.potential_scale_reduction
 
+Gelman and Rubin (1992)'s potential scale reduction for chain convergence.
+
 ``` python
 tfp.mcmc.potential_scale_reduction(
     chains_states,
@@ -13,7 +15,11 @@ tfp.mcmc.potential_scale_reduction(
 )
 ```
 
-Gelman and Rubin (1992)'s potential scale reduction for chain convergence.
+
+
+Defined in [`python/mcmc/diagnostic.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/diagnostic.py).
+
+<!-- Placeholder for "Used in" -->
 
 Given `N > 1` states from each of `C > 1` independent chains, the potential
 scale reduction factor, commonly referred to as R-hat, measures convergence of
@@ -30,9 +36,9 @@ Some guidelines:
   Before that, R-hat > 1 (except in pathological cases, e.g. if the chain
   paths were identical).
 * The above holds for any number of chains `C > 1`.  Increasing `C` does
-  improves effectiveness of the diagnostic.
+  improve effectiveness of the diagnostic.
 * Sometimes, R-hat < 1.2 is used to indicate approximate convergence, but of
-  course this is problem dependent. See [Brooks and Gelman (1998)][2].
+  course this is problem-dependent. See [Brooks and Gelman (1998)][2].
 * R-hat only measures non-convergence of the mean. If higher moments, or
   other statistics are desired, a different diagnostic should be used. See
   [Brooks and Gelman (1998)][2].
@@ -40,15 +46,15 @@ Some guidelines:
 #### Args:
 
 * <b>`chains_states`</b>:  `Tensor` or Python `list` of `Tensor`s representing the
-    state(s) of a Markov Chain at each result step.  The `ith` state is
+    states of a Markov Chain at each result step.  The `ith` state is
     assumed to have shape `[Ni, Ci1, Ci2,...,CiD] + A`.
     Dimension `0` indexes the `Ni > 1` result steps of the Markov Chain.
     Dimensions `1` through `D` index the `Ci1 x ... x CiD` independent
     chains to be tested for convergence to the same target.
     The remaining dimensions, `A`, can have any shape (even empty).
 * <b>`independent_chain_ndims`</b>: Integer type `Tensor` with value `>= 1` giving the
-    number of giving the number of dimensions, from `dim = 1` to `dim = D`,
-    holding independent chain results to be tested for convergence.
+    number of dimensions, from `dim = 1` to `dim = D`, holding independent
+    chain results to be tested for convergence.
 * <b>`name`</b>: `String` name to prepend to created tf.  Default:
     `potential_scale_reduction`.
 

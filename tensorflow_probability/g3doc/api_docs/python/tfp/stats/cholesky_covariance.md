@@ -5,6 +5,8 @@
 
 # tfp.stats.cholesky_covariance
 
+Cholesky factor of the covariance matrix of vector-variate random samples.
+
 ``` python
 tfp.stats.cholesky_covariance(
     x,
@@ -14,7 +16,11 @@ tfp.stats.cholesky_covariance(
 )
 ```
 
-Cholesky factor of the covariance matrix of vector-variate random samples.
+
+
+Defined in [`python/stats/sample_stats.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/stats/sample_stats.py).
+
+<!-- Placeholder for "Used in" -->
 
 This function can be use to fit a multivariate normal to data.
 

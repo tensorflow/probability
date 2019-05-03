@@ -5,6 +5,8 @@
 
 # tfp.sts.forecast
 
+Construct predictive distribution over future observations.
+
 ``` python
 tfp.sts.forecast(
     model,
@@ -14,7 +16,11 @@ tfp.sts.forecast(
 )
 ```
 
-Construct predictive distribution over future observations.
+
+
+Defined in [`python/sts/forecast.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/sts/forecast.py).
+
+<!-- Placeholder for "Used in" -->
 
 Given samples from the posterior over parameters, return the predictive
 distribution over future observations for num_steps_forecast timesteps.
@@ -27,7 +33,9 @@ distribution over future observations for num_steps_forecast timesteps.
 * <b>`observed_time_series`</b>: `float` `Tensor` of shape
     `concat([sample_shape, model.batch_shape, [num_timesteps, 1]])` where
     `sample_shape` corresponds to i.i.d. observations, and the trailing `[1]`
-    dimension may (optionally) be omitted if `num_timesteps > 1`.
+    dimension may (optionally) be omitted if `num_timesteps > 1`. May
+    optionally be an instance of <a href="../../tfp/sts/MaskedTimeSeries.md"><code>tfp.sts.MaskedTimeSeries</code></a> including a
+    mask `Tensor` to encode the locations of missing observations.
 * <b>`parameter_samples`</b>: Python `list` of `Tensors` representing posterior samples
     of model parameters, with shapes `[concat([[num_posterior_draws],
     param.prior.batch_shape, param.prior.event_shape]) for param in

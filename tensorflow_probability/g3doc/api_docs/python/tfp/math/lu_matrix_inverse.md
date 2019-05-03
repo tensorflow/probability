@@ -5,6 +5,8 @@
 
 # tfp.math.lu_matrix_inverse
 
+Computes a matrix inverse given the matrix's LU decomposition.
+
 ``` python
 tfp.math.lu_matrix_inverse(
     lower_upper,
@@ -14,7 +16,11 @@ tfp.math.lu_matrix_inverse(
 )
 ```
 
-Computes a matrix inverse given the matrix's LU decomposition.
+
+
+Defined in [`python/math/linalg.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/math/linalg.py).
+
+<!-- Placeholder for "Used in" -->
 
 This op is conceptually identical to,
 

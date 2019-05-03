@@ -5,6 +5,8 @@
 
 # tfp.trainable_distributions.softplus_and_shift
 
+Converts (batch of) scalars to (batch of) positive valued scalars.
+
 ``` python
 tfp.trainable_distributions.softplus_and_shift(
     x,
@@ -13,7 +15,11 @@ tfp.trainable_distributions.softplus_and_shift(
 )
 ```
 
-Converts (batch of) scalars to (batch of) positive valued scalars.
+
+
+Defined in [`python/trainable_distributions/trainable_distributions_lib.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/trainable_distributions/trainable_distributions_lib.py).
+
+<!-- Placeholder for "Used in" -->
 
 #### Args:
 

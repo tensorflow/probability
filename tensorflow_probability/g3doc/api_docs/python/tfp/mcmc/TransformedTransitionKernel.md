@@ -15,9 +15,15 @@
 
 ## Class `TransformedTransitionKernel`
 
+TransformedTransitionKernel applies a bijector to the MCMC's state space.
+
 Inherits From: [`TransitionKernel`](../../tfp/mcmc/TransitionKernel.md)
 
-TransformedTransitionKernel applies a bijector to the MCMC's state space.
+
+
+Defined in [`python/mcmc/transformed_kernel.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/transformed_kernel.py).
+
+<!-- Placeholder for "Used in" -->
 
 The `TransformedTransitionKernel` `TransitionKernel` enables fitting
 a [Bijector](

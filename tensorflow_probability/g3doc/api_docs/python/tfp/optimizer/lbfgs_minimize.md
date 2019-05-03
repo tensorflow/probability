@@ -5,6 +5,8 @@
 
 # tfp.optimizer.lbfgs_minimize
 
+Applies the L-BFGS algorithm to minimize a differentiable function.
+
 ``` python
 tfp.optimizer.lbfgs_minimize(
     value_and_gradients_function,
@@ -16,11 +18,16 @@ tfp.optimizer.lbfgs_minimize(
     initial_inverse_hessian_estimate=None,
     max_iterations=50,
     parallel_iterations=1,
+    stopping_condition=None,
     name=None
 )
 ```
 
-Applies the L-BFGS algorithm to minimize a differentiable function.
+
+
+Defined in [`python/optimizer/lbfgs.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/optimizer/lbfgs.py).
+
+<!-- Placeholder for "Used in" -->
 
 Performs unconstrained minimization of a differentiable function using the
 L-BFGS scheme. See [Nocedal and Wright(2006)][1] for details of the algorithm.
@@ -66,12 +73,14 @@ http://pages.mtu.edu/~struther/Courses/OLD/Sp2013/5630/Jorge_Nocedal_Numerical_o
 * <b>`value_and_gradients_function`</b>:  A Python callable that accepts a point as a
     real `Tensor` and returns a tuple of `Tensor`s of real dtype containing
     the value of the function and its gradient at that point. The function
-    to be minimized. The first component of the return value should be a
-    real scalar `Tensor`. The second component (the gradient) should have the
-    same shape as the input value to the function.
-* <b>`initial_position`</b>: `Tensor` of real dtype. The starting point of the search
-    procedure. Should be a point at which the function value and the gradient
-    norm are finite.
+    to be minimized. The input is of shape `[..., n]`, where `n` is the size
+    of the domain of input points, and all others are batching dimensions.
+    The first component of the return value is a real `Tensor` of matching
+    shape `[...]`. The second component (the gradient) is also of shape
+    `[..., n]` like the input value to the function.
+* <b>`initial_position`</b>: Real `Tensor` of shape `[..., n]`. The starting point, or
+    points when using batching dimensions, of the search procedure. At these
+    points the function value and the gradient norm should be finite.
 * <b>`num_correction_pairs`</b>: Positive integer. Specifies the maximum number of
     (position_delta, gradient_delta) correction pairs to keep as implicit
     approximation of the Hessian matrix.
@@ -86,9 +95,17 @@ http://pages.mtu.edu/~struther/Courses/OLD/Sp2013/5630/Jorge_Nocedal_Numerical_o
     than this value, the algorithm is stopped.
 * <b>`initial_inverse_hessian_estimate`</b>: None. Option currently not supported.
 * <b>`max_iterations`</b>: Scalar positive int32 `Tensor`. The maximum number of
-    iterations for BFGS updates.
+    iterations for L-BFGS updates.
 * <b>`parallel_iterations`</b>: Positive integer. The number of iterations allowed to
     run in parallel.
+* <b>`stopping_condition`</b>: (Optional) A Python function that takes as input two
+    Boolean tensors of shape `[...]`, and returns a Boolean scalar tensor.
+    The input tensors are `converged` and `failed`, indicating the current
+    status of each respective batch member; the return value states whether
+    the algorithm should stop. The default is tfp.optimizer.converged_all
+    which only stops when all batch members have either converged or failed.
+    An alternative is tfp.optimizer.converged_any which stops as soon as one
+    batch member has converged, or when all have failed.
 * <b>`name`</b>: (Optional) Python str. The name prefixed to the ops created by this
     function. If not supplied, the default name 'minimize' is used.
 

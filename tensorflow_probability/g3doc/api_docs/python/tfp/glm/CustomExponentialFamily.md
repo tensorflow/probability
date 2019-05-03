@@ -14,9 +14,16 @@
 
 ## Class `CustomExponentialFamily`
 
+Constucts GLM from arbitrary distribution and inverse link function.
+
 Inherits From: [`ExponentialFamily`](../../tfp/glm/ExponentialFamily.md)
 
-Constucts GLM from arbitrary distribution and inverse link function.
+
+
+Defined in [`python/glm/family.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/glm/family.py).
+
+<!-- Placeholder for "Used in" -->
+
 
 <h2 id="__init__"><code>__init__</code></h2>
 

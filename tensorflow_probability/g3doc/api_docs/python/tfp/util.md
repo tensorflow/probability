@@ -7,11 +7,14 @@
 
 TensorFlow Probability python utilities.
 
+
+
+Defined in [`python/util/__init__.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/util/__init__.py).
+
+<!-- Placeholder for "Used in" -->
+
+
 ## Modules
 
 [`docstring`](../tfp/util/docstring.md) module: Utilities for programmable docstrings.
-
-## Functions
-
-[`externalize_variables_as_args(...)`](../tfp/util/externalize_variables_as_args.md): "Converts variables within a callable into explicit args. (deprecated)
 

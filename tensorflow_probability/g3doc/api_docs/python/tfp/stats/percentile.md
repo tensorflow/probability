@@ -5,6 +5,8 @@
 
 # tfp.stats.percentile
 
+Compute the `q`-th percentile(s) of `x`.
+
 ``` python
 tfp.stats.percentile(
     x,
@@ -18,7 +20,11 @@ tfp.stats.percentile(
 )
 ```
 
-Compute the `q`-th percentile(s) of `x`.
+
+
+Defined in [`python/stats/quantiles.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/stats/quantiles.py).
+
+<!-- Placeholder for "Used in" -->
 
 Given a vector `x`, the `q`-th percentile of `x` is the value `q / 100` of the
 way from the minimum to the maximum in a sorted copy of `x`.
@@ -33,46 +39,15 @@ if `q = 0` and the same as the maximum if `q = 100`.
 Multiple percentiles can be computed at once by using `1-D` vector `q`.
 Dimension zero of the returned `Tensor` will index the different percentiles.
 
-
-```python
-# Get 30th percentile with default ('nearest') interpolation.
-x = [1., 2., 3., 4.]
-tfp.stats.percentile(x, q=30.)
-==> 2.0
-
-# Get 30th percentile with 'linear' interpolation.
-x = [1., 2., 3., 4.]
-tfp.stats.percentile(x, q=30., interpolation='linear')
-==> 1.9
-
-# Get 30th and 70th percentiles with 'lower' interpolation
-x = [1., 2., 3., 4.]
-tfp.stats.percentile(x, q=[30., 70.], interpolation='lower')
-==> [1., 3.]
-
-# Get 100th percentile (maximum).  By default, this is computed over every dim
-x = [[1., 2.]
-     [3., 4.]]
-tfp.stats.percentile(x, q=100.)
-==> 4.
-
-# Treat the leading dim as indexing samples, and find the 100th quantile (max)
-# over all such samples.
-x = [[1., 2.]
-     [3., 4.]]
-tfp.stats.percentile(x, q=100., axis=[0])
-==> [3., 4.]
-```
-
 Compare to `numpy.percentile`.
 
 #### Args:
 
-* <b>`x`</b>:  Floating point `N-D` `Tensor` with `N > 0`.  If `axis` is not `None`,
+* <b>`x`</b>:  Numeric `N-D` `Tensor` with `N > 0`.  If `axis` is not `None`,
     `x` must have statically known number of dimensions.
 * <b>`q`</b>:  Scalar or vector `Tensor` with values in `[0, 100]`. The percentile(s).
 * <b>`axis`</b>:  Optional `0-D` or `1-D` integer `Tensor` with constant values. The
-    axis that hold independent samples over which to return the desired
+    axis that index independent samples over which to return the desired
     percentile.  If `None` (the default), treat every dimension as a sample
     dimension, returning a scalar.
 * <b>`interpolation `</b>: {'nearest', 'linear', 'lower', 'higher', 'midpoint'}.
@@ -107,3 +82,35 @@ A `(rank(q) + N - len(axis))` dimensional `Tensor` of same dtype as `x`, or,
 
 * <b>`ValueError`</b>:  If argument 'interpolation' is not an allowed type.
 * <b>`ValueError`</b>:  If interpolation type not compatible with `dtype`.
+
+#### Examples
+
+```python
+# Get 30th percentile with default ('nearest') interpolation.
+x = [1., 2., 3., 4.]
+tfp.stats.percentile(x, q=30.)
+==> 2.0
+
+# Get 30th percentile with 'linear' interpolation.
+x = [1., 2., 3., 4.]
+tfp.stats.percentile(x, q=30., interpolation='linear')
+==> 1.9
+
+# Get 30th and 70th percentiles with 'lower' interpolation
+x = [1., 2., 3., 4.]
+tfp.stats.percentile(x, q=[30., 70.], interpolation='lower')
+==> [1., 3.]
+
+# Get 100th percentile (maximum).  By default, this is computed over every dim
+x = [[1., 2.]
+     [3., 4.]]
+tfp.stats.percentile(x, q=100.)
+==> 4.
+
+# Treat the leading dim as indexing samples, and find the 100th quantile (max)
+# over all such samples.
+x = [[1., 2.]
+     [3., 4.]]
+tfp.stats.percentile(x, q=100., axis=[0])
+==> [3., 4.]
+```

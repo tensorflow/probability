@@ -5,6 +5,8 @@
 
 # tfp.bijectors.masked_dense
 
+A autoregressively masked dense layer. Analogous to `tf.layers.dense`.
+
 ``` python
 tfp.bijectors.masked_dense(
     inputs,
@@ -19,7 +21,11 @@ tfp.bijectors.masked_dense(
 )
 ```
 
-A autoregressively masked dense layer. Analogous to `tf.layers.dense`.
+
+
+Defined in [`python/bijectors/masked_autoregressive.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/bijectors/masked_autoregressive.py).
+
+<!-- Placeholder for "Used in" -->
 
 See [Germain et al. (2015)][1] for detailed explanation.
 

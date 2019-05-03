@@ -5,18 +5,24 @@
 
 # tfp.trainable_distributions.multivariate_normal_tril
 
+Constructs a trainable `tfd.MultivariateNormalTriL` distribution.
+
 ``` python
 tfp.trainable_distributions.multivariate_normal_tril(
     x,
     dims,
-    layer_fn=tf.layers.dense,
+    layer_fn=tf.compat.v1.layers.dense,
     loc_fn=(lambda x: x),
     scale_fn=tfp.trainable_distributions.tril_with_diag_softplus_and_shift,
     name=None
 )
 ```
 
-Constructs a trainable `tfd.MultivariateNormalTriL` distribution.
+
+
+Defined in [`python/trainable_distributions/trainable_distributions_lib.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/trainable_distributions/trainable_distributions_lib.py).
+
+<!-- Placeholder for "Used in" -->
 
 This function creates a MultivariateNormal (MVN) with lower-triangular scale
 matrix. By default the MVN is parameterized via affine transformation of input

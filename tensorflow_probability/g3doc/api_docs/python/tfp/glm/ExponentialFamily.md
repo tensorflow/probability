@@ -12,9 +12,15 @@
 
 ## Class `ExponentialFamily`
 
-
-
 Specifies a mean-value parameterized exponential family.
+
+
+
+
+
+Defined in [`python/glm/family.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/glm/family.py).
+
+<!-- Placeholder for "Used in" -->
 
 Subclasses implement [exponential-family distribution](
 https://en.wikipedia.org/wiki/Exponential_family) properties (e.g.,

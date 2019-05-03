@@ -5,6 +5,8 @@
 
 # tfp.edward2.Bernoulli
 
+Create a random variable for Bernoulli.
+
 ``` python
 tfp.edward2.Bernoulli(
     *args,
@@ -12,7 +14,11 @@ tfp.edward2.Bernoulli(
 )
 ```
 
-Create a random variable for Bernoulli.
+
+
+Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
+
+<!-- Placeholder for "Used in" -->
 
 See Bernoulli for more details.
 

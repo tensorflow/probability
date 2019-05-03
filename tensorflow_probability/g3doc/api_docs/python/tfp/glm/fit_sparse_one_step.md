@@ -5,6 +5,8 @@
 
 # tfp.glm.fit_sparse_one_step
 
+One step of (the outer loop of) the GLM fitting algorithm.
+
 ``` python
 tfp.glm.fit_sparse_one_step(
     model_matrix,
@@ -20,7 +22,11 @@ tfp.glm.fit_sparse_one_step(
 )
 ```
 
-One step of (the outer loop of) the GLM fitting algorithm.
+
+
+Defined in [`python/glm/proximal_hessian.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/glm/proximal_hessian.py).
+
+<!-- Placeholder for "Used in" -->
 
 This function returns a new value of `model_coefficients`, equal to
 `model_coefficients_start + model_coefficients_update`.  The increment

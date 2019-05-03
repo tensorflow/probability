@@ -5,6 +5,8 @@
 
 # tfp.distributions.fill_triangular
 
+Creates a (batch of) triangular matrix from a vector of inputs.
+
 ``` python
 tfp.distributions.fill_triangular(
     x,
@@ -13,7 +15,11 @@ tfp.distributions.fill_triangular(
 )
 ```
 
-Creates a (batch of) triangular matrix from a vector of inputs.
+
+
+Defined in [`python/internal/distribution_util.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/internal/distribution_util.py).
+
+<!-- Placeholder for "Used in" -->
 
 Created matrix can be lower- or upper-triangular. (It is more efficient to
 create the matrix as upper or lower, rather than transpose.)

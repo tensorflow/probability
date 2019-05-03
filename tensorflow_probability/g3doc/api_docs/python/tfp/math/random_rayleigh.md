@@ -5,6 +5,8 @@
 
 # tfp.math.random_rayleigh
 
+Generates `Tensor` of positive reals drawn from a Rayleigh distributions.
+
 ``` python
 tfp.math.random_rayleigh(
     shape,
@@ -15,7 +17,11 @@ tfp.math.random_rayleigh(
 )
 ```
 
-Generates `Tensor` of positive reals drawn from a Rayleigh distributions.
+
+
+Defined in [`python/math/random_ops.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/math/random_ops.py).
+
+<!-- Placeholder for "Used in" -->
 
 The probability density function of a Rayleigh distribution with `scale`
 parameter is given by:

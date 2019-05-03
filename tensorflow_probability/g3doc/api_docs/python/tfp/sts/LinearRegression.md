@@ -17,9 +17,15 @@
 
 ## Class `LinearRegression`
 
+Formal representation of a linear regression from provided covariates.
+
 Inherits From: [`StructuralTimeSeries`](../../tfp/sts/StructuralTimeSeries.md)
 
-Formal representation of a linear regression from provided covariates.
+
+
+Defined in [`python/sts/regression.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/sts/regression.py).
+
+<!-- Placeholder for "Used in" -->
 
 This model defines a time series given by a linear combination of
 covariate time series provided in a design matrix:
@@ -114,7 +120,7 @@ __init__(
 )
 ```
 
-Build a state space model implementing linear regression.
+Specify a linear regression model.
 
 Note: the statistical behavior of the regression is determined by
 the broadcasting behavior of the `weights` `Tensor`:
@@ -220,7 +226,9 @@ Build the joint density `log p(params) + log p(y|params)` as a callable.
     `1` dimension is optional if `num_timesteps > 1`), where
     `batch_shape` should match `self.batch_shape` (the broadcast batch
     shape of all priors on parameters for this structural time series
-    model).
+    model). May optionally be an instance of <a href="../../tfp/sts/MaskedTimeSeries.md"><code>tfp.sts.MaskedTimeSeries</code></a>,
+    which includes a mask `Tensor` to specify timesteps with missing
+    observations.
 
 
 #### Returns:

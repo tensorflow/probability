@@ -12,7 +12,9 @@
 <meta itemprop="property" content="parameters"/>
 <meta itemprop="property" content="reparameterization_type"/>
 <meta itemprop="property" content="validate_args"/>
+<meta itemprop="property" content="__getitem__"/>
 <meta itemprop="property" content="__init__"/>
+<meta itemprop="property" content="__iter__"/>
 <meta itemprop="property" content="batch_shape_tensor"/>
 <meta itemprop="property" content="cdf"/>
 <meta itemprop="property" content="copy"/>
@@ -42,14 +44,23 @@
 
 ## Class `GammaGamma`
 
+Gamma-Gamma distribution.
+
 Inherits From: [`Distribution`](../../tfp/distributions/Distribution.md)
 
-Gamma-Gamma distribution.
+
+
+Defined in [`python/distributions/gamma_gamma.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/gamma_gamma.py).
+
+<!-- Placeholder for "Used in" -->
 
 Gamma-Gamma is a [compound
 distribution](https://en.wikipedia.org/wiki/Compound_probability_distribution)
 defined over positive real numbers using parameters `concentration`,
 `mixing_concentration` and `mixing_rate`.
+
+This distribution is also referred to as the beta of the second kind (B2), and
+can be useful for transaction value modeling, as [(Fader and Hardi, 2013)][1].
 
 #### Mathematical Details
 
@@ -74,14 +85,19 @@ pdf(x; alpha, alpha0, beta0) = ---------------------------------
 ```
 where the normalizing constant `Z = Beta(alpha, alpha0) * beta0**(-alpha0)`.
 
-See:
-  http://www.brucehardie.com/notes/025/gamma_gamma.pdf
-
 Samples of this distribution are reparameterized as samples of the Gamma
-distribution are reparameterized using the technique described in the paper
+distribution are reparameterized using the technique described in
+[(Figurnov et al., 2018)][2].
 
-[Michael Figurnov, Shakir Mohamed, Andriy Mnih.
-Implicit Reparameterization Gradients, 2018](https://arxiv.org/abs/1805.08498)
+#### References
+
+[1]: Peter S. Fader, Bruce G. S. Hardi. The Gamma-Gamma Model of Monetary
+     Value. _Technical Report_, 2013.
+     http://www.brucehardie.com/notes/025/gamma_gamma.pdf
+
+[2]: Michael Figurnov, Shakir Mohamed, Andriy Mnih.
+     Implicit Reparameterization Gradients. _arXiv preprint arXiv:1805.08498_,
+     2018. https://arxiv.org/abs/1805.08498
 
 <h2 id="__init__"><code>__init__</code></h2>
 
@@ -211,6 +227,49 @@ Python `bool` indicating possibly expensive checks are enabled.
 
 ## Methods
 
+<h3 id="__getitem__"><code>__getitem__</code></h3>
+
+``` python
+__getitem__(slices)
+```
+
+Slices the batch axes of this distribution, returning a new instance.
+
+```python
+b = tfd.Bernoulli(logits=tf.zeros([3, 5, 7, 9]))
+b.batch_shape  # => [3, 5, 7, 9]
+b2 = b[:, tf.newaxis, ..., -2:, 1::2]
+b2.batch_shape  # => [3, 1, 5, 2, 4]
+
+x = tf.random.normal([5, 3, 2, 2])
+cov = tf.matmul(x, x, transpose_b=True)
+chol = tf.cholesky(cov)
+loc = tf.random.normal([4, 1, 3, 1])
+mvn = tfd.MultivariateNormalTriL(loc, chol)
+mvn.batch_shape  # => [4, 5, 3]
+mvn.event_shape  # => [2]
+mvn2 = mvn[:, 3:, ..., ::-1, tf.newaxis]
+mvn2.batch_shape  # => [4, 2, 3, 1]
+mvn2.event_shape  # => [2]
+```
+
+#### Args:
+
+* <b>`slices`</b>: slices from the [] operator
+
+
+#### Returns:
+
+* <b>`dist`</b>: A new `tfd.Distribution` instance with sliced parameters.
+
+<h3 id="__iter__"><code>__iter__</code></h3>
+
+``` python
+__iter__()
+```
+
+
+
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
 
 ``` python
@@ -236,7 +295,8 @@ parameterizations of this distribution.
 ``` python
 cdf(
     value,
-    name='cdf'
+    name='cdf',
+    **kwargs
 )
 ```
 
@@ -252,6 +312,7 @@ cdf(x) := P[X <= x]
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -285,7 +346,10 @@ initialization arguments.
 <h3 id="covariance"><code>covariance</code></h3>
 
 ``` python
-covariance(name='covariance')
+covariance(
+    name='covariance',
+    **kwargs
+)
 ```
 
 Covariance.
@@ -318,6 +382,7 @@ length-`k'` vector.
 #### Args:
 
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -362,7 +427,10 @@ where `F` denotes the support of the random variable `X ~ P`.
 <h3 id="entropy"><code>entropy</code></h3>
 
 ``` python
-entropy(name='entropy')
+entropy(
+    name='entropy',
+    **kwargs
+)
 ```
 
 Shannon entropy in nats.
@@ -459,7 +527,8 @@ denotes (Shannon) cross entropy, and `H[.]` denotes (Shannon) entropy.
 ``` python
 log_cdf(
     value,
-    name='log_cdf'
+    name='log_cdf',
+    **kwargs
 )
 ```
 
@@ -479,6 +548,7 @@ a more accurate answer than simply taking the logarithm of the `cdf` when
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -491,7 +561,8 @@ a more accurate answer than simply taking the logarithm of the `cdf` when
 ``` python
 log_prob(
     value,
-    name='log_prob'
+    name='log_prob',
+    **kwargs
 )
 ```
 
@@ -501,6 +572,7 @@ Log probability density/mass function.
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -513,7 +585,8 @@ Log probability density/mass function.
 ``` python
 log_survival_function(
     value,
-    name='log_survival_function'
+    name='log_survival_function',
+    **kwargs
 )
 ```
 
@@ -534,6 +607,7 @@ survival function, which are more accurate than `1 - cdf(x)` when `x >> 1`.
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -544,7 +618,10 @@ survival function, which are more accurate than `1 - cdf(x)` when `x >> 1`.
 <h3 id="mean"><code>mean</code></h3>
 
 ``` python
-mean(name='mean')
+mean(
+    name='mean',
+    **kwargs
+)
 ```
 
 Mean.
@@ -559,7 +636,10 @@ is `False`, an exception will be raised rather than returning `NaN`
 <h3 id="mode"><code>mode</code></h3>
 
 ``` python
-mode(name='mode')
+mode(
+    name='mode',
+    **kwargs
+)
 ```
 
 Mode.
@@ -632,7 +712,8 @@ constant-valued tensors when constant values are fed.
 ``` python
 prob(
     value,
-    name='prob'
+    name='prob',
+    **kwargs
 )
 ```
 
@@ -642,6 +723,7 @@ Probability density/mass function.
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -654,7 +736,8 @@ Probability density/mass function.
 ``` python
 quantile(
     value,
-    name='quantile'
+    name='quantile',
+    **kwargs
 )
 ```
 
@@ -670,6 +753,7 @@ quantile(p) := x such that P[X <= x] == p
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -683,7 +767,8 @@ quantile(p) := x such that P[X <= x] == p
 sample(
     sample_shape=(),
     seed=None,
-    name='sample'
+    name='sample',
+    **kwargs
 )
 ```
 
@@ -697,6 +782,7 @@ sample.
 * <b>`sample_shape`</b>: 0D or 1D `int32` `Tensor`. Shape of the generated samples.
 * <b>`seed`</b>: Python integer seed for RNG
 * <b>`name`</b>: name to give to the op.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -706,7 +792,10 @@ sample.
 <h3 id="stddev"><code>stddev</code></h3>
 
 ``` python
-stddev(name='stddev')
+stddev(
+    name='stddev',
+    **kwargs
+)
 ```
 
 Standard deviation.
@@ -723,6 +812,7 @@ denotes expectation, and `stddev.shape = batch_shape + event_shape`.
 #### Args:
 
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -735,7 +825,8 @@ denotes expectation, and `stddev.shape = batch_shape + event_shape`.
 ``` python
 survival_function(
     value,
-    name='survival_function'
+    name='survival_function',
+    **kwargs
 )
 ```
 
@@ -753,6 +844,7 @@ survival_function(x) = P[X > x]
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -763,7 +855,10 @@ survival_function(x) = P[X > x]
 <h3 id="variance"><code>variance</code></h3>
 
 ``` python
-variance(name='variance')
+variance(
+    name='variance',
+    **kwargs
+)
 ```
 
 Variance.
@@ -777,9 +872,19 @@ Var = E[(X - E[X])**2]
 where `X` is the random variable associated with this distribution, `E`
 denotes expectation, and `Var.shape = batch_shape + event_shape`.
 
+
+Additional documentation from `GammaGamma`:
+
+The variance of a Gamma-Gamma distribution is
+`concentration**2 * mixing_rate**2 / ((mixing_concentration - 1)**2 *
+(mixing_concentration - 2))`, when `mixing_concentration > 2`, and `NaN`
+otherwise. If `self.allow_nan_stats` is `False`, an exception will be
+raised rather than returning `NaN`
+
 #### Args:
 
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:

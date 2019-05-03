@@ -9,9 +9,20 @@
 
 ## Class `RegisterKL`
 
-
-
 Decorator to register a KL divergence implementation function.
+
+
+
+### Aliases:
+
+* Class `tfp.distributions.RegisterKL`
+* Class `tfp.layers.dense_variational_v2.kullback_leibler.RegisterKL`
+
+
+
+Defined in [`python/distributions/kullback_leibler.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/kullback_leibler.py).
+
+<!-- Placeholder for "Used in" -->
 
 Usage:
 

@@ -5,6 +5,8 @@
 
 # tfp.edward2.PoissonLogNormalQuadratureCompound
 
+Create a random variable for PoissonLogNormalQuadratureCompound.
+
 ``` python
 tfp.edward2.PoissonLogNormalQuadratureCompound(
     *args,
@@ -12,7 +14,11 @@ tfp.edward2.PoissonLogNormalQuadratureCompound(
 )
 ```
 
-Create a random variable for PoissonLogNormalQuadratureCompound.
+
+
+Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
+
+<!-- Placeholder for "Used in" -->
 
 See PoissonLogNormalQuadratureCompound for more details.
 

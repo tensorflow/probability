@@ -15,9 +15,15 @@
 
 ## Class `MetropolisHastings`
 
+Runs one step of the Metropolis-Hastings algorithm.
+
 Inherits From: [`TransitionKernel`](../../tfp/mcmc/TransitionKernel.md)
 
-Runs one step of the Metropolis-Hastings algorithm.
+
+
+Defined in [`python/mcmc/metropolis_hastings.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/metropolis_hastings.py).
+
+<!-- Placeholder for "Used in" -->
 
 The [Metropolis-Hastings algorithm](
 https://en.wikipedia.org/wiki/Metropolis%E2%80%93Hastings_algorithm) is a
@@ -46,7 +52,7 @@ The most common use-case for `log_acceptance_correction` is in the
 Metropolis-Hastings algorithm, i.e.,
 
 ```none
-accept_prob(x' | x) = p(x') / p(x) (g(x|x') / g(x|x'))
+accept_prob(x' | x) = p(x') / p(x) (g(x|x') / g(x'|x))
 
 where,
   p  represents the target distribution,

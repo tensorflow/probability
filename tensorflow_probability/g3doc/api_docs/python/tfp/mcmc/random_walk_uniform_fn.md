@@ -5,6 +5,8 @@
 
 # tfp.mcmc.random_walk_uniform_fn
 
+Returns a callable that adds a random uniform perturbation to the input.
+
 ``` python
 tfp.mcmc.random_walk_uniform_fn(
     scale=1.0,
@@ -12,7 +14,11 @@ tfp.mcmc.random_walk_uniform_fn(
 )
 ```
 
-Returns a callable that adds a random uniform perturbation to the input.
+
+
+Defined in [`python/mcmc/random_walk_metropolis.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/random_walk_metropolis.py).
+
+<!-- Placeholder for "Used in" -->
 
 For more details on `random_walk_uniform_fn`, see
 `random_walk_normal_fn`. `scale` might

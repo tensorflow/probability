@@ -5,6 +5,8 @@
 
 # tfp.edward2.Chi2
 
+Create a random variable for Chi2.
+
 ``` python
 tfp.edward2.Chi2(
     *args,
@@ -12,7 +14,11 @@ tfp.edward2.Chi2(
 )
 ```
 
-Create a random variable for Chi2.
+
+
+Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
+
+<!-- Placeholder for "Used in" -->
 
 See Chi2 for more details.
 

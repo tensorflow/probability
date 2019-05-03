@@ -5,6 +5,8 @@
 
 # tfp.mcmc.random_walk_normal_fn
 
+Returns a callable that adds a random normal perturbation to the input.
+
 ``` python
 tfp.mcmc.random_walk_normal_fn(
     scale=1.0,
@@ -12,7 +14,11 @@ tfp.mcmc.random_walk_normal_fn(
 )
 ```
 
-Returns a callable that adds a random normal perturbation to the input.
+
+
+Defined in [`python/mcmc/random_walk_metropolis.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/random_walk_metropolis.py).
+
+<!-- Placeholder for "Used in" -->
 
 This function returns a callable that accepts a Python `list` of `Tensor`s of
 any shapes and `dtypes`  representing the state parts of the `current_state`

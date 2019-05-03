@@ -5,6 +5,8 @@
 
 # tfp.mcmc.effective_sample_size
 
+Estimate a lower bound on effective sample size for each independent chain.
+
 ``` python
 tfp.mcmc.effective_sample_size(
     states,
@@ -14,7 +16,11 @@ tfp.mcmc.effective_sample_size(
 )
 ```
 
-Estimate a lower bound on effective sample size for each independent chain.
+
+
+Defined in [`python/mcmc/diagnostic.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/diagnostic.py).
+
+<!-- Placeholder for "Used in" -->
 
 Roughly speaking, "effective sample size" (ESS) is the size of an iid sample
 with the same variance as `state`.

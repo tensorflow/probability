@@ -5,6 +5,8 @@
 
 # tfp.vi.monte_carlo_csiszar_f_divergence
 
+Monte-Carlo approximation of the Csiszar f-Divergence.
+
 ``` python
 tfp.vi.monte_carlo_csiszar_f_divergence(
     f,
@@ -17,7 +19,11 @@ tfp.vi.monte_carlo_csiszar_f_divergence(
 )
 ```
 
-Monte-Carlo approximation of the Csiszar f-Divergence.
+
+
+Defined in [`python/vi/csiszar_divergence.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/vi/csiszar_divergence.py).
+
+<!-- Placeholder for "Used in" -->
 
 A Csiszar-function is a member of,
 

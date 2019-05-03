@@ -7,6 +7,13 @@
 
 TensorFlow Probability Optimizer python package.
 
+
+
+Defined in [`python/optimizer/__init__.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/optimizer/__init__.py).
+
+<!-- Placeholder for "Used in" -->
+
+
 ## Modules
 
 [`linesearch`](../tfp/optimizer/linesearch.md) module: Line-search optimizers package.
@@ -21,6 +28,10 @@ TensorFlow Probability Optimizer python package.
 
 [`bfgs_minimize(...)`](../tfp/optimizer/bfgs_minimize.md): Applies the BFGS algorithm to minimize a differentiable function.
 
+[`converged_all(...)`](../tfp/optimizer/converged_all.md): Condition to stop when all batch members have converged or failed.
+
+[`converged_any(...)`](../tfp/optimizer/converged_any.md): Condition to stop when any batch member converges, or all have failed.
+
 [`differential_evolution_minimize(...)`](../tfp/optimizer/differential_evolution_minimize.md): Applies the Differential evolution algorithm to minimize a function.
 
 [`differential_evolution_one_step(...)`](../tfp/optimizer/differential_evolution_one_step.md): Performs one step of the differential evolution algorithm.
@@ -30,4 +41,8 @@ TensorFlow Probability Optimizer python package.
 [`nelder_mead_minimize(...)`](../tfp/optimizer/nelder_mead_minimize.md): Minimum of the objective function using the Nelder Mead simplex algorithm.
 
 [`nelder_mead_one_step(...)`](../tfp/optimizer/nelder_mead_one_step.md): A single iteration of the Nelder Mead algorithm.
+
+[`proximal_hessian_sparse_minimize(...)`](../tfp/optimizer/proximal_hessian_sparse_minimize.md): Minimize using Hessian-informed proximal gradient descent.
+
+[`proximal_hessian_sparse_one_step(...)`](../tfp/optimizer/proximal_hessian_sparse_one_step.md): One step of (the outer loop of) the minimization algorithm.
 

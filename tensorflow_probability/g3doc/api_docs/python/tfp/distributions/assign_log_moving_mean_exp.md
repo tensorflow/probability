@@ -5,6 +5,8 @@
 
 # tfp.distributions.assign_log_moving_mean_exp
 
+Compute the log of the exponentially weighted moving mean of the exp.
+
 ``` python
 tfp.distributions.assign_log_moving_mean_exp(
     log_mean_exp_var,
@@ -14,7 +16,11 @@ tfp.distributions.assign_log_moving_mean_exp(
 )
 ```
 
-Compute the log of the exponentially weighted moving mean of the exp.
+
+
+Defined in [`python/distributions/internal/moving_stats.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/internal/moving_stats.py).
+
+<!-- Placeholder for "Used in" -->
 
 If `log_value` is a draw from a stationary random variable, this function
 approximates `log(E[exp(log_value)])`, i.e., a weighted log-sum-exp. More

@@ -5,6 +5,8 @@
 
 # tfp.edward2.Zipf
 
+Create a random variable for Zipf.
+
 ``` python
 tfp.edward2.Zipf(
     *args,
@@ -12,7 +14,11 @@ tfp.edward2.Zipf(
 )
 ```
 
-Create a random variable for Zipf.
+
+
+Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
+
+<!-- Placeholder for "Used in" -->
 
 See Zipf for more details.
 

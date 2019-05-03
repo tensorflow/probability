@@ -5,6 +5,8 @@
 
 # tfp.edward2.Categorical
 
+Create a random variable for Categorical.
+
 ``` python
 tfp.edward2.Categorical(
     *args,
@@ -12,7 +14,11 @@ tfp.edward2.Categorical(
 )
 ```
 
-Create a random variable for Categorical.
+
+
+Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
+
+<!-- Placeholder for "Used in" -->
 
 See Categorical for more details.
 

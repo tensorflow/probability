@@ -5,6 +5,8 @@
 
 # tfp.sts.fit_with_hmc
 
+Draw posterior samples using Hamiltonian Monte Carlo (HMC).
+
 ``` python
 tfp.sts.fit_with_hmc(
     model,
@@ -22,7 +24,11 @@ tfp.sts.fit_with_hmc(
 )
 ```
 
-Draw posterior samples using Hamiltonian Monte Carlo (HMC).
+
+
+Defined in [`python/sts/fitting.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/sts/fitting.py).
+
+<!-- Placeholder for "Used in" -->
 
 Markov chain Monte Carlo (MCMC) methods are considered the gold standard of
 Bayesian inference; under suitable conditions and in the limit of infinitely
@@ -48,7 +54,9 @@ which is thought to be in the desirable range for optimal mixing [2].
 * <b>`observed_time_series`</b>: `float` `Tensor` of shape
     `concat([sample_shape, model.batch_shape, [num_timesteps, 1]]) where
     `sample_shape` corresponds to i.i.d. observations, and the trailing `[1]`
-    dimension may (optionally) be omitted if `num_timesteps > 1`.
+    dimension may (optionally) be omitted if `num_timesteps > 1`. May
+    optionally be an instance of <a href="../../tfp/sts/MaskedTimeSeries.md"><code>tfp.sts.MaskedTimeSeries</code></a>, which includes
+    a mask `Tensor` to specify timesteps with missing observations.
 * <b>`num_results`</b>: Integer number of Markov chain draws.
     Default value: `100`.
 * <b>`num_warmup_steps`</b>: Integer number of steps to take before starting to
@@ -77,7 +85,7 @@ which is thought to be in the desirable range for optimal mixing [2].
     Default value: `[]` (i.e., a single chain).
 * <b>`num_variational_steps`</b>: Python `int` number of steps to run the variational
     optimization to determine the initial state and step sizes.
-    Default value: `200`.
+    Default value: `150`.
 * <b>`variational_optimizer`</b>: Optional `tf.train.Optimizer` instance to use in
     the variational optimization. If `None`, defaults to
     `tf.train.AdamOptimizer(0.1)`.
@@ -143,7 +151,7 @@ with tf.Session() as sess:
   samples_, kernel_results_ = sess.run((samples, kernel_results))
 
 print("acceptance rate: {}".format(
-  np.mean(kernel_results_.inner_results.is_accepted, axis=0)))
+  np.mean(kernel_results_.inner_results.inner_results.is_accepted, axis=0)))
 
 # Plot the sampled traces for each parameter. If the chains have mixed, their
 # traces should all cover the same region of state space, frequently crossing
@@ -173,14 +181,14 @@ incorporate constraints on the parameter space.
 
 ```python
 transformed_hmc_kernel = mcmc.TransformedTransitionKernel(
-    inner_kernel=mcmc.HamiltonianMonteCarlo(
-        target_log_prob_fn=model.joint_log_prob(observed_time_series),
-        step_size=step_size,
-        num_leapfrog_steps=num_leapfrog_steps,
-        step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy(
-          num_adaptation_steps=num_adaptation_steps),
-        state_gradients_are_stopped=True,
-        seed=seed),
+    inner_kernel=mcmc.SimpleStepSizeAdaptation(
+        inner_kernel=mcmc.HamiltonianMonteCarlo(
+            target_log_prob_fn=model.joint_log_prob(observed_time_series),
+            step_size=step_size,
+            num_leapfrog_steps=num_leapfrog_steps,
+            state_gradients_are_stopped=True,
+            seed=seed),
+        num_adaptation_steps = int(0.8 * num_warmup_steps)),
     bijector=[param.bijector for param in model.parameters])
 
 # Initialize from a Uniform[-2, 2] distribution in unconstrained space.

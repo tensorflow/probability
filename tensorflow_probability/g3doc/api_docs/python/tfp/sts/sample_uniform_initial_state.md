@@ -5,6 +5,8 @@
 
 # tfp.sts.sample_uniform_initial_state
 
+Initialize from a uniform [-2, 2] distribution in unconstrained space.
+
 ``` python
 tfp.sts.sample_uniform_initial_state(
     parameter,
@@ -14,7 +16,11 @@ tfp.sts.sample_uniform_initial_state(
 )
 ```
 
-Initialize from a uniform [-2, 2] distribution in unconstrained space.
+
+
+Defined in [`python/sts/fitting.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/sts/fitting.py).
+
+<!-- Placeholder for "Used in" -->
 
 #### Args:
 

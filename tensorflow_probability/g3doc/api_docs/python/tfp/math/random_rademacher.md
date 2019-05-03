@@ -5,6 +5,8 @@
 
 # tfp.math.random_rademacher
 
+Generates `Tensor` consisting of `-1` or `+1`, chosen uniformly at random.
+
 ``` python
 tfp.math.random_rademacher(
     shape,
@@ -14,7 +16,11 @@ tfp.math.random_rademacher(
 )
 ```
 
-Generates `Tensor` consisting of `-1` or `+1`, chosen uniformly at random.
+
+
+Defined in [`python/math/random_ops.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/math/random_ops.py).
+
+<!-- Placeholder for "Used in" -->
 
 For more details, see [Rademacher distribution](
 https://en.wikipedia.org/wiki/Rademacher_distribution).
