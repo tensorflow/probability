@@ -234,7 +234,7 @@ class Triangular(distribution.Distribution):
 
     broadcast_x_to_high = _broadcast_to(x, [self.high])
     left_of_peak = tf.logical_and(
-        broadcast_x_to_high > self.low, broadcast_x_to_high <= self.peak)
+        broadcast_x_to_high >= self.low, broadcast_x_to_high <= self.peak)
 
     interval_length = self.high - self.low
     # This is the pdf function when a low <= high <= x. This looks like

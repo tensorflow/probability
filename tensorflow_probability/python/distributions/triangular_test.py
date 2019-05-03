@@ -336,6 +336,13 @@ class _TriangularTest(object):
         rtol=.03,
         atol=0)
 
+  def testTriangularExtrema(self):
+    low = self._dtype(0.)
+    peak = self._dtype(1.)
+    high = self._dtype(4.)
+    tri = tfd.Triangular(low=low, peak=peak, high=high)
+    self.assertAllClose(self.evaluate(tri.prob([0., 1., 4.])), [0, 0.5, 0])
+
 
 @test_util.run_all_in_graph_and_eager_modes
 class TriangularTestStaticShape(test_case.TestCase, _TriangularTest):
