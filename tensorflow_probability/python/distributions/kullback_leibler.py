@@ -225,7 +225,10 @@ def summarize_registered_kls(distributions_module):
         " " * (maxp - len(p)), p, "  " if "+" in (p + q) else "||", q))
   return """
   Built-in KL(distribution_a || distribution_b) registrations:
+
+  ```text
   {}
   {}
   {}
+  ```
   """.format(rows[0], "=" * max(map(len, rows)), "\n  ".join(rows[1:]))
