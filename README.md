@@ -18,8 +18,7 @@ in core TF.
 
 __Layer 1: Statistical Building Blocks__
 
-* Distributions ([`tfp.distributions`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions),
-  [`tf.distributions`](https://github.com/tensorflow/tensorflow/tree/master/tensorflow/python/ops/distributions)):
+* Distributions ([`tfp.distributions`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions)):
   A large collection of probability
   distributions and related statistics with batch and
   [broadcasting](https://docs.scipy.org/doc/numpy-1.14.0/user/basics.broadcasting.html)
