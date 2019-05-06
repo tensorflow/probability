@@ -34,8 +34,8 @@ __all__ = [
 class Weibull(bijector.Bijector):
   """Compute `Y = g(X) = 1 - exp((-X / scale) ** concentration), X >= 0`.
 
-  This bijector maps inputs from `[0, inf]` to [0, 1]`. The inverse of the
-  bijector applied to a uniform random variable `X ~ U(0, 1) gives back a
+  This bijector maps inputs from `[0, inf]` to `[0, 1]`. The inverse of the
+  bijector applied to a uniform random variable `X ~ U(0, 1)` gives back a
   random variable with the
   [Weibull distribution](https://en.wikipedia.org/wiki/Weibull_distribution):
 
