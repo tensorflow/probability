@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import inspect
+import six
 
 import tensorflow.compat.v2 as tf
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
@@ -30,7 +31,7 @@ _DIVERGENCES = {}
 __all__ = [
     "RegisterKL",
     "kl_divergence",
-    "summarize_registered_kls",
+    "augment_kl_xent_docs",
 ]
 
 
@@ -188,15 +189,18 @@ class RegisterKL(object):
     return kl_fn
 
 
-def summarize_registered_kls(distributions_module):
-  """Returns a str of registered KLs, to append to the doc for kl_divergence."""
+def _dist_classes(distributions_module):
   dist_classes = []
   for attr in dir(distributions_module):
     value = getattr(distributions_module, attr)
     if (inspect.isclass(value) and
         issubclass(value, distributions_module.Distribution)):
       dist_classes.append(value)
+  return dist_classes
 
+
+def _summarize_registered_kls(dist_classes):
+  """Returns a str of registered KLs, to append to the doc for kl_divergence."""
   maxdists = 6  # Only show up to N subclasses per p/q.
   ps, qs = [], []
   for p, q in sorted(_DIVERGENCES,
@@ -232,3 +236,40 @@ def summarize_registered_kls(distributions_module):
   {}
   ```
   """.format(rows[0], "=" * max(map(len, rows)), "\n  ".join(rows[1:]))
+
+
+def augment_kl_xent_docs(distributions_module):
+  """Augments doc on tfd.kl_divergence, EachDist.kl_divergence/cross_entropy."""
+  dist_classes = _dist_classes(distributions_module)
+  kl_divergence.__doc__ += _summarize_registered_kls(dist_classes)
+
+  if not six.PY3:
+    return  # Cannot update __doc__ on instancemethod objects in PY2.
+
+  for dist_class in dist_classes:
+    others = []
+    for p, q in _DIVERGENCES:
+      if issubclass(dist_class, p):
+        others.extend(
+            subq.__name__ for subq in dist_classes if issubclass(subq, q))
+    others = sorted(set(others))
+
+    def merge_doc(original, additional):
+      for line in original.split("\n"):
+        if "args:" == line.strip().lower():
+          indent = line.lower().split("args")[0]
+          yield "{}{}\n{}".format(indent, additional, indent)
+        yield line
+
+    if others:
+      others_str = ", ".join("`{}`".format(other) for other in others)
+      dist_class.kl_divergence.__doc__ = "\n".join(
+          merge_doc(
+              dist_class.kl_divergence.__doc__,
+              "`other` types with built-in registrations: {}".format(
+                  others_str)))
+      dist_class.cross_entropy.__doc__ = "\n".join(
+          merge_doc(
+              dist_class.cross_entropy.__doc__,
+              "`other` types with built-in registrations: {}".format(
+                  others_str)))

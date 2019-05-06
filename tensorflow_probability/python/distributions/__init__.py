@@ -63,7 +63,7 @@ from tensorflow_probability.python.distributions.joint_distribution_named import
 from tensorflow_probability.python.distributions.joint_distribution_sequential import JointDistributionSequential
 from tensorflow_probability.python.distributions.kullback_leibler import kl_divergence
 from tensorflow_probability.python.distributions.kullback_leibler import RegisterKL
-from tensorflow_probability.python.distributions.kullback_leibler import summarize_registered_kls
+from tensorflow_probability.python.distributions.kullback_leibler import augment_kl_xent_docs
 from tensorflow_probability.python.distributions.kumaraswamy import Kumaraswamy
 from tensorflow_probability.python.distributions.laplace import Laplace
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import LinearGaussianStateSpaceModel
@@ -127,8 +127,8 @@ from tensorflow_probability.python.internal.reparameterization import NOT_REPARA
 from tensorflow_probability.python.internal.reparameterization import ReparameterizationType
 
 import sys as _sys
-kl_divergence.__doc__ += summarize_registered_kls(_sys.modules[__name__])
-del summarize_registered_kls
+augment_kl_xent_docs(_sys.modules[__name__])
+del augment_kl_xent_docs
 del _sys
 
 # pylint: enable=unused-import,wildcard-import,line-too-long,g-importing-member,g-bad-import-order

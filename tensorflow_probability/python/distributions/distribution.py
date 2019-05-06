@@ -65,6 +65,8 @@ _DISTRIBUTION_PUBLIC_METHOD_WRAPPERS = [
     "variance",
 ]
 
+_ALWAYS_COPY_PUBLIC_METHOD_WRAPPERS = ["kl_divergence", "cross_entropy"]
+
 
 @six.add_metaclass(abc.ABCMeta)
 class _BaseDistribution(object):
@@ -228,14 +230,17 @@ class _DistributionMeta(abc.ABCMeta):
             "Internal error: expected base class '{}' to "
             "implement method '{}'".format(base.__name__, attr))
       class_special_attr_value = attrs.get(special_attr, None)
-      if class_special_attr_value is None:
-        # No _special method available, no need to update the docstring.
-        continue
-      class_special_attr_docstring = tf_inspect.getdoc(class_special_attr_value)
+      class_special_attr_docstring = (
+          None if class_special_attr_value is None else
+          tf_inspect.getdoc(class_special_attr_value))
+      if (class_special_attr_docstring or
+          attr in _ALWAYS_COPY_PUBLIC_METHOD_WRAPPERS):
+        class_attr_value = _copy_fn(base_attr_value)
+        attrs[attr] = class_attr_value
+
       if not class_special_attr_docstring:
         # No docstring to append.
         continue
-      class_attr_value = _copy_fn(base_attr_value)
       class_attr_docstring = tf_inspect.getdoc(base_attr_value)
       if class_attr_docstring is None:
         raise ValueError(
@@ -245,7 +250,6 @@ class _DistributionMeta(abc.ABCMeta):
           class_attr_value.__doc__,
           "Additional documentation from `{}`:\n\n{}".format(
               classname, class_special_attr_docstring))
-      attrs[attr] = class_attr_value
 
     # Now we'll intercept the default __init__ if it exists.
     default_init = attrs.get("__init__", None)
