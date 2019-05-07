@@ -895,9 +895,9 @@ class CsiszarVIMCOTest(test_case.TestCase):
     _, grad_log_sooavg_u = self.evaluate(value_and_gradient(log_sooavg_u, logu))
 
     self.assertAllClose(np_grad_log_avg_u, grad_log_avg_u,
-                        rtol=delta, atol=0.)
+                        rtol=delta, atol=delta)
     self.assertAllClose(np_grad_log_sooavg_u, grad_log_sooavg_u,
-                        rtol=delta, atol=0.)
+                        rtol=delta, atol=delta)
     # Verify claim in docstring.
     self.assertAllClose(
         np.ones_like(grad_log_avg_u.sum(axis=0)),

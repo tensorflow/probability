@@ -308,7 +308,7 @@ class VonMisesFisherTest(tfp_test_util.VectorDistributionTestHelpers,
         validate_args=True, allow_nan_stats=False)
     self._verifySampleAndPdfConsistency(vmf)
     # TODO(bjp): Enable self._verifyCovariance(vmf)
-    self._verifyPdfWithNumpy(vmf)
+    self._verifyPdfWithNumpy(vmf, atol=2e-4)
 
 
 if __name__ == '__main__':
