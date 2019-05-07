@@ -113,7 +113,7 @@ w0 = Gamma(0.1, 0.3, sample_shape=[units[0], feature_size])
 z2 = Gamma(0.1, 0.1, sample_shape=[data_size, units[2]])
 z1 = Gamma(shape, shape / tf.matmul(z2, w2))
 z0 = Gamma(shape, shape / tf.matmul(z1, w1))
-x = Poisson(tf.matmul(z1, w0))
+x = Poisson(tf.matmul(z0, w0))
 ```
 
 __Edward2 / TensorFlow Probability__. You write models as functions, where
