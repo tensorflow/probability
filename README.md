@@ -138,9 +138,11 @@ installation guide](https://www.tensorflow.org/install).
 ### Nightly Builds
 
 There are also nightly builds of TensorFlow Probability under the pip package
-`tfp-nightly`, which depends on one of `tf-nightly` and `tf-nightly-gpu`.
-Nightly builds include newer features, but may be less stable than the versioned
-releases.
+`tfp-nightly`, which depends on one of `tf-nightly`, `tf-nightly-gpu`,
+`tf-nightly-2.0-preview` or `tf-nightly-gpu-2.0-preview`. Nightly builds include
+newer features, but may be less stable than the versioned releases. Docs are
+periodically refreshed [here](
+https://github.com/tensorflow/probability/blob/master/tensorflow_probability/g3doc/api_docs/python/tfp.md).
 
 ### Installing from Source
 
