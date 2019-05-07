@@ -67,11 +67,8 @@ def _ensure_tf_install():  # pylint: disable=g-statement-before-imports
 
 _ensure_tf_install()
 
-
 # Cleanup symbols to avoid polluting namespace.
-import sys as _sys
-for symbol in ["_ensure_tf_install", "_sys"]:
-  delattr(_sys.modules[__name__], symbol)
+del _ensure_tf_install
 
 
 # from tensorflow_probability.google import staging  # DisableOnExport
