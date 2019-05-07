@@ -209,7 +209,10 @@ Initializes this transition kernel.
 
 <h3 id="is_calibrated"><code>is_calibrated</code></h3>
 
+Returns `True` if Markov chain converges to specified distribution.
 
+`TransitionKernel`s which are "uncalibrated" are often calibrated by
+composing them with the <a href="../../tfp/mcmc/MetropolisHastings.md"><code>tfp.mcmc.MetropolisHastings</code></a> `TransitionKernel`.
 
 <h3 id="max_doublings"><code>max_doublings</code></h3>
 
@@ -245,7 +248,18 @@ Returns `dict` of ``__init__`` arguments and their values.
 bootstrap_results(init_state)
 ```
 
+Returns an object with the same type as returned by `one_step(...)[1]`.
 
+#### Args:
+
+* <b>`init_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
+    initial state(s) of the Markov chain(s).
+
+
+#### Returns:
+
+* <b>`kernel_results`</b>: A (possibly nested) `tuple`, `namedtuple` or `list` of
+    `Tensor`s representing internal calculations made within this function.
 
 <h3 id="one_step"><code>one_step</code></h3>
 

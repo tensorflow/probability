@@ -417,6 +417,8 @@ H[P, Q] = E_p[-log q(X)] = -int_F p(x) log q(x) dr(x)
 
 where `F` denotes the support of the random variable `X ~ P`.
 
+`other` types with built-in registrations: `GaussianProcess`, `GaussianProcessRegressionModel`, `Normal`
+
 #### Args:
 
 * <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
@@ -513,6 +515,8 @@ KL[p, q] = E_p[log(p(X)/q(X))]
 
 where `F` denotes the support of the random variable `X ~ p`, `H[., .]`
 denotes (Shannon) cross entropy, and `H[.]` denotes (Shannon) entropy.
+
+`other` types with built-in registrations: `GaussianProcess`, `GaussianProcessRegressionModel`, `Normal`
 
 #### Args:
 

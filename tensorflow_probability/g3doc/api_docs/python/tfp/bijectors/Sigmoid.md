@@ -44,7 +44,46 @@ __init__(
 )
 ```
 
+Constructs Bijector.
 
+A `Bijector` transforms random variables into new random variables.
+
+Examples:
+
+```python
+# Create the Y = g(X) = X transform.
+identity = Identity()
+
+# Create the Y = g(X) = exp(X) transform.
+exp = Exp()
+```
+
+See `Bijector` subclass docstring for more details and specific examples.
+
+#### Args:
+
+* <b>`graph_parents`</b>: Python list of graph prerequisites of this `Bijector`.
+* <b>`is_constant_jacobian`</b>: Python `bool` indicating that the Jacobian matrix is
+    not a function of the input.
+* <b>`validate_args`</b>: Python `bool`, default `False`. Whether to validate input
+    with asserts. If `validate_args` is `False`, and the inputs are invalid,
+    correct behavior is not guaranteed.
+* <b>`dtype`</b>: `tf.dtype` supported by this `Bijector`. `None` means dtype is not
+    enforced.
+* <b>`forward_min_event_ndims`</b>: Python `integer` indicating the minimum number of
+    dimensions `forward` operates on.
+* <b>`inverse_min_event_ndims`</b>: Python `integer` indicating the minimum number of
+    dimensions `inverse` operates on. Will be set to
+    `forward_min_event_ndims` by default, if no value is provided.
+* <b>`name`</b>: The name to give Ops created by the initializer.
+
+
+#### Raises:
+
+* <b>`ValueError`</b>:  If neither `forward_min_event_ndims` and
+    `inverse_min_event_ndims` are specified, or if either of them is
+    negative.
+* <b>`ValueError`</b>:  If a member of `graph_parents` is not a `Tensor`.
 
 
 

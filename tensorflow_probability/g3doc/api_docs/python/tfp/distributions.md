@@ -7,7 +7,7 @@
 
 # Module: tfp.distributions
 
-Statistical distributions and bijective transformations.
+Statistical distributions.
 
 
 

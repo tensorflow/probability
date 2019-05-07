@@ -5,7 +5,7 @@
 
 # Module: tfp.bijectors
 
-Bijector Ops.
+Bijective transformations.
 
 
 

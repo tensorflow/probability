@@ -23,9 +23,7 @@
 <meta itemprop="property" content="variables"/>
 <meta itemprop="property" content="weights"/>
 <meta itemprop="property" content="__call__"/>
-<meta itemprop="property" content="__delattr__"/>
 <meta itemprop="property" content="__init__"/>
-<meta itemprop="property" content="__setattr__"/>
 <meta itemprop="property" content="apply"/>
 <meta itemprop="property" content="build"/>
 <meta itemprop="property" content="compute_mask"/>
@@ -119,7 +117,7 @@ model.get_weights()[0][:, :2]
 ``` python
 __init__(
     event_size,
-    convert_to_tensor_fn=tfd.Distribution.sample,
+    convert_to_tensor_fn=tfp.distributions.Distribution.sample,
     validate_args=False,
     **kwargs
 )
@@ -236,7 +234,10 @@ A list of tensors.
 
 <h3 id="name"><code>name</code></h3>
 
+Returns the name of this module as passed or determined in the ctor.
 
+NOTE: This is not the same as the `self.name_scope.name` which includes
+parent module names.
 
 <h3 id="name_scope"><code>name_scope</code></h3>
 
@@ -326,7 +327,17 @@ A sequence of all submodules.
 
 <h3 id="trainable_variables"><code>trainable_variables</code></h3>
 
+Sequence of variables owned by this module and it's submodules.
 
+Note: this method uses reflection to find variables on the current instance
+and submodules. For performance reasons you may wish to cache the result
+of calling this method if you don't expect the return value to change.
+
+#### Returns:
+
+A sequence of variables for the current module (sorted by attribute
+name) followed by variables from all submodules recursively (breadth
+first).
 
 <h3 id="trainable_weights"><code>trainable_weights</code></h3>
 
@@ -368,26 +379,34 @@ __call__(
 )
 ```
 
+Wraps `call`, applying pre- and post-processing steps.
+
+#### Arguments:
+
+* <b>`inputs`</b>: input tensor(s).
+* <b>`*args`</b>: additional positional arguments to be passed to `self.call`.
+* <b>`**kwargs`</b>: additional keyword arguments to be passed to `self.call`.
 
 
-<h3 id="__delattr__"><code>__delattr__</code></h3>
+#### Returns:
 
-``` python
-__delattr__(name)
-```
+  Output tensor(s).
 
-
-
-<h3 id="__setattr__"><code>__setattr__</code></h3>
-
-``` python
-__setattr__(
-    name,
-    value
-)
-```
+Note:
+  - The following optional keyword arguments are reserved for specific uses:
+    * `training`: Boolean scalar tensor of Python boolean indicating
+      whether the `call` is meant for training or inference.
+    * `mask`: Boolean input mask.
+  - If the layer's `call` method takes a `mask` argument (as some Keras
+    layers do), its default value will be set to the mask generated
+    for `inputs` by the previous layer (if `input` did come from
+    a layer that generated a corresponding mask, i.e. if it came from
+    a Keras layer with masking support.
 
 
+#### Raises:
+
+* <b>`ValueError`</b>: if the layer's `call` method returns None (an invalid value).
 
 <h3 id="apply"><code>apply</code></h3>
 
@@ -443,7 +462,18 @@ compute_mask(
 )
 ```
 
+Computes an output mask tensor.
 
+#### Arguments:
+
+* <b>`inputs`</b>: Tensor or list of tensors.
+* <b>`mask`</b>: Tensor or list of tensors.
+
+
+#### Returns:
+
+None or a tensor (or list of tensors,
+    one per output tensor of the layer).
 
 <h3 id="compute_output_shape"><code>compute_output_shape</code></h3>
 
@@ -484,7 +514,22 @@ from_config(
 )
 ```
 
+Creates a layer from its config.
 
+This method is the reverse of `get_config`,
+capable of instantiating the same layer from the config
+dictionary. It does not handle layer connectivity
+(handled by Network), nor weights (handled by `set_weights`).
+
+#### Arguments:
+
+* <b>`config`</b>: A Python dictionary, typically the
+        output of get_config.
+
+
+#### Returns:
+
+A layer instance.
 
 <h3 id="get_config"><code>get_config</code></h3>
 

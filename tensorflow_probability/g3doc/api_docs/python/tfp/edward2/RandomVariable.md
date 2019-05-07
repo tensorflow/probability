@@ -310,7 +310,7 @@ Used for Tensor.__div__.
 __eq__(other)
 ```
 
-
+Return self==value.
 
 <h3 id="__floordiv__"><code>__floordiv__</code></h3>
 
@@ -712,7 +712,7 @@ Dispatches cwise mul for "Dense*Dense" and "Dense*Sparse".
 __ne__(other)
 ```
 
-
+Return self!=value.
 
 <h3 id="__neg__"><code>__neg__</code></h3>
 

@@ -304,8 +304,8 @@
 *  <a href="./tfp/layers/DenseVariational.md"><code>tfp.layers.dense_variational_v2.DenseVariational</code></a>
 *  <a href="./tfp/layers/dense_variational_v2/kullback_leibler.md"><code>tfp.layers.dense_variational_v2.kullback_leibler</code></a>
 *  <a href="./tfp/distributions/RegisterKL.md"><code>tfp.layers.dense_variational_v2.kullback_leibler.RegisterKL</code></a>
+*  <a href="./tfp/layers/dense_variational_v2/kullback_leibler/augment_kl_xent_docs.md"><code>tfp.layers.dense_variational_v2.kullback_leibler.augment_kl_xent_docs</code></a>
 *  <a href="./tfp/distributions/kl_divergence.md"><code>tfp.layers.dense_variational_v2.kullback_leibler.kl_divergence</code></a>
-*  <a href="./tfp/layers/dense_variational_v2/kullback_leibler/summarize_registered_kls.md"><code>tfp.layers.dense_variational_v2.kullback_leibler.summarize_registered_kls</code></a>
 *  <a href="./tfp/layers/distribution_layer.md"><code>tfp.layers.distribution_layer</code></a>
 *  <a href="./tfp/layers/CategoricalMixtureOfOneHotCategorical.md"><code>tfp.layers.distribution_layer.CategoricalMixtureOfOneHotCategorical</code></a>
 *  <a href="./tfp/layers/DistributionLambda.md"><code>tfp.layers.distribution_layer.DistributionLambda</code></a>

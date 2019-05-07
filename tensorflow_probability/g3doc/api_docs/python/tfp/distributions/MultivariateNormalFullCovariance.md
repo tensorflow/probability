@@ -279,7 +279,34 @@ Python `bool` indicating possibly expensive checks are enabled.
 __getitem__(slices)
 ```
 
+Slices the batch axes of this distribution, returning a new instance.
 
+```python
+b = tfd.Bernoulli(logits=tf.zeros([3, 5, 7, 9]))
+b.batch_shape  # => [3, 5, 7, 9]
+b2 = b[:, tf.newaxis, ..., -2:, 1::2]
+b2.batch_shape  # => [3, 1, 5, 2, 4]
+
+x = tf.random.normal([5, 3, 2, 2])
+cov = tf.matmul(x, x, transpose_b=True)
+chol = tf.cholesky(cov)
+loc = tf.random.normal([4, 1, 3, 1])
+mvn = tfd.MultivariateNormalTriL(loc, chol)
+mvn.batch_shape  # => [4, 5, 3]
+mvn.event_shape  # => [2]
+mvn2 = mvn[:, 3:, ..., ::-1, tf.newaxis]
+mvn2.batch_shape  # => [4, 2, 3, 1]
+mvn2.event_shape  # => [2]
+```
+
+#### Args:
+
+* <b>`slices`</b>: slices from the [] operator
+
+
+#### Returns:
+
+* <b>`dist`</b>: A new `tfd.Distribution` instance with sliced parameters.
 
 <h3 id="__iter__"><code>__iter__</code></h3>
 
@@ -432,6 +459,8 @@ H[P, Q] = E_p[-log q(X)] = -int_F p(x) log q(x) dr(x)
 
 where `F` denotes the support of the random variable `X ~ P`.
 
+`other` types with built-in registrations: `GaussianProcess`, `GaussianProcessRegressionModel`, `MultivariateNormalDiag`, `MultivariateNormalDiagPlusLowRank`, `MultivariateNormalDiagWithSoftplusScale`, `MultivariateNormalFullCovariance`, `MultivariateNormalLinearOperator`, `MultivariateNormalTriL`, `VariationalGaussianProcess`
+
 #### Args:
 
 * <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
@@ -528,6 +557,8 @@ KL[p, q] = E_p[log(p(X)/q(X))]
 
 where `F` denotes the support of the random variable `X ~ p`, `H[., .]`
 denotes (Shannon) cross entropy, and `H[.]` denotes (Shannon) entropy.
+
+`other` types with built-in registrations: `GaussianProcess`, `GaussianProcessRegressionModel`, `MultivariateNormalDiag`, `MultivariateNormalDiagPlusLowRank`, `MultivariateNormalDiagWithSoftplusScale`, `MultivariateNormalFullCovariance`, `MultivariateNormalLinearOperator`, `MultivariateNormalTriL`, `VariationalGaussianProcess`
 
 #### Args:
 

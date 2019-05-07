@@ -291,7 +291,16 @@ parameterizations of this distribution.
 
 <h3 id="df"><code>df</code></h3>
 
+The degrees of freedom of the distribution.
 
+This controls the degrees of freedom of the distribution. The tails of the
+distribution get more heavier the smaller `df` is. As `df` goes to
+infinitiy, the distribution approaches the Multivariate Normal with the same
+`loc` and `scale`.
+
+#### Returns:
+
+The `df` `Tensor`.
 
 <h3 id="dtype"><code>dtype</code></h3>
 

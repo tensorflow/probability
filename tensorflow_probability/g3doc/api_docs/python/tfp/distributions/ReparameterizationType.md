@@ -38,7 +38,7 @@ one of two possible properties for samples from a distribution:
 __init__(rep_type)
 ```
 
-
+Initialize self.  See help(type(self)) for accurate signature.
 
 
 

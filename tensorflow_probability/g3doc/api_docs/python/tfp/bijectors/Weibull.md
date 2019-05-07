@@ -36,8 +36,8 @@ Defined in [`python/bijectors/weibull.py`](https://github.com/tensorflow/probabi
 
 <!-- Placeholder for "Used in" -->
 
-This bijector maps inputs from `[0, inf]` to [0, 1]`. The inverse of the
-bijector applied to a uniform random variable `X ~ U(0, 1) gives back a
+This bijector maps inputs from `[0, inf]` to `[0, 1]`. The inverse of the
+bijector applied to a uniform random variable `X ~ U(0, 1)` gives back a
 random variable with the
 [Weibull distribution](https://en.wikipedia.org/wiki/Weibull_distribution):
 

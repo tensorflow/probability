@@ -6,7 +6,6 @@
 <meta itemprop="property" content="weights"/>
 <meta itemprop="property" content="__getattribute__"/>
 <meta itemprop="property" content="__init__"/>
-<meta itemprop="property" content="__setattr__"/>
 <meta itemprop="property" content="add_slot"/>
 <meta itemprop="property" content="add_weight"/>
 <meta itemprop="property" content="apply_gradients"/>
@@ -163,7 +162,32 @@ __init__(
 )
 ```
 
+Create a new Optimizer.
 
+This must be called by the constructors of subclasses.
+Note that Optimizer instances should not bind to a single graph,
+and so shouldn't keep Tensors as member variables. Generally
+you should be able to use the _set_hyper()/state.get_hyper()
+facility instead.
+
+This class in stateful and thread-compatible.
+
+#### Args:
+
+* <b>`name`</b>: A non-empty string.  The name to use for accumulators created
+    for the optimizer.
+* <b>`**kwargs`</b>: keyword arguments. Allowed to be {`clipnorm`, `clipvalue`, `lr`,
+    `decay`}. `clipnorm` is clip gradients by norm; `clipvalue` is clip
+    gradients by value, `decay` is included for backward compatibility to
+    allow time inverse decay of learning rate. `lr` is included for backward
+    compatibility, recommended to use `learning_rate` instead.
+
+
+#### Raises:
+
+* <b>`ValueError`</b>: If name is malformed.
+* <b>`RuntimeError`</b>: If _create_slots has been overridden instead of
+      _create_vars.
 
 
 
@@ -192,17 +216,6 @@ __getattribute__(name)
 ```
 
 Overridden to support hyperparameter access.
-
-<h3 id="__setattr__"><code>__setattr__</code></h3>
-
-``` python
-__setattr__(
-    name,
-    value
-)
-```
-
-Override setattr to support dynamic hyperparameter setting.
 
 <h3 id="add_slot"><code>add_slot</code></h3>
 
@@ -298,7 +311,16 @@ An optimizer instance.
 get_config()
 ```
 
+Returns the config of the optimimizer.
 
+An optimizer config is a Python dictionary (serializable)
+containing the configuration of an optimizer.
+The same optimizer can be reinstantiated later
+(without any saved state) from this configuration.
+
+#### Returns:
+
+Python dictionary.
 
 <h3 id="get_gradients"><code>get_gradients</code></h3>
 

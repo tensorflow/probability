@@ -103,7 +103,7 @@ Initialize the `KLDivergenceRegularizer` regularizer.
 __call__(distribution_a)
 ```
 
-
+Call self as a function.
 
 <h3 id="from_config"><code>from_config</code></h3>
 
