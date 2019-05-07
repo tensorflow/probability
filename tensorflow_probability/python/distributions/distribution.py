@@ -159,15 +159,16 @@ def _convert_to_tensor(value, dtype=None, dtype_hint=None, name=None):
   if (tf.nest.is_nested(dtype) or
       tf.nest.is_nested(dtype_hint)):
     if dtype is None:
-      fn = lambda v, pd: tf.convert_to_tensor(v, dtype_hint=pd, name=name)
+      fn = lambda v, dh: tf.convert_to_tensor(v, dtype_hint=dh, name=name)
       return tf.nest.map_structure(fn, value, dtype_hint)
     elif dtype_hint is None:
       fn = lambda v, d: tf.convert_to_tensor(v, dtype=d, name=name)
-      return tf.nest.map_structure(fn, value, dtype_hint)
+      return tf.nest.map_structure(fn, value, dtype)
     else:
-      fn = lambda v, d, pd: tf.convert_to_tensor(  # pylint: disable=g-long-lambda
-          v, dtype=d, dtype_hint=pd, name=name)
-      return tf.nest.map_structure(fn, value, dtype, dtype_hint)
+      fn = lambda v, d, dh: tf.convert_to_tensor(  # pylint: disable=g-long-lambda
+          v, dtype=d, dtype_hint=dh, name=name)
+      return tf.nest.map_structure(fn, value, dtype, dtype_hint,
+                                   expand_composites=True)
   return tf.convert_to_tensor(
       value=value, dtype=dtype, dtype_hint=dtype_hint, name=name)
 

@@ -24,6 +24,7 @@ import six
 
 import tensorflow as tf
 from tensorflow_probability.python.distributions import distribution as tfd
+from tensorflow.python.framework import composite_tensor  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = []  # We intend nothing public.
@@ -119,7 +120,9 @@ def _value(self, dtype=None, name=None, as_ref=False):  # pylint: disable=g-doc-
       self._concrete_value = (self._convert_to_tensor_fn(self)
                               if callable(self._convert_to_tensor_fn)
                               else self._convert_to_tensor_fn)
-      if not tf.is_tensor(self._concrete_value):
+      if (not tf.is_tensor(self._concrete_value) and
+          not isinstance(self._concrete_value,
+                         composite_tensor.CompositeTensor)):
         self._concrete_value = tfd._convert_to_tensor(
             value=self._concrete_value,
             name=name or 'concrete_value',
