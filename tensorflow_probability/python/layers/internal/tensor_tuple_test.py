@@ -54,7 +54,11 @@ class CustomConvertToCompositeTensorTest(test_util.TensorFlowTestCase):
   def test_iter(self):
     x = MyTuple((1, [2., 3.], [[4, 5], [6, 7]]))
     y = ops.convert_to_tensor_or_composite(value=x)
-    self.assertTrue(tf.is_tensor(y))
+    # TODO(jsimsa): The behavior of `is_tensor` for composite tensors have
+    # changed (from True to False) and this check needs to be disabled so that
+    # both TAP presubmits (running at HEAD) and Kokoro presubmit (using TF
+    # nightly) pass. Re-enable this check when TF nightly picks up this change.
+    # self.assertTrue(tf.is_tensor(y))
     self.assertIsInstance(y, tensor_tuple.TensorTuple)
     self.assertLen(y, 3)
     for x_, y_ in zip(x, y):
