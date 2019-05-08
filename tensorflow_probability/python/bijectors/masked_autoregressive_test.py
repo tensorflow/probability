@@ -357,9 +357,10 @@ class AutoregressiveLayerTest(tf.test.TestCase):
     self.assertIsAutoregressive(made, event_size=4, order="right-to-left")
 
   def test_layer_callable_activation(self):
-    made = tfb.AutoregressiveLayer(params=2, activation=tf.math.exp,
-                                   input_order="random",
-                                   hidden_units=[9], hidden_degrees="equal")
+    made = tfb.AutoregressiveLayer(
+        params=2, activation=tf.math.exp, input_order="random",
+        kernel_regularizer=tfk.regularizers.l2(0.1), bias_initializer="ones",
+        hidden_units=[9], hidden_degrees="equal")
     self.assertEqual((3, 5, 2), made(np.zeros((3, 5))).shape)
     self.assertEqual(6 * 9 + 10 * 10, self._count_trainable_params(made))
     if not tf.executing_eagerly():
@@ -368,9 +369,10 @@ class AutoregressiveLayerTest(tf.test.TestCase):
     self.assertIsAutoregressive(made, event_size=5, order=made._input_order)
 
   def test_layer_smaller_hidden_layers_than_input(self):
-    made = tfb.AutoregressiveLayer(params=1, event_shape=9, activation="relu",
-                                   use_bias=False, input_order="right-to-left",
-                                   hidden_units=[5, 5])
+    made = tfb.AutoregressiveLayer(
+        params=1, event_shape=9, activation="relu", use_bias=False,
+        bias_regularizer=tfk.regularizers.l1(0.5), bias_constraint=tf.math.abs,
+        input_order="right-to-left", hidden_units=[5, 5])
     self.assertEqual((9, 1), made(np.zeros(9)).shape)
     self.assertEqual(9 * 5 + 5 * 5 + 5 * 9, self._count_trainable_params(made))
     if not tf.executing_eagerly():
@@ -380,7 +382,8 @@ class AutoregressiveLayerTest(tf.test.TestCase):
 
   def test_layer_no_hidden_units(self):
     made = tfb.AutoregressiveLayer(
-        params=4, event_shape=3, use_bias=False, hidden_degrees="random")
+        params=4, event_shape=3, use_bias=False, hidden_degrees="random",
+        kernel_constraint="unit_norm")
     self.assertEqual((2, 2, 5, 3, 4), made(np.zeros((2, 2, 5, 3))).shape)
     self.assertEqual(3 * 12, self._count_trainable_params(made))
     if not tf.executing_eagerly():

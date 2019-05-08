@@ -730,6 +730,11 @@ class AutoregressiveLayer(tf.keras.layers.Layer):
                activation=None,
                use_bias=True,
                kernel_initializer="glorot_uniform",
+               bias_initializer="zeros",
+               kernel_regularizer=None,
+               bias_regularizer=None,
+               kernel_constraint=None,
+               bias_constraint=None,
                validate_args=False,
                **kwargs):
     """Constructs the MADE layer.
@@ -756,14 +761,24 @@ class AutoregressiveLayer(tf.keras.layers.Layer):
         `None`.
       use_bias: Whether or not the dense layers constructed in this layer
         should have a bias term.  See `tf.keras.layers.Dense`.  Default: `True`.
-      kernel_initializer: Initializer for the kernel weights matrix.  Default:
-        'glorot_uniform'.
+      kernel_initializer: Initializer for the `Dense` kernel weight
+        matrices.  Default: 'glorot_uniform'.
+      bias_initializer: Initializer for the `Dense` bias vectors. Default:
+        'zeros'.
+      kernel_regularizer: Regularizer function applied to the `Dense` kernel
+        weight matrices.  Default: None.
+      bias_regularizer: Regularizer function applied to the `Dense` bias
+        weight vectors.  Default: None.
+      kernel_constraint: Constraint function applied to the `Dense` kernel
+        weight matrices.  Default: None.
+      bias_constraint: Constraint function applied to the `Dense` bias
+        weight vectors.  Default: None.
       validate_args: Python `bool`, default `False`. When `True`, layer
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
-      **kwargs: Addition keyword arguments passed to the `tf.keras.layers.Dense`
-        constructed by this layer.
+      **kwargs: Additional keyword arguments passed to the
+        `tf.keras.layer.Dense` constructed by this layer.
     """
     super(AutoregressiveLayer, self).__init__(**kwargs)
 
@@ -775,6 +790,11 @@ class AutoregressiveLayer(tf.keras.layers.Layer):
     self._activation = activation
     self._use_bias = use_bias
     self._kernel_initializer = kernel_initializer
+    self._bias_initializer = bias_initializer
+    self._kernel_regularizer = kernel_regularizer
+    self._bias_regularizer = bias_regularizer
+    self._kernel_constraint = tf.keras.constraints.get(kernel_constraint)
+    self._bias_constraint = bias_constraint
     self._validate_args = validate_args
     self._kwargs = kwargs
 
@@ -841,11 +861,16 @@ class AutoregressiveLayer(tf.keras.layers.Layer):
     for k in range(len(self._masks)):
       self._network.add(tf.keras.layers.Dense(
           layer_output_sizes[k],
-          kernel_initializer=_make_masked_initializer(
-              self._masks[k], self._kernel_initializer),
-          kernel_constraint=_make_masked_constraint(self._masks[k]),
           activation=self._activation if k + 1 < len(self._masks) else None,
           use_bias=self._use_bias,
+          kernel_initializer=_make_masked_initializer(
+              self._masks[k], self._kernel_initializer),
+          bias_initializer=self._bias_initializer,
+          kernel_regularizer=self._kernel_regularizer,
+          bias_regularizer=self._bias_regularizer,
+          kernel_constraint=_make_masked_constraint(
+              self._masks[k], self._kernel_constraint),
+          bias_constraint=self._bias_constraint,
           **self._kwargs))
 
     # Record that the layer has been built.
@@ -981,8 +1006,11 @@ def _make_masked_initializer(mask, initializer):
   return masked_initializer
 
 
-def _make_masked_constraint(mask):
+def _make_masked_constraint(mask, constraint=None):
+  constraint = tf.keras.constraints.get(constraint)
   def masked_constraint(x):
     x = tf.convert_to_tensor(value=x, dtype_hint=tf.float32, name="x")
+    if constraint is not None:
+      x = constraint(x)
     return tf.cast(mask, x.dtype) * x
   return masked_constraint
