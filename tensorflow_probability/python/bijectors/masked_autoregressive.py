@@ -27,10 +27,12 @@ from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math.numeric import clip_by_value_preserve_gradient
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
     "AutoregressiveLayer",
+    "AutoregressiveNetwork",
     "MaskedAutoregressiveFlow",
     "masked_autoregressive_default_template",
     "masked_dense",
@@ -526,10 +528,10 @@ def masked_autoregressive_default_template(hidden_layers,
     return tf.compat.v1.make_template(name, _fn)
 
 
-class AutoregressiveLayer(tf.keras.layers.Layer):
+class AutoregressiveNetwork(tf.keras.layers.Layer):
   r"""Masked Autoencoder for Distribution Estimation [Germain et al. (2015)][1].
 
-  A `AutoregressiveLayer` takes as input a Tensor of shape `[..., event_size]`
+  A `AutoregressiveNetwork` takes as input a Tensor of shape `[..., event_size]`
   and returns a Tensor of shape `[..., event_size, params]`.
 
   The output satisfies the autoregressive property.  That is, the layer is
@@ -555,7 +557,7 @@ class AutoregressiveLayer(tf.keras.layers.Layer):
   data = np.stack([x1, x2], axis=-1)
 
   # Density estimation with MADE.
-  made = tfb.AutoregressiveLayer(params=2, hidden_units=[10, 10])
+  made = tfb.AutoregressiveNetwork(params=2, hidden_units=[10, 10])
 
   distribution = tfd.TransformedDistribution(
       distribution=tfd.Normal(loc=0., scale=1.),
@@ -587,7 +589,7 @@ class AutoregressiveLayer(tf.keras.layers.Layer):
 
   #### Examples: Handling Rank-2+ Tensors
 
-  `AutoregressiveLayer` can be used as a building block to achieve different
+  `AutoregressiveNetwork` can be used as a building block to achieve different
   autoregressive structures over rank-2+ tensors.  For example, suppose we want
   to build an autoregressive distribution over images with dimension `[weight,
   height, channels]` with `channels = 3`:
@@ -615,8 +617,8 @@ class AutoregressiveLayer(tf.keras.layers.Layer):
       reshaped_images = tf.reshape(images, [n, event_shape])
 
       # Density estimatino with MADE.
-      made = tfb.AutoregressiveLayer(params=2, event_shape=event_shape,
-                                     hidden_units=[20, 20], activation="relu")
+      made = tfb.AutoregressiveNetwork(params=2, event_shape=event_shape,
+                                       hidden_units=[20, 20], activation="relu")
       distribution = tfd.TransformedDistribution(
           distribution=tfd.Normal(loc=0., scale=1.),
           bijector=tfb.MaskedAutoregressiveFlow(
@@ -666,8 +668,8 @@ class AutoregressiveLayer(tf.keras.layers.Layer):
           np.reshape(images, [n, width * height, channels]),
           axes=[0, 2, 1])
 
-      made = tfb.AutoregressiveLayer(params=1, event_shape=[width * height],
-                                     hidden_units=[20, 20], activation="relu")
+      made = tfb.AutoregressiveNetwork(params=1, event_shape=[width * height],
+                                       hidden_units=[20, 20], activation="relu")
 
       # Density estimation with MADE.
       #
@@ -707,8 +709,8 @@ class AutoregressiveLayer(tf.keras.layers.Layer):
       `layer(reshaped_images[..., channel, :])`, where `channel` is 0, 1, or 2.
 
       To use separate weights for each channel, we could construct an
-      `AutoregressiveLayer` and `TransformedDistribution` for each channel, and
-      combine them with a `tfd.Blockwise` distribution.
+      `AutoregressiveNetwork` and `TransformedDistribution` for each channel,
+      and combine them with a `tfd.Blockwise` distribution.
 
   #### References
 
@@ -780,7 +782,7 @@ class AutoregressiveLayer(tf.keras.layers.Layer):
       **kwargs: Additional keyword arguments passed to the
         `tf.keras.layer.Dense` constructed by this layer.
     """
-    super(AutoregressiveLayer, self).__init__(**kwargs)
+    super(AutoregressiveNetwork, self).__init__(**kwargs)
 
     self._params = params
     self._event_shape = _list(event_shape) if event_shape is not None else None
@@ -835,7 +837,7 @@ class AutoregressiveLayer(tf.keras.layers.Layer):
         hidden_degrees=self._hidden_degrees))
 
     # In the final layer, we will produce `self._params` outputs for each of the
-    # `self._event_size` inputs to `AutoregressiveLayer`.  But `masks[-1]` has
+    # `self._event_size` inputs to `AutoregressiveNetwork`.  But `masks[-1]` has
     # shape `[self._hidden_units[-1], self._event_size]`.  Thus, we need to
     # expand the mask to `[hidden_units[-1], event_size * self._params]` such
     # that all units for the same input are masked identically.  In particular,
@@ -874,11 +876,11 @@ class AutoregressiveLayer(tf.keras.layers.Layer):
           **self._kwargs))
 
     # Record that the layer has been built.
-    super(AutoregressiveLayer, self).build(input_shape)
+    super(AutoregressiveNetwork, self).build(input_shape)
 
   def call(self, x):
     """See tfkl.Layer.call."""
-    with tf.compat.v2.name_scope(self.name or "AutoregressiveLayer_call"):
+    with tf.compat.v2.name_scope(self.name or "AutoregressiveNetwork_call"):
       x = tf.convert_to_tensor(value=x, dtype=self.dtype, name="x")
       input_shape = tf.shape(input=x)
       # TODO(b/67594795): Better support for dynamic shapes.
@@ -898,6 +900,17 @@ class AutoregressiveLayer(tf.keras.layers.Layer):
   @property
   def params(self):
     return self._params
+
+
+class AutoregressiveLayer(AutoregressiveNetwork):
+  """Masked Autoencoder for Distribution Estimation [Germain et al. (2015)]."""
+
+  @deprecation.deprecated(
+      "2019-08-01",
+      "`AutoregressiveLayer` has been renamed `AutoregressiveNetwork`.",
+      warn_once=True)
+  def __new__(cls, *args, **kwargs):  # pylint: disable=unused-argument
+    return super(AutoregressiveLayer, cls).__new__(cls)
 
 
 def _list(xs):

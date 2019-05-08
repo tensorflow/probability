@@ -52,8 +52,8 @@ def _masked_autoregressive_shift_and_log_scale_fn(hidden_units,
                                                   name=None,
                                                   **kwargs):
   params = 1 if shift_only else 2
-  layer = tfb.AutoregressiveLayer(params, hidden_units=hidden_units,
-                                  activation=activation, name=name, **kwargs)
+  layer = tfb.AutoregressiveNetwork(params, hidden_units=hidden_units,
+                                    activation=activation, name=name, **kwargs)
 
   if shift_only:
     return lambda x: (layer(x)[..., 0], None)
@@ -311,7 +311,7 @@ class MaskedAutoregressive2DLayerTest(MaskedAutoregressiveFlowTest):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class AutoregressiveLayerTest(tf.test.TestCase):
+class AutoregressiveNetworkTest(tf.test.TestCase):
 
   def _count_trainable_params(self, layer):
     ret = 0
@@ -345,7 +345,7 @@ class AutoregressiveLayerTest(tf.test.TestCase):
       self.assertAllClose(np.zeros_like(diff), mask * diff, atol=0., rtol=1e-6)
 
   def test_layer_right_to_left_float64(self):
-    made = tfb.AutoregressiveLayer(
+    made = tfb.AutoregressiveNetwork(
         params=3, event_shape=4, activation=None, input_order="right-to-left",
         dtype=tf.float64, hidden_degrees="random", hidden_units=[10, 7, 10])
     self.assertEqual((4, 3), made(np.zeros(4, dtype=np.float64)).shape)
@@ -357,7 +357,7 @@ class AutoregressiveLayerTest(tf.test.TestCase):
     self.assertIsAutoregressive(made, event_size=4, order="right-to-left")
 
   def test_layer_callable_activation(self):
-    made = tfb.AutoregressiveLayer(
+    made = tfb.AutoregressiveNetwork(
         params=2, activation=tf.math.exp, input_order="random",
         kernel_regularizer=tfk.regularizers.l2(0.1), bias_initializer="ones",
         hidden_units=[9], hidden_degrees="equal")
@@ -369,7 +369,7 @@ class AutoregressiveLayerTest(tf.test.TestCase):
     self.assertIsAutoregressive(made, event_size=5, order=made._input_order)
 
   def test_layer_smaller_hidden_layers_than_input(self):
-    made = tfb.AutoregressiveLayer(
+    made = tfb.AutoregressiveNetwork(
         params=1, event_shape=9, activation="relu", use_bias=False,
         bias_regularizer=tfk.regularizers.l1(0.5), bias_constraint=tf.math.abs,
         input_order="right-to-left", hidden_units=[5, 5])
@@ -381,7 +381,7 @@ class AutoregressiveLayerTest(tf.test.TestCase):
     self.assertIsAutoregressive(made, event_size=9, order="right-to-left")
 
   def test_layer_no_hidden_units(self):
-    made = tfb.AutoregressiveLayer(
+    made = tfb.AutoregressiveNetwork(
         params=4, event_shape=3, use_bias=False, hidden_degrees="random",
         kernel_constraint="unit_norm")
     self.assertEqual((2, 2, 5, 3, 4), made(np.zeros((2, 2, 5, 3))).shape)
@@ -393,8 +393,9 @@ class AutoregressiveLayerTest(tf.test.TestCase):
 
   def test_layer_v2_kernel_initializer(self):
     init = tf.compat.v2.keras.initializers.GlorotNormal()
-    made = tfb.AutoregressiveLayer(params=2, event_shape=4, activation="relu",
-                                   hidden_units=[5, 5], kernel_initializer=init)
+    made = tfb.AutoregressiveNetwork(
+        params=2, event_shape=4, activation="relu",
+        hidden_units=[5, 5], kernel_initializer=init)
     self.assertEqual((4, 2), made(np.zeros(4)).shape)
     self.assertEqual(5 * 5 + 6 * 5 + 6 * 8, self._count_trainable_params(made))
     if not tf.executing_eagerly():
@@ -410,7 +411,7 @@ class AutoregressiveLayerTest(tf.test.TestCase):
     data = np.stack([x1, x2], axis=-1)
 
     # Density estimation with MADE.
-    made = tfb.AutoregressiveLayer(params=2, hidden_units=[10, 10])
+    made = tfb.AutoregressiveNetwork(params=2, hidden_units=[10, 10])
 
     distribution = tfd.TransformedDistribution(
         distribution=tfd.Normal(loc=0., scale=1.),
@@ -449,8 +450,8 @@ class AutoregressiveLayerTest(tf.test.TestCase):
     event_shape = [width * height * channels]
     reshaped_images = np.reshape(images, [n, width * height * channels])
 
-    made = tfb.AutoregressiveLayer(params=1, event_shape=event_shape,
-                                   hidden_units=[20, 20], activation="relu")
+    made = tfb.AutoregressiveNetwork(params=1, event_shape=event_shape,
+                                     hidden_units=[20, 20], activation="relu")
 
     # Density estimation with MADE.
     #
@@ -495,8 +496,8 @@ class AutoregressiveLayerTest(tf.test.TestCase):
         np.reshape(images, [n, width * height, channels]),
         axes=[0, 2, 1])
 
-    made = tfb.AutoregressiveLayer(params=1, event_shape=[width * height],
-                                   hidden_units=[20, 20], activation="relu")
+    made = tfb.AutoregressiveNetwork(params=1, event_shape=[width * height],
+                                     hidden_units=[20, 20], activation="relu")
 
     # Density estimation with MADE.
     #
