@@ -89,23 +89,23 @@ with tf.Session() as sess:
 #### Args:
 
 * <b>`x`</b>: `Tensor` with floating type. Must have statically defined rank and
-    statically known right-most dimension.
+  statically known right-most dimension.
 * <b>`layer_fn`</b>: Python `callable` which takes input `x` and `int` scalar `d` and
-    returns a transformation of `x` with shape
-    `tf.concat([tf.shape(x)[:-1], [1]], axis=0)`.
-    Default value: `tf.layers.dense`.
+  returns a transformation of `x` with shape
+  `tf.concat([tf.shape(x)[:-1], [1]], axis=0)`.
+  Default value: `tf.layers.dense`.
 * <b>`loc_fn`</b>: Python `callable` which transforms the `loc` parameter. Takes a
-    (batch of) length-`dims` vectors and returns a `Tensor` of same shape and
-    `dtype`.
-    Default value: `lambda x: x`.
+  (batch of) length-`dims` vectors and returns a `Tensor` of same shape and
+  `dtype`.
+  Default value: `lambda x: x`.
 * <b>`scale_fn`</b>: Python `callable` or `Tensor`. If a `callable` transforms the
-    `scale` parameters; if `Tensor` is the `tfd.Normal` `scale` argument.
-    Takes a (batch of) length-`dims` vectors and returns a `Tensor` of same
-    size. (Taking a `callable` or `Tensor` is how `tf.Variable` intializers
-    behave.)
-    Default value: `1`.
+  `scale` parameters; if `Tensor` is the `tfd.Normal` `scale` argument.
+  Takes a (batch of) length-`dims` vectors and returns a `Tensor` of same
+  size. (Taking a `callable` or `Tensor` is how `tf.Variable` intializers
+  behave.)
+  Default value: `1`.
 * <b>`name`</b>: A `name_scope` name for operations created by this function.
-    Default value: `None` (i.e., "normal").
+  Default value: `None` (i.e., "normal").
 
 
 #### Returns:

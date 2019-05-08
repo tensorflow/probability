@@ -34,44 +34,44 @@ Construct a `MixtureSameFamily` distribution.
 #### Args:
 
 * <b>`mixture_distribution`</b>: <a href="../../tfp/distributions/Categorical.md"><code>tfp.distributions.Categorical</code></a>-like instance.
-    Manages the probability of selecting components. The number of
-    categories must match the rightmost batch dimension of the
-    `components_distribution`. Must have either scalar `batch_shape` or
-    `batch_shape` matching `components_distribution.batch_shape[:-1]`.
+  Manages the probability of selecting components. The number of
+  categories must match the rightmost batch dimension of the
+  `components_distribution`. Must have either scalar `batch_shape` or
+  `batch_shape` matching `components_distribution.batch_shape[:-1]`.
 * <b>`components_distribution`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a>-like instance.
-    Right-most batch dimension indexes components.
+  Right-most batch dimension indexes components.
 * <b>`reparameterize`</b>: Python `bool`, default `False`. Whether to reparameterize
-    samples of the distribution using implicit reparameterization gradients
-    [(Figurnov et al., 2018)][1]. The gradients for the mixture logits are
-    equivalent to the ones described by [(Graves, 2016)][2]. The gradients
-    for the components parameters are also computed using implicit
-    reparameterization (as opposed to ancestral sampling), meaning that
-    all components are updated every step.
-    Only works when:
-      (1) components_distribution is fully reparameterized;
-      (2) components_distribution is either a scalar distribution or
-      fully factorized (tfd.Independent applied to a scalar distribution);
-      (3) batch shape has a known rank.
-    Experimental, may be slow and produce infs/NaNs.
+  samples of the distribution using implicit reparameterization gradients
+  [(Figurnov et al., 2018)][1]. The gradients for the mixture logits are
+  equivalent to the ones described by [(Graves, 2016)][2]. The gradients
+  for the components parameters are also computed using implicit
+  reparameterization (as opposed to ancestral sampling), meaning that
+  all components are updated every step.
+  Only works when:
+    (1) components_distribution is fully reparameterized;
+    (2) components_distribution is either a scalar distribution or
+    fully factorized (tfd.Independent applied to a scalar distribution);
+    (3) batch shape has a known rank.
+  Experimental, may be slow and produce infs/NaNs.
 * <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
-    parameters are checked for validity despite possibly degrading runtime
-    performance. When `False` invalid inputs may silently render incorrect
-    outputs.
+  parameters are checked for validity despite possibly degrading runtime
+  performance. When `False` invalid inputs may silently render incorrect
+  outputs.
 * <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
-    (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
-    result is undefined. When `False`, an exception is raised if one or
-    more of the statistic's batch members are undefined.
+  (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
+  result is undefined. When `False`, an exception is raised if one or
+  more of the statistic's batch members are undefined.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
 
 
 #### Raises:
 
-* <b>`ValueError`</b>: `if not dtype_util.is_integer(mixture_distribution.dtype)`.
-* <b>`ValueError`</b>: if mixture_distribution does not have scalar `event_shape`.
-* <b>`ValueError`</b>: if `mixture_distribution.batch_shape` and
+  ValueError: `if not dtype_util.is_integer(mixture_distribution.dtype)`.
+  ValueError: if mixture_distribution does not have scalar `event_shape`.
+  ValueError: if `mixture_distribution.batch_shape` and
     `components_distribution.batch_shape[:-1]` are both fully defined and
     the former is neither scalar nor equal to the latter.
-* <b>`ValueError`</b>: if `mixture_distribution` categories does not equal
+  ValueError: if `mixture_distribution` categories does not equal
     `components_distribution` rightmost batch shape.
 
 #### References

@@ -89,83 +89,83 @@ complete example:
 #### Args:
 
 * <b>`objective_function`</b>: A Python callable that accepts a batch of possible
-    solutions and returns the values of the objective function at those
-    arguments as a rank 1 real `Tensor`. This specifies the function to be
-    minimized. The input to this callable may be either a single `Tensor`
-    or a Python `list` of `Tensor`s. The signature must match the format of
-    the argument `population`. (i.e. objective_function(*population) must
-    return the value of the function to be minimized).
+  solutions and returns the values of the objective function at those
+  arguments as a rank 1 real `Tensor`. This specifies the function to be
+  minimized. The input to this callable may be either a single `Tensor`
+  or a Python `list` of `Tensor`s. The signature must match the format of
+  the argument `population`. (i.e. objective_function(*population) must
+  return the value of the function to be minimized).
 * <b>`initial_population`</b>: A real `Tensor` or Python list of `Tensor`s.
-    If a list, each `Tensor` must be of rank at least 1 and with a common
-    first dimension. The first dimension indexes into the candidate solutions
-    while the rest of the dimensions (if any) index into an individual
-    solution. The size of the population must be at least 4. This is a
-    requirement of the DE algorithm.
+  If a list, each `Tensor` must be of rank at least 1 and with a common
+  first dimension. The first dimension indexes into the candidate solutions
+  while the rest of the dimensions (if any) index into an individual
+  solution. The size of the population must be at least 4. This is a
+  requirement of the DE algorithm.
 * <b>`initial_position`</b>: A real `Tensor` of any shape. The seed solution used
-    to initialize the population of solutions. If this parameter is specified
-    then `initial_population` must not be specified.
+  to initialize the population of solutions. If this parameter is specified
+  then `initial_population` must not be specified.
 * <b>`population_size`</b>: A positive scalar int32 `Tensor` greater than 4. The
-    size of the population to evolve. This parameter is ignored if
-    `initial_population` is specified.
-    Default value: 50.
+  size of the population to evolve. This parameter is ignored if
+  `initial_population` is specified.
+  Default value: 50.
 * <b>`population_stddev`</b>: A positive scalar real `Tensor` of the same dtype
-    as `initial_position`. This parameter is ignored if `initial_population`
-    is specified. Used to generate the population from the `initial_position`
-    by adding random normal noise with zero mean and the specified standard
-    deviation.
-    Default value: 1.0
+  as `initial_position`. This parameter is ignored if `initial_population`
+  is specified. Used to generate the population from the `initial_position`
+  by adding random normal noise with zero mean and the specified standard
+  deviation.
+  Default value: 1.0
 * <b>`max_iterations`</b>: Positive scalar int32 `Tensor`. The maximum number of
-    generations to evolve the population for.
-    Default value: 100
+  generations to evolve the population for.
+  Default value: 100
 * <b>`func_tolerance`</b>: Scalar `Tensor` of the same dtype as the output of the
-    `objective_function`. The algorithm stops if the absolute difference
-    between the largest and the smallest objective function value in the
-    population is below this number.
-    Default value: 0
+  `objective_function`. The algorithm stops if the absolute difference
+  between the largest and the smallest objective function value in the
+  population is below this number.
+  Default value: 0
 * <b>`position_tolerance`</b>: Scalar `Tensor` of the same real dtype as
-    `initial_position` or `initial_population`. The algorithm terminates if
-    the largest absolute difference between the coordinates of the population
-    members is below this threshold.
-    Default value: 1e-8
+  `initial_position` or `initial_population`. The algorithm terminates if
+  the largest absolute difference between the coordinates of the population
+  members is below this threshold.
+  Default value: 1e-8
 * <b>`differential_weight`</b>: Real scalar `Tensor`. Must be positive and less than
-    2.0. The parameter controlling the strength of mutation in the algorithm.
-    Default value: 0.5
+  2.0. The parameter controlling the strength of mutation in the algorithm.
+  Default value: 0.5
 * <b>`crossover_prob`</b>: Real scalar `Tensor`. Must be between 0 and 1. The
-    probability of recombination per site.
-    Default value: 0.9
+  probability of recombination per site.
+  Default value: 0.9
 * <b>`seed`</b>: `int` or None. The random seed for this `Op`. If `None`, no seed is
-    applied.
-    Default value: None.
+  applied.
+  Default value: None.
 * <b>`name`</b>: (Optional) Python str. The name prefixed to the ops created by this
-    function. If not supplied, the default name
-    'differential_evolution_minimize' is used.
-    Default value: None
+  function. If not supplied, the default name
+  'differential_evolution_minimize' is used.
+  Default value: None
 
 
 #### Returns:
 
 * <b>`optimizer_results`</b>: An object containing the following attributes:
-* <b>`converged`</b>: Scalar boolean `Tensor` indicating whether the minimum was
-      found within the specified tolerances.
-* <b>`num_objective_evaluations`</b>: The total number of objective
-      evaluations performed.
-* <b>`position`</b>: A `Tensor` containing the best point found during the search.
-      If the search converged, then this value is the argmin of the
-      objective function within the specified tolerances.
-* <b>`objective_value`</b>: A `Tensor` containing the value of the objective
-      function at the `position`. If the search
-      converged, then this is the (local) minimum of
-      the objective function.
-* <b>`final_population`</b>: The final state of the population.
-* <b>`final_objective_values`</b>: The objective function evaluated at the
-      final population.
-* <b>`initial_population`</b>: The starting population.
-* <b>`initial_objective_values`</b>: The objective function evaluated at the
-      initial population.
-* <b>`num_iterations`</b>: The number of iterations of the main algorithm body.
+  converged: Scalar boolean `Tensor` indicating whether the minimum was
+    found within the specified tolerances.
+  num_objective_evaluations: The total number of objective
+    evaluations performed.
+  position: A `Tensor` containing the best point found during the search.
+    If the search converged, then this value is the argmin of the
+    objective function within the specified tolerances.
+  objective_value: A `Tensor` containing the value of the objective
+    function at the `position`. If the search
+    converged, then this is the (local) minimum of
+    the objective function.
+  final_population: The final state of the population.
+  final_objective_values: The objective function evaluated at the
+    final population.
+  initial_population: The starting population.
+  initial_objective_values: The objective function evaluated at the
+    initial population.
+  num_iterations: The number of iterations of the main algorithm body.
 
 
 #### Raises:
 
 * <b>`ValueError`</b>: If neither the initial population, nor the initial position
-    are specified or if both are specified.
+  are specified or if both are specified.

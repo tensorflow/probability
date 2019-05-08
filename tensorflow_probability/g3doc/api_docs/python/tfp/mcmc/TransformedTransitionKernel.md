@@ -120,20 +120,20 @@ Instantiates this object.
 #### Args:
 
 * <b>`inner_kernel`</b>: `TransitionKernel`-like object which has a
-    `target_log_prob_fn` argument.
+  `target_log_prob_fn` argument.
 * <b>`bijector`</b>: `tfp.distributions.Bijector` or list of
-    `tfp.distributions.Bijector`s. These bijectors use `forward` to map the
-    `inner_kernel` state space to the state expected by
-    `inner_kernel.target_log_prob_fn`.
+  `tfp.distributions.Bijector`s. These bijectors use `forward` to map the
+  `inner_kernel` state space to the state expected by
+  `inner_kernel.target_log_prob_fn`.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this function.
-    Default value: `None` (i.e., "transformed_kernel").
+  Default value: `None` (i.e., "transformed_kernel").
 
 
 #### Returns:
 
 * <b>`transformed_kernel`</b>: Instance of `TransitionKernel` which copies the input
-    transition kernel then modifies its `target_log_prob_fn` by applying the
-    provided bijector(s).
+  transition kernel then modifies its `target_log_prob_fn` by applying the
+  provided bijector(s).
 
 
 
@@ -188,22 +188,22 @@ transformed state.
 #### Args:
 
 * <b>`init_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the a
-    state(s) of the Markov chain(s). Must specify `init_state` or
-    `transformed_init_state` but not both.
+  state(s) of the Markov chain(s). Must specify `init_state` or
+  `transformed_init_state` but not both.
 * <b>`transformed_init_state`</b>: `Tensor` or Python `list` of `Tensor`s
-    representing the a state(s) of the Markov chain(s). Must specify
-    `init_state` or `transformed_init_state` but not both.
+  representing the a state(s) of the Markov chain(s). Must specify
+  `init_state` or `transformed_init_state` but not both.
 
 
 #### Returns:
 
 * <b>`kernel_results`</b>: A (possibly nested) `tuple`, `namedtuple` or `list` of
-    `Tensor`s representing internal calculations made within this function.
+  `Tensor`s representing internal calculations made within this function.
 
 
 #### Raises:
 
-* <b>`ValueError`</b>: if `inner_kernel` results doesn't contain the member
+  ValueError: if `inner_kernel` results doesn't contain the member
     "target_log_prob".
 
 #### Examples
@@ -238,28 +238,28 @@ Runs one iteration of the Transformed Kernel.
 #### Args:
 
 * <b>`current_state`</b>: `Tensor` or Python `list` of `Tensor`s
-    representing the current state(s) of the Markov chain(s),
-    _after_ application of `bijector.forward`. The first `r`
-    dimensions index independent chains,
-    `r = tf.rank(target_log_prob_fn(*current_state))`. The
-    `inner_kernel.one_step` does not actually use `current_state`,
-    rather it takes as input
-    `previous_kernel_results.transformed_state` (because
-    `TransformedTransitionKernel` creates a copy of the input
-    inner_kernel with a modified `target_log_prob_fn` which
-    internally applies the `bijector.forward`).
+  representing the current state(s) of the Markov chain(s),
+  _after_ application of `bijector.forward`. The first `r`
+  dimensions index independent chains,
+  `r = tf.rank(target_log_prob_fn(*current_state))`. The
+  `inner_kernel.one_step` does not actually use `current_state`,
+  rather it takes as input
+  `previous_kernel_results.transformed_state` (because
+  `TransformedTransitionKernel` creates a copy of the input
+  inner_kernel with a modified `target_log_prob_fn` which
+  internally applies the `bijector.forward`).
 * <b>`previous_kernel_results`</b>: `collections.namedtuple` containing `Tensor`s
-    representing values from previous calls to this function (or from the
-    `bootstrap_results` function.)
+  representing values from previous calls to this function (or from the
+  `bootstrap_results` function.)
 
 
 #### Returns:
 
 * <b>`next_state`</b>: Tensor or Python list of `Tensor`s representing the state(s)
-    of the Markov chain(s) after taking exactly one step. Has same type and
-    shape as `current_state`.
+  of the Markov chain(s) after taking exactly one step. Has same type and
+  shape as `current_state`.
 * <b>`kernel_results`</b>: `collections.namedtuple` of internal calculations used to
-    advance the chain.
+  advance the chain.
 
 
 

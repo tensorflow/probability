@@ -22,7 +22,7 @@ thread-local stack. Upon exiting, it pops the interceptor from the stack.
 #### Args:
 
 * <b>`interceptor`</b>: Function which takes a callable `f` and inputs `*args`,
-    `**kwargs`.
+  `**kwargs`.
 
 
 #### Yields:

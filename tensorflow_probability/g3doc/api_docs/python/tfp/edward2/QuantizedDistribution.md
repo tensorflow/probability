@@ -38,25 +38,25 @@ the `distribution`.
 #### Args:
 
 * <b>`distribution`</b>:  The base distribution class to transform. Typically an
-    instance of `Distribution`.
+  instance of `Distribution`.
 * <b>`low`</b>: `Tensor` with same `dtype` as this distribution and shape
-    able to be added to samples. Should be a whole number. Default `None`.
-    If provided, base distribution's `prob` should be defined at
-    `low`.
+  able to be added to samples. Should be a whole number. Default `None`.
+  If provided, base distribution's `prob` should be defined at
+  `low`.
 * <b>`high`</b>: `Tensor` with same `dtype` as this distribution and shape
-    able to be added to samples. Should be a whole number. Default `None`.
-    If provided, base distribution's `prob` should be defined at
-    `high - 1`.
-    `high` must be strictly greater than `low`.
+  able to be added to samples. Should be a whole number. Default `None`.
+  If provided, base distribution's `prob` should be defined at
+  `high - 1`.
+  `high` must be strictly greater than `low`.
 * <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
-    parameters are checked for validity despite possibly degrading runtime
-    performance. When `False` invalid inputs may silently render incorrect
-    outputs.
+  parameters are checked for validity despite possibly degrading runtime
+  performance. When `False` invalid inputs may silently render incorrect
+  outputs.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
 
 
 #### Raises:
 
 * <b>`TypeError`</b>: If `dist_cls` is not a subclass of
-      `Distribution` or continuous.
+    `Distribution` or continuous.
 * <b>`NotImplementedError`</b>:  If the base distribution does not implement `cdf`.

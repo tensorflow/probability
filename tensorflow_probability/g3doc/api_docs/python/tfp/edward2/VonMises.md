@@ -38,17 +38,17 @@ supports broadcasting (e.g. `loc + concentration` is a valid operation).
 
 * <b>`loc`</b>: Floating point tensor, the circular means of the distribution(s).
 * <b>`concentration`</b>: Floating point tensor, the level of concentration of the
-    distribution(s) around `loc`. Must take non-negative values.
-    `concentration = 0` defines a Uniform distribution, while
-    `concentration = +inf` indicates a Deterministic distribution at `loc`.
+  distribution(s) around `loc`. Must take non-negative values.
+  `concentration = 0` defines a Uniform distribution, while
+  `concentration = +inf` indicates a Deterministic distribution at `loc`.
 * <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
-    parameters are checked for validity despite possibly degrading runtime
-    performance. When `False` invalid inputs may silently render incorrect
-    outputs.
+  parameters are checked for validity despite possibly degrading runtime
+  performance. When `False` invalid inputs may silently render incorrect
+  outputs.
 * <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
-    (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
-    result is undefined. When `False`, an exception is raised if one or more
-    of the statistic's batch members are undefined.
+  (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
+  result is undefined. When `False`, an exception is raised if one or more
+  of the statistic's batch members are undefined.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
 
 

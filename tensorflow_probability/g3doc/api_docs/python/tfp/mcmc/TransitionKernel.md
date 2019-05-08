@@ -50,13 +50,13 @@ Returns an object with the same type as returned by `one_step(...)[1]`.
 #### Args:
 
 * <b>`init_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
-    initial state(s) of the Markov chain(s).
+  initial state(s) of the Markov chain(s).
 
 
 #### Returns:
 
 * <b>`kernel_results`</b>: A (possibly nested) `tuple`, `namedtuple` or `list` of
-    `Tensor`s representing internal calculations made within this function.
+  `Tensor`s representing internal calculations made within this function.
 
 <h3 id="one_step"><code>one_step</code></h3>
 
@@ -74,18 +74,18 @@ Must be overridden by subclasses.
 #### Args:
 
 * <b>`current_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
-    current state(s) of the Markov chain(s).
+  current state(s) of the Markov chain(s).
 * <b>`previous_kernel_results`</b>: A (possibly nested) `tuple`, `namedtuple` or
-    `list` of `Tensor`s representing internal calculations made within the
-    previous call to this function (or as returned by `bootstrap_results`).
+  `list` of `Tensor`s representing internal calculations made within the
+  previous call to this function (or as returned by `bootstrap_results`).
 
 
 #### Returns:
 
 * <b>`next_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
-    next state(s) of the Markov chain(s).
+  next state(s) of the Markov chain(s).
 * <b>`kernel_results`</b>: A (possibly nested) `tuple`, `namedtuple` or `list` of
-    `Tensor`s representing internal calculations made within this function.
+  `Tensor`s representing internal calculations made within this function.
 
 
 

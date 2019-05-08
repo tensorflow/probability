@@ -71,70 +71,70 @@ http://pages.mtu.edu/~struther/Courses/OLD/Sp2013/5630/Jorge_Nocedal_Numerical_o
 #### Args:
 
 * <b>`value_and_gradients_function`</b>:  A Python callable that accepts a point as a
-    real `Tensor` and returns a tuple of `Tensor`s of real dtype containing
-    the value of the function and its gradient at that point. The function
-    to be minimized. The input is of shape `[..., n]`, where `n` is the size
-    of the domain of input points, and all others are batching dimensions.
-    The first component of the return value is a real `Tensor` of matching
-    shape `[...]`. The second component (the gradient) is also of shape
-    `[..., n]` like the input value to the function.
+  real `Tensor` and returns a tuple of `Tensor`s of real dtype containing
+  the value of the function and its gradient at that point. The function
+  to be minimized. The input is of shape `[..., n]`, where `n` is the size
+  of the domain of input points, and all others are batching dimensions.
+  The first component of the return value is a real `Tensor` of matching
+  shape `[...]`. The second component (the gradient) is also of shape
+  `[..., n]` like the input value to the function.
 * <b>`initial_position`</b>: Real `Tensor` of shape `[..., n]`. The starting point, or
-    points when using batching dimensions, of the search procedure. At these
-    points the function value and the gradient norm should be finite.
+  points when using batching dimensions, of the search procedure. At these
+  points the function value and the gradient norm should be finite.
 * <b>`num_correction_pairs`</b>: Positive integer. Specifies the maximum number of
-    (position_delta, gradient_delta) correction pairs to keep as implicit
-    approximation of the Hessian matrix.
+  (position_delta, gradient_delta) correction pairs to keep as implicit
+  approximation of the Hessian matrix.
 * <b>`tolerance`</b>: Scalar `Tensor` of real dtype. Specifies the gradient tolerance
-    for the procedure. If the supremum norm of the gradient vector is below
-    this number, the algorithm is stopped.
+  for the procedure. If the supremum norm of the gradient vector is below
+  this number, the algorithm is stopped.
 * <b>`x_tolerance`</b>: Scalar `Tensor` of real dtype. If the absolute change in the
-    position between one iteration and the next is smaller than this number,
-    the algorithm is stopped.
+  position between one iteration and the next is smaller than this number,
+  the algorithm is stopped.
 * <b>`f_relative_tolerance`</b>: Scalar `Tensor` of real dtype. If the relative change
-    in the objective value between one iteration and the next is smaller
-    than this value, the algorithm is stopped.
+  in the objective value between one iteration and the next is smaller
+  than this value, the algorithm is stopped.
 * <b>`initial_inverse_hessian_estimate`</b>: None. Option currently not supported.
 * <b>`max_iterations`</b>: Scalar positive int32 `Tensor`. The maximum number of
-    iterations for L-BFGS updates.
+  iterations for L-BFGS updates.
 * <b>`parallel_iterations`</b>: Positive integer. The number of iterations allowed to
-    run in parallel.
+  run in parallel.
 * <b>`stopping_condition`</b>: (Optional) A Python function that takes as input two
-    Boolean tensors of shape `[...]`, and returns a Boolean scalar tensor.
-    The input tensors are `converged` and `failed`, indicating the current
-    status of each respective batch member; the return value states whether
-    the algorithm should stop. The default is tfp.optimizer.converged_all
-    which only stops when all batch members have either converged or failed.
-    An alternative is tfp.optimizer.converged_any which stops as soon as one
-    batch member has converged, or when all have failed.
+  Boolean tensors of shape `[...]`, and returns a Boolean scalar tensor.
+  The input tensors are `converged` and `failed`, indicating the current
+  status of each respective batch member; the return value states whether
+  the algorithm should stop. The default is tfp.optimizer.converged_all
+  which only stops when all batch members have either converged or failed.
+  An alternative is tfp.optimizer.converged_any which stops as soon as one
+  batch member has converged, or when all have failed.
 * <b>`name`</b>: (Optional) Python str. The name prefixed to the ops created by this
-    function. If not supplied, the default name 'minimize' is used.
+  function. If not supplied, the default name 'minimize' is used.
 
 
 #### Returns:
 
 * <b>`optimizer_results`</b>: A namedtuple containing the following items:
-* <b>`converged`</b>: Scalar boolean tensor indicating whether the minimum was
-      found within tolerance.
-* <b>`failed`</b>:  Scalar boolean tensor indicating whether a line search
-      step failed to find a suitable step size satisfying Wolfe
-      conditions. In the absence of any constraints on the
-      number of objective evaluations permitted, this value will
-      be the complement of `converged`. However, if there is
-      a constraint and the search stopped due to available
-      evaluations being exhausted, both `failed` and `converged`
-      will be simultaneously False.
-* <b>`num_objective_evaluations`</b>: The total number of objective
-      evaluations performed.
-* <b>`position`</b>: A tensor containing the last argument value found
-      during the search. If the search converged, then
-      this value is the argmin of the objective function.
-* <b>`objective_value`</b>: A tensor containing the value of the objective
-      function at the `position`. If the search converged, then this is
-      the (local) minimum of the objective function.
-* <b>`objective_gradient`</b>: A tensor containing the gradient of the objective
-      function at the `position`. If the search converged the
-      max-norm of this tensor should be below the tolerance.
-* <b>`position_deltas`</b>: A tensor encoding information about the latest
-      changes in `position` during the algorithm execution.
-* <b>`gradient_deltas`</b>: A tensor encoding information about the latest
-      changes in `objective_gradient` during the algorithm execution.
+  converged: Scalar boolean tensor indicating whether the minimum was
+    found within tolerance.
+  failed:  Scalar boolean tensor indicating whether a line search
+    step failed to find a suitable step size satisfying Wolfe
+    conditions. In the absence of any constraints on the
+    number of objective evaluations permitted, this value will
+    be the complement of `converged`. However, if there is
+    a constraint and the search stopped due to available
+    evaluations being exhausted, both `failed` and `converged`
+    will be simultaneously False.
+  num_objective_evaluations: The total number of objective
+    evaluations performed.
+  position: A tensor containing the last argument value found
+    during the search. If the search converged, then
+    this value is the argmin of the objective function.
+  objective_value: A tensor containing the value of the objective
+    function at the `position`. If the search converged, then this is
+    the (local) minimum of the objective function.
+  objective_gradient: A tensor containing the gradient of the objective
+    function at the `position`. If the search converged the
+    max-norm of this tensor should be below the tolerance.
+  position_deltas: A tensor encoding information about the latest
+    changes in `position` during the algorithm execution.
+  gradient_deltas: A tensor encoding information about the latest
+    changes in `objective_gradient` during the algorithm execution.

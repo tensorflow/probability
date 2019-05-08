@@ -56,40 +56,40 @@ These shape semantics are equivalent to `scipy.interpolate.interp1d`.
 
 * <b>`x`</b>: Numeric `Tensor` The x-coordinates of the interpolated output values.
 * <b>`x_ref_min`</b>:  Scalar `Tensor` of same `dtype` as `x`.  The minimum value of
-    the (implicitly defined) reference `x_ref`.
+  the (implicitly defined) reference `x_ref`.
 * <b>`x_ref_max`</b>:  Scalar `Tensor` of same `dtype` as `x`.  The maximum value of
-    the (implicitly defined) reference `x_ref`.
+  the (implicitly defined) reference `x_ref`.
 * <b>`y_ref`</b>:  `N-D` `Tensor` (`N > 0`) of same `dtype` as `x`. The reference
-    output values.
+  output values.
 * <b>`axis`</b>:  Scalar `Tensor` designating the dimension of `y_ref` that indexes
-    values of the interpolation table.
-    Default value: `-1`, the rightmost axis.
+  values of the interpolation table.
+  Default value: `-1`, the rightmost axis.
 * <b>`fill_value`</b>:  Determines what values output should take for `x` values that
-    are below `x_ref_min` or above `x_ref_max`. `Tensor` or one of the strings
-    "constant_extension" ==> Extend as constant function. "extrapolate" ==>
-    Extrapolate in a linear fashion.
-    Default value: `"constant_extension"`
+  are below `x_ref_min` or above `x_ref_max`. `Tensor` or one of the strings
+  "constant_extension" ==> Extend as constant function. "extrapolate" ==>
+  Extrapolate in a linear fashion.
+  Default value: `"constant_extension"`
 * <b>`fill_value_below`</b>:  Optional override of `fill_value` for `x < x_ref_min`.
 * <b>`fill_value_above`</b>:  Optional override of `fill_value` for `x > x_ref_max`.
 * <b>`grid_regularizing_transform`</b>:  Optional transformation `g` which regularizes
-    the implied spacing of the x reference points.  In other words, if
-    provided, we assume `g(x_ref_i)` is a regular grid between `g(x_ref_min)`
-    and `g(x_ref_max)`.
+  the implied spacing of the x reference points.  In other words, if
+  provided, we assume `g(x_ref_i)` is a regular grid between `g(x_ref_min)`
+  and `g(x_ref_max)`.
 * <b>`name`</b>:  A name to prepend to created ops.
-    Default value: `"interp_regular_1d_grid"`.
+  Default value: `"interp_regular_1d_grid"`.
 
 
 #### Returns:
 
 * <b>`y_interp`</b>:  Interpolation between members of `y_ref`, at points `x`.
-    `Tensor` of same `dtype` as `x`, and shape
-    `y.shape[:axis] + x.shape + y.shape[axis + 1:]`
+  `Tensor` of same `dtype` as `x`, and shape
+  `y.shape[:axis] + x.shape + y.shape[axis + 1:]`
 
 
 #### Raises:
 
-* <b>`ValueError`</b>:  If `fill_value` is not an allowed string.
-* <b>`ValueError`</b>:  If `axis` is not a scalar.
+  ValueError:  If `fill_value` is not an allowed string.
+  ValueError:  If `axis` is not a scalar.
 
 #### Examples
 

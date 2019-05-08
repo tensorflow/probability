@@ -59,42 +59,42 @@ accordingly. See below for some examples of this feature.
 
 * <b>`num_results`</b>: Integer number of Markov chain draws.
 * <b>`current_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
-    current state(s) of the Markov chain(s).
+  current state(s) of the Markov chain(s).
 * <b>`previous_kernel_results`</b>: A `Tensor` or a nested collection of `Tensor`s
-    representing internal calculations made within the previous call to this
-    function (or as returned by `bootstrap_results`).
+  representing internal calculations made within the previous call to this
+  function (or as returned by `bootstrap_results`).
 * <b>`kernel`</b>: An instance of <a href="../../tfp/mcmc/TransitionKernel.md"><code>tfp.mcmc.TransitionKernel</code></a> which implements one step
-    of the Markov chain.
+  of the Markov chain.
 * <b>`num_burnin_steps`</b>: Integer number of chain steps to take before starting to
-    collect results.
-    Default value: 0 (i.e., no burn-in).
+  collect results.
+  Default value: 0 (i.e., no burn-in).
 * <b>`num_steps_between_results`</b>: Integer number of chain steps between collecting
-    a result. Only one out of every `num_steps_between_samples + 1` steps is
-    included in the returned results.  The number of returned chain states is
-    still equal to `num_results`.  Default value: 0 (i.e., no thinning).
+  a result. Only one out of every `num_steps_between_samples + 1` steps is
+  included in the returned results.  The number of returned chain states is
+  still equal to `num_results`.  Default value: 0 (i.e., no thinning).
 * <b>`trace_fn`</b>: A callable that takes in the current chain state and the previous
-    kernel results and return a `Tensor` or a nested collection of `Tensor`s
-    that is then traced along with the chain state.
+  kernel results and return a `Tensor` or a nested collection of `Tensor`s
+  that is then traced along with the chain state.
 * <b>`return_final_kernel_results`</b>: If `True`, then the final kernel results are
-    returned alongside the chain state and the trace specified by the
-    `trace_fn`.
+  returned alongside the chain state and the trace specified by the
+  `trace_fn`.
 * <b>`parallel_iterations`</b>: The number of iterations allowed to run in parallel. It
-    must be a positive integer. See `tf.while_loop` for more details.
+  must be a positive integer. See `tf.while_loop` for more details.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this function.
-    Default value: `None` (i.e., "mcmc_sample_chain").
+  Default value: `None` (i.e., "mcmc_sample_chain").
 
 
 #### Returns:
 
-* <b>`checkpointable_states_and_trace`</b>: if `return_final_kernel_results` is
+  checkpointable_states_and_trace: if `return_final_kernel_results` is
     `True`. The return value is an instance of
     `CheckpointableStatesAndTrace`.
-* <b>`all_states`</b>: if `return_final_kernel_results` is `False` and `trace_fn` is
+  all_states: if `return_final_kernel_results` is `False` and `trace_fn` is
     `None`. The return value is a `Tensor` or Python list of `Tensor`s
     representing the state(s) of the Markov chain(s) at each result step. Has
     same shape as input `current_state` but with a prepended
     `num_results`-size dimension.
-* <b>`states_and_trace`</b>: if `return_final_kernel_results` is `False` and
+  states_and_trace: if `return_final_kernel_results` is `False` and
     `trace_fn` is not `None`. The return value is an instance of
     `StatesAndTrace`.
 

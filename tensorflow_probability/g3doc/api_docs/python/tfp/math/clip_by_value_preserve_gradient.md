@@ -39,11 +39,11 @@ correct results.
 
 * <b>`t`</b>: A `Tensor`.
 * <b>`clip_value_min`</b>: A scalar `Tensor`, or a `Tensor` with the same shape
-    as `t`. The minimum value to clip by.
+  as `t`. The minimum value to clip by.
 * <b>`clip_value_max`</b>: A scalar `Tensor`, or a `Tensor` with the same shape
-    as `t`. The maximum value to clip by.
+  as `t`. The maximum value to clip by.
 * <b>`name`</b>: A name for the operation (optional).
-    Default value: `'clip_by_value_preserve_gradient'`.
+  Default value: `'clip_by_value_preserve_gradient'`.
 
 
 #### Returns:

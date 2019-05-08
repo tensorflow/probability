@@ -53,23 +53,23 @@ Specify a local level model.
 #### Args:
 
 * <b>`level_scale_prior`</b>: optional `tfd.Distribution` instance specifying a prior
-    on the `level_scale` parameter. If `None`, a heuristic default prior is
-    constructed based on the provided `observed_time_series`.
-    Default value: `None`.
+  on the `level_scale` parameter. If `None`, a heuristic default prior is
+  constructed based on the provided `observed_time_series`.
+  Default value: `None`.
 * <b>`initial_level_prior`</b>: optional `tfd.Distribution` instance specifying a
-    prior on the initial level. If `None`, a heuristic default prior is
-    constructed based on the provided `observed_time_series`.
-    Default value: `None`.
+  prior on the initial level. If `None`, a heuristic default prior is
+  constructed based on the provided `observed_time_series`.
+  Default value: `None`.
 * <b>`observed_time_series`</b>: optional `float` `Tensor` of shape
-    `batch_shape + [T, 1]` (omitting the trailing unit dimension is also
-    supported when `T > 1`), specifying an observed time series.
-    Any priors not explicitly set will be given default values according to
-    the scale of the observed time series (or batch of time series). May
-    optionally be an instance of <a href="../../tfp/sts/MaskedTimeSeries.md"><code>tfp.sts.MaskedTimeSeries</code></a>, which includes
-    a mask `Tensor` to specify timesteps with missing observations.
-    Default value: `None`.
+  `batch_shape + [T, 1]` (omitting the trailing unit dimension is also
+  supported when `T > 1`), specifying an observed time series.
+  Any priors not explicitly set will be given default values according to
+  the scale of the observed time series (or batch of time series). May
+  optionally be an instance of <a href="../../tfp/sts/MaskedTimeSeries.md"><code>tfp.sts.MaskedTimeSeries</code></a>, which includes
+  a mask `Tensor` to specify timesteps with missing observations.
+  Default value: `None`.
 * <b>`name`</b>: the name of this model component.
-    Default value: 'LocalLevel'.
+  Default value: 'LocalLevel'.
 
 
 
@@ -82,10 +82,10 @@ Static batch shape of models represented by this component.
 #### Returns:
 
 * <b>`batch_shape`</b>: A `tf.TensorShape` giving the broadcast batch shape of
-    all model parameters. This should match the batch shape of
-    derived state space models, i.e.,
-    `self.make_state_space_model(...).batch_shape`. It may be partially
-    defined or unknown.
+  all model parameters. This should match the batch shape of
+  derived state space models, i.e.,
+  `self.make_state_space_model(...).batch_shape`. It may be partially
+  defined or unknown.
 
 <h3 id="initial_state_prior"><code>initial_state_prior</code></h3>
 
@@ -118,9 +118,9 @@ Runtime batch shape of models represented by this component.
 #### Returns:
 
 * <b>`batch_shape`</b>: `int` `Tensor` giving the broadcast batch shape of
-    all model parameters. This should match the batch shape of
-    derived state space models, i.e.,
-    `self.make_state_space_model(...).batch_shape_tensor()`.
+  all model parameters. This should match the batch shape of
+  derived state space models, i.e.,
+  `self.make_state_space_model(...).batch_shape_tensor()`.
 
 <h3 id="joint_log_prob"><code>joint_log_prob</code></h3>
 
@@ -133,18 +133,18 @@ Build the joint density `log p(params) + log p(y|params)` as a callable.
 #### Args:
 
 * <b>`observed_time_series`</b>: Observed `Tensor` trajectories of shape
-    `sample_shape + batch_shape + [num_timesteps, 1]` (the trailing
-    `1` dimension is optional if `num_timesteps > 1`), where
-    `batch_shape` should match `self.batch_shape` (the broadcast batch
-    shape of all priors on parameters for this structural time series
-    model). May optionally be an instance of <a href="../../tfp/sts/MaskedTimeSeries.md"><code>tfp.sts.MaskedTimeSeries</code></a>,
-    which includes a mask `Tensor` to specify timesteps with missing
-    observations.
+  `sample_shape + batch_shape + [num_timesteps, 1]` (the trailing
+  `1` dimension is optional if `num_timesteps > 1`), where
+  `batch_shape` should match `self.batch_shape` (the broadcast batch
+  shape of all priors on parameters for this structural time series
+  model). May optionally be an instance of <a href="../../tfp/sts/MaskedTimeSeries.md"><code>tfp.sts.MaskedTimeSeries</code></a>,
+  which includes a mask `Tensor` to specify timesteps with missing
+  observations.
 
 
 #### Returns:
 
-log_joint_fn: A function taking a `Tensor` argument for each model
+* <b>`log_joint_fn`</b>: A function taking a `Tensor` argument for each model
   parameter, in canonical order, and returning a `Tensor` log probability
   of shape `batch_shape`. Note that, *unlike* `tfp.Distributions`
   `log_prob` methods, the `log_joint` sums over the `sample_shape` from y,
@@ -170,13 +170,13 @@ Instantiate this model as a Distribution over specified `num_timesteps`.
 
 * <b>`num_timesteps`</b>: Python `int` number of timesteps to model.
 * <b>`param_vals`</b>: a list of `Tensor` parameter values in order corresponding to
-    `self.parameters`, or a dict mapping from parameter names to values.
+  `self.parameters`, or a dict mapping from parameter names to values.
 * <b>`initial_state_prior`</b>: an optional `Distribution` instance overriding the
-    default prior on the model's initial state. This is used in forecasting
-    ("today's prior is yesterday's posterior").
+  default prior on the model's initial state. This is used in forecasting
+  ("today's prior is yesterday's posterior").
 * <b>`initial_step`</b>: optional `int` specifying the initial timestep to model.
-    This is relevant when the model contains time-varying components,
-    e.g., holidays or seasonality.
+  This is relevant when the model contains time-varying components,
+  e.g., holidays or seasonality.
 
 
 #### Returns:
@@ -201,29 +201,29 @@ Sample from the joint prior over model parameters and trajectories.
 
 * <b>`num_timesteps`</b>: Scalar `int` `Tensor` number of timesteps to model.
 * <b>`initial_step`</b>: Optional scalar `int` `Tensor` specifying the starting
-    timestep.
-      Default value: 0.
+  timestep.
+    Default value: 0.
 * <b>`params_sample_shape`</b>: Number of possible worlds to sample iid from the
-    parameter prior, or more generally, `Tensor` `int` shape to fill with
-    iid samples.
-      Default value: [] (i.e., draw a single sample and don't expand the
-      shape).
-* <b>`trajectories_sample_shape`</b>: For each sampled set of parameters, number
-    of trajectories to sample, or more generally, `Tensor` `int` shape to
-    fill with iid samples.
+  parameter prior, or more generally, `Tensor` `int` shape to fill with
+  iid samples.
     Default value: [] (i.e., draw a single sample and don't expand the
-      shape).
+    shape).
+* <b>`trajectories_sample_shape`</b>: For each sampled set of parameters, number
+  of trajectories to sample, or more generally, `Tensor` `int` shape to
+  fill with iid samples.
+  Default value: [] (i.e., draw a single sample and don't expand the
+    shape).
 * <b>`seed`</b>: Python `int` random seed.
 
 
 #### Returns:
 
 * <b>`trajectories`</b>: `float` `Tensor` of shape
-    `trajectories_sample_shape + params_sample_shape + [num_timesteps, 1]`
-    containing all sampled trajectories.
+  `trajectories_sample_shape + params_sample_shape + [num_timesteps, 1]`
+  containing all sampled trajectories.
 * <b>`param_samples`</b>: list of sampled parameter value `Tensor`s, in order
-    corresponding to `self.parameters`, each of shape
-    `params_sample_shape + prior.batch_shape + prior.event_shape`.
+  corresponding to `self.parameters`, each of shape
+  `params_sample_shape + prior.batch_shape + prior.event_shape`.
 
 
 

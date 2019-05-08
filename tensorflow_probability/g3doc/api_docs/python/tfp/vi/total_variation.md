@@ -44,4 +44,4 @@ numerically unstable for `|logu| >> 0`.
 #### Returns:
 
 * <b>`total_variation_of_u`</b>: `float`-like `Tensor` of the Csiszar-function
-    evaluated at `u = exp(logu)`.
+  evaluated at `u = exp(logu)`.

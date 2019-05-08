@@ -37,13 +37,13 @@ h[j] iid~ q(H | x)
 #### Returns:
 
 * <b>`log_avg_u`</b>: `logu.dtype` `Tensor` corresponding to the natural-log of the
-    average of `u`. The sum of the gradient of `log_avg_u` is `1`.
+  average of `u`. The sum of the gradient of `log_avg_u` is `1`.
 * <b>`log_sooavg_u`</b>: `logu.dtype` `Tensor` characterized by the natural-log of the
-    average of `u`` except that the average swaps-out `u[i]` for the
-    leave-`i`-out Geometric-average. The mean of the gradient of
-    `log_sooavg_u` is `1`. Mathematically `log_sooavg_u` is,
-    ```none
-    log_sooavg_u[i] = log(Avg{h[j ; i] : j=0, ..., m-1})
-    h[j ; i] = { u[j]                              j!=i
-               { GeometricAverage{u[k] : k != i}   j==i
-    ```
+  average of `u`` except that the average swaps-out `u[i]` for the
+  leave-`i`-out Geometric-average. The mean of the gradient of
+  `log_sooavg_u` is `1`. Mathematically `log_sooavg_u` is,
+  ```none
+  log_sooavg_u[i] = log(Avg{h[j ; i] : j=0, ..., m-1})
+  h[j ; i] = { u[j]                              j!=i
+             { GeometricAverage{u[k] : k != i}   j==i
+  ```

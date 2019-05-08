@@ -44,30 +44,30 @@ Compare to `numpy.percentile`.
 #### Args:
 
 * <b>`x`</b>:  Numeric `N-D` `Tensor` with `N > 0`.  If `axis` is not `None`,
-    `x` must have statically known number of dimensions.
+  `x` must have statically known number of dimensions.
 * <b>`q`</b>:  Scalar or vector `Tensor` with values in `[0, 100]`. The percentile(s).
 * <b>`axis`</b>:  Optional `0-D` or `1-D` integer `Tensor` with constant values. The
-    axis that index independent samples over which to return the desired
-    percentile.  If `None` (the default), treat every dimension as a sample
-    dimension, returning a scalar.
+  axis that index independent samples over which to return the desired
+  percentile.  If `None` (the default), treat every dimension as a sample
+  dimension, returning a scalar.
 * <b>`interpolation `</b>: {'nearest', 'linear', 'lower', 'higher', 'midpoint'}.
-    Default value: 'nearest'.  This specifies the interpolation method to
-    use when the desired quantile lies between two data points `i < j`:
-      * linear: i + (j - i) * fraction, where fraction is the fractional part
-        of the index surrounded by i and j.
-      * lower: `i`.
-      * higher: `j`.
-      * nearest: `i` or `j`, whichever is nearest.
-      * midpoint: (i + j) / 2.
-    `linear` and `midpoint` interpolation do not work with integer dtypes.
+  Default value: 'nearest'.  This specifies the interpolation method to
+  use when the desired quantile lies between two data points `i < j`:
+    * linear: i + (j - i) * fraction, where fraction is the fractional part
+      of the index surrounded by i and j.
+    * lower: `i`.
+    * higher: `j`.
+    * nearest: `i` or `j`, whichever is nearest.
+    * midpoint: (i + j) / 2.
+  `linear` and `midpoint` interpolation do not work with integer dtypes.
 * <b>`keep_dims`</b>:  Python `bool`. If `True`, the last dimension is kept with size 1
-    If `False`, the last dimension is removed from the output shape.
+  If `False`, the last dimension is removed from the output shape.
 * <b>`validate_args`</b>:  Whether to add runtime checks of argument validity. If
-    False, and arguments are incorrect, correct behavior is not guaranteed.
+  False, and arguments are incorrect, correct behavior is not guaranteed.
 * <b>`preserve_gradients`</b>:  Python `bool`.  If `True`, ensure that gradient w.r.t
-    the percentile `q` is preserved in the case of linear interpolation.
-    If `False`, the gradient will be (incorrectly) zero when `q` corresponds
-    to a point in `x`.
+  the percentile `q` is preserved in the case of linear interpolation.
+  If `False`, the gradient will be (incorrectly) zero when `q` corresponds
+  to a point in `x`.
 * <b>`name`</b>:  A Python string name to give this `Op`.  Default is 'percentile'
 
 
@@ -80,8 +80,8 @@ A `(rank(q) + N - len(axis))` dimensional `Tensor` of same dtype as `x`, or,
 
 #### Raises:
 
-* <b>`ValueError`</b>:  If argument 'interpolation' is not an allowed type.
-* <b>`ValueError`</b>:  If interpolation type not compatible with `dtype`.
+  ValueError:  If argument 'interpolation' is not an allowed type.
+  ValueError:  If interpolation type not compatible with `dtype`.
 
 #### Examples
 

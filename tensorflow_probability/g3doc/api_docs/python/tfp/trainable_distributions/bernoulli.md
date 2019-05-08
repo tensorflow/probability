@@ -86,13 +86,13 @@ with tf.Session() as sess:
 #### Args:
 
 * <b>`x`</b>: `Tensor` with floating type. Must have statically defined rank and
-    statically known right-most dimension.
+  statically known right-most dimension.
 * <b>`layer_fn`</b>: Python `callable` which takes input `x` and `int` scalar `d` and
-    returns a transformation of `x` with shape
-    `tf.concat([tf.shape(x)[:-1], [1]], axis=0)`.
-    Default value: `tf.layers.dense`.
+  returns a transformation of `x` with shape
+  `tf.concat([tf.shape(x)[:-1], [1]], axis=0)`.
+  Default value: `tf.layers.dense`.
 * <b>`name`</b>: A `name_scope` name for operations created by this function.
-    Default value: `None` (i.e., "bernoulli").
+  Default value: `None` (i.e., "bernoulli").
 
 
 #### Returns:

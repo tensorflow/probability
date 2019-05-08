@@ -49,45 +49,45 @@ with leading dimensions in `x`, `x_ref_min`, `x_ref_max`.
 #### Args:
 
 * <b>`x`</b>: Numeric `Tensor` The x-coordinates of the interpolated output values for
-    each batch.  Shape broadcasts with `[A1, ..., AN, D]`, `N >= 0`.
+  each batch.  Shape broadcasts with `[A1, ..., AN, D]`, `N >= 0`.
 * <b>`x_ref_min`</b>:  `Tensor` of same `dtype` as `x`.  The minimum value of the each
-    batch of the (implicitly defined) reference `x_ref`. Shape broadcasts with
-    `[A1, ..., AN]`, `N >= 0`.
+  batch of the (implicitly defined) reference `x_ref`. Shape broadcasts with
+  `[A1, ..., AN]`, `N >= 0`.
 * <b>`x_ref_max`</b>:  `Tensor` of same `dtype` as `x`.  The maximum value of the each
-    batch of the (implicitly defined) reference `x_ref`. Shape broadcasts with
-    `[A1, ..., AN]`, `N >= 0`.
+  batch of the (implicitly defined) reference `x_ref`. Shape broadcasts with
+  `[A1, ..., AN]`, `N >= 0`.
 * <b>`y_ref`</b>:  `Tensor` of same `dtype` as `x`.  The reference output values.
-    `y_ref.shape[:axis]` broadcasts with the batch shape `[A1, ..., AN]`, and
-    `y_ref.shape[axis:]` is `[C, B1, ..., BM]`, so the trailing dimensions
-      index `C` reference values of a rank `M` `Tensor` (`M >= 0`).
+  `y_ref.shape[:axis]` broadcasts with the batch shape `[A1, ..., AN]`, and
+  `y_ref.shape[axis:]` is `[C, B1, ..., BM]`, so the trailing dimensions
+    index `C` reference values of a rank `M` `Tensor` (`M >= 0`).
 * <b>`axis`</b>:  Scalar `Tensor` designating the dimension of `y_ref` that indexes
-    values of the interpolation table.
-    Default value: `-1`, the rightmost axis.
+  values of the interpolation table.
+  Default value: `-1`, the rightmost axis.
 * <b>`fill_value`</b>:  Determines what values output should take for `x` values that
-    are below `x_ref_min` or above `x_ref_max`. `Tensor` or one of the strings
-    "constant_extension" ==> Extend as constant function. "extrapolate" ==>
-    Extrapolate in a linear fashion.
-    Default value: `"constant_extension"`
+  are below `x_ref_min` or above `x_ref_max`. `Tensor` or one of the strings
+  "constant_extension" ==> Extend as constant function. "extrapolate" ==>
+  Extrapolate in a linear fashion.
+  Default value: `"constant_extension"`
 * <b>`fill_value_below`</b>:  Optional override of `fill_value` for `x < x_ref_min`.
 * <b>`fill_value_above`</b>:  Optional override of `fill_value` for `x > x_ref_max`.
 * <b>`grid_regularizing_transform`</b>:  Optional transformation `g` which regularizes
-    the implied spacing of the x reference points.  In other words, if
-    provided, we assume `g(x_ref_i)` is a regular grid between `g(x_ref_min)`
-    and `g(x_ref_max)`.
+  the implied spacing of the x reference points.  In other words, if
+  provided, we assume `g(x_ref_i)` is a regular grid between `g(x_ref_min)`
+  and `g(x_ref_max)`.
 * <b>`name`</b>:  A name to prepend to created ops.
-    Default value: `"batch_interp_regular_1d_grid"`.
+  Default value: `"batch_interp_regular_1d_grid"`.
 
 
 #### Returns:
 
 * <b>`y_interp`</b>:  Interpolation between members of `y_ref`, at points `x`.
-    `Tensor` of same `dtype` as `x`, and shape `[A1, ..., AN, D, B1, ..., BM]`
+  `Tensor` of same `dtype` as `x`, and shape `[A1, ..., AN, D, B1, ..., BM]`
 
 
 #### Raises:
 
-* <b>`ValueError`</b>:  If `fill_value` is not an allowed string.
-* <b>`ValueError`</b>:  If `axis` is not a scalar.
+  ValueError:  If `fill_value` is not an allowed string.
+  ValueError:  If `axis` is not a scalar.
 
 #### Examples
 

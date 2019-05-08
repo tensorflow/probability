@@ -39,18 +39,18 @@ cheaply done via the Woodbury matrix identity, as implemented by
 #### Args:
 
 * <b>`matrix`</b>: Floating point `Tensor` batch of symmetric, positive definite
-    matrices.
+  matrices.
 * <b>`max_rank`</b>: Scalar `int` `Tensor`, the rank at which to truncate the
-    approximation.
+  approximation.
 * <b>`diag_rtol`</b>: Scalar floating point `Tensor` (same dtype as `matrix`). If the
-    errors of all diagonal elements of `lr @ lr.T` are each lower than
-    `element * diag_rtol`, iteration is permitted to terminate early.
+  errors of all diagonal elements of `lr @ lr.T` are each lower than
+  `element * diag_rtol`, iteration is permitted to terminate early.
 * <b>`name`</b>: Optional name for the op.
 
 
 #### Returns:
 
-* <b>`lr`</b>: Low rank pivoted Cholesky approximation of `matrix`.
+  lr: Low rank pivoted Cholesky approximation of `matrix`.
 
 #### References
 

@@ -88,6 +88,8 @@ Defined in [`python/distributions/__init__.py`](https://github.com/tensorflow/pr
 
 [`class JointDistribution`](../tfp/distributions/JointDistribution.md): Joint distribution over one or more component distributions.
 
+[`class JointDistributionCoroutine`](../tfp/distributions/JointDistributionCoroutine.md): Joint distribution parameterized by a distribution-making generator.
+
 [`class JointDistributionNamed`](../tfp/distributions/JointDistributionNamed.md): Joint distribution parameterized by named distribution-making functions.
 
 [`class JointDistributionSequential`](../tfp/distributions/JointDistributionSequential.md): Joint distribution parameterized by distribution-making functions.

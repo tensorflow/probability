@@ -29,23 +29,23 @@ nor is this condition checked even when `validate_args=True`.
 #### Args:
 
 * <b>`lower_upper`</b>: `lu` as returned by `tf.linalg.lu`, i.e., if
-    `matmul(P, matmul(L, U)) = X` then `lower_upper = L + U - eye`.
+  `matmul(P, matmul(L, U)) = X` then `lower_upper = L + U - eye`.
 * <b>`perm`</b>: `p` as returned by `tf.linag.lu`, i.e., if
-    `matmul(P, matmul(L, U)) = X` then `perm = argmax(P)`.
+  `matmul(P, matmul(L, U)) = X` then `perm = argmax(P)`.
 * <b>`rhs`</b>: Matrix-shaped float `Tensor` representing targets for which to solve;
-    `A X = RHS`. To handle vector cases, use:
-    `lu_solve(..., rhs[..., tf.newaxis])[..., 0]`.
+  `A X = RHS`. To handle vector cases, use:
+  `lu_solve(..., rhs[..., tf.newaxis])[..., 0]`.
 * <b>`validate_args`</b>: Python `bool` indicating whether arguments should be checked
-    for correctness. Note: this function does not verify the implied matrix is
-    actually invertible, even when `validate_args=True`.
-    Default value: `False` (i.e., don't validate arguments).
+  for correctness. Note: this function does not verify the implied matrix is
+  actually invertible, even when `validate_args=True`.
+  Default value: `False` (i.e., don't validate arguments).
 * <b>`name`</b>: Python `str` name given to ops managed by this object.
-    Default value: `None` (i.e., "lu_solve").
+  Default value: `None` (i.e., "lu_solve").
 
 
 #### Returns:
 
-* <b>`x`</b>: The `X` in `A @ X = RHS`.
+  x: The `X` in `A @ X = RHS`.
 
 #### Examples
 

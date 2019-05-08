@@ -511,65 +511,65 @@ Instantiate a VariationalGaussianProcess Distribution.
 #### Args:
 
 * <b>`kernel`</b>: `PositiveSemidefiniteKernel`-like instance representing the
-    GP's covariance function.
+  GP's covariance function.
 * <b>`index_points`</b>: `float` `Tensor` representing finite (batch of) vector(s) of
-    points in the index set over which the VGP is defined. Shape has the
-    form `[b1, ..., bB, e1, f1, ..., fF]` where `F` is the number of feature
-    dimensions and must equal `kernel.feature_ndims` and `e1` is the number
-    (size) of index points in each batch (we denote it `e1` to distinguish
-    it from the numer of inducing index points, denoted `e2` below).
-    Ultimately the VariationalGaussianProcess distribution corresponds to an
-    `e1`-dimensional multivariate normal. The batch shape must be
-    broadcastable with `kernel.batch_shape`, the batch shape of
-    `inducing_index_points`, and any batch dims yielded by `mean_fn`.
+  points in the index set over which the VGP is defined. Shape has the
+  form `[b1, ..., bB, e1, f1, ..., fF]` where `F` is the number of feature
+  dimensions and must equal `kernel.feature_ndims` and `e1` is the number
+  (size) of index points in each batch (we denote it `e1` to distinguish
+  it from the numer of inducing index points, denoted `e2` below).
+  Ultimately the VariationalGaussianProcess distribution corresponds to an
+  `e1`-dimensional multivariate normal. The batch shape must be
+  broadcastable with `kernel.batch_shape`, the batch shape of
+  `inducing_index_points`, and any batch dims yielded by `mean_fn`.
 * <b>`inducing_index_points`</b>: `float` `Tensor` of locations of inducing points in
-    the index set. Shape has the form `[b1, ..., bB, e2, f1, ..., fF]`, just
-    like `index_points`. The batch shape components needn't be identical to
-    those of `index_points`, but must be broadcast compatible with them.
+  the index set. Shape has the form `[b1, ..., bB, e2, f1, ..., fF]`, just
+  like `index_points`. The batch shape components needn't be identical to
+  those of `index_points`, but must be broadcast compatible with them.
 * <b>`variational_inducing_observations_loc`</b>: `float` `Tensor`; the mean of the
-    (full-rank Gaussian) variational posterior over function values at the
-    inducing points, conditional on observed data. Shape has the form `[b1,
-    ..., bB, e2]`, where `b1, ..., bB` is broadcast compatible with other
-    parameters' batch shapes, and `e2` is the number of inducing points.
+  (full-rank Gaussian) variational posterior over function values at the
+  inducing points, conditional on observed data. Shape has the form `[b1,
+  ..., bB, e2]`, where `b1, ..., bB` is broadcast compatible with other
+  parameters' batch shapes, and `e2` is the number of inducing points.
 * <b>`variational_inducing_observations_scale`</b>: `float` `Tensor`; the scale
-    matrix of the (full-rank Gaussian) variational posterior over function
-    values at the inducing points, conditional on observed data. Shape has
-    the form `[b1, ..., bB, e2, e2]`, where `b1, ..., bB` is broadcast
-    compatible with other parameters and `e2` is the number of inducing
-    points.
+  matrix of the (full-rank Gaussian) variational posterior over function
+  values at the inducing points, conditional on observed data. Shape has
+  the form `[b1, ..., bB, e2, e2]`, where `b1, ..., bB` is broadcast
+  compatible with other parameters and `e2` is the number of inducing
+  points.
 * <b>`mean_fn`</b>: Python `callable` that acts on index points to produce a (batch
-    of) vector(s) of mean values at those index points. Takes a `Tensor` of
-    shape `[b1, ..., bB, f1, ..., fF]` and returns a `Tensor` whose shape is
-    (broadcastable with) `[b1, ..., bB]`. Default value: `None` implies
-    constant zero function.
+  of) vector(s) of mean values at those index points. Takes a `Tensor` of
+  shape `[b1, ..., bB, f1, ..., fF]` and returns a `Tensor` whose shape is
+  (broadcastable with) `[b1, ..., bB]`. Default value: `None` implies
+  constant zero function.
 * <b>`observation_noise_variance`</b>: `float` `Tensor` representing the variance
-    of the noise in the Normal likelihood distribution of the model. May be
-    batched, in which case the batch shape must be broadcastable with the
-    shapes of all other batched parameters (`kernel.batch_shape`,
-    `index_points`, etc.).
-    Default value: `0.`
+  of the noise in the Normal likelihood distribution of the model. May be
+  batched, in which case the batch shape must be broadcastable with the
+  shapes of all other batched parameters (`kernel.batch_shape`,
+  `index_points`, etc.).
+  Default value: `0.`
 * <b>`predictive_noise_variance`</b>: `float` `Tensor` representing additional
-    variance in the posterior predictive model. If `None`, we simply re-use
-    `observation_noise_variance` for the posterior predictive noise. If set
-    explicitly, however, we use the given value. This allows us, for
-    example, to omit predictive noise variance (by setting this to zero) to
-    obtain noiseless posterior predictions of function values, conditioned
-    on noisy observations.
+  variance in the posterior predictive model. If `None`, we simply re-use
+  `observation_noise_variance` for the posterior predictive noise. If set
+  explicitly, however, we use the given value. This allows us, for
+  example, to omit predictive noise variance (by setting this to zero) to
+  obtain noiseless posterior predictions of function values, conditioned
+  on noisy observations.
 * <b>`jitter`</b>: `float` scalar `Tensor` added to the diagonal of the covariance
-    matrix to ensure positive definiteness of the covariance matrix.
-    Default value: `1e-6`.
+  matrix to ensure positive definiteness of the covariance matrix.
+  Default value: `1e-6`.
 * <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
-    parameters are checked for validity despite possibly degrading runtime
-    performance. When `False` invalid inputs may silently render incorrect
-    outputs.
-    Default value: `False`.
+  parameters are checked for validity despite possibly degrading runtime
+  performance. When `False` invalid inputs may silently render incorrect
+  outputs.
+  Default value: `False`.
 * <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`,
-    statistics (e.g., mean, mode, variance) use the value "`NaN`" to
-    indicate the result is undefined. When `False`, an exception is raised
-    if one or more of the statistic's batch members are undefined.
-    Default value: `False`.
+  statistics (e.g., mean, mode, variance) use the value "`NaN`" to
+  indicate the result is undefined. When `False`, an exception is raised
+  if one or more of the statistic's batch members are undefined.
+  Default value: `False`.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
-    Default value: "VariationalGaussianProcess".
+  Default value: "VariationalGaussianProcess".
 
 
 #### Raises:
@@ -793,7 +793,7 @@ cdf(x) := P[X <= x]
 #### Returns:
 
 * <b>`cdf`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
+  values of type `self.dtype`.
 
 <h3 id="copy"><code>copy</code></h3>
 
@@ -809,14 +809,14 @@ initialization arguments.
 #### Args:
 
 * <b>`**override_parameters_kwargs`</b>: String/value dictionary of initialization
-    arguments to override with new values.
+  arguments to override with new values.
 
 
 #### Returns:
 
 * <b>`distribution`</b>: A new instance of `type(self)` initialized from the union
-    of self.parameters and override_parameters_kwargs, i.e.,
-    `dict(self.parameters, **override_parameters_kwargs)`.
+  of self.parameters and override_parameters_kwargs, i.e.,
+  `dict(self.parameters, **override_parameters_kwargs)`.
 
 <h3 id="covariance"><code>covariance</code></h3>
 
@@ -863,8 +863,8 @@ length-`k'` vector.
 #### Returns:
 
 * <b>`covariance`</b>: Floating-point `Tensor` with shape `[B1, ..., Bn, k', k']`
-    where the first `n` dimensions are batch coordinates and
-    `k' = reduce_prod(self.event_shape)`.
+  where the first `n` dimensions are batch coordinates and
+  `k' = reduce_prod(self.event_shape)`.
 
 <h3 id="cross_entropy"><code>cross_entropy</code></h3>
 
@@ -899,7 +899,7 @@ where `F` denotes the support of the random variable `X ~ P`.
 #### Returns:
 
 * <b>`cross_entropy`</b>: `self.dtype` `Tensor` with shape `[B1, ..., Bn]`
-    representing `n` different calculations of (Shannon) cross entropy.
+  representing `n` different calculations of (Shannon) cross entropy.
 
 <h3 id="entropy"><code>entropy</code></h3>
 
@@ -998,8 +998,8 @@ denotes (Shannon) cross entropy, and `H[.]` denotes (Shannon) entropy.
 #### Returns:
 
 * <b>`kl_divergence`</b>: `self.dtype` `Tensor` with shape `[B1, ..., Bn]`
-    representing `n` different calculations of the Kullback-Leibler
-    divergence.
+  representing `n` different calculations of the Kullback-Leibler
+  divergence.
 
 <h3 id="log_cdf"><code>log_cdf</code></h3>
 
@@ -1033,7 +1033,7 @@ a more accurate answer than simply taking the logarithm of the `cdf` when
 #### Returns:
 
 * <b>`logcdf`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
+  values of type `self.dtype`.
 
 <h3 id="log_prob"><code>log_prob</code></h3>
 
@@ -1073,7 +1073,7 @@ or
 #### Returns:
 
 * <b>`log_prob`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
+  values of type `self.dtype`.
 
 <h3 id="log_survival_function"><code>log_survival_function</code></h3>
 
@@ -1158,41 +1158,41 @@ in [Titsias, 2009][1].
 #### Args:
 
 * <b>`kernel`</b>: `PositiveSemidefiniteKernel`-like instance representing the
-    GP's covariance function.
+  GP's covariance function.
 * <b>`inducing_index_points`</b>: `float` `Tensor` of locations of inducing points in
-    the index set. Shape has the form `[b1, ..., bB, e2, f1, ..., fF]`, just
-    like `observation_index_points`. The batch shape components needn't be
-    identical to those of `observation_index_points`, but must be broadcast
-    compatible with them.
+  the index set. Shape has the form `[b1, ..., bB, e2, f1, ..., fF]`, just
+  like `observation_index_points`. The batch shape components needn't be
+  identical to those of `observation_index_points`, but must be broadcast
+  compatible with them.
 * <b>`observation_index_points`</b>: `float` `Tensor` representing finite (batch of)
-    vector(s) of points where observations are defined. Shape has the
-    form `[b1, ..., bB, e1, f1, ..., fF]` where `F` is the number of feature
-    dimensions and must equal `kernel.feature_ndims` and `e1` is the number
-    (size) of index points in each batch (we denote it `e1` to distinguish
-    it from the numer of inducing index points, denoted `e2` below).
+  vector(s) of points where observations are defined. Shape has the
+  form `[b1, ..., bB, e1, f1, ..., fF]` where `F` is the number of feature
+  dimensions and must equal `kernel.feature_ndims` and `e1` is the number
+  (size) of index points in each batch (we denote it `e1` to distinguish
+  it from the numer of inducing index points, denoted `e2` below).
 * <b>`observations`</b>: `float` `Tensor` representing collection, or batch of
-    collections, of observations corresponding to
-    `observation_index_points`. Shape has the form `[b1, ..., bB, e]`, which
-    must be brodcastable with the batch and example shapes of
-    `observation_index_points`. The batch shape `[b1, ..., bB]` must be
-    broadcastable with the shapes of all other batched parameters
-    (`kernel.batch_shape`, `observation_index_points`, etc.).
+  collections, of observations corresponding to
+  `observation_index_points`. Shape has the form `[b1, ..., bB, e]`, which
+  must be brodcastable with the batch and example shapes of
+  `observation_index_points`. The batch shape `[b1, ..., bB]` must be
+  broadcastable with the shapes of all other batched parameters
+  (`kernel.batch_shape`, `observation_index_points`, etc.).
 * <b>`observation_noise_variance`</b>: `float` `Tensor` representing the variance
-    of the noise in the Normal likelihood distribution of the model. May be
-    batched, in which case the batch shape must be broadcastable with the
-    shapes of all other batched parameters (`kernel.batch_shape`,
-    `index_points`, etc.).
-    Default value: `0.`
+  of the noise in the Normal likelihood distribution of the model. May be
+  batched, in which case the batch shape must be broadcastable with the
+  shapes of all other batched parameters (`kernel.batch_shape`,
+  `index_points`, etc.).
+  Default value: `0.`
 * <b>`mean_fn`</b>: Python `callable` that acts on index points to produce a (batch
-    of) vector(s) of mean values at those index points. Takes a `Tensor` of
-    shape `[b1, ..., bB, f1, ..., fF]` and returns a `Tensor` whose shape is
-    (broadcastable with) `[b1, ..., bB]`. Default value: `None` implies
-    constant zero function.
+  of) vector(s) of mean values at those index points. Takes a `Tensor` of
+  shape `[b1, ..., bB, f1, ..., fF]` and returns a `Tensor` whose shape is
+  (broadcastable with) `[b1, ..., bB]`. Default value: `None` implies
+  constant zero function.
 * <b>`jitter`</b>: `float` scalar `Tensor` added to the diagonal of the covariance
-    matrix to ensure positive definiteness of the covariance matrix.
-    Default value: `1e-6`.
+  matrix to ensure positive definiteness of the covariance matrix.
+  Default value: `1e-6`.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
-    Default value: "optimal_variational_posterior".
+  Default value: "optimal_variational_posterior".
 
 #### Returns:
 
@@ -1200,7 +1200,7 @@ loc, scale: Tuple representing the variational location and scale.
 
 #### Raises:
 
-* <b>`ValueError`</b>: if `mean_fn` is not `None` and is not callable.
+  ValueError: if `mean_fn` is not `None` and is not callable.
 
 #### References
 
@@ -1229,7 +1229,7 @@ Subclasses should override class method `_param_shapes`.
 #### Args:
 
 * <b>`sample_shape`</b>: `Tensor` or python list/tuple. Desired shape of a call to
-    `sample()`.
+  `sample()`.
 * <b>`name`</b>: name to prepend ops with.
 
 
@@ -1259,7 +1259,7 @@ constant-valued tensors when constant values are fed.
 #### Args:
 
 * <b>`sample_shape`</b>: `TensorShape` or python list/tuple. Desired shape of a call
-    to `sample()`.
+  to `sample()`.
 
 
 #### Returns:
@@ -1309,7 +1309,7 @@ or
 #### Returns:
 
 * <b>`prob`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
+  values of type `self.dtype`.
 
 <h3 id="quantile"><code>quantile</code></h3>
 
@@ -1339,7 +1339,7 @@ quantile(p) := x such that P[X <= x] == p
 #### Returns:
 
 * <b>`quantile`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
+  values of type `self.dtype`.
 
 <h3 id="sample"><code>sample</code></h3>
 
@@ -1398,7 +1398,7 @@ denotes expectation, and `stddev.shape = batch_shape + event_shape`.
 #### Returns:
 
 * <b>`stddev`</b>: Floating-point `Tensor` with shape identical to
-    `batch_shape + event_shape`, i.e., the same shape as `self.mean()`.
+  `batch_shape + event_shape`, i.e., the same shape as `self.mean()`.
 
 <h3 id="survival_function"><code>survival_function</code></h3>
 
@@ -1461,7 +1461,7 @@ denotes expectation, and `Var.shape = batch_shape + event_shape`.
 #### Returns:
 
 * <b>`variance`</b>: Floating-point `Tensor` with shape identical to
-    `batch_shape + event_shape`, i.e., the same shape as `self.mean()`.
+  `batch_shape + event_shape`, i.e., the same shape as `self.mean()`.
 
 <h3 id="variational_loss"><code>variational_loss</code></h3>
 
@@ -1482,34 +1482,34 @@ negative variational lower bound as specified in [Hensman, 2013][1].
 #### Args:
 
 * <b>`observations`</b>: `float` `Tensor` representing collection, or batch of
-    collections, of observations corresponding to
-    `observation_index_points`. Shape has the form `[b1, ..., bB, e]`, which
-    must be brodcastable with the batch and example shapes of
-    `observation_index_points`. The batch shape `[b1, ..., bB]` must be
-    broadcastable with the shapes of all other batched parameters
-    (`kernel.batch_shape`, `observation_index_points`, etc.).
+  collections, of observations corresponding to
+  `observation_index_points`. Shape has the form `[b1, ..., bB, e]`, which
+  must be brodcastable with the batch and example shapes of
+  `observation_index_points`. The batch shape `[b1, ..., bB]` must be
+  broadcastable with the shapes of all other batched parameters
+  (`kernel.batch_shape`, `observation_index_points`, etc.).
 * <b>`observation_index_points`</b>: `float` `Tensor` representing finite (batch of)
-    vector(s) of points where observations are defined. Shape has the
-    form `[b1, ..., bB, e1, f1, ..., fF]` where `F` is the number of feature
-    dimensions and must equal `kernel.feature_ndims` and `e1` is the number
-    (size) of index points in each batch (we denote it `e1` to distinguish
-    it from the numer of inducing index points, denoted `e2` below). If
-    set to `None` uses `index_points` as the origin for observations.
-    Default value: None.
+  vector(s) of points where observations are defined. Shape has the
+  form `[b1, ..., bB, e1, f1, ..., fF]` where `F` is the number of feature
+  dimensions and must equal `kernel.feature_ndims` and `e1` is the number
+  (size) of index points in each batch (we denote it `e1` to distinguish
+  it from the numer of inducing index points, denoted `e2` below). If
+  set to `None` uses `index_points` as the origin for observations.
+  Default value: None.
 * <b>`kl_weight`</b>: Amount by which to scale the KL divergence loss between prior
-    and posterior.
-    Default value: 1.
+  and posterior.
+  Default value: 1.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
-    Default value: "GaussianProcess".
+  Default value: "GaussianProcess".
 
 #### Returns:
 
 * <b>`loss`</b>: Scalar tensor representing the negative variational lower bound.
-    Can be directly used in a `tf.Optimizer`.
+  Can be directly used in a `tf.Optimizer`.
 
 #### Raises:
 
-* <b>`ValueError`</b>: if `mean_fn` is not `None` and is not callable.
+  ValueError: if `mean_fn` is not `None` and is not callable.
 
 #### References
 

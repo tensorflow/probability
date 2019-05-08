@@ -46,9 +46,9 @@ identified in the search is used (favoring a shorter MRO distance to
 * <b>`distribution_a`</b>: The first distribution.
 * <b>`distribution_b`</b>: The second distribution.
 * <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`,
-    statistics (e.g., mean, mode, variance) use the value "`NaN`" to
-    indicate the result is undefined. When `False`, an exception is raised
-    if one or more of the statistic's batch members are undefined.
+  statistics (e.g., mean, mode, variance) use the value "`NaN`" to
+  indicate the result is undefined. When `False`, an exception is raised
+  if one or more of the statistic's batch members are undefined.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
 
 
@@ -60,7 +60,7 @@ and `distribution_b`.
 
 #### Raises:
 
-* <b>`NotImplementedError`</b>: If no KL method is defined for distribution types
+  NotImplementedError: If no KL method is defined for distribution types
     of `distribution_a` and `distribution_b`.
 
 Built-in KL(distribution_a || distribution_b) registrations:

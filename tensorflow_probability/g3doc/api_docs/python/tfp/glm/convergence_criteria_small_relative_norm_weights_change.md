@@ -35,14 +35,14 @@ https://en.wikipedia.org/wiki/Norm_(mathematics)#Euclidean_norm) of `x`.
 #### Args:
 
 * <b>`tolerance`</b>: `float`-like `Tensor` indicating convergence, i.e., when
-    max relative Euclidean norm weights difference < tolerance`.
-    Default value: `1e-5`.
+  max relative Euclidean norm weights difference < tolerance`.
+  Default value: `1e-5`.
 * <b>`norm_order`</b>: Order of the norm. Default value: `2` (i.e., "Euclidean norm".)
 
 
 #### Returns:
 
 * <b>`convergence_criteria_fn`</b>: Python `callable` which returns `bool` `Tensor`
-    indicated fitting procedure has converged. (See inner function
-    specification for argument signature.)
-    Default value: `1e-5`.
+  indicated fitting procedure has converged. (See inner function
+  specification for argument signature.)
+  Default value: `1e-5`.

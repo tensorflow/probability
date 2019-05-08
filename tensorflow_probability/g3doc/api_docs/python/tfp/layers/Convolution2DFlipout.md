@@ -164,66 +164,66 @@ Construct layer.
 #### Args:
 
 * <b>`filters`</b>: Integer, the dimensionality of the output space (i.e. the number
-    of filters in the convolution).
+  of filters in the convolution).
 * <b>`kernel_size`</b>: An integer or tuple/list of 2 integers, specifying the
-    height and width of the 2D convolution window.
-    Can be a single integer to specify the same value for
-    all spatial dimensions.
+  height and width of the 2D convolution window.
+  Can be a single integer to specify the same value for
+  all spatial dimensions.
 * <b>`strides`</b>: An integer or tuple/list of 2 integers,
-    specifying the strides of the convolution along the height and width.
-    Can be a single integer to specify the same value for
-    all spatial dimensions.
-    Specifying any stride value != 1 is incompatible with specifying
-    any `dilation_rate` value != 1.
+  specifying the strides of the convolution along the height and width.
+  Can be a single integer to specify the same value for
+  all spatial dimensions.
+  Specifying any stride value != 1 is incompatible with specifying
+  any `dilation_rate` value != 1.
 * <b>`padding`</b>: One of `"valid"` or `"same"` (case-insensitive).
 * <b>`data_format`</b>: A string, one of `channels_last` (default) or
-    `channels_first`. The ordering of the dimensions in the inputs.
-    `channels_last` corresponds to inputs with shape `(batch, height,
-    width, channels)` while `channels_first` corresponds to inputs with
-    shape `(batch, channels, height, width)`.
+  `channels_first`. The ordering of the dimensions in the inputs.
+  `channels_last` corresponds to inputs with shape `(batch, height,
+  width, channels)` while `channels_first` corresponds to inputs with
+  shape `(batch, channels, height, width)`.
 * <b>`dilation_rate`</b>: An integer or tuple/list of 2 integers, specifying
-    the dilation rate to use for dilated convolution.
-    Can be a single integer to specify the same value for
-    all spatial dimensions.
-    Currently, specifying any `dilation_rate` value != 1 is
-    incompatible with specifying any stride value != 1.
+  the dilation rate to use for dilated convolution.
+  Can be a single integer to specify the same value for
+  all spatial dimensions.
+  Currently, specifying any `dilation_rate` value != 1 is
+  incompatible with specifying any stride value != 1.
 * <b>`activation`</b>: Activation function. Set it to None to maintain a
-      linear activation.
+    linear activation.
 * <b>`activity_regularizer`</b>: Regularizer function for the output.
 * <b>`kernel_posterior_fn`</b>: Python `callable` which creates
-    `tfd.Distribution` instance representing the surrogate
-    posterior of the `kernel` parameter. Default value:
-    `default_mean_field_normal_fn()`.
+  `tfd.Distribution` instance representing the surrogate
+  posterior of the `kernel` parameter. Default value:
+  `default_mean_field_normal_fn()`.
 * <b>`kernel_posterior_tensor_fn`</b>: Python `callable` which takes a
-    `tfd.Distribution` instance and returns a representative
-    value. Default value: `lambda d: d.sample()`.
+  `tfd.Distribution` instance and returns a representative
+  value. Default value: `lambda d: d.sample()`.
 * <b>`kernel_prior_fn`</b>: Python `callable` which creates `tfd`
-    instance. See `default_mean_field_normal_fn` docstring for required
-    parameter signature.
-    Default value: `tfd.Normal(loc=0., scale=1.)`.
+  instance. See `default_mean_field_normal_fn` docstring for required
+  parameter signature.
+  Default value: `tfd.Normal(loc=0., scale=1.)`.
 * <b>`kernel_divergence_fn`</b>: Python `callable` which takes the surrogate posterior
-    distribution, prior distribution and random variate sample(s) from the
-    surrogate posterior and computes or approximates the KL divergence. The
-    distributions are `tfd.Distribution`-like instances and the
-    sample is a `Tensor`.
+  distribution, prior distribution and random variate sample(s) from the
+  surrogate posterior and computes or approximates the KL divergence. The
+  distributions are `tfd.Distribution`-like instances and the
+  sample is a `Tensor`.
 * <b>`bias_posterior_fn`</b>: Python `callable` which creates
-    `tfd.Distribution` instance representing the surrogate
-    posterior of the `bias` parameter. Default value:
-    `default_mean_field_normal_fn(is_singular=True)` (which creates an
-    instance of `tfd.Deterministic`).
+  `tfd.Distribution` instance representing the surrogate
+  posterior of the `bias` parameter. Default value:
+  `default_mean_field_normal_fn(is_singular=True)` (which creates an
+  instance of `tfd.Deterministic`).
 * <b>`bias_posterior_tensor_fn`</b>: Python `callable` which takes a
-    `tfd.Distribution` instance and returns a representative
-    value. Default value: `lambda d: d.sample()`.
+  `tfd.Distribution` instance and returns a representative
+  value. Default value: `lambda d: d.sample()`.
 * <b>`bias_prior_fn`</b>: Python `callable` which creates `tfd` instance.
-    See `default_mean_field_normal_fn` docstring for required parameter
-    signature. Default value: `None` (no prior, no variational inference)
+  See `default_mean_field_normal_fn` docstring for required parameter
+  signature. Default value: `None` (no prior, no variational inference)
 * <b>`bias_divergence_fn`</b>: Python `callable` which takes the surrogate posterior
-    distribution, prior distribution and random variate sample(s) from the
-    surrogate posterior and computes or approximates the KL divergence. The
-    distributions are `tfd.Distribution`-like instances and the
-    sample is a `Tensor`.
+  distribution, prior distribution and random variate sample(s) from the
+  surrogate posterior and computes or approximates the KL divergence. The
+  distributions are `tfd.Distribution`-like instances and the
+  sample is a `Tensor`.
 * <b>`seed`</b>: Python scalar `int` which initializes the random number
-    generator. Default value: `None` (i.e., use global seed).
+  generator. Default value: `None` (i.e., use global seed).
 
 
 
@@ -256,7 +256,7 @@ Input tensor or list of input tensors.
 #### Raises:
 
 * <b>`AttributeError`</b>: if the layer is connected to
-    more than one incoming layers.
+more than one incoming layers.
 
 
 #### Raises:
@@ -280,7 +280,7 @@ mask tensors.
 #### Raises:
 
 * <b>`AttributeError`</b>: if the layer is connected to
-    more than one incoming layers.
+more than one incoming layers.
 
 <h3 id="input_shape"><code>input_shape</code></h3>
 
@@ -351,7 +351,7 @@ Output tensor or list of output tensors.
 #### Raises:
 
 * <b>`AttributeError`</b>: if the layer is connected to more than one incoming
-    layers.
+  layers.
 * <b>`RuntimeError`</b>: if called in Eager mode.
 
 <h3 id="output_mask"><code>output_mask</code></h3>
@@ -370,7 +370,7 @@ mask tensors.
 #### Raises:
 
 * <b>`AttributeError`</b>: if the layer is connected to
-    more than one incoming layers.
+more than one incoming layers.
 
 <h3 id="output_shape"><code>output_shape</code></h3>
 
@@ -475,18 +475,20 @@ Wraps `call`, applying pre- and post-processing steps.
 
 #### Returns:
 
-  Output tensor(s).
+Output tensor(s).
 
-Note:
-  - The following optional keyword arguments are reserved for specific uses:
-    * `training`: Boolean scalar tensor of Python boolean indicating
-      whether the `call` is meant for training or inference.
-    * `mask`: Boolean input mask.
-  - If the layer's `call` method takes a `mask` argument (as some Keras
-    layers do), its default value will be set to the mask generated
-    for `inputs` by the previous layer (if `input` did come from
-    a layer that generated a corresponding mask, i.e. if it came from
-    a Keras layer with masking support.
+
+#### Note:
+
+- The following optional keyword arguments are reserved for specific uses:
+  * `training`: Boolean scalar tensor of Python boolean indicating
+    whether the `call` is meant for training or inference.
+  * `mask`: Boolean input mask.
+- If the layer's `call` method takes a `mask` argument (as some Keras
+  layers do), its default value will be set to the mask generated
+  for `inputs` by the previous layer (if `input` did come from
+  a layer that generated a corresponding mask, i.e. if it came from
+  a Keras layer with masking support.
 
 
 #### Raises:
@@ -535,8 +537,8 @@ This is typically used to create the weights of `Layer` subclasses.
 #### Arguments:
 
 * <b>`input_shape`</b>: Instance of `TensorShape`, or list of instances of
-    `TensorShape` if the layer expects a list of inputs
-    (one instance per input).
+  `TensorShape` if the layer expects a list of inputs
+  (one instance per input).
 
 <h3 id="compute_mask"><code>compute_mask</code></h3>
 
@@ -571,8 +573,8 @@ Computes the output shape of the layer.
 #### Args:
 
 * <b>`input_shape`</b>: Shape tuple (tuple of integers) or list of shape tuples
-    (one per output tensor of the layer). Shape tuples can include None for
-    free dimensions, instead of an integer.
+  (one per output tensor of the layer). Shape tuples can include None for
+  free dimensions, instead of an integer.
 
 
 #### Returns:
@@ -595,7 +597,7 @@ An integer count.
 #### Raises:
 
 * <b>`ValueError`</b>: if the layer isn't yet built
-      (in which case its weights aren't yet defined).
+  (in which case its weights aren't yet defined).
 
 <h3 id="from_config"><code>from_config</code></h3>
 
@@ -635,7 +637,7 @@ configuration of a layer. The same layer can be reinstantiated later
 #### Returns:
 
 * <b>`config`</b>: A Python dictionary of class keyword arguments and their
-    serialized values.
+  serialized values.
 
 <h3 id="get_input_at"><code>get_input_at</code></h3>
 
@@ -648,9 +650,9 @@ Retrieves the input tensor(s) of a layer at a given node.
 #### Arguments:
 
 * <b>`node_index`</b>: Integer, index of the node
-        from which to retrieve the attribute.
-        E.g. `node_index=0` will correspond to the
-        first time the layer was called.
+    from which to retrieve the attribute.
+    E.g. `node_index=0` will correspond to the
+    first time the layer was called.
 
 
 #### Returns:
@@ -673,9 +675,9 @@ Retrieves the input mask tensor(s) of a layer at a given node.
 #### Arguments:
 
 * <b>`node_index`</b>: Integer, index of the node
-        from which to retrieve the attribute.
-        E.g. `node_index=0` will correspond to the
-        first time the layer was called.
+    from which to retrieve the attribute.
+    E.g. `node_index=0` will correspond to the
+    first time the layer was called.
 
 
 #### Returns:
@@ -694,9 +696,9 @@ Retrieves the input shape(s) of a layer at a given node.
 #### Arguments:
 
 * <b>`node_index`</b>: Integer, index of the node
-        from which to retrieve the attribute.
-        E.g. `node_index=0` will correspond to the
-        first time the layer was called.
+    from which to retrieve the attribute.
+    E.g. `node_index=0` will correspond to the
+    first time the layer was called.
 
 
 #### Returns:
@@ -737,9 +739,9 @@ Retrieves the output tensor(s) of a layer at a given node.
 #### Arguments:
 
 * <b>`node_index`</b>: Integer, index of the node
-        from which to retrieve the attribute.
-        E.g. `node_index=0` will correspond to the
-        first time the layer was called.
+    from which to retrieve the attribute.
+    E.g. `node_index=0` will correspond to the
+    first time the layer was called.
 
 
 #### Returns:
@@ -762,9 +764,9 @@ Retrieves the output mask tensor(s) of a layer at a given node.
 #### Arguments:
 
 * <b>`node_index`</b>: Integer, index of the node
-        from which to retrieve the attribute.
-        E.g. `node_index=0` will correspond to the
-        first time the layer was called.
+    from which to retrieve the attribute.
+    E.g. `node_index=0` will correspond to the
+    first time the layer was called.
 
 
 #### Returns:
@@ -783,9 +785,9 @@ Retrieves the output shape(s) of a layer at a given node.
 #### Arguments:
 
 * <b>`node_index`</b>: Integer, index of the node
-        from which to retrieve the attribute.
-        E.g. `node_index=0` will correspond to the
-        first time the layer was called.
+    from which to retrieve the attribute.
+    E.g. `node_index=0` will correspond to the
+    first time the layer was called.
 
 
 #### Returns:
@@ -838,16 +840,16 @@ Sets the weights of the layer, from Numpy arrays.
 #### Arguments:
 
 * <b>`weights`</b>: a list of Numpy arrays. The number
-        of arrays and their shape must match
-        number of the dimensions of the weights
-        of the layer (i.e. it should match the
-        output of `get_weights`).
+    of arrays and their shape must match
+    number of the dimensions of the weights
+    of the layer (i.e. it should match the
+    output of `get_weights`).
 
 
 #### Raises:
 
 * <b>`ValueError`</b>: If the provided weights list does not match the
-        layer's specifications.
+    layer's specifications.
 
 <h3 id="with_name_scope"><code>with_name_scope</code></h3>
 

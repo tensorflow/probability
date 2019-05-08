@@ -24,19 +24,19 @@ Defined in [`python/sts/decomposition.py`](https://github.com/tensorflow/probabi
 #### Args:
 
 * <b>`model`</b>: An instance of <a href="../../tfp/sts/Sum.md"><code>tfp.sts.Sum</code></a> representing a structural time series
-    model.
+  model.
 * <b>`forecast_dist`</b>: A `Distribution` instance returned by `tfp.sts.forecast()`.
-    (specifically, must be a `tfd.MixtureSameFamily` over a
-    `tfd.LinearGaussianStateSpaceModel` parameterized by posterior samples).
+  (specifically, must be a `tfd.MixtureSameFamily` over a
+  `tfd.LinearGaussianStateSpaceModel` parameterized by posterior samples).
 * <b>`parameter_samples`</b>: Python `list` of `Tensors` representing posterior samples
-    of model parameters, with shapes `[concat([[num_posterior_draws],
-    param.prior.batch_shape, param.prior.event_shape]) for param in
-    model.parameters]`. This may optionally also be a map (Python `dict`) of
-    parameter names to `Tensor` values.
+  of model parameters, with shapes `[concat([[num_posterior_draws],
+  param.prior.batch_shape, param.prior.event_shape]) for param in
+  model.parameters]`. This may optionally also be a map (Python `dict`) of
+  parameter names to `Tensor` values.
 
 #### Returns:
 
-* <b>`component_forecasts`</b>: A `collections.OrderedDict` instance mapping
+  component_forecasts: A `collections.OrderedDict` instance mapping
     component StructuralTimeSeries instances (elements of `model.components`)
     to `tfd.Distribution` instances representing the marginal forecast for
     each component. Each distribution has batch and event shape matching
@@ -46,8 +46,7 @@ Defined in [`python/sts/decomposition.py`](https://github.com/tensorflow/probabi
 #### Examples
 
 Suppose we've built a model, fit it to data, and constructed a forecast
-distribution:
-
+* <b>`distribution`</b>: 
 ```python
   day_of_week = tfp.sts.Seasonal(
       num_seasons=7,
@@ -79,8 +78,7 @@ distribution into `decompose_forecast_by_components`:
 ```
 
 Using the component forecasts, we can visualize the uncertainty for each
-component:
-
+* <b>`component`</b>: 
 ```
 from matplotlib import pylab as plt
 num_components = len(component_forecasts)

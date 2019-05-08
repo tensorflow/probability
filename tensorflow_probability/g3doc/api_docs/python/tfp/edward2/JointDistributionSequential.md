@@ -34,11 +34,11 @@ Construct the `JointDistributionSequential` distribution.
 #### Args:
 
 * <b>`model`</b>: Python list of either tfd.Distribution instances and/or
-    lambda functions which take the `k` previous distributions and returns a
-    new tfd.Distribution instance.
+  lambda functions which take the `k` previous distributions and returns a
+  new tfd.Distribution instance.
 * <b>`validate_args`</b>: Python `bool`.  Whether to validate input with asserts.
-    If `validate_args` is `False`, and the inputs are invalid,
-    correct behavior is not guaranteed.
-    Default value: `False`.
+  If `validate_args` is `False`, and the inputs are invalid,
+  correct behavior is not guaranteed.
+  Default value: `False`.
 * <b>`name`</b>: The name for ops managed by the distribution.
-    Default value: `None` (i.e., `"JointDistributionSequential"`).
+  Default value: `None` (i.e., `"JointDistributionSequential"`).

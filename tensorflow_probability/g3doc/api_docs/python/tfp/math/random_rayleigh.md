@@ -37,16 +37,16 @@ https://en.wikipedia.org/wiki/Rayleigh_distribution)
 
 * <b>`shape`</b>: Vector-shaped, `int` `Tensor` representing shape of output.
 * <b>`scale`</b>: (Optional) Positive `float` `Tensor` representing `Rayleigh` scale.
-    Default value: `None` (i.e., `scale = 1.`).
+  Default value: `None` (i.e., `scale = 1.`).
 * <b>`dtype`</b>: (Optional) TF `dtype` representing `dtype` of output.
-    Default value: `tf.float32`.
+  Default value: `tf.float32`.
 * <b>`seed`</b>: (Optional) Python integer to seed the random number generator.
-    Default value: `None` (i.e., no seed).
+  Default value: `None` (i.e., no seed).
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this function.
-    Default value: `None` (i.e., 'random_rayleigh').
+  Default value: `None` (i.e., 'random_rayleigh').
 
 
 #### Returns:
 
 * <b>`rayleigh`</b>: `Tensor` with specified `shape` and `dtype` consisting of positive
-    real values drawn from a Rayleigh distribution with specified `scale`.
+  real values drawn from a Rayleigh distribution with specified `scale`.

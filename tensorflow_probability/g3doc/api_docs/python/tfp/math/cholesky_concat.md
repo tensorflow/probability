@@ -42,18 +42,18 @@ separate `rows` argument (which can be inferred from `conj(cols.T)`).
 
 * <b>`chol`</b>: Cholesky decomposition of `mat = chol @ chol.T`.
 * <b>`cols`</b>: The new columns whose first `n` rows we would like concatenated to the
-    right of `mat = chol @ chol.T`, and whose conjugate transpose we would
-    like concatenated to the bottom of `concat(mat, cols[:n,:])`. A `Tensor`
-    with final dims `(n+m, m)`. The first `n` rows are the top right rectangle
-    (their conjugate transpose forms the bottom left), and the bottom `m x m`
-    is self-adjoint.
+  right of `mat = chol @ chol.T`, and whose conjugate transpose we would
+  like concatenated to the bottom of `concat(mat, cols[:n,:])`. A `Tensor`
+  with final dims `(n+m, m)`. The first `n` rows are the top right rectangle
+  (their conjugate transpose forms the bottom left), and the bottom `m x m`
+  is self-adjoint.
 * <b>`name`</b>: Optional name for this op.
 
 
 #### Returns:
 
 * <b>`chol_concat`</b>: The Cholesky decomposition of:
-    ```
-    [ [ mat  cols[:n, :] ]
-      [   conj(cols.T)   ] ]
-    ```
+  ```
+  [ [ mat  cols[:n, :] ]
+    [   conj(cols.T)   ] ]
+  ```

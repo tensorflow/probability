@@ -126,26 +126,26 @@ Creates the `VariableLayer`.
 #### Arguments:
 
 * <b>`shape`</b>: integer or integer vector specifying the shape of the output of
-    this layer.
+  this layer.
 * <b>`dtype`</b>: TensorFlow `dtype` of the variable created by this layer.
-    Default value: `None` (i.e., `tf.as_dtype(tf.keras.backend.floatx())`).
+  Default value: `None` (i.e., `tf.as_dtype(tf.keras.backend.floatx())`).
 * <b>`activation`</b>: Activation function to use.  If you don't specify anything, no
-    activation is applied (ie. "linear" activation: `a(x) = x`).
-    Default value: `None`.
+  activation is applied (ie. "linear" activation: `a(x) = x`).
+  Default value: `None`.
 * <b>`initializer`</b>: Initializer for the `constant` vector. For example, to
-    initialize a trainable (initially standard) `Normal` with
-    `tf.math.softplus` transformed scale, one might use:
-    ```python
-    tfp.layers.BlockwiseInitializer([
-        'zeros',
-        tf.keras.initializers.Constant(np.log(np.expm1(1.))),  # = 0.541325
-    ], sizes=[1, 1])
-    ```
-    Default value: `'zeros'`.
+  initialize a trainable (initially standard) `Normal` with
+  `tf.math.softplus` transformed scale, one might use:
+  ```python
+  tfp.layers.BlockwiseInitializer([
+      'zeros',
+      tf.keras.initializers.Constant(np.log(np.expm1(1.))),  # = 0.541325
+  ], sizes=[1, 1])
+  ```
+  Default value: `'zeros'`.
 * <b>`regularizer`</b>: Regularizer function applied to the `constant` vector.
-    Default value: `None`.
+  Default value: `None`.
 * <b>`constraint`</b>: Constraint function applied to the `constant` vector.
-    Default value: `None`.
+  Default value: `None`.
 * <b>`**kwargs`</b>: Extra arguments forwarded to `tf.keras.layers.Layer`.
 
 
@@ -179,7 +179,7 @@ Input tensor or list of input tensors.
 #### Raises:
 
 * <b>`AttributeError`</b>: if the layer is connected to
-    more than one incoming layers.
+more than one incoming layers.
 
 
 #### Raises:
@@ -203,7 +203,7 @@ mask tensors.
 #### Raises:
 
 * <b>`AttributeError`</b>: if the layer is connected to
-    more than one incoming layers.
+more than one incoming layers.
 
 <h3 id="input_shape"><code>input_shape</code></h3>
 
@@ -274,7 +274,7 @@ Output tensor or list of output tensors.
 #### Raises:
 
 * <b>`AttributeError`</b>: if the layer is connected to more than one incoming
-    layers.
+  layers.
 * <b>`RuntimeError`</b>: if called in Eager mode.
 
 <h3 id="output_mask"><code>output_mask</code></h3>
@@ -293,7 +293,7 @@ mask tensors.
 #### Raises:
 
 * <b>`AttributeError`</b>: if the layer is connected to
-    more than one incoming layers.
+more than one incoming layers.
 
 <h3 id="output_shape"><code>output_shape</code></h3>
 
@@ -398,18 +398,20 @@ Wraps `call`, applying pre- and post-processing steps.
 
 #### Returns:
 
-  Output tensor(s).
+Output tensor(s).
 
-Note:
-  - The following optional keyword arguments are reserved for specific uses:
-    * `training`: Boolean scalar tensor of Python boolean indicating
-      whether the `call` is meant for training or inference.
-    * `mask`: Boolean input mask.
-  - If the layer's `call` method takes a `mask` argument (as some Keras
-    layers do), its default value will be set to the mask generated
-    for `inputs` by the previous layer (if `input` did come from
-    a layer that generated a corresponding mask, i.e. if it came from
-    a Keras layer with masking support.
+
+#### Note:
+
+- The following optional keyword arguments are reserved for specific uses:
+  * `training`: Boolean scalar tensor of Python boolean indicating
+    whether the `call` is meant for training or inference.
+  * `mask`: Boolean input mask.
+- If the layer's `call` method takes a `mask` argument (as some Keras
+  layers do), its default value will be set to the mask generated
+  for `inputs` by the previous layer (if `input` did come from
+  a layer that generated a corresponding mask, i.e. if it came from
+  a Keras layer with masking support.
 
 
 #### Raises:
@@ -458,8 +460,8 @@ This is typically used to create the weights of `Layer` subclasses.
 #### Arguments:
 
 * <b>`input_shape`</b>: Instance of `TensorShape`, or list of instances of
-    `TensorShape` if the layer expects a list of inputs
-    (one instance per input).
+  `TensorShape` if the layer expects a list of inputs
+  (one instance per input).
 
 <h3 id="compute_mask"><code>compute_mask</code></h3>
 
@@ -497,9 +499,9 @@ to match that input shape provided.
 #### Arguments:
 
 * <b>`input_shape`</b>: Shape tuple (tuple of integers)
-        or list of shape tuples (one per output tensor of the layer).
-        Shape tuples can include None for free dimensions,
-        instead of an integer.
+    or list of shape tuples (one per output tensor of the layer).
+    Shape tuples can include None for free dimensions,
+    instead of an integer.
 
 
 #### Returns:
@@ -522,7 +524,7 @@ An integer count.
 #### Raises:
 
 * <b>`ValueError`</b>: if the layer isn't yet built
-      (in which case its weights aren't yet defined).
+  (in which case its weights aren't yet defined).
 
 <h3 id="from_config"><code>from_config</code></h3>
 
@@ -543,7 +545,7 @@ dictionary. It does not handle layer connectivity
 #### Arguments:
 
 * <b>`config`</b>: A Python dictionary, typically the
-        output of get_config.
+    output of get_config.
 
 
 #### Returns:
@@ -582,9 +584,9 @@ Retrieves the input tensor(s) of a layer at a given node.
 #### Arguments:
 
 * <b>`node_index`</b>: Integer, index of the node
-        from which to retrieve the attribute.
-        E.g. `node_index=0` will correspond to the
-        first time the layer was called.
+    from which to retrieve the attribute.
+    E.g. `node_index=0` will correspond to the
+    first time the layer was called.
 
 
 #### Returns:
@@ -607,9 +609,9 @@ Retrieves the input mask tensor(s) of a layer at a given node.
 #### Arguments:
 
 * <b>`node_index`</b>: Integer, index of the node
-        from which to retrieve the attribute.
-        E.g. `node_index=0` will correspond to the
-        first time the layer was called.
+    from which to retrieve the attribute.
+    E.g. `node_index=0` will correspond to the
+    first time the layer was called.
 
 
 #### Returns:
@@ -628,9 +630,9 @@ Retrieves the input shape(s) of a layer at a given node.
 #### Arguments:
 
 * <b>`node_index`</b>: Integer, index of the node
-        from which to retrieve the attribute.
-        E.g. `node_index=0` will correspond to the
-        first time the layer was called.
+    from which to retrieve the attribute.
+    E.g. `node_index=0` will correspond to the
+    first time the layer was called.
 
 
 #### Returns:
@@ -671,9 +673,9 @@ Retrieves the output tensor(s) of a layer at a given node.
 #### Arguments:
 
 * <b>`node_index`</b>: Integer, index of the node
-        from which to retrieve the attribute.
-        E.g. `node_index=0` will correspond to the
-        first time the layer was called.
+    from which to retrieve the attribute.
+    E.g. `node_index=0` will correspond to the
+    first time the layer was called.
 
 
 #### Returns:
@@ -696,9 +698,9 @@ Retrieves the output mask tensor(s) of a layer at a given node.
 #### Arguments:
 
 * <b>`node_index`</b>: Integer, index of the node
-        from which to retrieve the attribute.
-        E.g. `node_index=0` will correspond to the
-        first time the layer was called.
+    from which to retrieve the attribute.
+    E.g. `node_index=0` will correspond to the
+    first time the layer was called.
 
 
 #### Returns:
@@ -717,9 +719,9 @@ Retrieves the output shape(s) of a layer at a given node.
 #### Arguments:
 
 * <b>`node_index`</b>: Integer, index of the node
-        from which to retrieve the attribute.
-        E.g. `node_index=0` will correspond to the
-        first time the layer was called.
+    from which to retrieve the attribute.
+    E.g. `node_index=0` will correspond to the
+    first time the layer was called.
 
 
 #### Returns:
@@ -772,16 +774,16 @@ Sets the weights of the layer, from Numpy arrays.
 #### Arguments:
 
 * <b>`weights`</b>: a list of Numpy arrays. The number
-        of arrays and their shape must match
-        number of the dimensions of the weights
-        of the layer (i.e. it should match the
-        output of `get_weights`).
+    of arrays and their shape must match
+    number of the dimensions of the weights
+    of the layer (i.e. it should match the
+    output of `get_weights`).
 
 
 #### Raises:
 
 * <b>`ValueError`</b>: If the provided weights list does not match the
-        layer's specifications.
+    layer's specifications.
 
 <h3 id="with_name_scope"><code>with_name_scope</code></h3>
 

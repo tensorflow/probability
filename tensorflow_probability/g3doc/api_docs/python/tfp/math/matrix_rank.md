@@ -25,17 +25,17 @@ Defined in [`python/math/linalg.py`](https://github.com/tensorflow/probability/t
 #### Arguments:
 
 * <b>`a`</b>: (Batch of) `float`-like matrix-shaped `Tensor`(s) which are to be
-    pseudo-inverted.
+  pseudo-inverted.
 * <b>`tol`</b>: Threshold below which the singular value is counted as "zero".
-    Default value: `None` (i.e., `eps * max(rows, cols) * max(singular_val)`).
+  Default value: `None` (i.e., `eps * max(rows, cols) * max(singular_val)`).
 * <b>`validate_args`</b>: When `True`, additional assertions might be embedded in the
-    graph.
-    Default value: `False` (i.e., no graph assertions are added).
+  graph.
+  Default value: `False` (i.e., no graph assertions are added).
 * <b>`name`</b>: Python `str` prefixed to ops created by this function.
-    Default value: "matrix_rank".
+  Default value: "matrix_rank".
 
 
 #### Returns:
 
 * <b>`matrix_rank`</b>: (Batch of) `int32` scalars representing the number of non-zero
-    singular values.
+  singular values.

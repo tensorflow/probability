@@ -58,24 +58,24 @@ when `N = 1`, but is slightly biased.
 
 * <b>`x`</b>:  A numeric `Tensor` holding samples.
 * <b>`y`</b>:  Optional `Tensor` with same `dtype` and `shape` as `x`.
-    Default value: `None` (`y` is effectively set to `x`).
+  Default value: `None` (`y` is effectively set to `x`).
 * <b>`sample_axis`</b>: Scalar or vector `Tensor` designating axis holding samples, or
-    `None` (meaning all axis hold samples).
-    Default value: `0` (leftmost dimension).
+  `None` (meaning all axis hold samples).
+  Default value: `0` (leftmost dimension).
 * <b>`event_axis`</b>:  Scalar or vector `Tensor`, or `None` (scalar events).
-    Axis indexing random events, whose correlation we are interested in.
-    If a vector, entries must form a contiguous block of dims. `sample_axis`
-    and `event_axis` should not intersect.
-    Default value: `-1` (rightmost axis holds events).
+  Axis indexing random events, whose correlation we are interested in.
+  If a vector, entries must form a contiguous block of dims. `sample_axis`
+  and `event_axis` should not intersect.
+  Default value: `-1` (rightmost axis holds events).
 * <b>`keepdims`</b>:  Boolean.  Whether to keep the sample axis as singletons.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this function.
-        Default value: `None` (i.e., `'correlation'`).
+      Default value: `None` (i.e., `'correlation'`).
 
 
 #### Returns:
 
 * <b>`corr`</b>: A `Tensor` of same `dtype` as the `x`, and rank equal to
-    `rank(x) - len(sample_axis) + 2 * len(event_axis)`.
+  `rank(x) - len(sample_axis) + 2 * len(event_axis)`.
 
 
 #### Raises:

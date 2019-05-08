@@ -46,46 +46,46 @@ this optimizer calls them relatively few times compared with other algorithms.
 #### Args:
 
 * <b>`grad_and_hessian_loss_fn`</b>: callable that takes as input a (batch of) `Tensor`
-    of the same shape and dtype as `x_start` and returns the triple
-    `(gradient_unregularized_loss, hessian_unregularized_loss_outer,
-    hessian_unregularized_loss_middle)` as defined in the argument spec of
-    `minimize_one_step`.
+  of the same shape and dtype as `x_start` and returns the triple
+  `(gradient_unregularized_loss, hessian_unregularized_loss_outer,
+  hessian_unregularized_loss_middle)` as defined in the argument spec of
+  `minimize_one_step`.
 * <b>`x_start`</b>: (Batch of) vector-shaped, `float` `Tensor` representing the initial
-    value of the argument to the `Loss` function.
+  value of the argument to the `Loss` function.
 * <b>`tolerance`</b>: scalar, `float` `Tensor` representing the tolerance for each
-    optimization step; see the `tolerance` argument of
-    `minimize_one_step`.
+  optimization step; see the `tolerance` argument of
+  `minimize_one_step`.
 * <b>`l1_regularizer`</b>: scalar, `float` `Tensor` representing the weight of the L1
-    regularization term (see equation above).
+  regularization term (see equation above).
 * <b>`l2_regularizer`</b>: scalar, `float` `Tensor` representing the weight of the L2
-    regularization term (see equation above).
-    Default value: `None` (i.e., no L2 regularization).
+  regularization term (see equation above).
+  Default value: `None` (i.e., no L2 regularization).
 * <b>`maximum_iterations`</b>: Python integer specifying the maximum number of
-    iterations of the outer loop of the optimizer.  After this many iterations
-    of the outer loop, the algorithm will terminate even if the return value
-    `optimal_x` has not converged.
-    Default value: `1`.
+  iterations of the outer loop of the optimizer.  After this many iterations
+  of the outer loop, the algorithm will terminate even if the return value
+  `optimal_x` has not converged.
+  Default value: `1`.
 * <b>`maximum_full_sweeps_per_iteration`</b>: Python integer specifying the maximum
-    number of sweeps allowed in each iteration of the outer loop of the
-    optimizer.  Passed as the `maximum_full_sweeps` argument to
-    `minimize_one_step`.
-    Default value: `1`.
+  number of sweeps allowed in each iteration of the outer loop of the
+  optimizer.  Passed as the `maximum_full_sweeps` argument to
+  `minimize_one_step`.
+  Default value: `1`.
 * <b>`learning_rate`</b>: scalar, `float` `Tensor` representing a multiplicative factor
-    used to dampen the proximal gradient descent steps.
-    Default value: `None` (i.e., factor is conceptually `1`).
+  used to dampen the proximal gradient descent steps.
+  Default value: `None` (i.e., factor is conceptually `1`).
 * <b>`name`</b>: Python string representing the name of the TensorFlow operation.
-    The default name is `"minimize"`.
+  The default name is `"minimize"`.
 
 
 #### Returns:
 
-* <b>`x`</b>: `Tensor` of the same shape and dtype as `x_start`, representing the
+  x: `Tensor` of the same shape and dtype as `x_start`, representing the
     (batches of) computed values of `x` which minimizes `Loss(x)`.
-* <b>`is_converged`</b>: scalar, `bool` `Tensor` indicating whether the minimization
+  is_converged: scalar, `bool` `Tensor` indicating whether the minimization
     procedure converged within the specified number of iterations across all
     batches.  Here convergence means that an iteration of the inner loop
     (`minimize_one_step`) returns `True` for its `is_converged` output value.
-* <b>`iter`</b>: scalar, `int` `Tensor` indicating the actual number of iterations of
+  iter: scalar, `int` `Tensor` indicating the actual number of iterations of
     the outer loop of the optimizer completed (i.e., number of calls to
     `minimize_one_step` before achieving convergence).
 

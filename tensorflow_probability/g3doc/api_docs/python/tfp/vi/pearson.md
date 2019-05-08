@@ -44,4 +44,4 @@ numerically unstable for `|logu| >> 0`.
 #### Returns:
 
 * <b>`pearson_of_u`</b>: `float`-like `Tensor` of the Csiszar-function evaluated at
-    `u = exp(logu)`.
+  `u = exp(logu)`.

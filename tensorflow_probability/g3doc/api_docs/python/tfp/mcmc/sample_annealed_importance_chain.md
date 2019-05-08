@@ -49,39 +49,39 @@ reduced to two times in the future).
 #### Args:
 
 * <b>`num_steps`</b>: Integer number of Markov chain updates to run. More
-    iterations means more expense, but smoother annealing between q
-    and p, which in turn means exponentially lower variance for the
-    normalizing constant estimator.
+  iterations means more expense, but smoother annealing between q
+  and p, which in turn means exponentially lower variance for the
+  normalizing constant estimator.
 * <b>`proposal_log_prob_fn`</b>: Python callable that returns the log density of the
-    initial distribution.
+  initial distribution.
 * <b>`target_log_prob_fn`</b>: Python callable which takes an argument like
-    `current_state` (or `*current_state` if it's a list) and returns its
-    (possibly unnormalized) log-density under the target distribution.
+  `current_state` (or `*current_state` if it's a list) and returns its
+  (possibly unnormalized) log-density under the target distribution.
 * <b>`current_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
-    current state(s) of the Markov chain(s). The first `r` dimensions index
-    independent chains, `r = tf.rank(target_log_prob_fn(*current_state))`.
+  current state(s) of the Markov chain(s). The first `r` dimensions index
+  independent chains, `r = tf.rank(target_log_prob_fn(*current_state))`.
 * <b>`make_kernel_fn`</b>: Python `callable` which returns a `TransitionKernel`-like
-    object. Must take one argument representing the `TransitionKernel`'s
-    `target_log_prob_fn`. The `target_log_prob_fn` argument represents the
-    `TransitionKernel`'s target log distribution.  Note:
-    `sample_annealed_importance_chain` creates a new `target_log_prob_fn`
-    which is an interpolation between the supplied `target_log_prob_fn` and
-    `proposal_log_prob_fn`; it is this interpolated function which is used as
-    an argument to `make_kernel_fn`.
+  object. Must take one argument representing the `TransitionKernel`'s
+  `target_log_prob_fn`. The `target_log_prob_fn` argument represents the
+  `TransitionKernel`'s target log distribution.  Note:
+  `sample_annealed_importance_chain` creates a new `target_log_prob_fn`
+  which is an interpolation between the supplied `target_log_prob_fn` and
+  `proposal_log_prob_fn`; it is this interpolated function which is used as
+  an argument to `make_kernel_fn`.
 * <b>`parallel_iterations`</b>: The number of iterations allowed to run in parallel.
-      It must be a positive integer. See `tf.while_loop` for more details.
+    It must be a positive integer. See `tf.while_loop` for more details.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this function.
-    Default value: `None` (i.e., "sample_annealed_importance_chain").
+  Default value: `None` (i.e., "sample_annealed_importance_chain").
 
 
 #### Returns:
 
-* <b>`next_state`</b>: `Tensor` or Python list of `Tensor`s representing the
+  next_state: `Tensor` or Python list of `Tensor`s representing the
     state(s) of the Markov chain(s) at the final iteration. Has same shape as
     input `current_state`.
-* <b>`ais_weights`</b>: Tensor with the estimated weight(s). Has shape matching
+  ais_weights: Tensor with the estimated weight(s). Has shape matching
     `target_log_prob_fn(current_state)`.
-* <b>`kernel_results`</b>: `collections.namedtuple` of internal calculations used to
+  kernel_results: `collections.namedtuple` of internal calculations used to
     advance the chain.
 
 #### Examples

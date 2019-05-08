@@ -55,11 +55,11 @@ numerically unstable for `|logu| >> 0`.
 
 * <b>`logu`</b>: `float`-like `Tensor` representing `log(u)` from above.
 * <b>`csiszar_function`</b>: Python `callable` representing a Csiszar-function over
-    log-domain.
+  log-domain.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this function.
 
 
 #### Returns:
 
 * <b>`dual_f_of_u`</b>: `float`-like `Tensor` of the result of calculating the dual of
-    `f` at `u = exp(logu)`.
+  `f` at `u = exp(logu)`.

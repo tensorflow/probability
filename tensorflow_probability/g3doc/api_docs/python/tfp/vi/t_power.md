@@ -52,4 +52,4 @@ divergence being the same up to factors depending only on `t`.
 #### Returns:
 
 * <b>`t_power_of_u`</b>: `float`-like `Tensor` of the Csiszar-function evaluated
-    at `u = exp(logu)`.
+  at `u = exp(logu)`.

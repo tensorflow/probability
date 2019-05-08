@@ -51,19 +51,19 @@ Additional leading dimensions (if any) will index batches.
 #### Args:
 
 * <b>`loc`</b>: Floating-point `Tensor`. If this is set to `None`, `loc` is
-    implicitly `0`. When specified, may have shape `[B1, ..., Bb, k]` where
-    `b >= 0` and `k` is the event size.
+  implicitly `0`. When specified, may have shape `[B1, ..., Bb, k]` where
+  `b >= 0` and `k` is the event size.
 * <b>`scale_tril`</b>: Floating-point, lower-triangular `Tensor` with non-zero
-    diagonal elements. `scale_tril` has shape `[B1, ..., Bb, k, k]` where
-    `b >= 0` and `k` is the event size.
+  diagonal elements. `scale_tril` has shape `[B1, ..., Bb, k, k]` where
+  `b >= 0` and `k` is the event size.
 * <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
-    parameters are checked for validity despite possibly degrading runtime
-    performance. When `False` invalid inputs may silently render incorrect
-    outputs.
+  parameters are checked for validity despite possibly degrading runtime
+  performance. When `False` invalid inputs may silently render incorrect
+  outputs.
 * <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`,
-    statistics (e.g., mean, mode, variance) use the value "`NaN`" to
-    indicate the result is undefined. When `False`, an exception is raised
-    if one or more of the statistic's batch members are undefined.
+  statistics (e.g., mean, mode, variance) use the value "`NaN`" to
+  indicate the result is undefined. When `False`, an exception is raised
+  if one or more of the statistic's batch members are undefined.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
 
 

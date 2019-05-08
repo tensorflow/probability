@@ -30,7 +30,7 @@ See InverseGamma for more details.
 
 Construct InverseGamma with `concentration` and `scale` parameters. (deprecated arguments)
 
-Warning: SOME ARGUMENTS ARE DEPRECATED: `(rate)`. They will be removed after 2019-05-08.
+* <b>`Warning`</b>: SOME ARGUMENTS ARE DEPRECATED: `(rate)`. They will be removed after 2019-05-08.
 Instructions for updating:
 The `rate` parameter is deprecated. Use `scale` instead.The `rate` parameter was always interpreted as a `scale` parameter, but erroneously misnamed.
 
@@ -41,17 +41,17 @@ supports broadcasting (e.g. `concentration + scale` is a valid operation).
 #### Args:
 
 * <b>`concentration`</b>: Floating point tensor, the concentration params of the
-    distribution(s). Must contain only positive values.
+  distribution(s). Must contain only positive values.
 * <b>`scale`</b>: Floating point tensor, the scale params of the distribution(s).
-    Must contain only positive values.
+  Must contain only positive values.
 * <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
-    parameters are checked for validity despite possibly degrading runtime
-    performance. When `False` invalid inputs may silently render incorrect
-    outputs.
+  parameters are checked for validity despite possibly degrading runtime
+  performance. When `False` invalid inputs may silently render incorrect
+  outputs.
 * <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
-    (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
-    result is undefined. When `False`, an exception is raised if one or
-    more of the statistic's batch members are undefined.
+  (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
+  result is undefined. When `False`, an exception is raised if one or
+  more of the statistic's batch members are undefined.
 * <b>`rate`</b>: Deprecated (mis-named) alias for `scale`.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
 

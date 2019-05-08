@@ -39,7 +39,7 @@ This serialization mimicks the implementation in `tf.keras.layers.Lambda`.
 
 #### Returns:
 
-* <b>`function`</b>: Function the serialized Keras object represents.
+  function: Function the serialized Keras object represents.
 
 #### Examples
 

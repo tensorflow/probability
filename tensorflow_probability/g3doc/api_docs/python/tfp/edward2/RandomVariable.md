@@ -118,18 +118,18 @@ Create a new random variable.
 #### Args:
 
 * <b>`distribution`</b>: tfd.Distribution governing the distribution of the random
-    variable, such as sampling and log-probabilities.
+  variable, such as sampling and log-probabilities.
 * <b>`sample_shape`</b>: tf.TensorShape of samples to draw from the random variable.
-    Default is `()` corresponding to a single sample.
+  Default is `()` corresponding to a single sample.
 * <b>`value`</b>: Fixed tf.Tensor to associate with random variable. Must have shape
-    `sample_shape + distribution.batch_shape + distribution.event_shape`.
-    Default is to sample from random variable according to `sample_shape`.
+  `sample_shape + distribution.batch_shape + distribution.event_shape`.
+  Default is to sample from random variable according to `sample_shape`.
 
 
 #### Raises:
 
 * <b>`ValueError`</b>: `value` has incompatible shape with
-    `sample_shape + distribution.batch_shape + distribution.event_shape`.
+  `sample_shape + distribution.batch_shape + distribution.event_shape`.
 
 
 
@@ -186,7 +186,7 @@ tf.abs(x)  # [5.25594902, 6.60492229]
 #### Args:
 
 * <b>`x`</b>: A `Tensor` or `SparseTensor` of type `float16`, `float32`, `float64`,
-    `int32`, `int64`, `complex64` or `complex128`.
+  `int32`, `int64`, `complex64` or `complex128`.
 * <b>`name`</b>: A name for the operation (optional).
 
 
@@ -390,7 +390,8 @@ The notation is similar to NumPy with the restriction that
 currently only support basic indexing. That means that
 using a non-scalar tensor as input is not currently allowed.
 
-Some useful examples:
+#### Some useful examples:
+
 
 ```python
 # Strip leading and trailing 2 elements
@@ -422,17 +423,20 @@ foo = tf.constant([[1,2,3], [4,5,6], [7,8,9]])
 print(foo[foo > 2].eval())  # => [3, 4, 5, 6, 7, 8, 9]
 ```
 
-Notes:
-  - `tf.newaxis` is `None` as in NumPy.
-  - An implicit ellipsis is placed at the end of the `slice_spec`
-  - NumPy advanced indexing is currently not supported.
+
+#### Notes:
+
+- `tf.newaxis` is `None` as in NumPy.
+- An implicit ellipsis is placed at the end of the `slice_spec`
+- NumPy advanced indexing is currently not supported.
+
 
 #### Args:
 
 * <b>`tensor`</b>: An ops.Tensor object.
 * <b>`slice_spec`</b>: The arguments to Tensor.__getitem__.
 * <b>`var`</b>: In the case of variable slice assignment, the Variable object to slice
-    (i.e. tensor is the read-only view of this variable).
+  (i.e. tensor is the read-only view of this variable).
 
 
 #### Returns:
@@ -444,7 +448,7 @@ The appropriate slice of "tensor", based on "slice_spec".
 
 * <b>`ValueError`</b>: If a slice range is negative size.
 * <b>`TypeError`</b>: If the slice indices aren't int, slice, ellipsis,
-    tf.newaxis or scalar int32/int64 tensors.
+  tf.newaxis or scalar int32/int64 tensors.
 
 <h3 id="__gt__"><code>__gt__</code></h3>
 
@@ -581,7 +585,8 @@ multiplication algorithm can be used by setting the corresponding
 This optimization is only available for plain matrices (rank-2 tensors) with
 datatypes `bfloat16` or `float32`.
 
-For example:
+#### For example:
+
 
 ```python
 # 2-D tensor `a`
@@ -633,17 +638,18 @@ d = a @ b @ [[10.], [11.]]
 d = tf.matmul(tf.matmul(a, b), [[10.], [11.]])
 ```
 
+
 #### Args:
 
 * <b>`a`</b>: `Tensor` of type `float16`, `float32`, `float64`, `int32`, `complex64`,
-    `complex128` and rank > 1.
+  `complex128` and rank > 1.
 * <b>`b`</b>: `Tensor` with same type and rank as `a`.
 * <b>`transpose_a`</b>: If `True`, `a` is transposed before multiplication.
 * <b>`transpose_b`</b>: If `True`, `b` is transposed before multiplication.
 * <b>`adjoint_a`</b>: If `True`, `a` is conjugated and transposed before
-    multiplication.
+  multiplication.
 * <b>`adjoint_b`</b>: If `True`, `b` is conjugated and transposed before
-    multiplication.
+  multiplication.
 * <b>`a_is_sparse`</b>: If `True`, `a` is treated as a sparse matrix.
 * <b>`b_is_sparse`</b>: If `True`, `b` is treated as a sparse matrix.
 * <b>`name`</b>: Name for the operation (optional).
@@ -665,7 +671,7 @@ for all indices i, j.
 #### Raises:
 
 * <b>`ValueError`</b>: If transpose_a and adjoint_a, or transpose_b and adjoint_b
-    are both set to True.
+  are both set to True.
 
 <h3 id="__mod__"><code>__mod__</code></h3>
 
@@ -805,9 +811,9 @@ tf.pow(x, y)  # [[256, 65536], [9, 27]]
 #### Args:
 
 * <b>`x`</b>: A `Tensor` of type `float16`, `float32`, `float64`, `int32`, `int64`,
-    `complex64`, or `complex128`.
+  `complex64`, or `complex128`.
 * <b>`y`</b>: A `Tensor` of type `float16`, `float32`, `float64`, `int32`, `int64`,
-    `complex64`, or `complex128`.
+  `complex64`, or `complex128`.
 * <b>`name`</b>: A name for the operation (optional).
 
 
@@ -954,7 +960,8 @@ multiplication algorithm can be used by setting the corresponding
 This optimization is only available for plain matrices (rank-2 tensors) with
 datatypes `bfloat16` or `float32`.
 
-For example:
+#### For example:
+
 
 ```python
 # 2-D tensor `a`
@@ -1006,17 +1013,18 @@ d = a @ b @ [[10.], [11.]]
 d = tf.matmul(tf.matmul(a, b), [[10.], [11.]])
 ```
 
+
 #### Args:
 
 * <b>`a`</b>: `Tensor` of type `float16`, `float32`, `float64`, `int32`, `complex64`,
-    `complex128` and rank > 1.
+  `complex128` and rank > 1.
 * <b>`b`</b>: `Tensor` with same type and rank as `a`.
 * <b>`transpose_a`</b>: If `True`, `a` is transposed before multiplication.
 * <b>`transpose_b`</b>: If `True`, `b` is transposed before multiplication.
 * <b>`adjoint_a`</b>: If `True`, `a` is conjugated and transposed before
-    multiplication.
+  multiplication.
 * <b>`adjoint_b`</b>: If `True`, `b` is conjugated and transposed before
-    multiplication.
+  multiplication.
 * <b>`a_is_sparse`</b>: If `True`, `a` is treated as a sparse matrix.
 * <b>`b_is_sparse`</b>: If `True`, `b` is treated as a sparse matrix.
 * <b>`name`</b>: Name for the operation (optional).
@@ -1038,7 +1046,7 @@ for all indices i, j.
 #### Raises:
 
 * <b>`ValueError`</b>: If transpose_a and adjoint_a, or transpose_b and adjoint_b
-    are both set to True.
+  are both set to True.
 
 <h3 id="__rmod__"><code>__rmod__</code></h3>
 
@@ -1127,9 +1135,9 @@ tf.pow(x, y)  # [[256, 65536], [9, 27]]
 #### Args:
 
 * <b>`x`</b>: A `Tensor` of type `float16`, `float32`, `float64`, `int32`, `int64`,
-    `complex64`, or `complex128`.
+  `complex64`, or `complex128`.
 * <b>`y`</b>: A `Tensor` of type `float16`, `float32`, `float64`, `int32`, `int64`,
-    `complex64`, or `complex128`.
+  `complex64`, or `complex128`.
 * <b>`name`</b>: A name for the operation (optional).
 
 
@@ -1189,7 +1197,8 @@ x ^ y = (x | y) & ~(x & y)
 Inputs are tensor and if the tensors contains more than one element, an
 element-wise logical XOR is computed.
 
-Usage:
+#### Usage:
+
 
 ```python
 x = tf.constant([False, False, True, True], dtype = tf.bool)
@@ -1197,6 +1206,7 @@ y = tf.constant([False, True, False, True], dtype = tf.bool)
 z = tf.logical_xor(x, y, name="LogicalXor")
 #  here z = [False  True  True False]
 ```
+
 
 #### Args:
 
@@ -1260,7 +1270,8 @@ x ^ y = (x | y) & ~(x & y)
 Inputs are tensor and if the tensors contains more than one element, an
 element-wise logical XOR is computed.
 
-Usage:
+#### Usage:
+
 
 ```python
 x = tf.constant([False, False, True, True], dtype = tf.bool)
@@ -1268,6 +1279,7 @@ y = tf.constant([False, True, False, True], dtype = tf.bool)
 z = tf.logical_xor(x, y, name="LogicalXor")
 #  here z = [False  True  True False]
 ```
+
 
 #### Args:
 
@@ -1299,11 +1311,11 @@ passed, the default session is used.
 #### Args:
 
 * <b>`session`</b>: tf.BaseSession.
-    The `tf.Session` to use to evaluate this random variable. If
-    none, the default session is used.
+  The `tf.Session` to use to evaluate this random variable. If
+  none, the default session is used.
 * <b>`feed_dict`</b>: dict.
-    A dictionary that maps `tf.Tensor` objects to feed values. See
-    `tf.Session.run()` for a description of the valid feed values.
+  A dictionary that maps `tf.Tensor` objects to feed values. See
+  `tf.Session.run()` for a description of the valid feed values.
 
 
 #### Returns:

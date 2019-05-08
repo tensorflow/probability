@@ -233,40 +233,40 @@ Initializes MALA transition kernel.
 #### Args:
 
 * <b>`target_log_prob_fn`</b>: Python callable which takes an argument like
-    `current_state` (or `*current_state` if it's a list) and returns its
-    (possibly unnormalized) log-density under the target distribution.
+  `current_state` (or `*current_state` if it's a list) and returns its
+  (possibly unnormalized) log-density under the target distribution.
 * <b>`step_size`</b>: `Tensor` or Python `list` of `Tensor`s representing the step
-    size for the leapfrog integrator. Must broadcast with the shape of
-    `current_state`. Larger step sizes lead to faster progress, but
-    too-large step sizes make rejection exponentially more likely. When
-    possible, it's often helpful to match per-variable step sizes to the
-    standard deviations of the target distribution in each variable.
+  size for the leapfrog integrator. Must broadcast with the shape of
+  `current_state`. Larger step sizes lead to faster progress, but
+  too-large step sizes make rejection exponentially more likely. When
+  possible, it's often helpful to match per-variable step sizes to the
+  standard deviations of the target distribution in each variable.
 * <b>`volatility_fn`</b>: Python callable which takes an argument like
-    `current_state` (or `*current_state` if it's a list) and returns
-    volatility value at `current_state`. Should return a `Tensor` or Python
-    `list` of `Tensor`s that must broadcast with the shape of
-    `current_state` Defaults to the identity function.
+  `current_state` (or `*current_state` if it's a list) and returns
+  volatility value at `current_state`. Should return a `Tensor` or Python
+  `list` of `Tensor`s that must broadcast with the shape of
+  `current_state` Defaults to the identity function.
 * <b>`seed`</b>: Python integer to seed the random number generator.
 * <b>`parallel_iterations`</b>: the number of coordinates for which the gradients of
-    the volatility matrix `volatility_fn` can be computed in parallel.
-    Default value: `None` (i.e., no seed).
+  the volatility matrix `volatility_fn` can be computed in parallel.
+  Default value: `None` (i.e., no seed).
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this function.
-    Default value: `None` (i.e., 'mala_kernel').
+  Default value: `None` (i.e., 'mala_kernel').
 
 
 #### Returns:
 
 * <b>`next_state`</b>: Tensor or Python list of `Tensor`s representing the state(s)
-    of the Markov chain(s) at each result step. Has same shape as
-    `current_state`.
+  of the Markov chain(s) at each result step. Has same shape as
+  `current_state`.
 * <b>`kernel_results`</b>: `collections.namedtuple` of internal calculations used to
-    advance the chain.
+  advance the chain.
 
 
 #### Raises:
 
 * <b>`ValueError`</b>: if there isn't one `step_size` or a list with same length as
-    `current_state`.
+  `current_state`.
 * <b>`TypeError`</b>: if `volatility_fn` is not callable.
 
 
@@ -334,26 +334,26 @@ Runs one iteration of MALA.
 #### Args:
 
 * <b>`current_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
-    current state(s) of the Markov chain(s). The first `r` dimensions index
-    independent chains, `r = tf.rank(target_log_prob_fn(*current_state))`.
+  current state(s) of the Markov chain(s). The first `r` dimensions index
+  independent chains, `r = tf.rank(target_log_prob_fn(*current_state))`.
 * <b>`previous_kernel_results`</b>: `collections.namedtuple` containing `Tensor`s
-    representing values from previous calls to this function (or from the
-    `bootstrap_results` function.)
+  representing values from previous calls to this function (or from the
+  `bootstrap_results` function.)
 
 
 #### Returns:
 
 * <b>`next_state`</b>: Tensor or Python list of `Tensor`s representing the state(s)
-    of the Markov chain(s) after taking exactly one step. Has same type and
-    shape as `current_state`.
+  of the Markov chain(s) after taking exactly one step. Has same type and
+  shape as `current_state`.
 * <b>`kernel_results`</b>: `collections.namedtuple` of internal calculations used to
-    advance the chain.
+  advance the chain.
 
 
 #### Raises:
 
 * <b>`ValueError`</b>: if there isn't one `step_size` or a list with same length as
-    `current_state` or `diffusion_drift`.
+  `current_state` or `diffusion_drift`.
 
 
 

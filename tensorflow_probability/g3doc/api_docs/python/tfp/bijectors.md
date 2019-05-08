@@ -24,7 +24,9 @@ Defined in [`python/bijectors/__init__.py`](https://github.com/tensorflow/probab
 
 [`class AffineScalar`](../tfp/bijectors/AffineScalar.md): Compute `Y = g(X; shift, scale) = scale * X + shift`.
 
-[`class AutoregressiveLayer`](../tfp/bijectors/AutoregressiveLayer.md): Masked Autoencoder for Distribution Estimation [Germain et al. (2015)][1].
+[`class AutoregressiveLayer`](../tfp/bijectors/AutoregressiveLayer.md): Masked Autoencoder for Distribution Estimation [Germain et al. (2015)].
+
+[`class AutoregressiveNetwork`](../tfp/bijectors/AutoregressiveNetwork.md): Masked Autoencoder for Distribution Estimation [Germain et al. (2015)][1].
 
 [`class BatchNormalization`](../tfp/bijectors/BatchNormalization.md): Compute `Y = g(X) s.t. X = g^-1(Y) = (Y - mean(Y)) / std(Y)`.
 

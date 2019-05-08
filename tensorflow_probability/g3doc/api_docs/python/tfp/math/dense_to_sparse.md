@@ -25,8 +25,8 @@ Defined in [`python/math/sparse.py`](https://github.com/tensorflow/probability/t
 
 * <b>`x`</b>: A `Tensor`.
 * <b>`ignore_value`</b>: Entries in `x` equal to this value will be
-    absent from the return `SparseTensor`. If `None`, default value of
-    `x` dtype will be used (e.g. '' for `str`, 0 for `int`).
+  absent from the return `SparseTensor`. If `None`, default value of
+  `x` dtype will be used (e.g. '' for `str`, 0 for `int`).
 * <b>`name`</b>: Python `str` prefix for ops created by this function.
 
 

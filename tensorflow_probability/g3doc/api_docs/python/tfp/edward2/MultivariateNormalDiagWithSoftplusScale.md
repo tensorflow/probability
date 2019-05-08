@@ -30,6 +30,6 @@ See MultivariateNormalDiagWithSoftplusScale for more details.
 
 DEPRECATED FUNCTION
 
-Warning: THIS FUNCTION IS DEPRECATED. It will be removed after 2019-06-05.
+* <b>`Warning`</b>: THIS FUNCTION IS DEPRECATED. It will be removed after 2019-06-05.
 Instructions for updating:
 MultivariateNormalDiagWithSoftplusScale is deprecated, use MultivariateNormalDiag(loc=loc, scale_diag=tf.nn.softplus(scale_diag)) instead.

@@ -26,9 +26,9 @@ represents the chain length.
 #### Attributes:
 
 * <b>`all_states`</b>: A `Tensor` or a nested collection of `Tensor`s representing the
-    MCMC chain state.
+  MCMC chain state.
 * <b>`trace`</b>: A `Tensor` or a nested collection of `Tensor`s representing the
-    auxiliary values traced alongside the chain.
+  auxiliary values traced alongside the chain.
 
 <h2 id="__new__"><code>__new__</code></h2>
 

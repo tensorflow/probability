@@ -34,15 +34,15 @@ Construct the `JointDistributionCoroutine` distribution.
 #### Args:
 
 * <b>`model`</b>: A generator that yields a sequence of `tfd.Distribution`-like
-    instances.
+  instances.
 * <b>`sample_dtype`</b>: Samples from this distribution will be structured like
-    `tf.nest.pack_sequence_as(sample_dtype, list_)`. `sample_dtype` is only
-    used for `tf.nest.pack_sequence_as` structuring of outputs, never
-    casting (which is the responsibility of the component distributions).
-    Default value: `None` (i.e., `tuple`).
+  `tf.nest.pack_sequence_as(sample_dtype, list_)`. `sample_dtype` is only
+  used for `tf.nest.pack_sequence_as` structuring of outputs, never
+  casting (which is the responsibility of the component distributions).
+  Default value: `None` (i.e., `tuple`).
 * <b>`validate_args`</b>: Python `bool`.  Whether to validate input with asserts.
-    If `validate_args` is `False`, and the inputs are invalid,
-    correct behavior is not guaranteed.
-    Default value: `False`.
+  If `validate_args` is `False`, and the inputs are invalid,
+  correct behavior is not guaranteed.
+  Default value: `False`.
 * <b>`name`</b>: The name for ops managed by the distribution.
-    Default value: `None` (i.e., `"JointDistributionCoroutine"`).
+  Default value: `None` (i.e., `"JointDistributionCoroutine"`).

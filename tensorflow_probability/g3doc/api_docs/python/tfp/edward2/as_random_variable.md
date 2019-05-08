@@ -37,17 +37,17 @@ on overriding distribution parameters.
 #### Args:
 
 * <b>`distribution`</b>: tfd.Distribution governing the distribution of the random
-    variable, such as sampling and log-probabilities.
+  variable, such as sampling and log-probabilities.
 * <b>`sample_shape`</b>: tf.TensorShape of samples to draw from the random variable.
-    Default is `()` corresponding to a single sample.
+  Default is `()` corresponding to a single sample.
 * <b>`value`</b>: Fixed tf.Tensor to associate with random variable. Must have shape
-    `sample_shape + distribution.batch_shape + distribution.event_shape`.
-    Default is to sample from random variable according to `sample_shape`.
+  `sample_shape + distribution.batch_shape + distribution.event_shape`.
+  Default is to sample from random variable according to `sample_shape`.
 
 
 #### Returns:
 
-* <b>`rv`</b>: a `RandomVariable` wrapping the provided distribution.
+  rv: a `RandomVariable` wrapping the provided distribution.
 
 #### Example
 

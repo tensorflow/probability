@@ -71,38 +71,38 @@ Construct a Polynomial kernel instance.
 #### Args:
 
 * <b>`bias_variance`</b>: Positive floating point `Tensor` that controls the
-    variance from the origin. If bias = 0, there is no variance and the
-    fitted function goes through the origin.  Must be broadcastable with
-    `slope_variance`, `shift`, `exponent`, and inputs to `apply` and
-    `matrix` methods. A value of `None` is treated like 0.
-    Default Value: `None`
+  variance from the origin. If bias = 0, there is no variance and the
+  fitted function goes through the origin.  Must be broadcastable with
+  `slope_variance`, `shift`, `exponent`, and inputs to `apply` and
+  `matrix` methods. A value of `None` is treated like 0.
+  Default Value: `None`
 * <b>`slope_variance`</b>: Positive floating point `Tensor` that controls the
-    variance of the regression line slope that is the basis for the
-    polynomial. Must be broadcastable with `bias_variance`, `shift`,
-    `exponent`, and inputs to `apply` and `matrix` methods. A value of
-    `None` is treated like 1.
-    Default Value: `None`
+  variance of the regression line slope that is the basis for the
+  polynomial. Must be broadcastable with `bias_variance`, `shift`,
+  `exponent`, and inputs to `apply` and `matrix` methods. A value of
+  `None` is treated like 1.
+  Default Value: `None`
 * <b>`shift`</b>: Floating point `Tensor` that contols the intercept with the
-    x-axis of the linear function to be exponentiated to get this
-    polynomial. Must be broadcastable with `bias_variance`,
-    `slope_variance`, `exponent` and inputs to `apply` and `matrix`
-    methods. A value of `None` is treated like 0, which results in having
-    the intercept at the origin.
-    Default Value: `None`
+  x-axis of the linear function to be exponentiated to get this
+  polynomial. Must be broadcastable with `bias_variance`,
+  `slope_variance`, `exponent` and inputs to `apply` and `matrix`
+  methods. A value of `None` is treated like 0, which results in having
+  the intercept at the origin.
+  Default Value: `None`
 * <b>`exponent`</b>: Positive floating point `Tensor` that controls the exponent
-    (also known as the degree) of the polynomial function. Must be
-    broadcastable with `bias_variance`, `slope_variance`, `shift`,
-    and inputs to `apply` and `matrix` methods. A value of `None` is
-    treated like 1, which results in a linear kernel.
-    Default Value: `None`
+  (also known as the degree) of the polynomial function. Must be
+  broadcastable with `bias_variance`, `slope_variance`, `shift`,
+  and inputs to `apply` and `matrix` methods. A value of `None` is
+  treated like 1, which results in a linear kernel.
+  Default Value: `None`
 * <b>`feature_ndims`</b>: Python `int` number of rightmost dims to include in
-    kernel computation.
-    Default Value: 1
+  kernel computation.
+  Default Value: 1
 * <b>`validate_args`</b>: If `True`, parameters are checked for validity despite
-    possibly degrading runtime performance.
-    Default Value: `False`
+  possibly degrading runtime performance.
+  Default Value: `False`
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
-    Default Value: `'Polynomial'`
+  Default Value: `'Polynomial'`
 
 
 
@@ -231,15 +231,15 @@ Apply the kernel function to a pair of (batches of) inputs.
 #### Args:
 
 * <b>`x1`</b>: `Tensor` input to the first positional parameter of the kernel, of
-    shape `[b1, ..., bB, f1, ..., fF]`, where `B` may be zero (ie, no
-    batching) and `F` (number of feature dimensions) must equal the kernel's
-    `feature_ndims` property. Batch shape must broadcast with the batch
-    shape of `x2` and with the kernel's parameters.
+  shape `[b1, ..., bB, f1, ..., fF]`, where `B` may be zero (ie, no
+  batching) and `F` (number of feature dimensions) must equal the kernel's
+  `feature_ndims` property. Batch shape must broadcast with the batch
+  shape of `x2` and with the kernel's parameters.
 * <b>`x2`</b>: `Tensor` input to the second positional parameter of the kernel,
-    shape `[c1, ..., cC, f1, ..., fF]`, where `C` may be zero (ie, no
-    batching) and `F` (number of feature dimensions) must equal the kernel's
-    `feature_ndims` property. Batch shape must broadcast with the batch
-    shape of `x1` and with the kernel's parameters.
+  shape `[c1, ..., cC, f1, ..., fF]`, where `C` may be zero (ie, no
+  batching) and `F` (number of feature dimensions) must equal the kernel's
+  `feature_ndims` property. Batch shape must broadcast with the batch
+  shape of `x1` and with the kernel's parameters.
 
 
 #### Returns:
@@ -341,19 +341,19 @@ Construct (batched) matrices from (batches of) collections of inputs.
 #### Args:
 
 * <b>`x1`</b>: `Tensor` input to the first positional parameter of the kernel, of
-    shape `[b1, ..., bB, e1, f1, ..., fF]`, where `B` may be zero (ie, no
-    batching), e1 is an integer greater than zero, and `F` (number of
-    feature dimensions) must equal the kernel's `feature_ndims` property.
-    Batch shape must broadcast with the batch shape of `x2` and with the
-    kernel's parameters *after* parameter expansion (see
-    `param_expansion_ndims` argument).
+  shape `[b1, ..., bB, e1, f1, ..., fF]`, where `B` may be zero (ie, no
+  batching), e1 is an integer greater than zero, and `F` (number of
+  feature dimensions) must equal the kernel's `feature_ndims` property.
+  Batch shape must broadcast with the batch shape of `x2` and with the
+  kernel's parameters *after* parameter expansion (see
+  `param_expansion_ndims` argument).
 * <b>`x2`</b>: `Tensor` input to the second positional parameter of the kernel,
-    shape `[c1, ..., cC, e2, f1, ..., fF]`, where `C` may be zero (ie, no
-    batching), e2 is an integer greater than zero,  and `F` (number of
-    feature dimensions) must equal the kernel's `feature_ndims` property.
-    Batch shape must broadcast with the batch shape of `x1` and with the
-    kernel's parameters *after* parameter expansion (see
-    `param_expansion_ndims` argument).
+  shape `[c1, ..., cC, e2, f1, ..., fF]`, where `C` may be zero (ie, no
+  batching), e2 is an integer greater than zero,  and `F` (number of
+  feature dimensions) must equal the kernel's `feature_ndims` property.
+  Batch shape must broadcast with the batch shape of `x1` and with the
+  kernel's parameters *after* parameter expansion (see
+  `param_expansion_ndims` argument).
 
 
 #### Returns:

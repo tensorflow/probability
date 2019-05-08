@@ -33,32 +33,32 @@ This function returns `bins`, such that:
 
 * <b>`x`</b>:  Numeric `N-D` `Tensor` with `N > 0`.
 * <b>`edges`</b>:  `Tensor` of same `dtype` as `x`.  The first dimension indexes edges
-    of intervals.  Must either be `1-D` or have
-    `x.shape[1:] == edges.shape[1:]`.  If `rank(edges) > 1`, `edges[k]`
-    designates a shape `edges.shape[1:]` `Tensor` of bin edges for the
-    corresponding dimensions of `x`.
+  of intervals.  Must either be `1-D` or have
+  `x.shape[1:] == edges.shape[1:]`.  If `rank(edges) > 1`, `edges[k]`
+  designates a shape `edges.shape[1:]` `Tensor` of bin edges for the
+  corresponding dimensions of `x`.
 * <b>`extend_lower_interval`</b>:  Python `bool`.  If `True`, extend the lowest
-    interval `I0` to `(-inf, c1]`.
+  interval `I0` to `(-inf, c1]`.
 * <b>`extend_upper_interval`</b>:  Python `bool`.  If `True`, extend the upper
-    interval `I_{K-1}` to `[c_{K-1}, +inf)`.
+  interval `I_{K-1}` to `[c_{K-1}, +inf)`.
 * <b>`dtype`</b>: The output type (`int32` or `int64`). `Default value:` `x.dtype`.
-    This effects the output values when `x` is below/above the intervals,
-    which will be `-1/K+1` for `int` types and `NaN` for `float`s.
-    At indices where `x` is `NaN`, the output values will be `0` for `int`
-    types and `NaN` for floats.
+  This effects the output values when `x` is below/above the intervals,
+  which will be `-1/K+1` for `int` types and `NaN` for `float`s.
+  At indices where `x` is `NaN`, the output values will be `0` for `int`
+  types and `NaN` for floats.
 * <b>`name`</b>:  A Python string name to prepend to created ops. Default: 'find_bins'
 
 
 #### Returns:
 
 * <b>`bins`</b>: `Tensor` with same `shape` as `x` and `dtype`.
-    Has whole number values.  `bins[i] = k` means the `x[i]` falls into the
-    `kth` bin, ie, `edges[bins[i]] <= x[i] < edges[bins[i] + 1]`.
+  Has whole number values.  `bins[i] = k` means the `x[i]` falls into the
+  `kth` bin, ie, `edges[bins[i]] <= x[i] < edges[bins[i] + 1]`.
 
 
 #### Raises:
 
-* <b>`ValueError`</b>:  If `edges.shape[0]` is determined to be less than 2.
+  ValueError:  If `edges.shape[0]` is determined to be less than 2.
 
 #### Examples
 

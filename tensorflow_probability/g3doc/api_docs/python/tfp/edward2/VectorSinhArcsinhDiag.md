@@ -49,40 +49,40 @@ Additional leading dimensions (if any) will index batches.
 #### Args:
 
 * <b>`loc`</b>: Floating-point `Tensor`. If this is set to `None`, `loc` is
-    implicitly `0`. When specified, may have shape `[B1, ..., Bb, k]` where
-    `b >= 0` and `k` is the event size.
+  implicitly `0`. When specified, may have shape `[B1, ..., Bb, k]` where
+  `b >= 0` and `k` is the event size.
 * <b>`scale_diag`</b>: Non-zero, floating-point `Tensor` representing a diagonal
-    matrix added to `scale`. May have shape `[B1, ..., Bb, k]`, `b >= 0`,
-    and characterizes `b`-batches of `k x k` diagonal matrices added to
-    `scale`. When both `scale_identity_multiplier` and `scale_diag` are
-    `None` then `scale` is the `Identity`.
+  matrix added to `scale`. May have shape `[B1, ..., Bb, k]`, `b >= 0`,
+  and characterizes `b`-batches of `k x k` diagonal matrices added to
+  `scale`. When both `scale_identity_multiplier` and `scale_diag` are
+  `None` then `scale` is the `Identity`.
 * <b>`scale_identity_multiplier`</b>: Non-zero, floating-point `Tensor` representing
-    a scale-identity-matrix added to `scale`. May have shape
-    `[B1, ..., Bb]`, `b >= 0`, and characterizes `b`-batches of scale
-    `k x k` identity matrices added to `scale`. When both
-    `scale_identity_multiplier` and `scale_diag` are `None` then `scale`
-    is the `Identity`.
+  a scale-identity-matrix added to `scale`. May have shape
+  `[B1, ..., Bb]`, `b >= 0`, and characterizes `b`-batches of scale
+  `k x k` identity matrices added to `scale`. When both
+  `scale_identity_multiplier` and `scale_diag` are `None` then `scale`
+  is the `Identity`.
 * <b>`skewness`</b>:  Skewness parameter.  floating-point `Tensor` with shape
-    broadcastable with `event_shape`.
+  broadcastable with `event_shape`.
 * <b>`tailweight`</b>:  Tailweight parameter.  floating-point `Tensor` with shape
-    broadcastable with `event_shape`.
+  broadcastable with `event_shape`.
 * <b>`distribution`</b>: `tf.Distribution`-like instance. Distribution from which `k`
-    iid samples are used as input to transformation `F`.  Default is
-    `tfd.Normal(loc=0., scale=1.)`.
-    Must be a scalar-batch, scalar-event distribution.  Typically
-    `distribution.reparameterization_type = FULLY_REPARAMETERIZED` or it is
-    a function of non-trainable parameters. WARNING: If you backprop through
-    a VectorSinhArcsinhDiag sample and `distribution` is not
-    `FULLY_REPARAMETERIZED` yet is a function of trainable variables, then
-    the gradient will be incorrect!
+  iid samples are used as input to transformation `F`.  Default is
+  `tfd.Normal(loc=0., scale=1.)`.
+  Must be a scalar-batch, scalar-event distribution.  Typically
+  `distribution.reparameterization_type = FULLY_REPARAMETERIZED` or it is
+  a function of non-trainable parameters. WARNING: If you backprop through
+  a VectorSinhArcsinhDiag sample and `distribution` is not
+  `FULLY_REPARAMETERIZED` yet is a function of trainable variables, then
+  the gradient will be incorrect!
 * <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
-    parameters are checked for validity despite possibly degrading runtime
-    performance. When `False` invalid inputs may silently render incorrect
-    outputs.
+  parameters are checked for validity despite possibly degrading runtime
+  performance. When `False` invalid inputs may silently render incorrect
+  outputs.
 * <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`,
-    statistics (e.g., mean, mode, variance) use the value "`NaN`" to
-    indicate the result is undefined. When `False`, an exception is raised
-    if one or more of the statistic's batch members are undefined.
+  statistics (e.g., mean, mode, variance) use the value "`NaN`" to
+  indicate the result is undefined. When `False`, an exception is raised
+  if one or more of the statistic's batch members are undefined.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
 
 

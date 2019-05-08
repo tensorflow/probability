@@ -35,30 +35,30 @@ Values of `x` outside of the intervals cause errors.  Consider using
 #### Args:
 
 * <b>`x`</b>:  Numeric `N-D` `Tensor` with `N > 0`.  If `axis` is not
-    `None`, must have statically known number of dimensions. The
-    `axis` kwarg determines which dimensions index iid samples.
-    Other dimensions of `x` index "events" for which we will compute different
-    histograms.
+  `None`, must have statically known number of dimensions. The
+  `axis` kwarg determines which dimensions index iid samples.
+  Other dimensions of `x` index "events" for which we will compute different
+  histograms.
 * <b>`edges`</b>:  `Tensor` of same `dtype` as `x`.  The first dimension indexes edges
-    of intervals.  Must either be `1-D` or have `edges.shape[1:]` the same
-    as the dimensions of `x` excluding `axis`.
-    If `rank(edges) > 1`, `edges[k]` designates a shape `edges.shape[1:]`
-    `Tensor` of interval edges for the corresponding dimensions of `x`.
+  of intervals.  Must either be `1-D` or have `edges.shape[1:]` the same
+  as the dimensions of `x` excluding `axis`.
+  If `rank(edges) > 1`, `edges[k]` designates a shape `edges.shape[1:]`
+  `Tensor` of interval edges for the corresponding dimensions of `x`.
 * <b>`axis`</b>:  Optional `0-D` or `1-D` integer `Tensor` with constant
-    values. The axis in `x` that index iid samples.
-    `Default value:` `None` (treat every dimension as sample dimension).
+  values. The axis in `x` that index iid samples.
+  `Default value:` `None` (treat every dimension as sample dimension).
 * <b>`extend_lower_interval`</b>:  Python `bool`.  If `True`, extend the lowest
-    interval `I0` to `(-inf, c1]`.
+  interval `I0` to `(-inf, c1]`.
 * <b>`extend_upper_interval`</b>:  Python `bool`.  If `True`, extend the upper
-    interval `I_{K-1}` to `[c_{K-1}, +inf)`.
+  interval `I_{K-1}` to `[c_{K-1}, +inf)`.
 * <b>`dtype`</b>: The output type (`int32` or `int64`). `Default value:` `x.dtype`.
 * <b>`name`</b>:  A Python string name to prepend to created ops.
-    `Default value:` 'histogram'
+  `Default value:` 'histogram'
 
 
 #### Returns:
 
-* <b>`counts`</b>: `Tensor` of type `dtype` and, with
+  counts: `Tensor` of type `dtype` and, with
     `~axis = [i for i in range(arr.ndim) if i not in axis]`,
     `counts.shape = [edges.shape[0]] + x.shape[~axis]`.
     With `I` a multi-index into `~axis`, `counts[k][I]` is the number of times

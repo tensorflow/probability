@@ -37,25 +37,25 @@ inspect the behavior of the chain during adaptation.
 #### Args:
 
 * <b>`num_adaptation_steps`</b>: Scalar `int` `Tensor` number of initial steps to
-    during which to adjust the step size. This may be greater, less than, or
-    equal to the number of burnin steps. If `None`, the step size is adapted
-    on every step (note this breaks stationarity of the chain!).
+  during which to adjust the step size. This may be greater, less than, or
+  equal to the number of burnin steps. If `None`, the step size is adapted
+  on every step (note this breaks stationarity of the chain!).
 * <b>`target_rate`</b>: Scalar `Tensor` representing desired `accept_ratio`.
-    Default value: `0.75` (i.e., [center of asymptotically optimal
-    rate](https://arxiv.org/abs/1411.6669)).
+  Default value: `0.75` (i.e., [center of asymptotically optimal
+  rate](https://arxiv.org/abs/1411.6669)).
 * <b>`decrement_multiplier`</b>: `Tensor` representing amount to downscale current
-    `step_size`.
-    Default value: `0.01`.
+  `step_size`.
+  Default value: `0.01`.
 * <b>`increment_multiplier`</b>: `Tensor` representing amount to upscale current
-    `step_size`.
-    Default value: `0.01`.
+  `step_size`.
+  Default value: `0.01`.
 * <b>`step_counter`</b>: Scalar `int` `Variable` specifying the current step. The step
-    size is adapted iff `step_counter < num_adaptation_steps`.
-    Default value: if `None`, an internal variable
-      `step_size_adaptation_step_counter` is created and initialized to `-1`.
+  size is adapted iff `step_counter < num_adaptation_steps`.
+  Default value: if `None`, an internal variable
+    `step_size_adaptation_step_counter` is created and initialized to `-1`.
 
 
 #### Returns:
 
 * <b>`step_size_simple_update_fn`</b>: Callable that takes args
-    `step_size_var, kernel_results` and returns updated step size(s).
+  `step_size_var, kernel_results` and returns updated step size(s).

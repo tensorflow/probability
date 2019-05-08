@@ -166,13 +166,13 @@ Initializes a `SeedStream`.
 #### Args:
 
 * <b>`seed`</b>: Any Python object convertible to string, supplying the
-    initial entropy.  If `None`, operations seeded with seeds
-    drawn from this `SeedStream` will follow TensorFlow semantics
-    for not being seeded.
+  initial entropy.  If `None`, operations seeded with seeds
+  drawn from this `SeedStream` will follow TensorFlow semantics
+  for not being seeded.
 * <b>`salt`</b>: Any Python object convertible to string, supplying
-    auxiliary entropy.  Must be unique across the Distributions
-    and TensorFlow Probability code base.  See class docstring for
-    rationale.
+  auxiliary entropy.  Must be unique across the Distributions
+  and TensorFlow Probability code base.  See class docstring for
+  rationale.
 
 
 
@@ -212,7 +212,7 @@ the given seed modulo `2**31 - 1` (see
 #### Returns:
 
 * <b>`seed`</b>: A fresh integer usable as a seed in downstream operations,
-    or `None`.
+  or `None`.
 
 
 

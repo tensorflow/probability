@@ -57,59 +57,59 @@ the optimum.  (If `l2_regularizer > 0`, then only weak convexity is needed.)
 #### Args:
 
 * <b>`gradient_unregularized_loss`</b>: (Batch of) `Tensor` with the same shape and
-    dtype as `x_start` representing the gradient, evaluated at `x_start`, of
-    the unregularized loss function (denoted `Loss` above).  (In all current
-    use cases, `Loss` is the negative log likelihood.)
+  dtype as `x_start` representing the gradient, evaluated at `x_start`, of
+  the unregularized loss function (denoted `Loss` above).  (In all current
+  use cases, `Loss` is the negative log likelihood.)
 * <b>`hessian_unregularized_loss_outer`</b>: (Batch of) `Tensor` or `SparseTensor`
-    having the same dtype as `x_start`, and shape `[N, n]` where `x_start` has
-    shape `[n]`, satisfying the property
-    `Transpose(hessian_unregularized_loss_outer)
-    @ diag(hessian_unregularized_loss_middle)
-    @ hessian_unregularized_loss_inner
-    = (approximation of) Hessian matrix of Loss, evaluated at x_start`.
+  having the same dtype as `x_start`, and shape `[N, n]` where `x_start` has
+  shape `[n]`, satisfying the property
+  `Transpose(hessian_unregularized_loss_outer)
+  @ diag(hessian_unregularized_loss_middle)
+  @ hessian_unregularized_loss_inner
+  = (approximation of) Hessian matrix of Loss, evaluated at x_start`.
 * <b>`hessian_unregularized_loss_middle`</b>: (Batch of) vector-shaped `Tensor` having
-    the same dtype as `x_start`, and shape `[N]` where
-    `hessian_unregularized_loss_outer` has shape `[N, n]`, satisfying the
-    property
-    `Transpose(hessian_unregularized_loss_outer)
-    @ diag(hessian_unregularized_loss_middle)
-    @ hessian_unregularized_loss_inner
-    = (approximation of) Hessian matrix of Loss, evaluated at x_start`.
+  the same dtype as `x_start`, and shape `[N]` where
+  `hessian_unregularized_loss_outer` has shape `[N, n]`, satisfying the
+  property
+  `Transpose(hessian_unregularized_loss_outer)
+  @ diag(hessian_unregularized_loss_middle)
+  @ hessian_unregularized_loss_inner
+  = (approximation of) Hessian matrix of Loss, evaluated at x_start`.
 * <b>`x_start`</b>: (Batch of) vector-shaped, `float` `Tensor` representing the current
-    value of the argument to the Loss function.
+  value of the argument to the Loss function.
 * <b>`tolerance`</b>: scalar, `float` `Tensor` representing the convergence threshold.
-    The optimization step will terminate early, returning its current value of
-    `x_start + x_update`, once the following condition is met:
-    `||x_update_end - x_update_start||_2 / (1 + ||x_start||_2)
-    < sqrt(tolerance)`,
-    where `x_update_end` is the value of `x_update` at the end of a sweep and
-    `x_update_start` is the value of `x_update` at the beginning of that
-    sweep.
+  The optimization step will terminate early, returning its current value of
+  `x_start + x_update`, once the following condition is met:
+  `||x_update_end - x_update_start||_2 / (1 + ||x_start||_2)
+  < sqrt(tolerance)`,
+  where `x_update_end` is the value of `x_update` at the end of a sweep and
+  `x_update_start` is the value of `x_update` at the beginning of that
+  sweep.
 * <b>`l1_regularizer`</b>: scalar, `float` `Tensor` representing the weight of the L1
-    regularization term (see equation above).  If L1 regularization is not
-    required, then <a href="../../tfp/glm/fit_one_step.md"><code>tfp.glm.fit_one_step</code></a> is preferable.
+  regularization term (see equation above).  If L1 regularization is not
+  required, then <a href="../../tfp/glm/fit_one_step.md"><code>tfp.glm.fit_one_step</code></a> is preferable.
 * <b>`l2_regularizer`</b>: scalar, `float` `Tensor` representing the weight of the L2
-    regularization term (see equation above).
-    Default value: `None` (i.e., no L2 regularization).
+  regularization term (see equation above).
+  Default value: `None` (i.e., no L2 regularization).
 * <b>`maximum_full_sweeps`</b>: Python integer specifying maximum number of sweeps to
-    run.  A "sweep" consists of an iteration of coordinate descent on each
-    coordinate. After this many sweeps, the algorithm will terminate even if
-    convergence has not been reached.
-    Default value: `1`.
+  run.  A "sweep" consists of an iteration of coordinate descent on each
+  coordinate. After this many sweeps, the algorithm will terminate even if
+  convergence has not been reached.
+  Default value: `1`.
 * <b>`learning_rate`</b>: scalar, `float` `Tensor` representing a multiplicative factor
-    used to dampen the proximal gradient descent steps.
-    Default value: `None` (i.e., factor is conceptually `1`).
+  used to dampen the proximal gradient descent steps.
+  Default value: `None` (i.e., factor is conceptually `1`).
 * <b>`name`</b>: Python string representing the name of the TensorFlow operation.
-    The default name is `"minimize_one_step"`.
+  The default name is `"minimize_one_step"`.
 
 
 #### Returns:
 
-* <b>`x`</b>: (Batch of) `Tensor` having the same shape and dtype as `x_start`,
+  x: (Batch of) `Tensor` having the same shape and dtype as `x_start`,
     representing the updated value of `x`, that is, `x_start + x_update`.
-* <b>`is_converged`</b>: scalar, `bool` `Tensor` indicating whether convergence
+  is_converged: scalar, `bool` `Tensor` indicating whether convergence
     occurred across all batches within the specified number of sweeps.
-* <b>`iter`</b>: scalar, `int` `Tensor` representing the actual number of coordinate
+  iter: scalar, `int` `Tensor` representing the actual number of coordinate
     updates made (before achieving convergence).  Since each sweep consists of
     `tf.size(x_start)` iterations, the maximum number of updates is
     `maximum_full_sweeps * tf.size(x_start)`.

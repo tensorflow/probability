@@ -34,19 +34,19 @@ Construct a `Independent` distribution.
 #### Args:
 
 * <b>`distribution`</b>: The base distribution instance to transform. Typically an
-    instance of `Distribution`.
+  instance of `Distribution`.
 * <b>`reinterpreted_batch_ndims`</b>: Scalar, integer number of rightmost batch dims
-    which will be regarded as event dims. When `None` all but the first
-    batch axis (batch axis 0) will be transferred to event dimensions
-    (analogous to `tf.layers.flatten`).
+  which will be regarded as event dims. When `None` all but the first
+  batch axis (batch axis 0) will be transferred to event dimensions
+  (analogous to `tf.layers.flatten`).
 * <b>`validate_args`</b>: Python `bool`.  Whether to validate input with asserts.
-    If `validate_args` is `False`, and the inputs are invalid,
-    correct behavior is not guaranteed.
+  If `validate_args` is `False`, and the inputs are invalid,
+  correct behavior is not guaranteed.
 * <b>`name`</b>: The name for ops managed by the distribution.
-    Default value: `Independent + distribution.name`.
+  Default value: `Independent + distribution.name`.
 
 
 #### Raises:
 
 * <b>`ValueError`</b>: if `reinterpreted_batch_ndims` exceeds
-    `distribution.batch_ndims`
+  `distribution.batch_ndims`

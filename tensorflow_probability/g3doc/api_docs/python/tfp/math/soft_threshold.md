@@ -85,15 +85,15 @@ multivariate case does not have a known closed form like above.)
 
 * <b>`x`</b>: `float` `Tensor` representing the input to the SoftThreshold function.
 * <b>`threshold`</b>: nonnegative scalar, `float` `Tensor` representing the radius of
-    the interval on which each coordinate of SoftThreshold takes the value
-    zero.  Denoted `gamma` above.
+  the interval on which each coordinate of SoftThreshold takes the value
+  zero.  Denoted `gamma` above.
 * <b>`name`</b>: Python string indicating the name of the TensorFlow operation.
-    Default value: `'soft_threshold'`.
+  Default value: `'soft_threshold'`.
 
 
 #### Returns:
 
-* <b>`softthreshold`</b>: `float` `Tensor` with the same shape and dtype as `x`,
+  softthreshold: `float` `Tensor` with the same shape and dtype as `x`,
     representing the value of the SoftThreshold function.
 
 #### References

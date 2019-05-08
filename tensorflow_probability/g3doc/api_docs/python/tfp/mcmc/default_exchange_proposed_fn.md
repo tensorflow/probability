@@ -36,12 +36,12 @@ exchange_proposed.eval()
 #### Args:
 
 * <b>`prob_exchange`</b>: Scalar `Tensor` giving probability that any exchanges will
-    be generated.
+  be generated.
 
 
 #### Returns:
 
 * <b>`default_exchange_proposed_fn_`</b>: Python callable which take a number of
-    replicas (a Python integer), and return combinations of replicas for
-    exchange as an [n, 2] integer `Tensor`, `0 <= n <= num_replica // 2`,
-    with *unique* values in the set `{0, ..., num_replica}`.
+  replicas (a Python integer), and return combinations of replicas for
+  exchange as an [n, 2] integer `Tensor`, `0 <= n <= num_replica // 2`,
+  with *unique* values in the set `{0, ..., num_replica}`.

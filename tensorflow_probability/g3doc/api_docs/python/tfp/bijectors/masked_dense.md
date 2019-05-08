@@ -33,16 +33,16 @@ See [Germain et al. (2015)][1] for detailed explanation.
 
 * <b>`inputs`</b>: Tensor input.
 * <b>`units`</b>: Python `int` scalar representing the dimensionality of the output
-    space.
+  space.
 * <b>`num_blocks`</b>: Python `int` scalar representing the number of blocks for the
-    MADE masks.
+  MADE masks.
 * <b>`exclusive`</b>: Python `bool` scalar representing whether to zero the diagonal of
-    the mask, used for the first layer of a MADE.
+  the mask, used for the first layer of a MADE.
 * <b>`kernel_initializer`</b>: Initializer function for the weight matrix.
-    If `None` (default), weights are initialized using the
-    `tf.glorot_random_initializer`.
+  If `None` (default), weights are initialized using the
+  `tf.glorot_random_initializer`.
 * <b>`reuse`</b>: Python `bool` scalar representing whether to reuse the weights of a
-    previous layer by the same name.
+  previous layer by the same name.
 * <b>`name`</b>: Python `str` used to describe ops managed by this function.
 * <b>`*args`</b>: `tf.layers.dense` arguments.
 * <b>`**kwargs`</b>: `tf.layers.dense` keyword arguments.
@@ -55,7 +55,7 @@ Output tensor.
 
 #### Raises:
 
-* <b>`NotImplementedError`</b>: if rightmost dimension of `inputs` is unknown prior to
+  NotImplementedError: if rightmost dimension of `inputs` is unknown prior to
     graph execution.
 
 #### References

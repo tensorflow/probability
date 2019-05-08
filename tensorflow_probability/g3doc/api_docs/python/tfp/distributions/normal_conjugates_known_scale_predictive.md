@@ -56,9 +56,9 @@ will broadcast in the case of multidimensional sets of parameters.
 #### Args:
 
 * <b>`prior`</b>: `Normal` object of type `dtype`:
-    the prior distribution having parameters `(loc0, scale0)`.
+  the prior distribution having parameters `(loc0, scale0)`.
 * <b>`scale`</b>: tensor of type `dtype`, taking values `scale > 0`.
-    The known stddev parameter(s).
+  The known stddev parameter(s).
 * <b>`s`</b>: Tensor of type `dtype`. The sum(s) of observations.
 * <b>`n`</b>: Tensor of type `int`. The number(s) of observations.
 
@@ -71,4 +71,4 @@ A new Normal predictive distribution object.
 #### Raises:
 
 * <b>`TypeError`</b>: if dtype of `s` does not match `dtype`, or `prior` is not a
-    Normal object.
+  Normal object.

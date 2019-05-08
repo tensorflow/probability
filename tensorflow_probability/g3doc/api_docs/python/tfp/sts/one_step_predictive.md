@@ -28,24 +28,24 @@ through time `T-1`.
 #### Args:
 
 * <b>`model`</b>: An instance of `StructuralTimeSeries` representing a
-    time-series model. This represents a joint distribution over
-    time-series and their parameters with batch shape `[b1, ..., bN]`.
+  time-series model. This represents a joint distribution over
+  time-series and their parameters with batch shape `[b1, ..., bN]`.
 * <b>`observed_time_series`</b>: `float` `Tensor` of shape
-    `concat([sample_shape, model.batch_shape, [num_timesteps, 1]]) where
-    `sample_shape` corresponds to i.i.d. observations, and the trailing `[1]`
-    dimension may (optionally) be omitted if `num_timesteps > 1`. May
-    optionally be an instance of <a href="../../tfp/sts/MaskedTimeSeries.md"><code>tfp.sts.MaskedTimeSeries</code></a> including a
-    mask `Tensor` to encode the locations of missing observations.
+  `concat([sample_shape, model.batch_shape, [num_timesteps, 1]]) where
+  `sample_shape` corresponds to i.i.d. observations, and the trailing `[1]`
+  dimension may (optionally) be omitted if `num_timesteps > 1`. May
+  optionally be an instance of <a href="../../tfp/sts/MaskedTimeSeries.md"><code>tfp.sts.MaskedTimeSeries</code></a> including a
+  mask `Tensor` to encode the locations of missing observations.
 * <b>`parameter_samples`</b>: Python `list` of `Tensors` representing posterior samples
-    of model parameters, with shapes `[concat([[num_posterior_draws],
-    param.prior.batch_shape, param.prior.event_shape]) for param in
-    model.parameters]`. This may optionally also be a map (Python `dict`) of
-    parameter names to `Tensor` values.
+  of model parameters, with shapes `[concat([[num_posterior_draws],
+  param.prior.batch_shape, param.prior.event_shape]) for param in
+  model.parameters]`. This may optionally also be a map (Python `dict`) of
+  parameter names to `Tensor` values.
 
 
 #### Returns:
 
-* <b>`forecast_dist`</b>: a `tfd.MixtureSameFamily` instance with event shape
+  forecast_dist: a `tfd.MixtureSameFamily` instance with event shape
     [num_timesteps] and
     batch shape `concat([sample_shape, model.batch_shape])`, with
     `num_posterior_draws` mixture components. The `t`th step represents the

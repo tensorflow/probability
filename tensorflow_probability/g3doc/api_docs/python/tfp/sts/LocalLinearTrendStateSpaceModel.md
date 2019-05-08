@@ -70,7 +70,8 @@ details.
 
 The local linear trend model is a special case of a linear Gaussian SSM, in
 which the latent state posits a `level` and `slope`, each evolving via a
-Gaussian random walk:
+#### Gaussian random walk:
+
 
 ```python
 level[t] = level[t-1] + slope[t-1] + Normal(0., level_scale)
@@ -158,33 +159,33 @@ Build a state space model implementing a local linear trend.
 #### Args:
 
 * <b>`num_timesteps`</b>: Scalar `int` `Tensor` number of timesteps to model
-    with this distribution.
+  with this distribution.
 * <b>`level_scale`</b>: Scalar (any additional dimensions are treated as batch
-    dimensions) `float` `Tensor` indicating the standard deviation of the
-    level transitions.
+  dimensions) `float` `Tensor` indicating the standard deviation of the
+  level transitions.
 * <b>`slope_scale`</b>: Scalar (any additional dimensions are treated as batch
-    dimensions) `float` `Tensor` indicating the standard deviation of the
-    slope transitions.
+  dimensions) `float` `Tensor` indicating the standard deviation of the
+  slope transitions.
 * <b>`initial_state_prior`</b>: instance of `tfd.MultivariateNormal`
-    representing the prior distribution on latent states; must
-    have event shape `[2]`.
+  representing the prior distribution on latent states; must
+  have event shape `[2]`.
 * <b>`observation_noise_scale`</b>: Scalar (any additional dimensions are
-    treated as batch dimensions) `float` `Tensor` indicating the standard
-    deviation of the observation noise.
+  treated as batch dimensions) `float` `Tensor` indicating the standard
+  deviation of the observation noise.
 * <b>`initial_step`</b>: Optional scalar `int` `Tensor` specifying the starting
-    timestep.
-    Default value: 0.
+  timestep.
+  Default value: 0.
 * <b>`validate_args`</b>: Python `bool`. Whether to validate input
-    with asserts. If `validate_args` is `False`, and the inputs are
-    invalid, correct behavior is not guaranteed.
-    Default value: `False`.
+  with asserts. If `validate_args` is `False`, and the inputs are
+  invalid, correct behavior is not guaranteed.
+  Default value: `False`.
 * <b>`allow_nan_stats`</b>: Python `bool`. If `False`, raise an
-    exception if a statistic (e.g. mean/mode/etc...) is undefined for any
-    batch member. If `True`, batch members with valid parameters leading to
-    undefined statistics will return NaN for this statistic.
-    Default value: `True`.
+  exception if a statistic (e.g. mean/mode/etc...) is undefined for any
+  batch member. If `True`, batch members with valid parameters leading to
+  undefined statistics will return NaN for this statistic.
+  Default value: `True`.
 * <b>`name`</b>: Python `str` name prefixed to ops created by this class.
-    Default value: "LocalLinearTrendStateSpaceModel".
+  Default value: "LocalLinearTrendStateSpaceModel".
 
 
 
@@ -336,31 +337,31 @@ A Probabilistic Perspective, The MIT Press. The inputs are returned by
 #### Args:
 
 * <b>`filtered_means`</b>: Means of the per-timestep filtered marginal
-    distributions p(z_t | x_{:t}), as a Tensor of shape
-    `sample_shape(x) + batch_shape + [num_timesteps, latent_size]`.
+  distributions p(z_t | x_{:t}), as a Tensor of shape
+  `sample_shape(x) + batch_shape + [num_timesteps, latent_size]`.
 * <b>`filtered_covs`</b>: Covariances of the per-timestep filtered marginal
-    distributions p(z_t | x_{:t}), as a Tensor of shape
-    `batch_shape + [num_timesteps, latent_size, latent_size]`.
+  distributions p(z_t | x_{:t}), as a Tensor of shape
+  `batch_shape + [num_timesteps, latent_size, latent_size]`.
 * <b>`predicted_means`</b>: Means of the per-timestep predictive
-     distributions over latent states, p(z_{t+1} | x_{:t}), as a
-     Tensor of shape `sample_shape(x) + batch_shape +
-     [num_timesteps, latent_size]`.
+   distributions over latent states, p(z_{t+1} | x_{:t}), as a
+   Tensor of shape `sample_shape(x) + batch_shape +
+   [num_timesteps, latent_size]`.
 * <b>`predicted_covs`</b>: Covariances of the per-timestep predictive
-     distributions over latent states, p(z_{t+1} | x_{:t}), as a
-     Tensor of shape `batch_shape + [num_timesteps, latent_size,
-     latent_size]`.
+   distributions over latent states, p(z_{t+1} | x_{:t}), as a
+   Tensor of shape `batch_shape + [num_timesteps, latent_size,
+   latent_size]`.
 
 
 #### Returns:
 
 * <b>`posterior_means`</b>: Means of the smoothed marginal distributions
-    p(z_t | x_{1:T}), as a Tensor of shape
-    `sample_shape(x) + batch_shape + [num_timesteps, latent_size]`,
-    which is of the same shape as filtered_means.
+  p(z_t | x_{1:T}), as a Tensor of shape
+  `sample_shape(x) + batch_shape + [num_timesteps, latent_size]`,
+  which is of the same shape as filtered_means.
 * <b>`posterior_covs`</b>: Covariances of the smoothed marginal distributions
-    p(z_t | x_{1:T}), as a Tensor of shape
-    `batch_shape + [num_timesteps, latent_size, latent_size]`.
-    which is of the same shape as filtered_covs.
+  p(z_t | x_{1:T}), as a Tensor of shape
+  `batch_shape + [num_timesteps, latent_size, latent_size]`.
+  which is of the same shape as filtered_covs.
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
 
@@ -410,7 +411,7 @@ cdf(x) := P[X <= x]
 #### Returns:
 
 * <b>`cdf`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
+  values of type `self.dtype`.
 
 <h3 id="copy"><code>copy</code></h3>
 
@@ -426,14 +427,14 @@ initialization arguments.
 #### Args:
 
 * <b>`**override_parameters_kwargs`</b>: String/value dictionary of initialization
-    arguments to override with new values.
+  arguments to override with new values.
 
 
 #### Returns:
 
 * <b>`distribution`</b>: A new instance of `type(self)` initialized from the union
-    of self.parameters and override_parameters_kwargs, i.e.,
-    `dict(self.parameters, **override_parameters_kwargs)`.
+  of self.parameters and override_parameters_kwargs, i.e.,
+  `dict(self.parameters, **override_parameters_kwargs)`.
 
 <h3 id="covariance"><code>covariance</code></h3>
 
@@ -480,8 +481,8 @@ length-`k'` vector.
 #### Returns:
 
 * <b>`covariance`</b>: Floating-point `Tensor` with shape `[B1, ..., Bn, k', k']`
-    where the first `n` dimensions are batch coordinates and
-    `k' = reduce_prod(self.event_shape)`.
+  where the first `n` dimensions are batch coordinates and
+  `k' = reduce_prod(self.event_shape)`.
 
 <h3 id="cross_entropy"><code>cross_entropy</code></h3>
 
@@ -514,7 +515,7 @@ where `F` denotes the support of the random variable `X ~ P`.
 #### Returns:
 
 * <b>`cross_entropy`</b>: `self.dtype` `Tensor` with shape `[B1, ..., Bn]`
-    representing `n` different calculations of (Shannon) cross entropy.
+  representing `n` different calculations of (Shannon) cross entropy.
 
 <h3 id="entropy"><code>entropy</code></h3>
 
@@ -567,53 +568,53 @@ depend only on the model itself. This means that the mean values have shape
 #### Args:
 
 * <b>`x`</b>: a float-type `Tensor` with rightmost dimensions
-    `[num_timesteps, observation_size]` matching
-    `self.event_shape`. Additional dimensions must match or be
-    broadcastable to `self.batch_shape`; any further dimensions
-    are interpreted as a sample shape.
+  `[num_timesteps, observation_size]` matching
+  `self.event_shape`. Additional dimensions must match or be
+  broadcastable to `self.batch_shape`; any further dimensions
+  are interpreted as a sample shape.
 * <b>`mask`</b>: optional bool-type `Tensor` with rightmost dimension
-    `[num_timesteps]`; `True` values specify that the value of `x`
-    at that timestep is masked, i.e., not conditioned on. Additional
-    dimensions must match or be broadcastable to `self.batch_shape`; any
-    further dimensions must match or be broadcastable to the sample
-    shape of `x`.
-    Default value: `None`.
+  `[num_timesteps]`; `True` values specify that the value of `x`
+  at that timestep is masked, i.e., not conditioned on. Additional
+  dimensions must match or be broadcastable to `self.batch_shape`; any
+  further dimensions must match or be broadcastable to the sample
+  shape of `x`.
+  Default value: `None`.
 
 
 #### Returns:
 
 * <b>`log_likelihoods`</b>: Per-timestep log marginal likelihoods `log
-    p(x_t | x_{:t-1})` evaluated at the input `x`, as a `Tensor`
-    of shape `sample_shape(x) + batch_shape + [num_timesteps].`
+  p(x_t | x_{:t-1})` evaluated at the input `x`, as a `Tensor`
+  of shape `sample_shape(x) + batch_shape + [num_timesteps].`
 * <b>`filtered_means`</b>: Means of the per-timestep filtered marginal
-     distributions p(z_t | x_{:t}), as a Tensor of shape
-    `sample_shape(x) + batch_shape + [num_timesteps, latent_size]`.
+   distributions p(z_t | x_{:t}), as a Tensor of shape
+  `sample_shape(x) + batch_shape + [num_timesteps, latent_size]`.
 * <b>`filtered_covs`</b>: Covariances of the per-timestep filtered marginal
-     distributions p(z_t | x_{:t}), as a Tensor of shape
-    `sample_shape(mask) + batch_shape + [num_timesteps, latent_size,
-    latent_size]`. Note that the covariances depend only on the model and
-    the mask, not on the data, so this may have fewer dimensions than
-    `filtered_means`.
+   distributions p(z_t | x_{:t}), as a Tensor of shape
+  `sample_shape(mask) + batch_shape + [num_timesteps, latent_size,
+  latent_size]`. Note that the covariances depend only on the model and
+  the mask, not on the data, so this may have fewer dimensions than
+  `filtered_means`.
 * <b>`predicted_means`</b>: Means of the per-timestep predictive
-     distributions over latent states, p(z_{t+1} | x_{:t}), as a
-     Tensor of shape `sample_shape(x) + batch_shape +
-     [num_timesteps, latent_size]`.
+   distributions over latent states, p(z_{t+1} | x_{:t}), as a
+   Tensor of shape `sample_shape(x) + batch_shape +
+   [num_timesteps, latent_size]`.
 * <b>`predicted_covs`</b>: Covariances of the per-timestep predictive
-     distributions over latent states, p(z_{t+1} | x_{:t}), as a
-     Tensor of shape `sample_shape(mask) + batch_shape +
-     [num_timesteps, latent_size, latent_size]`. Note that the covariances
-     depend only on the model and the mask, not on the data, so this may
-     have fewer dimensions than `predicted_means`.
+   distributions over latent states, p(z_{t+1} | x_{:t}), as a
+   Tensor of shape `sample_shape(mask) + batch_shape +
+   [num_timesteps, latent_size, latent_size]`. Note that the covariances
+   depend only on the model and the mask, not on the data, so this may
+   have fewer dimensions than `predicted_means`.
 * <b>`observation_means`</b>: Means of the per-timestep predictive
-     distributions over observations, p(x_{t} | x_{:t-1}), as a
-     Tensor of shape `sample_shape(x) + batch_shape +
-     [num_timesteps, observation_size]`.
+   distributions over observations, p(x_{t} | x_{:t-1}), as a
+   Tensor of shape `sample_shape(x) + batch_shape +
+   [num_timesteps, observation_size]`.
 * <b>`observation_covs`</b>: Covariances of the per-timestep predictive
-     distributions over observations, p(x_{t} | x_{:t-1}), as a
-     Tensor of shape `sample_shape(mask) + batch_shape + [num_timesteps,
-     observation_size, observation_size]`. Note that the covariances depend
-     only on the model and the mask, not on the data, so this may have fewer
-     dimensions than `observation_means`.
+   distributions over observations, p(x_{t} | x_{:t-1}), as a
+   Tensor of shape `sample_shape(mask) + batch_shape + [num_timesteps,
+   observation_size, observation_size]`. Note that the covariances depend
+   only on the model and the mask, not on the data, so this may have fewer
+   dimensions than `observation_means`.
 
 <h3 id="is_scalar_batch"><code>is_scalar_batch</code></h3>
 
@@ -682,8 +683,8 @@ denotes (Shannon) cross entropy, and `H[.]` denotes (Shannon) entropy.
 #### Returns:
 
 * <b>`kl_divergence`</b>: `self.dtype` `Tensor` with shape `[B1, ..., Bn]`
-    representing `n` different calculations of the Kullback-Leibler
-    divergence.
+  representing `n` different calculations of the Kullback-Leibler
+  divergence.
 
 <h3 id="latents_to_observations"><code>latents_to_observations</code></h3>
 
@@ -700,15 +701,15 @@ Push latent means and covariances forward through the observation model.
 
 * <b>`latent_means`</b>: float `Tensor` of shape `[..., num_timesteps, latent_size]`
 * <b>`latent_covs`</b>: float `Tensor` of shape
-    `[..., num_timesteps, latent_size, latent_size]`.
+  `[..., num_timesteps, latent_size, latent_size]`.
 
 
 #### Returns:
 
 * <b>`observation_means`</b>: float `Tensor` of shape
-    `[..., num_timesteps, observation_size]`
+  `[..., num_timesteps, observation_size]`
 * <b>`observation_covs`</b>: float `Tensor` of shape
-    `[..., num_timesteps, observation_size, observation_size]`
+  `[..., num_timesteps, observation_size, observation_size]`
 
 <h3 id="log_cdf"><code>log_cdf</code></h3>
 
@@ -742,7 +743,7 @@ a more accurate answer than simply taking the logarithm of the `cdf` when
 #### Returns:
 
 * <b>`logcdf`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
+  values of type `self.dtype`.
 
 <h3 id="log_prob"><code>log_prob</code></h3>
 
@@ -773,7 +774,7 @@ Additional documentation from `LinearGaussianStateSpaceModel`:
 #### Returns:
 
 * <b>`log_prob`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
+  values of type `self.dtype`.
 
 <h3 id="log_survival_function"><code>log_survival_function</code></h3>
 
@@ -853,7 +854,7 @@ Subclasses should override class method `_param_shapes`.
 #### Args:
 
 * <b>`sample_shape`</b>: `Tensor` or python list/tuple. Desired shape of a call to
-    `sample()`.
+  `sample()`.
 * <b>`name`</b>: name to prepend ops with.
 
 
@@ -883,7 +884,7 @@ constant-valued tensors when constant values are fed.
 #### Args:
 
 * <b>`sample_shape`</b>: `TensorShape` or python list/tuple. Desired shape of a call
-    to `sample()`.
+  to `sample()`.
 
 
 #### Returns:
@@ -930,31 +931,31 @@ where `x` is an observation sequence.
 #### Args:
 
 * <b>`x`</b>: a float-type `Tensor` with rightmost dimensions
-    `[num_timesteps, observation_size]` matching
-    `self.event_shape`. Additional dimensions must match or be
-    broadcastable to `self.batch_shape`; any further dimensions
-    are interpreted as a sample shape.
+  `[num_timesteps, observation_size]` matching
+  `self.event_shape`. Additional dimensions must match or be
+  broadcastable to `self.batch_shape`; any further dimensions
+  are interpreted as a sample shape.
 * <b>`mask`</b>: optional bool-type `Tensor` with rightmost dimension
-    `[num_timesteps]`; `True` values specify that the value of `x`
-    at that timestep is masked, i.e., not conditioned on. Additional
-    dimensions must match or be broadcastable to `self.batch_shape`; any
-    further dimensions must match or be broadcastable to the sample
-    shape of `x`.
-    Default value: `None`.
+  `[num_timesteps]`; `True` values specify that the value of `x`
+  at that timestep is masked, i.e., not conditioned on. Additional
+  dimensions must match or be broadcastable to `self.batch_shape`; any
+  further dimensions must match or be broadcastable to the sample
+  shape of `x`.
+  Default value: `None`.
 
 
 #### Returns:
 
 * <b>`smoothed_means`</b>: Means of the per-timestep smoothed
-     distributions over latent states, p(x_{t} | x_{:T}), as a
-     Tensor of shape `sample_shape(x) + batch_shape +
-     [num_timesteps, observation_size]`.
+   distributions over latent states, p(x_{t} | x_{:T}), as a
+   Tensor of shape `sample_shape(x) + batch_shape +
+   [num_timesteps, observation_size]`.
 * <b>`smoothed_covs`</b>: Covariances of the per-timestep smoothed
-     distributions over latent states, p(x_{t} | x_{:T}), as a
-     Tensor of shape `sample_shape(mask) + batch_shape + [num_timesteps,
-     observation_size, observation_size]`. Note that the covariances depend
-     only on the model and the mask, not on the data, so this may have fewer
-     dimensions than `filtered_means`.
+   distributions over latent states, p(x_{t} | x_{:T}), as a
+   Tensor of shape `sample_shape(mask) + batch_shape + [num_timesteps,
+   observation_size, observation_size]`. Note that the covariances depend
+   only on the model and the mask, not on the data, so this may have fewer
+   dimensions than `filtered_means`.
 
 <h3 id="prob"><code>prob</code></h3>
 
@@ -985,7 +986,7 @@ Additional documentation from `LinearGaussianStateSpaceModel`:
 #### Returns:
 
 * <b>`prob`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
+  values of type `self.dtype`.
 
 <h3 id="quantile"><code>quantile</code></h3>
 
@@ -1015,7 +1016,7 @@ quantile(p) := x such that P[X <= x] == p
 #### Returns:
 
 * <b>`quantile`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
+  values of type `self.dtype`.
 
 <h3 id="sample"><code>sample</code></h3>
 
@@ -1074,7 +1075,7 @@ denotes expectation, and `stddev.shape = batch_shape + event_shape`.
 #### Returns:
 
 * <b>`stddev`</b>: Floating-point `Tensor` with shape identical to
-    `batch_shape + event_shape`, i.e., the same shape as `self.mean()`.
+  `batch_shape + event_shape`, i.e., the same shape as `self.mean()`.
 
 <h3 id="survival_function"><code>survival_function</code></h3>
 
@@ -1137,7 +1138,7 @@ denotes expectation, and `Var.shape = batch_shape + event_shape`.
 #### Returns:
 
 * <b>`variance`</b>: Floating-point `Tensor` with shape identical to
-    `batch_shape + event_shape`, i.e., the same shape as `self.mean()`.
+  `batch_shape + event_shape`, i.e., the same shape as `self.mean()`.
 
 
 

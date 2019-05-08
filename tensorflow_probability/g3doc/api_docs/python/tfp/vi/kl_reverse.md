@@ -51,15 +51,15 @@ calculations and may therefore be numerically unstable for `|logu| >> 0`.
 
 * <b>`logu`</b>: `float`-like `Tensor` representing `log(u)` from above.
 * <b>`self_normalized`</b>: Python `bool` indicating whether `f'(u=1)=0`. When
-    `f'(u=1)=0` the implied Csiszar f-Divergence remains non-negative even
-    when `p, q` are unnormalized measures.
+  `f'(u=1)=0` the implied Csiszar f-Divergence remains non-negative even
+  when `p, q` are unnormalized measures.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this function.
 
 
 #### Returns:
 
 * <b>`kl_reverse_of_u`</b>: `float`-like `Tensor` of the Csiszar-function evaluated at
-    `u = exp(logu)`.
+  `u = exp(logu)`.
 
 
 #### Raises:

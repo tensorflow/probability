@@ -73,25 +73,25 @@ Initialize the `KLDivergenceRegularizer` regularizer.
 #### Args:
 
 * <b>`distribution_b`</b>: distribution instance corresponding to `b` as in
-    `KL[a, b]`. The previous layer's output is presumed to be a
-    `Distribution` instance and is `a`).
+  `KL[a, b]`. The previous layer's output is presumed to be a
+  `Distribution` instance and is `a`).
 * <b>`use_exact_kl`</b>: Python `bool` indicating if KL divergence should be
-    calculated exactly via <a href="../../tfp/distributions/kl_divergence.md"><code>tfp.distributions.kl_divergence</code></a> or via Monte
-    Carlo approximation.
-    Default value: `False`.
+  calculated exactly via <a href="../../tfp/distributions/kl_divergence.md"><code>tfp.distributions.kl_divergence</code></a> or via Monte
+  Carlo approximation.
+  Default value: `False`.
 * <b>`test_points_reduce_axis`</b>: `int` vector or scalar representing dimensions
-    over which to `reduce_mean` while calculating the Monte Carlo
-    approximation of the KL divergence.  As is with all `tf.reduce_*` ops,
-    `None` means reduce over all dimensions; `()` means reduce over none of
-    them.
-    Default value: `()` (i.e., no reduction).
+  over which to `reduce_mean` while calculating the Monte Carlo
+  approximation of the KL divergence.  As is with all `tf.reduce_*` ops,
+  `None` means reduce over all dimensions; `()` means reduce over none of
+  them.
+  Default value: `()` (i.e., no reduction).
 * <b>`test_points_fn`</b>: Python `callable` taking a `Distribution` instance and
-    returning a `Tensor` used for random test points to approximate the KL
-    divergence.
-    Default value: `tf.convert_to_tensor`.
+  returning a `Tensor` used for random test points to approximate the KL
+  divergence.
+  Default value: `tf.convert_to_tensor`.
 * <b>`weight`</b>: Multiplier applied to the calculated KL divergence for each Keras
-    batch member.
-    Default value: `None` (i.e., do not weight each batch member).
+  batch member.
+  Default value: `None` (i.e., do not weight each batch member).
 
 
 

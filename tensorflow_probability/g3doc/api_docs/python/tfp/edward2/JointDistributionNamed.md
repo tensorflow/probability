@@ -34,10 +34,10 @@ Construct the `JointDistributionNamed` distribution.
 #### Args:
 
 * <b>`model`</b>: Python `dict` or `namedtuple` of distribution-making functions each
-    with required args corresponding only to other keys.
+  with required args corresponding only to other keys.
 * <b>`validate_args`</b>: Python `bool`.  Whether to validate input with asserts.
-    If `validate_args` is `False`, and the inputs are invalid,
-    correct behavior is not guaranteed.
-    Default value: `False`.
+  If `validate_args` is `False`, and the inputs are invalid,
+  correct behavior is not guaranteed.
+  Default value: `False`.
 * <b>`name`</b>: The name for ops managed by the distribution.
-    Default value: `None` (i.e., `"JointDistributionNamed"`).
+  Default value: `None` (i.e., `"JointDistributionNamed"`).

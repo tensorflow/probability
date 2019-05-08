@@ -82,33 +82,33 @@ print('hessian computed through `diag_jacobian`, sample_shape skipped',
 #### Args:
 
 * <b>`xs`</b>: `Tensor` or a python `list` of `Tensors` of real-like dtypes and shapes
-    `sample_shape` + `event_shape_i`, where `event_shape_i` can be different
-    for different tensors.
+  `sample_shape` + `event_shape_i`, where `event_shape_i` can be different
+  for different tensors.
 * <b>`ys`</b>: `Tensor` or a python `list` of `Tensors` of the same dtype as `xs`. Must
-      broadcast with the shape of `xs`. Can be omitted if `fn` is provided.
+    broadcast with the shape of `xs`. Can be omitted if `fn` is provided.
 * <b>`sample_shape`</b>: A common `sample_shape` of the input tensors of `xs`. If not,
-    provided, assumed to be `[1]`, which may result in a slow performance of
-    `jacobians_diag`.
+  provided, assumed to be `[1]`, which may result in a slow performance of
+  `jacobians_diag`.
 * <b>`fn`</b>: Python callable that takes `xs` as an argument (or `*xs`, if it is a
-    list) and returns `ys`. Might be skipped if `ys` is provided and
-    `tf.enable_eager_execution()` is disabled.
+  list) and returns `ys`. Might be skipped if `ys` is provided and
+  `tf.enable_eager_execution()` is disabled.
 * <b>`parallel_iterations`</b>: `int` that specifies the allowed number of coordinates
-    of the input tensor `xs`, for which the partial derivatives `dys_i/dxs_i`
-    can be computed in parallel.
+  of the input tensor `xs`, for which the partial derivatives `dys_i/dxs_i`
+  can be computed in parallel.
 * <b>`name`</b>: Python `str` name prefixed to `Ops` created by this function.
-    Default value: `None` (i.e., "diag_jacobian").
+  Default value: `None` (i.e., "diag_jacobian").
 
 
 #### Returns:
 
 * <b>`ys`</b>: a list, which coincides with the input `ys`, when provided.
-    If the input `ys` is None, `fn(*xs)` gets computed and returned as a list.
+  If the input `ys` is None, `fn(*xs)` gets computed and returned as a list.
 * <b>`jacobians_diag_res`</b>: a `Tensor` or a Python list of `Tensor`s of the same
-    dtypes and shapes as the input `xs`. This is the diagonal of the Jacobian
-    of ys wrt xs.
+  dtypes and shapes as the input `xs`. This is the diagonal of the Jacobian
+  of ys wrt xs.
 
 
 #### Raises:
 
 * <b>`ValueError`</b>: if lists `xs` and `ys` have different length or both `ys` and
-    `fn` are `None`, or `fn` is None in the eager execution mode.
+  `fn` are `None`, or `fn` is None in the eager execution mode.

@@ -41,28 +41,28 @@ default `rcond` is `1e-15`. Here the default is
 #### Args:
 
 * <b>`a`</b>: (Batch of) `float`-like matrix-shaped `Tensor`(s) which are to be
-    pseudo-inverted.
+  pseudo-inverted.
 * <b>`rcond`</b>: `Tensor` of small singular value cutoffs.  Singular values smaller
-    (in modulus) than `rcond` * largest_singular_value (again, in modulus) are
-    set to zero. Must broadcast against `tf.shape(a)[:-2]`.
-    Default value: `10. * max(num_rows, num_cols) * np.finfo(a.dtype).eps`.
+  (in modulus) than `rcond` * largest_singular_value (again, in modulus) are
+  set to zero. Must broadcast against `tf.shape(a)[:-2]`.
+  Default value: `10. * max(num_rows, num_cols) * np.finfo(a.dtype).eps`.
 * <b>`validate_args`</b>: When `True`, additional assertions might be embedded in the
-    graph.
-    Default value: `False` (i.e., no graph assertions are added).
+  graph.
+  Default value: `False` (i.e., no graph assertions are added).
 * <b>`name`</b>: Python `str` prefixed to ops created by this function.
-    Default value: "pinv".
+  Default value: "pinv".
 
 
 #### Returns:
 
 * <b>`a_pinv`</b>: The pseudo-inverse of input `a`. Has same shape as `a` except
-    rightmost two dimensions are transposed.
+  rightmost two dimensions are transposed.
 
 
 #### Raises:
 
-* <b>`TypeError`</b>: if input `a` does not have `float`-like `dtype`.
-* <b>`ValueError`</b>: if input `a` has fewer than 2 dimensions.
+  TypeError: if input `a` does not have `float`-like `dtype`.
+  ValueError: if input `a` has fewer than 2 dimensions.
 
 #### Examples
 

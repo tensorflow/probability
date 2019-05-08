@@ -37,28 +37,28 @@ If the sequence is uncorrelated, `ESS = N`.  In general, one should expect
 #### Args:
 
 * <b>`states`</b>:  `Tensor` or list of `Tensor` objects.  Dimension zero should index
-    identically distributed states.
+  identically distributed states.
 * <b>`filter_threshold`</b>:  `Tensor` or list of `Tensor` objects.
-    Must broadcast with `state`.  The auto-correlation sequence is truncated
-    after the first appearance of a term less than `filter_threshold`.
-    Setting to `None` means we use no threshold filter.  Since `|R_k| <= 1`,
-    setting to any number less than `-1` has the same effect.
+  Must broadcast with `state`.  The auto-correlation sequence is truncated
+  after the first appearance of a term less than `filter_threshold`.
+  Setting to `None` means we use no threshold filter.  Since `|R_k| <= 1`,
+  setting to any number less than `-1` has the same effect.
 * <b>`filter_beyond_lag`</b>:  `Tensor` or list of `Tensor` objects.  Must be
-    `int`-like and scalar valued.  The auto-correlation sequence is truncated
-    to this length.  Setting to `None` means we do not filter based on number
-    of lags.
+  `int`-like and scalar valued.  The auto-correlation sequence is truncated
+  to this length.  Setting to `None` means we do not filter based on number
+  of lags.
 * <b>`name`</b>:  `String` name to prepend to created ops.
 
 
 #### Returns:
 
 * <b>`ess`</b>:  `Tensor` or list of `Tensor` objects.  The effective sample size of
-    each component of `states`.  Shape will be `states.shape[1:]`.
+  each component of `states`.  Shape will be `states.shape[1:]`.
 
 
 #### Raises:
 
-* <b>`ValueError`</b>:  If `states` and `filter_threshold` or `states` and
+  ValueError:  If `states` and `filter_threshold` or `states` and
     `filter_beyond_lag` are both lists with different lengths.
 
 #### Examples

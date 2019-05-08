@@ -33,11 +33,11 @@ Defined in [`python/layers/util.py`](https://github.com/tensorflow/probability/t
 * <b>`dtype`</b>: Type of parameter's event.
 * <b>`shape`</b>: Python `list`-like representing the parameter's event shape.
 * <b>`name`</b>: Python `str` name prepended to any created (or existing)
-    `tf.Variable`s.
+  `tf.Variable`s.
 * <b>`trainable`</b>: Python `bool` indicating all created `tf.Variable`s should be
-    added to the graph collection `GraphKeys.TRAINABLE_VARIABLES`.
+  added to the graph collection `GraphKeys.TRAINABLE_VARIABLES`.
 * <b>`add_variable_fn`</b>: `tf.get_variable`-like `callable` used to create (or
-    access existing) `tf.Variable`s.
+  access existing) `tf.Variable`s.
 
 
 #### Returns:

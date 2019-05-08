@@ -34,7 +34,7 @@ machine epsilon.
 
 * <b>`x`</b>: Float `Tensor` input.
 * <b>`name`</b>: Python string indicating the name of the TensorFlow operation.
-    Default value: `'log1psquare'`.
+  Default value: `'log1psquare'`.
 
 
 #### Returns:

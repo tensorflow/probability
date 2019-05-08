@@ -25,18 +25,18 @@ Defined in [`python/math/gradient.py`](https://github.com/tensorflow/probability
 #### Args:
 
 * <b>`f`</b>: Python `callable` to be differentiated. If `f` returns a scalar, this
-    scalar will be differentiated. If `f` returns a tensor or list of tensors,
-    by default a scalar will be computed by adding all their values to produce
-    a single scalar. If desired, the tensors can be elementwise multiplied by
-    the tensors passed as the `dy` keyword argument to the returned gradient
-    function.
+  scalar will be differentiated. If `f` returns a tensor or list of tensors,
+  by default a scalar will be computed by adding all their values to produce
+  a single scalar. If desired, the tensors can be elementwise multiplied by
+  the tensors passed as the `dy` keyword argument to the returned gradient
+  function.
 * <b>`xs`</b>: Python list of parameters of f for which to differentiate. (Can also
-    be single `Tensor`.)
+  be single `Tensor`.)
 * <b>`use_gradient_tape`</b>: Python `bool` indicating that `tf.GradientTape`
-    should be used regardless of `tf.executing_eagerly()` status.
-    Default value: `False`.
+  should be used regardless of `tf.executing_eagerly()` status.
+  Default value: `False`.
 * <b>`name`</b>: Python `str` name prefixed to ops created by this function.
-    Default value: `None` (i.e., `'value_and_gradient'`).
+  Default value: `None` (i.e., `'value_and_gradient'`).
 
 
 #### Returns:

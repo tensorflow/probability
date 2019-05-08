@@ -14,6 +14,10 @@ Defined in [`python/math/__init__.py`](https://github.com/tensorflow/probability
 <!-- Placeholder for "Used in" -->
 
 
+## Modules
+
+[`ode`](../tfp/math/ode.md) module: TensorFlow Probability ODE solvers.
+
 ## Functions
 
 [`batch_interp_regular_1d_grid(...)`](../tfp/math/batch_interp_regular_1d_grid.md): Linear `1-D` interpolation on a regular (constant spacing) grid.

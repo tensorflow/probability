@@ -219,37 +219,37 @@ Instantiate a StudentTProcess Distribution.
 #### Args:
 
 * <b>`df`</b>: Positive Floating-point `Tensor` representing the degrees of freedom.
-    Must be greater than 2.
+  Must be greater than 2.
 * <b>`kernel`</b>: `PositiveSemidefiniteKernel`-like instance representing the
-    TP's covariance function.
+  TP's covariance function.
 * <b>`index_points`</b>: `float` `Tensor` representing finite (batch of) vector(s) of
-    points in the index set over which the TP is defined. Shape has the form
-    `[b1, ..., bB, e, f1, ..., fF]` where `F` is the number of feature
-    dimensions and must equal `kernel.feature_ndims` and `e` is the number
-    (size) of index points in each batch. Ultimately this distribution
-    corresponds to a `e`-dimensional multivariate Student's T. The batch
-    shape must be broadcastable with `kernel.batch_shape` and any batch dims
-    yielded by `mean_fn`.
+  points in the index set over which the TP is defined. Shape has the form
+  `[b1, ..., bB, e, f1, ..., fF]` where `F` is the number of feature
+  dimensions and must equal `kernel.feature_ndims` and `e` is the number
+  (size) of index points in each batch. Ultimately this distribution
+  corresponds to a `e`-dimensional multivariate Student's T. The batch
+  shape must be broadcastable with `kernel.batch_shape` and any batch dims
+  yielded by `mean_fn`.
 * <b>`mean_fn`</b>: Python `callable` that acts on `index_points` to produce a (batch
-    of) vector(s) of mean values at `index_points`. Takes a `Tensor` of
-    shape `[b1, ..., bB, f1, ..., fF]` and returns a `Tensor` whose shape is
-    broadcastable with `[b1, ..., bB]`. Default value: `None` implies
-    constant zero function.
+  of) vector(s) of mean values at `index_points`. Takes a `Tensor` of
+  shape `[b1, ..., bB, f1, ..., fF]` and returns a `Tensor` whose shape is
+  broadcastable with `[b1, ..., bB]`. Default value: `None` implies
+  constant zero function.
 * <b>`jitter`</b>: `float` scalar `Tensor` added to the diagonal of the covariance
-    matrix to ensure positive definiteness of the covariance matrix.
-    Default value: `1e-6`.
+  matrix to ensure positive definiteness of the covariance matrix.
+  Default value: `1e-6`.
 * <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
-    parameters are checked for validity despite possibly degrading runtime
-    performance. When `False` invalid inputs may silently render incorrect
-    outputs.
-    Default value: `False`.
+  parameters are checked for validity despite possibly degrading runtime
+  performance. When `False` invalid inputs may silently render incorrect
+  outputs.
+  Default value: `False`.
 * <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`,
-    statistics (e.g., mean, mode, variance) use the value "`NaN`" to
-    indicate the result is undefined. When `False`, an exception is raised
-    if one or more of the statistic's batch members are undefined.
-    Default value: `False`.
+  statistics (e.g., mean, mode, variance) use the value "`NaN`" to
+  indicate the result is undefined. When `False`, an exception is raised
+  if one or more of the statistic's batch members are undefined.
+  Default value: `False`.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
-    Default value: "StudentTProcess".
+  Default value: "StudentTProcess".
 
 
 #### Raises:
@@ -480,7 +480,7 @@ cdf(x) := P[X <= x]
 #### Returns:
 
 * <b>`cdf`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
+  values of type `self.dtype`.
 
 <h3 id="copy"><code>copy</code></h3>
 
@@ -496,14 +496,14 @@ initialization arguments.
 #### Args:
 
 * <b>`**override_parameters_kwargs`</b>: String/value dictionary of initialization
-    arguments to override with new values.
+  arguments to override with new values.
 
 
 #### Returns:
 
 * <b>`distribution`</b>: A new instance of `type(self)` initialized from the union
-    of self.parameters and override_parameters_kwargs, i.e.,
-    `dict(self.parameters, **override_parameters_kwargs)`.
+  of self.parameters and override_parameters_kwargs, i.e.,
+  `dict(self.parameters, **override_parameters_kwargs)`.
 
 <h3 id="covariance"><code>covariance</code></h3>
 
@@ -564,8 +564,8 @@ rather than returning `NaN`.
 #### Returns:
 
 * <b>`covariance`</b>: Floating-point `Tensor` with shape `[B1, ..., Bn, k', k']`
-    where the first `n` dimensions are batch coordinates and
-    `k' = reduce_prod(self.event_shape)`.
+  where the first `n` dimensions are batch coordinates and
+  `k' = reduce_prod(self.event_shape)`.
 
 <h3 id="cross_entropy"><code>cross_entropy</code></h3>
 
@@ -598,7 +598,7 @@ where `F` denotes the support of the random variable `X ~ P`.
 #### Returns:
 
 * <b>`cross_entropy`</b>: `self.dtype` `Tensor` with shape `[B1, ..., Bn]`
-    representing `n` different calculations of (Shannon) cross entropy.
+  representing `n` different calculations of (Shannon) cross entropy.
 
 <h3 id="entropy"><code>entropy</code></h3>
 
@@ -695,8 +695,8 @@ denotes (Shannon) cross entropy, and `H[.]` denotes (Shannon) entropy.
 #### Returns:
 
 * <b>`kl_divergence`</b>: `self.dtype` `Tensor` with shape `[B1, ..., Bn]`
-    representing `n` different calculations of the Kullback-Leibler
-    divergence.
+  representing `n` different calculations of the Kullback-Leibler
+  divergence.
 
 <h3 id="log_cdf"><code>log_cdf</code></h3>
 
@@ -730,7 +730,7 @@ a more accurate answer than simply taking the logarithm of the `cdf` when
 #### Returns:
 
 * <b>`logcdf`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
+  values of type `self.dtype`.
 
 <h3 id="log_prob"><code>log_prob</code></h3>
 
@@ -754,7 +754,7 @@ Log probability density/mass function.
 #### Returns:
 
 * <b>`log_prob`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
+  values of type `self.dtype`.
 
 <h3 id="log_survival_function"><code>log_survival_function</code></h3>
 
@@ -840,7 +840,7 @@ Subclasses should override class method `_param_shapes`.
 #### Args:
 
 * <b>`sample_shape`</b>: `Tensor` or python list/tuple. Desired shape of a call to
-    `sample()`.
+  `sample()`.
 * <b>`name`</b>: name to prepend ops with.
 
 
@@ -870,7 +870,7 @@ constant-valued tensors when constant values are fed.
 #### Args:
 
 * <b>`sample_shape`</b>: `TensorShape` or python list/tuple. Desired shape of a call
-    to `sample()`.
+  to `sample()`.
 
 
 #### Returns:
@@ -904,7 +904,7 @@ Probability density/mass function.
 #### Returns:
 
 * <b>`prob`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
+  values of type `self.dtype`.
 
 <h3 id="quantile"><code>quantile</code></h3>
 
@@ -934,7 +934,7 @@ quantile(p) := x such that P[X <= x] == p
 #### Returns:
 
 * <b>`quantile`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
+  values of type `self.dtype`.
 
 <h3 id="sample"><code>sample</code></h3>
 
@@ -1004,7 +1004,7 @@ NaN, when df <= 1
 #### Returns:
 
 * <b>`stddev`</b>: Floating-point `Tensor` with shape identical to
-    `batch_shape + event_shape`, i.e., the same shape as `self.mean()`.
+  `batch_shape + event_shape`, i.e., the same shape as `self.mean()`.
 
 <h3 id="survival_function"><code>survival_function</code></h3>
 
@@ -1081,7 +1081,7 @@ rather than returning `NaN`.
 #### Returns:
 
 * <b>`variance`</b>: Floating-point `Tensor` with shape identical to
-    `batch_shape + event_shape`, i.e., the same shape as `self.mean()`.
+  `batch_shape + event_shape`, i.e., the same shape as `self.mean()`.
 
 
 

@@ -42,7 +42,8 @@ for any finite collections `{x[1], ..., x[N]}` in S and `{c[1], ..., c[N]}` in
 the reals (or the complex plane). '*' denotes the complex conjugate, in the
 complex case.
 
-Some examples:
+#### Some examples:
+
   - `S` is R, and `k(s, t) = (s - a) (t - b)`, where a, b are in R. This
     corresponds to a linear kernel.
   - `S` is R^+ U {0}, and `k(s, t) = min(s, t)`. This corresponds to a kernel
@@ -124,15 +125,15 @@ Construct a PositiveSemidefiniteKernel (subclass) instance.
 #### Args:
 
 * <b>`feature_ndims`</b>: Python `integer` indicating the number of dims (the rank)
-    of the feature space this kernel acts on.
+  of the feature space this kernel acts on.
 * <b>`dtype`</b>: `DType` on which this kernel operates.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this class. Default:
-    subclass name.
+  subclass name.
 
 
 #### Raises:
 
-* <b>`ValueError`</b>: if `feature_ndims` is not an integer greater than 0
+  ValueError: if `feature_ndims` is not an integer greater than 0
 Inputs to PositiveSemidefiniteKernel methods partition into 3 pieces:
 
 ```none
@@ -258,15 +259,15 @@ Apply the kernel function to a pair of (batches of) inputs.
 #### Args:
 
 * <b>`x1`</b>: `Tensor` input to the first positional parameter of the kernel, of
-    shape `[b1, ..., bB, f1, ..., fF]`, where `B` may be zero (ie, no
-    batching) and `F` (number of feature dimensions) must equal the kernel's
-    `feature_ndims` property. Batch shape must broadcast with the batch
-    shape of `x2` and with the kernel's parameters.
+  shape `[b1, ..., bB, f1, ..., fF]`, where `B` may be zero (ie, no
+  batching) and `F` (number of feature dimensions) must equal the kernel's
+  `feature_ndims` property. Batch shape must broadcast with the batch
+  shape of `x2` and with the kernel's parameters.
 * <b>`x2`</b>: `Tensor` input to the second positional parameter of the kernel,
-    shape `[c1, ..., cC, f1, ..., fF]`, where `C` may be zero (ie, no
-    batching) and `F` (number of feature dimensions) must equal the kernel's
-    `feature_ndims` property. Batch shape must broadcast with the batch
-    shape of `x1` and with the kernel's parameters.
+  shape `[c1, ..., cC, f1, ..., fF]`, where `C` may be zero (ie, no
+  batching) and `F` (number of feature dimensions) must equal the kernel's
+  `feature_ndims` property. Batch shape must broadcast with the batch
+  shape of `x1` and with the kernel's parameters.
 
 
 #### Returns:
@@ -368,19 +369,19 @@ Construct (batched) matrices from (batches of) collections of inputs.
 #### Args:
 
 * <b>`x1`</b>: `Tensor` input to the first positional parameter of the kernel, of
-    shape `[b1, ..., bB, e1, f1, ..., fF]`, where `B` may be zero (ie, no
-    batching), e1 is an integer greater than zero, and `F` (number of
-    feature dimensions) must equal the kernel's `feature_ndims` property.
-    Batch shape must broadcast with the batch shape of `x2` and with the
-    kernel's parameters *after* parameter expansion (see
-    `param_expansion_ndims` argument).
+  shape `[b1, ..., bB, e1, f1, ..., fF]`, where `B` may be zero (ie, no
+  batching), e1 is an integer greater than zero, and `F` (number of
+  feature dimensions) must equal the kernel's `feature_ndims` property.
+  Batch shape must broadcast with the batch shape of `x2` and with the
+  kernel's parameters *after* parameter expansion (see
+  `param_expansion_ndims` argument).
 * <b>`x2`</b>: `Tensor` input to the second positional parameter of the kernel,
-    shape `[c1, ..., cC, e2, f1, ..., fF]`, where `C` may be zero (ie, no
-    batching), e2 is an integer greater than zero,  and `F` (number of
-    feature dimensions) must equal the kernel's `feature_ndims` property.
-    Batch shape must broadcast with the batch shape of `x1` and with the
-    kernel's parameters *after* parameter expansion (see
-    `param_expansion_ndims` argument).
+  shape `[c1, ..., cC, e2, f1, ..., fF]`, where `C` may be zero (ie, no
+  batching), e2 is an integer greater than zero,  and `F` (number of
+  feature dimensions) must equal the kernel's `feature_ndims` property.
+  Batch shape must broadcast with the batch shape of `x1` and with the
+  kernel's parameters *after* parameter expansion (see
+  `param_expansion_ndims` argument).
 
 
 #### Returns:

@@ -34,11 +34,11 @@ Construct the `Sample` distribution.
 #### Args:
 
 * <b>`distribution`</b>: The base distribution instance to transform. Typically an
-    instance of `Distribution`.
+  instance of `Distribution`.
 * <b>`sample_shape`</b>: `int` scalar or vector `Tensor` representing the shape of a
-    single sample.
+  single sample.
 * <b>`validate_args`</b>: Python `bool`.  Whether to validate input with asserts.
-    If `validate_args` is `False`, and the inputs are invalid,
-    correct behavior is not guaranteed.
+  If `validate_args` is `False`, and the inputs are invalid,
+  correct behavior is not guaranteed.
 * <b>`name`</b>: The name for ops managed by the distribution.
-    Default value: `None` (i.e., `'Sample' + distribution.name`).
+  Default value: `None` (i.e., `'Sample' + distribution.name`).

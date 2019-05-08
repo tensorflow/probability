@@ -33,22 +33,22 @@ of a structural time series model. In particular, it:
 #### Args:
 
 * <b>`model`</b>: An instance of <a href="../../tfp/sts/Sum.md"><code>tfp.sts.Sum</code></a> representing a structural time series
-    model.
+  model.
 * <b>`observed_time_series`</b>: `float` `Tensor` of shape
-    `batch_shape + [num_timesteps, 1]` (omitting the trailing unit dimension
-    is also supported when `num_timesteps > 1`), specifying an observed time
-    series. May optionally be an instance of <a href="../../tfp/sts/MaskedTimeSeries.md"><code>tfp.sts.MaskedTimeSeries</code></a>, which
-    includes a mask `Tensor` to specify timesteps with missing observations.
+  `batch_shape + [num_timesteps, 1]` (omitting the trailing unit dimension
+  is also supported when `num_timesteps > 1`), specifying an observed time
+  series. May optionally be an instance of <a href="../../tfp/sts/MaskedTimeSeries.md"><code>tfp.sts.MaskedTimeSeries</code></a>, which
+  includes a mask `Tensor` to specify timesteps with missing observations.
 * <b>`parameter_samples`</b>: Python `list` of `Tensors` representing posterior
-    samples of model parameters, with shapes `[concat([
-    [num_posterior_draws], param.prior.batch_shape,
-    param.prior.event_shape]) for param in model.parameters]`. This may
-    optionally also be a map (Python `dict`) of parameter names to
-    `Tensor` values.
+  samples of model parameters, with shapes `[concat([
+  [num_posterior_draws], param.prior.batch_shape,
+  param.prior.event_shape]) for param in model.parameters]`. This may
+  optionally also be a map (Python `dict`) of parameter names to
+  `Tensor` values.
 
 #### Returns:
 
-* <b>`component_dists`</b>: A `collections.OrderedDict` instance mapping
+  component_dists: A `collections.OrderedDict` instance mapping
     component StructuralTimeSeries instances (elements of `model.components`)
     to `tfd.Distribution` instances representing the posterior marginal
     distributions on the process modeled by each component. Each distribution

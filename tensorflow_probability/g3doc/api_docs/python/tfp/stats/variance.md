@@ -44,14 +44,14 @@ when `N = 1`, but is slightly biased.
 
 * <b>`x`</b>:  A numeric `Tensor` holding samples.
 * <b>`sample_axis`</b>: Scalar or vector `Tensor` designating axis holding samples, or
-    `None` (meaning all axis hold samples).
-    Default value: `0` (leftmost dimension).
+  `None` (meaning all axis hold samples).
+  Default value: `0` (leftmost dimension).
 * <b>`keepdims`</b>:  Boolean.  Whether to keep the sample axis as singletons.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this function.
-        Default value: `None` (i.e., `'variance'`).
+      Default value: `None` (i.e., `'variance'`).
 
 
 #### Returns:
 
 * <b>`var`</b>: A `Tensor` of same `dtype` as the `x`, and rank equal to
-    `rank(x) - len(sample_axis)`
+  `rank(x) - len(sample_axis)`

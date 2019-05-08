@@ -112,34 +112,34 @@ with tf.Session(graph=tf.Graph()) as sess:
 #### Args:
 
 * <b>`learning_rate`</b>: Scalar `float`-like `Tensor`. The base learning rate for the
-    optimizer. Must be tuned to the specific function being minimized.
+  optimizer. Must be tuned to the specific function being minimized.
 * <b>`preconditioner_decay_rate`</b>: Scalar `float`-like `Tensor`. The exponential
-    decay rate of the rescaling of the preconditioner (RMSprop). (This is
-    "alpha" in Li et al. (2016)). Should be smaller than but nearly `1` to
-    approximate sampling from the posterior. (Default: `0.95`)
+  decay rate of the rescaling of the preconditioner (RMSprop). (This is
+  "alpha" in Li et al. (2016)). Should be smaller than but nearly `1` to
+  approximate sampling from the posterior. (Default: `0.95`)
 * <b>`data_size`</b>: Scalar `int`-like `Tensor`. The effective number of
-    points in the data set. Assumes that the loss is taken as the mean over a
-    minibatch. Otherwise if the sum was taken, divide this number by the
-    batch size. If a prior is included in the loss function, it should be
-    normalized by `data_size`. Default value: `1`.
+  points in the data set. Assumes that the loss is taken as the mean over a
+  minibatch. Otherwise if the sum was taken, divide this number by the
+  batch size. If a prior is included in the loss function, it should be
+  normalized by `data_size`. Default value: `1`.
 * <b>`burnin`</b>: Scalar `int`-like `Tensor`. The number of iterations to collect
-    gradient statistics to update the preconditioner before starting to draw
-    noisy samples. (Default: `25`)
+  gradient statistics to update the preconditioner before starting to draw
+  noisy samples. (Default: `25`)
 * <b>`diagonal_bias`</b>: Scalar `float`-like `Tensor`. Term added to the diagonal of
-    the preconditioner to prevent the preconditioner from degenerating.
-    (Default: `1e-8`)
+  the preconditioner to prevent the preconditioner from degenerating.
+  (Default: `1e-8`)
 * <b>`name`</b>: Python `str` describing ops managed by this function.
-    (Default: `"StochasticGradientLangevinDynamics"`)
+  (Default: `"StochasticGradientLangevinDynamics"`)
 * <b>`parallel_iterations`</b>: the number of coordinates for which the gradients of
-      the preconditioning matrix can be computed in parallel. Must be a
-      positive integer.
+    the preconditioning matrix can be computed in parallel. Must be a
+    positive integer.
 
 
 #### Raises:
 
-* <b>`InvalidArgumentError`</b>: If preconditioner_decay_rate is a `Tensor` not in
+  InvalidArgumentError: If preconditioner_decay_rate is a `Tensor` not in
     `(0,1]`.
-* <b>`NotImplementedError`</b>: If eager execution is enabled.
+  NotImplementedError: If eager execution is enabled.
 
 #### References
 
@@ -175,19 +175,19 @@ This class in stateful and thread-compatible.
 #### Args:
 
 * <b>`name`</b>: A non-empty string.  The name to use for accumulators created
-    for the optimizer.
+  for the optimizer.
 * <b>`**kwargs`</b>: keyword arguments. Allowed to be {`clipnorm`, `clipvalue`, `lr`,
-    `decay`}. `clipnorm` is clip gradients by norm; `clipvalue` is clip
-    gradients by value, `decay` is included for backward compatibility to
-    allow time inverse decay of learning rate. `lr` is included for backward
-    compatibility, recommended to use `learning_rate` instead.
+  `decay`}. `clipnorm` is clip gradients by norm; `clipvalue` is clip
+  gradients by value, `decay` is included for backward compatibility to
+  allow time inverse decay of learning rate. `lr` is included for backward
+  compatibility, recommended to use `learning_rate` instead.
 
 
 #### Raises:
 
 * <b>`ValueError`</b>: If name is malformed.
 * <b>`RuntimeError`</b>: If _create_slots has been overridden instead of
-      _create_vars.
+    _create_vars.
 
 
 
@@ -263,7 +263,7 @@ applies gradients.
 
 * <b>`grads_and_vars`</b>: List of (gradient, variable) pairs.
 * <b>`name`</b>: Optional name for the returned operation.  Default to the name
-    passed to the `Optimizer` constructor.
+  passed to the `Optimizer` constructor.
 
 
 #### Returns:
@@ -297,8 +297,8 @@ dictionary.
 
 * <b>`config`</b>: A Python dictionary, typically the output of get_config.
 * <b>`custom_objects`</b>: A Python dictionary mapping names to additional Python
-      objects used to create this optimizer, such as a function used for a
-      hyperparameter.
+  objects used to create this optimizer, such as a function used for a
+  hyperparameter.
 
 
 #### Returns:
@@ -347,7 +347,7 @@ List of gradient tensors.
 #### Raises:
 
 * <b>`ValueError`</b>: In case any gradient cannot be computed (e.g. if gradient
-    function not implemented).
+  function not implemented).
 
 <h3 id="get_slot"><code>get_slot</code></h3>
 
@@ -409,10 +409,10 @@ of using this function.
 
 * <b>`loss`</b>: A callable taking no arguments which returns the value to minimize.
 * <b>`var_list`</b>: list or tuple of `Variable` objects to update to minimize
-    `loss`, or a callable returning the list or tuple of `Variable` objects.
-    Use callable when the variable list would otherwise be incomplete before
-    `minimize` since the variables are created at the first time `loss` is
-    called.
+  `loss`, or a callable returning the list or tuple of `Variable` objects.
+  Use callable when the variable list would otherwise be incomplete before
+  `minimize` since the variables are created at the first time `loss` is
+  called.
 * <b>`grad_loss`</b>: Optional. A `Tensor` holding the gradient computed for `loss`.
 * <b>`name`</b>: Optional name for the returned operation.
 

@@ -163,32 +163,32 @@ Construct a SchurComplement kernel instance.
 #### Args:
 
 * <b>`base_kernel`</b>: A `PositiveSemidefiniteKernel` instance, the kernel used to
-    build the block matrices of which this kernel computes the  Schur
-    complement.
+  build the block matrices of which this kernel computes the  Schur
+  complement.
 * <b>`fixed_inputs`</b>: A Tensor, representing a collection of inputs. The Schur
-    complement that this kernel computes comes from a block matrix, whose
-    bottom-right corner is derived from `base_kernel.matrix(fixed_inputs,
-    fixed_inputs)`, and whose top-right and bottom-left pieces are
-    constructed by computing the base_kernel at pairs of input locations
-    together with these `fixed_inputs`. `fixed_inputs` is allowed to be an
-    empty collection (either `None` or having a zero shape entry), in which
-    case the kernel falls back to the trivial application of `base_kernel`
-    to inputs. See class-level docstring for more details on the exact
-    computation this does; `fixed_inputs` correspond to the `Z` structure
-    discussed there. `fixed_inputs` is assumed to have shape `[b1, ..., bB,
-    N, f1, ..., fF]` where the `b`'s are batch shape entries, the `f`'s are
-    feature_shape entries, and `N` is the number of fixed inputs. Use of
-    this kernel entails a 1-time O(N^3) cost of computing the Cholesky
-    decomposition of the k(Z, Z) matrix. The batch shape elements of
-    `fixed_inputs` must be broadcast compatible with
-    `base_kernel.batch_shape`.
+  complement that this kernel computes comes from a block matrix, whose
+  bottom-right corner is derived from `base_kernel.matrix(fixed_inputs,
+  fixed_inputs)`, and whose top-right and bottom-left pieces are
+  constructed by computing the base_kernel at pairs of input locations
+  together with these `fixed_inputs`. `fixed_inputs` is allowed to be an
+  empty collection (either `None` or having a zero shape entry), in which
+  case the kernel falls back to the trivial application of `base_kernel`
+  to inputs. See class-level docstring for more details on the exact
+  computation this does; `fixed_inputs` correspond to the `Z` structure
+  discussed there. `fixed_inputs` is assumed to have shape `[b1, ..., bB,
+  N, f1, ..., fF]` where the `b`'s are batch shape entries, the `f`'s are
+  feature_shape entries, and `N` is the number of fixed inputs. Use of
+  this kernel entails a 1-time O(N^3) cost of computing the Cholesky
+  decomposition of the k(Z, Z) matrix. The batch shape elements of
+  `fixed_inputs` must be broadcast compatible with
+  `base_kernel.batch_shape`.
 * <b>`diag_shift`</b>: A floating point scalar to be added to the diagonal of the
-    divisor_matrix before computing its Cholesky.
+  divisor_matrix before computing its Cholesky.
 * <b>`validate_args`</b>: If `True`, parameters are checked for validity despite
-    possibly degrading runtime performance.
-    Default value: `False`
+  possibly degrading runtime performance.
+  Default value: `False`
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
-    Default value: `"SchurComplement"`
+  Default value: `"SchurComplement"`
 
 
 
@@ -321,15 +321,15 @@ Apply the kernel function to a pair of (batches of) inputs.
 #### Args:
 
 * <b>`x1`</b>: `Tensor` input to the first positional parameter of the kernel, of
-    shape `[b1, ..., bB, f1, ..., fF]`, where `B` may be zero (ie, no
-    batching) and `F` (number of feature dimensions) must equal the kernel's
-    `feature_ndims` property. Batch shape must broadcast with the batch
-    shape of `x2` and with the kernel's parameters.
+  shape `[b1, ..., bB, f1, ..., fF]`, where `B` may be zero (ie, no
+  batching) and `F` (number of feature dimensions) must equal the kernel's
+  `feature_ndims` property. Batch shape must broadcast with the batch
+  shape of `x2` and with the kernel's parameters.
 * <b>`x2`</b>: `Tensor` input to the second positional parameter of the kernel,
-    shape `[c1, ..., cC, f1, ..., fF]`, where `C` may be zero (ie, no
-    batching) and `F` (number of feature dimensions) must equal the kernel's
-    `feature_ndims` property. Batch shape must broadcast with the batch
-    shape of `x1` and with the kernel's parameters.
+  shape `[c1, ..., cC, f1, ..., fF]`, where `C` may be zero (ie, no
+  batching) and `F` (number of feature dimensions) must equal the kernel's
+  `feature_ndims` property. Batch shape must broadcast with the batch
+  shape of `x1` and with the kernel's parameters.
 
 
 #### Returns:
@@ -431,19 +431,19 @@ Construct (batched) matrices from (batches of) collections of inputs.
 #### Args:
 
 * <b>`x1`</b>: `Tensor` input to the first positional parameter of the kernel, of
-    shape `[b1, ..., bB, e1, f1, ..., fF]`, where `B` may be zero (ie, no
-    batching), e1 is an integer greater than zero, and `F` (number of
-    feature dimensions) must equal the kernel's `feature_ndims` property.
-    Batch shape must broadcast with the batch shape of `x2` and with the
-    kernel's parameters *after* parameter expansion (see
-    `param_expansion_ndims` argument).
+  shape `[b1, ..., bB, e1, f1, ..., fF]`, where `B` may be zero (ie, no
+  batching), e1 is an integer greater than zero, and `F` (number of
+  feature dimensions) must equal the kernel's `feature_ndims` property.
+  Batch shape must broadcast with the batch shape of `x2` and with the
+  kernel's parameters *after* parameter expansion (see
+  `param_expansion_ndims` argument).
 * <b>`x2`</b>: `Tensor` input to the second positional parameter of the kernel,
-    shape `[c1, ..., cC, e2, f1, ..., fF]`, where `C` may be zero (ie, no
-    batching), e2 is an integer greater than zero,  and `F` (number of
-    feature dimensions) must equal the kernel's `feature_ndims` property.
-    Batch shape must broadcast with the batch shape of `x1` and with the
-    kernel's parameters *after* parameter expansion (see
-    `param_expansion_ndims` argument).
+  shape `[c1, ..., cC, e2, f1, ..., fF]`, where `C` may be zero (ie, no
+  batching), e2 is an integer greater than zero,  and `F` (number of
+  feature dimensions) must equal the kernel's `feature_ndims` property.
+  Batch shape must broadcast with the batch shape of `x1` and with the
+  kernel's parameters *after* parameter expansion (see
+  `param_expansion_ndims` argument).
 
 
 #### Returns:

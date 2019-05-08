@@ -50,11 +50,11 @@ relevant portions of `f`, `g`. For example see the unit-test,
 * <b>`gx`</b>: `Tensor` or list of `Tensor`s. Gradient of function at (each) `x`.
 * <b>`x`</b>: `Tensor` or list of `Tensor`s. Args of evaluation for `f`.
 * <b>`fx_gx_manually_stopped`</b>: Python `bool` indicating that `fx`, `gx` manually
-    have `stop_gradient` applied.
+  have `stop_gradient` applied.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this function.
 
 
 #### Returns:
 
 * <b>`fx`</b>: Floating-type `Tensor` equal to `f(x)` but which has gradient
-    `stop_gradient(g(x))`.
+  `stop_gradient(g(x))`.

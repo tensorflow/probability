@@ -60,10 +60,10 @@ loss = -1 * tf.reduce_mean(dist.log_prob(labels))
 #### Args:
 
 * <b>`matrix`</b>:  Rank `R` `Tensor`, `R >= 2`, where the last two dimensions are
-    equal.
+  equal.
 * <b>`transform`</b>:  Element-wise function mapping `Tensors` to `Tensors`. To be
-    applied to the diagonal of `matrix`. If `None`, `matrix` is returned
-    unchanged. Defaults to `None`.
+  applied to the diagonal of `matrix`. If `None`, `matrix` is returned
+  unchanged. Defaults to `None`.
 * <b>`name`</b>:  A name to give created ops. Defaults to "matrix_diag_transform".
 
 

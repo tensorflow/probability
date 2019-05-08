@@ -24,7 +24,8 @@ Defined in [`python/distributions/kullback_leibler.py`](https://github.com/tenso
 
 <!-- Placeholder for "Used in" -->
 
-Usage:
+#### Usage:
+
 
 @distributions.RegisterKL(distributions.Normal, distributions.Normal)
 def _kl_normal_mvn(norm_a, norm_b):
@@ -72,7 +73,7 @@ kl_fn
 
 * <b>`TypeError`</b>: if kl_fn is not a callable.
 * <b>`ValueError`</b>: if a KL divergence function has already been registered for
-    the given argument classes.
+  the given argument classes.
 
 
 

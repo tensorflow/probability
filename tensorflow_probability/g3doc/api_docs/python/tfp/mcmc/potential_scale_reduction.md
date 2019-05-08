@@ -28,7 +28,8 @@ Specifically, R-hat measures the degree to which variance (of the means)
 between chains exceeds what one would expect if the chains were identically
 distributed. See [Gelman and Rubin (1992)][1]; [Brooks and Gelman (1998)][2].
 
-Some guidelines:
+#### Some guidelines:
+
 
 * The initial state of the chains should be drawn from a distribution
   overdispersed with respect to the target.
@@ -43,20 +44,21 @@ Some guidelines:
   other statistics are desired, a different diagnostic should be used. See
   [Brooks and Gelman (1998)][2].
 
+
 #### Args:
 
 * <b>`chains_states`</b>:  `Tensor` or Python `list` of `Tensor`s representing the
-    states of a Markov Chain at each result step.  The `ith` state is
-    assumed to have shape `[Ni, Ci1, Ci2,...,CiD] + A`.
-    Dimension `0` indexes the `Ni > 1` result steps of the Markov Chain.
-    Dimensions `1` through `D` index the `Ci1 x ... x CiD` independent
-    chains to be tested for convergence to the same target.
-    The remaining dimensions, `A`, can have any shape (even empty).
+  states of a Markov Chain at each result step.  The `ith` state is
+  assumed to have shape `[Ni, Ci1, Ci2,...,CiD] + A`.
+  Dimension `0` indexes the `Ni > 1` result steps of the Markov Chain.
+  Dimensions `1` through `D` index the `Ci1 x ... x CiD` independent
+  chains to be tested for convergence to the same target.
+  The remaining dimensions, `A`, can have any shape (even empty).
 * <b>`independent_chain_ndims`</b>: Integer type `Tensor` with value `>= 1` giving the
-    number of dimensions, from `dim = 1` to `dim = D`, holding independent
-    chain results to be tested for convergence.
+  number of dimensions, from `dim = 1` to `dim = D`, holding independent
+  chain results to be tested for convergence.
 * <b>`name`</b>: `String` name to prepend to created tf.  Default:
-    `potential_scale_reduction`.
+  `potential_scale_reduction`.
 
 
 #### Returns:
@@ -68,7 +70,7 @@ the state(s).  Same `dtype` as `state`, and shape equal to
 
 #### Raises:
 
-* <b>`ValueError`</b>:  If `independent_chain_ndims < 1`.
+  ValueError:  If `independent_chain_ndims < 1`.
 
 #### Examples
 

@@ -108,38 +108,38 @@ time and match `len(components)`.
 #### Args:
 
 * <b>`cat`</b>: A `Categorical` distribution instance, representing the probabilities
-      of `distributions`.
+    of `distributions`.
 * <b>`components`</b>: A list or tuple of `Distribution` instances.
-    Each instance must have the same type, be defined on the same domain,
-    and have matching `event_shape` and `batch_shape`.
+  Each instance must have the same type, be defined on the same domain,
+  and have matching `event_shape` and `batch_shape`.
 * <b>`validate_args`</b>: Python `bool`, default `False`. If `True`, raise a runtime
-    error if batch or event ranks are inconsistent between cat and any of
-    the distributions. This is only checked if the ranks cannot be
-    determined statically at graph construction time.
+  error if batch or event ranks are inconsistent between cat and any of
+  the distributions. This is only checked if the ranks cannot be
+  determined statically at graph construction time.
 * <b>`allow_nan_stats`</b>: Boolean, default `True`. If `False`, raise an
-   exception if a statistic (e.g. mean/mode/etc...) is undefined for any
-    batch member. If `True`, batch members with valid parameters leading to
-    undefined statistics will return NaN for this statistic.
+ exception if a statistic (e.g. mean/mode/etc...) is undefined for any
+  batch member. If `True`, batch members with valid parameters leading to
+  undefined statistics will return NaN for this statistic.
 * <b>`use_static_graph`</b>: Calls to `sample` will not rely on dynamic tensor
-    indexing, allowing for some static graph compilation optimizations, but
-    at the expense of sampling all underlying distributions in the mixture.
-    (Possibly useful when running on TPUs).
-    Default value: `False` (i.e., use dynamic indexing).
+  indexing, allowing for some static graph compilation optimizations, but
+  at the expense of sampling all underlying distributions in the mixture.
+  (Possibly useful when running on TPUs).
+  Default value: `False` (i.e., use dynamic indexing).
 * <b>`name`</b>: A name for this distribution (optional).
 
 
 #### Raises:
 
 * <b>`TypeError`</b>: If cat is not a `Categorical`, or `components` is not
-    a list or tuple, or the elements of `components` are not
-    instances of `Distribution`, or do not have matching `dtype`.
+  a list or tuple, or the elements of `components` are not
+  instances of `Distribution`, or do not have matching `dtype`.
 * <b>`ValueError`</b>: If `components` is an empty list or tuple, or its
-    elements do not have a statically known event rank.
-    If `cat.num_classes` cannot be inferred at graph creation time,
-    or the constant value of `cat.num_classes` is not equal to
-    `len(components)`, or all `components` and `cat` do not have
-    matching static batch shapes, or all components do not
-    have matching static event shapes.
+  elements do not have a statically known event rank.
+  If `cat.num_classes` cannot be inferred at graph creation time,
+  or the constant value of `cat.num_classes` is not equal to
+  `len(components)`, or all `components` and `cat` do not have
+  matching static batch shapes, or all components do not
+  have matching static event shapes.
 
 
 
@@ -318,7 +318,7 @@ cdf(x) := P[X <= x]
 #### Returns:
 
 * <b>`cdf`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
+  values of type `self.dtype`.
 
 <h3 id="copy"><code>copy</code></h3>
 
@@ -334,14 +334,14 @@ initialization arguments.
 #### Args:
 
 * <b>`**override_parameters_kwargs`</b>: String/value dictionary of initialization
-    arguments to override with new values.
+  arguments to override with new values.
 
 
 #### Returns:
 
 * <b>`distribution`</b>: A new instance of `type(self)` initialized from the union
-    of self.parameters and override_parameters_kwargs, i.e.,
-    `dict(self.parameters, **override_parameters_kwargs)`.
+  of self.parameters and override_parameters_kwargs, i.e.,
+  `dict(self.parameters, **override_parameters_kwargs)`.
 
 <h3 id="covariance"><code>covariance</code></h3>
 
@@ -388,8 +388,8 @@ length-`k'` vector.
 #### Returns:
 
 * <b>`covariance`</b>: Floating-point `Tensor` with shape `[B1, ..., Bn, k', k']`
-    where the first `n` dimensions are batch coordinates and
-    `k' = reduce_prod(self.event_shape)`.
+  where the first `n` dimensions are batch coordinates and
+  `k' = reduce_prod(self.event_shape)`.
 
 <h3 id="cross_entropy"><code>cross_entropy</code></h3>
 
@@ -422,7 +422,7 @@ where `F` denotes the support of the random variable `X ~ P`.
 #### Returns:
 
 * <b>`cross_entropy`</b>: `self.dtype` `Tensor` with shape `[B1, ..., Bn]`
-    representing `n` different calculations of (Shannon) cross entropy.
+  representing `n` different calculations of (Shannon) cross entropy.
 
 <h3 id="entropy"><code>entropy</code></h3>
 
@@ -566,8 +566,8 @@ denotes (Shannon) cross entropy, and `H[.]` denotes (Shannon) entropy.
 #### Returns:
 
 * <b>`kl_divergence`</b>: `self.dtype` `Tensor` with shape `[B1, ..., Bn]`
-    representing `n` different calculations of the Kullback-Leibler
-    divergence.
+  representing `n` different calculations of the Kullback-Leibler
+  divergence.
 
 <h3 id="log_cdf"><code>log_cdf</code></h3>
 
@@ -601,7 +601,7 @@ a more accurate answer than simply taking the logarithm of the `cdf` when
 #### Returns:
 
 * <b>`logcdf`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
+  values of type `self.dtype`.
 
 <h3 id="log_prob"><code>log_prob</code></h3>
 
@@ -625,7 +625,7 @@ Log probability density/mass function.
 #### Returns:
 
 * <b>`log_prob`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
+  values of type `self.dtype`.
 
 <h3 id="log_survival_function"><code>log_survival_function</code></h3>
 
@@ -705,7 +705,7 @@ Subclasses should override class method `_param_shapes`.
 #### Args:
 
 * <b>`sample_shape`</b>: `Tensor` or python list/tuple. Desired shape of a call to
-    `sample()`.
+  `sample()`.
 * <b>`name`</b>: name to prepend ops with.
 
 
@@ -735,7 +735,7 @@ constant-valued tensors when constant values are fed.
 #### Args:
 
 * <b>`sample_shape`</b>: `TensorShape` or python list/tuple. Desired shape of a call
-    to `sample()`.
+  to `sample()`.
 
 
 #### Returns:
@@ -769,7 +769,7 @@ Probability density/mass function.
 #### Returns:
 
 * <b>`prob`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
+  values of type `self.dtype`.
 
 <h3 id="quantile"><code>quantile</code></h3>
 
@@ -799,7 +799,7 @@ quantile(p) := x such that P[X <= x] == p
 #### Returns:
 
 * <b>`quantile`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
+  values of type `self.dtype`.
 
 <h3 id="sample"><code>sample</code></h3>
 
@@ -858,7 +858,7 @@ denotes expectation, and `stddev.shape = batch_shape + event_shape`.
 #### Returns:
 
 * <b>`stddev`</b>: Floating-point `Tensor` with shape identical to
-    `batch_shape + event_shape`, i.e., the same shape as `self.mean()`.
+  `batch_shape + event_shape`, i.e., the same shape as `self.mean()`.
 
 <h3 id="survival_function"><code>survival_function</code></h3>
 
@@ -921,7 +921,7 @@ denotes expectation, and `Var.shape = batch_shape + event_shape`.
 #### Returns:
 
 * <b>`variance`</b>: Floating-point `Tensor` with shape identical to
-    `batch_shape + event_shape`, i.e., the same shape as `self.mean()`.
+  `batch_shape + event_shape`, i.e., the same shape as `self.mean()`.
 
 
 

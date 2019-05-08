@@ -36,69 +36,69 @@ as a finite-difference approximation of Newton's method.
 #### Args:
 
 * <b>`objective_fn`</b>: Python callable for which roots are searched. It must be a
-    callable of a single variable. `objective_fn` must return a `Tensor` of
-    the same shape and dtype as `initial_position`.
+  callable of a single variable. `objective_fn` must return a `Tensor` of
+  the same shape and dtype as `initial_position`.
 * <b>`initial_position`</b>: `Tensor` or Python float representing the starting
-    position. The function will search for roots in the neighborhood of each
-    point. The shape of `initial_position` should match that of the input to
-    `objective_fn`.
+  position. The function will search for roots in the neighborhood of each
+  point. The shape of `initial_position` should match that of the input to
+  `objective_fn`.
 * <b>`next_position`</b>: Optional `Tensor` representing the next position in the
-    search. If specified, this argument must broadcast with the shape of
-    `initial_position` and have the same dtype. It will be used to compute the
-    first step to take when searching for roots. If not specified, a default
-    value will be used instead.
-    Default value: `initial_position * (1 + 1e-4) + sign(initial_position) *
-      1e-4`.
+  search. If specified, this argument must broadcast with the shape of
+  `initial_position` and have the same dtype. It will be used to compute the
+  first step to take when searching for roots. If not specified, a default
+  value will be used instead.
+  Default value: `initial_position * (1 + 1e-4) + sign(initial_position) *
+    1e-4`.
 * <b>`value_at_position`</b>: Optional `Tensor` or Pyhon float representing the value
-    of `objective_fn` at `initial_position`. If specified, this argument must
-    have the same shape and dtype as `initial_position`. If not specified, the
-    value will be evaluated during the search.
-    Default value: None.
+  of `objective_fn` at `initial_position`. If specified, this argument must
+  have the same shape and dtype as `initial_position`. If not specified, the
+  value will be evaluated during the search.
+  Default value: None.
 * <b>`position_tolerance`</b>: Optional `Tensor` representing the tolerance for the
-    estimated roots. If specified, this argument must broadcast with the shape
-    of `initial_position` and have the same dtype.
-    Default value: `1e-8`.
+  estimated roots. If specified, this argument must broadcast with the shape
+  of `initial_position` and have the same dtype.
+  Default value: `1e-8`.
 * <b>`value_tolerance`</b>: Optional `Tensor` representing the tolerance used to check
-    for roots. If the absolute value of `objective_fn` is smaller than
-    `value_tolerance` at a given position, then that position is considered a
-    root for the function. If specified, this argument must broadcast with the
-    shape of `initial_position` and have the same dtype.
-    Default value: `1e-8`.
+  for roots. If the absolute value of `objective_fn` is smaller than
+  `value_tolerance` at a given position, then that position is considered a
+  root for the function. If specified, this argument must broadcast with the
+  shape of `initial_position` and have the same dtype.
+  Default value: `1e-8`.
 * <b>`max_iterations`</b>: Optional `Tensor` or Python integer specifying the maximum
-    number of steps to perform for each initial position. Must broadcast with
-    the shape of `initial_position`.
-    Default value: `50`.
+  number of steps to perform for each initial position. Must broadcast with
+  the shape of `initial_position`.
+  Default value: `50`.
 * <b>`stopping_policy_fn`</b>: Python `callable` controlling the algorithm termination.
-    It must be a callable accepting a `Tensor` of booleans with the shape of
-    `initial_position` (each denoting whether the search is finished for each
-    starting point), and returning a scalar boolean `Tensor` (indicating
-    whether the overall search should stop). Typical values are
-    `tf.reduce_all` (which returns only when the search is finished for all
-    points), and `tf.reduce_any` (which returns as soon as the search is
-    finished for any point).
-    Default value: `tf.reduce_all` (returns only when the search is finished
-      for all points).
+  It must be a callable accepting a `Tensor` of booleans with the shape of
+  `initial_position` (each denoting whether the search is finished for each
+  starting point), and returning a scalar boolean `Tensor` (indicating
+  whether the overall search should stop). Typical values are
+  `tf.reduce_all` (which returns only when the search is finished for all
+  points), and `tf.reduce_any` (which returns as soon as the search is
+  finished for any point).
+  Default value: `tf.reduce_all` (returns only when the search is finished
+    for all points).
 * <b>`validate_args`</b>: Python `bool` indicating whether to validate arguments such
-    as `position_tolerance`, `value_tolerance`, and `max_iterations`.
-    Default value: `False`.
+  as `position_tolerance`, `value_tolerance`, and `max_iterations`.
+  Default value: `False`.
 * <b>`name`</b>: Python `str` name prefixed to ops created by this function.
 
 
 #### Returns:
 
 * <b>`root_search_results`</b>: A Python `namedtuple` containing the following items:
-* <b>`estimated_root`</b>: `Tensor` containing the last position explored. If the
-      search was successful within the specified tolerance, this position is
-      a root of the objective function.
-* <b>`objective_at_estimated_root`</b>: `Tensor` containing the value of the
-      objective function at `position`. If the search was successful within
-      the specified tolerance, then this is close to 0.
-* <b>`num_iterations`</b>: The number of iterations performed.
+  estimated_root: `Tensor` containing the last position explored. If the
+    search was successful within the specified tolerance, this position is
+    a root of the objective function.
+  objective_at_estimated_root: `Tensor` containing the value of the
+    objective function at `position`. If the search was successful within
+    the specified tolerance, then this is close to 0.
+  num_iterations: The number of iterations performed.
 
 
 #### Raises:
 
-* <b>`ValueError`</b>: if a non-callable `stopping_policy_fn` is passed.
+  ValueError: if a non-callable `stopping_policy_fn` is passed.
 
 #### Examples
 

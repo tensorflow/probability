@@ -20,7 +20,7 @@ Defined in [`python/edward2/program_transformations.py`](https://github.com/tens
 #### Args:
 
 * <b>`model`</b>: Python callable which executes the generative process of a
-    computable probability distribution using `ed.RandomVariable`s.
+  computable probability distribution using `ed.RandomVariable`s.
 
 
 #### Returns:

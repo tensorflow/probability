@@ -271,34 +271,34 @@ The `step_size_update_fn` argument is deprecated. Use <a href="../../tfp/mcmc/Si
 #### Args:
 
 * <b>`target_log_prob_fn`</b>: Python callable which takes an argument like
-    `current_state` (or `*current_state` if it's a list) and returns its
-    (possibly unnormalized) log-density under the target distribution.
+  `current_state` (or `*current_state` if it's a list) and returns its
+  (possibly unnormalized) log-density under the target distribution.
 * <b>`step_size`</b>: `Tensor` or Python `list` of `Tensor`s representing the step
-    size for the leapfrog integrator. Must broadcast with the shape of
-    `current_state`. Larger step sizes lead to faster progress, but
-    too-large step sizes make rejection exponentially more likely. When
-    possible, it's often helpful to match per-variable step sizes to the
-    standard deviations of the target distribution in each variable.
+  size for the leapfrog integrator. Must broadcast with the shape of
+  `current_state`. Larger step sizes lead to faster progress, but
+  too-large step sizes make rejection exponentially more likely. When
+  possible, it's often helpful to match per-variable step sizes to the
+  standard deviations of the target distribution in each variable.
 * <b>`num_leapfrog_steps`</b>: Integer number of steps to run the leapfrog integrator
-    for. Total progress per HMC step is roughly proportional to
-    `step_size * num_leapfrog_steps`.
+  for. Total progress per HMC step is roughly proportional to
+  `step_size * num_leapfrog_steps`.
 * <b>`state_gradients_are_stopped`</b>: Python `bool` indicating that the proposed
-    new state be run through `tf.stop_gradient`. This is particularly useful
-    when combining optimization over samples from the HMC chain.
-    Default value: `False` (i.e., do not apply `stop_gradient`).
+  new state be run through `tf.stop_gradient`. This is particularly useful
+  when combining optimization over samples from the HMC chain.
+  Default value: `False` (i.e., do not apply `stop_gradient`).
 * <b>`step_size_update_fn`</b>: Python `callable` taking current `step_size`
-    (typically a `tf.Variable`) and `kernel_results` (typically
-    `collections.namedtuple`) and returns updated step_size (`Tensor`s).
-    Default value: `None` (i.e., do not update `step_size` automatically).
+  (typically a `tf.Variable`) and `kernel_results` (typically
+  `collections.namedtuple`) and returns updated step_size (`Tensor`s).
+  Default value: `None` (i.e., do not update `step_size` automatically).
 * <b>`seed`</b>: Python integer to seed the random number generator.
 * <b>`store_parameters_in_results`</b>: If `True`, then `step_size` and
-    `num_leapfrog_steps` are written to and read from eponymous fields in
-    the kernel results objects returned from `one_step` and
-    `bootstrap_results`. This allows wrapper kernels to adjust those
-    parameters on the fly. This is incompatible with `step_size_update_fn`,
-    which must be set to `None`.
+  `num_leapfrog_steps` are written to and read from eponymous fields in
+  the kernel results objects returned from `one_step` and
+  `bootstrap_results`. This allows wrapper kernels to adjust those
+  parameters on the fly. This is incompatible with `step_size_update_fn`,
+  which must be set to `None`.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this function.
-    Default value: `None` (i.e., 'hmc_kernel').
+  Default value: `None` (i.e., 'hmc_kernel').
 
 
 
@@ -389,26 +389,26 @@ Runs one iteration of Hamiltonian Monte Carlo.
 #### Args:
 
 * <b>`current_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
-    current state(s) of the Markov chain(s). The first `r` dimensions index
-    independent chains, `r = tf.rank(target_log_prob_fn(*current_state))`.
+  current state(s) of the Markov chain(s). The first `r` dimensions index
+  independent chains, `r = tf.rank(target_log_prob_fn(*current_state))`.
 * <b>`previous_kernel_results`</b>: `collections.namedtuple` containing `Tensor`s
-    representing values from previous calls to this function (or from the
-    `bootstrap_results` function.)
+  representing values from previous calls to this function (or from the
+  `bootstrap_results` function.)
 
 
 #### Returns:
 
 * <b>`next_state`</b>: Tensor or Python list of `Tensor`s representing the state(s)
-    of the Markov chain(s) after taking exactly one step. Has same type and
-    shape as `current_state`.
+  of the Markov chain(s) after taking exactly one step. Has same type and
+  shape as `current_state`.
 * <b>`kernel_results`</b>: `collections.namedtuple` of internal calculations used to
-    advance the chain.
+  advance the chain.
 
 
 #### Raises:
 
 * <b>`ValueError`</b>: if there isn't one `step_size` or a list with same length as
-    `current_state`.
+  `current_state`.
 
 
 

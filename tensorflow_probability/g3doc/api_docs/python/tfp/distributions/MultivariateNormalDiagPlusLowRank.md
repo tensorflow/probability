@@ -206,37 +206,37 @@ If both `scale_diag` and `scale_identity_multiplier` are `None`, then
 #### Args:
 
 * <b>`loc`</b>: Floating-point `Tensor`. If this is set to `None`, `loc` is
-    implicitly `0`. When specified, may have shape `[B1, ..., Bb, k]` where
-    `b >= 0` and `k` is the event size.
+  implicitly `0`. When specified, may have shape `[B1, ..., Bb, k]` where
+  `b >= 0` and `k` is the event size.
 * <b>`scale_diag`</b>: Non-zero, floating-point `Tensor` representing a diagonal
-    matrix added to `scale`. May have shape `[B1, ..., Bb, k]`, `b >= 0`,
-    and characterizes `b`-batches of `k x k` diagonal matrices added to
-    `scale`. When both `scale_identity_multiplier` and `scale_diag` are
-    `None` then `scale` is the `Identity`.
+  matrix added to `scale`. May have shape `[B1, ..., Bb, k]`, `b >= 0`,
+  and characterizes `b`-batches of `k x k` diagonal matrices added to
+  `scale`. When both `scale_identity_multiplier` and `scale_diag` are
+  `None` then `scale` is the `Identity`.
 * <b>`scale_identity_multiplier`</b>: Non-zero, floating-point `Tensor` representing
-    a scaled-identity-matrix added to `scale`. May have shape
-    `[B1, ..., Bb]`, `b >= 0`, and characterizes `b`-batches of scaled
-    `k x k` identity matrices added to `scale`. When both
-    `scale_identity_multiplier` and `scale_diag` are `None` then `scale` is
-    the `Identity`.
+  a scaled-identity-matrix added to `scale`. May have shape
+  `[B1, ..., Bb]`, `b >= 0`, and characterizes `b`-batches of scaled
+  `k x k` identity matrices added to `scale`. When both
+  `scale_identity_multiplier` and `scale_diag` are `None` then `scale` is
+  the `Identity`.
 * <b>`scale_perturb_factor`</b>: Floating-point `Tensor` representing a rank-`r`
-    perturbation added to `scale`. May have shape `[B1, ..., Bb, k, r]`,
-    `b >= 0`, and characterizes `b`-batches of rank-`r` updates to `scale`.
-    When `None`, no rank-`r` update is added to `scale`.
+  perturbation added to `scale`. May have shape `[B1, ..., Bb, k, r]`,
+  `b >= 0`, and characterizes `b`-batches of rank-`r` updates to `scale`.
+  When `None`, no rank-`r` update is added to `scale`.
 * <b>`scale_perturb_diag`</b>: Floating-point `Tensor` representing a diagonal matrix
-    inside the rank-`r` perturbation added to `scale`. May have shape
-    `[B1, ..., Bb, r]`, `b >= 0`, and characterizes `b`-batches of `r x r`
-    diagonal matrices inside the perturbation added to `scale`. When
-    `None`, an identity matrix is used inside the perturbation. Can only be
-    specified if `scale_perturb_factor` is also specified.
+  inside the rank-`r` perturbation added to `scale`. May have shape
+  `[B1, ..., Bb, r]`, `b >= 0`, and characterizes `b`-batches of `r x r`
+  diagonal matrices inside the perturbation added to `scale`. When
+  `None`, an identity matrix is used inside the perturbation. Can only be
+  specified if `scale_perturb_factor` is also specified.
 * <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
-    parameters are checked for validity despite possibly degrading runtime
-    performance. When `False` invalid inputs may silently render incorrect
-    outputs.
+  parameters are checked for validity despite possibly degrading runtime
+  performance. When `False` invalid inputs may silently render incorrect
+  outputs.
 * <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`,
-    statistics (e.g., mean, mode, variance) use the value "`NaN`" to
-    indicate the result is undefined. When `False`, an exception is raised
-    if one or more of the statistic's batch members are undefined.
+  statistics (e.g., mean, mode, variance) use the value "`NaN`" to
+  indicate the result is undefined. When `False`, an exception is raised
+  if one or more of the statistic's batch members are undefined.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
 
 
@@ -425,7 +425,7 @@ cdf(x) := P[X <= x]
 #### Returns:
 
 * <b>`cdf`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
+  values of type `self.dtype`.
 
 <h3 id="copy"><code>copy</code></h3>
 
@@ -441,14 +441,14 @@ initialization arguments.
 #### Args:
 
 * <b>`**override_parameters_kwargs`</b>: String/value dictionary of initialization
-    arguments to override with new values.
+  arguments to override with new values.
 
 
 #### Returns:
 
 * <b>`distribution`</b>: A new instance of `type(self)` initialized from the union
-    of self.parameters and override_parameters_kwargs, i.e.,
-    `dict(self.parameters, **override_parameters_kwargs)`.
+  of self.parameters and override_parameters_kwargs, i.e.,
+  `dict(self.parameters, **override_parameters_kwargs)`.
 
 <h3 id="covariance"><code>covariance</code></h3>
 
@@ -495,8 +495,8 @@ length-`k'` vector.
 #### Returns:
 
 * <b>`covariance`</b>: Floating-point `Tensor` with shape `[B1, ..., Bn, k', k']`
-    where the first `n` dimensions are batch coordinates and
-    `k' = reduce_prod(self.event_shape)`.
+  where the first `n` dimensions are batch coordinates and
+  `k' = reduce_prod(self.event_shape)`.
 
 <h3 id="cross_entropy"><code>cross_entropy</code></h3>
 
@@ -531,7 +531,7 @@ where `F` denotes the support of the random variable `X ~ P`.
 #### Returns:
 
 * <b>`cross_entropy`</b>: `self.dtype` `Tensor` with shape `[B1, ..., Bn]`
-    representing `n` different calculations of (Shannon) cross entropy.
+  representing `n` different calculations of (Shannon) cross entropy.
 
 <h3 id="entropy"><code>entropy</code></h3>
 
@@ -630,8 +630,8 @@ denotes (Shannon) cross entropy, and `H[.]` denotes (Shannon) entropy.
 #### Returns:
 
 * <b>`kl_divergence`</b>: `self.dtype` `Tensor` with shape `[B1, ..., Bn]`
-    representing `n` different calculations of the Kullback-Leibler
-    divergence.
+  representing `n` different calculations of the Kullback-Leibler
+  divergence.
 
 <h3 id="log_cdf"><code>log_cdf</code></h3>
 
@@ -665,7 +665,7 @@ a more accurate answer than simply taking the logarithm of the `cdf` when
 #### Returns:
 
 * <b>`logcdf`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
+  values of type `self.dtype`.
 
 <h3 id="log_prob"><code>log_prob</code></h3>
 
@@ -705,7 +705,7 @@ or
 #### Returns:
 
 * <b>`log_prob`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
+  values of type `self.dtype`.
 
 <h3 id="log_survival_function"><code>log_survival_function</code></h3>
 
@@ -785,7 +785,7 @@ Subclasses should override class method `_param_shapes`.
 #### Args:
 
 * <b>`sample_shape`</b>: `Tensor` or python list/tuple. Desired shape of a call to
-    `sample()`.
+  `sample()`.
 * <b>`name`</b>: name to prepend ops with.
 
 
@@ -815,7 +815,7 @@ constant-valued tensors when constant values are fed.
 #### Args:
 
 * <b>`sample_shape`</b>: `TensorShape` or python list/tuple. Desired shape of a call
-    to `sample()`.
+  to `sample()`.
 
 
 #### Returns:
@@ -865,7 +865,7 @@ or
 #### Returns:
 
 * <b>`prob`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
+  values of type `self.dtype`.
 
 <h3 id="quantile"><code>quantile</code></h3>
 
@@ -895,7 +895,7 @@ quantile(p) := x such that P[X <= x] == p
 #### Returns:
 
 * <b>`quantile`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
+  values of type `self.dtype`.
 
 <h3 id="sample"><code>sample</code></h3>
 
@@ -954,7 +954,7 @@ denotes expectation, and `stddev.shape = batch_shape + event_shape`.
 #### Returns:
 
 * <b>`stddev`</b>: Floating-point `Tensor` with shape identical to
-    `batch_shape + event_shape`, i.e., the same shape as `self.mean()`.
+  `batch_shape + event_shape`, i.e., the same shape as `self.mean()`.
 
 <h3 id="survival_function"><code>survival_function</code></h3>
 
@@ -1017,7 +1017,7 @@ denotes expectation, and `Var.shape = batch_shape + event_shape`.
 #### Returns:
 
 * <b>`variance`</b>: Floating-point `Tensor` with shape identical to
-    `batch_shape + event_shape`, i.e., the same shape as `self.mean()`.
+  `batch_shape + event_shape`, i.e., the same shape as `self.mean()`.
 
 
 

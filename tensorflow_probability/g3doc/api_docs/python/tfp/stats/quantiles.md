@@ -43,41 +43,41 @@ The exact number of data points in each interval depends on the size of
 #### Args:
 
 * <b>`x`</b>:  Numeric `N-D` `Tensor` with `N > 0`.  If `axis` is not `None`,
-    `x` must have statically known number of dimensions.
+  `x` must have statically known number of dimensions.
 * <b>`num_quantiles`</b>:  Scalar `integer` `Tensor`.  The number of intervals the
-    returned `num_quantiles + 1` cut points divide the range into.
+  returned `num_quantiles + 1` cut points divide the range into.
 * <b>`axis`</b>:  Optional `0-D` or `1-D` integer `Tensor` with constant values. The
-    axis that index independent samples over which to return the desired
-    percentile.  If `None` (the default), treat every dimension as a sample
-    dimension, returning a scalar.
+  axis that index independent samples over which to return the desired
+  percentile.  If `None` (the default), treat every dimension as a sample
+  dimension, returning a scalar.
 * <b>`interpolation `</b>: {'nearest', 'linear', 'lower', 'higher', 'midpoint'}.
-    Default value: 'nearest'.  This specifies the interpolation method to
-    use when the fractions `k / n` lie between two data points `i < j`:
-      * linear: i + (j - i) * fraction, where fraction is the fractional part
-        of the index surrounded by i and j.
-      * lower: `i`.
-      * higher: `j`.
-      * nearest: `i` or `j`, whichever is nearest.
-      * midpoint: (i + j) / 2. `linear` and `midpoint` interpolation do not
-        work with integer dtypes.
+  Default value: 'nearest'.  This specifies the interpolation method to
+  use when the fractions `k / n` lie between two data points `i < j`:
+    * linear: i + (j - i) * fraction, where fraction is the fractional part
+      of the index surrounded by i and j.
+    * lower: `i`.
+    * higher: `j`.
+    * nearest: `i` or `j`, whichever is nearest.
+    * midpoint: (i + j) / 2. `linear` and `midpoint` interpolation do not
+      work with integer dtypes.
 * <b>`keep_dims`</b>:  Python `bool`. If `True`, the last dimension is kept with size 1
-    If `False`, the last dimension is removed from the output shape.
+  If `False`, the last dimension is removed from the output shape.
 * <b>`validate_args`</b>:  Whether to add runtime checks of argument validity. If
-    False, and arguments are incorrect, correct behavior is not guaranteed.
+  False, and arguments are incorrect, correct behavior is not guaranteed.
 * <b>`name`</b>:  A Python string name to give this `Op`.  Default is 'percentile'
 
 
 #### Returns:
 
 * <b>`cut_points`</b>:  A `rank(x) + 1 - len(axis)` dimensional `Tensor` with same
-  `dtype` as `x` and shape `[num_quantiles + 1, ...]` where the trailing shape
-  is that of `x` without the dimensions in `axis` (unless `keep_dims is True`)
+`dtype` as `x` and shape `[num_quantiles + 1, ...]` where the trailing shape
+is that of `x` without the dimensions in `axis` (unless `keep_dims is True`)
 
 
 #### Raises:
 
-* <b>`ValueError`</b>:  If argument 'interpolation' is not an allowed type.
-* <b>`ValueError`</b>:  If interpolation type not compatible with `dtype`.
+  ValueError:  If argument 'interpolation' is not an allowed type.
+  ValueError:  If interpolation type not compatible with `dtype`.
 
 #### Examples
 

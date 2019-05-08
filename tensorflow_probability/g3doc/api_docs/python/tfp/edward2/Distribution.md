@@ -37,25 +37,25 @@ Constructs the `Distribution`.
 
 * <b>`dtype`</b>: The type of the event samples. `None` implies no type-enforcement.
 * <b>`reparameterization_type`</b>: Instance of `ReparameterizationType`.
-    If `tfd.FULLY_REPARAMETERIZED`, this
-    `Distribution` can be reparameterized in terms of some standard
-    distribution with a function whose Jacobian is constant for the support
-    of the standard distribution. If `tfd.NOT_REPARAMETERIZED`,
-    then no such reparameterization is available.
+  If `tfd.FULLY_REPARAMETERIZED`, this
+  `Distribution` can be reparameterized in terms of some standard
+  distribution with a function whose Jacobian is constant for the support
+  of the standard distribution. If `tfd.NOT_REPARAMETERIZED`,
+  then no such reparameterization is available.
 * <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
-    parameters are checked for validity despite possibly degrading runtime
-    performance. When `False` invalid inputs may silently render incorrect
-    outputs.
+  parameters are checked for validity despite possibly degrading runtime
+  performance. When `False` invalid inputs may silently render incorrect
+  outputs.
 * <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
-    (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
-    result is undefined. When `False`, an exception is raised if one or
-    more of the statistic's batch members are undefined.
+  (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
+  result is undefined. When `False`, an exception is raised if one or
+  more of the statistic's batch members are undefined.
 * <b>`parameters`</b>: Python `dict` of parameters used to instantiate this
-    `Distribution`.
+  `Distribution`.
 * <b>`graph_parents`</b>: Python `list` of graph prerequisites of this
-    `Distribution`.
+  `Distribution`.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this class. Default:
-    subclass name.
+  subclass name.
 
 
 #### Raises:

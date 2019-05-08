@@ -40,15 +40,15 @@ value in `weights` at each index where the corresponding value in `arr` is
 
 * <b>`arr`</b>: An `int32` `Tensor` of non-negative values.
 * <b>`weights`</b>: If non-None, must be the same shape as arr. For each value in
-    `arr`, the bin will be incremented by the corresponding weight instead of
-    1.
+  `arr`, the bin will be incremented by the corresponding weight instead of
+  1.
 * <b>`minlength`</b>: If given, ensures the output has length at least `minlength`,
-    padding with zeros at the end if necessary.
+  padding with zeros at the end if necessary.
 * <b>`maxlength`</b>: If given, skips values in `arr` that are equal or greater than
-    `maxlength`, ensuring that the output has length at most `maxlength`.
+  `maxlength`, ensuring that the output has length at most `maxlength`.
 * <b>`axis`</b>: A `0-D` or `1-D` `int32` `Tensor` (with static values) designating
-    dimensions in `arr` to reduce over.
-    `Default value:` `None`, meaning reduce over all dimensions.
+  dimensions in `arr` to reduce over.
+  `Default value:` `None`, meaning reduce over all dimensions.
 * <b>`dtype`</b>: If `weights` is None, determines the type of the output bins.
 * <b>`name`</b>: A name scope for the associated operations (optional).
 

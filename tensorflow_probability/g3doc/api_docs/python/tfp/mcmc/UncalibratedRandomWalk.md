@@ -50,32 +50,32 @@ Initializes this transition kernel.
 #### Args:
 
 * <b>`target_log_prob_fn`</b>: Python callable which takes an argument like
-    `current_state` (or `*current_state` if it's a list) and returns its
-    (possibly unnormalized) log-density under the target distribution.
+  `current_state` (or `*current_state` if it's a list) and returns its
+  (possibly unnormalized) log-density under the target distribution.
 * <b>`new_state_fn`</b>: Python callable which takes a list of state parts and a
-    seed; returns a same-type `list` of `Tensor`s, each being a perturbation
-    of the input state parts. The perturbation distribution is assumed to be
-    a symmetric distribution centered at the input state part.
-    Default value: `None` which is mapped to
-      `tfp.mcmc.random_walk_normal_fn()`.
+  seed; returns a same-type `list` of `Tensor`s, each being a perturbation
+  of the input state parts. The perturbation distribution is assumed to be
+  a symmetric distribution centered at the input state part.
+  Default value: `None` which is mapped to
+    `tfp.mcmc.random_walk_normal_fn()`.
 * <b>`seed`</b>: Python integer to seed the random number generator.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this function.
-    Default value: `None` (i.e., 'rwm_kernel').
+  Default value: `None` (i.e., 'rwm_kernel').
 
 
 #### Returns:
 
 * <b>`next_state`</b>: Tensor or Python list of `Tensor`s representing the state(s)
-    of the Markov chain(s) at each result step. Has same shape as
-    `current_state`.
+  of the Markov chain(s) at each result step. Has same shape as
+  `current_state`.
 * <b>`kernel_results`</b>: `collections.namedtuple` of internal calculations used to
-    advance the chain.
+  advance the chain.
 
 
 #### Raises:
 
 * <b>`ValueError`</b>: if there isn't one `scale` or a list with same length as
-    `current_state`.
+  `current_state`.
 
 
 
@@ -134,26 +134,26 @@ Runs one iteration of Random Walk Metropolis with normal proposal.
 #### Args:
 
 * <b>`current_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
-    current state(s) of the Markov chain(s). The first `r` dimensions index
-    independent chains, `r = tf.rank(target_log_prob_fn(*current_state))`.
+  current state(s) of the Markov chain(s). The first `r` dimensions index
+  independent chains, `r = tf.rank(target_log_prob_fn(*current_state))`.
 * <b>`previous_kernel_results`</b>: `collections.namedtuple` containing `Tensor`s
-    representing values from previous calls to this function (or from the
-    `bootstrap_results` function.)
+  representing values from previous calls to this function (or from the
+  `bootstrap_results` function.)
 
 
 #### Returns:
 
 * <b>`next_state`</b>: Tensor or Python list of `Tensor`s representing the state(s)
-    of the Markov chain(s) after taking exactly one step. Has same type and
-    shape as `current_state`.
+  of the Markov chain(s) after taking exactly one step. Has same type and
+  shape as `current_state`.
 * <b>`kernel_results`</b>: `collections.namedtuple` of internal calculations used to
-    advance the chain.
+  advance the chain.
 
 
 #### Raises:
 
 * <b>`ValueError`</b>: if there isn't one `scale` or a list with same length as
-    `current_state`.
+  `current_state`.
 
 
 

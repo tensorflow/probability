@@ -31,7 +31,8 @@ If `x.shape` is `[b1, b2, ..., bB, d]` then the output shape is
 `[b1, b2, ..., bB, n, n]` where `n` is such that `d = n(n+1)/2`, i.e.,
 `n = int(np.sqrt(0.25 + 2. * m) - 0.5)`.
 
-Example:
+#### Example:
+
 
 ```python
 fill_triangular([1, 2, 3, 4, 5, 6])
@@ -92,11 +93,12 @@ contains all the entries of x, as desired. The rest is details:
 For additional comparisons, a pure numpy version of this function can be found
 in `distribution_util_test.py`, function `_fill_triangular`.
 
+
 #### Args:
 
 * <b>`x`</b>: `Tensor` representing lower (or upper) triangular elements.
 * <b>`upper`</b>: Python `bool` representing whether output matrix should be upper
-    triangular (`True`) or lower triangular (`False`, default).
+  triangular (`True`) or lower triangular (`False`, default).
 * <b>`name`</b>: Python `str`. The name to give this op.
 
 

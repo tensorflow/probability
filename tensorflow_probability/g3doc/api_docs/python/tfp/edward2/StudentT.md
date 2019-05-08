@@ -40,20 +40,20 @@ supports broadcasting (e.g. `df + loc + scale` is a valid operation).
 #### Args:
 
 * <b>`df`</b>: Floating-point `Tensor`. The degrees of freedom of the
-    distribution(s). `df` must contain only positive values.
+  distribution(s). `df` must contain only positive values.
 * <b>`loc`</b>: Floating-point `Tensor`. The mean(s) of the distribution(s).
 * <b>`scale`</b>: Floating-point `Tensor`. The scaling factor(s) for the
-    distribution(s). Note that `scale` is not technically the standard
-    deviation of this distribution but has semantics more similar to
-    standard deviation than variance.
+  distribution(s). Note that `scale` is not technically the standard
+  deviation of this distribution but has semantics more similar to
+  standard deviation than variance.
 * <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
-    parameters are checked for validity despite possibly degrading runtime
-    performance. When `False` invalid inputs may silently render incorrect
-    outputs.
+  parameters are checked for validity despite possibly degrading runtime
+  performance. When `False` invalid inputs may silently render incorrect
+  outputs.
 * <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`,
-    statistics (e.g., mean, mode, variance) use the value "`NaN`" to
-    indicate the result is undefined. When `False`, an exception is raised
-    if one or more of the statistic's batch members are undefined.
+  statistics (e.g., mean, mode, variance) use the value "`NaN`" to
+  indicate the result is undefined. When `False`, an exception is raised
+  if one or more of the statistic's batch members are undefined.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
 
 

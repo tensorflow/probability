@@ -40,28 +40,28 @@ Parameterization: Finch's `alpha` is `1 - decay`.
 #### Args:
 
 * <b>`mean_var`</b>: `float`-like `Variable` representing the exponentially weighted
-    moving mean. Same shape as `variance_var` and `value`.
+  moving mean. Same shape as `variance_var` and `value`.
 * <b>`variance_var`</b>: `float`-like `Variable` representing the
-    exponentially weighted moving variance. Same shape as `mean_var` and
-    `value`.
+  exponentially weighted moving variance. Same shape as `mean_var` and
+  `value`.
 * <b>`value`</b>: `float`-like `Tensor`. Same shape as `mean_var` and `variance_var`.
 * <b>`decay`</b>: A `float`-like `Tensor`. The moving mean decay. Typically close to
-    `1.`, e.g., `0.999`.
+  `1.`, e.g., `0.999`.
 * <b>`name`</b>: Optional name of the returned operation.
 
 
 #### Returns:
 
 * <b>`mean_var`</b>: `Variable` representing the `value`-updated exponentially weighted
-    moving mean.
+  moving mean.
 * <b>`variance_var`</b>: `Variable` representing the `value`-updated
-    exponentially weighted moving variance.
+  exponentially weighted moving variance.
 
 
 #### Raises:
 
-* <b>`TypeError`</b>: if `mean_var` does not have float type `dtype`.
-* <b>`TypeError`</b>: if `mean_var`, `variance_var`, `value`, `decay` have different
+  TypeError: if `mean_var` does not have float type `dtype`.
+  TypeError: if `mean_var`, `variance_var`, `value`, `decay` have different
     `base_dtype`.
 
 #### References

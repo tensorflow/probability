@@ -45,11 +45,11 @@ Creates the `BlockwiseInitializer`.
 #### Arguments:
 
 * <b>`initializers`</b>: `list` of Keras initializers, e.g., `"glorot_uniform"` or
-    `tf.keras.initializers.Constant(0.5413)`.
+  `tf.keras.initializers.Constant(0.5413)`.
 * <b>`sizes`</b>: `list` of `int` scalars representing the number of elements
-    associated with each initializer in `initializers`.
+  associated with each initializer in `initializers`.
 * <b>`validate_args`</b>: Python `bool` indicating we should do (possibly expensive)
-    graph-time assertions, if necessary.
+  graph-time assertions, if necessary.
 
 
 
@@ -86,7 +86,7 @@ Returns a tensor object initialized as specified by the initializer.
 
 * <b>`shape`</b>: Shape of the tensor.
 * <b>`dtype`</b>: Optional dtype of the tensor. If not provided will return tensor
-   of `tf.float32`.
+ of `tf.float32`.
 
 <h3 id="from_config"><code>from_config</code></h3>
 
