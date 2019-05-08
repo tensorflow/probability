@@ -32,20 +32,46 @@ class UtilTest(tf.test.TestCase):
     # Test nominal behavior.
     x = np.ones([3], np.float32)
     self.assertAllEqual(
-        self.evaluate(util.pad_shape_right_with_ones(x, 3)).shape,
+        self.evaluate(util.pad_shape_with_ones(x, 3)).shape,
         [3, 1, 1, 1])
+
+  def testPadShapeStartWithOnes(self):
+    # Test nominal behavior.
+    x = np.ones([3], np.float32)
+    self.assertAllEqual(
+        self.evaluate(util.pad_shape_with_ones(x, 3, start=-2)).shape,
+        [1, 1, 1, 3])
+
+  def testPadShapeMiddleWithOnes(self):
+    # Test nominal behavior.
+    x = np.ones([2, 3, 5], np.float32)
+    self.assertAllEqual(
+        self.evaluate(util.pad_shape_with_ones(x, 3)).shape,
+        [2, 3, 5, 1, 1, 1])
+
+    self.assertAllEqual(
+        self.evaluate(util.pad_shape_with_ones(x, 3, start=-2)).shape,
+        [2, 3, 1, 1, 1, 5])
+
+    self.assertAllEqual(
+        self.evaluate(util.pad_shape_with_ones(x, 3, start=-3)).shape,
+        [2, 1, 1, 1, 3, 5])
 
   def testPadShapeRightWithOnesDynamicShape(self):
     if tf.executing_eagerly(): return
     # Test partially unknown shape
     x = tf.compat.v1.placeholder_with_default(np.ones([3], np.float32), [None])
-    expanded = util.pad_shape_right_with_ones(x, 3)
+    expanded = util.pad_shape_with_ones(x, 3)
     self.assertAllEqual(expanded.shape.as_list(), [None, 1, 1, 1])
     self.assertAllEqual(self.evaluate(expanded).shape, [3, 1, 1, 1])
 
+    expanded = util.pad_shape_with_ones(x, 3, start=-2)
+    self.assertAllEqual(expanded.shape.as_list(), [1, 1, 1, None])
+    self.assertAllEqual(self.evaluate(expanded).shape, [1, 1, 1, 3])
+
     # Test totally unknown shape
     x = tf.compat.v1.placeholder_with_default(np.ones([3], np.float32), None)
-    expanded = util.pad_shape_right_with_ones(x, 3)
+    expanded = util.pad_shape_with_ones(x, 3)
     self.assertIsNone(expanded.shape.ndims)
     self.assertAllEqual(self.evaluate(expanded).shape, [3, 1, 1, 1])
 
@@ -57,7 +83,7 @@ class UtilTest(tf.test.TestCase):
     with g.as_default():
       x = tf.constant(np.ones([3], np.float32))
       graph_def = g.as_graph_def()
-      x = util.pad_shape_right_with_ones(x, 3)
+      x = util.pad_shape_with_ones(x, 3)
       self.assertNotEqual(graph_def, g.as_graph_def())
 
     # Now verify that graphdef is unchanged (no extra ops) when we pass ndims=0.
@@ -65,7 +91,7 @@ class UtilTest(tf.test.TestCase):
     with g.as_default():
       x = tf.constant(np.ones([3], np.float32))
       graph_def = g.as_graph_def()
-      x = util.pad_shape_right_with_ones(x, 0)
+      x = util.pad_shape_with_ones(x, 0)
       self.assertEqual(graph_def, g.as_graph_def())
 
   def testSumRightmostNdimsPreservingShapeStaticRank(self):

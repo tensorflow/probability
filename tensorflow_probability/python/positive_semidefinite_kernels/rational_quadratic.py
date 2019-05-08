@@ -140,20 +140,20 @@ class RationalQuadratic(psd_kernel.PositiveSemidefiniteKernel):
     difference /= 2
 
     if self.length_scale is not None:
-      length_scale = util.pad_shape_right_with_ones(
+      length_scale = util.pad_shape_with_ones(
           self.length_scale, ndims=param_expansion_ndims)
       difference /= length_scale ** 2
 
     scale_mixture_rate = 1.
     if self.scale_mixture_rate is not None:
-      scale_mixture_rate = util.pad_shape_right_with_ones(
+      scale_mixture_rate = util.pad_shape_with_ones(
           self.scale_mixture_rate, ndims=param_expansion_ndims)
       difference /= scale_mixture_rate
 
     result = (1. + difference) ** -scale_mixture_rate
 
     if self.amplitude is not None:
-      amplitude = util.pad_shape_right_with_ones(
+      amplitude = util.pad_shape_with_ones(
           self.amplitude, ndims=param_expansion_ndims)
       result *= amplitude ** 2
     return result

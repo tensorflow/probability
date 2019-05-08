@@ -76,7 +76,7 @@ class TestKernel(tfpk.PositiveSemidefiniteKernel):
 
     value = tf.reduce_sum(input_tensor=x1 + x2, axis=-1)
     if self.multiplier is not None:
-      multiplier = kernels_util.pad_shape_right_with_ones(
+      multiplier = kernels_util.pad_shape_with_ones(
           self._multiplier, param_expansion_ndims)
       value *= multiplier
 

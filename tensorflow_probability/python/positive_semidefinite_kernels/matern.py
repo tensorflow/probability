@@ -144,13 +144,13 @@ class MaternOneHalf(_AmplitudeLengthScaleMixin,
         util.sum_rightmost_ndims_preserving_shape(
             tf.math.squared_difference(x1, x2), self.feature_ndims))
     if self.length_scale is not None:
-      length_scale = util.pad_shape_right_with_ones(
+      length_scale = util.pad_shape_with_ones(
           self.length_scale, ndims=param_expansion_ndims)
       norm /= length_scale
     log_result = -norm
 
     if self.amplitude is not None:
-      amplitude = util.pad_shape_right_with_ones(
+      amplitude = util.pad_shape_with_ones(
           self.amplitude, ndims=param_expansion_ndims)
       log_result += 2. * tf.math.log(amplitude)
     return tf.exp(log_result)
@@ -208,15 +208,15 @@ class MaternThreeHalves(_AmplitudeLengthScaleMixin,
         util.sum_rightmost_ndims_preserving_shape(
             tf.math.squared_difference(x1, x2), self.feature_ndims))
     if self.length_scale is not None:
-      length_scale = util.pad_shape_right_with_ones(
+      length_scale = util.pad_shape_with_ones(
           self.length_scale, ndims=param_expansion_ndims)
       norm /= length_scale
     series_term = np.sqrt(3) * norm
     log_result = tf.math.log1p(series_term) - series_term
 
     if self.amplitude is not None:
-      amplitude = util.pad_shape_right_with_ones(self.amplitude,
-                                                 param_expansion_ndims)
+      amplitude = util.pad_shape_with_ones(
+          self.amplitude, param_expansion_ndims)
       log_result += 2. * tf.math.log(amplitude)
     return tf.exp(log_result)
 
@@ -273,14 +273,14 @@ class MaternFiveHalves(_AmplitudeLengthScaleMixin,
         util.sum_rightmost_ndims_preserving_shape(
             tf.math.squared_difference(x1, x2), self.feature_ndims))
     if self.length_scale is not None:
-      length_scale = util.pad_shape_right_with_ones(
+      length_scale = util.pad_shape_with_ones(
           self.length_scale, ndims=param_expansion_ndims)
       norm /= length_scale
     series_term = np.sqrt(5) * norm
     log_result = tf.math.log1p(series_term + series_term**2 / 3.) - series_term
 
     if self.amplitude is not None:
-      amplitude = util.pad_shape_right_with_ones(self.amplitude,
-                                                 param_expansion_ndims)
+      amplitude = util.pad_shape_with_ones(
+          self.amplitude, param_expansion_ndims)
       log_result += 2. * tf.math.log(amplitude)
     return tf.exp(log_result)

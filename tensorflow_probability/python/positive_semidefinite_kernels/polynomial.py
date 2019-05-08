@@ -188,17 +188,17 @@ class Polynomial(psd_kernel.PositiveSemidefiniteKernel):
           ndims=self.feature_ndims)
 
     if self.exponent is not None:
-      exponent = util.pad_shape_right_with_ones(
+      exponent = util.pad_shape_with_ones(
           self.exponent, param_expansion_ndims)
       dot_prod **= exponent
 
     if self.slope_variance is not None:
-      slope_variance = util.pad_shape_right_with_ones(
+      slope_variance = util.pad_shape_with_ones(
           self.slope_variance, param_expansion_ndims)
       dot_prod *= slope_variance ** 2.
 
     if self.bias_variance is not None:
-      bias_variance = util.pad_shape_right_with_ones(
+      bias_variance = util.pad_shape_with_ones(
           self.bias_variance, param_expansion_ndims)
       dot_prod += bias_variance ** 2.
 
