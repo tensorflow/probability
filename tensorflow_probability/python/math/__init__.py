@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from tensorflow_probability.python.math import ode
 from tensorflow_probability.python.math.custom_gradient import custom_gradient
 from tensorflow_probability.python.math.diag_jacobian import diag_jacobian
 from tensorflow_probability.python.math.gradient import value_and_gradient
@@ -57,6 +58,7 @@ _allowed_symbols = [
     'lu_reconstruct',
     'lu_solve',
     'matrix_rank',
+    'ode',
     'pinv',
     'pivoted_cholesky',
     'random_rademacher',

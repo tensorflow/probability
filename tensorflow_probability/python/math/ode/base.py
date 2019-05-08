@@ -26,9 +26,10 @@ import six
 # TODO(parsiad): Support nested structures for initial_state.
 
 __all__ = [
-    'Solver',
-    'Solution',
+    'ChosenBySolver',
     'Diagnostics',
+    'Results',
+    'Solver',
 ]
 
 
@@ -40,14 +41,13 @@ class Solver(object):
   def solve(
       self,
       ode_fn,
+      initial_time,
       initial_state,
-      initial_time=0.,
-      final_time=None,
-      solution_times=None,
+      solution_times,
       jacobian_fn=None,
       jacobian_sparsity=None,
       batch_ndims=None,
-      previous_results=None,
+      previous_solver_internal_state=None,
   ):
     """Solves an initial value problem.
 
@@ -59,40 +59,34 @@ class Solver(object):
     y(initial_time) = initial_state
     ```
 
-    Here, `t` (also called time) is a scalar `Tensor` of real `dtype` and `y(t)`
-    (also called the state at time `t`) is an N-D float or complex `Tensor`.
+    Here, `t` (also called time) is a scalar float `Tensor` and `y(t)` (also
+    called the state at time `t`) is an N-D float or complex `Tensor`.
 
     Args:
       ode_fn: Function of the form `ode_fn(t, y)`. The input `t` is a scalar
-        `Tensor` of real `dtype`. The input `y` and output are both `Tensor`s
-        with the same shape and `dtype` as `initial_state`.
+        float `Tensor`. The input `y` and output are both `Tensor`s with the
+        same shape and `dtype` as `initial_state`.
+      initial_time: Scalar float `Tensor` specifying the initial time.
       initial_state: N-D float or complex `Tensor` specifying the initial state.
         The `dtype` of `initial_state` must be complex for problems with
         complex-valued states (even if the initial state is real).
-      initial_time: Scalar `Tensor` of real `dtype` specifying the initial time.
-        Default value: `0.`.
-      final_time: Optional scalar `Tensor` of real `dtype` specifying the final
-        time to integrate up to. Must satisfy `initial_time < final_time`. If
-        unspecified, the solver will use `solution_times[-1]` (see below) as the
-        final time. Therefore, at least one of `final_time` or `solution_times`
-        must be specified.
-        Default value: `None` (i.e., `solution_times[-1]` or error).
-      solution_times: Optional 1-D float `Tensor` specifying a list of times. If
-        specified, the solver stores the computed state at each of these times
-        in the returned `Solution` object. If unspecified, the solver will
-        choose this list of times automatically. Must satisfy `initial_time <=
-        solution_times[0]`, `solution_times[i] < solution_times[i+1]`, and
-        `solution_times[-1] <= final_time` if `final_time` is specified.
-        Default value: `None`.
+      solution_times: 1-D float `Tensor` specifying a list of times. The solver
+        stores the computed state at each of these times in the returned
+        `Results` object. Must satisfy `initial_time <= solution_times[0]` and
+        `solution_times[i] < solution_times[i+1]`. Alternatively, the user can
+        pass `tfp.math.ode.ChosenBySolver(final_time)` where `final_time` is a
+        scalar float `Tensor` satisfying `initial_time < final_time`. Doing so
+        requests that the solver automatically choose suitable times up to and
+        including `final_time` at which to store the computed state.
       jacobian_fn: Optional function of the form `jacobian_fn(t, y)`. The input
-        `t` is a scalar `Tensor` of real `dtype`. The input `y` has the same
-        shape and `dtype` as `initial_state`. The output is a 2N-D `Tensor`
-        whose shape is `initial_state.shape + initial_state.shape` and whose
-        `dtype` is the same as `initial_state`. In particular, the `(i1, ...,
-        iN, j1, ..., jN)`-th entry of `jacobian_fn(t, y)` is the derivative of
-        the `(i1, ..., iN)`-th entry of `ode_fn(t, y)` with respect to the `(j1,
-        ..., jN)`-th entry of `y`. If this argument is left unspecified, the
-        solver will automatically compute the Jacobian if and when it is needed.
+        `t` is a scalar float `Tensor`. The input `y` has the same shape and
+        `dtype` as `initial_state`. The output is a 2N-D `Tensor` whose shape is
+        `initial_state.shape + initial_state.shape` and whose `dtype` is the
+        same as `initial_state`. In particular, the `(i1, ..., iN, j1, ...,
+        jN)`-th entry of `jacobian_fn(t, y)` is the derivative of the `(i1, ...,
+        iN)`-th entry of `ode_fn(t, y)` with respect to the `(j1, ..., jN)`-th
+        entry of `y`. If this argument is left unspecified, the solver
+        automatically computes the Jacobian if and when it is needed.
         Default value: `None`.
       jacobian_sparsity: Optional 2N-D boolean `Tensor` whose shape is
         `initial_state.shape + initial_state.shape` specifying the sparsity
@@ -102,28 +96,32 @@ class Solver(object):
       batch_ndims: Optional nonnegative integer. When specified, the first
         `batch_ndims` dimensions of `initial_state` are batch dimensions.
         Default value: `None`.
-      previous_results: Optional solver-specific argument used to warm-start
-        this invocation of `solve`.
+      previous_solver_internal_state: Optional solver-specific argument used to
+        warm-start this invocation of `solve`.
         Default value: `None`.
 
     Returns:
-      solution: Object of type `Solution` containing the solution.
-      diagnostics: Object of type `Diagnostics` containing performance
-        information.
-      results: Solver-specific object which can be used to warm-start the solver
-        on a future invocation of `solve`.
+      Object of type `Results`.
     """
+    pass
 
 
-class Solution(collections.namedtuple('Solution', ['times', 'state'])):
-  """Solution returned by a Solver.
+class Results(
+    collections.namedtuple(
+        'Results',
+        ['times', 'states', 'diagnostics', 'solver_internal_state'])):
+  """Results returned by a Solver.
 
   Properties:
     times: A 1-D float `Tensor` satisfying `times[i] < times[i+1]`.
-    state: A (1+N)-D `Tensor` containing the state at each time. In particular,
-      `state[i]` is the state at time `times[i]`.
+    states: A (1+N)-D `Tensor` containing the state at each time. In particular,
+      `states[i]` is the state at time `times[i]`.
+    diagnostics: Object of type `Diagnostics` containing performance
+      information.
+    solver_internal_state: Solver-specific object which can be used to
+    warm-start the solver on a future invocation of `solve`.
   """
-  pass
+  __slots__ = ()
 
 
 @six.add_metaclass(abc.ABCMeta)
@@ -135,8 +133,8 @@ class Diagnostics(object):
     """Number of function evaluations.
 
     Returns:
-      num_ode_fn_evaluations: Scalar `Tensor` of integral `dtype` containing the
-        number of function evaluations.
+      num_ode_fn_evaluations: Scalar integer `Tensor` containing the number of
+        function evaluations.
     """
     pass
 
@@ -145,8 +143,8 @@ class Diagnostics(object):
     """Number of Jacobian evaluations.
 
     Returns:
-      num_jacobian_evaluations: Scalar `Tensor` of integral `dtype` containing
-        number of Jacobian evaluations.
+      num_jacobian_evaluations: Scalar integer `Tensor` containing number of
+        Jacobian evaluations.
     """
     pass
 
@@ -155,8 +153,8 @@ class Diagnostics(object):
     """Number of matrix factorizations.
 
     Returns:
-      num_matrix_factorizations: Scalar `Tensor` of integral `dtype` containing
-        the number of matrix factorizations.
+      num_matrix_factorizations: Scalar integer `Tensor` containing the number
+        of matrix factorizations.
     """
     pass
 
@@ -165,9 +163,8 @@ class Diagnostics(object):
     """Completion status.
 
     Returns:
-      status: Scalar `Tensor` of integral `dtype` containing the reason for
-        termination. -1 on failure, 1 on termination by an event, and 0
-        otherwise.
+      status: Scalar integer `Tensor` containing the reason for termination. -1
+        on failure, 1 on termination by an event, and 0 otherwise.
     """
     pass
 
@@ -179,3 +176,17 @@ class Diagnostics(object):
       success: Boolean `Tensor` equivalent to `status >= 0`.
     """
     return self.status >= 0
+
+
+class ChosenBySolver(collections.namedtuple('ChosenBySolver', ['final_time'])):
+  """Sentinel used to modify the behaviour of the `solve` method of a solver.
+
+  Can be passed as the `solution_times` argument in the `solve` method of a
+  solver. Doing so requests that the solver automatically choose suitable times
+  at which to store the computed state (see `tfp.math.ode.Base.solve`).
+
+  Properties:
+    final_time: Scalar float `Tensor` specifying the largest time at which to
+      store the computed state.
+  """
+  __slots__ = ()

@@ -41,6 +41,7 @@ py_library(
         ":random_ops",
         ":root_search",
         ":sparse",
+        "//tensorflow_probability/python/math/ode",
     ],
 )
 
