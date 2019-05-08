@@ -192,6 +192,11 @@ class JointDistributionNamed(
       return tuple(xs.get(n, None) for n in self._dist_fn_name)
     return tuple(getattr(xs, n) for n in self._dist_fn_name)
 
+  def _resolve_graph(self, distribution_names=None, leaf_name='x'):
+    return tuple(zip(self._dist_fn_name,
+                     [() if x is None else x
+                      for x in self._dist_fn_args]))
+
 
 class _Node(object):
 
@@ -225,21 +230,16 @@ def _best_order(g):
       result.append((u.name, u.parents))
       u.depth = -1  # Mark visited.
       return
-    b = (u.name, [])
-    result.append(b)
     u.depth = -1  # Mark visited.
-    d = 0
-    for v in sorted((g.get(p) for p in u.parents), key=lambda v: v.depth):
-      n0 = len(result)
+    for v in sorted((g.get(p) for p in u.parents),
+                    key=lambda v: (v.depth, v.name), reverse=True):
       _explore(v)
-      n1 = len(result)
-      b[1].extend(['_']*d + [v.name])
-      d = n1 - n0 - 1
+    result.append((u.name, u.parents))
   g = _depth(g)
   result = []
-  for u in sorted(g.values(), key=lambda v: v.depth, reverse=True):
+  for u in sorted(g.values(), key=lambda v: (v.depth, v.name), reverse=True):
     _explore(u)
-  return tuple(reversed(result))
+  return tuple(result)
 
 
 def _prob_chain_rule_flatten(named_makers):
@@ -250,13 +250,12 @@ def _prob_chain_rule_flatten(named_makers):
     if not args:
       return lambda *_: dist_fn()
     def _fn(*xs):
-      kwargs = dict(zip(args, reversed(xs[-len(args):])))
-      kwargs.pop('_', None)
+      kwargs = dict([(k, v) for k, v in zip(dist_fn_name, xs) if k in args])
       return dist_fn(**kwargs)
     return _fn
   named_makers = _convert_to_dict(named_makers)
-  g = {k: (None if distribution_util.is_distribution_instance(v)
-           else joint_distribution_sequential._get_required_args(v))  # pylint: disable=protected-access
+  g = {k: None if distribution_util.is_distribution_instance(v)
+          else joint_distribution_sequential._get_required_args(v)  # pylint: disable=protected-access
        for k, v in named_makers.items()}
   g = _best_order(g)
   dist_fn_name, dist_fn_args = zip(*g)
@@ -279,3 +278,5 @@ def _convert_to_dict(x):
   if hasattr(x, '_asdict'):
     return x._asdict()
   return dict(x)
+
+

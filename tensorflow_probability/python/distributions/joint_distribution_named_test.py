@@ -212,12 +212,14 @@ class JointDistributionNamedTest(tf.test.TestCase, parameterized.TestCase):
                                    validate_args=True)
     # pylint: enable=bad-whitespace
     self.assertEqual(
-        (('e', ()),
-         ('scale', ('e',)),
-         ('s', ()),
-         ('loc', ('s',)),
-         ('df', ()),
-         ('x', ('df', 'loc', '_', 'scale'))),
+        (
+            ('e', ()),
+            ('scale', ('e',)),
+            ('s', ()),
+            ('loc', ('s',)),
+            ('df', ()),
+            ('x', ('df', 'loc', 'scale'))
+        ),
         d._resolve_graph())
 
   @parameterized.parameters('mean', 'mode', 'stddev', 'variance')
@@ -332,6 +334,45 @@ class JointDistributionNamedTest(tf.test.TestCase, parameterized.TestCase):
     self.assertEqual(sample_shape * 3, x['x'].shape)
     lp = d.log_prob(x)
     self.assertEqual(sample_shape * 3, lp.shape)
+
+  def test_sample_complex_dependency(self):
+    # pylint: disable=bad-whitespace
+    d = tfd.JointDistributionNamed(
+        dict(
+            y    =          tfd.StudentT,
+            x    =          tfd.StudentT,
+            df   =          tfd.Exponential(2),
+            loc  =lambda s: tfd.Normal(loc=0, scale=s),
+            s    =          tfd.HalfNormal(2.5),
+            scale=lambda e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1]),
+            e    =          tfd.Independent(tfd.Exponential(rate=[100, 120]), 1)
+        ),
+        validate_args=False)
+
+    # pylint: enable=bad-whitespace
+
+    self.assertEqual(
+        (
+            ('e', ()),
+            ('scale', ('e',)),
+            ('s', ()),
+            ('loc', ('s',)),
+            ('df', ()),
+            ('y', ('df', 'loc', 'scale')),
+            ('x', ('df', 'loc', 'scale')),
+        ),
+        d._resolve_graph())
+
+    x = d.sample()
+    self.assertLen(x, 7)
+
+    ds, s = d.sample_distributions()
+    self.assertEqual(ds['x'].parameters['df'], s['df'])
+    self.assertEqual(ds['x'].parameters['loc'], s['loc'])
+    self.assertEqual(ds['x'].parameters['scale'], s['scale'])
+    self.assertEqual(ds['y'].parameters['df'], s['df'])
+    self.assertEqual(ds['y'].parameters['loc'], s['loc'])
+    self.assertEqual(ds['y'].parameters['scale'], s['scale'])
 
 
 if __name__ == '__main__':
