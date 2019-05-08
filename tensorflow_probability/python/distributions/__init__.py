@@ -173,6 +173,7 @@ __all__ = [
     'InverseGammaWithSoftplusConcentrationRate',
     'InverseGammaWithSoftplusConcentrationScale',
     'JointDistribution',
+    'JointDistributionCoroutine',
     'JointDistributionNamed',
     'JointDistributionSequential',
     'Kumaraswamy',
