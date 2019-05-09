@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""The Nelder Mead derivative free minimization algorithm.
+"""The Nelder-Mead derivative-free minimization algorithm.
 
-Nelder Mead method is one of the most popular derivative free minimization
-methods. For an optimization problem in `n`-dimensions it maintains a set of
+The Nelder-Mead method is one of the most popular derivative-free minimization
+methods. For an optimization problem in `n` dimensions it maintains a set of
 `n+1` candidate solutions that span a non-degenerate simplex. It successively
 modifies the simplex based on a set of moves (reflection, expansion, shrinkage
 and contraction) using the function values at each of the vertices.

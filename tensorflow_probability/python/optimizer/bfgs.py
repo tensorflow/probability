@@ -14,8 +14,8 @@
 # ============================================================================
 """The Broyden-Fletcher-Goldfarb-Shanno minimization algorithm.
 
-Quasi Newton methods are a class of popular first order optimization algorithm.
-These methods use a positive definite approximation to the exact
+Quasi-Newton methods are a class of popular first-order optimization algorithm.
+These methods use a positive-definite approximation to the exact
 Hessian to find the search direction. The Broyden-Fletcher-Goldfarb-Shanno
 algorithm (BFGS) is a specific implementation of this general idea.
 

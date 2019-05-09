@@ -14,20 +14,21 @@
 # ============================================================================
 """The differential evolution global optimization algorithm.
 
-Differential evolution (DE) is a population based global optimization scheme.
-It is applicable to problems with continuous parameter space and because it
-does not require gradient computation, it is also applicable to
+Differential evolution (DE) is a population-based global optimization scheme.
+It is applicable to problems with a continuous parameter space. Because it
+does not require computing gradients, it is also applicable to
 non-differentiable functions. For more details see:
 https://en.wikipedia.org/wiki/Differential_evolution
 
 DE starts with a population of candidate solutions (represented as vectors).
-It generates new trial solutions by adding the weighted difference between
-two population vectors to a third vector. This is the mutation operation. The
-mutated vectors parameters are mixed with the parameters of a third
-vector to yield the final candidate solution. This is the crossover step. If
-the trial vector yields a lower cost value it replaces the target vector. This
-process is repeated for each member of the population to complete one
-generation.
+It generates new trial solutions by a combination of
+- "mutation", namely adding the weighted difference between
+  two population vectors to a target vector, and
+- "crossover", namely mixing the target with the content of a third.
+
+If the trial vector thus constructed yields a lower cost value it
+replaces the target vector it was made from. This process is repeated for
+each member of the population to complete one generation.
 
 There are a number of different schemes that fall under the DE umbrella.
 The established notation for representing these schemes
@@ -133,7 +134,7 @@ def one_step(
       arguments as a rank 1 real `Tensor`. This specifies the function to be
       minimized. The input to this callable may be either a single `Tensor`
       or a Python `list` of `Tensor`s. The signature must match the format of
-      the argument `population`. (i.e. objective_function(*population) must
+      the argument `population`. (i.e., objective_function(*population) must
       return the value of the function to be minimized).
     population:  `Tensor` or Python `list` of `Tensor`s representing the
       current population vectors. Each `Tensor` must be of the same real dtype.
@@ -627,7 +628,7 @@ def _binary_crossover(population,
       `population`).
     mutants: A Python list of `Tensor`s with the same structure as `population`.
       The mutated population.
-    crossover_prob: A postive real scalar `Tensor` bounded above by 1.0. The
+    crossover_prob: A positive real scalar `Tensor` bounded above by 1.0. The
       probability of a crossover being performed for each axis.
     seed: `int` or None. The random seed for this `Op`. If `None`, no seed is
       applied.

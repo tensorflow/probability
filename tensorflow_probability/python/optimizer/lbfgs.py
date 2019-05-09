@@ -20,7 +20,7 @@ sparse. Instead of storing fully dense n x n approximations of Hessian
 matrices, they only save a few vectors of length n that represent the
 approximations implicitly.
 
-This module implements the algorithm know as L-BFGS, which, as its name
+This module implements the algorithm known as L-BFGS, which, as its name
 suggests, is a limited-memory version of the BFGS algorithm.
 """
 from __future__ import absolute_import
