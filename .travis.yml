@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-sudo: required
 language: python
 git:
   depth: 20
@@ -37,7 +36,7 @@ jobs:
 # of python versions x SHARD will be expanded and run in parallel.
 python:
   - "2.7"
-  - "3.4"
+  - "3.6"
 virtualenv:
   system_site_packages: true
 env:
