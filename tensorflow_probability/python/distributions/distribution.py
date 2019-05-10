@@ -804,7 +804,7 @@ class Distribution(_BaseDistribution):
                                        self.batch_shape_tensor),
           name="is_scalar_batch")
 
-  def _sample_n(self, n, seed=None):
+  def _sample_n(self, n, seed=None, **kwargs):
     raise NotImplementedError("sample_n is not implemented: {}".format(
         type(self).__name__))
 
@@ -959,7 +959,7 @@ class Distribution(_BaseDistribution):
     """
     return self._call_cdf(value, name, **kwargs)
 
-  def _log_survival_function(self, value):
+  def _log_survival_function(self, value, **kwargs):
     raise NotImplementedError(
         "log_survival_function is not implemented: {}".format(
             type(self).__name__))
@@ -1003,7 +1003,7 @@ class Distribution(_BaseDistribution):
     """
     return self._call_log_survival_function(value, name, **kwargs)
 
-  def _survival_function(self, value):
+  def _survival_function(self, value, **kwargs):
     raise NotImplementedError("survival_function is not implemented: {}".format(
         type(self).__name__))
 
@@ -1042,7 +1042,7 @@ class Distribution(_BaseDistribution):
     """
     return self._call_survival_function(value, name, **kwargs)
 
-  def _entropy(self):
+  def _entropy(self, **kwargs):
     raise NotImplementedError("entropy is not implemented: {}".format(
         type(self).__name__))
 
@@ -1051,7 +1051,7 @@ class Distribution(_BaseDistribution):
     with self._name_scope(name):
       return self._entropy(**kwargs)
 
-  def _mean(self):
+  def _mean(self, **kwargs):
     raise NotImplementedError("mean is not implemented: {}".format(
         type(self).__name__))
 
@@ -1060,7 +1060,7 @@ class Distribution(_BaseDistribution):
     with self._name_scope(name):
       return self._mean(**kwargs)
 
-  def _quantile(self, value):
+  def _quantile(self, value, **kwargs):
     raise NotImplementedError("quantile is not implemented: {}".format(
         type(self).__name__))
 
@@ -1090,7 +1090,7 @@ class Distribution(_BaseDistribution):
     """
     return self._call_quantile(value, name, **kwargs)
 
-  def _variance(self):
+  def _variance(self, **kwargs):
     raise NotImplementedError("variance is not implemented: {}".format(
         type(self).__name__))
 
@@ -1123,7 +1123,7 @@ class Distribution(_BaseDistribution):
         except NotImplementedError:
           raise original_exception
 
-  def _stddev(self):
+  def _stddev(self, **kwargs):
     raise NotImplementedError("stddev is not implemented: {}".format(
         type(self).__name__))
 
@@ -1157,7 +1157,7 @@ class Distribution(_BaseDistribution):
         except NotImplementedError:
           raise original_exception
 
-  def _covariance(self):
+  def _covariance(self, **kwargs):
     raise NotImplementedError("covariance is not implemented: {}".format(
         type(self).__name__))
 
@@ -1201,7 +1201,7 @@ class Distribution(_BaseDistribution):
     with self._name_scope(name):
       return self._covariance(**kwargs)
 
-  def _mode(self):
+  def _mode(self, **kwargs):
     raise NotImplementedError("mode is not implemented: {}".format(
         type(self).__name__))
 
