@@ -958,7 +958,7 @@ def embed_check_categorical_event_shape(
     max_event_size = (
         _largest_integer_by_dtype(x_dtype)
         if dtype_util.is_floating(x_dtype) else 0)
-    if max_event_size is 0:
+    if max_event_size == 0:
       raise TypeError("Unable to validate size of unrecognized dtype "
                       "({}).".format(dtype_util.name(x_dtype)))
     try:
