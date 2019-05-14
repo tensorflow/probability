@@ -18,38 +18,44 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from experimental.fun_mcmc.fun_mcmc_lib import blanes_3_stage_step
+from experimental.fun_mcmc.fun_mcmc_lib import blanes_4_stage_step
 from experimental.fun_mcmc.fun_mcmc_lib import call_and_grads
 from experimental.fun_mcmc.fun_mcmc_lib import call_fn
 from experimental.fun_mcmc.fun_mcmc_lib import hamiltonian_monte_carlo
 from experimental.fun_mcmc.fun_mcmc_lib import HamiltonianMonteCarloExtra
 from experimental.fun_mcmc.fun_mcmc_lib import HamiltonianMonteCarloState
+from experimental.fun_mcmc.fun_mcmc_lib import IntegratorStepState
 from experimental.fun_mcmc.fun_mcmc_lib import leapfrog_step
-from experimental.fun_mcmc.fun_mcmc_lib import LeapFrogStepExtras
-from experimental.fun_mcmc.fun_mcmc_lib import LeapFrogStepState
 from experimental.fun_mcmc.fun_mcmc_lib import maybe_broadcast_structure
 from experimental.fun_mcmc.fun_mcmc_lib import metropolis_hastings_step
 from experimental.fun_mcmc.fun_mcmc_lib import PotentialFn
+from experimental.fun_mcmc.fun_mcmc_lib import ruth4_step
 from experimental.fun_mcmc.fun_mcmc_lib import sign_adaptation
 from experimental.fun_mcmc.fun_mcmc_lib import State
+from experimental.fun_mcmc.fun_mcmc_lib import symmetric_spliting_integrator_step
 from experimental.fun_mcmc.fun_mcmc_lib import trace
 from experimental.fun_mcmc.fun_mcmc_lib import transform_log_prob_fn
 from experimental.fun_mcmc.fun_mcmc_lib import TransitionOperator
 
 __all__ = [
-    'HamiltonianMonteCarloExtra',
-    'HamiltonianMonteCarloState',
-    'LeapFrogStepExtras',
-    'LeapFrogStepState',
-    'PotentialFn',
-    'State',
-    'TransitionOperator',
+    'blanes_3_stage_step',
+    'blanes_4_stage_step',
     'call_and_grads',
     'call_fn',
     'hamiltonian_monte_carlo',
+    'HamiltonianMonteCarloExtra',
+    'HamiltonianMonteCarloState',
+    'IntegratorStepState',
+    'leapfrog_step',
     'maybe_broadcast_structure',
     'metropolis_hastings_step',
-    'leapfrog_step',
+    'PotentialFn',
+    'ruth4_step',
     'sign_adaptation',
+    'State',
+    'symmetric_spliting_integrator_step',
     'trace',
     'transform_log_prob_fn',
+    'TransitionOperator',
 ]

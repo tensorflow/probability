@@ -107,7 +107,13 @@ class FunMCMCTest(tf.test.TestCase, parameterized.TestCase):
     self.assertAllClose([2., 3.], orig_space)
     self.assertAllClose(lp, tlp)
 
-  def testLeapfrogStep(self):
+  @parameterized.parameters(
+      fun_mcmc.leapfrog_step,
+      fun_mcmc.ruth4_step,
+      fun_mcmc.blanes_3_stage_step,
+      fun_mcmc.blanes_4_stage_step,
+  )
+  def testIntegratorStep(self, method):
     if not tf.executing_eagerly():
       return
 
@@ -117,8 +123,8 @@ class FunMCMCTest(tf.test.TestCase, parameterized.TestCase):
     def kinetic_energy_fn(p):
       return tf.abs(p)**3., 2.
 
-    state, extras = fun_mcmc.leapfrog_step(
-        leapfrog_step_state=fun_mcmc.LeapFrogStepState(
+    state, extras = method(
+        integrator_step_state=fun_mcmc.IntegratorStepState(
             state=1., state_grads=None, momentum=2.),
         step_size=0.1,
         target_log_prob_fn=target_log_prob_fn,
@@ -205,7 +211,7 @@ class FunMCMCTest(tf.test.TestCase, parameterized.TestCase):
     kernel = tf.function(lambda state: fun_mcmc.hamiltonian_monte_carlo(
         state,
         step_size=step_size,
-        num_leapfrog_steps=num_leapfrog_steps,
+        num_integrator_steps=num_leapfrog_steps,
         target_log_prob_fn=target_log_prob_fn,
         seed=tfp_test_util.test_seed()))
 
@@ -258,7 +264,7 @@ class FunMCMCTest(tf.test.TestCase, parameterized.TestCase):
       hmc_state, hmc_extra = fun_mcmc.hamiltonian_monte_carlo(
           hmc_state,
           step_size=step_size,
-          num_leapfrog_steps=num_leapfrog_steps,
+          num_integrator_steps=num_leapfrog_steps,
           target_log_prob_fn=target_log_prob_fn)
 
       rate = tf.compat.v1.train.polynomial_decay(
