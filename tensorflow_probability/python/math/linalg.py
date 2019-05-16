@@ -548,7 +548,7 @@ def lu_matrix_inverse(lower_upper, perm, validate_args=False, name=None):
 
   This op is conceptually identical to,
 
-  ````python
+  ```python
   inv_X = tf.lu_matrix_inverse(*tf.linalg.lu(X))
   tf.assert_near(tf.matrix_inverse(X), inv_X)
   # ==> True
