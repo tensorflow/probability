@@ -16,6 +16,7 @@
 
 from __future__ import absolute_import
 from __future__ import division
+from __future__ import print_function
 
 # Dependency imports
 from absl.testing import parameterized
@@ -351,7 +352,7 @@ class _HiddenMarkovModelTest(
 
     self.run_test_sample_consistent_mean_variance(self.evaluate, model,
                                                   num_samples=100000,
-                                                  rtol=0.02)
+                                                  rtol=0.03)
 
   def test_single_sequence_posterior_marginals(self):
 
@@ -465,7 +466,7 @@ class _HiddenMarkovModelTest(
                                     [0.00000, 0.00000, 0.99960, 0.00039]])
     self.assertAllClose(inferred_probs, expected_probs, rtol=0., atol=1e-4)
 
-  def test_max_probability_basic_example(self):
+  def test_posterior_mode_basic_example(self):
     observation_locs_data = tf.constant([0.0, 1.0, 2.0, 3.0],
                                         dtype=self.dtype)
     observation_scale_data = tf.constant(0.25, dtype=self.dtype)
@@ -565,7 +566,7 @@ class _HiddenMarkovModelTest(
     expected_states = increase_rank(rank_e, [0, 2, 2, 2, 2, 3, 3, 2])
     self.assertAllEqual(inferred_states, expected_states)
 
-  def test_max_probability_high_rank_batch(self):
+  def test_posterior_mode_high_rank_batch(self):
     observation_probs_data = tf.constant([[1.0, 0.0],
                                           [0.0, 1.0]],
                                          dtype=self.dtype)
@@ -592,37 +593,10 @@ class _HiddenMarkovModelTest(
     expected_states = 2*[3*[[5*[0], 5*[1]]]]
     self.assertAllEqual(inferred_states, expected_states)
 
-  def test_max_probability_edge_case_no_transitions(self):
-    observation_probs_data = tf.constant([[1.0, 0.0],
-                                          [0.0, 1.0]],
-                                         dtype=self.dtype)
-    transition_matrix_data = tf.constant([[1.0, 0.0],
-                                          [0.0, 1.0]],
-                                         dtype=self.dtype)
-    initial_prob_data = tf.constant([0.5, 0.5],
-                                    dtype=self.dtype)
-
-    observations = tf.constant([[0], [1]])
-
-    (initial_prob, transition_matrix,
-     observation_probs) = self.make_placeholders([
-         initial_prob_data, transition_matrix_data,
-         observation_probs_data])
-
-    model = tfd.HiddenMarkovModel(
-        tfd.Categorical(probs=initial_prob),
-        tfd.Categorical(probs=transition_matrix),
-        tfd.Categorical(probs=observation_probs),
-        num_steps=1)
-
-    inferred_states = model.posterior_mode(observations)
-    expected_states = [[0], [1]]
-    self.assertAllEqual(inferred_states, expected_states)
-
   # Check that the Viterbi algorithm is invariant under permutations of the
   # names of the observations of the HMM (when there is a unique most
   # likely sequence of hidden states).
-  def test_max_probability_invariance_observations(self):
+  def test_posterior_mode_invariance_observations(self):
     observation_probs_data = tf.constant([[0.09, 0.48, 0.52, 0.11],
                                           [0.31, 0.21, 0.21, 0.27]],
                                          dtype=self.dtype)
@@ -665,7 +639,7 @@ class _HiddenMarkovModelTest(
   # Check that the Viterbi algorithm is invariant under permutations of the
   # names of the hidden states of the HMM (when there is a unique most
   # likely sequence of hidden states).
-  def test_max_probability_invariance_states(self):
+  def test_posterior_mode_invariance_states(self):
     observation_probs_data = tf.constant([[0.12, 0.48, 0.5, 0.1],
                                           [0.4, 0.1, 0.5, 0.0],
                                           [0.1, 0.2, 0.3, 0.4]],
@@ -716,6 +690,183 @@ class _HiddenMarkovModelTest(
                                                    axis=-1),
                                     expected_states)[..., 0])
     self.assertAllEqual(inferred_states, expected_states_permuted)
+
+  def test_posterior_mode_missing_continuous_observations(self):
+    initial_prob_data = tf.constant([0.5, 0.5], dtype=self.dtype)
+    transition_matrix_data = tf.constant([[[0.6, 0.4],
+                                           [0.6, 0.4]],
+                                          [[0.4, 0.6],
+                                           [0.4, 0.6]]], dtype=self.dtype)
+    observation_locs_data = tf.constant([[0.0, 0.0],
+                                         [10.0, 10.0]], dtype=self.dtype)
+
+    (initial_prob, transition_matrix,
+     observation_locs) = self.make_placeholders([
+         initial_prob_data, transition_matrix_data,
+         observation_locs_data])
+
+    model = tfd.HiddenMarkovModel(tfd.Categorical(probs=initial_prob),
+                                  tfd.Categorical(probs=transition_matrix),
+                                  tfd.MultivariateNormalDiag(
+                                      loc=observation_locs),
+                                  num_steps=3)
+
+    observations = tf.constant([[0.0, 0.0],
+                                [0.0, 0.0],
+                                [10.0, 10.0]], dtype=self.dtype)
+
+    # We test two different transition matrices as well as two
+    # different masks.
+    # As a result we have a 2x2 tensor of sequences of states
+    # returned by `posterior_mode`.
+    x = model.posterior_mode(observations, mask=[[[False, True, False]],
+                                                 [[False, False, False]]])
+
+    self.assertAllEqual(x, [[[0, 0, 1], [0, 1, 1]],
+                            [[0, 0, 1], [0, 0, 1]]])
+
+  def test_posterior_mode_missing_discrete_observations(self):
+    initial_prob = tf.constant([1.0, 0.0, 0.0, 0.0], dtype=self.dtype)
+
+    # This test uses a model with a random walk that can make a change of
+    # of -1, 0 or +1 at each step.
+    transition_data = (0.5 * np.diag(np.ones(4)) +
+                       0.25*np.diag(np.ones(3), -1) +
+                       0.25*np.diag(np.ones(3), 1))
+    transition_data[0, 0] += 0.25
+    transition_data[3, 3] += 0.25
+    transition_matrix = tf.constant(transition_data, dtype=self.dtype)
+
+    # Observations of the random walk are unreliable and give the
+    # correct position with probability `0.25 + 0.75 * reliability`
+    def observation_fn(reliability):
+      return np.array(reliability * np.diag(np.ones(4)) +
+                      (1 - reliability) * 0.25 * np.ones((4, 4)))
+
+    observation_data = np.array(
+        [observation_fn(reliability)
+         for reliability in [0.993, 0.994, 0.995, 0.996]])
+    observation_probs = tf.constant(observation_data, dtype=self.dtype)
+
+    model = tfd.HiddenMarkovModel(tfd.Categorical(probs=initial_prob),
+                                  tfd.Categorical(probs=transition_matrix),
+                                  tfd.Categorical(probs=observation_probs),
+                                  num_steps=7)
+
+    observations = tf.constant([0, 1, 2, 3, 2, 1, 0])
+    mask = tf.constant([False, True, True, False, True, True, False])
+
+    inferred_states = model.posterior_mode(observations, mask)
+
+    # This example has been tuned so that there are two local maxima in the
+    # space of paths.
+    # As the `reliability` parameter increases, the mode switches from one of
+    # the two paths to the other.
+    expected_states = [[0, 0, 0, 0, 0, 0, 0],
+                       [0, 0, 0, 0, 0, 0, 0],
+                       [0, 1, 2, 3, 2, 1, 0],
+                       [0, 1, 2, 3, 2, 1, 0]]
+    self.assertAllEqual(inferred_states, expected_states)
+
+  def test_posterior_marginals_missing_observations(self):
+    initial_prob = tf.constant([1., 0., 0., 0.], dtype=self.dtype)
+
+    # This test uses a model with a random walk that can make a change of
+    # of -1, 0 or +1 at each step.
+    transition_data = [[0.75, 0.25, 0., 0.],
+                       [0.25, 0.5, 0.25, 0.],
+                       [0., 0.25, 0.5, 0.25],
+                       [0.0, 0.0, 0.25, 0.75]]
+    transition_matrix = tf.constant(transition_data, dtype=self.dtype)
+
+    observation_data = np.array(np.eye(4))
+    observation_probs = tf.constant(observation_data, dtype=self.dtype)
+
+    model = tfd.HiddenMarkovModel(tfd.Categorical(probs=initial_prob),
+                                  tfd.Categorical(probs=transition_matrix),
+                                  tfd.Categorical(probs=observation_probs),
+                                  num_steps=7)
+
+    observations = tf.constant([0, 1, 2, 3, 2, 1, 0])
+    mask = tf.constant([False, True, True, True, True, True, False])
+
+    marginals = model.posterior_marginals(observations, mask).probs
+    expected_marginals = [[1., 0., 0., 0.],
+                          [21./26, 5./26, 0., 0.],
+                          [105./143, 35./143, 3./143, 0.],
+                          [1225./1716, 147./572, 49./1716, 1./1716],
+                          [105./143, 35./143, 3./143, 0.],
+                          [21./26, 5./26, 0., 0.],
+                          [1., 0., 0., 0.]]
+    self.assertAllClose(marginals, expected_marginals)
+
+  def test_posterior_mode_edge_case_no_transitions(self):
+    # Test all eight combinations of a single state that is
+    # 1. unmasked/masked
+    # 2. observed at state 0/state 1
+    # 3. more likely started at state 0/state 1
+    initial_prob_data = tf.constant([[0.9, 0.1], [0.1, 0.9]], dtype=self.dtype)
+    transition_matrix_data = tf.constant([[0.5, 0.5],
+                                          [0.5, 0.5]], dtype=self.dtype)
+    observation_probs_data = tf.constant([[1.0, 0.0],
+                                          [0.0, 1.0]], dtype=self.dtype)
+
+    (initial_prob, transition_matrix,
+     observation_probs) = self.make_placeholders([
+         initial_prob_data, transition_matrix_data,
+         observation_probs_data])
+
+    model = tfd.HiddenMarkovModel(tfd.Categorical(probs=initial_prob),
+                                  tfd.Categorical(probs=transition_matrix),
+                                  tfd.Categorical(probs=observation_probs),
+                                  num_steps=1)
+
+    inferred_state = model.posterior_mode(
+        observations=[[[0]], [[1]]],
+        mask=[[[[True]]], [[[False]]]])
+
+    expected_state = [[[[0], [1]], [[0], [1]]],
+                      [[[0], [0]], [[1], [1]]]]
+
+    self.assertAllEqual(inferred_state, expected_state)
+
+  def test_posterior_marginals_edge_case_no_transitions(self):
+    # Test all eight combinations of a single state that is
+    # 1. unmasked/masked
+    # 2. observed at state 0/state 1
+    # 3. more likely started at state 0/state 1
+    initial_prob_data = tf.constant([[0.9, 0.1], [0.1, 0.9]], dtype=self.dtype)
+    transition_matrix_data = tf.constant([[0.5, 0.5],
+                                          [0.5, 0.5]], dtype=self.dtype)
+    observation_probs_data = tf.constant([[1.0, 0.0],
+                                          [0.0, 1.0]], dtype=self.dtype)
+
+    (initial_prob, transition_matrix,
+     observation_probs) = self.make_placeholders([
+         initial_prob_data, transition_matrix_data,
+         observation_probs_data])
+
+    model = tfd.HiddenMarkovModel(tfd.Categorical(probs=initial_prob),
+                                  tfd.Categorical(probs=transition_matrix),
+                                  tfd.Categorical(probs=observation_probs),
+                                  num_steps=1)
+
+    inferred_marginals = model.posterior_marginals(
+        observations=[[[0]], [[1]]],
+        mask=[[[[True]]], [[[False]]]]).probs
+
+    # Result is a [2,2,2] batch of sequences of length 1 of
+    # [2]-vectors of probabilities.
+    expected_marginals = [[[[[0.9, 0.1]],
+                            [[0.1, 0.9]]],
+                           [[[0.9, 0.1]],
+                            [[0.1, 0.9]]]],
+                          [[[[1., 0.]],
+                            [[1., 0.]]],
+                           [[[0., 1.]],
+                            [[0., 1.]]]]]
+
+    self.assertAllClose(inferred_marginals, expected_marginals)
 
 
 class HiddenMarkovModelTestFloat32(_HiddenMarkovModelTest):
