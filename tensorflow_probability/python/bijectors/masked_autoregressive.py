@@ -779,8 +779,8 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
-      **kwargs: Additional keyword arguments passed to the
-        `tf.keras.layer.Dense` constructed by this layer.
+      **kwargs: Additional keyword arguments passed to this layer (but not to
+        the `tf.keras.layer.Dense` layers constructed by this layer).
     """
     super(AutoregressiveNetwork, self).__init__(**kwargs)
 
@@ -872,8 +872,7 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
           bias_regularizer=self._bias_regularizer,
           kernel_constraint=_make_masked_constraint(
               self._masks[k], self._kernel_constraint),
-          bias_constraint=self._bias_constraint,
-          **self._kwargs))
+          bias_constraint=self._bias_constraint))
 
     # Record that the layer has been built.
     super(AutoregressiveNetwork, self).build(input_shape)
