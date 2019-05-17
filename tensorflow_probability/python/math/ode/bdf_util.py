@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import collections
 import numpy as np
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 MAX_ORDER = 5
@@ -95,10 +96,10 @@ def interpolation_matrix(dtype, order, step_size_ratio):
   full_interpolation_matrix = tf.math.cumprod(
       ((j - 1) - i * step_size_ratio_cast) / j, axis=1)
   zeros_matrix = tf.zeros_like(full_interpolation_matrix)
-  interpolation_matrix_ = tf.where(
+  interpolation_matrix_ = tf1.where(
       tf.range(1, MAX_ORDER + 1) <= order,
       tf.transpose(
-          tf.where(
+          tf1.where(
               tf.range(1, MAX_ORDER + 1) <= order,
               tf.transpose(full_interpolation_matrix), zeros_matrix)),
       zeros_matrix)
@@ -109,14 +110,14 @@ def newton(backward_differences, max_num_iters, newton_coefficient, ode_fn_vec,
            order, step_size, time, tol, unitary, upper):
   """Runs Newton's method to solve the BDF equation."""
   initial_guess = tf.reduce_sum(
-      tf.where(
+      tf1.where(
           tf.range(MAX_ORDER + 1) <= order,
           backward_differences[:MAX_ORDER + 1],
           tf.zeros_like(backward_differences)[:MAX_ORDER + 1]),
       axis=0)
 
   rhs_constant_term = newton_coefficient * tf.reduce_sum(
-      tf.where(
+      tf1.where(
           tf.range(1, MAX_ORDER + 1) <= order, RECIPROCAL_SUMS[1:, np.newaxis] *
           backward_differences[1:MAX_ORDER + 1],
           tf.zeros_like(backward_differences)[1:MAX_ORDER + 1]),

@@ -20,6 +20,7 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
@@ -287,7 +288,7 @@ class Dirichlet(distribution.Distribution):
           tf.shape(input=mode),
           dtype_util.as_numpy_dtype(self.dtype)(np.nan),
           name="nan")
-      return tf.where(
+      return tf1.where(
           tf.reduce_all(input_tensor=self.concentration > 1., axis=-1), mode,
           nan)
     return distribution_util.with_dependencies([

@@ -19,6 +19,7 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 from scipy import stats
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
@@ -85,9 +86,9 @@ class PoissonTest(test_case.TestCase):
         tf.shape(input=expected_continuous_log_pmf),
         value=dtype_util.as_numpy_dtype(
             expected_continuous_log_pmf.dtype)(-np.inf))
-    expected_continuous_log_pmf = tf.where(x >= 0.,
-                                           expected_continuous_log_pmf,
-                                           neg_inf)
+    expected_continuous_log_pmf = tf1.where(x >= 0.,
+                                            expected_continuous_log_pmf,
+                                            neg_inf)
     expected_continuous_pmf = tf.exp(expected_continuous_log_pmf)
 
     log_pmf = poisson.log_prob(x)
@@ -173,9 +174,8 @@ class PoissonTest(test_case.TestCase):
             np.float32)
 
     expected_continuous_cdf = tf.math.igammac(1. + x, lam)
-    expected_continuous_cdf = tf.where(x >= 0.,
-                                       expected_continuous_cdf,
-                                       tf.zeros_like(expected_continuous_cdf))
+    expected_continuous_cdf = tf1.where(x >= 0., expected_continuous_cdf,
+                                        tf.zeros_like(expected_continuous_cdf))
     expected_continuous_log_cdf = tf.math.log(expected_continuous_cdf)
 
     poisson = self._make_poisson(rate=lam, interpolate_nondiscrete=True)

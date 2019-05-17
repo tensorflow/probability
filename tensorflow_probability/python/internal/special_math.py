@@ -76,6 +76,7 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import dtype_util
@@ -148,9 +149,9 @@ def _ndtr(x):
       0.5 * np.sqrt(2.), dtype=x.dtype, name="half_sqrt_2")
   w = x * half_sqrt_2
   z = tf.abs(w)
-  y = tf.where(
+  y = tf1.where(
       tf.less(z, half_sqrt_2), 1. + tf.math.erf(w),
-      tf.where(tf.greater(w, 0.), 2. - tf.math.erfc(z), tf.math.erfc(z)))
+      tf1.where(tf.greater(w, 0.), 2. - tf.math.erfc(z), tf.math.erfc(z)))
   return 0.5 * y
 
 
@@ -247,11 +248,11 @@ def _ndtri(p):
       return tf.zeros_like(var)
     return coeffs[0] + _create_polynomial(var, coeffs[1:]) * var
 
-  maybe_complement_p = tf.where(p > -np.expm1(-2.), 1. - p, p)
+  maybe_complement_p = tf1.where(p > -np.expm1(-2.), 1. - p, p)
   # Write in an arbitrary value in place of 0 for p since 0 will cause NaNs
   # later on. The result from the computation when p == 0 is not used so any
   # number that doesn't result in NaNs is fine.
-  sanitized_mcp = tf.where(
+  sanitized_mcp = tf1.where(
       maybe_complement_p <= 0.,
       tf.fill(tf.shape(input=p),
               dtype_util.as_numpy_dtype(p.dtype)(0.5)), maybe_complement_p)
@@ -277,14 +278,14 @@ def _ndtri(p):
   x_for_small_p = first_term - second_term_small_p
   x_otherwise = first_term - second_term_otherwise
 
-  x = tf.where(sanitized_mcp > np.exp(-2.), x_for_big_p,
-               tf.where(z >= 8.0, x_for_small_p, x_otherwise))
+  x = tf1.where(sanitized_mcp > np.exp(-2.), x_for_big_p,
+                tf1.where(z >= 8.0, x_for_small_p, x_otherwise))
 
-  x = tf.where(p > 1. - np.exp(-2.), x, -x)
+  x = tf1.where(p > 1. - np.exp(-2.), x, -x)
   infinity_scalar = tf.constant(np.inf, dtype=p.dtype)
   infinity = tf.fill(tf.shape(input=p), infinity_scalar)
-  x_nan_replaced = tf.where(
-      p <= 0.0, -infinity, tf.where(p >= 1.0, infinity, x))
+  x_nan_replaced = tf1.where(p <= 0.0, -infinity,
+                             tf1.where(p >= 1.0, infinity, x))
   return x_nan_replaced
 
 
@@ -371,10 +372,10 @@ def log_ndtr(x, series_order=3, name="log_ndtr"):
     #   the gradient of a select involves the calculation 1*dy+0*(-inf)=nan
     #   regardless of whether dy is finite. Note that the minimum is a NOP if
     #   the branch is chosen.
-    return tf.where(
+    return tf1.where(
         tf.greater(x, upper_segment),
         -_ndtr(-x),  # log(1-x) ~= -x, x << 1
-        tf.where(
+        tf1.where(
             tf.greater(x, lower_segment),
             tf.math.log(_ndtr(tf.maximum(x, lower_segment))),
             _log_ndtr_lower(tf.minimum(x, lower_segment), series_order)))
@@ -479,4 +480,4 @@ def log_cdf_laplace(x, name="log_cdf_laplace"):
     # internally by log1p, rather than being done explicitly here.
     upper_solution = tf.math.log1p(-0.5 * safe_exp_neg_x)
 
-    return tf.where(x < 0., lower_solution, upper_solution)
+    return tf1.where(x < 0., lower_solution, upper_solution)

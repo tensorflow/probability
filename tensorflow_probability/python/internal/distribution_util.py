@@ -21,6 +21,7 @@ from __future__ import print_function
 import functools
 import hashlib
 import numpy as np
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import assert_util
@@ -488,8 +489,8 @@ def pad_mixture_dimensions(x, mixture_distribution, categorical_distribution,
 
     dist_batch_ndims = _get_ndims(mixture_distribution)
     cat_batch_ndims = _get_ndims(categorical_distribution)
-    pad_ndims = tf.where(categorical_distribution.is_scalar_batch(),
-                         dist_batch_ndims, dist_batch_ndims - cat_batch_ndims)
+    pad_ndims = tf1.where(categorical_distribution.is_scalar_batch(),
+                          dist_batch_ndims, dist_batch_ndims - cat_batch_ndims)
     s = tf.shape(input=x)
     x = tf.reshape(
         x,
@@ -506,11 +507,11 @@ def pad_mixture_dimensions(x, mixture_distribution, categorical_distribution,
 def pick_scalar_condition(pred, true_value, false_value, name=None):
   """Convenience function that chooses one of two values based on the predicate.
 
-  This utility is equivalent to a version of `tf.where` that accepts only a
+  This utility is equivalent to a version of `tf1.where` that accepts only a
   scalar predicate and computes its result statically when possible. It may also
   be used in place of `tf.cond` when both branches yield a `Tensor` of the same
   shape; the operational difference is that `tf.cond` uses control flow to
-  evaluate only the branch that's needed, while `tf.where` (and thus
+  evaluate only the branch that's needed, while `tf1.where` (and thus
   this method) may evaluate both branches before the predicate's truth is known.
   This means that `tf.cond` is preferred when one of the branches is expensive
   to evaluate (like performing a large matmul), while this method is preferred
@@ -538,7 +539,7 @@ def pick_scalar_condition(pred, true_value, false_value, name=None):
     false_value = tf.convert_to_tensor(value=false_value, name="false_value")
     pred_ = tf.get_static_value(pred)
     if pred_ is None:
-      return tf.where(pred, true_value, false_value)
+      return tf1.where(pred, true_value, false_value)
     return true_value if pred_ else false_value
 
 
@@ -565,8 +566,8 @@ def make_non_negative_axis(axis, rank):
     return tf.convert_to_tensor(value=positive_axis, dtype=axis.dtype)
 
   # Dynamic case.
-  # Unfortunately static values are lost by this tf.where.
-  return tf.where(axis < 0, rank + axis, axis)
+  # Unfortunately static values are lost by this tf1.where.
+  return tf1.where(axis < 0, rank + axis, axis)
 
 
 def move_dimension(x, source_idx, dest_idx):
@@ -1262,9 +1263,8 @@ def rotate_transpose(x, shift, name="rotate_transpose"):
       # Finally, we transform shift by modulo length so it can be specified
       # independently from the array upon which it operates (like python).
       ndims = tf.rank(x)
-      shift = tf.where(
-          tf.less(shift, 0), -shift % ndims,
-          ndims - shift % ndims)
+      shift = tf1.where(
+          tf.less(shift, 0), -shift % ndims, ndims - shift % ndims)
       first = tf.range(0, shift)
       last = tf.range(shift, ndims)
       perm = tf.concat([last, first], 0)
@@ -1316,8 +1316,8 @@ def pick_vector(cond, true_vector, false_vector, name="pick_vector"):
       return true_vector if cond_value_static else false_vector
     n = tf.shape(input=true_vector)[0]
     return tf.slice(
-        tf.concat([true_vector, false_vector], 0), [tf.where(cond, 0, n)],
-        [tf.where(cond, n, -1)])
+        tf.concat([true_vector, false_vector], 0), [tf1.where(cond, 0, n)],
+        [tf1.where(cond, n, -1)])
 
 
 def prefer_static_broadcast_shape(shape1,
@@ -1778,7 +1778,7 @@ def reduce_weighted_logsumexp(logx,
     # off the max. We do this because otherwise we'd get `inf - inf = NaN`. That
     # this is ok follows from the fact that we're actually free to subtract any
     # value we like, so long as we add it back after taking the `log(sum(...))`.
-    max_log_absw_x = tf.where(
+    max_log_absw_x = tf1.where(
         tf.math.is_inf(max_log_absw_x), tf.zeros_like(max_log_absw_x),
         max_log_absw_x)
     wx_over_max_absw_x = (tf.sign(w) * tf.exp(log_absw_x - max_log_absw_x))
@@ -1843,10 +1843,10 @@ def softplus_inverse(x, name=None):
     too_large_value = x
     # This `where` will ultimately be a NOP because we won't select this
     # codepath whenever we used the surrogate `ones_like`.
-    x = tf.where(tf.logical_or(is_too_small, is_too_large), tf.ones_like(x), x)
+    x = tf1.where(tf.logical_or(is_too_small, is_too_large), tf.ones_like(x), x)
     y = x + tf.math.log(-tf.math.expm1(-x))  # == log(expm1(x))
-    return tf.where(is_too_small, too_small_value,
-                    tf.where(is_too_large, too_large_value, y))
+    return tf1.where(is_too_small, too_small_value,
+                     tf1.where(is_too_large, too_large_value, y))
 
 
 # TODO(b/35290280): Add unit-tests.
@@ -1986,7 +1986,7 @@ def pad(x, axis, front=False, back=False, value=0, count=1, name=None):
       else:
         final_shape = None
     else:
-      axis = tf.where(axis < 0, ndims + axis, axis)
+      axis = tf1.where(axis < 0, ndims + axis, axis)
       final_shape = None
     x = tf.pad(
         tensor=x,

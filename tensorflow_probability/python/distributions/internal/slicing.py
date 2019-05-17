@@ -22,6 +22,7 @@ import collections
 import warnings
 
 import six
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 __all__ = ['batch_slice']
@@ -90,14 +91,14 @@ def _slice_single_param(param, param_event_ndims, slices, dist_batch_shape):
     if isinstance(slc, slice):
       start, stop, step = slc.start, slc.stop, slc.step
       if start is not None:
-        start = tf.where(is_broadcast, 0, start)
+        start = tf1.where(is_broadcast, 0, start)
       if stop is not None:
-        stop = tf.where(is_broadcast, 1, stop)
+        stop = tf1.where(is_broadcast, 1, stop)
       if step is not None:
-        step = tf.where(is_broadcast, 1, step)
+        step = tf1.where(is_broadcast, 1, step)
       param_slices.append(slice(start, stop, step))
     else:  # int, or int Tensor, e.g. d[d.batch_shape_tensor()[0] // 2]
-      param_slices.append(tf.where(is_broadcast, 0, slc))
+      param_slices.append(tf1.where(is_broadcast, 0, slc))
     param_dim_idx += 1
     batch_dim_idx += 1
   param_slices.extend([ALL_SLICE] * param_event_ndims)

@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
@@ -162,7 +163,7 @@ class Poisson(distribution.Distribution):
       neg_inf = tf.fill(
           tf.shape(input=log_probs),
           value=dtype_util.as_numpy_dtype(log_probs.dtype)(-np.inf))
-      log_probs = tf.where(tf.math.is_inf(log_probs), neg_inf, log_probs)
+      log_probs = tf1.where(tf.math.is_inf(log_probs), neg_inf, log_probs)
     return log_probs
 
   def _log_cdf(self, x):
@@ -175,7 +176,7 @@ class Poisson(distribution.Distribution):
     # the values and handle this case explicitly.
     safe_x = tf.maximum(x if self.interpolate_nondiscrete else tf.floor(x), 0.)
     cdf = tf.math.igammac(1. + safe_x, self.rate)
-    return tf.where(
+    return tf1.where(
         tf.broadcast_to(x < 0., tf.shape(input=cdf)), tf.zeros_like(cdf), cdf)
 
   def _log_normalization(self):
@@ -189,7 +190,7 @@ class Poisson(distribution.Distribution):
     is_supported = tf.broadcast_to(tf.equal(x, safe_x), tf.shape(input=y))
     neg_inf = tf.fill(
         tf.shape(input=y), value=dtype_util.as_numpy_dtype(y.dtype)(-np.inf))
-    return tf.where(is_supported, y, neg_inf)
+    return tf1.where(is_supported, y, neg_inf)
 
   def _mean(self):
     return tf.identity(self.rate)

@@ -21,6 +21,7 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
@@ -320,10 +321,8 @@ class TruncatedNormal(distribution.Distribution):
                  tf.math.log(self.scale * self._normalizer))
     # p(x) is 0 outside the bounds.
     neg_inf = tf.math.log(tf.zeros_like(log_prob))
-    bounded_log_prob = tf.where(
-        tf.logical_or(x > self._high, x < self._low),
-        neg_inf,
-        log_prob)
+    bounded_log_prob = tf1.where(
+        tf.logical_or(x > self._high, x < self._low), neg_inf, log_prob)
     return bounded_log_prob
 
   def _cdf(self, x):

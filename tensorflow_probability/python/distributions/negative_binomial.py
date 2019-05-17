@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
@@ -182,8 +183,8 @@ class NegativeBinomial(distribution.Distribution):
     return self.total_count * tf.exp(self.logits)
 
   def _mode(self):
-    adjusted_count = tf.where(1. < self.total_count, self.total_count - 1.,
-                              tf.zeros_like(self.total_count))
+    adjusted_count = tf1.where(1. < self.total_count, self.total_count - 1.,
+                               tf.zeros_like(self.total_count))
     return tf.floor(adjusted_count * tf.exp(self.logits))
 
   def _variance(self):

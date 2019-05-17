@@ -21,6 +21,7 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -189,10 +190,9 @@ class Pareto(distribution.Distribution):
         dims=tf.shape(input=broadcasted_concentration),
         value=dtype_util.as_numpy_dtype(self.dtype)(np.inf))
 
-    return tf.where(
-        broadcasted_concentration > 1.,
-        self.concentration * self.scale / (self.concentration - 1),
-        infs)
+    return tf1.where(broadcasted_concentration > 1.,
+                     self.concentration * self.scale / (self.concentration - 1),
+                     infs)
 
   @distribution_util.AppendDocstring(
       """The variance of Pareto is defined` if `concentration > 2.`, otherwise
@@ -202,11 +202,9 @@ class Pareto(distribution.Distribution):
     infs = tf.fill(
         dims=tf.shape(input=broadcasted_concentration),
         value=dtype_util.as_numpy_dtype(self.dtype)(np.inf))
-    return tf.where(
-        broadcasted_concentration > 2.,
-        self.scale ** 2 * self.concentration / (
-            (self.concentration - 1.) ** 2 * (self.concentration - 2.)),
-        infs)
+    return tf1.where(
+        broadcasted_concentration > 2., self.scale**2 * self.concentration /
+        ((self.concentration - 1.)**2 * (self.concentration - 2.)), infs)
 
   def _mode(self):
     return self.scale + tf.zeros_like(self.concentration)
@@ -227,13 +225,13 @@ class Pareto(distribution.Distribution):
     Returns:
       Tensor representing an extension of `f(x)`.
     """
-    # We need to do a series of broadcasts for the tf.where.
+    # We need to do a series of broadcasts for the tf1.where.
     scale = self.scale + tf.zeros_like(self.concentration)
     is_invalid = x < scale
     scale = scale + tf.zeros_like(x)
     x = x + tf.zeros_like(scale)
     # We need to do this to ensure gradients are sound.
-    y = f(tf.where(is_invalid, scale, x))
+    y = f(tf1.where(is_invalid, scale, x))
     if alt == 0.:
       alt = tf.zeros_like(y)
     elif alt == 1.:
@@ -242,7 +240,7 @@ class Pareto(distribution.Distribution):
       alt = tf.fill(
           dims=tf.shape(input=y),
           value=dtype_util.as_numpy_dtype(self.dtype)(alt))
-    return tf.where(is_invalid, alt, y)
+    return tf1.where(is_invalid, alt, y)
 
 
 @kullback_leibler.RegisterKL(Pareto, Pareto)
@@ -268,7 +266,7 @@ def _kl_pareto_pareto(a, b, name=None):
         a.concentration, b.concentration, a.scale, b.scale)
     common_type = dtype_util.common_dtype(
         [a.concentration, b.concentration, a.scale, b.scale], tf.float32)
-    return tf.where(
+    return tf1.where(
         a.scale >= b.scale,
         b.concentration * (tf.math.log(a.scale) - tf.math.log(b.scale)) +
         tf.math.log(a.concentration) - tf.math.log(b.concentration) +

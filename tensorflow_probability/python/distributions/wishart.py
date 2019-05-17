@@ -21,6 +21,7 @@ from __future__ import print_function
 import math
 # Dependency imports
 import numpy as np
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
@@ -392,7 +393,7 @@ class _WishartLinearOperator(distribution.Distribution):
 
   def _mode(self):
     s = self.df - self.dimension - 1.
-    s = tf.where(
+    s = tf1.where(
         tf.less(s, 0.), tf.constant(float("NaN"), dtype=self.dtype, name="nan"),
         s)
     if self.input_output_cholesky:

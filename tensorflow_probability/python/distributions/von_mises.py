@@ -20,6 +20,7 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -361,10 +362,10 @@ def von_mises_cdf(x, concentration):
       x, concentration, dtype)
 
   use_series = concentration < ck
-  cdf = tf.where(use_series, cdf_series, cdf_normal)
+  cdf = tf1.where(use_series, cdf_series, cdf_normal)
   cdf += num_periods
-  dcdf_dconcentration = tf.where(use_series, dcdf_dconcentration_series,
-                                 dcdf_dconcentration_normal)
+  dcdf_dconcentration = tf1.where(use_series, dcdf_dconcentration_series,
+                                  dcdf_dconcentration_normal)
 
   def grad(dy):
     prob = tf.exp(concentration * (tf.cos(x) - 1.)) / (
@@ -522,7 +523,8 @@ def random_von_mises(shape, concentration, dtype=tf.float32, seed=None):
     }
     s_concentration_cutoff = s_concentration_cutoff_dict[dtype]
 
-    s = tf.where(concentration > s_concentration_cutoff, s_exact, s_approximate)
+    s = tf1.where(concentration > s_concentration_cutoff, s_exact,
+                  s_approximate)
 
     def loop_body(done, u, w):
       """Resample the non-accepted points."""
@@ -532,7 +534,7 @@ def random_von_mises(shape, concentration, dtype=tf.float32, seed=None):
           shape, minval=-1., maxval=1., dtype=dtype, seed=seed())
       z = tf.cos(np.pi * u)
       # Update the non-accepted points.
-      w = tf.where(done, w, (1. + s * z) / (s + z))
+      w = tf1.where(done, w, (1. + s * z) / (s + z))
       y = concentration * (s - w)
 
       v = tf.random.uniform(

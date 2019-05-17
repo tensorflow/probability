@@ -21,6 +21,7 @@ from __future__ import print_function
 import math
 
 import numpy as np
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -169,10 +170,10 @@ class Uniform(distribution.Distribution):
   def _prob(self, x):
     broadcasted_x = x * tf.ones(
         self.batch_shape_tensor(), dtype=x.dtype)
-    return tf.where(
+    return tf1.where(
         tf.math.is_nan(broadcasted_x),
         broadcasted_x,
-        tf.where(
+        tf1.where(
             tf.logical_or(
                 broadcasted_x < self.low,
                 # This > is only sound for continuous uniform
@@ -186,9 +187,9 @@ class Uniform(distribution.Distribution):
     zeros = tf.zeros(broadcast_shape, dtype=self.dtype)
     ones = tf.ones(broadcast_shape, dtype=self.dtype)
     broadcasted_x = x * ones
-    result_if_not_big = tf.where(
-        x < self.low, zeros, (broadcasted_x - self.low) / self.range())
-    return tf.where(x >= self.high, ones, result_if_not_big)
+    result_if_not_big = tf1.where(x < self.low, zeros,
+                                  (broadcasted_x - self.low) / self.range())
+    return tf1.where(x >= self.high, ones, result_if_not_big)
 
   def _quantile(self, value):
     broadcast_shape = tf.broadcast_dynamic_shape(
@@ -235,8 +236,8 @@ def _kl_uniform_uniform(a, b, name=None):
         a.low, b.low, a.high, b.high)
     dtype = dtype_util.common_dtype(
         [a.low, a.high, b.low, b.high], tf.float32)
-    return tf.where((b.low <= a.low) & (a.high <= b.high),
-                    tf.math.log(b.high - b.low) - tf.math.log(a.high - a.low),
-                    tf.broadcast_to(
-                        dtype_util.as_numpy_dtype(dtype)(np.inf),
-                        final_batch_shape))
+    return tf1.where((b.low <= a.low) & (a.high <= b.high),
+                     tf.math.log(b.high - b.low) - tf.math.log(a.high - a.low),
+                     tf.broadcast_to(
+                         dtype_util.as_numpy_dtype(dtype)(np.inf),
+                         final_batch_shape))

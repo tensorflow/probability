@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import numpy as np
 
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import beta as beta_lib
 from tensorflow_probability.python.distributions import distribution
@@ -46,7 +47,7 @@ def _bessel_ive(v, z, cache=None):
         'Evaluating bessel_i by recurrence becomes imprecise for large v')
 
   cache = cache or {}
-  safe_z = tf.where(z > 0, z, tf.ones_like(z))
+  safe_z = tf1.where(z > 0, z, tf.ones_like(z))
   if v in cache:
     return wrap(cache[v])
   if v == 0:
@@ -58,13 +59,13 @@ def _bessel_ive(v, z, cache=None):
     sinhe = lambda x: (tf.exp(x - tf.abs(x)) - tf.exp(-x - tf.abs(x))) / 2
     cache[v] = (
         np.sqrt(2 / np.pi) * sinhe(z) *
-        tf.where(z > 0, tf.math.rsqrt(safe_z), tf.ones_like(safe_z)))
+        tf1.where(z > 0, tf.math.rsqrt(safe_z), tf.ones_like(safe_z)))
   elif v == -0.5:
     # cosh(x)*exp(-abs(x)), cosh(x) = (e^x + e^{-x}) / 2
     coshe = lambda x: (tf.exp(x - tf.abs(x)) + tf.exp(-x - tf.abs(x))) / 2
     cache[v] = (
         np.sqrt(2 / np.pi) * coshe(z) *
-        tf.where(z > 0, tf.math.rsqrt(safe_z), tf.ones_like(safe_z)))
+        tf1.where(z > 0, tf.math.rsqrt(safe_z), tf.ones_like(safe_z)))
   if v <= 1:
     return wrap(cache[v])
   # Recurrence relation:
@@ -265,9 +266,8 @@ class VonMisesFisher(distribution.Distribution):
     if event_dim is None:
       raise ValueError('vMF _log_normalizer currently only supports '
                        'statically known event shape')
-    safe_conc = tf.where(self.concentration > 0,
-                         self.concentration,
-                         tf.ones_like(self.concentration))
+    safe_conc = tf1.where(self.concentration > 0, self.concentration,
+                          tf.ones_like(self.concentration))
     safe_lognorm = ((event_dim / 2 - 1) * tf.math.log(safe_conc) -
                     (event_dim / 2) * np.log(2 * np.pi) -
                     tf.math.log(_bessel_ive(event_dim / 2 - 1, safe_conc)) -
@@ -275,9 +275,8 @@ class VonMisesFisher(distribution.Distribution):
     log_nsphere_surface_area = (
         np.log(2.) + (event_dim / 2) * np.log(np.pi) -
         tf.math.lgamma(tf.cast(event_dim / 2, self.dtype)))
-    return tf.where(self.concentration > 0,
-                    -safe_lognorm,
-                    log_nsphere_surface_area * tf.ones_like(safe_lognorm))
+    return tf1.where(self.concentration > 0, -safe_lognorm,
+                     log_nsphere_surface_area * tf.ones_like(safe_lognorm))
 
   # TODO(bjp): Odd dimension analytic CDFs are provided in [1]
   # [1]: https://ieeexplore.ieee.org/document/7347705/
@@ -309,12 +308,12 @@ class VonMisesFisher(distribution.Distribution):
     event_dim = tf.compat.dimension_value(self.event_shape[0])
     if event_dim is None:
       raise ValueError('event shape must be statically known for _bessel_ive')
-    safe_conc = tf.where(self.concentration > 0,
-                         self.concentration, tf.ones_like(self.concentration))
+    safe_conc = tf1.where(self.concentration > 0, self.concentration,
+                          tf.ones_like(self.concentration))
     safe_mean = self.mean_direction * (
         _bessel_ive(event_dim / 2, safe_conc) /
         _bessel_ive(event_dim / 2 - 1, safe_conc))[..., tf.newaxis]
-    return tf.where(
+    return tf1.where(
         self.concentration[..., tf.newaxis] > tf.zeros_like(safe_mean),
         safe_mean, tf.zeros_like(safe_mean))
 
@@ -327,8 +326,8 @@ class VonMisesFisher(distribution.Distribution):
     if event_dim > 2:
       raise ValueError('vMF covariance is numerically unstable for dim>2')
     concentration = self.concentration[..., tf.newaxis]
-    safe_conc = tf.where(
-        concentration > 0, concentration, tf.ones_like(concentration))
+    safe_conc = tf1.where(concentration > 0, concentration,
+                          tf.ones_like(concentration))
     h = (_bessel_ive(event_dim / 2, safe_conc) /
          _bessel_ive(event_dim / 2 - 1, safe_conc))
     intermediate = (
@@ -338,11 +337,10 @@ class VonMisesFisher(distribution.Distribution):
     cov = tf.linalg.set_diag(
         intermediate,
         tf.linalg.diag_part(intermediate) + (h / safe_conc))
-    return tf.where(
-        concentration[..., tf.newaxis] > tf.zeros_like(cov),
-        cov,
-        tf.linalg.eye(event_dim,
-                      batch_shape=self.batch_shape_tensor()) / event_dim)
+    return tf1.where(
+        concentration[..., tf.newaxis] > tf.zeros_like(cov), cov,
+        tf.linalg.eye(event_dim, batch_shape=self.batch_shape_tensor()) /
+        event_dim)
 
   def _rotate(self, samples):
     """Applies a Householder rotation to `samples`."""
@@ -365,10 +363,9 @@ class VonMisesFisher(distribution.Distribution):
     # [1]: Inversion sampler via: https://ieeexplore.ieee.org/document/7347705/
     # The inversion is: u = 1 + log(z + (1-z)*exp(-2*kappa)) / kappa
     # We must protect against both kappa and z being zero.
-    safe_conc = tf.where(self.concentration > 0,
-                         self.concentration,
-                         tf.ones_like(self.concentration))
-    safe_z = tf.where(z > 0, z, tf.ones_like(z))
+    safe_conc = tf1.where(self.concentration > 0, self.concentration,
+                          tf.ones_like(self.concentration))
+    safe_z = tf1.where(z > 0, z, tf.ones_like(z))
     safe_u = 1 + tf.reduce_logsumexp(
         input_tensor=[
             tf.math.log(safe_z),
@@ -376,10 +373,9 @@ class VonMisesFisher(distribution.Distribution):
         ],
         axis=0) / safe_conc
     # Limit of the above expression as kappa->0 is 2*z-1
-    u = tf.where(self.concentration > tf.zeros_like(safe_u), safe_u,
-                 2 * z - 1)
+    u = tf1.where(self.concentration > tf.zeros_like(safe_u), safe_u, 2 * z - 1)
     # Limit of the expression as z->0 is -1.
-    u = tf.where(tf.equal(z, 0), -tf.ones_like(u), u)
+    u = tf1.where(tf.equal(z, 0), -tf.ones_like(u), u)
     if not self._allow_nan_stats:
       u = tf.debugging.check_numerics(u, 'u in _sample_3d')
     return u[..., tf.newaxis]
@@ -430,7 +426,7 @@ class VonMisesFisher(distribution.Distribution):
 
       def body_fn(w, should_continue):
         z = beta.sample(sample_shape=sample_batch_shape, seed=seed())
-        w = tf.where(should_continue, (1 - (1 + b) * z) / (1 - (1 - b) * z), w)
+        w = tf1.where(should_continue, (1 - (1 + b) * z) / (1 - (1 - b) * z), w)
         w = tf.debugging.check_numerics(w, 'w')
         should_continue = tf.logical_and(
             should_continue,

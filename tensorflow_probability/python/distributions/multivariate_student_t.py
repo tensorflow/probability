@@ -20,6 +20,7 @@ from __future__ import print_function
 import functools
 
 import numpy as np
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math
@@ -289,8 +290,8 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
 
     if self.allow_nan_stats:
       nan = dtype_util.as_numpy_dtype(self.dtype)(np.nan)
-      return tf.where(df > 1., mean,
-                      tf.fill(tf.shape(input=mean), nan, name="nan"))
+      return tf1.where(df > 1., mean,
+                       tf.fill(tf.shape(input=mean), nan, name="nan"))
     else:
       with tf.control_dependencies([
           assert_util.assert_less(
@@ -313,19 +314,19 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
             tf.ones([statistic_ndims], dtype=tf.int32)
         ], -1))
     df = _broadcast_to_shape(df, tf.shape(input=statistic))
-    # We need to put the tf.where inside the outer tf.where to ensure we never
+    # We need to put the tf.where inside the outer tf1.where to ensure we never
     # hit a NaN in the gradient.
-    denom = tf.where(df > 2., df - 2., tf.ones_like(df))
+    denom = tf1.where(df > 2., df - 2., tf.ones_like(df))
     statistic = statistic * df_factor_fn(df / denom)
     # When 1 < df <= 2, stddev/variance are infinite.
     inf = dtype_util.as_numpy_dtype(self.dtype)(np.inf)
-    result_where_defined = tf.where(
+    result_where_defined = tf1.where(
         df > 2., statistic, tf.fill(tf.shape(input=statistic), inf, name="inf"))
 
     if self.allow_nan_stats:
       nan = dtype_util.as_numpy_dtype(self.dtype)(np.nan)
-      return tf.where(df > 1., result_where_defined,
-                      tf.fill(tf.shape(input=statistic), nan, name="nan"))
+      return tf1.where(df > 1., result_where_defined,
+                       tf.fill(tf.shape(input=statistic), nan, name="nan"))
     else:
       with tf.control_dependencies([
           assert_util.assert_less(

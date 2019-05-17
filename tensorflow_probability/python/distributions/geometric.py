@@ -19,6 +19,7 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
@@ -150,7 +151,7 @@ class Geometric(distribution.Distribution):
       # However, scipy takes the floor, so we do too.
       x = tf.floor(x)
     x *= tf.ones_like(self.probs)
-    return tf.where(x < 0., tf.zeros_like(x), -tf.math.expm1(
+    return tf1.where(x < 0., tf.zeros_like(x), -tf.math.expm1(
         (1. + x) * tf.math.log1p(-self.probs)))
 
   def _log_prob(self, x):
@@ -161,7 +162,7 @@ class Geometric(distribution.Distribution):
       x = tf.floor(x)
     x *= tf.ones_like(self.probs)
     probs = self.probs * tf.ones_like(x)
-    safe_domain = tf.where(tf.equal(x, 0.), tf.zeros_like(probs), probs)
+    safe_domain = tf1.where(tf.equal(x, 0.), tf.zeros_like(probs), probs)
     return x * tf.math.log1p(-safe_domain) + tf.math.log(probs)
 
   def _entropy(self):
