@@ -135,7 +135,7 @@ def make_simple_step_size_update_policy(num_adaptation_steps,
             kernel_results.log_accept_ratio.dtype))
     log_mean_accept_ratio = tf.reduce_logsumexp(
         input_tensor=tf.minimum(kernel_results.log_accept_ratio, 0.)) - log_n
-    adjustment = tf.where(
+    adjustment = tf.compat.v1.where(
         log_mean_accept_ratio < tf.cast(
             tf.math.log(target_rate), log_mean_accept_ratio.dtype),
         -decrement_multiplier / (1. + decrement_multiplier),

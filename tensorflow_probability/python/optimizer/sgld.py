@@ -261,7 +261,7 @@ class StochasticGradientLangevinDynamics(tf.compat.v2.optimizers.Optimizer):
   def _apply_noisy_update(self, mom, grad, var, indices=None):
     # Compute and apply the gradient update following
     # preconditioned Langevin dynamics
-    stddev = tf.where(
+    stddev = tf.compat.v1.where(
         tf.squeeze(self.iterations > tf.cast(self._burnin, tf.int64)),
         tf.cast(tf.math.rsqrt(self._learning_rate), grad.dtype),
         tf.zeros([], grad.dtype))

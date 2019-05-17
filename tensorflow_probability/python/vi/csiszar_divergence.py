@@ -497,9 +497,8 @@ def t_power(logu, t, self_normalized=False, name=None):
     fu = tf.math.expm1(t * logu)
     if self_normalized:
       fu -= t * tf.math.expm1(logu)
-    fu *= tf.where(tf.logical_and(0. < t, t < 1.),
-                   -tf.ones_like(t),
-                   tf.ones_like(t))
+    fu *= tf.compat.v1.where(
+        tf.logical_and(0. < t, t < 1.), -tf.ones_like(t), tf.ones_like(t))
     return fu
 
 
@@ -1066,7 +1065,7 @@ def csiszar_vimco_helper(logu, name=None):
     # happens; if it does we want to complain loudly (which `softplus_inverse`
     # will).
     d_ok = tf.not_equal(d, 0.)
-    safe_d = tf.where(d_ok, d, tf.ones_like(d))
+    safe_d = tf.compat.v1.where(d_ok, d, tf.ones_like(d))
     d_ok_result = logu + tfd.softplus_inverse(safe_d)
 
     inf = np.array(np.inf, dtype=logu.dtype.as_numpy_dtype)
@@ -1081,18 +1080,19 @@ def csiszar_vimco_helper(logu, name=None):
         logu > 0.,
         tf.equal(logu, log_max_u[tf.newaxis, ...]))
     log_lomsum_u = tf.reduce_logsumexp(
-        input_tensor=tf.where(is_positive_and_largest,
-                              tf.fill(tf.shape(input=logu), -inf), logu),
+        input_tensor=tf.compat.v1.where(is_positive_and_largest,
+                                        tf.fill(tf.shape(input=logu), -inf),
+                                        logu),
         axis=0,
         keepdims=True)
     log_lomsum_u = tf.tile(
         log_lomsum_u,
         multiples=1 + tf.pad(tensor=[n - 1], paddings=[[0, tf.rank(logu) - 1]]))
 
-    d_not_ok_result = tf.where(is_positive_and_largest, log_lomsum_u,
-                               tf.fill(tf.shape(input=d), -inf))
+    d_not_ok_result = tf.compat.v1.where(is_positive_and_largest, log_lomsum_u,
+                                         tf.fill(tf.shape(input=d), -inf))
 
-    log_loosum_u = tf.where(d_ok, d_ok_result, d_not_ok_result)
+    log_loosum_u = tf.compat.v1.where(d_ok, d_ok_result, d_not_ok_result)
 
     # The swap-one-out-sum ("soosum") is n different sums, each of which
     # replaces the i-th item with the i-th-left-out average, i.e.,

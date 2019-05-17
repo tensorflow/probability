@@ -278,8 +278,8 @@ def _test_acceptance(x_initial, target_log_prob, decided, log_slice_heights,
       divided = (((x_initial < midpoint) & (x_proposed >= midpoint)) |
                  ((x_proposed < midpoint) & (x_initial >= midpoint)))
       next_d = d | divided
-      next_right = tf.where(x_proposed < midpoint, midpoint, right)
-      next_left = tf.where(x_proposed >= midpoint, midpoint, left)
+      next_right = tf.compat.v1.where(x_proposed < midpoint, midpoint, right)
+      next_left = tf.compat.v1.where(x_proposed >= midpoint, midpoint, left)
       left_test = (log_slice_heights >= target_log_prob(next_left))
       right_test = (log_slice_heights >= target_log_prob(next_right))
       unacceptable = next_d & left_test & right_test
@@ -287,7 +287,8 @@ def _test_acceptance(x_initial, target_log_prob, decided, log_slice_heights,
       # and are unacceptable, set acceptable to False. For others, let them
       # be as they were.
       now_decided = ~decided & unacceptable
-      next_acceptable = tf.where(now_decided, ~unacceptable, acceptable)
+      next_acceptable = tf.compat.v1.where(now_decided, ~unacceptable,
+                                           acceptable)
       # Decided if (a) was already decided, or
       # (b) the new width is less than 1.1 step_size, or
       # (c) was marked unacceptable.
@@ -352,7 +353,9 @@ def _sample_with_shrinkage(x_initial, target_log_prob, log_slice_heights,
       """Iterates until every chain has found a suitable next state."""
       proportions = tf.random.uniform(
           x_initial_shape, dtype=x_initial_dtype, seed=seed_gen())
-      x_proposed = tf.where(~found, left + proportions * (right - left), x_next)
+      x_proposed = tf.compat.v1.where(~found,
+                                      left + proportions * (right - left),
+                                      x_next)
       accept_res = _test_acceptance(x_initial, target_log_prob=target_log_prob,
                                     decided=found,
                                     log_slice_heights=log_slice_heights,
@@ -366,8 +369,9 @@ def _sample_with_shrinkage(x_initial, target_log_prob, log_slice_heights,
       # algorithm in Neal). However, this does not matter because the endpoints
       # for points that have been already accepted are not used again so it
       # doesn't matter what we do with them.
-      next_left = tf.where(x_proposed < x_initial, x_proposed, left)
-      next_right = tf.where(x_proposed >= x_initial, x_proposed, right)
+      next_left = tf.compat.v1.where(x_proposed < x_initial, x_proposed, left)
+      next_right = tf.compat.v1.where(x_proposed >= x_initial, x_proposed,
+                                      right)
       return next_found, next_left, next_right, x_proposed
 
     return tf.while_loop(

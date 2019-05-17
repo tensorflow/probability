@@ -122,15 +122,18 @@ def moments_of_masked_time_series(time_series_tensor, broadcast_mask):
       time_series_tensor.dtype)
 
   # Manually compute mean and variance, excluding masked entries.
-  mean = (tf.reduce_sum(input_tensor=tf.where(
-      broadcast_mask,
-      tf.zeros_like(time_series_tensor),
-      time_series_tensor), axis=-1) / num_unmasked_entries)
-  variance = (tf.reduce_sum(input_tensor=tf.where(
-      broadcast_mask,
-      tf.zeros_like(time_series_tensor),
-      (time_series_tensor - mean[..., tf.newaxis]) ** 2), axis=-1)
-              / num_unmasked_entries)
+  mean = (
+      tf.reduce_sum(
+          input_tensor=tf.compat.v1.where(broadcast_mask,
+                                          tf.zeros_like(time_series_tensor),
+                                          time_series_tensor),
+          axis=-1) / num_unmasked_entries)
+  variance = (
+      tf.reduce_sum(
+          input_tensor=tf.compat.v1.where(
+              broadcast_mask, tf.zeros_like(time_series_tensor),
+              (time_series_tensor - mean[..., tf.newaxis])**2),
+          axis=-1) / num_unmasked_entries)
   return mean, variance
 
 

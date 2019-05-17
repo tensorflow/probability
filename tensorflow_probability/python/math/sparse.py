@@ -54,7 +54,7 @@ def dense_to_sparse(x, ignore_value=None, name=None):
       else:
         ignore_value = x.dtype.as_numpy_dtype(0)
       ignore_value = tf.cast(ignore_value, x.dtype, name='ignore_value')
-    indices = tf.where(tf.not_equal(x, ignore_value), name='indices')
+    indices = tf.compat.v1.where(tf.not_equal(x, ignore_value), name='indices')
     return tf.SparseTensor(
         indices=indices,
         values=tf.gather_nd(x, indices, name='values'),

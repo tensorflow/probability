@@ -310,7 +310,8 @@ def _fix_step_size(value_and_gradients_function,
     return (i < iter_max) & tf.reduce_any(input_tensor=to_fix)
 
   def _body(i, val_c, to_fix):
-    next_c = tf.where(to_fix, val_c.x * step_size_shrink_param, val_c.x)
+    next_c = tf.compat.v1.where(to_fix, val_c.x * step_size_shrink_param,
+                                val_c.x)
     next_val_c = value_and_gradients_function(next_c)
     still_to_fix = to_fix & ~hzl.is_finite(next_val_c)
     return (i + 1, next_val_c, still_to_fix)
@@ -658,7 +659,8 @@ def _to_str(x):
   """Converts a bool tensor to a string with True/False values."""
   x = tf.convert_to_tensor(value=x)
   if x.dtype == tf.bool:
-    return tf.where(x, tf.fill(x.shape, 'True'), tf.fill(x.shape, 'False'))
+    return tf.compat.v1.where(x, tf.fill(x.shape, 'True'),
+                              tf.fill(x.shape, 'False'))
   return x
 
 

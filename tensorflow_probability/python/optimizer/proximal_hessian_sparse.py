@@ -353,7 +353,7 @@ def minimize_one_step(gradient_unregularized_loss,
       # computed incrementally, where x_update_end and x_update_start are as
       # defined in the convergence criteria.  Accordingly, we reset
       # x_update_diff_norm_sq to zero at the beginning of each sweep.
-      x_update_diff_norm_sq = tf.where(
+      x_update_diff_norm_sq = tf.compat.v1.where(
           tf.equal(coord, 0), tf.zeros_like(x_update_diff_norm_sq),
           x_update_diff_norm_sq)
 

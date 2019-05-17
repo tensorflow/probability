@@ -163,7 +163,7 @@ def _swap_m_with_i(vecs, m, i):
                prefer_static.shape(vecs, out_type=tf.int64)[-1]),
       prefer_static.shape(vecs[..., m + 1:]))
   shp = prefer_static.shape(trailing_elts)
-  trailing_elts = tf.where(
+  trailing_elts = tf.compat.v1.where(
       tf.equal(trailing_elts, tf.broadcast_to(i, shp)),
       tf.broadcast_to(tf.gather(vecs, [m], axis=-1), shp),
       tf.broadcast_to(vecs[..., m + 1:], shp))
@@ -427,7 +427,7 @@ def pinv(a, rcond=None, validate_args=False, name=None):
     # Saturate small singular values to inf. This has the effect of make
     # `1. / s = 0.` while not resulting in `NaN` gradients.
     cutoff = rcond * tf.reduce_max(input_tensor=singular_values, axis=-1)
-    singular_values = tf.where(
+    singular_values = tf.compat.v1.where(
         singular_values > cutoff[..., tf.newaxis], singular_values,
         tf.fill(tf.shape(input=singular_values), np.array(np.inf, dtype)))
 

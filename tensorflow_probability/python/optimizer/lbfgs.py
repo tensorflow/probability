@@ -463,4 +463,4 @@ def _queue_push(queue, should_update, new_vecs):
   update_pattern = tf.broadcast_to(
       should_update[tf.newaxis, ..., tf.newaxis],
       distribution_util.prefer_static_shape(queue))
-  return tf.where(update_pattern, new_queue, queue)
+  return tf.compat.v1.where(update_pattern, new_queue, queue)

@@ -51,9 +51,9 @@ def log1psquare(x, name=None):
     is_large = tf.abs(x) > (eps**-0.5).astype(dtype)
 
     # Mask out small x's so the gradient correctly propagates.
-    abs_large_x = tf.where(is_large, tf.abs(x), tf.ones_like(x))
-    return tf.where(is_large, 2. * tf.math.log(abs_large_x),
-                    tf.math.log1p(tf.square(x)))
+    abs_large_x = tf.compat.v1.where(is_large, tf.abs(x), tf.ones_like(x))
+    return tf.compat.v1.where(is_large, 2. * tf.math.log(abs_large_x),
+                              tf.math.log1p(tf.square(x)))
 
 
 def soft_threshold(x, threshold, name=None):

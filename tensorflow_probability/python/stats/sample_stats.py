@@ -455,8 +455,8 @@ def covariance(x,
     # tf.squeeze requires python ints for axis, not Tensor.  This is enough to
     # require our axis args to be constants.
     if not keepdims:
-      squeeze_axis = tf.where(sample_axis < e_start, sample_axis,
-                              sample_axis + e_len)
+      squeeze_axis = tf.compat.v1.where(sample_axis < e_start, sample_axis,
+                                        sample_axis + e_len)
       cov = _squeeze(cov, axis=squeeze_axis)
 
     return cov
@@ -678,7 +678,7 @@ def _make_positive_axis(axis, ndims):
   else:
     # Dynamic case
     axis = tf.convert_to_tensor(value=axis, name='axis', dtype=tf.int32)
-    positive_axis = tf.where(axis >= 0, axis, axis + ndims)
+    positive_axis = tf.compat.v1.where(axis >= 0, axis, axis + ndims)
 
   return positive_axis
 

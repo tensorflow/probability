@@ -255,10 +255,11 @@ def minimize(value_and_gradients_function,
       search_direction_reset = _get_search_direction(
           initial_inv_hessian, state.objective_gradient)
 
-      actual_serch_direction = tf.where(
-          needs_reset, search_direction_reset, search_direction)
-      actual_inv_hessian = tf.where(
-          needs_reset, initial_inv_hessian, state.inverse_hessian_estimate)
+      actual_serch_direction = tf.compat.v1.where(needs_reset,
+                                                  search_direction_reset,
+                                                  search_direction)
+      actual_inv_hessian = tf.compat.v1.where(needs_reset, initial_inv_hessian,
+                                              state.inverse_hessian_estimate)
 
       # Replace the hessian estimate in the state, in case it had to be reset.
       current_state = bfgs_utils.update_fields(
@@ -342,9 +343,9 @@ def _update_inv_hessian(prev_state, next_state):
         prev_state.inverse_hessian_estimate)
     return bfgs_utils.update_fields(
         next_state,
-        inverse_hessian_estimate=tf.where(should_update,
-                                          next_inv_hessian,
-                                          prev_state.inverse_hessian_estimate))
+        inverse_hessian_estimate=tf.compat.v1.where(
+            should_update, next_inv_hessian,
+            prev_state.inverse_hessian_estimate))
 
   return prefer_static.cond(
       tf.reduce_any(input_tensor=should_update),

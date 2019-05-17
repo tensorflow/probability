@@ -95,7 +95,7 @@ def _grad_neg_log_likelihood_and_fim(model_matrix, linear_response, response,
   def _mask_if_invalid(x, mask):
     mask = tf.fill(
         tf.shape(input=x), value=np.array(mask, x.dtype.as_numpy_dtype))
-    return tf.where(is_valid, x, mask)
+    return tf.compat.v1.where(is_valid, x, mask)
 
   # TODO(b/111923449): Link to derivation once it's available.
   v = (response - mean) * _mask_if_invalid(grad_mean, 1) / _mask_if_invalid(
