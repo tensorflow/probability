@@ -67,6 +67,15 @@ class DeterministicTest(tf.test.TestCase):
     self.assertAllEqual((2, 2), prob.shape)
     self.assertAllEqual(expected_prob, self.evaluate(prob))
 
+  def testLogProbWithDefaultTolInt32Loc(self):
+    loc = [[0, 1], [2, 3]]
+    x = [[0, 2], [1, 3]]
+    deterministic = tfd.Deterministic(tf.constant(loc, dtype=tf.int32))
+    expected_logprob = [[0., float("-inf")], [float("-inf"), 0.]]
+    prob = deterministic.log_prob(x)
+    self.assertAllEqual((2, 2), prob.shape)
+    self.assertAllEqual(expected_logprob, self.evaluate(prob))
+
   def testProbWithNonzeroATol(self):
     loc = [[0., 1.], [2., 3.]]
     x = [[0., 1.1], [1.99, 3.]]

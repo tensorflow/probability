@@ -271,7 +271,9 @@ class Deterministic(_BaseDeterministic):
     return tf.TensorShape([])
 
   def _prob(self, x):
-    return tf.cast(tf.abs(x - self.loc) <= self._slack, dtype=self.dtype)
+    # Enforces dtype of probability to be float, when self.dtype is not.
+    prob_dtype = self.dtype if self.dtype.is_floating else tf.float32
+    return tf.cast(tf.abs(x - self.loc) <= self._slack, dtype=prob_dtype)
 
   def _cdf(self, x):
     return tf.cast(x >= self.loc - self._slack, dtype=self.dtype)
