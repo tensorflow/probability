@@ -168,7 +168,7 @@ transpose = utils.copy_docstring(
     _transpose)
 
 where = utils.copy_docstring(
-    tf.where,
+    tf.compat.v1.where,
     lambda condition, x=None, y=None, name=None: np.where(condition, x, y))
 
 zeros = utils.copy_docstring(

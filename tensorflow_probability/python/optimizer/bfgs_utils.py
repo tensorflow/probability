@@ -163,9 +163,8 @@ def line_search_step(state, value_and_gradients_function, search_direction,
     # For inactive batch members `left.x` is zero. However, their
     # `search_direction` might also be undefined, so we can't rely on
     # multiplication by zero to produce a `position_delta` of zero.
-    position_delta = tf.where(
-        inactive,
-        tf.zeros_like(search_direction),
+    position_delta = tf.compat.v1.where(
+        inactive, tf.zeros_like(search_direction),
         search_direction * tf.expand_dims(ls_result.left.x, axis=-1))
     return _update_position(
         state_after_ls,

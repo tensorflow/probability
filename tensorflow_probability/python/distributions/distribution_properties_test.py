@@ -244,7 +244,6 @@ def single_param(constraint_fn, param_shape):
         constraint_fn(tf.convert_to_tensor(value=x)),
         message='param non-finite')
     if tf.executing_eagerly():
-      # TODO(b/128974935): Eager segfault when Tensors retained by hypothesis?
       return result.numpy()
     return result
 
@@ -252,8 +251,7 @@ def single_param(constraint_fn, param_shape):
       dtype=np.float32, shape=param_shape, elements=float32s).map(mapper)
 
 
-# TODO(b/128974935): Use hps.composite
-# @hps.composite
+@hps.composite
 def broadcasting_params(draw, dist_name, batch_shape, event_dim=None):
   """Draws a dict of parameters which should yield the given batch shape."""
   _, params_event_ndims = INSTANTIABLE_DISTS[dist_name]
@@ -285,8 +283,7 @@ def broadcasting_params(draw, dist_name, batch_shape, event_dim=None):
   return params_kwargs
 
 
-# TODO(b/128974935): Use hps.composite
-# @hps.composite
+@hps.composite
 def independents(draw, batch_shape=None, event_dim=None):
   reinterpreted_batch_ndims = draw(hps.integers(min_value=0, max_value=2))
   if batch_shape is None:
@@ -298,11 +295,10 @@ def independents(draw, batch_shape=None, event_dim=None):
             batch_shapes(
                 min_ndims=reinterpreted_batch_ndims,
                 max_ndims=reinterpreted_batch_ndims)))
-  underlying, batch_shape = distributions(
-      draw,
+  underlying, batch_shape = draw(distributions(
       batch_shape=batch_shape,
       event_dim=event_dim,
-      eligibility_filter=lambda name: name != 'Independent')
+      eligibility_filter=lambda name: name != 'Independent'))
   logging.info(
       'underlying distribution: %s; parameters used: %s', underlying,
       [k for k, v in six.iteritems(underlying.parameters) if v is not None])
@@ -313,8 +309,7 @@ def independents(draw, batch_shape=None, event_dim=None):
           batch_shape[:len(batch_shape) - reinterpreted_batch_ndims])
 
 
-# TODO(b/128974935): Use hps.composite
-# @hps.composite
+@hps.composite
 def transformed_distributions(draw, batch_shape=None, event_dim=None):
   bijector = bijector_hps.unconstrained_bijectors(draw)
   logging.info('TD bijector: %s', bijector)
@@ -326,21 +321,11 @@ def transformed_distributions(draw, batch_shape=None, event_dim=None):
     # Use batch_shape overrides.
     underlying_batch_shape = tf.TensorShape([])  # scalar underlying batch
     batch_shape_arg = batch_shape
-  # TODO(b/128974935): Use the composite distributions(..).map(..).filter(..)
-  # underlyings = distributions(
-  #     batch_shape=underlying_batch_shape, event_dim=event_dim).map(
-  #         lambda dist_and_batch_shape: dist_and_batch_shape[0]).filter(
-  #         bijector_hps.distribution_filter_for(bijector))
-  # to_transform = draw(underlyings)
-  to_transform, _ = distributions(
-      draw,
-      batch_shape=underlying_batch_shape,
-      event_dim=event_dim,
-      eligibility_filter=lambda name: name != 'TransformedDistribution')
-  while not bijector_hps.distribution_filter_for(bijector)(to_transform):
-    to_transform, _ = distributions(
-        draw, batch_shape=underlying_batch_shape, event_dim=event_dim)
-
+  underlyings = distributions(
+      batch_shape=underlying_batch_shape, event_dim=event_dim).map(
+          lambda dist_and_batch_shape: dist_and_batch_shape[0]).filter(
+              bijector_hps.distribution_filter_for(bijector))
+  to_transform = draw(underlyings)
   logging.info(
       'TD underlying distribution: %s; parameters used: %s', to_transform,
       [k for k, v in six.iteritems(to_transform.parameters) if v is not None])
@@ -351,8 +336,7 @@ def transformed_distributions(draw, batch_shape=None, event_dim=None):
       validate_args=True), batch_shape)
 
 
-# TODO(b/128974935): Use hps.composite
-# @hps.composite
+@hps.composite
 def mixtures_same_family(draw, batch_shape=None, event_dim=None):
   if batch_shape is None:
     # Ensure the components dist has at least one batch dim (a component dim).
@@ -362,22 +346,20 @@ def mixtures_same_family(draw, batch_shape=None, event_dim=None):
         batch_shape,
         draw(batch_shapes(min_ndims=1, max_ndims=1, min_lastdimsize=2)))
 
-  component_dist, _ = distributions(
-      draw,
+  component_dist, _ = draw(distributions(
       batch_shape=batch_shape,
       event_dim=event_dim,
-      eligibility_filter=lambda name: name != 'MixtureSameFamily')
+      eligibility_filter=lambda name: name != 'MixtureSameFamily'))
   logging.info(
       'component distribution: %s; parameters used: %s', component_dist,
       [k for k, v in six.iteritems(component_dist.parameters) if v is not None])
   # scalar or same-shaped categorical?
   mixture_batch_shape = draw(
       hps.one_of(hps.just(batch_shape[:-1]), hps.just(tf.TensorShape([]))))
-  mixture_dist, _ = distributions(
-      draw,
+  mixture_dist, _ = draw(distributions(
       dist_name='Categorical',
       batch_shape=mixture_batch_shape,
-      event_dim=tensorshape_util.as_list(batch_shape)[-1])
+      event_dim=tensorshape_util.as_list(batch_shape)[-1]))
   logging.info(
       'mixture distribution: %s; parameters used: %s', mixture_dist,
       [k for k, v in six.iteritems(mixture_dist.parameters) if v is not None])
@@ -394,8 +376,7 @@ def assert_shapes_unchanged(target_shaped_dict, possibly_bcast_dict):
         tensorshape_util.as_list(possibly_bcast_dict[param].shape))
 
 
-# TODO(b/128974935): Use hps.composite
-# @hps.composite
+@hps.composite
 def distributions(draw,
                   dist_name=None,
                   batch_shape=None,
@@ -404,34 +385,25 @@ def distributions(draw,
   """Samples one a set of supported distributions."""
   if dist_name is None:
 
-    def dist_filter(dist_name):
-      if not eligibility_filter(dist_name):
-        return False
-      dist_cls, _ = INSTANTIABLE_DISTS[dist_name]
-      if (tf.executing_eagerly() and
-          issubclass(dist_cls, tfd.TransformedDistribution)):
-        # TODO(b/128974935): Eager+transformed dist don't play nicely.
-        return False
-      return True
-
     dist_name = draw(
         hps.one_of(
             map(hps.just,
-                [k for k in INSTANTIABLE_DISTS.keys() if dist_filter(k)])))
+                [k for k in INSTANTIABLE_DISTS.keys() if eligibility_filter(k)])
+            ))
 
   dist_cls, _ = INSTANTIABLE_DISTS[dist_name]
   if dist_name == 'Independent':
-    return independents(draw, batch_shape, event_dim)
+    return draw(independents(batch_shape, event_dim))
   if dist_name == 'MixtureSameFamily':
-    return mixtures_same_family(draw, batch_shape, event_dim)
+    return draw(mixtures_same_family(batch_shape, event_dim))
   if dist_name == 'TransformedDistribution':
-    return transformed_distributions(draw, batch_shape, event_dim)
+    return draw(transformed_distributions(batch_shape, event_dim))
 
   if batch_shape is None:
     batch_shape = draw(batch_shapes())
 
-  params_kwargs = broadcasting_params(
-      draw, dist_name, batch_shape, event_dim=event_dim)
+  params_kwargs = draw(broadcasting_params(
+      dist_name, batch_shape, event_dim=event_dim))
   params_constrained = constraint_for(dist_name)(params_kwargs)
   assert_shapes_unchanged(params_kwargs, params_constrained)
   params_constrained['validate_args'] = True
@@ -471,9 +443,6 @@ class DistributionSlicingTest(tf.test.TestCase):
 
       sliced_samples = self.evaluate(sliced_dist.sample(seed=maybe_seed(seed)))
     except NotImplementedError as e:
-      # TODO(b/34701635): Binomial needs a sampler.
-      if 'sample_n is not implemented: Binomial' in str(e):
-        return
       raise
     except tf.errors.UnimplementedError as e:
       if 'Unhandled input dimensions' in str(e) or 'rank not in' in str(e):
@@ -530,9 +499,7 @@ class DistributionSlicingTest(tf.test.TestCase):
             data.draw(
                 hpnp.arrays(dtype=np.int64,
                             shape=[]).filter(lambda x: x != 0))))
-    # TODO(b/128974935): Avoid passing in data.draw using hps.composite
-    # dist, batch_shape = data.draw(distributions())
-    dist, batch_shape = distributions(data.draw)
+    dist, batch_shape = data.draw(distributions())
     logging.info(
         'distribution: %s; parameters used: %s', dist,
         [k for k, v in six.iteritems(dist.parameters) if v is not None])

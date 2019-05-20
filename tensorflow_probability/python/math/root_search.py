@@ -269,20 +269,22 @@ def secant_root(objective_fn,
             tf.abs(value_at_position) < value_tolerance)
 
     # Compute the next position and the value at that point.
-    next_position = tf.where(was_finished, position, position + step)
-    value_at_next_position = tf.where(was_finished, value_at_position,
-                                      objective_fn(next_position))
+    next_position = tf.compat.v1.where(was_finished, position, position + step)
+    value_at_next_position = tf.compat.v1.where(was_finished, value_at_position,
+                                                objective_fn(next_position))
 
     # True if the search was already finished, or (2) just became true.
     is_finished = tf.equal(value_at_position, value_at_next_position)
 
     # Use the mid-point between the last two positions if (2) just became true.
-    next_position = tf.where(is_finished & ~was_finished,
-                             (position + next_position) * 0.5, next_position)
+    next_position = tf.compat.v1.where(is_finished & ~was_finished,
+                                       (position + next_position) * 0.5,
+                                       next_position)
 
     # Once finished, stop updating the iteration index and set the step to zero.
-    num_iterations = tf.where(is_finished, num_iterations, num_iterations + 1)
-    next_step = tf.where(
+    num_iterations = tf.compat.v1.where(is_finished, num_iterations,
+                                        num_iterations + 1)
+    next_step = tf.compat.v1.where(
         is_finished, zero, step * value_at_next_position /
         (value_at_position - value_at_next_position))
 

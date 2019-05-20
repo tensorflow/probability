@@ -21,6 +21,7 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
@@ -209,7 +210,7 @@ class Triangular(distribution.Distribution):
     # We use Inverse CDF sampling here. Because the CDF is a quadratic function,
     # we must use sqrts here.
     interval_length = self.high - self.low
-    return tf.where(
+    return tf1.where(
         # Note the CDF on the left side of the peak is
         # (x - low) ** 2 / ((high - low) * (peak - low)).
         # If we plug in peak for x, we get that the CDF at the peak
@@ -218,8 +219,7 @@ class Triangular(distribution.Distribution):
         # we drew.
         samples < (self.peak - self.low) / interval_length,
         # Inverse of (x - low) ** 2 / ((high - low) * (peak - low)).
-        self.low + tf.sqrt(
-            samples * interval_length * (self.peak - self.low)),
+        self.low + tf.sqrt(samples * interval_length * (self.peak - self.low)),
         # Inverse of 1 - (high - x) ** 2 / ((high - low) * (high - peak))
         self.high - tf.sqrt(
             (1. - samples) * interval_length * (self.high - self.peak)))
@@ -239,7 +239,7 @@ class Triangular(distribution.Distribution):
     interval_length = self.high - self.low
     # This is the pdf function when a low <= high <= x. This looks like
     # a triangle, so we have to treat each line segment separately.
-    result_inside_interval = tf.where(
+    result_inside_interval = tf1.where(
         left_of_peak,
         # Line segment from (self.low, 0) to (self.peak, 2 / (self.high -
         # self.low).
@@ -255,10 +255,9 @@ class Triangular(distribution.Distribution):
     broadcast_shape = tf.broadcast_dynamic_shape(
         tf.shape(input=x), self.batch_shape_tensor())
 
-    return tf.where(
-        outside_interval,
-        tf.zeros(broadcast_shape, dtype=self.dtype),
-        result_inside_interval)
+    return tf1.where(outside_interval,
+                     tf.zeros(broadcast_shape, dtype=self.dtype),
+                     result_inside_interval)
 
   def _cdf(self, x):
     broadcast_shape = tf.broadcast_dynamic_shape(
@@ -272,7 +271,7 @@ class Triangular(distribution.Distribution):
     # Due to the PDF being not smooth at the peak, we have to treat each side
     # somewhat differently. The PDF is two line segments, and thus we get
     # quadratics here for the CDF.
-    result_inside_interval = tf.where(
+    result_inside_interval = tf1.where(
         left_of_peak,
         # (x - low) ** 2 / ((high - low) * (peak - low))
         tf.math.squared_difference(x, self.low) / (interval_length *
@@ -284,13 +283,13 @@ class Triangular(distribution.Distribution):
     broadcast_x_to_high_peak = _broadcast_to(broadcast_x_to_high, [self.peak])
     zeros = tf.zeros(broadcast_shape, dtype=self.dtype)
     # We now add that the left tail is 0 and the right tail is 1.
-    result_if_not_big = tf.where(
-        broadcast_x_to_high_peak < self.low, zeros, result_inside_interval)
+    result_if_not_big = tf1.where(broadcast_x_to_high_peak < self.low, zeros,
+                                  result_inside_interval)
 
     broadcast_x_to_peak_low = _broadcast_to(x, [self.low, self.peak])
     ones = tf.ones(broadcast_shape, dtype=self.dtype)
-    return tf.where(
-        broadcast_x_to_peak_low >= self.high, ones, result_if_not_big)
+    return tf1.where(broadcast_x_to_peak_low >= self.high, ones,
+                     result_if_not_big)
 
   def _entropy(self):
     return 0.5 - np.log(2.) + tf.math.log(self.high - self.low)

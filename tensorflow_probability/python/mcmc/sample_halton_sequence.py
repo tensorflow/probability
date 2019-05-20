@@ -211,10 +211,9 @@ def sample_halton_sequence(dim,
 
     # The mask is true for those coefficients that are irrelevant.
     weight_mask = exponents_by_axes >= max_sizes_by_axes
-    capped_exponents = tf.where(
-        weight_mask,
-        tf.zeros_like(exponents_by_axes),
-        exponents_by_axes)
+    capped_exponents = tf.compat.v1.where(weight_mask,
+                                          tf.zeros_like(exponents_by_axes),
+                                          exponents_by_axes)
     weights = radixes ** capped_exponents
     # The following computes the base b expansion of the indices. Suppose,
     # x = a0 + a1*b + a2*b^2 + ... Then, performing a floor div of x with

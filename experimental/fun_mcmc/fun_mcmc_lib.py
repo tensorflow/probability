@@ -51,22 +51,25 @@ tfb = tfp.bijectors
 mcmc_util = tfp.mcmc.internal.util
 
 __all__ = [
-    'HamiltonianMonteCarloExtra',
-    'HamiltonianMonteCarloState',
-    'LeapFrogStepExtras',
-    'LeapFrogStepState',
-    'PotentialFn',
-    'State',
-    'TransitionOperator',
+    'blanes_3_stage_step',
+    'blanes_4_stage_step',
     'call_and_grads',
     'call_fn',
     'hamiltonian_monte_carlo',
+    'HamiltonianMonteCarloExtra',
+    'HamiltonianMonteCarloState',
+    'IntegratorStepState',
+    'leapfrog_step',
     'maybe_broadcast_structure',
     'metropolis_hastings_step',
-    'leapfrog_step',
+    'PotentialFn',
+    'ruth4_step',
     'sign_adaptation',
+    'State',
+    'symmetric_spliting_integrator_step',
     'trace',
     'transform_log_prob_fn',
+    'TransitionOperator',
 ]
 
 AnyTensor = Union[tf.Tensor, np.ndarray, np.generic]
@@ -239,33 +242,51 @@ def transform_log_prob_fn(log_prob_fn: PotentialFn,
                                           init_state)
 
 
-LeapFrogStepState = collections.namedtuple('LeapFrogStepState',
-                                           'state, state_grads, momentum')
-LeapFrogStepExtras = collections.namedtuple(
-    'LeapFrogStepExtras', 'target_log_prob, state_extra, '
+IntegratorStepState = collections.namedtuple('IntegratorStepState',
+                                             'state, state_grads, momentum')
+IntegratorStepExtras = collections.namedtuple(
+    'IntegratorStepExtras', 'target_log_prob, state_extra, '
     'kinetic_energy, kinetic_energy_extra')
 
 
-def leapfrog_step(leapfrog_step_state: LeapFrogStepState,
-                  step_size: FloatTensor, target_log_prob_fn: PotentialFn,
-                  kinetic_energy_fn: PotentialFn
-                 ) -> Tuple[LeapFrogStepState, LeapFrogStepExtras]:
-  """Leapfrog `TransitionOperator`.
+def symmetric_spliting_integrator_step(
+    integrator_step_state: IntegratorStepState,
+    step_size: FloatTensor,
+    target_log_prob_fn: PotentialFn,
+    kinetic_energy_fn: PotentialFn,
+    coefficients: Sequence[FloatTensor],
+) -> Tuple[IntegratorStepState, IntegratorStepExtras]:
+  """Symmetric symplectic integrator `TransitionOperator`.
+
+  This implementation is based on Hamiltonian splitting, with the splits
+  weighted by coefficients. We assume a symmetric integrator, so only the first
+  `N / 2 + 1` coefficients need be specified. We always update the momentum
+  first. See [1] for an overview of the method.
 
   Args:
-    leapfrog_step_state: LeapFrogStepState.
+    integrator_step_state: IntegratorStepState.
     step_size: Step size, structure broadcastable to the `target_log_prob_fn`
       state.
     target_log_prob_fn: Target log prob fn.
     kinetic_energy_fn: Kinetic energy fn.
+    coefficients: First N / 2 + 1 coefficients.
 
   Returns:
-    leapfrog_step_state: LeapFrogStepState.
-    leapfrog_step_extras: LeapFrogStepExtras.
+    integrator_step_state: IntegratorStepState.
+    integrator_step_extras: IntegratorStepExtras.
+
+  #### References:
+
+  [1]: Sergio Blanes, Fernando Casas, J.M. Sanz-Serna. Numerical integrators for
+       the Hybrid Monte Carlo method. SIAM J. Sci. Comput., 36(4), 2014.
+       https://arxiv.org/pdf/1405.3153.pdf
   """
-  state = leapfrog_step_state.state
-  state_grads = leapfrog_step_state.state_grads
-  momentum = leapfrog_step_state.momentum
+  if len(coefficients) < 2:
+    raise ValueError('Too few coefficients. Need at least 2.')
+  coefficients = list(coefficients) + list(reversed(coefficients))[1:]
+  state = integrator_step_state.state
+  state_grads = integrator_step_state.state_grads
+  momentum = integrator_step_state.momentum
   step_size = maybe_broadcast_structure(step_size, state)
 
   state = tf.nest.map_structure(tf.convert_to_tensor, state)
@@ -277,23 +298,165 @@ def leapfrog_step(leapfrog_step_state: LeapFrogStepState,
   else:
     state_grads = tf.nest.map_structure(tf.convert_to_tensor, state_grads)
 
-  momentum = tf.nest.map_structure(lambda m, sg, s: m + 0.5 * sg * s, momentum,
-                                   state_grads, step_size)
+  for i, c in enumerate(coefficients):
+    # pylint: disable=cell-var-from-loop
+    if i % 2 == 0:
+      momentum = tf.nest.map_structure(lambda m, sg, s: m + c * sg * s,
+                                       momentum, state_grads, step_size)
 
-  kinetic_energy, kinetic_energy_extra, momentum_grads = call_and_grads(
-      kinetic_energy_fn, momentum)
+      kinetic_energy, kinetic_energy_extra, momentum_grads = call_and_grads(
+          kinetic_energy_fn, momentum)
+    else:
+      state = tf.nest.map_structure(lambda x, mg, s: x + c * mg * s, state,
+                                    momentum_grads, step_size)
 
-  state = tf.nest.map_structure(lambda x, mg, s: x + mg * s, state,
-                                momentum_grads, step_size)
+      target_log_prob, state_extra, state_grads = call_and_grads(
+          target_log_prob_fn, state)
 
-  target_log_prob, state_extra, state_grads = call_and_grads(
-      target_log_prob_fn, state)
+  return (IntegratorStepState(state, state_grads, momentum),
+          IntegratorStepExtras(target_log_prob, state_extra, kinetic_energy,
+                               kinetic_energy_extra))
 
-  momentum = tf.nest.map_structure(lambda m, sg, s: m + 0.5 * sg * s, momentum,
-                                   state_grads, step_size)
 
-  return LeapFrogStepState(state, state_grads, momentum), LeapFrogStepExtras(
-      target_log_prob, state_extra, kinetic_energy, kinetic_energy_extra)
+def leapfrog_step(
+    integrator_step_state: IntegratorStepState,
+    step_size: FloatTensor,
+    target_log_prob_fn: PotentialFn,
+    kinetic_energy_fn: PotentialFn,
+) -> Tuple[IntegratorStepState, IntegratorStepExtras]:
+  """Leapfrog integrator `TransitionOperator`.
+
+  Args:
+    integrator_step_state: IntegratorStepState.
+    step_size: Step size, structure broadcastable to the `target_log_prob_fn`
+      state.
+    target_log_prob_fn: Target log prob fn.
+    kinetic_energy_fn: Kinetic energy fn.
+
+  Returns:
+    integrator_step_state: IntegratorStepState.
+    integrator_step_extras: IntegratorStepExtras.
+  """
+  coefficients = [0.5, 1.]
+  return symmetric_spliting_integrator_step(
+      integrator_step_state,
+      step_size,
+      target_log_prob_fn,
+      kinetic_energy_fn,
+      coefficients=coefficients)
+
+
+def ruth4_step(
+    integrator_step_state: IntegratorStepState,
+    step_size: FloatTensor,
+    target_log_prob_fn: PotentialFn,
+    kinetic_energy_fn: PotentialFn,
+) -> Tuple[IntegratorStepState, IntegratorStepExtras]:
+  """Ruth 4th order integrator `TransitionOperator`.
+
+  See [1] for details.
+
+  Args:
+    integrator_step_state: IntegratorStepState.
+    step_size: Step size, structure broadcastable to the `target_log_prob_fn`
+      state.
+    target_log_prob_fn: Target log prob fn.
+    kinetic_energy_fn: Kinetic energy fn.
+
+  Returns:
+    integrator_step_state: IntegratorStepState.
+    integrator_step_extras: IntegratorStepExtras.
+
+  #### References:
+
+  [1]: Ruth, Ronald D. (August 1983). "A Canonical Integration Technique".
+       Nuclear Science, IEEE Trans. on. NS-30 (4): 2669-2671
+  """
+  c = 2**(1./3)
+  coefficients = (1. / (2 - c)) * np.array([0.5, 1., 0.5 - 0.5 * c, -c])
+  return symmetric_spliting_integrator_step(
+      integrator_step_state,
+      step_size,
+      target_log_prob_fn,
+      kinetic_energy_fn,
+      coefficients=coefficients)
+
+
+def blanes_3_stage_step(
+    integrator_step_state: IntegratorStepState,
+    step_size: FloatTensor,
+    target_log_prob_fn: PotentialFn,
+    kinetic_energy_fn: PotentialFn,
+) -> Tuple[IntegratorStepState, IntegratorStepExtras]:
+  """Blanes 4th order integrator `TransitionOperator`.
+
+  See [1] for details.
+
+  Args:
+    integrator_step_state: IntegratorStepState.
+    step_size: Step size, structure broadcastable to the `target_log_prob_fn`
+      state.
+    target_log_prob_fn: Target log prob fn.
+    kinetic_energy_fn: Kinetic energy fn.
+
+  Returns:
+    integrator_step_state: IntegratorStepState.
+    integrator_step_extras: IntegratorStepExtras.
+
+  #### References:
+
+  [1]: Sergio Blanes, Fernando Casas, J.M. Sanz-Serna. Numerical integrators for
+       the Hybrid Monte Carlo method. SIAM J. Sci. Comput., 36(4), 2014.
+       https://arxiv.org/pdf/1405.3153.pdf
+  """
+  a1 = 0.11888010966
+  b1 = 0.29619504261
+  coefficients = [a1, b1, 0.5 - a1, 1. - 2. * b1]
+  return symmetric_spliting_integrator_step(
+      integrator_step_state,
+      step_size,
+      target_log_prob_fn,
+      kinetic_energy_fn,
+      coefficients=coefficients)
+
+
+def blanes_4_stage_step(
+    integrator_step_state: IntegratorStepState,
+    step_size: FloatTensor,
+    target_log_prob_fn: PotentialFn,
+    kinetic_energy_fn: PotentialFn,
+) -> Tuple[IntegratorStepState, IntegratorStepExtras]:
+  """Blanes 6th order integrator `TransitionOperator`.
+
+  See [1] for details.
+
+  Args:
+    integrator_step_state: IntegratorStepState.
+    step_size: Step size, structure broadcastable to the `target_log_prob_fn`
+      state.
+    target_log_prob_fn: Target log prob fn.
+    kinetic_energy_fn: Kinetic energy fn.
+
+  Returns:
+    integrator_step_state: IntegratorStepState.
+    integrator_step_extras: IntegratorStepExtras.
+
+  #### References:
+
+  [1]: Sergio Blanes, Fernando Casas, J.M. Sanz-Serna. Numerical integrators for
+       the Hybrid Monte Carlo method. SIAM J. Sci. Comput., 36(4), 2014.
+       https://arxiv.org/pdf/1405.3153.pdf
+  """
+  a1 = 0.071353913
+  a2 = 0.268548791
+  b1 = 0.191667800
+  coefficients = [a1, b1, a2, 0.5 - b1, 1. - 2. * (a1 + a2)]
+  return symmetric_spliting_integrator_step(
+      integrator_step_state,
+      step_size,
+      target_log_prob_fn,
+      kinetic_energy_fn,
+      coefficients=coefficients)
 
 
 def metropolis_hastings_step(current_state: State,
@@ -356,7 +519,7 @@ HamiltonianMonteCarloState = collections.namedtuple(
 
 HamiltonianMonteCarloExtra = collections.namedtuple(
     'HamiltonianMonteCarloExtra',
-    'is_accepted, log_accept_ratio, leapfrog_trace, '
+    'is_accepted, log_accept_ratio, integrator_trace, '
     'proposed_hmc_state')
 
 MomentumSampleFn = Union[Callable[[State], State], Callable[..., State]]
@@ -366,13 +529,14 @@ def hamiltonian_monte_carlo(
     hmc_state: HamiltonianMonteCarloState,
     target_log_prob_fn: PotentialFn,
     step_size: Any,
-    num_leapfrog_steps: IntTensor,
+    num_integrator_steps: IntTensor,
     momentum: State = None,
     kinetic_energy_fn: PotentialFn = None,
     momentum_sample_fn: MomentumSampleFn = None,
-    leapfrog_trace_fn: Callable[[LeapFrogStepState, LeapFrogStepExtras],
-                                TensorNest] = lambda *args: (),
+    integrator_trace_fn: Callable[[IntegratorStepState, IntegratorStepExtras],
+                                  TensorNest] = lambda *args: (),
     log_uniform: FloatTensor = None,
+    integrator=leapfrog_step,
     seed=None,
 ) -> Tuple[HamiltonianMonteCarloState, HamiltonianMonteCarloExtra]:
   """Hamiltonian Monte Carlo `TransitionOperator`.
@@ -382,7 +546,7 @@ def hamiltonian_monte_carlo(
   ```python
   step_size = 0.2
   num_steps = 2000
-  num_leapfrog_steps = 10
+  num_integrator_steps = 10
   state = tf.ones([16, 2])
 
   base_mean = [1., 0]
@@ -402,7 +566,7 @@ def hamiltonian_monte_carlo(
   kernel = tf.function(lambda state: fun_mcmc.hamiltonian_monte_carlo(
       state,
       step_size=step_size,
-      num_leapfrog_steps=num_leapfrog_steps,
+      num_integrator_steps=num_integrator_steps,
       target_log_prob_fn=target_log_prob_fn,
       seed=tfp_test_util.test_seed()))
 
@@ -422,13 +586,14 @@ def hamiltonian_monte_carlo(
     target_log_prob_fn: Target log prob fn.
     step_size: Step size, structure broadcastable to the `target_log_prob_fn`
       state.
-    num_leapfrog_steps: Number of leapfrog steps to take.
+    num_integrator_steps: Number of integrator steps to take.
     momentum: Initial momentum, passed to `momentum_sample_fn`. Default: zeroes.
     kinetic_energy_fn: Kinetic energy function.
     momentum_sample_fn: Sampler for the momentum.
-    leapfrog_trace_fn: Trace function for the leapfrog integrator.
+    integrator_trace_fn: Trace function for the integrator integrator.
     log_uniform: Optional logarithm of a uniformly distributed random sample in
       [0, 1], used for the MH accept/reject step.
+    integrator: Integrator to use for the HMC dynamics.
     seed: For reproducibility.
 
   Returns:
@@ -476,39 +641,40 @@ def hamiltonian_monte_carlo(
       state_extra=state_extra,
       target_log_prob=target_log_prob)
 
-  def leapfrog_wrapper(leapfrog_state, target_log_prob, state_extra):
-    """Leapfrog wrapper that tracks extra state."""
+  def integrator_wrapper(integrator_step_state, target_log_prob, state_extra):
+    """Integrator wrapper that tracks extra state."""
     del target_log_prob
     del state_extra
 
-    leapfrog_state, leapfrog_extra = leapfrog_step(
-        leapfrog_state,
+    integrator_step_state, integrator_extra = integrator(
+        integrator_step_state,
         step_size=step_size,
         target_log_prob_fn=target_log_prob_fn,
         kinetic_energy_fn=kinetic_energy_fn)
 
     return [
-        leapfrog_state, leapfrog_extra.target_log_prob,
-        leapfrog_extra.state_extra
-    ], leapfrog_extra
+        integrator_step_state, integrator_extra.target_log_prob,
+        integrator_extra.state_extra
+    ], integrator_extra
 
-  def leapfrog_trace_wrapper_fn(args, leapfrog_extra):
-    return leapfrog_trace_fn(args[0], leapfrog_extra)
+  def integrator_trace_wrapper_fn(args, integrator_extra):
+    return integrator_trace_fn(args[0], integrator_extra)
 
-  leapfrog_wrapper_state = (LeapFrogStepState(state, state_grads, momentum),
-                            target_log_prob, state_extra)
+  integrator_wrapper_state = (IntegratorStepState(state, state_grads, momentum),
+                              target_log_prob, state_extra)
 
-  [[leapfrog_state, target_log_prob, state_extra], _], leapfrog_trace = trace(
-      leapfrog_wrapper_state,
-      leapfrog_wrapper,
-      num_leapfrog_steps,
-      trace_fn=leapfrog_trace_wrapper_fn)
+  [[integrator_step_state, target_log_prob, state_extra],
+   _], integrator_trace = trace(
+       integrator_wrapper_state,
+       integrator_wrapper,
+       num_integrator_steps,
+       trace_fn=integrator_trace_wrapper_fn)
 
-  kinetic_energy, _ = call_fn(kinetic_energy_fn, leapfrog_state.momentum)
+  kinetic_energy, _ = call_fn(kinetic_energy_fn, integrator_step_state.momentum)
   proposed_energy = -target_log_prob + kinetic_energy
   proposed_state = HamiltonianMonteCarloState(
-      state=leapfrog_state.state,
-      state_grads=leapfrog_state.state_grads,
+      state=integrator_step_state.state,
+      state_grads=integrator_step_state.state_grads,
       target_log_prob=target_log_prob,
       state_extra=state_extra)
 
@@ -525,7 +691,7 @@ def hamiltonian_monte_carlo(
       is_accepted=is_accepted,
       proposed_hmc_state=proposed_state,
       log_accept_ratio=-energy_change,
-      leapfrog_trace=leapfrog_trace)
+      integrator_trace=integrator_trace)
 
 
 def sign_adaptation(control: FloatNest,

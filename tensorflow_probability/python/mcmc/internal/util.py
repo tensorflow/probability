@@ -98,7 +98,8 @@ def _choose_base_case(is_accepted,
       return accepted
     accepted = tf.convert_to_tensor(value=accepted, name='accepted')
     rejected = tf.convert_to_tensor(value=rejected, name='rejected')
-    r = tf.where(_expand_is_accepted_like(accepted), accepted, rejected)
+    r = tf.compat.v1.where(
+        _expand_is_accepted_like(accepted), accepted, rejected)
     r.set_shape(r.shape.merge_with(accepted.shape.merge_with(rejected.shape)))
     return r
 
@@ -160,7 +161,7 @@ def safe_sum(x, alt_value=-np.inf, name=None):
     x = tf.reduce_sum(input_tensor=x, axis=-1)
     alt_value = np.array(alt_value, x.dtype.as_numpy_dtype)
     alt_fill = tf.fill(tf.shape(input=x), value=alt_value)
-    x = tf.where(tf.math.is_finite(x), x, alt_fill)
+    x = tf.compat.v1.where(tf.math.is_finite(x), x, alt_fill)
     x.set_shape(x.shape.merge_with(in_shape))
     return x
 

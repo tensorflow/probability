@@ -274,14 +274,15 @@ def find_bins(x,
 
     if not extend_lower_interval:
       low_fill = np.nan if dtype.is_floating else -1
-      bins = tf.where(x < tf.expand_dims(edges[0], 0),
-                      tf.fill(tf.shape(input=x), tf.cast(low_fill, dtype)),
-                      bins)
+      bins = tf.compat.v1.where(
+          x < tf.expand_dims(edges[0], 0),
+          tf.fill(tf.shape(input=x), tf.cast(low_fill, dtype)), bins)
 
     if not extend_upper_interval:
       up_fill = np.nan if dtype.is_floating else tf.shape(input=edges)[0] - 1
-      bins = tf.where(x > tf.expand_dims(edges[-1], 0),
-                      tf.fill(tf.shape(input=x), tf.cast(up_fill, dtype)), bins)
+      bins = tf.compat.v1.where(
+          x > tf.expand_dims(edges[-1], 0),
+          tf.fill(tf.shape(input=x), tf.cast(up_fill, dtype)), bins)
 
     if flattening_x:
       bins = tf.reshape(bins, x_orig_shape)
@@ -602,10 +603,9 @@ def percentile(x,
           nan_batch_members, shape=right_rank_matched_shape)
       shape_gathered_y = tf.shape(input=gathered_y)
       nan = np.array(np.nan, gathered_y.dtype.as_numpy_dtype)
-      gathered_y = tf.where(
+      gathered_y = tf.compat.v1.where(
           tf.broadcast_to(nan_batch_members, shape_gathered_y),
-          tf.fill(shape_gathered_y, nan),
-          gathered_y)
+          tf.fill(shape_gathered_y, nan), gathered_y)
 
     # Expand dimensions if requested
     if keep_dims:

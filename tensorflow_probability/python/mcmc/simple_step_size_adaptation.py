@@ -61,7 +61,7 @@ def _get_differing_dims(a, b):
     b_shape = np.array(b.shape.as_list())
     return np.where(a_shape != b_shape[:len(a_shape)])[0]
   else:
-    return tf.where(
+    return tf.compat.v1.where(
         tf.not_equal(tf.shape(input=a),
                      tf.shape(input=b)[:tf.rank(a)]))[:, 0]
 
@@ -390,8 +390,9 @@ class SimpleStepSizeAdaptation(kernel_base.TransitionKernel):
             step_size_part / (1. + previous_kernel_results.adaptation_rate))
 
         new_step_size_parts.append(
-            tf.where(previous_kernel_results.step < self.num_adaptation_steps,
-                     new_step_size_part, step_size_part))
+            tf.compat.v1.where(
+                previous_kernel_results.step < self.num_adaptation_steps,
+                new_step_size_part, step_size_part))
       new_step_size = tf.nest.pack_sequence_as(step_size, new_step_size_parts)
 
       return new_state, previous_kernel_results._replace(

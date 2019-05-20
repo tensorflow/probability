@@ -66,8 +66,8 @@ class _ProximalHessianTest(object):
         tf.linalg.norm(tensor=model_coefficients, axis=-1)[..., tf.newaxis])
 
     mask = tfd.Bernoulli(probs=0.5, dtype=tf.bool).sample(batch_shape + [d])
-    model_coefficients = tf.where(mask, model_coefficients,
-                                  tf.zeros_like(model_coefficients))
+    model_coefficients = tf.compat.v1.where(mask, model_coefficients,
+                                            tf.zeros_like(model_coefficients))
     model_matrix = tfd.Normal(
         loc=np.array(0, dtype), scale=np.array(1, dtype)).sample(
             batch_shape + [n, d], seed=seed())

@@ -264,7 +264,7 @@ class HMCTest(tf.test.TestCase):
 
   def testKernelResultsUsingTruncatedDistribution(self):
     def log_prob(x):
-      return tf.where(
+      return tf.compat.v1.where(
           x >= 0.,
           -x - x**2,  # Non-constant gradient.
           tf.fill(x.shape, tf.cast(-np.inf, x.dtype)))
@@ -474,7 +474,7 @@ class HMCTest(tf.test.TestCase):
     """
     def _unbounded_exponential_log_prob(x):
       """An exponential distribution with log-likelihood NaN for x < 0."""
-      per_element_potentials = tf.where(
+      per_element_potentials = tf.compat.v1.where(
           x < 0., tf.fill(tf.shape(input=x), x.dtype.as_numpy_dtype(np.nan)),
           -x)
       return tf.reduce_sum(input_tensor=per_element_potentials)

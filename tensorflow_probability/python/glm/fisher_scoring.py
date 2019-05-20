@@ -349,7 +349,7 @@ def fit_one_step(
     def mask_if_invalid(x, mask):
       mask = tf.fill(
           tf.shape(input=x), value=np.array(mask, x.dtype.as_numpy_dtype))
-      return tf.where(is_valid, x, mask)
+      return tf.compat.v1.where(is_valid, x, mask)
 
     # Run one step of iteratively reweighted least-squares.
     # Compute "`z`", the adjusted predicted linear response.

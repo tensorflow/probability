@@ -20,6 +20,7 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution as distribution_lib
@@ -388,7 +389,7 @@ def calculate_reshape(original_shape, new_shape, validate=False, name=None):
     size_implicit_dim = (
         original_size // tf.maximum(1, -tf.reduce_prod(input_tensor=new_shape)))
     new_ndims = tf.shape(input=new_shape)
-    expanded_new_shape = tf.where(  # Assumes exactly one `-1`.
+    expanded_new_shape = tf1.where(  # Assumes exactly one `-1`.
         implicit_dim, tf.fill(new_ndims, size_implicit_dim), new_shape)
     validations = [] if not validate else [  # pylint: disable=g-long-ternary
         assert_util.assert_rank(

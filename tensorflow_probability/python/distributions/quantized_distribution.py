@@ -20,6 +20,7 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution as distributions
@@ -346,11 +347,12 @@ class QuantizedDistribution(distributions.Distribution):
       result_so_far = tf.math.ceil(x_samps)
 
       if low is not None:
-        result_so_far = tf.where(result_so_far < low, low * ones, result_so_far)
+        result_so_far = tf1.where(result_so_far < low, low * ones,
+                                  result_so_far)
 
       if high is not None:
-        result_so_far = tf.where(result_so_far > high, high * ones,
-                                 result_so_far)
+        result_so_far = tf1.where(result_so_far > high, high * ones,
+                                  result_so_far)
 
       return result_so_far
 
@@ -388,8 +390,8 @@ class QuantizedDistribution(distributions.Distribution):
     # In either case, we are doing Log[ exp{big} - exp{small} ]
     # We want to use the sf items precisely when we are on the right side of the
     # median, which occurs when logsf_y < logcdf_y.
-    big = tf.where(logsf_y < logcdf_y, logsf_y_minus_1, logcdf_y)
-    small = tf.where(logsf_y < logcdf_y, logsf_y, logcdf_y_minus_1)
+    big = tf1.where(logsf_y < logcdf_y, logsf_y_minus_1, logcdf_y)
+    small = tf1.where(logsf_y < logcdf_y, logsf_y, logcdf_y_minus_1)
 
     return _logsum_expbig_minus_expsmall(big, small)
 
@@ -418,7 +420,7 @@ class QuantizedDistribution(distributions.Distribution):
     cdf_y_minus_1 = self.cdf(y - 1)
 
     # sf_prob has greater precision iff we're on the right side of the median.
-    return tf.where(
+    return tf1.where(
         sf_y < cdf_y,  # True iff we're on the right side of the median.
         sf_y_minus_1 - sf_y,
         cdf_y - cdf_y_minus_1)
@@ -447,10 +449,10 @@ class QuantizedDistribution(distributions.Distribution):
     # Re-define values at the cutoffs.
     if low is not None:
       neg_inf = -np.inf * tf.ones_like(result_so_far)
-      result_so_far = tf.where(j < low, neg_inf, result_so_far)
+      result_so_far = tf1.where(j < low, neg_inf, result_so_far)
     if high is not None:
-      result_so_far = tf.where(j >= high, tf.zeros_like(result_so_far),
-                               result_so_far)
+      result_so_far = tf1.where(j >= high, tf.zeros_like(result_so_far),
+                                result_so_far)
 
     return result_so_far
 
@@ -478,11 +480,11 @@ class QuantizedDistribution(distributions.Distribution):
 
     # Re-define values at the cutoffs.
     if low is not None:
-      result_so_far = tf.where(j < low, tf.zeros_like(result_so_far),
-                               result_so_far)
+      result_so_far = tf1.where(j < low, tf.zeros_like(result_so_far),
+                                result_so_far)
     if high is not None:
-      result_so_far = tf.where(j >= high, tf.ones_like(result_so_far),
-                               result_so_far)
+      result_so_far = tf1.where(j >= high, tf.ones_like(result_so_far),
+                                result_so_far)
 
     return result_so_far
 
@@ -510,11 +512,11 @@ class QuantizedDistribution(distributions.Distribution):
 
     # Re-define values at the cutoffs.
     if low is not None:
-      result_so_far = tf.where(j < low, tf.zeros_like(result_so_far),
-                               result_so_far)
+      result_so_far = tf1.where(j < low, tf.zeros_like(result_so_far),
+                                result_so_far)
     if high is not None:
       neg_inf = -np.inf * tf.ones_like(result_so_far)
-      result_so_far = tf.where(j >= high, neg_inf, result_so_far)
+      result_so_far = tf1.where(j >= high, neg_inf, result_so_far)
 
     return result_so_far
 
@@ -542,11 +544,11 @@ class QuantizedDistribution(distributions.Distribution):
 
     # Re-define values at the cutoffs.
     if low is not None:
-      result_so_far = tf.where(j < low, tf.ones_like(result_so_far),
-                               result_so_far)
+      result_so_far = tf1.where(j < low, tf.ones_like(result_so_far),
+                                result_so_far)
     if high is not None:
-      result_so_far = tf.where(j >= high, tf.zeros_like(result_so_far),
-                               result_so_far)
+      result_so_far = tf1.where(j >= high, tf.zeros_like(result_so_far),
+                                result_so_far)
 
     return result_so_far
 

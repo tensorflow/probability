@@ -757,9 +757,8 @@ def _default_step_sizes(reference_vertex):
   small_sizes = tf.ones_like(reference_vertex) * 0.00025
   # Step size to choose when the coordinate is non-zero.
   large_sizes = reference_vertex * 0.05
-  return tf.where(tf.abs(reference_vertex) < _EPSILON,
-                  small_sizes,
-                  large_sizes)
+  return tf.compat.v1.where(
+      tf.abs(reference_vertex) < _EPSILON, small_sizes, large_sizes)
 
 
 def _prepare_args_with_initial_simplex(objective_function,

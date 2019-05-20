@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
@@ -310,7 +311,7 @@ class Categorical(distribution.Distribution):
 
     cdf = tf.reshape(cdf_flat, shape=batch_shape)
 
-    return tf.where(should_be_zero, tf.zeros_like(cdf), cdf)
+    return tf1.where(should_be_zero, tf.zeros_like(cdf), cdf)
 
   def _log_prob(self, k):
     k = tf.convert_to_tensor(value=k, name="k")

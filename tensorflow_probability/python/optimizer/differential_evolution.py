@@ -199,15 +199,16 @@ def one_step(
 
     infinity = tf.zeros_like(population_values) + np.inf
 
-    population_values = tf.where(
+    population_values = tf.compat.v1.where(
         tf.math.is_nan(population_values), x=infinity, y=population_values)
 
     to_replace = candidate_values < population_values
     next_population = [
-        tf.where(to_replace, x=candidates_part, y=population_part)
+        tf.compat.v1.where(to_replace, x=candidates_part, y=population_part)
         for candidates_part, population_part in zip(candidates, population)
     ]
-    next_values = tf.where(to_replace, x=candidate_values, y=population_values)
+    next_values = tf.compat.v1.where(
+        to_replace, x=candidate_values, y=population_values)
 
   return next_population, next_values
 
@@ -511,7 +512,7 @@ def _check_failure(population_values):
 def _find_best_in_population(population, values):
   """Finds the population member with the lowest value."""
   best_value = tf.math.reduce_min(input_tensor=values)
-  best_index = tf.where(tf.math.equal(values, best_value))[0, 0]
+  best_index = tf.compat.v1.where(tf.math.equal(values, best_value))[0, 0]
 
   return ([population_part[best_index] for population_part in population],
           best_value)
@@ -663,10 +664,8 @@ def _binary_crossover(population,
         dtype=crossover_prob.dtype.base_dtype,
         seed=seed_stream()) < crossover_prob
     do_binary_crossover |= force_crossovers
-    recombinant_flat = tf.where(
-        do_binary_crossover,
-        x=mutant_part_flat,
-        y=pop_part_flat)
+    recombinant_flat = tf.compat.v1.where(
+        do_binary_crossover, x=mutant_part_flat, y=pop_part_flat)
     recombinant = tf.reshape(recombinant_flat, tf.shape(input=population_part))
     recombinants.append(recombinant)
   return recombinants
@@ -754,18 +753,18 @@ def _get_mixing_indices(size, seed=None, name=None):
                               seed=seed_stream())
 
     # Shift second if it is on top of or to the right of first
-    second = tf.where(first < second, x=second, y=second + 1)
+    second = tf.compat.v1.where(first < second, x=second, y=second + 1)
     smaller = tf.math.minimum(first, second)
     larger = tf.math.maximum(first, second)
     # Shift the third one so it does not coincide with either the first or the
     # second number. Assuming first < second, shift by 1 if the number is in
     # [first, second) and by 2 if the number is greater than or equal to the
     # second.
-    third = tf.where(third < smaller, x=third, y=third + 1)
-    third = tf.where(third < larger, x=third, y=third + 1)
+    third = tf.compat.v1.where(third < smaller, x=third, y=third + 1)
+    third = tf.compat.v1.where(third < larger, x=third, y=third + 1)
     sample = tf.stack([first, second, third], axis=1)
     to_avoid = tf.expand_dims(tf.range(size), axis=-1)
-    sample = tf.where(sample < to_avoid, x=sample, y=sample + 1)
+    sample = tf.compat.v1.where(sample < to_avoid, x=sample, y=sample + 1)
     return sample
 
 

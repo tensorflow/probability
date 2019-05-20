@@ -33,7 +33,8 @@ class ConditionalDistributionTest(distribution_test.DistributionTest):
     class _FakeDistribution(tfd.ConditionalDistribution):
       """Fake Distribution for testing _set_sample_static_shape."""
 
-      def __init__(self, batch_shape=None, event_shape=None):
+      def __init__(
+          self, batch_shape=None, event_shape=None):
         self._static_batch_shape = tf.TensorShape(batch_shape)
         self._static_event_shape = tf.TensorShape(event_shape)
         super(_FakeDistribution, self).__init__(
@@ -79,6 +80,80 @@ class ConditionalDistributionTest(distribution_test.DistributionTest):
       method = getattr(d, name)
       with self.assertRaisesRegexp(ValueError, "b1.*b2"):
         method([] if name == "sample" else 1.0, arg1="b1", arg2="b2")
+
+  def _GetPartiallyImplementedDistribution(self):
+    class _PartiallyImplementedDistribution(tfd.ConditionalDistribution):
+      """Partially implemented Distribution for testing default methods."""
+
+      def __init__(
+          self, batch_shape=None, event_shape=None):
+        self._static_batch_shape = tf.TensorShape(batch_shape)
+        self._static_event_shape = tf.TensorShape(event_shape)
+        super(_PartiallyImplementedDistribution, self).__init__(
+            dtype=tf.float32,
+            reparameterization_type=tfd.NOT_REPARAMETERIZED,
+            validate_args=True,
+            allow_nan_stats=True,
+            name="PartiallyImplementedDistribution")
+
+      def _batch_shape(self):
+        return self._static_batch_shape
+
+      def _event_shape(self):
+        return self._static_event_shape
+
+    return _PartiallyImplementedDistribution
+
+  def testDefaultMethodNonLogSpaceInvocations(self):
+    dist = self._GetPartiallyImplementedDistribution()(
+        batch_shape=[], event_shape=[])
+
+    # Add logspace methods.
+    hidden_logspace_methods = [
+        "_log_cdf", "_log_prob", "_log_survival_function"]
+    regular_methods = ["cdf", "prob", "survival_function"]
+
+    def raise_with_input_fn(x, arg1, arg2):  # pylint:disable=unused-argument
+      raise ValueError(arg1, arg2)
+
+    def raise_only_conditional_fn(arg1, arg2):  # pylint:disable=unused-argument
+      raise ValueError(arg1, arg2)
+
+    for log_m, m in zip(hidden_logspace_methods, regular_methods):
+      setattr(dist, log_m, raise_with_input_fn)
+      method = getattr(dist, m)
+      with self.assertRaisesRegexp(ValueError, "b1.*b2"):
+        method(1.0, arg1="b1", arg2="b2")
+
+    setattr(dist, "_stddev", raise_only_conditional_fn)
+    method = getattr(dist, "variance")
+    with self.assertRaisesRegexp(ValueError, "b1.*b2"):
+      method(arg1="b1", arg2="b2")
+
+  def testDefaultMethodLogSpaceInvocations(self):
+    dist = self._GetPartiallyImplementedDistribution()(
+        batch_shape=[], event_shape=[])
+
+    # Add logspace methods.
+    hidden_methods = ["_cdf", "_prob", "_survival_function"]
+    regular_logspace_methods = ["log_cdf", "log_prob", "log_survival_function"]
+
+    def raise_with_input_fn(x, arg1, arg2):  # pylint:disable=unused-argument
+      raise ValueError(arg1, arg2)
+
+    def raise_only_conditional_fn(arg1, arg2):  # pylint:disable=unused-argument
+      raise ValueError(arg1, arg2)
+
+    for m, log_m in zip(hidden_methods, regular_logspace_methods):
+      setattr(dist, m, raise_with_input_fn)
+      method = getattr(dist, log_m)
+      with self.assertRaisesRegexp(ValueError, "b1.*b2"):
+        method(1.0, arg1="b1", arg2="b2")
+
+    setattr(dist, "_variance", raise_only_conditional_fn)
+    method = getattr(dist, "stddev")
+    with self.assertRaisesRegexp(ValueError, "b1.*b2"):
+      method(arg1="b1", arg2="b2")
 
 
 if __name__ == "__main__":

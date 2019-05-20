@@ -21,6 +21,7 @@ from __future__ import print_function
 import functools
 # Dependency imports
 import numpy as np
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
@@ -247,7 +248,7 @@ class HalfCauchy(distribution.Distribution):
       x = x + tf.zeros_like(loc)
       # Substitute out-of-support values in x with values that are in the
       # support of the distribution before applying f.
-      y = f(tf.where(x < loc, self._inv_z(0.5) + tf.zeros_like(x), x))
+      y = f(tf1.where(x < loc, self._inv_z(0.5) + tf.zeros_like(x), x))
       if default_value == 0.:
         default_value = tf.zeros_like(y)
       elif default_value == 1.:
@@ -256,4 +257,4 @@ class HalfCauchy(distribution.Distribution):
         default_value = tf.fill(
             dims=tf.shape(input=y),
             value=dtype_util.as_numpy_dtype(self.dtype)(default_value))
-      return tf.where(x < loc, default_value, y)
+      return tf1.where(x < loc, default_value, y)

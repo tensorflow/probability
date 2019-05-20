@@ -39,7 +39,7 @@ from tensorflow_probability.python.internal import prefer_static
 def val_where(cond, tval, fval):
   """Like tf.where but works on namedtuples."""
   if isinstance(tval, tf.Tensor):
-    return tf.where(cond, tval, fval)
+    return tf.compat.v1.where(cond, tval, fval)
   elif isinstance(tval, tuple):
     cls = type(tval)
     return cls(*(val_where(cond, t, f) for t, f in zip(tval, fval)))
@@ -202,12 +202,10 @@ def _secant2_inner(value_and_gradients_function,
   updated_right = active & tf.equal(val_right.x, val_c.x)
   is_new = updated_left | updated_right
 
-  next_c = tf.where(updated_left,
-                    _secant(initial_args.left, val_left),
-                    val_c.x)
-  next_c = tf.where(updated_right,
-                    _secant(initial_args.right, val_right),
-                    next_c)
+  next_c = tf.compat.v1.where(updated_left, _secant(initial_args.left,
+                                                    val_left), val_c.x)
+  next_c = tf.compat.v1.where(updated_right,
+                              _secant(initial_args.right, val_right), next_c)
   in_range = (val_left.x <= next_c) & (next_c <= val_right.x)
 
   # Figure out if an extra function evaluation is needed for new `c` points.

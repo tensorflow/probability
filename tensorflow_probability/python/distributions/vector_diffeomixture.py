@@ -20,6 +20,7 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import affine_linear_operator as affine_linear_operator_bijector
@@ -968,5 +969,5 @@ def softmax(x, axis, name=None):
     if axis_ is not None:
       axis = np.int(ndims + axis_ if axis_ < 0 else axis_)
     else:
-      axis = tf.where(axis < 0, ndims + axis, axis)
+      axis = tf1.where(axis < 0, ndims + axis, axis)
   return tf.nn.softmax(x, axis=axis)

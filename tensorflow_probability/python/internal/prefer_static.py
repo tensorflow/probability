@@ -22,6 +22,7 @@ from __future__ import print_function
 import decorator
 import numpy as np
 
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import tensorshape_util
@@ -275,7 +276,7 @@ def _shape(input, out_type=tf.int32, name=None):  # pylint: disable=redefined-bu
 shape = _copy_docstring(tf.shape, _shape)
 
 where = _prefer_static(
-    tf.where,
+    tf1.where,
     lambda condition, x=None, y=None, name=None: np.where(condition, x, y))
 
 zeros = _prefer_static(

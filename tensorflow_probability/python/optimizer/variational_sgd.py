@@ -185,7 +185,7 @@ class VariationalSGD(tf.compat.v2.optimizers.Optimizer):
     # via Welford's algorithm
     if isinstance(grad, tf.Tensor):
       delta = grad - avg_first
-      first_moment_update = avg_first.assign_add(delta * tf.where(
+      first_moment_update = avg_first.assign_add(delta * tf.compat.v1.where(
           self.iterations < 1, tf.cast(1, var.dtype), 1. - decay_tensor))
 
       with tf.control_dependencies([first_moment_update]):
@@ -199,8 +199,8 @@ class VariationalSGD(tf.compat.v2.optimizers.Optimizer):
       delta = grad.values - tf.gather_nd(avg_first, grad.indices)
       first_moment_update = tf.compat.v1.scatter_add(
           avg_first, grad.indices,
-          delta * tf.where(self.iterations < 1, tf.cast(1., var.dtype),
-                           1. - decay_tensor))
+          delta * tf.compat.v1.where(self.iterations < 1, tf.cast(
+              1., var.dtype), 1. - decay_tensor))
 
       with tf.control_dependencies([first_moment_update]):
         avg_second = tf.compat.v1.scatter_add(
@@ -226,7 +226,7 @@ class VariationalSGD(tf.compat.v2.optimizers.Optimizer):
         diag_preconditioner)
 
   def _resource_apply_dense(self, grad, var):
-    max_learning_rate = tf.where(
+    max_learning_rate = tf.compat.v1.where(
         self.iterations < tf.cast(self._burnin, tf.int64),
         self._burnin_max_learning_rate, self._max_learning_rate)
 
@@ -242,7 +242,7 @@ class VariationalSGD(tf.compat.v2.optimizers.Optimizer):
         use_locking=self._use_locking)
 
   def _resource_apply_sparse(self, grad, var, indices):
-    max_learning_rate = tf.where(
+    max_learning_rate = tf.compat.v1.where(
         self.iterations < tf.cast(self._burnin, tf.int64),
         self._burnin_max_learning_rate, self._max_learning_rate)
 

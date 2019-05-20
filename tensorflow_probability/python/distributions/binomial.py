@@ -17,6 +17,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import multinomial
@@ -57,9 +58,9 @@ def _bdtr(k, n, p):
   #   where(unsafe, safe_output, betainc(where(unsafe, safe_input, input)))
   ones = tf.ones_like(n - k)
   k_eq_n = tf.equal(k, n)
-  safe_dn = tf.where(k_eq_n, ones, n - k)
+  safe_dn = tf1.where(k_eq_n, ones, n - k)
   dk = tf.math.betainc(a=safe_dn, b=k + 1, x=1 - p)
-  return tf.where(k_eq_n, ones, dk)
+  return tf1.where(k_eq_n, ones, dk)
 
 
 class Binomial(distribution.Distribution):

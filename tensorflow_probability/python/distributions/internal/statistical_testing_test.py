@@ -138,16 +138,17 @@ class StatisticalTestingTest(tf.test.TestCase, parameterized.TestCase):
     samples = tf.convert_to_tensor(value=samples, dtype=dtype)
     def cdf(x):
       ones = tf.ones_like(x)
-      answer = tf.where(x < 3, 0.6 * ones, ones)
-      answer = tf.where(x < 2, 0.3 * ones, answer)
-      answer = tf.where(x < 1, 0.1 * ones, answer)
-      return tf.where(x < 0, 0 * ones, answer)
+      answer = tf.compat.v1.where(x < 3, 0.6 * ones, ones)
+      answer = tf.compat.v1.where(x < 2, 0.3 * ones, answer)
+      answer = tf.compat.v1.where(x < 1, 0.1 * ones, answer)
+      return tf.compat.v1.where(x < 0, 0 * ones, answer)
+
     def left_continuous_cdf(x):
       ones = tf.ones_like(x)
-      answer = tf.where(x <= 3, 0.6 * ones, ones)
-      answer = tf.where(x <= 2, 0.3 * ones, answer)
-      answer = tf.where(x <= 1, 0.1 * ones, answer)
-      return tf.where(x <= 0, 0 * ones, answer)
+      answer = tf.compat.v1.where(x <= 3, 0.6 * ones, ones)
+      answer = tf.compat.v1.where(x <= 2, 0.3 * ones, answer)
+      answer = tf.compat.v1.where(x <= 1, 0.1 * ones, answer)
+      return tf.compat.v1.where(x <= 0, 0 * ones, answer)
     # Unlike empirical_cdfs, the samples Tensor must come in iid across the
     # leading dimension.
     obtained = self.evaluate(st.kolmogorov_smirnov_distance(
@@ -165,16 +166,18 @@ class StatisticalTestingTest(tf.test.TestCase, parameterized.TestCase):
     samples = rng.choice(4, size=shape, p=probs).astype(dtype=dtype)
     def cdf(x):
       ones = tf.ones_like(x)
-      answer = tf.where(x < 3, 0.6 * ones, ones)
-      answer = tf.where(x < 2, 0.3 * ones, answer)
-      answer = tf.where(x < 1, 0.1 * ones, answer)
-      return tf.where(x < 0, 0 * ones, answer)
+      answer = tf.compat.v1.where(x < 3, 0.6 * ones, ones)
+      answer = tf.compat.v1.where(x < 2, 0.3 * ones, answer)
+      answer = tf.compat.v1.where(x < 1, 0.1 * ones, answer)
+      return tf.compat.v1.where(x < 0, 0 * ones, answer)
+
     def left_continuous_cdf(x):
       ones = tf.ones_like(x)
-      answer = tf.where(x <= 3, 0.6 * ones, ones)
-      answer = tf.where(x <= 2, 0.3 * ones, answer)
-      answer = tf.where(x <= 1, 0.1 * ones, answer)
-      return tf.where(x <= 0, 0 * ones, answer)
+      answer = tf.compat.v1.where(x <= 3, 0.6 * ones, ones)
+      answer = tf.compat.v1.where(x <= 2, 0.3 * ones, answer)
+      answer = tf.compat.v1.where(x <= 1, 0.1 * ones, answer)
+      return tf.compat.v1.where(x <= 0, 0 * ones, answer)
+
     self.evaluate(st.assert_true_cdf_equal_by_dkwm(
         samples, cdf, left_continuous_cdf=left_continuous_cdf,
         false_fail_rate=1e-6))

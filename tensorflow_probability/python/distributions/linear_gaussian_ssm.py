@@ -21,6 +21,7 @@ from __future__ import print_function
 import collections
 
 # Dependency imports
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
@@ -1333,7 +1334,7 @@ def build_kalman_filter_step(get_transition_matrix_for_timestep,
       # from masked elements will not be selected below, but we need to ensure
       # that any results we incidently compute on masked values are at least
       # finite (not inf or NaN) so that they don't screw up gradient propagation
-      # through `tf.where`, as described in
+      # through `tf1.where`, as described in
       #  https://github.com/tensorflow/tensorflow/issues/2540.
       # We fill with the prior expectation because any fixed value such as zero
       # might be arbitrarily unlikely under the prior, leading to overflow in
@@ -1342,7 +1343,7 @@ def build_kalman_filter_step(get_transition_matrix_for_timestep,
       x_expected = _propagate_mean(state.predicted_mean,
                                    observation_matrix,
                                    observation_noise) * tf.ones_like(x_t)
-      x_t = tf.where(
+      x_t = tf1.where(
           tf.broadcast_to(mask_t, tf.shape(input=x_expected)), x_expected,
           tf.broadcast_to(x_t, tf.shape(input=x_expected)))
 
@@ -1361,17 +1362,16 @@ def build_kalman_filter_step(get_transition_matrix_for_timestep,
     log_marginal_likelihood = observation_dist.log_prob(x_t[..., 0])
 
     if mask_t is not None:
-      filtered_mean = tf.where(
+      filtered_mean = tf1.where(
           tf.broadcast_to(mask_t, tf.shape(input=filtered_mean)),
           state.predicted_mean, filtered_mean)
-      filtered_cov = tf.where(
+      filtered_cov = tf1.where(
           tf.broadcast_to(mask_t, tf.shape(input=filtered_cov)),
           state.predicted_cov, filtered_cov)
-      log_marginal_likelihood = tf.where(
+      log_marginal_likelihood = tf1.where(
           tf.broadcast_to(mask_t[..., 0, 0],
                           tf.shape(input=log_marginal_likelihood)),
-          tf.zeros_like(log_marginal_likelihood),
-          log_marginal_likelihood)
+          tf.zeros_like(log_marginal_likelihood), log_marginal_likelihood)
 
     # Run the filtered posterior through the transition
     # model to predict the next time step:

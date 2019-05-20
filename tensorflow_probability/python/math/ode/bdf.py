@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import collections
 import numpy as np
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.math.ode import base
@@ -314,8 +315,8 @@ class BDF(base.Solver):
       distance_to_next_time = next_time - iterand.time
       overstepped = iterand.new_step_size > distance_to_next_time
       iterand = iterand._replace(
-          new_step_size=tf.where(overstepped, distance_to_next_time,
-                                 iterand.new_step_size),
+          new_step_size=tf1.where(overstepped, distance_to_next_time,
+                                  iterand.new_step_size),
           should_update_step_size=overstepped | iterand.should_update_step_size)
 
       if not self._evaluate_jacobian_lazily:
@@ -355,17 +356,17 @@ class BDF(base.Solver):
       backward_differences, order, state_shape, step_size = solver_internal_state
 
       if max_num_steps is not None:
-        status = tf.where(tf.equal(num_steps, max_num_steps), -1, 0)
+        status = tf1.where(tf.equal(num_steps, max_num_steps), -1, 0)
 
-      backward_differences = tf.where(
+      backward_differences = tf1.where(
           should_update_step_size,
           bdf_util.interpolate_backward_differences(backward_differences, order,
                                                     new_step_size / step_size),
           backward_differences)
-      step_size = tf.where(should_update_step_size, new_step_size, step_size)
+      step_size = tf1.where(should_update_step_size, new_step_size, step_size)
       should_update_factorization = should_update_step_size
-      num_steps_same_size = tf.where(should_update_step_size, 0,
-                                     num_steps_same_size)
+      num_steps_same_size = tf1.where(should_update_step_size, 0,
+                                      num_steps_same_size)
 
       def update_factorization():
         return bdf_util.newton_qr(jacobian,
@@ -416,15 +417,15 @@ class BDF(base.Solver):
       # step size.
       newton_failed = tf.logical_not(newton_converged)
       should_update_step_size = newton_failed & jacobian_is_up_to_date
-      new_step_size = step_size * tf.where(should_update_step_size,
-                                           newton_step_size_factor, 1.)
+      new_step_size = step_size * tf1.where(should_update_step_size,
+                                            newton_step_size_factor, 1.)
 
       # If Newton's method failed and the Jacobian was NOT up to date, update
       # the Jacobian.
       should_update_jacobian = newton_failed & tf.logical_not(
           jacobian_is_up_to_date)
 
-      error_ratio = tf.where(
+      error_ratio = tf1.where(
           newton_converged,
           bdf_util.error_ratio(next_backward_difference,
                                error_coefficients_array.read(order), tol),
@@ -434,7 +435,7 @@ class BDF(base.Solver):
 
       # If Newton's method converged but the solution was NOT accepted, decrease
       # the step size.
-      new_step_size = tf.where(
+      new_step_size = tf1.where(
           converged_and_rejected,
           util.next_step_size(step_size, order, error_ratio, safety_factor,
                               min_step_size_factor, max_step_size_factor),
@@ -443,16 +444,16 @@ class BDF(base.Solver):
 
       # If Newton's method converged and the solution was accepted, update the
       # matrix of backward differences.
-      time = tf.where(accepted, time + step_size, time)
-      backward_differences = tf.where(
+      time = tf1.where(accepted, time + step_size, time)
+      backward_differences = tf1.where(
           accepted,
           bdf_util.update_backward_differences(backward_differences,
                                                next_backward_difference,
                                                next_state, order),
           backward_differences)
       jacobian_is_up_to_date = jacobian_is_up_to_date & tf.logical_not(accepted)
-      num_steps_same_size = tf.where(accepted, num_steps_same_size + 1,
-                                     num_steps_same_size)
+      num_steps_same_size = tf1.where(accepted, num_steps_same_size + 1,
+                                      num_steps_same_size)
 
       # Order and step size are only updated if we have taken strictly more than
       # order + 1 steps of the same size. This is to prevent the order from
@@ -474,16 +475,16 @@ class BDF(base.Solver):
             backward_differences_array.read(proposed_order + 1),
             error_coefficients_array.read(proposed_order), tol)
         proposed_error_ratio_is_lower = proposed_error_ratio < new_error_ratio
-        new_order = tf.where(
+        new_order = tf1.where(
             should_update_order_and_step_size & proposed_error_ratio_is_lower,
             proposed_order, new_order)
-        new_error_ratio = tf.where(
+        new_error_ratio = tf1.where(
             should_update_order_and_step_size & proposed_error_ratio_is_lower,
             proposed_error_ratio, new_error_ratio)
       order = new_order
       error_ratio = new_error_ratio
 
-      new_step_size = tf.where(
+      new_step_size = tf1.where(
           should_update_order_and_step_size,
           util.next_step_size(step_size, order, error_ratio, safety_factor,
                               min_step_size_factor, max_step_size_factor),
