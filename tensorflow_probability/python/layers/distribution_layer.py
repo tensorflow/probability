@@ -107,16 +107,15 @@ class DistributionLambda(tf.keras.layers.Lambda):
   tfd = tfp.distributions
   tfpl = tfp.layers
 
-  event_size = 7
-
   model = tfk.Sequential([
-    tfkl.Dense(2),
+    tfkl.Dense(2, input_dim=2),
     tfpl.DistributionLambda(
       make_distribution_fn=lambda t: tfd.Normal(
-          loc=t[..., 0:1], scale=tf.exp(t[..., 1:2])),
+          loc=t[..., 0], scale=tf.exp(t[..., 1])),
       convert_to_tensor_fn=lambda s: s.sample(5))
   ])
-  # ==> Normal (batch_shape=[1]) instance parametrized by mean and log scale.
+  # model.call(x), where x.shape = B + [2] will produce
+  # ==> Normal (batch_shape=[B]) instance parametrized by mean and log scale.
   ```
 
   """
