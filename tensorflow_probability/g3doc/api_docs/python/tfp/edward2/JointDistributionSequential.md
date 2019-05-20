@@ -23,13 +23,12 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See JointDistributionSequential for more details.
 
 #### Returns:
+RandomVariable.
 
-  RandomVariable.
 
 #### Original Docstring for Distribution
 
 Construct the `JointDistributionSequential` distribution.
-
 
 #### Args:
 

@@ -84,7 +84,6 @@ The inequality follows from the fact that the "perspective" of `f`, i.e.,
 BOund (ELBO) as a special case, i.e., `f(u) = -log(u)`, we call this framework
 "Evidence Divergence Bound Optimization" (EDBO).
 
-
 #### Args:
 
 * <b>`f`</b>: Python `callable` representing a Csiszar-function in log-space, i.e.,

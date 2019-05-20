@@ -29,6 +29,7 @@ Defined in [`python/glm/fisher_scoring.py`](https://github.com/tensorflow/probab
 
 <!-- Placeholder for "Used in" -->
 
+
 #### Args:
 
 * <b>`model_matrix`</b>: (Batch of) `float`-like, matrix-shaped `Tensor` where each row

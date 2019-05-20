@@ -60,9 +60,9 @@ Parameterization: Finch's `alpha` is `1 - decay`.
 
 #### Raises:
 
-  TypeError: if `mean_var` does not have float type `dtype`.
-  TypeError: if `mean_var`, `variance_var`, `value`, `decay` have different
-    `base_dtype`.
+* <b>`TypeError`</b>: if `mean_var` does not have float type `dtype`.
+* <b>`TypeError`</b>: if `mean_var`, `variance_var`, `value`, `decay` have different
+  `base_dtype`.
 
 #### References
 

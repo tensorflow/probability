@@ -22,6 +22,7 @@ Defined in [`python/sts/fitting.py`](https://github.com/tensorflow/probability/t
 
 <!-- Placeholder for "Used in" -->
 
+
 #### Args:
 
 * <b>`parameter`</b>: `sts.Parameter` named tuple instance.

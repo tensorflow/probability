@@ -26,8 +26,8 @@ thread-local stack. Upon exiting, it pops the interceptor from the stack.
 
 
 #### Yields:
+None.
 
-  None.
 
 #### Examples
 

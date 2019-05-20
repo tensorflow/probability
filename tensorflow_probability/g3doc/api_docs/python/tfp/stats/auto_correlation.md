@@ -71,9 +71,9 @@ contains a slight bias, which goes to zero as `len(x) - m --> infinity`.
 
 
 #### Returns:
-
 `rxx`: `Tensor` of same `dtype` as `x`.  `rxx.shape[i] = x.shape[i]` for
   `i != axis`, and `rxx.shape[axis] = max_lags + 1`.
+
 
 
 #### Raises:

@@ -44,7 +44,6 @@ distributed. See [Gelman and Rubin (1992)][1]; [Brooks and Gelman (1998)][2].
   other statistics are desired, a different diagnostic should be used. See
   [Brooks and Gelman (1998)][2].
 
-
 #### Args:
 
 * <b>`chains_states`</b>:  `Tensor` or Python `list` of `Tensor`s representing the
@@ -62,15 +61,15 @@ distributed. See [Gelman and Rubin (1992)][1]; [Brooks and Gelman (1998)][2].
 
 
 #### Returns:
-
 `Tensor` or Python `list` of `Tensor`s representing the R-hat statistic for
 the state(s).  Same `dtype` as `state`, and shape equal to
 `state.shape[1 + independent_chain_ndims:]`.
 
 
+
 #### Raises:
 
-  ValueError:  If `independent_chain_ndims < 1`.
+* <b>`ValueError`</b>:  If `independent_chain_ndims < 1`.
 
 #### Examples
 

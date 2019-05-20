@@ -85,7 +85,6 @@ Initializes this transition kernel.
 <h3 id="is_calibrated"><code>is_calibrated</code></h3>
 
 Returns `True` if Markov chain converges to specified distribution.
-
 `TransitionKernel`s which are "uncalibrated" are often calibrated by
 composing them with the <a href="../../tfp/mcmc/MetropolisHastings.md"><code>tfp.mcmc.MetropolisHastings</code></a> `TransitionKernel`.
 
@@ -96,7 +95,6 @@ composing them with the <a href="../../tfp/mcmc/MetropolisHastings.md"><code>tfp
 <h3 id="num_leapfrog_steps"><code>num_leapfrog_steps</code></h3>
 
 Returns the num_leapfrog_steps parameter.
-
 If `store_parameters_in_results` argument to the initializer was set to
 `True`, this only returns the value of the `num_leapfrog_steps` placed in
 the kernel results by the `bootstrap_results` method. The actual
@@ -122,7 +120,6 @@ Return `dict` of ``__init__`` arguments and their values.
 <h3 id="step_size"><code>step_size</code></h3>
 
 Returns the step_size parameter.
-
 If `store_parameters_in_results` argument to the initializer was set to
 `True`, this only returns the value of the `step_size` placed in the kernel
 results by the `bootstrap_results` method. The actual step size in that

@@ -86,17 +86,17 @@ accordingly. See below for some examples of this feature.
 
 #### Returns:
 
-  checkpointable_states_and_trace: if `return_final_kernel_results` is
-    `True`. The return value is an instance of
-    `CheckpointableStatesAndTrace`.
-  all_states: if `return_final_kernel_results` is `False` and `trace_fn` is
-    `None`. The return value is a `Tensor` or Python list of `Tensor`s
-    representing the state(s) of the Markov chain(s) at each result step. Has
-    same shape as input `current_state` but with a prepended
-    `num_results`-size dimension.
-  states_and_trace: if `return_final_kernel_results` is `False` and
-    `trace_fn` is not `None`. The return value is an instance of
-    `StatesAndTrace`.
+* <b>`checkpointable_states_and_trace`</b>: if `return_final_kernel_results` is
+  `True`. The return value is an instance of
+  `CheckpointableStatesAndTrace`.
+* <b>`all_states`</b>: if `return_final_kernel_results` is `False` and `trace_fn` is
+  `None`. The return value is a `Tensor` or Python list of `Tensor`s
+  representing the state(s) of the Markov chain(s) at each result step. Has
+  same shape as input `current_state` but with a prepended
+  `num_results`-size dimension.
+* <b>`states_and_trace`</b>: if `return_final_kernel_results` is `False` and
+  `trace_fn` is not `None`. The return value is an instance of
+  `StatesAndTrace`.
 
 #### Examples
 

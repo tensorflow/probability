@@ -144,8 +144,8 @@ print ("Leaped Estimated: %f, True Value: %f" % values)
 
 #### Raises:
 
-  ValueError: if both `sequence_indices` and `num_results` were specified or
-    if dimension `dim` is less than 1 or greater than 1000.
+* <b>`ValueError`</b>: if both `sequence_indices` and `num_results` were specified or
+  if dimension `dim` is less than 1 or greater than 1000.
 
 #### References
 

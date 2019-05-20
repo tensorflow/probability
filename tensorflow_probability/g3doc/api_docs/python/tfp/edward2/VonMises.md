@@ -23,8 +23,8 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See VonMises for more details.
 
 #### Returns:
+RandomVariable.
 
-  RandomVariable.
 
 #### Original Docstring for Distribution
 
@@ -32,7 +32,6 @@ Construct von Mises distributions with given location and concentration.
 
 The parameters `loc` and `concentration` must be shaped in a way that
 supports broadcasting (e.g. `loc + concentration` is a valid operation).
-
 
 #### Args:
 

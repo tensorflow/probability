@@ -23,8 +23,8 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See StudentT for more details.
 
 #### Returns:
+RandomVariable.
 
-  RandomVariable.
 
 #### Original Docstring for Distribution
 
@@ -35,7 +35,6 @@ The distributions have degree of freedom `df`, mean `loc`, and scale
 
 The parameters `df`, `loc`, and `scale` must be shaped in a way that
 supports broadcasting (e.g. `df + loc + scale` is a valid operation).
-
 
 #### Args:
 

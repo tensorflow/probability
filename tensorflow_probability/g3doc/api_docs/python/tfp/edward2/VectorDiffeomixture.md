@@ -23,8 +23,8 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See VectorDiffeomixture for more details.
 
 #### Returns:
+RandomVariable.
 
-  RandomVariable.
 
 #### Original Docstring for Distribution
 
@@ -37,7 +37,6 @@ p(x) = int p(x | z) p(z) dz,
 where z is in the K-simplex, and
 p(x | z) := p(x | loc=sum_k z[k] loc[k], scale=sum_k z[k] scale[k])
 ```
-
 
 #### Args:
 

@@ -46,7 +46,6 @@ fill_triangular_inverse(
 # ==> [1, 2, 3, 4, 5, 6]
 ```
 
-
 #### Args:
 
 * <b>`x`</b>: `Tensor` representing lower (or upper) triangular elements.

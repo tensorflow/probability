@@ -46,10 +46,10 @@ distribution over future observations for num_steps_forecast timesteps.
 
 #### Returns:
 
-  forecast_dist: a `tfd.MixtureSameFamily` instance with event shape
-    [num_steps_forecast, 1] and batch shape
-    `concat([sample_shape, model.batch_shape])`, with `num_posterior_draws`
-    mixture components.
+* <b>`forecast_dist`</b>: a `tfd.MixtureSameFamily` instance with event shape
+  [num_steps_forecast, 1] and batch shape
+  `concat([sample_shape, model.batch_shape])`, with `num_posterior_draws`
+  mixture components.
 
 #### Examples
 
@@ -70,7 +70,8 @@ Suppose we've built a model and fit it to data using HMC:
 ```
 
 Passing the posterior samples into `forecast`, we construct a forecast
-* <b>`distribution`</b>: 
+distribution:
+
 ```python
   forecast_dist = tfp.sts.forecast(model, observed_time_series,
                                    parameter_samples=samples,

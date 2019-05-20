@@ -21,6 +21,7 @@ Defined in [`python/sts/decomposition.py`](https://github.com/tensorflow/probabi
 
 <!-- Placeholder for "Used in" -->
 
+
 #### Args:
 
 * <b>`model`</b>: An instance of <a href="../../tfp/sts/Sum.md"><code>tfp.sts.Sum</code></a> representing a structural time series
@@ -36,17 +37,18 @@ Defined in [`python/sts/decomposition.py`](https://github.com/tensorflow/probabi
 
 #### Returns:
 
-  component_forecasts: A `collections.OrderedDict` instance mapping
-    component StructuralTimeSeries instances (elements of `model.components`)
-    to `tfd.Distribution` instances representing the marginal forecast for
-    each component. Each distribution has batch and event shape matching
-    `forecast_dist` (specifically, the event shape is
-    `[num_steps_forecast]`).
+* <b>`component_forecasts`</b>: A `collections.OrderedDict` instance mapping
+  component StructuralTimeSeries instances (elements of `model.components`)
+  to `tfd.Distribution` instances representing the marginal forecast for
+  each component. Each distribution has batch and event shape matching
+  `forecast_dist` (specifically, the event shape is
+  `[num_steps_forecast]`).
 
 #### Examples
 
 Suppose we've built a model, fit it to data, and constructed a forecast
-* <b>`distribution`</b>: 
+distribution:
+
 ```python
   day_of_week = tfp.sts.Seasonal(
       num_seasons=7,
@@ -78,7 +80,8 @@ distribution into `decompose_forecast_by_components`:
 ```
 
 Using the component forecasts, we can visualize the uncertainty for each
-* <b>`component`</b>: 
+component:
+
 ```
 from matplotlib import pylab as plt
 num_components = len(component_forecasts)

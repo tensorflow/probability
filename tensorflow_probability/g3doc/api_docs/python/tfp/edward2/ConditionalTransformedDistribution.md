@@ -23,13 +23,12 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See ConditionalTransformedDistribution for more details.
 
 #### Returns:
+RandomVariable.
 
-  RandomVariable.
 
 #### Original Docstring for Distribution
 
 Construct a Transformed Distribution.
-
 
 #### Args:
 

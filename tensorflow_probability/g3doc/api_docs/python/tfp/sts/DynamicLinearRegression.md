@@ -31,8 +31,7 @@ Defined in [`python/sts/dynamic_regression.py`](https://github.com/tensorflow/pr
 The dynamic linear regression model is a special case of a linear Gaussian SSM
 and a generalization of typical (static) linear regression. The model
 represents regression `weights` with a latent state which evolves via a
-#### Gaussian random walk:
-
+Gaussian random walk:
 
 ```
 weights[t] ~ Normal(weights[t-1], drift_scale)

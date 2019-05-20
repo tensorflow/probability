@@ -47,7 +47,7 @@ on overriding distribution parameters.
 
 #### Returns:
 
-  rv: a `RandomVariable` wrapping the provided distribution.
+* <b>`rv`</b>: a `RandomVariable` wrapping the provided distribution.
 
 #### Example
 

@@ -23,6 +23,7 @@ Defined in [`python/math/linalg.py`](https://github.com/tensorflow/probability/t
 
 <!-- Placeholder for "Used in" -->
 
+
 #### Args:
 
 * <b>`sparse_or_dense_a`</b>: `SparseTensor` or `Tensor` representing a (batch of)

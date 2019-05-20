@@ -51,7 +51,6 @@ __eq__(other)
 ```
 
 Determine if this `ReparameterizationType` is equal to another.
-
 Since RepaparameterizationType instances are constant static global
 instances, equality checks if two instances' id() values are equal.
 
@@ -61,8 +60,8 @@ instances, equality checks if two instances' id() values are equal.
 
 
 #### Returns:
-
 `self is other`.
+
 
 
 

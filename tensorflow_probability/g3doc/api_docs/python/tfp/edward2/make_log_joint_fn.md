@@ -17,6 +17,7 @@ Defined in [`python/edward2/program_transformations.py`](https://github.com/tens
 
 <!-- Placeholder for "Used in" -->
 
+
 #### Args:
 
 * <b>`model`</b>: Python callable which executes the generative process of a
@@ -24,10 +25,10 @@ Defined in [`python/edward2/program_transformations.py`](https://github.com/tens
 
 
 #### Returns:
+A log-joint probability function. Its inputs are `model`'s original inputs
+and random variables which appear during the program execution. Its output
+is a scalar tf.Tensor.
 
-  A log-joint probability function. Its inputs are `model`'s original inputs
-  and random variables which appear during the program execution. Its output
-  is a scalar tf.Tensor.
 
 #### Examples
 

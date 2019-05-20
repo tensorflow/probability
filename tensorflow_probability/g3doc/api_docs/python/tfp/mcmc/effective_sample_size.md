@@ -58,8 +58,8 @@ If the sequence is uncorrelated, `ESS = N`.  In general, one should expect
 
 #### Raises:
 
-  ValueError:  If `states` and `filter_threshold` or `states` and
-    `filter_beyond_lag` are both lists with different lengths.
+* <b>`ValueError`</b>:  If `states` and `filter_threshold` or `states` and
+  `filter_beyond_lag` are both lists with different lengths.
 
 #### Examples
 

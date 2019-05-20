@@ -17,6 +17,7 @@ Defined in [`python/util/docstring.py`](https://github.com/tensorflow/probabilit
 
 <!-- Placeholder for "Used in" -->
 
+
 #### Args:
 
 * <b>`**kwargs`</b>: Keyword arguments to set. For each key-value pair `k` and `v`,
@@ -24,5 +25,4 @@ Defined in [`python/util/docstring.py`](https://github.com/tensorflow/probabilit
 
 
 #### Returns:
-
 Decorated function.

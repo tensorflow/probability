@@ -31,7 +31,6 @@ previously computed results).
 <h3 id="is_calibrated"><code>is_calibrated</code></h3>
 
 Returns `True` if Markov chain converges to specified distribution.
-
 `TransitionKernel`s which are "uncalibrated" are often calibrated by
 composing them with the <a href="../../tfp/mcmc/MetropolisHastings.md"><code>tfp.mcmc.MetropolisHastings</code></a> `TransitionKernel`.
 
@@ -68,7 +67,6 @@ one_step(
 ```
 
 Takes one step of the TransitionKernel.
-
 Must be overridden by subclasses.
 
 #### Args:

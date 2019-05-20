@@ -105,14 +105,14 @@ the optimum.  (If `l2_regularizer > 0`, then only weak convexity is needed.)
 
 #### Returns:
 
-  x: (Batch of) `Tensor` having the same shape and dtype as `x_start`,
-    representing the updated value of `x`, that is, `x_start + x_update`.
-  is_converged: scalar, `bool` `Tensor` indicating whether convergence
-    occurred across all batches within the specified number of sweeps.
-  iter: scalar, `int` `Tensor` representing the actual number of coordinate
-    updates made (before achieving convergence).  Since each sweep consists of
-    `tf.size(x_start)` iterations, the maximum number of updates is
-    `maximum_full_sweeps * tf.size(x_start)`.
+* <b>`x`</b>: (Batch of) `Tensor` having the same shape and dtype as `x_start`,
+  representing the updated value of `x`, that is, `x_start + x_update`.
+* <b>`is_converged`</b>: scalar, `bool` `Tensor` indicating whether convergence
+  occurred across all batches within the specified number of sweeps.
+* <b>`iter`</b>: scalar, `int` `Tensor` representing the actual number of coordinate
+  updates made (before achieving convergence).  Since each sweep consists of
+  `tf.size(x_start)` iterations, the maximum number of updates is
+  `maximum_full_sweeps * tf.size(x_start)`.
 
 #### References
 

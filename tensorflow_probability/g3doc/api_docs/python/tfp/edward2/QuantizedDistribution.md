@@ -23,8 +23,8 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See QuantizedDistribution for more details.
 
 #### Returns:
+RandomVariable.
 
-  RandomVariable.
 
 #### Original Docstring for Distribution
 
@@ -33,7 +33,6 @@ Construct a Quantized Distribution representing `Y = ceiling(X)`.
 Some properties are inherited from the distribution defining `X`. Example:
 `allow_nan_stats` is determined for this `QuantizedDistribution` by reading
 the `distribution`.
-
 
 #### Args:
 

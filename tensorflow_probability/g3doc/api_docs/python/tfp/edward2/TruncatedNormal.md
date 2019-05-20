@@ -23,8 +23,8 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See TruncatedNormal for more details.
 
 #### Returns:
+RandomVariable.
 
-  RandomVariable.
 
 #### Original Docstring for Distribution
 
@@ -33,7 +33,6 @@ Construct TruncatedNormal.
 All parameters of the distribution will be broadcast to the same shape,
 so the resulting distribution will have a batch_shape of the broadcast
 shape of all parameters.
-
 
 #### Args:
 

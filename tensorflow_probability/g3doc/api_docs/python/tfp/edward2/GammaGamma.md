@@ -23,8 +23,8 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See GammaGamma for more details.
 
 #### Returns:
+RandomVariable.
 
-  RandomVariable.
 
 #### Original Docstring for Distribution
 
@@ -33,7 +33,6 @@ Initializes a batch of Gamma-Gamma distributions.
 The parameters `concentration` and `rate` must be shaped in a way that
 supports broadcasting (e.g.
 `concentration + mixing_concentration + mixing_rate` is a valid operation).
-
 
 #### Args:
 

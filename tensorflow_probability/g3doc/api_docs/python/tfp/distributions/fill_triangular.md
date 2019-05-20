@@ -93,7 +93,6 @@ contains all the entries of x, as desired. The rest is details:
 For additional comparisons, a pure numpy version of this function can be found
 in `distribution_util_test.py`, function `_fill_triangular`.
 
-
 #### Args:
 
 * <b>`x`</b>: `Tensor` representing lower (or upper) triangular elements.

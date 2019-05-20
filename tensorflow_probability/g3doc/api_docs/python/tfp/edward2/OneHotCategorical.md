@@ -23,13 +23,12 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See OneHotCategorical for more details.
 
 #### Returns:
+RandomVariable.
 
-  RandomVariable.
 
 #### Original Docstring for Distribution
 
 Initialize OneHotCategorical distributions using class log-probabilities.
-
 
 #### Args:
 

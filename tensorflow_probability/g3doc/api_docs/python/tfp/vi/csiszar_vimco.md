@@ -63,7 +63,6 @@ This implementation prefers numerical precision over efficiency, i.e.,
 `O(num_draws * num_batch_draws * prod(batch_shape) * prod(event_shape))`.
 (The constant may be fairly large, perhaps around 12.)
 
-
 #### Args:
 
 * <b>`f`</b>: Python `callable` representing a Csiszar-function in log-space.
@@ -88,7 +87,7 @@ This implementation prefers numerical precision over efficiency, i.e.,
 
 #### Raises:
 
-  ValueError: if `num_draws < 2`.
+* <b>`ValueError`</b>: if `num_draws < 2`.
 
 #### References
 

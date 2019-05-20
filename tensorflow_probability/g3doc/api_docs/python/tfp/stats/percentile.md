@@ -50,7 +50,7 @@ Compare to `numpy.percentile`.
   axis that index independent samples over which to return the desired
   percentile.  If `None` (the default), treat every dimension as a sample
   dimension, returning a scalar.
-* <b>`interpolation `</b>: {'nearest', 'linear', 'lower', 'higher', 'midpoint'}.
+* <b>`interpolation`</b>: {'nearest', 'linear', 'lower', 'higher', 'midpoint'}.
   Default value: 'nearest'.  This specifies the interpolation method to
   use when the desired quantile lies between two data points `i < j`:
     * linear: i + (j - i) * fraction, where fraction is the fractional part
@@ -72,16 +72,16 @@ Compare to `numpy.percentile`.
 
 
 #### Returns:
-
 A `(rank(q) + N - len(axis))` dimensional `Tensor` of same dtype as `x`, or,
   if `axis` is `None`, a `rank(q)` `Tensor`.  The first `rank(q)` dimensions
   index quantiles for different values of `q`.
 
 
+
 #### Raises:
 
-  ValueError:  If argument 'interpolation' is not an allowed type.
-  ValueError:  If interpolation type not compatible with `dtype`.
+* <b>`ValueError`</b>:  If argument 'interpolation' is not an allowed type.
+* <b>`ValueError`</b>:  If interpolation type not compatible with `dtype`.
 
 #### Examples
 

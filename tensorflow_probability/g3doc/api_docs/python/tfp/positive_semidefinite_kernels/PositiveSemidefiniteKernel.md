@@ -43,13 +43,13 @@ the reals (or the complex plane). '*' denotes the complex conjugate, in the
 complex case.
 
 #### Some examples:
+- `S` is R, and `k(s, t) = (s - a) (t - b)`, where a, b are in R. This
+  corresponds to a linear kernel.
+- `S` is R^+ U {0}, and `k(s, t) = min(s, t)`. This corresponds to a kernel
+  for a Wiener process.
+- `S` is the set of strings over an alphabet `A = {c1, ... cC}`, and
+  `k(s, t)` is defined via some similarity metric over strings.
 
-  - `S` is R, and `k(s, t) = (s - a) (t - b)`, where a, b are in R. This
-    corresponds to a linear kernel.
-  - `S` is R^+ U {0}, and `k(s, t) = min(s, t)`. This corresponds to a kernel
-    for a Wiener process.
-  - `S` is the set of strings over an alphabet `A = {c1, ... cC}`, and
-    `k(s, t)` is defined via some similarity metric over strings.
 
 We model positive semi-definite functions (*kernels*, in common machine
 learning parlance) as classes implementing 2 primary public methods:
@@ -133,7 +133,7 @@ Construct a PositiveSemidefiniteKernel (subclass) instance.
 
 #### Raises:
 
-  ValueError: if `feature_ndims` is not an integer greater than 0
+* <b>`ValueError`</b>: if `feature_ndims` is not an integer greater than 0
 Inputs to PositiveSemidefiniteKernel methods partition into 3 pieces:
 
 ```none
@@ -155,7 +155,6 @@ which shape dimensions will be 'reduced' away during kernel computation.
 <h3 id="batch_shape"><code>batch_shape</code></h3>
 
 The batch_shape property of a PositiveSemidefiniteKernel.
-
 This property describes the fully broadcast shape of all kernel parameters.
 For example, consider an ExponentiatedQuadratic kernel, which is
 parameterized by an amplitude and length_scale:
@@ -178,9 +177,9 @@ Note that this property defers to the private _batch_shape method, which
 concrete implementation sub-classes are obliged to provide.
 
 #### Returns:
-
 `TensorShape` instance describing the fully broadcast shape of all
 kernel parameters.
+
 
 <h3 id="dtype"><code>dtype</code></h3>
 
@@ -189,7 +188,6 @@ DType over which the kernel operates.
 <h3 id="feature_ndims"><code>feature_ndims</code></h3>
 
 The number of feature dimensions.
-
 Kernel functions generally act on pairs of inputs from some space like
 
 ```none
@@ -202,8 +200,8 @@ might consider kernels over matrices, tensors, or even more general spaces,
 like strings or graphs.
 
 #### Returns:
-
 The number of feature dimensions (feature rank) of this kernel.
+
 
 <h3 id="name"><code>name</code></h3>
 
@@ -271,11 +269,11 @@ Apply the kernel function to a pair of (batches of) inputs.
 
 
 #### Returns:
+`Tensor` containing the (batch of) results of applying the kernel function
+to inputs `x1` and `x2`. If the kernel parameters' batch shape is
+`[k1, ..., kK]` then the shape of the `Tensor` resulting from this method
+call is `broadcast([b1, ..., bB], [c1, ..., cC], [k1, ..., kK])`.
 
-  `Tensor` containing the (batch of) results of applying the kernel function
-  to inputs `x1` and `x2`. If the kernel parameters' batch shape is
-  `[k1, ..., kK]` then the shape of the `Tensor` resulting from this method
-  call is `broadcast([b1, ..., bB], [c1, ..., cC], [k1, ..., kK])`.
 
 Given an index set `S`, a kernel function is mathematically defined as a
 real- or complex-valued function on `S` satisfying the
@@ -351,9 +349,9 @@ batch_shape_tensor()
 The batch_shape property of a PositiveSemidefiniteKernel as a `Tensor`.
 
 #### Returns:
-
 `Tensor` which evaluates to a vector of integers which are the
 fully-broadcast shapes of the kernel parameters.
+
 
 <h3 id="matrix"><code>matrix</code></h3>
 
@@ -385,11 +383,11 @@ Construct (batched) matrices from (batches of) collections of inputs.
 
 
 #### Returns:
+`Tensor containing (batch of) matrices of kernel applications to pairs
+from inputs `x1` and `x2`. If the kernel parameters' batch shape is
+`[k1, ..., kK]`, then the shape of the resulting `Tensor` is
+`broadcast([b1, ..., bB], [c1, ..., cC], [k1, ..., kK]) + [e1, e2]`.
 
-  `Tensor containing (batch of) matrices of kernel applications to pairs
-  from inputs `x1` and `x2`. If the kernel parameters' batch shape is
-  `[k1, ..., kK]`, then the shape of the resulting `Tensor` is
-  `broadcast([b1, ..., bB], [c1, ..., cC], [k1, ..., kK]) + [e1, e2]`.
 
 Given inputs `x1` and `x2` of shapes
 

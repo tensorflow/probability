@@ -28,6 +28,7 @@ Defined in [`python/layers/util.py`](https://github.com/tensorflow/probability/t
 
 <!-- Placeholder for "Used in" -->
 
+
 #### Args:
 
 * <b>`dtype`</b>: Type of parameter's event.
@@ -41,5 +42,4 @@ Defined in [`python/layers/util.py`](https://github.com/tensorflow/probability/t
 
 
 #### Returns:
-
 Multivariate standard `Normal` distribution.

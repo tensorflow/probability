@@ -34,7 +34,7 @@ probabilities (see examples below).
 
 #### Returns:
 
-  set_values: function that sets the value of intercepted ops.
+* <b>`set_values`</b>: function that sets the value of intercepted ops.
 
 #### Examples
 

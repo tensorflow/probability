@@ -23,13 +23,12 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See Exponential for more details.
 
 #### Returns:
+RandomVariable.
 
-  RandomVariable.
 
 #### Original Docstring for Distribution
 
 Construct Exponential distribution with parameter `rate`.
-
 
 #### Args:
 

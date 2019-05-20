@@ -25,6 +25,7 @@ Defined in [`python/optimizer/differential_evolution.py`](https://github.com/ten
 
 <!-- Placeholder for "Used in" -->
 
+
 #### Args:
 
 * <b>`objective_function`</b>:  A Python callable that accepts a batch of possible
@@ -32,7 +33,7 @@ Defined in [`python/optimizer/differential_evolution.py`](https://github.com/ten
   arguments as a rank 1 real `Tensor`. This specifies the function to be
   minimized. The input to this callable may be either a single `Tensor`
   or a Python `list` of `Tensor`s. The signature must match the format of
-  the argument `population`. (i.e. objective_function(*population) must
+  the argument `population`. (i.e., objective_function(*population) must
   return the value of the function to be minimized).
 * <b>`population`</b>:  `Tensor` or Python `list` of `Tensor`s representing the
   current population vectors. Each `Tensor` must be of the same real dtype.
@@ -65,8 +66,8 @@ Defined in [`python/optimizer/differential_evolution.py`](https://github.com/ten
 
 
 #### Returns:
-
 A sequence containing the following elements (in order):
+
 * <b>`next_population`</b>: A `Tensor` or Python `list` of `Tensor`s of the same
   structure as the input population. The population at the next generation.
 * <b>`next_population_values`</b>: A `Tensor` of same shape and dtype as input

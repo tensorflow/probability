@@ -70,9 +70,8 @@ f_g(u) = f_h(u) = u log(u) - (1 + u) log((1 + u) / 2)
        = jensen_shannon(log(u)).
 ```
 
-* <b>`Warning`</b>: this function makes non-log-space calculations and may therefore be
+Warning: this function makes non-log-space calculations and may therefore be
 numerically unstable for `|logu| >> 0`.
-
 
 #### Args:
 

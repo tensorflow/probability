@@ -85,8 +85,8 @@ information (for fitting) yet solves the numerical stability problem. I.e.,
 
 #### Raises:
 
-  NotImplementedError: if rightmost dimension of `inputs` is unknown prior to
-    graph execution.
+* <b>`NotImplementedError`</b>: if rightmost dimension of `inputs` is unknown prior to
+  graph execution.
 
 #### References
 

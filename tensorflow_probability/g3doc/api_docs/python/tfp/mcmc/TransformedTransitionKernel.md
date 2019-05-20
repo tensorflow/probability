@@ -150,7 +150,6 @@ Instantiates this object.
 <h3 id="is_calibrated"><code>is_calibrated</code></h3>
 
 Returns `True` if Markov chain converges to specified distribution.
-
 `TransitionKernel`s which are "uncalibrated" are often calibrated by
 composing them with the <a href="../../tfp/mcmc/MetropolisHastings.md"><code>tfp.mcmc.MetropolisHastings</code></a> `TransitionKernel`.
 
@@ -176,7 +175,6 @@ bootstrap_results(
 ```
 
 Returns an object with the same type as returned by `one_step`.
-
 Unlike other `TransitionKernel`s,
 `TransformedTransitionKernel.bootstrap_results` has the option of
 initializing the `TransformedTransitionKernelResults` from either an initial
@@ -203,8 +201,8 @@ transformed state.
 
 #### Raises:
 
-  ValueError: if `inner_kernel` results doesn't contain the member
-    "target_log_prob".
+* <b>`ValueError`</b>: if `inner_kernel` results doesn't contain the member
+  "target_log_prob".
 
 #### Examples
 

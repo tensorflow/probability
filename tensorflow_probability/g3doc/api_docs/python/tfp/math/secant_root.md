@@ -98,7 +98,7 @@ as a finite-difference approximation of Newton's method.
 
 #### Raises:
 
-  ValueError: if a non-callable `stopping_policy_fn` is passed.
+* <b>`ValueError`</b>: if a non-callable `stopping_policy_fn` is passed.
 
 #### Examples
 

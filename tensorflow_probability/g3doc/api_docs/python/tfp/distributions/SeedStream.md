@@ -197,7 +197,6 @@ __call__()
 ```
 
 Returns a fresh integer usable as a seed in downstream operations.
-
 If this `SeedStream` was initialized with `seed=None`, returns
 `None`.  This has the effect that downstream operations (both
 `SeedStream`s and primitive TensorFlow ops) will behave as though

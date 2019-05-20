@@ -22,6 +22,7 @@ Defined in [`python/internal/distribution_util.py`](https://github.com/tensorflo
 
 <!-- Placeholder for "Used in" -->
 
+
 #### Example:
 
 
@@ -35,8 +36,7 @@ tridiag(below=[1., 2., 3.],
 #            [  0.,   0.,   3.,   7.]], dtype=float32)
 ```
 
-* <b>`Warning`</b>: This Op is intended for convenience, not efficiency.
-
+Warning: This Op is intended for convenience, not efficiency.
 
 #### Args:
 

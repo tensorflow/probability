@@ -23,8 +23,8 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See Deterministic for more details.
 
 #### Returns:
+RandomVariable.
 
-  RandomVariable.
 
 #### Original Docstring for Distribution
 
@@ -38,7 +38,6 @@ pmf(x; loc)
   = 1, if Abs(x - loc) <= atol + rtol * Abs(loc),
   = 0, otherwise.
 ```
-
 
 #### Args:
 

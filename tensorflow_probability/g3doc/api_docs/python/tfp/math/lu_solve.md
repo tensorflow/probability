@@ -45,7 +45,7 @@ nor is this condition checked even when `validate_args=True`.
 
 #### Returns:
 
-  x: The `X` in `A @ X = RHS`.
+* <b>`x`</b>: The `X` in `A @ X = RHS`.
 
 #### Examples
 

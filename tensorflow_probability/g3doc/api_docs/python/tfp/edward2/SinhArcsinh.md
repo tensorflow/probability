@@ -23,8 +23,8 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See SinhArcsinh for more details.
 
 #### Returns:
+RandomVariable.
 
-  RandomVariable.
 
 #### Original Docstring for Distribution
 
@@ -32,7 +32,6 @@ Construct SinhArcsinh distribution on `(-inf, inf)`.
 
 Arguments `(loc, scale, skewness, tailweight)` must have broadcastable shape
 (indexing batch dimensions).  They must all have the same `dtype`.
-
 
 #### Args:
 

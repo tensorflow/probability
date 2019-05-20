@@ -66,7 +66,6 @@ du.reduce_weighted_logsumexp(x, w, axis=[0, 1])
 # ==> log(-1+5)
 ```
 
-
 #### Args:
 
 * <b>`logx`</b>: The tensor to reduce. Should have numeric type.

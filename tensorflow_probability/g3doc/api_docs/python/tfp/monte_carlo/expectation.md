@@ -108,7 +108,7 @@ approx_kl_bernoulli_bernoulli = tfp.monte_carlo.expectation(
 # For comparing the gradients, see `expectation_test.py`.
 ```
 
-* <b>`Note`</b>: The above example is for illustration only. To compute approximate
+Note: The above example is for illustration only. To compute approximate
 KL-divergence, the following is preferred:
 
 ```python
@@ -118,7 +118,6 @@ approx_kl_p_q = bf.monte_carlo_csiszar_f_divergence(
     q=p,
     num_draws=num_draws)
 ```
-
 
 #### Args:
 

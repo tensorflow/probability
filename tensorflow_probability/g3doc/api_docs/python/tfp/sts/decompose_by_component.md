@@ -48,12 +48,12 @@ of a structural time series model. In particular, it:
 
 #### Returns:
 
-  component_dists: A `collections.OrderedDict` instance mapping
-    component StructuralTimeSeries instances (elements of `model.components`)
-    to `tfd.Distribution` instances representing the posterior marginal
-    distributions on the process modeled by each component. Each distribution
-    has batch shape matching that of `posterior_means`/`posterior_covs`, and
-    event shape of `[num_timesteps]`.
+* <b>`component_dists`</b>: A `collections.OrderedDict` instance mapping
+  component StructuralTimeSeries instances (elements of `model.components`)
+  to `tfd.Distribution` instances representing the posterior marginal
+  distributions on the process modeled by each component. Each distribution
+  has batch shape matching that of `posterior_means`/`posterior_covs`, and
+  event shape of `[num_timesteps]`.
 
 #### Examples
 

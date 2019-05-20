@@ -54,6 +54,5 @@ value in `weights` at each index where the corresponding value in `arr` is
 
 
 #### Returns:
-
 A vector with the same dtype as `weights` or the given `dtype`. The bin
 values.

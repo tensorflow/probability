@@ -96,7 +96,6 @@ __init__(
 ```
 
 Initialize a Mixture distribution.
-
 A `Mixture` is defined by a `Categorical` (`cat`, representing the
 mixture probabilities) and a list of `Distribution` objects
 all having matching dtype, batch shape, event shape, and continuity
@@ -148,7 +147,6 @@ time and match `len(components)`.
 <h3 id="allow_nan_stats"><code>allow_nan_stats</code></h3>
 
 Python `bool` describing behavior when a stat is undefined.
-
 Stats return +/- infinity when it makes sense. E.g., the variance of a
 Cauchy distribution is infinity. However, sometimes the statistic is
 undefined, e.g., if a distribution's pdf does not achieve a maximum within
@@ -164,7 +162,6 @@ infinity), so the variance = E[(X - mean)**2] is also undefined.
 <h3 id="batch_shape"><code>batch_shape</code></h3>
 
 Shape of a single sample from a single event index as a `TensorShape`.
-
 May be partially defined or unknown.
 
 The batch dimensions are indexes into independent, non-identical
@@ -189,7 +186,6 @@ The `DType` of `Tensor`s handled by this `Distribution`.
 <h3 id="event_shape"><code>event_shape</code></h3>
 
 Shape of a single sample from a single batch as a `TensorShape`.
-
 May be partially defined or unknown.
 
 #### Returns:
@@ -211,13 +207,12 @@ Dictionary of parameters used to instantiate this `Distribution`.
 <h3 id="reparameterization_type"><code>reparameterization_type</code></h3>
 
 Describes how samples from the distribution are reparameterized.
-
 Currently this is one of the static instances
 `tfd.FULLY_REPARAMETERIZED` or `tfd.NOT_REPARAMETERIZED`.
 
 #### Returns:
-
 An instance of `ReparameterizationType`.
+
 
 <h3 id="validate_args"><code>validate_args</code></h3>
 
@@ -234,7 +229,6 @@ __getitem__(slices)
 ```
 
 Slices the batch axes of this distribution, returning a new instance.
-
 ```python
 b = tfd.Bernoulli(logits=tf.zeros([3, 5, 7, 9]))
 b.batch_shape  # => [3, 5, 7, 9]
@@ -277,7 +271,6 @@ batch_shape_tensor(name='batch_shape_tensor')
 ```
 
 Shape of a single sample from a single event index as a 1-D `Tensor`.
-
 The batch dimensions are indexes into independent, non-identical
 parameterizations of this distribution.
 
@@ -301,7 +294,6 @@ cdf(
 ```
 
 Cumulative distribution function.
-
 Given random variable `X`, the cumulative distribution function `cdf` is:
 
 ```none
@@ -327,7 +319,6 @@ copy(**override_parameters_kwargs)
 ```
 
 Creates a deep copy of the distribution.
-
 Note: the copy distribution may continue to depend on the original
 initialization arguments.
 
@@ -353,7 +344,6 @@ covariance(
 ```
 
 Covariance.
-
 Covariance is (possibly) defined only for non-scalar-event distributions.
 
 For example, for a length-`k`, vector-valued distribution, it is calculated
@@ -401,7 +391,6 @@ cross_entropy(
 ```
 
 Computes the (Shannon) cross entropy.
-
 Denote this distribution (`self`) by `P` and the `other` distribution by
 `Q`. Assuming `P, Q` are absolutely continuous with respect to
 one another and permit densities `p(x) dr(x)` and `q(x) dr(x)`, (Shannon)
@@ -442,7 +431,6 @@ entropy_lower_bound(name='entropy_lower_bound')
 ```
 
 A lower bound on the entropy of this mixture model.
-
 The bound below is not always very tight, and its usefulness depends
 on the mixture probabilities and the components in use.
 
@@ -479,8 +467,8 @@ This is the term we calculate below for \\( G[q] \\).
 
 
 #### Returns:
-
 A lower bound on the Mixture's entropy.
+
 
 <h3 id="event_shape_tensor"><code>event_shape_tensor</code></h3>
 
@@ -543,7 +531,6 @@ kl_divergence(
 ```
 
 Computes the Kullback--Leibler divergence.
-
 Denote this distribution (`self`) by `p` and the `other` distribution by
 `q`. Assuming `p, q` are absolutely continuous with respect to reference
 measure `r`, the KL divergence is defined as:
@@ -580,7 +567,6 @@ log_cdf(
 ```
 
 Log cumulative distribution function.
-
 Given random variable `X`, the cumulative distribution function `cdf` is:
 
 ```none
@@ -638,7 +624,6 @@ log_survival_function(
 ```
 
 Log survival function.
-
 Given random variable `X`, the survival function is defined:
 
 ```none
@@ -658,9 +643,9 @@ survival function, which are more accurate than `1 - cdf(x)` when `x >> 1`.
 
 
 #### Returns:
-
 `Tensor` of shape `sample_shape(x) + self.batch_shape` with values of type
   `self.dtype`.
+
 
 <h3 id="mean"><code>mean</code></h3>
 
@@ -695,7 +680,6 @@ param_shapes(
 ```
 
 Shapes of parameters given the desired shape of a call to `sample()`.
-
 This is a class method that describes what key/value arguments are required
 to instantiate the given `Distribution` so that a particular shape is
 returned for that instance's call to `sample()`.
@@ -710,8 +694,8 @@ Subclasses should override class method `_param_shapes`.
 
 
 #### Returns:
-
 `dict` of parameter name to `Tensor` shapes.
+
 
 <h3 id="param_static_shapes"><code>param_static_shapes</code></h3>
 
@@ -723,7 +707,6 @@ param_static_shapes(
 ```
 
 param_shapes with static (i.e. `TensorShape`) shapes.
-
 This is a class method that describes what key/value arguments are required
 to instantiate the given `Distribution` so that a particular shape is
 returned for that instance's call to `sample()`. Assumes that the sample's
@@ -739,8 +722,8 @@ constant-valued tensors when constant values are fed.
 
 
 #### Returns:
-
 `dict` of parameter name to `TensorShape`.
+
 
 
 #### Raises:
@@ -782,7 +765,6 @@ quantile(
 ```
 
 Quantile function. Aka "inverse cdf" or "percent point function".
-
 Given random variable `X` and `p in [0, 1]`, the `quantile` is:
 
 ```none
@@ -813,7 +795,6 @@ sample(
 ```
 
 Generate samples of the specified shape.
-
 Note that a call to `sample()` without arguments will generate a single
 sample.
 
@@ -839,7 +820,6 @@ stddev(
 ```
 
 Standard deviation.
-
 Standard deviation is defined as,
 
 ```none
@@ -871,7 +851,6 @@ survival_function(
 ```
 
 Survival function.
-
 Given random variable `X`, the survival function is defined:
 
 ```none
@@ -888,9 +867,9 @@ survival_function(x) = P[X > x]
 
 
 #### Returns:
-
 `Tensor` of shape `sample_shape(x) + self.batch_shape` with values of type
   `self.dtype`.
+
 
 <h3 id="variance"><code>variance</code></h3>
 
@@ -902,7 +881,6 @@ variance(
 ```
 
 Variance.
-
 Variance is defined as,
 
 ```none

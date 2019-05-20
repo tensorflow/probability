@@ -84,17 +84,17 @@ For large, sparse data sets, `model_matrix` should be supplied as a
 
 #### Returns:
 
-  model_coefficients: (Batch of) `Tensor` of the same shape and dtype as
-    `model_coefficients_start`, representing the computed model coefficients
-    which minimize the regularized negative log-likelihood.
-  is_converged: scalar, `bool` `Tensor` indicating whether the minimization
-    procedure converged across all batches within the specified number of
-    iterations.  Here convergence means that an iteration of the inner loop
-    (`fit_sparse_one_step`) returns `True` for its `is_converged` output
-    value.
-  iter: scalar, `int` `Tensor` indicating the actual number of iterations of
-    the outer loop of the optimizer completed (i.e., number of calls to
-    `fit_sparse_one_step` before achieving convergence).
+* <b>`model_coefficients`</b>: (Batch of) `Tensor` of the same shape and dtype as
+  `model_coefficients_start`, representing the computed model coefficients
+  which minimize the regularized negative log-likelihood.
+* <b>`is_converged`</b>: scalar, `bool` `Tensor` indicating whether the minimization
+  procedure converged across all batches within the specified number of
+  iterations.  Here convergence means that an iteration of the inner loop
+  (`fit_sparse_one_step`) returns `True` for its `is_converged` output
+  value.
+* <b>`iter`</b>: scalar, `int` `Tensor` indicating the actual number of iterations of
+  the outer loop of the optimizer completed (i.e., number of calls to
+  `fit_sparse_one_step` before achieving convergence).
 
 #### Example
 

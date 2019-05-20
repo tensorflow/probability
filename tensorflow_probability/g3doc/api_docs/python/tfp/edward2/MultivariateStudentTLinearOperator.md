@@ -23,8 +23,8 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See MultivariateStudentTLinearOperator for more details.
 
 #### Returns:
+RandomVariable.
 
-  RandomVariable.
 
 #### Original Docstring for Distribution
 
@@ -37,7 +37,6 @@ The `event_shape` is given by last dimension of the matrix implied by
 `scale`. The last dimension of `loc` must broadcast with this.
 
 Additional leading dimensions (if any) will index batches.
-
 
 #### Args:
 

@@ -57,8 +57,8 @@ handles the `condition_kwargs`.
 
 #### Raises:
 
-  NotImplementedError: if rightmost dimension of `inputs` is unknown prior to
-    graph execution, or if `condition_kwargs` is not empty.
+* <b>`NotImplementedError`</b>: if rightmost dimension of `inputs` is unknown prior to
+  graph execution, or if `condition_kwargs` is not empty.
 
 #### References
 

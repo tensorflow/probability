@@ -61,8 +61,8 @@ default `rcond` is `1e-15`. Here the default is
 
 #### Raises:
 
-  TypeError: if input `a` does not have `float`-like `dtype`.
-  ValueError: if input `a` has fewer than 2 dimensions.
+* <b>`TypeError`</b>: if input `a` does not have `float`-like `dtype`.
+* <b>`ValueError`</b>: if input `a` has fewer than 2 dimensions.
 
 #### Examples
 

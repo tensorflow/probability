@@ -88,8 +88,8 @@ These shape semantics are equivalent to `scipy.interpolate.interp1d`.
 
 #### Raises:
 
-  ValueError:  If `fill_value` is not an allowed string.
-  ValueError:  If `axis` is not a scalar.
+* <b>`ValueError`</b>:  If `fill_value` is not an allowed string.
+* <b>`ValueError`</b>:  If `axis` is not a scalar.
 
 #### Examples
 

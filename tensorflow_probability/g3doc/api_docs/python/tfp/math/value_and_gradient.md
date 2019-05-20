@@ -22,6 +22,7 @@ Defined in [`python/math/gradient.py`](https://github.com/tensorflow/probability
 
 <!-- Placeholder for "Used in" -->
 
+
 #### Args:
 
 * <b>`f`</b>: Python `callable` to be differentiated. If `f` returns a scalar, this

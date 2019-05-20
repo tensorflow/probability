@@ -23,8 +23,8 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See MultivariateNormalTriL for more details.
 
 #### Returns:
+RandomVariable.
 
-  RandomVariable.
 
 #### Original Docstring for Distribution
 
@@ -46,7 +46,6 @@ where `scale_tril` is lower-triangular `k x k` matrix with non-zero
 diagonal, i.e., `tf.diag_part(scale_tril) != 0`.
 
 Additional leading dimensions (if any) will index batches.
-
 
 #### Args:
 

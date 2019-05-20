@@ -29,5 +29,4 @@ interceptor.
 
 
 #### Returns:
-
 The decorated function.

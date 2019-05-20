@@ -76,9 +76,9 @@ with leading dimensions in `x`, `x_ref_min`, `x_ref_max`.
 
 #### Raises:
 
-  ValueError:  If `rank(x) < 2` is determined statically.
-  ValueError:  If `axis` is not a scalar is determined statically.
-  ValueError:  If `axis + nd > rank(y_ref)` is determined statically.
+* <b>`ValueError`</b>:  If `rank(x) < 2` is determined statically.
+* <b>`ValueError`</b>:  If `axis` is not a scalar is determined statically.
+* <b>`ValueError`</b>:  If `axis + nd > rank(y_ref)` is determined statically.
 
 #### Examples
 

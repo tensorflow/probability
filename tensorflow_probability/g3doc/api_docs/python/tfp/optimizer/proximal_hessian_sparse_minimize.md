@@ -79,15 +79,15 @@ this optimizer calls them relatively few times compared with other algorithms.
 
 #### Returns:
 
-  x: `Tensor` of the same shape and dtype as `x_start`, representing the
-    (batches of) computed values of `x` which minimizes `Loss(x)`.
-  is_converged: scalar, `bool` `Tensor` indicating whether the minimization
-    procedure converged within the specified number of iterations across all
-    batches.  Here convergence means that an iteration of the inner loop
-    (`minimize_one_step`) returns `True` for its `is_converged` output value.
-  iter: scalar, `int` `Tensor` indicating the actual number of iterations of
-    the outer loop of the optimizer completed (i.e., number of calls to
-    `minimize_one_step` before achieving convergence).
+* <b>`x`</b>: `Tensor` of the same shape and dtype as `x_start`, representing the
+  (batches of) computed values of `x` which minimizes `Loss(x)`.
+* <b>`is_converged`</b>: scalar, `bool` `Tensor` indicating whether the minimization
+  procedure converged within the specified number of iterations across all
+  batches.  Here convergence means that an iteration of the inner loop
+  (`minimize_one_step`) returns `True` for its `is_converged` output value.
+* <b>`iter`</b>: scalar, `int` `Tensor` indicating the actual number of iterations of
+  the outer loop of the optimizer completed (i.e., number of calls to
+  `minimize_one_step` before achieving convergence).
 
 #### References
 

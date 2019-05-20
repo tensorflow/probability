@@ -86,8 +86,8 @@ with leading dimensions in `x`, `x_ref_min`, `x_ref_max`.
 
 #### Raises:
 
-  ValueError:  If `fill_value` is not an allowed string.
-  ValueError:  If `axis` is not a scalar.
+* <b>`ValueError`</b>:  If `fill_value` is not an allowed string.
+* <b>`ValueError`</b>:  If `axis` is not a scalar.
 
 #### Examples
 

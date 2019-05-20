@@ -64,8 +64,8 @@ will broadcast in the case of multidimensional sets of parameters.
 
 
 #### Returns:
-
 A new Normal predictive distribution object.
+
 
 
 #### Raises:

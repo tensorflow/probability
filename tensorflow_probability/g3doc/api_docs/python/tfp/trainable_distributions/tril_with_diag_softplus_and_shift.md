@@ -21,6 +21,7 @@ Defined in [`python/trainable_distributions/trainable_distributions_lib.py`](htt
 
 <!-- Placeholder for "Used in" -->
 
+
 #### Args:
 
 * <b>`x`</b>: (Batch of) `float`-like `Tensor` representing vectors which will be

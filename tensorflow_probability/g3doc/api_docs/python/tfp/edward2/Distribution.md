@@ -23,15 +23,14 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See Distribution for more details.
 
 #### Returns:
+RandomVariable.
 
-  RandomVariable.
 
 #### Original Docstring for Distribution
 
 Constructs the `Distribution`.
 
 **This is a private method for subclass use.**
-
 
 #### Args:
 

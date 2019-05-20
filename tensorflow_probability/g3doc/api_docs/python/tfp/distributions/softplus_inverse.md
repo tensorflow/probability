@@ -33,5 +33,4 @@ softplus_inverse = log(exp(x) - 1.)
 
 
 #### Returns:
-
 `Tensor`. Has the same type/shape as input `x`.

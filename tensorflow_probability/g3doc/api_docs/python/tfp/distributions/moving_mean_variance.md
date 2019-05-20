@@ -54,8 +54,8 @@ variable creation.
 
 #### Raises:
 
-  TypeError: if `value_var` does not have float type `dtype`.
-  TypeError: if `value`, `decay` have different `base_dtype`.
+* <b>`TypeError`</b>: if `value_var` does not have float type `dtype`.
+* <b>`TypeError`</b>: if `value`, `decay` have different `base_dtype`.
 
 #### References
 

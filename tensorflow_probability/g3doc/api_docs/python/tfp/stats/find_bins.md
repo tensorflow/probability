@@ -58,7 +58,7 @@ This function returns `bins`, such that:
 
 #### Raises:
 
-  ValueError:  If `edges.shape[0]` is determined to be less than 2.
+* <b>`ValueError`</b>:  If `edges.shape[0]` is determined to be less than 2.
 
 #### Examples
 

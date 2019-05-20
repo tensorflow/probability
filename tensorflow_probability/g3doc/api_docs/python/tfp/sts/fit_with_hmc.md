@@ -97,12 +97,12 @@ which is thought to be in the desirable range for optimal mixing [2].
 
 #### Returns:
 
-  samples: Python `list` of `Tensors` representing posterior samples of model
-    parameters, with shapes `[concat([[num_results], chain_batch_shape,
-    param.prior.batch_shape, param.prior.event_shape]) for param in
-    model.parameters]`.
-  kernel_results: A (possibly nested) `tuple`, `namedtuple` or `list` of
-    `Tensor`s representing internal calculations made within the HMC sampler.
+* <b>`samples`</b>: Python `list` of `Tensors` representing posterior samples of model
+  parameters, with shapes `[concat([[num_results], chain_batch_shape,
+  param.prior.batch_shape, param.prior.event_shape]) for param in
+  model.parameters]`.
+* <b>`kernel_results`</b>: A (possibly nested) `tuple`, `namedtuple` or `list` of
+  `Tensor`s representing internal calculations made within the HMC sampler.
 
 #### Examples
 

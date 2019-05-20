@@ -23,8 +23,8 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See Gamma for more details.
 
 #### Returns:
+RandomVariable.
 
-  RandomVariable.
 
 #### Original Docstring for Distribution
 
@@ -32,7 +32,6 @@ Construct Gamma with `concentration` and `rate` parameters.
 
 The parameters `concentration` and `rate` must be shaped in a way that
 supports broadcasting (e.g. `concentration + rate` is a valid operation).
-
 
 #### Args:
 

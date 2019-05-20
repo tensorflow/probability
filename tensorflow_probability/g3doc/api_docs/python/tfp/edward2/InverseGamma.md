@@ -23,20 +23,19 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See InverseGamma for more details.
 
 #### Returns:
+RandomVariable.
 
-  RandomVariable.
 
 #### Original Docstring for Distribution
 
 Construct InverseGamma with `concentration` and `scale` parameters. (deprecated arguments)
 
-* <b>`Warning`</b>: SOME ARGUMENTS ARE DEPRECATED: `(rate)`. They will be removed after 2019-05-08.
+Warning: SOME ARGUMENTS ARE DEPRECATED: `(rate)`. They will be removed after 2019-05-08.
 Instructions for updating:
 The `rate` parameter is deprecated. Use `scale` instead.The `rate` parameter was always interpreted as a `scale` parameter, but erroneously misnamed.
 
 The parameters `concentration` and `scale` must be shaped in a way that
 supports broadcasting (e.g. `concentration + scale` is a valid operation).
-
 
 #### Args:
 

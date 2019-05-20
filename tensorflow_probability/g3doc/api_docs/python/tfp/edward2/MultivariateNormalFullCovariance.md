@@ -23,8 +23,8 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See MultivariateNormalFullCovariance for more details.
 
 #### Returns:
+RandomVariable.
 
-  RandomVariable.
 
 #### Original Docstring for Distribution
 
@@ -42,7 +42,6 @@ definite matrix.  In other words it is (real) symmetric with all eigenvalues
 strictly positive.
 
 Additional leading dimensions (if any) will index batches.
-
 
 #### Args:
 

@@ -24,6 +24,7 @@ Defined in [`python/distributions/kullback_leibler.py`](https://github.com/tenso
 
 <!-- Placeholder for "Used in" -->
 
+
 #### Usage:
 
 
@@ -65,8 +66,8 @@ Perform the KL registration.
 
 
 #### Returns:
-
 kl_fn
+
 
 
 #### Raises:

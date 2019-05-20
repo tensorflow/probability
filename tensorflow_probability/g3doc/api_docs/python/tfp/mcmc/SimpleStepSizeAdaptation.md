@@ -146,45 +146,44 @@ __init__(
 ```
 
 Creates the step size adaptation kernel.
-
 The default setter_fn and the getter_fn callbacks assume that the inner
 kernel produces kernel results structurally the same as the
 `HamiltonianMonteCarlo` kernel.
 
 #### Args:
 
-  inner_kernel: `TransitionKernel`-like object.
-  num_adaptation_steps: Scalar `int` `Tensor` number of initial steps to
-    during which to adjust the step size. This may be greater, less than, or
-    equal to the number of burnin steps.
-  target_accept_prob: A floating point `Tensor` representing desired
-    acceptance probability. Must be a positive number less than 1. This can
-    either be a scalar, or have shape [num_chains]. Default value: `0.75`
-    (the [center of asymptotically optimal rate for HMC][1]).
-  adaptation_rate: `Tensor` representing amount to scale the current
-    `step_size`.
-  step_size_setter_fn: A callable with the signature
-    `(kernel_results, new_step_size) -> new_kernel_results` where
-    `kernel_results` are the results of the `inner_kernel`, `new_step_size`
-    is a `Tensor` or a nested collection of `Tensor`s with the same
-    structure as returned by the `step_size_getter_fn`, and
-    `new_kernel_results` are a copy of `kernel_results` with the step
-    size(s) set.
-  step_size_getter_fn: A callable with the signature
-    `(kernel_results) -> step_size` where `kernel_results` are the results
-    of the `inner_kernel`, and `step_size` is a floating point `Tensor` or a
-    nested collection of such `Tensor`s.
-  log_accept_prob_getter_fn: A callable with the signature
-    `(kernel_results) -> log_accept_prob` where `kernel_results` are the
-    results of the `inner_kernel`, and `log_accept_prob` is a floating point
-    `Tensor`. `log_accept_prob` can either be a scalar, or have shape
-    [num_chains]. If it's the latter, `step_size` should also have the same
-    leading dimension.
-  validate_args: Python `bool`. When `True` kernel parameters are checked
-    for validity. When `False` invalid inputs may silently render incorrect
-    outputs.
-  name: Python `str` name prefixed to Ops created by this class. Default:
-    'simple_step_size_adaptation'.
+* <b>`inner_kernel`</b>: `TransitionKernel`-like object.
+* <b>`num_adaptation_steps`</b>: Scalar `int` `Tensor` number of initial steps to
+  during which to adjust the step size. This may be greater, less than, or
+  equal to the number of burnin steps.
+* <b>`target_accept_prob`</b>: A floating point `Tensor` representing desired
+  acceptance probability. Must be a positive number less than 1. This can
+  either be a scalar, or have shape [num_chains]. Default value: `0.75`
+  (the [center of asymptotically optimal rate for HMC][1]).
+* <b>`adaptation_rate`</b>: `Tensor` representing amount to scale the current
+  `step_size`.
+* <b>`step_size_setter_fn`</b>: A callable with the signature
+  `(kernel_results, new_step_size) -> new_kernel_results` where
+  `kernel_results` are the results of the `inner_kernel`, `new_step_size`
+  is a `Tensor` or a nested collection of `Tensor`s with the same
+  structure as returned by the `step_size_getter_fn`, and
+  `new_kernel_results` are a copy of `kernel_results` with the step
+  size(s) set.
+* <b>`step_size_getter_fn`</b>: A callable with the signature
+  `(kernel_results) -> step_size` where `kernel_results` are the results
+  of the `inner_kernel`, and `step_size` is a floating point `Tensor` or a
+  nested collection of such `Tensor`s.
+* <b>`log_accept_prob_getter_fn`</b>: A callable with the signature
+  `(kernel_results) -> log_accept_prob` where `kernel_results` are the
+  results of the `inner_kernel`, and `log_accept_prob` is a floating point
+  `Tensor`. `log_accept_prob` can either be a scalar, or have shape
+  [num_chains]. If it's the latter, `step_size` should also have the same
+  leading dimension.
+* <b>`validate_args`</b>: Python `bool`. When `True` kernel parameters are checked
+  for validity. When `False` invalid inputs may silently render incorrect
+  outputs.
+* <b>`name`</b>: Python `str` name prefixed to Ops created by this class. Default:
+  'simple_step_size_adaptation'.
 
 #### References
 
@@ -242,7 +241,6 @@ is_calibrated()
 ```
 
 Returns `True` if Markov chain converges to specified distribution.
-
 `TransitionKernel`s which are "uncalibrated" are often calibrated by
 composing them with the <a href="../../tfp/mcmc/MetropolisHastings.md"><code>tfp.mcmc.MetropolisHastings</code></a> `TransitionKernel`.
 
@@ -264,7 +262,6 @@ one_step(
 ```
 
 Takes one step of the TransitionKernel.
-
 Must be overridden by subclasses.
 
 #### Args:

@@ -23,8 +23,8 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See VectorLaplaceDiag for more details.
 
 #### Returns:
+RandomVariable.
 
-  RandomVariable.
 
 #### Original Docstring for Distribution
 
@@ -42,7 +42,8 @@ Recall that `covariance = 2 * scale @ scale.T`.
 scale = diag(scale_diag + scale_identity_multiplier * ones(k))
 ```
 
-* <b>`where`</b>: 
+where:
+
 * `scale_diag.shape = [k]`, and,
 * `scale_identity_multiplier.shape = []`.
 
@@ -50,7 +51,6 @@ Additional leading dimensions (if any) will index batches.
 
 If both `scale_diag` and `scale_identity_multiplier` are `None`, then
 `scale` is the Identity matrix.
-
 
 #### Args:
 

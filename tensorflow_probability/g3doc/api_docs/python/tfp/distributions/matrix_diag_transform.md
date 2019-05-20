@@ -68,5 +68,4 @@ loss = -1 * tf.reduce_mean(dist.log_prob(labels))
 
 
 #### Returns:
-
 A `Tensor` with same shape and `dtype` as `matrix`.

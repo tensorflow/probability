@@ -23,8 +23,8 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See Logistic for more details.
 
 #### Returns:
+RandomVariable.
 
-  RandomVariable.
 
 #### Original Docstring for Distribution
 
@@ -32,7 +32,6 @@ Construct Logistic distributions with mean and scale `loc` and `scale`.
 
 The parameters `loc` and `scale` must be shaped in a way that supports
 broadcasting (e.g. `loc + scale` is a valid operation).
-
 
 #### Args:
 

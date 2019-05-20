@@ -56,9 +56,9 @@ will broadcast in the case of multidimensional sets of parameters.
 
 
 #### Returns:
-
 A new Normal posterior distribution object for the unknown observation
 mean `loc`.
+
 
 
 #### Raises:

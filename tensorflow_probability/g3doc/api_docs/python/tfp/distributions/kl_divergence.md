@@ -53,15 +53,15 @@ identified in the search is used (favoring a shorter MRO distance to
 
 
 #### Returns:
-
 A Tensor with the batchwise KL-divergence between `distribution_a`
 and `distribution_b`.
 
 
+
 #### Raises:
 
-  NotImplementedError: If no KL method is defined for distribution types
-    of `distribution_a` and `distribution_b`.
+* <b>`NotImplementedError`</b>: If no KL method is defined for distribution types
+  of `distribution_a` and `distribution_b`.
 
 Built-in KL(distribution_a || distribution_b) registrations:
 

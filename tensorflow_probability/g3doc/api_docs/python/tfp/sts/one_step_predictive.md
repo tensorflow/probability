@@ -45,12 +45,12 @@ through time `T-1`.
 
 #### Returns:
 
-  forecast_dist: a `tfd.MixtureSameFamily` instance with event shape
-    [num_timesteps] and
-    batch shape `concat([sample_shape, model.batch_shape])`, with
-    `num_posterior_draws` mixture components. The `t`th step represents the
-    forecast distribution `p(observed_time_series[t] |
-    observed_time_series[0:t-1], parameter_samples)`.
+* <b>`forecast_dist`</b>: a `tfd.MixtureSameFamily` instance with event shape
+  [num_timesteps] and
+  batch shape `concat([sample_shape, model.batch_shape])`, with
+  `num_posterior_draws` mixture components. The `t`th step represents the
+  forecast distribution `p(observed_time_series[t] |
+  observed_time_series[0:t-1], parameter_samples)`.
 
 #### Examples
 

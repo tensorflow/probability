@@ -93,8 +93,8 @@ multivariate case does not have a known closed form like above.)
 
 #### Returns:
 
-  softthreshold: `float` `Tensor` with the same shape and dtype as `x`,
-    representing the value of the SoftThreshold function.
+* <b>`softthreshold`</b>: `float` `Tensor` with the same shape and dtype as `x`,
+  representing the value of the SoftThreshold function.
 
 #### References
 

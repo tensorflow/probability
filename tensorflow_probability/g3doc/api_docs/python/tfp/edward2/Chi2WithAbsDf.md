@@ -23,13 +23,13 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See Chi2WithAbsDf for more details.
 
 #### Returns:
+RandomVariable.
 
-  RandomVariable.
 
 #### Original Docstring for Distribution
 
 DEPRECATED FUNCTION
 
-* <b>`Warning`</b>: THIS FUNCTION IS DEPRECATED. It will be removed after 2019-06-05.
+Warning: THIS FUNCTION IS DEPRECATED. It will be removed after 2019-06-05.
 Instructions for updating:
 Chi2WithAbsDf is deprecated, use Chi2(df=tf.floor(tf.abs(df))) instead.

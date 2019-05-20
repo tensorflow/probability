@@ -23,8 +23,8 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See Mixture for more details.
 
 #### Returns:
+RandomVariable.
 
-  RandomVariable.
 
 #### Original Docstring for Distribution
 
@@ -37,7 +37,6 @@ properties (the components).
 
 The `num_classes` of `cat` must be possible to infer at graph construction
 time and match `len(components)`.
-
 
 #### Args:
 

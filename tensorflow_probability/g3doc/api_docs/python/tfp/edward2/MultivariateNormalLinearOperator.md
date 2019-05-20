@@ -23,8 +23,8 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See MultivariateNormalLinearOperator for more details.
 
 #### Returns:
+RandomVariable.
 
-  RandomVariable.
 
 #### Original Docstring for Distribution
 
@@ -39,7 +39,6 @@ The `event_shape` is given by last dimension of the matrix implied by
 Recall that `covariance = scale @ scale.T`.
 
 Additional leading dimensions (if any) will index batches.
-
 
 #### Args:
 

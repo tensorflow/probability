@@ -50,7 +50,7 @@ cheaply done via the Woodbury matrix identity, as implemented by
 
 #### Returns:
 
-  lr: Low rank pivoted Cholesky approximation of `matrix`.
+* <b>`lr`</b>: Low rank pivoted Cholesky approximation of `matrix`.
 
 #### References
 

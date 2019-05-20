@@ -121,7 +121,6 @@ __init__(
 ```
 
 Specify a linear regression model.
-
 Note: the statistical behavior of the regression is determined by
 the broadcasting behavior of the `weights` `Tensor`:
 

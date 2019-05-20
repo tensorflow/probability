@@ -37,7 +37,6 @@ solve(
 ```
 
 Solves an initial value problem.
-
 An initial value problem consists of a system of ODEs and an initial
 condition:
 
@@ -90,8 +89,8 @@ called the state at time `t`) is an N-D float or complex `Tensor`.
 
 
 #### Returns:
-
 Object of type `Results`.
+
 
 
 

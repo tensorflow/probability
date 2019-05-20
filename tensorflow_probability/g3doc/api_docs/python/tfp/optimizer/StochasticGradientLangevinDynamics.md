@@ -109,37 +109,35 @@ with tf.Session(graph=tf.Graph()) as sess:
   sample_mean = np.mean(samples_, 0)
   print('sample mean', sample_mean)
 ```
-#### Args:
-
-* <b>`learning_rate`</b>: Scalar `float`-like `Tensor`. The base learning rate for the
-  optimizer. Must be tuned to the specific function being minimized.
-* <b>`preconditioner_decay_rate`</b>: Scalar `float`-like `Tensor`. The exponential
-  decay rate of the rescaling of the preconditioner (RMSprop). (This is
-  "alpha" in Li et al. (2016)). Should be smaller than but nearly `1` to
-  approximate sampling from the posterior. (Default: `0.95`)
-* <b>`data_size`</b>: Scalar `int`-like `Tensor`. The effective number of
-  points in the data set. Assumes that the loss is taken as the mean over a
-  minibatch. Otherwise if the sum was taken, divide this number by the
-  batch size. If a prior is included in the loss function, it should be
-  normalized by `data_size`. Default value: `1`.
-* <b>`burnin`</b>: Scalar `int`-like `Tensor`. The number of iterations to collect
-  gradient statistics to update the preconditioner before starting to draw
-  noisy samples. (Default: `25`)
-* <b>`diagonal_bias`</b>: Scalar `float`-like `Tensor`. Term added to the diagonal of
-  the preconditioner to prevent the preconditioner from degenerating.
-  (Default: `1e-8`)
-* <b>`name`</b>: Python `str` describing ops managed by this function.
-  (Default: `"StochasticGradientLangevinDynamics"`)
-* <b>`parallel_iterations`</b>: the number of coordinates for which the gradients of
-    the preconditioning matrix can be computed in parallel. Must be a
-    positive integer.
-
+Args:
+  learning_rate: Scalar `float`-like `Tensor`. The base learning rate for the
+    optimizer. Must be tuned to the specific function being minimized.
+  preconditioner_decay_rate: Scalar `float`-like `Tensor`. The exponential
+    decay rate of the rescaling of the preconditioner (RMSprop). (This is
+    "alpha" in Li et al. (2016)). Should be smaller than but nearly `1` to
+    approximate sampling from the posterior. (Default: `0.95`)
+  data_size: Scalar `int`-like `Tensor`. The effective number of
+    points in the data set. Assumes that the loss is taken as the mean over a
+    minibatch. Otherwise if the sum was taken, divide this number by the
+    batch size. If a prior is included in the loss function, it should be
+    normalized by `data_size`. Default value: `1`.
+  burnin: Scalar `int`-like `Tensor`. The number of iterations to collect
+    gradient statistics to update the preconditioner before starting to draw
+    noisy samples. (Default: `25`)
+  diagonal_bias: Scalar `float`-like `Tensor`. Term added to the diagonal of
+    the preconditioner to prevent the preconditioner from degenerating.
+    (Default: `1e-8`)
+  name: Python `str` describing ops managed by this function.
+    (Default: `"StochasticGradientLangevinDynamics"`)
+  parallel_iterations: the number of coordinates for which the gradients of
+      the preconditioning matrix can be computed in parallel. Must be a
+      positive integer.
 
 #### Raises:
 
-  InvalidArgumentError: If preconditioner_decay_rate is a `Tensor` not in
-    `(0,1]`.
-  NotImplementedError: If eager execution is enabled.
+* <b>`InvalidArgumentError`</b>: If preconditioner_decay_rate is a `Tensor` not in
+  `(0,1]`.
+* <b>`NotImplementedError`</b>: If eager execution is enabled.
 
 #### References
 
@@ -163,7 +161,6 @@ __init__(
 ```
 
 Create a new Optimizer.
-
 This must be called by the constructors of subclasses.
 Note that Optimizer instances should not bind to a single graph,
 and so shouldn't keep Tensors as member variables. Generally
@@ -255,7 +252,6 @@ apply_gradients(
 ```
 
 Apply gradients to variables.
-
 This is the second part of `minimize()`. It returns an `Operation` that
 applies gradients.
 
@@ -267,9 +263,9 @@ applies gradients.
 
 
 #### Returns:
-
 An `Operation` that applies the specified gradients. If `global_step`
 was not None, that operation also increments `global_step`.
+
 
 
 #### Raises:
@@ -288,7 +284,6 @@ from_config(
 ```
 
 Creates an optimizer from its config.
-
 This method is the reverse of `get_config`,
 capable of instantiating the same optimizer from the config
 dictionary.
@@ -302,8 +297,8 @@ dictionary.
 
 
 #### Returns:
-
 An optimizer instance.
+
 
 <h3 id="get_config"><code>get_config</code></h3>
 
@@ -312,15 +307,14 @@ get_config()
 ```
 
 Returns the config of the optimimizer.
-
 An optimizer config is a Python dictionary (serializable)
 containing the configuration of an optimizer.
 The same optimizer can be reinstantiated later
 (without any saved state) from this configuration.
 
 #### Returns:
-
 Python dictionary.
+
 
 <h3 id="get_gradients"><code>get_gradients</code></h3>
 
@@ -340,8 +334,8 @@ Returns gradients of `loss` with respect to `params`.
 
 
 #### Returns:
-
 List of gradient tensors.
+
 
 
 #### Raises:
@@ -399,7 +393,6 @@ minimize(
 ```
 
 Minimize `loss` by updating `var_list`.
-
 This method simply computes gradient using `tf.GradientTape` and calls
 `apply_gradients()`. If you want to process the gradient before applying
 then call `tf.GradientTape` and `apply_gradients()` explicitly instead
@@ -418,9 +411,9 @@ of using this function.
 
 
 #### Returns:
-
 An Operation that updates the variables in `var_list`.  If `global_step`
 was not `None`, that operation also increments `global_step`.
+
 
 
 #### Raises:

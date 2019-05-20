@@ -123,7 +123,6 @@ Returns the minimal number of dimensions bijector.inverse operates on.
 <h3 id="is_constant_jacobian"><code>is_constant_jacobian</code></h3>
 
 Returns true iff the Jacobian matrix is not a function of x.
-
 Note: Jacobian matrix is either constant for both forward and inverse or
 neither.
 
@@ -154,7 +153,6 @@ __call__(
 ```
 
 Applies or composes the `Bijector`, depending on input type.
-
 This is a convenience function which applies the `Bijector` instance in
 three different ways, depending on the input:
 
@@ -174,9 +172,9 @@ three different ways, depending on the input:
 
 #### Returns:
 
-  composition: A `tfd.TransformedDistribution` if the input was a
-    `tfd.Distribution`, a `tfb.Chain` if the input was a `tfb.Bijector`, or
-    a `Tensor` computed by `self.forward`.
+* <b>`composition`</b>: A `tfd.TransformedDistribution` if the input was a
+  `tfd.Distribution`, a `tfb.Chain` if the input was a `tfb.Bijector`, or
+  a `Tensor` computed by `self.forward`.
 
 #### Examples
 
@@ -219,8 +217,8 @@ Returns the forward `Bijector` evaluation, i.e., X = g(Y).
 
 
 #### Returns:
-
 `Tensor`.
+
 
 
 #### Raises:
@@ -236,7 +234,6 @@ forward_event_shape(input_shape)
 ```
 
 Shape of a single sample from a single batch as a `TensorShape`.
-
 Same meaning as `forward_event_shape_tensor`. May be only partially defined.
 
 #### Args:
@@ -299,9 +296,9 @@ Returns both the forward_log_det_jacobian.
 
 
 #### Returns:
-
 `Tensor`, if this bijector is injective.
   If not injective this is not implemented.
+
 
 
 #### Raises:
@@ -332,10 +329,10 @@ Returns the inverse `Bijector` evaluation, i.e., X = g^{-1}(Y).
 
 
 #### Returns:
-
 `Tensor`, if this bijector is injective.
   If not injective, returns the k-tuple containing the unique
   `k` points `(x1, ..., xk)` such that `g(xi) = y`.
+
 
 
 #### Raises:
@@ -351,7 +348,6 @@ inverse_event_shape(output_shape)
 ```
 
 Shape of a single sample from a single batch as a `TensorShape`.
-
 Same meaning as `inverse_event_shape_tensor`. May be only partially defined.
 
 #### Args:
@@ -400,7 +396,6 @@ inverse_log_det_jacobian(
 ```
 
 Returns the (log o det o Jacobian o inverse)(y).
-
 Mathematically, returns: `log(det(dX/dY))(Y)`. (Recall that: `X=g^{-1}(Y)`.)
 
 Note that `forward_log_det_jacobian` is the negative of this function,

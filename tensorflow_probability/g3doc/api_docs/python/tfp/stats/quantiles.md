@@ -50,7 +50,7 @@ The exact number of data points in each interval depends on the size of
   axis that index independent samples over which to return the desired
   percentile.  If `None` (the default), treat every dimension as a sample
   dimension, returning a scalar.
-* <b>`interpolation `</b>: {'nearest', 'linear', 'lower', 'higher', 'midpoint'}.
+* <b>`interpolation`</b>: {'nearest', 'linear', 'lower', 'higher', 'midpoint'}.
   Default value: 'nearest'.  This specifies the interpolation method to
   use when the fractions `k / n` lie between two data points `i < j`:
     * linear: i + (j - i) * fraction, where fraction is the fractional part
@@ -76,8 +76,8 @@ is that of `x` without the dimensions in `axis` (unless `keep_dims is True`)
 
 #### Raises:
 
-  ValueError:  If argument 'interpolation' is not an allowed type.
-  ValueError:  If interpolation type not compatible with `dtype`.
+* <b>`ValueError`</b>:  If argument 'interpolation' is not an allowed type.
+* <b>`ValueError`</b>:  If interpolation type not compatible with `dtype`.
 
 #### Examples
 

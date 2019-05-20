@@ -49,14 +49,14 @@ See [Germain et al. (2015)][1] for detailed explanation.
 
 
 #### Returns:
-
 Output tensor.
+
 
 
 #### Raises:
 
-  NotImplementedError: if rightmost dimension of `inputs` is unknown prior to
-    graph execution.
+* <b>`NotImplementedError`</b>: if rightmost dimension of `inputs` is unknown prior to
+  graph execution.
 
 #### References
 

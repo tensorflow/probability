@@ -19,6 +19,7 @@
 <meta itemprop="property" content="output_shape"/>
 <meta itemprop="property" content="params"/>
 <meta itemprop="property" content="submodules"/>
+<meta itemprop="property" content="trainable"/>
 <meta itemprop="property" content="trainable_variables"/>
 <meta itemprop="property" content="trainable_weights"/>
 <meta itemprop="property" content="updates"/>
@@ -125,8 +126,8 @@ Constructs the MADE layer.
   parameters are checked for validity despite possibly degrading runtime
   performance. When `False` invalid inputs may silently render incorrect
   outputs.
-* <b>`**kwargs`</b>: Additional keyword arguments passed to the
-  `tf.keras.layer.Dense` constructed by this layer.
+* <b>`**kwargs`</b>: Additional keyword arguments passed to this layer (but not to
+  the `tf.keras.layer.Dense` layers constructed by this layer).
 
 <h2 id="__new__"><code>__new__</code></h2>
 
@@ -139,7 +140,6 @@ __new__(
 ```
 
 DEPRECATED FUNCTION
-
 Warning: THIS FUNCTION IS DEPRECATED. It will be removed after 2019-08-01.
 Instructions for updating:
 `AutoregressiveLayer` has been renamed `AutoregressiveNetwork`.
@@ -167,13 +167,12 @@ Optional regularizer function for the output of this layer.
 <h3 id="input"><code>input</code></h3>
 
 Retrieves the input tensor(s) of a layer.
-
 Only applicable if the layer has exactly one input,
 i.e. if it is connected to one incoming layer.
 
 #### Returns:
-
 Input tensor or list of input tensors.
+
 
 
 #### Raises:
@@ -190,14 +189,13 @@ more than one incoming layers.
 <h3 id="input_mask"><code>input_mask</code></h3>
 
 Retrieves the input mask tensor(s) of a layer.
-
 Only applicable if the layer has exactly one inbound node,
 i.e. if it is connected to one incoming layer.
 
 #### Returns:
-
 Input mask tensor (potentially None) or list of input
 mask tensors.
+
 
 
 #### Raises:
@@ -208,15 +206,14 @@ more than one incoming layers.
 <h3 id="input_shape"><code>input_shape</code></h3>
 
 Retrieves the input shape(s) of a layer.
-
 Only applicable if the layer has exactly one input,
 i.e. if it is connected to one incoming layer, or if all inputs
 have the same shape.
 
 #### Returns:
-
 Input shape, as an integer shape tuple
 (or list of shape tuples, one tuple per input tensor).
+
 
 
 #### Raises:
@@ -227,14 +224,13 @@ Input shape, as an integer shape tuple
 <h3 id="losses"><code>losses</code></h3>
 
 Losses which are associated with this `Layer`.
-
 Variable regularization tensors are created when this property is accessed,
 so it is eager safe: accessing `losses` under a `tf.GradientTape` will
 propagate gradients back to the corresponding variables.
 
 #### Returns:
-
 A list of tensors.
+
 
 <h3 id="metrics"><code>metrics</code></h3>
 
@@ -243,7 +239,6 @@ A list of tensors.
 <h3 id="name"><code>name</code></h3>
 
 Returns the name of this module as passed or determined in the ctor.
-
 NOTE: This is not the same as the `self.name_scope.name` which includes
 parent module names.
 
@@ -262,13 +257,12 @@ Returns a `tf.name_scope` instance for this class.
 <h3 id="output"><code>output</code></h3>
 
 Retrieves the output tensor(s) of a layer.
-
 Only applicable if the layer has exactly one output,
 i.e. if it is connected to one incoming layer.
 
 #### Returns:
-
 Output tensor or list of output tensors.
+
 
 
 #### Raises:
@@ -280,14 +274,13 @@ Output tensor or list of output tensors.
 <h3 id="output_mask"><code>output_mask</code></h3>
 
 Retrieves the output mask tensor(s) of a layer.
-
 Only applicable if the layer has exactly one inbound node,
 i.e. if it is connected to one incoming layer.
 
 #### Returns:
-
 Output mask tensor (potentially None) or list of output
 mask tensors.
+
 
 
 #### Raises:
@@ -298,14 +291,13 @@ more than one incoming layers.
 <h3 id="output_shape"><code>output_shape</code></h3>
 
 Retrieves the output shape(s) of a layer.
-
 Only applicable if the layer has one output,
 or if all outputs have the same shape.
 
 #### Returns:
-
 Output shape, as an integer shape tuple
 (or list of shape tuples, one tuple per output tensor).
+
 
 
 #### Raises:
@@ -320,36 +312,40 @@ Output shape, as an integer shape tuple
 <h3 id="submodules"><code>submodules</code></h3>
 
 Sequence of all sub-modules.
-
 Submodules are modules which are properties of this module, or found as
 properties of modules which are properties of this module (and so on).
 
->>> a = tf.Module()
->>> b = tf.Module()
->>> c = tf.Module()
->>> a.b = b
->>> b.c = c
->>> assert list(a.submodules) == [b, c]
->>> assert list(b.submodules) == [c]
->>> assert list(c.submodules) == []
+```
+a = tf.Module()
+b = tf.Module()
+c = tf.Module()
+a.b = b
+b.c = c
+assert list(a.submodules) == [b, c]
+assert list(b.submodules) == [c]
+assert list(c.submodules) == []
+```
 
 #### Returns:
-
 A sequence of all submodules.
+
+
+<h3 id="trainable"><code>trainable</code></h3>
+
+
 
 <h3 id="trainable_variables"><code>trainable_variables</code></h3>
 
 Sequence of variables owned by this module and it's submodules.
-
 Note: this method uses reflection to find variables on the current instance
 and submodules. For performance reasons you may wish to cache the result
 of calling this method if you don't expect the return value to change.
 
 #### Returns:
-
 A sequence of variables for the current module (sorted by attribute
 name) followed by variables from all submodules recursively (breadth
 first).
+
 
 <h3 id="trainable_weights"><code>trainable_weights</code></h3>
 
@@ -362,20 +358,19 @@ first).
 <h3 id="variables"><code>variables</code></h3>
 
 Returns the list of all layer variables/weights.
-
 Alias of `self.weights`.
 
 #### Returns:
-
 A list of variables.
+
 
 <h3 id="weights"><code>weights</code></h3>
 
 Returns the list of all layer variables/weights.
 
 #### Returns:
-
 A list of variables.
+
 
 
 
@@ -401,12 +396,11 @@ Wraps `call`, applying pre- and post-processing steps.
 
 
 #### Returns:
-
 Output tensor(s).
 
 
-#### Note:
 
+#### Note:
 - The following optional keyword arguments are reserved for specific uses:
   * `training`: Boolean scalar tensor of Python boolean indicating
     whether the `call` is meant for training or inference.
@@ -416,6 +410,7 @@ Output tensor(s).
   for `inputs` by the previous layer (if `input` did come from
   a layer that generated a corresponding mask, i.e. if it came from
   a Keras layer with masking support.
+
 
 
 #### Raises:
@@ -433,7 +428,6 @@ apply(
 ```
 
 Apply the layer on a input.
-
 This is an alias of `self.__call__`.
 
 #### Arguments:
@@ -444,8 +438,8 @@ This is an alias of `self.__call__`.
 
 
 #### Returns:
-
 Output tensor(s).
+
 
 <h3 id="build"><code>build</code></h3>
 
@@ -473,9 +467,9 @@ Computes an output mask tensor.
 
 
 #### Returns:
-
 None or a tensor (or list of tensors,
     one per output tensor of the layer).
+
 
 <h3 id="compute_output_shape"><code>compute_output_shape</code></h3>
 
@@ -494,8 +488,8 @@ count_params()
 Count the total number of scalars composing the weights.
 
 #### Returns:
-
 An integer count.
+
 
 
 #### Raises:
@@ -513,7 +507,6 @@ from_config(
 ```
 
 Creates a layer from its config.
-
 This method is the reverse of `get_config`,
 capable of instantiating the same layer from the config
 dictionary. It does not handle layer connectivity
@@ -526,8 +519,8 @@ dictionary. It does not handle layer connectivity
 
 
 #### Returns:
-
 A layer instance.
+
 
 <h3 id="get_config"><code>get_config</code></h3>
 
@@ -536,7 +529,6 @@ get_config()
 ```
 
 Returns the config of the layer.
-
 A layer config is a Python dictionary (serializable)
 containing the configuration of a layer.
 The same layer can be reinstantiated later
@@ -547,8 +539,8 @@ information, nor the layer class name. These are handled
 by `Network` (one layer of abstraction above).
 
 #### Returns:
-
 Python dictionary.
+
 
 <h3 id="get_input_at"><code>get_input_at</code></h3>
 
@@ -567,8 +559,8 @@ Retrieves the input tensor(s) of a layer at a given node.
 
 
 #### Returns:
-
 A tensor (or list of tensors if the layer has multiple inputs).
+
 
 
 #### Raises:
@@ -592,9 +584,9 @@ Retrieves the input mask tensor(s) of a layer at a given node.
 
 
 #### Returns:
-
 A mask tensor
 (or list of tensors if the layer has multiple inputs).
+
 
 <h3 id="get_input_shape_at"><code>get_input_shape_at</code></h3>
 
@@ -613,9 +605,9 @@ Retrieves the input shape(s) of a layer at a given node.
 
 
 #### Returns:
-
 A shape tuple
 (or list of shape tuples if the layer has multiple inputs).
+
 
 
 #### Raises:
@@ -636,8 +628,8 @@ Retrieves losses relevant to a specific set of inputs.
 
 
 #### Returns:
-
 List of loss tensors of the layer that depend on `inputs`.
+
 
 <h3 id="get_output_at"><code>get_output_at</code></h3>
 
@@ -656,8 +648,8 @@ Retrieves the output tensor(s) of a layer at a given node.
 
 
 #### Returns:
-
 A tensor (or list of tensors if the layer has multiple outputs).
+
 
 
 #### Raises:
@@ -681,9 +673,9 @@ Retrieves the output mask tensor(s) of a layer at a given node.
 
 
 #### Returns:
-
 A mask tensor
 (or list of tensors if the layer has multiple outputs).
+
 
 <h3 id="get_output_shape_at"><code>get_output_shape_at</code></h3>
 
@@ -702,9 +694,9 @@ Retrieves the output shape(s) of a layer at a given node.
 
 
 #### Returns:
-
 A shape tuple
 (or list of shape tuples if the layer has multiple outputs).
+
 
 
 #### Raises:
@@ -725,8 +717,8 @@ Retrieves updates relevant to a specific set of inputs.
 
 
 #### Returns:
-
 List of update ops of the layer that depend on `inputs`.
+
 
 <h3 id="get_weights"><code>get_weights</code></h3>
 
@@ -737,8 +729,8 @@ get_weights()
 Returns the current weights of the layer.
 
 #### Returns:
-
 Weights values as a list of numpy arrays.
+
 
 <h3 id="set_weights"><code>set_weights</code></h3>
 
@@ -772,22 +764,25 @@ with_name_scope(
 ```
 
 Decorator to automatically enter the module name scope.
-
->>> class MyModule(tf.Module):
-...   @tf.Module.with_name_scope
-...   def __call__(self, x):
-...     if not hasattr(self, 'w'):
-...       self.w = tf.Variable(tf.random.normal([x.shape[1], 64]))
-...     return tf.matmul(x, self.w)
+```
+class MyModule(tf.Module):
+  @tf.Module.with_name_scope
+  def __call__(self, x):
+    if not hasattr(self, 'w'):
+      self.w = tf.Variable(tf.random.normal([x.shape[1], 64]))
+    return tf.matmul(x, self.w)
+```
 
 Using the above module would produce `tf.Variable`s and `tf.Tensor`s whose
 names included the module name:
 
->>> mod = MyModule()
->>> mod(tf.ones([8, 32]))
-<tf.Tensor: ...>
->>> mod.w
-<tf.Variable ...'my_module/w:0'>
+```
+mod = MyModule()
+mod(tf.ones([8, 32]))
+# ==> <tf.Tensor: ...>
+mod.w
+# ==> <tf.Variable ...'my_module/w:0'>
+```
 
 #### Args:
 
@@ -795,8 +790,8 @@ names included the module name:
 
 
 #### Returns:
-
 The original method wrapped such that it enters the module's name scope.
+
 
 
 

@@ -23,18 +23,17 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See PoissonLogNormalQuadratureCompound for more details.
 
 #### Returns:
+RandomVariable.
 
-  RandomVariable.
 
 #### Original Docstring for Distribution
 
 Constructs the PoissonLogNormalQuadratureCompound`.
 
-* <b>`Note`</b>: `probs` returned by (optional) `quadrature_fn` are presumed to be
+Note: `probs` returned by (optional) `quadrature_fn` are presumed to be
 either a length-`quadrature_size` vector or a batch of vectors in 1-to-1
 correspondence with the returned `grid`. (I.e., broadcasting is only
 partially supported.)
-
 
 #### Args:
 
