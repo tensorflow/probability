@@ -32,6 +32,7 @@ py_library(
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":leapfrog_integrator",
         ":slice_sampler_utils",
         ":util",
     ],
@@ -63,6 +64,28 @@ py_test(
     deps = [
         ":util",
         # absl/testing:parameterized dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "leapfrog_integrator",
+    srcs = ["leapfrog_integrator.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":util",
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "leapfrog_integrator_test",
+    size = "small",
+    srcs = ["leapfrog_integrator_test.py"],
+    deps = [
+        ":leapfrog_integrator",
+        # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],

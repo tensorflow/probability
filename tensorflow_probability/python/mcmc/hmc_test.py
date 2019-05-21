@@ -28,8 +28,6 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.mcmc.hmc import _compute_log_acceptance_correction
-from tensorflow_probability.python.mcmc.hmc import _leapfrog_integrator_one_step
-from tensorflow_probability.python.mcmc.internal.util import maybe_call_fn_and_grads
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -80,74 +78,6 @@ class HMCTest(tf.test.TestCase):
     return tf.reduce_sum(
         input_tensor=self._shape_param * x - self._rate_param * tf.exp(x),
         axis=event_dims)
-
-  def _integrator_conserves_energy(self, x, independent_chain_ndims):
-    event_dims = tf.range(independent_chain_ndims, tf.rank(x))
-
-    m = tf.random.normal(tf.shape(input=x))
-    log_prob_0, grad_0 = maybe_call_fn_and_grads(
-        lambda x: self._log_gamma_log_prob(x, event_dims),
-        x)
-    old_energy = -log_prob_0 + 0.5 * tf.reduce_sum(
-        input_tensor=m**2., axis=event_dims)
-
-    x_shape = self.evaluate(x).shape
-    event_size = np.prod(x_shape[independent_chain_ndims:])
-    step_size = tf.constant(0.1 / event_size, x.dtype)
-    hmc_lf_steps = tf.constant(1000, np.int32)
-
-    def leapfrog_one_step(*args):
-      return _leapfrog_integrator_one_step(
-          lambda x: self._log_gamma_log_prob(x, event_dims),
-          independent_chain_ndims,
-          [step_size],
-          *args)
-
-    [[new_m], _, log_prob_1, _] = tf.while_loop(
-        cond=lambda *args: True,
-        body=leapfrog_one_step,
-        loop_vars=[
-            [m],         # current_momentum_parts
-            [x],         # current_state_parts,
-            log_prob_0,  # current_target_log_prob
-            grad_0,      # current_target_log_prob_grad_parts
-        ],
-        maximum_iterations=hmc_lf_steps)
-
-    new_energy = -log_prob_1 + 0.5 * tf.reduce_sum(
-        input_tensor=new_m**2., axis=event_dims)
-
-    old_energy_, new_energy_ = self.evaluate([old_energy, new_energy])
-    tf.compat.v1.logging.vlog(
-        1, 'average energy relative change: {}'.format(
-            (1. - new_energy_ / old_energy_).mean()))
-    self.assertAllClose(old_energy_, new_energy_, atol=0., rtol=0.02)
-
-  def _integrator_conserves_energy_wrapper(self, independent_chain_ndims):
-    """Tests the long-term energy conservation of the leapfrog integrator.
-
-    The leapfrog integrator is symplectic, so for sufficiently small step
-    sizes it should be possible to run it more or less indefinitely without
-    the energy of the system blowing up or collapsing.
-
-    Args:
-      independent_chain_ndims: Python `int` scalar representing the number of
-        dims associated with independent chains.
-    """
-    x = tf.constant(np.random.rand(50, 10, 2), np.float32)
-    self._integrator_conserves_energy(x, independent_chain_ndims)
-
-  def testIntegratorEnergyConservationNullShape(self):
-    self._integrator_conserves_energy_wrapper(0)
-
-  def testIntegratorEnergyConservation1(self):
-    self._integrator_conserves_energy_wrapper(1)
-
-  def testIntegratorEnergyConservation2(self):
-    self._integrator_conserves_energy_wrapper(2)
-
-  def testIntegratorEnergyConservation3(self):
-    self._integrator_conserves_energy_wrapper(3)
 
   def testSampleChainSeedReproducibleWorksCorrectly(self):
     num_results = 10
