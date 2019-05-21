@@ -150,7 +150,8 @@ class SmilesGrammar(object):
     """
     symbols = []
     for production in tf.unstack(productions, axis=1):
-      lhs, rhs = self.production_rules[tf.argmax(input=production, axis=-1)]
+      lhs, rhs = self.production_rules[
+          tf.argmax(input=tf.squeeze(production), axis=-1)]
       if not symbols:  # first iteration
         if lhs != self.start_symbol:
           raise ValueError("`productions` must begin with `self.start_symbol`.")
@@ -232,7 +233,7 @@ class ProbabilisticGrammar(tf.keras.Model):
       production = ed.OneHotCategorical(logits=logits,
                                         name="production_" + str(t))
       _, rhs = self.grammar.production_rules[tf.argmax(
-          input=production, axis=-1)]
+          input=tf.squeeze(production), axis=-1)]
       for symbol in rhs:
         if symbol in self.grammar.nonterminal_symbols:
           stack.append(symbol)
