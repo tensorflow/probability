@@ -20,6 +20,9 @@ from __future__ import print_function
 
 from tensorflow_probability.python.positive_semidefinite_kernels.exp_sin_squared import ExpSinSquared
 from tensorflow_probability.python.positive_semidefinite_kernels.exponentiated_quadratic import ExponentiatedQuadratic
+from tensorflow_probability.python.positive_semidefinite_kernels.feature_scaled import FeatureScaled
+from tensorflow_probability.python.positive_semidefinite_kernels.feature_transformed import FeatureTransformed
+from tensorflow_probability.python.positive_semidefinite_kernels.kumaraswamy_transformed import KumaraswamyTransformed
 from tensorflow_probability.python.positive_semidefinite_kernels.matern import MaternFiveHalves
 from tensorflow_probability.python.positive_semidefinite_kernels.matern import MaternOneHalf
 from tensorflow_probability.python.positive_semidefinite_kernels.matern import MaternThreeHalves
@@ -29,11 +32,15 @@ from tensorflow_probability.python.positive_semidefinite_kernels.positive_semide
 from tensorflow_probability.python.positive_semidefinite_kernels.rational_quadratic import RationalQuadratic
 from tensorflow_probability.python.positive_semidefinite_kernels.schur_complement import SchurComplement
 
+
 from tensorflow.python.util.all_util import remove_undocumented
 
 _allowed_symbols = [
     'ExponentiatedQuadratic',
     'ExpSinSquared',
+    'FeatureScaled',
+    'FeatureTransformed',
+    'KumaraswamyTransformed',
     'Linear',
     'MaternFiveHalves',
     'MaternOneHalf',

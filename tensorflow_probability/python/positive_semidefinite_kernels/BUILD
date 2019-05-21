@@ -30,6 +30,9 @@ py_library(
     deps = [
         ":exp_sin_squared",
         ":exponentiated_quadratic",
+        ":feature_scaled",
+        ":feature_transformed",
+        ":kumaraswamy_transformed",
         ":matern",
         ":polynomial",
         ":positive_semidefinite_kernel",
@@ -192,6 +195,72 @@ py_test(
         # absl/testing:parameterized dep,
         # numpy dep,
         # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "feature_scaled",
+    srcs = ["feature_scaled.py"],
+    deps = [
+        ":feature_transformed",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/positive_semidefinite_kernels/internal:util",
+    ],
+)
+
+py_test(
+    name = "feature_scaled_test",
+    srcs = ["feature_scaled_test.py"],
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "feature_transformed",
+    srcs = ["feature_transformed.py"],
+    deps = [
+        ":positive_semidefinite_kernel",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/positive_semidefinite_kernels/internal:util",
+    ],
+)
+
+py_test(
+    name = "feature_transformed_test",
+    srcs = ["feature_transformed_test.py"],
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "kumaraswamy_transformed",
+    srcs = ["kumaraswamy_transformed.py"],
+    deps = [
+        ":feature_transformed",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/positive_semidefinite_kernels/internal:util",
+    ],
+)
+
+py_test(
+    name = "kumaraswamy_transformed_test",
+    srcs = ["kumaraswamy_transformed_test.py"],
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],
