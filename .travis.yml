@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-sudo: required
 language: python
+dist: xenial
 git:
   depth: 20
   quiet: true
@@ -31,13 +31,14 @@ stages:
 jobs:
   include:
     - stage: lint
+      python: "3.5"
       script: ./testing/run_lints.sh
 
 # The below implicitly run under a build stage called "Test". The full matrix
 # of python versions x SHARD will be expanded and run in parallel.
 python:
   - "2.7"
-  - "3.4"
+  - "3.5"
 virtualenv:
   system_site_packages: true
 env:
