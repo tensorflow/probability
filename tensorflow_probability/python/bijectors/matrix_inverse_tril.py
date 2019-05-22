@@ -72,7 +72,9 @@ class MatrixInverseTriL(bijector.Bijector):
     with tf.control_dependencies(self._assertions(x)):
       shape = tf.shape(input=x)
       return tf.linalg.triangular_solve(
-          x, tf.eye(shape[-1], batch_shape=shape[:-2]), lower=True)
+          x,
+          tf.eye(shape[-1], batch_shape=shape[:-2], dtype=x.dtype),
+          lower=True)
 
   def _inverse(self, y):
     return self._forward(y)

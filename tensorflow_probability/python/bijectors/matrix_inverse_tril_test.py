@@ -172,7 +172,7 @@ class MatrixInverseTriLBijectorTest(tf.test.TestCase):
     for ndims in range(2, 5):
       x_ = np.tril(
           np.random.uniform(
-              -1., 1., size=[batch_size, ndims, ndims]).astype(np.float32))
+              -1., 1., size=[batch_size, ndims, ndims]).astype(np.float64))
       fldj = bijector.forward_log_det_jacobian(x_, event_ndims=2)
       fldj_theoretical = bijector_test_util.get_fldj_theoretical(
           bijector, x_, event_ndims=2,

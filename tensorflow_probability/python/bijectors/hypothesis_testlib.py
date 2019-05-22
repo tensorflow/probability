@@ -84,6 +84,7 @@ class Support(object):
   VECTOR_STRICTLY_INCREASING = 'VECTOR_STRICTLY_INCREASING'
   MATRIX_LOWER_TRIL_POSITIVE_DEFINITE = 'MATRIX_LOWER_TRIL_POSITIVE_DEFINITE'
   MATRIX_POSITIVE_DEFINITE = 'MATRIX_POSITIVE_DEFINITE'
+  CORRELATION_CHOLESKY = 'CORRELATION_CHOLESKY'
   OTHER = 'OTHER'
 
 
@@ -104,6 +105,9 @@ def bijector_supports():
       'CholeskyToInvCholesky':
           BijectorSupport(Support.MATRIX_LOWER_TRIL_POSITIVE_DEFINITE,
                           Support.MATRIX_LOWER_TRIL_POSITIVE_DEFINITE),
+      'CorrelationCholesky':
+          BijectorSupport(Support.VECTOR_UNCONSTRAINED,
+                          Support.CORRELATION_CHOLESKY),
       'MatrixInverseTriL':
           BijectorSupport(Support.MATRIX_LOWER_TRIL_POSITIVE_DEFINITE,
                           Support.MATRIX_LOWER_TRIL_POSITIVE_DEFINITE),

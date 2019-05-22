@@ -43,6 +43,7 @@ py_library(
         ":chain",
         ":cholesky_outer_product",
         ":cholesky_to_inv_cholesky",
+        ":correlation_cholesky",
         ":cumsum",
         ":discrete_cosine_transform",
         ":exp",
@@ -301,6 +302,16 @@ py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
+    ],
+)
+
+py_library(
+    name = "correlation_cholesky",
+    srcs = ["correlation_cholesky.py"],
+    deps = [
+        ":bijector",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:prefer_static",
     ],
 )
 
@@ -845,6 +856,19 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "correlation_cholesky_test",
+    size = "small",
+    srcs = ["correlation_cholesky_test.py"],
+    deps = [
+        ":bijector_test_util",
+        ":bijectors",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions:lkj",
     ],
 )
 

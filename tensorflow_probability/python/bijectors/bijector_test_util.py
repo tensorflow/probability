@@ -239,6 +239,7 @@ def assert_bijective_and_finite(bijector,
 def get_fldj_theoretical(bijector,
                          x,
                          event_ndims,
+                         inverse_event_ndims=None,
                          input_to_unconstrained=None,
                          output_to_unconstrained=None):
   """Numerically approximate the forward log det Jacobian of a bijector.
@@ -255,9 +256,11 @@ def get_fldj_theoretical(bijector,
 
   Args:
     bijector: the bijector whose Jacobian we wish to approximate
-    x: the value for which we want to approximate the Jacobian.  x must have
+    x: the value for which we want to approximate the Jacobian. x must have
       a a single batch dimension for compatibility with tape.batch_jacobian.
     event_ndims: number of dimensions in an event
+    inverse_event_ndims: Integer describing the number of event dimensions for
+      the bijector codomain. If None, then the value of `event_ndims` is used.
     input_to_unconstrained: bijector that maps the input to the above bijector
       to an unconstrained 1-D vector.  If unspecified, flatten the input into
       a 1-D vector according to its event_ndims.
@@ -269,6 +272,8 @@ def get_fldj_theoretical(bijector,
     A numerical approximation to the log det Jacobian of bijector.forward
     evaluated at x.
   """
+  if inverse_event_ndims is None:
+    inverse_event_ndims = event_ndims
   if input_to_unconstrained is None:
     input_to_unconstrained = reshape_bijector.Reshape(
         event_shape_in=x.shape[tensorshape_util.rank(x.shape) - event_ndims:],
@@ -288,9 +293,10 @@ def get_fldj_theoretical(bijector,
   jacobian = tape.batch_jacobian(
       f_x_unconstrained, x_unconstrained, experimental_use_pfor=False)
 
-  return (
-      tf.linalg.slogdet(jacobian).log_abs_determinant +
-      input_to_unconstrained.forward_log_det_jacobian(
-          x, event_ndims=event_ndims) -
-      output_to_unconstrained.forward_log_det_jacobian(
-          f_x, event_ndims=event_ndims))
+  log_det_jacobian = 0.5 * tf.linalg.slogdet(
+      tf.matmul(jacobian, jacobian, adjoint_a=True)).log_abs_determinant
+
+  return (log_det_jacobian + input_to_unconstrained.forward_log_det_jacobian(
+      x, event_ndims=event_ndims) -
+          output_to_unconstrained.forward_log_det_jacobian(
+              f_x, event_ndims=inverse_event_ndims))
