@@ -542,13 +542,11 @@ class BDF(base.Solver):
       # `real_dtype` is the floating point `dtype` associated with
       # `initial_state.dtype` (recall that the latter can be complex).
       real_dtype = tf.abs(initial_state).dtype
-      initial_time = tf.ensure_shape(
-          tf.convert_to_tensor(initial_time, dtype=real_dtype), [])
+      initial_time = tf.convert_to_tensor(initial_time, dtype=real_dtype)
       num_solution_times = 0
       if solution_times_chosen_by_solver:
         final_time = solution_times.final_time
-        final_time = tf.ensure_shape(
-            tf.convert_to_tensor(final_time, dtype=real_dtype), [])
+        final_time = tf.convert_to_tensor(final_time, dtype=real_dtype)
       else:
         solution_times = tf.convert_to_tensor(solution_times, dtype=real_dtype)
         num_solution_times = tf.size(solution_times)
@@ -563,14 +561,12 @@ class BDF(base.Solver):
           use_pfor=self._use_pfor_to_compute_jacobian)
       rtol = tf.convert_to_tensor(self._rtol, dtype=real_dtype)
       atol = tf.convert_to_tensor(self._atol, dtype=real_dtype)
-      safety_factor = tf.ensure_shape(
-          tf.convert_to_tensor(self._safety_factor, dtype=real_dtype), [])
-      min_step_size_factor = tf.ensure_shape(
-          tf.convert_to_tensor(self._min_step_size_factor, dtype=real_dtype),
-          [])
-      max_step_size_factor = tf.ensure_shape(
-          tf.convert_to_tensor(self._max_step_size_factor, dtype=real_dtype),
-          [])
+      safety_factor = tf.convert_to_tensor(
+          self._safety_factor, dtype=real_dtype)
+      min_step_size_factor = tf.convert_to_tensor(
+          self._min_step_size_factor, dtype=real_dtype)
+      max_step_size_factor = tf.convert_to_tensor(
+          self._max_step_size_factor, dtype=real_dtype)
       max_num_steps = self._max_num_steps
       if max_num_steps is not None:
         max_num_steps = tf.convert_to_tensor(max_num_steps, dtype=tf.int32)
@@ -579,17 +575,31 @@ class BDF(base.Solver):
       if max_num_newton_iters is not None:
         max_num_newton_iters = tf.convert_to_tensor(
             max_num_newton_iters, dtype=tf.int32)
-      newton_tol_factor = tf.ensure_shape(
-          tf.convert_to_tensor(self._newton_tol_factor, dtype=real_dtype), [])
-      newton_step_size_factor = tf.ensure_shape(
-          tf.convert_to_tensor(self._newton_step_size_factor, dtype=real_dtype),
-          [])
+      newton_tol_factor = tf.convert_to_tensor(
+          self._newton_tol_factor, dtype=real_dtype)
+      newton_step_size_factor = tf.convert_to_tensor(
+          self._newton_step_size_factor, dtype=real_dtype)
       bdf_coefficients = tf.cast(
           tf.concat(
               [[0.],
                tf.convert_to_tensor(self._bdf_coefficients, dtype=real_dtype)],
               0), state_dtype)
       util.error_if_not_vector(bdf_coefficients, 'bdf_coefficients')
+      if self._validate_args:
+        initial_time = tf.ensure_shape(initial_time, [])
+        if solution_times_chosen_by_solver:
+          final_time = tf.ensure_shape(final_time, [])
+        safety_factor = tf.ensure_shape(safety_factor, [])
+        min_step_size_factor = tf.ensure_shape(min_step_size_factor, [])
+        max_step_size_factor = tf.ensure_shape(max_step_size_factor, [])
+        if max_num_steps is not None:
+          max_num_steps = tf.ensure_shape(max_num_steps, [])
+        max_order = tf.ensure_shape(max_order, [])
+        if max_num_newton_iters is not None:
+          max_num_newton_iters = tf.ensure_shape(max_num_newton_iters, [])
+        newton_tol_factor = tf.ensure_shape(newton_tol_factor, [])
+        newton_step_size_factor = tf.ensure_shape(newton_step_size_factor, [])
+        bdf_coefficients = tf.ensure_shape(bdf_coefficients, [6])
       newton_coefficients = 1. / (
           (1. - bdf_coefficients) * bdf_util.RECIPROCAL_SUMS)
       newton_coefficients_array = tf.TensorArray(
@@ -614,12 +624,6 @@ class BDF(base.Solver):
                         '`previous_solver_internal_state` was specified.')
       first_step_size = tf.convert_to_tensor(first_step_size, dtype=real_dtype)
       if self._validate_args:
-        if max_num_steps is not None:
-          max_num_steps = tf.ensure_shape(max_num_steps, [])
-        max_order = tf.ensure_shape(max_order, [])
-        if max_num_newton_iters is not None:
-          max_num_newton_iters = tf.ensure_shape(max_num_newton_iters, [])
-        bdf_coefficients = tf.ensure_shape(bdf_coefficients, [6])
         first_step_size = tf.ensure_shape(first_step_size, [])
       solver_internal_state = previous_solver_internal_state
       if solver_internal_state is None:
