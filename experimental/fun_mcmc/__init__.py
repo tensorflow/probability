@@ -36,6 +36,7 @@ from experimental.fun_mcmc.fun_mcmc_lib import State
 from experimental.fun_mcmc.fun_mcmc_lib import symmetric_spliting_integrator_step
 from experimental.fun_mcmc.fun_mcmc_lib import trace
 from experimental.fun_mcmc.fun_mcmc_lib import transform_log_prob_fn
+from experimental.fun_mcmc.fun_mcmc_lib import transition_kernel_wrapper
 from experimental.fun_mcmc.fun_mcmc_lib import TransitionOperator
 
 __all__ = [
@@ -57,5 +58,6 @@ __all__ = [
     'symmetric_spliting_integrator_step',
     'trace',
     'transform_log_prob_fn',
+    'transition_kernel_wrapper',
     'TransitionOperator',
 ]

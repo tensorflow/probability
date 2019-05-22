@@ -44,7 +44,7 @@ import collections
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-from typing import Any, Callable, Mapping, Tuple, Union, Sequence
+from typing import Any, Callable, Mapping, Optional, Sequence, Text, Tuple, Union
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 tfb = tfp.bijectors
@@ -69,6 +69,7 @@ __all__ = [
     'symmetric_spliting_integrator_step',
     'trace',
     'transform_log_prob_fn',
+    'transition_kernel_wrapper',
     'TransitionOperator',
 ]
 
@@ -81,8 +82,7 @@ BijectorNest = Union[tfb.Bijector, Sequence[tfb.Bijector], Mapping[Any, tfb
                                                                    .Bijector]]
 FloatNest = Union[FloatTensor, Sequence[FloatTensor], Mapping[Any, FloatTensor]]
 State = TensorNest  # pylint: disable=invalid-name
-TransitionOperator = Union[Callable[[TensorNest], Tuple[State, TensorNest]],
-                           Callable[..., Tuple[State, TensorNest]]]
+TransitionOperator = Callable[..., Tuple[State, TensorNest]]
 PotentialFn = Union[Callable[[TensorNest], Tuple[tf.Tensor, TensorNest]],
                     Callable[..., Tuple[tf.Tensor, TensorNest]]]
 
@@ -122,8 +122,12 @@ def trace(state: State, fn: TransitionOperator, num_steps: IntTensor,
   return state, tf.nest.map_structure(prepend, first_trace, full_trace)
 
 
-def call_fn(fn: TransitionOperator, args: Union[Tuple[Any], Any]) -> Any:
-  """Calls a transition operator with args, unpacking args if its a sequence.
+def call_fn(fn: TransitionOperator,
+            args: Union[Tuple[Any], Mapping[Text, Any], Any]) -> Any:
+  """Calls a transition operator with args.
+
+  If args is a sequence, the args are unpacked as `*args`.
+  If args is a mapping, the args are unpacked as `**args`.
 
   Args:
     fn: A `TransitionOperator`.
@@ -133,14 +137,19 @@ def call_fn(fn: TransitionOperator, args: Union[Tuple[Any], Any]) -> Any:
     ret: Return value of `fn`.
   """
 
-  if isinstance(args, (list, tuple)) and not mcmc_util.is_namedtuple_like(args):
+  if isinstance(
+      args, collections.Sequence) and not mcmc_util.is_namedtuple_like(args):
     args = args  # type: Tuple[Any]
     return fn(*args)
+  elif isinstance(args, collections.Mapping):
+    args = args  # type: Mapping[str, Any]
+    return fn(**args)
   else:
     return fn(args)
 
 
-def call_and_grads(fn: TransitionOperator, args: Union[Tuple[Any], Any]
+def call_and_grads(fn: TransitionOperator,
+                   args: Union[Tuple[Any], Mapping[Text, Any], Any]
                   ) -> Tuple[tf.Tensor, TensorNest, TensorNest]:
   """Calls `fn` and returns the gradients with respect to `fn`'s first output.
 
@@ -725,3 +734,30 @@ def sign_adaptation(control: FloatNest,
   set_point = maybe_broadcast_structure(set_point, control)
 
   return tf.nest.map_structure(_get_new_control, control, output, set_point)
+
+
+def transition_kernel_wrapper(current_state: FloatNest,
+                              kernel_results: Optional[Any],
+                              kernel: tfp.mcmc.TransitionKernel
+                             ) -> Tuple[FloatNest, Any]:
+  """Wraps a `tfp.mcmc.TransitionKernel` as a `TransitionOperator`.
+
+  Args:
+    current_state: Current state passed to the transition kernel.
+    kernel_results: Kernel results passed to the transition kernel. Can be
+      `None`.
+    kernel: The transition kernel.
+
+  Returns:
+    state: A tuple of:
+      current_state: Current state returned by the transition kernel.
+      kernel_results: Kernel results returned by the transition kernel.
+    extra: An empty tuple.
+  """
+  flat_current_state = tf.nest.flatten(current_state)
+  if kernel_results is None:
+    kernel_results = kernel.bootstrap_results(flat_current_state)
+  flat_current_state, kernel_results = kernel.one_step(flat_current_state,
+                                                       kernel_results)
+  return (tf.nest.pack_sequence_as(current_state,
+                                   flat_current_state), kernel_results), ()

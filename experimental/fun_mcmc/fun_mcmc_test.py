@@ -76,6 +76,12 @@ class FunMCMCTest(tf.test.TestCase, parameterized.TestCase):
     self.assertEqual(1, fun_mcmc.call_fn(sum_fn, 1))
     self.assertEqual(3, fun_mcmc.call_fn(sum_fn, (1, 2)))
 
+  def testCallFnDict(self):
+    sum_fn = lambda a, b: a + b
+
+    self.assertEqual(3, fun_mcmc.call_fn(sum_fn, [1, 2]))
+    self.assertEqual(3, fun_mcmc.call_fn(sum_fn, {'a': 1, 'b': 2}))
+
   def testBroadcastStructure(self):
     if not tf.executing_eagerly():
       return
@@ -320,6 +326,29 @@ class FunMCMCTest(tf.test.TestCase, parameterized.TestCase):
     new_control = fun_mcmc.sign_adaptation(
         control=1., output=0.5, set_point=0., adaptation_rate=0.1)
     self.assertAllClose(new_control, 1. * 1.1)
+
+  def testWrapTransitionKernel(self):
+
+    class TestKernel(tfp.mcmc.TransitionKernel):
+
+      def one_step(self, current_state, previous_kernel_results):
+        return [x + 1 for x in current_state], previous_kernel_results + 1
+
+      def bootstrap_results(self, current_state):
+        return sum(current_state)
+
+      def is_calibrated(self):
+        return True
+
+    def kernel(state, pkr):
+      return fun_mcmc.transition_kernel_wrapper(state, pkr, TestKernel())
+
+    ((final_state, final_kr), _), _ = fun_mcmc.trace(({
+        'x': 0.,
+        'y': 1.
+    }, None), kernel, 2, trace_fn=lambda *args: ())
+    self.assertAllEqual({'x': 2., 'y': 3.}, self.evaluate(final_state))
+    self.assertAllEqual(1. + 2., self.evaluate(final_kr))
 
 
 if __name__ == '__main__':
