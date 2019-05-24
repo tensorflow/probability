@@ -23,6 +23,7 @@ import itertools
 # Dependency imports
 from absl.testing import parameterized
 import numpy as np
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
@@ -155,6 +156,28 @@ class CorrelationCholeskyBijectorTest(parameterized.TestCase, tf.test.TestCase):
         self.evaluate(fldj),
         atol=1e-5,
         rtol=1e-5)
+
+  def testBijectorWithVariables(self):
+    x_ = np.array([1.], dtype=np.float32)
+    y_ = np.array([[1., 0.], [0.707107, 0.707107]], dtype=np.float32)
+
+    x = tf.Variable(x_, dtype=tf.float32)
+    y = tf.Variable(y_, dtype=tf.float32)
+    forward_event_ndims = tf.Variable(1, dtype=tf.int32)
+    inverse_event_ndims = tf.Variable(2, dtype=tf.int32)
+    self.evaluate(tf1.global_variables_initializer())
+
+    bijector = tfb.CorrelationCholesky()
+    self.assertAllClose(
+        y_, self.evaluate(bijector.forward(x)), atol=1e-5, rtol=1e-5)
+    self.assertAllClose(
+        x_, self.evaluate(bijector.inverse(y)), atol=1e-5, rtol=1e-5)
+
+    fldj = bijector.forward_log_det_jacobian(x, event_ndims=forward_event_ndims)
+    self.assertAllClose(-np.log(2), self.evaluate(fldj))
+
+    ildj = bijector.inverse_log_det_jacobian(y, event_ndims=inverse_event_ndims)
+    self.assertAllClose(np.log(2), ildj)
 
   @parameterized.parameters(itertools.product([2, 3, 4, 5, 6, 7], [1., 2., 3.]))
   def testWithLKJSamples(self, dimension, concentration):

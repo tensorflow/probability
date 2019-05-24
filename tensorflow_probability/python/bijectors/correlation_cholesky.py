@@ -176,6 +176,12 @@ class CorrelationCholesky(bijector.Bijector):
     # transformation.
     return fill_triangular.FillTriangular().inverse(x[..., 1:, :-1])
 
+  def _forward_log_det_jacobian(self, x):
+    # TODO(b/133442896): It should be possible to use the fallback
+    # implementation of _forward_log_det_jacobian in terms of
+    # _inverse_log_det_jacobian in the base Bijector class.
+    return -self._inverse_log_det_jacobian(self.forward(x))
+
   def _inverse_log_det_jacobian(self, y):
     # The inverse log det jacobian (ILDJ) of the entire mapping is the sum of
     # the ILDJs of each row's mapping.
