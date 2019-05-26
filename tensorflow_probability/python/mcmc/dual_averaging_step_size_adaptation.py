@@ -1,3 +1,17 @@
+# Copyright 2019 The TensorFlow Probability Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ============================================================================
 """DualAveragingStepSizeAdaptation TransitionKernel."""
 
 from __future__ import absolute_import
@@ -56,12 +70,150 @@ def _get_differing_dims(a, b):
 class DualAveragingStepSizeAdaptationResults(
     collections.namedtuple(
         'DualAveragingStepSizeAdaptationResults',
-        'inner_results, target_accept_prob, mu, exploration_shrinkage, initial_t, decay_rate, error_sum, '
+        'inner_results, target_accept_prob, shrinkage_target, '
+        'exploration_shrinkage, initial_t, decay_rate, error_sum, '
         'log_averaging_step, step, new_step_size')):
+  """Results of the DualAveragingStepSizeAdaptation TransitionKernel.
+
+  Attributes:
+    inner_results: Results of the inner kernel.
+    target_accept_prob: Floating point scalar `Tensor`. Target accept
+      probability.
+    shrinkage_target: Floating point scalar `Tensor`. Arbitrary value the
+    exploration step size is biased towards.
+    exploration_shrinkage: Floating point scalar `Tensor`. How strongly the
+    exploration rate is biased towards the shrinkage target.
+    initial_t: Int32 scalar `Tensor`. Number of "pseudo-observations" applied
+      to the initial step size. Prevents early noisy exploration.
+    decay_rate: Floating point scalar `Tensor`. How much to favor recent
+      iterations over earlier ones. A value of 1 gives equal weight to all
+      history.
+    error_sum: Floating point scalar `Tensor`. Aggregator for the sum of the
+      acceptance probabilities minus target probability. Algorithm seeks to
+      make this 0 in expectation.
+    log_averaging_step: Floating point scalar `Tensor` or a list thereof (one
+      for (each `state_part`). Smoothed version of the step size.
+    step: Int32 scalar `Tensor`. The current step number as perceived by this
+      kernel. Increases by 1 for every call to `one_step`.
+    new_step_size:  Floating point scalar `Tensor` or a list thereof (one for
+      each `state_part`). Step size that will be passed to the inner kernel
+      during the next step.
+  """
   __slots__ = ()
 
 
 class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
+  """Adapts the inner kernel's `step_size` based on `log_accept_prob`.
+
+  The dual averaging policy uses a noisy step size for exploration, while
+  averaging over tuning steps to provide a smoothed estimate of an optimal
+  value. It is based on [section 3.2 of Hoffman and Gelman (2013)][1], which
+  modifies the [stochastic convex optimization scheme of Nesterov (2009)][2].
+  The modified algorithm applies extra weight to recent iterations while
+  keeping the convergence guarantees of Robbins-Monro, and takes care not
+  to make the step size too small too quickly, to avoid expensive early
+  iterations. A good target acceptance probability depends on the inner
+  kernel. If this kernel is `HamiltonianMonteCarlo`, then 0.6-0.9 is a good
+  range to aim for. For `RandomWalkMetropolis` this should be closer to 0.25.
+  See the individual kernels' docstrings for guidance.
+
+  In general, adaptation prevents the chain from reaching a stationary
+  distribution, so obtaining consistent samples requires `num_adaptation_steps`
+  be set to a value [somewhat smaller][3] than the number of burnin steps.
+  However, it may sometimes be helpful to set `num_adaptation_steps` to a larger
+  value during development in order to inspect the behavior of the chain during
+  adaptation.
+
+  The step size is assumed to broadcast with the chain state, potentially having
+  leading dimensions corresponding to multiple chains. When there are fewer of
+  those leading dimensions than there are chain dimensions, the corresponding
+  dimensions in the `log_accept_prob` are averaged (in the direct space, rather
+  than the log space) before being used to adjust the step size. This means that
+  this kernel can do both cross-chain adaptation, or per-chain step size
+  adaptation, depending on the shape of the step size.
+
+  For example, if your problem has a state with shape `[S]`, your chain state
+  has shape `[C0, C1, Y]` (meaning that there are `C0 * C1` total chains) and
+  `log_accept_prob` has shape `[C0, C1]` (one acceptance probability per chain),
+  then depending on the shape of the step size, the following will happen:
+
+  - Step size has shape [], [S] or [1], the `log_accept_prob` will be averaged
+    across its `C0` and `C1` dimensions. This means that you will learn a shared
+    step size based on the mean acceptance probability across all chains. This
+    can be useful if you don't have a lot of steps to adapt and want to average
+    away the noise.
+
+  - Step size has shape [C1, 1] or [C1, S], the `log_accept_prob` will be
+    averaged across its `C0` dimension. This means that you will learn a shared
+    step size based on the mean acceptance probability across chains that share
+    the coordinate across the `C1` dimension. This can be useful when the `C1`
+    dimension indexes different distributions, while `C0` indexes replicas of a
+    single distribution, all sampled in parallel.
+
+  - Step size has shape [C0, C1, 1] or [C0, C1, S], then no averaging will
+    happen. This means that each chain will learn its own step size. This can be
+    useful when all chains are sampling from different distributions. Even when
+    all chains are for the same distribution, this can help during the initial
+    warmup period.
+
+  - Step size has shape [C0, 1, 1] or [C0, 1, S], the `log_accept_prob` will be
+    averaged across its `C1` dimension. This means that you will learn a shared
+    step size based on the mean acceptance probability across chains that share
+    the coordinate across the `C0` dimension. This can be useful when the `C0`
+    dimension indexes different distributions, while `C1` indexes replicas of a
+    single distribution, all sampled in parallel.
+
+  #### Examples
+
+  ```python
+  import tensorflow as tf
+  import tensorflow_probability as tfp
+  tfd = tfp.distributions
+
+  target_log_prob_fn = tfd.Normal(loc=0., scale=1.).log_prob
+  num_burnin_steps = 500
+  num_results = 500
+  num_chains = 64
+  step_size = 0.1
+  # Or, if you want per-chain step size:
+  # step_size = tf.fill([num_chains], step_size)
+
+  kernel = tfp.mcmc.HamiltonianMonteCarlo(
+      target_log_prob_fn=target_log_prob_fn,
+      num_leapfrog_steps=2,
+      step_size=step_size)
+  kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
+      inner_kernel=kernel, num_adaptation_steps=int(num_burnin_steps * 0.8))
+
+  # The chain will be stepped for num_results + num_burnin_steps, adapting for
+  # the first num_adaptation_steps.
+  samples, [step_size, log_accept_ratio] = tfp.mcmc.sample_chain(
+      num_results=num_results,
+      num_burnin_steps=num_burnin_steps,
+      current_state=tf.zeros(num_chains),
+      kernel=kernel,
+      trace_fn=lambda _, pkr: [pkr.inner_results.accepted_results.step_size,
+                               pkr.inner_results.log_accept_ratio])
+
+  # ~0.75
+  p_accept = tf.reduce_mean(tf.exp(tf.minimum(log_accept_ratio, 0.)))
+  ```
+  #### References
+
+  [1]: Matthew D. Hoffman, Andrew Gelman. The No-U-Turn Sampler: Adaptively
+      Setting Path Lengths in Hamiltonian Monte Carlo.
+      In _Journal of Machine Learning Research_, 15(1):1593-1623, 2014.
+      http://jmlr.org/papers/volume15/hoffman14a/hoffman14a.pdf
+
+  [2] Yurii Nesterov. Primal-dual subgradient methods for convex problems.
+      Mathematical programming 120.1 (2009): 221-259
+      https://link.springer.com/article/10.1007/s10107-007-0149-x
+
+  [3]:
+  http://andrewgelman.com/2017/12/15/burn-vs-warm-iterative-simulation-algorithms/#comment-627745
+
+  """
+
   def __init__(
       self,
       inner_kernel,
@@ -78,15 +230,20 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
     inner_kernel = mcmc_util.enable_store_parameters_in_results(inner_kernel)
 
     with tf.name_scope(
-        mcmc_util.make_name(name, 'simple_step_size_adaptation', '__init__')
-    ) as name:
-      dtype = dtype_util.common_dtype([target_accept_prob, exploration_shrinkage, initial_t, decay_rate],
-                                      tf.float32)
+        mcmc_util.make_name(
+            name, 'dual_averaging_step_size_adaptation', '__init__')) as name:
+      dtype = dtype_util.common_dtype(
+          [target_accept_prob, exploration_shrinkage, initial_t, decay_rate],
+          tf.float32)
       target_accept_prob = tf.convert_to_tensor(
           value=target_accept_prob, dtype=dtype, name='target_accept_prob')
-      exploration_shrinkage = tf.convert_to_tensor(value=exploration_shrinkage, dtype=dtype, name='exploration_shrinkage')
-      initial_t = tf.convert_to_tensor(value=initial_t, dtype=dtype, name='initial_t')
-      decay_rate = tf.convert_to_tensor(value=decay_rate, dtype=dtype, name='decay_rate')
+      exploration_shrinkage = tf.convert_to_tensor(
+          value=exploration_shrinkage, dtype=dtype,
+          name='exploration_shrinkage')
+      initial_t = tf.convert_to_tensor(value=initial_t, dtype=dtype,
+                                       name='initial_t')
+      decay_rate = tf.convert_to_tensor(value=decay_rate, dtype=dtype,
+                                        name='decay_rate')
       num_adaptation_steps = tf.convert_to_tensor(
           value=num_adaptation_steps,
           dtype=tf.int32,
@@ -137,7 +294,7 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
 
   def one_step(self, current_state, previous_kernel_results):
     with tf.name_scope(
-        mcmc_util.make_name(self.name, 'simple_step_size_adaptation',
+        mcmc_util.make_name(self.name, 'dual_averaging_step_size_adaptation',
                             'one_step')):
       # Set the step_size.
       inner_results = self.step_size_setter_fn(
@@ -157,9 +314,15 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
       step_size = self.step_size_getter_fn(new_inner_results)
       step_size_parts = tf.nest.flatten(step_size)
       log_accept_prob_rank = tf.rank(log_accept_prob)
-
+      error_sum_parts = tf.nest.flatten(previous_kernel_results.error_sum)
+      log_averaging_step_parts = tf.nest.flatten(
+          previous_kernel_results.log_averaging_step)
+      new_error_sum_parts = []
       new_step_size_parts = []
-      for step_size_part, state_part in zip(step_size_parts, state_parts):
+      new_log_averaging_step_parts = []
+      for step_size_part, state_part, error_sum_part, log_averaging_step_part \
+          in zip(step_size_parts, state_parts,
+                 error_sum_parts, log_averaging_step_parts):
         # Compute new step sizes for each step size part. If step size part has
         # smaller rank than the corresponding state part, then the difference is
         # averaged away in the log accept prob.
@@ -200,6 +363,7 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
             tf.rank(state_part) - tf.rank(step_size_part))
         reduced_log_accept_prob = _reduce_logmeanexp(log_accept_prob,
                                                      tf.range(num_reduce_dims))
+
         # reduced_log_accept_prob must broadcast into step_size_part on the
         # left, so we do an additional reduction over dimensions where their
         # shapes differ.
@@ -207,19 +371,22 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
                                              step_size_part)
         reduced_log_accept_prob = _reduce_logmeanexp(
             reduced_log_accept_prob, reduce_indices, keepdims=True)
-
-        initial_t = previous_kernel_results.initial_t
-        t = initial_t + tf.cast(previous_kernel_results.step, initial_t.dtype)
-        new_error_sum = (previous_kernel_results.error_sum +
+        new_error_sum = (error_sum_part +
                          target_accept_prob -
                          tf.math.exp(reduced_log_accept_prob))
-        log_step = (
-            previous_kernel_results.mu -
-            new_error_sum / (tf.math.sqrt(t) * previous_kernel_results.exploration_shrinkage))
-        eta = tf.math.pow(t, -previous_kernel_results.decay_rate)
-        new_log_averaging_step = (
-            eta * log_step +
-            (1 - eta) * previous_kernel_results.log_averaging_step)
+
+        initial_t = previous_kernel_results.initial_t
+        step = tf.cast(previous_kernel_results.step, initial_t.dtype) + 1.
+        soft_t = initial_t + step
+
+        new_log_step = tf.transpose(
+            tf.transpose(previous_kernel_results.shrinkage_target)-
+            (new_error_sum * tf.math.sqrt(step)) /
+            (soft_t * previous_kernel_results.exploration_shrinkage))
+
+        eta = tf.math.pow(step, -previous_kernel_results.decay_rate)
+        new_log_averaging_step = (eta * new_log_step +
+                                  (1 - eta) * log_averaging_step_part)
 
         # - If still adapting, return an exploring step size,
         # - If just finished, return the averaging step size
@@ -227,12 +394,22 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
         new_step_size_parts.append(
             tf.where(
                 previous_kernel_results.step < self.num_adaptation_steps,
-                tf.math.exp(log_step),
+                tf.math.exp(new_log_step),
                 tf.where(
                     previous_kernel_results.step > self.num_adaptation_steps,
                     step_size_part,
                     tf.math.exp(new_log_averaging_step))))
+        new_log_averaging_step_parts.append(
+            tf.where(
+                previous_kernel_results.step > self.num_adaptation_steps,
+                log_averaging_step_part,
+                new_log_averaging_step))
+        new_error_sum_parts.append(new_error_sum)
       new_step_size = tf.nest.pack_sequence_as(step_size, new_step_size_parts)
+      new_error_sum = tf.nest.pack_sequence_as(error_sum_parts,
+                                               new_error_sum_parts)
+      new_log_averaging_step = tf.nest.pack_sequence_as(
+          log_averaging_step_parts, new_log_averaging_step_parts)
 
       return new_state, previous_kernel_results._replace(
           inner_results=new_inner_results,
@@ -243,21 +420,40 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
 
   def bootstrap_results(self, init_state):
     with tf.name_scope(
-        mcmc_util.make_name(self.name, 'simple_step_size_adaptation',
+        mcmc_util.make_name(self.name, 'dual_averaging_step_size_adaptation',
                             'bootstrap_results')):
       inner_results = self.inner_kernel.bootstrap_results(init_state)
       step_size = self.step_size_getter_fn(inner_results)
+
+      log_accept_prob = self.log_accept_prob_getter_fn(inner_results)
+
+      state_parts = tf.nest.flatten(init_state)
+      step_size_parts = tf.nest.flatten(step_size)
+      log_accept_prob_rank = tf.rank(log_accept_prob)
+      error_sum_parts, log_averaging_step_parts = [], []
+      for state_part, step_size_part in zip(state_parts, step_size_parts):
+        num_reduce_dims = tf.minimum(
+            log_accept_prob_rank,
+            tf.rank(state_part) - tf.rank(step_size_part))
+        reduced_log_accept_prob = _reduce_logmeanexp(log_accept_prob,
+                                                     tf.range(num_reduce_dims))
+        reduce_indices = _get_differing_dims(reduced_log_accept_prob,
+                                             step_size_part)
+        reduced_log_accept_prob = _reduce_logmeanexp(
+            reduced_log_accept_prob, reduce_indices, keepdims=True)
+        error_sum_parts.append(tf.fill(reduced_log_accept_prob.shape, 0.))
+        log_averaging_step_parts.append(tf.fill(step_size_part.shape, 0.))
 
       return DualAveragingStepSizeAdaptationResults(
           inner_results=inner_results,
           step=tf.constant(0, dtype=tf.int32),
           target_accept_prob=self.parameters['target_accept_prob'],
-          mu=tf.math.log(10 * step_size),
+          shrinkage_target=tf.math.log(10. * step_size),
           exploration_shrinkage=self.parameters['exploration_shrinkage'],
           initial_t=self.parameters['initial_t'],
           decay_rate=self.parameters['decay_rate'],
-          error_sum=tf.constant(0., dtype=tf.float32),
-          log_averaging_step=tf.constant(0., dtype=tf.float32),
+          error_sum=error_sum_parts,
+          log_averaging_step=log_averaging_step_parts,
           new_step_size=step_size)
 
   def is_calibrated(self):
@@ -277,4 +473,3 @@ def _maybe_validate_target_accept_prob(target_accept_prob, validate_args):
           tf.ones_like(target_accept_prob),
           message='`target_accept_prob` must be < 1.')]):
     return tf.identity(target_accept_prob)
-
