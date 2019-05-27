@@ -152,7 +152,7 @@ def _make_kl_divergence_penalty(
     weight=None):
   """Creates a callable computing `KL[a,b]` from `a`, a `tfd.Distribution`."""
 
-  if use_exact_kl is None:
+  if use_exact_kl:
     kl_divergence_fn = kullback_leibler.kl_divergence
   else:
     def kl_divergence_fn(distribution_a, distribution_b):
