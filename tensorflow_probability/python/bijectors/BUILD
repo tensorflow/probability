@@ -861,7 +861,7 @@ py_test(
 
 py_test(
     name = "correlation_cholesky_test",
-    size = "small",
+    size = "medium",
     srcs = ["correlation_cholesky_test.py"],
     deps = [
         ":bijector_test_util",

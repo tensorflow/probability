@@ -44,7 +44,7 @@ py_library(
 
 py_test(
     name = "moving_stats_test",
-    size = "small",
+    size = "medium",
     srcs = ["moving_stats_test.py"],
     tags = [
         "nomsan",  # disable to avoid false positives from scipy.

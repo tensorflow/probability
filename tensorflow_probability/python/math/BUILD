@@ -131,7 +131,7 @@ py_library(
 
 py_test(
     name = "linalg_test",
-    size = "small",
+    size = "medium",
     srcs = ["linalg_test.py"],
     shard_count = 5,
     deps = [

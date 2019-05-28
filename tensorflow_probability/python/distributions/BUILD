@@ -1726,9 +1726,9 @@ py_test(
 
 py_test(
     name = "linear_gaussian_ssm_test",
-    size = "large",
+    size = "medium",
     srcs = ["linear_gaussian_ssm_test.py"],
-    shard_count = 4,
+    shard_count = 5,
     deps = [
         ":linear_gaussian_ssm",
         # numpy dep,
@@ -2262,7 +2262,7 @@ py_test(
 
 py_test(
     name = "zipf_test",
-    size = "large",
+    size = "medium",
     srcs = ["zipf_test.py"],
     deps = [
         # numpy dep,
