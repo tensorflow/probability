@@ -465,8 +465,8 @@ def _maybe_validate_target_accept_prob(target_accept_prob, validate_args):
   if not validate_args:
     return target_accept_prob
   with tf.control_dependencies([
-      tf.assert_positive(
-          target_accept_prob, message='`target_accept_prob` must be > 0.'
+      tf.assert_greater(
+          target_accept_prob, 0., message='`target_accept_prob` must be > 0.'
       ),
       tf.assert_less(
           target_accept_prob,
