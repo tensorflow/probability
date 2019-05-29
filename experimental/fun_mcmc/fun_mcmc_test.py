@@ -46,12 +46,11 @@ class FunMCMCTest(tf.test.TestCase, parameterized.TestCase):
         x = 0.
       return x + 1., 2 * x
 
-    (x, e), x_trace = fun_mcmc.trace(
+    x, e_trace = fun_mcmc.trace(
         state=None, fn=fun, num_steps=5, trace_fn=lambda _, xp1: xp1)
 
     self.assertAllEqual(5., x.numpy())
-    self.assertAllEqual(8., e.numpy())
-    self.assertAllEqual([0., 2., 4., 6., 8.], x_trace.numpy())
+    self.assertAllEqual([0., 2., 4., 6., 8.], e_trace.numpy())
 
   def testTraceNested(self):
     if not tf.executing_eagerly():
@@ -62,13 +61,23 @@ class FunMCMCTest(tf.test.TestCase, parameterized.TestCase):
         x = 0.
       return (x + 1., y + 2.), ()
 
-    ((x, y), _), (x_trace, y_trace) = fun_mcmc.trace(
+    (x, y), (x_trace, y_trace) = fun_mcmc.trace(
         state=(None, 0.), fn=fun, num_steps=5, trace_fn=lambda xy, _: xy)
 
     self.assertAllEqual(5., x)
     self.assertAllEqual(10., y)
     self.assertAllEqual([1., 2., 3., 4., 5.], x_trace)
     self.assertAllEqual([2., 4., 6., 8., 10.], y_trace)
+
+  def testTraceTrace(self):
+    if not tf.executing_eagerly():
+      return
+
+    def fun(x):
+      return fun_mcmc.trace(x, lambda x: (x + 1., ()), 2, lambda *args: ())
+
+    x, _ = fun_mcmc.trace(0., fun, 2, lambda *args: ())
+    self.assertAllEqual(4., x)
 
   def testCallFn(self):
     sum_fn = lambda *args: sum(args)
@@ -343,7 +352,7 @@ class FunMCMCTest(tf.test.TestCase, parameterized.TestCase):
     def kernel(state, pkr):
       return fun_mcmc.transition_kernel_wrapper(state, pkr, TestKernel())
 
-    ((final_state, final_kr), _), _ = fun_mcmc.trace(({
+    (final_state, final_kr), _ = fun_mcmc.trace(({
         'x': 0.,
         'y': 1.
     }, None), kernel, 2, trace_fn=lambda *args: ())

@@ -110,16 +110,20 @@ def trace(state: State, fn: TransitionOperator, num_steps: IntTensor,
   def trace_fn_wrapper(args):
     return tf.nest.map_structure(tf.convert_to_tensor, call_fn(trace_fn, args))
 
-  state = call_fn(fn, state)
-  first_trace = trace_fn_wrapper(state)
+  state_and_extra = fn_wrapper((state, None), None)
+  first_trace = trace_fn_wrapper(state_and_extra)
 
-  state, full_trace = mcmc_util.trace_scan(
-      fn_wrapper, state, tf.ones(num_steps - 1), trace_fn=trace_fn_wrapper)
+  state_and_extra, full_trace = mcmc_util.trace_scan(
+      fn_wrapper,
+      state_and_extra,
+      tf.ones(num_steps - 1),
+      trace_fn=trace_fn_wrapper)
 
   prepend = lambda x, y: tf.concat(  # pylint: disable=g-long-lambda
       [tf.convert_to_tensor(value=x)[tf.newaxis], y], 0)
 
-  return state, tf.nest.map_structure(prepend, first_trace, full_trace)
+  return state_and_extra[0], tf.nest.map_structure(prepend, first_trace,
+                                                   full_trace)
 
 
 def call_fn(fn: TransitionOperator,
@@ -672,8 +676,8 @@ def hamiltonian_monte_carlo(
   integrator_wrapper_state = (IntegratorStepState(state, state_grads, momentum),
                               target_log_prob, state_extra)
 
-  [[integrator_step_state, target_log_prob, state_extra],
-   _], integrator_trace = trace(
+  [integrator_step_state, target_log_prob,
+   state_extra], integrator_trace = trace(
        integrator_wrapper_state,
        integrator_wrapper,
        num_integrator_steps,
