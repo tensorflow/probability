@@ -311,7 +311,7 @@ def independents(draw, batch_shape=None, event_dim=None):
 
 @hps.composite
 def transformed_distributions(draw, batch_shape=None, event_dim=None):
-  bijector = bijector_hps.unconstrained_bijectors(draw)
+  bijector = draw(bijector_hps.unconstrained_bijectors)
   logging.info('TD bijector: %s', bijector)
   if batch_shape is None:
     batch_shape = draw(batch_shapes())

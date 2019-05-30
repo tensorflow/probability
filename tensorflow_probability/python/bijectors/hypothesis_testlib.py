@@ -159,8 +159,7 @@ def bijector_supports():
   return BIJECTOR_SUPPORTS
 
 
-# TODO(b/128974935): Use hps.composite
-# @hps.composite
+@hps.composite
 def unconstrained_bijectors(draw):
   """Draws bijectors which can act on [numerically] unconstrained events."""
   bijector_names = hps.one_of(map(hps.just, instantiable_bijectors().keys()))
