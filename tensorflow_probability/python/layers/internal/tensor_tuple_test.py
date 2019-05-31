@@ -72,7 +72,7 @@ class CustomConvertToCompositeTensorTest(test_util.TensorFlowTestCase):
     self.assertLen(y, 3)
     for i in range(3):
       self.assertAllEqual(x[i], tf.get_static_value(y[i]))
-    self.assertEqual(not(tf.executing_eagerly()), y._is_graph_tensor())
+    self.assertEqual(not(tf.executing_eagerly()), y._is_graph_tensor)
 
   def test_to_from(self):
     x = MyTuple((1, [2., 3.], [[4, 5], [6, 7]]))
