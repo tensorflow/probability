@@ -155,26 +155,6 @@ def deep_exponential_family_variational(data_size, feature_size, units):
   return qw2, qw1, qw0, qz2, qz1, qz0
 
 
-def make_value_setter(**model_kwargs):
-  """Creates a value-setting interceptor.
-
-  Args:
-    **model_kwargs: dict of str to Tensor. Keys are the names of random variable
-      in the model to which this interceptor is being applied. Values are
-      Tensors to set their value to.
-
-  Returns:
-    set_values: Function which sets the value of intercepted ops.
-  """
-  def set_values(f, *args, **kwargs):
-    """Sets random variable values to its aligned value."""
-    name = kwargs.get("name")
-    if name in model_kwargs:
-      kwargs["value"] = model_kwargs[name]
-    return ed.interceptable(f)(*args, **kwargs)
-  return set_values
-
-
 def load_nips2011_papers(path):
   """Loads NIPS 2011 conference papers.
 
@@ -261,8 +241,8 @@ def main(argv):
       FLAGS.layer_sizes)
 
   with ed.tape() as model_tape:
-    with ed.interception(make_value_setter(w2=qw2, w1=qw1, w0=qw0,
-                                           z2=qz2, z1=qz1, z0=qz0)):
+    with ed.interception(ed.make_value_setter(w2=qw2, w1=qw1, w0=qw0,
+                                              z2=qz2, z1=qz1, z0=qz0)):
       posterior_predictive = deep_exponential_family(data_size,
                                                      feature_size,
                                                      FLAGS.layer_sizes,

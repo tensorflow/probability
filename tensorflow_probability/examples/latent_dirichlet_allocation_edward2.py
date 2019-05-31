@@ -223,26 +223,6 @@ def make_lda_variational(activation, num_topics, layer_sizes):
   return lda_variational
 
 
-def make_value_setter(**model_kwargs):
-  """Creates a value-setting interceptor.
-
-  Args:
-    **model_kwargs: dict of str to Tensor. Keys are the names of random variable
-      in the model to which this interceptor is being applied. Values are
-      Tensors to set their value to.
-
-  Returns:
-    set_values: Function which sets the value of intercepted ops.
-  """
-  def set_values(f, *args, **kwargs):
-    """Sets random variable values to its aligned value."""
-    name = kwargs.get("name")
-    if name in model_kwargs:
-      kwargs["value"] = model_kwargs[name]
-    return ed.interceptable(f)(*args, **kwargs)
-  return set_values
-
-
 def model_fn(features, labels, mode, params, config):
   """Builds the model function for use in an Estimator.
 
@@ -285,7 +265,7 @@ def model_fn(features, labels, mode, params, config):
 
   with ed.tape() as model_tape:
     with ed.interception(
-        make_value_setter(topics=variational_tape["topics_posterior"])):
+        ed.make_value_setter(topics=variational_tape["topics_posterior"])):
       posterior_predictive = latent_dirichlet_allocation(concentration,
                                                          topics_words)
 

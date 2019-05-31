@@ -225,23 +225,13 @@ def deep_exponential_family_variational():
   qz0 = trainable_gamma(z0.shape, name="qz0")
   return qw2, qw1, qw0, qz2, qz1, qz0
 
-def make_value_setter(**model_kwargs):
-  """Creates a value-setting interceptor."""
-  def set_values(f, *args, **kwargs):
-    """Sets random variable values to its aligned value."""
-    name = kwargs.get("name")
-    if name in model_kwargs:
-      kwargs["value"] = model_kwargs[name]
-    return ed.interceptable(f)(*args, **kwargs)
-  return set_values
-
 # Compute expected log-likelihood. First, sample from the variational
 # distribution; second, compute the log-likelihood given the sample.
 qw2, qw1, qw0, qz2, qz1, qz0 = deep_exponential_family_variational()
 
 with ed.tape() as model_tape:
-  with ed.interception(make_value_setter(w2=qw2, w1=qw1, w0=qw0,
-                                         z2=qz2, z1=qz1, z0=qz0)):
+  with ed.interception(ed.make_value_setter(w2=qw2, w1=qw1, w0=qw0,
+                                            z2=qz2, z1=qz1, z0=qz0)):
     posterior_predictive = deep_exponential_family(data_size, feature_size, units, shape)
 
 log_likelihood = posterior_predictive.distribution.log_prob(bag_of_words)
