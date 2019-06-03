@@ -29,5 +29,7 @@ py_library(
     name = "experimental",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
-    deps = [],
+    deps = [
+        "//tensorflow_probability/python/internal/auto_batching",
+    ],
 )
