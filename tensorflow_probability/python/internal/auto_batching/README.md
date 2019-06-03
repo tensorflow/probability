@@ -149,26 +149,26 @@ The contract for type annotations is:
 It's early days, so code written against the auto-batching system has to be
 aware of several inessential (and temporary) limitations.
 
-Error messages: The error messages auto-batching emits when
+**Error messages**: The error messages auto-batching emits when
 something goes wrong are pretty implementor-oriented. In particular, the stack
 traces refer to the auto-batching system itself, not to the point in the user
 program that caused the problem. For now, the only thing a user can do about a
 confusing error are guess, source-dive, or ask.
 
-Limited syntax: The auto-batching transformation only supports
+**Limited syntax**: The auto-batching transformation only supports
 very basic Python syntax: Assignments, conditionals, tuples, and function calls
-are about it. (Notably, you have to write while in tail-recursive style.)
+are about it. (Notably, you have to write `while` in tail-recursive style.)
 
-Truth matching: A program coded for auto-batching has a batch dimension on every
-Tensor. When running without the auto-batching system, this dimension has size
-1, but it is still there. This creates a problem at `if` statements: A boolean
-Tensor of shape `[1]` is not a valid `if` condition (and raises an error to that
-effect). The solution is to call the `auto_batching.truthy` function on every
-boolean Tensor just before using it in an `if`. This function detects whether it
-is being dry-run, and either strips the size-1 leading dimension or does
-nothing, respectively.
+**Truth matching**: A program coded for auto-batching has a batch dimension on
+every Tensor. When running without the auto-batching system, this dimension has
+size 1, but it is still there. This creates a problem at `if` statements: A
+boolean Tensor of shape `[1]` is not a valid `if` condition (and raises an error
+to that effect). The solution is to call the `auto_batching.truthy` function on
+every boolean Tensor just before using it in an `if`. This function detects
+whether it is being dry-run, and either strips the size-1 leading dimension or
+does nothing, respectively.
 
-Everything is a Tensor: All variables subject to auto-batching
+**Everything is a Tensor**: All variables subject to auto-batching
 must hold Tensors or (potentially nested) lists or tuples of Tensors. This is
 because the system doesn't know how to add a batch dimension to any other data.
 The only way to access non-Tensor objects from within an auto-batched program is
@@ -176,7 +176,7 @@ to store them in Python variables in an enclosing scope. This means either
 module-level globals, or nesting the batched function definition inside a Python
 function.
 
-*Everything* is a Tensor: Auto-batched programs actually have more
+**_Everything_ is a Tensor**: Auto-batched programs actually have more
 variables than meets the eye. This is because the system as currently written
 conservatively introduces temporary variables for all subexpressions everywhere
 in the program (working on it). So all operations that produce non-Tensors as
@@ -184,7 +184,7 @@ intermediaries have to either be lifted out of the auto-batched scope, or hidden
 in non-auto-batched helper functions. This particularly gets module and class
 member references.
 
-Cross-rank broadcasting: Auto-batching requires that dimension 0
+**Cross-rank broadcasting**: Auto-batching requires that dimension 0
 be the batch dimension of every Tensor it sees. Thus, code that relied on
 broadcasting to line up Tensor ranks will break.  For example, suppose the
 single-example version of some program has an `x + y`, where `x` has shape `[5,
@@ -194,7 +194,7 @@ size `7` on the left. Now the shape of `x` is `[7, 5, 3]`, and the shape of `y`
 is `[7, 3]`, and `+` complains. The solution is make sure the shape of the
 batched `y` ends up as `[7, 1, 3]` (putting the 1 under the batch dimension).
 
-Junk data: The straight-line sections of your program may be run
+**Junk data**: The straight-line sections of your program may be run
 with (some) junk data. The system will execute operations if at least one batch
 member needs them.  If not all batch members are ready for that operation, the
 system may put junk data (generally zeros or leftovers of a previous result from
@@ -202,7 +202,7 @@ that thread) at those indices (and mask out the results). In principle, it is
 possible to give the user control over this, but that hasn't been implemented
 yet.
 
-Explicit temporaries: Auto-batched operations (both primitives and
+**Explicit temporaries**: Auto-batched operations (both primitives and
 function calls) cannot read and write the same auto-batched variables
 (yet). This means it is sometimes necessary to introduce explicit temporaries to
 make sure that every operation writes a different variable from those it
