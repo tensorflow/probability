@@ -90,6 +90,7 @@ from tensorflow_probability.python.distributions.sample_stats import auto_correl
 from tensorflow_probability.python.distributions.sample_stats import percentile
 from tensorflow_probability.python.distributions.seed_stream import SeedStream
 from tensorflow_probability.python.distributions.sinh_arcsinh import SinhArcsinh
+from tensorflow_probability.python.distributions.skew_generalized_normal import SkewGeneralizedNormal
 from tensorflow_probability.python.distributions.student_t import StudentT
 from tensorflow_probability.python.distributions.student_t_process import StudentTProcess
 from tensorflow_probability.python.distributions.transformed_distribution import TransformedDistribution
@@ -179,6 +180,7 @@ __all__ = [
     'PoissonLogNormalQuadratureCompound',
     'SeedStream',
     'SinhArcsinh',
+    'SkewGeneralizedNormal',
     'StudentT',
     'StudentTWithAbsDfSoftplusScale',
     'StudentTProcess',
