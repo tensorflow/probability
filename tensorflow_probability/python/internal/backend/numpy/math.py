@@ -77,9 +77,9 @@ __all__ = [
     'is_finite',
     'is_inf',
     'is_nan',
-    # 'is_non_decreasing',
-    # 'is_strictly_increasing',
-    # 'l2_normalize',
+    'is_non_decreasing',
+    'is_strictly_increasing',
+    'l2_normalize',
     'lbeta',
     'less',
     'less_equal',
@@ -137,7 +137,7 @@ __all__ = [
     'subtract',
     'tan',
     'tanh',
-    # 'top_k',
+    'top_k',
     'truediv',
     # 'unsorted_segment_max',
     # 'unsorted_segment_mean',
@@ -200,6 +200,10 @@ def _reduce_logsumexp(input_tensor, axis=None, keepdims=False, name=None):  # py
     y = input_tensor - m
     y = np.exp(y, out=y)
     return m + np.log(np.sum(y, axis=_astuple(axis), keepdims=keepdims))
+
+
+def _top_k(input, k=1, sorted=True, name=None):  # pylint: disable=unused-argument,redefined-builtin
+  raise NotImplementedError
 
 
 # --- Begin Public Functions --------------------------------------------------
@@ -409,17 +413,18 @@ is_nan = utils.copy_docstring(
     tf.math.is_nan,
     lambda x, name=None: np.isnan(x))
 
-# is_non_decreasing = utils.copy_docstring(
-#    tf.math.is_non_decreasing,
-#    lambda x, name=None: np.is_non_decreasing)
+is_non_decreasing = utils.copy_docstring(
+    tf.math.is_non_decreasing,
+    lambda x, name=None: np.all(x[1:] >= x[:-1]))
 
-# is_strictly_increasing = utils.copy_docstring(
-#     tf.math.is_strictly_increasing,
-#     lambda x, name=None: np.is_strictly_increasing)
+is_strictly_increasing = utils.copy_docstring(
+    tf.math.is_strictly_increasing,
+    lambda x, name=None: np.all(x[1:] > x[:-1]))
 
-# l2_normalize = utils.copy_docstring(
-#     tf.math.l2_normalize,
-#     lambda x, axis=None, epsilon=1e-12, name=None: np.l2_normalize)
+l2_normalize = utils.copy_docstring(
+    tf.math.l2_normalize,
+    lambda x, axis=None, epsilon=1e-12, name=None: (  # pylint: disable=g-long-lambda
+        np.linalg.norm(x, ord=2, axis=axis, keepdims=True)))
 
 lbeta = utils.copy_docstring(
     tf.math.lbeta,
@@ -664,9 +669,9 @@ tanh = utils.copy_docstring(
     tf.math.tanh,
     lambda x, name=None: np.tanh(x))
 
-# top_k = utils.copy_docstring(
-#     tf.math.top_k,
-#     lambda input, k=1, sorted=True, name=None: np.top_k)
+top_k = utils.copy_docstring(
+    tf.math.top_k,
+    _top_k)
 
 truediv = utils.copy_docstring(
     tf.math.truediv,

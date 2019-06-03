@@ -19,21 +19,28 @@ from __future__ import division
 from __future__ import print_function
 
 from tensorflow_probability.python.internal.backend.numpy import compat
+from tensorflow_probability.python.internal.backend.numpy import debugging
 from tensorflow_probability.python.internal.backend.numpy import errors
 from tensorflow_probability.python.internal.backend.numpy import keras
 from tensorflow_probability.python.internal.backend.numpy import linalg
 from tensorflow_probability.python.internal.backend.numpy import math
 from tensorflow_probability.python.internal.backend.numpy import nn
+from tensorflow_probability.python.internal.backend.numpy import numpy_logging as logging
 from tensorflow_probability.python.internal.backend.numpy import random_generators as random
 from tensorflow_probability.python.internal.backend.numpy import test
 from tensorflow_probability.python.internal.backend.numpy.array import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.control_flow import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.dtype import *  # pylint: disable=wildcard-import
+from tensorflow_probability.python.internal.backend.numpy.functional_ops import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.math import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.misc import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.ops import *  # pylint: disable=wildcard-import
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
+
 eye = linalg.eye
+function = compat.function
 matmul = linalg.matmul
 Variable = compat.v2.Variable
+Assert = debugging.Assert
+check_numerics = debugging.check_numerics

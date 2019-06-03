@@ -12,19 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Numpy implementations of TensorFlow Keras Layers functions."""
+"""Experimental Numpy backend."""
+
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+# Dependency imports
+import numpy as np
+
+import tensorflow as tf
+
+from tensorflow_probability.python.internal.backend.numpy.internal import utils
+
 
 __all__ = [
-    'Layer',
+    'constant',
 ]
 
-
-# --- Begin Public Functions --------------------------------------------------
-
-
-class Layer(object):
-  pass
+constant = utils.copy_docstring(
+    tf.compat.v1.initializers.constant,
+    lambda value=0, dtype=tf.dtypes.float32, verify_shape=False: (  # pylint: disable=g-long-lambda
+        lambda shape, dtype=None, partition_info=None, verify_shape=None: (  # pylint: disable=g-long-lambda
+            np.ones(shape, dtype=dtype) * value))
+)

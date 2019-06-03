@@ -31,6 +31,7 @@ __all__ = [
     'broadcast_static_shape',
     'broadcast_to',
     'cast',
+    'clip_by_value',
     'constant',
     'control_dependencies',
     'convert_to_tensor',
@@ -126,7 +127,12 @@ broadcast_to = utils.copy_docstring(
 
 cast = utils.copy_docstring(
     tf.cast,
-    lambda x, dtype, name=None: np.array(x, dtype=utils.numpy_dtype(dtype)))
+    lambda x, dtype, name=None: np.array(x).astype(utils.numpy_dtype(dtype)))
+
+clip_by_value = utils.copy_docstring(
+    tf.clip_by_value,
+    lambda t, clip_value_min, clip_value_max, name=None:  # pylint: disable=g-long-lambda
+    np.clip(t, clip_value_min, clip_value_max))
 
 constant = utils.copy_docstring(
     tf.constant,
@@ -198,6 +204,8 @@ class name_scope(object):  # pylint: disable=invalid-name
   def __init__(self, name, *args, **kwargs):
     del args, kwargs
     self._name = name
+    if self._name is not None and not self._name.endswith('/'):
+      self._name += '/'
 
   def __enter__(self):
     return self._name

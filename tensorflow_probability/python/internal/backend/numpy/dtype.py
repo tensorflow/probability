@@ -61,7 +61,8 @@ __all__ = [
 
 as_dtype = utils.copy_docstring(
     tf.as_dtype,
-    lambda type_value: np.dtype(type_value).type)
+    lambda type_value: np.dtype(  # pylint: disable=g-long-lambda
+        type_value.name if hasattr(type_value, 'name') else type_value).type)
 
 bool = np.bool  # pylint: disable=redefined-builtin
 

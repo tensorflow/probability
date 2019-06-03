@@ -24,20 +24,29 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.internal.backend.numpy.internal import utils
+from tensorflow_probability.python.internal.backend.numpy.linalg import norm
 
 
 __all__ = [
+    'batch_gather',
     'concat',
     'expand_dims',
     'fill',
+    'gather',
+    'gather_nd',
     'linspace',
+    'meshgrid',
+    'norm',
+    'one_hot',
     'ones',
     'ones_like',
+    'pad',
     'range',
     'rank',
     'reshape',
     'reverse',
     'roll',
+    'searchsorted',
     'shape',
     'size',
     'split',
@@ -45,6 +54,7 @@ __all__ = [
     'stack',
     'tile',
     'transpose',
+    'unstack',
     'where',
     'zeros',
     'zeros_like',
@@ -52,13 +62,63 @@ __all__ = [
     # 'einsum',
     # 'foldl',
     # 'foldr',
-    # 'gather',
-    # 'gather_nd',
-    # 'one_hot',
-    # 'pad',
     # 'tensordot',
-    # 'unstack',
 ]
+
+
+def _batch_gather(  # pylint: disable=unused-argument
+    params,
+    indices,
+    name=None):
+  raise NotImplementedError
+
+
+def _gather(  # pylint: disable=unused-argument
+    params,
+    indices,
+    validate_indices=None,
+    name=None,
+    axis=0):
+  raise NotImplementedError
+
+
+def _gather_nd(  # pylint: disable=unused-argument
+    params,
+    indices,
+    name=None):
+  raise NotImplementedError
+
+
+def _one_hot(  # pylint: disable=unused-argument
+    indices,
+    depth,
+    on_value=None,
+    off_value=None,
+    axis=None,
+    dtype=None,
+    name=None):
+  """One hot."""
+  if on_value is None:
+    on_value = 1
+  if off_value is None:
+    off_value = 0
+  if axis is None:
+    axis = -1
+
+  zeros = np.zeros_like(indices)  # pylint: disable=redefined-outer-name
+  zeros = np.tile(zeros[..., None], [1] * len(indices.shape) + [depth])
+
+  ones = np.ones_like(zeros)  # pylint: disable=redefined-outer-name
+
+  cond = np.abs(np.arange(depth, dtype=np.float32)[None] + zeros
+                - indices[..., None] + zeros) < 0.1
+
+  y_out = np.where(cond, ones * on_value, zeros + off_value)
+
+  if axis is not None:
+    y_out = np.swapaxes(y_out, axis, -1)
+
+  return y_out
 
 
 def _ones_like(input, dtype=None, name=None):  # pylint: disable=redefined-builtin
@@ -66,6 +126,25 @@ def _ones_like(input, dtype=None, name=None):  # pylint: disable=redefined-built
   if isinstance(s, (np.ndarray, np.generic)):
     return np.ones(s, utils.numpy_dtype(dtype or input.dtype))
   return tf.ones(s, dtype or s.dtype, name)
+
+
+def _pad(  # pylint: disable=unused-argument
+    tensor,
+    paddings,
+    mode='CONSTANT',
+    name=None,
+    constant_values=0):
+  raise NotImplementedError
+
+
+def _searchsorted(  # pylint: disable=unused-argument
+    sorted_sequence,
+    values,
+    side='left',
+    out_type=tf.int32,
+    name=None):
+  return np.searchsorted(
+      sorted_sequence, values, side=side, sorter=None).astype(out_type)
 
 
 def _shape(input, out_type=tf.int32, name=None):  # pylint: disable=redefined-builtin,unused-argument
@@ -91,6 +170,10 @@ def _zeros_like(input, dtype=None, name=None):  # pylint: disable=redefined-buil
 # --- Begin Public Functions --------------------------------------------------
 
 
+batch_gather = utils.copy_docstring(
+    tf.compat.v1.batch_gather,
+    _gather)
+
 concat = utils.copy_docstring(
     tf.concat,
     lambda values, axis, name='concat': np.concatenate(values, axis))
@@ -103,6 +186,14 @@ fill = utils.copy_docstring(
     tf.fill,
     lambda dims, value, name=None: value * np.ones(dims, np.array(value).dtype))
 
+gather = utils.copy_docstring(
+    tf.gather,
+    _gather)
+
+gather_nd = utils.copy_docstring(
+    tf.gather_nd,
+    _gather_nd)
+
 reverse = utils.copy_docstring(
     tf.reverse,
     lambda tensor, axis, name=None: np.flip(tensor, axis))
@@ -112,6 +203,18 @@ linspace = utils.copy_docstring(
     lambda start, stop, num, name=None: (  # pylint: disable=g-long-lambda
         np.linspace(start, stop, num).astype(np.array(start).dtype)))
 
+meshgrid = utils.copy_docstring(
+    tf.meshgrid,
+    np.meshgrid)
+
+norm = utils.copy_docstring(
+    tf.norm,
+    norm)
+
+one_hot = utils.copy_docstring(
+    tf.one_hot,
+    _one_hot)
+
 ones = utils.copy_docstring(
     tf.ones,
     lambda shape, dtype=tf.float32, name=None: np.ones(  # pylint: disable=g-long-lambda
@@ -120,6 +223,10 @@ ones = utils.copy_docstring(
 ones_like = utils.copy_docstring(
     tf.ones_like,
     _ones_like)
+
+pad = utils.copy_docstring(
+    tf.pad,
+    _pad)
 
 range = utils.copy_docstring(  # pylint: disable=redefined-builtin
     tf.range,
@@ -137,6 +244,10 @@ reshape = utils.copy_docstring(
 roll = utils.copy_docstring(
     tf.roll,
     lambda input, shift, axis: np.roll(input, shift, axis))  # pylint: disable=unnecessary-lambda
+
+searchsorted = utils.copy_docstring(
+    tf.searchsorted,
+    _searchsorted)
 
 shape = utils.copy_docstring(
     tf.shape,
@@ -166,6 +277,10 @@ tile = utils.copy_docstring(
 transpose = utils.copy_docstring(
     tf.transpose,
     _transpose)
+
+unstack = utils.copy_docstring(
+    tf.unstack,
+    lambda value, num=None, axis=0, name=None: np.split(value, num, axis))
 
 where = utils.copy_docstring(
     tf.compat.v1.where,

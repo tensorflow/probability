@@ -34,13 +34,16 @@ py_library(
         ":array",
         ":compat",
         ":control_flow",
+        ":debugging",
         ":dtype",
         ":errors",
+        ":functional_ops",
         ":keras",
         ":linalg",
         ":math",
         ":misc",
         ":nn",
+        ":numpy_logging",
         ":ops",
         ":random_generators",
         ":test",
@@ -79,6 +82,17 @@ py_library(
 )
 
 py_library(
+    name = "debugging",
+    srcs = ["debugging.py"],
+    deps = [
+        ":v1",
+        ":v2",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
+    ],
+)
+
+py_library(
     name = "dtype",
     srcs = ["dtype.py"],
     deps = [
@@ -97,10 +111,32 @@ py_library(
 )
 
 py_library(
+    name = "functional_ops",
+    srcs = ["functional_ops.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
+    ],
+)
+
+py_library(
+    name = "initializers",
+    srcs = ["initializers.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
+    ],
+)
+
+py_library(
     name = "keras",
     srcs = ["keras.py"],
     deps = [
         ":keras_layers",
+        # numpy dep,
+        # tensorflow dep,
         "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
     ],
 )
@@ -109,6 +145,7 @@ py_library(
     name = "keras_layers",
     srcs = ["keras_layers.py"],
     deps = [
+        # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
     ],
@@ -117,6 +154,18 @@ py_library(
 py_library(
     name = "linalg",
     srcs = ["linalg.py"],
+    deps = [
+        ":linear_operator",
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
+    ],
+)
+
+py_library(
+    name = "linear_operator",
+    srcs = ["linear_operator.py"],
     deps = [
         # numpy dep,
         # scipy dep,
@@ -151,6 +200,16 @@ py_library(
     srcs = ["nn.py"],
     deps = [
         ":math",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
+    ],
+)
+
+py_library(
+    name = "numpy_logging",
+    srcs = ["numpy_logging.py"],
+    deps = [
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
@@ -205,6 +264,7 @@ py_library(
     name = "v1",
     srcs = ["v1.py"],
     deps = [
+        ":initializers",
         ":ops",
         "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
     ],

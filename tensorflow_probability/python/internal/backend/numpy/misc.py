@@ -24,11 +24,13 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.internal.backend.numpy.internal import utils
+from tensorflow_probability.python.internal.backend.numpy.ops import is_tensor
 
 
 __all__ = [
     'argsort',
     'sort',
+    'is_tensor',
     # 'clip_by_norm',
     # 'floormod',
     # 'meshgrid',

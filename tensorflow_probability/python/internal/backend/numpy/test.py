@@ -26,11 +26,16 @@ import numpy as np
 import tensorflow as tf
 
 __all__ = [
+    'Benchmark',
     'TestCase',
 ]
 
 
 # --- Begin Public Functions --------------------------------------------------
+
+
+class Benchmark(tf.test.Benchmark):
+  pass
 
 
 class TestCase(tf.test.TestCase):
@@ -45,35 +50,21 @@ class TestCase(tf.test.TestCase):
     return np.array(a)
 
   @contextlib.contextmanager
-  def assertRaisesWithPredicateMatch(self,
-                                     exception_type,
-                                     expected_err_re_or_predicate):
-    # pylint: disable=g-doc-return-or-yield
-    """Returns a context manager to enclose code expected to raise an exception.
-
-    If the exception is an OpError, the op stack is also included in the message
-    predicate search.
-
-    Args:
-      exception_type: The expected type of exception that should be raised.
-      expected_err_re_or_predicate: If this is callable, it should be a function
-        of one argument that inspects the passed-in exception and returns True
-        (success) or False (please fail the test). Otherwise, the error message
-        is expected to match this regular expression partially.
-
-    Returns:
-      A context manager to surround code that is expected to raise an
-      exception.
-    """
-    # pylint: enable=g-doc-return-or-yield
-    if not tf.executing_eagerly():
-      # Don't test graph mode until we intercept assertions since not
-      # all assertions try to operate statically.
+  def assertRaisesOpError(self, msg):
+    # Numpy backend doesn't raise OpErrors.
+    try:
       yield
-      return
-    with super(TestCase, self).assertRaisesWithPredicateMatch(
-        exception_type, expected_err_re_or_predicate):
-      yield
+      self.fail('No exception raised. Expected exception similar to '
+                'tf.errors.OpError with message: %s' % msg)
+    except Exception:  # pylint: disable=broad-except
+      pass
 
+  def assertEqual(self, first, second, msg=None):
+    if isinstance(first, list) and isinstance(second, tuple):
+      first = tuple(first)
+    if isinstance(first, tuple) and isinstance(second, list):
+      second = tuple(second)
+
+    return super(TestCase, self).assertEqual(first, second, msg)
 
 main = tf.test.main

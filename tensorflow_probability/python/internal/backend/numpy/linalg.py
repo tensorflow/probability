@@ -25,6 +25,8 @@ import tensorflow as tf
 
 from tensorflow_probability.python.internal.backend.numpy.internal import utils
 
+from tensorflow_probability.python.internal.backend.numpy.linear_operator import *  # pylint: disable=wildcard-import
+
 scipy_linalg = utils.try_import('scipy.linalg')
 
 
@@ -32,16 +34,17 @@ __all__ = [
     'band_part',
     'cholesky',
     'cholesky_solve',
+    'det',
     'diag',
     'diag_part',
     'eye',
     'matmul',
     'matrix_transpose',
+    'norm',
     'set_diag',
     'triangular_solve',
     # 'adjoint',
     # 'cross',
-    # 'det',
     # 'eigh',
     # 'eigvalsh',
     # 'einsum',
@@ -79,8 +82,14 @@ def _eye(num_rows, num_columns=None, batch_shape=None,
 
 def _fill_diagonal(input, diagonal, name=None):  # pylint: disable=unused-argument,redefined-builtin
   x = np.array(input).copy()
-  np.fill_diagonal(x, diagonal)
-  return x
+  if np.isscalar(diagonal):
+    np.fill_diagonal(x, diagonal)
+    return x
+  else:
+    diag_inds = np.diag_indices(x.shape[-1])
+    # TODO(iansf): This won't work for jax.
+    x[(slice(None, None, 1),) * len(x.shape[:-2]) + diag_inds] = diagonal
+    return x
 
 
 def _matrix_transpose(a, name='matrix_transpose', conjugate=False):  # pylint: disable=unused-argument
@@ -124,13 +133,17 @@ cholesky_solve = utils.copy_docstring(
     tf.linalg.cholesky_solve,
     lambda chol, rhs, name=None: scipy_linalg.cho_solve((chol, True), rhs))
 
+det = utils.copy_docstring(
+    tf.linalg.det,
+    lambda input, name=None: np.linalg.det(input))
+
 diag = utils.copy_docstring(
     tf.linalg.diag,
     lambda diagonal, name=None: np.diag(diagonal))
 
 diag_part = utils.copy_docstring(
     tf.linalg.diag_part,
-    lambda input, name=None: np.diagonal(input))
+    lambda input, name=None: np.diagonal(input, axis1=-2, axis2=-1))
 
 eye = utils.copy_docstring(
     tf.eye,
@@ -139,6 +152,14 @@ eye = utils.copy_docstring(
 matmul = utils.copy_docstring(
     tf.linalg.matmul,
     _matmul)
+
+norm = utils.copy_docstring(
+    tf.norm,
+    lambda tensor, ord='euclidean', axis=None, keepdims=None, name=None,  # pylint: disable=g-long-lambda
+           keep_dims=None: np.linalg.norm(
+               tensor, ord=2 if ord == 'euclidean' else ord,
+               axis=axis, keepdims=keep_dims)
+)
 
 set_diag = utils.copy_docstring(
     tf.linalg.set_diag,

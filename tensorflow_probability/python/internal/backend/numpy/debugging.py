@@ -12,19 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Numpy implementations of TensorFlow Keras Layers functions."""
+"""Experimental Numpy backend."""
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+# Dependency imports
+
+import tensorflow as tf
+
+from tensorflow_probability.python.internal.backend.numpy.internal import utils
+
 
 __all__ = [
-    'Layer',
+    'Assert',
+    'check_numerics',
 ]
 
 
-# --- Begin Public Functions --------------------------------------------------
+Assert = utils.copy_docstring(  # pylint: disable=invalid-name
+    tf.debugging.Assert,
+    lambda condition, data, summarize=None, name=None: None)
 
 
-class Layer(object):
-  pass
+check_numerics = utils.copy_docstring(
+    tf.debugging.check_numerics,
+    lambda x, *_, **__: x
+)

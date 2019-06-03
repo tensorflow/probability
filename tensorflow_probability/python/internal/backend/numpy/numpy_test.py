@@ -19,7 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import functools
-import logging
+# import logging
 
 # Dependency imports
 
@@ -424,11 +424,22 @@ def _maybe_convert_to_tensors(args):
 
 class NumpyTest(test_case.TestCase, parameterized.TestCase):
 
+  def evaluate(self, tensors):
+    if tf.executing_eagerly():
+      return self._eval_helper(tensors)
+    else:
+      sess = tf.compat.v1.get_default_session()
+      if sess is None:
+        with self.session() as sess:
+          return sess.run(tensors)
+      else:
+        return sess.run(tensors)
+
   @parameterized.named_parameters(NUMPY_TEST_CASES)
   def testLogEmptyTestCases(
       self, tensorflow_function, numpy_function, strategy_list, atol=1e-6):
     if not strategy_list:
-      logging.warning(
+      tf.compat.v1.logging.warning(
           'The test for %s contains no strategies.', numpy_function.__name__)
 
   @parameterized.named_parameters(NUMPY_TEST_CASES)
@@ -437,6 +448,7 @@ class NumpyTest(test_case.TestCase, parameterized.TestCase):
     for strategy in strategy_list:
       @hp.settings(deadline=None,
                    max_examples=10,
+                   database=None,
                    derandomize=True)
       @hp.given(strategy)
       def check_consistency(tf_fn, np_fn, args):

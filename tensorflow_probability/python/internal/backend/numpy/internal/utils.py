@@ -21,6 +21,7 @@ from __future__ import print_function
 import importlib
 import types
 
+import numpy as np
 import tensorflow as tf
 
 
@@ -72,6 +73,11 @@ def common_dtype(args_list, preferred_dtype=None):
   if dtype is None and preferred_dtype is None:
     return None
   return (preferred_dtype if dtype is None else dtype).as_numpy_dtype
+
+
+def is_complex(dtype):
+  """Returns whether this is a complex floating point type."""
+  return np.issubdtype(np.dtype(dtype), np.complex)
 
 
 class _FakeModule(types.ModuleType):

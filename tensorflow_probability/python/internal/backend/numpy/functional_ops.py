@@ -18,39 +18,64 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+# Dependency imports
+import numpy as np
+
 import tensorflow as tf
 
-from tensorflow_probability.python.internal.backend.numpy import v1
-from tensorflow_probability.python.internal.backend.numpy import v2
 from tensorflow_probability.python.internal.backend.numpy.internal import utils
 
 
 __all__ = [
-    'dimension_value',
-    'function',
-    'v1',
-    'v2',
+    'map_fn',
+    'scan',
 ]
 
 
-def _dimension_value(dimension):
-  if dimension is None:
-    return None
-  return int(dimension)
+def _map_fn(  # pylint: disable=unused-argument
+    fn,
+    elems,
+    dtype=None,
+    parallel_iterations=None,
+    back_prop=True,
+    swap_memory=False,
+    infer_shape=True,
+    name=None):
+  return np.array([fn(x) for x in elems])
+
+
+def _scan(  # pylint: disable=unused-argument
+    fn,
+    elems,
+    initializer=None,
+    parallel_iterations=10,
+    back_prop=True,
+    swap_memory=False,
+    infer_shape=True,
+    reverse=False,
+    name=None):
+  """Scan implementation."""
+  out = []
+  if initializer is None:
+    arg = elems[0]
+    elems = elems[1:]
+  else:
+    arg = initializer
+
+  for x in elems:
+    arg = fn(arg, x)
+    out.append(arg)
+  return np.array(out)
 
 
 # --- Begin Public Functions --------------------------------------------------
 
 
-dimension_value = utils.copy_docstring(
-    tf.compat.dimension_value,
-    _dimension_value)
+map_fn = utils.copy_docstring(
+    tf.map_fn,
+    _map_fn)
 
+scan = utils.copy_docstring(
+    tf.scan,
+    _scan)
 
-function = utils.copy_docstring(
-    tf.function,
-    lambda func=None, input_signature=None, autograph=True,  # pylint: disable=g-long-lambda
-           experimental_autograph_options=None,
-           experimental_relax_shapes=False: func)
-
-del tf, utils
