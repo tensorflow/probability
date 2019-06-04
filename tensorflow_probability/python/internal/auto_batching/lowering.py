@@ -275,6 +275,11 @@ def _lower_function_calls_1(
             msg = 'Cannot lower FunctionCallOp that writes to its own input {}.'
             raise ValueError(msg.format(name))
         builder.append_instruction(
+            # Some of the pushees (op.function.vars_in) may be in scope if this
+            # is a self-call.  They may therefore overlap with op.vars_in.  If
+            # so, those values will be copied and/or duplicated.  Insofar as
+            # op.vars_in become dead, some of this will be undone by the
+            # following pop.  This is wasteful but sound.
             inst.push_op(op.vars_in, op.function.vars_in))
         builder.maybe_add_pop(
             # Pop names defined on entry now, to save a stack frame in the

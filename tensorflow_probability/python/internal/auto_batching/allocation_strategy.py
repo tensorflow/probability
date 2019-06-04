@@ -138,12 +138,15 @@ def _optimize_1(graph, live_out, alloc):
       for varname in inst.pattern_traverse(_vars_read_by(op)):
         _variable_is_read(varname, alloc)
       if isinstance(op, inst.FunctionCallOp):
+        callee_writes = _indirectly_writes(op.function)
         for varname in live_out - set(inst.pattern_flatten(op.vars_out)):
-          # TODO(axch): Technically a variable only needs the conservative
-          # storage strategy if it crosses a call to some function that writes
-          # it (e.g., a recursive self-call).  Checking for that here would
-          # require traversing the call graph.
-          _variable_crosses_function_call_boundary(varname, alloc)
+          # A variable only needs the conservative storage strategy if it
+          # crosses a call to some function that writes it (e.g., a recursive
+          # self-call).
+          if varname in callee_writes:
+            _variable_crosses_function_call_boundary(varname, alloc)
+          else:
+            _variable_crosses_block_boundary(varname, alloc)
         _variable_crosses_function_call_boundary(inst.pc_var, alloc)
     if isinstance(block.terminator, inst.BranchOp):
       # TODO(axch): Actually, being read by BranchOp only implies
@@ -153,3 +156,54 @@ def _optimize_1(graph, live_out, alloc):
       _variable_crosses_block_boundary(block.terminator.cond_var, alloc)
     for varname in liveness_map[block].live_out_of_block:
       _variable_crosses_block_boundary(varname, alloc)
+
+
+def _directly_writes(graph):
+  """Set of variables directly written by the given graph."""
+  answer = set()
+  for i in range(graph.exit_index()):
+    block = graph.block(i)
+    for op in block.instructions:
+      if isinstance(op, inst.PrimOp):
+        answer = answer.union(set(inst.pattern_flatten(op.vars_out)))
+      elif isinstance(op, inst.FunctionCallOp):
+        answer = answer.union(set(inst.pattern_flatten(op.vars_out)))
+        # These because the caller writes them before the goto.
+        answer = answer.union(set(inst.pattern_flatten(op.function.vars_in)))
+      elif isinstance(op, inst.PopOp):
+        # If the stack discipline is followed, any local variable will be
+        # written by something before it is ever popped.  Formal parameters are
+        # written by the caller and popped before returning.
+        # Pops should not prevent a variable from being allocated as a register
+        # instead of a full variable, because pops as such do not cause
+        # registers to lose and data that a full variable would have kept.
+        pass
+  return answer
+
+
+def _directly_calls(graph):
+  """Set of Functions directly called by the given graph."""
+  # TODO(axch): Deduplicate this and _directly_writes into a generic CFG
+  # traversal?
+  answer = set()
+  for i in range(graph.exit_index()):
+    block = graph.block(i)
+    for op in block.instructions:
+      if isinstance(op, inst.FunctionCallOp):
+        answer.add(op.function)
+  return answer
+
+
+def _indirectly_writes(function):
+  """Set of variables written by the given function including callees."""
+  queue = [function]
+  visited = set()
+  answer = set()
+  while queue:
+    func = queue.pop()
+    if func in visited:
+      continue
+    visited.add(func)
+    answer = answer.union(_directly_writes(func.graph))
+    queue += list(_directly_calls(func.graph))
+  return answer
