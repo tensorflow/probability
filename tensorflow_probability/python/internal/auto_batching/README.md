@@ -174,15 +174,17 @@ because the system doesn't know how to add a batch dimension to any other data.
 The only way to access non-Tensor objects from within an auto-batched program is
 to store them in Python variables in an enclosing scope. This means either
 module-level globals, or nesting the batched function definition inside a Python
-function.
+function, like [the NUTS implementation](https://github.com/tensorflow/probability/blob/20cb64b5040e2b4dccf32c8e6bf6beccb1fa0696/tensorflow_probability/python/experimental/mcmc/nuts.py#L313-L314).
 
 **_Everything_ is a Tensor**: Auto-batched programs actually have more
 variables than meets the eye. This is because the system as currently written
 conservatively introduces temporary variables for all subexpressions everywhere
 in the program (working on it). So all operations that produce non-Tensors as
 intermediaries have to either be lifted out of the auto-batched scope, or hidden
-in non-auto-batched helper functions. This particularly gets module and class
-member references.
+in non-auto-batched helper functions. The NUTS implementation is written in this
+style, e.g., [here](https://github.com/tensorflow/probability/blob/20cb64b5040e2b4dccf32c8e6bf6beccb1fa0696/tensorflow_probability/python/experimental/mcmc/nuts.py#L388-L389).
+This particularly gets module and class member references, which have to be
+[aliased](https://github.com/tensorflow/probability/blob/20cb64b5040e2b4dccf32c8e6bf6beccb1fa0696/tensorflow_probability/python/experimental/mcmc/nuts.py#L55-L56).
 
 **Cross-rank broadcasting**: Auto-batching requires that dimension 0
 be the batch dimension of every Tensor it sees. Thus, code that relied on
@@ -206,5 +208,7 @@ yet.
 function calls) cannot read and write the same auto-batched variables
 (yet). This means it is sometimes necessary to introduce explicit temporaries to
 make sure that every operation writes a different variable from those it
-reads. The temporaries cost nothing at runtime, but they still have to appear in
-the source.
+reads, like
+[here](https://github.com/tensorflow/probability/blob/20cb64b5040e2b4dccf32c8e6bf6beccb1fa0696/tensorflow_probability/python/experimental/mcmc/nuts.py#L380).
+The temporaries cost nothing at runtime, but they still have to appear in the
+source.
