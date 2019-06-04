@@ -22,9 +22,43 @@ import collections
 # Dependency imports
 import tensorflow as tf
 
+from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
+
 from tensorflow_probability.python import mcmc
 from tensorflow_probability.python.sts.internal import util as sts_util
+
+
+def _build_inference_bijector(parameter):
+  """Return a scaling-and-support bijector for inference.
+
+  By default, this is just `param.bijector`, which transforms a real-value input
+  to the parameter's support.
+
+  For scale parameters (heuristically detected as any param with a Softplus
+  support bijector), we also rescale by the prior stddev. This is
+  approximately equivalent to performing inference on a standardized input
+  `observed_time_series/stddev(observed_time_series)`, because:
+   a) rescaling all the scale parameters is equivalent (gives equivalent
+      forecasts, etc) to rescaling the `observed_time_series`.
+   b) the default scale priors in STS components have stddev proportional to
+     `stddev(observed_time_series)`.
+
+  Args:
+    parameter: `sts.Parameter` named tuple instance.
+  Returns:
+    bijector: a `tfb.Bijector` instance to use in inference.
+  """
+  if isinstance(parameter.bijector, tfb.Softplus):
+    try:
+      # Use mean + stddev, rather than just stddev, to ensure a reasonable
+      # init if the user passes a crazy custom prior like N(100000, 0.001).
+      prior_scale = tf.abs(parameter.prior.mean()) + parameter.prior.stddev()
+      return tfb.Chain([tfb.AffineScalar(scale=prior_scale),
+                        parameter.bijector])
+    except NotImplementedError:  # Custom prior with no mean and/or stddev.
+      pass
+  return parameter.bijector
 
 
 def sample_uniform_initial_state(parameter,
@@ -57,7 +91,7 @@ def sample_uniform_initial_state(parameter,
       dtype=unconstrained_prior_sample.dtype,
       seed=seed) - 2
   if return_constrained:
-    return parameter.bijector.forward(uniform_initializer)
+    return _build_inference_bijector(parameter).forward(uniform_initializer)
   else:
     return uniform_initializer
 
@@ -86,7 +120,7 @@ def _build_trainable_posterior(param, initial_loc_fn):
         q, reinterpreted_batch_ndims=param.prior.event_shape.ndims)
 
   # Transform to constrained parameter space.
-  return tfd.TransformedDistribution(q, param.bijector)
+  return tfd.TransformedDistribution(q, _build_inference_bijector(param))
 
 
 def build_factored_variational_loss(model,
@@ -237,9 +271,8 @@ def build_factored_variational_loss(model,
     for param in model.parameters:
       def initial_loc_fn(param):
         return sample_uniform_initial_state(
-            param, return_constrained=True,
-            init_sample_shape=init_batch_shape,
-            seed=seed())
+            param, init_sample_shape=init_batch_shape,
+            return_constrained=False, seed=seed())
       q = _build_trainable_posterior(param, initial_loc_fn=initial_loc_fn)
       variational_distributions[param.name] = q
       variational_samples.append(q.sample(seed=seed()))
@@ -528,7 +561,8 @@ def fit_with_hmc(model,
                     num_leapfrog_steps=num_leapfrog_steps,
                     state_gradients_are_stopped=True,
                     seed=seed()),
-                bijector=[param.bijector for param in model.parameters]),
+                bijector=[_build_inference_bijector(param)
+                          for param in model.parameters]),
             num_adaptation_steps=int(num_warmup_steps * 0.8),
             adaptation_rate=tf.convert_to_tensor(
                 value=0.1, dtype=initial_state[0].dtype)),
