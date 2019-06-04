@@ -12,25 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Description:
-#   API-unstable code that is part of the TFP package.
+"""TensorFlow Probability Google-internal NUTS package.
+"""
 
-package(
-    default_visibility = [
-        "//tensorflow_probability:__subpackages__",
-    ],
-)
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 
-licenses(["notice"])  # Apache 2.0
+from tensorflow_probability.python.experimental.mcmc import nuts
+from tensorflow_probability.python.experimental.mcmc.nuts import NoUTurnSampler
 
-exports_files(["LICENSE"])
+from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
-py_library(
-    name = "experimental",
-    srcs = ["__init__.py"],
-    srcs_version = "PY2AND3",
-    deps = [
-        "//tensorflow_probability/python/experimental/mcmc",
-        "//tensorflow_probability/python/internal/auto_batching",
-    ],
-)
+_allowed_symbols = [
+    'nuts',
+    'NoUTurnSampler',
+]
+
+remove_undocumented(__name__, _allowed_symbols)
