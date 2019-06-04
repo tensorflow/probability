@@ -49,7 +49,7 @@ import tensorflow as tf
 from tensorflow_probability.python import distributions
 from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python import mcmc
-from tensorflow_probability.python.internal import auto_batching as ab
+from tensorflow_probability.python.experimental import auto_batching as ab
 
 
 # TODO(axch): Sensibly support field references from auto-batched code

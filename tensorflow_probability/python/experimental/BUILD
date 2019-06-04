@@ -30,7 +30,18 @@ py_library(
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":auto_batching",
         "//tensorflow_probability/python/experimental/mcmc",
+        "//tensorflow_probability/python/internal/auto_batching",
+    ],
+)
+
+# This module is a redirect to python/internal
+py_library(
+    name = "auto_batching",
+    srcs = ["auto_batching.py"],
+    srcs_version = "PY2AND3",
+    deps = [
         "//tensorflow_probability/python/internal/auto_batching",
     ],
 )
