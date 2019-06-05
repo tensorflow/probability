@@ -55,7 +55,7 @@ landing_page:
         # Fit model given data.
         coeffs, linear_response, is_converged, num_iter = tfp.glm.fit(
             model_matrix=features[:, tf.newaxis],
-            response=tf.to_float(labels),
+            response=tf.cast(labels, dtype=tf.float32),
             model=model)
         # ==> coeffs is approximately [1.618] (We're golden!)
         </pre>
