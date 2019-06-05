@@ -553,7 +553,7 @@ class ParametersTest(tf.test.TestCase):
 @test_util.run_all_in_graph_and_eager_modes
 class TfModuleTest(tf.test.TestCase):
 
-  def variable_tracking_works(self):
+  def test_variable_tracking_works(self):
     scale = tf.Variable(1.)
     normal = tfd.Normal(loc=0, scale=scale, validate_args=True)
     self.assertIsInstance(normal, tf.Module)
