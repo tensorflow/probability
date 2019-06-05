@@ -45,6 +45,29 @@ py_library(
 )
 
 py_library(
+    name = "docstring_util",
+    srcs = [
+        "docstring_util.py",
+    ],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "docstring_util_test",
+    size = "small",
+    srcs = ["docstring_util_test.py"],
+    deps = [
+        ":docstring_util",
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_library(
     name = "dtype_util",
     srcs = ["dtype_util.py"],
     srcs_version = "PY2AND3",

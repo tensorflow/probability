@@ -31,30 +31,4 @@ py_library(
     name = "util",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
-    deps = [
-        ":docstring",
-    ],
-)
-
-py_library(
-    name = "docstring",
-    srcs = [
-        "docstring.py",
-    ],
-    srcs_version = "PY2AND3",
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-    ],
-)
-
-py_test(
-    name = "docstring_test",
-    size = "small",
-    srcs = ["docstring_test.py"],
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-    ],
 )

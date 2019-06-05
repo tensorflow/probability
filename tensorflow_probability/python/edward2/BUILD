@@ -47,6 +47,7 @@ py_library(
         ":interceptor",
         ":random_variable",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:docstring_util",
     ],
 )
 

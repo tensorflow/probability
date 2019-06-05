@@ -234,6 +234,7 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:docstring_util",
         "//tensorflow_probability/python/sts/internal",
     ],
 )

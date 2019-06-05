@@ -25,8 +25,7 @@ import six
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.edward2.interceptor import interceptable
 from tensorflow_probability.python.edward2.random_variable import RandomVariable
-
-from tensorflow_probability.python.util import docstring as docstring_util
+from tensorflow_probability.python.internal import docstring_util
 
 
 # Dictionary between RV names and their original TFP distribution.

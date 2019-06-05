@@ -20,7 +20,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 
-from tensorflow_probability.python.util import docstring as docstring_util
+from tensorflow_probability.python.internal import docstring_util
 
 
 class DocstringUtil(tf.test.TestCase):
