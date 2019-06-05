@@ -294,7 +294,7 @@ class DistributionLambdaSerializationTest(tf.test.TestCase):
     dtype = model.input.dtype.as_numpy_dtype()
 
     model_file = self.create_tempfile()
-    model.save(model_file.full_path)
+    model.save(model_file.full_path, save_format='h5')
     model_copy = tfk.models.load_model(model_file.full_path)
 
     x = np.random.uniform(-3., 3., input_shape).astype(dtype)
@@ -760,7 +760,7 @@ class _IndependentLayerTest(object):
     ])
 
     model_file = self.create_tempfile()
-    model.save(model_file.full_path)
+    model.save(model_file.full_path, save_format='h5')
     model_copy = tfk.models.load_model(model_file.full_path)
 
     self.assertAllEqual(self.evaluate(model(x).mean()),
@@ -1118,7 +1118,7 @@ class _MixtureLayerTest(object):
     ])
 
     model_file = self.create_tempfile()
-    model.save(model_file.full_path)
+    model.save(model_file.full_path, save_format='h5')
     model_copy = tfk.models.load_model(model_file.full_path)
 
     self.assertAllEqual(self.evaluate(model(x).mean()),
