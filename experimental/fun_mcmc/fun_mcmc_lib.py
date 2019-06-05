@@ -42,7 +42,7 @@ from __future__ import print_function
 import collections
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from typing import Any, Callable, Mapping, Optional, Sequence, Text, Tuple, Union
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
@@ -56,6 +56,7 @@ __all__ = [
     'call_and_grads',
     'call_fn',
     'hamiltonian_monte_carlo',
+    'hamiltonian_monte_carlo_init',
     'HamiltonianMonteCarloExtra',
     'HamiltonianMonteCarloState',
     'IntegratorStepState',
@@ -88,7 +89,8 @@ PotentialFn = Union[Callable[[TensorNest], Tuple[tf.Tensor, TensorNest]],
 
 
 def trace(state: State, fn: TransitionOperator, num_steps: IntTensor,
-          trace_fn: Callable[[State, TensorNest], TensorNest]
+          trace_fn: Callable[[State, TensorNest], TensorNest],
+          parallel_iterations: int = 10,
          ) -> Tuple[State, TensorNest]:
   """`TransitionOperator` that runs `fn` repeatedly and traces its outputs.
 
@@ -98,32 +100,75 @@ def trace(state: State, fn: TransitionOperator, num_steps: IntTensor,
     num_steps: Number of steps to run the function for. Must be greater than 1.
     trace_fn: Callable that the unpacked outputs of `fn` and returns a nest of
       `Tensor`s. These will be stacked and returned.
+    parallel_iterations: Number of iterations of the while loop to run in
+      parallel.
 
   Returns:
     state: The final state returned by `fn`.
     traces: Stacked outputs of `trace_fn`.
   """
+  state = tf.nest.map_structure(
+      lambda t: t if t is None else tf.convert_to_tensor(t), state)
 
-  def fn_wrapper(args, _):
-    return tf.nest.map_structure(tf.convert_to_tensor, call_fn(fn, args[0]))
+  def wrapper(state):
+    state, extra = tf.nest.map_structure(tf.convert_to_tensor,
+                                         call_fn(fn, state))
+    trace_element = tf.nest.map_structure(tf.convert_to_tensor,
+                                          trace_fn(state, extra))
+    return state, trace_element
 
-  def trace_fn_wrapper(args):
-    return tf.nest.map_structure(tf.convert_to_tensor, call_fn(trace_fn, args))
+  if any(e is None for e in tf.nest.flatten(state)) or tf.executing_eagerly():
+    state, first_trace = wrapper(state)
+    trace_arrays = tf.nest.map_structure(
+        lambda v: tf.TensorArray(  # pylint: disable=g-long-lambda
+            v.dtype, size=num_steps, element_shape=v.shape).write(0, v),
+        first_trace)
+    start_idx = 1
+  else:
+    state_spec = tf.nest.map_structure(tf.TensorSpec.from_tensor, state)
+    # We need the shapes and dtypes of the outputs of `wrapper` function to
+    # create the `TensorArray`s, we can get it by pre-compiling the wrapper
+    # function.
+    wrapper = tf.function(autograph=False)(wrapper)
+    concrete_wrapper = wrapper.get_concrete_function(state_spec)
+    _, trace_dtypes = concrete_wrapper.output_dtypes
+    _, trace_shapes = concrete_wrapper.output_shapes
+    trace_arrays = tf.nest.map_structure(
+        lambda dtype, shape: tf.TensorArray(  # pylint: disable=g-long-lambda
+            dtype,
+            size=num_steps,
+            element_shape=shape),
+        trace_dtypes,
+        trace_shapes)
+    wrapper = lambda state: concrete_wrapper(*tf.nest.flatten(state))
+    start_idx = 0
 
-  state_and_extra = fn_wrapper((state, None), None)
-  first_trace = trace_fn_wrapper(state_and_extra)
+  def body(i, state, trace_arrays):
+    state, trace_element = wrapper(state)
+    trace_arrays = tf.nest.map_structure(lambda a, v: a.write(i, v),
+                                         trace_arrays, trace_element)
+    return i + 1, state, trace_arrays
 
-  state_and_extra, full_trace = mcmc_util.trace_scan(
-      fn_wrapper,
-      state_and_extra,
-      tf.ones(num_steps - 1),
-      trace_fn=trace_fn_wrapper)
+  def cond(i, *_):
+    return i < num_steps
 
-  prepend = lambda x, y: tf.concat(  # pylint: disable=g-long-lambda
-      [tf.convert_to_tensor(value=x)[tf.newaxis], y], 0)
+  _, state, trace_arrays = tf.while_loop(
+      cond=cond,
+      body=body,
+      loop_vars=(start_idx, state, trace_arrays),
+      parallel_iterations=parallel_iterations)
 
-  return state_and_extra[0], tf.nest.map_structure(prepend, first_trace,
-                                                   full_trace)
+  stacked_trace = tf.nest.map_structure(lambda x: x.stack(), trace_arrays)
+
+  static_length = tf.get_static_value(num_steps)
+
+  def _merge_static_length(x):
+    x.set_shape(tf.TensorShape(static_length).concatenate(x.shape[1:]))
+    return x
+
+  stacked_trace = tf.nest.map_structure(_merge_static_length, stacked_trace)
+
+  return state, stacked_trace
 
 
 def call_fn(fn: TransitionOperator,
@@ -140,7 +185,6 @@ def call_fn(fn: TransitionOperator,
   Returns:
     ret: Return value of `fn`.
   """
-
   if isinstance(
       args, collections.Sequence) and not mcmc_util.is_namedtuple_like(args):
     args = args  # type: Tuple[Any]
@@ -526,9 +570,22 @@ def metropolis_hastings_step(current_state: State,
 
 
 # state_extra is not a true state, but here for convenience.
-HamiltonianMonteCarloState = collections.namedtuple(
-    'HamiltonianMonteCarloState',
-    'state, state_grads, target_log_prob, state_extra')
+class HamiltonianMonteCarloState(
+    collections.namedtuple(
+        'HamiltonianMonteCarloState',
+        'state, state_grads, target_log_prob, state_extra')):
+  """State of `hamiltonian_monte_carlo`."""
+  __slots__ = ()
+
+  def __new__(cls,
+              state,
+              state_grads=None,
+              target_log_prob=None,
+              state_extra=None):
+    return super(HamiltonianMonteCarloState,
+                 cls).__new__(cls, state, state_grads, target_log_prob,
+                              state_extra)
+
 
 HamiltonianMonteCarloExtra = collections.namedtuple(
     'HamiltonianMonteCarloExtra',
@@ -536,6 +593,24 @@ HamiltonianMonteCarloExtra = collections.namedtuple(
     'proposed_hmc_state')
 
 MomentumSampleFn = Union[Callable[[State], State], Callable[..., State]]
+
+
+def hamiltonian_monte_carlo_init(state: TensorNest,
+                                 target_log_prob_fn: PotentialFn
+                                ) -> HamiltonianMonteCarloState:
+  """Initializes the `HamiltonianMonteCarloState`.
+
+  Args:
+    state: State of the chain.
+    target_log_prob_fn: Target log prob fn.
+
+  Returns:
+    hmc_state: State of the `hamiltonian_monte_carlo` `TransitionOperator`.
+  """
+  target_log_prob, state_extra, state_grads = call_and_grads(
+      target_log_prob_fn, tf.nest.map_structure(tf.convert_to_tensor, state))
+  return HamiltonianMonteCarloState(state, state_grads, target_log_prob,
+                                    state_extra)
 
 
 def hamiltonian_monte_carlo(
@@ -584,11 +659,7 @@ def hamiltonian_monte_carlo(
       seed=tfp_test_util.test_seed()))
 
   _, chain = fun_mcmc.trace(
-      state=fun_mcmc.HamiltonianMonteCarloState(
-          state=state,
-          state_grads=None,
-          target_log_prob=None,
-          state_extra=None),
+      state=fun_mcmc.hamiltonian_monte_carlo_init(state, target_log_prob_fn),
       fn=kernel,
       num_steps=num_steps,
       trace_fn=lambda state, extra: state.state_extra[0])
@@ -613,6 +684,9 @@ def hamiltonian_monte_carlo(
     hmc_state: HamiltonianMonteCarloState
     hmc_extra: HamiltonianMonteCarloExtra
   """
+  if any(e is None for e in tf.nest.flatten(hmc_state)):
+    hmc_state = hamiltonian_monte_carlo_init(hmc_state.state,
+                                             target_log_prob_fn)
   state = hmc_state.state
   state_grads = hmc_state.state_grads
   target_log_prob = hmc_state.target_log_prob
@@ -634,17 +708,11 @@ def hamiltonian_monte_carlo(
       ret = tf.nest.map_structure(
           lambda x: tf.random.normal(tf.shape(input=x), dtype=x.dtype),
           momentum)
-      if len(ret) == 1:
-        return ret[0]
-      else:
-        return ret
+      return tf.nest.pack_sequence_as(state, tf.nest.flatten(ret))
 
   if momentum is None:
     momentum = call_fn(momentum_sample_fn,
                        tf.nest.map_structure(tf.zeros_like, state))
-  if target_log_prob is None:
-    target_log_prob, state_extra, state_grads = call_and_grads(
-        target_log_prob_fn, state)
 
   kinetic_energy, _ = call_fn(kinetic_energy_fn, momentum)
   current_energy = -target_log_prob + kinetic_energy
@@ -665,16 +733,14 @@ def hamiltonian_monte_carlo(
         target_log_prob_fn=target_log_prob_fn,
         kinetic_energy_fn=kinetic_energy_fn)
 
-    return [
-        integrator_step_state, integrator_extra.target_log_prob,
-        integrator_extra.state_extra
-    ], integrator_extra
+    return (integrator_step_state, integrator_extra.target_log_prob,
+            integrator_extra.state_extra), integrator_extra
 
   def integrator_trace_wrapper_fn(args, integrator_extra):
     return integrator_trace_fn(args[0], integrator_extra)
 
-  integrator_wrapper_state = (IntegratorStepState(state, state_grads, momentum),
-                              target_log_prob, state_extra)
+  integrator_wrapper_state = (IntegratorStepState(
+      state, state_grads, momentum), target_log_prob, state_extra)
 
   [integrator_step_state, target_log_prob,
    state_extra], integrator_trace = trace(

@@ -22,7 +22,7 @@ from __future__ import print_function
 from absl.testing import parameterized
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from experimental import fun_mcmc
@@ -32,6 +32,10 @@ from tensorflow.python.framework import test_util  # pylint: disable=g-direct-te
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
+
+
+def _no_compile(fn):
+  return fn
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -231,11 +235,7 @@ class FunMCMCTest(tf.test.TestCase, parameterized.TestCase):
         seed=tfp_test_util.test_seed()))
 
     _, chain = fun_mcmc.trace(
-        state=fun_mcmc.HamiltonianMonteCarloState(
-            state=state,
-            state_grads=None,
-            target_log_prob=None,
-            state_extra=None),
+        state=fun_mcmc.HamiltonianMonteCarloState(state),
         fn=kernel,
         num_steps=num_steps,
         trace_fn=lambda state, extra: state.state_extra[0])
@@ -251,6 +251,71 @@ class FunMCMCTest(tf.test.TestCase, parameterized.TestCase):
     self.assertAllClose(true_mean, sample_mean, rtol=0.1, atol=0.1)
     self.assertAllClose(true_cov, sample_cov, rtol=0.1, atol=0.1)
 
+  @parameterized.parameters(
+      (tf.function, 1),
+      (_no_compile, 3)
+  )
+  def testHMCCountTargetLogProb(self, compile_fn, expected_count):
+    if not tf.executing_eagerly():
+      return
+
+    counter = [0]
+    @compile_fn
+    def target_log_prob_fn(x):
+      counter[0] += 1
+      return -tf.square(x), []
+
+    # pylint: disable=g-long-lambda
+    @tf.function
+    def trace():
+      kernel = lambda state: fun_mcmc.hamiltonian_monte_carlo(
+          state,
+          step_size=0.1,
+          num_integrator_steps=3,
+          target_log_prob_fn=target_log_prob_fn,
+          seed=tfp_test_util.test_seed())
+
+      fun_mcmc.trace(
+          state=fun_mcmc.HamiltonianMonteCarloState(tf.zeros([1])),
+          fn=kernel,
+          num_steps=4,
+          trace_fn=lambda *args: ())
+    trace()
+
+    self.assertEqual(expected_count, counter[0])
+
+  def testHMCCountTargetLogProbEfficient(self):
+    if not tf.executing_eagerly():
+      return
+
+    counter = [0]
+    def target_log_prob_fn(x):
+      counter[0] += 1
+      return -tf.square(x), []
+
+    @tf.function
+    def trace():
+      # pylint: disable=g-long-lambda
+      kernel = lambda state: fun_mcmc.hamiltonian_monte_carlo(
+          state,
+          step_size=0.1,
+          num_integrator_steps=3,
+          target_log_prob_fn=target_log_prob_fn,
+          seed=tfp_test_util.test_seed())
+
+      fun_mcmc.trace(
+          state=fun_mcmc.hamiltonian_monte_carlo_init(
+              state=tf.zeros([1]),
+              target_log_prob_fn=target_log_prob_fn
+          ),
+          fn=kernel,
+          num_steps=4,
+          trace_fn=lambda *args: ())
+
+    trace()
+
+    self.assertEqual(2, counter[0])
+
   def testAdaptiveStepSize(self):
     if not tf.executing_eagerly():
       return
@@ -263,56 +328,58 @@ class FunMCMCTest(tf.test.TestCase, parameterized.TestCase):
     base_mean = [1., 0]
     base_cov = [[1, 0.5], [0.5, 1]]
 
-    bijector = tfb.Softplus()
-    base_dist = tfd.MultivariateNormalFullCovariance(
-        loc=base_mean, covariance_matrix=base_cov)
-    target_dist = bijector(base_dist)
-
-    def orig_target_log_prob_fn(x):
-      return target_dist.log_prob(x), ()
-
-    target_log_prob_fn, state = fun_mcmc.transform_log_prob_fn(
-        orig_target_log_prob_fn, bijector, state)
-
     @tf.function
-    def kernel(hmc_state, step_size, step):
-      hmc_state, hmc_extra = fun_mcmc.hamiltonian_monte_carlo(
-          hmc_state,
-          step_size=step_size,
-          num_integrator_steps=num_leapfrog_steps,
-          target_log_prob_fn=target_log_prob_fn)
+    def computation(state):
+      bijector = tfb.Softplus()
+      base_dist = tfd.MultivariateNormalFullCovariance(
+          loc=base_mean, covariance_matrix=base_cov)
+      target_dist = bijector(base_dist)
 
-      rate = tf.compat.v1.train.polynomial_decay(
-          0.01,
-          global_step=step,
-          power=0.5,
-          decay_steps=num_adapt_steps,
-          end_learning_rate=0.)
-      mean_p_accept = tf.reduce_mean(
-          input_tensor=tf.exp(tf.minimum(0., hmc_extra.log_accept_ratio)))
-      step_size = fun_mcmc.sign_adaptation(
-          step_size, output=mean_p_accept, set_point=0.9, adaptation_rate=rate)
+      def orig_target_log_prob_fn(x):
+        return target_dist.log_prob(x), ()
 
-      return (hmc_state, step_size, step + 1), hmc_extra
+      target_log_prob_fn, state = fun_mcmc.transform_log_prob_fn(
+          orig_target_log_prob_fn, bijector, state)
 
-    _, (chain, log_accept_ratio_trace) = fun_mcmc.trace(
-        (fun_mcmc.HamiltonianMonteCarloState(
-            state=state,
-            state_grads=None,
-            target_log_prob=None,
-            state_extra=None), step_size, 0),
-        kernel,
-        num_adapt_steps + num_steps,
-        trace_fn=lambda state, extra: (state[0].state_extra[0], extra.
-                                       log_accept_ratio))
+      def kernel(hmc_state, step_size, step):
+        hmc_state, hmc_extra = fun_mcmc.hamiltonian_monte_carlo(
+            hmc_state,
+            step_size=step_size,
+            num_integrator_steps=num_leapfrog_steps,
+            target_log_prob_fn=target_log_prob_fn)
+
+        rate = tf.compat.v1.train.polynomial_decay(
+            0.01,
+            global_step=step,
+            power=0.5,
+            decay_steps=num_adapt_steps,
+            end_learning_rate=0.)
+        mean_p_accept = tf.reduce_mean(
+            input_tensor=tf.exp(tf.minimum(0., hmc_extra.log_accept_ratio)))
+        step_size = fun_mcmc.sign_adaptation(
+            step_size,
+            output=mean_p_accept,
+            set_point=0.9,
+            adaptation_rate=rate)
+
+        return (hmc_state, step_size, step + 1), hmc_extra
+
+      _, (chain, log_accept_ratio_trace) = fun_mcmc.trace(
+          (fun_mcmc.HamiltonianMonteCarloState(state), step_size, 0),
+          kernel,
+          num_adapt_steps + num_steps,
+          trace_fn=lambda state, extra: (state[0].state_extra[0], extra.
+                                         log_accept_ratio))
+      true_samples = target_dist.sample(4096, seed=tfp_test_util.test_seed())
+      return chain, log_accept_ratio_trace, true_samples
+
+    chain, log_accept_ratio_trace, true_samples = computation(state)
 
     log_accept_ratio_trace = log_accept_ratio_trace[num_adapt_steps:]
     chain = chain[num_adapt_steps:]
 
     sample_mean = tf.reduce_mean(input_tensor=chain, axis=[0, 1])
     sample_cov = tfp.stats.covariance(chain, sample_axis=[0, 1])
-
-    true_samples = target_dist.sample(4096, seed=tfp_test_util.test_seed())
 
     true_mean = tf.reduce_mean(input_tensor=true_samples, axis=0)
     true_cov = tfp.stats.covariance(chain, sample_axis=[0, 1])

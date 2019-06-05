@@ -23,6 +23,7 @@ from experimental.fun_mcmc.fun_mcmc_lib import blanes_4_stage_step
 from experimental.fun_mcmc.fun_mcmc_lib import call_and_grads
 from experimental.fun_mcmc.fun_mcmc_lib import call_fn
 from experimental.fun_mcmc.fun_mcmc_lib import hamiltonian_monte_carlo
+from experimental.fun_mcmc.fun_mcmc_lib import hamiltonian_monte_carlo_init
 from experimental.fun_mcmc.fun_mcmc_lib import HamiltonianMonteCarloExtra
 from experimental.fun_mcmc.fun_mcmc_lib import HamiltonianMonteCarloState
 from experimental.fun_mcmc.fun_mcmc_lib import IntegratorStepState
@@ -45,6 +46,7 @@ __all__ = [
     'call_and_grads',
     'call_fn',
     'hamiltonian_monte_carlo',
+    'hamiltonian_monte_carlo_init',
     'HamiltonianMonteCarloExtra',
     'HamiltonianMonteCarloState',
     'IntegratorStepState',
