@@ -44,7 +44,7 @@ class ChainBijectorTest(tf.test.TestCase):
 
   def testBijector(self):
     chain = tfb.Chain((tfb.Exp(), tfb.Softplus()))
-    self.assertEqual("chain_of_exp_of_softplus", chain.name)
+    self.assertStartsWith(chain.name, "chain_of_exp_of_softplus")
     x = np.asarray([[[1., 2.],
                      [2., 3.]]])
     self.assertAllClose(1. + np.exp(x), self.evaluate(chain.forward(x)))
@@ -58,7 +58,7 @@ class ChainBijectorTest(tf.test.TestCase):
 
   def testBijectorIdentity(self):
     chain = tfb.Chain()
-    self.assertEqual("identity", chain.name)
+    self.assertStartsWith(chain.name, "identity")
     x = np.asarray([[[1., 2.],
                      [2., 3.]]])
     self.assertAllClose(x, self.evaluate(chain.forward(x)))

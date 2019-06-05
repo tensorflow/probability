@@ -128,13 +128,13 @@ class BlockwiseBijectorTest(tf.test.TestCase, parameterized.TestCase):
     sp = tfb.Softplus()
     aff = tfb.Affine(scale_diag=[2., 3., 4.])
     blockwise = tfb.Blockwise(bijectors=[exp, sp, aff], block_sizes=[2, 1, 3])
-    self.assertEqual('blockwise_of_exp_and_softplus_and_affine',
-                     blockwise.name)
+    self.assertStartsWith(blockwise.name,
+                          'blockwise_of_exp_and_softplus_and_affine')
 
   def testNameOneBijector(self):
     exp = tfb.Exp()
     blockwise = tfb.Blockwise(bijectors=[exp], block_sizes=[3])
-    self.assertEqual('blockwise_of_exp', blockwise.name)
+    self.assertStartsWith(blockwise.name, 'blockwise_of_exp')
 
   def testRaisesEmptyBijectors(self):
     with self.assertRaisesRegexp(ValueError, '`bijectors` must not be empty'):

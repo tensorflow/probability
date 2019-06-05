@@ -50,7 +50,7 @@ class SoftplusBijectorTest(tf.test.TestCase):
 
   def testBijectorForwardInverseEventDimsZero(self):
     bijector = tfb.Softplus()
-    self.assertEqual("softplus", bijector.name)
+    self.assertStartsWith(bijector.name, "softplus")
     x = 2 * rng.randn(2, 10)
     y = self._softplus(x)
 
@@ -78,7 +78,7 @@ class SoftplusBijectorTest(tf.test.TestCase):
 
   def testBijectorForwardInverseEventDimsOne(self):
     bijector = tfb.Softplus()
-    self.assertEqual("softplus", bijector.name)
+    self.assertStartsWith(bijector.name, "softplus")
     x = 2 * rng.randn(2, 10)
     y = self._softplus(x)
 

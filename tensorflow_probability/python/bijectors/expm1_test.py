@@ -33,7 +33,7 @@ class Expm1BijectorTest(tf.test.TestCase):
 
   def testBijector(self):
     bijector = tfb.Expm1()
-    self.assertEqual("expm1", bijector.name)
+    self.assertStartsWith(bijector.name, "expm1")
     x = [[[-1.], [1.4]]]
     y = np.expm1(x)
     self.assertAllClose(y, self.evaluate(bijector.forward(x)))

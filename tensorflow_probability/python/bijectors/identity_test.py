@@ -32,7 +32,7 @@ class IdentityTest(tf.test.TestCase):
 
   def testBijector(self):
     bijector = tfb.Identity(validate_args=True)
-    self.assertEqual("identity", bijector.name)
+    self.assertStartsWith(bijector.name, "identity")
     x = [[[0.], [1.]]]
     self.assertAllEqual(x, self.evaluate(bijector.forward(x)))
     self.assertAllEqual(x, self.evaluate(bijector.inverse(x)))

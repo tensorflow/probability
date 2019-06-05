@@ -25,7 +25,8 @@ import weakref
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
@@ -38,7 +39,7 @@ def try_import(name):
   try:
     return importlib.import_module(name)
   except ImportError as e:
-    tf.compat.v1.logging.warning(
+    tf1.logging.warning(
         "Could not import {}: {}.".format(name, str(e)))
     return None
 
@@ -69,7 +70,7 @@ class BaseBijectorTest(tf.test.TestCase):
     self.assertEqual(False, bij.is_constant_jacobian)
     self.assertEqual(False, bij.validate_args)
     self.assertEqual(None, bij.dtype)
-    self.assertEqual("bare_bones_bijector", bij.name)
+    self.assertStartsWith(bij.name, "bare_bones_bijector")
 
     for shape in [[], [1, 2], [1, 2, 3]]:
       forward_event_shape_ = self.evaluate(
@@ -193,12 +194,12 @@ class BijectorTestEventNdims(tf.test.TestCase):
   def testBijectorDynamicEventNdims(self):
     with self.assertRaisesError("Expected scalar"):
       bij = ExpOnlyJacobian(validate_args=True)
-      event_ndims = tf.compat.v1.placeholder_with_default((1, 2), shape=None)
+      event_ndims = tf1.placeholder_with_default((1, 2), shape=None)
       self.evaluate(
           bij.forward_log_det_jacobian(1., event_ndims=event_ndims))
     with self.assertRaisesError("Expected scalar"):
       bij = ExpOnlyJacobian(validate_args=True)
-      event_ndims = tf.compat.v1.placeholder_with_default((1, 2), shape=None)
+      event_ndims = tf1.placeholder_with_default((1, 2), shape=None)
       self.evaluate(
           bij.inverse_log_det_jacobian(1., event_ndims=event_ndims))
 
@@ -329,8 +330,8 @@ class BijectorReduceEventDimsTest(tf.test.TestCase):
 
   def testHandlesNonStaticEventNdims(self):
     x_ = [[[1., 2.], [3., 4.]]]
-    x = tf.compat.v1.placeholder_with_default(x_, shape=None)
-    event_ndims = tf.compat.v1.placeholder_with_default(1, shape=None)
+    x = tf1.placeholder_with_default(x_, shape=None)
+    event_ndims = tf1.placeholder_with_default(1, shape=None)
     bij = ExpOnlyJacobian(forward_min_event_ndims=1)
     bij.inverse_log_det_jacobian(x, event_ndims=event_ndims)
     ildj = self.evaluate(
@@ -401,8 +402,8 @@ class BijectorLDJCachingTest(tf.test.TestCase):
     # Exercise the scenario outlined in
     # https://github.com/tensorflow/probability/issues/253 (originally reported
     # internally as b/119756336).
-    x1 = tf.compat.v1.placeholder(tf.float32, shape=[None, 2], name="x1")
-    x2 = tf.compat.v1.placeholder(tf.float32, shape=[None, 2], name="x2")
+    x1 = tf1.placeholder(tf.float32, shape=[None, 2], name="x1")
+    x2 = tf1.placeholder(tf.float32, shape=[None, 2], name="x2")
 
     bij = ConstantJacobian()
 
@@ -458,13 +459,13 @@ class NumpyArrayCaching(tf.test.TestCase):
     # converted to tf.Tensor objects.
 
     with mock.patch.object(tf, "convert_to_tensor", return_value=x_):
-      with mock.patch.object(tf.compat.v2, "exp", return_value=y_):
+      with mock.patch.object(tf, "exp", return_value=y_):
         y = b.forward(x_)
         self.assertIsInstance(y, np.ndarray)
         self.assertAllEqual([x_], [k() for k in b._from_x.keys()])
 
     with mock.patch.object(tf, "convert_to_tensor", return_value=y_):
-      with mock.patch.object(tf.compat.v2.math, "log", return_value=x_):
+      with mock.patch.object(tf.math, "log", return_value=x_):
         x = b.inverse(y_)
         self.assertIsInstance(x, np.ndarray)
         self.assertIs(x, b.inverse(y))
@@ -473,10 +474,21 @@ class NumpyArrayCaching(tf.test.TestCase):
     yt_ = y_.T
     xt_ = x_.T
     with mock.patch.object(tf, "convert_to_tensor", return_value=yt_):
-      with mock.patch.object(tf.compat.v2.math, "log", return_value=xt_):
+      with mock.patch.object(tf.math, "log", return_value=xt_):
         xt = b.inverse(yt_)
         self.assertIsNot(x, xt)
         self.assertIs(xt_, xt)
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class TfModuleTest(tf.test.TestCase):
+
+  def variable_tracking_works(self):
+    x = tf.Variable(1.)
+    bijector = tfb.Kumaraswamy(
+        concentration0=1., concentration1=x, validate_args=True)
+    self.assertIsInstance(bijector, tf.Module)
+    self.assertEqual((x,), bijector.trainable_variables)
 
 
 if __name__ == "__main__":

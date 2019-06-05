@@ -44,7 +44,7 @@ class MatrixInverseTriLBijectorTest(tf.test.TestCase):
 
   def testComputesCorrectValues(self):
     inv = tfb.MatrixInverseTriL(validate_args=True)
-    self.assertEqual("matrix_inverse_tril", inv.name)
+    self.assertStartsWith(inv.name, "matrix_inverse_tril")
     x_ = np.array([[0.7, 0., 0.],
                    [0.1, -1., 0.],
                    [0.3, 0.25, 0.5]], dtype=np.float32)

@@ -68,7 +68,7 @@ class OneHotCategoricalTest(tf.test.TestCase):
       self.assertAllEqual([10], self.evaluate(dist.event_shape_tensor()))
       # event_shape is available as a constant because the shape is
       # known at graph build time.
-      self.assertEqual(10, tf.get_static_value(dist.event_shape_tensor()))
+      self.assertEqual(10, dist.event_shape)
 
     for batch_shape in ([], [1], [2, 3, 4]):
       dist = make_onehot_categorical(batch_shape, tf.constant(

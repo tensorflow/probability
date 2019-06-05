@@ -312,6 +312,7 @@ py_library(
         "//tensorflow_probability/python/distributions/internal:slicing",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:name_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
@@ -836,6 +837,7 @@ py_library(
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:special_math",
+        "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
 

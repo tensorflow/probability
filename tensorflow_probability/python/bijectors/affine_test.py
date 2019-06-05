@@ -36,7 +36,7 @@ class AffineBijectorTest(tf.test.TestCase):
     mu = -1.
     # scale corresponds to 1.
     bijector = tfb.Affine(shift=mu)
-    self.assertEqual("affine", bijector.name)
+    self.assertStartsWith(bijector.name, "affine")
 
   def testNoBatchMultivariateIdentity(self):
     def static_run(fun, x, **kwargs):

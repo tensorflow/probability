@@ -34,7 +34,7 @@ class DiscreteCosineTransformTest(tf.test.TestCase):
 
   def testBijector(self):
     bijector = tfb.DiscreteCosineTransform(validate_args=True)
-    self.assertEqual('dct', bijector.name)
+    self.assertStartsWith(bijector.name, 'dct')
     x = np.random.randn(6, 5, 4).astype(np.float32)
     y = fftpack.dct(x, norm='ortho').astype(np.float32)
     self.assertAllClose(y, self.evaluate(bijector.forward(x)))
@@ -48,7 +48,7 @@ class DiscreteCosineTransformTest(tf.test.TestCase):
 
   def testBijector_dct3(self):
     bijector = tfb.DiscreteCosineTransform(dct_type=3, validate_args=True)
-    self.assertEqual('dct', bijector.name)
+    self.assertStartsWith(bijector.name, 'dct')
     x = np.random.randn(6, 5, 4).astype(np.float32)
     y = fftpack.dct(x, type=3, norm='ortho').astype(np.float32)
     self.assertAllClose(y, self.evaluate(bijector.forward(x)))

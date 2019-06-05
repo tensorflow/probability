@@ -31,7 +31,7 @@ class CholeskyToInvCholeskyTest(tf.test.TestCase):
 
   def testBijector(self):
     bijector = tfb.CholeskyToInvCholesky()
-    self.assertEqual("cholesky_to_inv_cholesky", bijector.name)
+    self.assertStartsWith(bijector.name, "cholesky_to_inv_cholesky")
     x = np.array([[3., 0.], [2., 7.]], dtype=np.float32)
     m = x.dot(x.T)
     m_inv = np.linalg.inv(m)

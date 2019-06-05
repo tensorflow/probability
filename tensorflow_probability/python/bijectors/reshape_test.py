@@ -65,7 +65,7 @@ class _ReshapeBijectorTest(object):
         bijector.forward_event_shape_tensor(expected_x.shape),
         bijector.inverse_event_shape_tensor(expected_y.shape),
     ])
-    self.assertEqual("reshape", bijector.name)
+    self.assertStartsWith(bijector.name, "reshape")
     self.assertAllClose(expected_y, y_, rtol=1e-6, atol=0)
     self.assertAllClose(expected_x, x_, rtol=1e-6, atol=0)
     self.assertAllClose(0., fldj_, rtol=1e-6, atol=0)

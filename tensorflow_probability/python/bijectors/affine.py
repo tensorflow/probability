@@ -168,10 +168,6 @@ class Affine(bijector.Bijector):
       ValueError: if `perturb_diag` is specified but not `perturb_factor`.
       TypeError: if `shift` has different `dtype` from `scale` arguments.
     """
-    self._graph_parents = []
-    self._name = name
-    self._validate_args = validate_args
-
     # Ambiguous definition of low rank update.
     if scale_perturb_diag is not None and scale_perturb_factor is None:
       raise ValueError("When scale_perturb_diag is specified, "
@@ -185,7 +181,9 @@ class Affine(bijector.Bijector):
                                          scale_diag is None and
                                          scale_perturb_factor is None)
 
-    with self._name_scope("init"):
+    with tf.name_scope(name) as name:
+      self._name = name
+      self._validate_args = validate_args
 
       if dtype is None:
         dtype = dtype_util.common_dtype([
@@ -227,9 +225,6 @@ class Affine(bijector.Bijector):
       self._adjoint = adjoint
       super(Affine, self).__init__(
           forward_min_event_ndims=1,
-          graph_parents=([self._scale] if tf.is_tensor(
-              self._scale) else self._scale.graph_parents +
-                         [self._shift] if self._shift is not None else []),
           is_constant_jacobian=True,
           dtype=dtype,
           validate_args=validate_args,

@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.bijectors import bijector
 
 
@@ -84,20 +86,21 @@ class Inline(bijector.Bijector):
         dimensionality this bijector acts on.
       name: Python `str`, name given to ops managed by this object.
     """
-    super(Inline, self).__init__(
-        forward_min_event_ndims=forward_min_event_ndims,
-        inverse_min_event_ndims=inverse_min_event_ndims,
-        is_constant_jacobian=is_constant_jacobian,
-        validate_args=validate_args,
-        name=name)
-    self._forward_fn = forward_fn
-    self._inverse_fn = inverse_fn
-    self._inverse_log_det_jacobian_fn = inverse_log_det_jacobian_fn
-    self._forward_log_det_jacobian_fn = forward_log_det_jacobian_fn
-    self._forward_event_shape_fn = forward_event_shape_fn
-    self._forward_event_shape_tensor_fn = forward_event_shape_tensor_fn
-    self._inverse_event_shape_fn = inverse_event_shape_fn
-    self._inverse_event_shape_tensor_fn = inverse_event_shape_tensor_fn
+    with tf.name_scope(name) as name:
+      self._forward_fn = forward_fn
+      self._inverse_fn = inverse_fn
+      self._inverse_log_det_jacobian_fn = inverse_log_det_jacobian_fn
+      self._forward_log_det_jacobian_fn = forward_log_det_jacobian_fn
+      self._forward_event_shape_fn = forward_event_shape_fn
+      self._forward_event_shape_tensor_fn = forward_event_shape_tensor_fn
+      self._inverse_event_shape_fn = inverse_event_shape_fn
+      self._inverse_event_shape_tensor_fn = inverse_event_shape_tensor_fn
+      super(Inline, self).__init__(
+          forward_min_event_ndims=forward_min_event_ndims,
+          inverse_min_event_ndims=inverse_min_event_ndims,
+          is_constant_jacobian=is_constant_jacobian,
+          validate_args=validate_args,
+          name=name)
 
   def _forward_event_shape(self, input_shape):
     if self._forward_event_shape_fn is None:

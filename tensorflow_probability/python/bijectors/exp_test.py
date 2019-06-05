@@ -33,7 +33,7 @@ class ExpBijectorTest(tf.test.TestCase):
 
   def testBijector(self):
     bijector = tfb.Exp()
-    self.assertEqual("exp", bijector.name)
+    self.assertStartsWith(bijector.name, "exp")
     x = [[[1.], [2.]]]
     y = np.exp(x)
     self.assertAllClose(y, self.evaluate(bijector.forward(x)))

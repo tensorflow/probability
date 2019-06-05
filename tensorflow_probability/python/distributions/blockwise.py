@@ -98,7 +98,7 @@ class Blockwise(distribution.Distribution):
           allow_nan_stats=allow_nan_stats,
           reparameterization_type=reparameterization_type,
           parameters=parameters,
-          graph_parents=_flatten(d._graph_parents for d in distributions),  # pylint: disable=protected-access
+          graph_parents=_model_flatten(d._graph_parents for d in distributions),  # pylint: disable=protected-access
           name=name)
 
   @property
@@ -162,7 +162,7 @@ class Blockwise(distribution.Distribution):
       return tf.concat(means, axis=-1)
 
 
-def _flatten(list_of_lists):
+def _model_flatten(list_of_lists):
   return [item for sublist in list_of_lists for item in sublist]  # pylint: disable=g-complex-comprehension
 
 

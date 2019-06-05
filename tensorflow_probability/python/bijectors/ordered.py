@@ -31,8 +31,7 @@ __all__ = [
 
 
 class Ordered(bijector.Bijector):
-  """Bijector which maps a tensor x_k that has increasing elements in the last
-  dimension to an unconstrained tensor y_k.
+  """Maps a vector of increasing elements to an unconstrained vector.
 
   Both the domain and the codomain of the mapping is [-inf, inf], however,
   the input of the forward mapping must be strictly increasing.
@@ -56,10 +55,11 @@ class Ordered(bijector.Bijector):
   """
 
   def __init__(self, validate_args=False, name="ordered"):
-    super(Ordered, self).__init__(
-        forward_min_event_ndims=1,
-        validate_args=validate_args,
-        name=name)
+    with tf.name_scope(name) as name:
+      super(Ordered, self).__init__(
+          forward_min_event_ndims=1,
+          validate_args=validate_args,
+          name=name)
 
   def _forward(self, x):
     x = self._maybe_assert_valid_x(x)

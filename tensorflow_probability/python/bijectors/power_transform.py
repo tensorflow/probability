@@ -56,19 +56,15 @@ class PowerTransform(bijector.Bijector):
     Raises:
       ValueError: if `power < 0` or is not known statically.
     """
-    self._graph_parents = []
-    self._name = name
-    self._validate_args = validate_args
-    with self._name_scope("init"):
-      power = tf.get_static_value(
-          tf.convert_to_tensor(value=power, name="power"))
-    if power is None or power < 0:
-      raise ValueError("`power` must be a non-negative TF constant.")
-    self._power = power
-    super(PowerTransform, self).__init__(
-        forward_min_event_ndims=0,
-        validate_args=validate_args,
-        name=name)
+    with tf.name_scope(name) as name:
+      power = tf.get_static_value(tf.convert_to_tensor(power, name="power"))
+      if power is None or power < 0:
+        raise ValueError("`power` must be a non-negative TF constant.")
+      self._power = power
+      super(PowerTransform, self).__init__(
+          forward_min_event_ndims=0,
+          validate_args=validate_args,
+          name=name)
 
   @property
   def power(self):

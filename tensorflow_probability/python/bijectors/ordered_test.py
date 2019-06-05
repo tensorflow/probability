@@ -41,7 +41,7 @@ class OrderedBijectorTest(tf.test.TestCase):
 
   def testBijectorVector(self):
     ordered = tfb.Ordered()
-    self.assertEqual("ordered", ordered.name)
+    self.assertStartsWith(ordered.name, "ordered")
     x = np.asarray([[2., 3, 4], [4., 8, 13]])
     y = [[2., 0, 0], [4., np.log(4.), np.log(5.)]]
     self.assertAllClose(y, self.evaluate(ordered.forward(x)))
@@ -59,7 +59,7 @@ class OrderedBijectorTest(tf.test.TestCase):
 
   def testBijectorUnknownShape(self):
     ordered = tfb.Ordered()
-    self.assertEqual("ordered", ordered.name)
+    self.assertStartsWith(ordered.name, "ordered")
     x_ = np.asarray([[2., 3, 4], [4., 8, 13]], dtype=np.float32)
     y_ = np.asarray(
         [[2., 0, 0], [4., np.log(4.), np.log(5.)]], dtype=np.float32)

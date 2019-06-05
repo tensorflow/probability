@@ -33,7 +33,9 @@ from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions.internal import slicing
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import name_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow.python.training.tracking import data_structures  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
@@ -69,7 +71,7 @@ _ALWAYS_COPY_PUBLIC_METHOD_WRAPPERS = ["kl_divergence", "cross_entropy"]
 
 
 @six.add_metaclass(abc.ABCMeta)
-class _BaseDistribution(object):
+class _BaseDistribution(tf.Module):
   """Abstract base class needed for resolving subclass hierarchy."""
   pass
 
@@ -170,7 +172,7 @@ def _convert_to_tensor(value, dtype=None, dtype_hint=None, name=None):
       return tf.nest.map_structure(fn, value, dtype, dtype_hint,
                                    expand_composites=True)
   return tf.convert_to_tensor(
-      value=value, dtype=dtype, dtype_hint=dtype_hint, name=name)
+      value, dtype=dtype, dtype_hint=dtype_hint, name=name)
 
 
 def _remove_dict_keys_with_value(dict_, val):
@@ -279,13 +281,13 @@ class _DistributionMeta(abc.ABCMeta):
         # this has nearly zero overhead. However, failing to do this, we will
         # resolve the input arguments dynamically and only when needed.
         dummy_self = tuple()
-        self_._parameters = lambda: (  # pylint: disable=g-long-lambda
+        self_._parameters = data_structures.NoDependency(lambda: (  # pylint: disable=g-long-lambda
             _remove_dict_keys_with_value(
                 inspect.getcallargs(default_init, dummy_self, *args, **kwargs),
-                dummy_self))
+                dummy_self)))
       elif hasattr(self_._parameters, "pop"):
-        self_._parameters = _remove_dict_keys_with_value(
-            self_._parameters, self_)
+        self_._parameters = data_structures.NoDependency(
+            _remove_dict_keys_with_value(self_._parameters, self_))
     # pylint: enable=protected-access
 
     attrs["__init__"] = wrapped_init(default_init)  # pylint: disable=no-value-for-parameter,assignment-from-no-return
@@ -469,22 +471,30 @@ class Distribution(_BaseDistribution):
     Raises:
       ValueError: if any member of graph_parents is `None` or not a `Tensor`.
     """
+    if not name:
+      name = type(self).__name__
+      name = name_util.camel_to_lower_snake(name)
+    name = name_util.get_name_scope_name(name.lstrip("_"))
+    # TODO(b/134508150): Uncomment once name requirements can be reconciled.
+    # name = name_util.strip_invalid_chars(name)
+    # name = name.rstrip("_")
+    # super(Distribution, self).__init__(name=name)
+    self._name = name
+
     graph_parents = [] if graph_parents is None else graph_parents
     for i, t in enumerate(graph_parents):
       if t is None or not tf.is_tensor(t):
         raise ValueError("Graph parent item %d is not a Tensor; %s." % (i, t))
-    if not name or name[-1] != "/":  # `name` is not a name scope
-      non_unique_name = name or type(self).__name__
-      with tf.name_scope(non_unique_name) as name:
-        pass
     self._dtype = dtype
     self._reparameterization_type = reparameterization_type
     self._allow_nan_stats = allow_nan_stats
     self._validate_args = validate_args
-    self._parameters = parameters
+    self._parameters = data_structures.NoDependency(parameters)
     self._parameters_sanitized = False
     self._graph_parents = graph_parents
-    self._name = name
+    self._initial_parameter_control_dependencies = tuple(
+        d for d in self._parameter_control_dependencies(is_init=True)
+        if d is not None)
 
   @classmethod
   def param_shapes(cls, sample_shape, name="DistributionParamShapes"):
@@ -564,17 +574,15 @@ class Distribution(_BaseDistribution):
   def parameters(self):
     """Dictionary of parameters used to instantiate this `Distribution`."""
     # Remove "self", "__class__", or other special variables. These can appear
-    # if the subclass used:
-    # `parameters = dict(locals())`.
+    # if the subclass used: `parameters = dict(locals())`.
     if (not hasattr(self, "_parameters_sanitized") or
         not self._parameters_sanitized):
-      if callable(self._parameters):
-        self._parameters = self._parameters()
-      self._parameters = {
-          k: v for k, v in self._parameters.items()
-          if not k.startswith("__") and v is not self}
+      p = self._parameters() if callable(self._parameters) else self._parameters
+      self._parameters = data_structures.NoDependency({
+          k: v for k, v in p.items()
+          if not k.startswith("__") and v is not self})
       self._parameters_sanitized = True
-    return self._parameters
+    return dict(self._parameters)
 
   @classmethod
   def _params_event_ndims(cls):
@@ -714,16 +722,16 @@ class Distribution(_BaseDistribution):
     Returns:
       batch_shape: `Tensor`.
     """
-    with self._name_scope(name):
+    with self._name_and_control_scope(name):
       if tensorshape_util.is_fully_defined(self.batch_shape):
-        return tf.convert_to_tensor(
-            value=tensorshape_util.as_list(self.batch_shape),
-            dtype=tf.int32,
-            name="batch_shape")
-      return self._batch_shape_tensor()
+        v = tensorshape_util.as_list(self.batch_shape)
+      else:
+        v = self._batch_shape_tensor()
+      return tf.identity(tf.convert_to_tensor(v, dtype_hint=tf.int32),
+                         name="batch_shape")
 
   def _batch_shape(self):
-    return tf.TensorShape(None)
+    return None
 
   @property
   def batch_shape(self):
@@ -752,16 +760,16 @@ class Distribution(_BaseDistribution):
     Returns:
       event_shape: `Tensor`.
     """
-    with self._name_scope(name):
+    with self._name_and_control_scope(name):
       if tensorshape_util.is_fully_defined(self.event_shape):
-        return tf.convert_to_tensor(
-            value=tensorshape_util.as_list(self.event_shape),
-            dtype=tf.int32,
-            name="event_shape")
-      return self._event_shape_tensor()
+        v = tensorshape_util.as_list(self.event_shape)
+      else:
+        v = self._event_shape_tensor()
+      return tf.identity(tf.convert_to_tensor(v, dtype_hint=tf.int32),
+                         name="event_shape")
 
   def _event_shape(self):
-    return tf.TensorShape(None)
+    return None
 
   @property
   def event_shape(self):
@@ -783,10 +791,9 @@ class Distribution(_BaseDistribution):
     Returns:
       is_scalar_event: `bool` scalar `Tensor`.
     """
-    with self._name_scope(name):
+    with self._name_and_control_scope(name):
       return tf.convert_to_tensor(
-          value=self._is_scalar_helper(self.event_shape,
-                                       self.event_shape_tensor),
+          self._is_scalar_helper(self.event_shape, self.event_shape_tensor),
           name="is_scalar_event")
 
   def is_scalar_batch(self, name="is_scalar_batch"):
@@ -798,10 +805,9 @@ class Distribution(_BaseDistribution):
     Returns:
       is_scalar_batch: `bool` scalar `Tensor`.
     """
-    with self._name_scope(name):
+    with self._name_and_control_scope(name):
       return tf.convert_to_tensor(
-          value=self._is_scalar_helper(self.batch_shape,
-                                       self.batch_shape_tensor),
+          self._is_scalar_helper(self.batch_shape, self.batch_shape_tensor),
           name="is_scalar_batch")
 
   def _sample_n(self, n, seed=None, **kwargs):
@@ -810,9 +816,9 @@ class Distribution(_BaseDistribution):
 
   def _call_sample_n(self, sample_shape, seed, name, **kwargs):
     """Wrapper around _sample_n."""
-    with self._name_scope(name):
+    with self._name_and_control_scope(name):
       sample_shape = tf.convert_to_tensor(
-          value=sample_shape, dtype=tf.int32, name="sample_shape")
+          sample_shape, dtype=tf.int32, name="sample_shape")
       sample_shape, n = self._expand_sample_shape_to_vector(
           sample_shape, "sample_shape")
       samples = self._sample_n(n, seed, **kwargs)
@@ -841,7 +847,7 @@ class Distribution(_BaseDistribution):
 
   def _call_log_prob(self, value, name, **kwargs):
     """Wrapper around _log_prob."""
-    with self._name_scope(name):
+    with self._name_and_control_scope(name):
       value = _convert_to_tensor(
           value, name="value", dtype_hint=self.dtype)
       if hasattr(self, "_log_prob"):
@@ -867,7 +873,7 @@ class Distribution(_BaseDistribution):
 
   def _call_prob(self, value, name, **kwargs):
     """Wrapper around _prob."""
-    with self._name_scope(name):
+    with self._name_and_control_scope(name):
       value = _convert_to_tensor(
           value, name="value", dtype_hint=self.dtype)
       if hasattr(self, "_prob"):
@@ -893,7 +899,7 @@ class Distribution(_BaseDistribution):
 
   def _call_log_cdf(self, value, name, **kwargs):
     """Wrapper around _log_cdf."""
-    with self._name_scope(name):
+    with self._name_and_control_scope(name):
       value = _convert_to_tensor(
           value, name="value", dtype_hint=self.dtype)
       if hasattr(self, "_log_cdf"):
@@ -929,7 +935,7 @@ class Distribution(_BaseDistribution):
 
   def _call_cdf(self, value, name, **kwargs):
     """Wrapper around _cdf."""
-    with self._name_scope(name):
+    with self._name_and_control_scope(name):
       value = _convert_to_tensor(
           value, name="value", dtype_hint=self.dtype)
       if hasattr(self, "_cdf"):
@@ -966,7 +972,7 @@ class Distribution(_BaseDistribution):
 
   def _call_log_survival_function(self, value, name, **kwargs):
     """Wrapper around _log_survival_function."""
-    with self._name_scope(name):
+    with self._name_and_control_scope(name):
       value = _convert_to_tensor(
           value, name="value", dtype_hint=self.dtype)
       try:
@@ -1009,7 +1015,7 @@ class Distribution(_BaseDistribution):
 
   def _call_survival_function(self, value, name, **kwargs):
     """Wrapper around _survival_function."""
-    with self._name_scope(name):
+    with self._name_and_control_scope(name):
       value = _convert_to_tensor(
           value, name="value", dtype_hint=self.dtype)
       try:
@@ -1048,7 +1054,7 @@ class Distribution(_BaseDistribution):
 
   def entropy(self, name="entropy", **kwargs):
     """Shannon entropy in nats."""
-    with self._name_scope(name):
+    with self._name_and_control_scope(name):
       return self._entropy(**kwargs)
 
   def _mean(self, **kwargs):
@@ -1057,7 +1063,7 @@ class Distribution(_BaseDistribution):
 
   def mean(self, name="mean", **kwargs):
     """Mean."""
-    with self._name_scope(name):
+    with self._name_and_control_scope(name):
       return self._mean(**kwargs)
 
   def _quantile(self, value, **kwargs):
@@ -1065,7 +1071,7 @@ class Distribution(_BaseDistribution):
         type(self).__name__))
 
   def _call_quantile(self, value, name, **kwargs):
-    with self._name_scope(name):
+    with self._name_and_control_scope(name):
       value = _convert_to_tensor(
           value, name="value", dtype_hint=self.dtype)
       return self._quantile(value, **kwargs)
@@ -1114,7 +1120,7 @@ class Distribution(_BaseDistribution):
       variance: Floating-point `Tensor` with shape identical to
         `batch_shape + event_shape`, i.e., the same shape as `self.mean()`.
     """
-    with self._name_scope(name):
+    with self._name_and_control_scope(name):
       try:
         return self._variance(**kwargs)
       except NotImplementedError as original_exception:
@@ -1148,7 +1154,7 @@ class Distribution(_BaseDistribution):
         `batch_shape + event_shape`, i.e., the same shape as `self.mean()`.
     """
 
-    with self._name_scope(name):
+    with self._name_and_control_scope(name):
       try:
         return self._stddev(**kwargs)
       except NotImplementedError as original_exception:
@@ -1198,7 +1204,7 @@ class Distribution(_BaseDistribution):
         where the first `n` dimensions are batch coordinates and
         `k' = reduce_prod(self.event_shape)`.
     """
-    with self._name_scope(name):
+    with self._name_and_control_scope(name):
       return self._covariance(**kwargs)
 
   def _mode(self, **kwargs):
@@ -1207,7 +1213,7 @@ class Distribution(_BaseDistribution):
 
   def mode(self, name="mode", **kwargs):
     """Mode."""
-    with self._name_scope(name):
+    with self._name_and_control_scope(name):
       return self._mode(**kwargs)
 
   def _cross_entropy(self, other):
@@ -1236,7 +1242,7 @@ class Distribution(_BaseDistribution):
       cross_entropy: `self.dtype` `Tensor` with shape `[B1, ..., Bn]`
         representing `n` different calculations of (Shannon) cross entropy.
     """
-    with self._name_scope(name):
+    with self._name_and_control_scope(name):
       return self._cross_entropy(other)
 
   def _kl_divergence(self, other):
@@ -1268,7 +1274,7 @@ class Distribution(_BaseDistribution):
         representing `n` different calculations of the Kullback-Leibler
         divergence.
     """
-    with self._name_scope(name):
+    with self._name_and_control_scope(name):
       return self._kl_divergence(other)
 
   def __str__(self):
@@ -1308,11 +1314,20 @@ class Distribution(_BaseDistribution):
                 dtype=_str_dtype(self.dtype)))
 
   @contextlib.contextmanager
-  def _name_scope(self, name=None):
+  def _name_and_control_scope(self, name=None):
     """Helper function to standardize op scope."""
     with tf.name_scope(self.name):
-      with tf.name_scope(name) as scope:
-        yield scope
+      with tf.name_scope(name) as name_scope:
+        deps = tuple(
+            d for d in (  # pylint: disable=g-complex-comprehension
+                tuple(self._initial_parameter_control_dependencies) +
+                tuple(self._parameter_control_dependencies(is_init=False)))
+            if d is not None)
+        if not deps:
+          yield name_scope
+          return
+        with tf.control_dependencies(deps) as deps_scope:
+          yield deps_scope
 
   def _expand_sample_shape_to_vector(self, x, name):
     """Helper to `sample` which ensures input is 1D."""
@@ -1380,6 +1395,21 @@ class Distribution(_BaseDistribution):
       # case.
       return tensorshape_util.as_list(shape.shape) == [0]
     return tf.equal(tf.shape(input=shape)[0], 0)
+
+  def _parameter_control_dependencies(self, is_init):
+    """Returns a list of ops to be executed in members with graph deps.
+
+    Typically subclasses override this function to return parameter specific
+    assertions (eg, positivity of `scale`, etc.).
+
+    Args:
+      is_init: Python `bool` indicating that the call site is `__init__`.
+
+    Returns:
+      dependencies: `list`-like of ops to be executed in member functions with
+        graph dependencies.
+    """
+    return ()
 
 
 class _PrettyDict(dict):

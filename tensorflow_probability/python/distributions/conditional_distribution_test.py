@@ -33,8 +33,7 @@ class ConditionalDistributionTest(distribution_test.DistributionTest):
     class _FakeDistribution(tfd.ConditionalDistribution):
       """Fake Distribution for testing _set_sample_static_shape."""
 
-      def __init__(
-          self, batch_shape=None, event_shape=None):
+      def __init__(self, batch_shape=None, event_shape=None):
         self._static_batch_shape = tf.TensorShape(batch_shape)
         self._static_event_shape = tf.TensorShape(event_shape)
         super(_FakeDistribution, self).__init__(

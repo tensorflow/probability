@@ -29,6 +29,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import special_math
+from tensorflow_probability.python.internal import tensor_util
 
 
 __all__ = [
@@ -130,22 +131,18 @@ class Normal(distribution.Distribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name) as name:
-      dtype = dtype_util.common_dtype([loc, scale], tf.float32)
-      loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
-      scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
-      with tf.control_dependencies(
-          [assert_util.assert_positive(scale)] if validate_args else []):
-        self._loc = tf.identity(loc)
-        self._scale = tf.identity(scale)
-        dtype_util.assert_same_float_dtype([self._loc, self._scale])
-    super(Normal, self).__init__(
-        dtype=dtype,
-        reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
-        validate_args=validate_args,
-        allow_nan_stats=allow_nan_stats,
-        parameters=parameters,
-        graph_parents=[self._loc, self._scale],
-        name=name)
+      dtype = dtype_util.common_dtype([loc, scale], preferred_dtype=tf.float32)
+      self._loc = tensor_util.convert_immutable_to_tensor(
+          loc, dtype=dtype, name="loc")
+      self._scale = tensor_util.convert_immutable_to_tensor(
+          scale, dtype=dtype, name="scale")
+      super(Normal, self).__init__(
+          dtype=dtype,
+          reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
+          validate_args=validate_args,
+          allow_nan_stats=allow_nan_stats,
+          parameters=parameters,
+          name=name)
 
   @staticmethod
   def _param_shapes(sample_shape):
@@ -185,7 +182,7 @@ class Normal(distribution.Distribution):
   def _sample_n(self, n, seed=None):
     shape = tf.concat([[n], self.batch_shape_tensor()], 0)
     sampled = tf.random.normal(
-        shape=shape, mean=0., stddev=1., dtype=self.loc.dtype, seed=seed)
+        shape=shape, mean=0., stddev=1., dtype=self.dtype, seed=seed)
     return sampled * self.scale + self.loc
 
   def _log_prob(self, x):
@@ -235,6 +232,16 @@ class Normal(distribution.Distribution):
     """Reconstruct input `x` from a its normalized version."""
     with tf.name_scope("reconstruct"):
       return z * self.scale + self.loc
+
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+    assertions = []
+    if is_init != tensor_util.is_mutable(self.scale):
+      assertions.append(assert_util.assert_positive(
+          self.scale,
+          message="Argument `scale` must be positive."))
+    return assertions
 
 
 @kullback_leibler.RegisterKL(Normal, Normal)

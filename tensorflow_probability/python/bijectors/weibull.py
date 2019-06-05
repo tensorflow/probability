@@ -65,10 +65,7 @@ class Weibull(bijector.Bijector):
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
     """
-    self._graph_parents = []
-    self._name = name
-    self._validate_args = validate_args
-    with self._name_scope("init"):
+    with tf.name_scope(name) as name:
       self._scale = tf.convert_to_tensor(value=scale, name="scale")
       self._concentration = tf.convert_to_tensor(
           value=concentration, name="concentration")
@@ -83,11 +80,10 @@ class Weibull(bijector.Bijector):
                 self._concentration,
                 message="Argument concentration was not positive")
         ], self._concentration)
-
-    super(Weibull, self).__init__(
-        forward_min_event_ndims=0,
-        validate_args=validate_args,
-        name=name)
+      super(Weibull, self).__init__(
+          forward_min_event_ndims=0,
+          validate_args=validate_args,
+          name=name)
 
   @property
   def scale(self):

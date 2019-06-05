@@ -128,6 +128,15 @@ py_library(
 )
 
 py_library(
+    name = "name_util",
+    srcs = ["name_util.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_library(
     name = "nest_util",
     srcs = ["nest_util.py"],
     srcs_version = "PY2AND3",
@@ -193,6 +202,28 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/math:gradient",
+    ],
+)
+
+py_library(
+    name = "tensor_util",
+    srcs = ["tensor_util.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "tensor_util_test",
+    size = "small",
+    srcs = ["tensor_util_test.py"],
+    deps = [
+        ":tensor_util",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
     ],
 )
 

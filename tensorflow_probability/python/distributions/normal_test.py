@@ -23,7 +23,8 @@ import math
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
@@ -37,7 +38,7 @@ def try_import(name):  # pylint: disable=invalid-name
   try:
     module = importlib.import_module(name)
   except ImportError as e:
-    tf.compat.v1.logging.warning("Could not import %s: %s" % (name, str(e)))
+    tf1.logging.warning("Could not import %s: %s" % (name, str(e)))
   return module
 
 stats = try_import("scipy.stats")
@@ -442,9 +443,8 @@ class NormalTest(test_case.TestCase):
     self.assertAllEqual(expected_samples_shape, sample_values.shape)
 
   def testNegativeSigmaFails(self):
-    with self.assertRaisesOpError("Condition x > 0 did not hold"):
-      normal = tfd.Normal(
-          loc=[1.], scale=[-5.], validate_args=True, name="G")
+    with self.assertRaisesOpError("Argument `scale` must be positive."):
+      normal = tfd.Normal(loc=[1.], scale=[-5.], validate_args=True, name="G")
       self.evaluate(normal.mean())
 
   def testNormalShape(self):
@@ -458,8 +458,8 @@ class NormalTest(test_case.TestCase):
     self.assertEqual(normal.event_shape, tf.TensorShape([]))
 
   def testNormalShapeWithPlaceholders(self):
-    mu = tf.compat.v1.placeholder_with_default(np.float32(5), shape=None)
-    sigma = tf.compat.v1.placeholder_with_default(
+    mu = tf1.placeholder_with_default(np.float32(5), shape=None)
+    sigma = tf1.placeholder_with_default(
         np.float32([1.0, 2.0]), shape=None)
     normal = tfd.Normal(loc=mu, scale=sigma)
 
@@ -494,6 +494,16 @@ class NormalTest(test_case.TestCase):
     self.assertEqual(kl.shape, (batch_size,))
     self.assertAllClose(kl_val, kl_expected)
     self.assertAllClose(kl_expected, kl_sample_, atol=0.0, rtol=1e-2)
+
+  def testVariableScale(self):
+    x = tf.Variable(1.)
+    d = tfd.Normal(loc=0., scale=x, validate_args=True)
+    self.evaluate(tf1.global_variables_initializer())
+    self.assertIs(x, d.scale)
+    self.assertEqual(0., self.evaluate(d.mean()))
+    with self.assertRaisesOpError("Argument `scale` must be positive."):
+      with tf.control_dependencies([x.assign(-1.)]):
+        self.evaluate(d.mean())
 
 
 class NormalEagerGCTest(tf.test.TestCase):

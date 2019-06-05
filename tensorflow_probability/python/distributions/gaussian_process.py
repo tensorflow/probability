@@ -335,7 +335,7 @@ class GaussianProcess(distribution.Distribution):
         according to whether `index_points` consists of one or many index
         points, respectively.
     """
-    with self._name_scope('get_marginal_distribution'):
+    with self._name_and_control_scope('get_marginal_distribution'):
       # TODO(cgs): consider caching the result here, keyed on `index_points`.
       index_points = self._get_index_points(index_points)
       covariance = self._compute_covariance(index_points)

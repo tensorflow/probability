@@ -20,6 +20,7 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 
@@ -28,7 +29,7 @@ from tensorflow.python.framework import test_util  # pylint: disable=g-direct-te
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SinhArcsinhBijectorTest(tf.test.TestCase):
+class SinhArcsinhTest(tf.test.TestCase):
   """Tests correctness of the power transformation."""
 
   def testBijectorVersusNumpyRewriteOfBasicFunctions(self):
@@ -36,7 +37,7 @@ class SinhArcsinhBijectorTest(tf.test.TestCase):
     tailweight = 2.0
     bijector = tfb.SinhArcsinh(
         skewness=skewness, tailweight=tailweight, validate_args=True)
-    self.assertEqual("SinhArcsinh", bijector.name)
+    self.assertStartsWith(bijector.name, "sinh_arcsinh")
     x = np.array([[[-2.01], [2.], [1e-4]]]).astype(np.float32)
     y = np.sinh((np.arcsinh(x) + skewness) * tailweight)
     self.assertAllClose(y, self.evaluate(bijector.forward(x)))
@@ -175,7 +176,7 @@ class SinhArcsinhBijectorTest(tf.test.TestCase):
           atol=0.)
 
   def testZeroTailweightRaises(self):
-    with self.assertRaisesOpError("not positive"):
+    with self.assertRaisesOpError("Argument `tailweight` must be positive"):
       self.evaluate(
           tfb.SinhArcsinh(tailweight=0., validate_args=True).forward(1.0))
 
@@ -183,6 +184,16 @@ class SinhArcsinhBijectorTest(tf.test.TestCase):
     bijector = tfb.SinhArcsinh()
     self.assertEqual(bijector.tailweight.dtype, np.float32)
     self.assertEqual(bijector.skewness.dtype, np.float32)
+
+  def testVariableTailweight(self):
+    x = tf.Variable(1.)
+    b = tfb.SinhArcsinh(tailweight=x, validate_args=True)
+    self.evaluate(tf1.global_variables_initializer())
+    self.assertIs(x, b.tailweight)
+    self.assertEqual((), self.evaluate(b.forward(0.5)).shape)
+    with self.assertRaisesOpError("Argument `tailweight` must be positive."):
+      with tf.control_dependencies([x.assign(-1.)]):
+        self.assertEqual((), self.evaluate(b.forward(0.5)).shape)
 
 
 if __name__ == "__main__":

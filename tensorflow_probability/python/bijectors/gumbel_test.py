@@ -22,6 +22,7 @@ from __future__ import print_function
 import numpy as np
 from scipy import stats
 
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
@@ -30,14 +31,14 @@ from tensorflow.python.framework import test_util  # pylint: disable=g-direct-te
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class GumbelBijectorTest(tf.test.TestCase):
+class GumbelTest(tf.test.TestCase):
   """Tests correctness of the Gumbel bijector."""
 
   def testBijector(self):
     loc = 0.3
     scale = 5.
     bijector = tfb.Gumbel(loc=loc, scale=scale, validate_args=True)
-    self.assertEqual("gumbel", bijector.name)
+    self.assertStartsWith(bijector.name, "gumbel")
     x = np.array([[[-3.], [0.], [0.5], [4.2], [12.]]], dtype=np.float32)
     # Gumbel distribution
     gumbel_dist = stats.gumbel_r(loc=loc, scale=scale)
@@ -64,6 +65,16 @@ class GumbelBijectorTest(tf.test.TestCase):
     y = np.linspace(0.01, 0.99, num=10).astype(np.float32)
     bijector_test_util.assert_bijective_and_finite(
         bijector, x, y, eval_func=self.evaluate, event_ndims=0, rtol=1e-3)
+
+  def testVariableScale(self):
+    x = tf.Variable(1.)
+    b = tfb.Gumbel(loc=0., scale=x, validate_args=True)
+    self.evaluate(tf1.global_variables_initializer())
+    self.assertIs(x, b.scale)
+    self.assertEqual((), self.evaluate(b.forward(-3.)).shape)
+    with self.assertRaisesOpError("Argument `scale` must be positive."):
+      with tf.control_dependencies([x.assign(-1.)]):
+        self.evaluate(b.forward(-3.))
 
 
 if __name__ == "__main__":

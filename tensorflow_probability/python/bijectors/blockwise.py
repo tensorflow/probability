@@ -79,28 +79,31 @@ class Blockwise(bijector_base.Bijector):
       ValueError: If size of `block_sizes` does not equal to the length of
         bijectors or is not a vector.
     """
-    super(Blockwise, self).__init__(
-        forward_min_event_ndims=1,
-        validate_args=validate_args,
-        name=name or
-        'blockwise_of_' + '_and_'.join([b.name for b in bijectors]))
+    if not name:
+      name = 'blockwise_of_' + '_and_'.join([b.name for b in bijectors])
+      name = name.replace('/', '')
+    with tf.name_scope(name) as name:
+      super(Blockwise, self).__init__(
+          forward_min_event_ndims=1,
+          validate_args=validate_args,
+          name=name)
 
-    if not bijectors:
-      raise ValueError('`bijectors` must not be empty.')
+      if not bijectors:
+        raise ValueError('`bijectors` must not be empty.')
 
-    for bijector in bijectors:
-      if (bijector.forward_min_event_ndims > 1 or
-          bijector.inverse_min_event_ndims != bijector.forward_min_event_ndims):
-        # TODO(b/) In the future, it can be reasonable to support N-D bijectors
-        # by concatenating along some specific axis, broadcasting low-D
-        # bijectors appropriately.
-        raise NotImplementedError('Only scalar and vector event-shape '
-                                  'bijectors that do not alter the '
-                                  'shape are supported at this time.')
+      for bijector in bijectors:
+        if (bijector.forward_min_event_ndims > 1 or
+            (bijector.inverse_min_event_ndims !=
+             bijector.forward_min_event_ndims)):
+          # TODO(siege): In the future, it can be reasonable to support N-D
+          # bijectors by concatenating along some specific axis, broadcasting
+          # low-D bijectors appropriately.
+          raise NotImplementedError('Only scalar and vector event-shape '
+                                    'bijectors that do not alter the '
+                                    'shape are supported at this time.')
 
-    self._bijectors = bijectors
+      self._bijectors = bijectors
 
-    with self._name_scope('init'):
       if block_sizes is None:
         block_sizes = tf.ones(len(bijectors), dtype=tf.int32)
       self._block_sizes = tf.convert_to_tensor(

@@ -18,8 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import math
-
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
@@ -105,7 +103,7 @@ class Uniform(distribution.Distribution):
       dtype = dtype_util.common_dtype([low, high], tf.float32)
       low = tf.convert_to_tensor(value=low, name="low", dtype=dtype)
       high = tf.convert_to_tensor(value=high, name="high", dtype=dtype)
-      with tf.control_dependencies([
+      with tf.control_dependencies([  # pylint: disable=g-long-ternary
           assert_util.assert_less(
               low, high, message="uniform not defined when low >= high.")
       ] if validate_args else []):
@@ -144,7 +142,7 @@ class Uniform(distribution.Distribution):
 
   def range(self, name="range"):
     """`high - low`."""
-    with self._name_scope(name):
+    with self._name_and_control_scope(name):
       return self.high - self.low
 
   def _batch_shape_tensor(self):
@@ -208,7 +206,7 @@ class Uniform(distribution.Distribution):
     return tf.square(self.range()) / 12.
 
   def _stddev(self):
-    return self.range() / math.sqrt(12.)
+    return self.range() / np.sqrt(12.)
 
 
 @kullback_leibler.RegisterKL(Uniform, Uniform)

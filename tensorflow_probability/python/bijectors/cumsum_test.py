@@ -63,7 +63,7 @@ class _CumsumBijectorTest(tf.test.TestCase):
     x = self._build_tensor(x)
     for axis in range(-self.evaluate(tf.rank(x)), 0):
       bijector = tfb.Cumsum(axis=axis)
-      self.assertEqual("cumsum", bijector.name)
+      self.assertStartsWith(bijector.name, "cumsum")
 
       y = tf.cumsum(x, axis=axis)
       self.assertAllClose(y, self.evaluate(bijector.forward(x)))

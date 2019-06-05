@@ -20,6 +20,8 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
+
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 
@@ -28,7 +30,7 @@ from tensorflow.python.framework import test_util  # pylint: disable=g-direct-te
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class KumaraswamyBijectorTest(tf.test.TestCase):
+class KumaraswamyTest(tf.test.TestCase):
   """Tests correctness of the Kumaraswamy bijector."""
 
   def testBijector(self):
@@ -36,7 +38,7 @@ class KumaraswamyBijectorTest(tf.test.TestCase):
     b = 0.3
     bijector = tfb.Kumaraswamy(
         concentration1=a, concentration0=b, validate_args=True)
-    self.assertEqual("kumaraswamy", bijector.name)
+    self.assertStartsWith(bijector.name, "kumaraswamy")
     x = np.array([[[0.1], [0.2], [0.3], [0.4], [0.5]]], dtype=np.float32)
     # Kumaraswamy cdf. This is the same as inverse(x).
     y = 1. - (1. - x ** a) ** b
@@ -86,6 +88,44 @@ class KumaraswamyBijectorTest(tf.test.TestCase):
     bijector_test_util.assert_bijective_and_finite(
         bijector, x, y, eval_func=self.evaluate, event_ndims=0,
         rtol=1e-3)
+
+  def testVariableConcentration1(self):
+    x = tf.Variable(1.)
+    b = tfb.Kumaraswamy(concentration0=1., concentration1=x, validate_args=True)
+    self.evaluate(tf1.global_variables_initializer())
+    self.assertIs(x, b.concentration1)
+    self.assertEqual((), self.evaluate(b.forward(1.)).shape)
+    with self.assertRaisesOpError(
+        "Argument `concentration1` must be positive."):
+      with tf.control_dependencies([x.assign(-1.)]):
+        self.assertEqual((), self.evaluate(b.forward(1.)).shape)
+
+  def testVariableConcentration0(self):
+    x = tf.Variable(1.)
+    b = tfb.Kumaraswamy(concentration0=x, concentration1=1., validate_args=True)
+    self.evaluate(tf1.global_variables_initializer())
+    self.assertIs(x, b.concentration0)
+    self.assertEqual((), self.evaluate(b.forward(1.)).shape)
+    with self.assertRaisesOpError(
+        "Argument `concentration0` must be positive."):
+      with tf.control_dependencies([x.assign(-1.)]):
+        self.assertEqual((), self.evaluate(b.forward(1.)).shape)
+
+  def testShapeGetterRaisesException(self):
+    x = tf.Variable(-1.)
+    self.evaluate(tf1.global_variables_initializer())
+    with self.assertRaisesOpError(
+        "Argument `concentration1` must be positive."):
+      b = tfb.Kumaraswamy(concentration0=1.,
+                          concentration1=x,
+                          validate_args=True)
+      self.evaluate(b.forward_event_shape_tensor([1, 2, 3]))
+    with self.assertRaisesOpError(
+        "Argument `concentration1` must be positive."):
+      b = tfb.Kumaraswamy(concentration0=1.,
+                          concentration1=x,
+                          validate_args=True)
+      self.evaluate(b.forward_event_shape_tensor(tf.constant([1, 2, 3])))
 
 
 if __name__ == "__main__":

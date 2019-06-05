@@ -93,7 +93,7 @@ class Permute(bijector.Bijector):
       NotImplementedError: if `axis` is not known prior to graph execution.
       NotImplementedError: if `axis` is not negative.
     """
-    with tf.name_scope(name or "permute"):
+    with tf.name_scope(name or "permute") as name:
       axis = tf.convert_to_tensor(value=axis, name="axis")
       if not dtype_util.is_integer(axis.dtype):
         raise TypeError("axis.dtype ({}) should be `int`-like.".format(
@@ -132,7 +132,7 @@ class Permute(bijector.Bijector):
           forward_min_event_ndims=forward_min_event_ndims,
           is_constant_jacobian=True,
           validate_args=validate_args,
-          name=name or "permute")
+          name=name)
 
   @property
   def permutation(self):

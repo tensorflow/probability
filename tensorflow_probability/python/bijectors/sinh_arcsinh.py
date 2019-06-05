@@ -26,8 +26,8 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensor_util
 
 __all__ = [
     "SinhArcsinh",
@@ -95,7 +95,7 @@ class SinhArcsinh(bijector.Bijector):
                skewness=None,
                tailweight=None,
                validate_args=False,
-               name="SinhArcsinh"):
+               name="sinh_arcsinh"):
     """Instantiates the `SinhArcsinh` bijector.
 
     Args:
@@ -107,26 +107,19 @@ class SinhArcsinh(bijector.Bijector):
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
     """
-    self._graph_parents = []
-    self._name = name
-    self._validate_args = validate_args
-    with self._name_scope("init"):
+    with tf.name_scope(name) as name:
       tailweight = 1. if tailweight is None else tailweight
       skewness = 0. if skewness is None else skewness
-      self._skewness = tf.convert_to_tensor(value=skewness, name="skewness")
-      self._tailweight = tf.convert_to_tensor(
-          value=tailweight, name="tailweight", dtype=self._skewness.dtype)
-      dtype_util.assert_same_float_dtype([self._skewness, self._tailweight])
-      if validate_args:
-        self._tailweight = distribution_util.with_dependencies([
-            assert_util.assert_positive(
-                self._tailweight,
-                message="Argument tailweight was not positive")
-        ], self._tailweight)
-    super(SinhArcsinh, self).__init__(
-        forward_min_event_ndims=0,
-        validate_args=validate_args,
-        name=name)
+      dtype = dtype_util.common_dtype(
+          [tailweight, skewness], preferred_dtype=tf.float32)
+      self._skewness = tensor_util.convert_immutable_to_tensor(
+          skewness, dtype=dtype, name="skewness")
+      self._tailweight = tensor_util.convert_immutable_to_tensor(
+          tailweight, dtype=dtype, name="tailweight")
+      super(SinhArcsinh, self).__init__(
+          forward_min_event_ndims=0,
+          validate_args=validate_args,
+          name=name)
 
   @property
   def skewness(self):
@@ -172,3 +165,13 @@ class SinhArcsinh(bijector.Bijector):
         # TODO(srvasude): Consider using cosh(arcsinh(x)) in cases
         # where (arcsinh(x) + skewness) * tailweight ~= arcsinh(x).
         / _sqrtx2p1(x)) + tf.math.log(self.tailweight))
+
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+    assertions = []
+    if is_init != tensor_util.is_mutable(self.tailweight):
+      assertions.append(assert_util.assert_positive(
+          self.tailweight,
+          message="Argument `tailweight` must be positive."))
+    return assertions

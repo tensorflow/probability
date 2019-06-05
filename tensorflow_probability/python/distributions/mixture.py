@@ -484,7 +484,7 @@ class Mixture(distribution.Distribution):
     Returns:
       A lower bound on the Mixture's entropy.
     """
-    with self._name_scope(name):
+    with self._name_and_control_scope(name):
       with tf.control_dependencies(self._assertions):
         distribution_entropies = [d.entropy() for d in self.components]
         cat_probs = self._cat_probs(log_probs=False)

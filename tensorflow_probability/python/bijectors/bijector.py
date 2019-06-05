@@ -21,17 +21,18 @@ from __future__ import print_function
 import abc
 import collections
 import contextlib
-import re
 import weakref
 
 # Dependency imports
 import numpy as np
 import six
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import name_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
@@ -44,7 +45,7 @@ __all__ = [
 def _get_current_graph():
   if tf.executing_eagerly():
     return None
-  return tf.compat.v1.get_default_graph()
+  return tf1.get_default_graph()
 
 
 class _Mapping(
@@ -202,7 +203,7 @@ class HashableWeakRef(weakref.ref):
 
 
 @six.add_metaclass(abc.ABCMeta)
-class Bijector(object):
+class Bijector(tf.Module):
   r"""Interface for transformations of a `Distribution` sample.
 
   Bijectors can be used to represent any differentiable and injective
@@ -606,6 +607,16 @@ class Bijector(object):
         negative.
       ValueError:  If a member of `graph_parents` is not a `Tensor`.
     """
+    if not name:
+      name = type(self).__name__
+      name = name_util.camel_to_lower_snake(name)
+    name = name_util.get_name_scope_name(name.lstrip("_"))
+    # TODO(b/134508150): Uncomment once name requirements can be reconciled.
+    # name = name_util.strip_invalid_chars(name)
+    # name = name.rstrip("_")
+    # super(Bijector, self).__init__(name=name)
+    self._name = name
+
     self._graph_parents = graph_parents or []
 
     if forward_min_event_ndims is None and inverse_min_event_ndims is None:
@@ -642,20 +653,14 @@ class Bijector(object):
     self._dtype = dtype
     self._from_y = WeakKeyDefaultDict()
     self._from_x = WeakKeyDefaultDict()
-    if name:
-      self._name = name
-    else:
-      # We want the default convention to be snake_case rather than CamelCase
-      # since `Chain` uses bijector.name as the kwargs dictionary key.
-      def camel_to_snake(name):
-        s1 = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
-        return re.sub("([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
-
-      self._name = camel_to_snake(type(self).__name__.lstrip("_"))
 
     for i, t in enumerate(self._graph_parents):
       if t is None or not tf.is_tensor(t):
         raise ValueError("Graph parent item %d is not a Tensor; %s." % (i, t))
+
+    self._initial_parameter_control_dependencies = tuple(
+        d for d in self._parameter_control_dependencies(is_init=True)
+        if d is not None)
 
   @property
   def graph_parents(self):
@@ -821,10 +826,13 @@ class Bijector(object):
       forward_event_shape_tensor: `Tensor`, `int32` vector indicating
         event-portion shape after applying `forward`.
     """
-    with self._name_scope(name):
+    with self._name_and_control_scope(name):
       input_shape = tf.convert_to_tensor(
-          value=input_shape, dtype=tf.int32, name="input_shape")
-      return self._forward_event_shape_tensor(input_shape)
+          input_shape, dtype_hint=tf.int32, name="input_shape")
+      return tf.identity(
+          tf.convert_to_tensor(self._forward_event_shape_tensor(input_shape),
+                               dtype_hint=tf.int32),
+          name="forward_event_shape")
 
   def _forward_event_shape(self, input_shape):
     """Subclass implementation for `forward_event_shape` public function."""
@@ -844,7 +852,8 @@ class Bijector(object):
       forward_event_shape_tensor: `TensorShape` indicating event-portion shape
         after applying `forward`. Possibly unknown.
     """
-    return self._forward_event_shape(tf.TensorShape(input_shape))
+    input_shape = tf.TensorShape(input_shape)
+    return tf.TensorShape(self._forward_event_shape(input_shape))
 
   def _inverse_event_shape_tensor(self, output_shape):
     """Subclass implementation for `inverse_event_shape_tensor` function."""
@@ -865,15 +874,18 @@ class Bijector(object):
       inverse_event_shape_tensor: `Tensor`, `int32` vector indicating
         event-portion shape after applying `inverse`.
     """
-    with self._name_scope(name):
+    with self._name_and_control_scope(name):
       output_shape = tf.convert_to_tensor(
-          value=output_shape, dtype=tf.int32, name="output_shape")
-      return self._inverse_event_shape_tensor(output_shape)
+          output_shape, dtype_hint=tf.int32, name="output_shape")
+      return tf.identity(
+          tf.convert_to_tensor(self._inverse_event_shape_tensor(output_shape),
+                               dtype_hint=tf.int32),
+          name="inverse_event_shape")
 
   def _inverse_event_shape(self, output_shape):
     """Subclass implementation for `inverse_event_shape` public function."""
     # By default, we assume event_shape is unchanged.
-    return tf.TensorShape(output_shape)
+    return output_shape
 
   def inverse_event_shape(self, output_shape):
     """Shape of a single sample from a single batch as a `TensorShape`.
@@ -888,7 +900,8 @@ class Bijector(object):
       inverse_event_shape_tensor: `TensorShape` indicating event-portion shape
         after applying `inverse`. Possibly unknown.
     """
-    return self._inverse_event_shape(tf.TensorShape(output_shape))
+    output_shape = tf.TensorShape(output_shape)
+    return tf.TensorShape(self._inverse_event_shape(output_shape))
 
   def _forward(self, x):
     """Subclass implementation for `forward` public function."""
@@ -896,8 +909,8 @@ class Bijector(object):
 
   def _call_forward(self, x, name, **kwargs):
     """Wraps call to _forward, allowing extra shared logic."""
-    with self._name_scope(name):
-      x = tf.convert_to_tensor(value=x, name="x")
+    with self._name_and_control_scope(name):
+      x = tf.convert_to_tensor(x, name="x")
       self._maybe_assert_dtype(x)
       if not self._is_injective:  # No caching for non-injective
         return self._forward(x, **kwargs)
@@ -938,8 +951,8 @@ class Bijector(object):
 
   def _call_inverse(self, y, name, **kwargs):
     """Wraps call to _inverse, allowing extra shared logic."""
-    with self._name_scope(name):
-      y = tf.convert_to_tensor(value=y, name="y")
+    with self._name_and_control_scope(name):
+      y = tf.convert_to_tensor(y, name="y")
       self._maybe_assert_dtype(y)
       if not self._is_injective:  # No caching for non-injective
         return self._inverse(y, **kwargs)
@@ -1165,11 +1178,11 @@ class Bijector(object):
       ildj: the inverse log det jacobian at `y`. Also updates the cache as
         needed.
     """
-    with self._name_scope(name), tf.control_dependencies(
+    with self._name_and_control_scope(name), tf.control_dependencies(
         self._check_valid_event_ndims(
             min_event_ndims=self.inverse_min_event_ndims,
             event_ndims=event_ndims)):
-      y = tf.convert_to_tensor(value=y, name="y")
+      y = tf.convert_to_tensor(y, name="y")
       self._maybe_assert_dtype(y)
 
       if not self._is_injective:
@@ -1249,11 +1262,11 @@ class Bijector(object):
           "forward_log_det_jacobian cannot be implemented for non-injective "
           "transforms.")
 
-    with self._name_scope(name), tf.control_dependencies(
+    with self._name_and_control_scope(name), tf.control_dependencies(
         self._check_valid_event_ndims(
             min_event_ndims=self.forward_min_event_ndims,
             event_ndims=event_ndims)):
-      x = tf.convert_to_tensor(value=x, name="x")
+      x = tf.convert_to_tensor(x, name="x")
       self._maybe_assert_dtype(x)
 
       return -self._compute_inverse_log_det_jacobian_with_caching(
@@ -1294,11 +1307,20 @@ class Bijector(object):
     return self._call_forward_log_det_jacobian(x, event_ndims, name, **kwargs)
 
   @contextlib.contextmanager
-  def _name_scope(self, name=None):
+  def _name_and_control_scope(self, name=None):
     """Helper function to standardize op scope."""
-    with tf.compat.v2.name_scope(self.name):
-      with tf.compat.v2.name_scope(name) as scope:
-        yield scope
+    with tf.name_scope(self.name):
+      with tf.name_scope(name) as name_scope:
+        deps = tuple(
+            d for d in (  # pylint: disable=g-complex-comprehension
+                tuple(self._initial_parameter_control_dependencies) +
+                tuple(self._parameter_control_dependencies(is_init=False)))
+            if d is not None)
+        if not deps:
+          yield name_scope
+          return
+        with tf.control_dependencies(deps) as deps_scope:
+          yield deps_scope
 
   def _maybe_assert_dtype(self, x):
     """Helper to check dtype when self.dtype is known."""
@@ -1372,7 +1394,7 @@ class Bijector(object):
 
   def _check_valid_event_ndims(self, min_event_ndims, event_ndims):
     """Check whether event_ndims is atleast min_event_ndims."""
-    event_ndims = tf.convert_to_tensor(value=event_ndims, name="event_ndims")
+    event_ndims = tf.convert_to_tensor(event_ndims, name="event_ndims")
     event_ndims_ = tf.get_static_value(event_ndims)
     assertions = []
 
@@ -1419,6 +1441,21 @@ class Bijector(object):
       event_ndims_ = int(event_ndims_)
 
     return event_ndims_
+
+  def _parameter_control_dependencies(self, is_init):
+    """Returns a list of ops to be executed in members with graph deps.
+
+    Typically subclasses override this function to return parameter specific
+    assertions (eg, positivity of `scale`, etc.).
+
+    Args:
+      is_init: Python `bool` indicating that the call site is `__init__`.
+
+    Returns:
+      dependencies: `list`-like of ops to be executed in member functions with
+        graph dependencies.
+    """
+    return ()
 
 
 class ConditionalBijector(Bijector):

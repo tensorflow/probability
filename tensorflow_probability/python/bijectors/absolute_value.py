@@ -77,10 +77,7 @@ class AbsoluteValue(bijector.Bijector):
         `inverse_log_det_jacobian` are non-negative.
       name: Python `str` name given to ops managed by this object.
     """
-    self._graph_parents = []
-    self._name = name
-
-    with self._name_scope("init"):
+    with tf.name_scope(name) as name:
       super(AbsoluteValue, self).__init__(
           forward_min_event_ndims=0,
           validate_args=validate_args,

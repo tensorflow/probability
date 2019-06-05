@@ -33,7 +33,7 @@ class SquareBijectorTest(tf.test.TestCase):
 
   def testBijectorScalar(self):
     bijector = tfb.Square(validate_args=True)
-    self.assertEqual("square", bijector.name)
+    self.assertStartsWith(bijector.name, "square")
     x = [[[1., 5],
           [2, 1]],
          [[np.sqrt(2.), 3],

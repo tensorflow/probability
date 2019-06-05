@@ -36,7 +36,7 @@ class AffineLinearOperatorTest(tf.test.TestCase):
     y = x
     ildj = 0.
 
-    self.assertEqual(affine.name, "affine_linear_operator")
+    self.assertStartsWith(affine.name, "affine_linear_operator")
     self.assertAllClose(y, self.evaluate(affine.forward(x)))
     self.assertAllClose(x, self.evaluate(affine.inverse(y)))
     self.assertAllClose(
@@ -60,7 +60,7 @@ class AffineLinearOperatorTest(tf.test.TestCase):
     y = diag * x + shift
     ildj = -np.sum(np.log(np.abs(diag)), axis=-1)
 
-    self.assertEqual(affine.name, "affine_linear_operator")
+    self.assertStartsWith(affine.name, "affine_linear_operator")
     self.assertAllClose(y, self.evaluate(affine.forward(x)))
     self.assertAllClose(x, self.evaluate(affine.inverse(y)))
     self.assertAllClose(
@@ -95,7 +95,7 @@ class AffineLinearOperatorTest(tf.test.TestCase):
     ildj = -np.sum(np.log(np.abs(np.diagonal(
         tril, axis1=-2, axis2=-1))))
 
-    self.assertEqual(affine.name, "affine_linear_operator")
+    self.assertStartsWith(affine.name, "affine_linear_operator")
     self.assertAllClose(y, self.evaluate(affine.forward(x)))
     self.assertAllClose(x, self.evaluate(affine.inverse(y)))
     self.assertAllClose(
@@ -133,7 +133,7 @@ class AffineLinearOperatorTest(tf.test.TestCase):
     ildj = -np.sum(np.log(np.abs(np.diagonal(
         tril, axis1=-2, axis2=-1))))
 
-    self.assertEqual(affine.name, "affine_linear_operator")
+    self.assertStartsWith(affine.name, "affine_linear_operator")
     self.assertAllClose(y, self.evaluate(affine.forward(x)))
     self.assertAllClose(x, self.evaluate(affine.inverse(y)))
     self.assertAllClose(

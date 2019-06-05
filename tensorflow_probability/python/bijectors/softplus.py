@@ -83,7 +83,7 @@ class Softplus(bijector.Bijector):
                hinge_softness=None,
                validate_args=False,
                name="softplus"):
-    with tf.name_scope(name):
+    with tf.name_scope(name) as name:
       if hinge_softness is None:
         self._hinge_softness = None
       else:
@@ -96,11 +96,10 @@ class Softplus(bijector.Bijector):
               message="hinge_softness must be non-zero")
           self._hinge_softness = distribution_util.with_dependencies(
               [nonzero_check], self.hinge_softness)
-
-    super(Softplus, self).__init__(
-        forward_min_event_ndims=0,
-        validate_args=validate_args,
-        name=name)
+      super(Softplus, self).__init__(
+          forward_min_event_ndims=0,
+          validate_args=validate_args,
+          name=name)
 
   def _forward(self, x):
     if self.hinge_softness is None:

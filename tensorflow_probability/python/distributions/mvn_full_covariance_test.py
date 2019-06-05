@@ -51,7 +51,7 @@ class MultivariateNormalFullCovarianceTest(tf.test.TestCase):
     mu = [1., 2.]
     sigma = [[1., 0.], [0., 1.]]
     mvn = tfd.MultivariateNormalFullCovariance(mu, sigma, name="Billy")
-    self.assertEqual(mvn.name, "Billy/")
+    self.assertStartsWith(mvn.name, "Billy")
 
   def testDoesNotRaiseIfInitializedWithSymmetricMatrix(self):
     mu = rng.rand(10)

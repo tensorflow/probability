@@ -34,7 +34,7 @@ class _IteratedSigmoidCenteredBijectorTest(object):
 
   def testBijectorVector(self):
     iterated_sigmoid = tfb.IteratedSigmoidCentered()
-    self.assertEqual("iterated_sigmoid", iterated_sigmoid.name)
+    self.assertStartsWith(iterated_sigmoid.name, "iterated_sigmoid")
     x = self.dtype([[0., 0., 0.], -np.log([1 / 3., 1 / 2., 1.])])
     y = self.dtype([[0.25, 0.25, 0.25, 0.25], [0.5, 0.25, 0.125, 0.125]])
     self.assertAllClose(y, self.evaluate(iterated_sigmoid.forward(x)))
@@ -55,7 +55,7 @@ class _IteratedSigmoidCenteredBijectorTest(object):
 
   def testBijectorUnknownShape(self):
     iterated_sigmoid = tfb.IteratedSigmoidCentered()
-    self.assertEqual("iterated_sigmoid", iterated_sigmoid.name)
+    self.assertStartsWith(iterated_sigmoid.name, "iterated_sigmoid")
     x_ = self.dtype([[0., 0., 0.], -np.log([1 / 3., 1 / 2., 1.])])
     y_ = self.dtype([[0.25, 0.25, 0.25, 0.25], [0.5, 0.25, 0.125, 0.125]])
     x = tf.compat.v1.placeholder_with_default(x_, shape=[2, None])

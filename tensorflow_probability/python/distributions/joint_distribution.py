@@ -62,9 +62,9 @@ class JointDistribution(distribution_lib.Distribution):
     instance. The optional `value` argument is either `None` or a `list`-like
     with the same `len` as either of the results.
 
-  - `_flatten`: takes a structured input and returns a sequence.
+  - `_model_flatten`: takes a structured input and returns a sequence.
 
-  - `_unflatten`: takes a sequence and returns a structure matching the
+  - `_model_unflatten`: takes a sequence and returns a structure matching the
     semantics of the `JointDistribution` subclass.
 
   Subclasses initialize:
@@ -82,11 +82,11 @@ class JointDistribution(distribution_lib.Distribution):
     raise NotImplementedError()
 
   @abc.abstractmethod
-  def _unflatten(self, xs):
+  def _model_unflatten(self, xs):
     raise NotImplementedError()
 
   @abc.abstractmethod
-  def _flatten(self, xs):
+  def _model_flatten(self, xs):
     raise NotImplementedError()
 
   @property
@@ -94,7 +94,7 @@ class JointDistribution(distribution_lib.Distribution):
     """The `DType` of `Tensor`s handled by this `Distribution`."""
     if self._most_recently_built_distributions is None:
       return super(JointDistribution, self).dtype
-    return self._unflatten(
+    return self._model_unflatten(
         None if d is None else d.dtype
         for d in self._most_recently_built_distributions)
 
@@ -111,7 +111,7 @@ class JointDistribution(distribution_lib.Distribution):
     """
     if self._most_recently_built_distributions is None:
       return None
-    return self._unflatten(
+    return self._model_unflatten(
         None if d is None else d.reparameterization_type
         for d in self._most_recently_built_distributions)
 
@@ -132,7 +132,7 @@ class JointDistribution(distribution_lib.Distribution):
     # a `TensorShape`.
     if self._most_recently_built_distributions is None:
       return None
-    return self._unflatten(
+    return self._model_unflatten(
         tf.TensorShape(None) if d is None else d.batch_shape
         for d in self._most_recently_built_distributions)
 
@@ -149,8 +149,9 @@ class JointDistribution(distribution_lib.Distribution):
       batch_shape: `Tensor` representing batch shape of each distribution in
         `model`.
     """
-    with self._name_scope(name):
-      return self._unflatten(self._map_attr_over_dists('batch_shape_tensor')[1])
+    with self._name_and_control_scope(name):
+      return self._model_unflatten(
+          self._map_attr_over_dists('batch_shape_tensor')[1])
 
   @property
   def event_shape(self):
@@ -166,7 +167,7 @@ class JointDistribution(distribution_lib.Distribution):
     # a `TensorShape`.
     if self._most_recently_built_distributions is None:
       return None
-    return self._unflatten(
+    return self._model_unflatten(
         tf.TensorShape(None) if d is None else d.event_shape
         for d in self._most_recently_built_distributions)
 
@@ -180,8 +181,9 @@ class JointDistribution(distribution_lib.Distribution):
       event_shape: `tuple` of `Tensor`s representing the `event_shape` for each
         distribution in `model`.
     """
-    with self._name_scope(name):
-      return self._unflatten(self._map_attr_over_dists('event_shape_tensor')[1])
+    with self._name_and_control_scope(name):
+      return self._model_unflatten(
+          self._map_attr_over_dists('event_shape_tensor')[1])
 
   def sample_distributions(self, sample_shape=(), seed=None, value=None,
                            name='sample_distributions'):
@@ -205,9 +207,9 @@ class JointDistribution(distribution_lib.Distribution):
       samples: a `tuple` of `Tensor`s with prepended dimensions `sample_shape`
         for each of `distribution_fn`.
     """
-    with self._name_scope(name):
+    with self._name_and_control_scope(name):
       ds, xs = self._call_flat_sample_distributions(sample_shape, seed, value)
-      return self._unflatten(ds), self._unflatten(xs)
+      return self._model_unflatten(ds), self._model_unflatten(xs)
 
   def log_prob_parts(self, value, name='log_prob_parts'):
     """Log probability density/mass function.
@@ -223,9 +225,9 @@ class JointDistribution(distribution_lib.Distribution):
       log_prob_parts: a `tuple` of `Tensor`s representing the `log_prob` for
         each `distribution_fn` evaluated at each corresponding `value`.
     """
-    with self._name_scope(name):
+    with self._name_and_control_scope(name):
       _, xs = self._map_measure_over_dists('log_prob', value)
-      return self._unflatten(xs)
+      return self._model_unflatten(xs)
 
   def prob_parts(self, value, name='prob_parts'):
     """Log probability density/mass function.
@@ -240,9 +242,9 @@ class JointDistribution(distribution_lib.Distribution):
       prob_parts: a `tuple` of `Tensor`s representing the `prob` for
         each `distribution_fn` evaluated at each corresponding `value`.
     """
-    with self._name_scope(name):
+    with self._name_and_control_scope(name):
       _, xs = self._map_measure_over_dists('prob', value)
-      return self._unflatten(xs)
+      return self._model_unflatten(xs)
 
   def is_scalar_event(self, name='is_scalar_event'):
     """Indicates that `event_shape == []`.
@@ -253,8 +255,9 @@ class JointDistribution(distribution_lib.Distribution):
     Returns:
       is_scalar_event: `bool` scalar `Tensor` for each distribution in `model`.
     """
-    with self._name_scope(name):
-      return self._unflatten(self._map_attr_over_dists('is_scalar_event')[1])
+    with self._name_and_control_scope(name):
+      return self._model_unflatten(
+          self._map_attr_over_dists('is_scalar_event')[1])
 
   def is_scalar_batch(self, name='is_scalar_batch'):
     """Indicates that `batch_shape == []`.
@@ -265,8 +268,9 @@ class JointDistribution(distribution_lib.Distribution):
     Returns:
       is_scalar_batch: `bool` scalar `Tensor` for each distribution in `model`.
     """
-    with self._name_scope(name):
-      return self._unflatten(self._map_attr_over_dists('is_scalar_batch')[1])
+    with self._name_and_control_scope(name):
+      return self._model_unflatten(
+          self._map_attr_over_dists('is_scalar_batch')[1])
 
   def _log_prob(self, value):
     _, xs = self._map_measure_over_dists('log_prob', value)
@@ -280,7 +284,7 @@ class JointDistribution(distribution_lib.Distribution):
                 '(i.e., draw a sample from each distribution).')})
   def _sample_n(self, sample_shape, seed, value=None):
     _, xs = self._call_flat_sample_distributions(sample_shape, seed, value)
-    return self._unflatten(xs)
+    return self._model_unflatten(xs)
 
   def _map_measure_over_dists(self, attr, value):
     if any(x is None for x in tf.nest.flatten(value)):
@@ -302,7 +306,7 @@ class JointDistribution(distribution_lib.Distribution):
   def _call_flat_sample_distributions(
       self, sample_shape=(), seed=None, value=None):
     if value is not None:
-      value = self._flatten(value)
+      value = self._model_flatten(value)
     ds, xs = self._flat_sample_distributions(sample_shape, seed, value)
     if not value:
       self._most_recently_built_distributions = tuple(ds)
@@ -313,11 +317,11 @@ class JointDistribution(distribution_lib.Distribution):
   # override the public level because then tfp.layers can't take generic
   # `Distribution.foo` as argument for the `convert_to_tensor_fn` parameter.
   def _call_log_prob(self, value, name):
-    with self._name_scope(name):
+    with self._name_and_control_scope(name):
       return self._log_prob(value)
 
   def _call_sample_n(self, sample_shape, seed, name, value=None):
-    with self._name_scope(name):
+    with self._name_and_control_scope(name):
       return self._sample_n(sample_shape, seed, value)
 
 

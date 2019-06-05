@@ -379,7 +379,7 @@ class QuantizedDistributionTest(test_case.TestCase):
     batch_shape = (2, 3)
     qdist = tfd.QuantizedDistribution(
         distribution=tfd.Normal(
-            loc=tf.zeros(batch_shape), scale=tf.zeros(batch_shape)),
+            loc=tf.zeros(batch_shape), scale=tf.ones(batch_shape)),
         low=1.0,
         high=10.0)
 

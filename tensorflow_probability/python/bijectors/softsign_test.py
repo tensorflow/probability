@@ -55,7 +55,7 @@ class SoftsignBijectorTest(tf.test.TestCase):
 
   def testBijectorForwardInverse(self):
     bijector = tfb.Softsign(validate_args=True)
-    self.assertEqual("softsign", bijector.name)
+    self.assertStartsWith(bijector.name, "softsign")
     x = 2. * self._rng.randn(2, 10)
     y = self._softsign(x)
 
@@ -73,7 +73,7 @@ class SoftsignBijectorTest(tf.test.TestCase):
 
   def testBijectorForwardInverseEventDimsOne(self):
     bijector = tfb.Softsign(validate_args=True)
-    self.assertEqual("softsign", bijector.name)
+    self.assertStartsWith(bijector.name, "softsign")
     x = 2. * self._rng.randn(2, 10)
     y = self._softsign(x)
     self.assertAllClose(y, self.evaluate(bijector.forward(x)))

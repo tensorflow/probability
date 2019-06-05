@@ -194,13 +194,13 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
       pass
     return ds, values_out
 
-  def _unflatten(self, xs):
+  def _model_unflatten(self, xs):
     if self._sample_dtype is None:
       return tuple(xs)
     # Cast `xs` as `tuple` so we can handle generators.
     return tf.nest.pack_sequence_as(self._sample_dtype, tuple(xs))
 
-  def _flatten(self, xs):
+  def _model_flatten(self, xs):
     if self._sample_dtype is None:
       return tuple(xs)
     return nest.flatten_up_to(self._sample_dtype, xs)

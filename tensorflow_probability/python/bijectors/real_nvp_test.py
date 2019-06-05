@@ -66,7 +66,7 @@ class RealNVPTest(
       ildj_ = self.evaluate(ildj)
       fldj_ = self.evaluate(fldj)
 
-      self.assertEqual("real_nvp", nvp.name)
+      self.assertStartsWith(nvp.name, "real_nvp")
       self.assertAllClose(forward_x_, forward_inverse_y_, rtol=1e-4, atol=0.)
       self.assertAllClose(x_, inverse_y_, rtol=1e-4, atol=0.)
       self.assertAllClose(ildj_, -fldj_, rtol=1e-6, atol=0.)
@@ -97,7 +97,7 @@ class RealNVPTest(
         ildj,
         fldj,
     ])
-    self.assertEqual("real_nvp", nvp.name)
+    self.assertStartsWith(nvp.name, "real_nvp")
     self.assertAllClose(forward_x_, forward_inverse_y_, rtol=1e-4, atol=0.)
     self.assertAllClose(x_, inverse_y_, rtol=1e-4, atol=0.)
     self.assertAllClose(ildj_, -fldj_, rtol=1e-6, atol=0.)
@@ -128,7 +128,7 @@ class RealNVPTest(
         ildj,
         fldj,
     ])
-    self.assertEqual("real_nvp", nvp.name)
+    self.assertStartsWith(nvp.name, "real_nvp")
     self.assertAllClose(forward_x_, forward_inverse_y_, rtol=1e-4, atol=0.)
     self.assertAllClose(x_, inverse_y_, rtol=1e-4, atol=0.)
     self.assertAllClose(ildj_, -fldj_, rtol=1e-6, atol=0.)
@@ -182,7 +182,7 @@ class RealNVPTest(
         ildj,
         fldj,
     ])
-    self.assertEqual("real_nvp", nvp.name)
+    self.assertStartsWith(nvp.name, "real_nvp")
     self.assertAllClose(forward_x_, forward_inverse_y_, rtol=1e-5, atol=1e-5)
     self.assertAllClose(x_, inverse_y_, rtol=1e-5, atol=1e-5)
     self.assertAllClose(ildj_, -fldj_, rtol=1e-5, atol=1e-5)

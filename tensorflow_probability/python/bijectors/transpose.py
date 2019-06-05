@@ -121,7 +121,7 @@ class Transpose(bijector.Bijector):
       NotImplementedError: if `rightmost_transposed_ndims` is not known prior to
         graph execution.
     """
-    with tf.name_scope(name):
+    with tf.name_scope(name) as name:
       if (rightmost_transposed_ndims is None) == (perm is None):
         raise ValueError('Must specify exactly one of '
                          '`rightmost_transposed_ndims` and `perm`.')

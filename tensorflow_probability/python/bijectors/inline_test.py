@@ -33,7 +33,6 @@ class InlineBijectorTest(tf.test.TestCase):
   """Tests correctness of the inline constructed bijector."""
 
   def testBijector(self):
-    exp = tfb.Exp()
     inline = tfb.Inline(
         forward_fn=tf.exp,
         inverse_fn=tf.math.log,
@@ -42,7 +41,7 @@ class InlineBijectorTest(tf.test.TestCase):
         forward_min_event_ndims=0,
         name="exp")
 
-    self.assertEqual(exp.name, inline.name)
+    self.assertStartsWith(inline.name, "exp")
     x = [[[1., 2.], [3., 4.], [5., 6.]]]
     y = np.exp(x)
     self.assertAllClose(y, self.evaluate(inline.forward(x)))

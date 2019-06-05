@@ -100,7 +100,7 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers,
         ildj,
         fldj,
     ])
-    self.assertEqual("batch_normalization", batch_norm.name)
+    self.assertStartsWith(batch_norm.name, "batch_normalization")
 
     reduction_axes = self._reduction_axes(input_shape, event_dims)
     keepdims = len(event_dims) > 1

@@ -27,6 +27,7 @@ from tensorflow_probability.python.distributions import joint_distribution as jo
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow.python.training.tracking import data_structures  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -42,7 +43,8 @@ def _make_summary_statistic(attr):
       raise ValueError(
           'Can only compute ' + attr + ' when all distributions are '
           'independent; {}'.format(self.model))
-    return self._unflatten(getattr(d(), attr)() for d in self._dist_fn_wrapped)  # pylint: disable=protected-access
+    return self._model_unflatten(  # pylint: disable=protected-access
+        getattr(d(), attr)() for d in self._dist_fn_wrapped)  # pylint: disable=protected-access
   return _fn
 
 
@@ -190,7 +192,10 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name or 'JointDistributionSequential') as name:
-      self._model = model
+      # Since we rely on `type(model)` and because `tf.Module` redefines
+      # lists, tuples, dicts, we create two aliases of `model`.
+      self._model_trackable = model
+      self._model = data_structures.NoDependency(model)
       self._build(model)
       self._most_recently_built_distributions = [
           None if a else d() for d, a
@@ -205,7 +210,7 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
           graph_parents=[],
           name=name)
       # Check valid structure.
-      self._unflatten(self._flatten(model))
+      self._model_unflatten(self._model_flatten(model))
 
   def _build(self, model):
     """Creates `dist_fn`, `dist_fn_wrapped`, `dist_fn_args`."""
@@ -242,27 +247,27 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
         xs[i] = tf.convert_to_tensor(value=xs[i], dtype_hint=ds[-1].dtype)
         seed()  # Ensure reproducibility even when xs are (partially) set.
     # Note: we could also resolve distributions up to the first non-`None` in
-    # `self._flatten(value)`, however we omit this feature for simplicity,
+    # `self._model_flatten(value)`, however we omit this feature for simplicity,
     # speed, and because it has not yet been requested.
     return ds, xs
 
-  def _unflatten(self, xs):
+  def _model_unflatten(self, xs):
     try:
       return type(self.model)(xs)
-    except TypeError:
+    except TypeError as e:
       raise TypeError(
-          'Unable to unflatten like `model` with type "{}".'.format(
-              type(self.model).__name__))
+          'Unable to unflatten like `model` with type "{}". '
+          'Exception: {}'.format(type(self.model).__name__, e))
 
-  def _flatten(self, xs):
+  def _model_flatten(self, xs):
     if xs is None:
       return (None,) * len(self._dist_fn_wrapped)
     try:
       xs = tuple(xs)
-    except TypeError:
+    except TypeError as e:
       raise TypeError(
-          'Unable to flatten like `model` with type "{}".'.format(
-              type(self.model).__name__))
+          'Unable to flatten like `model` with type "{}". '
+          'Exception: {}'.format(type(self.model).__name__, e))
     return xs + (None,)*(len(self._dist_fn_args) - len(xs))
 
   def _call_attr(self, attr):
@@ -403,7 +408,7 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
         # Makers which have no deps need slicing, just like distribution
         # instances.
         dfn.append(_sliced_maker(d))
-    return self.copy(model=self._unflatten(dfn))
+    return self.copy(model=self._model_unflatten(dfn))
 
 
 def _unify_call_signature(i, dist_fn):

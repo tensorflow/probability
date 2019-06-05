@@ -30,7 +30,7 @@ class AbsoluteValueTest(tf.test.TestCase):
 
   def testBijectorVersusNumpyRewriteOfBasicFunctionsEventNdims0(self):
     bijector = tfb.AbsoluteValue(validate_args=True)
-    self.assertEqual("absolute_value", bijector.name)
+    self.assertStartsWith(bijector.name, "absolute_value")
     x = tf.constant([[0., 1., -1], [0., -5., 3.]])  # Shape [2, 3]
     y = tf.abs(x)
 

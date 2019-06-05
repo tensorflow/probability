@@ -33,7 +33,7 @@ class SigmoidBijectorTest(tf.test.TestCase):
   """Tests correctness of the Y = g(X) = (1 + exp(-X))^-1 transformation."""
 
   def testBijector(self):
-    self.assertEqual("sigmoid", tfb.Sigmoid().name)
+    self.assertStartsWith(tfb.Sigmoid().name, "sigmoid")
     x = np.linspace(-10., 10., 100).reshape([2, 5, 10]).astype(np.float32)
     y = special.expit(x)
     ildj = -np.log(y) - np.log1p(-y)

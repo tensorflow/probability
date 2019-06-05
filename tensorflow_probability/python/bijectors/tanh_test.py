@@ -32,7 +32,7 @@ class TanhBijectorTest(tf.test.TestCase):
   """Tests correctness of the Y = g(X) = tanh(X) transformation."""
 
   def testBijector(self):
-    self.assertEqual("tanh", tfb.Tanh().name)
+    self.assertStartsWith(tfb.Tanh().name, "tanh")
     x = np.linspace(-3., 3., 100).reshape([2, 5, 10]).astype(np.float64)
     y = np.tanh(x)
     ildj = -np.log1p(-np.square(np.tanh(x)))

@@ -40,7 +40,7 @@ class InvertBijectorTest(tf.test.TestCase):
         tfb.SoftmaxCentered(),
     ]:
       rev = tfb.Invert(fwd)
-      self.assertEqual("_".join(["invert", fwd.name]), rev.name)
+      self.assertStartsWith(rev.name, "_".join(["invert", fwd.name]))
       x = [[[1., 2.],
             [2., 3.]]]
       self.assertAllClose(

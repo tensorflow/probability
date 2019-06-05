@@ -78,11 +78,7 @@ class AffineScalar(bijector.Bijector):
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
     """
-    self._graph_parents = []
-    self._name = name
-    self._validate_args = validate_args
-
-    with self._name_scope("init"):
+    with tf.name_scope(name) as name:
       self._shift = shift
       self._scale = scale
 

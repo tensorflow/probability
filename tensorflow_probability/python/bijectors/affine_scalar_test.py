@@ -38,7 +38,7 @@ class AffineScalarBijectorTest(tf.test.TestCase):
     mu = -1.
     # scale corresponds to 1.
     bijector = tfb.AffineScalar(shift=mu)
-    self.assertEqual("affine_scalar", bijector.name)
+    self.assertStartsWith(bijector.name, "affine_scalar")
 
   def testNoBatchScalar(self):
     def static_run(fun, x, **kwargs):

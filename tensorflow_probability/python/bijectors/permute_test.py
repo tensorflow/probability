@@ -58,7 +58,7 @@ class PermuteBijectorTest(tf.test.TestCase):
         bijector.forward_log_det_jacobian(expected_x, event_ndims=1),
         bijector.inverse_log_det_jacobian(expected_y, event_ndims=1),
     ])
-    self.assertEqual("permute", bijector.name)
+    self.assertStartsWith(bijector.name, "permute")
     self.assertAllEqual(expected_permutation, permutation_)
     self.assertAllClose(expected_y, y_, rtol=1e-6, atol=0)
     self.assertAllClose(expected_x, x_, rtol=1e-6, atol=0)

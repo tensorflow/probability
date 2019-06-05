@@ -31,7 +31,7 @@ class CholeskyOuterProductBijectorTest(tf.test.TestCase):
 
   def testBijectorMatrix(self):
     bijector = tfb.CholeskyOuterProduct(validate_args=True)
-    self.assertEqual("cholesky_outer_product", bijector.name)
+    self.assertStartsWith(bijector.name, "cholesky_outer_product")
     x = [[[1., 0], [2, 1]], [[np.sqrt(2.), 0], [np.sqrt(8.), 1]]]
     y = np.matmul(x, np.transpose(x, axes=(0, 2, 1)))
     # Fairly easy to compute differentials since we have 2x2.

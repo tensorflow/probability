@@ -463,20 +463,19 @@ class DistributionTest(tf.test.TestCase):
     x_log_prob = x.log_prob(0., name="custom_log_prob")
     x_duplicate_sample = x_duplicate.sample(name="custom_sample")
 
-    self.assertEqual(x.name, "x/")
-    self.assertEqual(y.name, "y/")
+    self.assertStartsWith(x.name, "x")
+    self.assertStartsWith(y.name, "y")
 
     # There's no notion of graph, hence the same name will be reused.
     # Tensors also do not have names in eager mode, so exit early.
     if tf.executing_eagerly():
       return
-    self.assertTrue(x_sample.name.startswith("x/custom_sample"))
-    self.assertTrue(x_log_prob.name.startswith("x/custom_log_prob"))
+    self.assertStartsWith(x_sample.name, "x/custom_sample")
+    self.assertStartsWith(x_log_prob.name, "x/custom_log_prob")
 
-    self.assertEqual(x_duplicate.name, "x_1/")
-    self.assertTrue(x_duplicate_sample.name.startswith(
-        "x_1/custom_sample"))
-    self.assertTrue(x_sample_duplicate.name.startswith("x/custom_sample_1"))
+    self.assertStartsWith(x_duplicate.name, "x_1")
+    self.assertStartsWith(x_duplicate_sample.name, "x_1/custom_sample")
+    self.assertStartsWith(x_sample_duplicate.name, "x/custom_sample_1")
 
   def testUnimplemtnedProbAndLogProbExceptions(self):
     class TerribleDistribution(tfd.Distribution):
@@ -533,7 +532,7 @@ class ParametersTest(tf.test.TestCase):
     actual_d_parameters = d.parameters
     self.assertEqual({"arg1": 1., "arg2": 2., "arg3": None, "named": {}},
                      actual_d_parameters)
-    self.assertIs(actual_d_parameters, d.parameters)
+    self.assertEqual(actual_d_parameters, d.parameters)
 
   @test_util.run_in_graph_and_eager_modes(assert_no_eager_garbage=True)
   def testNoSelfRefs(self):
@@ -549,6 +548,16 @@ class ParametersTest(tf.test.TestCase):
     self.assertNear(0.5 * np.log(2. * np.pi * np.e * scale**2.),
                     normal_differential_entropy(scale).numpy(),
                     err=1e-5)
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class TfModuleTest(tf.test.TestCase):
+
+  def variable_tracking_works(self):
+    scale = tf.Variable(1.)
+    normal = tfd.Normal(loc=0, scale=scale, validate_args=True)
+    self.assertIsInstance(normal, tf.Module)
+    self.assertEqual((scale,), normal.trainable_variables)
 
 
 if __name__ == "__main__":

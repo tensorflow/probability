@@ -63,7 +63,7 @@ class _TransposeBijectorTest(object):
 
     [y_, x_, ildj_, fldj_] = self.evaluate([y, x, ildj, fldj])
 
-    self.assertEqual('transpose', bijector.name)
+    self.assertStartsWith(bijector.name, 'transpose')
     self.assertAllEqual(actual_y, y_)
     self.assertAllEqual(actual_x, x_)
     self.assertAllEqual(0., ildj_)
@@ -102,7 +102,7 @@ class _TransposeBijectorTest(object):
 
     [y_, x_, ildj_, fldj_] = self.evaluate([y, x, ildj, fldj])
 
-    self.assertEqual('transpose', bijector.name)
+    self.assertStartsWith(bijector.name, 'transpose')
     self.assertAllEqual(actual_y, y_)
     self.assertAllEqual(actual_x, x_)
     self.assertAllEqual(0., ildj_)

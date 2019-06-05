@@ -116,7 +116,7 @@ def _value(self, dtype=None, name=None, as_ref=False):  # pylint: disable=g-doc-
           '`x = tfd.Normal(0,1).set_tensor_conversion(tfd.Distribution.mean)`'
           ' results in `tf.convert_to_tensor(x)` being identical to '
           '`x.mean()`.'.format(type(self), self))
-    with self._name_scope('value'):
+    with self._name_and_control_scope('value'):
       self._concrete_value = (self._convert_to_tensor_fn(self)
                               if callable(self._convert_to_tensor_fn)
                               else self._convert_to_tensor_fn)

@@ -55,7 +55,7 @@ class MultivariateNormalLinearOperatorTest(tf.test.TestCase):
     loc = [1., 2.]
     scale = tf.linalg.LinearOperatorIdentity(2)
     mvn = tfd.MultivariateNormalLinearOperator(loc, scale, name="Billy")
-    self.assertEqual(mvn.name, "Billy/")
+    self.assertStartsWith(mvn.name, "Billy")
 
   def testLogPDFScalarBatch(self):
     loc = self.rng.rand(2)

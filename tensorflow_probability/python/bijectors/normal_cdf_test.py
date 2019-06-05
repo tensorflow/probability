@@ -34,7 +34,7 @@ class NormalCDFBijectorTest(tf.test.TestCase):
 
   def testBijector(self):
     bijector = tfb.NormalCDF(validate_args=True)
-    self.assertEqual("normal", bijector.name)
+    self.assertStartsWith(bijector.name, "normal")
     x = np.array([[[-3.], [0.], [0.5], [4.2], [5.]]], dtype=np.float64)
     # Normal distribution
     normal_dist = stats.norm(loc=0., scale=1.)

@@ -37,7 +37,7 @@ class SoftmaxCenteredBijectorTest(tf.test.TestCase):
 
   def testBijectorVector(self):
     softmax = tfb.SoftmaxCentered()
-    self.assertEqual("softmax_centered", softmax.name)
+    self.assertStartsWith(softmax.name, "softmax_centered")
     x = np.log([[2., 3, 4], [4., 8, 12]])
     y = [[0.2, 0.3, 0.4, 0.1], [0.16, 0.32, 0.48, 0.04]]
     self.assertAllClose(y, self.evaluate(softmax.forward(x)))
@@ -55,7 +55,7 @@ class SoftmaxCenteredBijectorTest(tf.test.TestCase):
 
   def testBijectorUnknownShape(self):
     softmax = tfb.SoftmaxCentered()
-    self.assertEqual("softmax_centered", softmax.name)
+    self.assertStartsWith(softmax.name, "softmax_centered")
     x_ = np.log([[2., 3, 4], [4., 8, 12]]).astype(np.float32)
     y_ = np.array(
         [[0.2, 0.3, 0.4, 0.1], [0.16, 0.32, 0.48, 0.04]], dtype=np.float32)

@@ -24,6 +24,7 @@ from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensor_util
 
 __all__ = [
     "Gumbel",
@@ -63,23 +64,16 @@ class Gumbel(bijector.Bijector):
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
     """
-    self._graph_parents = []
-    self._name = name
-    self._validate_args = validate_args
-    with self._name_scope("init"):
-      self._loc = tf.convert_to_tensor(value=loc, name="loc")
-      self._scale = tf.convert_to_tensor(value=scale, name="scale")
-      dtype_util.assert_same_float_dtype([self._loc, self._scale])
-      if validate_args:
-        self._scale = distribution_util.with_dependencies([
-            assert_util.assert_positive(
-                self._scale, message="Argument scale was not positive")
-        ], self._scale)
-
-    super(Gumbel, self).__init__(
-        validate_args=validate_args,
-        forward_min_event_ndims=0,
-        name=name)
+    with tf.name_scope(name) as name:
+      dtype = dtype_util.common_dtype([loc, scale], preferred_dtype=tf.float32)
+      self._loc = tensor_util.convert_immutable_to_tensor(
+          loc, dtype=dtype, name="loc")
+      self._scale = tensor_util.convert_immutable_to_tensor(
+          scale, dtype=dtype, name="scale")
+      super(Gumbel, self).__init__(
+          validate_args=validate_args,
+          forward_min_event_ndims=0,
+          name=name)
 
   @property
   def loc(self):
@@ -117,3 +111,13 @@ class Gumbel(bijector.Bijector):
         tf.constant(1., y.dtype),
         message="Inverse transformation input must be less than or equal to 1.")
     return distribution_util.with_dependencies([is_positive, less_than_one], y)
+
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+    assertions = []
+    if is_init != tensor_util.is_mutable(self.scale):
+      assertions.append(assert_util.assert_positive(
+          self.scale,
+          message="Argument `scale` must be positive."))
+    return assertions

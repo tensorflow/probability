@@ -47,7 +47,7 @@ class ReciprocalTest(tf.test.TestCase, parameterized.TestCase):
       )
   def testBijector(self, lower, upper):
     bijector = tfb.Reciprocal()
-    self.assertEqual('reciprocal', bijector.name)
+    self.assertStartsWith(bijector.name, 'reciprocal')
     x = tf.linspace(lower, upper, 100)
     y = 1. / x
     self.assertAllClose(self.evaluate(y), self.evaluate(bijector.forward(x)))

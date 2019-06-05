@@ -402,21 +402,21 @@ class _WishartLinearOperator(distribution.Distribution):
 
   def mean_log_det(self, name="mean_log_det"):
     """Computes E[log(det(X))] under this Wishart distribution."""
-    with self._name_scope(name):
+    with self._name_and_control_scope(name):
       return (self._multi_digamma(0.5 * self.df, self.dimension) +
               self.dimension * math.log(2.) +
               2 * self.scale_operator.log_abs_determinant())
 
   def log_normalization(self, name="log_normalization"):
     """Computes the log normalizing constant, log(Z)."""
-    with self._name_scope(name):
+    with self._name_and_control_scope(name):
       return (self.df * self.scale_operator.log_abs_determinant() +
               0.5 * self.df * self.dimension * math.log(2.) +
               self._multi_lgamma(0.5 * self.df, self.dimension))
 
   def _multi_gamma_sequence(self, a, p, name="multi_gamma_sequence"):
     """Creates sequence used in multivariate (di)gamma; shape = shape(a)+[p]."""
-    with self._name_scope(name):
+    with self._name_and_control_scope(name):
       # Linspace only takes scalars, so we'll add in the offset afterwards.
       seq = tf.linspace(
           tf.constant(0., dtype=self.dtype), 0.5 - 0.5 * p, tf.cast(
@@ -425,14 +425,14 @@ class _WishartLinearOperator(distribution.Distribution):
 
   def _multi_lgamma(self, a, p, name="multi_lgamma"):
     """Computes the log multivariate gamma function; log(Gamma_p(a))."""
-    with self._name_scope(name):
+    with self._name_and_control_scope(name):
       seq = self._multi_gamma_sequence(a, p)
       return (0.25 * p * (p - 1.) * math.log(math.pi) +
               tf.reduce_sum(input_tensor=tf.math.lgamma(seq), axis=[-1]))
 
   def _multi_digamma(self, a, p, name="multi_digamma"):
     """Computes the multivariate digamma function; Psi_p(a)."""
-    with self._name_scope(name):
+    with self._name_and_control_scope(name):
       seq = self._multi_gamma_sequence(a, p)
       return tf.reduce_sum(input_tensor=tf.math.digamma(seq), axis=[-1])
 

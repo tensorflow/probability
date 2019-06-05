@@ -179,13 +179,13 @@ class JointDistributionNamed(
         self._dist_fn_wrapped,
         self._dist_fn_args,
         self._dist_fn_name,  # JointDistributionSequential doesn't have this.
-    ] = _prob_chain_rule_flatten(model)
+    ] = _prob_chain_rule_model_flatten(model)
 
-  def _unflatten(self, xs):
+  def _model_unflatten(self, xs):
     kwargs = dict(zip(self._dist_fn_name, tuple(xs)))
     return type(self.model)(**kwargs)
 
-  def _flatten(self, xs):
+  def _model_flatten(self, xs):
     if xs is None:
       return (None,) * len(self._dist_fn_name)
     if hasattr(xs, 'get'):
@@ -242,7 +242,7 @@ def _best_order(g):
   return tuple(result)
 
 
-def _prob_chain_rule_flatten(named_makers):
+def _prob_chain_rule_model_flatten(named_makers):
   """Creates lists of callables suitable for JDSeq."""
   def _make(dist_fn, args):
     if args is None:
@@ -268,9 +268,7 @@ def _prob_chain_rule_flatten(named_makers):
 
 def _is_dict_like(x):
   """Returns `True` if input is convertible to `dict`, `False` otherwise."""
-  if hasattr(x, '_asdict'):
-    return True
-  return isinstance(x, collections.Mapping)
+  return hasattr(x, '_asdict') or isinstance(x, collections.Mapping)
 
 
 def _convert_to_dict(x):
@@ -278,5 +276,3 @@ def _convert_to_dict(x):
   if hasattr(x, '_asdict'):
     return x._asdict()
   return dict(x)
-
-

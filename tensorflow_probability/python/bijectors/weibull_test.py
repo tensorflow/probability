@@ -37,7 +37,7 @@ class WeibullBijectorTest(tf.test.TestCase):
     concentration = 0.3
     bijector = tfb.Weibull(
         scale=scale, concentration=concentration, validate_args=True)
-    self.assertEqual("weibull", bijector.name)
+    self.assertStartsWith(bijector.name, "weibull")
     x = np.array([[[0.], [1.], [14.], [20.], [100.]]], dtype=np.float32)
     # Weibull distribution
     weibull_dist = stats.frechet_r(c=concentration, scale=scale)
