@@ -38,19 +38,22 @@ class _EffectiveSampleSizeTest(object):
     raise NotImplementedError(
         "Subclass failed to implement `use_static_shape`.")
 
-  def _check_versus_expected_effective_sample_size(self,
-                                                   x_,
-                                                   expected_ess,
-                                                   atol=1e-2,
-                                                   rtol=1e-2,
-                                                   filter_threshold=None,
-                                                   filter_beyond_lag=None):
+  def _check_versus_expected_effective_sample_size(
+      self,
+      x_,
+      expected_ess,
+      atol=1e-2,
+      rtol=1e-2,
+      filter_threshold=None,
+      filter_beyond_lag=None,
+      filter_beyond_positive_pairs=False):
     x = tf.compat.v1.placeholder_with_default(
         input=x_, shape=x_.shape if self.use_static_shape else None)
     ess = tfp.mcmc.effective_sample_size(
         x,
         filter_threshold=filter_threshold,
-        filter_beyond_lag=filter_beyond_lag)
+        filter_beyond_lag=filter_beyond_lag,
+        filter_beyond_positive_pairs=filter_beyond_positive_pairs)
     if self.use_static_shape:
       self.assertAllEqual(x.shape[1:], ess.shape)
 
@@ -88,7 +91,7 @@ class _EffectiveSampleSizeTest(object):
     # we should have a super-duper estimate of ESS, and it should be very close
     # to the full sequence length of 5000.
     # The choice of filter_beyond_lag = 0 means we cutoff as soon as the
-    # auto-corris below zero.  This should happen very quickly, due to the fact
+    # auto-corr is below zero.  This should happen very quickly, due to the fact
     # that the theoretical auto-corr is [1, 0, 0,...]
     with spectral_ops_test_util.fft_kernel_label_map():
       self._check_versus_expected_effective_sample_size(
@@ -107,6 +110,42 @@ class _EffectiveSampleSizeTest(object):
           filter_beyond_lag=None,
           filter_threshold=0.,
           rtol=0.1)
+
+  def testIidRank1NormalHasFullEssMaxLagInitialPositive(self):
+    # See similar test for ThresholdZero for background. This time this uses the
+    # initial_positive sequence criterion. In this case, initial_positive
+    # sequence might be a little more noisy than the threshold case because it
+    # will typically not drop the lag-1 auto-correlation.
+    with spectral_ops_test_util.fft_kernel_label_map():
+      self._check_versus_expected_effective_sample_size(
+          x_=rng.randn(5000).astype(np.float32),
+          expected_ess=5000,
+          filter_beyond_lag=None,
+          filter_threshold=None,
+          filter_beyond_positive_pairs=True,
+          rtol=0.2)
+
+  def testIidRank2NormalHasFullEssMaxLagInitialPositive(self):
+    # See similar test for Rank1Normal for reasoning.
+    with spectral_ops_test_util.fft_kernel_label_map():
+      self._check_versus_expected_effective_sample_size(
+          x_=rng.randn(5000, 2).astype(np.float32),
+          expected_ess=5000,
+          filter_beyond_lag=None,
+          filter_threshold=None,
+          filter_beyond_positive_pairs=True,
+          rtol=0.2)
+
+  def testIidRank1NormalHasFullEssMaxLagInitialPositiveOddLength(self):
+    # See similar test for Rank1Normal for reasoning.
+    with spectral_ops_test_util.fft_kernel_label_map():
+      self._check_versus_expected_effective_sample_size(
+          x_=rng.randn(4999).astype(np.float32),
+          expected_ess=4999,
+          filter_beyond_lag=None,
+          filter_threshold=None,
+          filter_beyond_positive_pairs=True,
+          rtol=0.2)
 
   def testLength10CorrelationHasEssOneTenthTotalLengthUsingMaxLags50(self):
     # Create x_, such that
@@ -137,6 +176,23 @@ class _EffectiveSampleSizeTest(object):
           expected_ess=50000 // 10,
           filter_beyond_lag=None,
           filter_threshold=0.,
+          rtol=0.1)
+
+  def testLength10CorrelationHasEssOneTenthTotalLengthUsingMaxLagsInitialPositive(
+      self):
+    # Create x_, such that
+    #   x_[i] = iid_x_[0], i = 0,...,9
+    #   x_[i] = iid_x_[1], i = 10,..., 19,
+    #   and so on.
+    iid_x_ = rng.randn(5000, 1).astype(np.float32)
+    x_ = (iid_x_ * np.ones((5000, 10)).astype(np.float32)).reshape((50000,))
+    with spectral_ops_test_util.fft_kernel_label_map():
+      self._check_versus_expected_effective_sample_size(
+          x_=x_,
+          expected_ess=50000 // 10,
+          filter_beyond_lag=None,
+          filter_threshold=None,
+          filter_beyond_positive_pairs=True,
           rtol=0.1)
 
   def testListArgs(self):
@@ -214,6 +270,55 @@ class _EffectiveSampleSizeTest(object):
       # filter_threshold = 1 <==> filter_beyond_lag = 9.
       self.assertAllClose(ess_1_9_, ess_1_none_)
       self.assertAllClose(ess_1_9_, ess_none_9_)
+
+  def testInitialPositiveAndLag(self):
+    # We will use the max_lags argument to verify that initial_positive sequence
+    # argument does what it should.
+
+    # This sequence begins to have non-positive pairwise sums at lag 38
+    x_ = np.linspace(-1., 1., 100).astype(np.float32)
+    with spectral_ops_test_util.fft_kernel_label_map():
+      x = tf.compat.v1.placeholder_with_default(
+          input=x_, shape=x_.shape if self.use_static_shape else None)
+
+      ess_true_37 = tfp.mcmc.effective_sample_size(
+          x,
+          filter_beyond_positive_pairs=True,
+          filter_threshold=None,
+          filter_beyond_lag=37)
+      ess_true_none = tfp.mcmc.effective_sample_size(
+          x,
+          filter_beyond_positive_pairs=True,
+          filter_threshold=None,
+          filter_beyond_lag=None)
+      ess_false_37 = tfp.mcmc.effective_sample_size(
+          x,
+          filter_beyond_positive_pairs=False,
+          filter_threshold=None,
+          filter_beyond_lag=37)
+      ess_true_37_, ess_true_none_, ess_false_37_ = self.evaluate(
+          [ess_true_37, ess_true_none, ess_false_37])
+
+      self.assertAllClose(ess_true_37_, ess_true_none_)
+      self.assertAllClose(ess_true_37_, ess_false_37_)
+
+  def testInitialPositiveSuperEfficient(self):
+    # Initial positive sequence will correctly estimate the ESS of
+    # super-efficient MCMC chains.
+
+    # This sequence has strong anti-autocorrelation, so will get ESS larger than
+    # its length.
+    x_ = ((np.arange(0, 100) % 2).astype(np.float32) -
+          0.5) * np.exp(-np.linspace(0., 10., 100))
+    with spectral_ops_test_util.fft_kernel_label_map():
+      x = tf.compat.v1.placeholder_with_default(
+          input=x_, shape=x_.shape if self.use_static_shape else None)
+
+      ess = tfp.mcmc.effective_sample_size(
+          x, filter_beyond_positive_pairs=True)
+      ess_ = self.evaluate(ess)
+
+      self.assertGreater(ess_, 100.)
 
 
 @test_util.run_all_in_graph_and_eager_modes

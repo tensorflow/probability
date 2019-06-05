@@ -22,7 +22,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import stats
 
@@ -35,6 +35,7 @@ __all__ = [
 def effective_sample_size(states,
                           filter_threshold=0.,
                           filter_beyond_lag=None,
+                          filter_beyond_positive_pairs=False,
                           name=None):
   """Estimate a lower bound on effective sample size for each independent chain.
 
@@ -47,8 +48,9 @@ def effective_sample_size(states,
 
   ```Variance{ N**-1 * Sum{X_i} } = ESS**-1 * Variance{ X_1 }.```
 
-  If the sequence is uncorrelated, `ESS = N`.  In general, one should expect
-  `ESS <= N`, with more highly correlated sequences having smaller `ESS`.
+  If the sequence is uncorrelated, `ESS = N`.  If the sequence is positively
+  auto-correlated, `ESS` will be less than `N`. If there are negative
+  correlations, then `ESS` can exceed `N`.
 
   Args:
     states:  `Tensor` or list of `Tensor` objects.  Dimension zero should index
@@ -57,11 +59,14 @@ def effective_sample_size(states,
       Must broadcast with `state`.  The auto-correlation sequence is truncated
       after the first appearance of a term less than `filter_threshold`.
       Setting to `None` means we use no threshold filter.  Since `|R_k| <= 1`,
-      setting to any number less than `-1` has the same effect.
+      setting to any number less than `-1` has the same effect. Ignored if
+      `filter_beyond_positive_pairs` is `True`.
     filter_beyond_lag:  `Tensor` or list of `Tensor` objects.  Must be
       `int`-like and scalar valued.  The auto-correlation sequence is truncated
       to this length.  Setting to `None` means we do not filter based on number
       of lags.
+    filter_beyond_positive_pairs: Python boolean. If `True`, only consider the
+      initial auto-correlation sequence where the pairwise sums are positive.
     name:  `String` name to prepend to created ops.
 
   Returns:
@@ -95,7 +100,7 @@ def effective_sample_size(states,
   states.shape
   ==> (1000, 2)
 
-  ess = effective_sample_size(states)
+  ess = effective_sample_size(states, filter_beyond_positive_pairs=True)
   ==> Shape (2,) Tensor
 
   mean, variance = tf.nn.moments(states, axis=0)
@@ -110,15 +115,33 @@ def effective_sample_size(states,
   This function estimates the above by first estimating the auto-correlation.
   Since `R_k` must be estimated using only `N - k` samples, it becomes
   progressively noisier for larger `k`.  For this reason, the summation over
-  `R_k` should be truncated at some number `filter_beyond_lag < N`.  Since many
-  MCMC methods generate chains where `R_k > 0`, a reasonable criteria is to
-  truncate at the first index where the estimated auto-correlation becomes
-  negative.
+  `R_k` should be truncated at some number `filter_beyond_lag < N`. This
+  function provides two methods to perform this truncation.
 
-  The arguments `filter_beyond_lag`, `filter_threshold` are filters intended to
-  remove noisy tail terms from `R_k`.  They combine in an "OR" manner meaning
-  terms are removed if they were to be filtered under the `filter_beyond_lag` OR
-  `filter_threshold` criteria.
+  * `filter_threshold` -- since many MCMC methods generate chains where `R_k >
+    0`, a reasonable criteria is to truncate at the first index where the
+    estimated auto-correlation becomes negative. This method does not estimate
+    the `ESS` of super-efficient chains (where `ESS > N`) correctly.
+
+  * `filter_beyond_positive_pairs` -- reversible MCMC chains produce
+    auto-correlation sequence with the property that pairwise sums of the
+    elements of that sequence are positive [1] (i.e. `R_{2k} + R_{2k + 1} > 0`
+    for `k in {0, ..., N/2}`). Deviations are only possible due to noise. This
+    method truncates the auto-correlation sequence where the pairwise sums
+    become non-positive.
+
+  The arguments `filter_beyond_lag`, `filter_threshold` and
+  `filter_beyond_positive_pairs` are filters intended to remove noisy tail terms
+  from `R_k`.  You can combine `filter_beyond_lag` with `filter_threshold` or
+  `filter_beyond_positive_pairs. E.g. combining `filter_beyond_lag` and
+  `filter_beyond_positive_pairs` means that terms are removed if they were to be
+  filtered under the `filter_beyond_lag` OR `filter_beyond_positive_pairs`
+  criteria.
+
+  #### References
+
+  [1]: Geyer, C. J. Practical Markov chain Monte Carlo (with discussion).
+       Statistical Science, 7:473-511, 1992.
   """
   states_was_list = _is_list_like(states)
 
@@ -130,12 +153,16 @@ def effective_sample_size(states,
                                                'filter_beyond_lag')
   filter_threshold = _broadcast_maybelist_arg(states, filter_threshold,
                                               'filter_threshold')
+  filter_beyond_positive_pairs = _broadcast_maybelist_arg(
+      states, filter_beyond_positive_pairs, 'filter_beyond_positive_pairs')
 
   # Process items, one at a time.
-  with tf.compat.v1.name_scope(name, 'effective_sample_size'):
+  with tf.name_scope('effective_sample_size' if name is None else name):
     ess_list = [
-        _effective_sample_size_single_state(s, ml, mlt)
-        for (s, ml, mlt) in zip(states, filter_beyond_lag, filter_threshold)
+        _effective_sample_size_single_state(s, fbl, ft, fbpp)  # pylint: disable=g-complex-comprehension
+        for (s, fbl, ft,
+             fbpp) in zip(states, filter_beyond_lag, filter_threshold,
+                          filter_beyond_positive_pairs)
     ]
 
   if states_was_list:
@@ -144,12 +171,11 @@ def effective_sample_size(states,
 
 
 def _effective_sample_size_single_state(states, filter_beyond_lag,
-                                        filter_threshold):
+                                        filter_threshold,
+                                        filter_beyond_positive_pairs):
   """ESS computation for one single Tensor argument."""
 
-  with tf.compat.v1.name_scope(
-      'effective_sample_size_single_state',
-      values=[states, filter_beyond_lag, filter_threshold]):
+  with tf.name_scope('effective_sample_size_single_state'):
 
     states = tf.convert_to_tensor(value=states, name='states')
     dt = states.dtype
@@ -157,24 +183,6 @@ def _effective_sample_size_single_state(states, filter_beyond_lag,
     # filter_beyond_lag == None ==> auto_corr is the full sequence.
     auto_corr = stats.auto_correlation(
         states, axis=0, max_lags=filter_beyond_lag)
-    if filter_threshold is not None:
-      filter_threshold = tf.convert_to_tensor(
-          value=filter_threshold, dtype=dt, name='filter_threshold')
-      # Get a binary mask to zero out values of auto_corr below the threshold.
-      #   mask[i, ...] = 1 if auto_corr[j, ...] > threshold for all j <= i,
-      #   mask[i, ...] = 0, otherwise.
-      # So, along dimension zero, the mask will look like [1, 1, ..., 0, 0,...]
-      # Building step by step,
-      #   Assume auto_corr = [1, 0.5, 0.0, 0.3], and filter_threshold = 0.2.
-      # Step 1:  mask = [False, False, True, False]
-      mask = auto_corr < filter_threshold
-      # Step 2:  mask = [0, 0, 1, 1]
-      mask = tf.cast(mask, dtype=dt)
-      # Step 3:  mask = [0, 0, 1, 2]
-      mask = tf.cumsum(mask, axis=0)
-      # Step 4:  mask = [1, 1, 0, 0]
-      mask = tf.maximum(1. - mask, 0.)
-      auto_corr *= mask
 
     # With R[k] := auto_corr[k, ...],
     # ESS = N / {1 + 2 * Sum_{k=1}^N (N - k) / N * R[k]}
@@ -195,9 +203,52 @@ def _effective_sample_size_single_state(states, filter_beyond_lag,
            tf.ones([tf.rank(auto_corr) - 1], dtype=tf.int32)),
           axis=0)
     nk_factor = tf.reshape(nk_factor, new_shape)
+    weighted_auto_corr = nk_factor * auto_corr
+
+    if filter_beyond_positive_pairs:
+      def _sum_pairs(x):
+        x_len = tf.shape(x)[0]
+        # For odd sequences, we drop the final value.
+        x = x[:x_len - x_len % 2]
+        new_shape = tf.concat([[x_len // 2, 2], tf.shape(x)[1:]], axis=0)
+        return tf.reduce_sum(tf.reshape(x, new_shape), 1)
+
+      # Pairwise sums are all positive for auto-correlation spectra derived from
+      # reversible MCMC chains.
+      # E.g. imagine the pairwise sums are [0.2, 0.1, -0.1, -0.2]
+      # Step 1: mask = [False, False, True, False]
+      mask = _sum_pairs(auto_corr) < 0.
+      # Step 2: mask = [0, 0, 1, 1]
+      mask = tf.cast(mask, dt)
+      # Step 3: mask = [0, 0, 1, 2]
+      mask = tf.cumsum(mask, axis=0)
+      # Step 4: mask = [1, 1, 0, 0]
+      mask = tf.maximum(1. - mask, 0.)
+
+      # N.B. this reduces the length of weighted_auto_corr by a factor of 2.
+      # It still works fine in the formula below.
+      weighted_auto_corr = _sum_pairs(weighted_auto_corr) * mask
+    elif filter_threshold is not None:
+      filter_threshold = tf.convert_to_tensor(
+          value=filter_threshold, dtype=dt, name='filter_threshold')
+      # Get a binary mask to zero out values of auto_corr below the threshold.
+      #   mask[i, ...] = 1 if auto_corr[j, ...] > threshold for all j <= i,
+      #   mask[i, ...] = 0, otherwise.
+      # So, along dimension zero, the mask will look like [1, 1, ..., 0, 0,...]
+      # Building step by step,
+      #   Assume auto_corr = [1, 0.5, 0.0, 0.3], and filter_threshold = 0.2.
+      # Step 1:  mask = [False, False, True, False]
+      mask = auto_corr < filter_threshold
+      # Step 2:  mask = [0, 0, 1, 1]
+      mask = tf.cast(mask, dtype=dt)
+      # Step 3:  mask = [0, 0, 1, 2]
+      mask = tf.cumsum(mask, axis=0)
+      # Step 4:  mask = [1, 1, 0, 0]
+      mask = tf.maximum(1. - mask, 0.)
+      weighted_auto_corr *= mask
 
     return n / (-1 +
-                2 * tf.reduce_sum(input_tensor=nk_factor * auto_corr, axis=0))
+                2 * tf.reduce_sum(input_tensor=weighted_auto_corr, axis=0))
 
 
 def potential_scale_reduction(chains_states,
@@ -321,7 +372,7 @@ def potential_scale_reduction(chains_states,
           'Argument `independent_chain_ndims` must be `>= 1`, found: {}'.format(
               independent_chain_ndims))
 
-  with tf.compat.v1.name_scope(name, 'potential_scale_reduction'):
+  with tf.name_scope('potential_scale_reduction' if name is None else name):
     rhat_list = [
         _potential_scale_reduction_single_state(s, independent_chain_ndims)
         for s in chains_states
@@ -334,9 +385,7 @@ def potential_scale_reduction(chains_states,
 
 def _potential_scale_reduction_single_state(state, independent_chain_ndims):
   """potential_scale_reduction for one single state `Tensor`."""
-  with tf.compat.v1.name_scope(
-      'potential_scale_reduction_single_state',
-      values=[state, independent_chain_ndims]):
+  with tf.name_scope('potential_scale_reduction_single_state'):
     # We assume exactly one leading dimension indexes e.g. correlated samples
     # from each Markov chain.
     state = tf.convert_to_tensor(value=state, name='state')
@@ -372,7 +421,7 @@ def _potential_scale_reduction_single_state(state, independent_chain_ndims):
 
 # TODO(b/72873233) Move some variant of this to tfd.sample_stats.
 def _reduce_variance(x, axis=None, biased=True, keepdims=False):
-  with tf.compat.v1.name_scope('reduce_variance'):
+  with tf.name_scope('reduce_variance'):
     x = tf.convert_to_tensor(value=x, name='x')
     mean = tf.reduce_mean(input_tensor=x, axis=axis, keepdims=True)
     biased_var = tf.reduce_mean(
