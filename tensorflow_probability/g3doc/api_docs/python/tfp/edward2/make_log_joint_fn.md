@@ -20,11 +20,13 @@ Defined in [`python/edward2/program_transformations.py`](https://github.com/tens
 
 #### Args:
 
+
 * <b>`model`</b>: Python callable which executes the generative process of a
   computable probability distribution using `ed.RandomVariable`s.
 
 
 #### Returns:
+
 A log-joint probability function. Its inputs are `model`'s original inputs
 and random variables which appear during the program execution. Its output
 is a scalar tf.Tensor.

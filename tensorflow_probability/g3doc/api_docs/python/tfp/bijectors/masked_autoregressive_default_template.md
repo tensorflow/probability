@@ -57,6 +57,7 @@ information (for fitting) yet solves the numerical stability problem. I.e.,
 
 #### Args:
 
+
 * <b>`hidden_layers`</b>: Python `list`-like of non-negative integer, scalars
   indicating the number of units in each hidden layer. Default: `[512, 512].
 * <b>`shift_only`</b>: Python `bool` indicating if only the `shift` term shall be
@@ -77,6 +78,7 @@ information (for fitting) yet solves the numerical stability problem. I.e.,
 
 #### Returns:
 
+
 * <b>`shift`</b>: `Float`-like `Tensor` of shift terms (the "mu" in
   [Germain et al.  (2015)][1]).
 * <b>`log_scale`</b>: `Float`-like `Tensor` of log(scale) terms (the "alpha" in
@@ -84,6 +86,7 @@ information (for fitting) yet solves the numerical stability problem. I.e.,
 
 
 #### Raises:
+
 
 * <b>`NotImplementedError`</b>: if rightmost dimension of `inputs` is unknown prior to
   graph execution.

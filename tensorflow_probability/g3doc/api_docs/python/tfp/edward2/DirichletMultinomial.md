@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See DirichletMultinomial for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -31,6 +32,7 @@ RandomVariable.
 Initialize a batch of DirichletMultinomial distributions.
 
 #### Args:
+
 
 * <b>`total_count`</b>:  Non-negative floating point tensor, whose dtype is the same
   as `concentration`. The shape is broadcastable to `[N1,..., Nm]` with

@@ -31,6 +31,7 @@ Defined in [`python/layers/util.py`](https://github.com/tensorflow/probability/t
 
 #### Args:
 
+
 * <b>`dtype`</b>: Type of parameter's event.
 * <b>`shape`</b>: Python `list`-like representing the parameter's event shape.
 * <b>`name`</b>: Python `str` name prepended to any created (or existing)
@@ -42,4 +43,5 @@ Defined in [`python/layers/util.py`](https://github.com/tensorflow/probability/t
 
 
 #### Returns:
+
 Multivariate standard `Normal` distribution.

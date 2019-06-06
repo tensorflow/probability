@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See Blockwise for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -31,6 +32,7 @@ RandomVariable.
 Construct the `Blockwise` distribution.
 
 #### Args:
+
 
 * <b>`distributions`</b>: Python `list` of <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a>
   instances. All distribution instances must have the same `batch_shape`

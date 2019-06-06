@@ -86,6 +86,7 @@ with tf.Session() as sess:
 
 #### Args:
 
+
 * <b>`x`</b>: `Tensor` with floating type. Must have statically defined rank and
   statically known right-most dimension.
 * <b>`layer_fn`</b>: Python `callable` which takes input `x` and `int` scalar `d` and
@@ -101,5 +102,6 @@ with tf.Session() as sess:
 
 
 #### Returns:
+
 
 * <b>`poisson`</b>: An instance of `tfd.Poisson`.

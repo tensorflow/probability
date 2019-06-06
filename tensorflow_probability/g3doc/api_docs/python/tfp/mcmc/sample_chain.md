@@ -57,6 +57,7 @@ accordingly. See below for some examples of this feature.
 
 #### Args:
 
+
 * <b>`num_results`</b>: Integer number of Markov chain draws.
 * <b>`current_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
   current state(s) of the Markov chain(s).
@@ -85,6 +86,7 @@ accordingly. See below for some examples of this feature.
 
 
 #### Returns:
+
 
 * <b>`checkpointable_states_and_trace`</b>: if `return_final_kernel_results` is
   `True`. The return value is an instance of

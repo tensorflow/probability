@@ -28,6 +28,7 @@ nor is this condition checked even when `validate_args=True`.
 
 #### Args:
 
+
 * <b>`lower_upper`</b>: `lu` as returned by `tf.linalg.lu`, i.e., if
   `matmul(P, matmul(L, U)) = X` then `lower_upper = L + U - eye`.
 * <b>`perm`</b>: `p` as returned by `tf.linag.lu`, i.e., if
@@ -44,6 +45,7 @@ nor is this condition checked even when `validate_args=True`.
 
 
 #### Returns:
+
 
 * <b>`x`</b>: The `X` in `A @ X = RHS`.
 

@@ -56,6 +56,7 @@ the optimum.  (If `l2_regularizer > 0`, then only weak convexity is needed.)
 
 #### Args:
 
+
 * <b>`gradient_unregularized_loss`</b>: (Batch of) `Tensor` with the same shape and
   dtype as `x_start` representing the gradient, evaluated at `x_start`, of
   the unregularized loss function (denoted `Loss` above).  (In all current
@@ -104,6 +105,7 @@ the optimum.  (If `l2_regularizer > 0`, then only weak convexity is needed.)
 
 
 #### Returns:
+
 
 * <b>`x`</b>: (Batch of) `Tensor` having the same shape and dtype as `x_start`,
   representing the updated value of `x`, that is, `x_start + x_update`.

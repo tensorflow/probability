@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See VectorExponentialDiag for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -54,6 +55,7 @@ If both `scale_diag` and `scale_identity_multiplier` are `None`, then
 
 #### Args:
 
+
 * <b>`loc`</b>: Floating-point `Tensor`. If this is set to `None`, `loc` is
   implicitly `0`. When specified, may have shape `[B1, ..., Bb, k]` where
   `b >= 0` and `k` is the event size.
@@ -80,5 +82,6 @@ If both `scale_diag` and `scale_identity_multiplier` are `None`, then
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if at most `scale_identity_multiplier` is specified.

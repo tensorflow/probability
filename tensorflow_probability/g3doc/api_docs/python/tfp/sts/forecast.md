@@ -27,6 +27,7 @@ distribution over future observations for num_steps_forecast timesteps.
 
 #### Args:
 
+
 * <b>`model`</b>: An instance of `StructuralTimeSeries` representing a
   time-series model. This represents a joint distribution over
   time-series and their parameters with batch shape `[b1, ..., bN]`.
@@ -45,6 +46,7 @@ distribution over future observations for num_steps_forecast timesteps.
 
 
 #### Returns:
+
 
 * <b>`forecast_dist`</b>: a `tfd.MixtureSameFamily` instance with event shape
   [num_steps_forecast, 1] and batch shape

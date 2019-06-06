@@ -14,7 +14,3 @@ Defined in [`python/util/__init__.py`](https://github.com/tensorflow/probability
 <!-- Placeholder for "Used in" -->
 
 
-## Modules
-
-[`docstring`](../tfp/util/docstring.md) module: Utilities for programmable docstrings.
-

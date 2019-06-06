@@ -22,6 +22,7 @@ within this context manager. In addition, the operation must be registered
 
 #### Yields:
 
+
 * <b>`tape`</b>: OrderedDict where operations are recorded in sequence. Keys are
   the `name` keyword argument to the operation (typically, a random
   variable's `name`) and values are the corresponding output of the

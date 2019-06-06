@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See PoissonLogNormalQuadratureCompound for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -36,6 +37,7 @@ correspondence with the returned `grid`. (I.e., broadcasting is only
 partially supported.)
 
 #### Args:
+
 
 * <b>`loc`</b>: `float`-like (batch of) scalar `Tensor`; the location parameter of
   the LogNormal prior.
@@ -60,6 +62,7 @@ partially supported.)
 
 
 #### Raises:
+
 
 * <b>`TypeError`</b>: if `quadrature_grid` and `quadrature_probs` have different base
   `dtype`.

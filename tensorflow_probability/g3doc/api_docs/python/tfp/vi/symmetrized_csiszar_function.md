@@ -55,6 +55,7 @@ f-Divergence.
 #### Example:
 
 
+
 When either of the following functions are symmetrized, we obtain the
 Jensen-Shannon Csiszar-function, i.e.,
 
@@ -75,6 +76,7 @@ numerically unstable for `|logu| >> 0`.
 
 #### Args:
 
+
 * <b>`logu`</b>: `float`-like `Tensor` representing `log(u)` from above.
 * <b>`csiszar_function`</b>: Python `callable` representing a Csiszar-function over
   log-domain.
@@ -82,6 +84,7 @@ numerically unstable for `|logu| >> 0`.
 
 
 #### Returns:
+
 
 * <b>`symmetrized_g_of_u`</b>: `float`-like `Tensor` of the result of applying the
   symmetrization of `g` evaluated at `u = exp(logu)`.

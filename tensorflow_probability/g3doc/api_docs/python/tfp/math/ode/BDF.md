@@ -88,7 +88,9 @@ __init__(
 
 Initializes the solver.
 
+
 #### Args:
+
 
 * <b>`rtol`</b>: Optional float `Tensor` specifying an upper bound on relative error,
   per element of the dependent variable. The error tolerance for the next
@@ -175,6 +177,7 @@ solve(
 ```
 
 See <a href="../../../tfp/math/ode/Solver.md#solve"><code>tfp.math.ode.Solver.solve</code></a>.
+
 
 
 

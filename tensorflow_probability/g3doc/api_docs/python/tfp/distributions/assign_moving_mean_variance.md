@@ -39,6 +39,7 @@ Parameterization: Finch's `alpha` is `1 - decay`.
 
 #### Args:
 
+
 * <b>`mean_var`</b>: `float`-like `Variable` representing the exponentially weighted
   moving mean. Same shape as `variance_var` and `value`.
 * <b>`variance_var`</b>: `float`-like `Variable` representing the
@@ -52,6 +53,7 @@ Parameterization: Finch's `alpha` is `1 - decay`.
 
 #### Returns:
 
+
 * <b>`mean_var`</b>: `Variable` representing the `value`-updated exponentially weighted
   moving mean.
 * <b>`variance_var`</b>: `Variable` representing the `value`-updated
@@ -59,6 +61,7 @@ Parameterization: Finch's `alpha` is `1 - decay`.
 
 
 #### Raises:
+
 
 * <b>`TypeError`</b>: if `mean_var` does not have float type `dtype`.
 * <b>`TypeError`</b>: if `mean_var`, `variance_var`, `value`, `decay` have different

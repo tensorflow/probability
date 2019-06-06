@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See Beta for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -31,6 +32,7 @@ RandomVariable.
 Initialize a batch of Beta distributions.
 
 #### Args:
+
 
 * <b>`concentration1`</b>: Positive floating-point `Tensor` indicating mean
   number of successes; aka "alpha". Implies `self.dtype` and

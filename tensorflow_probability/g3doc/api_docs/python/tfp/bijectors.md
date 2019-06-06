@@ -72,7 +72,7 @@ Defined in [`python/bijectors/__init__.py`](https://github.com/tensorflow/probab
 
 [`class NormalCDF`](../tfp/bijectors/NormalCDF.md): Compute `Y = g(X) = NormalCDF(x)`.
 
-[`class Ordered`](../tfp/bijectors/Ordered.md): Bijector which maps a tensor x_k that has increasing elements in the last
+[`class Ordered`](../tfp/bijectors/Ordered.md): Maps a vector of increasing elements to an unconstrained vector.
 
 [`class Permute`](../tfp/bijectors/Permute.md): Permutes the rightmost dimension of a `Tensor`.
 
@@ -89,6 +89,8 @@ Defined in [`python/bijectors/__init__.py`](https://github.com/tensorflow/probab
 [`class Sigmoid`](../tfp/bijectors/Sigmoid.md): Bijector which computes `Y = g(X) = 1 / (1 + exp(-X))`.
 
 [`class SinhArcsinh`](../tfp/bijectors/SinhArcsinh.md): Compute `Y = g(X) = Sinh( (Arcsinh(X) + skewness) * tailweight )`.
+
+[`class Softfloor`](../tfp/bijectors/Softfloor.md): Compute a differentiable approximation to `tf.math.floor`.
 
 [`class SoftmaxCentered`](../tfp/bijectors/SoftmaxCentered.md): Bijector which computes `Y = g(X) = exp([X 0]) / sum(exp([X 0]))`.
 

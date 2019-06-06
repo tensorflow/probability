@@ -37,6 +37,7 @@ solve(
 ```
 
 Solves an initial value problem.
+
 An initial value problem consists of a system of ODEs and an initial
 condition:
 
@@ -49,6 +50,7 @@ Here, `t` (also called time) is a scalar float `Tensor` and `y(t)` (also
 called the state at time `t`) is an N-D float or complex `Tensor`.
 
 #### Args:
+
 
 * <b>`ode_fn`</b>: Function of the form `ode_fn(t, y)`. The input `t` is a scalar
   float `Tensor`. The input `y` and output are both `Tensor`s with the
@@ -89,6 +91,7 @@ called the state at time `t`) is an N-D float or complex `Tensor`.
 
 
 #### Returns:
+
 Object of type `Results`.
 
 

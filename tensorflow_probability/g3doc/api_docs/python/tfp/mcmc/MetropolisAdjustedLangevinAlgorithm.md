@@ -230,7 +230,9 @@ __init__(
 
 Initializes MALA transition kernel.
 
+
 #### Args:
+
 
 * <b>`target_log_prob_fn`</b>: Python callable which takes an argument like
   `current_state` (or `*current_state` if it's a list) and returns its
@@ -256,6 +258,7 @@ Initializes MALA transition kernel.
 
 #### Returns:
 
+
 * <b>`next_state`</b>: Tensor or Python list of `Tensor`s representing the state(s)
   of the Markov chain(s) at each result step. Has same shape as
   `current_state`.
@@ -264,6 +267,7 @@ Initializes MALA transition kernel.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if there isn't one `step_size` or a list with same length as
   `current_state`.
@@ -276,6 +280,7 @@ Initializes MALA transition kernel.
 <h3 id="is_calibrated"><code>is_calibrated</code></h3>
 
 Returns `True` if Markov chain converges to specified distribution.
+
 `TransitionKernel`s which are "uncalibrated" are often calibrated by
 composing them with the <a href="../../tfp/mcmc/MetropolisHastings.md"><code>tfp.mcmc.MetropolisHastings</code></a> `TransitionKernel`.
 
@@ -283,7 +288,9 @@ composing them with the <a href="../../tfp/mcmc/MetropolisHastings.md"><code>tfp
 
 
 
+
 <h3 id="parallel_iterations"><code>parallel_iterations</code></h3>
+
 
 
 
@@ -291,7 +298,9 @@ composing them with the <a href="../../tfp/mcmc/MetropolisHastings.md"><code>tfp
 
 Return `dict` of ``__init__`` arguments and their values.
 
+
 <h3 id="seed"><code>seed</code></h3>
+
 
 
 
@@ -299,11 +308,14 @@ Return `dict` of ``__init__`` arguments and their values.
 
 
 
+
 <h3 id="target_log_prob_fn"><code>target_log_prob_fn</code></h3>
 
 
 
+
 <h3 id="volatility_fn"><code>volatility_fn</code></h3>
+
 
 
 
@@ -319,6 +331,7 @@ bootstrap_results(init_state)
 
 Creates initial `previous_kernel_results` using a supplied `state`.
 
+
 <h3 id="one_step"><code>one_step</code></h3>
 
 ``` python
@@ -330,7 +343,9 @@ one_step(
 
 Runs one iteration of MALA.
 
+
 #### Args:
+
 
 * <b>`current_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
   current state(s) of the Markov chain(s). The first `r` dimensions index
@@ -342,6 +357,7 @@ Runs one iteration of MALA.
 
 #### Returns:
 
+
 * <b>`next_state`</b>: Tensor or Python list of `Tensor`s representing the state(s)
   of the Markov chain(s) after taking exactly one step. Has same type and
   shape as `current_state`.
@@ -350,6 +366,7 @@ Runs one iteration of MALA.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if there isn't one `step_size` or a list with same length as
   `current_state` or `diffusion_drift`.

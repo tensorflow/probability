@@ -156,7 +156,9 @@ __init__(
 
 Instantiates this object.
 
+
 #### Args:
+
 
 * <b>`target_log_prob_fn`</b>: Python callable which takes an argument like
   `current_state` (or `*current_state` if it's a list) and returns its
@@ -177,6 +179,7 @@ Instantiates this object.
 
 #### Raises:
 
+
 * <b>`ValueError`</b>: `inverse_temperatures` doesn't have statically known 1D shape.
 
 
@@ -187,13 +190,16 @@ Instantiates this object.
 
 
 
+
 <h3 id="inverse_temperatures"><code>inverse_temperatures</code></h3>
+
 
 
 
 <h3 id="is_calibrated"><code>is_calibrated</code></h3>
 
 Returns `True` if Markov chain converges to specified distribution.
+
 `TransitionKernel`s which are "uncalibrated" are often calibrated by
 composing them with the <a href="../../tfp/mcmc/MetropolisHastings.md"><code>tfp.mcmc.MetropolisHastings</code></a> `TransitionKernel`.
 
@@ -201,7 +207,9 @@ composing them with the <a href="../../tfp/mcmc/MetropolisHastings.md"><code>tfp
 
 
 
+
 <h3 id="num_replica"><code>num_replica</code></h3>
+
 
 
 
@@ -209,11 +217,14 @@ composing them with the <a href="../../tfp/mcmc/MetropolisHastings.md"><code>tfp
 
 Return `dict` of ``__init__`` arguments and their values.
 
+
 <h3 id="seed"><code>seed</code></h3>
 
 
 
+
 <h3 id="target_log_prob_fn"><code>target_log_prob_fn</code></h3>
+
 
 
 
@@ -229,13 +240,16 @@ bootstrap_results(init_state)
 
 Returns an object with the same type as returned by `one_step`.
 
+
 #### Args:
+
 
 * <b>`init_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
   initial state(s) of the Markov chain(s).
 
 
 #### Returns:
+
 
 * <b>`kernel_results`</b>: A (possibly nested) `tuple`, `namedtuple` or `list` of
   `Tensor`s representing internal calculations made within this function.
@@ -252,7 +266,9 @@ one_step(
 
 Takes one step of the TransitionKernel.
 
+
 #### Args:
+
 
 * <b>`current_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
   current state(s) of the Markov chain(s).
@@ -262,6 +278,7 @@ Takes one step of the TransitionKernel.
 
 
 #### Returns:
+
 
 * <b>`next_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
   next state(s) of the Markov chain(s).

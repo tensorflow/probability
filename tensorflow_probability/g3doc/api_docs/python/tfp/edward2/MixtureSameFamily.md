@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See MixtureSameFamily for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -31,6 +32,7 @@ RandomVariable.
 Construct a `MixtureSameFamily` distribution.
 
 #### Args:
+
 
 * <b>`mixture_distribution`</b>: <a href="../../tfp/distributions/Categorical.md"><code>tfp.distributions.Categorical</code></a>-like instance.
   Manages the probability of selecting components. The number of
@@ -64,6 +66,7 @@ Construct a `MixtureSameFamily` distribution.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: `if not dtype_util.is_integer(mixture_distribution.dtype)`.
 * <b>`ValueError`</b>: if mixture_distribution does not have scalar `event_shape`.

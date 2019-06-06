@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See InverseGaussian for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -31,6 +32,7 @@ RandomVariable.
 Constructs inverse Gaussian distribution with `loc` and `concentration`.
 
 #### Args:
+
 
 * <b>`loc`</b>: Floating-point `Tensor`, the loc params. Must contain only positive
   values.

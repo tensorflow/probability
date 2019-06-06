@@ -20,6 +20,12 @@ Defined in [`python/positive_semidefinite_kernels/__init__.py`](https://github.c
 
 [`class ExponentiatedQuadratic`](../tfp/positive_semidefinite_kernels/ExponentiatedQuadratic.md): The ExponentiatedQuadratic kernel.
 
+[`class FeatureScaled`](../tfp/positive_semidefinite_kernels/FeatureScaled.md): Kernel that first rescales all feature dimensions.
+
+[`class FeatureTransformed`](../tfp/positive_semidefinite_kernels/FeatureTransformed.md): Input transformed kernel.
+
+[`class KumaraswamyTransformed`](../tfp/positive_semidefinite_kernels/KumaraswamyTransformed.md): Transform inputs by Kumaraswamy bijector.
+
 [`class Linear`](../tfp/positive_semidefinite_kernels/Linear.md): Linear Kernel.
 
 [`class MaternFiveHalves`](../tfp/positive_semidefinite_kernels/MaternFiveHalves.md): Matern 5/2 Kernel.

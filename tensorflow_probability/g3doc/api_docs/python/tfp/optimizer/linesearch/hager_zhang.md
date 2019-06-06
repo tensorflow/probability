@@ -112,6 +112,7 @@ usage of the line search.
 
 #### Args:
 
+
 * <b>`value_and_gradients_function`</b>: A Python callable that accepts a real scalar
   tensor and returns a namedtuple with the fields 'x', 'f', and 'df' that
   correspond to scalar tensors of real dtype containing the point at which
@@ -181,6 +182,7 @@ usage of the line search.
 
 
 #### Returns:
+
 
 * <b>`results`</b>: A namedtuple containing the following attributes.
   converged: Boolean `Tensor` of shape [n]. Whether a point satisfying

@@ -3,7 +3,6 @@
 <meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="all_states"/>
 <meta itemprop="property" content="trace"/>
-<meta itemprop="property" content="__new__"/>
 </div>
 
 # tfp.mcmc.StatesAndTrace
@@ -25,24 +24,11 @@ represents the chain length.
 
 #### Attributes:
 
+
 * <b>`all_states`</b>: A `Tensor` or a nested collection of `Tensor`s representing the
   MCMC chain state.
 * <b>`trace`</b>: A `Tensor` or a nested collection of `Tensor`s representing the
   auxiliary values traced alongside the chain.
-
-<h2 id="__new__"><code>__new__</code></h2>
-
-``` python
-__new__(
-    _cls,
-    all_states,
-    trace
-)
-```
-
-Create new instance of StatesAndTrace(all_states, trace)
-
-
 
 ## Properties
 
@@ -50,7 +36,9 @@ Create new instance of StatesAndTrace(all_states, trace)
 
 
 
+
 <h3 id="trace"><code>trace</code></h3>
+
 
 
 

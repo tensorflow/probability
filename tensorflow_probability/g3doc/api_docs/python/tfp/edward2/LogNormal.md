@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See LogNormal for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -36,6 +37,7 @@ standard deviation `scale`. It is constructed as the exponential
 transformation of a Normal distribution.
 
 #### Args:
+
 
 * <b>`loc`</b>: Floating-point `Tensor`; the means of the underlying
   Normal distribution(s).

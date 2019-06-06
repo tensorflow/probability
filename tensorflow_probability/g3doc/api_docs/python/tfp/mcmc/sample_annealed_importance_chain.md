@@ -48,6 +48,7 @@ reduced to two times in the future).
 
 #### Args:
 
+
 * <b>`num_steps`</b>: Integer number of Markov chain updates to run. More
   iterations means more expense, but smoother annealing between q
   and p, which in turn means exponentially lower variance for the
@@ -75,6 +76,7 @@ reduced to two times in the future).
 
 
 #### Returns:
+
 
 * <b>`next_state`</b>: `Tensor` or Python list of `Tensor`s representing the
   state(s) of the Markov chain(s) at the final iteration. Has same shape as

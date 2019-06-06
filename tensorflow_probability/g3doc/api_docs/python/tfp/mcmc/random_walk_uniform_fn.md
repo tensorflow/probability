@@ -28,6 +28,7 @@ uniform point on the rectangle `[-scale, scale]`.
 
 #### Args:
 
+
 * <b>`scale`</b>: a `Tensor` or Python `list` of `Tensor`s of any shapes and `dtypes`
   controlling the upper and lower bound of the uniform proposal
   distribution.
@@ -36,6 +37,7 @@ uniform point on the rectangle `[-scale, scale]`.
 
 
 #### Returns:
+
 
 * <b>`random_walk_uniform_fn`</b>: A callable accepting a Python `list` of `Tensor`s
   representing the state parts of the `current_state` and an `int`

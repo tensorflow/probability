@@ -25,6 +25,7 @@ Defined in [`python/math/linalg.py`](https://github.com/tensorflow/probability/t
 
 #### Args:
 
+
 * <b>`lower_upper`</b>: `lu` as returned by `tf.linalg.lu`, i.e., if
   `matmul(P, matmul(L, U)) = X` then `lower_upper = L + U - eye`.
 * <b>`perm`</b>: `p` as returned by `tf.linag.lu`, i.e., if
@@ -37,6 +38,7 @@ Defined in [`python/math/linalg.py`](https://github.com/tensorflow/probability/t
 
 
 #### Returns:
+
 
 * <b>`x`</b>: The original input to `tf.linalg.lu`, i.e., `x` as in,
   `lu_reconstruct(*tf.linalg.lu(x))`.

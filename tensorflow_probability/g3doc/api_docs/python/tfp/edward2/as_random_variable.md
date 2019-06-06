@@ -36,6 +36,7 @@ on overriding distribution parameters.
 
 #### Args:
 
+
 * <b>`distribution`</b>: tfd.Distribution governing the distribution of the random
   variable, such as sampling and log-probabilities.
 * <b>`sample_shape`</b>: tf.TensorShape of samples to draw from the random variable.
@@ -46,6 +47,7 @@ on overriding distribution parameters.
 
 
 #### Returns:
+
 
 * <b>`rv`</b>: a `RandomVariable` wrapping the provided distribution.
 

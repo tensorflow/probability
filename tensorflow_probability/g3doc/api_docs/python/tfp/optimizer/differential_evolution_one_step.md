@@ -28,6 +28,7 @@ Defined in [`python/optimizer/differential_evolution.py`](https://github.com/ten
 
 #### Args:
 
+
 * <b>`objective_function`</b>:  A Python callable that accepts a batch of possible
   solutions and returns the values of the objective function at those
   arguments as a rank 1 real `Tensor`. This specifies the function to be
@@ -66,6 +67,7 @@ Defined in [`python/optimizer/differential_evolution.py`](https://github.com/ten
 
 
 #### Returns:
+
 A sequence containing the following elements (in order):
 
 * <b>`next_population`</b>: A `Tensor` or Python `list` of `Tensor`s of the same

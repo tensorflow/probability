@@ -27,10 +27,12 @@ This serialization mimicks the implementation in `tf.keras.layers.Lambda`.
 
 #### Args:
 
+
 * <b>`func`</b>: Python function to serialize.
 
 
 #### Returns:
+
 (serial, function_type): Serialized object, which is a tuple of its
 bytecode (if function is anonymous) or name (if function is named), and its
 function type.

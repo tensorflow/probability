@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See NegativeBinomial for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -31,6 +32,7 @@ RandomVariable.
 Construct NegativeBinomial distributions.
 
 #### Args:
+
 
 * <b>`total_count`</b>: Non-negative floating-point `Tensor` with shape
   broadcastable to `[B1,..., Bb]` with `b >= 0` and the same dtype as

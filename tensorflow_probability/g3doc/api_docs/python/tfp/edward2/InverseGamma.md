@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See InverseGamma for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -38,6 +39,7 @@ The parameters `concentration` and `scale` must be shaped in a way that
 supports broadcasting (e.g. `concentration + scale` is a valid operation).
 
 #### Args:
+
 
 * <b>`concentration`</b>: Floating point tensor, the concentration params of the
   distribution(s). Must contain only positive values.
@@ -57,5 +59,6 @@ supports broadcasting (e.g. `concentration + scale` is a valid operation).
 
 
 #### Raises:
+
 
 * <b>`TypeError`</b>: if `concentration` and `scale` are different dtypes.

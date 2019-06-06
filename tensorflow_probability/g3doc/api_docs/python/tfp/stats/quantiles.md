@@ -42,6 +42,7 @@ The exact number of data points in each interval depends on the size of
 
 #### Args:
 
+
 * <b>`x`</b>:  Numeric `N-D` `Tensor` with `N > 0`.  If `axis` is not `None`,
   `x` must have statically known number of dimensions.
 * <b>`num_quantiles`</b>:  Scalar `integer` `Tensor`.  The number of intervals the
@@ -69,12 +70,14 @@ The exact number of data points in each interval depends on the size of
 
 #### Returns:
 
+
 * <b>`cut_points`</b>:  A `rank(x) + 1 - len(axis)` dimensional `Tensor` with same
 `dtype` as `x` and shape `[num_quantiles + 1, ...]` where the trailing shape
 is that of `x` without the dimensions in `axis` (unless `keep_dims is True`)
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>:  If argument 'interpolation' is not an allowed type.
 * <b>`ValueError`</b>:  If interpolation type not compatible with `dtype`.

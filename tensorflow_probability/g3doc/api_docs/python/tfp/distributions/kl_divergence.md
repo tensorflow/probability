@@ -43,6 +43,7 @@ identified in the search is used (favoring a shorter MRO distance to
 
 #### Args:
 
+
 * <b>`distribution_a`</b>: The first distribution.
 * <b>`distribution_b`</b>: The second distribution.
 * <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`,
@@ -53,12 +54,14 @@ identified in the search is used (favoring a shorter MRO distance to
 
 
 #### Returns:
+
 A Tensor with the batchwise KL-divergence between `distribution_a`
 and `distribution_b`.
 
 
 
 #### Raises:
+
 
 * <b>`NotImplementedError`</b>: If no KL method is defined for distribution types
   of `distribution_a` and `distribution_b`.

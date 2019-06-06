@@ -34,6 +34,7 @@ consider using `monte_carlo_csiszar_f_divergence`.
 #### The VIMCO loss is:
 
 
+
 ```none
 vimco = f(Avg{logu[i] : i=0,...,m-1})
 where,
@@ -65,6 +66,7 @@ This implementation prefers numerical precision over efficiency, i.e.,
 
 #### Args:
 
+
 * <b>`f`</b>: Python `callable` representing a Csiszar-function in log-space.
 * <b>`p_log_prob`</b>: Python `callable` representing the natural-log of the
   probability under distribution `p`. (In variational inference `p` is the
@@ -82,10 +84,12 @@ This implementation prefers numerical precision over efficiency, i.e.,
 
 #### Returns:
 
+
 * <b>`vimco`</b>: The Csiszar f-Divergence generalized VIMCO objective.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if `num_draws < 2`.
 

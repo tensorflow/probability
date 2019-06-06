@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See MultivariateNormalFullCovariance for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -45,6 +46,7 @@ Additional leading dimensions (if any) will index batches.
 
 #### Args:
 
+
 * <b>`loc`</b>: Floating-point `Tensor`. If this is set to `None`, `loc` is
   implicitly `0`. When specified, may have shape `[B1, ..., Bb, k]` where
   `b >= 0` and `k` is the event size.
@@ -65,5 +67,6 @@ Additional leading dimensions (if any) will index batches.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if neither `loc` nor `covariance_matrix` are specified.

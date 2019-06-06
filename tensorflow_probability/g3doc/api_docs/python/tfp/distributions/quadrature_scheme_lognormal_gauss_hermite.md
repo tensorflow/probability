@@ -28,6 +28,7 @@ than `quadrature_scheme_lognormal_quantiles`.
 
 #### Args:
 
+
 * <b>`loc`</b>: `float`-like (batch of) scalar `Tensor`; the location parameter of
   the LogNormal prior.
 * <b>`scale`</b>: `float`-like (batch of) scalar `Tensor`; the scale parameter of
@@ -42,6 +43,7 @@ than `quadrature_scheme_lognormal_quantiles`.
 
 
 #### Returns:
+
 
 * <b>`grid`</b>: (Batch of) length-`quadrature_size` vectors representing the
   `log_rate` parameters of a `Poisson`.

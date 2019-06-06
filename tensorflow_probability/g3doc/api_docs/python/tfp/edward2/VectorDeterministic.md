@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See VectorDeterministic for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -43,6 +44,7 @@ pmf(x; loc)
 ```
 
 #### Args:
+
 
 * <b>`loc`</b>: Numeric `Tensor` of shape `[B1, ..., Bb, k]`, with `b >= 0`, `k >= 0`
   The point (or batch of points) on which this distribution is supported.

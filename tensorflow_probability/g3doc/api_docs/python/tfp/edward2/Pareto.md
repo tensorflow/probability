@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See Pareto for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -31,6 +32,7 @@ RandomVariable.
 Construct Pareto distribution with `concentration` and `scale`.
 
 #### Args:
+
 
 * <b>`concentration`</b>: Floating point tensor. Must contain only positive values.
 * <b>`scale`</b>: Floating point tensor, equivalent to `mode`. `scale` also

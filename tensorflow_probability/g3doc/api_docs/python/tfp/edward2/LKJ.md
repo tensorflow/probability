@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See LKJ for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -31,6 +32,7 @@ RandomVariable.
 Construct LKJ distributions.
 
 #### Args:
+
 
 * <b>`dimension`</b>: Python `int`. The dimension of the correlation matrices
   to sample.
@@ -59,5 +61,6 @@ Construct LKJ distributions.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: If `dimension` is negative.

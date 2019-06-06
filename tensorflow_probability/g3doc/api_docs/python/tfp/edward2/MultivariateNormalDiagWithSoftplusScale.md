@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See MultivariateNormalDiagWithSoftplusScale for more details.
 
 #### Returns:
+
 RandomVariable.
 
 

@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See TruncatedNormal for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -35,6 +36,7 @@ so the resulting distribution will have a batch_shape of the broadcast
 shape of all parameters.
 
 #### Args:
+
 
 * <b>`loc`</b>: Floating point tensor; the mean of the normal distribution(s) (
   note that the mean of the resulting distribution will be different

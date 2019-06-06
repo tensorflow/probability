@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See JointDistributionNamed for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -31,6 +32,7 @@ RandomVariable.
 Construct the `JointDistributionNamed` distribution.
 
 #### Args:
+
 
 * <b>`model`</b>: Python `dict` or `namedtuple` of distribution-making functions each
   with required args corresponding only to other keys.

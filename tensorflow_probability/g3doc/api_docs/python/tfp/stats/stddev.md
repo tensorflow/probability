@@ -54,6 +54,7 @@ when `N = 1`, but is slightly biased.
 
 #### Args:
 
+
 * <b>`x`</b>:  A numeric `Tensor` holding samples.
 * <b>`sample_axis`</b>: Scalar or vector `Tensor` designating axis holding samples, or
   `None` (meaning all axis hold samples).
@@ -64,6 +65,7 @@ when `N = 1`, but is slightly biased.
 
 
 #### Returns:
+
 
 * <b>`stddev`</b>: A `Tensor` of same `dtype` as the `x`, and rank equal to
   `rank(x) - len(sample_axis)`

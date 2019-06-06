@@ -24,6 +24,7 @@ Defined in [`python/math/sparse.py`](https://github.com/tensorflow/probability/t
 
 #### Args:
 
+
 * <b>`x`</b>: A `Tensor`.
 * <b>`ignore_value`</b>: Entries in `x` equal to this value will be
   absent from the return `SparseTensor`. If `None`, default value of
@@ -33,9 +34,11 @@ Defined in [`python/math/sparse.py`](https://github.com/tensorflow/probability/t
 
 #### Returns:
 
+
 * <b>`sparse_x`</b>: A `tf.SparseTensor` with the same shape as `x`.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: when `x`'s rank is `None`.

@@ -46,6 +46,7 @@ relevant portions of `f`, `g`. For example see the unit-test,
 
 #### Args:
 
+
 * <b>`fx`</b>: `Tensor`. Output of function evaluated at `x`.
 * <b>`gx`</b>: `Tensor` or list of `Tensor`s. Gradient of function at (each) `x`.
 * <b>`x`</b>: `Tensor` or list of `Tensor`s. Args of evaluation for `f`.
@@ -55,6 +56,7 @@ relevant portions of `f`, `g`. For example see the unit-test,
 
 
 #### Returns:
+
 
 * <b>`fx`</b>: Floating-type `Tensor` equal to `f(x)` but which has gradient
   `stop_gradient(g(x))`.
