@@ -243,7 +243,7 @@ class SchurComplement(psd_kernel.PositiveSemidefiniteKernel):
 
   def _batch_shape(self):
     if self._is_empty_fixed_inputs():
-      return self._base_kernel.batch_shape()
+      return self._base_kernel.batch_shape
     return tf.broadcast_static_shape(
         self._base_kernel.batch_shape,
         self._fixed_inputs.shape[

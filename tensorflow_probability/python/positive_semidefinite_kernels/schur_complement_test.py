@@ -149,6 +149,13 @@ class SchurComplementTest(tf.test.TestCase, parameterized.TestCase):
         self.evaluate(base_kernel.matrix(x, y)),
         self.evaluate(schur.matrix(x, y)))
 
+    # Test batch shapes
+    base_kernel = tfpk.ExponentiatedQuadratic([1., 2.])
+    fixed_inputs = tf.ones([0, 2], np.float32)
+    schur = tfpk.SchurComplement(base_kernel, fixed_inputs)
+    self.assertAllEqual([2], schur.batch_shape)
+    self.assertAllEqual([2], self.evaluate(schur.batch_shape_tensor()))
+
   def testNoneFixedInputs(self):
     base_kernel = tfpk.ExponentiatedQuadratic(1., 1.)
     schur = tfpk.SchurComplement(base_kernel, fixed_inputs=None)
