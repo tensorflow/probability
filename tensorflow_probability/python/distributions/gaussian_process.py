@@ -416,16 +416,37 @@ class GaussianProcess(distribution.Distribution):
     return self.get_marginal_distribution(index_points).log_prob(value)
 
   def _batch_shape_tensor(self, index_points=None):
-    return self.get_marginal_distribution(index_points).batch_shape_tensor()
+    index_points = self._get_index_points(index_points)
+    return tf.broadcast_dynamic_shape(
+        tf.shape(index_points)[:-(self.kernel.feature_ndims + 1)],
+        self.kernel.batch_shape_tensor())
 
   def _batch_shape(self, index_points=None):
-    return self.get_marginal_distribution(index_points).batch_shape
+    index_points = self._get_index_points(index_points)
+    return tf.broadcast_static_shape(
+        index_points.shape[:-(self.kernel.feature_ndims + 1)],
+        self.kernel.batch_shape)
 
   def _event_shape_tensor(self, index_points=None):
-    return self.get_marginal_distribution(index_points).event_shape_tensor()
+    index_points = self._get_index_points(index_points)
+    if self._is_univariate_marginal(index_points):
+      return tf.constant([], dtype=tf.int32)
+    else:
+      # The examples index is one position to the left of the feature dims.
+      examples_index = -(self.kernel.feature_ndims + 1)
+      return tf.shape(index_points)[examples_index:examples_index + 1]
 
   def _event_shape(self, index_points=None):
-    return self.get_marginal_distribution(index_points).event_shape
+    index_points = self._get_index_points(index_points)
+    if self._is_univariate_marginal(index_points):
+      return tf.TensorShape([])
+    else:
+      # The examples index is one position to the left of the feature dims.
+      examples_index = -(self.kernel.feature_ndims + 1)
+      shape = index_points.shape[examples_index:examples_index + 1]
+      if shape.rank is None:
+        return tf.TensorShape([None])
+      return shape
 
   def _sample_n(self, n, seed=None, index_points=None):
     return self.get_marginal_distribution(index_points).sample(n, seed=seed)
