@@ -68,6 +68,7 @@ py_library(
         ":scale_tril",
         ":sigmoid",
         ":sinh_arcsinh",
+        ":softfloor",
         ":softmax_centered",
         ":softplus",
         ":softsign",
@@ -207,6 +208,17 @@ py_library(
     deps = [
         ":bijector",
         ":cholesky_outer_product",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+    ],
+)
+
+py_library(
+    name = "softfloor",
+    srcs = ["softfloor.py"],
+    deps = [
+        ":bijector",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
@@ -1089,6 +1101,18 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:tensorshape_util",
+    ],
+)
+
+py_test(
+    name = "softfloor_test",
+    size = "small",
+    srcs = ["softfloor_test.py"],
+    deps = [
+        ":bijector_test_util",
+        ":bijectors",
+        # numpy dep,
+        # tensorflow dep,
     ],
 )
 

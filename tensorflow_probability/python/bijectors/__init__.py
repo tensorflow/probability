@@ -61,6 +61,7 @@ from tensorflow_probability.python.bijectors.reshape import Reshape
 from tensorflow_probability.python.bijectors.scale_tril import ScaleTriL
 from tensorflow_probability.python.bijectors.sigmoid import Sigmoid
 from tensorflow_probability.python.bijectors.sinh_arcsinh import SinhArcsinh
+from tensorflow_probability.python.bijectors.softfloor import Softfloor
 from tensorflow_probability.python.bijectors.softmax_centered import SoftmaxCentered
 from tensorflow_probability.python.bijectors.softplus import Softplus
 from tensorflow_probability.python.bijectors.softsign import Softsign
@@ -111,6 +112,7 @@ __all__ = [
     "ScaleTriL",
     "Sigmoid",
     "SinhArcsinh",
+    "Softfloor",
     "SoftmaxCentered",
     "Softplus",
     "Softsign",
