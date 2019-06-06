@@ -117,6 +117,12 @@ class SchurComplementTest(tf.test.TestCase, parameterized.TestCase):
     fixed_inputs = np.random.uniform(-1., 1., size=[7, 1, 1, 1, 2, 3])
     k = tfpk.SchurComplement(base_kernel, fixed_inputs)
     self.assertAllEqual(
+        [7, 2, 3, 1],
+        k.batch_shape)
+    self.assertAllEqual(
+        [7, 2, 3, 1],
+        self.evaluate(k.batch_shape_tensor()))
+    self.assertAllEqual(
         [7, 2, 3, 4],
         k.apply(x, x).shape)
     self.assertAllEqual(

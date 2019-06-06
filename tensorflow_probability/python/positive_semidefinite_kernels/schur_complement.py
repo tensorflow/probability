@@ -247,15 +247,15 @@ class SchurComplement(psd_kernel.PositiveSemidefiniteKernel):
     return tf.broadcast_static_shape(
         self._base_kernel.batch_shape,
         self._fixed_inputs.shape[
-            :-self._base_kernel.feature_ndims])
+            :-(self._base_kernel.feature_ndims + 1)])
 
   def _batch_shape_tensor(self):
     if self._is_empty_fixed_inputs():
       return self._base_kernel.batch_shape_tensor()
     return tf.broadcast_dynamic_shape(
-        self._base_kernel.batch_shape_tensor,
+        self._base_kernel.batch_shape_tensor(),
         tf.shape(input=self._fixed_inputs)[
-            :-self._base_kernel.feature_ndims])
+            :-(self._base_kernel.feature_ndims + 1)])
 
   def _covariance_decrease(self, x1, x2):
     div_mat_chol = self._cholesky_bijector.forward(self._divisor_matrix)
