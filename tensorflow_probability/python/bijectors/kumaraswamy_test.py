@@ -121,9 +121,9 @@ class KumaraswamyTest(tf.test.TestCase):
                           validate_args=True)
       self.evaluate(b.forward_event_shape_tensor([1, 2, 3]))
     with self.assertRaisesOpError(
-        "Argument `concentration1` must be positive."):
-      b = tfb.Kumaraswamy(concentration0=1.,
-                          concentration1=x,
+        "Argument `concentration0` must be positive."):
+      b = tfb.Kumaraswamy(concentration0=x,
+                          concentration1=1.,
                           validate_args=True)
       self.evaluate(b.forward_event_shape_tensor(tf.constant([1, 2, 3])))
 
