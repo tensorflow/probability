@@ -34,7 +34,7 @@ _camel_snake_re = re.compile(r'((?<=[a-z0-9])[A-Z]|(?!^)(?<!_)[A-Z](?=[a-z]))')
 
 
 def strip_invalid_chars(name):
-  return re.sub(_valid_chars_re, r'_', name).lstrip('_') if name else ''
+  return re.sub(_valid_chars_re, r'_', name).strip('_') if name else ''
 
 
 def camel_to_lower_snake(name):
@@ -46,6 +46,7 @@ def get_name_scope_name(name):
   """Returns the input name as a unique `tf.name_scope` name."""
   if name and name[-1] == '/':
     return name
+  name = strip_invalid_chars(name)
   with tf.name_scope(name) as unique_name:
     pass
   return unique_name

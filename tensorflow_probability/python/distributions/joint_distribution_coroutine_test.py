@@ -483,12 +483,12 @@ class JointDistributionCoroutineTest(tf.test.TestCase):
     m = tfd.JointDistributionCoroutine(model, sample_dtype=sd)
     self.assertEqual(
         ('tfp.distributions.JointDistributionCoroutine('
-         '"JointDistributionCoroutine/",'
+         '"JointDistributionCoroutine",'
          ' dtype=Model(s=?, w=?))'),
         str(m))
     self.assertEqual(
         ('<tfp.distributions.JointDistributionCoroutine'
-         ' \'JointDistributionCoroutine/\''
+         ' \'JointDistributionCoroutine\''
          ' batch_shape=?'
          ' event_shape=?'
          ' dtype=Model(s=?, w=?)>'),
@@ -496,14 +496,14 @@ class JointDistributionCoroutineTest(tf.test.TestCase):
     m.sample()
     self.assertEqual(
         ('tfp.distributions.JointDistributionCoroutine('
-         '"JointDistributionCoroutine/",'
+         '"JointDistributionCoroutine",'
          ' batch_shape=Model(s=[], w=[]),'
          ' event_shape=Model(s=[100], w=[100]),'
          ' dtype=Model(s=float32, w=float32))'),
         str(m))
     self.assertEqual(
         ('<tfp.distributions.JointDistributionCoroutine'
-         ' \'JointDistributionCoroutine/\''
+         ' \'JointDistributionCoroutine\''
          ' batch_shape=Model(s=[], w=[])'
          ' event_shape=Model(s=[100], w=[100])'
          ' dtype=Model(s=float32, w=float32)>'),

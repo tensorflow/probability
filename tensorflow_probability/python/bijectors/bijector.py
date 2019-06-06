@@ -610,11 +610,9 @@ class Bijector(tf.Module):
     if not name:
       name = type(self).__name__
       name = name_util.camel_to_lower_snake(name)
-    name = name_util.get_name_scope_name(name.lstrip("_"))
-    # TODO(b/134508150): Uncomment once name requirements can be reconciled.
-    # name = name_util.strip_invalid_chars(name)
-    # name = name.rstrip("_")
-    # super(Bijector, self).__init__(name=name)
+    name = name_util.get_name_scope_name(name)
+    name = name_util.strip_invalid_chars(name)
+    super(Bijector, self).__init__(name=name)
     self._name = name
 
     self._graph_parents = graph_parents or []

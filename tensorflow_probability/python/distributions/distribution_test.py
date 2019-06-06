@@ -115,7 +115,7 @@ class DistributionStrReprTest(tf.test.TestCase):
     self.assertEqual(
         str(normal),
         "tfp.distributions.Normal("
-        "\"Normal/\", "
+        "\"Normal\", "
         "batch_shape=[], "
         "event_shape=[], "
         "dtype=float16)")
@@ -124,7 +124,7 @@ class DistributionStrReprTest(tf.test.TestCase):
     self.assertEqual(
         str(chi2),
         "tfp.distributions.Chi2("
-        "\"silly/\", "  # What a silly name that is!
+        "\"silly\", "  # What a silly name that is!
         "batch_shape=[2], "
         "event_shape=[], "
         "dtype=float32)")
@@ -138,7 +138,7 @@ class DistributionStrReprTest(tf.test.TestCase):
         rate=tf.compat.v1.placeholder_with_default(input=1., shape=None))
     self.assertEqual(
         str(exp),
-        "tfp.distributions.Exponential(\"Exponential/\", "
+        "tfp.distributions.Exponential(\"Exponential\", "
         # No batch shape.
         "event_shape=[], "
         "dtype=float32)")
@@ -149,7 +149,7 @@ class DistributionStrReprTest(tf.test.TestCase):
     self.assertEqual(
         str(mvn_static),
         "tfp.distributions.MultivariateNormalDiag("
-        "\"MVN/\", "
+        "\"MVN\", "
         "batch_shape=[2], "
         "event_shape=[2], "
         "dtype=float64)")
@@ -166,7 +166,7 @@ class DistributionStrReprTest(tf.test.TestCase):
     self.assertEqual(
         str(mvn_dynamic),
         "tfp.distributions.MultivariateNormalDiag("
-        "\"MVN2/\", "
+        "\"MVN2\", "
         "batch_shape=[?], "  # Partially known.
         "event_shape=[3], "
         "dtype=float32)")
@@ -176,7 +176,7 @@ class DistributionStrReprTest(tf.test.TestCase):
     self.assertEqual(
         repr(normal),
         "<tfp.distributions.Normal"
-        " 'Normal/'"
+        " 'Normal'"
         " batch_shape=[]"
         " event_shape=[]"
         " dtype=float16>")
@@ -185,7 +185,7 @@ class DistributionStrReprTest(tf.test.TestCase):
     self.assertEqual(
         repr(chi2),
         "<tfp.distributions.Chi2"
-        " 'silly/'"  # What a silly name that is!
+        " 'silly'"  # What a silly name that is!
         " batch_shape=[2]"
         " event_shape=[]"
         " dtype=float32>")
@@ -200,7 +200,7 @@ class DistributionStrReprTest(tf.test.TestCase):
     self.assertEqual(
         repr(exp),
         "<tfp.distributions.Exponential"
-        " 'Exponential/'"
+        " 'Exponential'"
         " batch_shape=?"
         " event_shape=[]"
         " dtype=float32>")
@@ -211,7 +211,7 @@ class DistributionStrReprTest(tf.test.TestCase):
     self.assertEqual(
         repr(mvn_static),
         "<tfp.distributions.MultivariateNormalDiag"
-        " 'MVN/'"
+        " 'MVN'"
         " batch_shape=[2]"
         " event_shape=[2]"
         " dtype=float64>")
@@ -228,7 +228,7 @@ class DistributionStrReprTest(tf.test.TestCase):
     self.assertEqual(
         repr(mvn_dynamic),
         "<tfp.distributions.MultivariateNormalDiag"
-        " 'MVN2/'"
+        " 'MVN2'"
         " batch_shape=[?]"  # Partially known.
         " event_shape=[3]"
         " dtype=float32>")
@@ -470,12 +470,12 @@ class DistributionTest(tf.test.TestCase):
     # Tensors also do not have names in eager mode, so exit early.
     if tf.executing_eagerly():
       return
-    self.assertStartsWith(x_sample.name, "x/custom_sample")
-    self.assertStartsWith(x_log_prob.name, "x/custom_log_prob")
+    self.assertStartsWith(x_sample.name, "x_2/custom_sample")
+    self.assertStartsWith(x_log_prob.name, "x_4/custom_log_prob")
 
     self.assertStartsWith(x_duplicate.name, "x_1")
-    self.assertStartsWith(x_duplicate_sample.name, "x_1/custom_sample")
-    self.assertStartsWith(x_sample_duplicate.name, "x/custom_sample_1")
+    self.assertStartsWith(x_duplicate_sample.name, "x_1_1/custom_sample")
+    self.assertStartsWith(x_sample_duplicate.name, "x_3/custom_sample")
 
   def testUnimplemtnedProbAndLogProbExceptions(self):
     class TerribleDistribution(tfd.Distribution):

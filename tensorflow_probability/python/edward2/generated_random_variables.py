@@ -30,52 +30,13 @@ from tensorflow_probability.python.internal import docstring_util
 
 # Dictionary between RV names and their original TFP distribution.
 rv_dict = {}
-for (dist_name, dist_class)  in six.iteritems(tfd.__dict__):
+for (dist_name_, dist_class)  in six.iteritems(tfd.__dict__):
   if inspect.isclass(dist_class) and issubclass(dist_class, tfd.Distribution):
-    rv_dict[dist_name] = dist_class
+    rv_dict[dist_name_] = dist_class
 
 __all__ = list(rv_dict.keys()) + [
     'as_random_variable'
 ]
-
-
-def _simple_name(distribution):
-  """Infer the original name passed into a distribution constructor.
-
-  Distributions typically follow the pattern of
-  with.name_scope(name) as name:
-    super(name=name)
-  so we attempt to reverse the name-scope transformation to allow
-  addressing of RVs by the distribution's original, user-visible
-  name kwarg.
-
-  Args:
-    distribution: a tfd.Distribution instance.
-  Returns:
-    simple_name: the original name passed into the Distribution.
-
-  #### Example
-
-  ```
-  d1 = tfd.Normal(0., 1., name='x') # d1.name = 'x/'
-  d2 = tfd.Normal(0., 1., name='x') # d2.name = 'x_2/'
-  _simple_name(d2) # returns 'x'
-
-  ```
-
-  """
-  simple_name = distribution.name
-
-  # turn 'scope/x/' into 'x'
-  if simple_name.endswith('/'):
-    simple_name = simple_name.split('/')[-2]
-
-  # turn 'x_3' into 'x'
-  parts = simple_name.split('_')
-  if parts[-1].isdigit():
-    simple_name = '_'.join(parts[:-1])
-
-  return simple_name
 
 
 @interceptable
@@ -138,10 +99,15 @@ def as_random_variable(distribution,
   ```
   """
 
+  dist_name = distribution.parameters.get('name', None)
+  if dist_name is None:
+    raise ValueError('Distribution ({}) must have explicit name.'.format(
+        str(distribution)))
+
   return _build_custom_rv(distribution=distribution,
                           sample_shape=sample_shape,
                           value=value,
-                          name=_simple_name(distribution))
+                          name=dist_name)
 
 
 def _make_random_variable(distribution_cls):
