@@ -268,7 +268,9 @@ class LocalLevel(StructuralTimeSeries):
 
       super(LocalLevel, self).__init__(
           parameters=[
-              Parameter('level_scale', level_scale_prior, tfb.Softplus()),
+              Parameter('level_scale', level_scale_prior,
+                        tfb.Chain([tfb.AffineScalar(scale=observed_stddev),
+                                   tfb.Softplus()])),
           ],
           latent_size=1,
           name=name)

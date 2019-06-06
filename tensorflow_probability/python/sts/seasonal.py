@@ -876,7 +876,9 @@ class Seasonal(StructuralTimeSeries):
 
       super(Seasonal, self).__init__(
           parameters=[
-              Parameter('drift_scale', drift_scale_prior, tfb.Softplus()),
+              Parameter('drift_scale', drift_scale_prior,
+                        tfb.Chain([tfb.AffineScalar(scale=observed_stddev),
+                                   tfb.Softplus()])),
           ],
           latent_size=(num_seasons - 1
                        if self.constrain_mean_effect_to_zero else num_seasons),

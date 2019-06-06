@@ -237,7 +237,7 @@ def build_factored_variational_loss(model,
     for param in model.parameters:
       def initial_loc_fn(param):
         return sample_uniform_initial_state(
-            param, return_constrained=True,
+            param, return_constrained=False,
             init_sample_shape=init_batch_shape,
             seed=seed())
       q = _build_trainable_posterior(param, initial_loc_fn=initial_loc_fn)

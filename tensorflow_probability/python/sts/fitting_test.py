@@ -76,6 +76,23 @@ class VariationalInferenceTests(tf.test.TestCase):
           [self.evaluate(variational_loss) for _ in range(25)], axis=0)
     self.assertAllEqual(avg_loss.shape, [num_inits] + batch_shape)
 
+  def test_init_is_valid_for_large_observations(self):
+    num_timesteps = 20
+    observed_time_series = (
+        -1e8 + 1e6 * np.random.randn(num_timesteps)).astype(np.float32)
+    model = self._build_model(observed_time_series)
+    variational_loss, _ = tfp.sts.build_factored_variational_loss(
+        model=model, observed_time_series=observed_time_series)
+    self.evaluate(tf.compat.v1.global_variables_initializer())
+    loss_ = self.evaluate(variational_loss)
+    self.assertTrue(np.isfinite(loss_))
+
+    # When this test was written, the variational loss with default
+    # initialization and seed was 431.5 nats. Larger finite initial losses are
+    # not 'incorrect' as such, but if your change makes the next line fail,
+    # you have probably done something questionable.
+    self.assertLessEqual(loss_, 10000)
+
 
 class _HMCTests(object):
 

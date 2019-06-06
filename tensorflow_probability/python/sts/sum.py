@@ -439,13 +439,16 @@ class Sum(StructuralTimeSeries):
 
       # Build parameters list for the combined model, by inheriting parameters
       # from the component models in canonical order.
-      parameters = [
-          Parameter('observation_noise_scale', observation_noise_scale_prior,
-                    tfb.Softplus()),
-      ] + [Parameter(name='{}_{}'.format(component.name, parameter.name),
-                     prior=parameter.prior,
-                     bijector=parameter.bijector)
-           for component in components for parameter in component.parameters]
+      parameters = [Parameter('observation_noise_scale',
+                              observation_noise_scale_prior,
+                              tfb.Chain([
+                                  tfb.AffineScalar(scale=observed_stddev),
+                                  tfb.Softplus()]))]
+      for component in components:
+        for parameter in component.parameters:
+          parameters.append(Parameter(
+              name='{}_{}'.format(component.name, parameter.name),
+              prior=parameter.prior, bijector=parameter.bijector))
 
       self._components = components
       self._components_by_name = components_by_name
